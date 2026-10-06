@@ -1,4 +1,4 @@
-// Creates the login account. With --demo, also adds sample customers, templates,
+// Creates the admin login account. With --demo, also adds a demo client with sample customers, templates,
 // a twice-weekly campaign and two weeks of message history.
 //   npm run seed            (uses ADMIN_EMAIL / ADMIN_PASSWORD / ADMIN_NAME)
 //   npm run seed -- --demo
@@ -19,12 +19,14 @@ async function main() {
 
   await db.user.upsert({
     where: { email },
-    update: { passwordHash: await bcrypt.hash(password, 12) },
-    create: { email, name: process.env.ADMIN_NAME ?? "Admin", passwordHash: await bcrypt.hash(password, 12) },
+    update: { passwordHash: await bcrypt.hash(password, 12), role: "ADMIN", clientId: null },
+    create: { email, name: process.env.ADMIN_NAME ?? "Admin", role: "ADMIN", passwordHash: await bcrypt.hash(password, 12) },
   });
-  console.log(`✓ Login ready for ${email}`);
+  console.log(`✓ Admin login ready for ${email}`);
 
   if (!process.argv.includes("--demo")) return;
+
+  const { id: clientId } = await db.client.upsert({ where: { name: "Demo Café" }, update: {}, create: { name: "Demo Café" } });
 
   const first = ["Priya", "Arjun", "Meena", "Rahul", "Divya", "Karthik", "Sneha", "Vikram", "Anitha", "Suresh", "Lakshmi", "Nikhil"];
   const last = ["Sharma", "Rao", "Iyer", "Nair", "Reddy", "Menon", "Pillai", "Kumar", "Das", "Patel"];
@@ -32,15 +34,17 @@ async function main() {
   const customers = Array.from({ length: 1000 }, (_, i) => ({
     name: `${first[i % first.length]} ${last[(i * 7) % last.length]}`,
     phone: `91${9000000000 + i * 7919}`,
+    clientId,
     tags: [tags[i % 3]],
     optedOut: i % 97 === 0,
   }));
   await db.customer.createMany({ data: customers, skipDuplicates: true });
 
   const offer = await db.template.upsert({
-    where: { name_language: { name: "weekly_offer", language: "en" } },
+    where: { clientId_name_language: { clientId, name: "weekly_offer", language: "en" } },
     update: {},
     create: {
+      clientId,
       name: "weekly_offer",
       language: "en",
       category: "MARKETING",
@@ -54,9 +58,10 @@ async function main() {
     },
   });
   await db.template.upsert({
-    where: { name_language: { name: "order_ready", language: "en" } },
+    where: { clientId_name_language: { clientId, name: "order_ready", language: "en" } },
     update: {},
     create: {
+      clientId,
       name: "order_ready",
       language: "en",
       category: "UTILITY",
@@ -66,21 +71,21 @@ async function main() {
     },
   });
   await db.template.upsert({
-    where: { name_language: { name: "login_code", language: "en" } },
+    where: { clientId_name_language: { clientId, name: "login_code", language: "en" } },
     update: {},
-    create: { name: "login_code", language: "en", category: "AUTHENTICATION", status: "APPROVED", body: "", codeExpiryMins: 10, securityNote: true, buttons: [{ type: "COPY_CODE", text: "Copy code" }] },
+    create: { clientId, name: "login_code", language: "en", category: "AUTHENTICATION", status: "APPROVED", body: "", codeExpiryMins: 10, securityNote: true, buttons: [{ type: "COPY_CODE", text: "Copy code" }] },
   });
 
   const schedule = { scheduleType: "WEEKLY" as const, daysOfWeek: [2, 5], sendTime: "10:00", runAt: null, timezone: "Asia/Kolkata" };
   const campaign =
-    (await db.campaign.findFirst({ where: { name: "Tuesday & Friday offers" } })) ??
+    (await db.campaign.findFirst({ where: { clientId, name: "Tuesday & Friday offers" } })) ??
     (await db.campaign.create({
-      data: { name: "Tuesday & Friday offers", templateId: offer.id, ...schedule, batchSize: 100, intervalMinutes: 10, nextRunAt: computeNextRun(schedule) },
+      data: { clientId, name: "Tuesday & Friday offers", templateId: offer.id, ...schedule, batchSize: 100, intervalMinutes: 10, nextRunAt: computeNextRun(schedule) },
     }));
 
   // Two weeks of history
   if (!(await db.campaignRun.count({ where: { campaignId: campaign.id } }))) {
-    const all = await db.customer.findMany({ where: { optedOut: false }, select: { id: true, name: true } });
+    const all = await db.customer.findMany({ where: { clientId, optedOut: false }, select: { id: true, name: true } });
     for (let d = 13; d >= 1; d--) {
       const day = new Date(Date.now() - d * 86_400_000);
       if (![2, 5].includes(day.getDay())) continue;

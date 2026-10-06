@@ -12,7 +12,7 @@ const LOCAL_GAP_MS = [1_000, 3_000]; // random pause between local-session sends
 /** Creates a run and queues one message per eligible customer. */
 export async function startRun(campaign: Campaign & { template: { name: string } }, scheduledFor: Date) {
   const customers = await db.customer.findMany({
-    where: { optedOut: false, ...(campaign.audienceTag ? { tags: { has: campaign.audienceTag } } : {}) },
+    where: { clientId: campaign.clientId, optedOut: false, ...(campaign.audienceTag ? { tags: { has: campaign.audienceTag } } : {}) },
     select: { id: true },
   });
   const run = await db.campaignRun.create({
@@ -74,7 +74,7 @@ function sessionDown(e: unknown) {
 async function processRun(runId: string, now: Date, deadline: number) {
   const run = await db.campaignRun.findUnique({
     where: { id: runId },
-    include: { campaign: { include: { template: true } } },
+    include: { campaign: { include: { template: true, client: true } } },
   });
   if (!run) return { sent: 0, failed: 0 };
   const { campaign } = run;
@@ -95,7 +95,7 @@ async function processRun(runId: string, now: Date, deadline: number) {
     await pause("WAITING_TEMPLATE", 5);
     return { sent: 0, failed: 0 };
   }
-  if (!(await readiness(settings)).ok) {
+  if (!(await readiness(settings, campaign.client)).ok) {
     await pause("WAITING_CONNECTION", 2);
     return { sent: 0, failed: 0 };
   }
@@ -109,7 +109,7 @@ async function processRun(runId: string, now: Date, deadline: number) {
   });
 
   // The local session sends one by one with human-like gaps; Meta can take parallel sends.
-  const local = settings.provider === "LOCAL" && !isSimulated(settings);
+  const local = settings.provider === "LOCAL" && !isSimulated(settings, campaign.client);
   let sent = 0;
   let failed = 0;
   let outOfTime = false;
@@ -125,7 +125,7 @@ async function processRun(runId: string, now: Date, deadline: number) {
       return;
     }
     try {
-      const res = await deliver(settings, t, m.customer);
+      const res = await deliver(settings, t, m.customer, campaign.client);
       await db.message.update({
         where: { id: m.id },
         data: {

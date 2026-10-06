@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { normalizePhone } from "@/lib/phone";
-import { requireUser } from "@/lib/session";
+import { requireAdmin } from "@/lib/session";
 import { deliver, getSettings, readiness, templateSendable } from "@/lib/provider";
 import {
   fromMetaComponents,
@@ -20,6 +20,7 @@ import {
   MetaError,
   uploadHeaderSample,
   waConfig,
+  type WaConfig,
 } from "@/lib/whatsapp";
 
 export type ActionResult = { ok: boolean; message?: string; errors?: string[]; id?: string };
@@ -41,16 +42,27 @@ function contentFields(d: TemplateDraft) {
   } as const;
 }
 
-async function metaComponents(d: TemplateDraft) {
-  const handle = d.category !== "AUTHENTICATION" && d.headerType === "IMAGE" ? await uploadHeaderSample(d.headerMediaUrl) : undefined;
+async function metaComponents(cfg: WaConfig, d: TemplateDraft) {
+  const handle = d.category !== "AUTHENTICATION" && d.headerType === "IMAGE" ? await uploadHeaderSample(cfg, d.headerMediaUrl) : undefined;
   return toMetaComponents(d, handle);
 }
 
+/** The WhatsApp account a client's templates live in. */
+async function clientWa(clientId: string) {
+  return waConfig(await db.client.findUnique({ where: { id: clientId } }));
+}
+
 export async function saveTemplate(id: string | null, draft: TemplateDraft): Promise<ActionResult> {
-  await requireUser();
+  const s = id ? await requireAdmin() : await requireAdmin(true);
+  if ("denied" in s) return { ok: false, message: s.denied };
   const errors = validateDraft(draft);
   if (errors.length) return { ok: false, errors };
-  const { live } = waConfig();
+  const owner = id ? await db.template.findUnique({ where: { id }, select: { clientId: true } }) : null;
+  if (id && !owner) return { ok: false, message: "Template not found." };
+  const clientId = owner?.clientId ?? s.clientId!;
+  const cfg = await clientWa(clientId);
+  const { live } = cfg;
+  const sameName = { clientId_name_language: { clientId, name: draft.name, language: draft.language } };
 
   // Local session: no Meta review. A template Meta had approved no longer matches, so it
   // goes back to draft and is resubmitted the next time it's saved with Meta active.
@@ -69,11 +81,11 @@ export async function saveTemplate(id: string | null, draft: TemplateDraft): Pro
       revalidatePath("/dashboard/templates");
       return { ok: true, id, message: "Saved. The local session sends the new version from the next batch." };
     }
-    if (await db.template.findUnique({ where: { name_language: { name: draft.name, language: draft.language } } })) {
+    if (await db.template.findUnique({ where: sameName })) {
       return { ok: false, errors: ["A template with this name and language already exists."] };
     }
     const created = await db.template.create({
-      data: { name: draft.name, language: draft.language, category: draft.category, ...contentFields(draft), status: "DRAFT" },
+      data: { clientId, name: draft.name, language: draft.language, category: draft.category, ...contentFields(draft), status: "DRAFT" },
     });
     revalidatePath("/dashboard/templates");
     return { ok: true, id: created.id, message: "Template saved. The local session can send it right away." };
@@ -85,9 +97,9 @@ export async function saveTemplate(id: string | null, draft: TemplateDraft): Pro
     if (!existing) return { ok: false, message: "Template not found." };
     const merged = { ...draft, name: existing.name, language: existing.language, category: existing.category };
     try {
-      if (live && existing.metaId) await editMetaTemplate(existing.metaId, await metaComponents(merged));
+      if (live && existing.metaId) await editMetaTemplate(cfg, existing.metaId, await metaComponents(cfg, merged));
       else if (live) {
-        const res = await createMetaTemplate({ name: existing.name, language: existing.language, category: existing.category, components: await metaComponents(merged) });
+        const res = await createMetaTemplate(cfg, { name: existing.name, language: existing.language, category: existing.category, components: await metaComponents(cfg, merged) });
         await db.template.update({ where: { id }, data: { metaId: res.id } });
       }
     } catch (e) {
@@ -107,18 +119,18 @@ export async function saveTemplate(id: string | null, draft: TemplateDraft): Pro
     };
   }
 
-  if (await db.template.findUnique({ where: { name_language: { name: draft.name, language: draft.language } } })) {
+  if (await db.template.findUnique({ where: sameName })) {
     return { ok: false, errors: ["A template with this name and language already exists."] };
   }
   const created = await db.template.create({
-    data: { name: draft.name, language: draft.language, category: draft.category, ...contentFields(draft), status: live ? "DRAFT" : "APPROVED" },
+    data: { clientId, name: draft.name, language: draft.language, category: draft.category, ...contentFields(draft), status: live ? "DRAFT" : "APPROVED" },
   });
   if (!live) {
     revalidatePath("/dashboard/templates");
     return { ok: true, id: created.id, message: "Template created. Demo mode approves templates instantly." };
   }
   try {
-    const res = await createMetaTemplate({ name: draft.name, language: draft.language, category: draft.category, components: await metaComponents(draft) });
+    const res = await createMetaTemplate(cfg, { name: draft.name, language: draft.language, category: draft.category, components: await metaComponents(cfg, draft) });
     await db.template.update({
       where: { id: created.id },
       data: { metaId: res.id, status: mapMetaStatus(res.status), category: res.category as never, lastSyncedAt: new Date() },
@@ -133,16 +145,19 @@ export async function saveTemplate(id: string | null, draft: TemplateDraft): Pro
 }
 
 export async function syncTemplates(): Promise<ActionResult> {
-  await requireUser();
-  if (!waConfig().live) return { ok: false, message: "Connect WhatsApp in Settings to sync templates from Meta." };
+  const s = await requireAdmin(true);
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const { clientId } = s;
+  const cfg = await clientWa(clientId);
+  if (!cfg.live) return { ok: false, message: "Add this client's WhatsApp details on the Clients page to sync templates from Meta." };
   try {
-    const remote = await listMetaTemplates();
+    const remote = await listMetaTemplates(cfg);
     let imported = 0;
     for (const r of remote) {
       const parsed = fromMetaComponents(r.components ?? []);
       const status = mapMetaStatus(r.status);
       const category = (["MARKETING", "UTILITY", "AUTHENTICATION"].includes(r.category) ? r.category : "UTILITY") as never;
-      const local = await db.template.findFirst({ where: { OR: [{ metaId: r.id }, { name: r.name, language: r.language }] } });
+      const local = await db.template.findFirst({ where: { clientId, OR: [{ metaId: r.id }, { name: r.name, language: r.language }] } });
       const content = {
         ...parsed,
         headerText: parsed.headerType === "TEXT" ? parsed.headerText : null,
@@ -156,7 +171,7 @@ export async function syncTemplates(): Promise<ActionResult> {
       if (local) {
         await db.template.update({ where: { id: local.id }, data: content });
       } else {
-        await db.template.create({ data: { name: r.name, language: r.language, ...content, variables: { "1": { source: "name" } } } });
+        await db.template.create({ data: { clientId, name: r.name, language: r.language, ...content, variables: { "1": { source: "name" } } } });
         imported++;
       }
     }
@@ -168,12 +183,14 @@ export async function syncTemplates(): Promise<ActionResult> {
 }
 
 export async function deleteTemplate(id: string): Promise<ActionResult> {
-  await requireUser();
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
   const t = await db.template.findUnique({ where: { id }, include: { _count: { select: { campaigns: true } } } });
   if (!t) return { ok: false, message: "Template not found." };
   if (t._count.campaigns) return { ok: false, message: "This template is used by a campaign. Change or delete the campaign first." };
   try {
-    if (waConfig().live && t.metaId) await deleteMetaTemplate(t.name, t.metaId);
+    const cfg = await clientWa(t.clientId);
+    if (cfg.live && t.metaId) await deleteMetaTemplate(cfg, t.name, t.metaId);
   } catch (e) {
     return { ok: false, message: errText(e) };
   }
@@ -183,22 +200,23 @@ export async function deleteTemplate(id: string): Promise<ActionResult> {
 }
 
 export async function sendTestMessage(id: string, rawPhone: string): Promise<ActionResult> {
-  await requireUser();
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
   const phone = normalizePhone(rawPhone);
   if (!phone) return { ok: false, message: "Enter a valid mobile number." };
-  const t = await db.template.findUnique({ where: { id } });
+  const t = await db.template.findUnique({ where: { id }, include: { client: true } });
   if (!t) return { ok: false, message: "Template not found." };
   if (t.category === "AUTHENTICATION") return { ok: false, message: "Authentication templates are sent by your app's login flow, not from here." };
   const settings = await getSettings();
   if (!templateSendable(settings, t)) return { ok: false, message: "Only templates approved by Meta can be sent." };
-  const ready = await readiness(settings);
+  const ready = await readiness(settings, t.client);
   if (!ready.ok) return { ok: false, message: ready.reason };
 
   const customer =
-    (await db.customer.findUnique({ where: { phone } })) ??
-    (await db.customer.create({ data: { phone, name: "Test recipient", tags: ["test"] } }));
+    (await db.customer.findUnique({ where: { clientId_phone: { clientId: t.clientId, phone } } })) ??
+    (await db.customer.create({ data: { clientId: t.clientId, phone, name: "Test recipient", tags: ["test"] } }));
   try {
-    const res = await deliver(settings, t, customer);
+    const res = await deliver(settings, t, customer, t.client);
     await db.message.create({
       data: {
         customerId: customer.id, templateId: t.id, templateName: t.name, body: res.text, status: "SENT",

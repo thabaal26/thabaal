@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
   } else if (e.event === "message") {
     const p = (e as Extract<Event, { event: "message" }>).payload;
     if (!p.fromMe && OPT_OUT.test(p.body ?? "")) {
+      // Every client sends through the one local session, so STOP opts out of all of them.
       await db.customer.updateMany({ where: { phone: p.from.split("@")[0] }, data: { optedOut: true } });
     }
   }

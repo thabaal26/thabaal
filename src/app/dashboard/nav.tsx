@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, LayoutDashboard, MessagesSquare, Settings, SquarePen, Users } from "lucide-react";
+import { Building2, CalendarClock, LayoutDashboard, MessagesSquare, Settings, SquarePen, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
@@ -14,15 +14,17 @@ export const NAV = [
   { href: "/dashboard/settings", label: "Settings", short: "Settings", icon: Settings },
 ];
 
+const ADMIN_NAV = [{ href: "/dashboard/clients", label: "Clients", short: "Clients", icon: Building2 }];
+
 function isActive(path: string, href: string) {
   return href === "/dashboard" ? path === href : path.startsWith(href);
 }
 
-export function SideNav() {
+export function SideNav({ isAdmin }: { isAdmin: boolean }) {
   const path = usePathname();
   return (
     <nav className="space-y-0.5">
-      {NAV.map(({ href, label, icon: Icon }) => (
+      {[...NAV, ...(isAdmin ? ADMIN_NAV : [])].map(({ href, label, icon: Icon }) => (
         <Link
           key={href}
           href={href}

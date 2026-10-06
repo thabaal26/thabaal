@@ -7,7 +7,7 @@ import { dispatch, startRun } from "@/lib/dispatcher";
 import { APP_TZ } from "@/lib/format";
 import { getSettings, templateSendable } from "@/lib/provider";
 import { computeNextRun } from "@/lib/schedule";
-import { requireUser } from "@/lib/session";
+import { requireAdmin } from "@/lib/session";
 import type { ActionResult } from "./templates";
 
 export type CampaignInput = {
@@ -28,10 +28,15 @@ function refresh() {
 }
 
 export async function saveCampaign(id: string | null, input: CampaignInput): Promise<ActionResult> {
-  await requireUser();
+  const s = id ? await requireAdmin() : await requireAdmin(true);
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const existing = id ? await db.campaign.findUnique({ where: { id }, select: { clientId: true } }) : null;
+  if (id && !existing) return { ok: false, message: "Campaign not found." };
+  const clientId = existing?.clientId ?? s.clientId!;
+
   const errors: string[] = [];
   if (!input.name.trim()) errors.push("Give the campaign a name.");
-  const template = await db.template.findUnique({ where: { id: input.templateId } });
+  const template = await db.template.findUnique({ where: { id: input.templateId, clientId } });
   if (!template) errors.push("Choose a template.");
   else if (template.category === "AUTHENTICATION") errors.push("Authentication templates can't be used in campaigns.");
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(input.sendTime)) errors.push("Choose a send time.");
@@ -62,7 +67,7 @@ export async function saveCampaign(id: string | null, input: CampaignInput): Pro
 
   const saved = id
     ? await db.campaign.update({ where: { id }, data: { ...data, nextRunAt } })
-    : await db.campaign.create({ data: { ...data, nextRunAt } });
+    : await db.campaign.create({ data: { ...data, clientId, nextRunAt } });
 
   // Batch size and interval apply to runs already in progress from their next batch.
   refresh();
@@ -70,7 +75,8 @@ export async function saveCampaign(id: string | null, input: CampaignInput): Pro
 }
 
 export async function toggleCampaign(id: string, active: boolean): Promise<ActionResult> {
-  await requireUser();
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
   const c = await db.campaign.findUnique({ where: { id } });
   if (!c) return { ok: false, message: "Campaign not found." };
   const nextRunAt = active ? computeNextRun(c) : null;
@@ -81,7 +87,8 @@ export async function toggleCampaign(id: string, active: boolean): Promise<Actio
 }
 
 export async function deleteCampaign(id: string): Promise<ActionResult> {
-  await requireUser();
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
   await db.message.deleteMany({ where: { run: { campaignId: id }, status: "QUEUED" } });
   await db.campaign.delete({ where: { id } });
   refresh();
@@ -89,7 +96,8 @@ export async function deleteCampaign(id: string): Promise<ActionResult> {
 }
 
 export async function runCampaignNow(id: string): Promise<ActionResult> {
-  await requireUser();
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
   const c = await db.campaign.findUnique({ where: { id }, include: { template: true } });
   if (!c) return { ok: false, message: "Campaign not found." };
   if (!templateSendable(await getSettings(), c.template)) return { ok: false, message: "The template isn't approved by Meta yet." };
@@ -102,7 +110,8 @@ export async function runCampaignNow(id: string): Promise<ActionResult> {
 }
 
 export async function cancelRun(runId: string): Promise<ActionResult> {
-  await requireUser();
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
   const skipped = await db.message.updateMany({
     where: { runId, status: "QUEUED" },
     data: { status: "SKIPPED", error: "Run stopped from dashboard" },
@@ -113,7 +122,8 @@ export async function cancelRun(runId: string): Promise<ActionResult> {
 }
 
 export async function runDispatcherNow(): Promise<ActionResult> {
-  await requireUser();
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
   const r = await dispatch();
   refresh();
   return { ok: true, message: `Scheduler ran: ${r.campaignsStarted} campaigns started, ${r.sent} sent, ${r.failed} failed.` };

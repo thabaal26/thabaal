@@ -3,10 +3,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
-import { Card, CardHeader, PageHeader, StatusBadge } from "@/components/ui";
+import { Badge, Card, CardHeader, PageHeader, StatusBadge } from "@/components/ui";
 import { db } from "@/lib/db";
 import { APP_TZ, fmtDate, fmtNumber, pct } from "@/lib/format";
 import { formatInTimeZone } from "date-fns-tz";
+import { DAYS } from "@/lib/schedule";
+import { getScope, owned } from "@/lib/session";
 import { cancelRun, deleteCampaign, runCampaignNow, toggleCampaign } from "../../actions/campaigns";
 import { CampaignForm } from "../campaign-form";
 import { campaignFormData } from "../form-data";
@@ -16,14 +18,15 @@ export const dynamic = "force-dynamic";
 
 export default async function CampaignPage({ params }: PageProps<"/dashboard/campaigns/[id]">) {
   const { id } = await params;
-  const c = await db.campaign.findUnique({
-    where: { id },
-    include: { runs: { orderBy: { scheduledFor: "desc" }, take: 20 } },
+  const scope = await getScope();
+  const c = await db.campaign.findFirst({
+    where: { id, ...owned(scope) },
+    include: { runs: { orderBy: { scheduledFor: "desc" }, take: 20 }, template: { select: { name: true, status: true } } },
   });
   if (!c) notFound();
 
   const [{ templates, audience }, stats] = await Promise.all([
-    campaignFormData(),
+    campaignFormData(c.clientId),
     db.message.groupBy({ by: ["runId", "status"], where: { runId: { in: c.runs.map((r) => r.id) } }, _count: true }),
   ]);
   const stat = (runId: string, ...s: string[]) =>
@@ -38,7 +41,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
         title={c.name}
         description={c.active && c.nextRunAt ? `Next send ${fmtDate(c.nextRunAt, "EEEE d MMM, h:mm a")}` : "Paused: nothing scheduled"}
         actions={
-          <>
+          scope.isAdmin && <>
             <ActionButton action={runCampaignNow.bind(null, c.id)} size="md" confirm="Start sending this campaign to its customers now?">
               <Send className="size-4" /> Send now
             </ActionButton>
@@ -52,6 +55,34 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
         }
       />
 
+      {!scope.isAdmin ? (
+        <Card>
+          <CardHeader title="Campaign details" />
+          <dl className="grid gap-4 p-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <dt className="text-xs text-muted">Template</dt>
+              <dd className="mt-1 flex flex-wrap items-center gap-2 font-mono">{c.template.name} <StatusBadge status={c.template.status} /></dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted">Sent to</dt>
+              <dd className="mt-1">
+                {c.audienceTag ? <Badge>{c.audienceTag}</Badge> : "All customers"}{" "}
+                <span className="text-xs text-muted">· {fmtNumber(c.audienceTag ? (audience.tags.find((t) => t.tag === c.audienceTag)?.n ?? 0) : audience.all)} customers</span>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted">Schedule</dt>
+              <dd className="mt-1">
+                {c.scheduleType === "WEEKLY" ? `Every ${c.daysOfWeek.map((d) => DAYS[d]).join(", ")}` : `Once on ${fmtDate(c.runAt, "d MMM yyyy")}`} at {c.sendTime}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted">Pace</dt>
+              <dd className="mt-1">{c.batchSize} messages every {c.intervalMinutes} min</dd>
+            </div>
+          </dl>
+        </Card>
+      ) : (
       <CampaignForm
         id={c.id}
         templates={templates}
@@ -69,6 +100,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
           active: c.active,
         }}
       />
+      )}
 
       <Card className="mt-6">
         <CardHeader title="Send history" description="The last 20 runs of this campaign." />
@@ -100,7 +132,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
                     ))}
                   </dl>
                   <div className="mt-2 flex justify-end">
-                    {running ? (
+                    {running && scope.isAdmin ? (
                       <ActionButton action={cancelRun.bind(null, r.id)} variant="danger" confirm="Stop this run?">Stop sending</ActionButton>
                     ) : (
                       <Link href={`/dashboard/messages?campaign=${c.id}`} className="py-2 text-sm font-medium text-brand-deep">View messages →</Link>
@@ -136,7 +168,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
                       <td className="px-5 py-3 text-right">{fmtNumber(read)} <span className="text-xs text-muted">{pct(read, r.total)}%</span></td>
                       <td className="px-5 py-3 text-right text-rose-600">{fmtNumber(stat(r.id, "FAILED"))}</td>
                       <td className="px-5 py-3 text-right">
-                        {["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION"].includes(r.status) ? (
+                        {scope.isAdmin && ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION"].includes(r.status) ? (
                           <ActionButton action={cancelRun.bind(null, r.id)} variant="danger" confirm="Stop this run?">Stop</ActionButton>
                         ) : (
                           <Link href={`/dashboard/messages?campaign=${c.id}`} className="text-xs font-medium text-brand-deep hover:underline">Log</Link>

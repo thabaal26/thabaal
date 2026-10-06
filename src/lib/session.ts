@@ -47,10 +47,60 @@ export async function readSessionUserId(token?: string) {
 export const requireUser = cache(async () => {
   const userId = await readSessionUserId((await cookies()).get(COOKIE)?.value);
   const user = userId
-    ? await db.user.findUnique({ where: { id: userId }, select: { id: true, email: true, name: true } })
+    ? await db.user.findUnique({
+        where: { id: userId },
+        select: { id: true, email: true, name: true, role: true, clientId: true, client: { select: { name: true } } },
+      })
     : null;
-  if (!user) redirect("/login");
+  if (!user || (user.role === "CLIENT" && !user.clientId)) redirect("/login");
   return user;
 });
 
 export const SESSION_COOKIE = COOKIE;
+/** Admin-only: which client the admin is looking at. Absent means all clients. */
+export const CLIENT_COOKIE = "wp_client";
+
+export type Scope = {
+  isAdmin: boolean;
+  /** null only for an admin viewing all clients */
+  clientId: string | null;
+  clientName: string | null;
+};
+
+/**
+ * What the signed-in user may see. Client logins are pinned to their own client;
+ * admins see the client picked in the switcher, or everything.
+ */
+export const getScope = cache(async (): Promise<Scope> => {
+  const user = await requireUser();
+  if (user.role === "CLIENT") return { isAdmin: false, clientId: user.clientId, clientName: user.client?.name ?? null };
+  const picked = (await cookies()).get(CLIENT_COOKIE)?.value;
+  const client = picked ? await db.client.findUnique({ where: { id: picked }, select: { id: true, name: true } }) : null;
+  return { isAdmin: true, clientId: client?.id ?? null, clientName: client?.name ?? null };
+});
+
+/** Prisma filter for models that carry clientId (Customer, Template, Campaign, PendingCustomer). */
+export function owned(s: Scope) {
+  return s.clientId ? { clientId: s.clientId } : {};
+}
+
+/** Prisma filter for Message and CampaignRun, which belong to a client through their customer or campaign. */
+export function ownedMessages(s: Scope) {
+  return s.clientId ? { customer: { clientId: s.clientId } } : {};
+}
+
+type Denied = { denied: string };
+
+/**
+ * For server actions that change data: only admins may write. With `needClient`,
+ * the admin must have a client picked so new records know where they belong.
+ * Callers return `{ ok: false, message: s.denied }` when this is denied.
+ */
+export async function requireAdmin(): Promise<Scope | Denied>;
+export async function requireAdmin(needClient: true): Promise<(Scope & { clientId: string }) | Denied>;
+export async function requireAdmin(needClient = false): Promise<Scope | Denied> {
+  const s = await getScope();
+  if (!s.isAdmin) return { denied: "Your account can view campaigns but not change them." };
+  if (needClient && !s.clientId) return { denied: "Pick a client in the sidebar first." };
+  return s;
+}

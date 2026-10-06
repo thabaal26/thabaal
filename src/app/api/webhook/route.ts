@@ -52,6 +52,14 @@ async function applyStatus(s: StatusUpdate) {
   });
 }
 
+/** STOP only opts out of the business whose number received it. */
+async function optOut(phone: string, phoneNumberId?: string) {
+  const owner = phoneNumberId ? await db.client.findUnique({ where: { waPhoneNumberId: phoneNumberId }, select: { id: true } }) : null;
+  // Clients without their own number all share the env-configured one.
+  const client = owner ? { clientId: owner.id } : { client: { waPhoneNumberId: null } };
+  await db.customer.updateMany({ where: { phone, ...client }, data: { optedOut: true } });
+}
+
 export async function POST(req: NextRequest) {
   const raw = await req.text();
   if (!validSignature(raw, req.headers.get("x-hub-signature-256"))) {
@@ -66,7 +74,7 @@ export async function POST(req: NextRequest) {
         for (const s of v.statuses ?? []) await applyStatus(s);
         for (const m of v.messages ?? []) {
           const text = m.text?.body ?? m.button?.text ?? m.interactive?.button_reply?.title ?? "";
-          if (OPT_OUT.test(text)) await db.customer.updateMany({ where: { phone: m.from }, data: { optedOut: true } });
+          if (OPT_OUT.test(text)) await optOut(m.from, v.metadata?.phone_number_id);
         }
       } else if (change.field === "message_template_status_update") {
         await db.template.updateMany({

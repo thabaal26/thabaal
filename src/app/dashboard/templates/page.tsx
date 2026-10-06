@@ -7,6 +7,7 @@ import { WhatsAppBubble } from "@/components/whatsapp-preview";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { fmtDate } from "@/lib/format";
+import { getScope, owned } from "@/lib/session";
 import { CATEGORY_INFO, renderFor, SAMPLE_CUSTOMER, type Category, type TemplateButton, type VarMap } from "@/lib/template";
 import { deleteTemplate, syncTemplates } from "../actions/templates";
 
@@ -16,13 +17,15 @@ export const dynamic = "force-dynamic";
 export default async function TemplatesPage({ searchParams }: PageProps<"/dashboard/templates">) {
   const { category } = await searchParams;
   const active = (Object.keys(CATEGORY_INFO) as Category[]).find((c) => c === category);
+  const scope = await getScope();
+  const canCreate = scope.isAdmin && scope.clientId;
   const [templates, counts] = await Promise.all([
     db.template.findMany({
-      where: active ? { category: active } : {},
-      include: { _count: { select: { campaigns: true } } },
+      where: { ...owned(scope), ...(active ? { category: active } : {}) },
+      include: { _count: { select: { campaigns: true } }, client: { select: { name: true } } },
       orderBy: { updatedAt: "desc" },
     }),
-    db.template.groupBy({ by: ["category"], _count: true }),
+    db.template.groupBy({ by: ["category"], where: owned(scope), _count: true }),
   ]);
   const total = counts.reduce((a, c) => a + c._count, 0);
 
@@ -32,7 +35,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
         title="Templates"
         description="Messages Meta has approved for your number. Edit one here and every future send uses the new version once Meta approves it."
         actions={
-          <>
+          canCreate && <>
             <ActionButton action={syncTemplates} size="md" title="Fetch the latest templates and statuses from Meta">
               <RefreshCw className="size-4" /> Sync with Meta
             </ActionButton>
@@ -78,15 +81,17 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <Link href={`/dashboard/templates/${t.id}`} className="block truncate font-mono text-sm font-medium hover:underline">{t.name}</Link>
-                      <p className="mt-0.5 text-xs text-muted">{t.language} · updated {fmtDate(t.updatedAt, "d MMM")}{t._count.campaigns ? ` · ${t._count.campaigns} campaign${t._count.campaigns > 1 ? "s" : ""}` : ""}</p>
+                      <p className="mt-0.5 text-xs text-muted">{!scope.clientId && `${t.client.name} · `}{t.language} · updated {fmtDate(t.updatedAt, "d MMM")}{t._count.campaigns ? ` · ${t._count.campaigns} campaign${t._count.campaigns > 1 ? "s" : ""}` : ""}</p>
                     </div>
                     <StatusBadge status={t.status} />
                   </div>
                   <div className="mt-auto flex items-center justify-between">
                     <StatusBadge status={t.category} />
                     <div className="flex gap-1">
-                      <Link href={`/dashboard/templates/${t.id}`} className={buttonClass("secondary", "sm")}>Edit</Link>
-                      <ActionButton action={deleteTemplate.bind(null, t.id)} variant="ghost" confirm={`Delete "${t.name}"? This also deletes it from Meta.`}>Delete</ActionButton>
+                      <Link href={`/dashboard/templates/${t.id}`} className={buttonClass("secondary", "sm")}>{scope.isAdmin ? "Edit" : "View"}</Link>
+                      {scope.isAdmin && (
+                        <ActionButton action={deleteTemplate.bind(null, t.id)} variant="ghost" confirm={`Delete "${t.name}"? This also deletes it from Meta.`}>Delete</ActionButton>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -99,9 +104,13 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
           <EmptyState
             icon={<SquarePen className="size-5" />}
             title={active ? `No ${CATEGORY_INFO[active].label.toLowerCase()} templates` : "No templates yet"}
-            action={<Link href="/dashboard/templates/new" className={buttonClass("primary")}><Plus className="size-4" /> New template</Link>}
+            action={canCreate && <Link href="/dashboard/templates/new" className={buttonClass("primary")}><Plus className="size-4" /> New template</Link>}
           >
-            Create one here, or sync the templates you already made in WhatsApp Manager.
+            {canCreate
+              ? "Create one here, or sync the templates you already made in WhatsApp Manager."
+              : scope.isAdmin
+                ? "Pick a client in the sidebar to add or sync their templates."
+                : "Message templates approved for your WhatsApp number will appear here."}
           </EmptyState>
         </Card>
       )}

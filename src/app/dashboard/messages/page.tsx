@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { MESSAGE_STATUSES, messageWhere } from "@/lib/queries";
+import { getScope, owned, ownedMessages } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Message log" };
 export const dynamic = "force-dynamic";
@@ -25,7 +26,8 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
   const raw = await searchParams;
   const p: Params = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v]));
   const page = Math.max(1, Number(p.page) || 1);
-  const where = messageWhere(p);
+  const scope = await getScope();
+  const where = { ...messageWhere(p), ...ownedMessages(scope) };
 
   const [rows, total, byStatus, campaigns] = await Promise.all([
     db.message.findMany({
@@ -36,8 +38,8 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
       take: PAGE_SIZE,
     }),
     db.message.count({ where }),
-    db.message.groupBy({ by: ["status"], where: messageWhere({ ...p, status: undefined }), _count: true }),
-    db.campaign.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    db.message.groupBy({ by: ["status"], where: { ...messageWhere({ ...p, status: undefined }), ...ownedMessages(scope) }, _count: true }),
+    db.campaign.findMany({ where: owned(scope), select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const allCount = byStatus.reduce((a, s) => a + s._count, 0);

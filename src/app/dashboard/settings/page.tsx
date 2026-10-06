@@ -1,6 +1,7 @@
-import { CheckCircle2, Circle, LogOut } from "lucide-react";
+import { Building2, CheckCircle2, Circle, LogOut } from "lucide-react";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import Link from "next/link";
 import { Badge, buttonClass, Card, CardHeader, PageHeader } from "@/components/ui";
 import { requireUser } from "@/lib/session";
 import { logout } from "../../login/actions";
@@ -36,6 +37,26 @@ function Copyable({ label, value }: { label: string; value: string }) {
 
 export default async function SettingsPage() {
   const user = await requireUser();
+  const account = (
+    <Card>
+      <CardHeader title="Your account" description={`Signed in as ${user.email}`} />
+      <PasswordForm />
+      <form action={logout} className="border-t border-line p-5 pt-4">
+        <button className={buttonClass("secondary") + " w-full sm:w-auto"}>
+          <LogOut className="size-4" /> Sign out
+        </button>
+      </form>
+    </Card>
+  );
+  if (user.role !== "ADMIN") {
+    return (
+      <>
+        <PageHeader title="Settings" description={user.client ? `Your login for ${user.client.name}.` : "Your account."} />
+        <div className="max-w-xl">{account}</div>
+      </>
+    );
+  }
+
   const cfg = waConfig();
   const settings = await getSettings();
   const h = await headers();
@@ -43,7 +64,11 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" description="WhatsApp connection, scheduler and your account." />
+      <PageHeader
+        title="Settings"
+        description="WhatsApp connection, scheduler and your account."
+        actions={<Link href="/dashboard/clients" className={buttonClass("secondary")}><Building2 className="size-4" /> Clients</Link>}
+      />
       <ProviderSwitch provider={settings.provider} metaLive={cfg.live} localReady={!!wahaConfig(settings)} />
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <LocalSessionPanel
@@ -55,7 +80,7 @@ export default async function SettingsPage() {
         <Card>
           <CardHeader
             title="Meta Cloud API"
-            description={cfg.live ? "Configured. Set these in Vercel → Environment Variables." : "Not configured. Add these in Vercel → Environment Variables, then redeploy."}
+            description={`Default number, used by clients without their own WhatsApp details on the Clients page. ${cfg.live ? "Configured in Vercel → Environment Variables." : "Not configured: add these in Vercel → Environment Variables, then redeploy."}`}
             action={settings.provider === "META" ? <Badge tone="green" dot>Active</Badge> : undefined}
           />
           <ul className="divide-y divide-line">
@@ -82,15 +107,7 @@ export default async function SettingsPage() {
               </p>
             </div>
           </Card>
-          <Card>
-            <CardHeader title="Your account" description={`Signed in as ${user.email}`} />
-            <PasswordForm />
-            <form action={logout} className="border-t border-line p-5 pt-4">
-              <button className={buttonClass("secondary") + " w-full sm:w-auto"}>
-                <LogOut className="size-4" /> Sign out
-              </button>
-            </form>
-          </Card>
+          {account}
         </div>
       </div>
     </>

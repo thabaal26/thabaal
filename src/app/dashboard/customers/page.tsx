@@ -9,6 +9,7 @@ import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
+import { getScope, owned } from "@/lib/session";
 import { deleteCustomer, setOptOut } from "../actions/customers";
 import { CustomerMenu, CustomerTools } from "./customer-tools";
 
@@ -22,21 +23,28 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
   const q = typeof sp.q === "string" ? sp.q.trim() : "";
   const tag = typeof sp.tag === "string" ? sp.tag : "";
   const page = Math.max(1, Number(sp.page) || 1);
+  const scope = await getScope();
 
   const where: Prisma.CustomerWhereInput = {
+    ...owned(scope),
     ...(tag === "__optout" ? { optedOut: true } : tag ? { tags: { has: tag } } : {}),
     ...(q && { OR: [{ name: { contains: q, mode: "insensitive" } }, { phone: { contains: q.replace(/\D/g, "") || q } }] }),
   };
   const [rows, total, tags] = await Promise.all([
     db.customer.findMany({
       where,
-      include: { messages: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true, status: true } } },
+      include: {
+        messages: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true, status: true } },
+        client: { select: { name: true } },
+      },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
     db.customer.count({ where }),
-    db.$queryRaw<{ tag: string }[]>`SELECT DISTINCT unnest(tags) AS tag FROM "Customer" ORDER BY 1`,
+    db.$queryRaw<{ tag: string }[]>`
+      SELECT DISTINCT unnest(tags) AS tag FROM "Customer"
+      WHERE ${scope.clientId}::text IS NULL OR "clientId" = ${scope.clientId} ORDER BY 1`,
   ]);
   const qs = (patch: Record<string, string | undefined>) => {
     const s = new URLSearchParams(Object.entries({ q, tag, ...patch }).filter(([, v]) => v) as [string, string][]);
@@ -47,8 +55,8 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
     <>
       <PageHeader
         title="Customers"
-        description="Everyone who can receive your campaigns. Customers who reply STOP are opted out automatically."
-        actions={<CustomerTools />}
+        description={`${fmtNumber(total)}${tag || q ? " matching" : ""} customers${scope.clientName ? ` of ${scope.clientName}` : ""}. Customers who reply STOP are opted out automatically.`}
+        actions={scope.isAdmin && scope.clientId ? <CustomerTools /> : undefined}
       />
 
       <Card>
@@ -81,6 +89,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
                     {formatPhone(c.phone)}
                     {c.messages[0] && ` · ${fmtDate(c.messages[0].createdAt, "d MMM")} ${c.messages[0].status.toLowerCase()}`}
                   </p>
+                  {c.purchases && <p className="mt-0.5 line-clamp-2 text-xs text-ink-2">{c.purchases}</p>}
                   {(c.optedOut || c.tags.length > 0) && (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {c.optedOut && <Badge tone="red">Opted out</Badge>}
@@ -88,20 +97,24 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
                     </div>
                   )}
                 </div>
-                <CustomerMenu
-                  name={c.name}
-                  optedOut={c.optedOut}
-                  toggle={setOptOut.bind(null, c.id, !c.optedOut)}
-                  remove={deleteCustomer.bind(null, c.id)}
-                />
+                {scope.isAdmin && (
+                  <CustomerMenu
+                    name={c.name}
+                    optedOut={c.optedOut}
+                    toggle={setOptOut.bind(null, c.id, !c.optedOut)}
+                    remove={deleteCustomer.bind(null, c.id)}
+                  />
+                )}
               </li>
             ))}
           </ul>
           <div className="hidden overflow-x-auto sm:block">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="w-full min-w-[880px] text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-xs text-muted">
                   <th className="px-4 py-2.5 font-medium">Customer</th>
+                  {!scope.clientId && <th className="px-4 py-2.5 font-medium">Client</th>}
+                  <th className="px-4 py-2.5 font-medium">Purchased</th>
                   <th className="px-4 py-2.5 font-medium">Tags</th>
                   <th className="px-4 py-2.5 font-medium">Last message</th>
                   <th className="px-4 py-2.5 font-medium">Added</th>
@@ -115,6 +128,8 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
                       <p className="font-medium">{c.name}</p>
                       <p className="tabular text-xs text-muted">{formatPhone(c.phone)}</p>
                     </td>
+                    {!scope.clientId && <td className="px-4 py-3 text-xs text-ink-2">{c.client.name}</td>}
+                    <td className="max-w-xs px-4 py-3 text-xs text-ink-2">{c.purchases ?? <span className="text-muted">—</span>}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
                         {c.optedOut && <Badge tone="red">Opted out</Badge>}
@@ -126,10 +141,12 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
                     <td className="px-4 py-3 text-xs text-muted">{c.messages[0] ? `${fmtDate(c.messages[0].createdAt, "d MMM")} · ${c.messages[0].status.toLowerCase()}` : "—"}</td>
                     <td className="px-4 py-3 text-xs text-muted">{fmtDate(c.createdAt, "d MMM yyyy")}</td>
                     <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1">
-                        <ActionButton action={setOptOut.bind(null, c.id, !c.optedOut)} variant="ghost">{c.optedOut ? "Opt in" : "Opt out"}</ActionButton>
-                        <ActionButton action={deleteCustomer.bind(null, c.id)} variant="ghost" confirm={`Delete ${c.name} and their message history?`}>Delete</ActionButton>
-                      </div>
+                      {scope.isAdmin && (
+                        <div className="flex justify-end gap-1">
+                          <ActionButton action={setOptOut.bind(null, c.id, !c.optedOut)} variant="ghost">{c.optedOut ? "Opt in" : "Opt out"}</ActionButton>
+                          <ActionButton action={deleteCustomer.bind(null, c.id)} variant="ghost" confirm={`Delete ${c.name} and their message history?`}>Delete</ActionButton>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -139,7 +156,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
           </>
         ) : (
           <EmptyState icon={<Users className="size-5" />} title={q || tag ? "No matching customers" : "No customers yet"}>
-            {q || tag ? "Try a different search." : "Import your customer list as a CSV to get started."}
+            {q || tag ? "Try a different search." : scope.isAdmin ? "Import your customer list as a CSV to get started." : "Customers will appear here once they're added."}
           </EmptyState>
         )}
 

@@ -3,14 +3,15 @@ import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { fmtDate } from "@/lib/format";
 import { messageWhere } from "@/lib/queries";
-import { readSessionUserId, SESSION_COOKIE } from "@/lib/session";
+import { getScope, ownedMessages, readSessionUserId, SESSION_COOKIE } from "@/lib/session";
 
 export async function GET(req: NextRequest) {
   const userId = await readSessionUserId((await cookies()).get(SESSION_COOKIE)?.value);
   if (!userId) return new NextResponse("Unauthorized", { status: 401 });
+  const scope = await getScope();
 
   const rows = await db.message.findMany({
-    where: messageWhere(Object.fromEntries(req.nextUrl.searchParams)),
+    where: { ...messageWhere(Object.fromEntries(req.nextUrl.searchParams)), ...ownedMessages(scope) },
     include: { customer: true, run: { include: { campaign: true } } },
     orderBy: { createdAt: "desc" },
     take: 50_000,

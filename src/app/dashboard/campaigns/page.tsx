@@ -7,22 +7,28 @@ import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { fmtDate } from "@/lib/format";
 import { DAYS, estimateDuration, formatMinutes } from "@/lib/schedule";
+import { getScope, owned } from "@/lib/session";
 import { toggleCampaign } from "../actions/campaigns";
 
 export const metadata: Metadata = { title: "Campaigns" };
 export const dynamic = "force-dynamic";
 
 export default async function CampaignsPage() {
-  const [campaigns, audience] = await Promise.all([
+  const scope = await getScope();
+  const [campaigns, audiences] = await Promise.all([
     db.campaign.findMany({
+      where: owned(scope),
       include: {
+        client: { select: { name: true } },
         template: { select: { name: true, status: true } },
         runs: { orderBy: { startedAt: "desc" }, take: 1 },
       },
       orderBy: [{ active: "desc" }, { nextRunAt: "asc" }],
     }),
-    db.customer.count({ where: { optedOut: false } }),
+    db.customer.groupBy({ by: ["clientId"], where: { ...owned(scope), optedOut: false }, _count: true }),
   ]);
+  const audienceOf = (clientId: string) => audiences.find((a) => a.clientId === clientId)?._count ?? 0;
+  const canCreate = scope.isAdmin && scope.clientId;
 
   return (
     <>
@@ -30,9 +36,11 @@ export default async function CampaignsPage() {
         title="Campaigns"
         description="Recurring or one-off sends. Each one delivers in batches at the pace you set."
         actions={
-          <Link href="/dashboard/campaigns/new" className={buttonClass("primary")}>
-            <Plus className="size-4" /> New campaign
-          </Link>
+          canCreate && (
+            <Link href="/dashboard/campaigns/new" className={buttonClass("primary")}>
+              <Plus className="size-4" /> New campaign
+            </Link>
+          )
         }
       />
 
@@ -45,7 +53,10 @@ export default async function CampaignsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <Link href={`/dashboard/campaigns/${c.id}`} className="block truncate text-base font-semibold after:absolute after:inset-0 hover:underline">{c.name}</Link>
-                    <p className="mt-0.5 truncate font-mono text-xs text-muted">{c.template.name}</p>
+                    <p className="mt-0.5 truncate font-mono text-xs text-muted">
+                      {!scope.clientId && <span className="font-sans font-medium text-ink-2">{c.client.name} · </span>}
+                      {c.template.name}
+                    </p>
                   </div>
                   {c.active ? <Badge tone="green" dot>Active</Badge> : <Badge dot>Paused</Badge>}
                 </div>
@@ -71,7 +82,7 @@ export default async function CampaignsPage() {
                   </div>
                   <div>
                     <dt className="text-muted">Takes</dt>
-                    <dd className="mt-0.5 font-medium">~{formatMinutes(estimateDuration(audience, c.batchSize, c.intervalMinutes))}</dd>
+                    <dd className="mt-0.5 font-medium">~{formatMinutes(estimateDuration(audienceOf(c.clientId), c.batchSize, c.intervalMinutes))}</dd>
                   </div>
                 </dl>
 
@@ -89,7 +100,9 @@ export default async function CampaignsPage() {
                   </span>
                   <div className="flex items-center gap-2">
                     {last && ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION"].includes(last.status) && <StatusBadge status={last.status} />}
-                    <ActionButton className="relative z-10" action={toggleCampaign.bind(null, c.id, !c.active)}>{c.active ? "Pause" : "Resume"}</ActionButton>
+                    {scope.isAdmin && (
+                      <ActionButton className="relative z-10" action={toggleCampaign.bind(null, c.id, !c.active)}>{c.active ? "Pause" : "Resume"}</ActionButton>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -101,9 +114,13 @@ export default async function CampaignsPage() {
           <EmptyState
             icon={<CalendarClock className="size-5" />}
             title="No campaigns yet"
-            action={<Link href="/dashboard/campaigns/new" className={buttonClass("primary")}><Plus className="size-4" /> New campaign</Link>}
+            action={canCreate && <Link href="/dashboard/campaigns/new" className={buttonClass("primary")}><Plus className="size-4" /> New campaign</Link>}
           >
-            For two promotions a week, create one campaign and pick two days, for example Tuesday and Friday.
+            {scope.isAdmin
+              ? scope.clientId
+                ? "For two promotions a week, create one campaign and pick two days, for example Tuesday and Friday."
+                : "Pick a client in the sidebar to create a campaign for them."
+              : "Campaigns set up for you will appear here."}
           </EmptyState>
         </Card>
       )}

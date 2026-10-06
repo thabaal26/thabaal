@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { APP_TZ, daysAgo, fmtDate, fmtNumber, pct } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { estimateDuration, formatMinutes } from "@/lib/schedule";
+import { getScope, owned, ownedMessages } from "@/lib/session";
 import { cancelRun, runDispatcherNow } from "./actions/campaigns";
 import { DailyChart } from "./daily-chart";
 
@@ -14,31 +15,36 @@ export const dynamic = "force-dynamic";
 export default async function Overview() {
   const weekAgo = daysAgo(7);
   const since = daysAgo(13);
+  const scope = await getScope();
+  const mine = owned(scope);
+  const myMessages = ownedMessages(scope);
 
   const [customers, optedOut, week, activeRuns, upcoming, recent, daily] = await Promise.all([
-    db.customer.count({ where: { optedOut: false } }),
-    db.customer.count({ where: { optedOut: true } }),
-    db.message.groupBy({ by: ["status"], where: { createdAt: { gte: weekAgo }, status: { notIn: ["QUEUED", "SKIPPED"] } }, _count: true }),
+    db.customer.count({ where: { ...mine, optedOut: false } }),
+    db.customer.count({ where: { ...mine, optedOut: true } }),
+    db.message.groupBy({ by: ["status"], where: { ...myMessages, createdAt: { gte: weekAgo }, status: { notIn: ["QUEUED", "SKIPPED"] } }, _count: true }),
     db.campaignRun.findMany({
-      where: { status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION"] } },
+      where: { campaign: mine, status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION"] } },
       include: { campaign: true },
       orderBy: { startedAt: "desc" },
     }),
     db.campaign.findMany({
-      where: { active: true, nextRunAt: { not: null } },
+      where: { ...mine, active: true, nextRunAt: { not: null } },
       include: { template: { select: { name: true, status: true } } },
       orderBy: { nextRunAt: "asc" },
       take: 5,
     }),
     db.message.findMany({
-      where: { status: { not: "QUEUED" } },
+      where: { ...myMessages, status: { not: "QUEUED" } },
       include: { customer: true },
       orderBy: { createdAt: "desc" },
       take: 6,
     }),
     db.$queryRaw<{ day: string; status: string; n: bigint }[]>`
-      SELECT to_char(("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${APP_TZ}, 'YYYY-MM-DD') AS day, status::text AS status, count(*) AS n
-      FROM "Message" WHERE "createdAt" >= ${since} AND status NOT IN ('QUEUED', 'SKIPPED')
+      SELECT to_char((m."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${APP_TZ}, 'YYYY-MM-DD') AS day, m.status::text AS status, count(*) AS n
+      FROM "Message" m JOIN "Customer" c ON c.id = m."customerId"
+      WHERE m."createdAt" >= ${since} AND m.status NOT IN ('QUEUED', 'SKIPPED')
+        AND (${scope.clientId}::text IS NULL OR c."clientId" = ${scope.clientId})
       GROUP BY 1, 2`,
   ]);
 
@@ -55,10 +61,10 @@ export default async function Overview() {
   return (
     <>
       <PageHeader
-        title="Overview"
-        description="How your WhatsApp campaigns performed over the last 7 days."
+        title={scope.clientName ? `${scope.clientName} overview` : "Overview"}
+        description={scope.isAdmin && !scope.clientId ? "All clients together, last 7 days. Pick a client in the sidebar to see one." : "How your WhatsApp campaigns performed over the last 7 days."}
         actions={
-          <>
+          scope.isAdmin && <>
             <ActionButton action={runDispatcherNow} size="md" title="Process due campaigns and batches now">
               <Send className="size-4" /> Run scheduler now
             </ActionButton>
@@ -116,9 +122,11 @@ export default async function Overview() {
                         : "finishing"}
                     </p>
                   </div>
-                  <ActionButton action={cancelRun.bind(null, r.id)} variant="danger" confirm="Stop this run? Queued messages will not be sent.">
-                    Stop
-                  </ActionButton>
+                  {scope.isAdmin && (
+                    <ActionButton action={cancelRun.bind(null, r.id)} variant="danger" confirm="Stop this run? Queued messages will not be sent.">
+                      Stop
+                    </ActionButton>
+                  )}
                 </li>
               );
             })}
@@ -163,7 +171,7 @@ export default async function Overview() {
             </ul>
           ) : (
             <EmptyState icon={<CalendarClock className="size-5" />} title="Nothing scheduled">
-              Create a weekly campaign to start sending automatically.
+              {scope.isAdmin ? "Create a weekly campaign to start sending automatically." : "Upcoming campaigns will show here."}
             </EmptyState>
           )}
         </Card>

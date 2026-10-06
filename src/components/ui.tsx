@@ -117,6 +117,18 @@ export function EmptyState({ icon, title, children, action }: { icon: ReactNode;
   );
 }
 
+/** Shown to an admin in "All clients" view on pages that create something for one client. */
+export function PickClientNotice({ what }: { what: string }) {
+  return (
+    <Card>
+      <div className="flex flex-col items-center px-6 py-14 text-center">
+        <h3 className="text-sm font-semibold text-ink">Pick a client first</h3>
+        <p className="mt-1 max-w-sm text-sm text-muted">Choose a client in the sidebar switcher, then add the {what} for them.</p>
+      </div>
+    </Card>
+  );
+}
+
 export function Stat({ label, value, sub, icon, accent }: { label: string; value: ReactNode; sub?: ReactNode; icon: ReactNode; accent?: string }) {
   return (
     <Card className="p-4 sm:p-5">
