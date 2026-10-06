@@ -125,16 +125,16 @@ export function WhatsAppForm({ clientId, phoneNumberId, businessAccountId, hasTo
       >
         <div>
           <Label htmlFor={`t-${clientId}`} hint={hasToken ? "saved; leave blank to keep" : "permanent System User token"}>Access token</Label>
-          <input id={`t-${clientId}`} type="password" autoComplete="off" className="field font-mono" value={v.token} onChange={(e) => setV({ ...v, token: e.target.value })} placeholder={hasToken ? "••••••••" : "EAAG…"} />
+          <input id={`t-${clientId}`} name="wa-token" type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" className="field font-mono" value={v.token} onChange={(e) => setV({ ...v, token: e.target.value })} placeholder={hasToken ? "••••••••" : "EAAG…"} />
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <Label htmlFor={`pn-${clientId}`}>Phone number ID</Label>
-            <input id={`pn-${clientId}`} inputMode="numeric" className="field font-mono" value={v.phoneNumberId} onChange={(e) => setV({ ...v, phoneNumberId: e.target.value })} />
+            <input id={`pn-${clientId}`} name="wa-phone-number-id" autoComplete="off" data-1p-ignore data-lpignore="true" inputMode="numeric" className="field font-mono" value={v.phoneNumberId} onChange={(e) => setV({ ...v, phoneNumberId: e.target.value })} />
           </div>
           <div>
             <Label htmlFor={`w-${clientId}`}>Business Account ID</Label>
-            <input id={`w-${clientId}`} inputMode="numeric" className="field font-mono" value={v.businessAccountId} onChange={(e) => setV({ ...v, businessAccountId: e.target.value })} />
+            <input id={`w-${clientId}`} name="wa-business-account-id" autoComplete="off" data-1p-ignore data-lpignore="true" inputMode="numeric" className="field font-mono" value={v.businessAccountId} onChange={(e) => setV({ ...v, businessAccountId: e.target.value })} />
           </div>
         </div>
         <p className="text-xs text-muted">Find these in Meta WhatsApp Manager → API setup. Add this portal&apos;s webhook URL (Settings) to the client&apos;s Meta app too.</p>
