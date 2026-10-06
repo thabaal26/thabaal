@@ -10,7 +10,13 @@ function greeting(now = new Date()) {
 
 const host = (url: string) => url.replace(/^https?:\/\//, "").replace(/\/$/, "");
 
-/** First thing a client sees after signing in: their own banner, name and numbers. */
+const chip = "inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/10 transition hover:bg-white/20";
+
+/**
+ * First thing a client sees after signing in: their name, numbers and banner, kept to a
+ * compact strip so the figures below stay on the first screen. Phones skip the banner
+ * image; the logo is already in the header.
+ */
 export function BrandHero({
   client,
   customers,
@@ -21,37 +27,38 @@ export function BrandHero({
   actions?: ReactNode;
 }) {
   return (
-    <section className="mb-6 overflow-hidden rounded-3xl bg-night text-white shadow-pop">
-      <div className="grid md:grid-cols-[1.1fr_1fr]">
-        <div className="relative flex flex-col justify-between gap-6 p-6 sm:p-8">
-          <div aria-hidden className="pointer-events-none absolute -left-16 -top-16 size-64 rounded-full bg-glow/20 blur-3xl" />
-          <div className="relative">
-            <p className="text-sm font-medium text-glow">வணக்கம் 🙏 · {greeting()}</p>
-            <h1 className="mt-2 text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">Welcome back, {client.name}</h1>
-            <p className="mt-2 max-w-md text-sm text-white/70">
-              {client.tagline ? `${client.tagline.replace(/[.!]?\s*$/, ".")} ` : ""}Here is how your WhatsApp campaigns are reaching your customers.
-            </p>
-          </div>
-          <div className="relative flex flex-wrap gap-2 text-xs">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3.5 py-2 ring-1 ring-white/10 sm:px-3 sm:py-1.5">
+    <section className="relative mb-5 overflow-hidden rounded-3xl bg-night text-white shadow-pop sm:mb-6">
+      <div aria-hidden className="pointer-events-none absolute -left-16 -top-20 size-56 rounded-full bg-glow/20 blur-3xl" />
+      <div className="relative flex items-stretch">
+        <div className="min-w-0 flex-1 p-4 sm:p-6">
+          <p className="text-[13px] font-medium text-glow">வணக்கம் 🙏 · {greeting()}</p>
+          <h1 className="mt-1 truncate text-xl font-semibold leading-tight tracking-tight sm:text-2xl">Welcome back, {client.name}</h1>
+          <p className="mt-1 hidden text-sm text-white/65 sm:line-clamp-1">
+            {client.tagline ? `${client.tagline.replace(/[.!]?\s*$/, ".")} ` : ""}Here is how your WhatsApp campaigns are reaching your customers.
+          </p>
+          <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 text-xs sm:mx-0 sm:mt-4 sm:flex-wrap sm:px-0">
+            <span className={chip}>
               <Users className="size-3.5 text-glow" /> {fmtNumber(customers)} customers
             </span>
             {client.website && (
-              <a href={client.website} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3.5 py-2 ring-1 ring-white/10 sm:px-3 sm:py-1.5 transition hover:bg-white/20">
+              <a href={client.website} target="_blank" rel="noreferrer" className={chip}>
                 <Globe className="size-3.5 text-glow" /> {host(client.website)}
               </a>
             )}
             {client.supportPhone && (
-              <a href={`tel:${client.supportPhone.replace(/\s/g, "")}`} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3.5 py-2 ring-1 ring-white/10 sm:px-3 sm:py-1.5 transition hover:bg-white/20">
+              <a href={`tel:${client.supportPhone.replace(/\s/g, "")}`} className={chip}>
                 <Phone className="size-3.5 text-glow" /> {client.supportPhone}
               </a>
             )}
           </div>
-          {actions && <div className="relative flex flex-wrap gap-2">{actions}</div>}
+          {actions && <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:flex sm:flex-wrap">{actions}</div>}
         </div>
         {client.bannerUrl && (
-          // eslint-disable-next-line @next/next/no-img-element -- admin-supplied banner of any size
-          <img src={client.bannerUrl} alt={`${client.name} banner`} className="aspect-[1.91/1] h-full w-full object-cover md:aspect-auto" />
+          // The text sets the height; the banner fills the side instead of stretching the strip.
+          <div className="relative hidden w-[34%] max-w-md shrink-0 md:block">
+            {/* eslint-disable-next-line @next/next/no-img-element -- admin-supplied banner of any size */}
+            <img src={client.bannerUrl} alt={`${client.name} banner`} className="absolute inset-0 size-full object-cover object-center" />
+          </div>
         )}
       </div>
     </section>
