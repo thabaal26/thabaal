@@ -4,6 +4,7 @@ import { Clock, Gauge, Loader2, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { MobileActionBar } from "@/components/mobile-action-bar";
+import { Picker } from "@/components/picker";
 import { toastResult } from "@/components/toast";
 import { Button, Card, CardHeader, Label } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -71,45 +72,52 @@ export function CampaignForm({
             {numbers.length > 1 && (
               <div className="sm:col-span-2">
                 <Label htmlFor="sender" hint="templates below are the ones approved for this number">Send from</Label>
-                <select
+                <Picker
                   id="sender"
-                  className="field"
+                  title="Send from"
                   value={c.senderId}
-                  onChange={(e) => {
-                    const next = numbers.find((n) => n.id === e.target.value) ?? numbers[0];
+                  onChange={(id) => {
+                    const next = numbers.find((n) => n.id === id) ?? numbers[0];
                     const keep = templates.find((t) => t.id === c.templateId && (!t.businessAccountId || t.businessAccountId === next.businessAccountId));
-                    set({ senderId: e.target.value, templateId: keep ? c.templateId : "" });
+                    set({ senderId: id, templateId: keep ? c.templateId : "" });
                   }}
-                >
-                  <option value="">Default number ({numbers.find((n) => n.isDefault)?.label ?? numbers[0].label})</option>
-                  {numbers.map((n) => (
-                    <option key={n.id} value={n.id}>{n.label}</option>
-                  ))}
-                </select>
+                  options={[
+                    { value: "", label: "Default number", hint: numbers.find((n) => n.isDefault)?.label ?? numbers[0].label },
+                    ...numbers.map((n) => ({ value: n.id, label: n.label, hint: n.dailyLimit ? `Up to ${n.dailyLimit.toLocaleString("en-IN")} people a day` : "No daily limit" })),
+                  ]}
+                />
               </div>
             )}
             <div>
               <Label htmlFor="tpl">Template</Label>
-              <select id="tpl" className="field" value={chosen ? c.templateId : ""} onChange={(e) => set({ templateId: e.target.value })}>
-                <option value="">{usable.length ? "Choose a template…" : "No templates for this number yet"}</option>
-                {usable.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} · {t.category.toLowerCase()}{t.status !== "APPROVED" ? " (not approved yet)" : ""}
-                  </option>
-                ))}
-              </select>
+              <Picker
+                id="tpl"
+                title="Template"
+                value={chosen ? c.templateId : ""}
+                onChange={(templateId) => set({ templateId })}
+                placeholder={usable.length ? "Choose a template…" : "No templates for this number yet"}
+                options={usable.map((t) => ({
+                  value: t.id,
+                  label: t.name,
+                  hint: `${t.category.charAt(0)}${t.category.slice(1).toLowerCase()}${t.status !== "APPROVED" ? " · not approved yet" : " · approved"}`,
+                }))}
+              />
               {chosen && chosen.status !== "APPROVED" && (
                 <p className="mt-1.5 text-xs text-amber-700">Sending waits until Meta approves this template.</p>
               )}
             </div>
             <div>
               <Label htmlFor="aud">Send to</Label>
-              <select id="aud" className="field" value={c.audienceTag} onChange={(e) => set({ audienceTag: e.target.value })}>
-                <option value="">All customers ({audience.all})</option>
-                {audience.tags.map((t) => (
-                  <option key={t.tag} value={t.tag}>Tag: {t.tag} ({t.n})</option>
-                ))}
-              </select>
+              <Picker
+                id="aud"
+                title="Send to"
+                value={c.audienceTag}
+                onChange={(audienceTag) => set({ audienceTag })}
+                options={[
+                  { value: "", label: "All customers", hint: `${audience.all.toLocaleString("en-IN")} customers` },
+                  ...audience.tags.map((t) => ({ value: t.tag, label: t.tag, hint: `${t.n.toLocaleString("en-IN")} customers` })),
+                ]}
+              />
             </div>
           </div>
         </Card>

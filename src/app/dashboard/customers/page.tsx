@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { Search, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AutoSelect } from "@/components/auto-select";
+import { Picker } from "@/components/picker";
 import { ActionButton } from "@/components/action-button";
 import { Badge, buttonClass, Card, EmptyState, PageHeader } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -42,10 +42,14 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
       take: PAGE_SIZE,
     }),
     db.customer.count({ where }),
-    db.$queryRaw<{ tag: string }[]>`
-      SELECT DISTINCT unnest(tags) AS tag FROM "Customer"
-      WHERE ${scope.clientId}::text IS NULL OR "clientId" = ${scope.clientId} ORDER BY 1`,
+    db.$queryRaw<{ tag: string; n: bigint }[]>`
+      SELECT unnest(tags) AS tag, count(*) AS n FROM "Customer"
+      WHERE ${scope.clientId}::text IS NULL OR "clientId" = ${scope.clientId} GROUP BY 1 ORDER BY 2 DESC, 1`,
   ]);
+  // Every customer of a client carries its client-wide tag (e.g. thenan-oils); it adds nothing per row.
+  const clientTag = scope.clientName?.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const rowTags = (tags: string[]) => tags.filter((t) => t !== clientTag);
+  const tagLabel = (t: string) => (t === "no-item-info" ? "No item recorded" : t.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase()));
   const qs = (patch: Record<string, string | undefined>) => {
     const s = new URLSearchParams(Object.entries({ q, tag, ...patch }).filter(([, v]) => v) as [string, string][]);
     return `/dashboard/customers${s.size ? `?${s}` : ""}`;
@@ -60,19 +64,24 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
       />
 
       <Card>
-        <form className="flex gap-2 border-b border-line p-3">
+        <form className="grid gap-2 border-b border-line p-3 sm:flex">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
-            <input name="q" type="search" enterKeyHint="search" defaultValue={q} placeholder="Search name or number" className="field pl-10" />
+            <input name="q" type="search" enterKeyHint="search" defaultValue={q} placeholder="Search by name or phone number" className="field pl-10" />
           </div>
-          <AutoSelect name="tag" aria-label="Filter customers" defaultValue={tag} className="field w-32 shrink-0 sm:w-48">
-            <option value="">All customers</option>
-            <option value="__optout">Opted out</option>
-            {tags.map((t) => (
-              <option key={t.tag} value={t.tag}>Tag: {t.tag}</option>
-            ))}
-          </AutoSelect>
-          <div className="hidden sm:block"><button className={buttonClass("secondary")}>Filter</button></div>
+          <Picker
+            name="tag"
+            autoSubmit
+            title="Show customers"
+            defaultValue={tag}
+            className="sm:w-64"
+            options={[
+              { value: "", label: "All customers" },
+              { value: "__optout", label: "Opted out" },
+              ...tags.filter((t) => t.tag !== clientTag).map((t) => ({ value: t.tag, label: tagLabel(t.tag), hint: `${fmtNumber(Number(t.n))} customers` })),
+            ]}
+          />
+          <div className="hidden sm:block"><button className={buttonClass("secondary")}>Search</button></div>
         </form>
 
         {rows.length ? (
@@ -90,11 +99,11 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
                     {c.messages[0] && ` · ${fmtDate(c.messages[0].createdAt, "d MMM")} ${c.messages[0].status.toLowerCase()}`}
                   </p>
                   {c.purchases && <p className="mt-0.5 line-clamp-2 text-xs text-ink-2">{c.purchases}</p>}
-                  {(c.optedOut || c.tags.length > 0) && (
-                    <div className="mt-1 flex flex-wrap gap-1">
+                  {(c.optedOut || c.unreachable || rowTags(c.tags).length > 0) && (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
                       {c.optedOut && <Badge tone="red">Opted out</Badge>}
                       {c.unreachable && <Badge tone="amber">Can&apos;t receive</Badge>}
-                      {c.tags.map((t) => <Badge key={t}>{t}</Badge>)}
+                      {rowTags(c.tags).map((t) => <Badge key={t}>{t}</Badge>)}
                     </div>
                   )}
                 </div>
@@ -137,7 +146,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
                       <div className="flex flex-wrap gap-1">
                         {c.optedOut && <Badge tone="red">Opted out</Badge>}
                         {c.unreachable && <Badge tone="amber">Can&apos;t receive</Badge>}
-                        {c.tags.map((t) => (
+                        {rowTags(c.tags).map((t) => (
                           <Link key={t} href={qs({ tag: t, page: undefined })}><Badge>{t}</Badge></Link>
                         ))}
                       </div>

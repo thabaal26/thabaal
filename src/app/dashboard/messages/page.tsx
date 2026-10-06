@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronLeft, ChevronRight, Download, MessagesSquare, Search } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AutoSelect } from "@/components/auto-select";
+import { Picker } from "@/components/picker";
 import { Badge, buttonClass, Card, EmptyState, PageHeader, StatusBadge } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
@@ -57,13 +57,13 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
         }
       />
 
-      <div className="no-scrollbar -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+      <div className="mb-4 flex flex-wrap gap-2">
         {[{ key: "", label: "All", n: allCount }, ...MESSAGE_STATUSES.map((s) => ({ key: s, label: s[0] + s.slice(1).toLowerCase(), n: byStatus.find((b) => b.status === s)?._count ?? 0 }))].map((s) => (
           <Link
             key={s.key}
             href={href(p, { status: s.key || undefined, page: undefined })}
             className={cn(
-              "flex h-9 shrink-0 items-center gap-2 rounded-full border px-3.5 text-[13px] font-medium transition active:scale-95 sm:h-auto sm:px-3 sm:py-1.5 sm:text-xs",
+              "flex h-9 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition active:scale-95 sm:h-auto sm:gap-2 sm:py-1.5 sm:text-xs",
               (p.status ?? "") === s.key ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-ink/30",
             )}
           >
@@ -80,19 +80,27 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
             <input name="q" type="search" enterKeyHint="search" defaultValue={p.q} placeholder="Search name, phone or template" className="field pl-10" />
           </div>
-          <AutoSelect name="campaign" aria-label="Campaign" defaultValue={p.campaign ?? ""} className="field sm:w-48">
-            <option value="">All campaigns</option>
-            <option value="test">Test sends</option>
-            {campaigns.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </AutoSelect>
-          <AutoSelect name="range" aria-label="Time range" defaultValue={p.range ?? ""} className="field sm:w-40">
-            <option value="">All time</option>
-            <option value="1d">Last 24 hours</option>
-            <option value="7d">Last 7 days</option>
-            <option value="30d">Last 30 days</option>
-          </AutoSelect>
+          <Picker
+            name="campaign"
+            autoSubmit
+            title="Campaign"
+            defaultValue={p.campaign ?? ""}
+            className="sm:w-52"
+            options={[{ value: "", label: "All campaigns" }, { value: "test", label: "Test sends" }, ...campaigns.map((c) => ({ value: c.id, label: c.name }))]}
+          />
+          <Picker
+            name="range"
+            autoSubmit
+            title="Time range"
+            defaultValue={p.range ?? ""}
+            className="sm:w-44"
+            options={[
+              { value: "", label: "All time" },
+              { value: "1d", label: "Last 24 hours" },
+              { value: "7d", label: "Last 7 days" },
+              { value: "30d", label: "Last 30 days" },
+            ]}
+          />
           <div className="hidden sm:block"><button className={buttonClass("secondary")}>Filter</button></div>
         </form>
 

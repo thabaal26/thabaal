@@ -10,7 +10,7 @@ function greeting(now = new Date()) {
 
 const host = (url: string) => url.replace(/^https?:\/\//, "").replace(/\/$/, "");
 
-const chip = "inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/10 transition hover:bg-white/20";
+const chip = "inline-flex max-w-full items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/10 transition hover:bg-white/20";
 
 /**
  * First thing a client sees after signing in: their name, numbers and banner, kept to a
@@ -37,11 +37,11 @@ export function BrandHero({
       <div className="relative flex items-stretch">
         <div className="min-w-0 flex-1 p-4 sm:p-6">
           <p className="text-[13px] font-medium text-glow">வணக்கம் 🙏 · {greeting()}</p>
-          <h1 className="mt-1 truncate text-xl font-semibold leading-tight tracking-tight sm:text-2xl">Welcome back, {client.name}</h1>
+          <h1 className="mt-1 text-xl font-semibold leading-tight tracking-tight [overflow-wrap:anywhere] sm:text-2xl">Welcome back, {client.name}</h1>
           <p className="mt-1 hidden text-sm text-white/65 sm:line-clamp-1">
             {client.tagline ? `${client.tagline.replace(/[.!]?\s*$/, ".")} ` : ""}Here is how your WhatsApp campaigns are reaching your customers.
           </p>
-          <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 text-xs sm:mx-0 sm:mt-4 sm:flex-wrap sm:px-0">
+          <div className="mt-3 flex flex-wrap gap-2 text-xs sm:mt-4">
             <span className={chip}>
               <Users className="size-3.5 text-glow" /> {fmtNumber(customers)} customers
             </span>

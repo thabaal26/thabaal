@@ -21,6 +21,7 @@ import {
   type TemplateDraft,
   type VarSource,
 } from "@/lib/template";
+import { Picker } from "@/components/picker";
 import { saveTemplate, sendTestMessage } from "../actions/templates";
 
 const SOURCES: { value: VarSource["source"]; label: string }[] = [
@@ -169,11 +170,14 @@ export function TemplateEditor({
               {accounts.length > 1 && (
                 <div className="sm:col-span-2">
                   <Label htmlFor="waba" hint="templates are approved per WhatsApp account">WhatsApp account</Label>
-                  <select id="waba" className="field" value={t.businessAccountId ?? accounts[0].id} disabled={locked} onChange={(e) => set({ businessAccountId: e.target.value })}>
-                    {accounts.map((a) => (
-                      <option key={a.id} value={a.id}>{a.label}</option>
-                    ))}
-                  </select>
+                  <Picker
+                    id="waba"
+                    title="WhatsApp account"
+                    value={t.businessAccountId ?? accounts[0].id}
+                    disabled={locked}
+                    onChange={(businessAccountId) => set({ businessAccountId })}
+                    options={accounts.map((a) => ({ value: a.id, label: a.label }))}
+                  />
                 </div>
               )}
               <div>
@@ -189,12 +193,17 @@ export function TemplateEditor({
               </div>
               <div>
                 <Label htmlFor="lang">Language</Label>
-                <select id="lang" className="field" value={t.language} disabled={locked} onChange={(e) => set({ language: e.target.value })}>
-                  {LANGUAGES.map((l) => (
-                    <option key={l.code} value={l.code}>{l.label}</option>
-                  ))}
-                  {!LANGUAGES.some((l) => l.code === t.language) && <option value={t.language}>{t.language}</option>}
-                </select>
+                <Picker
+                  id="lang"
+                  title="Language"
+                  value={t.language}
+                  disabled={locked}
+                  onChange={(language) => set({ language })}
+                  options={[
+                    ...LANGUAGES.map((l) => ({ value: l.code, label: l.label, hint: l.code })),
+                    ...(LANGUAGES.some((l) => l.code === t.language) ? [] : [{ value: t.language, label: t.language }]),
+                  ]}
+                />
               </div>
             </div>
           </div>
@@ -290,11 +299,12 @@ export function TemplateEditor({
                     return (
                       <div key={key} className="grid items-center gap-3 px-5 py-3 sm:grid-cols-[110px_1fr_1fr]">
                         <span className="font-mono text-xs text-ink-2">{key === "h1" ? "Header {{1}}" : `{{${key}}}`}</span>
-                        <select className="field" value={v.source} onChange={(e) => setVar(key, { ...v, source: e.target.value as VarSource["source"] })}>
-                          {SOURCES.map((s) => (
-                            <option key={s.value} value={s.value}>{s.label}</option>
-                          ))}
-                        </select>
+                        <Picker
+                          title={`What fills ${key === "h1" ? "the header variable" : `{{${key}}}`}`}
+                          value={v.source}
+                          onChange={(source) => setVar(key, { ...v, source: source as VarSource["source"] })}
+                          options={SOURCES.map((s) => ({ value: s.value, label: s.label }))}
+                        />
                         {v.source === "static" ? (
                           <input className="field" placeholder="Text to insert" value={v.value ?? ""} onChange={(e) => setVar(key, { ...v, value: e.target.value })} />
                         ) : (

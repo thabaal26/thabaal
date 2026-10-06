@@ -46,13 +46,13 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
         }
       />
 
-      <div className="no-scrollbar -mx-4 mb-5 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+      <div className="mb-5 flex flex-wrap gap-2">
         {[{ key: "", label: "All", n: total }, ...(Object.keys(CATEGORY_INFO) as Category[]).map((c) => ({ key: c, label: CATEGORY_INFO[c].label, n: counts.find((x) => x.category === c)?._count ?? 0 }))].map((tab) => (
           <Link
             key={tab.key}
             href={tab.key ? `/dashboard/templates?category=${tab.key}` : "/dashboard/templates"}
             className={cn(
-              "flex h-9 shrink-0 items-center gap-2 rounded-full border px-3.5 text-[13px] font-medium transition active:scale-95 sm:h-auto sm:px-3 sm:py-1.5 sm:text-xs",
+              "flex h-9 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition active:scale-95 sm:h-auto sm:px-3 sm:py-1.5 sm:text-xs",
               (active ?? "") === tab.key ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-ink/30",
             )}
           >

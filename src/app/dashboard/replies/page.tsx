@@ -49,13 +49,13 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
         actions={n(false) > 0 && <ActionButton action={handleAllReplies} size="md" confirm="Mark every open reply as handled?"><CheckCheck className="size-4" /> Mark all handled</ActionButton>}
       />
 
-      <div className="no-scrollbar -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+      <div className="mb-4 flex flex-wrap gap-2">
         {TABS.map((t) => (
           <Link
             key={t.key}
             href={t.key ? `/dashboard/replies?show=${t.key}` : "/dashboard/replies"}
             className={cn(
-              "flex h-9 shrink-0 items-center gap-2 rounded-full border px-3.5 text-[13px] font-medium transition active:scale-95 sm:h-auto sm:px-3 sm:py-1.5 sm:text-xs",
+              "flex h-9 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition active:scale-95 sm:h-auto sm:px-3 sm:py-1.5 sm:text-xs",
               show === t.key ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-ink/30",
             )}
           >

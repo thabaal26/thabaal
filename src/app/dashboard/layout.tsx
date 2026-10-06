@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { getScope, ownedMessages, requireUser } from "@/lib/session";
 import { getSettings, isSimulated } from "@/lib/provider";
 import { senderFor } from "@/lib/senders";
-import { nightColor, themeStyle } from "@/lib/theme";
+import { nightColor, themeCss, themeStyle } from "@/lib/theme";
 import { logout } from "../login/actions";
 import { ClientSwitcher, HeaderClientSwitcher } from "./client-switcher";
 import { BottomNav, SettingsLink, SideNav } from "./nav";
@@ -69,6 +69,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
 
   return (
     <div style={themeStyle(client)} className="min-h-dvh overflow-x-clip bg-canvas lg:pl-64">
+      {client && themeCss(client) && <style>{themeCss(client)}</style>}
       <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col bg-night px-4 py-6 lg:flex">
         <div className="mb-8 flex items-center gap-3 px-2">
           <BrandMark logoUrl={client?.logoUrl} name={name} size="md" />

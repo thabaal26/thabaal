@@ -3,6 +3,7 @@
 import { KeyRound, Loader2, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { Picker } from "@/components/picker";
 import { Sheet } from "@/components/sheet";
 import { toastResult } from "@/components/toast";
 import { Button, Label } from "@/components/ui";
@@ -389,10 +390,13 @@ export function SendingRulesForm({ clientId, initial }: { clientId: string; init
     >
       <div>
         <Label htmlFor={`gap-${clientId}`} hint="marketing only">Gap between offers per customer</Label>
-        <select id={`gap-${clientId}`} className="field" value={gap} onChange={(e) => setGap(Number(e.target.value))}>
-          {GAPS.map((g) => <option key={g.h} value={g.h}>{g.label}</option>)}
-          {!GAPS.some((g) => g.h === gap) && <option value={gap}>{gap} hours</option>}
-        </select>
+        <Picker
+          id={`gap-${clientId}`}
+          title="Gap between offers per customer"
+          value={String(gap)}
+          onChange={(v) => setGap(Number(v))}
+          options={[...GAPS.map((g) => ({ value: String(g.h), label: g.label })), ...(GAPS.some((g) => g.h === gap) ? [] : [{ value: String(gap), label: `${gap} hours` }])]}
+        />
       </div>
       <div>
         <Label htmlFor={`qf-${clientId}`} hint="India time · marketing waits">

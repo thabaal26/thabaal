@@ -65,6 +65,15 @@ export function themeStyle(b: Brand | null | undefined): CSSProperties | undefin
   } as CSSProperties;
 }
 
+/**
+ * The same variables as a :root rule, so sheets, toasts and dialogs rendered outside the
+ * dashboard wrapper (portals into <body>) wear the client's colours too.
+ */
+export function themeCss(b: Brand | null | undefined) {
+  const s = themeStyle(b) as Record<string, string> | undefined;
+  return s ? `:root{${Object.entries(s).map(([k, v]) => `${k}:${v}`).join(";")}}` : "";
+}
+
 /** The sidebar colour, for the browser's theme-color. */
 export function nightColor(b: Brand | null | undefined) {
   const s = themeStyle(b) as Record<string, string> | undefined;
