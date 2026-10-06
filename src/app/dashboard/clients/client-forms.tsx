@@ -346,7 +346,7 @@ export function BrandingForm({ clientId, name, initial }: { clientId: string; na
             )}
             <div className="min-w-0">
               <p className="truncate font-semibold text-white">{name}</p>
-              <p className="truncate text-[10px] text-white/55">{v.tagline || "WhatsApp campaigns"}</p>
+              <p className="truncate text-[11px] text-white/55">{v.tagline || "WhatsApp campaigns"}</p>
             </div>
           </div>
           <div className="space-y-1 bg-night px-3 pb-3">
@@ -397,7 +397,7 @@ export function SendingRulesForm({ clientId, initial }: { clientId: string; init
       <div>
         <Label htmlFor={`qf-${clientId}`} hint="India time · marketing waits">
           <span className="inline-flex items-center gap-2">
-            <input type="checkbox" className="accent-brand" checked={quietOn} onChange={(e) => setQuietOn(e.target.checked)} aria-label="Use quiet hours" />
+            <input type="checkbox" className="size-5 accent-brand sm:size-4" checked={quietOn} onChange={(e) => setQuietOn(e.target.checked)} aria-label="Use quiet hours" />
             Quiet hours
           </span>
         </Label>

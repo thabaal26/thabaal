@@ -18,8 +18,8 @@ export function DailyChart({ rows, since }: { rows: { day: string; status: strin
   const max = Math.max(...totals, 1);
 
   return (
-    <div className="px-5 pb-5 pt-4">
-      <div className="mb-4 flex flex-wrap gap-4 text-xs text-muted">
+    <div className="px-4 pb-4 pt-3.5 sm:px-5 sm:pb-5 sm:pt-4">
+      <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted sm:mb-4">
         {SERIES.map((s) => (
           <span key={s.key} className="flex items-center gap-1.5">
             <span className={`size-2 rounded-sm ${s.color}`} />
@@ -27,7 +27,7 @@ export function DailyChart({ rows, since }: { rows: { day: string; status: strin
           </span>
         ))}
       </div>
-      <div className="flex h-48 items-end gap-1.5 border-b border-line" role="img" aria-label="Messages per day for the last 14 days">
+      <div className="flex h-36 items-end gap-1 border-b border-line sm:h-48 sm:gap-1.5" role="img" aria-label="Messages per day for the last 14 days">
         {days.map((d, i) => (
           <div key={d} className="group relative flex h-full flex-1 flex-col justify-end">
             <div
@@ -54,10 +54,12 @@ export function DailyChart({ rows, since }: { rows: { day: string; status: strin
           </div>
         ))}
       </div>
-      <div className="mt-2 flex gap-1.5 text-[10px] text-muted">
+      <div className="mt-2 flex gap-1 text-[11px] text-muted sm:gap-1.5">
         {days.map((d, i) => (
-          <span key={d} className="flex-1 text-center">
-            {i % 2 === 0 ? label(d, "d MMM") : ""}
+          <span key={d} className="flex-1 whitespace-nowrap text-center">
+            {/* Every 3rd day on phones, every 2nd from tablets up. */}
+            <span className="sm:hidden">{i % 3 === 0 ? label(d, "d/M") : ""}</span>
+            <span className="hidden sm:inline">{i % 2 === 0 ? label(d, "d MMM") : ""}</span>
           </span>
         ))}
       </div>

@@ -60,8 +60,8 @@ export default async function ClientsPage() {
                     {c.users.length ? (
                       <ul className="mt-2 divide-y divide-line rounded-xl border border-line">
                         {c.users.map((u) => (
-                          <li key={u.id} className="flex flex-wrap items-center gap-2 px-3 py-2.5">
-                            <div className="min-w-0 flex-1">
+                          <li key={u.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2.5">
+                            <div className="min-w-0 basis-full sm:basis-auto sm:flex-1">
                               <p className="truncate text-sm font-medium">{u.name}</p>
                               <p className="truncate text-xs text-muted">{u.email}</p>
                             </div>

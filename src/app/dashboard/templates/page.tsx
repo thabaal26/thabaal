@@ -67,7 +67,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
             const r = renderFor({ ...t, headerText: t.headerText ?? "", footer: t.footer ?? "", variables: t.variables as VarMap }, SAMPLE_CUSTOMER);
             return (
               <Card key={t.id} className="flex flex-col overflow-hidden transition hover:shadow-pop">
-                <Link href={`/dashboard/templates/${t.id}`} className="chat-wall block h-56 overflow-hidden p-4">
+                <Link href={`/dashboard/templates/${t.id}`} className="chat-wall relative block max-h-56 min-h-28 overflow-hidden p-4 [mask-image:linear-gradient(to_bottom,black_80%,transparent)]">
                   <WhatsAppBubble
                     header={r.header}
                     headerImage={t.headerType === "IMAGE" ? t.headerMediaUrl : undefined}

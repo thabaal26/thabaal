@@ -54,15 +54,15 @@ export function SideNav({ isAdmin, openReplies }: { isAdmin: boolean; openReplie
   );
 }
 
-/** Phone tab bar: the five everyday sections, within thumb reach. Settings lives in the top bar. */
+/** Phone tab bar: a floating frosted bar with the five everyday sections, within thumb reach. */
 export function BottomNav({ openReplies }: { openReplies?: number }) {
   const path = usePathname();
   return (
     <nav
       aria-label="Main"
-      className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 backdrop-blur-md lg:hidden"
+      className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 rounded-[1.4rem] border border-white/60 bg-white/80 shadow-[0_10px_40px_-12px_rgb(15_26_23/0.35)] ring-1 ring-black/5 backdrop-blur-xl backdrop-saturate-150 lg:hidden"
     >
-      <div className="mx-auto grid max-w-lg grid-cols-5">
+      <div className="mx-auto grid max-w-lg grid-cols-5 px-1">
         {PHONE_TABS.map((tab) => NAV.find((n) => n.href === tab)!).map(({ href, short, icon: Icon }) => {
           const active = isActive(path, href);
           return (
@@ -70,7 +70,7 @@ export function BottomNav({ openReplies }: { openReplies?: number }) {
               key={href}
               href={href}
               aria-current={active ? "page" : undefined}
-              className={cn("flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium transition active:scale-95", active ? "text-brand-deep" : "text-muted")}
+              className={cn("flex h-[3.75rem] flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition active:scale-95", active ? "text-brand-deep" : "text-muted")}
             >
               <span className={cn("relative grid h-7 w-12 place-items-center rounded-full transition", active && "bg-brand-soft")}>
                 <Icon className="size-[18px]" strokeWidth={active ? 2.4 : 2} />

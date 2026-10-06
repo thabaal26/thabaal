@@ -19,12 +19,12 @@ export function Card({ className, ...p }: ComponentProps<"div">) {
 
 export function CardHeader({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
   return (
-    <div className="flex flex-col gap-3 border-b border-line px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-5">
-      <div className="min-w-0">
+    <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 border-b border-line px-4 py-3.5 sm:flex-nowrap sm:gap-4 sm:px-5 sm:py-4">
+      <div className="min-w-0 flex-1 basis-40">
         <h2 className="text-sm font-semibold text-ink">{title}</h2>
         {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
       </div>
-      {action && <div className="shrink-0 self-start">{action}</div>}
+      {action && <div className="min-w-0 max-w-full shrink-0 self-start">{action}</div>}
     </div>
   );
 }
@@ -146,13 +146,13 @@ export function PickClientNotice({ what }: { what: string }) {
 
 export function Stat({ label, value, sub, icon, accent }: { label: string; value: ReactNode; sub?: ReactNode; icon: ReactNode; accent?: string }) {
   return (
-    <Card className="p-4 sm:p-5">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-muted">{label}</p>
-        <span className={cn("grid size-8 place-items-center rounded-lg", accent ?? "bg-brand-soft text-brand-deep")}>{icon}</span>
+    <Card className="p-3.5 sm:p-5">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[12px] font-medium leading-snug text-muted sm:text-xs">{label}</p>
+        <span className={cn("hidden size-8 shrink-0 place-items-center rounded-lg sm:grid", accent ?? "bg-brand-soft text-brand-deep")}>{icon}</span>
       </div>
-      <p className="tabular mt-2 text-2xl font-semibold tracking-tight sm:mt-3 sm:text-3xl">{value}</p>
-      {sub && <p className="mt-1 text-xs text-muted">{sub}</p>}
+      <p className="tabular mt-1.5 text-[1.6rem] font-semibold leading-none tracking-tight sm:mt-3 sm:text-3xl">{value}</p>
+      {sub && <p className="mt-1.5 text-[11.5px] leading-snug text-muted sm:text-xs">{sub}</p>}
     </Card>
   );
 }

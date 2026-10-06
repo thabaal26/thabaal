@@ -6,7 +6,7 @@ import { getSettings, isSimulated } from "@/lib/provider";
 import { senderFor } from "@/lib/senders";
 import { nightColor, themeStyle } from "@/lib/theme";
 import { logout } from "../login/actions";
-import { ClientSwitcher } from "./client-switcher";
+import { ClientSwitcher, HeaderClientSwitcher } from "./client-switcher";
 import { BottomNav, SettingsLink, SideNav } from "./nav";
 
 /** The client whose look the dashboard wears: a client login's own, or the one an admin picked. */
@@ -99,29 +99,43 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
       <header className="sticky top-0 z-30 bg-night/95 pt-[env(safe-area-inset-top)] backdrop-blur-md lg:hidden">
         <div className="flex h-14 items-center gap-3 px-4">
           <BrandMark logoUrl={client?.logoUrl} name={name} size="sm" />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold leading-tight text-white">{scope.isAdmin && !client ? "All clients" : name}</p>
-            {live ? (
-              <p className="flex items-center gap-1.5 truncate text-[11px] leading-tight text-glow">
-                <span className="size-1.5 shrink-0 rounded-full bg-glow" />
-                {scope.isAdmin ? `Sending via ${via}` : "WhatsApp connected"}
-              </p>
-            ) : scope.isAdmin ? (
-              <p className="flex items-center gap-1.5 truncate text-[11px] leading-tight text-amber-300">
-                <span className="size-1.5 shrink-0 rounded-full bg-amber-400" /> Demo mode · sends simulated
-              </p>
-            ) : (
-              <p className="truncate text-[11px] leading-tight text-white/55">{subtitle}</p>
-            )}
-          </div>
+          {scope.isAdmin ? (
+            <HeaderClientSwitcher clients={clients} current={scope.clientId} title={client ? name : "All clients"}>
+              {live ? (
+                <p className="flex items-center gap-1.5 truncate text-[11px] leading-tight text-glow">
+                  <span className="size-1.5 shrink-0 rounded-full bg-glow" />
+                  {scope.isAdmin ? `Sending via ${via}` : "WhatsApp connected"}
+                </p>
+              ) : scope.isAdmin ? (
+                <p className="flex items-center gap-1.5 truncate text-[11px] leading-tight text-amber-300">
+                  <span className="size-1.5 shrink-0 rounded-full bg-amber-400" /> Demo mode · sends simulated
+                </p>
+              ) : (
+                <p className="truncate text-[11px] leading-tight text-white/55">{subtitle}</p>
+              )}
+            </HeaderClientSwitcher>
+          ) : (
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold leading-tight text-white">{name}</p>
+              {live ? (
+                <p className="flex items-center gap-1.5 truncate text-[11px] leading-tight text-glow">
+                  <span className="size-1.5 shrink-0 rounded-full bg-glow" />
+                  {scope.isAdmin ? `Sending via ${via}` : "WhatsApp connected"}
+                </p>
+              ) : scope.isAdmin ? (
+                <p className="flex items-center gap-1.5 truncate text-[11px] leading-tight text-amber-300">
+                  <span className="size-1.5 shrink-0 rounded-full bg-amber-400" /> Demo mode · sends simulated
+                </p>
+              ) : (
+                <p className="truncate text-[11px] leading-tight text-white/55">{subtitle}</p>
+              )}
+            </div>
+          )}
           <SettingsLink />
         </div>
       </header>
 
-      {scope.isAdmin && (
-        <div className="bg-night px-4 pb-3 lg:hidden"><ClientSwitcher clients={clients} current={scope.clientId} dark /></div>
-      )}
-      <main className="mx-auto max-w-7xl animate-rise px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 sm:px-8 sm:pt-8 lg:pb-10">{children}</main>
+      <main className="mx-auto max-w-7xl animate-rise px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-5 sm:px-8 sm:pt-8 lg:pb-10">{children}</main>
       <BottomNav openReplies={openReplies} />
     </div>
   );

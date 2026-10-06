@@ -225,7 +225,7 @@ export function CampaignForm({
 
         <label className="flex items-center justify-between rounded-xl border border-line bg-white px-4 py-3 text-sm">
           Campaign active
-          <input type="checkbox" className="size-4 accent-brand" checked={c.active} onChange={(e) => set({ active: e.target.checked })} />
+          <input type="checkbox" className="size-5 accent-brand sm:size-4" checked={c.active} onChange={(e) => set({ active: e.target.checked })} />
         </label>
 
         <div className="hidden lg:block">
@@ -238,7 +238,7 @@ export function CampaignForm({
       <MobileActionBar>
         <div className="min-w-0 flex-1 leading-tight">
           <p className="tabular truncate text-sm font-semibold">{size.toLocaleString("en-IN")} customers</p>
-          <p className="truncate text-xs text-muted">{batches} batch{batches === 1 ? "" : "es"} · done in {formatMinutes(mins)}</p>
+          <p className="truncate text-xs text-muted">{batches} batch{batches === 1 ? "" : "es"} · {days > 1 ? `about ${days} days` : `done in ${formatMinutes(mins)}`}</p>
         </div>
         <Button className="shrink-0 px-6" disabled={pending} onClick={save}>
           {pending ? <Loader2 className="size-4 animate-spin" /> : id ? "Save" : "Create"}

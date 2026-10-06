@@ -1,11 +1,47 @@
 "use client";
 
-import { Building2 } from "lucide-react";
+import { Building2, ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useTransition, type ReactNode } from "react";
 import { toastResult } from "@/components/toast";
 import { cn } from "@/lib/cn";
 import { setActiveClient } from "./actions/clients";
+
+/**
+ * Phone header version: the title itself is the switcher, so admins don't lose a whole
+ * row of screen to it. A native select sits invisibly on top for the OS picker.
+ */
+export function HeaderClientSwitcher({ clients, current, title, children }: { clients: { id: string; name: string }[]; current: string | null; title: string; children: ReactNode }) {
+  const [pending, start] = useTransition();
+  const router = useRouter();
+  return (
+    <div className={cn("relative min-w-0 flex-1", pending && "opacity-60")}>
+      <p className="flex items-center gap-1 text-sm font-semibold leading-tight text-white">
+        <span className="truncate">{title}</span>
+        <ChevronDown className="size-4 shrink-0 text-white/60" />
+      </p>
+      {children}
+      <select
+        aria-label="Switch client"
+        value={current ?? ""}
+        disabled={pending}
+        onChange={(e) =>
+          start(async () => {
+            const r = await setActiveClient(e.target.value);
+            if (!r.ok) toastResult(r);
+            router.refresh();
+          })
+        }
+        className="absolute inset-0 size-full cursor-pointer opacity-0"
+      >
+        <option value="">All clients</option>
+        {clients.map((c) => (
+          <option key={c.id} value={c.id}>{c.name}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
 
 /** Admin-only: choose which client's data the whole dashboard shows. */
 export function ClientSwitcher({ clients, current, dark }: { clients: { id: string; name: string }[]; current: string | null; dark?: boolean }) {

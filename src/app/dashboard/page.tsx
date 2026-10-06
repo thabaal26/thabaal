@@ -125,7 +125,7 @@ export default async function Overview() {
         />
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Stat label="Active customers" value={fmtNumber(customers)} sub={`${fmtNumber(optedOut)} opted out`} icon={<Users className="size-4" />} />
         <Stat
           label="Messages sent · 7 days"
@@ -226,7 +226,30 @@ export default async function Overview() {
       {byProduct.length > 0 && (
         <Card className="mt-6">
           <CardHeader title="Campaign results by product" description="Last 30 days. Which customer groups read your messages and write back." />
-          <div className="overflow-x-auto">
+          {/* Phones: one compact card per product instead of a sideways-scrolling table. */}
+          <ul className="divide-y divide-line sm:hidden">
+            {byProduct.map((r) => (
+              <li key={r.tag} className="px-4 py-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <Link href={`/dashboard/customers?tag=${encodeURIComponent(r.tag)}`} className="truncate text-sm font-medium">{tagLabel(r.tag)}</Link>
+                  <span className="tabular shrink-0 text-xs text-muted">{fmtNumber(r.sent)} sent{r.failed > 0 && <span className="text-rose-600"> · {r.failed} failed</span>}</span>
+                </div>
+                <dl className="tabular mt-2 grid grid-cols-3 gap-2 text-center">
+                  {[
+                    ["Delivered", `${pct(r.delivered, r.sent)}%`],
+                    ["Read", `${pct(r.read, r.delivered)}%`],
+                    ["Replies", fmtNumber(r.replies)],
+                  ].map(([k, v]) => (
+                    <div key={k} className="rounded-lg bg-canvas px-1 py-1.5">
+                      <dd className="text-sm font-semibold">{v}</dd>
+                      <dt className="text-[11px] text-muted">{k}</dt>
+                    </div>
+                  ))}
+                </dl>
+              </li>
+            ))}
+          </ul>
+          <div className="hidden overflow-x-auto sm:block">
             <table className="w-full min-w-[560px] text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-xs text-muted">

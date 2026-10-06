@@ -67,7 +67,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
         <Stat label="Messages received" value={fmtNumber(sent.length)} sub={c.optedOut ? "Opted out of campaigns" : "From your campaigns"} icon={<Send className="size-4" />} />
         <Stat label="Read" value={`${pct(read, delivered)}%`} sub={`${read} of ${delivered} delivered`} icon={<Eye className="size-4" />} accent="bg-violet-50 text-violet-700" />
         <Stat label="Replies" value={fmtNumber(c.replies.length)} sub={c.replies[0] ? `Last ${fmtDate(c.replies[0].receivedAt, "d MMM")}` : "None yet"} icon={<CheckCheck className="size-4" />} />
@@ -97,7 +97,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                   {c.optedOut && <Badge tone="red">Opted out</Badge>}
                   {c.unreachable && <Badge tone="amber">Can&apos;t receive WhatsApp</Badge>}
                   {productTags.map((t) => (
-                    <Link key={t} href={`/dashboard/customers?tag=${encodeURIComponent(t)}`}><Badge>{t === "no-item-info" ? "no item recorded" : t}</Badge></Link>
+                    <Link key={t} href={`/dashboard/customers?tag=${encodeURIComponent(t)}`} className="-my-1 py-1"><Badge>{t === "no-item-info" ? "no item recorded" : t}</Badge></Link>
                   ))}
                 </div>
               </div>

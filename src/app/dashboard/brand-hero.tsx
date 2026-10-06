@@ -33,16 +33,16 @@ export function BrandHero({
             </p>
           </div>
           <div className="relative flex flex-wrap gap-2 text-xs">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/10">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3.5 py-2 ring-1 ring-white/10 sm:px-3 sm:py-1.5">
               <Users className="size-3.5 text-glow" /> {fmtNumber(customers)} customers
             </span>
             {client.website && (
-              <a href={client.website} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/10 transition hover:bg-white/20">
+              <a href={client.website} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3.5 py-2 ring-1 ring-white/10 sm:px-3 sm:py-1.5 transition hover:bg-white/20">
                 <Globe className="size-3.5 text-glow" /> {host(client.website)}
               </a>
             )}
             {client.supportPhone && (
-              <a href={`tel:${client.supportPhone.replace(/\s/g, "")}`} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/10 transition hover:bg-white/20">
+              <a href={`tel:${client.supportPhone.replace(/\s/g, "")}`} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3.5 py-2 ring-1 ring-white/10 sm:px-3 sm:py-1.5 transition hover:bg-white/20">
                 <Phone className="size-3.5 text-glow" /> {client.supportPhone}
               </a>
             )}
