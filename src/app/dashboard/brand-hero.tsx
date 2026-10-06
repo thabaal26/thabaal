@@ -14,8 +14,8 @@ const chip = "inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/10
 
 /**
  * First thing a client sees after signing in: their name, numbers and banner, kept to a
- * compact strip so the figures below stay on the first screen. Phones skip the banner
- * image; the logo is already in the header.
+ * compact strip so the figures below stay on the first screen. Phones show the banner as
+ * a slim strip on top; wider screens put it beside the text.
  */
 export function BrandHero({
   client,
@@ -28,7 +28,12 @@ export function BrandHero({
 }) {
   return (
     <section className="relative mb-5 overflow-hidden rounded-3xl bg-night text-white shadow-pop sm:mb-6">
-      <div aria-hidden className="pointer-events-none absolute -left-16 -top-20 size-56 rounded-full bg-glow/20 blur-3xl" />
+      {client.bannerUrl && (
+        // Phones: a slim strip across the top, so the banner shows without filling the screen.
+        // eslint-disable-next-line @next/next/no-img-element -- admin-supplied banner of any size
+        <img src={client.bannerUrl} alt={`${client.name} banner`} className="relative h-28 w-full object-cover object-center md:hidden" />
+      )}
+      <div aria-hidden className="pointer-events-none absolute -left-16 -top-20 size-56 rounded-full bg-glow/20 blur-3xl max-md:hidden" />
       <div className="relative flex items-stretch">
         <div className="min-w-0 flex-1 p-4 sm:p-6">
           <p className="text-[13px] font-medium text-glow">வணக்கம் 🙏 · {greeting()}</p>
