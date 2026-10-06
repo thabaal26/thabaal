@@ -2,6 +2,16 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { db } from "./db";
 
+/**
+ * Which client's customers a message to this Meta number concerns: the client that owns the
+ * number, or (for the env-configured number) every client without numbers of its own.
+ */
+export async function receivingNumber(phoneNumberId?: string) {
+  const number = phoneNumberId ? await db.whatsAppNumber.findUnique({ where: { phoneNumberId }, select: { id: true, clientId: true } }) : null;
+  const customers: Prisma.CustomerWhereInput = number ? { clientId: number.clientId } : { client: { numbers: { none: {} } } };
+  return { number, customers };
+}
+
 export type IncomingReply = {
   phone: string; // digits only
   text: string;
@@ -22,9 +32,11 @@ export type IncomingReply = {
 export async function recordReply(r: IncomingReply) {
   if (!r.text.trim()) return;
   let where: Prisma.CustomerWhereInput = { phone: r.phone };
+  let senderId: string | null = null;
   if (!r.anyClient) {
-    const owner = r.phoneNumberId ? await db.client.findUnique({ where: { waPhoneNumberId: r.phoneNumberId }, select: { id: true } }) : null;
-    where = { ...where, ...(owner ? { clientId: owner.id } : { client: { waPhoneNumberId: null } }) };
+    const { number, customers } = await receivingNumber(r.phoneNumberId);
+    where = { ...where, ...customers };
+    senderId = number?.id ?? null;
   }
   const candidates = await db.customer.findMany({
     where,
@@ -35,7 +47,7 @@ export async function recordReply(r: IncomingReply) {
 
   try {
     await db.reply.create({
-      data: { customerId: customer.id, text: r.text.trim().slice(0, 4000), kind: r.kind, waMessageId: r.waMessageId, receivedAt: r.at ?? new Date() },
+      data: { customerId: customer.id, senderId, text: r.text.trim().slice(0, 4000), kind: r.kind, waMessageId: r.waMessageId, receivedAt: r.at ?? new Date() },
     });
   } catch (e) {
     // Webhooks retry; the same message id arriving twice is expected.

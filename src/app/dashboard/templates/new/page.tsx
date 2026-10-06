@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader, PickClientNotice } from "@/components/ui";
+import { clientAccounts } from "@/lib/senders";
 import { getScope } from "@/lib/session";
 import { TemplateEditor } from "../template-editor";
 
@@ -12,6 +13,7 @@ export default async function NewTemplatePage() {
   const scope = await getScope();
   if (!scope.isAdmin) redirect("/dashboard/templates");
   if (!scope.clientId) return <><PageHeader title="New template" /><PickClientNotice what="template" /></>;
+  const accounts = (await clientAccounts(scope.clientId)).map((a) => ({ id: a.businessAccountId, label: `${a.labels.join(", ")} · account ${a.businessAccountId}` }));
   return (
     <>
       <Link href="/dashboard/templates" className="-my-2 mb-1 inline-flex items-center gap-1 py-2 text-sm text-muted hover:text-ink sm:mb-3 sm:text-xs">
@@ -21,6 +23,7 @@ export default async function NewTemplatePage() {
       <TemplateEditor
         id={null}
         businessName={scope.clientName ?? process.env.BUSINESS_NAME ?? "Your Business"}
+        accounts={accounts}
         initial={{
           name: "",
           language: "en",
@@ -34,6 +37,7 @@ export default async function NewTemplatePage() {
           variables: { "1": { source: "first_name" }, "2": { source: "static", value: "20% off" } },
           codeExpiryMins: 10,
           securityNote: true,
+          businessAccountId: accounts[0]?.id ?? null,
         }}
       />
     </>

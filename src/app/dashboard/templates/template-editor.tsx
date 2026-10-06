@@ -55,12 +55,15 @@ export function TemplateEditor({
   status,
   statusReason,
   businessName,
+  accounts = [],
 }: {
   id: string | null;
   initial: TemplateDraft;
   status?: string;
   statusReason?: string | null;
   businessName: string;
+  /** The client's WhatsApp Business Accounts; a new template picks one when there are several. */
+  accounts?: { id: string; label: string }[];
 }) {
   const [t, setT] = useState<TemplateDraft>(initial);
   const [pending, start] = useTransition();
@@ -163,6 +166,16 @@ export function TemplateEditor({
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-[1fr_200px]">
+              {accounts.length > 1 && (
+                <div className="sm:col-span-2">
+                  <Label htmlFor="waba" hint="templates are approved per WhatsApp account">WhatsApp account</Label>
+                  <select id="waba" className="field" value={t.businessAccountId ?? accounts[0].id} disabled={locked} onChange={(e) => set({ businessAccountId: e.target.value })}>
+                    {accounts.map((a) => (
+                      <option key={a.id} value={a.id}>{a.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <Label htmlFor="name" hint="lowercase_with_underscores">Template name</Label>
                 <input

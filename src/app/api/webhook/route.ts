@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { metaReplyContent, recordReply } from "@/lib/replies";
+import { metaReplyContent, receivingNumber, recordReply } from "@/lib/replies";
 import { mapMetaStatus } from "@/lib/whatsapp";
 
 export const dynamic = "force-dynamic";
@@ -55,10 +55,8 @@ async function applyStatus(s: StatusUpdate) {
 
 /** STOP only opts out of the business whose number received it. */
 async function optOut(phone: string, phoneNumberId?: string) {
-  const owner = phoneNumberId ? await db.client.findUnique({ where: { waPhoneNumberId: phoneNumberId }, select: { id: true } }) : null;
-  // Clients without their own number all share the env-configured one.
-  const client = owner ? { clientId: owner.id } : { client: { waPhoneNumberId: null } };
-  await db.customer.updateMany({ where: { phone, ...client }, data: { optedOut: true } });
+  const { customers } = await receivingNumber(phoneNumberId);
+  await db.customer.updateMany({ where: { phone, ...customers }, data: { optedOut: true } });
 }
 
 export async function POST(req: NextRequest) {

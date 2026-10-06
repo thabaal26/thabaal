@@ -32,7 +32,7 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
   const [rows, total, byStatus, campaigns] = await Promise.all([
     db.message.findMany({
       where,
-      include: { customer: true, run: { include: { campaign: { select: { name: true } } } } },
+      include: { customer: true, run: { include: { campaign: { select: { name: true } } } }, sender: { select: { label: true } } },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
@@ -122,6 +122,7 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                       <div><dt className="text-muted">Phone</dt><dd className="tabular">{formatPhone(m.customer.phone)}</dd></div>
                       <div><dt className="text-muted">Campaign</dt><dd className="truncate">{m.run?.campaign.name ?? "Test send"}</dd></div>
+                      {m.sender && <div><dt className="text-muted">Sent from</dt><dd className="truncate">{m.sender.label}</dd></div>}
                       <div><dt className="text-muted">Delivered</dt><dd>{m.deliveredAt ? fmtDate(m.deliveredAt, "d MMM, h:mm a") : "—"}</dd></div>
                       <div><dt className="text-muted">Read</dt><dd>{m.readAt ? fmtDate(m.readAt, "d MMM, h:mm a") : "—"}</dd></div>
                     </dl>
@@ -165,7 +166,7 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
                     <td className="px-4 py-3 text-xs text-ink-2">
                       {m.run?.campaign.name ?? <Badge>Test send</Badge>}
                       <div className="mt-1 flex gap-1">
-                        {m.status !== "QUEUED" && <Badge tone={m.provider === "LOCAL" ? "violet" : "blue"}>{m.provider === "LOCAL" ? "Local" : "Meta"}</Badge>}
+                        {m.status !== "QUEUED" && <Badge tone={m.provider === "LOCAL" ? "violet" : "blue"}>{m.provider === "LOCAL" ? "Local" : (m.sender?.label ?? "Meta")}</Badge>}
                         {m.simulated && <Badge tone="amber">Demo</Badge>}
                       </div>
                     </td>

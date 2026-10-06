@@ -15,7 +15,8 @@ export default async function NewCampaignPage() {
   const scope = await getScope();
   if (!scope.isAdmin) redirect("/dashboard/campaigns");
   if (!scope.clientId) return <><PageHeader title="New campaign" /><PickClientNotice what="campaign" /></>;
-  const { templates, audience } = await campaignFormData(scope.clientId);
+  const { templates, audience, numbers } = await campaignFormData(scope.clientId);
+  const defaultAccount = numbers[0]?.businessAccountId;
   const tomorrow = daysAgo(-1).toISOString().slice(0, 10);
   return (
     <>
@@ -27,9 +28,11 @@ export default async function NewCampaignPage() {
         id={null}
         templates={templates}
         audience={audience}
+        numbers={numbers}
         initial={{
           name: "",
-          templateId: templates.find((t) => t.status === "APPROVED")?.id ?? "",
+          templateId: templates.find((t) => t.status === "APPROVED" && (!defaultAccount || !t.businessAccountId || t.businessAccountId === defaultAccount))?.id ?? "",
+          senderId: "",
           audienceTag: "",
           scheduleType: "WEEKLY",
           daysOfWeek: [2, 5],

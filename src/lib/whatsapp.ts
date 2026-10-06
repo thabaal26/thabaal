@@ -7,14 +7,15 @@ import type { MetaComponent } from "./template";
 const VERSION = process.env.META_GRAPH_VERSION ?? "v23.0";
 const GRAPH = `https://graph.facebook.com/${VERSION}`;
 
-export type ClientCredentials = { waToken: string | null; waPhoneNumberId: string | null; waBusinessAccountId: string | null };
+/** Credentials of one sending number: its token, phone number ID and WhatsApp Business Account. */
+export type WaSource = { token: string | null; phoneNumberId: string | null; businessAccountId: string | null };
 
-/** A client's own WhatsApp account when it has one, otherwise the env-configured number. */
-export function waConfig(client?: ClientCredentials | null) {
-  const own = Boolean(client?.waToken && client.waPhoneNumberId && client.waBusinessAccountId);
-  const token = own ? client!.waToken! : process.env.WHATSAPP_TOKEN;
-  const phoneNumberId = own ? client!.waPhoneNumberId! : process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const wabaId = own ? client!.waBusinessAccountId! : process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+/** That number when all three are set, otherwise the env-configured number. */
+export function waConfig(src?: WaSource | null) {
+  const own = Boolean(src?.token && src.phoneNumberId && src.businessAccountId);
+  const token = own ? src!.token! : process.env.WHATSAPP_TOKEN;
+  const phoneNumberId = own ? src!.phoneNumberId! : process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const wabaId = own ? src!.businessAccountId! : process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
   return {
     live: Boolean(token && phoneNumberId && wabaId),
     own,
@@ -94,6 +95,14 @@ export type MetaTemplate = {
   rejected_reason?: string;
   components: MetaComponent[];
 };
+
+export type MetaPhoneNumber = { id: string; display_phone_number: string; verified_name: string; quality_rating?: string };
+
+/** The sending numbers in a WhatsApp Business Account. Only the token in `cfg` is used. */
+export async function listPhoneNumbers(cfg: WaConfig, businessAccountId: string) {
+  const res = await graph<{ data: MetaPhoneNumber[] }>(cfg, `${businessAccountId}/phone_numbers?fields=id,display_phone_number,verified_name,quality_rating`);
+  return res.data;
+}
 
 export async function listMetaTemplates(cfg: WaConfig) {
   const { wabaId } = cfg;

@@ -21,11 +21,13 @@ export function CampaignForm({
   initial,
   templates,
   audience,
+  numbers,
 }: {
   id: string | null;
   initial: CampaignInput;
-  templates: { id: string; name: string; category: string; status: string }[];
+  templates: { id: string; name: string; category: string; status: string; businessAccountId: string | null }[];
   audience: { all: number; tags: { tag: string; n: number }[] };
+  numbers: { id: string; label: string; businessAccountId: string; isDefault: boolean }[];
 }) {
   const [c, setC] = useState(initial);
   const [pending, start] = useTransition();
@@ -38,7 +40,10 @@ export function CampaignForm({
   const [h, m] = c.sendTime.split(":").map(Number);
   const end = new Date(2000, 0, 1, h || 0, (m || 0) + mins);
   const perWeek = c.scheduleType === "WEEKLY" ? c.daysOfWeek.length : 0;
-  const chosen = templates.find((t) => t.id === c.templateId);
+  // Meta only sends a template from numbers in the account that approved it.
+  const sender = numbers.find((n) => n.id === c.senderId) ?? numbers[0];
+  const usable = sender ? templates.filter((t) => !t.businessAccountId || t.businessAccountId === sender.businessAccountId) : templates;
+  const chosen = usable.find((t) => t.id === c.templateId);
 
   function save() {
     start(async () => {
@@ -61,11 +66,31 @@ export function CampaignForm({
               <Label htmlFor="cname">Campaign name</Label>
               <input id="cname" className="field" placeholder="Weekly offers" value={c.name} onChange={(e) => set({ name: e.target.value })} />
             </div>
+            {numbers.length > 1 && (
+              <div className="sm:col-span-2">
+                <Label htmlFor="sender" hint="templates below are the ones approved for this number">Send from</Label>
+                <select
+                  id="sender"
+                  className="field"
+                  value={c.senderId}
+                  onChange={(e) => {
+                    const next = numbers.find((n) => n.id === e.target.value) ?? numbers[0];
+                    const keep = templates.find((t) => t.id === c.templateId && (!t.businessAccountId || t.businessAccountId === next.businessAccountId));
+                    set({ senderId: e.target.value, templateId: keep ? c.templateId : "" });
+                  }}
+                >
+                  <option value="">Default number ({numbers.find((n) => n.isDefault)?.label ?? numbers[0].label})</option>
+                  {numbers.map((n) => (
+                    <option key={n.id} value={n.id}>{n.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <Label htmlFor="tpl">Template</Label>
-              <select id="tpl" className="field" value={c.templateId} onChange={(e) => set({ templateId: e.target.value })}>
-                <option value="">Choose a template…</option>
-                {templates.map((t) => (
+              <select id="tpl" className="field" value={chosen ? c.templateId : ""} onChange={(e) => set({ templateId: e.target.value })}>
+                <option value="">{usable.length ? "Choose a template…" : "No templates for this number yet"}</option>
+                {usable.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name} · {t.category.toLowerCase()}{t.status !== "APPROVED" ? " (not approved yet)" : ""}
                   </option>

@@ -26,6 +26,8 @@ export type TemplateDraft = {
   variables: VarMap;
   codeExpiryMins: number | null;
   securityNote: boolean;
+  /** WhatsApp Business Account to create it in, when the client has several. */
+  businessAccountId?: string | null;
 };
 
 export type CustomerLike = { name: string; phone: string };

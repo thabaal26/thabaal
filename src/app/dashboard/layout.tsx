@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { db } from "@/lib/db";
 import { getScope, ownedMessages, requireUser } from "@/lib/session";
 import { getSettings, isSimulated } from "@/lib/provider";
+import { senderFor } from "@/lib/senders";
 import { nightColor, themeStyle } from "@/lib/theme";
 import { logout } from "../login/actions";
 import { ClientSwitcher } from "./client-switcher";
@@ -54,7 +55,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
   const name = client?.name ?? "Campaign Portal";
   const subtitle = client?.tagline || (scope.isAdmin ? (client ? "Admin view" : "Admin · all clients") : "WhatsApp campaigns");
   const via = settings.provider === "LOCAL" ? "Local session" : "Meta Cloud API";
-  const live = !isSimulated(settings, client);
+  const live = !isSimulated(settings, client ? (await senderFor(client.id)).cfg : undefined);
 
   // Clients only see a reassuring "connected" line; setup problems are the admin's to fix.
   const mode = live ? (

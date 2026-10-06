@@ -52,7 +52,7 @@ export const requireUser = cache(async () => {
         select: { id: true, email: true, name: true, role: true, clientId: true, client: { select: { name: true } } },
       })
     : null;
-  if (!user || (user.role === "CLIENT" && !user.clientId)) redirect("/login");
+  if (!user || (user.role === "CLIENT" && !user.clientId)) redirect(userId ? "/api/session/clear" : "/login");
   return user;
 });
 

@@ -19,9 +19,9 @@ import {
   mapMetaStatus,
   MetaError,
   uploadHeaderSample,
-  waConfig,
   type WaConfig,
 } from "@/lib/whatsapp";
+import { clientAccounts, clientNumbers, senderForAccount } from "@/lib/senders";
 
 export type ActionResult = { ok: boolean; message?: string; errors?: string[]; id?: string };
 
@@ -47,9 +47,14 @@ async function metaComponents(cfg: WaConfig, d: TemplateDraft) {
   return toMetaComponents(d, handle);
 }
 
-/** The WhatsApp account a client's templates live in. */
-async function clientWa(clientId: string) {
-  return waConfig(await db.client.findUnique({ where: { id: clientId } }));
+/**
+ * The WhatsApp Business Account a new template goes into: the one picked in the editor,
+ * else the default number's. Null means the env-configured number.
+ */
+async function targetAccount(clientId: string, picked?: string | null) {
+  const numbers = await clientNumbers(clientId);
+  if (picked && numbers.some((n) => n.businessAccountId === picked)) return picked;
+  return numbers[0]?.businessAccountId ?? null;
 }
 
 export async function saveTemplate(id: string | null, draft: TemplateDraft): Promise<ActionResult> {
@@ -57,12 +62,14 @@ export async function saveTemplate(id: string | null, draft: TemplateDraft): Pro
   if ("denied" in s) return { ok: false, message: s.denied };
   const errors = validateDraft(draft);
   if (errors.length) return { ok: false, errors };
-  const owner = id ? await db.template.findUnique({ where: { id }, select: { clientId: true } }) : null;
+  const owner = id ? await db.template.findUnique({ where: { id }, select: { clientId: true, businessAccountId: true } }) : null;
   if (id && !owner) return { ok: false, message: "Template not found." };
   const clientId = owner?.clientId ?? s.clientId!;
-  const cfg = await clientWa(clientId);
+  const businessAccountId = owner ? owner.businessAccountId : await targetAccount(clientId, draft.businessAccountId);
+  const { cfg } = await senderForAccount(clientId, businessAccountId);
   const { live } = cfg;
-  const sameName = { clientId_name_language: { clientId, name: draft.name, language: draft.language } };
+  // Composite unique keys can't match a null column, so look the name up with findFirst.
+  const nameTaken = () => db.template.findFirst({ where: { clientId, businessAccountId, name: draft.name, language: draft.language } });
 
   // Local session: no Meta review. A template Meta had approved no longer matches, so it
   // goes back to draft and is resubmitted the next time it's saved with Meta active.
@@ -81,11 +88,11 @@ export async function saveTemplate(id: string | null, draft: TemplateDraft): Pro
       revalidatePath("/dashboard/templates");
       return { ok: true, id, message: "Saved. The local session sends the new version from the next batch." };
     }
-    if (await db.template.findUnique({ where: sameName })) {
+    if (await nameTaken()) {
       return { ok: false, errors: ["A template with this name and language already exists."] };
     }
     const created = await db.template.create({
-      data: { clientId, name: draft.name, language: draft.language, category: draft.category, ...contentFields(draft), status: "DRAFT" },
+      data: { clientId, businessAccountId, name: draft.name, language: draft.language, category: draft.category, ...contentFields(draft), status: "DRAFT" },
     });
     revalidatePath("/dashboard/templates");
     return { ok: true, id: created.id, message: "Template saved. The local session can send it right away." };
@@ -119,11 +126,11 @@ export async function saveTemplate(id: string | null, draft: TemplateDraft): Pro
     };
   }
 
-  if (await db.template.findUnique({ where: sameName })) {
+  if (await nameTaken()) {
     return { ok: false, errors: ["A template with this name and language already exists."] };
   }
   const created = await db.template.create({
-    data: { clientId, name: draft.name, language: draft.language, category: draft.category, ...contentFields(draft), status: live ? "DRAFT" : "APPROVED" },
+    data: { clientId, businessAccountId, name: draft.name, language: draft.language, category: draft.category, ...contentFields(draft), status: live ? "DRAFT" : "APPROVED" },
   });
   if (!live) {
     revalidatePath("/dashboard/templates");
@@ -148,38 +155,51 @@ export async function syncTemplates(): Promise<ActionResult> {
   const s = await requireAdmin(true);
   if ("denied" in s) return { ok: false, message: s.denied };
   const { clientId } = s;
-  const cfg = await clientWa(clientId);
-  if (!cfg.live) return { ok: false, message: "Add this client's WhatsApp details on the Clients page to sync templates from Meta." };
-  try {
-    const remote = await listMetaTemplates(cfg);
-    let imported = 0;
-    for (const r of remote) {
-      const parsed = fromMetaComponents(r.components ?? []);
-      const status = mapMetaStatus(r.status);
-      const category = (["MARKETING", "UTILITY", "AUTHENTICATION"].includes(r.category) ? r.category : "UTILITY") as never;
-      const local = await db.template.findFirst({ where: { clientId, OR: [{ metaId: r.id }, { name: r.name, language: r.language }] } });
-      const content = {
-        ...parsed,
-        headerText: parsed.headerType === "TEXT" ? parsed.headerText : null,
-        footer: parsed.footer || null,
-        category,
-        status,
-        statusReason: r.rejected_reason && r.rejected_reason !== "NONE" ? r.rejected_reason : null,
-        metaId: r.id,
-        lastSyncedAt: new Date(),
-      };
-      if (local) {
-        await db.template.update({ where: { id: local.id }, data: content });
-      } else {
-        await db.template.create({ data: { clientId, name: r.name, language: r.language, ...content, variables: { "1": { source: "name" } } } });
-        imported++;
+  const accounts = (await clientAccounts(clientId)).filter((a) => a.cfg.live);
+  if (!accounts.length) return { ok: false, message: "Add a WhatsApp number for this client on the Clients page to sync templates from Meta." };
+
+  // Each WhatsApp Business Account has its own templates, so sync them one by one.
+  let total = 0;
+  let imported = 0;
+  const failed: string[] = [];
+  for (const { businessAccountId, labels, cfg } of accounts) {
+    try {
+      const remote = await listMetaTemplates(cfg);
+      total += remote.length;
+      for (const r of remote) {
+        const parsed = fromMetaComponents(r.components ?? []);
+        const status = mapMetaStatus(r.status);
+        const category = (["MARKETING", "UTILITY", "AUTHENTICATION"].includes(r.category) ? r.category : "UTILITY") as never;
+        const local = await db.template.findFirst({
+          where: { clientId, OR: [{ metaId: r.id }, { businessAccountId, name: r.name, language: r.language }] },
+        });
+        const content = {
+          ...parsed,
+          headerText: parsed.headerType === "TEXT" ? parsed.headerText : null,
+          footer: parsed.footer || null,
+          category,
+          status,
+          statusReason: r.rejected_reason && r.rejected_reason !== "NONE" ? r.rejected_reason : null,
+          metaId: r.id,
+          businessAccountId,
+          lastSyncedAt: new Date(),
+        };
+        if (local) {
+          await db.template.update({ where: { id: local.id }, data: content });
+        } else {
+          await db.template.create({ data: { clientId, name: r.name, language: r.language, ...content, variables: { "1": { source: "name" } } } });
+          imported++;
+        }
       }
+    } catch (e) {
+      failed.push(`${labels.join(", ")}: ${errText(e)}`);
     }
-    revalidatePath("/dashboard/templates");
-    return { ok: true, message: `Synced ${remote.length} templates from Meta${imported ? `, ${imported} new` : ""}.` };
-  } catch (e) {
-    return { ok: false, message: errText(e) };
   }
+  revalidatePath("/dashboard/templates");
+  const ok = accounts.length - failed.length;
+  const synced = `Synced ${total} templates from ${ok} WhatsApp account${ok === 1 ? "" : "s"}${imported ? `, ${imported} new` : ""}.`;
+  if (failed.length) return { ok: ok > 0, message: `${ok ? `${synced} ` : ""}Couldn't sync ${failed.join("; ")}` };
+  return { ok: true, message: synced };
 }
 
 export async function deleteTemplate(id: string): Promise<ActionResult> {
@@ -189,7 +209,7 @@ export async function deleteTemplate(id: string): Promise<ActionResult> {
   if (!t) return { ok: false, message: "Template not found." };
   if (t._count.campaigns) return { ok: false, message: "This template is used by a campaign. Change or delete the campaign first." };
   try {
-    const cfg = await clientWa(t.clientId);
+    const { cfg } = await senderForAccount(t.clientId, t.businessAccountId);
     if (cfg.live && t.metaId) await deleteMetaTemplate(cfg, t.name, t.metaId);
   } catch (e) {
     return { ok: false, message: errText(e) };
@@ -204,27 +224,30 @@ export async function sendTestMessage(id: string, rawPhone: string): Promise<Act
   if ("denied" in s) return { ok: false, message: s.denied };
   const phone = normalizePhone(rawPhone);
   if (!phone) return { ok: false, message: "Enter a valid mobile number." };
-  const t = await db.template.findUnique({ where: { id }, include: { client: true } });
+  const t = await db.template.findUnique({ where: { id } });
   if (!t) return { ok: false, message: "Template not found." };
   if (t.category === "AUTHENTICATION") return { ok: false, message: "Authentication templates are sent by your app's login flow, not from here." };
   const settings = await getSettings();
   if (!templateSendable(settings, t)) return { ok: false, message: "Only templates approved by Meta can be sent." };
-  const ready = await readiness(settings, t.client);
+  // Sent from a number in the account that approved the template.
+  const { number, cfg } = await senderForAccount(t.clientId, t.businessAccountId);
+  const ready = await readiness(settings, cfg);
   if (!ready.ok) return { ok: false, message: ready.reason };
 
   const customer =
     (await db.customer.findUnique({ where: { clientId_phone: { clientId: t.clientId, phone } } })) ??
     (await db.customer.create({ data: { clientId: t.clientId, phone, name: "Test recipient", tags: ["test"] } }));
   try {
-    const res = await deliver(settings, t, customer, t.client);
+    const res = await deliver(settings, t, customer, cfg);
     await db.message.create({
       data: {
         customerId: customer.id, templateId: t.id, templateName: t.name, body: res.text, status: "SENT",
         waMessageId: res.id, simulated: res.simulated, provider: res.provider, sentAt: new Date(),
+        senderId: res.provider === "META" ? (number?.id ?? null) : null,
       },
     });
     revalidatePath("/dashboard/messages");
-    return { ok: true, message: res.simulated ? "Simulated send logged (demo mode)." : `Test sent to +${phone}.` };
+    return { ok: true, message: res.simulated ? "Simulated send logged (demo mode)." : `Test sent to +${phone}${number?.displayPhone ? ` from ${number.displayPhone}` : ""}.` };
   } catch (e) {
     await db.message.create({
       data: { customerId: customer.id, templateId: t.id, templateName: t.name, status: "FAILED", provider: settings.provider, error: errText(e), failedAt: new Date() },

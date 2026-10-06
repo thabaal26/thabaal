@@ -3,7 +3,7 @@ import type { Setting, Template } from "@prisma/client";
 import { db } from "./db";
 import { renderFor, toPlainText, type TemplateButton, type VarMap } from "./template";
 import { getSession, sendImage, sendText, type WahaConfig } from "./waha";
-import { sendTemplateMessage, waConfig, type ClientCredentials } from "./whatsapp";
+import { sendTemplateMessage, waConfig, type WaConfig } from "./whatsapp";
 
 export type ProviderName = "META" | "LOCAL";
 
@@ -15,14 +15,14 @@ export function wahaConfig(s: Setting): WahaConfig | null {
   return s.wahaUrl && s.wahaApiKey ? { url: s.wahaUrl, apiKey: s.wahaApiKey, session: s.wahaSession || "default" } : null;
 }
 
-/** Whether the active provider can really send for this client, or sends are simulated. */
-export function isSimulated(s: Setting, client?: ClientCredentials | null) {
-  return s.provider === "META" ? !waConfig(client).live : !wahaConfig(s);
+/** Whether the active provider can really send from this number, or sends are simulated. */
+export function isSimulated(s: Setting, cfg: WaConfig = waConfig()) {
+  return s.provider === "META" ? !cfg.live : !wahaConfig(s);
 }
 
 /** Ready to send right now? Local sessions must be linked and online. */
-export async function readiness(s: Setting, client?: ClientCredentials | null): Promise<{ ok: boolean; reason?: string }> {
-  if (isSimulated(s, client) || s.provider === "META") return { ok: true };
+export async function readiness(s: Setting, cfg?: WaConfig): Promise<{ ok: boolean; reason?: string }> {
+  if (isSimulated(s, cfg) || s.provider === "META") return { ok: true };
   const session = await getSession(wahaConfig(s)!);
   if (session.status === "WORKING") return { ok: true };
   return {
@@ -39,8 +39,8 @@ export type Sendable = Pick<
   "name" | "language" | "category" | "headerType" | "headerText" | "headerMediaUrl" | "body" | "footer" | "variables" | "buttons" | "codeExpiryMins" | "securityNote"
 >;
 
-/** Sends one rendered template to one customer through the active provider, from the client's own number when it has one. */
-export async function deliver(s: Setting, t: Sendable, customer: { name: string; phone: string }, client?: ClientCredentials | null) {
+/** Sends one rendered template to one customer through the active provider, from the given number. */
+export async function deliver(s: Setting, t: Sendable, customer: { name: string; phone: string }, cfg: WaConfig = waConfig()) {
   const r = renderFor({ ...t, headerText: t.headerText ?? "", footer: t.footer ?? "", variables: t.variables as VarMap }, customer);
   const provider = s.provider as ProviderName;
 
@@ -56,7 +56,7 @@ export async function deliver(s: Setting, t: Sendable, customer: { name: string;
   }
 
   const text = [r.header, r.body, r.footer].filter(Boolean).join("\n\n");
-  const res = await sendTemplateMessage(waConfig(client), {
+  const res = await sendTemplateMessage(cfg, {
     to: customer.phone,
     templateName: t.name,
     language: t.language,

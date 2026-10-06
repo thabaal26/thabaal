@@ -29,7 +29,10 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
   const [replies, counts] = await Promise.all([
     db.reply.findMany({
       where: { ...mine, ...filter },
-      include: { customer: { select: { id: true, name: true, phone: true, purchases: true, client: { select: { name: true } } } } },
+      include: {
+        customer: { select: { id: true, name: true, phone: true, purchases: true, client: { select: { name: true } } } },
+        sender: { select: { label: true } },
+      },
       orderBy: { receivedAt: "desc" },
       take: 200,
     }),
@@ -81,6 +84,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
                     <p className="mt-2 w-fit max-w-full whitespace-pre-wrap rounded-2xl rounded-tl-sm bg-bubble px-3 py-2 text-sm shadow-sm ring-1 ring-line">{r.text}</p>
                     <p className="mt-1.5 text-xs text-muted">
                       {fmtDate(r.receivedAt, "EEE d MMM, h:mm a")}
+                      {r.sender && <> · to {r.sender.label}</>}
                       {r.customer.purchases && <> · bought before: {r.customer.purchases}</>}
                     </p>
                   </div>

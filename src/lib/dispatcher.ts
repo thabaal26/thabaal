@@ -3,6 +3,7 @@ import type { Campaign } from "@prisma/client";
 import { db } from "./db";
 import { computeNextRun } from "./schedule";
 import { deliver, getSettings, isSimulated, readiness, templateSendable } from "./provider";
+import { senderFor } from "./senders";
 import { WahaError } from "./waha";
 
 const TIME_BUDGET_MS = 50_000; // stay under Vercel's function limit
@@ -74,7 +75,7 @@ function sessionDown(e: unknown) {
 async function processRun(runId: string, now: Date, deadline: number) {
   const run = await db.campaignRun.findUnique({
     where: { id: runId },
-    include: { campaign: { include: { template: true, client: true } } },
+    include: { campaign: { include: { template: true } } },
   });
   if (!run) return { sent: 0, failed: 0 };
   const { campaign } = run;
@@ -91,11 +92,14 @@ async function processRun(runId: string, now: Date, deadline: number) {
   // Always the latest saved version, so template edits reach the next batch.
   const t = campaign.template;
   const settings = await getSettings();
-  if (!templateSendable(settings, t)) {
+  const { number, cfg } = await senderFor(campaign.clientId, campaign.senderId);
+  // Meta only sends a template from numbers in the account that approved it.
+  const wrongAccount = settings.provider === "META" && t.businessAccountId && number && t.businessAccountId !== number.businessAccountId;
+  if (!templateSendable(settings, t) || wrongAccount) {
     await pause("WAITING_TEMPLATE", 5);
     return { sent: 0, failed: 0 };
   }
-  if (!(await readiness(settings, campaign.client)).ok) {
+  if (!(await readiness(settings, cfg)).ok) {
     await pause("WAITING_CONNECTION", 2);
     return { sent: 0, failed: 0 };
   }
@@ -109,7 +113,7 @@ async function processRun(runId: string, now: Date, deadline: number) {
   });
 
   // The local session sends one by one with human-like gaps; Meta can take parallel sends.
-  const local = settings.provider === "LOCAL" && !isSimulated(settings, campaign.client);
+  const local = settings.provider === "LOCAL" && !isSimulated(settings, cfg);
   let sent = 0;
   let failed = 0;
   let outOfTime = false;
@@ -125,7 +129,7 @@ async function processRun(runId: string, now: Date, deadline: number) {
       return;
     }
     try {
-      const res = await deliver(settings, t, m.customer, campaign.client);
+      const res = await deliver(settings, t, m.customer, cfg);
       await db.message.update({
         where: { id: m.id },
         data: {
@@ -135,6 +139,7 @@ async function processRun(runId: string, now: Date, deadline: number) {
           provider: res.provider,
           body: res.text,
           templateName: t.name,
+          senderId: settings.provider === "META" ? (number?.id ?? null) : null,
           sentAt: new Date(),
         },
       });

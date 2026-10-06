@@ -2,7 +2,7 @@
 // a twice-weekly campaign and two weeks of message history.
 //   npm run seed            (uses ADMIN_EMAIL / ADMIN_PASSWORD / ADMIN_NAME)
 //   npm run seed -- --demo
-import { PrismaClient, type MessageStatus } from "@prisma/client";
+import { PrismaClient, type MessageStatus, type Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { computeNextRun } from "../src/lib/schedule";
 
@@ -27,6 +27,9 @@ async function main() {
   if (!process.argv.includes("--demo")) return;
 
   const { id: clientId } = await db.client.upsert({ where: { name: "Demo Café" }, update: {}, create: { name: "Demo Café" } });
+  // Demo templates belong to the env-configured number, so they have no WhatsApp account.
+  const templateOnce = async (name: string, data: Prisma.TemplateUncheckedCreateInput) =>
+    (await db.template.findFirst({ where: { clientId, businessAccountId: null, name, language: "en" } })) ?? db.template.create({ data });
 
   const first = ["Priya", "Arjun", "Meena", "Rahul", "Divya", "Karthik", "Sneha", "Vikram", "Anitha", "Suresh", "Lakshmi", "Nikhil"];
   const last = ["Sharma", "Rao", "Iyer", "Nair", "Reddy", "Menon", "Pillai", "Kumar", "Das", "Patel"];
@@ -40,41 +43,29 @@ async function main() {
   }));
   await db.customer.createMany({ data: customers, skipDuplicates: true });
 
-  const offer = await db.template.upsert({
-    where: { clientId_name_language: { clientId, name: "weekly_offer", language: "en" } },
-    update: {},
-    create: {
-      clientId,
-      name: "weekly_offer",
-      language: "en",
-      category: "MARKETING",
-      status: "APPROVED",
-      headerType: "TEXT",
-      headerText: "This week's special ☕",
-      body: "Hi {{1}}, enjoy *{{2}}* on your next visit. Show this message at the counter before Sunday.",
-      footer: "Reply STOP to unsubscribe",
-      buttons: [{ type: "QUICK_REPLY", text: "Interested" }],
-      variables: { "1": { source: "first_name" }, "2": { source: "static", value: "20% off any drink" } },
-    },
+  const offer = await templateOnce("weekly_offer", {
+    clientId,
+    name: "weekly_offer",
+    language: "en",
+    category: "MARKETING",
+    status: "APPROVED",
+    headerType: "TEXT",
+    headerText: "This week's special ☕",
+    body: "Hi {{1}}, enjoy *{{2}}* on your next visit. Show this message at the counter before Sunday.",
+    footer: "Reply STOP to unsubscribe",
+    buttons: [{ type: "QUICK_REPLY", text: "Interested" }],
+    variables: { "1": { source: "first_name" }, "2": { source: "static", value: "20% off any drink" } },
   });
-  await db.template.upsert({
-    where: { clientId_name_language: { clientId, name: "order_ready", language: "en" } },
-    update: {},
-    create: {
-      clientId,
-      name: "order_ready",
-      language: "en",
-      category: "UTILITY",
-      status: "APPROVED",
-      body: "Hi {{1}}, your order is ready for pickup. See you soon!",
-      variables: { "1": { source: "first_name" } },
-    },
+  await templateOnce("order_ready", {
+    clientId,
+    name: "order_ready",
+    language: "en",
+    category: "UTILITY",
+    status: "APPROVED",
+    body: "Hi {{1}}, your order is ready for pickup. See you soon!",
+    variables: { "1": { source: "first_name" } },
   });
-  await db.template.upsert({
-    where: { clientId_name_language: { clientId, name: "login_code", language: "en" } },
-    update: {},
-    create: { clientId, name: "login_code", language: "en", category: "AUTHENTICATION", status: "APPROVED", body: "", codeExpiryMins: 10, securityNote: true, buttons: [{ type: "COPY_CODE", text: "Copy code" }] },
-  });
+  await templateOnce("login_code", { clientId, name: "login_code", language: "en", category: "AUTHENTICATION", status: "APPROVED", body: "", codeExpiryMins: 10, securityNote: true, buttons: [{ type: "COPY_CODE", text: "Copy code" }] });
 
   const schedule = { scheduleType: "WEEKLY" as const, daysOfWeek: [2, 5], sendTime: "10:00", runAt: null, timezone: "Asia/Kolkata" };
   const campaign =

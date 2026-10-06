@@ -7,7 +7,21 @@ import { Sheet } from "@/components/sheet";
 import { toastResult } from "@/components/toast";
 import { Button, Label } from "@/components/ui";
 import { HEX, themeStyle } from "@/lib/theme";
-import { createClient, createClientUser, resetUserPassword, saveClientBranding, saveClientWhatsApp, type BrandingInput } from "../actions/clients";
+import { cn } from "@/lib/cn";
+import {
+  addClientNumber,
+  createClient,
+  createClientUser,
+  findAccountNumbers,
+  removeClientNumber,
+  renameNumber,
+  resetUserPassword,
+  saveClientBranding,
+  saveClientToken,
+  setDefaultNumber,
+  type BrandingInput,
+  type FoundNumber,
+} from "../actions/clients";
 
 type Result = { ok: boolean; message?: string; errors?: string[] };
 
@@ -110,37 +124,139 @@ export function ResetPasswordButton({ userId, email }: { userId: string; email: 
   );
 }
 
-export function WhatsAppForm({ clientId, phoneNumberId, businessAccountId, hasToken }: { clientId: string; phoneNumberId: string; businessAccountId: string; hasToken: boolean }) {
-  const [v, setV] = useState({ token: "", phoneNumberId, businessAccountId });
+const noFill = { autoComplete: "off", "data-1p-ignore": true, "data-lpignore": "true" } as const;
+
+/** The access token the client's numbers share. Never shown back; blank keeps the saved one. */
+export function TokenForm({ clientId, hasToken }: { clientId: string; hasToken: boolean }) {
+  const [token, setToken] = useState("");
   const { pending, submit } = useSubmit();
   return (
+    <form
+      className="flex flex-col gap-2 sm:flex-row sm:items-end"
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit(() => saveClientToken(clientId, token), () => setToken(""));
+      }}
+    >
+      <div className="min-w-0 flex-1">
+        <Label htmlFor={`tok-${clientId}`} hint={hasToken ? "saved · paste a new one to replace it" : "permanent System User token"}>Access token</Label>
+        <input id={`tok-${clientId}`} name="wa-token" type="password" {...noFill} autoComplete="new-password" className="field font-mono" value={token} onChange={(e) => setToken(e.target.value)} placeholder={hasToken ? "••••••••" : "EAA…"} />
+      </div>
+      <Button disabled={pending || !token.trim()} size="sm" variant="secondary">{pending ? spin : hasToken ? "Replace token" : "Save token"}</Button>
+    </form>
+  );
+}
+
+/** Finds a WhatsApp account's numbers on Meta, then adds the one picked. */
+export function AddNumberForm({ clientId, hasToken }: { clientId: string; hasToken: boolean }) {
+  const [waba, setWaba] = useState("");
+  const [ownToken, setOwnToken] = useState("");
+  const [found, setFound] = useState<FoundNumber[] | null>(null);
+  const [pick, setPick] = useState("");
+  const [label, setLabel] = useState("");
+  const [finding, startFind] = useTransition();
+  const { pending, submit } = useSubmit();
+
+  const find = () =>
+    startFind(async () => {
+      const r = await findAccountNumbers(clientId, waba, ownToken);
+      if (!r.ok) return toastResult(r);
+      setFound(r.numbers ?? []);
+      const first = r.numbers?.find((n) => !n.addedTo);
+      setPick(first?.phoneNumberId ?? "");
+      if (first && !label) setLabel(first.verifiedName === "Test Number" ? "Test number" : "Main");
+    });
+
+  return (
     <details className="group mt-3">
-      <summary className="cursor-pointer list-none text-sm font-medium text-brand-deep hover:underline">Edit WhatsApp details</summary>
-      <form
-        className="mt-3 space-y-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit(() => saveClientWhatsApp(clientId, v), () => setV((x) => ({ ...x, token: "" })));
+      <summary className="cursor-pointer list-none text-sm font-medium text-brand-deep hover:underline">+ Add a WhatsApp number</summary>
+      <div className="mt-3 space-y-3 rounded-xl border border-line p-3">
+        <div>
+          <Label htmlFor={`waba-${clientId}`} hint="WhatsApp Manager → API setup">WhatsApp Business Account ID</Label>
+          <div className="flex gap-2">
+            <input
+              id={`waba-${clientId}`}
+              name="wa-business-account-id"
+              {...noFill}
+              inputMode="numeric"
+              className="field font-mono"
+              value={waba}
+              onChange={(e) => { setWaba(e.target.value.replace(/\D/g, "")); setFound(null); }}
+              placeholder="1124232406755071"
+            />
+            <Button type="button" variant="secondary" disabled={finding || waba.length < 6} onClick={find}>{finding ? spin : "Find numbers"}</Button>
+          </div>
+        </div>
+        <details>
+          <summary className="cursor-pointer text-xs text-muted hover:text-ink">This account needs a different token?</summary>
+          <input name="wa-number-token" type="password" {...noFill} autoComplete="new-password" className="field mt-2 font-mono" value={ownToken} onChange={(e) => setOwnToken(e.target.value)} placeholder="EAA… (leave blank to use the client's token)" />
+        </details>
+        {!hasToken && !ownToken && <p className="text-xs text-amber-700">Save the client&apos;s access token above first, or paste one for this account.</p>}
+
+        {found && (
+          <form
+            className="space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              submit(() => addClientNumber(clientId, { businessAccountId: waba, phoneNumberId: pick, label, token: ownToken }), () => {
+                setFound(null); setWaba(""); setOwnToken(""); setLabel(""); setPick("");
+              });
+            }}
+          >
+            <fieldset className="space-y-1.5">
+              <legend className="mb-1.5 text-xs font-medium text-ink-2">Numbers in this account</legend>
+              {found.map((n) => (
+                <label key={n.phoneNumberId} className={cn("flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-sm", pick === n.phoneNumberId ? "border-brand bg-brand-soft/50" : "border-line", n.addedTo && "cursor-not-allowed opacity-60")}>
+                  <input type="radio" name={`pick-${clientId}`} className="accent-brand" checked={pick === n.phoneNumberId} disabled={!!n.addedTo} onChange={() => setPick(n.phoneNumberId)} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-medium">{n.displayPhone} <span className="font-normal text-muted">· {n.verifiedName}</span></span>
+                    <span className="block font-mono text-[11px] text-muted">ID {n.phoneNumberId}{n.addedTo ? ` · already added to ${n.addedTo}` : ""}</span>
+                  </span>
+                  {n.quality && <span className="text-[11px] text-muted">{n.quality.toLowerCase()}</span>}
+                </label>
+              ))}
+            </fieldset>
+            <div>
+              <Label htmlFor={`label-${clientId}`} hint="shown when picking who sends">Name for this number</Label>
+              <input id={`label-${clientId}`} {...noFill} className="field" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Main, Madurai, Test…" />
+            </div>
+            <Button disabled={pending || !pick || !label.trim()} size="sm">{pending ? spin : "Add number"}</Button>
+          </form>
+        )}
+      </div>
+    </details>
+  );
+}
+
+export function NumberActions({ id, label, isDefault }: { id: string; label: string; isDefault: boolean }) {
+  const { pending, submit } = useSubmit();
+  return (
+    <div className="flex shrink-0 items-center gap-1">
+      {!isDefault && <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => submit(() => setDefaultNumber(id))}>Make default</Button>}
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        disabled={pending}
+        onClick={() => {
+          const next = window.prompt("Name for this number:", label);
+          if (next && next !== label) submit(() => renameNumber(id, next));
         }}
       >
-        <div>
-          <Label htmlFor={`t-${clientId}`} hint={hasToken ? "saved; leave blank to keep" : "permanent System User token"}>Access token</Label>
-          <input id={`t-${clientId}`} name="wa-token" type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" className="field font-mono" value={v.token} onChange={(e) => setV({ ...v, token: e.target.value })} placeholder={hasToken ? "••••••••" : "EAAG…"} />
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <Label htmlFor={`pn-${clientId}`}>Phone number ID</Label>
-            <input id={`pn-${clientId}`} name="wa-phone-number-id" autoComplete="off" data-1p-ignore data-lpignore="true" inputMode="numeric" className="field font-mono" value={v.phoneNumberId} onChange={(e) => setV({ ...v, phoneNumberId: e.target.value })} />
-          </div>
-          <div>
-            <Label htmlFor={`w-${clientId}`}>Business Account ID</Label>
-            <input id={`w-${clientId}`} name="wa-business-account-id" autoComplete="off" data-1p-ignore data-lpignore="true" inputMode="numeric" className="field font-mono" value={v.businessAccountId} onChange={(e) => setV({ ...v, businessAccountId: e.target.value })} />
-          </div>
-        </div>
-        <p className="text-xs text-muted">Find these in Meta WhatsApp Manager → API setup. Add this portal&apos;s webhook URL (Settings) to the client&apos;s Meta app too.</p>
-        <Button disabled={pending} size="sm">{pending ? spin : "Save WhatsApp details"}</Button>
-      </form>
-    </details>
+        Rename
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        disabled={pending}
+        onClick={() => {
+          if (window.confirm(`Remove ${label}? Campaigns that send from it will use the default number instead.`)) submit(() => removeClientNumber(id));
+        }}
+      >
+        Remove
+      </Button>
+    </div>
   );
 }
 

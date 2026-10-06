@@ -21,11 +21,15 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
   const scope = await getScope();
   const c = await db.campaign.findFirst({
     where: { id, ...owned(scope) },
-    include: { runs: { orderBy: { scheduledFor: "desc" }, take: 20 }, template: { select: { name: true, status: true } } },
+    include: {
+      runs: { orderBy: { scheduledFor: "desc" }, take: 20 },
+      template: { select: { name: true, status: true } },
+      sender: { select: { label: true, displayPhone: true } },
+    },
   });
   if (!c) notFound();
 
-  const [{ templates, audience }, stats] = await Promise.all([
+  const [{ templates, audience, numbers }, stats] = await Promise.all([
     campaignFormData(c.clientId),
     db.message.groupBy({ by: ["runId", "status"], where: { runId: { in: c.runs.map((r) => r.id) } }, _count: true }),
   ]);
@@ -70,6 +74,12 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
                 <span className="text-xs text-muted">· {fmtNumber(c.audienceTag ? (audience.tags.find((t) => t.tag === c.audienceTag)?.n ?? 0) : audience.all)} customers</span>
               </dd>
             </div>
+            {numbers.length > 0 && (
+              <div>
+                <dt className="text-xs text-muted">Sent from</dt>
+                <dd className="mt-1">{c.sender ? c.sender.label : `${numbers.find((n) => n.isDefault)?.label ?? numbers[0].label} (default)`}</dd>
+              </div>
+            )}
             <div>
               <dt className="text-xs text-muted">Schedule</dt>
               <dd className="mt-1">
@@ -87,9 +97,11 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
         id={c.id}
         templates={templates}
         audience={audience}
+        numbers={numbers}
         initial={{
           name: c.name,
           templateId: c.templateId,
+          senderId: c.senderId ?? "",
           audienceTag: c.audienceTag ?? "",
           scheduleType: c.scheduleType,
           daysOfWeek: c.daysOfWeek,

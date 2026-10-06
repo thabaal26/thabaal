@@ -7,12 +7,15 @@ import { dispatch, startRun } from "@/lib/dispatcher";
 import { APP_TZ } from "@/lib/format";
 import { getSettings, templateSendable } from "@/lib/provider";
 import { computeNextRun } from "@/lib/schedule";
+import { senderFor } from "@/lib/senders";
 import { requireAdmin } from "@/lib/session";
 import type { ActionResult } from "./templates";
 
 export type CampaignInput = {
   name: string;
   templateId: string;
+  /** WhatsApp number to send from; empty uses the client's default. */
+  senderId: string;
   audienceTag: string;
   scheduleType: "ONCE" | "WEEKLY";
   daysOfWeek: number[];
@@ -39,6 +42,10 @@ export async function saveCampaign(id: string | null, input: CampaignInput): Pro
   const template = await db.template.findUnique({ where: { id: input.templateId, clientId } });
   if (!template) errors.push("Choose a template.");
   else if (template.category === "AUTHENTICATION") errors.push("Authentication templates can't be used in campaigns.");
+  const { number: sender } = await senderFor(clientId, input.senderId || null);
+  if (input.senderId && sender?.id !== input.senderId) errors.push("Choose a number to send from.");
+  if (template && sender && template.businessAccountId && template.businessAccountId !== sender.businessAccountId)
+    errors.push(`"${template.name}" is approved in a different WhatsApp account than ${sender.label}. Pick a template from that number's account.`);
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(input.sendTime)) errors.push("Choose a send time.");
   if (input.scheduleType === "WEEKLY" && !input.daysOfWeek.length) errors.push("Pick at least one day of the week.");
   if (input.scheduleType === "ONCE" && !/^\d{4}-\d{2}-\d{2}$/.test(input.runDate)) errors.push("Choose a date.");
@@ -53,6 +60,7 @@ export async function saveCampaign(id: string | null, input: CampaignInput): Pro
   const data = {
     name: input.name.trim(),
     templateId: input.templateId,
+    senderId: input.senderId || null,
     audienceTag: input.audienceTag.trim() || null,
     scheduleType: input.scheduleType,
     daysOfWeek: input.scheduleType === "WEEKLY" ? [...new Set(input.daysOfWeek)].sort() : [],

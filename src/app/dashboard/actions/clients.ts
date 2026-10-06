@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { CLIENT_COOKIE, requireAdmin } from "@/lib/session";
 import { HEX } from "@/lib/theme";
+import { listPhoneNumbers, waConfig } from "@/lib/whatsapp";
 import type { ActionResult } from "./templates";
 
 const refresh = () => revalidatePath("/dashboard", "layout");
@@ -35,27 +36,130 @@ export async function createClient(name: string): Promise<ActionResult> {
   return { ok: true, id: c.id, message: `${clean} added.` };
 }
 
-/** Blank token keeps the saved one, so the form never has to show it. */
-export async function saveClientWhatsApp(
+/** The access token the client's numbers share. Blank keeps the saved one, so the form never shows it. */
+export async function saveClientToken(clientId: string, rawToken: string): Promise<ActionResult> {
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const token = rawToken.trim();
+  if (!token) return { ok: false, message: "Paste the access token from Meta." };
+  if (!/^EA[A-Za-z0-9]{20,}$/.test(token)) return { ok: false, message: "That doesn't look like a Meta access token. It starts with EAA." };
+  if (!(await db.client.findUnique({ where: { id: clientId } }))) return { ok: false, message: "Client not found." };
+  await db.client.update({ where: { id: clientId }, data: { waToken: token } });
+  refresh();
+  return { ok: true, message: "Access token saved." };
+}
+
+const DIGITS = /^\d{6,20}$/;
+
+/** The token to reach an account: one typed for this number, else the client's shared token. */
+async function tokenFor(clientId: string, typed?: string) {
+  const t = typed?.trim();
+  if (t) return t;
+  return (await db.client.findUnique({ where: { id: clientId }, select: { waToken: true } }))?.waToken ?? null;
+}
+
+export type FoundNumber = { phoneNumberId: string; displayPhone: string; verifiedName: string; quality?: string; addedTo?: string };
+
+/** Asks Meta which numbers a WhatsApp Business Account has, so nobody copies IDs by hand. */
+export async function findAccountNumbers(clientId: string, businessAccountId: string, token?: string): Promise<ActionResult & { numbers?: FoundNumber[] }> {
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const waba = businessAccountId.trim();
+  if (!DIGITS.test(waba)) return { ok: false, message: "The WhatsApp Business Account ID is a long number from WhatsApp Manager → Account settings or API setup." };
+  const t = await tokenFor(clientId, token);
+  if (!t) return { ok: false, message: "Save an access token first." };
+  try {
+    const found = await listPhoneNumbers({ ...waConfig(), token: t }, waba);
+    if (!found.length) return { ok: false, message: "This WhatsApp account has no phone numbers yet. Add one in WhatsApp Manager → Phone numbers." };
+    const taken = await db.whatsAppNumber.findMany({
+      where: { phoneNumberId: { in: found.map((n) => n.id) } },
+      select: { phoneNumberId: true, client: { select: { name: true } } },
+    });
+    return {
+      ok: true,
+      numbers: found.map((n) => ({
+        phoneNumberId: n.id,
+        displayPhone: n.display_phone_number,
+        verifiedName: n.verified_name,
+        quality: n.quality_rating,
+        addedTo: taken.find((x) => x.phoneNumberId === n.id)?.client.name,
+      })),
+    };
+  } catch (e) {
+    return { ok: false, message: `Meta said: ${e instanceof Error ? e.message : "request failed"}` };
+  }
+}
+
+export async function addClientNumber(
   clientId: string,
-  input: { token: string; phoneNumberId: string; businessAccountId: string },
+  input: { businessAccountId: string; phoneNumberId: string; label: string; token?: string },
 ): Promise<ActionResult> {
   const s = await requireAdmin();
   if ("denied" in s) return { ok: false, message: s.denied };
-  const client = await db.client.findUnique({ where: { id: clientId } });
-  if (!client) return { ok: false, message: "Client not found." };
-  const phoneNumberId = input.phoneNumberId.trim() || null;
-  const businessAccountId = input.businessAccountId.trim() || null;
-  const token = input.token.trim() || client.waToken;
-  if (phoneNumberId && !/^\d{6,20}$/.test(phoneNumberId)) return { ok: false, message: "Phone number ID is the long number from WhatsApp Manager → API setup." };
-  if (businessAccountId && !/^\d{6,20}$/.test(businessAccountId)) return { ok: false, message: "WhatsApp Business Account ID should be digits only." };
-  if (phoneNumberId) {
-    const clash = await db.client.findUnique({ where: { waPhoneNumberId: phoneNumberId } });
-    if (clash && clash.id !== clientId) return { ok: false, message: `That phone number ID is already used by ${clash.name}.` };
+  const waba = input.businessAccountId.trim();
+  const label = input.label.trim();
+  if (!label) return { ok: false, message: "Give the number a short name, e.g. Main or Madurai." };
+  const ownToken = input.token?.trim() || null;
+  const t = await tokenFor(clientId, ownToken ?? undefined);
+  if (!t) return { ok: false, message: "Save an access token first." };
+
+  // Confirm with Meta that the number really is in that account and the token reaches it.
+  let match;
+  try {
+    match = (await listPhoneNumbers({ ...waConfig(), token: t }, waba)).find((n) => n.id === input.phoneNumberId);
+  } catch (e) {
+    return { ok: false, message: `Meta said: ${e instanceof Error ? e.message : "request failed"}` };
   }
-  await db.client.update({ where: { id: clientId }, data: { waToken: token, waPhoneNumberId: phoneNumberId, waBusinessAccountId: businessAccountId } });
+  if (!match) return { ok: false, message: "That number isn't in this WhatsApp account." };
+  const clash = await db.whatsAppNumber.findUnique({ where: { phoneNumberId: match.id }, include: { client: { select: { name: true } } } });
+  if (clash) return { ok: false, message: `${match.display_phone_number} is already added${clash.clientId === clientId ? "" : ` to ${clash.client.name}`}.` };
+
+  const first = !(await db.whatsAppNumber.count({ where: { clientId } }));
+  await db.whatsAppNumber.create({
+    data: {
+      clientId, label, phoneNumberId: match.id, businessAccountId: waba,
+      displayPhone: match.display_phone_number, verifiedName: match.verified_name, token: ownToken, isDefault: first,
+    },
+  });
   refresh();
-  return { ok: true, message: phoneNumberId && businessAccountId && token ? "WhatsApp details saved." : "Saved. Fill in all three to send from this client's own number." };
+  return { ok: true, message: `${label} (${match.display_phone_number}) added${first ? " as the default number" : ""}.` };
+}
+
+export async function setDefaultNumber(numberId: string): Promise<ActionResult> {
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const n = await db.whatsAppNumber.findUnique({ where: { id: numberId } });
+  if (!n) return { ok: false, message: "Number not found." };
+  await db.$transaction([
+    db.whatsAppNumber.updateMany({ where: { clientId: n.clientId }, data: { isDefault: false } }),
+    db.whatsAppNumber.update({ where: { id: numberId }, data: { isDefault: true } }),
+  ]);
+  refresh();
+  return { ok: true, message: `${n.label} is now the default number.` };
+}
+
+export async function renameNumber(numberId: string, label: string): Promise<ActionResult> {
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  if (!label.trim()) return { ok: false, message: "Enter a name." };
+  await db.whatsAppNumber.update({ where: { id: numberId }, data: { label: label.trim() } });
+  refresh();
+  return { ok: true, message: "Renamed." };
+}
+
+export async function removeClientNumber(numberId: string): Promise<ActionResult> {
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const n = await db.whatsAppNumber.findUnique({ where: { id: numberId } });
+  if (!n) return { ok: false, message: "Number not found." };
+  await db.whatsAppNumber.delete({ where: { id: numberId } });
+  // Keep one default while numbers remain; campaigns that used this one fall back to it.
+  if (n.isDefault) {
+    const next = await db.whatsAppNumber.findFirst({ where: { clientId: n.clientId }, orderBy: { createdAt: "asc" } });
+    if (next) await db.whatsAppNumber.update({ where: { id: next.id }, data: { isDefault: true } });
+  }
+  refresh();
+  return { ok: true, message: `${n.label} removed. Campaigns that used it now send from the default number.` };
 }
 
 export type BrandingInput = {
