@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCheck, Eye, MessageCircle, Send, ShoppingBag } from "lucide-react";
+import { ArrowLeft, CheckCheck, Eye, MapPin, MessageCircle, Send, ShoppingBag } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -54,7 +54,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
       </Link>
       <PageHeader
         title={c.name}
-        description={`${formatPhone(c.phone)}${!scope.clientId ? ` · ${c.client.name}` : ""} · customer since ${fmtDate(c.createdAt, "d MMM yyyy")}`}
+        description={`${formatPhone(c.phone)}${c.location ? ` · ${c.location}${c.region && c.region !== "Not sure" ? `, ${c.region}` : ""}` : ""}${!scope.clientId ? ` · ${c.client.name}` : ""} · customer since ${fmtDate(c.createdAt, "d MMM yyyy")}`}
         actions={
           <>
             <a href={`https://wa.me/${c.phone}`} target="_blank" rel="noreferrer" className={buttonClass("primary")}>
@@ -81,6 +81,18 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
               <p className="flex gap-2 text-sm"><ShoppingBag className="mt-0.5 size-4 shrink-0 text-brand" />{c.purchases}</p>
             ) : (
               <p className="text-sm text-muted">No purchase recorded.</p>
+            )}
+            {c.location && (
+              <div className="flex items-start gap-2 text-sm">
+                <MapPin className="mt-0.5 size-4 shrink-0 text-brand" />
+                <div>
+                  <Link href={`/dashboard/customers?area=${encodeURIComponent(`loc:${c.location}`)}`} className="hover:underline">{c.location}</Link>
+                  <p className="text-xs text-muted">
+                    {c.region}
+                    {c.locationRaw && c.locationRaw !== c.location ? ` · written as "${c.locationRaw}"` : ""}
+                  </p>
+                </div>
+              </div>
             )}
             <div className="rounded-lg bg-canvas px-3 py-2 text-xs">
               <p className="font-medium text-ink-2">Agreed to WhatsApp messages</p>

@@ -74,9 +74,9 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
       </div>
 
       <Card>
-        <form className="grid grid-cols-2 gap-2 border-b border-line p-3 sm:flex">
+        <form className="grid gap-2 border-b border-line p-3 sm:flex">
           {p.status && <input type="hidden" name="status" value={p.status} />}
-          <div className="relative col-span-2 flex-1">
+          <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
             <input name="q" type="search" enterKeyHint="search" defaultValue={p.q} placeholder="Search name, phone or template" className="field pl-10" />
           </div>

@@ -108,6 +108,11 @@ model Customer {
   phone       String // E.164 digits only, e.g. 919876543210
   tags        String[]  @default([])
   purchases   String? // items as written on the paper order sheets
+  /// Area, cleaned up (e.g. "Sellur"); region groups areas: Madurai city / Outside Madurai / Not sure.
+  location    String?
+  region      String?
+  /// The location exactly as written on the order sheet.
+  locationRaw String?
   optedOut    Boolean   @default(false)
   /// How and when the customer agreed to receive WhatsApp messages (Meta requires opt-in).
   optInSource String?
@@ -121,6 +126,7 @@ model Customer {
 
   @@unique([clientId, phone])
   @@index([phone])
+  @@index([clientId, region])
 }
 
 /// Customers transcribed from paper sheets whose phone number was blank or unusable.

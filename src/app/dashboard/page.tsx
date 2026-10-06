@@ -25,7 +25,7 @@ export default async function Overview() {
   const myMessages = ownedMessages(scope);
 
   const monthAgo = daysAgo(30);
-  const [client, segments, results, repliesByTag, health, blocked] = await Promise.all([
+  const [client, segments, results, repliesByTag, health, blocked, areaRows] = await Promise.all([
     scope.clientId ? db.client.findUnique({ where: { id: scope.clientId } }) : null,
     scope.clientId
       ? db.$queryRaw<{ tag: string; n: bigint }[]>`
@@ -55,6 +55,7 @@ export default async function Overview() {
       where: { ...owned(scope), active: true, template: { status: { in: ["PAUSED", "DISABLED", "REJECTED"] } } },
       select: { id: true, name: true, template: { select: { name: true, status: true, statusReason: true } } },
     }),
+    scope.clientId ? db.customer.groupBy({ by: ["region", "location"], where: { clientId: scope.clientId, optedOut: false }, _count: true }) : [],
   ]);
   const [customers, optedOut, week, activeRuns, upcoming, recent, daily] = await Promise.all([
     db.customer.count({ where: { ...mine, optedOut: false } }),
@@ -109,6 +110,12 @@ export default async function Overview() {
   const clientTag = client?.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
   const shown = segments.map((t) => ({ tag: t.tag, n: Number(t.n) })).filter((t) => t.tag !== clientTag || segments.length === 1).slice(0, 8);
   const top = shown[0]?.n ?? 0;
+  // Location view: city vs outside, plus the busiest areas.
+  const REGIONS = ["Madurai city", "Outside Madurai", "Not sure"];
+  const byRegion = [...REGIONS.map((r) => ({ key: r, label: r, n: areaRows.filter((a) => a.region === r).reduce((t, a) => t + a._count, 0), href: `region:${r}` })),
+    { key: "none", label: "No location noted", n: areaRows.filter((a) => !a.location).reduce((t, a) => t + a._count, 0), href: "none" }].filter((r) => r.n);
+  const regionTotal = byRegion.reduce((t, r) => t + r.n, 0);
+  const topAreas = areaRows.filter((a) => a.location).sort((a, b) => b._count - a._count).slice(0, 10);
   const byProduct = results
     .filter((r) => r.tag !== clientTag || results.length === 1)
     .map((r) => ({ tag: r.tag, sent: Number(r.sent), delivered: Number(r.delivered), read: Number(r.read), failed: Number(r.failed), replies: Number(repliesByTag.find((x) => x.tag === r.tag)?.n ?? 0) }));
@@ -220,6 +227,48 @@ export default async function Overview() {
               </li>
             ))}
           </ul>
+        </Card>
+      )}
+
+      {byRegion.length > 1 && (
+        <Card className="mt-6">
+          <CardHeader title="Customers by area" description="Where your customers are, from the order sheets. Tap any area to see its customers." />
+          <div className="space-y-5 p-4 sm:p-5">
+            <div>
+              <div className="flex h-3 overflow-hidden rounded-full bg-canvas">
+                {byRegion.map((r, i) => (
+                  <div key={r.key} className={["bg-brand", "bg-glow", "bg-zinc-400", "bg-line"][i] ?? "bg-line"} style={{ width: `${pct(r.n, regionTotal)}%` }} />
+                ))}
+              </div>
+              <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:flex sm:flex-wrap sm:gap-x-6">
+                {byRegion.map((r, i) => (
+                  <li key={r.key}>
+                    <Link href={`/dashboard/customers?area=${encodeURIComponent(r.href)}`} className="group flex items-center gap-2 text-sm">
+                      <span className={`size-2.5 shrink-0 rounded-full ${["bg-brand", "bg-glow", "bg-zinc-400", "bg-line"][i] ?? "bg-line"}`} />
+                      <span className="group-hover:underline">{r.label}</span>
+                      <span className="tabular text-xs text-muted">{fmtNumber(r.n)}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {topAreas.length > 0 && (
+              <div>
+                <p className="mb-2 text-xs font-medium text-muted">Top areas</p>
+                <div className="flex flex-wrap gap-2">
+                  {topAreas.map((a) => (
+                    <Link
+                      key={a.location}
+                      href={`/dashboard/customers?area=${encodeURIComponent(`loc:${a.location}`)}`}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-sm transition hover:border-brand/40 hover:bg-brand-soft/40"
+                    >
+                      {a.location} <span className="tabular text-xs text-muted">{a._count}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </Card>
       )}
 
