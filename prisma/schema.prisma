@@ -64,6 +64,13 @@ model WhatsAppNumber {
   /// Overrides the client's token, for numbers in an account the shared token can't reach.
   token             String?
   isDefault         Boolean    @default(false)
+  /// From Meta: GREEN, YELLOW, RED or UNKNOWN.
+  qualityRating     String?
+  /// From Meta: TIER_250, TIER_1K, TIER_10K, TIER_100K or TIER_UNLIMITED.
+  messagingTier     String?
+  /// Our own lower limit while warming a new number up; null follows Meta's tier.
+  dailyCap          Int?
+  statusCheckedAt   DateTime?
   createdAt         DateTime   @default(now())
   campaigns         Campaign[]
   messages          Message[]
@@ -214,6 +221,8 @@ enum RunStatus {
   RUNNING
   WAITING_TEMPLATE
   WAITING_CONNECTION
+  WAITING_LIMIT // the number used up its 24-hour messaging limit
+  WAITING_QUALITY // Meta rated the number red; paused to protect it
   COMPLETED
   CANCELLED
 }

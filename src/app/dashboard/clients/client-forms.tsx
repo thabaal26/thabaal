@@ -13,6 +13,8 @@ import {
   createClient,
   createClientUser,
   findAccountNumbers,
+  refreshClientNumbers,
+  setDailyCap,
   removeClientNumber,
   renameNumber,
   resetUserPassword,
@@ -228,10 +230,33 @@ export function AddNumberForm({ clientId, hasToken }: { clientId: string; hasTok
   );
 }
 
-export function NumberActions({ id, label, isDefault }: { id: string; label: string; isDefault: boolean }) {
+export function RefreshNumbersButton({ clientId }: { clientId: string }) {
   const { pending, submit } = useSubmit();
   return (
-    <div className="flex shrink-0 items-center gap-1">
+    <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => submit(() => refreshClientNumbers(clientId))} title="Fetch quality and limits from Meta">
+      {pending ? spin : "Refresh from Meta"}
+    </Button>
+  );
+}
+
+export function NumberActions({ id, label, isDefault, dailyCap }: { id: string; label: string; isDefault: boolean; dailyCap: number | null }) {
+  const { pending, submit } = useSubmit();
+  return (
+    <div className="flex shrink-0 flex-wrap items-center gap-1">
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        disabled={pending}
+        title="Message fewer people a day than Meta allows while a new number builds quality"
+        onClick={() => {
+          const next = window.prompt(`Warm-up cap for ${label}: most people to message per day.
+Leave empty to follow Meta's limit.`, dailyCap?.toString() ?? "");
+          if (next !== null) submit(() => setDailyCap(id, next));
+        }}
+      >
+        {dailyCap != null ? `Cap ${dailyCap}/day` : "Set cap"}
+      </Button>
       {!isDefault && <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => submit(() => setDefaultNumber(id))}>Make default</Button>}
       <Button
         type="button"

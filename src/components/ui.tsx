@@ -92,6 +92,8 @@ const STATUS: Record<string, { tone: keyof typeof tones; label: string }> = {
   RUNNING: { tone: "blue", label: "Sending" },
   WAITING_TEMPLATE: { tone: "amber", label: "Waiting for approval" },
   WAITING_CONNECTION: { tone: "amber", label: "Phone disconnected" },
+  WAITING_LIMIT: { tone: "amber", label: "Daily limit reached" },
+  WAITING_QUALITY: { tone: "red", label: "Paused: low quality" },
   META: { tone: "blue", label: "Meta API" },
   LOCAL: { tone: "violet", label: "Local session" },
   COMPLETED: { tone: "green", label: "Completed" },
@@ -115,6 +117,18 @@ export function EmptyState({ icon, title, children, action }: { icon: ReactNode;
       {action && <div className="mt-5">{action}</div>}
     </div>
   );
+}
+
+const QUALITY: Record<string, { tone: keyof typeof tones; label: string }> = {
+  GREEN: { tone: "green", label: "Quality: High" },
+  YELLOW: { tone: "amber", label: "Quality: Medium" },
+  RED: { tone: "red", label: "Quality: Low" },
+};
+
+/** Meta's quality rating for a sending number. */
+export function QualityBadge({ rating }: { rating: string | null | undefined }) {
+  const q = (rating && QUALITY[rating]) || { tone: "gray" as const, label: "Quality: not rated yet" };
+  return <Badge tone={q.tone} dot>{q.label}</Badge>;
 }
 
 /** Shown to an admin in "All clients" view on pages that create something for one client. */

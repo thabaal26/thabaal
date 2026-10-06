@@ -27,7 +27,7 @@ export function CampaignForm({
   initial: CampaignInput;
   templates: { id: string; name: string; category: string; status: string; businessAccountId: string | null }[];
   audience: { all: number; tags: { tag: string; n: number }[] };
-  numbers: { id: string; label: string; businessAccountId: string; isDefault: boolean }[];
+  numbers: { id: string; label: string; businessAccountId: string; isDefault: boolean; dailyLimit: number | null; quality: string | null }[];
 }) {
   const [c, setC] = useState(initial);
   const [pending, start] = useTransition();
@@ -42,6 +42,8 @@ export function CampaignForm({
   const perWeek = c.scheduleType === "WEEKLY" ? c.daysOfWeek.length : 0;
   // Meta only sends a template from numbers in the account that approved it.
   const sender = numbers.find((n) => n.id === c.senderId) ?? numbers[0];
+  // Meta's 24-hour limit can stretch a big send over several days.
+  const days = sender?.dailyLimit ? Math.ceil(size / sender.dailyLimit) : 1;
   const usable = sender ? templates.filter((t) => !t.businessAccountId || t.businessAccountId === sender.businessAccountId) : templates;
   const chosen = usable.find((t) => t.id === c.templateId);
 
@@ -194,8 +196,16 @@ export function CampaignForm({
             <p className="text-xs uppercase tracking-wider text-white/50">Each send</p>
             <p className="tabular mt-2 text-3xl font-semibold">{size.toLocaleString("en-IN")} <span className="text-base font-normal text-white/60">customers</span></p>
             <p className="mt-1 text-sm text-white/70">
-              {batches} batch{batches === 1 ? "" : "es"} · done in {formatMinutes(mins)}
+              {batches} batch{batches === 1 ? "" : "es"} · done in {days > 1 ? `about ${days} days` : formatMinutes(mins)}
             </p>
+            {days > 1 && sender?.dailyLimit && (
+              <p className="mt-2 rounded-lg bg-white/10 px-2.5 py-1.5 text-xs text-white/80">
+                {sender.label.split(" · ")[0]} can message {sender.dailyLimit.toLocaleString("en-IN")} people a day, so this send continues automatically each day until everyone is reached.
+              </p>
+            )}
+            {sender?.quality === "RED" && (
+              <p className="mt-2 rounded-lg bg-rose-500/20 px-2.5 py-1.5 text-xs text-rose-100">This number&apos;s quality is low. Sends stay paused until Meta rates it higher.</p>
+            )}
           </div>
           <ul className="space-y-3 p-5 text-sm">
             <li className="flex gap-3"><Users className="mt-0.5 size-4 text-muted" />{c.batchSize || 0} customers at a time</li>

@@ -9,6 +9,8 @@ import { estimateDuration, formatMinutes } from "@/lib/schedule";
 import { getScope, owned, ownedMessages } from "@/lib/session";
 import { cancelRun, runDispatcherNow } from "./actions/campaigns";
 import { BrandHero } from "./brand-hero";
+import { NumberHealth } from "./number-health";
+import { numberHealth } from "@/lib/limits";
 import { DailyChart } from "./daily-chart";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +25,7 @@ export default async function Overview() {
   const myMessages = ownedMessages(scope);
 
   const monthAgo = daysAgo(30);
-  const [client, segments, results, repliesByTag] = await Promise.all([
+  const [client, segments, results, repliesByTag, health] = await Promise.all([
     scope.clientId ? db.client.findUnique({ where: { id: scope.clientId } }) : null,
     scope.clientId
       ? db.$queryRaw<{ tag: string; n: bigint }[]>`
@@ -47,13 +49,14 @@ export default async function Overview() {
           FROM "Reply" r JOIN "Customer" c ON c.id = r."customerId" CROSS JOIN LATERAL unnest(c.tags) AS t(tag)
           WHERE c."clientId" = ${scope.clientId} AND r."receivedAt" >= ${monthAgo} GROUP BY 1`
       : [],
+    scope.clientId ? numberHealth(scope.clientId) : [],
   ]);
   const [customers, optedOut, week, activeRuns, upcoming, recent, daily] = await Promise.all([
     db.customer.count({ where: { ...mine, optedOut: false } }),
     db.customer.count({ where: { ...mine, optedOut: true } }),
     db.message.groupBy({ by: ["status"], where: { ...myMessages, createdAt: { gte: weekAgo }, status: { notIn: ["QUEUED", "SKIPPED"] } }, _count: true }),
     db.campaignRun.findMany({
-      where: { campaign: mine, status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION"] } },
+      where: { campaign: mine, status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY"] } },
       include: { campaign: true },
       orderBy: { startedAt: "desc" },
     }),
@@ -97,10 +100,10 @@ export default async function Overview() {
       </Link>
     </>
   );
-  // Product and segment tags, largest first; the client-wide tag says nothing on its own.
-  const shown = segments.map((t) => ({ tag: t.tag, n: Number(t.n) })).filter((t) => t.n < customers || segments.length === 1).slice(0, 8);
-  const top = shown[0]?.n ?? 0;
+  // Product and segment tags, largest first; the client-wide tag (e.g. thenan-oils) says nothing on its own.
   const clientTag = client?.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const shown = segments.map((t) => ({ tag: t.tag, n: Number(t.n) })).filter((t) => t.tag !== clientTag || segments.length === 1).slice(0, 8);
+  const top = shown[0]?.n ?? 0;
   const byProduct = results
     .filter((r) => r.tag !== clientTag || results.length === 1)
     .map((r) => ({ tag: r.tag, sent: Number(r.sent), delivered: Number(r.delivered), read: Number(r.read), failed: Number(r.failed), replies: Number(repliesByTag.find((x) => x.tag === r.tag)?.n ?? 0) }));
@@ -135,6 +138,8 @@ export default async function Overview() {
           accent="bg-violet-50 text-violet-700"
         />
       </div>
+
+      <NumberHealth numbers={health} />
 
       {activeRuns.length > 0 && (
         <Card className="mt-6">

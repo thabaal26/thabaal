@@ -3,6 +3,7 @@ import type { Campaign } from "@prisma/client";
 import { db } from "./db";
 import { computeNextRun } from "./schedule";
 import { deliver, getSettings, isSimulated, readiness, templateSendable } from "./provider";
+import { allowance, refreshStaleNumbers, windowFreesAt } from "./limits";
 import { senderFor } from "./senders";
 import { WahaError } from "./waha";
 
@@ -86,8 +87,9 @@ async function processRun(runId: string, now: Date, deadline: number) {
   });
   if (!claimed.count) return { sent: 0, failed: 0 };
 
-  const pause = (status: "WAITING_TEMPLATE" | "WAITING_CONNECTION", minutes: number) =>
-    db.campaignRun.update({ where: { id: run.id }, data: { status, nextBatchAt: new Date(Date.now() + minutes * 60_000) } });
+  type Wait = "WAITING_TEMPLATE" | "WAITING_CONNECTION" | "WAITING_LIMIT" | "WAITING_QUALITY";
+  const pauseUntil = (status: Wait, at: Date) => db.campaignRun.update({ where: { id: run.id }, data: { status, nextBatchAt: at } });
+  const pause = (status: Wait, minutes: number) => pauseUntil(status, new Date(Date.now() + minutes * 60_000));
 
   // Always the latest saved version, so template edits reach the next batch.
   const t = campaign.template;
@@ -103,12 +105,29 @@ async function processRun(runId: string, now: Date, deadline: number) {
     await pause("WAITING_CONNECTION", 2);
     return { sent: 0, failed: 0 };
   }
+  // Respect Meta's 24-hour messaging limit and stop if the number's quality turns red.
+  let take = campaign.batchSize;
+  if (settings.provider === "META" && number && cfg.live) {
+    if (number.qualityRating === "RED") {
+      await pause("WAITING_QUALITY", 60);
+      return { sent: 0, failed: 0 };
+    }
+    const a = await allowance(number);
+    if (!a.unlimited) {
+      if (a.left <= 0) {
+        const ids = (await db.whatsAppNumber.findMany({ where: { clientId: number.clientId }, select: { id: true } })).map((x) => x.id);
+        await pauseUntil("WAITING_LIMIT", await windowFreesAt(number.dailyCap != null ? [number.id] : ids));
+        return { sent: 0, failed: 0 };
+      }
+      take = Math.min(take, a.left);
+    }
+  }
   if (run.status !== "RUNNING") await db.campaignRun.update({ where: { id: run.id }, data: { status: "RUNNING" } });
 
   const batch = await db.message.findMany({
     where: { runId: run.id, status: "QUEUED" },
     include: { customer: true },
-    take: campaign.batchSize,
+    take,
     orderBy: { id: "asc" },
   });
 
@@ -179,8 +198,9 @@ export async function dispatch() {
   const now = new Date();
 
   const campaignsStarted = await startDueCampaigns(now);
+  await refreshStaleNumbers().catch((e) => console.error("Could not refresh number status", e));
   const runs = await db.campaignRun.findMany({
-    where: { status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION"] }, nextBatchAt: { lte: now } },
+    where: { status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY"] }, nextBatchAt: { lte: now } },
     select: { id: true },
     orderBy: { nextBatchAt: "asc" },
     take: 20,

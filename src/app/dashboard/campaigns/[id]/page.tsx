@@ -123,7 +123,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
               const delivered = stat(r.id, "DELIVERED", "READ");
               const read = stat(r.id, "READ");
               const failed = stat(r.id, "FAILED");
-              const running = ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION"].includes(r.status);
+              const running = ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY"].includes(r.status);
               return (
                 <li key={r.id} className="px-4 py-3.5">
                   <div className="flex items-center justify-between gap-2">
@@ -180,7 +180,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
                       <td className="px-5 py-3 text-right">{fmtNumber(read)} <span className="text-xs text-muted">{pct(read, r.total)}%</span></td>
                       <td className="px-5 py-3 text-right text-rose-600">{fmtNumber(stat(r.id, "FAILED"))}</td>
                       <td className="px-5 py-3 text-right">
-                        {scope.isAdmin && ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION"].includes(r.status) ? (
+                        {scope.isAdmin && ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY"].includes(r.status) ? (
                           <ActionButton action={cancelRun.bind(null, r.id)} variant="danger" confirm="Stop this run?">Stop</ActionButton>
                         ) : (
                           <Link href={`/dashboard/messages?campaign=${c.id}`} className="text-xs font-medium text-brand-deep hover:underline">Log</Link>

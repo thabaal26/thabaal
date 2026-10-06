@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
+import { refreshNumberStatus } from "@/lib/limits";
 import { metaReplyContent, receivingNumber, recordReply } from "@/lib/replies";
 import { mapMetaStatus } from "@/lib/whatsapp";
 
@@ -76,6 +77,14 @@ export async function POST(req: NextRequest) {
           const phoneNumberId = v.metadata?.phone_number_id;
           if (OPT_OUT.test(text)) await optOut(m.from, phoneNumberId);
           await recordReply({ phone: m.from, text, kind, waMessageId: m.id, phoneNumberId, at: m.timestamp ? new Date(Number(m.timestamp) * 1000) : undefined });
+        }
+      } else if (change.field === "phone_number_quality_update") {
+        // Meta changed a number's quality or limit; it sends the display number, so match on digits.
+        const digits = String(v.display_phone_number ?? "").replace(/\D/g, "");
+        const numbers = await db.whatsAppNumber.findMany({ include: { client: { select: { waToken: true } } } });
+        for (const n of numbers.filter((x) => digits && x.displayPhone?.replace(/\D/g, "") === digits)) {
+          if (v.current_limit) await db.whatsAppNumber.update({ where: { id: n.id }, data: { messagingTier: v.current_limit } });
+          await refreshNumberStatus(n, n.client.waToken);
         }
       } else if (change.field === "message_template_status_update") {
         await db.template.updateMany({

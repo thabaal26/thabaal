@@ -4,10 +4,12 @@ import { redirect } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
 import { Badge, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
 import { db } from "@/lib/db";
+import { numberHealth } from "@/lib/limits";
+import { QualityBadge } from "@/components/ui";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { getScope } from "@/lib/session";
 import { deleteClientUser } from "../actions/clients";
-import { AddLoginForm, AddNumberForm, BrandingForm, NewClientForm, NumberActions, ResetPasswordButton, TokenForm } from "./client-forms";
+import { AddLoginForm, AddNumberForm, BrandingForm, NewClientForm, NumberActions, RefreshNumbersButton, ResetPasswordButton, TokenForm } from "./client-forms";
 
 export const metadata: Metadata = { title: "Clients" };
 export const dynamic = "force-dynamic";
@@ -24,6 +26,7 @@ export default async function ClientsPage() {
     },
     orderBy: { name: "asc" },
   });
+  const health = new Map((await Promise.all(clients.map((c) => numberHealth(c.id)))).flat().map((h) => [h.id, h]));
 
   return (
     <>
@@ -76,7 +79,10 @@ export default async function ClientsPage() {
                   </section>
 
                   <section>
-                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">WhatsApp numbers</h3>
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">WhatsApp numbers</h3>
+                      {c.numbers.length > 0 && <RefreshNumbersButton clientId={c.id} />}
+                    </div>
                     <div className="mt-2">
                       <TokenForm clientId={c.id} hasToken={!!c.waToken} />
                     </div>
@@ -90,6 +96,7 @@ export default async function ClientsPage() {
                                 {n.label}
                                 {n.isDefault && <Badge tone="green">Default</Badge>}
                                 {n.verifiedName === "Test Number" && <Badge tone="amber">Test</Badge>}
+                                <QualityBadge rating={n.qualityRating} />
                               </p>
                               <p className="truncate text-xs text-muted">
                                 {n.displayPhone ?? "—"}
@@ -97,8 +104,13 @@ export default async function ClientsPage() {
                                 {accounts > 1 ? ` · account ${n.businessAccountId}` : ""}
                                 {n._count.campaigns ? ` · ${n._count.campaigns} campaign${n._count.campaigns > 1 ? "s" : ""}` : ""}
                               </p>
+                              {health.get(n.id) && (
+                                <p className="text-xs text-muted">
+                                  Limit {health.get(n.id)!.tier}/day{n.dailyCap != null ? ` · warm-up cap ${n.dailyCap}/day` : ""} · {health.get(n.id)!.used} messaged in 24 h
+                                </p>
+                              )}
                             </div>
-                            <NumberActions id={n.id} label={n.label} isDefault={n.isDefault} />
+                            <NumberActions id={n.id} label={n.label} isDefault={n.isDefault} dailyCap={n.dailyCap} />
                           </li>
                         ))}
                       </ul>

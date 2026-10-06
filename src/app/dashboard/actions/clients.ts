@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { CLIENT_COOKIE, requireAdmin } from "@/lib/session";
 import { HEX } from "@/lib/theme";
 import { listPhoneNumbers, waConfig } from "@/lib/whatsapp";
+import { refreshNumberStatus } from "@/lib/limits";
 import type { ActionResult } from "./templates";
 
 const refresh = () => revalidatePath("/dashboard", "layout");
@@ -115,14 +116,40 @@ export async function addClientNumber(
   if (clash) return { ok: false, message: `${match.display_phone_number} is already added${clash.clientId === clientId ? "" : ` to ${clash.client.name}`}.` };
 
   const first = !(await db.whatsAppNumber.count({ where: { clientId } }));
-  await db.whatsAppNumber.create({
+  const created = await db.whatsAppNumber.create({
     data: {
       clientId, label, phoneNumberId: match.id, businessAccountId: waba,
       displayPhone: match.display_phone_number, verifiedName: match.verified_name, token: ownToken, isDefault: first,
+      qualityRating: match.quality_rating ?? null,
     },
   });
+  await refreshNumberStatus(created, t);
   refresh();
   return { ok: true, message: `${label} (${match.display_phone_number}) added${first ? " as the default number" : ""}.` };
+}
+
+/** Fetches every number's quality and messaging limit from Meta now. */
+export async function refreshClientNumbers(clientId: string): Promise<ActionResult> {
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const c = await db.client.findUnique({ where: { id: clientId }, include: { numbers: true } });
+  if (!c) return { ok: false, message: "Client not found." };
+  const results = await Promise.all(c.numbers.map((n) => refreshNumberStatus(n, c.waToken)));
+  refresh();
+  const ok = results.filter(Boolean).length;
+  return ok === c.numbers.length ? { ok: true, message: "Quality and limits updated from Meta." } : { ok: false, message: `Updated ${ok} of ${c.numbers.length}. Check the token can reach the others.` };
+}
+
+/** A lower daily limit than Meta's while a new number warms up. Empty clears it. */
+export async function setDailyCap(numberId: string, raw: string): Promise<ActionResult> {
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const clean = raw.trim();
+  const cap = clean ? Number(clean) : null;
+  if (cap !== null && (!Number.isInteger(cap) || cap < 1 || cap > 100_000)) return { ok: false, message: "Enter a whole number of people per day, or leave it empty." };
+  await db.whatsAppNumber.update({ where: { id: numberId }, data: { dailyCap: cap } });
+  refresh();
+  return { ok: true, message: cap ? `Capped at ${cap} people a day.` : "Cap removed; follows Meta's limit." };
 }
 
 export async function setDefaultNumber(numberId: string): Promise<ActionResult> {

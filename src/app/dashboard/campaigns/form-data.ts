@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { clientNumbers, numberLabel } from "@/lib/senders";
+import { tierLimit } from "@/lib/limits";
 
 /** One client's templates and audience sizes, for the campaign form. */
 export async function campaignFormData(clientId: string) {
@@ -18,6 +19,10 @@ export async function campaignFormData(clientId: string) {
   return {
     templates,
     audience: { all, tags: tags.map((t) => ({ tag: t.tag, n: Number(t.n) })) },
-    numbers: numbers.map((n) => ({ id: n.id, label: numberLabel(n), businessAccountId: n.businessAccountId, isDefault: n.isDefault })),
+    numbers: numbers.map((n) => {
+      const meta = tierLimit(n.messagingTier);
+      const dailyLimit = n.dailyCap != null ? Math.min(n.dailyCap, meta ?? Infinity) : meta;
+      return { id: n.id, label: numberLabel(n), businessAccountId: n.businessAccountId, isDefault: n.isDefault, dailyLimit, quality: n.qualityRating };
+    }),
   };
 }
