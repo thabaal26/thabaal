@@ -1,38 +1,77 @@
 import { LogOut, MessageCircle } from "lucide-react";
+import type { Metadata, Viewport } from "next";
 import { db } from "@/lib/db";
 import { getScope, requireUser } from "@/lib/session";
 import { getSettings, isSimulated } from "@/lib/provider";
+import { nightColor, themeStyle } from "@/lib/theme";
 import { logout } from "../login/actions";
 import { ClientSwitcher } from "./client-switcher";
 import { BottomNav, SettingsLink, SideNav } from "./nav";
+
+/** The client whose look the dashboard wears: a client login's own, or the one an admin picked. */
+async function brandedClient() {
+  const scope = await getScope();
+  return scope.clientId ? db.client.findUnique({ where: { id: scope.clientId } }) : null;
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const client = await brandedClient();
+  if (!client) return {};
+  return {
+    title: { absolute: `${client.name} · Campaigns`, template: `%s · ${client.name}` },
+    ...(client.logoUrl && { icons: { icon: client.logoUrl, apple: client.logoUrl } }),
+    appleWebApp: { capable: true, title: client.name, statusBarStyle: "black-translucent" },
+  };
+}
+
+export async function generateViewport(): Promise<Viewport> {
+  return { themeColor: nightColor(await brandedClient()) };
+}
+
+function BrandMark({ logoUrl, name, size }: { logoUrl?: string | null; name: string; size: "sm" | "md" }) {
+  const box = size === "md" ? "size-10 rounded-xl" : "size-8 rounded-lg";
+  if (logoUrl) {
+    // eslint-disable-next-line @next/next/no-img-element -- admin-supplied path or URL of any size
+    return <img src={logoUrl} alt={`${name} logo`} className={`${box} shrink-0 object-cover ring-1 ring-white/15`} />;
+  }
+  return (
+    <span className={`grid ${box} shrink-0 place-items-center bg-brand text-white`}>
+      <MessageCircle className={size === "md" ? "size-5" : "size-[18px]"} />
+    </span>
+  );
+}
 
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
   const user = await requireUser();
   const scope = await getScope();
   const [settings, client, clients] = await Promise.all([
     getSettings(),
-    scope.clientId ? db.client.findUnique({ where: { id: scope.clientId } }) : null,
+    brandedClient(),
     scope.isAdmin ? db.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }) : [],
   ]);
-  const title = scope.isAdmin ? "Campaign Portal" : (scope.clientName ?? "Campaign Portal");
+  const name = client?.name ?? "Campaign Portal";
+  const subtitle = client?.tagline || (scope.isAdmin ? (client ? "Admin view" : "Admin · all clients") : "WhatsApp campaigns");
   const via = settings.provider === "LOCAL" ? "Local session" : "Meta Cloud API";
-
-  const mode = !isSimulated(settings, client) ? (
-    <span className="flex items-center gap-2 text-xs text-emerald-300"><span className="size-2 animate-pulse rounded-full bg-emerald-400" />Sending via {via}</span>
-  ) : (
-    <span className="flex items-center gap-2 text-xs text-amber-300"><span className="size-2 rounded-full bg-amber-400" />Demo mode · {via} not set up</span>
-  );
-
   const live = !isSimulated(settings, client);
 
+  // Clients only see a reassuring "connected" line; setup problems are the admin's to fix.
+  const mode = live ? (
+    <span className="flex items-center gap-2 text-xs text-glow">
+      <span className="size-2 animate-pulse rounded-full bg-glow" />
+      {scope.isAdmin ? `Sending via ${via}` : "WhatsApp connected"}
+    </span>
+  ) : scope.isAdmin ? (
+    <span className="flex items-center gap-2 text-xs text-amber-300"><span className="size-2 rounded-full bg-amber-400" />Demo mode · {via} not set up</span>
+  ) : null;
+
   return (
-    <div className="min-h-dvh overflow-x-clip lg:pl-64">
+    <div style={themeStyle(client)} className="min-h-dvh overflow-x-clip bg-canvas lg:pl-64">
       <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col bg-night px-4 py-6 lg:flex">
-        <div className="mb-8 flex items-center gap-2.5 px-2">
-          <span className="grid size-9 place-items-center rounded-xl bg-brand text-white"><MessageCircle className="size-5" /></span>
-          <div>
-            <p className="text-sm font-semibold text-white">{title}</p>
-            <p className="text-[11px] text-white/50">{scope.isAdmin ? "Admin" : "WhatsApp campaigns"}</p>
+        <div className="mb-8 flex items-center gap-3 px-2">
+          <BrandMark logoUrl={client?.logoUrl} name={name} size="md" />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-white">{name}</p>
+            <p className="line-clamp-2 text-[11px] leading-snug text-white/55">{subtitle}</p>
           </div>
         </div>
         {scope.isAdmin && <div className="mb-5"><ClientSwitcher clients={clients} current={scope.clientId} dark /></div>}
@@ -50,18 +89,27 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
               </button>
             </form>
           </div>
+          {!scope.isAdmin && <p className="text-[10px] text-white/30">Powered by Campaign Portal</p>}
         </div>
       </aside>
 
       <header className="sticky top-0 z-30 bg-night/95 pt-[env(safe-area-inset-top)] backdrop-blur-md lg:hidden">
         <div className="flex h-14 items-center gap-3 px-4">
-          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-brand text-white"><MessageCircle className="size-[18px]" /></span>
+          <BrandMark logoUrl={client?.logoUrl} name={name} size="sm" />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold leading-tight text-white">{scope.isAdmin ? (scope.clientName ?? "All clients") : title}</p>
-            <p className={`flex items-center gap-1.5 truncate text-[11px] leading-tight ${live ? "text-emerald-300" : "text-amber-300"}`}>
-              <span className={`size-1.5 shrink-0 rounded-full ${live ? "bg-emerald-400" : "bg-amber-400"}`} />
-              {live ? `Sending via ${via}` : "Demo mode · sends simulated"}
-            </p>
+            <p className="truncate text-sm font-semibold leading-tight text-white">{scope.isAdmin && !client ? "All clients" : name}</p>
+            {live ? (
+              <p className="flex items-center gap-1.5 truncate text-[11px] leading-tight text-glow">
+                <span className="size-1.5 shrink-0 rounded-full bg-glow" />
+                {scope.isAdmin ? `Sending via ${via}` : "WhatsApp connected"}
+              </p>
+            ) : scope.isAdmin ? (
+              <p className="flex items-center gap-1.5 truncate text-[11px] leading-tight text-amber-300">
+                <span className="size-1.5 shrink-0 rounded-full bg-amber-400" /> Demo mode · sends simulated
+              </p>
+            ) : (
+              <p className="truncate text-[11px] leading-tight text-white/55">{subtitle}</p>
+            )}
           </div>
           <SettingsLink />
         </div>

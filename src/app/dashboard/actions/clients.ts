@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { CLIENT_COOKIE, requireAdmin } from "@/lib/session";
+import { HEX } from "@/lib/theme";
 import type { ActionResult } from "./templates";
 
 const refresh = () => revalidatePath("/dashboard", "layout");
@@ -55,6 +56,33 @@ export async function saveClientWhatsApp(
   await db.client.update({ where: { id: clientId }, data: { waToken: token, waPhoneNumberId: phoneNumberId, waBusinessAccountId: businessAccountId } });
   refresh();
   return { ok: true, message: phoneNumberId && businessAccountId && token ? "WhatsApp details saved." : "Saved. Fill in all three to send from this client's own number." };
+}
+
+export type BrandingInput = {
+  brandPrimary: string;
+  brandAccent: string;
+  logoUrl: string;
+  bannerUrl: string;
+  tagline: string;
+  website: string;
+  supportPhone: string;
+};
+
+/** Looks the client's login sees. Blank fields fall back to the default portal look. */
+export async function saveClientBranding(clientId: string, input: BrandingInput): Promise<ActionResult> {
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const v = Object.fromEntries(Object.entries(input).map(([k, x]) => [k, x.trim() || null])) as Record<keyof BrandingInput, string | null>;
+  const errors: string[] = [];
+  for (const k of ["brandPrimary", "brandAccent"] as const) if (v[k] && !HEX.test(v[k]!)) errors.push("Colours must look like #f5c400.");
+  for (const k of ["logoUrl", "bannerUrl"] as const) if (v[k] && !/^(https:\/\/|\/)\S+$/.test(v[k]!)) errors.push("Images need a full https:// link or a path starting with /.");
+  if (v.website && !/^https?:\/\/\S+\.\S+/.test(v.website)) errors.push("Website should start with https://");
+  if (v.tagline && v.tagline.length > 80) errors.push("Keep the tagline under 80 characters.");
+  if (errors.length) return { ok: false, errors: [...new Set(errors)] };
+  if (!(await db.client.findUnique({ where: { id: clientId } }))) return { ok: false, message: "Client not found." };
+  await db.client.update({ where: { id: clientId }, data: v });
+  refresh();
+  return { ok: true, message: "Branding saved. Their portal uses it from the next page load." };
 }
 
 export async function createClientUser(clientId: string, input: { name: string; email: string; password: string }): Promise<ActionResult> {

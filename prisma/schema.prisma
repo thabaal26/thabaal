@@ -31,6 +31,14 @@ model Client {
   waToken             String?
   waPhoneNumberId     String?           @unique
   waBusinessAccountId String?
+  /// Branding their login sees. Colours are #rrggbb; image paths are under /public or full URLs.
+  brandPrimary        String?
+  brandAccent         String?
+  logoUrl             String?
+  bannerUrl           String?
+  tagline             String?
+  website             String?
+  supportPhone        String?
   createdAt           DateTime          @default(now())
   users               User[]
   customers           Customer[]

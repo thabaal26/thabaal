@@ -8,6 +8,7 @@ import { formatPhone } from "@/lib/phone";
 import { estimateDuration, formatMinutes } from "@/lib/schedule";
 import { getScope, owned, ownedMessages } from "@/lib/session";
 import { cancelRun, runDispatcherNow } from "./actions/campaigns";
+import { BrandHero } from "./brand-hero";
 import { DailyChart } from "./daily-chart";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,14 @@ export default async function Overview() {
   const mine = owned(scope);
   const myMessages = ownedMessages(scope);
 
+  const [client, segments] = await Promise.all([
+    scope.clientId ? db.client.findUnique({ where: { id: scope.clientId } }) : null,
+    scope.clientId
+      ? db.$queryRaw<{ tag: string; n: bigint }[]>`
+          SELECT unnest(tags) AS tag, count(*) AS n FROM "Customer"
+          WHERE "clientId" = ${scope.clientId} AND "optedOut" = false GROUP BY 1 ORDER BY 2 DESC, 1`
+      : [],
+  ]);
   const [customers, optedOut, week, activeRuns, upcoming, recent, daily] = await Promise.all([
     db.customer.count({ where: { ...mine, optedOut: false } }),
     db.customer.count({ where: { ...mine, optedOut: true } }),
@@ -58,22 +67,31 @@ export default async function Overview() {
     ? await db.message.groupBy({ by: ["runId", "status"], where: { runId: { in: activeRuns.map((r) => r.id) } }, _count: true })
     : [];
 
+  const adminActions = scope.isAdmin && (
+    <>
+      <ActionButton action={runDispatcherNow} size="md" title="Process due campaigns and batches now">
+        <Send className="size-4" /> Run scheduler now
+      </ActionButton>
+      <Link href="/dashboard/campaigns/new" className={buttonClass("primary")}>
+        <CalendarClock className="size-4" /> New campaign
+      </Link>
+    </>
+  );
+  // Product and segment tags, largest first; the client-wide tag says nothing on its own.
+  const shown = segments.map((t) => ({ tag: t.tag, n: Number(t.n) })).filter((t) => t.n < customers || segments.length === 1).slice(0, 8);
+  const top = shown[0]?.n ?? 0;
+
   return (
     <>
-      <PageHeader
-        title={scope.clientName ? `${scope.clientName} overview` : "Overview"}
-        description={scope.isAdmin && !scope.clientId ? "All clients together, last 7 days. Pick a client in the sidebar to see one." : "How your WhatsApp campaigns performed over the last 7 days."}
-        actions={
-          scope.isAdmin && <>
-            <ActionButton action={runDispatcherNow} size="md" title="Process due campaigns and batches now">
-              <Send className="size-4" /> Run scheduler now
-            </ActionButton>
-            <Link href="/dashboard/campaigns/new" className={buttonClass("primary")}>
-              <CalendarClock className="size-4" /> New campaign
-            </Link>
-          </>
-        }
-      />
+      {client ? (
+        <BrandHero client={client} customers={customers} actions={adminActions} />
+      ) : (
+        <PageHeader
+          title="Overview"
+          description={scope.isAdmin ? "All clients together, last 7 days. Pick a client in the sidebar to see one." : "How your WhatsApp campaigns performed over the last 7 days."}
+          actions={adminActions}
+        />
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Active customers" value={fmtNumber(customers)} sub={`${fmtNumber(optedOut)} opted out`} icon={<Users className="size-4" />} />
@@ -130,6 +148,29 @@ export default async function Overview() {
                 </li>
               );
             })}
+          </ul>
+        </Card>
+      )}
+
+      {shown.length > 0 && (
+        <Card className="mt-6">
+          <CardHeader title="What your customers buy" description="Customers per product or group. Each can be targeted with its own campaign." />
+          <ul className="grid gap-x-8 gap-y-3 p-4 sm:grid-cols-2 sm:p-5">
+            {shown.map((t) => (
+              <li key={t.tag}>
+                <Link href={`/dashboard/customers?tag=${encodeURIComponent(t.tag)}`} className="group block">
+                  <div className="flex items-baseline justify-between gap-2 text-sm">
+                    <span className="truncate font-medium group-hover:underline">
+                      {t.tag === "no-item-info" ? "No item recorded" : t.tag.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase())}
+                    </span>
+                    <span className="tabular text-xs text-muted">{fmtNumber(t.n)}</span>
+                  </div>
+                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-canvas">
+                    <div className="h-full rounded-full bg-brand" style={{ width: `${Math.max(4, pct(t.n, top))}%` }} />
+                  </div>
+                </Link>
+              </li>
+            ))}
           </ul>
         </Card>
       )}

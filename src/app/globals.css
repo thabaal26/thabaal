@@ -16,6 +16,7 @@
   --color-brand-deep: #0a6b3d;
   --color-brand-soft: #e3f5ea;
   --color-night: #0c1714;
+  --color-glow: #34d399; /* accent on the dark sidebar */
   --color-chat: #efeae2;
   --color-bubble: #ffffff;
   --shadow-card: 0 1px 2px rgb(15 26 23 / 0.04), 0 4px 16px -6px rgb(15 26 23 / 0.08);

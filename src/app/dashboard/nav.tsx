@@ -33,7 +33,7 @@ export function SideNav({ isAdmin }: { isAdmin: boolean }) {
             isActive(path, href) ? "bg-white/10 font-medium text-white" : "text-white/60 hover:bg-white/5 hover:text-white",
           )}
         >
-          <Icon className={cn("size-4", isActive(path, href) && "text-emerald-400")} />
+          <Icon className={cn("size-4", isActive(path, href) && "text-glow")} />
           {label}
         </Link>
       ))}

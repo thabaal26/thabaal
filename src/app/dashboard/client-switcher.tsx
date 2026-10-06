@@ -13,7 +13,7 @@ export function ClientSwitcher({ clients, current, dark }: { clients: { id: stri
   const router = useRouter();
   return (
     <label className={cn("flex items-center gap-2 rounded-lg px-2.5", dark ? "bg-white/10 text-white" : "border border-line bg-white text-ink")}>
-      <Building2 className={cn("size-4 shrink-0", dark ? "text-emerald-300" : "text-brand-deep")} />
+      <Building2 className={cn("size-4 shrink-0", dark ? "text-glow" : "text-brand-deep")} />
       <span className="sr-only">Client</span>
       <select
         value={current ?? ""}

@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { getScope } from "@/lib/session";
 import { deleteClientUser } from "../actions/clients";
-import { AddLoginForm, NewClientForm, ResetPasswordButton, WhatsAppForm } from "./client-forms";
+import { AddLoginForm, BrandingForm, NewClientForm, ResetPasswordButton, WhatsAppForm } from "./client-forms";
 
 export const metadata: Metadata = { title: "Clients" };
 export const dynamic = "force-dynamic";
@@ -87,6 +87,33 @@ export default async function ClientsPage() {
                         : "Until all three are filled in, this client's campaigns send from the default number in Settings."}
                     </p>
                     <WhatsAppForm clientId={c.id} phoneNumberId={c.waPhoneNumberId ?? ""} businessAccountId={c.waBusinessAccountId ?? ""} hasToken={!!c.waToken} />
+                  </section>
+
+                  <section className="border-t border-line pt-5 lg:col-span-2">
+                    <div className="mb-2 flex items-center gap-3">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Branding</h3>
+                      {c.brandPrimary && (
+                        <span className="flex gap-1">
+                          {[c.brandPrimary, c.brandAccent].filter(Boolean).map((hex) => (
+                            <span key={hex} title={hex!} className="size-4 rounded-full ring-1 ring-black/10" style={{ background: hex! }} />
+                          ))}
+                        </span>
+                      )}
+                      <span className="text-xs text-muted">{c.brandPrimary || c.logoUrl ? "Their login sees their own logo, colours and banner." : "Default portal look."}</span>
+                    </div>
+                    <BrandingForm
+                      clientId={c.id}
+                      name={c.name}
+                      initial={{
+                        brandPrimary: c.brandPrimary ?? "",
+                        brandAccent: c.brandAccent ?? "",
+                        logoUrl: c.logoUrl ?? "",
+                        bannerUrl: c.bannerUrl ?? "",
+                        tagline: c.tagline ?? "",
+                        website: c.website ?? "",
+                        supportPhone: c.supportPhone ?? "",
+                      }}
+                    />
                   </section>
                 </div>
               </Card>
