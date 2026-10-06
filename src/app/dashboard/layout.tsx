@@ -19,6 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
   if (!client) return {};
   return {
     title: { absolute: `${client.name} · Campaigns`, template: `%s · ${client.name}` },
+    manifest: `/api/manifest/${client.id}`,
     ...(client.logoUrl && { icons: { icon: client.logoUrl, apple: client.logoUrl } }),
     appleWebApp: { capable: true, title: client.name, statusBarStyle: "black-translucent" },
   };
