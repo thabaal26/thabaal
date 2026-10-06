@@ -93,6 +93,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
                   {(c.optedOut || c.tags.length > 0) && (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {c.optedOut && <Badge tone="red">Opted out</Badge>}
+                      {c.unreachable && <Badge tone="amber">Can&apos;t receive</Badge>}
                       {c.tags.map((t) => <Badge key={t}>{t}</Badge>)}
                     </div>
                   )}
@@ -135,6 +136,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
                         {c.optedOut && <Badge tone="red">Opted out</Badge>}
+                        {c.unreachable && <Badge tone="amber">Can&apos;t receive</Badge>}
                         {c.tags.map((t) => (
                           <Link key={t} href={qs({ tag: t, page: undefined })}><Badge>{t}</Badge></Link>
                         ))}

@@ -94,6 +94,7 @@ const STATUS: Record<string, { tone: keyof typeof tones; label: string }> = {
   WAITING_CONNECTION: { tone: "amber", label: "Phone disconnected" },
   WAITING_LIMIT: { tone: "amber", label: "Daily limit reached" },
   WAITING_QUALITY: { tone: "red", label: "Paused: low quality" },
+  WAITING_QUIET: { tone: "gray", label: "Waiting: quiet hours" },
   META: { tone: "blue", label: "Meta API" },
   LOCAL: { tone: "violet", label: "Local session" },
   COMPLETED: { tone: "green", label: "Completed" },

@@ -82,11 +82,20 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
             ) : (
               <p className="text-sm text-muted">No purchase recorded.</p>
             )}
-            {(productTags.length > 0 || c.optedOut) && (
+            <div className="rounded-lg bg-canvas px-3 py-2 text-xs">
+              <p className="font-medium text-ink-2">Agreed to WhatsApp messages</p>
+              {c.optInSource ? (
+                <p className="mt-0.5 text-muted">{c.optInSource}{c.optInAt ? ` · ${fmtDate(c.optInAt, "d MMM yyyy")}` : ""}</p>
+              ) : (
+                <p className="mt-0.5 text-amber-700">Not recorded. Meta requires consent before marketing messages.</p>
+              )}
+            </div>
+            {(productTags.length > 0 || c.optedOut || c.unreachable) && (
               <div>
                 <p className="mb-1.5 text-xs font-medium text-muted">Groups</p>
                 <div className="flex flex-wrap gap-1">
                   {c.optedOut && <Badge tone="red">Opted out</Badge>}
+                  {c.unreachable && <Badge tone="amber">Can&apos;t receive WhatsApp</Badge>}
                   {productTags.map((t) => (
                     <Link key={t} href={`/dashboard/customers?tag=${encodeURIComponent(t)}`}><Badge>{t === "no-item-info" ? "no item recorded" : t}</Badge></Link>
                   ))}

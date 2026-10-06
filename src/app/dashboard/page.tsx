@@ -25,7 +25,7 @@ export default async function Overview() {
   const myMessages = ownedMessages(scope);
 
   const monthAgo = daysAgo(30);
-  const [client, segments, results, repliesByTag, health] = await Promise.all([
+  const [client, segments, results, repliesByTag, health, blocked] = await Promise.all([
     scope.clientId ? db.client.findUnique({ where: { id: scope.clientId } }) : null,
     scope.clientId
       ? db.$queryRaw<{ tag: string; n: bigint }[]>`
@@ -50,13 +50,18 @@ export default async function Overview() {
           WHERE c."clientId" = ${scope.clientId} AND r."receivedAt" >= ${monthAgo} GROUP BY 1`
       : [],
     scope.clientId ? numberHealth(scope.clientId) : [],
+    // Active campaigns whose template Meta paused, disabled or rejected can't send.
+    db.campaign.findMany({
+      where: { ...owned(scope), active: true, template: { status: { in: ["PAUSED", "DISABLED", "REJECTED"] } } },
+      select: { id: true, name: true, template: { select: { name: true, status: true, statusReason: true } } },
+    }),
   ]);
   const [customers, optedOut, week, activeRuns, upcoming, recent, daily] = await Promise.all([
     db.customer.count({ where: { ...mine, optedOut: false } }),
     db.customer.count({ where: { ...mine, optedOut: true } }),
     db.message.groupBy({ by: ["status"], where: { ...myMessages, createdAt: { gte: weekAgo }, status: { notIn: ["QUEUED", "SKIPPED"] } }, _count: true }),
     db.campaignRun.findMany({
-      where: { campaign: mine, status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY"] } },
+      where: { campaign: mine, status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"] } },
       include: { campaign: true },
       orderBy: { startedAt: "desc" },
     }),
@@ -138,6 +143,22 @@ export default async function Overview() {
           accent="bg-violet-50 text-violet-700"
         />
       </div>
+
+      {blocked.length > 0 && (
+        <div role="alert" className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 sm:p-5">
+          <p className="flex items-center gap-2 font-semibold"><TriangleAlert className="size-4" /> {blocked.length === 1 ? "A campaign can't send" : `${blocked.length} campaigns can't send`}: Meta stopped the template</p>
+          <ul className="mt-2 space-y-1">
+            {blocked.map((c) => (
+              <li key={c.id}>
+                <Link href={`/dashboard/campaigns/${c.id}`} className="font-medium underline">{c.name}</Link>: template <span className="font-mono">{c.template.name}</span> is{" "}
+                {c.template.status === "PAUSED" ? "paused by Meta for low quality" : c.template.status === "DISABLED" ? "disabled by Meta" : "rejected"}
+                {c.template.statusReason ? ` (${c.template.statusReason.toLowerCase().replace(/_/g, " ")})` : ""}.
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-rose-800">Edit the template so it&apos;s more useful to customers, or switch the campaign to another approved template.</p>
+        </div>
+      )}
 
       <NumberHealth numbers={health} />
 

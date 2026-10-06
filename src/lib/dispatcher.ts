@@ -2,10 +2,14 @@ import "server-only";
 import type { Campaign } from "@prisma/client";
 import { db } from "./db";
 import { computeNextRun } from "./schedule";
+import { fmtDate } from "./format";
 import { deliver, getSettings, isSimulated, readiness, templateSendable } from "./provider";
 import { allowance, refreshStaleNumbers, windowFreesAt } from "./limits";
+import { explainError, metaError } from "./meta-errors";
+import { applyFailure, quietUntil, recentlyMarketed } from "./rules";
 import { senderFor } from "./senders";
 import { WahaError } from "./waha";
+import { MetaError } from "./whatsapp";
 
 const TIME_BUDGET_MS = 50_000; // stay under Vercel's function limit
 const CONCURRENCY = 10;
@@ -14,7 +18,7 @@ const LOCAL_GAP_MS = [1_000, 3_000]; // random pause between local-session sends
 /** Creates a run and queues one message per eligible customer. */
 export async function startRun(campaign: Campaign & { template: { name: string } }, scheduledFor: Date) {
   const customers = await db.customer.findMany({
-    where: { clientId: campaign.clientId, optedOut: false, ...(campaign.audienceTag ? { tags: { has: campaign.audienceTag } } : {}) },
+    where: { clientId: campaign.clientId, optedOut: false, unreachable: false, ...(campaign.audienceTag ? { tags: { has: campaign.audienceTag } } : {}) },
     select: { id: true },
   });
   const run = await db.campaignRun.create({
@@ -76,7 +80,7 @@ function sessionDown(e: unknown) {
 async function processRun(runId: string, now: Date, deadline: number) {
   const run = await db.campaignRun.findUnique({
     where: { id: runId },
-    include: { campaign: { include: { template: true } } },
+    include: { campaign: { include: { template: true, client: { select: { marketingGapHours: true, quietFrom: true, quietTo: true } } } } },
   });
   if (!run) return { sent: 0, failed: 0 };
   const { campaign } = run;
@@ -87,7 +91,7 @@ async function processRun(runId: string, now: Date, deadline: number) {
   });
   if (!claimed.count) return { sent: 0, failed: 0 };
 
-  type Wait = "WAITING_TEMPLATE" | "WAITING_CONNECTION" | "WAITING_LIMIT" | "WAITING_QUALITY";
+  type Wait = "WAITING_TEMPLATE" | "WAITING_CONNECTION" | "WAITING_LIMIT" | "WAITING_QUALITY" | "WAITING_QUIET";
   const pauseUntil = (status: Wait, at: Date) => db.campaignRun.update({ where: { id: run.id }, data: { status, nextBatchAt: at } });
   const pause = (status: Wait, minutes: number) => pauseUntil(status, new Date(Date.now() + minutes * 60_000));
 
@@ -103,6 +107,13 @@ async function processRun(runId: string, now: Date, deadline: number) {
   }
   if (!(await readiness(settings, cfg)).ok) {
     await pause("WAITING_CONNECTION", 2);
+    return { sent: 0, failed: 0 };
+  }
+  // Offers at night get reported; hold marketing until quiet hours end.
+  const marketing = t.category === "MARKETING";
+  const resumeAt = marketing ? quietUntil(campaign.client, new Date()) : null;
+  if (resumeAt) {
+    await pauseUntil("WAITING_QUIET", resumeAt);
     return { sent: 0, failed: 0 };
   }
   // Respect Meta's 24-hour messaging limit and stop if the number's quality turns red.
@@ -131,20 +142,34 @@ async function processRun(runId: string, now: Date, deadline: number) {
     orderBy: { id: "asc" },
   });
 
+  // Customers who got any marketing message recently are skipped, so nobody is flooded with offers.
+  const recent = marketing ? await recentlyMarketed(batch.map((m) => m.customerId), campaign.client.marketingGapHours) : new Map<string, Date>();
+
   // The local session sends one by one with human-like gaps; Meta can take parallel sends.
   const local = settings.provider === "LOCAL" && !isSimulated(settings, cfg);
   let sent = 0;
   let failed = 0;
   let outOfTime = false;
   let disconnected = false;
+  let throttled = false;
+  let restricted = false;
 
   await inPool(batch, local ? 1 : CONCURRENCY, async (m) => {
     if (Date.now() > deadline) {
       outOfTime = true; // stays QUEUED for the next call
       return false;
     }
-    if (m.customer.optedOut) {
-      await db.message.update({ where: { id: m.id }, data: { status: "SKIPPED", error: "Customer opted out" } });
+    if (throttled || restricted) return false;
+    if (m.customer.optedOut || m.customer.unreachable) {
+      await db.message.update({ where: { id: m.id }, data: { status: "SKIPPED", error: m.customer.optedOut ? "Customer opted out" : "Number can't receive WhatsApp messages" } });
+      return;
+    }
+    const last = recent.get(m.customerId);
+    if (last) {
+      await db.message.update({
+        where: { id: m.id },
+        data: { status: "SKIPPED", error: `Already got an offer within ${campaign.client.marketingGapHours} hours (last ${fmtDate(last, "d MMM, h:mm a")})` },
+      });
       return;
     }
     try {
@@ -168,21 +193,33 @@ async function processRun(runId: string, now: Date, deadline: number) {
         disconnected = true;
         return false;
       }
+      const code = e instanceof MetaError ? (e.code ?? null) : null;
+      const kind = metaError(code)?.kind;
+      // Too fast: leave it queued and slow down. Restricted number: stop the whole run.
+      if (kind === "rate") {
+        throttled = true;
+        return false;
+      }
+      if (kind === "number-restricted") restricted = true;
       await db.message.update({
         where: { id: m.id },
         data: {
           status: "FAILED",
           provider: settings.provider,
-          error: e instanceof Error ? e.message : String(e),
+          errorCode: code,
+          error: explainError(code, e instanceof Error ? e.message : String(e)),
           failedAt: new Date(),
         },
       });
+      await applyFailure(m.customerId, code);
       failed++;
     }
     if (local) await sleep(LOCAL_GAP_MS[0] + Math.random() * (LOCAL_GAP_MS[1] - LOCAL_GAP_MS[0]));
   });
 
   if (disconnected) await pause("WAITING_CONNECTION", 2);
+  else if (restricted) await pause("WAITING_QUALITY", 6 * 60);
+  else if (throttled) await db.campaignRun.update({ where: { id: run.id }, data: { nextBatchAt: new Date(Date.now() + 5 * 60_000) } });
   // Finish the rest of this batch on the next scheduler call instead of waiting a full interval.
   else if (outOfTime) await db.campaignRun.update({ where: { id: run.id }, data: { nextBatchAt: new Date() } });
 
@@ -200,7 +237,7 @@ export async function dispatch() {
   const campaignsStarted = await startDueCampaigns(now);
   await refreshStaleNumbers().catch((e) => console.error("Could not refresh number status", e));
   const runs = await db.campaignRun.findMany({
-    where: { status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY"] }, nextBatchAt: { lte: now } },
+    where: { status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"] }, nextBatchAt: { lte: now } },
     select: { id: true },
     orderBy: { nextBatchAt: "asc" },
     take: 20,

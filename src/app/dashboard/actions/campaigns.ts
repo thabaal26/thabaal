@@ -109,7 +109,7 @@ export async function runCampaignNow(id: string): Promise<ActionResult> {
   const c = await db.campaign.findUnique({ where: { id }, include: { template: true } });
   if (!c) return { ok: false, message: "Campaign not found." };
   if (!templateSendable(await getSettings(), c.template)) return { ok: false, message: "The template isn't approved by Meta yet." };
-  const busy = await db.campaignRun.findFirst({ where: { campaignId: id, status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY"] } } });
+  const busy = await db.campaignRun.findFirst({ where: { campaignId: id, status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"] } } });
   if (busy) return { ok: false, message: "This campaign is already sending. Wait for it to finish or stop it." };
   const run = await startRun(c, new Date());
   await dispatch();

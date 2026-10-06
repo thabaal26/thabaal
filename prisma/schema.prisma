@@ -41,6 +41,11 @@ model Client {
   tagline             String?
   website             String?
   supportPhone        String?
+  /// Hours a customer must wait between marketing messages; 0 turns the rule off.
+  marketingGapHours   Int               @default(72)
+  /// No marketing sends between these HH:mm times (IST); null turns quiet hours off.
+  quietFrom           String?           @default("21:00")
+  quietTo             String?           @default("09:00")
   createdAt           DateTime          @default(now())
   users               User[]
   customers           Customer[]
@@ -96,18 +101,23 @@ model User {
 }
 
 model Customer {
-  id        String    @id @default(cuid())
-  clientId  String
-  client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  name      String
-  phone     String // E.164 digits only, e.g. 919876543210
-  tags      String[]  @default([])
-  purchases String? // items as written on the paper order sheets
-  optedOut  Boolean   @default(false)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  messages  Message[]
-  replies   Reply[]
+  id          String    @id @default(cuid())
+  clientId    String
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name        String
+  phone       String // E.164 digits only, e.g. 919876543210
+  tags        String[]  @default([])
+  purchases   String? // items as written on the paper order sheets
+  optedOut    Boolean   @default(false)
+  /// How and when the customer agreed to receive WhatsApp messages (Meta requires opt-in).
+  optInSource String?
+  optInAt     DateTime?
+  /// Set when Meta says the number can't receive messages; campaigns skip them.
+  unreachable Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  messages    Message[]
+  replies     Reply[]
 
   @@unique([clientId, phone])
   @@index([phone])
@@ -223,6 +233,7 @@ enum RunStatus {
   WAITING_CONNECTION
   WAITING_LIMIT // the number used up its 24-hour messaging limit
   WAITING_QUALITY // Meta rated the number red; paused to protect it
+  WAITING_QUIET // inside the client's quiet hours
   COMPLETED
   CANCELLED
 }
@@ -265,6 +276,8 @@ model Message {
   status       MessageStatus   @default(QUEUED)
   waMessageId  String?         @unique
   error        String?
+  /// Meta error code when a send failed, e.g. 131026.
+  errorCode    Int?
   simulated    Boolean         @default(false)
   senderId     String?
   sender       WhatsAppNumber? @relation(fields: [senderId], references: [id], onDelete: SetNull)

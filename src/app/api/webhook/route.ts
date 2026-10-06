@@ -2,6 +2,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { refreshNumberStatus } from "@/lib/limits";
+import { explainError } from "@/lib/meta-errors";
+import { applyFailure } from "@/lib/rules";
 import { metaReplyContent, receivingNumber, recordReply } from "@/lib/replies";
 import { mapMetaStatus } from "@/lib/whatsapp";
 
@@ -19,7 +21,7 @@ export function GET(req: NextRequest) {
 const RANK = { QUEUED: 0, SENT: 1, DELIVERED: 2, READ: 3, FAILED: 4, SKIPPED: 4 } as const;
 const OPT_OUT = /^\s*(stop|unsubscribe|opt[\s-]?out|cancel)\s*$/i;
 
-type StatusUpdate = { id: string; status: string; timestamp: string; errors?: { title?: string; message?: string; error_data?: { details?: string } }[] };
+type StatusUpdate = { id: string; status: string; timestamp: string; errors?: { code?: number; title?: string; message?: string; error_data?: { details?: string } }[] };
 
 function validSignature(raw: string, header: string | null) {
   const secret = process.env.META_APP_SECRET;
@@ -31,16 +33,18 @@ function validSignature(raw: string, header: string | null) {
 }
 
 async function applyStatus(s: StatusUpdate) {
-  const msg = await db.message.findUnique({ where: { waMessageId: s.id }, select: { id: true, status: true } });
+  const msg = await db.message.findUnique({ where: { waMessageId: s.id }, select: { id: true, status: true, customerId: true } });
   if (!msg) return;
   const at = new Date(Number(s.timestamp) * 1000);
   const next = s.status.toUpperCase();
   if (next === "FAILED") {
     const err = s.errors?.[0];
+    const code = err?.code ?? null;
     await db.message.update({
       where: { id: msg.id },
-      data: { status: "FAILED", failedAt: at, error: err?.error_data?.details || err?.message || err?.title || "Delivery failed" },
+      data: { status: "FAILED", failedAt: at, errorCode: code, error: explainError(code, err?.error_data?.details || err?.message || err?.title || "Delivery failed") },
     });
+    await applyFailure(msg.customerId, code);
     return;
   }
   if (!(next in RANK) || RANK[next as keyof typeof RANK] <= RANK[msg.status]) return;

@@ -99,7 +99,7 @@ export default async function CampaignsPage() {
                     )}
                   </span>
                   <div className="flex items-center gap-2">
-                    {last && ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY"].includes(last.status) && <StatusBadge status={last.status} />}
+                    {last && ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"].includes(last.status) && <StatusBadge status={last.status} />}
                     {scope.isAdmin && (
                       <ActionButton className="relative z-10" action={toggleCampaign.bind(null, c.id, !c.active)}>{c.active ? "Pause" : "Resume"}</ActionButton>
                     )}

@@ -152,6 +152,22 @@ export async function setDailyCap(numberId: string, raw: string): Promise<Action
   return { ok: true, message: cap ? `Capped at ${cap} people a day.` : "Cap removed; follows Meta's limit." };
 }
 
+/** Protects number quality: hours between offers to the same person, and no offers at night. */
+export async function saveSendingRules(clientId: string, input: { marketingGapHours: number; quietFrom: string; quietTo: string }): Promise<ActionResult> {
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const time = /^([01]\d|2[0-3]):[0-5]\d$/;
+  if (!Number.isInteger(input.marketingGapHours) || input.marketingGapHours < 0 || input.marketingGapHours > 24 * 30) return { ok: false, message: "Pick how long to wait between offers." };
+  const quiet = input.quietFrom && input.quietTo;
+  if (quiet && (!time.test(input.quietFrom) || !time.test(input.quietTo))) return { ok: false, message: "Quiet hours need a start and end time." };
+  await db.client.update({
+    where: { id: clientId },
+    data: { marketingGapHours: input.marketingGapHours, quietFrom: quiet ? input.quietFrom : null, quietTo: quiet ? input.quietTo : null },
+  });
+  refresh();
+  return { ok: true, message: "Sending rules saved. They apply from the next batch." };
+}
+
 export async function setDefaultNumber(numberId: string): Promise<ActionResult> {
   const s = await requireAdmin();
   if ("denied" in s) return { ok: false, message: s.denied };

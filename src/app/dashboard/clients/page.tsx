@@ -9,7 +9,7 @@ import { QualityBadge } from "@/components/ui";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { getScope } from "@/lib/session";
 import { deleteClientUser } from "../actions/clients";
-import { AddLoginForm, AddNumberForm, BrandingForm, NewClientForm, NumberActions, RefreshNumbersButton, ResetPasswordButton, TokenForm } from "./client-forms";
+import { AddLoginForm, AddNumberForm, BrandingForm, NewClientForm, NumberActions, RefreshNumbersButton, ResetPasswordButton, SendingRulesForm, TokenForm } from "./client-forms";
 
 export const metadata: Metadata = { title: "Clients" };
 export const dynamic = "force-dynamic";
@@ -118,6 +118,14 @@ export default async function ClientsPage() {
                       <p className="mt-3 text-xs text-muted">No numbers yet, so this client&apos;s campaigns send from the default number in Settings.</p>
                     )}
                     <AddNumberForm clientId={c.id} hasToken={!!c.waToken} />
+                  </section>
+
+                  <section className="border-t border-line pt-5 lg:col-span-2">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Sending rules</h3>
+                    <p className="mb-3 mt-1 text-xs text-muted">
+                      Keeps quality high with Meta: customers who got an offer recently are skipped, and marketing never goes out at night. Utility messages aren&apos;t affected.
+                    </p>
+                    <SendingRulesForm clientId={c.id} initial={{ marketingGapHours: c.marketingGapHours, quietFrom: c.quietFrom, quietTo: c.quietTo }} />
                   </section>
 
                   <section className="border-t border-line pt-5 lg:col-span-2">

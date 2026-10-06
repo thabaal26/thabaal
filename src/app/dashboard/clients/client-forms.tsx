@@ -20,6 +20,7 @@ import {
   resetUserPassword,
   saveClientBranding,
   saveClientToken,
+  saveSendingRules,
   setDefaultNumber,
   type BrandingInput,
   type FoundNumber,
@@ -360,5 +361,53 @@ export function BrandingForm({ clientId, name, initial }: { clientId: string; na
         </div>
       </form>
     </details>
+  );
+}
+
+const GAPS = [
+  { h: 0, label: "Off: no limit" },
+  { h: 24, label: "1 day" },
+  { h: 48, label: "2 days" },
+  { h: 72, label: "3 days (recommended)" },
+  { h: 168, label: "1 week" },
+];
+
+/** How often one customer may get offers, and the night hours when marketing waits. */
+export function SendingRulesForm({ clientId, initial }: { clientId: string; initial: { marketingGapHours: number; quietFrom: string | null; quietTo: string | null } }) {
+  const [gap, setGap] = useState(initial.marketingGapHours);
+  const [quietOn, setQuietOn] = useState(Boolean(initial.quietFrom && initial.quietTo));
+  const [from, setFrom] = useState(initial.quietFrom ?? "21:00");
+  const [to, setTo] = useState(initial.quietTo ?? "09:00");
+  const { pending, submit } = useSubmit();
+  return (
+    <form
+      className="grid gap-3 sm:grid-cols-[1fr_1.4fr_auto] sm:items-end"
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit(() => saveSendingRules(clientId, { marketingGapHours: gap, quietFrom: quietOn ? from : "", quietTo: quietOn ? to : "" }));
+      }}
+    >
+      <div>
+        <Label htmlFor={`gap-${clientId}`} hint="marketing only">Gap between offers per customer</Label>
+        <select id={`gap-${clientId}`} className="field" value={gap} onChange={(e) => setGap(Number(e.target.value))}>
+          {GAPS.map((g) => <option key={g.h} value={g.h}>{g.label}</option>)}
+          {!GAPS.some((g) => g.h === gap) && <option value={gap}>{gap} hours</option>}
+        </select>
+      </div>
+      <div>
+        <Label htmlFor={`qf-${clientId}`} hint="India time · marketing waits">
+          <span className="inline-flex items-center gap-2">
+            <input type="checkbox" className="accent-brand" checked={quietOn} onChange={(e) => setQuietOn(e.target.checked)} aria-label="Use quiet hours" />
+            Quiet hours
+          </span>
+        </Label>
+        <div className="flex items-center gap-2">
+          <input id={`qf-${clientId}`} type="time" className="field" value={from} disabled={!quietOn} onChange={(e) => setFrom(e.target.value)} />
+          <span className="text-xs text-muted">to</span>
+          <input type="time" aria-label="Quiet hours end" className="field" value={to} disabled={!quietOn} onChange={(e) => setTo(e.target.value)} />
+        </div>
+      </div>
+      <Button disabled={pending} size="sm">{pending ? spin : "Save rules"}</Button>
+    </form>
   );
 }

@@ -8,7 +8,7 @@ import type { ActionResult } from "./templates";
 
 const parseTags = (s: string) => [...new Set(s.split(/[,;|]/).map((t) => t.trim().toLowerCase()).filter(Boolean))];
 
-export async function saveCustomer(id: string | null, input: { name: string; phone: string; tags: string }): Promise<ActionResult> {
+export async function saveCustomer(id: string | null, input: { name: string; phone: string; tags: string; optInSource?: string }): Promise<ActionResult> {
   const s = await requireAdmin(true);
   if ("denied" in s) return { ok: false, message: s.denied };
   const phone = normalizePhone(input.phone);
@@ -18,7 +18,10 @@ export async function saveCustomer(id: string | null, input: { name: string; pho
   if (clash && clash.id !== id) return { ok: false, message: `+${phone} already belongs to ${clash.name}.` };
   const data = { name: input.name.trim(), phone, tags: parseTags(input.tags) };
   if (id) await db.customer.update({ where: { id, clientId: s.clientId }, data });
-  else await db.customer.create({ data: { ...data, clientId: s.clientId } });
+  else {
+    if (!input.optInSource?.trim()) return { ok: false, message: "Note how the customer agreed to WhatsApp messages; Meta requires it." };
+    await db.customer.create({ data: { ...data, clientId: s.clientId, optInSource: input.optInSource.trim(), optInAt: new Date() } });
+  }
   revalidatePath("/dashboard/customers");
   return { ok: true, message: id ? "Customer updated." : "Customer added." };
 }
@@ -39,9 +42,10 @@ function splitCsv(line: string) {
   return out;
 }
 
-export async function importCustomers(csv: string, extraTags: string): Promise<ActionResult> {
+export async function importCustomers(csv: string, extraTags: string, optInSource = ""): Promise<ActionResult> {
   const s = await requireAdmin(true);
   if ("denied" in s) return { ok: false, message: s.denied };
+  if (!optInSource.trim()) return { ok: false, message: "Note how these customers agreed to WhatsApp messages; Meta requires it." };
   const lines = csv.replace(/^﻿/, "").split(/\r?\n/).filter((l) => l.trim());
   if (!lines.length) return { ok: false, message: "The file is empty." };
 
@@ -71,7 +75,11 @@ export async function importCustomers(csv: string, extraTags: string): Promise<A
   const existing = await db.customer.findMany({ where: { clientId, phone: { in: [...rows.keys()] } }, select: { phone: true, tags: true } });
   const known = new Map(existing.map((c) => [c.phone, c.tags]));
   const fresh = [...rows].filter(([p]) => !known.has(p));
-  await db.customer.createMany({ data: fresh.map(([phone, r]) => ({ clientId, phone, name: r.name, tags: r.tags })), skipDuplicates: true });
+  const optInAt = new Date();
+  await db.customer.createMany({
+    data: fresh.map(([phone, r]) => ({ clientId, phone, name: r.name, tags: r.tags, optInSource: optInSource.trim(), optInAt })),
+    skipDuplicates: true,
+  });
   for (const [phone, r] of rows) {
     const tags = known.get(phone);
     if (tags) await db.customer.update({ where: { clientId_phone: { clientId, phone } }, data: { name: r.name, tags: [...new Set([...tags, ...r.tags])] } });

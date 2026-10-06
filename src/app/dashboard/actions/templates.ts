@@ -22,6 +22,7 @@ import {
   type WaConfig,
 } from "@/lib/whatsapp";
 import { clientAccounts, clientNumbers, senderForAccount } from "@/lib/senders";
+import { explainError } from "@/lib/meta-errors";
 
 export type ActionResult = { ok: boolean; message?: string; errors?: string[]; id?: string };
 
@@ -249,9 +250,11 @@ export async function sendTestMessage(id: string, rawPhone: string): Promise<Act
     revalidatePath("/dashboard/messages");
     return { ok: true, message: res.simulated ? "Simulated send logged (demo mode)." : `Test sent to +${phone}${number?.displayPhone ? ` from ${number.displayPhone}` : ""}.` };
   } catch (e) {
+    const code = e instanceof MetaError ? (e.code ?? null) : null;
+    const error = explainError(code, errText(e));
     await db.message.create({
-      data: { customerId: customer.id, templateId: t.id, templateName: t.name, status: "FAILED", provider: settings.provider, error: errText(e), failedAt: new Date() },
+      data: { customerId: customer.id, templateId: t.id, templateName: t.name, status: "FAILED", provider: settings.provider, errorCode: code, error, failedAt: new Date() },
     });
-    return { ok: false, message: errText(e) };
+    return { ok: false, message: error };
   }
 }
