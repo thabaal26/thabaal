@@ -1,12 +1,13 @@
 "use client";
 
-import { Building2, CalendarClock, LayoutDashboard, MessagesSquare, Settings, SquarePen, Users } from "lucide-react";
+import { Building2, CalendarClock, Inbox, LayoutDashboard, MessagesSquare, Settings, SquarePen, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
 
 export const NAV = [
   { href: "/dashboard", label: "Overview", short: "Home", icon: LayoutDashboard },
+  { href: "/dashboard/replies", label: "Replies", short: "Replies", icon: Inbox },
   { href: "/dashboard/messages", label: "Message log", short: "Log", icon: MessagesSquare },
   { href: "/dashboard/campaigns", label: "Campaigns", short: "Campaigns", icon: CalendarClock },
   { href: "/dashboard/templates", label: "Templates", short: "Templates", icon: SquarePen },
@@ -15,12 +16,23 @@ export const NAV = [
 ];
 
 const ADMIN_NAV = [{ href: "/dashboard/clients", label: "Clients", short: "Clients", icon: Building2 }];
+/** Phone tab bar order: what people check most. Templates is reached from Settings. */
+const PHONE_TABS = ["/dashboard", "/dashboard/replies", "/dashboard/campaigns", "/dashboard/customers", "/dashboard/messages"];
+
+function CountBadge({ n, className }: { n?: number; className?: string }) {
+  if (!n) return null;
+  return (
+    <span className={cn("tabular grid h-[18px] min-w-[18px] place-items-center rounded-full bg-glow px-1 text-[10px] font-bold text-night", className)}>
+      {n > 99 ? "99+" : n}
+    </span>
+  );
+}
 
 function isActive(path: string, href: string) {
   return href === "/dashboard" ? path === href : path.startsWith(href);
 }
 
-export function SideNav({ isAdmin }: { isAdmin: boolean }) {
+export function SideNav({ isAdmin, openReplies }: { isAdmin: boolean; openReplies?: number }) {
   const path = usePathname();
   return (
     <nav className="space-y-0.5">
@@ -34,7 +46,8 @@ export function SideNav({ isAdmin }: { isAdmin: boolean }) {
           )}
         >
           <Icon className={cn("size-4", isActive(path, href) && "text-glow")} />
-          {label}
+          <span className="flex-1">{label}</span>
+          {href === "/dashboard/replies" && <CountBadge n={openReplies} />}
         </Link>
       ))}
     </nav>
@@ -42,7 +55,7 @@ export function SideNav({ isAdmin }: { isAdmin: boolean }) {
 }
 
 /** Phone tab bar: the five everyday sections, within thumb reach. Settings lives in the top bar. */
-export function BottomNav() {
+export function BottomNav({ openReplies }: { openReplies?: number }) {
   const path = usePathname();
   return (
     <nav
@@ -50,7 +63,7 @@ export function BottomNav() {
       className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 backdrop-blur-md lg:hidden"
     >
       <div className="mx-auto grid max-w-lg grid-cols-5">
-        {NAV.slice(0, 5).map(({ href, short, icon: Icon }) => {
+        {PHONE_TABS.map((tab) => NAV.find((n) => n.href === tab)!).map(({ href, short, icon: Icon }) => {
           const active = isActive(path, href);
           return (
             <Link
@@ -59,8 +72,9 @@ export function BottomNav() {
               aria-current={active ? "page" : undefined}
               className={cn("flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium transition active:scale-95", active ? "text-brand-deep" : "text-muted")}
             >
-              <span className={cn("grid h-7 w-12 place-items-center rounded-full transition", active && "bg-brand-soft")}>
+              <span className={cn("relative grid h-7 w-12 place-items-center rounded-full transition", active && "bg-brand-soft")}>
                 <Icon className="size-[18px]" strokeWidth={active ? 2.4 : 2} />
+                {href === "/dashboard/replies" && <CountBadge n={openReplies} className="absolute -right-0.5 -top-1 ring-2 ring-white" />}
               </span>
               {short}
             </Link>

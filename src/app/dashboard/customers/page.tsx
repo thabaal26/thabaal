@@ -79,12 +79,12 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
           <>
           <ul className="divide-y divide-line sm:hidden">
             {rows.map((c) => (
-              <li key={c.id} className="flex items-center gap-3 px-4 py-3">
+              <li key={c.id} className="relative flex items-center gap-3 px-4 py-3 active:bg-canvas">
                 <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft text-sm font-semibold text-brand-deep">
                   {c.name.trim().slice(0, 1).toUpperCase()}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{c.name}</p>
+                  <Link href={`/dashboard/customers/${c.id}`} className="block truncate font-medium after:absolute after:inset-0">{c.name}</Link>
                   <p className="tabular truncate text-xs text-muted">
                     {formatPhone(c.phone)}
                     {c.messages[0] && ` · ${fmtDate(c.messages[0].createdAt, "d MMM")} ${c.messages[0].status.toLowerCase()}`}
@@ -98,12 +98,14 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
                   )}
                 </div>
                 {scope.isAdmin && (
-                  <CustomerMenu
-                    name={c.name}
-                    optedOut={c.optedOut}
-                    toggle={setOptOut.bind(null, c.id, !c.optedOut)}
-                    remove={deleteCustomer.bind(null, c.id)}
-                  />
+                  <div className="relative z-10">
+                    <CustomerMenu
+                      name={c.name}
+                      optedOut={c.optedOut}
+                      toggle={setOptOut.bind(null, c.id, !c.optedOut)}
+                      remove={deleteCustomer.bind(null, c.id)}
+                    />
+                  </div>
                 )}
               </li>
             ))}
@@ -125,7 +127,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
                 {rows.map((c) => (
                   <tr key={c.id} className="hover:bg-canvas/60">
                     <td className="px-4 py-3">
-                      <p className="font-medium">{c.name}</p>
+                      <Link href={`/dashboard/customers/${c.id}`} className="font-medium hover:underline">{c.name}</Link>
                       <p className="tabular text-xs text-muted">{formatPhone(c.phone)}</p>
                     </td>
                     {!scope.clientId && <td className="px-4 py-3 text-xs text-ink-2">{c.client.name}</td>}

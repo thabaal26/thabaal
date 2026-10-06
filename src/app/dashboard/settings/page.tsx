@@ -1,4 +1,4 @@
-import { Building2, CheckCircle2, Circle, LogOut } from "lucide-react";
+import { Building2, CheckCircle2, Circle, LogOut, SquarePen } from "lucide-react";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
@@ -51,7 +51,11 @@ export default async function SettingsPage() {
   if (user.role !== "ADMIN") {
     return (
       <>
-        <PageHeader title="Settings" description={user.client ? `Your login for ${user.client.name}.` : "Your account."} />
+        <PageHeader
+          title="Settings"
+          description={user.client ? `Your login for ${user.client.name}.` : "Your account."}
+          actions={<Link href="/dashboard/templates" className={buttonClass("secondary") + " lg:hidden"}><SquarePen className="size-4" /> Templates</Link>}
+        />
         <div className="max-w-xl">{account}</div>
       </>
     );
@@ -67,7 +71,12 @@ export default async function SettingsPage() {
       <PageHeader
         title="Settings"
         description="WhatsApp connection, scheduler and your account."
-        actions={<Link href="/dashboard/clients" className={buttonClass("secondary")}><Building2 className="size-4" /> Clients</Link>}
+        actions={
+          <>
+            <Link href="/dashboard/templates" className={buttonClass("secondary") + " lg:hidden"}><SquarePen className="size-4" /> Templates</Link>
+            <Link href="/dashboard/clients" className={buttonClass("secondary")}><Building2 className="size-4" /> Clients</Link>
+          </>
+        }
       />
       <ProviderSwitch provider={settings.provider} metaLive={cfg.live} localReady={!!wahaConfig(settings)} />
       <div className="mt-6 grid gap-6 lg:grid-cols-2">

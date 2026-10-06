@@ -75,6 +75,7 @@ model Customer {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   messages  Message[]
+  replies   Reply[]
 
   @@unique([clientId, phone])
   @@index([phone])
@@ -235,4 +236,19 @@ model Message {
   @@index([runId, status])
   @@index([createdAt])
   @@index([status])
+}
+
+/// A message a customer sent back: a typed reply or a quick-reply button tap such as "Order now".
+model Reply {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  text        String
+  kind        String // text | button | media
+  waMessageId String?  @unique
+  handled     Boolean  @default(false)
+  receivedAt  DateTime @default(now())
+
+  @@index([customerId, receivedAt])
+  @@index([handled, receivedAt])
 }

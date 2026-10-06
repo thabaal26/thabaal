@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
+import { metaReplyContent, recordReply } from "@/lib/replies";
 import { mapMetaStatus } from "@/lib/whatsapp";
 
 export const dynamic = "force-dynamic";
@@ -73,8 +74,10 @@ export async function POST(req: NextRequest) {
       if (change.field === "messages") {
         for (const s of v.statuses ?? []) await applyStatus(s);
         for (const m of v.messages ?? []) {
-          const text = m.text?.body ?? m.button?.text ?? m.interactive?.button_reply?.title ?? "";
-          if (OPT_OUT.test(text)) await optOut(m.from, v.metadata?.phone_number_id);
+          const { text, kind } = metaReplyContent(m);
+          const phoneNumberId = v.metadata?.phone_number_id;
+          if (OPT_OUT.test(text)) await optOut(m.from, phoneNumberId);
+          await recordReply({ phone: m.from, text, kind, waMessageId: m.id, phoneNumberId, at: m.timestamp ? new Date(Number(m.timestamp) * 1000) : undefined });
         }
       } else if (change.field === "message_template_status_update") {
         await db.template.updateMany({

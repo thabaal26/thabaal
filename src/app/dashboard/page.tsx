@@ -13,6 +13,8 @@ import { DailyChart } from "./daily-chart";
 
 export const dynamic = "force-dynamic";
 
+const tagLabel = (tag: string) => (tag === "no-item-info" ? "No item recorded" : tag.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase()));
+
 export default async function Overview() {
   const weekAgo = daysAgo(7);
   const since = daysAgo(13);
@@ -20,12 +22,30 @@ export default async function Overview() {
   const mine = owned(scope);
   const myMessages = ownedMessages(scope);
 
-  const [client, segments] = await Promise.all([
+  const monthAgo = daysAgo(30);
+  const [client, segments, results, repliesByTag] = await Promise.all([
     scope.clientId ? db.client.findUnique({ where: { id: scope.clientId } }) : null,
     scope.clientId
       ? db.$queryRaw<{ tag: string; n: bigint }[]>`
           SELECT unnest(tags) AS tag, count(*) AS n FROM "Customer"
           WHERE "clientId" = ${scope.clientId} AND "optedOut" = false GROUP BY 1 ORDER BY 2 DESC, 1`
+      : [],
+    scope.clientId
+      ? db.$queryRaw<{ tag: string; sent: bigint; delivered: bigint; read: bigint; failed: bigint }[]>`
+          SELECT t.tag,
+            count(*) AS sent,
+            count(*) FILTER (WHERE m.status IN ('DELIVERED', 'READ')) AS delivered,
+            count(*) FILTER (WHERE m.status = 'READ') AS read,
+            count(*) FILTER (WHERE m.status = 'FAILED') AS failed
+          FROM "Message" m JOIN "Customer" c ON c.id = m."customerId" CROSS JOIN LATERAL unnest(c.tags) AS t(tag)
+          WHERE c."clientId" = ${scope.clientId} AND m."createdAt" >= ${monthAgo} AND m.status NOT IN ('QUEUED', 'SKIPPED')
+          GROUP BY 1 ORDER BY 2 DESC`
+      : [],
+    scope.clientId
+      ? db.$queryRaw<{ tag: string; n: bigint }[]>`
+          SELECT t.tag, count(*) AS n
+          FROM "Reply" r JOIN "Customer" c ON c.id = r."customerId" CROSS JOIN LATERAL unnest(c.tags) AS t(tag)
+          WHERE c."clientId" = ${scope.clientId} AND r."receivedAt" >= ${monthAgo} GROUP BY 1`
       : [],
   ]);
   const [customers, optedOut, week, activeRuns, upcoming, recent, daily] = await Promise.all([
@@ -80,6 +100,10 @@ export default async function Overview() {
   // Product and segment tags, largest first; the client-wide tag says nothing on its own.
   const shown = segments.map((t) => ({ tag: t.tag, n: Number(t.n) })).filter((t) => t.n < customers || segments.length === 1).slice(0, 8);
   const top = shown[0]?.n ?? 0;
+  const clientTag = client?.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const byProduct = results
+    .filter((r) => r.tag !== clientTag || results.length === 1)
+    .map((r) => ({ tag: r.tag, sent: Number(r.sent), delivered: Number(r.delivered), read: Number(r.read), failed: Number(r.failed), replies: Number(repliesByTag.find((x) => x.tag === r.tag)?.n ?? 0) }));
 
   return (
     <>
@@ -160,9 +184,7 @@ export default async function Overview() {
               <li key={t.tag}>
                 <Link href={`/dashboard/customers?tag=${encodeURIComponent(t.tag)}`} className="group block">
                   <div className="flex items-baseline justify-between gap-2 text-sm">
-                    <span className="truncate font-medium group-hover:underline">
-                      {t.tag === "no-item-info" ? "No item recorded" : t.tag.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase())}
-                    </span>
+                    <span className="truncate font-medium group-hover:underline">{tagLabel(t.tag)}</span>
                     <span className="tabular text-xs text-muted">{fmtNumber(t.n)}</span>
                   </div>
                   <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-canvas">
@@ -172,6 +194,43 @@ export default async function Overview() {
               </li>
             ))}
           </ul>
+        </Card>
+      )}
+
+      {byProduct.length > 0 && (
+        <Card className="mt-6">
+          <CardHeader title="Campaign results by product" description="Last 30 days. Which customer groups read your messages and write back." />
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr className="border-b border-line text-left text-xs text-muted">
+                  <th className="px-5 py-2.5 font-medium">Product</th>
+                  <th className="px-5 py-2.5 text-right font-medium">Sent</th>
+                  <th className="px-5 py-2.5 text-right font-medium">Delivered</th>
+                  <th className="px-5 py-2.5 text-right font-medium">Read</th>
+                  <th className="px-5 py-2.5 text-right font-medium">Replies</th>
+                </tr>
+              </thead>
+              <tbody className="tabular divide-y divide-line">
+                {byProduct.map((r) => (
+                  <tr key={r.tag} className="hover:bg-canvas/60">
+                    <td className="px-5 py-3 font-medium">
+                      <Link href={`/dashboard/customers?tag=${encodeURIComponent(r.tag)}`} className="hover:underline">{tagLabel(r.tag)}</Link>
+                    </td>
+                    <td className="px-5 py-3 text-right">{fmtNumber(r.sent)}{r.failed > 0 && <span className="ml-1 text-xs text-rose-600">({r.failed} failed)</span>}</td>
+                    <td className="px-5 py-3 text-right">{pct(r.delivered, r.sent)}%</td>
+                    <td className="px-5 py-3 text-right">
+                      <span className="inline-flex items-center gap-2">
+                        <span className="hidden h-1.5 w-16 overflow-hidden rounded-full bg-canvas sm:block"><span className="block h-full rounded-full bg-brand" style={{ width: `${pct(r.read, r.delivered)}%` }} /></span>
+                        {pct(r.read, r.delivered)}%
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-right">{r.replies ? <Link href="/dashboard/replies?show=all" className="font-medium text-brand-deep hover:underline">{fmtNumber(r.replies)}</Link> : "0"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </Card>
       )}
 

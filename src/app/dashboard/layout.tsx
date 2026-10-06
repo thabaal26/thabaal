@@ -1,7 +1,7 @@
 import { LogOut, MessageCircle } from "lucide-react";
 import type { Metadata, Viewport } from "next";
 import { db } from "@/lib/db";
-import { getScope, requireUser } from "@/lib/session";
+import { getScope, ownedMessages, requireUser } from "@/lib/session";
 import { getSettings, isSimulated } from "@/lib/provider";
 import { nightColor, themeStyle } from "@/lib/theme";
 import { logout } from "../login/actions";
@@ -45,10 +45,11 @@ function BrandMark({ logoUrl, name, size }: { logoUrl?: string | null; name: str
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
   const user = await requireUser();
   const scope = await getScope();
-  const [settings, client, clients] = await Promise.all([
+  const [settings, client, clients, openReplies] = await Promise.all([
     getSettings(),
     brandedClient(),
     scope.isAdmin ? db.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }) : [],
+    db.reply.count({ where: { handled: false, ...ownedMessages(scope) } }),
   ]);
   const name = client?.name ?? "Campaign Portal";
   const subtitle = client?.tagline || (scope.isAdmin ? (client ? "Admin view" : "Admin · all clients") : "WhatsApp campaigns");
@@ -76,7 +77,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           </div>
         </div>
         {scope.isAdmin && <div className="mb-5"><ClientSwitcher clients={clients} current={scope.clientId} dark /></div>}
-        <SideNav isAdmin={scope.isAdmin} />
+        <SideNav isAdmin={scope.isAdmin} openReplies={openReplies} />
         <div className="mt-auto space-y-4 border-t border-white/10 px-2 pt-4">
           {mode}
           <div className="flex items-center justify-between gap-2">
@@ -120,7 +121,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
         <div className="bg-night px-4 pb-3 lg:hidden"><ClientSwitcher clients={clients} current={scope.clientId} dark /></div>
       )}
       <main className="mx-auto max-w-7xl animate-rise px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 sm:px-8 sm:pt-8 lg:pb-10">{children}</main>
-      <BottomNav />
+      <BottomNav openReplies={openReplies} />
     </div>
   );
 }

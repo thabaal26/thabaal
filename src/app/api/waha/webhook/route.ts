@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { wahaWebhookKey } from "@/lib/provider";
+import { recordReply } from "@/lib/replies";
 import { mapAck } from "@/lib/waha";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +11,7 @@ const OPT_OUT = /^\s*(stop|unsubscribe|opt[\s-]?out|cancel)\s*$/i;
 
 type Event =
   | { event: "message.ack"; payload: { id: string; ack: number; ackName?: string } }
-  | { event: "message"; payload: { from: string; body?: string; fromMe?: boolean } }
+  | { event: "message"; payload: { id?: string; from: string; body?: string; fromMe?: boolean; hasMedia?: boolean; timestamp?: number } }
   | { event: string; payload: unknown };
 
 /** Finds our message by WAHA id, tolerating the short and long id formats engines use. */
@@ -50,9 +51,17 @@ export async function POST(req: NextRequest) {
     }
   } else if (e.event === "message") {
     const p = (e as Extract<Event, { event: "message" }>).payload;
-    if (!p.fromMe && OPT_OUT.test(p.body ?? "")) {
-      // Every client sends through the one local session, so STOP opts out of all of them.
-      await db.customer.updateMany({ where: { phone: p.from.split("@")[0] }, data: { optedOut: true } });
+    const phone = p.from.split("@")[0];
+    if (!p.fromMe && !p.from.endsWith("@g.us")) {
+      if (OPT_OUT.test(p.body ?? "")) {
+        // Every client sends through the one local session, so STOP opts out of all of them.
+        await db.customer.updateMany({ where: { phone }, data: { optedOut: true } });
+      }
+      const text = p.body?.trim() || (p.hasMedia ? "[Photo or file]" : "");
+      await recordReply({
+        phone, text, kind: p.body?.trim() ? "text" : "media", waMessageId: p.id, anyClient: true,
+        at: p.timestamp ? new Date(p.timestamp * 1000) : undefined,
+      });
     }
   }
   return NextResponse.json({ ok: true });
