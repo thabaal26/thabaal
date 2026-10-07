@@ -89,9 +89,9 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
                     </p>
                   </div>
                   <div className="flex shrink-0 gap-2 sm:flex-col sm:items-stretch">
-                    <a href={`https://wa.me/${r.customer.phone}`} target="_blank" rel="noreferrer" className={cn(buttonClass("primary", "sm"), "flex-1 sm:flex-none")}>
-                      <MessageCircle className="size-3.5" /> Reply on WhatsApp
-                    </a>
+                    <Link href={`/dashboard/customers/${r.customer.id}#reply`} className={cn(buttonClass("primary", "sm"), "flex-1 sm:flex-none")}>
+                      <MessageCircle className="size-3.5" /> Reply here
+                    </Link>
                     <ActionButton action={setReplyHandled.bind(null, r.id, !r.handled)} className="flex-1 sm:flex-none">
                       {r.handled ? <><RotateCcw className="size-3.5" /> Reopen</> : <><CheckCheck className="size-3.5" /> Handled</>}
                     </ActionButton>

@@ -1,7 +1,7 @@
 import { LogOut, MessageCircle } from "lucide-react";
 import type { Metadata, Viewport } from "next";
 import { db } from "@/lib/db";
-import { getScope, ownedMessages, requireUser } from "@/lib/session";
+import { getScope, owned, ownedMessages, requireUser } from "@/lib/session";
 import { getSettings, isSimulated } from "@/lib/provider";
 import { senderFor } from "@/lib/senders";
 import { nightColor, themeCss, themeStyle } from "@/lib/theme";
@@ -46,11 +46,12 @@ function BrandMark({ logoUrl, name, size }: { logoUrl?: string | null; name: str
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
   const user = await requireUser();
   const scope = await getScope();
-  const [settings, client, clients, openReplies] = await Promise.all([
+  const [settings, client, clients, openReplies, newOrders] = await Promise.all([
     getSettings(),
     brandedClient(),
     scope.isAdmin ? db.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }) : [],
     db.reply.count({ where: { handled: false, ...ownedMessages(scope) } }),
+    db.order.count({ where: { status: "NEW", ...owned(scope) } }).catch(() => 0), // 0 until the Order table exists (npm run db:push)
   ]);
   const name = client?.name ?? "Campaign Portal";
   const subtitle = client?.tagline || (scope.isAdmin ? (client ? "Admin view" : "Admin · all clients") : "WhatsApp campaigns");
@@ -79,7 +80,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           </div>
         </div>
         {scope.isAdmin && <div className="mb-5"><ClientSwitcher clients={clients} current={scope.clientId} dark /></div>}
-        <SideNav isAdmin={scope.isAdmin} openReplies={openReplies} />
+        <SideNav isAdmin={scope.isAdmin} openReplies={openReplies} newOrders={newOrders} />
         <div className="mt-auto space-y-4 border-t border-white/10 px-2 pt-4">
           {mode}
           <div className="flex items-center justify-between gap-2">
@@ -137,7 +138,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
       </header>
 
       <main className="mx-auto max-w-7xl animate-rise px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-5 sm:px-8 sm:pt-8 lg:pb-10">{children}</main>
-      <BottomNav openReplies={openReplies} />
+      <BottomNav openReplies={openReplies} newOrders={newOrders} />
     </div>
   );
 }

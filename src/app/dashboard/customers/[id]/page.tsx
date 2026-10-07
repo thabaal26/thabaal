@@ -8,8 +8,10 @@ import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { fmtDate, fmtNumber, pct } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
+import { replyWindowEnd } from "@/lib/replies";
 import { getScope, owned } from "@/lib/session";
 import { setOptOut } from "../../actions/customers";
+import { SendPanel } from "./send-panel";
 
 export const metadata: Metadata = { title: "Customer" };
 export const dynamic = "force-dynamic";
@@ -30,6 +32,13 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
     },
   });
   if (!c) notFound();
+
+  const [templates, numbers] = await Promise.all([
+    db.template.findMany({ where: { clientId: c.clientId, status: "APPROVED", category: { not: "AUTHENTICATION" } }, orderBy: { name: "asc" } }),
+    db.whatsAppNumber.findMany({ where: { clientId: c.clientId }, orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }], select: { id: true, label: true, businessAccountId: true } }),
+  ]);
+  // WhatsApp allows typed messages for 24 hours after the customer last wrote to us.
+  const windowEnd = replyWindowEnd(c.replies[0]?.receivedAt);
 
   const sent = c.messages.filter((m) => !["QUEUED", "SKIPPED"].includes(m.status));
   const delivered = sent.filter((m) => m.status === "DELIVERED" || m.status === "READ").length;
@@ -72,6 +81,15 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
         <Stat label="Read" value={`${pct(read, delivered)}%`} sub={`${read} of ${delivered} delivered`} icon={<Eye className="size-4" />} accent="bg-violet-50 text-violet-700" />
         <Stat label="Replies" value={fmtNumber(c.replies.length)} sub={c.replies[0] ? `Last ${fmtDate(c.replies[0].receivedAt, "d MMM")}` : "None yet"} icon={<CheckCheck className="size-4" />} />
       </div>
+
+      <SendPanel
+        customer={{ id: c.id, name: c.name, phone: c.phone }}
+        templates={templates}
+        numbers={numbers}
+        canSend={scope.isAdmin}
+        windowEndsAt={windowEnd ? fmtDate(windowEnd, "d MMM, h:mm a") : null}
+        blocked={c.optedOut ? "This customer opted out of messages. Opt them back in to send." : c.unreachable ? "WhatsApp says this number can't receive messages." : null}
+      />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1.6fr]">
         <Card className="h-fit">

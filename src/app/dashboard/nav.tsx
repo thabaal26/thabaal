@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, CalendarClock, Inbox, LayoutDashboard, MessagesSquare, Settings, SquarePen, Users } from "lucide-react";
+import { Building2, CalendarClock, Inbox, LayoutDashboard, MessagesSquare, Settings, ShoppingBag, SquarePen, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
@@ -8,6 +8,7 @@ import { cn } from "@/lib/cn";
 export const NAV = [
   { href: "/dashboard", label: "Overview", short: "Home", icon: LayoutDashboard },
   { href: "/dashboard/replies", label: "Replies", short: "Replies", icon: Inbox },
+  { href: "/dashboard/orders", label: "Orders", short: "Orders", icon: ShoppingBag },
   { href: "/dashboard/messages", label: "Message log", short: "Log", icon: MessagesSquare },
   { href: "/dashboard/campaigns", label: "Campaigns", short: "Campaigns", icon: CalendarClock },
   { href: "/dashboard/templates", label: "Templates", short: "Templates", icon: SquarePen },
@@ -17,7 +18,7 @@ export const NAV = [
 
 const ADMIN_NAV = [{ href: "/dashboard/clients", label: "Clients", short: "Clients", icon: Building2 }];
 /** Phone tab bar order: what people check most. Templates is reached from Settings. */
-const PHONE_TABS = ["/dashboard", "/dashboard/replies", "/dashboard/campaigns", "/dashboard/customers", "/dashboard/messages"];
+const PHONE_TABS = ["/dashboard", "/dashboard/replies", "/dashboard/orders", "/dashboard/customers", "/dashboard/campaigns"];
 
 function CountBadge({ n, className }: { n?: number; className?: string }) {
   if (!n) return null;
@@ -32,7 +33,7 @@ function isActive(path: string, href: string) {
   return href === "/dashboard" ? path === href : path.startsWith(href);
 }
 
-export function SideNav({ isAdmin, openReplies }: { isAdmin: boolean; openReplies?: number }) {
+export function SideNav({ isAdmin, openReplies, newOrders }: { isAdmin: boolean; openReplies?: number; newOrders?: number }) {
   const path = usePathname();
   return (
     <nav className="space-y-0.5">
@@ -48,6 +49,7 @@ export function SideNav({ isAdmin, openReplies }: { isAdmin: boolean; openReplie
           <Icon className={cn("size-4", isActive(path, href) && "text-glow")} />
           <span className="flex-1">{label}</span>
           {href === "/dashboard/replies" && <CountBadge n={openReplies} />}
+          {href === "/dashboard/orders" && <CountBadge n={newOrders} />}
         </Link>
       ))}
     </nav>
@@ -55,7 +57,7 @@ export function SideNav({ isAdmin, openReplies }: { isAdmin: boolean; openReplie
 }
 
 /** Phone tab bar: a floating frosted bar with the five everyday sections, within thumb reach. */
-export function BottomNav({ openReplies }: { openReplies?: number }) {
+export function BottomNav({ openReplies, newOrders }: { openReplies?: number; newOrders?: number }) {
   const path = usePathname();
   return (
     <nav
@@ -75,6 +77,7 @@ export function BottomNav({ openReplies }: { openReplies?: number }) {
               <span className={cn("relative grid h-7 w-12 place-items-center rounded-full transition", active && "bg-brand-soft")}>
                 <Icon className="size-[18px]" strokeWidth={active ? 2.4 : 2} />
                 {href === "/dashboard/replies" && <CountBadge n={openReplies} className="absolute -right-0.5 -top-1 ring-2 ring-white" />}
+                {href === "/dashboard/orders" && <CountBadge n={newOrders} className="absolute -right-0.5 -top-1 ring-2 ring-white" />}
               </span>
               {short}
             </Link>

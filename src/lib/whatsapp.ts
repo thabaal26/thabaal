@@ -86,6 +86,16 @@ export async function sendTemplateMessage(cfg: WaConfig, input: SendInput): Prom
   return { id: res.messages[0].id, simulated: false };
 }
 
+/** A plain text message. WhatsApp only allows it within 24 hours of the customer's last message. */
+export async function sendTextMessage(cfg: WaConfig, to: string, body: string): Promise<{ id: string; simulated: boolean }> {
+  if (!cfg.live) return { id: `demo.${crypto.randomUUID()}`, simulated: true };
+  const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to, type: "text", text: { body, preview_url: false } }),
+  });
+  return { id: res.messages[0].id, simulated: false };
+}
+
 export type MetaTemplate = {
   id: string;
   name: string;

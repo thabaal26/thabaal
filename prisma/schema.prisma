@@ -53,6 +53,7 @@ model Client {
   templates           Template[]
   campaigns           Campaign[]
   numbers             WhatsAppNumber[]
+  orders              Order[]
 }
 
 /// One sending number on Meta's Cloud API. Templates belong to its WhatsApp Business
@@ -123,6 +124,7 @@ model Customer {
   updatedAt   DateTime  @updatedAt
   messages    Message[]
   replies     Reply[]
+  orders      Order[]
 
   @@unique([clientId, phone])
   @@index([phone])
@@ -315,4 +317,38 @@ model Reply {
 
   @@index([customerId, receivedAt])
   @@index([handled, receivedAt])
+}
+
+enum OrderStatus {
+  NEW
+  CONFIRMED
+  PAID
+  DISPATCHED
+  DELIVERED
+  CANCELLED
+}
+
+/// A cart a customer sent from the WhatsApp catalogue.
+model Order {
+  id          String      @id @default(cuid())
+  clientId    String
+  client      Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  customerId  String
+  customer    Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  waMessageId String?     @unique
+  catalogId   String?
+  /// The note the customer typed with the cart, if any.
+  note        String?
+  /// [{ id: retailer id, name?: product name, quantity, price, currency }]
+  items       Json
+  total       Float       @default(0)
+  currency    String      @default("INR")
+  status      OrderStatus @default(NEW)
+  /// Our own notes: payment mode, delivery slot, address.
+  internalNote String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([clientId, status, createdAt])
+  @@index([customerId])
 }

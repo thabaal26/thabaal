@@ -1,0 +1,125 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { db } from "@/lib/db";
+import { fmtDate } from "@/lib/format";
+import { allowance } from "@/lib/limits";
+import { deliver, getSettings, readiness, templateSendable, wahaConfig } from "@/lib/provider";
+import { applyFailure, quietUntil, recentlyMarketed } from "@/lib/rules";
+import { senderFor } from "@/lib/senders";
+import { getScope, owned, requireAdmin } from "@/lib/session";
+import { sendText, WahaError } from "@/lib/waha";
+import { sendTextMessage } from "@/lib/whatsapp";
+import { explainSendError, type SendResult } from "./send-helpers";
+
+const WINDOW_MS = 24 * 3_600_000;
+
+/**
+ * Sends one approved template to one customer now. Opt-outs and numbers that can't
+ * receive WhatsApp are never overridden; quiet hours and the gap between marketing
+ * messages ask for confirmation (`force`) instead.
+ */
+export async function sendToCustomer(customerId: string, templateId: string, senderId: string | null, force = false): Promise<SendResult> {
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const customer = await db.customer.findFirst({ where: { id: customerId, ...owned(s) }, include: { client: true } });
+  if (!customer) return { ok: false, message: "Customer not found." };
+  if (customer.optedOut) return { ok: false, message: "This customer opted out of messages. Opt them back in first." };
+  if (customer.unreachable) return { ok: false, message: "WhatsApp says this number can't receive messages." };
+
+  const t = await db.template.findFirst({ where: { id: templateId, clientId: customer.clientId } });
+  if (!t) return { ok: false, message: "Template not found." };
+  const settings = await getSettings();
+  if (!templateSendable(settings, t)) return { ok: false, message: "Only templates approved by Meta can be sent." };
+
+  const { number, cfg } = await senderFor(customer.clientId, senderId);
+  // Meta only sends a template from numbers in the account that approved it.
+  if (settings.provider === "META" && t.businessAccountId && number && t.businessAccountId !== number.businessAccountId)
+    return { ok: false, message: "That template belongs to a different WhatsApp account. Pick a number from the same account." };
+  const ready = await readiness(settings, cfg);
+  if (!ready.ok) return { ok: false, message: ready.reason ?? "The WhatsApp connection is not ready." };
+
+  if (settings.provider === "META" && number && cfg.live) {
+    if (number.qualityRating === "RED") return { ok: false, message: "This number's quality rating is red, so sending is paused to protect it." };
+    const a = await allowance(number);
+    if (!a.unlimited && a.left <= 0) return { ok: false, message: "This number reached its 24-hour messaging limit. Try again later or use another number." };
+  }
+
+  if (t.category === "MARKETING" && !force) {
+    const resume = quietUntil(customer.client);
+    if (resume) return { ok: false, soft: true, message: `It's quiet hours (marketing is held until ${fmtDate(resume, "h:mm a")}). Send anyway?` };
+    const last = (await recentlyMarketed([customer.id], customer.client.marketingGapHours)).get(customer.id);
+    if (last) return { ok: false, soft: true, message: `${customer.name} already got an offer on ${fmtDate(last, "d MMM, h:mm a")}. Send another anyway?` };
+  }
+
+  try {
+    const res = await deliver(settings, t, customer, cfg);
+    await db.message.create({
+      data: {
+        customerId: customer.id, templateId: t.id, templateName: t.name, body: res.text, status: "SENT",
+        waMessageId: res.id, simulated: res.simulated, provider: res.provider, sentAt: new Date(),
+        senderId: res.provider === "META" ? (number?.id ?? null) : null,
+      },
+    });
+    revalidatePath(`/dashboard/customers/${customer.id}`);
+    revalidatePath("/dashboard/messages");
+    return { ok: true, message: res.simulated ? "Simulated send logged (demo mode)." : `Sent to ${customer.name}${number?.displayPhone ? ` from ${number.displayPhone}` : ""}.` };
+  } catch (e) {
+    const { code, error } = explainSendError(e);
+    await db.message.create({
+      data: { customerId: customer.id, templateId: t.id, templateName: t.name, status: "FAILED", provider: settings.provider, errorCode: code, error, failedAt: new Date() },
+    });
+    await applyFailure(customer.id, code);
+    revalidatePath(`/dashboard/customers/${customer.id}`);
+    return { ok: false, message: error };
+  }
+}
+
+/**
+ * A typed reply to a customer who wrote to us in the last 24 hours (the only time WhatsApp
+ * allows free text). Client logins may do this for their own customers, like handling replies.
+ */
+export async function replyToCustomer(customerId: string, text: string): Promise<SendResult> {
+  const scope = await getScope();
+  const body = text.trim();
+  if (!body) return { ok: false, message: "Type a message first." };
+  if (body.length > 4000) return { ok: false, message: "Keep the message under 4000 characters." };
+  const customer = await db.customer.findFirst({ where: { id: customerId, ...owned(scope) } });
+  if (!customer) return { ok: false, message: "Customer not found." };
+  if (customer.optedOut) return { ok: false, message: "This customer opted out of messages." };
+
+  const settings = await getSettings();
+  const last = await db.reply.findFirst({ where: { customerId: customer.id }, orderBy: { receivedAt: "desc" }, select: { receivedAt: true, senderId: true } });
+  const local = settings.provider === "LOCAL";
+  if (!local && (!last || Date.now() - last.receivedAt.getTime() > WINDOW_MS))
+    return { ok: false, message: "WhatsApp only allows typed messages within 24 hours of the customer's last message. Send a template instead." };
+
+  // Answer from the number they wrote to, so the chat stays in one thread for them.
+  const { number, cfg } = await senderFor(customer.clientId, last?.senderId);
+  try {
+    let id: string;
+    let simulated = false;
+    if (local) {
+      const w = wahaConfig(settings);
+      if (w) id = await sendText(w, customer.phone, body);
+      else { id = `demo.${crypto.randomUUID()}`; simulated = true; }
+    } else {
+      ({ id, simulated } = await sendTextMessage(cfg, customer.phone, body));
+    }
+    await db.message.create({
+      data: {
+        customerId: customer.id, templateName: "Typed reply", body, status: "SENT", waMessageId: id, simulated,
+        provider: settings.provider, sentAt: new Date(), senderId: !local ? (number?.id ?? null) : null,
+      },
+    });
+    revalidatePath(`/dashboard/customers/${customer.id}`);
+    revalidatePath("/dashboard/messages");
+    return { ok: true, message: simulated ? "Simulated reply logged (demo mode)." : "Reply sent." };
+  } catch (e) {
+    const { code, error } = explainSendError(e);
+    await db.message.create({
+      data: { customerId: customer.id, templateName: "Typed reply", body, status: "FAILED", provider: settings.provider, errorCode: code, error, failedAt: new Date() },
+    });
+    return { ok: false, message: e instanceof WahaError ? e.message : error };
+  }
+}

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { refreshNumberStatus } from "@/lib/limits";
 import { explainError } from "@/lib/meta-errors";
 import { applyFailure } from "@/lib/rules";
+import { recordOrder } from "@/lib/orders";
 import { metaReplyContent, receivingNumber, recordReply } from "@/lib/replies";
 import { mapMetaStatus } from "@/lib/whatsapp";
 
@@ -80,7 +81,8 @@ export async function POST(req: NextRequest) {
           const { text, kind } = metaReplyContent(m);
           const phoneNumberId = v.metadata?.phone_number_id;
           if (OPT_OUT.test(text)) await optOut(m.from, phoneNumberId);
-          await recordReply({ phone: m.from, text, kind, waMessageId: m.id, phoneNumberId, at: m.timestamp ? new Date(Number(m.timestamp) * 1000) : undefined });
+          const customer = await recordReply({ phone: m.from, text, kind, waMessageId: m.id, phoneNumberId, at: m.timestamp ? new Date(Number(m.timestamp) * 1000) : undefined });
+          if (customer && m.type === "order") await recordOrder(customer, m.id, m).catch((e) => console.error("Could not save order", e));
         }
       } else if (change.field === "phone_number_quality_update") {
         // Meta changed a number's quality or limit; it sends the display number, so match on digits.
