@@ -97,24 +97,6 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         </div>
       )}
 
-      {scope.canManage && scope.clientId && (
-        <Card className="mb-4">
-          <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:p-5">
-            {/* eslint-disable-next-line @next/next/no-img-element -- our own public image */}
-            <img src="/thenan-order-header.jpg" alt="Order message picture" className="size-16 shrink-0 rounded-xl object-cover ring-1 ring-line" />
-            <div className="min-w-0 flex-1 text-sm">
-              <p className="font-medium">Order messages with your picture</p>
-              <p className="mt-0.5 text-xs text-muted">
-                {pictureStatus.map((p) => `${p.name.replace("thenan_order_", "")}: ${p.status ? p.status.toLowerCase() : "not created"}`).join(" · ")}. Used automatically once approved; the plain versions cover the wait.
-              </p>
-            </div>
-            {pictureStatus.some((p) => !p.status) && (
-              <ActionButton action={createOrderTemplates.bind(null, headerImage)} confirm="Create the picture versions of the order templates and submit them to Meta?">Create with picture</ActionButton>
-            )}
-          </div>
-        </Card>
-      )}
-
       <div className="mb-4 flex flex-wrap gap-2">
         {TABS.map((t) => (
           <Link
@@ -130,9 +112,6 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         ))}
       </div>
 
-      {scope.canManage && client && <PaymentForm config={client.paymentConfig} own={{ name: PAYMENT_TEMPLATE, status: ownPaymentTemplate?.status ?? null }} using={paymentTemplate?.name ?? null} />}
-      {scope.canManage && client && <RefillForm days={client.refillDays} templateId={client.refillTemplateId} templates={approved} />}
-      {scope.canManage && client && <WinbackForm days={client.lapsedDays} templateId={client.winbackTemplateId} templates={approved} lapsed={lapsed} />}
 
       {orders.length ? (
         <div className="space-y-4">
@@ -198,6 +177,33 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
             When a customer sends a cart from your WhatsApp catalogue, it appears here with items, total and a one-tap confirmation.
           </EmptyState>
         </Card>
+      )}
+      {/* Settings below the orders, so staff on a phone see today's orders first. */}
+      {scope.canManage && scope.clientId && (
+        <section className="mt-8">
+          <h2 className="mb-3 text-sm font-semibold text-ink">Order settings</h2>
+          {scope.canManage && scope.clientId && (
+            <Card className="mb-4">
+              <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:p-5">
+                {/* eslint-disable-next-line @next/next/no-img-element -- our own public image */}
+                <img src="/thenan-order-header.jpg" alt="Order message picture" className="size-16 shrink-0 rounded-xl object-cover ring-1 ring-line" />
+                <div className="min-w-0 flex-1 text-sm">
+                  <p className="font-medium">Order messages with your picture</p>
+                  <p className="mt-0.5 text-xs text-muted">
+                    {pictureStatus.map((p) => `${p.name.replace("thenan_order_", "")}: ${p.status ? p.status.toLowerCase() : "not created"}`).join(" · ")}. Used automatically once approved; the plain versions cover the wait.
+                  </p>
+                </div>
+                {pictureStatus.some((p) => !p.status) && (
+                  <ActionButton action={createOrderTemplates.bind(null, headerImage)} confirm="Create the picture versions of the order templates and submit them to Meta?">Create with picture</ActionButton>
+                )}
+              </div>
+            </Card>
+          )}
+
+          {scope.canManage && client && <PaymentForm config={client.paymentConfig} own={{ name: PAYMENT_TEMPLATE, status: ownPaymentTemplate?.status ?? null }} using={paymentTemplate?.name ?? null} />}
+          {scope.canManage && client && <RefillForm days={client.refillDays} templateId={client.refillTemplateId} templates={approved} />}
+          {scope.canManage && client && <WinbackForm days={client.lapsedDays} templateId={client.winbackTemplateId} templates={approved} lapsed={lapsed} />}
+        </section>
       )}
     </>
   );
