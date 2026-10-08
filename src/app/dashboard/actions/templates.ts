@@ -66,7 +66,10 @@ async function targetAccount(clientId: string, picked?: string | null) {
 export async function saveTemplate(id: string | null, draft: TemplateDraft): Promise<ActionResult> {
   const s = id ? await requireManager() : await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
-  const errors = validateDraft(draft);
+  // An approved template can drop its own image (it then sends the default image); Meta only needs a sample
+  // image when the template is created or its wording is resubmitted, which is checked further down.
+  const imageRemoved = Boolean(id) && draft.headerType === "IMAGE" && !draft.headerMediaUrl.trim();
+  const errors = validateDraft(imageRemoved ? { ...draft, headerMediaUrl: "https://example.com/placeholder.jpg" } : draft);
   if (errors.length) return { ok: false, errors };
   const owner = id ? await db.template.findUnique({ where: { id }, select: { clientId: true, businessAccountId: true } }) : null;
   if (id && (!owner || !mine(s, owner.clientId))) return { ok: false, message: "Template not found." };
@@ -128,6 +131,7 @@ export async function saveTemplate(id: string | null, draft: TemplateDraft): Pro
     }
 
     try {
+      if (imageRemoved) return { ok: false, message: "Meta needs an image to review the new wording. Add an image, then save again." };
       if (live && existing.metaId) await editMetaTemplate(cfg, existing.metaId, await metaComponents(cfg, merged));
       else if (live) {
         const res = await createMetaTemplate(cfg, { name: existing.name, language: existing.language, category: existing.category, components: await metaComponents(cfg, merged) });
@@ -208,9 +212,10 @@ export async function syncTemplates(): Promise<ActionResult> {
           businessAccountId,
           lastSyncedAt: new Date(),
         };
-        // An image template without its own picture would send the common image; find the right one.
+        // An image template that never had a picture would send the common image; find the right one.
+        // An empty link means someone removed it on purpose, so it's left alone.
         const image =
-          parsed.headerType === "IMAGE" && !local?.headerMediaUrl?.trim() ? await syncedHeaderImage(r.name, r.components ?? []) : null;
+          parsed.headerType === "IMAGE" && local?.headerMediaUrl == null ? await syncedHeaderImage(r.name, r.components ?? []) : null;
         if (local) {
           await db.template.update({ where: { id: local.id }, data: { ...content, ...(image && { headerMediaUrl: image }) } });
         } else {
