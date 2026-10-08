@@ -19,6 +19,7 @@ import {
   removeClientNumber,
   renameNumber,
   resetUserPassword,
+  setUserAccess,
   saveClientBranding,
   saveClientToken,
   saveSendingRules,
@@ -77,7 +78,7 @@ export function NewClientForm() {
 }
 
 export function AddLoginForm({ clientId }: { clientId: string }) {
-  const [v, setV] = useState({ name: "", email: "", password: "" });
+  const [v, setV] = useState({ name: "", email: "", password: "", access: "STAFF" as "MANAGER" | "STAFF" | "VIEWER" });
   const { pending, submit } = useSubmit();
   return (
     <details className="group mt-3">
@@ -86,7 +87,7 @@ export function AddLoginForm({ clientId }: { clientId: string }) {
         className="mt-3 grid gap-3 sm:grid-cols-2"
         onSubmit={(e) => {
           e.preventDefault();
-          submit(() => createClientUser(clientId, v), () => setV({ name: "", email: "", password: "" }));
+          submit(() => createClientUser(clientId, v), () => setV({ name: "", email: "", password: "", access: "STAFF" }));
         }}
       >
         <div>
@@ -102,10 +103,40 @@ export function AddLoginForm({ clientId }: { clientId: string }) {
           <input id={`p-${clientId}`} type="text" autoComplete="new-password" minLength={8} className="field font-mono" value={v.password} onChange={(e) => setV({ ...v, password: e.target.value })} required />
         </div>
         <div className="sm:col-span-2">
+          <Label htmlFor={`a-${clientId}`}>Access</Label>
+          <select id={`a-${clientId}`} className="field" value={v.access} onChange={(e) => setV({ ...v, access: e.target.value as typeof v.access })}>
+            {ACCESS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+        <div className="sm:col-span-2">
           <Button disabled={pending} size="sm">{pending ? spin : "Create login"}</Button>
         </div>
       </form>
     </details>
+  );
+}
+
+const ACCESS_OPTIONS = [
+  { value: "MANAGER", label: "Manager: campaigns, templates, customers, orders, replies" },
+  { value: "STAFF", label: "Staff: orders, dispatch, replies, sheet" },
+  { value: "VIEWER", label: "Viewer: look only" },
+] as const;
+
+/** Change what an existing client login may do. */
+export function AccessSelect({ userId, access }: { userId: string; access: "MANAGER" | "STAFF" | "VIEWER" }) {
+  const { pending, submit } = useSubmit();
+  return (
+    <select
+      aria-label="Access"
+      className="field h-9 w-auto py-0 text-xs"
+      disabled={pending}
+      defaultValue={access}
+      onChange={(e) => submit(() => setUserAccess(userId, e.target.value as typeof access))}
+    >
+      <option value="MANAGER">Manager</option>
+      <option value="STAFF">Staff</option>
+      <option value="VIEWER">Viewer</option>
+    </select>
   );
 }
 

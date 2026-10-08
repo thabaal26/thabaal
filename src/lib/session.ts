@@ -49,7 +49,7 @@ export const requireUser = cache(async () => {
   const user = userId
     ? await db.user.findUnique({
         where: { id: userId },
-        select: { id: true, email: true, name: true, role: true, clientId: true, client: { select: { name: true } } },
+        select: { id: true, email: true, name: true, role: true, access: true, clientId: true, client: { select: { name: true } } },
       })
     : null;
   if (!user || (user.role === "CLIENT" && !user.clientId)) redirect(userId ? "/api/session/clear" : "/login");
@@ -62,6 +62,10 @@ export const CLIENT_COOKIE = "wp_client";
 
 export type Scope = {
   isAdmin: boolean;
+  /** Campaigns, templates, customers, automations: admins and client managers. */
+  canManage: boolean;
+  /** Orders, dispatch, replies: everyone but viewers. */
+  canOperate: boolean;
   /** null only for an admin viewing all clients */
   clientId: string | null;
   clientName: string | null;
@@ -73,10 +77,17 @@ export type Scope = {
  */
 export const getScope = cache(async (): Promise<Scope> => {
   const user = await requireUser();
-  if (user.role === "CLIENT") return { isAdmin: false, clientId: user.clientId, clientName: user.client?.name ?? null };
+  if (user.role === "CLIENT")
+    return {
+      isAdmin: false,
+      canManage: user.access === "MANAGER",
+      canOperate: user.access !== "VIEWER",
+      clientId: user.clientId,
+      clientName: user.client?.name ?? null,
+    };
   const picked = (await cookies()).get(CLIENT_COOKIE)?.value;
   const client = picked ? await db.client.findUnique({ where: { id: picked }, select: { id: true, name: true } }) : null;
-  return { isAdmin: true, clientId: client?.id ?? null, clientName: client?.name ?? null };
+  return { isAdmin: true, canManage: true, canOperate: true, clientId: client?.id ?? null, clientName: client?.name ?? null };
 });
 
 /** Prisma filter for models that carry clientId (Customer, Template, Campaign, PendingCustomer). */
@@ -103,7 +114,27 @@ type Denied = { denied: string };
 export async function requireOrderAccess(): Promise<Scope | Denied> {
   const s = await getScope();
   if (!s.isAdmin && !s.clientId) return { denied: "Your account isn't linked to a business." };
+  if (!s.canOperate) return { denied: "Your login can view but not change anything." };
   return s;
+}
+
+/**
+ * For managing a business's marketing (campaigns, templates, customers, audiences, automations):
+ * admins, and client logins with Manager access, limited to their own business.
+ * Actions that look a record up by id must still check it belongs to them with `mine()`.
+ */
+export async function requireManager(): Promise<Scope | Denied>;
+export async function requireManager(needClient: true): Promise<(Scope & { clientId: string }) | Denied>;
+export async function requireManager(needClient = false): Promise<Scope | Denied> {
+  const s = await getScope();
+  if (!s.canManage) return { denied: "Your login can't change campaigns, templates or customers. Ask the business owner." };
+  if (needClient && !s.clientId) return { denied: "Pick a client in the sidebar first." };
+  return s;
+}
+
+/** Whether a record of this client is within the signed-in user's reach. */
+export function mine(s: Scope, clientId: string) {
+  return s.isAdmin || s.clientId === clientId;
 }
 
 export async function requireAdmin(): Promise<Scope | Denied>;

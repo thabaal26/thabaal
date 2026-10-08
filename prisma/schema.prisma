@@ -104,7 +104,14 @@ model WhatsAppNumber {
 
 enum Role {
   ADMIN // sees and manages every client
-  CLIENT // read-only view of its own client
+  CLIENT // a login for one client; what it may do is set by access
+}
+
+/// What a client login may do within its own business.
+enum ClientAccess {
+  MANAGER // everything for their business: campaigns, templates, customers, automations, orders, replies
+  STAFF // day-to-day: orders and dispatch, replies, Google Sheet, QR codes
+  VIEWER // look only
 }
 
 model User {
@@ -113,6 +120,7 @@ model User {
   name         String
   passwordHash String
   role         Role     @default(CLIENT)
+  access       ClientAccess @default(STAFF)
   clientId     String?
   client       Client?  @relation(fields: [clientId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())

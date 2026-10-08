@@ -25,7 +25,7 @@ export default async function EditTemplatePage({ params }: PageProps<"/dashboard
     </Link>
   );
 
-  if (!scope.isAdmin) {
+  if (!scope.canManage) {
     const r = renderFor({ ...t, headerText: t.headerText ?? "", footer: t.footer ?? "", variables: t.variables as VarMap }, SAMPLE_CUSTOMER);
     return (
       <>

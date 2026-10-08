@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 export default async function NewCampaignPage() {
   const scope = await getScope();
-  if (!scope.isAdmin) redirect("/dashboard/campaigns");
+  if (!scope.canManage) redirect("/dashboard/campaigns");
   if (!scope.clientId) return <><PageHeader title="New campaign" /><PickClientNotice what="campaign" /></>;
   const { templates, audience, numbers } = await campaignFormData(scope.clientId);
   const defaultAccount = numbers[0]?.businessAccountId;

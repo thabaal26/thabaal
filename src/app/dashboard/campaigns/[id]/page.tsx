@@ -68,7 +68,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
         title={c.name}
         description={c.active && c.nextRunAt ? `Next send ${fmtDate(c.nextRunAt, "EEEE d MMM, h:mm a")}` : "Paused: nothing scheduled"}
         actions={
-          scope.isAdmin && <>
+          scope.canManage && <>
             <ActionButton action={sendCampaignTest.bind(null, c.id)} size="md" title={`Send one copy to your own numbers (customers tagged "${TEST_TAG}")`}>
               <FlaskConical className="size-4" /> Send test to me
             </ActionButton>
@@ -85,7 +85,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
         }
       />
 
-      {!scope.isAdmin ? (
+      {!scope.canManage ? (
         <Card>
           <CardHeader title="Campaign details" />
           <dl className="grid gap-4 p-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
@@ -170,7 +170,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
                     ))}
                   </dl>
                   <div className="mt-2 flex justify-end">
-                    {running && scope.isAdmin ? (
+                    {running && scope.canManage ? (
                       <ActionButton action={cancelRun.bind(null, r.id)} variant="danger" confirm="Stop this run?">Stop sending</ActionButton>
                     ) : (
                       <Link href={`/dashboard/messages?campaign=${c.id}`} className="py-2 text-sm font-medium text-brand-deep">View messages →</Link>
@@ -212,7 +212,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
                         {salesOf(r.id) ? <>{fmtNumber(Number(salesOf(r.id)!.orders))} <span className="text-xs text-muted">· {money(Number(salesOf(r.id)!.revenue))}</span></> : "—"}
                       </td>
                       <td className="px-5 py-3 text-right">
-                        {scope.isAdmin && ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"].includes(r.status) ? (
+                        {scope.canManage && ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"].includes(r.status) ? (
                           <ActionButton action={cancelRun.bind(null, r.id)} variant="danger" confirm="Stop this run?">Stop</ActionButton>
                         ) : (
                           <Link href={`/dashboard/messages?campaign=${c.id}`} className="text-xs font-medium text-brand-deep hover:underline">Log</Link>

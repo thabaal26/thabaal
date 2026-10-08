@@ -19,7 +19,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
   const { category } = await searchParams;
   const active = (Object.keys(CATEGORY_INFO) as Category[]).find((c) => c === category);
   const scope = await getScope();
-  const canCreate = scope.isAdmin && scope.clientId;
+  const canCreate = scope.canManage && scope.clientId;
   const [templates, counts] = await Promise.all([
     db.template.findMany({
       where: { ...owned(scope), ...(active ? { category: active } : {}) },
@@ -65,7 +65,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
         ))}
       </div>
 
-      {scope.isAdmin && brand && <DefaultImage url={brand.defaultImageUrl} fallback={brand.bannerUrl} />}
+      {scope.canManage && brand && <DefaultImage url={brand.defaultImageUrl} fallback={brand.bannerUrl} />}
 
       {templates.length ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -106,8 +106,8 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
                       )}
                     </span>
                     <div className="flex gap-1">
-                      <Link href={`/dashboard/templates/${t.id}`} className={buttonClass("secondary", "sm")}>{scope.isAdmin ? "Edit" : "View"}</Link>
-                      {scope.isAdmin && (
+                      <Link href={`/dashboard/templates/${t.id}`} className={buttonClass("secondary", "sm")}>{scope.canManage ? "Edit" : "View"}</Link>
+                      {scope.canManage && (
                         <ActionButton action={deleteTemplate.bind(null, t.id)} variant="ghost" confirm={`Delete "${t.name}"? This also deletes it from Meta.`}>Delete</ActionButton>
                       )}
                     </div>
@@ -126,7 +126,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
           >
             {canCreate
               ? "Create one here, or sync the templates you already made in WhatsApp Manager."
-              : scope.isAdmin
+              : scope.canManage
                 ? "Pick a client in the sidebar to add or sync their templates."
                 : "Message templates approved for your WhatsApp number will appear here."}
           </EmptyState>

@@ -9,7 +9,7 @@ import { replyWindowEnd } from "@/lib/replies";
 import { headerImageFor } from "@/lib/media";
 import { normalizePhone } from "@/lib/phone";
 import { senderFor } from "@/lib/senders";
-import { requireAdmin, requireOrderAccess } from "@/lib/session";
+import { requireManager, requireOrderAccess } from "@/lib/session";
 import { sendText } from "@/lib/waha";
 import { sendTemplateMessage, sendTextMessage } from "@/lib/whatsapp";
 import { explainSendError, type SendResult } from "./send-helpers";
@@ -195,7 +195,7 @@ const ORDER_TEMPLATES: { name: string; body: string; samples: string[] }[] = [
  * order) and submits them to Meta. Skips any the client already has.
  */
 export async function createOrderTemplates(imageUrl?: string): Promise<SendResult> {
-  const s = await requireAdmin(true);
+  const s = await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
   // The picture versions get their own names, so the plain ones keep working while Meta reviews them.
   const image = imageUrl?.trim();
@@ -222,7 +222,7 @@ export async function createOrderTemplates(imageUrl?: string): Promise<SendResul
 
 /** Refill reminders: send `templateId` this many days after each order; 0 days turns them off. */
 export async function saveRefillRule(days: number, templateId: string): Promise<SendResult> {
-  const s = await requireAdmin(true);
+  const s = await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
   const n = Math.round(Number(days) || 0);
   if (n < 0 || n > 365) return { ok: false, message: "Days must be between 1 and 365, or 0 to turn reminders off." };
@@ -237,7 +237,7 @@ export async function saveRefillRule(days: number, templateId: string): Promise<
 
 /** Win-back: customers tagged lapsed (no order for `days`) get `templateId` once; no template turns it off. */
 export async function saveWinbackRule(days: number, templateId: string): Promise<SendResult> {
-  const s = await requireAdmin(true);
+  const s = await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
   const n = Math.round(Number(days) || 0);
   if (n < 7 || n > 365) return { ok: false, message: "Lapsed after must be between 7 and 365 days." };

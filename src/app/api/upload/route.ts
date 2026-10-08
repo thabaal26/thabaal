@@ -1,6 +1,6 @@
 import { put } from "@vercel/blob";
 import { NextResponse, type NextRequest } from "next/server";
-import { requireAdmin } from "@/lib/session";
+import { requireManager } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,7 @@ const TYPES = ["image/jpeg", "image/png"];
  * Public because WhatsApp downloads the image by that link; only admins can upload.
  */
 export async function POST(req: NextRequest) {
-  const s = await requireAdmin();
+  const s = await requireManager();
   if ("denied" in s) return NextResponse.json({ error: s.denied }, { status: 403 });
 
   const type = req.headers.get("content-type") ?? "";

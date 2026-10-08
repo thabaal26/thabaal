@@ -48,19 +48,19 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     db.order.groupBy({ by: ["status"], where: mine, _count: true }),
     scope.clientId ? db.template.findMany({ where: { clientId: scope.clientId, name: { in: [...ORDER_TEMPLATES, ...ORDER_TEMPLATES.map((n) => `thenan_${n}`)] } }, select: { name: true, status: true } }) : [],
     scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { refillDays: true, refillTemplateId: true, lapsedDays: true, winbackTemplateId: true } }) : null,
-    scope.clientId && scope.isAdmin
+    scope.clientId && scope.canManage
       ? db.template.findMany({ where: { clientId: scope.clientId, status: "APPROVED", category: { not: "AUTHENTICATION" }, name: { notIn: ORDER_TEMPLATES } }, select: { id: true, name: true }, orderBy: { name: "asc" } })
       : [],
   ]);
   // An order update is covered when either the plain or the picture version is approved.
-  const lapsed = scope.clientId && scope.isAdmin ? await db.customer.count({ where: { clientId: scope.clientId, tags: { has: "lapsed" }, optedOut: false } }) : 0;
+  const lapsed = scope.clientId && scope.canManage ? await db.customer.count({ where: { clientId: scope.clientId, tags: { has: "lapsed" }, optedOut: false } }) : 0;
   const notReady = ORDER_TEMPLATES.filter((name) => !orderTemplates.some((t) => (t.name === name || t.name === `thenan_${name}`) && t.status === "APPROVED"));
   const pictureStatus = ORDER_TEMPLATES.map((name) => ({ name: `thenan_${name}`, status: orderTemplates.find((t) => t.name === `thenan_${name}`)?.status ?? null }));
   const h = await headers();
   const headerImage = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}/thenan-order-header.jpg`;
   const missing = ORDER_TEMPLATES.filter((name) => !orderTemplates.some((t) => t.name === name));
   // Client staff pack and dispatch their own orders, so they get the order buttons too.
-  const canEdit = scope.isAdmin || !!scope.clientId;
+  const canEdit = scope.canOperate && (scope.canManage || !!scope.clientId);
   const n = (...s: string[]) => counts.filter((c) => s.includes(c.status)).reduce((sum, c) => sum + c._count, 0);
   const tabCount: Record<string, number> = {
     "": n("NEW", "CONFIRMED", "PAID", "DISPATCHED"),
@@ -82,15 +82,15 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         <div className="mb-4 flex flex-col gap-3 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-600/20 sm:flex-row sm:items-center sm:justify-between">
           <p>
             <b>Order updates after 24 hours need approved templates.</b> Not ready yet: {notReady.join(", ")}.{" "}
-            {missing.length === 0 ? "They're waiting for Meta's approval." : scope.isAdmin ? "Create them once and Meta usually approves within minutes." : "Ask your admin to create them."}
+            {missing.length === 0 ? "They're waiting for Meta's approval." : scope.canManage ? "Create them once and Meta usually approves within minutes." : "Ask your admin to create them."}
           </p>
-          {scope.isAdmin && missing.length > 0 && (
+          {scope.canManage && missing.length > 0 && (
             <ActionButton action={createOrderTemplates} confirm={`Create and submit ${missing.join(", ")} to Meta?`}>Create order templates</ActionButton>
           )}
         </div>
       )}
 
-      {scope.isAdmin && scope.clientId && (
+      {scope.canManage && scope.clientId && (
         <Card className="mb-4">
           <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:p-5">
             {/* eslint-disable-next-line @next/next/no-img-element -- our own public image */}
@@ -123,8 +123,8 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         ))}
       </div>
 
-      {scope.isAdmin && client && <RefillForm days={client.refillDays} templateId={client.refillTemplateId} templates={approved} />}
-      {scope.isAdmin && client && <WinbackForm days={client.lapsedDays} templateId={client.winbackTemplateId} templates={approved} lapsed={lapsed} />}
+      {scope.canManage && client && <RefillForm days={client.refillDays} templateId={client.refillTemplateId} templates={approved} />}
+      {scope.canManage && client && <WinbackForm days={client.lapsedDays} templateId={client.winbackTemplateId} templates={approved} lapsed={lapsed} />}
 
       {orders.length ? (
         <div className="space-y-4">

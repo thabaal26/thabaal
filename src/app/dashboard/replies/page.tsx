@@ -47,7 +47,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
       <PageHeader
         title="Replies"
         description="What customers sent back after your campaigns: order taps and messages. Reply on WhatsApp, then mark them handled."
-        actions={n(false) > 0 && <ActionButton action={handleAllReplies} size="md" confirm="Mark every open reply as handled?"><CheckCheck className="size-4" /> Mark all handled</ActionButton>}
+        actions={scope.canOperate && n(false) > 0 && <ActionButton action={handleAllReplies} size="md" confirm="Mark every open reply as handled?"><CheckCheck className="size-4" /> Mark all handled</ActionButton>}
       />
 
       <div className="mb-4 flex flex-wrap gap-2">
@@ -90,14 +90,14 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
                       {r.customer.purchases && <> · bought before: {r.customer.purchases}</>}
                     </p>
                   </div>
-                  <div className="flex shrink-0 gap-2 sm:flex-col sm:items-stretch">
+                  {scope.canOperate && <div className="flex shrink-0 gap-2 sm:flex-col sm:items-stretch">
                     <Link href={`/dashboard/customers/${r.customer.id}#reply`} className={cn(buttonClass("primary", "sm"), "flex-1 sm:flex-none")}>
                       <MessageCircle className="size-3.5" /> Reply here
                     </Link>
                     <ActionButton action={setReplyHandled.bind(null, r.id, !r.handled)} className="flex-1 sm:flex-none">
                       {r.handled ? <><RotateCcw className="size-3.5" /> Reopen</> : <><CheckCheck className="size-3.5" /> Handled</>}
                     </ActionButton>
-                  </div>
+                  </div>}
                 </li>
               );
             })}

@@ -232,7 +232,10 @@ export async function saveClientBranding(clientId: string, input: BrandingInput)
   return { ok: true, message: "Branding saved. Their portal uses it from the next page load." };
 }
 
-export async function createClientUser(clientId: string, input: { name: string; email: string; password: string }): Promise<ActionResult> {
+const ACCESS = ["MANAGER", "STAFF", "VIEWER"] as const;
+type Access = (typeof ACCESS)[number];
+
+export async function createClientUser(clientId: string, input: { name: string; email: string; password: string; access?: Access }): Promise<ActionResult> {
   const s = await requireAdmin();
   if ("denied" in s) return { ok: false, message: s.denied };
   const email = input.email.trim().toLowerCase();
@@ -242,7 +245,7 @@ export async function createClientUser(clientId: string, input: { name: string; 
   if (!(await db.client.findUnique({ where: { id: clientId } }))) return { ok: false, message: "Client not found." };
   if (await db.user.findUnique({ where: { email } })) return { ok: false, message: `${email} already has an account.` };
   await db.user.create({
-    data: { name: input.name.trim(), email, role: "CLIENT", clientId, passwordHash: await bcrypt.hash(input.password, 12) },
+    data: { name: input.name.trim(), email, role: "CLIENT", access: ACCESS.includes(input.access as Access) ? input.access : "STAFF", clientId, passwordHash: await bcrypt.hash(input.password, 12) },
   });
   refresh();
   return { ok: true, message: `Login created for ${email}.` };
@@ -266,4 +269,16 @@ export async function deleteClientUser(userId: string): Promise<ActionResult> {
   await db.user.delete({ where: { id: userId } });
   refresh();
   return { ok: true, message: `${u.email} can no longer sign in.` };
+}
+
+/** What a client login may do: Manager (everything for their business), Staff (orders, replies) or Viewer. */
+export async function setUserAccess(userId: string, access: Access): Promise<ActionResult> {
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  if (!ACCESS.includes(access)) return { ok: false, message: "Unknown access level." };
+  const u = await db.user.findUnique({ where: { id: userId } });
+  if (!u || u.role !== "CLIENT") return { ok: false, message: "Client login not found." };
+  await db.user.update({ where: { id: userId }, data: { access } });
+  refresh();
+  return { ok: true, message: `${u.email} is now ${access.toLowerCase()}. It applies on their next page load.` };
 }

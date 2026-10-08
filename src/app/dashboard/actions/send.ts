@@ -7,7 +7,7 @@ import { allowance } from "@/lib/limits";
 import { deliver, getSettings, readiness, templateSendable, wahaConfig } from "@/lib/provider";
 import { applyFailure, quietUntil, recentlyMarketed } from "@/lib/rules";
 import { senderFor } from "@/lib/senders";
-import { getScope, owned, requireAdmin } from "@/lib/session";
+import { getScope, owned, requireManager } from "@/lib/session";
 import { sendText, WahaError } from "@/lib/waha";
 import { sendTextMessage } from "@/lib/whatsapp";
 import { explainSendError, type SendResult } from "./send-helpers";
@@ -20,7 +20,7 @@ const WINDOW_MS = 24 * 3_600_000;
  * messages ask for confirmation (`force`) instead.
  */
 export async function sendToCustomer(customerId: string, templateId: string, senderId: string | null, force = false): Promise<SendResult> {
-  const s = await requireAdmin();
+  const s = await requireManager();
   if ("denied" in s) return { ok: false, message: s.denied };
   const customer = await db.customer.findFirst({ where: { id: customerId, ...owned(s) }, include: { client: true } });
   if (!customer) return { ok: false, message: "Customer not found." };
@@ -81,6 +81,7 @@ export async function sendToCustomer(customerId: string, templateId: string, sen
  */
 export async function replyToCustomer(customerId: string, text: string): Promise<SendResult> {
   const scope = await getScope();
+  if (!scope.canOperate) return { ok: false, message: "Your login can view but not change anything." };
   const body = text.trim();
   if (!body) return { ok: false, message: "Type a message first." };
   if (body.length > 4000) return { ok: false, message: "Keep the message under 4000 characters." };

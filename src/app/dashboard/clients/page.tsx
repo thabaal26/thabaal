@@ -9,7 +9,7 @@ import { QualityBadge } from "@/components/ui";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { getScope } from "@/lib/session";
 import { deleteClientUser } from "../actions/clients";
-import { AddLoginForm, AddNumberForm, BrandingForm, NewClientForm, NumberActions, RefreshNumbersButton, ResetPasswordButton, SendingRulesForm, TokenForm } from "./client-forms";
+import { AccessSelect, AddLoginForm, AddNumberForm, BrandingForm, NewClientForm, NumberActions, RefreshNumbersButton, ResetPasswordButton, SendingRulesForm, TokenForm } from "./client-forms";
 
 export const metadata: Metadata = { title: "Clients" };
 export const dynamic = "force-dynamic";
@@ -20,7 +20,7 @@ export default async function ClientsPage() {
 
   const clients = await db.client.findMany({
     include: {
-      users: { select: { id: true, name: true, email: true, createdAt: true }, orderBy: { createdAt: "asc" } },
+      users: { select: { id: true, name: true, email: true, access: true, createdAt: true }, orderBy: { createdAt: "asc" } },
       numbers: { orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }], include: { _count: { select: { campaigns: true } } } },
       _count: { select: { customers: true, campaigns: true, templates: true, pending: true } },
     },
@@ -32,7 +32,7 @@ export default async function ClientsPage() {
     <>
       <PageHeader
         title="Clients"
-        description="Each client sees only their own customers, campaigns, templates and message log when they sign in. Their logins can view but not change anything."
+        description="Each client sees only their own customers, campaigns, templates and message log when they sign in. Each login is a Manager (everything for their business), Staff (orders, dispatch, replies) or Viewer."
         actions={<NewClientForm />}
       />
 
@@ -65,6 +65,7 @@ export default async function ClientsPage() {
                               <p className="truncate text-sm font-medium">{u.name}</p>
                               <p className="truncate text-xs text-muted">{u.email}</p>
                             </div>
+                            <AccessSelect userId={u.id} access={u.access} />
                             <ResetPasswordButton userId={u.id} email={u.email} />
                             <ActionButton action={deleteClientUser.bind(null, u.id)} variant="ghost" confirm={`Remove ${u.email}? They won't be able to sign in.`}>
                               Remove

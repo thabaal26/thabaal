@@ -72,7 +72,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
             <a href={`https://wa.me/${c.phone}`} target="_blank" rel="noreferrer" className={buttonClass("primary")}>
               <MessageCircle className="size-4" /> Message on WhatsApp
             </a>
-            {scope.isAdmin && (
+            {scope.canManage && (
               <ActionButton action={setOptOut.bind(null, c.id, !c.optedOut)} size="md">{c.optedOut ? "Opt back in" : "Opt out"}</ActionButton>
             )}
           </>
@@ -89,7 +89,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
         customer={{ id: c.id, name: c.name, phone: c.phone }}
         templates={templates}
         numbers={numbers}
-        canSend={scope.isAdmin}
+        canSend={scope.canManage}
         windowEndsAt={windowEnd ? fmtDate(windowEnd, "d MMM, h:mm a") : null}
         blocked={c.optedOut ? "This customer opted out of messages. Opt them back in to send." : c.unreachable ? "WhatsApp says this number can't receive messages." : null}
       />

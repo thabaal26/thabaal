@@ -3,18 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { audienceWhere, cleanFilter, type AudienceFilter } from "@/lib/audiences";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/session";
+import { requireManager } from "@/lib/session";
 import type { SendResult } from "./send-helpers";
 
 /** How many customers the filter matches right now, for the live count while building it. */
 export async function countAudience(filter: AudienceFilter): Promise<{ ok: boolean; n: number }> {
-  const s = await requireAdmin(true);
+  const s = await requireManager(true);
   if ("denied" in s) return { ok: false, n: 0 };
   return { ok: true, n: await db.customer.count({ where: await audienceWhere(s.clientId, filter) }) };
 }
 
 export async function saveAudience(name: string, filter: AudienceFilter): Promise<SendResult> {
-  const s = await requireAdmin(true);
+  const s = await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
   const n = name.trim().slice(0, 60);
   if (!n) return { ok: false, message: "Give the audience a name." };
@@ -26,7 +26,7 @@ export async function saveAudience(name: string, filter: AudienceFilter): Promis
 }
 
 export async function deleteAudience(id: string): Promise<SendResult> {
-  const s = await requireAdmin(true);
+  const s = await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
   const inUse = await db.campaign.count({ where: { clientId: s.clientId, audienceTag: `aud:${id}`, active: true } });
   if (inUse) return { ok: false, message: `${inUse} active campaign${inUse > 1 ? "s use" : " uses"} this audience. Change or pause ${inUse > 1 ? "them" : "it"} first.` };

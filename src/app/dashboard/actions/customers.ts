@@ -3,13 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { normalizePhone } from "@/lib/phone";
-import { requireAdmin } from "@/lib/session";
+import { owned, requireManager } from "@/lib/session";
 import type { ActionResult } from "./templates";
 
 const parseTags = (s: string) => [...new Set(s.split(/[,;|]/).map((t) => t.trim().toLowerCase()).filter(Boolean))];
 
 export async function saveCustomer(id: string | null, input: { name: string; phone: string; tags: string; optInSource?: string }): Promise<ActionResult> {
-  const s = await requireAdmin(true);
+  const s = await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
   const phone = normalizePhone(input.phone);
   if (!input.name.trim()) return { ok: false, message: "Enter the customer's name." };
@@ -43,7 +43,7 @@ function splitCsv(line: string) {
 }
 
 export async function importCustomers(csv: string, extraTags: string, optInSource = ""): Promise<ActionResult> {
-  const s = await requireAdmin(true);
+  const s = await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
   if (!optInSource.trim()) return { ok: false, message: "Note how these customers agreed to WhatsApp messages; Meta requires it." };
   const lines = csv.replace(/^﻿/, "").split(/\r?\n/).filter((l) => l.trim());
@@ -92,17 +92,19 @@ export async function importCustomers(csv: string, extraTags: string, optInSourc
 }
 
 export async function setOptOut(id: string, optedOut: boolean): Promise<ActionResult> {
-  const s = await requireAdmin();
+  const s = await requireManager();
   if ("denied" in s) return { ok: false, message: s.denied };
-  await db.customer.update({ where: { id }, data: { optedOut } });
+  const r = await db.customer.updateMany({ where: { id, ...owned(s) }, data: { optedOut } });
+  if (!r.count) return { ok: false, message: "Customer not found." };
   revalidatePath("/dashboard/customers");
   return { ok: true, message: optedOut ? "Customer won't receive campaigns." : "Customer will receive campaigns again." };
 }
 
 export async function deleteCustomer(id: string): Promise<ActionResult> {
-  const s = await requireAdmin();
+  const s = await requireManager();
   if ("denied" in s) return { ok: false, message: s.denied };
-  await db.customer.delete({ where: { id } });
+  const r = await db.customer.deleteMany({ where: { id, ...owned(s) } });
+  if (!r.count) return { ok: false, message: "Customer not found." };
   revalidatePath("/dashboard/customers");
   return { ok: true, message: "Customer and their message history deleted." };
 }

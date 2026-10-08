@@ -11,6 +11,7 @@ import type { ActionResult } from "./templates";
  */
 export async function setReplyHandled(id: string, handled: boolean): Promise<ActionResult> {
   const scope = await getScope();
+  if (!scope.canOperate) return { ok: false, message: "Your login can view but not change anything." };
   const r = await db.reply.updateMany({ where: { id, ...ownedMessages(scope) }, data: { handled } });
   if (!r.count) return { ok: false, message: "Reply not found." };
   revalidatePath("/dashboard", "layout");
@@ -19,6 +20,7 @@ export async function setReplyHandled(id: string, handled: boolean): Promise<Act
 
 export async function handleAllReplies(): Promise<ActionResult> {
   const scope = await getScope();
+  if (!scope.canOperate) return { ok: false, message: "Your login can view but not change anything." };
   const r = await db.reply.updateMany({ where: { handled: false, ...ownedMessages(scope) }, data: { handled: true } });
   revalidatePath("/dashboard", "layout");
   return { ok: true, message: `${r.count} replies marked as handled.` };

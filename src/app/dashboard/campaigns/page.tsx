@@ -29,7 +29,7 @@ export default async function CampaignsPage() {
     db.customer.groupBy({ by: ["clientId"], where: { ...owned(scope), optedOut: false }, _count: true }),
   ]);
   const audienceOf = (clientId: string) => audiences.find((a) => a.clientId === clientId)?._count ?? 0;
-  const canCreate = scope.isAdmin && scope.clientId;
+  const canCreate = scope.canManage && scope.clientId;
   const now = new Date();
 
   return (
@@ -108,7 +108,7 @@ export default async function CampaignsPage() {
                   </span>
                   <div className="flex items-center gap-2">
                     {last && ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"].includes(last.status) && <StatusBadge status={last.status} />}
-                    {scope.isAdmin && (
+                    {scope.canManage && (
                       <ActionButton className="relative z-10" action={toggleCampaign.bind(null, c.id, !c.active)}>{c.active ? "Pause" : "Resume"}</ActionButton>
                     )}
                   </div>
@@ -124,7 +124,7 @@ export default async function CampaignsPage() {
             title="No campaigns yet"
             action={canCreate && <Link href="/dashboard/campaigns/new" className={buttonClass("primary")}><Plus className="size-4" /> New campaign</Link>}
           >
-            {scope.isAdmin
+            {scope.canManage
               ? scope.clientId
                 ? "For two promotions a week, create one campaign and pick two days, for example Tuesday and Friday."
                 : "Pick a client in the sidebar to create a campaign for them."

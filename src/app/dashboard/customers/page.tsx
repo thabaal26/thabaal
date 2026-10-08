@@ -78,7 +78,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
       <PageHeader
         title="Customers"
         description={`${fmtNumber(total)}${tag || q || area ? " matching" : ""} customers${scope.clientName ? ` of ${scope.clientName}` : ""}. Customers who reply STOP are opted out automatically.`}
-        actions={scope.clientId ? <><Link href="/dashboard/customers/grow" className={buttonClass("secondary")}><QrCode className="size-4" /> Get more customers</Link><Link href="/dashboard/customers/sheet" className={buttonClass("secondary")}><Sheet className="size-4" /> Google Sheet</Link>{scope.isAdmin && <Link href="/dashboard/customers/audiences" className={buttonClass("secondary")}><UsersRound className="size-4" /> Audiences</Link>}{scope.isAdmin && <CustomerTools />}</> : undefined}
+        actions={scope.clientId ? <><Link href="/dashboard/customers/grow" className={buttonClass("secondary")}><QrCode className="size-4" /> Get more customers</Link><Link href="/dashboard/customers/sheet" className={buttonClass("secondary")}><Sheet className="size-4" /> Google Sheet</Link>{scope.canManage && <Link href="/dashboard/customers/audiences" className={buttonClass("secondary")}><UsersRound className="size-4" /> Audiences</Link>}{scope.canManage && <CustomerTools />}</> : undefined}
       />
 
       <Card>
@@ -132,7 +132,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
                     </div>
                   )}
                 </div>
-                {scope.isAdmin && (
+                {scope.canManage && (
                   <div className="relative z-10">
                     <CustomerMenu
                       name={c.name}
@@ -190,7 +190,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
                     <td className="px-4 py-3 text-xs text-muted">{c.messages[0] ? `${fmtDate(c.messages[0].createdAt, "d MMM")} · ${c.messages[0].status.toLowerCase()}` : "—"}</td>
                     <td className="px-4 py-3 text-xs text-muted">{fmtDate(c.createdAt, "d MMM yyyy")}</td>
                     <td className="px-4 py-3">
-                      {scope.isAdmin && (
+                      {scope.canManage && (
                         <div className="flex justify-end gap-1">
                           <ActionButton action={setOptOut.bind(null, c.id, !c.optedOut)} variant="ghost">{c.optedOut ? "Opt in" : "Opt out"}</ActionButton>
                           <ActionButton action={deleteCustomer.bind(null, c.id)} variant="ghost" confirm={`Delete ${c.name} and their message history?`}>Delete</ActionButton>
@@ -205,7 +205,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
           </>
         ) : (
           <EmptyState icon={<Users className="size-5" />} title={q || tag || area ? "No matching customers" : "No customers yet"}>
-            {q || tag || area ? "Try a different search or filter." : scope.isAdmin ? "Import your customer list as a CSV to get started." : "Customers will appear here once they're added."}
+            {q || tag || area ? "Try a different search or filter." : scope.canManage ? "Import your customer list as a CSV to get started." : "Customers will appear here once they're added."}
           </EmptyState>
         )}
 

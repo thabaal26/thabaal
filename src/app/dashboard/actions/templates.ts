@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { normalizePhone } from "@/lib/phone";
-import { requireAdmin } from "@/lib/session";
+import { mine, requireManager } from "@/lib/session";
 import { deliver, getSettings, readiness, templateSendable } from "@/lib/provider";
 import {
   fromMetaComponents,
@@ -63,12 +63,12 @@ async function targetAccount(clientId: string, picked?: string | null) {
 }
 
 export async function saveTemplate(id: string | null, draft: TemplateDraft): Promise<ActionResult> {
-  const s = id ? await requireAdmin() : await requireAdmin(true);
+  const s = id ? await requireManager() : await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
   const errors = validateDraft(draft);
   if (errors.length) return { ok: false, errors };
   const owner = id ? await db.template.findUnique({ where: { id }, select: { clientId: true, businessAccountId: true } }) : null;
-  if (id && !owner) return { ok: false, message: "Template not found." };
+  if (id && (!owner || !mine(s, owner.clientId))) return { ok: false, message: "Template not found." };
   const clientId = owner?.clientId ?? s.clientId!;
   const businessAccountId = owner ? owner.businessAccountId : await targetAccount(clientId, draft.businessAccountId);
   const { cfg } = await senderForAccount(clientId, businessAccountId);
@@ -169,7 +169,7 @@ export async function saveTemplate(id: string | null, draft: TemplateDraft): Pro
 }
 
 export async function syncTemplates(): Promise<ActionResult> {
-  const s = await requireAdmin(true);
+  const s = await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
   const { clientId } = s;
   const accounts = (await clientAccounts(clientId)).filter((a) => a.cfg.live);
@@ -220,10 +220,10 @@ export async function syncTemplates(): Promise<ActionResult> {
 }
 
 export async function deleteTemplate(id: string): Promise<ActionResult> {
-  const s = await requireAdmin();
+  const s = await requireManager();
   if ("denied" in s) return { ok: false, message: s.denied };
   const t = await db.template.findUnique({ where: { id }, include: { _count: { select: { campaigns: true } } } });
-  if (!t) return { ok: false, message: "Template not found." };
+  if (!t || !mine(s, t.clientId)) return { ok: false, message: "Template not found." };
   if (t._count.campaigns) return { ok: false, message: "This template is used by a campaign. Change or delete the campaign first." };
   try {
     const { cfg } = await senderForAccount(t.clientId, t.businessAccountId);
@@ -237,12 +237,12 @@ export async function deleteTemplate(id: string): Promise<ActionResult> {
 }
 
 export async function sendTestMessage(id: string, rawPhone: string): Promise<ActionResult> {
-  const s = await requireAdmin();
+  const s = await requireManager();
   if ("denied" in s) return { ok: false, message: s.denied };
   const phone = normalizePhone(rawPhone);
   if (!phone) return { ok: false, message: "Enter a valid mobile number." };
   const t = await db.template.findUnique({ where: { id } });
-  if (!t) return { ok: false, message: "Template not found." };
+  if (!t || !mine(s, t.clientId)) return { ok: false, message: "Template not found." };
   if (t.category === "AUTHENTICATION") return { ok: false, message: "Authentication templates are sent by your app's login flow, not from here." };
   const settings = await getSettings();
   if (!templateSendable(settings, t)) return { ok: false, message: "Only templates approved by Meta can be sent." };
@@ -277,7 +277,7 @@ export async function sendTestMessage(id: string, rawPhone: string): Promise<Act
 
 /** The client's default image, used by image templates that have none of their own. Empty clears it. */
 export async function setDefaultImage(url: string): Promise<ActionResult> {
-  const s = await requireAdmin(true);
+  const s = await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
   const u = url.trim();
   if (u && !/^https:\/\/\S+$/.test(u)) return { ok: false, message: "Use a public https:// image link." };

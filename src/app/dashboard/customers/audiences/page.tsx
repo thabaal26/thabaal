@@ -20,7 +20,7 @@ export default async function AudiencesPage() {
       <ArrowLeft className="size-3.5" /> Customers
     </Link>
   );
-  if (!scope.clientId || !scope.isAdmin) return <>{back}<PageHeader title="Audiences" /><PickClientNotice what="audiences" /></>;
+  if (!scope.clientId || !scope.canManage) return <>{back}<PageHeader title="Audiences" /><PickClientNotice what="audiences" /></>;
   const clientId = scope.clientId;
 
   const [saved, regionRows] = await Promise.all([

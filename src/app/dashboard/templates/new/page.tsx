@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "New template" };
 
 export default async function NewTemplatePage() {
   const scope = await getScope();
-  if (!scope.isAdmin) redirect("/dashboard/templates");
+  if (!scope.canManage) redirect("/dashboard/templates");
   if (!scope.clientId) return <><PageHeader title="New template" /><PickClientNotice what="template" /></>;
   const accounts = (await clientAccounts(scope.clientId)).map((a) => ({ id: a.businessAccountId, label: `${a.labels.join(", ")} · account ${a.businessAccountId}` }));
   return (

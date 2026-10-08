@@ -9,7 +9,7 @@ import { getSettings, templateSendable } from "@/lib/provider";
 import { isQuietTime } from "@/lib/rules";
 import { computeNextRun, TEST_TAG } from "@/lib/schedule";
 import { senderFor } from "@/lib/senders";
-import { requireAdmin } from "@/lib/session";
+import { mine, requireAdmin, requireManager } from "@/lib/session";
 import { sendToCustomer } from "./send";
 import type { ActionResult } from "./templates";
 
@@ -33,10 +33,10 @@ function refresh() {
 }
 
 export async function saveCampaign(id: string | null, input: CampaignInput): Promise<ActionResult> {
-  const s = id ? await requireAdmin() : await requireAdmin(true);
+  const s = id ? await requireManager() : await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
   const existing = id ? await db.campaign.findUnique({ where: { id }, select: { clientId: true } }) : null;
-  if (id && !existing) return { ok: false, message: "Campaign not found." };
+  if (id && (!existing || !mine(s, existing.clientId))) return { ok: false, message: "Campaign not found." };
   const clientId = existing?.clientId ?? s.clientId!;
 
   const errors: string[] = [];
@@ -92,10 +92,10 @@ export async function saveCampaign(id: string | null, input: CampaignInput): Pro
 }
 
 export async function toggleCampaign(id: string, active: boolean): Promise<ActionResult> {
-  const s = await requireAdmin();
+  const s = await requireManager();
   if ("denied" in s) return { ok: false, message: s.denied };
   const c = await db.campaign.findUnique({ where: { id } });
-  if (!c) return { ok: false, message: "Campaign not found." };
+  if (!c || !mine(s, c.clientId)) return { ok: false, message: "Campaign not found." };
   const nextRunAt = active ? computeNextRun(c) : null;
   if (active && !nextRunAt) return { ok: false, message: "Nothing left to schedule. Edit the date or days first." };
   await db.campaign.update({ where: { id }, data: { active, nextRunAt } });
@@ -104,8 +104,10 @@ export async function toggleCampaign(id: string, active: boolean): Promise<Actio
 }
 
 export async function deleteCampaign(id: string): Promise<ActionResult> {
-  const s = await requireAdmin();
+  const s = await requireManager();
   if ("denied" in s) return { ok: false, message: s.denied };
+  const owner = await db.campaign.findUnique({ where: { id }, select: { clientId: true } });
+  if (!owner || !mine(s, owner.clientId)) return { ok: false, message: "Campaign not found." };
   await db.message.deleteMany({ where: { run: { campaignId: id }, status: "QUEUED" } });
   await db.campaign.delete({ where: { id } });
   refresh();
@@ -113,10 +115,10 @@ export async function deleteCampaign(id: string): Promise<ActionResult> {
 }
 
 export async function runCampaignNow(id: string): Promise<ActionResult> {
-  const s = await requireAdmin();
+  const s = await requireManager();
   if ("denied" in s) return { ok: false, message: s.denied };
   const c = await db.campaign.findUnique({ where: { id }, include: { template: true } });
-  if (!c) return { ok: false, message: "Campaign not found." };
+  if (!c || !mine(s, c.clientId)) return { ok: false, message: "Campaign not found." };
   if (!templateSendable(await getSettings(), c.template)) return { ok: false, message: "The template isn't approved by Meta yet." };
   const busy = await db.campaignRun.findFirst({ where: { campaignId: id, status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"] } } });
   if (busy) return { ok: false, message: "This campaign is already sending. Wait for it to finish or stop it." };
@@ -132,10 +134,10 @@ export async function runCampaignNow(id: string): Promise<ActionResult> {
  * and the gap between offers, because these are your numbers.
  */
 export async function sendCampaignTest(id: string): Promise<ActionResult> {
-  const s = await requireAdmin();
+  const s = await requireManager();
   if ("denied" in s) return { ok: false, message: s.denied };
   const c = await db.campaign.findUnique({ where: { id }, select: { clientId: true, templateId: true, senderId: true } });
-  if (!c) return { ok: false, message: "Campaign not found." };
+  if (!c || !mine(s, c.clientId)) return { ok: false, message: "Campaign not found." };
   const testers = await db.customer.findMany({ where: { clientId: c.clientId, tags: { has: TEST_TAG } }, select: { id: true, name: true }, take: 5 });
   if (!testers.length) return { ok: false, message: `No customers are tagged "${TEST_TAG}". Add that tag to your own number on the Customers page.` };
 
@@ -147,8 +149,10 @@ export async function sendCampaignTest(id: string): Promise<ActionResult> {
 }
 
 export async function cancelRun(runId: string): Promise<ActionResult> {
-  const s = await requireAdmin();
+  const s = await requireManager();
   if ("denied" in s) return { ok: false, message: s.denied };
+  const run = await db.campaignRun.findUnique({ where: { id: runId }, select: { campaign: { select: { clientId: true } } } });
+  if (!run || !mine(s, run.campaign.clientId)) return { ok: false, message: "Run not found." };
   const skipped = await db.message.updateMany({
     where: { runId, status: "QUEUED" },
     data: { status: "SKIPPED", error: "Run stopped from dashboard" },
