@@ -5,6 +5,7 @@ import { ActionButton } from "@/components/action-button";
 import { Badge, buttonClass, Card, EmptyState, PageHeader, StatusBadge } from "@/components/ui";
 import { WhatsAppBubble } from "@/components/whatsapp-preview";
 import { cn } from "@/lib/cn";
+import { DefaultImage } from "./default-image";
 import { db } from "@/lib/db";
 import { fmtDate } from "@/lib/format";
 import { getScope, owned } from "@/lib/session";
@@ -22,12 +23,15 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
   const [templates, counts] = await Promise.all([
     db.template.findMany({
       where: { ...owned(scope), ...(active ? { category: active } : {}) },
-      include: { _count: { select: { campaigns: true } }, client: { select: { name: true } } },
+      include: { _count: { select: { campaigns: true } }, client: { select: { name: true, defaultImageUrl: true, bannerUrl: true } } },
       orderBy: { updatedAt: "desc" },
     }),
     db.template.groupBy({ by: ["category"], where: owned(scope), _count: true }),
   ]);
   const total = counts.reduce((a, c) => a + c._count, 0);
+  const brand = scope.clientId ? await db.client.findUnique({ where: { id: scope.clientId }, select: { defaultImageUrl: true, bannerUrl: true } }) : null;
+  // What an image template without its own picture will send.
+  const fallbackFor = (c: { defaultImageUrl: string | null; bannerUrl: string | null }) => c.defaultImageUrl ?? c.bannerUrl;
 
   return (
     <>
@@ -61,6 +65,8 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
         ))}
       </div>
 
+      {scope.isAdmin && brand && <DefaultImage url={brand.defaultImageUrl} fallback={brand.bannerUrl} />}
+
       {templates.length ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {templates.map((t) => {
@@ -70,7 +76,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
                 <Link href={`/dashboard/templates/${t.id}`} className="chat-wall relative block max-h-56 min-h-28 overflow-hidden p-4 [mask-image:linear-gradient(to_bottom,black_80%,transparent)]">
                   <WhatsAppBubble
                     header={r.header}
-                    headerImage={t.headerType === "IMAGE" ? t.headerMediaUrl : undefined}
+                    headerImage={t.headerType === "IMAGE" ? t.headerMediaUrl || fallbackFor(t.client) : undefined}
                     body={r.body}
                     footer={r.footer}
                     buttons={t.buttons as TemplateButton[]}
@@ -85,9 +91,9 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
                     </div>
                     <StatusBadge status={t.status} />
                   </div>
-                  {t.headerType === "IMAGE" && !t.headerMediaUrl && (
+                  {t.headerType === "IMAGE" && !t.headerMediaUrl && !fallbackFor(t.client) && (
                     <Link href={`/dashboard/templates/${t.id}`} className="-mt-1 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800 ring-1 ring-amber-600/20 hover:bg-amber-100">
-                      Image missing: sends will fail until you add one. <span className="font-medium underline">Add image</span>
+                      Image missing: sends will fail until you add one here or set a default image above. <span className="font-medium underline">Add image</span>
                     </Link>
                   )}
                   <div className="mt-auto flex items-center justify-between">

@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { itemsText, money, type OrderItem } from "@/lib/orders";
 import { getSettings, wahaConfig } from "@/lib/provider";
 import { replyWindowEnd } from "@/lib/replies";
+import { headerImageFor } from "@/lib/media";
 import { normalizePhone } from "@/lib/phone";
 import { senderFor } from "@/lib/senders";
 import { requireAdmin, requireOrderAccess } from "@/lib/session";
@@ -106,7 +107,7 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
     } else {
       // Prefer the version with a picture once Meta has approved it; the plain one stays as a fallback.
       const options = await db.template.findMany({ where: { clientId: c.clientId, name: { in: TEMPLATE_NAMES[kind] }, status: "APPROVED" } });
-      const t = options.find((x) => x.headerType === "IMAGE" && x.headerMediaUrl) ?? options.find((x) => x.headerType === "NONE") ?? null;
+      const t = options.find((x) => x.headerType === "IMAGE") ?? options.find((x) => x.headerType === "NONE") ?? null;
       if (!t) {
         // A delivery thank-you is optional: still close the order when there's no way to message.
         if (kind === "deliver") {
@@ -117,7 +118,7 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
         return { ok: false, message: `The customer's 24-hour window has closed, so WhatsApp needs an approved ${TEMPLATE_NAMES[kind][0]} template. Use "Create order templates" at the top of Orders.` };
       }
       const bodyParams = kind === "confirm" ? [first, itemsText(items).slice(0, 300), String(Math.round(order.total))] : kind === "dispatch" ? [first, ref, when] : [first, ref];
-      ({ id: waId, simulated } = await sendTemplateMessage(cfg, { to: c.phone, templateName: t.name, language: t.language, headerType: t.headerType, headerMediaUrl: t.headerMediaUrl, headerParams: [], bodyParams }));
+      ({ id: waId, simulated } = await sendTemplateMessage(cfg, { to: c.phone, templateName: t.name, language: t.language, headerType: t.headerType, headerMediaUrl: await headerImageFor(t), headerParams: [], bodyParams }));
       templateName = t.name;
       templateId = t.id;
     }

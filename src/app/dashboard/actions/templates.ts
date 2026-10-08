@@ -274,3 +274,14 @@ export async function sendTestMessage(id: string, rawPhone: string): Promise<Act
     return { ok: false, message: error };
   }
 }
+
+/** The client's default image, used by image templates that have none of their own. Empty clears it. */
+export async function setDefaultImage(url: string): Promise<ActionResult> {
+  const s = await requireAdmin(true);
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const u = url.trim();
+  if (u && !/^https:\/\/\S+$/.test(u)) return { ok: false, message: "Use a public https:// image link." };
+  await db.client.update({ where: { id: s.clientId }, data: { defaultImageUrl: u || null } });
+  revalidatePath("/dashboard/templates");
+  return { ok: true, message: u ? "Default image saved. Image templates without their own picture now use it." : "Default image removed." };
+}

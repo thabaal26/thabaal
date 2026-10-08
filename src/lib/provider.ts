@@ -1,4 +1,5 @@
 import "server-only";
+import { headerImageFor } from "./media";
 import type { Setting, Template } from "@prisma/client";
 import { db } from "./db";
 import { renderFor, toPlainText, type TemplateButton, type VarMap } from "./template";
@@ -36,28 +37,30 @@ export async function readiness(s: Setting, cfg?: WaConfig): Promise<{ ok: boole
 
 export type Sendable = Pick<
   Template,
-  "name" | "language" | "category" | "headerType" | "headerText" | "headerMediaUrl" | "body" | "footer" | "variables" | "buttons" | "codeExpiryMins" | "securityNote"
+  "clientId" | "name" | "language" | "category" | "headerType" | "headerText" | "headerMediaUrl" | "body" | "footer" | "variables" | "buttons" | "codeExpiryMins" | "securityNote"
 >;
 
 /** Sends one rendered template to one customer through the active provider, from the given number. */
 export async function deliver(s: Setting, t: Sendable, customer: { name: string; phone: string }, cfg: WaConfig = waConfig()) {
   const r = renderFor({ ...t, headerText: t.headerText ?? "", footer: t.footer ?? "", variables: t.variables as VarMap }, customer);
   const provider = s.provider as ProviderName;
+  // A template without its own picture uses the client's default image.
+  const image = await headerImageFor(t);
 
   if (provider === "LOCAL") {
     const text = toPlainText(r, t.buttons as TemplateButton[]);
     const cfg = wahaConfig(s);
     if (!cfg) return { id: `demo.${crypto.randomUUID()}`, simulated: true, provider, text };
     const id =
-      t.headerType === "IMAGE" && t.headerMediaUrl
-        ? await sendImage(cfg, customer.phone, t.headerMediaUrl, text)
+      image
+        ? await sendImage(cfg, customer.phone, image, text)
         : await sendText(cfg, customer.phone, text);
     return { id, simulated: false, provider, text };
   }
 
   // Meta rejects an image-header template sent without its image (error 132012), so say what's missing.
-  if (cfg.live && t.headerType === "IMAGE" && !t.headerMediaUrl?.trim())
-    throw new Error(`"${t.name}" has an image header but no image link. Open the template, paste the image URL and save.`);
+  if (cfg.live && t.headerType === "IMAGE" && !image)
+    throw new Error(`"${t.name}" has an image header but no image. Set a default image on the Templates page, or add one to this template.`);
 
   const text = [r.header, r.body, r.footer].filter(Boolean).join("\n\n");
   const res = await sendTemplateMessage(cfg, {
@@ -65,7 +68,7 @@ export async function deliver(s: Setting, t: Sendable, customer: { name: string;
     templateName: t.name,
     language: t.language,
     headerType: t.headerType,
-    headerMediaUrl: t.headerMediaUrl,
+    headerMediaUrl: image,
     headerParams: r.headerParams,
     bodyParams: r.bodyParams,
   });

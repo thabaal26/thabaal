@@ -40,6 +40,8 @@ model Client {
   brandAccent         String?
   logoUrl             String?
   bannerUrl           String?
+  /// Image used by image-header templates that have none of their own.
+  defaultImageUrl String?
   tagline             String?
   website             String?
   supportPhone        String?
