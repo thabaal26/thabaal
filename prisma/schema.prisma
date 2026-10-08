@@ -397,6 +397,8 @@ model Order {
   externalRef        String?     @unique
   /// "Review and pay" message sent on WhatsApp; Meta's payment webhook fills paidAt and the UPI transaction id.
   paymentRequestedAt DateTime?
+  /// One automatic reminder when the payment request is still unpaid after a few hours.
+  paymentReminderAt  DateTime?
   paidAt             DateTime?
   paymentTxnId       String?
   createdAt          DateTime    @default(now())

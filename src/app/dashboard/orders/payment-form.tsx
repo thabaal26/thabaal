@@ -15,7 +15,7 @@ export function PaymentForm({ config, own, using }: { config: string | null; own
     <Card className="mb-4">
       <CardHeader
         title="WhatsApp payments (UPI)"
-        description={`Customers get a "Review and pay" button for their order and pay by UPI inside WhatsApp. After 24 hours without a message from them it sends a template: ${
+        description={`New WhatsApp carts get a "Review and pay" request automatically (one reminder after 6 hours if unpaid), and paid orders turn PAID on their own. After 24 hours without a message from them it sends a template: ${
           using ? `now using "${using}"` : "none approved yet, so add one from Meta's Template library and sync templates"
         }${using === own.name ? "" : ` (your "${own.name}" is ${own.status ? own.status.toLowerCase() : "not created yet"}; it takes over once approved)`}.`}
       />

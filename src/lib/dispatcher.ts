@@ -12,6 +12,7 @@ import { syncDueSheets } from "./sheets";
 import { campaignAudienceWhere } from "./audiences";
 import { refreshLifecycleTags, sendWinbacks } from "./lifecycle";
 import { backfillOrderNames } from "./orders";
+import { remindUnpaidOrders } from "./payments";
 import { senderFor } from "./senders";
 import { WahaError } from "./waha";
 import { MetaError } from "./whatsapp";
@@ -256,6 +257,7 @@ export async function dispatch() {
   if (Date.now() < deadline) await sendRefillReminders(now).catch((e) => console.error("Refill reminders failed", e));
   if (Date.now() < deadline) await syncDueSheets(now).catch((e) => console.error("Sheet sync failed", e));
   if (Date.now() < deadline) await backfillOrderNames().catch((e) => console.error("Order name backfill failed", e));
+  if (Date.now() < deadline) await remindUnpaidOrders(now).catch((e) => console.error("Payment reminders failed", e));
   if (Date.now() < deadline) await refreshLifecycleTags().catch((e) => console.error("Lifecycle tags failed", e));
   if (Date.now() < deadline) await sendWinbacks(now).catch((e) => console.error("Win-back failed", e));
   await db.setting.upsert({ where: { id: 1 }, update: { lastDispatchAt: now }, create: { id: 1, lastDispatchAt: now } });

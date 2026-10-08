@@ -52,7 +52,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
     brandedClient(),
     scope.isAdmin ? db.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }) : [],
     db.reply.count({ where: { handled: false, ...ownedMessages(scope) } }),
-    db.order.count({ where: { status: "NEW", ...owned(scope) } }).catch(() => 0), // 0 until the Order table exists (npm run db:push)
+    db.order.count({ where: { status: { in: ["NEW", "PAID"] }, ...owned(scope) } }).catch(() => 0), // 0 until the Order table exists (npm run db:push)
   ]);
   const name = client?.name ?? "Campaign Portal";
   const subtitle = client?.tagline || (scope.isAdmin ? (client ? "Admin view" : "Admin · all clients") : "WhatsApp campaigns");

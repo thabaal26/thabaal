@@ -4,8 +4,7 @@ import type { OrderStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { itemsText, itemsWithNames, money, orderRef, type OrderItem } from "@/lib/orders";
-import { PAYMENT_TEMPLATE, paymentTemplateFor } from "@/lib/payments";
-import { renderFor, type VarMap } from "@/lib/template";
+import { confirmPayment, sendPaymentRequestFor, updateOrderCard } from "@/lib/payments";
 import { getSettings, wahaConfig } from "@/lib/provider";
 import { replyWindowEnd } from "@/lib/replies";
 import { headerImageFor } from "@/lib/media";
@@ -13,7 +12,7 @@ import { normalizePhone } from "@/lib/phone";
 import { senderFor } from "@/lib/senders";
 import { requireManager, requireOrderAccess } from "@/lib/session";
 import { sendText } from "@/lib/waha";
-import { sendPaymentRequest, sendPaymentTemplate, sendTemplateMessage, sendTextMessage } from "@/lib/whatsapp";
+import { sendTemplateMessage, sendTextMessage } from "@/lib/whatsapp";
 import { explainSendError, type SendResult } from "./send-helpers";
 import { saveTemplate } from "./templates";
 
@@ -23,10 +22,24 @@ export async function setOrderStatus(id: string, status: OrderStatus): Promise<S
   const s = await requireOrderAccess();
   if ("denied" in s) return { ok: false, message: s.denied };
   if (!STATUSES.includes(status)) return { ok: false, message: "Unknown status." };
-  const r = await db.order.updateMany({ where: { id, ...(s.clientId ? { clientId: s.clientId } : {}) }, data: { status } });
-  if (!r.count) return { ok: false, message: "Order not found." };
+  const order = await db.order.findFirst({
+    where: { id, ...(s.clientId ? { clientId: s.clientId } : {}) },
+    include: { customer: true, client: { select: { name: true } } },
+  });
+  if (!order) return { ok: false, message: "Order not found." };
+  // Paid outside WhatsApp (UPI to the shop, cash): record it and thank the customer like an online payment.
+  if (status === "PAID" && !order.paidAt) {
+    await confirmPayment(order.id);
+    revalidatePath("/dashboard", "layout");
+    return { ok: true, message: "Marked paid and thanked the customer." };
+  }
+  await db.order.update({ where: { id: order.id }, data: { status } });
+  let told = false;
+  if (status === "CANCELLED" && !order.customer.optedOut)
+    told = await updateOrderCard(order, "canceled", `Hello ${order.customer.name.trim().split(/\s+/)[0] || "there"}, your ${order.client.name} order ${orderRef(order)} has been cancelled. Reply to this message if you have any questions.`)
+      .catch((e) => (console.error("Could not update the order card", e), false));
   revalidatePath("/dashboard", "layout");
-  return { ok: true, message: `Marked ${status.toLowerCase()}.` };
+  return { ok: true, message: `Marked ${status.toLowerCase()}.${told ? " The customer was told on WhatsApp." : ""}` };
 }
 
 export async function saveOrderNote(id: string, note: string): Promise<SendResult> {
@@ -104,6 +117,11 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
         waId = `demo.${crypto.randomUUID()}`;
         simulated = true;
       }
+    } else if (open && order.paymentRequestedAt && (await updateOrderCard(order, kind === "confirm" ? "processing" : kind === "dispatch" ? "shipped" : "completed", text).catch(() => false))) {
+      // Sent on the order card from "Review and pay", which also moves its status; already logged.
+      await db.order.update({ where: { id: order.id }, data: { status: nextStatus } });
+      revalidatePath("/dashboard", "layout");
+      return { ok: true, message: `Order updated on ${c.name}'s WhatsApp order card.` };
     } else if (open) {
       ({ id: waId, simulated } = await sendTextMessage(cfg, c.phone, text));
     } else {
@@ -151,66 +169,11 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
 export async function requestPayment(id: string): Promise<SendResult> {
   const s = await requireOrderAccess();
   if ("denied" in s) return { ok: false, message: s.denied };
-  const order = await db.order.findFirst({
-    where: { id, ...(s.clientId ? { clientId: s.clientId } : {}) },
-    include: { customer: true, client: { select: { name: true, paymentConfig: true } } },
-  });
+  const order = await db.order.findFirst({ where: { id, ...(s.clientId ? { clientId: s.clientId } : {}) }, select: { id: true } });
   if (!order) return { ok: false, message: "Order not found." };
-  if (order.status === "PAID" || order.paidAt) return { ok: false, message: "This order is already paid." };
-  if (!order.client.paymentConfig) return { ok: false, message: "Set your payment configuration name at the top of Orders first." };
-  if (order.total <= 0) return { ok: false, message: "This order has no total. Add prices before asking for payment." };
-  const c = order.customer;
-  if (c.optedOut) return { ok: false, message: "This customer opted out of messages." };
-
-  const settings = await getSettings();
-  if (settings.provider !== "META") return { ok: false, message: "Payment requests need the WhatsApp Cloud API." };
-  const items = await itemsWithNames(order);
-  const first = c.name.trim().split(/\s+/)[0] || "there";
-  const ref = orderRef(order);
-  const payment = {
-    referenceId: orderRef(order),
-    configuration: order.client.paymentConfig,
-    items: items.map((i) => ({ id: i.id, name: i.name ?? i.id, quantity: i.quantity, price: i.price })),
-    total: order.total,
-    catalogId: order.catalogId,
-  };
-  const text = `Hello ${first}, here is your ${order.client.name} order ${ref}.\n\nItems: ${itemsText(items)}\nTotal: ${money(order.total, order.currency)}\n\nTap "Review and pay" to pay by UPI.`;
-
-  const lastReply = await db.reply.findFirst({ where: { customerId: c.id }, orderBy: { receivedAt: "desc" }, select: { receivedAt: true, senderId: true } });
-  const open = replyWindowEnd(lastReply?.receivedAt) !== null;
-  const { number, cfg } = await senderFor(c.clientId, lastReply?.senderId);
-
-  try {
-    let res: { id: string; simulated: boolean };
-    let templateName = "Payment request";
-    if (open) {
-      res = await sendPaymentRequest(cfg, c.phone, text, payment);
-    } else {
-      const t = await paymentTemplateFor(c.clientId);
-      if (!t)
-        return { ok: false, message: `The customer's 24-hour window has closed, so WhatsApp needs an approved template with a "Review and pay" button. Add one from Meta's Template library (approved instantly) or wait for ${PAYMENT_TEMPLATE}, then sync templates.` };
-      const r = renderFor({ ...t, headerText: t.headerText ?? "", footer: t.footer ?? "", variables: t.variables as VarMap }, c);
-      res = await sendPaymentTemplate(
-        cfg,
-        c.phone,
-        { name: t.name, language: t.language, bodyParams: r.bodyParams, headerParams: r.headerParams, headerImage: t.headerType === "IMAGE" ? await headerImageFor(t) : null },
-        payment,
-      );
-      templateName = t.name;
-    }
-    await db.message.create({
-      data: {
-        customerId: c.id, templateName, body: text, status: "SENT", waMessageId: res.id, simulated: res.simulated,
-        provider: "META", sentAt: new Date(), senderId: number?.id ?? null,
-      },
-    });
-    await db.order.update({ where: { id: order.id }, data: { paymentRequestedAt: new Date() } });
-    revalidatePath("/dashboard/orders");
-    return { ok: true, message: res.simulated ? "Simulated payment request logged (demo mode)." : `Payment request sent to ${c.name}.` };
-  } catch (e) {
-    const err = explainSendError(e).error;
-    return { ok: false, message: err };
-  }
+  const r = await sendPaymentRequestFor(order.id);
+  revalidatePath("/dashboard/orders");
+  return r;
 }
 
 /** The payment configuration name from WhatsApp Manager → Payment configurations; empty turns payment requests off. */
