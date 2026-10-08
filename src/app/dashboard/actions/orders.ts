@@ -104,7 +104,9 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
     } else if (open) {
       ({ id: waId, simulated } = await sendTextMessage(cfg, c.phone, text));
     } else {
-      const t = await db.template.findFirst({ where: { clientId: c.clientId, name: { in: TEMPLATE_NAMES[kind] }, status: "APPROVED" } });
+      // Prefer the version with a picture once Meta has approved it; the plain one stays as a fallback.
+      const options = await db.template.findMany({ where: { clientId: c.clientId, name: { in: TEMPLATE_NAMES[kind] }, status: "APPROVED" } });
+      const t = options.find((x) => x.headerType === "IMAGE" && x.headerMediaUrl) ?? options.find((x) => x.headerType === "NONE") ?? null;
       if (!t) {
         // A delivery thank-you is optional: still close the order when there's no way to message.
         if (kind === "deliver") {
@@ -115,7 +117,7 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
         return { ok: false, message: `The customer's 24-hour window has closed, so WhatsApp needs an approved ${TEMPLATE_NAMES[kind][0]} template. Use "Create order templates" at the top of Orders.` };
       }
       const bodyParams = kind === "confirm" ? [first, itemsText(items).slice(0, 300), String(Math.round(order.total))] : kind === "dispatch" ? [first, ref, when] : [first, ref];
-      ({ id: waId, simulated } = await sendTemplateMessage(cfg, { to: c.phone, templateName: t.name, language: t.language, headerType: "NONE", headerParams: [], bodyParams }));
+      ({ id: waId, simulated } = await sendTemplateMessage(cfg, { to: c.phone, templateName: t.name, language: t.language, headerType: t.headerType, headerMediaUrl: t.headerMediaUrl, headerParams: [], bodyParams }));
       templateName = t.name;
       templateId = t.id;
     }
@@ -191,18 +193,22 @@ const ORDER_TEMPLATES: { name: string; body: string; samples: string[] }[] = [
  * Creates the three order update templates (utility, so they can be sent any time after an
  * order) and submits them to Meta. Skips any the client already has.
  */
-export async function createOrderTemplates(): Promise<SendResult> {
+export async function createOrderTemplates(imageUrl?: string): Promise<SendResult> {
   const s = await requireAdmin(true);
   if ("denied" in s) return { ok: false, message: s.denied };
-  const existing = await db.template.findMany({ where: { clientId: s.clientId, name: { in: ORDER_TEMPLATES.map((t) => t.name) } }, select: { name: true } });
-  const missing = ORDER_TEMPLATES.filter((t) => !existing.some((e) => e.name === t.name));
-  if (!missing.length) return { ok: true, message: "All three order templates already exist." };
+  // The picture versions get their own names, so the plain ones keep working while Meta reviews them.
+  const image = imageUrl?.trim();
+  if (image && !/^https:\/\/\S+\.(jpe?g|png)(\?\S*)?$/i.test(image)) return { ok: false, message: "Use a public https link to a JPG or PNG image." };
+  const named = ORDER_TEMPLATES.map((t) => ({ ...t, name: image ? `thenan_${t.name}` : t.name }));
+  const existing = await db.template.findMany({ where: { clientId: s.clientId, name: { in: named.map((t) => t.name) } }, select: { name: true } });
+  const missing = named.filter((t) => !existing.some((e) => e.name === t.name));
+  if (!missing.length) return { ok: true, message: `All three ${image ? "picture " : ""}order templates already exist.` };
 
   const failed: string[] = [];
   for (const t of missing) {
     const variables = Object.fromEntries(t.samples.map((v, k) => [String(k + 1), { source: "static" as const, value: v }]));
     const r = await saveTemplate(null, {
-      name: t.name, language: "en", category: "UTILITY", headerType: "NONE", headerText: "", headerMediaUrl: "",
+      name: t.name, language: "en", category: "UTILITY", headerType: image ? "IMAGE" : "NONE", headerText: "", headerMediaUrl: image ?? "",
       body: t.body, footer: "", buttons: [], variables, codeExpiryMins: null, securityNote: false,
     });
     if (!r.ok) failed.push(`${t.name}: ${r.message ?? r.errors?.join(", ")}`);

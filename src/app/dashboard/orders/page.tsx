@@ -1,5 +1,6 @@
 import { PackageCheck, ShoppingBag } from "lucide-react";
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -44,13 +45,17 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
       take: 200,
     }),
     db.order.groupBy({ by: ["status"], where: mine, _count: true }),
-    scope.clientId ? db.template.findMany({ where: { clientId: scope.clientId, name: { in: ORDER_TEMPLATES } }, select: { name: true, status: true } }) : [],
+    scope.clientId ? db.template.findMany({ where: { clientId: scope.clientId, name: { in: [...ORDER_TEMPLATES, ...ORDER_TEMPLATES.map((n) => `thenan_${n}`)] } }, select: { name: true, status: true } }) : [],
     scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { refillDays: true, refillTemplateId: true } }) : null,
     scope.clientId && scope.isAdmin
       ? db.template.findMany({ where: { clientId: scope.clientId, status: "APPROVED", category: { not: "AUTHENTICATION" }, name: { notIn: ORDER_TEMPLATES } }, select: { id: true, name: true }, orderBy: { name: "asc" } })
       : [],
   ]);
-  const notReady = ORDER_TEMPLATES.filter((name) => orderTemplates.find((t) => t.name === name)?.status !== "APPROVED");
+  // An order update is covered when either the plain or the picture version is approved.
+  const notReady = ORDER_TEMPLATES.filter((name) => !orderTemplates.some((t) => (t.name === name || t.name === `thenan_${name}`) && t.status === "APPROVED"));
+  const pictureStatus = ORDER_TEMPLATES.map((name) => ({ name: `thenan_${name}`, status: orderTemplates.find((t) => t.name === `thenan_${name}`)?.status ?? null }));
+  const h = await headers();
+  const headerImage = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}/thenan-order-header.jpg`;
   const missing = ORDER_TEMPLATES.filter((name) => !orderTemplates.some((t) => t.name === name));
   // Client staff pack and dispatch their own orders, so they get the order buttons too.
   const canEdit = scope.isAdmin || !!scope.clientId;
@@ -81,6 +86,24 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
             <ActionButton action={createOrderTemplates} confirm={`Create and submit ${missing.join(", ")} to Meta?`}>Create order templates</ActionButton>
           )}
         </div>
+      )}
+
+      {scope.isAdmin && scope.clientId && (
+        <Card className="mb-4">
+          <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:p-5">
+            {/* eslint-disable-next-line @next/next/no-img-element -- our own public image */}
+            <img src="/thenan-order-header.jpg" alt="Order message picture" className="size-16 shrink-0 rounded-xl object-cover ring-1 ring-line" />
+            <div className="min-w-0 flex-1 text-sm">
+              <p className="font-medium">Order messages with your picture</p>
+              <p className="mt-0.5 text-xs text-muted">
+                {pictureStatus.map((p) => `${p.name.replace("thenan_order_", "")}: ${p.status ? p.status.toLowerCase() : "not created"}`).join(" · ")}. Used automatically once approved; the plain versions cover the wait.
+              </p>
+            </div>
+            {pictureStatus.some((p) => !p.status) && (
+              <ActionButton action={createOrderTemplates.bind(null, headerImage)} confirm="Create the picture versions of the order templates and submit them to Meta?">Create with picture</ActionButton>
+            )}
+          </div>
+        </Card>
       )}
 
       <div className="mb-4 flex flex-wrap gap-2">
