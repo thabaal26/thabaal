@@ -184,8 +184,16 @@ export async function sendPaymentRequest(cfg: WaConfig, to: string, body: string
   return { id: res.messages[0].id, simulated: false };
 }
 
-/** Outside the window: an approved "order details" template whose body has one variable, the customer's name. */
-export async function sendPaymentTemplate(cfg: WaConfig, to: string, template: { name: string; language: string }, firstName: string, p: PaymentRequest): Promise<{ id: string; simulated: boolean }> {
+/**
+ * Outside the window: an approved template with WhatsApp's "Review and pay" button, either our own
+ * or one added from Meta's template library (those are approved straight away).
+ */
+export async function sendPaymentTemplate(
+  cfg: WaConfig,
+  to: string,
+  template: { name: string; language: string; bodyParams: string[]; headerParams: string[]; headerImage?: string | null },
+  p: PaymentRequest,
+): Promise<{ id: string; simulated: boolean }> {
   if (!cfg.live) return { id: `demo.${crypto.randomUUID()}`, simulated: true };
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
@@ -197,7 +205,9 @@ export async function sendPaymentTemplate(cfg: WaConfig, to: string, template: {
         name: template.name,
         language: { code: template.language },
         components: [
-          { type: "body", parameters: [{ type: "text", text: firstName }] },
+          ...(template.headerImage ? [{ type: "header", parameters: [{ type: "image", image: { link: template.headerImage } }] }] : []),
+          ...(template.headerParams.length ? [{ type: "header", parameters: template.headerParams.map((text) => ({ type: "text", text })) }] : []),
+          ...(template.bodyParams.length ? [{ type: "body", parameters: template.bodyParams.map((text) => ({ type: "text", text })) }] : []),
           { type: "button", sub_type: "order_details", index: 0, parameters: [{ type: "action", action: { order_details: orderDetails(p) } }] },
         ],
       },

@@ -1,4 +1,4 @@
-import { CheckCheck, Copy, ExternalLink, ImageIcon, Phone, Reply } from "lucide-react";
+import { CheckCheck, Copy, CreditCard, ExternalLink, ImageIcon, Phone, Reply } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import type { TemplateButton } from "@/lib/template";
@@ -15,7 +15,7 @@ function formatWa(text: string): ReactNode[] {
   });
 }
 
-const ICON = { QUICK_REPLY: Reply, URL: ExternalLink, PHONE_NUMBER: Phone, COPY_CODE: Copy };
+const ICON = { QUICK_REPLY: Reply, URL: ExternalLink, PHONE_NUMBER: Phone, COPY_CODE: Copy, ORDER_DETAILS: CreditCard };
 
 export function WhatsAppBubble({
   header, headerImage, body, footer, buttons, time = "10:00", className,

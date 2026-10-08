@@ -4,7 +4,8 @@ export type Category = "MARKETING" | "UTILITY" | "AUTHENTICATION";
 export type HeaderKind = "NONE" | "TEXT" | "IMAGE";
 
 export type TemplateButton = {
-  type: "QUICK_REPLY" | "URL" | "PHONE_NUMBER" | "COPY_CODE";
+  /** ORDER_DETAILS is WhatsApp's "Review and pay" button; such templates only go out as payment requests. */
+  type: "QUICK_REPLY" | "URL" | "PHONE_NUMBER" | "COPY_CODE" | "ORDER_DETAILS";
   text: string;
   url?: string;
   phone?: string;
@@ -234,7 +235,11 @@ export function fromMetaComponents(components: MetaComponent[]) {
     } else if (c.type === "BUTTONS") {
       out.buttons = (c.buttons ?? []).map((b) => ({
         type:
-          b.type === "URL" ? "URL" : b.type === "PHONE_NUMBER" ? "PHONE_NUMBER" : b.type === "OTP" ? "COPY_CODE" : "QUICK_REPLY",
+          b.type === "URL" ? "URL"
+          : b.type === "PHONE_NUMBER" ? "PHONE_NUMBER"
+          : b.type === "OTP" ? "COPY_CODE"
+          : b.type === "ORDER_DETAILS" ? "ORDER_DETAILS"
+          : "QUICK_REPLY",
         text: b.text ?? "Copy code",
         url: b.url,
         phone: b.phone_number,

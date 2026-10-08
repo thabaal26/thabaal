@@ -10,7 +10,7 @@ import { money, type OrderItem } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { getScope, owned } from "@/lib/session";
 import { ActionButton } from "@/components/action-button";
-import { createOrderTemplates, PAYMENT_TEMPLATE } from "../actions/orders";
+import { createOrderTemplates, PAYMENT_TEMPLATE, paymentTemplateFor } from "../actions/orders";
 import { NewOrder } from "./new-order";
 import { OrderActions } from "./order-actions";
 import { PaymentForm } from "./payment-form";
@@ -39,7 +39,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
   const tab = TABS.find((t) => t.key === show) ?? TABS[0];
   const mine = owned(scope);
 
-  const [orders, counts, orderTemplates, client, approved, paymentTemplate] = await Promise.all([
+  const [orders, counts, orderTemplates, client, approved, ownPaymentTemplate, paymentTemplate] = await Promise.all([
     db.order.findMany({
       where: { ...mine, ...(tab.where as object) },
       include: {
@@ -56,6 +56,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
       ? db.template.findMany({ where: { clientId: scope.clientId, status: "APPROVED", category: { not: "AUTHENTICATION" }, name: { notIn: ORDER_TEMPLATES } }, select: { id: true, name: true }, orderBy: { name: "asc" } })
       : [],
     scope.clientId ? db.template.findFirst({ where: { clientId: scope.clientId, name: PAYMENT_TEMPLATE }, select: { status: true } }) : null,
+    scope.clientId ? paymentTemplateFor(scope.clientId) : null,
   ]);
   // An order update is covered when either the plain or the picture version is approved.
   const lapsed = scope.clientId && scope.canManage ? await db.customer.count({ where: { clientId: scope.clientId, tags: { has: "lapsed" }, optedOut: false } }) : 0;
@@ -128,7 +129,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         ))}
       </div>
 
-      {scope.canManage && client && <PaymentForm config={client.paymentConfig} template={{ name: PAYMENT_TEMPLATE, status: paymentTemplate?.status ?? null }} />}
+      {scope.canManage && client && <PaymentForm config={client.paymentConfig} own={{ name: PAYMENT_TEMPLATE, status: ownPaymentTemplate?.status ?? null }} using={paymentTemplate?.name ?? null} />}
       {scope.canManage && client && <RefillForm days={client.refillDays} templateId={client.refillTemplateId} templates={approved} />}
       {scope.canManage && client && <WinbackForm days={client.lapsedDays} templateId={client.winbackTemplateId} templates={approved} lapsed={lapsed} />}
 

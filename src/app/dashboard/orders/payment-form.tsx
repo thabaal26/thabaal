@@ -7,7 +7,7 @@ import { Button, Card, CardHeader, Label } from "@/components/ui";
 import { savePaymentConfig } from "../actions/orders";
 
 /** Manager setting: which WhatsApp payment configuration "Request payment" uses. */
-export function PaymentForm({ config, template }: { config: string | null; template: { name: string; status: string | null } }) {
+export function PaymentForm({ config, own, using }: { config: string | null; own: { name: string; status: string | null }; using: string | null }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [name, setName] = useState(config ?? "");
@@ -15,7 +15,9 @@ export function PaymentForm({ config, template }: { config: string | null; templ
     <Card className="mb-4">
       <CardHeader
         title="WhatsApp payments (UPI)"
-        description={`Customers get a "Review and pay" button for their order and pay by UPI inside WhatsApp. After 24 hours without a message from them, this needs the "${template.name}" order details template (${template.status ? template.status.toLowerCase() : "not created yet"}).`}
+        description={`Customers get a "Review and pay" button for their order and pay by UPI inside WhatsApp. After 24 hours without a message from them it sends a template: ${
+          using ? `now using "${using}"` : "none approved yet, so add one from Meta's Template library and sync templates"
+        }${using === own.name ? "" : ` (your "${own.name}" is ${own.status ? own.status.toLowerCase() : "not created yet"}; it takes over once approved)`}.`}
       />
       <form
         className="flex flex-col gap-3 p-4 sm:flex-row sm:items-end sm:p-5"

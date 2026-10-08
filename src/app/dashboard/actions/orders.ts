@@ -4,6 +4,7 @@ import type { OrderStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { itemsText, money, type OrderItem } from "@/lib/orders";
+import { renderFor, type TemplateButton, type VarMap } from "@/lib/template";
 import { getSettings, wahaConfig } from "@/lib/provider";
 import { replyWindowEnd } from "@/lib/replies";
 import { headerImageFor } from "@/lib/media";
@@ -142,8 +143,19 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
   }
 }
 
-/** Name of the approved "order details" template used once the customer's 24-hour window has closed. */
+/** Our own "order details" template, preferred once approved for requests after the customer's 24-hour window. */
 export const PAYMENT_TEMPLATE = "payment_request";
+
+const hasPayButton = (t: { buttons: unknown }) => (t.buttons as TemplateButton[]).some((b) => b.type === "ORDER_DETAILS");
+
+/**
+ * The approved template with a "Review and pay" button to send: payment_request when Meta has approved it,
+ * otherwise one added from Meta's template library (pre-approved), so payments work while ours is in review.
+ */
+export async function paymentTemplateFor(clientId: string) {
+  const approved = (await db.template.findMany({ where: { clientId, status: "APPROVED" }, orderBy: { name: "asc" } })).filter(hasPayButton);
+  return approved.find((t) => t.name === PAYMENT_TEMPLATE) ?? approved[0] ?? null;
+}
 
 /**
  * Sends the customer WhatsApp's "Review and pay" message for this order, paid by UPI through the
@@ -186,9 +198,17 @@ export async function requestPayment(id: string): Promise<SendResult> {
     if (open) {
       res = await sendPaymentRequest(cfg, c.phone, text, payment);
     } else {
-      const t = await db.template.findFirst({ where: { clientId: c.clientId, name: PAYMENT_TEMPLATE, status: "APPROVED" }, select: { language: true } });
-      res = await sendPaymentTemplate(cfg, c.phone, { name: PAYMENT_TEMPLATE, language: t?.language ?? "en" }, first, payment);
-      templateName = PAYMENT_TEMPLATE;
+      const t = await paymentTemplateFor(c.clientId);
+      if (!t)
+        return { ok: false, message: `The customer's 24-hour window has closed, so WhatsApp needs an approved template with a "Review and pay" button. Add one from Meta's Template library (approved instantly) or wait for ${PAYMENT_TEMPLATE}, then sync templates.` };
+      const r = renderFor({ ...t, headerText: t.headerText ?? "", footer: t.footer ?? "", variables: t.variables as VarMap }, c);
+      res = await sendPaymentTemplate(
+        cfg,
+        c.phone,
+        { name: t.name, language: t.language, bodyParams: r.bodyParams, headerParams: r.headerParams, headerImage: t.headerType === "IMAGE" ? await headerImageFor(t) : null },
+        payment,
+      );
+      templateName = t.name;
     }
     await db.message.create({
       data: {
@@ -201,9 +221,6 @@ export async function requestPayment(id: string): Promise<SendResult> {
     return { ok: true, message: res.simulated ? "Simulated payment request logged (demo mode)." : `Payment request sent to ${c.name}.` };
   } catch (e) {
     const err = explainSendError(e).error;
-    // Outside the window the template is the only way; say what to create when it's missing.
-    if (!open && /template|132001|does not exist/i.test(err))
-      return { ok: false, message: `The customer's 24-hour window has closed, so WhatsApp needs an approved "${PAYMENT_TEMPLATE}" order details template. Create it in WhatsApp Manager, then sync templates.` };
     return { ok: false, message: err };
   }
 }
