@@ -1,6 +1,8 @@
 import "server-only";
 import { explainSendError } from "@/app/dashboard/actions/send-helpers";
+import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { db } from "./db";
+import { APP_TZ } from "./format";
 import { getSettings } from "./provider";
 import { replyWindowEnd } from "./replies";
 import { senderFor } from "./senders";
@@ -16,8 +18,17 @@ const AUTO_GAP_MS = 12 * 3_600_000;
 /** A button tap or message asking to see products or prices. */
 const WANTS_CATALOGUE = /\b(price|prices|rate|rates|catalog|catalogue|menu|list|products?|order now)\b|விலை|பட்டியல்/i;
 
+/** "Hi", "Hello", "Vanakkam", "Good morning"… the usual way customers open a chat. */
+const GREETING = /^\s*(hi+|hello+|helo|hey+|hai+|vanakkam|good\s*(morning|afternoon|evening))\b|வணக்கம்/i;
+
 export function wantsCatalogue(text: string, kind: string) {
-  return (kind === "button" || kind === "text") && WANTS_CATALOGUE.test(text);
+  return (kind === "button" || kind === "text") && (WANTS_CATALOGUE.test(text) || GREETING.test(text));
+}
+
+/** True when this is the customer's first message today (app time zone); call after saving the reply. */
+export async function firstMessageToday(customerId: string) {
+  const today = fromZonedTime(`${formatInTimeZone(new Date(), APP_TZ, "yyyy-MM-dd")}T00:00:00`, APP_TZ);
+  return (await db.reply.count({ where: { customerId, receivedAt: { gte: today } } })) <= 1;
 }
 
 /** Sends the "View catalogue" message to a customer whose 24-hour window is open. */
