@@ -14,6 +14,7 @@ import { createOrderTemplates } from "../actions/orders";
 import { NewOrder } from "./new-order";
 import { OrderActions } from "./order-actions";
 import { RefillForm } from "./refill-form";
+import { WinbackForm } from "./winback-form";
 
 /** The utility templates that let order updates go out after the customer's 24-hour window. */
 const ORDER_TEMPLATES = ["order_confirmation", "order_dispatched", "order_delivered"];
@@ -46,12 +47,13 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     }),
     db.order.groupBy({ by: ["status"], where: mine, _count: true }),
     scope.clientId ? db.template.findMany({ where: { clientId: scope.clientId, name: { in: [...ORDER_TEMPLATES, ...ORDER_TEMPLATES.map((n) => `thenan_${n}`)] } }, select: { name: true, status: true } }) : [],
-    scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { refillDays: true, refillTemplateId: true } }) : null,
+    scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { refillDays: true, refillTemplateId: true, lapsedDays: true, winbackTemplateId: true } }) : null,
     scope.clientId && scope.isAdmin
       ? db.template.findMany({ where: { clientId: scope.clientId, status: "APPROVED", category: { not: "AUTHENTICATION" }, name: { notIn: ORDER_TEMPLATES } }, select: { id: true, name: true }, orderBy: { name: "asc" } })
       : [],
   ]);
   // An order update is covered when either the plain or the picture version is approved.
+  const lapsed = scope.clientId && scope.isAdmin ? await db.customer.count({ where: { clientId: scope.clientId, tags: { has: "lapsed" }, optedOut: false } }) : 0;
   const notReady = ORDER_TEMPLATES.filter((name) => !orderTemplates.some((t) => (t.name === name || t.name === `thenan_${name}`) && t.status === "APPROVED"));
   const pictureStatus = ORDER_TEMPLATES.map((name) => ({ name: `thenan_${name}`, status: orderTemplates.find((t) => t.name === `thenan_${name}`)?.status ?? null }));
   const h = await headers();
@@ -122,6 +124,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
       </div>
 
       {scope.isAdmin && client && <RefillForm days={client.refillDays} templateId={client.refillTemplateId} templates={approved} />}
+      {scope.isAdmin && client && <WinbackForm days={client.lapsedDays} templateId={client.winbackTemplateId} templates={approved} lapsed={lapsed} />}
 
       {orders.length ? (
         <div className="space-y-4">

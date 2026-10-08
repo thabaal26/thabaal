@@ -27,7 +27,7 @@ export function CampaignForm({
   id: string | null;
   initial: CampaignInput;
   templates: { id: string; name: string; category: string; status: string; businessAccountId: string | null }[];
-  audience: { all: number; tags: { tag: string; n: number }[] };
+  audience: { all: number; tags: { tag: string; label: string; hint?: string; n: number }[] };
   numbers: { id: string; label: string; businessAccountId: string; isDefault: boolean; dailyLimit: number | null; quality: string | null }[];
 }) {
   const [c, setC] = useState(initial);
@@ -115,7 +115,7 @@ export function CampaignForm({
                 onChange={(audienceTag) => set({ audienceTag })}
                 options={[
                   { value: "", label: "All customers", hint: `${audience.all.toLocaleString("en-IN")} customers` },
-                  ...audience.tags.map((t) => ({ value: t.tag, label: t.tag, hint: `${t.n.toLocaleString("en-IN")} customers` })),
+                  ...audience.tags.map((t) => ({ value: t.tag, label: t.label, hint: `${t.n.toLocaleString("en-IN")} customers${t.hint ? ` · ${t.hint}` : ""}` })),
                 ]}
               />
             </div>

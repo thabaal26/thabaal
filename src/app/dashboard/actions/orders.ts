@@ -233,3 +233,18 @@ export async function saveRefillRule(days: number, templateId: string): Promise<
   revalidatePath("/dashboard/orders");
   return { ok: true, message: n ? `Refill reminders on: ${n} days after each order.` : "Refill reminders turned off." };
 }
+
+/** Win-back: customers tagged lapsed (no order for `days`) get `templateId` once; no template turns it off. */
+export async function saveWinbackRule(days: number, templateId: string): Promise<SendResult> {
+  const s = await requireAdmin(true);
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const n = Math.round(Number(days) || 0);
+  if (n < 7 || n > 365) return { ok: false, message: "Lapsed after must be between 7 and 365 days." };
+  if (templateId) {
+    const t = await db.template.findFirst({ where: { id: templateId, clientId: s.clientId }, select: { id: true } });
+    if (!t) return { ok: false, message: "Choose a template." };
+  }
+  await db.client.update({ where: { id: s.clientId }, data: { lapsedDays: n, winbackTemplateId: templateId || null } });
+  revalidatePath("/dashboard/orders");
+  return { ok: true, message: templateId ? `Win-back on: customers with no order for ${n} days get one message (up to 200 a day).` : `Win-back off. Customers are still tagged "lapsed" after ${n} days.` };
+}
