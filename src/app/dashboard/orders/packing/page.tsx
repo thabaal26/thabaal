@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Card, CardHeader, EmptyState, PageHeader, PickClientNotice } from "@/components/ui";
 import { db } from "@/lib/db";
 import { fmtDate, fmtNumber } from "@/lib/format";
-import { money, type OrderItem } from "@/lib/orders";
+import { money, orderRef, type OrderItem } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { getScope } from "@/lib/session";
 import { PrintButton } from "./print-button";
@@ -77,7 +77,7 @@ export default async function PackingPage() {
                         <p className="tabular text-xs text-muted">{formatPhone(o.customer.phone)}</p>
                       </div>
                       <div className="text-right text-xs text-muted">
-                        <p className="font-mono font-medium text-ink">#{o.id.slice(-5).toUpperCase()}</p>
+                        <p className="font-mono font-medium text-ink">{orderRef(o)}</p>
                         <p>{o.status === "PAID" ? "Paid" : "To collect"}</p>
                       </div>
                     </div>

@@ -6,7 +6,7 @@ import { explainError } from "@/lib/meta-errors";
 import { applyFailure } from "@/lib/rules";
 import { recordOrder } from "@/lib/orders";
 import { metaReplyContent, receivingNumber, recordReply } from "@/lib/replies";
-import { money } from "@/lib/orders";
+import { money, orderRef, orderWhereRef } from "@/lib/orders";
 import { senderFor } from "@/lib/senders";
 import { mapMetaStatus, sendOrderStatus } from "@/lib/whatsapp";
 import { JOIN_RE, joinFromWhatsApp } from "@/lib/optin";
@@ -70,17 +70,17 @@ type PaymentUpdate = {
   payment?: { reference_id?: string; transaction?: { id?: string; status?: string } };
 };
 
-/** The customer paid (or failed to pay) through "Review and pay"; reference_id is our order id. */
+/** The customer paid (or failed to pay) through "Review and pay"; reference_id is our order number (RG-1001). */
 async function applyPayment(s: PaymentUpdate) {
-  const orderId = s.payment?.reference_id;
-  if (!orderId) return;
+  const reference = s.payment?.reference_id;
+  if (!reference) return;
   const txn = s.payment?.transaction;
   const paid = txn?.status === "success" || s.status === "captured";
   if (!paid) {
     console.warn("WhatsApp payment not completed", JSON.stringify(s));
     return;
   }
-  const order = await db.order.findUnique({ where: { id: orderId }, include: { customer: true, client: { select: { name: true } } } });
+  const order = await db.order.findFirst({ where: orderWhereRef(reference), include: { customer: true, client: { select: { name: true } } } });
   // Meta may send the same payment twice; only the first one marks it paid and thanks the customer.
   if (!order || order.paidAt) return;
   await db.order.update({
@@ -96,14 +96,14 @@ async function applyPayment(s: PaymentUpdate) {
 }
 
 /** Moves the order card in the customer's chat to "processing" and says the payment arrived. */
-async function thankForPayment(order: { id: string; total: number; currency: string; customer: { id: string; name: string; phone: string; clientId: string }; client: { name: string } }) {
+async function thankForPayment(order: { id: string; number: number; total: number; currency: string; customer: { id: string; name: string; phone: string; clientId: string }; client: { name: string } }) {
   const c = order.customer;
   const first = c.name.trim().split(/\s+/)[0] || "there";
-  const ref = `#${order.id.slice(-5).toUpperCase()}`;
+  const ref = orderRef(order);
   const text = `Hello ${first}, we have received your payment of ${money(order.total, order.currency)} for order ${ref}. Thank you! We are packing your order and will message you when it is dispatched.`;
   const lastReply = await db.reply.findFirst({ where: { customerId: c.id }, orderBy: { receivedAt: "desc" }, select: { senderId: true } });
   const { number, cfg } = await senderFor(c.clientId, lastReply?.senderId);
-  const res = await sendOrderStatus(cfg, c.phone, order.id, "processing", text, "Payment received");
+  const res = await sendOrderStatus(cfg, c.phone, ref, "processing", text, "Payment received");
   await db.message.create({
     data: {
       customerId: c.id, templateName: "Payment received", body: text, status: "SENT", waMessageId: res.id, simulated: res.simulated,

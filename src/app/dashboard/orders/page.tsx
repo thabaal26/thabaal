@@ -6,7 +6,7 @@ import { Badge, buttonClass, Card, EmptyState, PageHeader } from "@/components/u
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { fmtDate, fmtNumber } from "@/lib/format";
-import { money, type OrderItem } from "@/lib/orders";
+import { money, orderRef, type OrderItem } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { getScope, owned } from "@/lib/session";
 import { ActionButton } from "@/components/action-button";
@@ -150,7 +150,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
                     {!scope.clientId && <Badge>{o.customer.client.name}</Badge>}
                     <Badge tone={TONE[o.status]}>{o.status.toLowerCase()}</Badge>
                     <span className="ml-auto text-xs text-muted">
-                      #{o.id.slice(-5).toUpperCase()} · {fmtDate(o.createdAt, "EEE d MMM, h:mm a")}
+                      {orderRef(o)} · {fmtDate(o.createdAt, "EEE d MMM, h:mm a")}
                     </span>
                   </div>
                   <ul className="divide-y divide-line rounded-lg bg-canvas px-3 text-sm">

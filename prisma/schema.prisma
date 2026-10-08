@@ -373,6 +373,8 @@ enum OrderStatus {
 /// A cart a customer sent from the WhatsApp catalogue.
 model Order {
   id                 String      @id @default(cuid())
+  /// Running number shown to people as RG-1001, RG-1002…; also the WhatsApp payment reference.
+  number             Int         @unique @default(autoincrement())
   clientId           String
   client             Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
   customerId         String

@@ -3,7 +3,7 @@
 import type { OrderStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { itemsText, money, type OrderItem } from "@/lib/orders";
+import { itemsText, money, orderRef, type OrderItem } from "@/lib/orders";
 import { PAYMENT_TEMPLATE, paymentTemplateFor } from "@/lib/payments";
 import { renderFor, type VarMap } from "@/lib/template";
 import { getSettings, wahaConfig } from "@/lib/provider";
@@ -74,7 +74,7 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
 
   const items = order.items as OrderItem[];
   const first = c.name.trim().split(/\s+/)[0] || "there";
-  const ref = `#${order.id.slice(-5).toUpperCase()}`;
+  const ref = orderRef(order);
   const when = dispatchLine(details);
   const contact = [details.by?.trim() && `Delivery by: ${details.by.trim()}`, details.phone?.trim() && `Contact: ${details.phone.trim()}`, details.link?.trim() && `Track: ${details.link.trim()}`]
     .filter(Boolean)
@@ -166,9 +166,9 @@ export async function requestPayment(id: string): Promise<SendResult> {
   if (settings.provider !== "META") return { ok: false, message: "Payment requests need the WhatsApp Cloud API." };
   const items = order.items as OrderItem[];
   const first = c.name.trim().split(/\s+/)[0] || "there";
-  const ref = `#${order.id.slice(-5).toUpperCase()}`;
+  const ref = orderRef(order);
   const payment = {
-    referenceId: order.id,
+    referenceId: orderRef(order),
     configuration: order.client.paymentConfig,
     items: items.map((i) => ({ id: i.id, name: i.name ?? i.id, quantity: i.quantity, price: i.price })),
     total: order.total,
@@ -250,7 +250,7 @@ export async function createOrder(input: { phone: string; name: string; items: {
     },
   });
   revalidatePath("/dashboard", "layout");
-  return { ok: true, message: `Order #${order.id.slice(-5).toUpperCase()} added.` };
+  return { ok: true, message: `Order ${orderRef(order)} added.` };
 }
 
 const ORDER_TEMPLATES: { name: string; body: string; samples: string[] }[] = [

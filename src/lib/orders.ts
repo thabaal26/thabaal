@@ -3,6 +3,15 @@ import { db } from "./db";
 import { senderFor } from "./senders";
 import { catalogProductNames } from "./whatsapp";
 
+/** The order number people see and quote, e.g. RG-1001. */
+export const orderRef = (o: { number: number }) => `RG-${1000 + o.number}`;
+
+/** Order lookup for a reference from orderRef, or an order id (payment requests sent before order numbers). */
+export function orderWhereRef(ref: string) {
+  const m = /^RG-(\d+)$/i.exec(ref.trim());
+  return m ? { number: Number(m[1]) - 1000 } : { id: ref };
+}
+
 export type OrderItem = { id: string; name?: string; quantity: number; price: number; currency: string };
 
 type MetaOrder = { catalog_id?: string; text?: string; product_items?: { product_retailer_id?: string; quantity?: number | string; item_price?: number | string; currency?: string }[] };
