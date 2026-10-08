@@ -221,6 +221,8 @@ export type MetaComponent = {
   add_security_recommendation?: boolean;
   code_expiration_minutes?: number;
   buttons?: { type: string; text?: string; url?: string; phone_number?: string }[];
+  /** For an image header, header_handle holds a link to the sample image the template was approved with. */
+  example?: { header_handle?: string[] };
 };
 
 /** Turns a template fetched from Meta into our editable shape. */

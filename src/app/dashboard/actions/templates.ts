@@ -23,6 +23,7 @@ import {
 } from "@/lib/whatsapp";
 import { clientAccounts, clientNumbers, senderForAccount } from "@/lib/senders";
 import { explainError } from "@/lib/meta-errors";
+import { syncedHeaderImage } from "@/lib/media";
 
 export type ActionResult = { ok: boolean; message?: string; errors?: string[]; id?: string };
 
@@ -201,10 +202,13 @@ export async function syncTemplates(): Promise<ActionResult> {
           businessAccountId,
           lastSyncedAt: new Date(),
         };
+        // An image template without its own picture would send the common image; find the right one.
+        const image =
+          parsed.headerType === "IMAGE" && !local?.headerMediaUrl?.trim() ? await syncedHeaderImage(r.name, r.components ?? []) : null;
         if (local) {
-          await db.template.update({ where: { id: local.id }, data: content });
+          await db.template.update({ where: { id: local.id }, data: { ...content, ...(image && { headerMediaUrl: image }) } });
         } else {
-          await db.template.create({ data: { clientId, name: r.name, language: r.language, ...content, variables: { "1": { source: "name" } } } });
+          await db.template.create({ data: { clientId, name: r.name, language: r.language, ...content, ...(image && { headerMediaUrl: image }), variables: { "1": { source: "first_name" } } } });
           imported++;
         }
       }
