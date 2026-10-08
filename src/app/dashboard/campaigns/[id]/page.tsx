@@ -1,4 +1,4 @@
-import { ArrowLeft, Pause, Play, Send } from "lucide-react";
+import { ArrowLeft, FlaskConical, Pause, Play, Send } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -7,9 +7,9 @@ import { Badge, Card, CardHeader, PageHeader, StatusBadge } from "@/components/u
 import { db } from "@/lib/db";
 import { APP_TZ, fmtDate, fmtNumber, pct } from "@/lib/format";
 import { formatInTimeZone } from "date-fns-tz";
-import { DAYS, effectiveInterval } from "@/lib/schedule";
+import { DAYS, effectiveInterval, TEST_TAG } from "@/lib/schedule";
 import { getScope, owned } from "@/lib/session";
-import { cancelRun, deleteCampaign, runCampaignNow, toggleCampaign } from "../../actions/campaigns";
+import { cancelRun, deleteCampaign, runCampaignNow, sendCampaignTest, toggleCampaign } from "../../actions/campaigns";
 import { CampaignForm } from "../campaign-form";
 import { campaignFormData } from "../form-data";
 
@@ -51,6 +51,9 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
         description={c.active && c.nextRunAt ? `Next send ${fmtDate(c.nextRunAt, "EEEE d MMM, h:mm a")}` : "Paused: nothing scheduled"}
         actions={
           scope.isAdmin && <>
+            <ActionButton action={sendCampaignTest.bind(null, c.id)} size="md" title={`Send one copy to your own numbers (customers tagged "${TEST_TAG}")`}>
+              <FlaskConical className="size-4" /> Send test to me
+            </ActionButton>
             <ActionButton action={runCampaignNow.bind(null, c.id)} size="md" confirm={sendConfirm}>
               <Send className="size-4" /> Send now
             </ActionButton>

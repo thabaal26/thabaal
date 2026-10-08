@@ -7,9 +7,10 @@ import { dispatch, startRun } from "@/lib/dispatcher";
 import { APP_TZ } from "@/lib/format";
 import { getSettings, templateSendable } from "@/lib/provider";
 import { isQuietTime } from "@/lib/rules";
-import { computeNextRun } from "@/lib/schedule";
+import { computeNextRun, TEST_TAG } from "@/lib/schedule";
 import { senderFor } from "@/lib/senders";
 import { requireAdmin } from "@/lib/session";
+import { sendToCustomer } from "./send";
 import type { ActionResult } from "./templates";
 
 export type CampaignInput = {
@@ -123,6 +124,26 @@ export async function runCampaignNow(id: string): Promise<ActionResult> {
   await dispatch();
   refresh();
   return { ok: true, message: `Started: ${run.total} customers queued, ${c.batchSize} every ${c.intervalMinutes} min.` };
+}
+
+/**
+ * Sends the campaign's message once to the client's customers tagged "test" (your own numbers),
+ * from the campaign's number, so you can see it before real customers do. Skips quiet hours
+ * and the gap between offers, because these are your numbers.
+ */
+export async function sendCampaignTest(id: string): Promise<ActionResult> {
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const c = await db.campaign.findUnique({ where: { id }, select: { clientId: true, templateId: true, senderId: true } });
+  if (!c) return { ok: false, message: "Campaign not found." };
+  const testers = await db.customer.findMany({ where: { clientId: c.clientId, tags: { has: TEST_TAG } }, select: { id: true, name: true }, take: 5 });
+  if (!testers.length) return { ok: false, message: `No customers are tagged "${TEST_TAG}". Add that tag to your own number on the Customers page.` };
+
+  const results = await Promise.all(testers.map((t) => sendToCustomer(t.id, c.templateId, c.senderId, true)));
+  const failed = results.filter((r) => !r.ok);
+  return failed.length
+    ? { ok: false, message: `Test failed: ${failed[0].message}` }
+    : { ok: true, message: `Test sent to ${testers.map((t) => t.name).join(", ")}. Check your phone.` };
 }
 
 export async function cancelRun(runId: string): Promise<ActionResult> {

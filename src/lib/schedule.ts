@@ -1,6 +1,9 @@
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
 
-export const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+/** The tag that marks your own numbers; a campaign's "Send test" goes only to these customers. */
+export const TEST_TAG = "test";
+
+export const DAYS =["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 type Schedule = {
   scheduleType: "ONCE" | "WEEKLY";
