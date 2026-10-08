@@ -1,11 +1,15 @@
 // Shared by server and client: template shapes, validation, rendering and Meta payloads.
 
+/** Meta's sample template every new account gets; never meant for customers. */
+export const META_SAMPLES = ["hello_world"];
+
 export type Category = "MARKETING" | "UTILITY" | "AUTHENTICATION";
 export type HeaderKind = "NONE" | "TEXT" | "IMAGE";
 
 export type TemplateButton = {
   /** ORDER_DETAILS is WhatsApp's "Review and pay" button; such templates only go out as payment requests. */
-  type: "QUICK_REPLY" | "URL" | "PHONE_NUMBER" | "COPY_CODE" | "ORDER_DETAILS";
+  /** CATALOG is WhatsApp's "View catalog" button; it must be the template's only button and needs no header. */
+  type: "QUICK_REPLY" | "URL" | "PHONE_NUMBER" | "COPY_CODE" | "ORDER_DETAILS" | "CATALOG";
   text: string;
   url?: string;
   phone?: string;
@@ -118,6 +122,7 @@ export function toPlainText(
       b.type === "URL" ? `👉 ${b.text}: ${b.url}`
       : b.type === "PHONE_NUMBER" ? `📞 ${b.text}: ${b.phone}`
       : b.type === "QUICK_REPLY" ? `↩️ Reply "${b.text}"`
+      : b.type === "CATALOG" ? `🛍️ Reply "catalogue" to see our products`
       : "",
     )
     .filter(Boolean);
@@ -158,6 +163,11 @@ export function validateDraft(t: TemplateDraft): string[] {
   });
   if (t.buttons.filter((b) => b.type === "URL").length > 2) errors.push("At most 2 website buttons.");
   if (t.buttons.filter((b) => b.type === "PHONE_NUMBER").length > 1) errors.push("At most 1 call button.");
+  if (t.buttons.some((b) => b.type === "CATALOG")) {
+    if (t.buttons.length > 1) errors.push("A catalogue button must be the template's only button.");
+    if (t.headerType !== "NONE") errors.push("Catalogue templates can't have a header: WhatsApp shows a product picture there.");
+    if (t.category !== "MARKETING") errors.push("Catalogue templates must be in the Marketing category.");
+  }
   return errors;
 }
 
@@ -195,7 +205,9 @@ export function toMetaComponents(t: TemplateDraft, headerHandle?: string) {
           ? { type: "URL", text: b.text, url: b.url }
           : b.type === "PHONE_NUMBER"
             ? { type: "PHONE_NUMBER", text: b.text, phone_number: b.phone?.replace(/\s/g, "") }
-            : { type: "QUICK_REPLY", text: b.text },
+            : b.type === "CATALOG"
+              ? { type: "CATALOG", text: b.text }
+              : { type: "QUICK_REPLY", text: b.text },
       ),
     });
   }
@@ -239,6 +251,7 @@ export function fromMetaComponents(components: MetaComponent[]) {
           : b.type === "PHONE_NUMBER" ? "PHONE_NUMBER"
           : b.type === "OTP" ? "COPY_CODE"
           : b.type === "ORDER_DETAILS" ? "ORDER_DETAILS"
+          : b.type === "CATALOG" ? "CATALOG"
           : "QUICK_REPLY",
         text: b.text ?? "Copy code",
         url: b.url,

@@ -92,7 +92,10 @@ export function metaReplyContent(m: {
   const tapped = m.button?.text ?? m.interactive?.button_reply?.title ?? m.interactive?.list_reply?.title;
   if (tapped) return { text: tapped, kind: "button" };
   const caption = m.image?.caption ?? m.video?.caption ?? m.document?.caption ?? m.document?.filename;
-  const label = { image: "Photo", video: "Video", audio: "Voice note", document: "Document", sticker: "Sticker", location: "Location" }[m.type ?? ""] ?? "Message";
+  const label =
+    { image: "Photo", video: "Video", audio: "Voice note", document: "Document", sticker: "Sticker", location: "Location",
+      interactive: "Tapped a WhatsApp button", unsupported: "A message type WhatsApp can't show here", request_welcome: "Opened the chat", system: "WhatsApp notice" }[m.type ?? ""] ??
+    (m.type ? `Message (${m.type})` : "Message");
   const file = m.type ? (m as Record<string, { id?: string } | undefined>)[m.type] : undefined;
   const media = file?.id && MEDIA_TYPES.includes(m.type!) ? { id: file.id, type: m.type! } : undefined;
   return { text: caption ? `${label}: ${caption}` : `[${label}]`, kind: "media", media };
