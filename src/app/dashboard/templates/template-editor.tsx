@@ -1,6 +1,5 @@
 "use client";
 
-import { upload } from "@vercel/blob/client";
 import { Bold, Braces, Eye, Italic, Loader2, Plus, Send, Strikethrough, Trash2, TriangleAlert, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
@@ -81,28 +80,25 @@ export function TemplateEditor({
 
   // Header image goes straight from the browser to Vercel Blob; its public link fills the field.
   const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
   async function uploadImage(file?: File) {
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) return toastResult({ ok: false, message: "That image is over 5 MB. WhatsApp allows up to 5 MB." });
+    if (file.size > 4 * 1024 * 1024) return toastResult({ ok: false, message: "That image is over 4 MB. Use a smaller JPG or PNG." });
     setUploading(true);
-    setProgress(0);
-    // The client retries failed requests quietly; give up after a minute and show why.
     const timeout = AbortSignal.timeout(60_000);
     try {
-      const blob = await upload(`templates/${file.name}`, file, {
-        access: "public",
-        handleUploadUrl: "/api/upload",
-        abortSignal: timeout,
-        onUploadProgress: (p) => setProgress(Math.round(p.percentage)),
+      const res = await fetch(`/api/upload?filename=${encodeURIComponent(file.name)}`, {
+        method: "POST",
+        headers: { "Content-Type": file.type },
+        body: file,
+        signal: timeout,
       });
-      set({ headerMediaUrl: blob.url });
+      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (!res.ok || !data.url) throw new Error(data.error ?? `Server returned ${res.status}`);
+      set({ headerMediaUrl: data.url });
       toastResult({ ok: true, message: "Image uploaded. Save the template to keep it." });
     } catch (e) {
       console.error("Image upload failed", e);
-      const message = timeout.aborted
-        ? "Upload timed out. Check that the Blob store is Public and connected to this project, then try again."
-        : `Upload failed: ${e instanceof Error ? e.message : String(e)}`;
+      const message = timeout.aborted ? "Upload timed out. Try again, or paste an image link instead." : `Upload failed: ${e instanceof Error ? e.message : String(e)}`;
       toastResult({ ok: false, message });
     } finally {
       setUploading(false);
@@ -284,11 +280,11 @@ export function TemplateEditor({
                         <input className="field" value={t.headerMediaUrl} placeholder="https://yourdomain.com/offer.jpg" onChange={(e) => set({ headerMediaUrl: e.target.value })} />
                         <label className={cn("inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-sm font-medium ring-1 ring-line hover:bg-canvas", uploading && "pointer-events-none opacity-60")}>
                           {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-                          {uploading ? `Uploading ${progress}%` : "Upload"}
+                          {uploading ? "Uploading…" : "Upload"}
                           <input type="file" accept="image/jpeg,image/png" className="sr-only" onChange={(e) => uploadImage(e.target.files?.[0])} />
                         </label>
                       </div>
-                      <p className="text-xs text-muted">JPG or PNG, up to 5 MB. A wide image (about 1200×628) reads best in the chat.</p>
+                      <p className="text-xs text-muted">JPG or PNG, up to 4 MB. A wide image (about 1200×628) reads best in the chat.</p>
                     </div>
                   )}
                 </div>

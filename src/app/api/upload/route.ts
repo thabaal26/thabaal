@@ -1,28 +1,33 @@
-import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
+import { put } from "@vercel/blob";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
+// Vercel caps a request body at 4.5 MB, so header images go up to 4 MB.
+const MAX_BYTES = 4 * 1024 * 1024;
+const TYPES = ["image/jpeg", "image/png"];
+
 /**
- * Lets the template editor upload a header image straight from the browser to Vercel Blob.
- * Only admins get an upload token; files are public because WhatsApp downloads them by link.
+ * Stores a template header image in Vercel Blob and returns its public link.
+ * Public because WhatsApp downloads the image by that link; only admins can upload.
  */
 export async function POST(req: NextRequest) {
-  const body = (await req.json()) as HandleUploadBody;
+  const s = await requireAdmin();
+  if ("denied" in s) return NextResponse.json({ error: s.denied }, { status: 403 });
+
+  const type = req.headers.get("content-type") ?? "";
+  if (!TYPES.includes(type)) return NextResponse.json({ error: "Only JPG or PNG images can be used." }, { status: 400 });
+  const size = Number(req.headers.get("content-length") ?? 0);
+  if (size > MAX_BYTES) return NextResponse.json({ error: "That image is over 4 MB." }, { status: 400 });
+  if (!req.body) return NextResponse.json({ error: "No file received." }, { status: 400 });
+
+  const name = (req.nextUrl.searchParams.get("filename") ?? "image").replace(/[^\w.-]+/g, "-").slice(-80);
   try {
-    const res = await handleUpload({
-      body,
-      request: req,
-      onBeforeGenerateToken: async () => {
-        const s = await requireAdmin();
-        if ("denied" in s) throw new Error(s.denied);
-        // WhatsApp header images: JPG or PNG, at most 5 MB.
-        return { allowedContentTypes: ["image/jpeg", "image/png"], maximumSizeInBytes: 5 * 1024 * 1024, addRandomSuffix: true };
-      },
-    });
-    return NextResponse.json(res);
+    const blob = await put(`templates/${name}`, req.body, { access: "public", contentType: type, addRandomSuffix: true });
+    return NextResponse.json({ url: blob.url });
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : "Upload failed" }, { status: 400 });
+    console.error("Blob upload failed", e);
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Upload failed" }, { status: 500 });
   }
 }
