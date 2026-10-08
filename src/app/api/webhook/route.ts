@@ -7,6 +7,7 @@ import { applyFailure } from "@/lib/rules";
 import { recordOrder } from "@/lib/orders";
 import { metaReplyContent, receivingNumber, recordReply } from "@/lib/replies";
 import { mapMetaStatus } from "@/lib/whatsapp";
+import { JOIN_RE, joinFromWhatsApp } from "@/lib/optin";
 
 export const dynamic = "force-dynamic";
 
@@ -84,6 +85,12 @@ export async function POST(req: NextRequest) {
           const { text, kind, media } = metaReplyContent(m);
           const phoneNumberId = v.metadata?.phone_number_id;
           if (OPT_OUT.test(text)) await optOut(m.from, phoneNumberId);
+          // "JOIN van" from an opt-in QR code or link: add them as an opted-in customer first.
+          const join = JOIN_RE.exec(text);
+          if (join) {
+            const profileName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name;
+            await joinFromWhatsApp({ phone: m.from, profileName, source: join[1], phoneNumberId }).catch((e) => console.error("Could not add joining customer", e));
+          }
           const customer = await recordReply({ phone: m.from, text, kind, media, waMessageId: m.id, phoneNumberId, at: m.timestamp ? new Date(Number(m.timestamp) * 1000) : undefined });
           if (customer && m.type === "order") await recordOrder(customer, m.id, m).catch((e) => console.error("Could not save order", e));
         }
