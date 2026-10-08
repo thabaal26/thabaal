@@ -6,7 +6,7 @@ import { APP_TZ } from "./format";
 import { getSettings } from "./provider";
 import { replyWindowEnd } from "./replies";
 import { senderFor } from "./senders";
-import { sendCatalogMessage } from "./whatsapp";
+import { sendCatalogMessage, sendTextMessage } from "./whatsapp";
 
 // The free way to show the catalogue: a catalogue message inside the customer's 24-hour window
 // (a service message), instead of a paid marketing template.
@@ -70,4 +70,49 @@ export async function autoSendCatalogue(customerId: string, trigger: "asked" | "
   if (recent) return;
   const r = await sendCatalogueTo(customerId);
   if (!r.ok) console.warn(`Automatic catalogue reply not sent: ${r.message}`);
+}
+
+/**
+ * Quick-reply buttons on campaign templates that get a fixed answer instead of the catalogue.
+ * `then: "catalogue"` also sends the catalogue so the customer can start choosing.
+ */
+const BUTTON_REPLIES: { match: RegExp; reply: (first: string, business: string) => string; then?: "catalogue" }[] = [
+  {
+    match: /^\s*make a gift pack\s*$/i,
+    reply: (first, business) =>
+      `நன்றி ${first}! 🎁 உங்கள் தீபாவளி பரிசுப் பெட்டியை தயார் செய்ய எங்கள் குழு விரைவில் உங்களை அழைக்கும்.
+
+Thank you! Our ${business} team will call you shortly to put together your Deepavali gift pack. Meanwhile, browse our products below. 🪔`,
+    then: "catalogue",
+  },
+  {
+    match: /^\s*happy (deepavali|diwali)\s*$/i,
+    reply: (first, business) =>
+      `நன்றி ${first}! 🪔✨ உங்களுக்கும் உங்கள் குடும்பத்தினருக்கும் இனிய தீபாவளி நல்வாழ்த்துக்கள்! 💛
+
+Thank you, and a very Happy Deepavali to you and your family from all of us at ${business}! 🙏`,
+  },
+];
+
+/**
+ * Answers a campaign button that has its own reply (e.g. "Make a gift pack"). Returns true when the tap
+ * was one of those, so the caller doesn't also treat it as a greeting. Double taps within 2 minutes are ignored.
+ */
+export async function autoReplyToButton(customerId: string, text: string, kind: string) {
+  if (kind !== "button" && kind !== "text") return false;
+  const rule = BUTTON_REPLIES.find((r) => r.match.test(text));
+  if (!rule) return false;
+  const c = await db.customer.findUnique({ where: { id: customerId }, select: { id: true, name: true, phone: true, clientId: true, optedOut: true, client: { select: { name: true } } } });
+  if (!c || c.optedOut || (await getSettings()).provider !== "META") return true;
+  const recent = await db.message.findFirst({ where: { customerId, templateName: "Auto reply", createdAt: { gte: new Date(Date.now() - ASKED_GAP_MS) } }, select: { id: true } });
+  if (recent) return true;
+  const last = await db.reply.findFirst({ where: { customerId }, orderBy: { receivedAt: "desc" }, select: { senderId: true } });
+  const { number, cfg } = await senderFor(c.clientId, last?.senderId);
+  const body = rule.reply(c.name.trim().split(/\s+/)[0] || "", c.client.name);
+  const res = await sendTextMessage(cfg, c.phone, body);
+  await db.message.create({
+    data: { customerId: c.id, templateName: "Auto reply", body, status: "SENT", waMessageId: res.id, simulated: res.simulated, provider: "META", sentAt: new Date(), senderId: number?.id ?? null },
+  });
+  if (rule.then === "catalogue") await autoSendCatalogue(c.id, "asked");
+  return true;
 }

@@ -8,7 +8,7 @@ import { recordOrder } from "@/lib/orders";
 import { metaReplyContent, receivingNumber, recordReply } from "@/lib/replies";
 import { orderWhereRef } from "@/lib/orders";
 import { autoRequestPayment, confirmPayment } from "@/lib/payments";
-import { autoSendCatalogue, catalogueTrigger, firstMessageToday } from "@/lib/catalog";
+import { autoReplyToButton, autoSendCatalogue, catalogueTrigger, firstMessageToday } from "@/lib/catalog";
 import { mapMetaStatus } from "@/lib/whatsapp";
 import { JOIN_RE, joinFromWhatsApp } from "@/lib/optin";
 
@@ -177,7 +177,9 @@ export async function POST(req: NextRequest) {
           const customer = await recordReply({ phone: m.from, text, kind, media, waMessageId: m.id, phoneNumberId, at: m.timestamp ? new Date(Number(m.timestamp) * 1000) : undefined });
           // Said hi, asked about products or prices (e.g. tapped "Send price list"), or wrote for the first time
           // today: reply with the free catalogue message (at most once every 12 hours).
-          if (customer && m.type !== "order") {
+          // Buttons with their own answer ("Make a gift pack", "Happy Deepavali") get that instead.
+          const answered = customer && m.type !== "order" ? await autoReplyToButton(customer.id, text, kind).catch((e) => (console.error("Automatic button reply failed", e), true)) : false;
+          if (customer && m.type !== "order" && !answered) {
             const trigger = catalogueTrigger(text, kind) ?? ((await firstMessageToday(customer.id)) ? "greeting" : null);
             if (trigger) await autoSendCatalogue(customer.id, trigger).catch((e) => console.error("Automatic catalogue reply failed", e));
           }
