@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import { QrCode, Search, Users } from "lucide-react";
+import { QrCode, Search, Sheet, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Picker } from "@/components/picker";
@@ -78,7 +78,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
       <PageHeader
         title="Customers"
         description={`${fmtNumber(total)}${tag || q || area ? " matching" : ""} customers${scope.clientName ? ` of ${scope.clientName}` : ""}. Customers who reply STOP are opted out automatically.`}
-        actions={scope.clientId ? <><Link href="/dashboard/customers/grow" className={buttonClass("secondary")}><QrCode className="size-4" /> Get more customers</Link>{scope.isAdmin && <CustomerTools />}</> : undefined}
+        actions={scope.clientId ? <><Link href="/dashboard/customers/grow" className={buttonClass("secondary")}><QrCode className="size-4" /> Get more customers</Link><Link href="/dashboard/customers/sheet" className={buttonClass("secondary")}><Sheet className="size-4" /> Google Sheet</Link>{scope.isAdmin && <CustomerTools />}</> : undefined}
       />
 
       <Card>

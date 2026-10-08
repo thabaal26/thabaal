@@ -51,6 +51,12 @@ model Client {
   /// Refill reminder: this many days after an order, send refillTemplate. Null turns it off.
   refillDays          Int?
   refillTemplateId    String?
+  /// Google Sheet tabs shared as "anyone with the link"; synced into Customers and Orders.
+  sheetCustomersUrl   String?
+  sheetOrdersUrl      String?
+  sheetSyncedAt       DateTime?
+  /// Result of the last sync, shown on the sheet page (e.g. "12 added, 3 updated").
+  sheetSyncNote       String?
   createdAt           DateTime          @default(now())
   users               User[]
   customers           Customer[]
@@ -361,6 +367,8 @@ model Order {
   internalNote String?
   /// When the refill reminder for this order went out, so it's sent once.
   reminderSentAt DateTime?
+  /// Where the order came from outside WhatsApp, e.g. a Google Sheet row; keeps a sync from adding it twice.
+  externalRef  String?     @unique
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 

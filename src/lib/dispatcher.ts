@@ -8,6 +8,7 @@ import { allowance, refreshStaleNumbers, windowFreesAt } from "./limits";
 import { explainError, metaError } from "./meta-errors";
 import { applyFailure, quietUntil, recentlyMarketed } from "./rules";
 import { sendRefillReminders } from "./refill";
+import { syncDueSheets } from "./sheets";
 import { senderFor } from "./senders";
 import { WahaError } from "./waha";
 import { MetaError } from "./whatsapp";
@@ -253,6 +254,7 @@ export async function dispatch() {
     failed += res.failed;
   }
   if (Date.now() < deadline) await sendRefillReminders(now).catch((e) => console.error("Refill reminders failed", e));
+  if (Date.now() < deadline) await syncDueSheets(now).catch((e) => console.error("Sheet sync failed", e));
   await db.setting.upsert({ where: { id: 1 }, update: { lastDispatchAt: now }, create: { id: 1, lastDispatchAt: now } });
   return { campaignsStarted, runsProcessed: runs.length, sent, failed, ms: Date.now() - startedAt };
 }
