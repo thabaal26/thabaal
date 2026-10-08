@@ -57,7 +57,8 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
         }
       />
 
-      <div className="mb-4 flex flex-wrap gap-2">
+      {/* Phones: one swipeable row of status chips instead of a tall wrapped block. */}
+      <div className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] *:shrink-0 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
         {[{ key: "", label: "All", n: allCount }, ...MESSAGE_STATUSES.map((s) => ({ key: s, label: s[0] + s.slice(1).toLowerCase(), n: byStatus.find((b) => b.status === s)?._count ?? 0 }))].map((s) => (
           <Link
             key={s.key}

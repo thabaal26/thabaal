@@ -85,6 +85,11 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
                     </div>
                     <StatusBadge status={t.status} />
                   </div>
+                  {t.headerType === "IMAGE" && !t.headerMediaUrl && (
+                    <Link href={`/dashboard/templates/${t.id}`} className="-mt-1 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800 ring-1 ring-amber-600/20 hover:bg-amber-100">
+                      Image missing: sends will fail until you add one. <span className="font-medium underline">Add image</span>
+                    </Link>
+                  )}
                   <div className="mt-auto flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
                       <StatusBadge status={t.category} />

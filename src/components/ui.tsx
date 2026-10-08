@@ -8,7 +8,8 @@ export function PageHeader({ title, description, actions }: { title: string; des
         <h1 className="truncate text-[1.6rem] font-semibold leading-tight tracking-tight text-ink sm:text-2xl">{title}</h1>
         {description && <p className="mt-1 max-w-2xl text-sm text-muted">{description}</p>}
       </div>
-      {actions && <div className="grid auto-cols-fr grid-flow-col gap-2 sm:flex sm:flex-wrap sm:items-center">{actions}</div>}
+      {/* Phones: buttons share the row and wrap two-up instead of squeezing four into one line. */}
+      {actions && <div className="flex flex-wrap gap-2 *:min-w-[calc(50%-0.25rem)] *:flex-1 sm:items-center sm:*:min-w-0 sm:*:flex-none">{actions}</div>}
     </div>
   );
 }
