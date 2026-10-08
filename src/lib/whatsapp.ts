@@ -243,6 +243,25 @@ export async function sendOrderStatus(cfg: WaConfig, to: string, referenceId: st
   return { id: res.messages[0].id, simulated: false };
 }
 
+/**
+ * WhatsApp's "View catalog" message: opens the catalogue linked to the sending number. Free inside the
+ * customer's 24-hour window (a service message), unlike a catalogue template.
+ */
+export async function sendCatalogMessage(cfg: WaConfig, to: string, body: string): Promise<{ id: string; simulated: boolean }> {
+  if (!cfg.live) return { id: `demo.${crypto.randomUUID()}`, simulated: true };
+  const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "interactive",
+      interactive: { type: "catalog_message", body: { text: body.slice(0, 1024) }, action: { name: "catalog_message" } },
+    }),
+  });
+  return { id: res.messages[0].id, simulated: false };
+}
+
 export type MetaTemplate = {
   id: string;
   name: string;

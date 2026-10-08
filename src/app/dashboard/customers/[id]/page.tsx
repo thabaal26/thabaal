@@ -12,6 +12,7 @@ import { itemsText, money, type OrderItem } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { replyWindowEnd } from "@/lib/replies";
 import { getScope, owned } from "@/lib/session";
+import { sendCatalogue } from "../../actions/catalog";
 import { requestCallPermission } from "../../actions/calls";
 import { setOptOut } from "../../actions/customers";
 import { CallButton } from "./call-button";
@@ -76,6 +77,11 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
             <a href={`https://wa.me/${c.phone}`} target="_blank" rel="noreferrer" className={buttonClass("primary")}>
               <MessageCircle className="size-4" /> Message on WhatsApp
             </a>
+            {scope.canOperate && windowEnd && !c.optedOut && (
+              <ActionButton action={sendCatalogue.bind(null, c.id)} size="md" title="Free while the customer's 24-hour window is open">
+                Send catalogue
+              </ActionButton>
+            )}
             {scope.canOperate && <CallButton customerId={c.id} name={c.name} primary={callAllowed} />}
             {scope.canOperate && !callAllowed && (
               <ActionButton
