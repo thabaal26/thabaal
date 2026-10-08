@@ -110,15 +110,21 @@ export async function saveTemplate(id: string | null, draft: TemplateDraft): Pro
     if (!existing) return { ok: false, message: "Template not found." };
     const merged = { ...draft, name: existing.name, language: existing.language, category: existing.category };
 
-    // Only the image link changed: Meta keeps its own sample image, so nothing needs re-review.
-    const { headerMediaUrl: newUrl, ...newRest } = contentFields(merged);
-    const { headerMediaUrl: oldUrl, ...oldRest } = existing;
+    // The image link and which customer field fills each {{n}} are ours alone: Meta keeps its own sample
+    // image and never sees the variable mapping. Saving only those (or nothing) must not resubmit.
+    const { headerMediaUrl: newUrl, variables: newVars, ...newRest } = contentFields(merged);
+    const { headerMediaUrl: oldUrl, variables: oldVars, ...oldRest } = existing;
     const keys = Object.keys(newRest) as (keyof typeof newRest)[];
     const sameForMeta = keys.every((k) => stable(newRest[k]) === stable(oldRest[k as keyof typeof oldRest]));
-    if (sameForMeta && newUrl !== oldUrl) {
-      await db.template.update({ where: { id }, data: { headerMediaUrl: newUrl } });
+    if (sameForMeta) {
+      const localChange = newUrl !== oldUrl || stable(newVars) !== stable(oldVars);
+      if (localChange) await db.template.update({ where: { id }, data: { headerMediaUrl: newUrl, variables: newVars } });
       revalidatePath("/dashboard/templates");
-      return { ok: true, id, message: "Image link saved. Meta's approval is unchanged, so sending continues." };
+      return {
+        ok: true,
+        id,
+        message: localChange ? "Saved. Meta's approval is unchanged, so sending continues." : "No changes to save.",
+      };
     }
 
     try {
