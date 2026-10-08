@@ -1,5 +1,7 @@
 import "server-only";
 import { db } from "./db";
+import { senderFor } from "./senders";
+import { catalogProductNames } from "./whatsapp";
 
 export type OrderItem = { id: string; name?: string; quantity: number; price: number; currency: string };
 
@@ -28,9 +30,40 @@ export const money = (n: number, currency = "INR") =>
 export async function recordOrder(customer: { id: string; clientId: string }, waMessageId: string | undefined, m: { order?: MetaOrder }, names?: Map<string, string>) {
   const o = parseOrder(m);
   if (!o.items.length) return null;
-  const items = o.items.map((i) => ({ ...i, name: names?.get(i.id) }));
+  const known = names ?? (await lookupNames(customer.clientId, o.catalogId, o.items.map((i) => i.id)));
+  const items = o.items.map((i) => ({ ...i, name: known.get(i.id) }));
   if (waMessageId && (await db.order.findUnique({ where: { waMessageId }, select: { id: true } }))) return null;
   return db.order.create({
     data: { clientId: customer.clientId, customerId: customer.id, waMessageId, catalogId: o.catalogId, note: o.note, items, total: o.total, currency: o.currency },
   });
+}
+
+/** Item names for a cart's retailer ids, from the client's catalogue; empty when they can't be fetched. */
+export async function lookupNames(clientId: string, catalogId: string | null | undefined, ids: string[]) {
+  if (!catalogId || !ids.length) return new Map<string, string>();
+  const { cfg } = await senderFor(clientId, null);
+  try {
+    return await catalogProductNames(cfg, catalogId, [...new Set(ids)]);
+  } catch (e) {
+    console.error("Could not read product names from the catalogue", e);
+    return new Map<string, string>();
+  }
+}
+
+/**
+ * Fills in names for orders saved with only product ids (older carts, or when the lookup failed).
+ * Runs from the scheduler, a few orders at a time.
+ */
+export async function backfillOrderNames(limit = 20) {
+  const rows = await db.$queryRaw<{ id: string }[]>`
+    SELECT id FROM "Order" WHERE "catalogId" IS NOT NULL AND items::text NOT LIKE '%"name"%' AND "createdAt" > now() - interval '120 days'
+    ORDER BY "createdAt" DESC LIMIT ${limit}`;
+  for (const { id } of rows) {
+    const o = await db.order.findUnique({ where: { id }, select: { clientId: true, catalogId: true, items: true } });
+    if (!o) continue;
+    const items = o.items as OrderItem[];
+    const names = await lookupNames(o.clientId, o.catalogId, items.map((i) => i.id));
+    if (!names.size) continue;
+    await db.order.update({ where: { id }, data: { items: items.map((i) => ({ ...i, name: i.name ?? names.get(i.id) })) } });
+  }
 }

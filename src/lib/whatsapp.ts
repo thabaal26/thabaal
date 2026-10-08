@@ -182,3 +182,16 @@ export function mapMetaStatus(s: string) {
       return "PENDING" as const; // PENDING, IN_APPEAL, PENDING_DELETION…
   }
 }
+
+/**
+ * Product names for retailer ids in a catalogue. Carts only carry ids, so orders look them up here.
+ * Needs the token to have catalog_management (or business_management) permission.
+ */
+export async function catalogProductNames(cfg: WaConfig, catalogId: string, retailerIds: string[]) {
+  const names = new Map<string, string>();
+  if (!cfg.live || !retailerIds.length) return names;
+  const filter = encodeURIComponent(JSON.stringify({ retailer_id: { is_any: retailerIds } }));
+  const res = await graph<{ data: { retailer_id: string; name: string }[] }>(cfg, `${catalogId}/products?fields=retailer_id,name&limit=100&filter=${filter}`);
+  for (const p of res.data ?? []) if (p.retailer_id && p.name) names.set(p.retailer_id, p.name);
+  return names;
+}
