@@ -13,6 +13,7 @@ import { BrandHero } from "./brand-hero";
 import { NumberHealth } from "./number-health";
 import { numberHealth } from "@/lib/limits";
 import { DailyChart } from "./daily-chart";
+import { SpendCard } from "./spend-card";
 
 export const dynamic = "force-dynamic";
 
@@ -191,6 +192,7 @@ export default async function Overview() {
       )}
 
       <NumberHealth numbers={health} />
+      {scope.clientId && <SpendCard clientId={scope.clientId} canManage={scope.canManage} />}
 
       {activeRuns.length > 0 && (
         <Card className="mt-6">

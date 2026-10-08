@@ -65,6 +65,7 @@ model Client {
   /// WhatsApp Manager → Payment configurations: the name of the active one (e.g. a UPI VPA). Null turns payment requests off.
   paymentConfig       String?
   audiences           Audience[]
+  topUps              TopUp[]
   createdAt           DateTime          @default(now())
   users               User[]
   customers           Customer[]
@@ -459,4 +460,18 @@ model Call {
 
   @@index([status, startedAt])
   @@index([clientId, startedAt])
+}
+
+/// Money added to the WhatsApp (Meta) account, entered by hand: Meta has no API for the balance.
+/// The dashboard subtracts estimated message spend since the first top-up.
+model TopUp {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  amount    Float
+  note      String?
+  addedBy   String?
+  createdAt DateTime @default(now())
+
+  @@index([clientId, createdAt])
 }
