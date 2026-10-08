@@ -7,7 +7,7 @@ import { getSettings } from "./provider";
 import { replyWindowEnd } from "./replies";
 import { senderFor } from "./senders";
 import { renderFor, type TemplateButton, type VarMap } from "./template";
-import { sendOrderStatus, sendPaymentRequest, sendPaymentTemplate } from "./whatsapp";
+import { MetaError, sendOrderStatus, sendPaymentRequest, sendPaymentTemplate } from "./whatsapp";
 
 // WhatsApp payments for orders: the "Review and pay" request, reminders, confirmation and the order card
 // in the customer's chat. Shared by the webhook, the Orders page and the scheduler.
@@ -42,6 +42,23 @@ async function logMessage(customerId: string, templateName: string, body: string
   await db.message.create({
     data: { customerId, templateName, body, status: "SENT", waMessageId: res.id, simulated: res.simulated, provider: "META", sentAt: new Date(), senderId },
   });
+}
+
+/** Meta couldn't fetch a catalogue product's picture (error 131053). */
+const MEDIA_ERROR = 131053;
+
+/**
+ * Sends with the catalogue link (so WhatsApp shows product pictures), and if Meta can't load a product's
+ * picture, sends again without it so the customer still gets a working "Review and pay".
+ */
+async function withCatalogFallback<T, P extends { catalogId?: string | null }>(payment: P, send: (p: P) => Promise<T>) {
+  try {
+    return await send(payment);
+  } catch (e) {
+    if (!payment.catalogId || !(e instanceof MetaError) || e.code !== MEDIA_ERROR) throw e;
+    console.warn("Product picture couldn't be loaded; sending the payment request without catalogue pictures");
+    return send({ ...payment, catalogId: null });
+  }
 }
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] || "there";
@@ -79,18 +96,14 @@ export async function sendPaymentRequestFor(orderId: string, opts: { reminder?: 
     let res: { id: string; simulated: boolean };
     let templateName = opts.reminder ? "Payment reminder" : "Payment request";
     if (open) {
-      res = await sendPaymentRequest(cfg, c.phone, text, payment);
+      res = await withCatalogFallback(payment, (p) => sendPaymentRequest(cfg, c.phone, text, p));
     } else {
       const t = await paymentTemplateFor(c.clientId);
       if (!t)
         return { ok: false, message: `The customer's 24-hour window has closed, so WhatsApp needs an approved template with a "Review and pay" button. Add one from Meta's Template library (approved instantly) or wait for ${PAYMENT_TEMPLATE}, then sync templates.` };
       const r = renderFor({ ...t, headerText: t.headerText ?? "", footer: t.footer ?? "", variables: t.variables as VarMap }, c);
-      res = await sendPaymentTemplate(
-        cfg,
-        c.phone,
-        { name: t.name, language: t.language, bodyParams: r.bodyParams, headerParams: r.headerParams, headerImage: t.headerType === "IMAGE" ? await headerImageFor(t) : null },
-        payment,
-      );
+      const template = { name: t.name, language: t.language, bodyParams: r.bodyParams, headerParams: r.headerParams, headerImage: t.headerType === "IMAGE" ? await headerImageFor(t) : null };
+      res = await withCatalogFallback(payment, (p) => sendPaymentTemplate(cfg, c.phone, template, p));
       templateName = t.name;
     }
     await logMessage(c.id, templateName, text, res, number?.id ?? null);
