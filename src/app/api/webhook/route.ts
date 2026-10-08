@@ -97,6 +97,14 @@ export async function POST(req: NextRequest) {
           where: { metaId: String(v.message_template_id) },
           data: { status: mapMetaStatus(v.event), statusReason: v.reason && v.reason !== "NONE" ? v.reason : null, lastSyncedAt: new Date() },
         });
+      } else if (change.field === "template_category_update") {
+        // Meta re-categorised a template (often utility → marketing), which changes pricing and quiet-hours rules.
+        const category = String(v.new_category ?? "").toUpperCase();
+        if (["MARKETING", "UTILITY", "AUTHENTICATION"].includes(category))
+          await db.template.updateMany({ where: { metaId: String(v.message_template_id) }, data: { category: category as never, lastSyncedAt: new Date() } });
+      } else if (change.field === "message_template_quality_update" || change.field === "account_update" || change.field === "account_alerts") {
+        // Not stored yet; logged so they show up in Vercel's logs.
+        console.warn(`WhatsApp ${change.field}`, JSON.stringify(v));
       }
     }
   }

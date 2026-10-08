@@ -66,8 +66,19 @@ export function metaReplyContent(m: {
   order?: { product_items?: { quantity?: number | string }[] };
   video?: { caption?: string };
   document?: { caption?: string; filename?: string };
+  reaction?: { emoji?: string };
+  location?: { latitude?: number; longitude?: number; name?: string; address?: string };
+  contacts?: { name?: { formatted_name?: string } }[];
 }): { text: string; kind: IncomingReply["kind"] } {
   if (m.text?.body) return { text: m.text.body, kind: "text" };
+  // An emoji reaction to one of our messages; an empty emoji means they removed it.
+  if (m.type === "reaction") return { text: m.reaction?.emoji ? `Reacted ${m.reaction.emoji}` : "", kind: "media" };
+  if (m.type === "location") {
+    const l = m.location;
+    const where = [l?.name, l?.address].filter(Boolean).join(", ");
+    return { text: `Location: ${where || `${l?.latitude}, ${l?.longitude}`}${l?.latitude != null ? ` (https://maps.google.com/?q=${l.latitude},${l.longitude})` : ""}`, kind: "media" };
+  }
+  if (m.type === "contacts") return { text: `Shared contact: ${m.contacts?.map((c) => c.name?.formatted_name).filter(Boolean).join(", ") || "unnamed"}`, kind: "media" };
   if (m.type === "order") {
     const n = (m.order?.product_items ?? []).reduce((sum, i) => sum + (Number(i.quantity) || 1), 0);
     return { text: `Placed an order from the catalogue (${n} item${n === 1 ? "" : "s"})`, kind: "order" };
