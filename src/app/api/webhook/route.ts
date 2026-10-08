@@ -8,7 +8,7 @@ import { recordOrder } from "@/lib/orders";
 import { metaReplyContent, receivingNumber, recordReply } from "@/lib/replies";
 import { orderWhereRef } from "@/lib/orders";
 import { autoRequestPayment, confirmPayment } from "@/lib/payments";
-import { autoSendCatalogue, firstMessageToday, wantsCatalogue } from "@/lib/catalog";
+import { autoSendCatalogue, catalogueTrigger, firstMessageToday } from "@/lib/catalog";
 import { mapMetaStatus } from "@/lib/whatsapp";
 import { JOIN_RE, joinFromWhatsApp } from "@/lib/optin";
 
@@ -177,8 +177,10 @@ export async function POST(req: NextRequest) {
           const customer = await recordReply({ phone: m.from, text, kind, media, waMessageId: m.id, phoneNumberId, at: m.timestamp ? new Date(Number(m.timestamp) * 1000) : undefined });
           // Said hi, asked about products or prices (e.g. tapped "Send price list"), or wrote for the first time
           // today: reply with the free catalogue message (at most once every 12 hours).
-          if (customer && m.type !== "order" && (wantsCatalogue(text, kind) || (await firstMessageToday(customer.id))))
-            await autoSendCatalogue(customer.id).catch((e) => console.error("Automatic catalogue reply failed", e));
+          if (customer && m.type !== "order") {
+            const trigger = catalogueTrigger(text, kind) ?? ((await firstMessageToday(customer.id)) ? "greeting" : null);
+            if (trigger) await autoSendCatalogue(customer.id, trigger).catch((e) => console.error("Automatic catalogue reply failed", e));
+          }
           if (customer && m.type === "order") {
             const order = await recordOrder(customer, m.id, m).catch((e) => (console.error("Could not save order", e), null));
             // A new cart: send "Review and pay" right away while the customer is in the chat.
