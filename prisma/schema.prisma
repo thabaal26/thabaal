@@ -48,6 +48,9 @@ model Client {
   /// No marketing sends between these HH:mm times (IST); null turns quiet hours off.
   quietFrom           String?           @default("21:00")
   quietTo             String?           @default("09:00")
+  /// Refill reminder: this many days after an order, send refillTemplate. Null turns it off.
+  refillDays          Int?
+  refillTemplateId    String?
   createdAt           DateTime          @default(now())
   users               User[]
   customers           Customer[]
@@ -356,6 +359,8 @@ model Order {
   status      OrderStatus @default(NEW)
   /// Our own notes: payment mode, delivery slot, address.
   internalNote String?
+  /// When the refill reminder for this order went out, so it's sent once.
+  reminderSentAt DateTime?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 

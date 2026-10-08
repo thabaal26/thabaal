@@ -212,3 +212,18 @@ export async function createOrderTemplates(): Promise<SendResult> {
     ? { ok: false, message: `Some templates weren't created. ${failed.join(" · ")}` }
     : { ok: true, message: `Submitted ${missing.map((t) => t.name).join(", ")} to Meta. Approval usually takes minutes.` };
 }
+
+/** Refill reminders: send `templateId` this many days after each order; 0 days turns them off. */
+export async function saveRefillRule(days: number, templateId: string): Promise<SendResult> {
+  const s = await requireAdmin(true);
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const n = Math.round(Number(days) || 0);
+  if (n < 0 || n > 365) return { ok: false, message: "Days must be between 1 and 365, or 0 to turn reminders off." };
+  if (n > 0) {
+    const t = await db.template.findFirst({ where: { id: templateId, clientId: s.clientId }, select: { id: true } });
+    if (!t) return { ok: false, message: "Choose a template." };
+  }
+  await db.client.update({ where: { id: s.clientId }, data: { refillDays: n || null, refillTemplateId: n ? templateId : null } });
+  revalidatePath("/dashboard/orders");
+  return { ok: true, message: n ? `Refill reminders on: ${n} days after each order.` : "Refill reminders turned off." };
+}

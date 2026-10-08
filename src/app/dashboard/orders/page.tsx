@@ -12,6 +12,7 @@ import { ActionButton } from "@/components/action-button";
 import { createOrderTemplates } from "../actions/orders";
 import { NewOrder } from "./new-order";
 import { OrderActions } from "./order-actions";
+import { RefillForm } from "./refill-form";
 
 /** The utility templates that let order updates go out after the customer's 24-hour window. */
 const ORDER_TEMPLATES = ["order_confirmation", "order_dispatched", "order_delivered"];
@@ -35,7 +36,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
   const tab = TABS.find((t) => t.key === show) ?? TABS[0];
   const mine = owned(scope);
 
-  const [orders, counts, orderTemplates] = await Promise.all([
+  const [orders, counts, orderTemplates, client, approved] = await Promise.all([
     db.order.findMany({
       where: { ...mine, ...(tab.where as object) },
       include: { customer: { select: { id: true, name: true, phone: true, location: true, client: { select: { name: true } } } } },
@@ -44,6 +45,10 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     }),
     db.order.groupBy({ by: ["status"], where: mine, _count: true }),
     scope.clientId ? db.template.findMany({ where: { clientId: scope.clientId, name: { in: ORDER_TEMPLATES } }, select: { name: true, status: true } }) : [],
+    scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { refillDays: true, refillTemplateId: true } }) : null,
+    scope.clientId && scope.isAdmin
+      ? db.template.findMany({ where: { clientId: scope.clientId, status: "APPROVED", category: { not: "AUTHENTICATION" }, name: { notIn: ORDER_TEMPLATES } }, select: { id: true, name: true }, orderBy: { name: "asc" } })
+      : [],
   ]);
   const notReady = ORDER_TEMPLATES.filter((name) => orderTemplates.find((t) => t.name === name)?.status !== "APPROVED");
   const missing = ORDER_TEMPLATES.filter((name) => !orderTemplates.some((t) => t.name === name));
@@ -92,6 +97,8 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
           </Link>
         ))}
       </div>
+
+      {scope.isAdmin && client && <RefillForm days={client.refillDays} templateId={client.refillTemplateId} templates={approved} />}
 
       {orders.length ? (
         <div className="space-y-4">

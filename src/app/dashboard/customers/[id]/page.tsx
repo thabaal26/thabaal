@@ -8,6 +8,7 @@ import { Badge, buttonClass, Card, CardHeader, PageHeader, Stat, StatusBadge } f
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { fmtDate, fmtNumber, pct } from "@/lib/format";
+import { itemsText, money, type OrderItem } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { replyWindowEnd } from "@/lib/replies";
 import { getScope, owned } from "@/lib/session";
@@ -30,6 +31,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
       client: { select: { name: true } },
       messages: { include: { run: { select: { campaign: { select: { name: true } } } }, sender: { select: { label: true } } }, orderBy: { createdAt: "desc" }, take: 100 },
       replies: { include: { sender: { select: { label: true } } }, orderBy: { receivedAt: "desc" }, take: 100 },
+      orders: { orderBy: { createdAt: "desc" }, take: 20 },
     },
   });
   if (!c) notFound();
@@ -96,10 +98,29 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
         <Card className="h-fit">
           <CardHeader title="What they buy" />
           <div className="space-y-4 p-4 sm:p-5">
+            {c.orders.length > 0 && (
+              <div>
+                <p className="mb-1.5 flex items-center justify-between text-xs font-medium text-muted">
+                  <span>Orders ({c.orders.length})</span>
+                  <span className="tabular">Spent {money(c.orders.filter((o) => o.status !== "CANCELLED").reduce((sum, o) => sum + o.total, 0))}</span>
+                </p>
+                <ul className="divide-y divide-line rounded-lg bg-canvas px-3 text-sm">
+                  {c.orders.map((o) => (
+                    <li key={o.id} className="py-2">
+                      <div className="flex justify-between gap-2 text-xs text-muted">
+                        <span>{fmtDate(o.createdAt, "d MMM yyyy")} · {o.status.toLowerCase()}</span>
+                        <span className="tabular">{money(o.total, o.currency)}</span>
+                      </div>
+                      <p className="mt-0.5 line-clamp-2">{itemsText(o.items as OrderItem[])}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {c.purchases ? (
               <p className="flex gap-2 text-sm"><ShoppingBag className="mt-0.5 size-4 shrink-0 text-brand" />{c.purchases}</p>
             ) : (
-              <p className="text-sm text-muted">No purchase recorded.</p>
+              c.orders.length === 0 && <p className="text-sm text-muted">No purchase recorded.</p>
             )}
             {c.location && (
               <div className="flex items-start gap-2 text-sm">
