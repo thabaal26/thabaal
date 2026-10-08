@@ -216,6 +216,29 @@ export async function sendPaymentTemplate(
   return { id: res.messages[0].id, simulated: false };
 }
 
+/**
+ * Updates the order card in the customer's chat after a "Review and pay" message, e.g. to "processing"
+ * once paid. Sent as a reply to their payment, inside the window it opens.
+ */
+export async function sendOrderStatus(cfg: WaConfig, to: string, referenceId: string, status: "processing" | "partially-shipped" | "shipped" | "completed" | "canceled", body: string, description?: string) {
+  if (!cfg.live) return { id: `demo.${crypto.randomUUID()}`, simulated: true };
+  const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "interactive",
+      interactive: {
+        type: "order_status",
+        body: { text: body.slice(0, 1024) },
+        action: { name: "review_order", parameters: { reference_id: referenceId, order: { status, ...(description && { description: description.slice(0, 120) }) } } },
+      },
+    }),
+  });
+  return { id: res.messages[0].id, simulated: false };
+}
+
 export type MetaTemplate = {
   id: string;
   name: string;

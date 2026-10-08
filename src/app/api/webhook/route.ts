@@ -6,7 +6,9 @@ import { explainError } from "@/lib/meta-errors";
 import { applyFailure } from "@/lib/rules";
 import { recordOrder } from "@/lib/orders";
 import { metaReplyContent, receivingNumber, recordReply } from "@/lib/replies";
-import { mapMetaStatus } from "@/lib/whatsapp";
+import { money } from "@/lib/orders";
+import { senderFor } from "@/lib/senders";
+import { mapMetaStatus, sendOrderStatus } from "@/lib/whatsapp";
 import { JOIN_RE, joinFromWhatsApp } from "@/lib/optin";
 
 export const dynamic = "force-dynamic";
@@ -78,12 +80,36 @@ async function applyPayment(s: PaymentUpdate) {
     console.warn("WhatsApp payment not completed", JSON.stringify(s));
     return;
   }
-  await db.order.updateMany({
-    where: { id: orderId, status: { in: ["NEW", "CONFIRMED"] } },
-    data: { status: "PAID", paidAt: new Date(), paymentTxnId: txn?.id ?? null },
+  const order = await db.order.findUnique({ where: { id: orderId }, include: { customer: true, client: { select: { name: true } } } });
+  // Meta may send the same payment twice; only the first one marks it paid and thanks the customer.
+  if (!order || order.paidAt) return;
+  await db.order.update({
+    where: { id: order.id },
+    data: {
+      paidAt: new Date(),
+      paymentTxnId: txn?.id ?? null,
+      // Already further along (dispatched): just record the payment.
+      ...((order.status === "NEW" || order.status === "CONFIRMED") && { status: "PAID" as const }),
+    },
   });
-  // Already further along (dispatched): just record the payment.
-  await db.order.updateMany({ where: { id: orderId, paidAt: null }, data: { paidAt: new Date(), paymentTxnId: txn?.id ?? null } });
+  await thankForPayment(order).catch((e) => console.error("Could not send payment confirmation", e));
+}
+
+/** Moves the order card in the customer's chat to "processing" and says the payment arrived. */
+async function thankForPayment(order: { id: string; total: number; currency: string; customer: { id: string; name: string; phone: string; clientId: string }; client: { name: string } }) {
+  const c = order.customer;
+  const first = c.name.trim().split(/\s+/)[0] || "there";
+  const ref = `#${order.id.slice(-5).toUpperCase()}`;
+  const text = `Hello ${first}, we have received your payment of ${money(order.total, order.currency)} for order ${ref}. Thank you! We are packing your order and will message you when it is dispatched.`;
+  const lastReply = await db.reply.findFirst({ where: { customerId: c.id }, orderBy: { receivedAt: "desc" }, select: { senderId: true } });
+  const { number, cfg } = await senderFor(c.clientId, lastReply?.senderId);
+  const res = await sendOrderStatus(cfg, c.phone, order.id, "processing", text, "Payment received");
+  await db.message.create({
+    data: {
+      customerId: c.id, templateName: "Payment received", body: text, status: "SENT", waMessageId: res.id, simulated: res.simulated,
+      provider: "META", sentAt: new Date(), senderId: number?.id ?? null,
+    },
+  });
 }
 
 /** STOP only opts out of the business whose number received it. */
