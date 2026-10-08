@@ -29,6 +29,8 @@ npm run dev
 4. Deploy. Then, from your computer with the production `DATABASE_URL` in `.env`, run:
    `npm run db:push && npm run seed` (with the client's `ADMIN_EMAIL` and `ADMIN_PASSWORD`).
 5. **Scheduler**: something must call `/api/cron` every 5 minutes.
+   - Easiest: the included GitHub Action ([.github/workflows/scheduler.yml](.github/workflows/scheduler.yml)). In the
+     GitHub repo add secrets `APP_URL` (your Vercel URL) and `CRON_SECRET` (same as in Vercel). GitHub may run it a few minutes late.
    - Vercel **Hobby** (free) only allows daily crons. Use [cron-job.org](https://cron-job.org) (free) to call
      `https://YOUR-APP.vercel.app/api/cron?key=YOUR_CRON_SECRET` every 5 minutes.
    - Vercel **Pro**: add `vercel.json` with
