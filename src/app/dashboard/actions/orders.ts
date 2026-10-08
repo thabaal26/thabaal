@@ -4,7 +4,8 @@ import type { OrderStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { itemsText, money, type OrderItem } from "@/lib/orders";
-import { renderFor, type TemplateButton, type VarMap } from "@/lib/template";
+import { PAYMENT_TEMPLATE, paymentTemplateFor } from "@/lib/payments";
+import { renderFor, type VarMap } from "@/lib/template";
 import { getSettings, wahaConfig } from "@/lib/provider";
 import { replyWindowEnd } from "@/lib/replies";
 import { headerImageFor } from "@/lib/media";
@@ -141,20 +142,6 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
   } catch (e) {
     return { ok: false, message: explainSendError(e).error };
   }
-}
-
-/** Our own "order details" template, preferred once approved for requests after the customer's 24-hour window. */
-export const PAYMENT_TEMPLATE = "payment_request";
-
-const hasPayButton = (t: { buttons: unknown }) => (t.buttons as TemplateButton[]).some((b) => b.type === "ORDER_DETAILS");
-
-/**
- * The approved template with a "Review and pay" button to send: payment_request when Meta has approved it,
- * otherwise one added from Meta's template library (pre-approved), so payments work while ours is in review.
- */
-export async function paymentTemplateFor(clientId: string) {
-  const approved = (await db.template.findMany({ where: { clientId, status: "APPROVED" }, orderBy: { name: "asc" } })).filter(hasPayButton);
-  return approved.find((t) => t.name === PAYMENT_TEMPLATE) ?? approved[0] ?? null;
 }
 
 /**
