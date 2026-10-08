@@ -6,7 +6,8 @@ import { Badge, buttonClass, Card, EmptyState, PageHeader, StatusBadge } from "@
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { fmtDate } from "@/lib/format";
-import { DAYS, estimateDuration, formatMinutes } from "@/lib/schedule";
+import { quietUntil } from "@/lib/rules";
+import { DAYS, estimateDuration, formatMinutes, timeUntil } from "@/lib/schedule";
 import { getScope, owned } from "@/lib/session";
 import { toggleCampaign } from "../actions/campaigns";
 
@@ -19,8 +20,8 @@ export default async function CampaignsPage() {
     db.campaign.findMany({
       where: owned(scope),
       include: {
-        client: { select: { name: true } },
-        template: { select: { name: true, status: true } },
+        client: { select: { name: true, quietFrom: true, quietTo: true } },
+        template: { select: { name: true, status: true, category: true } },
         runs: { orderBy: { startedAt: "desc" }, take: 1 },
       },
       orderBy: [{ active: "desc" }, { nextRunAt: "asc" }],
@@ -29,6 +30,7 @@ export default async function CampaignsPage() {
   ]);
   const audienceOf = (clientId: string) => audiences.find((a) => a.clientId === clientId)?._count ?? 0;
   const canCreate = scope.isAdmin && scope.clientId;
+  const now = new Date();
 
   return (
     <>
@@ -91,7 +93,13 @@ export default async function CampaignsPage() {
                     {c.template.status !== "APPROVED" ? (
                       <span className="text-amber-700">Template waiting for approval</span>
                     ) : c.active && c.nextRunAt ? (
-                      <>Next: <b className="text-ink">{fmtDate(c.nextRunAt, "EEE d MMM, h:mm a")}</b></>
+                      <>
+                        Starts <b className="text-ink">{timeUntil(c.nextRunAt, now)}</b> · {fmtDate(c.nextRunAt, "EEE d MMM, h:mm a")}
+                        {c.template.category === "MARKETING" && (() => {
+                          const resume = quietUntil(c.client, c.nextRunAt);
+                          return resume ? <span className="block text-amber-700">Quiet hours: it will wait and start at {fmtDate(resume, "h:mm a")}</span> : null;
+                        })()}
+                      </>
                     ) : last ? (
                       <>Last run {fmtDate(last.startedAt, "d MMM")}</>
                     ) : (

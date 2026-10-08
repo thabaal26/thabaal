@@ -28,6 +28,10 @@ export type ActionResult = { ok: boolean; message?: string; errors?: string[]; i
 
 const errText = (e: unknown) => (e instanceof MetaError || e instanceof Error ? e.message : "Something went wrong");
 
+/** JSON with sorted keys, so values compare equal however the database orders them. */
+const stable = (v: unknown): string =>
+  JSON.stringify(v, (_, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => a.localeCompare(b))) : x));
+
 function contentFields(d: TemplateDraft) {
   const auth = d.category === "AUTHENTICATION";
   return {
@@ -104,6 +108,18 @@ export async function saveTemplate(id: string | null, draft: TemplateDraft): Pro
     const existing = await db.template.findUnique({ where: { id } });
     if (!existing) return { ok: false, message: "Template not found." };
     const merged = { ...draft, name: existing.name, language: existing.language, category: existing.category };
+
+    // Only the image link changed: Meta keeps its own sample image, so nothing needs re-review.
+    const { headerMediaUrl: newUrl, ...newRest } = contentFields(merged);
+    const { headerMediaUrl: oldUrl, ...oldRest } = existing;
+    const keys = Object.keys(newRest) as (keyof typeof newRest)[];
+    const sameForMeta = keys.every((k) => stable(newRest[k]) === stable(oldRest[k as keyof typeof oldRest]));
+    if (sameForMeta && newUrl !== oldUrl) {
+      await db.template.update({ where: { id }, data: { headerMediaUrl: newUrl } });
+      revalidatePath("/dashboard/templates");
+      return { ok: true, id, message: "Image link saved. Meta's approval is unchanged, so sending continues." };
+    }
+
     try {
       if (live && existing.metaId) await editMetaTemplate(cfg, existing.metaId, await metaComponents(cfg, merged));
       else if (live) {

@@ -55,6 +55,10 @@ export async function deliver(s: Setting, t: Sendable, customer: { name: string;
     return { id, simulated: false, provider, text };
   }
 
+  // Meta rejects an image-header template sent without its image (error 132012), so say what's missing.
+  if (cfg.live && t.headerType === "IMAGE" && !t.headerMediaUrl?.trim())
+    throw new Error(`"${t.name}" has an image header but no image link. Open the template, paste the image URL and save.`);
+
   const text = [r.header, r.body, r.footer].filter(Boolean).join("\n\n");
   const res = await sendTemplateMessage(cfg, {
     to: customer.phone,

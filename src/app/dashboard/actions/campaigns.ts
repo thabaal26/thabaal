@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { dispatch, startRun } from "@/lib/dispatcher";
 import { APP_TZ } from "@/lib/format";
 import { getSettings, templateSendable } from "@/lib/provider";
+import { isQuietTime } from "@/lib/rules";
 import { computeNextRun } from "@/lib/schedule";
 import { senderFor } from "@/lib/senders";
 import { requireAdmin } from "@/lib/session";
@@ -52,6 +53,13 @@ export async function saveCampaign(id: string | null, input: CampaignInput): Pro
   if (!Number.isInteger(input.batchSize) || input.batchSize < 1 || input.batchSize > 1000) errors.push("Batch size must be between 1 and 1,000.");
   if (!Number.isInteger(input.intervalMinutes) || input.intervalMinutes < 1 || input.intervalMinutes > 1440)
     errors.push("Interval must be between 1 and 1,440 minutes.");
+
+  // Say it now instead of letting the campaign wait silently: marketing isn't sent in quiet hours.
+  if (template?.category === "MARKETING" && /^([01]\d|2[0-3]):[0-5]\d$/.test(input.sendTime)) {
+    const client = await db.client.findUnique({ where: { id: clientId }, select: { quietFrom: true, quietTo: true } });
+    if (client && isQuietTime(client, input.sendTime))
+      errors.push(`${input.sendTime} is inside quiet hours (${client.quietFrom} to ${client.quietTo}), so marketing would be held. Pick a time outside them, or turn quiet hours off for this client.`);
+  }
   if (errors.length) return { ok: false, errors };
 
   const runAt = input.scheduleType === "ONCE" ? fromZonedTime(`${input.runDate}T${input.sendTime}:00`, APP_TZ) : null;

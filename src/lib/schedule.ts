@@ -34,6 +34,16 @@ export function estimateDuration(total: number, batchSize: number, intervalMinut
   return (Math.ceil(total / batchSize) - 1) * intervalMinutes;
 }
 
+/** Friendly countdown, like "in 5 min", "in 2h 10m" or "in 3 days". */
+export function timeUntil(at: Date, now = new Date()) {
+  const mins = Math.ceil((at.getTime() - now.getTime()) / 60_000);
+  if (mins <= 0) return "any moment now";
+  if (mins < 60) return `in ${mins} min`;
+  if (mins < 24 * 60) return `in ${formatMinutes(mins)}`;
+  const days = Math.round(mins / (24 * 60));
+  return `in ${days} day${days === 1 ? "" : "s"}`;
+}
+
 export function formatMinutes(mins: number) {
   if (mins < 1) return "instantly";
   const h = Math.floor(mins / 60);
