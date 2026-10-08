@@ -20,7 +20,6 @@ export async function POST(req: NextRequest) {
         // WhatsApp header images: JPG or PNG, at most 5 MB.
         return { allowedContentTypes: ["image/jpeg", "image/png"], maximumSizeInBytes: 5 * 1024 * 1024, addRandomSuffix: true };
       },
-      onUploadCompleted: async () => {},
     });
     return NextResponse.json(res);
   } catch (e) {
