@@ -7,7 +7,7 @@ import { Badge, Card, CardHeader, PageHeader, StatusBadge } from "@/components/u
 import { db } from "@/lib/db";
 import { APP_TZ, fmtDate, fmtNumber, pct } from "@/lib/format";
 import { formatInTimeZone } from "date-fns-tz";
-import { DAYS } from "@/lib/schedule";
+import { DAYS, effectiveInterval } from "@/lib/schedule";
 import { getScope, owned } from "@/lib/session";
 import { cancelRun, deleteCampaign, runCampaignNow, toggleCampaign } from "../../actions/campaigns";
 import { CampaignForm } from "../campaign-form";
@@ -88,7 +88,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
             </div>
             <div>
               <dt className="text-xs text-muted">Pace</dt>
-              <dd className="mt-1">{c.batchSize} messages every {c.intervalMinutes} min</dd>
+              <dd className="mt-1">{c.batchSize} messages every {effectiveInterval(c.intervalMinutes)} min</dd>
             </div>
           </dl>
         </Card>

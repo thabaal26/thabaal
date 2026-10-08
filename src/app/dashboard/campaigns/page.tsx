@@ -7,7 +7,7 @@ import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { fmtDate } from "@/lib/format";
 import { quietUntil } from "@/lib/rules";
-import { DAYS, estimateDuration, formatMinutes, timeUntil } from "@/lib/schedule";
+import { DAYS, effectiveInterval, estimateDuration, formatMinutes, timeUntil } from "@/lib/schedule";
 import { getScope, owned } from "@/lib/session";
 import { toggleCampaign } from "../actions/campaigns";
 
@@ -80,7 +80,7 @@ export default async function CampaignsPage() {
                   </div>
                   <div>
                     <dt className="text-muted">Pace</dt>
-                    <dd className="mt-0.5 font-medium">{c.batchSize} / {c.intervalMinutes} min</dd>
+                    <dd className="mt-0.5 font-medium">{c.batchSize} / {effectiveInterval(c.intervalMinutes)} min</dd>
                   </div>
                   <div>
                     <dt className="text-muted">Takes</dt>

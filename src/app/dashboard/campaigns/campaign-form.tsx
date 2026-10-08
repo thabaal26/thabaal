@@ -8,7 +8,7 @@ import { Picker } from "@/components/picker";
 import { toastResult } from "@/components/toast";
 import { Button, Card, CardHeader, Label } from "@/components/ui";
 import { cn } from "@/lib/cn";
-import { DAYS, estimateDuration, formatMinutes } from "@/lib/schedule";
+import { DAYS, effectiveInterval, estimateDuration, formatMinutes, SCHEDULER_TICK_MINUTES } from "@/lib/schedule";
 import { saveCampaign, type CampaignInput } from "../actions/campaigns";
 
 const PRESETS = [
@@ -194,6 +194,11 @@ export function CampaignForm({
                 <input id="interval" type="number" inputMode="numeric" min={1} max={1440} className="field tabular" value={c.intervalMinutes || ""} onChange={(e) => set({ intervalMinutes: Number(e.target.value) })} />
               </div>
             </div>
+            {c.intervalMinutes > 0 && c.intervalMinutes < SCHEDULER_TICK_MINUTES && (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Batches go out at most once every {SCHEDULER_TICK_MINUTES} minutes, so {c.intervalMinutes} min works as {SCHEDULER_TICK_MINUTES}. For a faster pace, raise the batch size instead.
+              </p>
+            )}
           </div>
         </Card>
       </div>
@@ -217,7 +222,7 @@ export function CampaignForm({
           </div>
           <ul className="space-y-3 p-5 text-sm">
             <li className="flex gap-3"><Users className="mt-0.5 size-4 text-muted" />{c.batchSize || 0} customers at a time</li>
-            <li className="flex gap-3"><Gauge className="mt-0.5 size-4 text-muted" />then waits {c.intervalMinutes || 0} minute{c.intervalMinutes === 1 ? "" : "s"}</li>
+            <li className="flex gap-3"><Gauge className="mt-0.5 size-4 text-muted" />then waits {effectiveInterval(c.intervalMinutes || 0)} minute{effectiveInterval(c.intervalMinutes || 0) === 1 ? "" : "s"}</li>
             <li className="flex gap-3">
               <Clock className="mt-0.5 size-4 text-muted" />
               {c.sendTime} → about {end.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}

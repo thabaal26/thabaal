@@ -28,10 +28,16 @@ export function computeNextRun(s: Schedule, after = new Date()): Date | null {
   return null;
 }
 
+/** The scheduler checks for due batches this often, so no campaign sends faster than one batch per tick. */
+export const SCHEDULER_TICK_MINUTES = 5;
+
+/** Minutes between batches in practice: the chosen interval, but never less than one scheduler tick. */
+export const effectiveInterval = (intervalMinutes: number) => Math.max(intervalMinutes, SCHEDULER_TICK_MINUTES);
+
 /** Minutes needed to deliver `total` messages in batches. */
 export function estimateDuration(total: number, batchSize: number, intervalMinutes: number) {
   if (total <= 0 || batchSize <= 0) return 0;
-  return (Math.ceil(total / batchSize) - 1) * intervalMinutes;
+  return (Math.ceil(total / batchSize) - 1) * effectiveInterval(intervalMinutes);
 }
 
 /** Friendly countdown, like "in 5 min", "in 2h 10m" or "in 3 days". */
