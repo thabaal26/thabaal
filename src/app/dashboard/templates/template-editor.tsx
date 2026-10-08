@@ -1,12 +1,12 @@
 "use client";
 
-import { Bold, Braces, Eye, Italic, Loader2, Plus, Send, Strikethrough, Trash2, TriangleAlert, Upload } from "lucide-react";
+import { Bold, Braces, Eye, ImageIcon, Italic, Loader2, Plus, Send, Strikethrough, Trash2, TriangleAlert, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { MobileActionBar } from "@/components/mobile-action-bar";
 import { Sheet } from "@/components/sheet";
 import { toastResult } from "@/components/toast";
-import { Badge, Button, Card, CardHeader, Label, StatusBadge } from "@/components/ui";
+import { Badge, Button, buttonClass, Card, CardHeader, Label, StatusBadge } from "@/components/ui";
 import { PhoneFrame, WhatsAppBubble } from "@/components/whatsapp-preview";
 import { cn } from "@/lib/cn";
 import {
@@ -276,14 +276,32 @@ export function TemplateEditor({
                   )}
                   {t.headerType === "IMAGE" && (
                     <div className="space-y-2">
-                      <div className="flex gap-2">
-                        <input className="field" value={t.headerMediaUrl} placeholder="https://yourdomain.com/offer.jpg" onChange={(e) => set({ headerMediaUrl: e.target.value })} />
-                        <label className={cn("inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-sm font-medium ring-1 ring-line hover:bg-canvas", uploading && "pointer-events-none opacity-60")}>
-                          {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-                          {uploading ? "Uploading…" : "Upload"}
-                          <input type="file" accept="image/jpeg,image/png" className="sr-only" onChange={(e) => uploadImage(e.target.files?.[0])} />
-                        </label>
+                      <div className="flex items-center gap-3">
+                        <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-canvas ring-1 ring-line">
+                          {t.headerMediaUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element -- any URL the admin enters
+                            <img src={t.headerMediaUrl} alt="Header image" className="size-full object-cover" />
+                          ) : (
+                            <ImageIcon className="size-5 text-muted" />
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <label className={cn(buttonClass("secondary", "sm"), "cursor-pointer", uploading && "pointer-events-none opacity-60")}>
+                            {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+                            {uploading ? "Uploading…" : t.headerMediaUrl ? "Replace image" : "Upload image"}
+                            <input type="file" accept="image/jpeg,image/png" className="sr-only" onChange={(e) => { uploadImage(e.target.files?.[0]); e.target.value = ""; }} />
+                          </label>
+                          {t.headerMediaUrl && !uploading && (
+                            <button type="button" className={buttonClass("ghost", "sm")} onClick={() => set({ headerMediaUrl: "" })}>Remove</button>
+                          )}
+                        </div>
                       </div>
+                      {!t.headerMediaUrl && (
+                        <p className="flex items-center gap-1.5 text-xs text-amber-700">
+                          <TriangleAlert className="size-3.5" /> Add an image: WhatsApp rejects image-header messages sent without one.
+                        </p>
+                      )}
+                      <input className="field text-xs" value={t.headerMediaUrl} placeholder="…or paste an image link: https://yourdomain.com/offer.jpg" onChange={(e) => set({ headerMediaUrl: e.target.value })} aria-label="Image link" />
                       <p className="text-xs text-muted">JPG or PNG, up to 4 MB. A wide image (about 1200×628) reads best in the chat.</p>
                     </div>
                   )}

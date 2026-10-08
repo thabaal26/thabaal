@@ -1,8 +1,10 @@
 "use client";
 
-import { Building2, CalendarClock, Inbox, LayoutDashboard, MessagesSquare, Settings, ShoppingBag, SquarePen, Users } from "lucide-react";
+import { Building2, CalendarClock, Inbox, LayoutDashboard, Menu, MessagesSquare, Settings, ShoppingBag, SquarePen, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { Sheet } from "@/components/sheet";
 import { cn } from "@/lib/cn";
 
 export const NAV = [
@@ -17,8 +19,8 @@ export const NAV = [
 ];
 
 const ADMIN_NAV = [{ href: "/dashboard/clients", label: "Clients", short: "Clients", icon: Building2 }];
-/** Phone tab bar order: what people check most. Templates is reached from Settings. */
-const PHONE_TABS = ["/dashboard", "/dashboard/replies", "/dashboard/orders", "/dashboard/customers", "/dashboard/campaigns"];
+/** Phone tabs: what people check most. Everything else is under "More". */
+const PHONE_TABS = ["/dashboard", "/dashboard/replies", "/dashboard/customers", "/dashboard/campaigns"];
 
 function CountBadge({ n, className }: { n?: number; className?: string }) {
   if (!n) return null;
@@ -56,9 +58,12 @@ export function SideNav({ isAdmin, openReplies, newOrders }: { isAdmin: boolean;
   );
 }
 
-/** Phone tab bar: a floating frosted bar with the five everyday sections, within thumb reach. */
-export function BottomNav({ openReplies, newOrders }: { openReplies?: number; newOrders?: number }) {
+/** Phone tab bar: a floating frosted bar with the everyday sections within thumb reach, and "More" for the rest. */
+export function BottomNav({ isAdmin, openReplies, newOrders }: { isAdmin: boolean; openReplies?: number; newOrders?: number }) {
   const path = usePathname();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const more = [...NAV, ...(isAdmin ? ADMIN_NAV : [])].filter((n) => !PHONE_TABS.includes(n.href));
+  const moreActive = more.some((n) => isActive(path, n.href));
   return (
     <nav
       aria-label="Main"
@@ -83,7 +88,39 @@ export function BottomNav({ openReplies, newOrders }: { openReplies?: number; ne
             </Link>
           );
         })}
+        <button
+          type="button"
+          onClick={() => setMoreOpen(true)}
+          aria-haspopup="dialog"
+          className={cn("flex h-[3.75rem] flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition active:scale-95", moreActive ? "text-brand-deep" : "text-muted")}
+        >
+          <span className={cn("relative grid h-7 w-12 place-items-center rounded-full transition", moreActive && "bg-brand-soft")}>
+            <Menu className="size-[18px]" strokeWidth={moreActive ? 2.4 : 2} />
+            <CountBadge n={newOrders} className="absolute -right-0.5 -top-1 ring-2 ring-white" />
+          </span>
+          More
+        </button>
       </div>
+      <Sheet open={moreOpen} onClose={() => setMoreOpen(false)} title="More">
+        <ul className="grid grid-cols-2 gap-2">
+          {more.map(({ href, label, icon: Icon }) => (
+            <li key={href}>
+              <Link
+                href={href}
+                onClick={() => setMoreOpen(false)}
+                className={cn(
+                  "flex h-14 items-center gap-3 rounded-2xl px-4 text-sm font-medium ring-1 ring-line transition active:scale-[0.98]",
+                  isActive(path, href) ? "bg-brand-soft text-brand-deep ring-brand/30" : "bg-panel text-ink hover:bg-canvas",
+                )}
+              >
+                <Icon className="size-5 shrink-0" />
+                <span className="flex-1">{label}</span>
+                {href === "/dashboard/orders" && <CountBadge n={newOrders} />}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Sheet>
     </nav>
   );
 }

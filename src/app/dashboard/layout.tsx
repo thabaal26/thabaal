@@ -138,7 +138,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
       </header>
 
       <main className="mx-auto max-w-7xl animate-rise px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-5 sm:px-8 sm:pt-8 lg:pb-10">{children}</main>
-      <BottomNav openReplies={openReplies} newOrders={newOrders} />
+      <BottomNav isAdmin={scope.isAdmin} openReplies={openReplies} newOrders={newOrders} />
     </div>
   );
 }
