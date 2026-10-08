@@ -96,6 +96,16 @@ type Denied = { denied: string };
  * the admin must have a client picked so new records know where they belong.
  * Callers return `{ ok: false, message: s.denied }` when this is denied.
  */
+/**
+ * For day-to-day order work (confirm, dispatch, deliver, notes, new orders): the client's own
+ * staff do this, so client logins may, limited to their own client. Admins may too.
+ */
+export async function requireOrderAccess(): Promise<Scope | Denied> {
+  const s = await getScope();
+  if (!s.isAdmin && !s.clientId) return { denied: "Your account isn't linked to a business." };
+  return s;
+}
+
 export async function requireAdmin(): Promise<Scope | Denied>;
 export async function requireAdmin(needClient: true): Promise<(Scope & { clientId: string }) | Denied>;
 export async function requireAdmin(needClient = false): Promise<Scope | Denied> {

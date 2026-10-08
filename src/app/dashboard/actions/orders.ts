@@ -6,16 +6,18 @@ import { db } from "@/lib/db";
 import { itemsText, money, type OrderItem } from "@/lib/orders";
 import { getSettings, wahaConfig } from "@/lib/provider";
 import { replyWindowEnd } from "@/lib/replies";
+import { normalizePhone } from "@/lib/phone";
 import { senderFor } from "@/lib/senders";
-import { requireAdmin } from "@/lib/session";
+import { requireAdmin, requireOrderAccess } from "@/lib/session";
 import { sendText } from "@/lib/waha";
 import { sendTemplateMessage, sendTextMessage } from "@/lib/whatsapp";
 import { explainSendError, type SendResult } from "./send-helpers";
+import { saveTemplate } from "./templates";
 
 const STATUSES: OrderStatus[] = ["NEW", "CONFIRMED", "PAID", "DISPATCHED", "DELIVERED", "CANCELLED"];
 
 export async function setOrderStatus(id: string, status: OrderStatus): Promise<SendResult> {
-  const s = await requireAdmin();
+  const s = await requireOrderAccess();
   if ("denied" in s) return { ok: false, message: s.denied };
   if (!STATUSES.includes(status)) return { ok: false, message: "Unknown status." };
   const r = await db.order.updateMany({ where: { id, ...(s.clientId ? { clientId: s.clientId } : {}) }, data: { status } });
@@ -25,7 +27,7 @@ export async function setOrderStatus(id: string, status: OrderStatus): Promise<S
 }
 
 export async function saveOrderNote(id: string, note: string): Promise<SendResult> {
-  const s = await requireAdmin();
+  const s = await requireOrderAccess();
   if ("denied" in s) return { ok: false, message: s.denied };
   const r = await db.order.updateMany({ where: { id, ...(s.clientId ? { clientId: s.clientId } : {}) }, data: { internalNote: note.trim().slice(0, 1000) || null } });
   if (!r.count) return { ok: false, message: "Order not found." };
@@ -33,15 +35,31 @@ export async function saveOrderNote(id: string, note: string): Promise<SendResul
   return { ok: true, message: "Note saved." };
 }
 
-const TEMPLATE_NAMES = { confirm: ["order_confirmation", "thenan_order_confirmation"], dispatch: ["order_dispatched", "thenan_order_dispatched"] };
+const TEMPLATE_NAMES = {
+  confirm: ["order_confirmation", "thenan_order_confirmation"],
+  dispatch: ["order_dispatched", "thenan_order_dispatched"],
+  deliver: ["order_delivered", "thenan_order_delivered"],
+};
+
+/** Who is bringing the order and how to follow it; all optional. */
+export type DispatchDetails = { eta?: string; by?: string; phone?: string; link?: string };
+
+/** One line for the template's {{3}}: Meta rejects line breaks inside template variables. */
+function dispatchLine(d: DispatchDetails) {
+  const parts = [d.eta?.trim() || "soon"];
+  if (d.by?.trim()) parts.push(`with ${d.by.trim()}${d.phone?.trim() ? ` (${d.phone.trim()})` : ""}`);
+  else if (d.phone?.trim()) parts.push(`(delivery contact ${d.phone.trim()})`);
+  if (d.link?.trim()) parts.push(`- track: ${d.link.trim()}`);
+  return parts.join(" ").replace(/\s{2,}/g, " ").slice(0, 300);
+}
 
 /**
- * Tells the customer their order is confirmed or dispatched, then moves the order on. While
- * their 24-hour window is open (an order always opens it) it sends a typed message; later it
- * needs the approved order_confirmation / order_dispatched utility template.
+ * Tells the customer their order is confirmed, dispatched or delivered, then moves the order on.
+ * While their 24-hour window is open (an order always opens it) it sends a typed message; later it
+ * needs the approved order_confirmation / order_dispatched / order_delivered utility template.
  */
-export async function notifyOrder(id: string, kind: "confirm" | "dispatch", eta?: string): Promise<SendResult> {
-  const s = await requireAdmin();
+export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "deliver", details: DispatchDetails = {}): Promise<SendResult> {
+  const s = await requireOrderAccess();
   if ("denied" in s) return { ok: false, message: s.denied };
   const order = await db.order.findFirst({
     where: { id, ...(s.clientId ? { clientId: s.clientId } : {}) },
@@ -54,11 +72,17 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch", eta?
   const items = order.items as OrderItem[];
   const first = c.name.trim().split(/\s+/)[0] || "there";
   const ref = `#${order.id.slice(-5).toUpperCase()}`;
-  const when = eta?.trim() || "soon";
+  const when = dispatchLine(details);
+  const contact = [details.by?.trim() && `Delivery by: ${details.by.trim()}`, details.phone?.trim() && `Contact: ${details.phone.trim()}`, details.link?.trim() && `Track: ${details.link.trim()}`]
+    .filter(Boolean)
+    .join("\n");
   const text =
     kind === "confirm"
       ? `Hello ${first}, thank you for your order with ${order.client.name}.\n\nItems: ${itemsText(items)}\nTotal: ${money(order.total, order.currency)}\n\nWe will confirm your delivery slot shortly.`
-      : `Hello ${first}, your ${order.client.name} order ${ref} is on its way and will reach you by ${when}.\n\nFor any help, reply to this message.`;
+      : kind === "dispatch"
+        ? `Hello ${first}, your ${order.client.name} order ${ref} is on its way and will reach you by ${details.eta?.trim() || "soon"}.${contact ? `\n\n${contact}` : ""}\n\nFor any help, reply to this message.`
+        : `Hello ${first}, your ${order.client.name} order ${ref} has been delivered. Thank you for shopping with us!\n\nIf anything is not right, reply to this message.`;
+  const nextStatus = kind === "confirm" ? "CONFIRMED" : kind === "dispatch" ? "DISPATCHED" : "DELIVERED";
 
   const settings = await getSettings();
   const lastReply = await db.reply.findFirst({ where: { customerId: c.id }, orderBy: { receivedAt: "desc" }, select: { receivedAt: true, senderId: true } });
@@ -81,9 +105,16 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch", eta?
       ({ id: waId, simulated } = await sendTextMessage(cfg, c.phone, text));
     } else {
       const t = await db.template.findFirst({ where: { clientId: c.clientId, name: { in: TEMPLATE_NAMES[kind] }, status: "APPROVED" } });
-      if (!t)
-        return { ok: false, message: "The customer's 24-hour window has closed and no approved order template was found. Get the order_confirmation / order_dispatched templates approved first." };
-      const bodyParams = kind === "confirm" ? [first, itemsText(items), String(Math.round(order.total))] : [first, ref, when];
+      if (!t) {
+        // A delivery thank-you is optional: still close the order when there's no way to message.
+        if (kind === "deliver") {
+          await db.order.update({ where: { id: order.id }, data: { status: "DELIVERED" } });
+          revalidatePath("/dashboard", "layout");
+          return { ok: true, message: "Marked delivered. No message sent: the 24-hour window has closed and order_delivered isn't approved yet." };
+        }
+        return { ok: false, message: `The customer's 24-hour window has closed, so WhatsApp needs an approved ${TEMPLATE_NAMES[kind][0]} template. Use "Create order templates" at the top of Orders.` };
+      }
+      const bodyParams = kind === "confirm" ? [first, itemsText(items).slice(0, 300), String(Math.round(order.total))] : kind === "dispatch" ? [first, ref, when] : [first, ref];
       ({ id: waId, simulated } = await sendTemplateMessage(cfg, { to: c.phone, templateName: t.name, language: t.language, headerType: "NONE", headerParams: [], bodyParams }));
       templateName = t.name;
       templateId = t.id;
@@ -94,10 +125,90 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch", eta?
         provider: settings.provider, sentAt: new Date(), senderId: settings.provider === "META" ? (number?.id ?? null) : null,
       },
     });
-    await db.order.update({ where: { id: order.id }, data: { status: kind === "confirm" ? "CONFIRMED" : "DISPATCHED" } });
+    // Keep the delivery details with the order for later questions.
+    const record = kind === "dispatch" && contact ? `Dispatched ${new Date().toLocaleDateString("en-IN")}: ${when}` : null;
+    await db.order.update({
+      where: { id: order.id },
+      data: { status: nextStatus, ...(record && { internalNote: [order.internalNote, record].filter(Boolean).join("\n").slice(0, 1000) }) },
+    });
     revalidatePath("/dashboard", "layout");
-    return { ok: true, message: simulated ? "Simulated message logged (demo mode)." : `${kind === "confirm" ? "Confirmation" : "Dispatch update"} sent to ${c.name}.` };
+    const label = kind === "confirm" ? "Confirmation" : kind === "dispatch" ? "Dispatch update" : "Delivery thank-you";
+    return { ok: true, message: simulated ? "Simulated message logged (demo mode)." : `${label} sent to ${c.name}.` };
   } catch (e) {
     return { ok: false, message: explainSendError(e).error };
   }
+}
+
+/** An order taken by phone, at the shop or on paper, so it can be confirmed and dispatched like a WhatsApp cart. */
+export async function createOrder(input: { phone: string; name: string; items: { name: string; quantity: number; price: number }[]; note?: string }): Promise<SendResult> {
+  const s = await requireOrderAccess();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  if (!s.clientId) return { ok: false, message: "Pick a client in the sidebar first." };
+  const phone = normalizePhone(input.phone);
+  if (!phone) return { ok: false, message: "Enter a valid phone number." };
+  const lines = input.items
+    .map((i) => ({ name: i.name.trim(), quantity: Math.max(1, Math.round(Number(i.quantity) || 1)), price: Math.max(0, Number(i.price) || 0) }))
+    .filter((i) => i.name);
+  if (!lines.length) return { ok: false, message: "Add at least one item." };
+
+  const customer =
+    (await db.customer.findUnique({ where: { clientId_phone: { clientId: s.clientId, phone } }, select: { id: true } })) ??
+    (await db.customer.create({ data: { clientId: s.clientId, phone, name: input.name.trim() || `+${phone}`, tags: ["manual-order"] }, select: { id: true } }));
+  const items: OrderItem[] = lines.map((i, k) => ({ id: `manual-${k + 1}`, name: i.name, quantity: i.quantity, price: i.price, currency: "INR" }));
+  const order = await db.order.create({
+    data: {
+      clientId: s.clientId,
+      customerId: customer.id,
+      items,
+      total: items.reduce((sum, i) => sum + i.price * i.quantity, 0),
+      note: input.note?.trim() || null,
+      internalNote: "Entered by hand",
+    },
+  });
+  revalidatePath("/dashboard", "layout");
+  return { ok: true, message: `Order #${order.id.slice(-5).toUpperCase()} added.` };
+}
+
+const ORDER_TEMPLATES: { name: string; body: string; samples: string[] }[] = [
+  {
+    name: "order_confirmation",
+    body: "Hello {{1}}, thank you for your order. Items: {{2}}. Total: Rs {{3}}. We will confirm your delivery slot shortly.",
+    samples: ["Priya", "2 x Groundnut oil 1 L", "560"],
+  },
+  {
+    name: "order_dispatched",
+    body: "Hello {{1}}, your order {{2}} has been dispatched and will reach you by {{3}}. Reply to this message for any help.",
+    samples: ["Priya", "#A1B2C", "today evening with Ravi (98765 43210)"],
+  },
+  {
+    name: "order_delivered",
+    body: "Hello {{1}}, your order {{2}} has been delivered. Thank you for shopping with us! Reply to this message if anything is not right.",
+    samples: ["Priya", "#A1B2C"],
+  },
+];
+
+/**
+ * Creates the three order update templates (utility, so they can be sent any time after an
+ * order) and submits them to Meta. Skips any the client already has.
+ */
+export async function createOrderTemplates(): Promise<SendResult> {
+  const s = await requireAdmin(true);
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const existing = await db.template.findMany({ where: { clientId: s.clientId, name: { in: ORDER_TEMPLATES.map((t) => t.name) } }, select: { name: true } });
+  const missing = ORDER_TEMPLATES.filter((t) => !existing.some((e) => e.name === t.name));
+  if (!missing.length) return { ok: true, message: "All three order templates already exist." };
+
+  const failed: string[] = [];
+  for (const t of missing) {
+    const variables = Object.fromEntries(t.samples.map((v, k) => [String(k + 1), { source: "static" as const, value: v }]));
+    const r = await saveTemplate(null, {
+      name: t.name, language: "en", category: "UTILITY", headerType: "NONE", headerText: "", headerMediaUrl: "",
+      body: t.body, footer: "", buttons: [], variables, codeExpiryMins: null, securityNote: false,
+    });
+    if (!r.ok) failed.push(`${t.name}: ${r.message ?? r.errors?.join(", ")}`);
+  }
+  revalidatePath("/dashboard", "layout");
+  return failed.length
+    ? { ok: false, message: `Some templates weren't created. ${failed.join(" · ")}` }
+    : { ok: true, message: `Submitted ${missing.map((t) => t.name).join(", ")} to Meta. Approval usually takes minutes.` };
 }

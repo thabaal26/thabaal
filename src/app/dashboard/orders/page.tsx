@@ -8,7 +8,13 @@ import { fmtDate, fmtNumber } from "@/lib/format";
 import { money, type OrderItem } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { getScope, owned } from "@/lib/session";
+import { ActionButton } from "@/components/action-button";
+import { createOrderTemplates } from "../actions/orders";
+import { NewOrder } from "./new-order";
 import { OrderActions } from "./order-actions";
+
+/** The utility templates that let order updates go out after the customer's 24-hour window. */
+const ORDER_TEMPLATES = ["order_confirmation", "order_dispatched", "order_delivered"];
 
 export const metadata: Metadata = { title: "Orders" };
 export const dynamic = "force-dynamic";
@@ -29,7 +35,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
   const tab = TABS.find((t) => t.key === show) ?? TABS[0];
   const mine = owned(scope);
 
-  const [orders, counts] = await Promise.all([
+  const [orders, counts, orderTemplates] = await Promise.all([
     db.order.findMany({
       where: { ...mine, ...(tab.where as object) },
       include: { customer: { select: { id: true, name: true, phone: true, location: true, client: { select: { name: true } } } } },
@@ -37,7 +43,12 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
       take: 200,
     }),
     db.order.groupBy({ by: ["status"], where: mine, _count: true }),
+    scope.clientId ? db.template.findMany({ where: { clientId: scope.clientId, name: { in: ORDER_TEMPLATES } }, select: { name: true, status: true } }) : [],
   ]);
+  const notReady = ORDER_TEMPLATES.filter((name) => orderTemplates.find((t) => t.name === name)?.status !== "APPROVED");
+  const missing = ORDER_TEMPLATES.filter((name) => !orderTemplates.some((t) => t.name === name));
+  // Client staff pack and dispatch their own orders, so they get the order buttons too.
+  const canEdit = scope.isAdmin || !!scope.clientId;
   const n = (...s: string[]) => counts.filter((c) => s.includes(c.status)).reduce((sum, c) => sum + c._count, 0);
   const tabCount: Record<string, number> = {
     "": n("NEW", "CONFIRMED", "PAID", "DISPATCHED"),
@@ -49,7 +60,23 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
 
   return (
     <>
-      <PageHeader title="Orders" description="Carts customers send from your WhatsApp catalogue. Confirm, dispatch and track them here." />
+      <PageHeader
+        title="Orders"
+        description="WhatsApp catalogue carts and orders you add by hand. Confirm, dispatch and deliver them here; the customer gets a WhatsApp update at each step."
+        actions={scope.clientId && canEdit ? <NewOrder /> : undefined}
+      />
+
+      {scope.clientId && notReady.length > 0 && (
+        <div className="mb-4 flex flex-col gap-3 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-600/20 sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            <b>Order updates after 24 hours need approved templates.</b> Not ready yet: {notReady.join(", ")}.{" "}
+            {missing.length === 0 ? "They're waiting for Meta's approval." : scope.isAdmin ? "Create them once and Meta usually approves within minutes." : "Ask your admin to create them."}
+          </p>
+          {scope.isAdmin && missing.length > 0 && (
+            <ActionButton action={createOrderTemplates} confirm={`Create and submit ${missing.join(", ")} to Meta?`}>Create order templates</ActionButton>
+          )}
+        </div>
+      )}
 
       <div className="mb-4 flex flex-wrap gap-2">
         {TABS.map((t) => (
@@ -105,7 +132,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
                       {o.note}
                     </p>
                   )}
-                  <OrderActions id={o.id} status={o.status} note={o.internalNote} canEdit={scope.isAdmin} />
+                  <OrderActions id={o.id} status={o.status} note={o.internalNote} canEdit={canEdit} />
                 </div>
               </Card>
             );
