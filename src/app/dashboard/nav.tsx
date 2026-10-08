@@ -67,7 +67,7 @@ export function BottomNav({ isAdmin, openReplies, newOrders }: { isAdmin: boolea
   return (
     <nav
       aria-label="Main"
-      className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 rounded-[1.4rem] border border-white/60 bg-white/80 shadow-[0_10px_40px_-12px_rgb(15_26_23/0.35)] ring-1 ring-black/5 backdrop-blur-xl backdrop-saturate-150 lg:hidden"
+      className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 rounded-[1.4rem] border border-white/60 bg-white/80 shadow-[0_10px_40px_-12px_rgb(15_26_23/0.35)] ring-1 ring-black/5 backdrop-blur-xl backdrop-saturate-150 lg:hidden print:hidden"
     >
       <div className="mx-auto grid max-w-lg grid-cols-5 px-1">
         {PHONE_TABS.map((tab) => NAV.find((n) => n.href === tab)!).map(({ href, short, icon: Icon }) => {

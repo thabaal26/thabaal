@@ -69,9 +69,9 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
   ) : null;
 
   return (
-    <div style={themeStyle(client)} className="min-h-dvh overflow-x-clip bg-canvas lg:pl-64">
+    <div style={themeStyle(client)} className="min-h-dvh overflow-x-clip bg-canvas lg:pl-64 print:bg-white print:pl-0 lg:print:pl-0">
       {client && themeCss(client) && <style>{themeCss(client)}</style>}
-      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col bg-night px-4 py-6 lg:flex">
+      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col bg-night px-4 py-6 lg:flex print:!hidden">
         <div className="mb-8 flex items-center gap-3 px-2">
           <BrandMark logoUrl={client?.logoUrl} name={name} size="md" />
           <div className="min-w-0">
@@ -98,7 +98,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
         </div>
       </aside>
 
-      <header className="sticky top-0 z-30 bg-night/95 pt-[env(safe-area-inset-top)] backdrop-blur-md lg:hidden">
+      <header className="sticky top-0 z-30 bg-night/95 pt-[env(safe-area-inset-top)] backdrop-blur-md lg:hidden print:hidden">
         <div className="flex h-14 items-center gap-3 px-4">
           <BrandMark logoUrl={client?.logoUrl} name={name} size="sm" />
           {scope.isAdmin ? (

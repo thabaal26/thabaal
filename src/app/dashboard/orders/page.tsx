@@ -1,8 +1,8 @@
-import { PackageCheck, ShoppingBag } from "lucide-react";
+import { PackageCheck, PackageOpen, ShoppingBag } from "lucide-react";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
-import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
+import { Badge, buttonClass, Card, EmptyState, PageHeader } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { fmtDate, fmtNumber } from "@/lib/format";
@@ -75,7 +75,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
       <PageHeader
         title="Orders"
         description="WhatsApp catalogue carts and orders you add by hand. Confirm, dispatch and deliver them here; the customer gets a WhatsApp update at each step."
-        actions={scope.clientId && canEdit ? <NewOrder /> : undefined}
+        actions={scope.clientId && canEdit ? <><Link href="/dashboard/orders/packing" className={buttonClass("secondary")}><PackageOpen className="size-4" /> Packing list</Link><NewOrder /></> : undefined}
       />
 
       {scope.clientId && notReady.length > 0 && (
