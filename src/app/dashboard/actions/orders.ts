@@ -172,6 +172,7 @@ export async function requestPayment(id: string): Promise<SendResult> {
     configuration: order.client.paymentConfig,
     items: items.map((i) => ({ id: i.id, name: i.name ?? i.id, quantity: i.quantity, price: i.price })),
     total: order.total,
+    catalogId: order.catalogId,
   };
   const text = `Hello ${first}, here is your ${order.client.name} order ${ref}.\n\nItems: ${itemsText(items)}\nTotal: ${money(order.total, order.currency)}\n\nTap "Review and pay" to pay by UPI.`;
 

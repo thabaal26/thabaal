@@ -147,6 +147,8 @@ export type PaymentRequest = {
   configuration: string;
   items: { id: string; name: string; quantity: number; price: number }[];
   total: number;
+  /** The catalogue the items came from; WhatsApp then shows each product's picture. */
+  catalogId?: string | null;
 };
 
 /** The order_details parameters behind WhatsApp's "Review and pay" button (UPI). */
@@ -154,7 +156,8 @@ function orderDetails(p: PaymentRequest) {
   const lines = p.items.filter((i) => i.quantity > 0);
   const itemsTotal = lines.reduce((sum, i) => sum + i.price * i.quantity, 0);
   // Meta checks that the items add up to the total; when they don't (prices missing), send one line for the order.
-  const items = itemsTotal > 0 && Math.abs(itemsTotal - p.total) < 0.01
+  const itemized = itemsTotal > 0 && Math.abs(itemsTotal - p.total) < 0.01;
+  const items = itemized
     ? lines.map((i) => ({ retailer_id: i.id.slice(0, 50), name: i.name.slice(0, 60), amount: paise(i.price), quantity: i.quantity }))
     : [{ retailer_id: "order", name: "Your order", amount: paise(p.total), quantity: 1 }];
   return {
@@ -164,7 +167,8 @@ function orderDetails(p: PaymentRequest) {
     payment_configuration: p.configuration,
     currency: "INR",
     total_amount: paise(p.total),
-    order: { status: "pending", items, subtotal: paise(p.total), tax: { ...paise(0), description: "Included" } },
+    // Only itemized carts can point at the catalogue: every retailer_id must be one of its products.
+    order: { status: "pending", ...(itemized && p.catalogId && { catalog_id: p.catalogId }), items, subtotal: paise(p.total), tax: { ...paise(0), description: "Included" } },
   };
 }
 
