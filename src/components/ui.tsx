@@ -39,7 +39,7 @@ const variants = {
 
 export function buttonClass(variant: keyof typeof variants = "primary", size: "sm" | "md" = "md") {
   return cn(
-    "inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-xl font-medium transition sm:rounded-lg active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/20",
+    "inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-xl font-medium transition sm:rounded-lg active:scale-[0.97] [@media(hover:hover)]:hover:-translate-y-px disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/20",
     // Phones get 40–44px targets; desktop keeps the denser sizes.
     size === "sm" ? "h-10 px-3.5 text-sm sm:h-8 sm:px-3 sm:text-xs" : "h-11 px-4 text-[15px] sm:h-10 sm:text-sm",
     variants[variant],
@@ -147,7 +147,7 @@ export function PickClientNotice({ what }: { what: string }) {
 
 export function Stat({ label, value, sub, icon, accent }: { label: string; value: ReactNode; sub?: ReactNode; icon: ReactNode; accent?: string }) {
   return (
-    <Card className="p-3.5 sm:p-5">
+    <Card className="lift p-3.5 sm:p-5">
       <div className="flex items-start justify-between gap-2">
         <p className="text-[12px] font-medium leading-snug text-muted sm:text-xs">{label}</p>
         <span className={cn("hidden size-8 shrink-0 place-items-center rounded-lg sm:grid", accent ?? "bg-brand-soft text-brand-deep")}>{icon}</span>

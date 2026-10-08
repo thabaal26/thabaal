@@ -224,7 +224,7 @@ export function CallWidget() {
         <div
           role="dialog"
           aria-live="assertive"
-          className="fixed inset-x-3 top-[calc(4rem+env(safe-area-inset-top))] z-50 mx-auto max-w-sm rounded-2xl bg-night p-4 text-white shadow-2xl ring-1 ring-white/10 lg:left-auto lg:right-6 lg:top-6 print:hidden"
+          className="animate-toast fixed inset-x-3 top-[calc(4rem+env(safe-area-inset-top))] z-50 mx-auto max-w-sm rounded-2xl bg-night p-4 text-white shadow-2xl ring-1 ring-white/10 lg:left-auto lg:right-6 lg:top-6 print:hidden"
         >
           {live ? (
             <>
@@ -244,7 +244,7 @@ export function CallWidget() {
           ) : incoming ? (
             <>
               <p className="flex items-center gap-2 text-xs text-glow">
-                <span className="size-2 animate-pulse rounded-full bg-glow" /> Incoming WhatsApp call
+                <Phone className="size-3.5 animate-ring" /> Incoming WhatsApp call
               </p>
               <p className="mt-0.5 truncate text-lg font-semibold">{who(incoming)}</p>
               <p className="text-xs text-white/55">{formatPhone(incoming.fromPhone)}</p>
@@ -252,7 +252,8 @@ export function CallWidget() {
                 <button disabled={busy} onClick={() => decline(incoming)} className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-rose-600 text-sm font-medium disabled:opacity-50">
                   <PhoneOff className="size-4" /> Decline
                 </button>
-                <button disabled={busy} onClick={() => answer(incoming)} className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-500 text-sm font-medium text-night disabled:opacity-50">
+                <button disabled={busy} onClick={() => answer(incoming)} className="relative flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-500 text-sm font-medium text-night disabled:opacity-50">
+                  {!busy && <span aria-hidden className="absolute inset-0 animate-ping rounded-xl bg-emerald-400/40" />}
                   <Phone className="size-4" /> {busy ? "Connecting…" : "Answer"}
                 </button>
               </div>

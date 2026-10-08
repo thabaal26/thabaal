@@ -57,4 +57,14 @@ export async function clientAccounts(clientId: string) {
 }
 
 /** How a number appears in lists: "Main · +91 98765 43210". */
+/**
+ * Prisma filter for templates this client can actually send: those in a WhatsApp Business Account one of
+ * its numbers belongs to. Hides templates synced from other accounts, such as Meta's test account samples.
+ */
+export async function sendableTemplates(clientId: string) {
+  const numbers = await db.whatsAppNumber.findMany({ where: { clientId }, select: { businessAccountId: true } });
+  if (!numbers.length) return {};
+  return { OR: [{ businessAccountId: null }, { businessAccountId: { in: [...new Set(numbers.map((n) => n.businessAccountId))] } }] };
+}
+
 export const numberLabel = (n: { label: string; displayPhone: string | null }) => (n.displayPhone ? `${n.label} · ${n.displayPhone}` : n.label);

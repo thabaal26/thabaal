@@ -26,7 +26,7 @@ const PHONE_TABS = ["/dashboard", "/dashboard/replies", "/dashboard/customers", 
 function CountBadge({ n, className }: { n?: number; className?: string }) {
   if (!n) return null;
   return (
-    <span className={cn("tabular grid h-[18px] min-w-[18px] place-items-center rounded-full bg-glow px-1 text-[10px] font-bold text-night", className)}>
+    <span className={cn("tabular grid h-[18px] min-w-[18px] animate-pop place-items-center rounded-full bg-glow px-1 text-[10px] font-bold text-night", className)}>
       {n > 99 ? "99+" : n}
     </span>
   );

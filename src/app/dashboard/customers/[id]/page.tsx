@@ -12,6 +12,7 @@ import { itemsText, money, type OrderItem } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { replyWindowEnd } from "@/lib/replies";
 import { getScope, owned } from "@/lib/session";
+import { sendableTemplates } from "@/lib/senders";
 import { META_SAMPLES } from "@/lib/template";
 import { sendCatalogue } from "../../actions/catalog";
 import { requestCallPermission } from "../../actions/calls";
@@ -41,7 +42,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
   if (!c) notFound();
 
   const [templates, numbers] = await Promise.all([
-    db.template.findMany({ where: { clientId: c.clientId, status: "APPROVED", category: { not: "AUTHENTICATION" }, name: { notIn: META_SAMPLES } }, orderBy: { name: "asc" } }),
+    db.template.findMany({ where: { clientId: c.clientId, status: "APPROVED", category: { not: "AUTHENTICATION" }, name: { notIn: META_SAMPLES }, ...(await sendableTemplates(c.clientId)) }, orderBy: { name: "asc" } }),
     db.whatsAppNumber.findMany({ where: { clientId: c.clientId }, orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }], select: { id: true, label: true, businessAccountId: true } }),
   ]);
   // WhatsApp allows typed messages for 24 hours after the customer last wrote to us.

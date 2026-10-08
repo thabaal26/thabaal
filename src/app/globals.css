@@ -25,6 +25,21 @@
   --animate-toast: toast 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   --animate-sheet: sheet 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   --animate-fade: fade 0.2s ease-out both;
+  --animate-pop: pop 0.4s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+  --animate-ring: ring 1.2s ease-in-out infinite;
+  @keyframes pop {
+    from { transform: scale(0.4); opacity: 0; }
+    to { transform: none; opacity: 1; }
+  }
+  @keyframes ring {
+    0%, 60%, 100% { transform: rotate(0); }
+    10%, 30%, 50% { transform: rotate(-14deg); }
+    20%, 40% { transform: rotate(14deg); }
+  }
+  @keyframes grow {
+    from { transform: scaleX(0); }
+    to { transform: none; }
+  }
   @keyframes sheet {
     from { transform: translateY(100%); }
     to { transform: none; }
@@ -80,6 +95,27 @@ html {
 .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Page sections arrive one after another instead of all at once. */
+.stagger > *, .stagger > .grid > * { animation: rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.stagger > :nth-child(2) { animation-delay: 40ms; }
+.stagger > :nth-child(3) { animation-delay: 80ms; }
+.stagger > :nth-child(4) { animation-delay: 120ms; }
+.stagger > :nth-child(5) { animation-delay: 160ms; }
+.stagger > :nth-child(6) { animation-delay: 200ms; }
+.stagger > :nth-child(n + 7) { animation-delay: 240ms; }
+.stagger > .grid > :nth-child(2) { animation-delay: 140ms; }
+.stagger > .grid > :nth-child(3) { animation-delay: 180ms; }
+.stagger > .grid > :nth-child(n + 4) { animation-delay: 220ms; }
+
+/* Progress and share bars fill in from the left. */
+.bar { transform-origin: left; animation: grow 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.2s both; }
+
+/* Cards and list rows respond to the pointer on computers; phones get the press feedback instead. */
+@media (hover: hover) and (pointer: fine) {
+  .lift { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+  .lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-pop); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

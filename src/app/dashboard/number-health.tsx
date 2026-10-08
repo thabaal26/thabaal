@@ -43,7 +43,7 @@ export function NumberHealth({ numbers, compact }: { numbers: Health; compact?: 
                 </div>
                 {n.limit !== null && (
                   <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-canvas">
-                    <div className={cn("h-full rounded-full", full ? "bg-amber-500" : "bg-brand")} style={{ width: `${Math.min(100, Math.max(2, share))}%` }} />
+                    <div className={cn("bar h-full rounded-full", full ? "bg-amber-500" : "bg-brand")} style={{ width: `${Math.min(100, Math.max(2, share))}%` }} />
                   </div>
                 )}
                 <p className="mt-1 text-[11px] text-muted">

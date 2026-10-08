@@ -213,7 +213,7 @@ export default async function Overview() {
                       <StatusBadge status={r.status} />
                     </div>
                     <div className="mt-2 h-2 overflow-hidden rounded-full bg-canvas">
-                      <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${pct(done, r.total)}%` }} />
+                      <div className="bar h-full rounded-full bg-brand transition-all" style={{ width: `${pct(done, r.total)}%` }} />
                     </div>
                     <p className="tabular mt-1.5 text-xs text-muted">
                       {fmtNumber(done)} of {fmtNumber(r.total)} processed · {by("FAILED")} failed ·{" "}
@@ -246,7 +246,7 @@ export default async function Overview() {
                     <span className="tabular text-xs text-muted">{fmtNumber(t.n)}</span>
                   </div>
                   <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-canvas">
-                    <div className="h-full rounded-full bg-brand" style={{ width: `${Math.max(4, pct(t.n, top))}%` }} />
+                    <div className="bar h-full rounded-full bg-brand" style={{ width: `${Math.max(4, pct(t.n, top))}%` }} />
                   </div>
                 </Link>
               </li>

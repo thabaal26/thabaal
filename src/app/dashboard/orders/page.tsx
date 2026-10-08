@@ -9,6 +9,7 @@ import { fmtDate, fmtNumber } from "@/lib/format";
 import { money, orderRef, type OrderItem } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { getScope, owned } from "@/lib/session";
+import { sendableTemplates } from "@/lib/senders";
 import { META_SAMPLES } from "@/lib/template";
 import { ActionButton } from "@/components/action-button";
 import { PAYMENT_TEMPLATE, paymentTemplateFor } from "@/lib/payments";
@@ -55,7 +56,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     scope.clientId ? db.template.findMany({ where: { clientId: scope.clientId, name: { in: [...ORDER_TEMPLATES, ...ORDER_TEMPLATES.map((n) => `thenan_${n}`)] } }, select: { name: true, status: true } }) : [],
     scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { refillDays: true, refillTemplateId: true, lapsedDays: true, winbackTemplateId: true, paymentConfig: true } }) : null,
     scope.clientId && scope.canManage
-      ? db.template.findMany({ where: { clientId: scope.clientId, status: "APPROVED", category: { not: "AUTHENTICATION" }, name: { notIn: [...ORDER_TEMPLATES, ...META_SAMPLES] } }, select: { id: true, name: true }, orderBy: { name: "asc" } })
+      ? db.template.findMany({ where: { clientId: scope.clientId, status: "APPROVED", category: { not: "AUTHENTICATION" }, name: { notIn: [...ORDER_TEMPLATES, ...META_SAMPLES] }, ...(await sendableTemplates(scope.clientId)) }, select: { id: true, name: true }, orderBy: { name: "asc" } })
       : [],
     scope.clientId ? db.template.findFirst({ where: { clientId: scope.clientId, name: PAYMENT_TEMPLATE }, select: { status: true } }) : null,
     scope.clientId ? paymentTemplateFor(scope.clientId) : null,
