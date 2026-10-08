@@ -63,6 +63,17 @@ export async function lookupNames(clientId: string, catalogId: string | null | u
  * Fills in names for orders saved with only product ids (older carts, or when the lookup failed).
  * Runs from the scheduler, a few orders at a time.
  */
+/** The order's items with product names, looking up and saving any still missing so messages never show bare codes. */
+export async function itemsWithNames(o: { id: string; clientId: string; catalogId: string | null; items: unknown }) {
+  const items = o.items as OrderItem[];
+  if (items.every((i) => i.name) || !o.catalogId) return items;
+  const names = await lookupNames(o.clientId, o.catalogId, items.map((i) => i.id));
+  if (!names.size) return items;
+  const named = items.map((i) => ({ ...i, name: i.name ?? names.get(i.id) }));
+  await db.order.update({ where: { id: o.id }, data: { items: named } });
+  return named;
+}
+
 export async function backfillOrderNames(limit = 20) {
   const rows = await db.$queryRaw<{ id: string }[]>`
     SELECT id FROM "Order" WHERE "catalogId" IS NOT NULL AND items::text NOT LIKE '%"name"%' AND "createdAt" > now() - interval '120 days'

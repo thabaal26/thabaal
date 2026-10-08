@@ -3,7 +3,7 @@
 import type { OrderStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { itemsText, money, orderRef, type OrderItem } from "@/lib/orders";
+import { itemsText, itemsWithNames, money, orderRef, type OrderItem } from "@/lib/orders";
 import { PAYMENT_TEMPLATE, paymentTemplateFor } from "@/lib/payments";
 import { renderFor, type VarMap } from "@/lib/template";
 import { getSettings, wahaConfig } from "@/lib/provider";
@@ -72,7 +72,7 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
   const c = order.customer;
   if (c.optedOut) return { ok: false, message: "This customer opted out of messages." };
 
-  const items = order.items as OrderItem[];
+  const items = await itemsWithNames(order);
   const first = c.name.trim().split(/\s+/)[0] || "there";
   const ref = orderRef(order);
   const when = dispatchLine(details);
@@ -164,7 +164,7 @@ export async function requestPayment(id: string): Promise<SendResult> {
 
   const settings = await getSettings();
   if (settings.provider !== "META") return { ok: false, message: "Payment requests need the WhatsApp Cloud API." };
-  const items = order.items as OrderItem[];
+  const items = await itemsWithNames(order);
   const first = c.name.trim().split(/\s+/)[0] || "there";
   const ref = orderRef(order);
   const payment = {
