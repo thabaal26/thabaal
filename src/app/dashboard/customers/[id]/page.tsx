@@ -54,8 +54,8 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
   ].sort((a, b) => b.at.getTime() - a.at.getTime());
 
   // Every customer carries the client-wide tag (e.g. thenan-oils), so it says nothing here.
-  const clientTag = c.client.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-  const productTags = c.tags.filter((t) => t !== clientTag);
+  const plain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const productTags = c.tags.filter((t) => plain(t) !== plain(c.client.name));
 
   return (
     <>

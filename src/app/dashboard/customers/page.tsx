@@ -62,8 +62,11 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
       .map((a) => ({ value: `loc:${a.location}`, label: a.location!, hint: `${a.region ?? "Area"} · ${fmtNumber(a._count)} customer${a._count === 1 ? "" : "s"}` })),
   ];
   // Every customer of a client carries its client-wide tag (e.g. thenan-oils); it adds nothing per row.
-  const clientTag = scope.clientName?.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-  const rowTags = (tags: string[]) => tags.filter((t) => t !== clientTag);
+  // Every customer of a client carries the client's own tag (e.g. "Thenan Oils"); it says nothing here, so hide it
+  // however it was spelled ("thenan-oils", "Thenan Oils", "thenan_oils").
+  const plain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const clientTag = scope.clientName ? plain(scope.clientName) : undefined;
+  const rowTags = (tags: string[], clientName?: string) => tags.filter((t) => plain(t) !== (clientName ? plain(clientName) : clientTag));
   const tagLabel = (t: string) => (t === "no-item-info" ? "No item recorded" : t.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase()));
   const qs = (patch: Record<string, string | undefined>) => {
     const s = new URLSearchParams(Object.entries({ q, tag, area, ...patch }).filter(([, v]) => v) as [string, string][]);
@@ -95,7 +98,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
             options={[
               { value: "", label: "All customers" },
               { value: "__optout", label: "Opted out" },
-              ...tags.filter((t) => t.tag !== clientTag).map((t) => ({ value: t.tag, label: tagLabel(t.tag), hint: `${fmtNumber(Number(t.n))} customers` })),
+              ...tags.filter((t) => plain(t.tag) !== clientTag).map((t) => ({ value: t.tag, label: tagLabel(t.tag), hint: `${fmtNumber(Number(t.n))} customers` })),
             ]}
           />
           {areaOptions.length > 1 && (
@@ -121,11 +124,11 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
                     {c.messages[0] && ` · ${fmtDate(c.messages[0].createdAt, "d MMM")} ${c.messages[0].status.toLowerCase()}`}
                   </p>
                   {c.purchases && <p className="mt-0.5 line-clamp-2 text-xs text-ink-2">{c.purchases}</p>}
-                  {(c.optedOut || c.unreachable || rowTags(c.tags).length > 0) && (
+                  {(c.optedOut || c.unreachable || rowTags(c.tags, c.client?.name).length > 0) && (
                     <div className="mt-1.5 flex flex-wrap gap-1">
                       {c.optedOut && <Badge tone="red">Opted out</Badge>}
                       {c.unreachable && <Badge tone="amber">Can&apos;t receive</Badge>}
-                      {rowTags(c.tags).map((t) => <Badge key={t}>{t}</Badge>)}
+                      {rowTags(c.tags, c.client?.name).map((t) => <Badge key={t}>{t}</Badge>)}
                     </div>
                   )}
                 </div>
@@ -179,7 +182,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
                       <div className="flex flex-wrap gap-1">
                         {c.optedOut && <Badge tone="red">Opted out</Badge>}
                         {c.unreachable && <Badge tone="amber">Can&apos;t receive</Badge>}
-                        {rowTags(c.tags).map((t) => (
+                        {rowTags(c.tags, c.client?.name).map((t) => (
                           <Link key={t} href={qs({ tag: t, page: undefined })}><Badge>{t}</Badge></Link>
                         ))}
                       </div>
