@@ -29,10 +29,13 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
   });
   if (!c) notFound();
 
-  const [{ templates, audience, numbers }, stats] = await Promise.all([
+  const [{ templates, audience, numbers }, stats, charged] = await Promise.all([
     campaignFormData(c.clientId),
     db.message.groupBy({ by: ["runId", "status"], where: { runId: { in: c.runs.map((r) => r.id) } }, _count: true }),
+    // Meta reports per message whether it was billed; it doesn't send the amount.
+    db.message.groupBy({ by: ["runId"], where: { runId: { in: c.runs.map((r) => r.id) }, billable: true }, _count: true }),
   ]);
+  const chargedIn = (runId: string) => charged.find((x) => x.runId === runId)?._count ?? 0;
   const stat = (runId: string, ...s: string[]) =>
     stats.filter((x) => x.runId === runId && s.includes(x.status)).reduce((a, x) => a + x._count, 0);
 
@@ -164,6 +167,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
                   <th className="px-5 py-2.5 text-right font-medium">Delivered</th>
                   <th className="px-5 py-2.5 text-right font-medium">Read</th>
                   <th className="px-5 py-2.5 text-right font-medium">Failed</th>
+                  <th className="px-5 py-2.5 text-right font-medium" title="Messages Meta billed (marketing rate)">Charged</th>
                   <th className="px-5 py-2.5" />
                 </tr>
               </thead>
@@ -179,6 +183,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
                       <td className="px-5 py-3 text-right">{fmtNumber(delivered)} <span className="text-xs text-muted">{pct(delivered, r.total)}%</span></td>
                       <td className="px-5 py-3 text-right">{fmtNumber(read)} <span className="text-xs text-muted">{pct(read, r.total)}%</span></td>
                       <td className="px-5 py-3 text-right text-rose-600">{fmtNumber(stat(r.id, "FAILED"))}</td>
+                      <td className="px-5 py-3 text-right">{fmtNumber(chargedIn(r.id))}</td>
                       <td className="px-5 py-3 text-right">
                         {scope.isAdmin && ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"].includes(r.status) ? (
                           <ActionButton action={cancelRun.bind(null, r.id)} variant="danger" confirm="Stop this run?">Stop</ActionButton>

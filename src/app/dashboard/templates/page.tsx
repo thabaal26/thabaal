@@ -2,7 +2,7 @@ import { Plus, RefreshCw, SquarePen } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ActionButton } from "@/components/action-button";
-import { buttonClass, Card, EmptyState, PageHeader, StatusBadge } from "@/components/ui";
+import { Badge, buttonClass, Card, EmptyState, PageHeader, StatusBadge } from "@/components/ui";
 import { WhatsAppBubble } from "@/components/whatsapp-preview";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
@@ -86,7 +86,14 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
                     <StatusBadge status={t.status} />
                   </div>
                   <div className="mt-auto flex items-center justify-between">
-                    <StatusBadge status={t.category} />
+                    <span className="flex items-center gap-1.5">
+                      <StatusBadge status={t.category} />
+                      {t.qualityScore && t.qualityScore !== "UNKNOWN" && (
+                        <Badge tone={t.qualityScore === "GREEN" ? "green" : t.qualityScore === "RED" ? "red" : "amber"} dot>
+                          Quality {t.qualityScore.toLowerCase()}
+                        </Badge>
+                      )}
+                    </span>
                     <div className="flex gap-1">
                       <Link href={`/dashboard/templates/${t.id}`} className={buttonClass("secondary", "sm")}>{scope.isAdmin ? "Edit" : "View"}</Link>
                       {scope.isAdmin && (

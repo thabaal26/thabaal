@@ -1,3 +1,4 @@
+import { ReplyMedia } from "@/components/reply-media";
 import { ArrowLeft, CheckCheck, Eye, MapPin, MessageCircle, Send, ShoppingBag } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -18,7 +19,7 @@ export const dynamic = "force-dynamic";
 
 type Entry =
   | { at: Date; type: "out"; id: string; template: string; campaign: string | null; status: string; body: string | null; readAt: Date | null; error: string | null; via: string | null }
-  | { at: Date; type: "in"; id: string; text: string; kind: string; via: string | null };
+  | { at: Date; type: "in"; id: string; text: string; kind: string; mediaId: string | null; mediaType: string | null; via: string | null };
 
 export default async function CustomerPage({ params }: PageProps<"/dashboard/customers/[id]">) {
   const { id } = await params;
@@ -49,7 +50,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
       at: m.sentAt ?? m.createdAt, type: "out" as const, id: m.id, template: m.templateName, campaign: m.run?.campaign.name ?? null,
       status: m.status, body: m.body, readAt: m.readAt, error: m.error, via: m.sender?.label ?? null,
     })),
-    ...c.replies.map((r) => ({ at: r.receivedAt, type: "in" as const, id: r.id, text: r.text, kind: r.kind, via: r.sender?.label ?? null })),
+    ...c.replies.map((r) => ({ at: r.receivedAt, type: "in" as const, id: r.id, text: r.text, kind: r.kind, mediaId: r.mediaId, mediaType: r.mediaType, via: r.sender?.label ?? null })),
   ].sort((a, b) => b.at.getTime() - a.at.getTime());
 
   // Every customer carries the client-wide tag (e.g. thenan-oils), so it says nothing here.
@@ -145,6 +146,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                     <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-bubble px-3 py-2 text-sm shadow-sm">
                       {e.kind === "button" && <p className="mb-0.5 text-[11px] font-medium text-brand-deep">Tapped a button</p>}
                       <p className="whitespace-pre-wrap">{e.text}</p>
+                      {e.mediaId && <ReplyMedia id={e.id} type={e.mediaType} />}
                       <p className="mt-1 text-right text-[10px] text-muted">{e.via && `to ${e.via} · `}{fmtDate(e.at, "d MMM, h:mm a")}</p>
                     </div>
                   </li>

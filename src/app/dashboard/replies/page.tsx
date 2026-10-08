@@ -1,3 +1,4 @@
+import { ReplyMedia } from "@/components/reply-media";
 import { CheckCheck, Inbox, MessageCircle, RotateCcw, ShoppingBag } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -82,6 +83,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
                       {order && <Badge tone="green"><ShoppingBag className="size-3" /> {r.kind === "button" ? "Tapped button" : "Possible order"}</Badge>}
                     </div>
                     <p className="mt-2 w-fit max-w-full whitespace-pre-wrap rounded-2xl rounded-tl-sm bg-bubble px-3 py-2 text-sm shadow-sm ring-1 ring-line">{r.text}</p>
+                    {r.mediaId && <ReplyMedia id={r.id} type={r.mediaType} />}
                     <p className="mt-1.5 text-xs text-muted">
                       {fmtDate(r.receivedAt, "EEE d MMM, h:mm a")}
                       {r.sender && <> · to {r.sender.label}</>}

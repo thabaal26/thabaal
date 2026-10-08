@@ -22,7 +22,11 @@ export type IncomingReply = {
   phoneNumberId?: string;
   /** Local session replies can belong to any client. */
   anyClient?: boolean;
+  /** A photo, voice note or file on Meta's servers, downloaded when someone views it. */
+  media?: { id: string; type: string };
 };
+
+const MEDIA_TYPES = ["image", "audio", "video", "document", "sticker"];
 
 /**
  * Saves a customer's reply against the right client. When several clients share the number
@@ -47,7 +51,7 @@ export async function recordReply(r: IncomingReply) {
 
   try {
     await db.reply.create({
-      data: { customerId: customer.id, senderId, text: r.text.trim().slice(0, 4000), kind: r.kind, waMessageId: r.waMessageId, receivedAt: r.at ?? new Date() },
+      data: { customerId: customer.id, senderId, text: r.text.trim().slice(0, 4000), kind: r.kind, mediaId: r.media?.id, mediaType: r.media?.type, waMessageId: r.waMessageId, receivedAt: r.at ?? new Date() },
     });
   } catch (e) {
     // Webhooks retry; the same message id arriving twice is expected.
@@ -69,7 +73,7 @@ export function metaReplyContent(m: {
   reaction?: { emoji?: string };
   location?: { latitude?: number; longitude?: number; name?: string; address?: string };
   contacts?: { name?: { formatted_name?: string } }[];
-}): { text: string; kind: IncomingReply["kind"] } {
+}): { text: string; kind: IncomingReply["kind"]; media?: IncomingReply["media"] } {
   if (m.text?.body) return { text: m.text.body, kind: "text" };
   // An emoji reaction to one of our messages; an empty emoji means they removed it.
   if (m.type === "reaction") return { text: m.reaction?.emoji ? `Reacted ${m.reaction.emoji}` : "", kind: "media" };
@@ -87,7 +91,9 @@ export function metaReplyContent(m: {
   if (tapped) return { text: tapped, kind: "button" };
   const caption = m.image?.caption ?? m.video?.caption ?? m.document?.caption ?? m.document?.filename;
   const label = { image: "Photo", video: "Video", audio: "Voice note", document: "Document", sticker: "Sticker", location: "Location" }[m.type ?? ""] ?? "Message";
-  return { text: caption ? `${label}: ${caption}` : `[${label}]`, kind: "media" };
+  const file = m.type ? (m as Record<string, { id?: string } | undefined>)[m.type] : undefined;
+  const media = file?.id && MEDIA_TYPES.includes(m.type!) ? { id: file.id, type: m.type! } : undefined;
+  return { text: caption ? `${label}: ${caption}` : `[${label}]`, kind: "media", media };
 }
 
 /** When typed messages stop being allowed (24 hours after the customer last wrote); null if that has passed or they never wrote. */

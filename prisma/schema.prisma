@@ -192,6 +192,8 @@ model Template {
   metaId       String?        @unique
   status       TemplateStatus @default(DRAFT)
   statusReason String?
+  /// Meta's quality score for the template: GREEN | YELLOW | RED | UNKNOWN.
+  qualityScore String?
   lastSyncedAt DateTime?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
@@ -295,6 +297,9 @@ model Message {
   deliveredAt  DateTime?
   readAt       DateTime?
   failedAt     DateTime?
+  /// From Meta's status webhook: marketing | utility | authentication | service, and whether it was charged.
+  pricingCategory String?
+  billable        Boolean?
 
   @@index([runId, status])
   @@index([createdAt])
@@ -307,7 +312,10 @@ model Reply {
   customerId  String
   customer    Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
   text        String
-  kind        String // text | button | media
+  kind        String // text | button | media | order
+  /// Media the customer sent (image, audio, video, document, sticker); fetched from Meta when viewed.
+  mediaId     String?
+  mediaType   String?
   waMessageId String?         @unique
   /// The number the customer wrote to.
   senderId    String?

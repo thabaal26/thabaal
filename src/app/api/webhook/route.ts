@@ -22,7 +22,7 @@ export function GET(req: NextRequest) {
 const RANK = { QUEUED: 0, SENT: 1, DELIVERED: 2, READ: 3, FAILED: 4, SKIPPED: 4 } as const;
 const OPT_OUT = /^\s*(stop|unsubscribe|opt[\s-]?out|cancel)\s*$/i;
 
-type StatusUpdate = { id: string; status: string; timestamp: string; errors?: { code?: number; title?: string; message?: string; error_data?: { details?: string } }[] };
+type StatusUpdate = { id: string; status: string; timestamp: string; pricing?: { category?: string; billable?: boolean }; errors?: { code?: number; title?: string; message?: string; error_data?: { details?: string } }[] };
 
 function validSignature(raw: string, header: string | null) {
   const secret = process.env.META_APP_SECRET;
@@ -36,6 +36,9 @@ function validSignature(raw: string, header: string | null) {
 async function applyStatus(s: StatusUpdate) {
   const msg = await db.message.findUnique({ where: { waMessageId: s.id }, select: { id: true, status: true, customerId: true } });
   if (!msg) return;
+  // Every status carries Meta's pricing; keep it for cost reporting even when the status itself is stale.
+  if (s.pricing?.category)
+    await db.message.update({ where: { id: msg.id }, data: { pricingCategory: s.pricing.category.toLowerCase(), billable: s.pricing.billable ?? null } });
   const at = new Date(Number(s.timestamp) * 1000);
   const next = s.status.toUpperCase();
   if (next === "FAILED") {
@@ -78,10 +81,10 @@ export async function POST(req: NextRequest) {
       if (change.field === "messages") {
         for (const s of v.statuses ?? []) await applyStatus(s);
         for (const m of v.messages ?? []) {
-          const { text, kind } = metaReplyContent(m);
+          const { text, kind, media } = metaReplyContent(m);
           const phoneNumberId = v.metadata?.phone_number_id;
           if (OPT_OUT.test(text)) await optOut(m.from, phoneNumberId);
-          const customer = await recordReply({ phone: m.from, text, kind, waMessageId: m.id, phoneNumberId, at: m.timestamp ? new Date(Number(m.timestamp) * 1000) : undefined });
+          const customer = await recordReply({ phone: m.from, text, kind, media, waMessageId: m.id, phoneNumberId, at: m.timestamp ? new Date(Number(m.timestamp) * 1000) : undefined });
           if (customer && m.type === "order") await recordOrder(customer, m.id, m).catch((e) => console.error("Could not save order", e));
         }
       } else if (change.field === "phone_number_quality_update") {
@@ -102,8 +105,13 @@ export async function POST(req: NextRequest) {
         const category = String(v.new_category ?? "").toUpperCase();
         if (["MARKETING", "UTILITY", "AUTHENTICATION"].includes(category))
           await db.template.updateMany({ where: { metaId: String(v.message_template_id) }, data: { category: category as never, lastSyncedAt: new Date() } });
-      } else if (change.field === "message_template_quality_update" || change.field === "account_update" || change.field === "account_alerts") {
-        // Not stored yet; logged so they show up in Vercel's logs.
+      } else if (change.field === "message_template_quality_update") {
+        await db.template.updateMany({
+          where: { metaId: String(v.message_template_id) },
+          data: { qualityScore: String(v.new_quality_score ?? "UNKNOWN").toUpperCase(), lastSyncedAt: new Date() },
+        });
+      } else if (change.field === "account_update" || change.field === "account_alerts") {
+        // Restrictions, policy notices and verification results; logged so they show up in Vercel's logs.
         console.warn(`WhatsApp ${change.field}`, JSON.stringify(v));
       }
     }
