@@ -1,6 +1,7 @@
 "use client";
 
-import { Bold, Braces, Eye, Italic, Loader2, Plus, Send, Strikethrough, Trash2, TriangleAlert } from "lucide-react";
+import { upload } from "@vercel/blob/client";
+import { Bold, Braces, Eye, Italic, Loader2, Plus, Send, Strikethrough, Trash2, TriangleAlert, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { MobileActionBar } from "@/components/mobile-action-bar";
@@ -77,6 +78,23 @@ export function TemplateEditor({
   const auth = t.category === "AUTHENTICATION";
 
   const set = (patch: Partial<TemplateDraft>) => setT((s) => ({ ...s, ...patch }));
+
+  // Header image goes straight from the browser to Vercel Blob; its public link fills the field.
+  const [uploading, setUploading] = useState(false);
+  async function uploadImage(file?: File) {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) return toastResult({ ok: false, message: "That image is over 5 MB. WhatsApp allows up to 5 MB." });
+    setUploading(true);
+    try {
+      const blob = await upload(`templates/${file.name}`, file, { access: "public", handleUploadUrl: "/api/upload" });
+      set({ headerMediaUrl: blob.url });
+      toastResult({ ok: true, message: "Image uploaded. Save the template to keep it." });
+    } catch (e) {
+      toastResult({ ok: false, message: e instanceof Error ? e.message : "Upload failed" });
+    } finally {
+      setUploading(false);
+    }
+  }
   const errors = useMemo(() => validateDraft(t), [t]);
   const preview = renderFor(t, SAMPLE_CUSTOMER);
   const bodyVars = placeholders(t.body);
@@ -248,7 +266,17 @@ export function TemplateEditor({
                     <input className="field" maxLength={60} value={t.headerText} placeholder="Headline, optionally with {{1}}" onChange={(e) => set({ headerText: e.target.value })} />
                   )}
                   {t.headerType === "IMAGE" && (
-                    <input className="field" value={t.headerMediaUrl} placeholder="https://yourdomain.com/offer.jpg" onChange={(e) => set({ headerMediaUrl: e.target.value })} />
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input className="field" value={t.headerMediaUrl} placeholder="https://yourdomain.com/offer.jpg" onChange={(e) => set({ headerMediaUrl: e.target.value })} />
+                        <label className={cn("inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-sm font-medium ring-1 ring-line hover:bg-canvas", uploading && "pointer-events-none opacity-60")}>
+                          {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+                          {uploading ? "Uploading…" : "Upload"}
+                          <input type="file" accept="image/jpeg,image/png" className="sr-only" onChange={(e) => uploadImage(e.target.files?.[0])} />
+                        </label>
+                      </div>
+                      <p className="text-xs text-muted">JPG or PNG, up to 5 MB. A wide image (about 1200×628) reads best in the chat.</p>
+                    </div>
                   )}
                 </div>
 
