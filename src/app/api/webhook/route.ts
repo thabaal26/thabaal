@@ -63,10 +63,93 @@ async function applyStatus(s: StatusUpdate) {
   });
 }
 
+type PaymentUpdate = {
+  status?: string;
+  payment?: { reference_id?: string; transaction?: { id?: string; status?: string } };
+};
+
+/** The customer paid (or failed to pay) through "Review and pay"; reference_id is our order id. */
+async function applyPayment(s: PaymentUpdate) {
+  const orderId = s.payment?.reference_id;
+  if (!orderId) return;
+  const txn = s.payment?.transaction;
+  const paid = txn?.status === "success" || s.status === "captured";
+  if (!paid) {
+    console.warn("WhatsApp payment not completed", JSON.stringify(s));
+    return;
+  }
+  await db.order.updateMany({
+    where: { id: orderId, status: { in: ["NEW", "CONFIRMED"] } },
+    data: { status: "PAID", paidAt: new Date(), paymentTxnId: txn?.id ?? null },
+  });
+  // Already further along (dispatched): just record the payment.
+  await db.order.updateMany({ where: { id: orderId, paidAt: null }, data: { paidAt: new Date(), paymentTxnId: txn?.id ?? null } });
+}
+
 /** STOP only opts out of the business whose number received it. */
 async function optOut(phone: string, phoneNumberId?: string) {
   const { customers } = await receivingNumber(phoneNumberId);
   await db.customer.updateMany({ where: { phone, ...customers }, data: { optedOut: true } });
+}
+
+type CallEvent = { id: string; from?: string; to?: string; event?: string; direction?: string; status?: string; duration?: number; session?: { sdp?: string; sdp_type?: string } };
+type CallStatusUpdate = { id: string; type?: string; status?: string };
+
+/** A customer calling one of our numbers: "connect" rings the portal, "terminate" ends it. */
+async function applyCall(c: CallEvent, v: { metadata?: { phone_number_id?: string }; contacts?: { wa_id?: string; profile?: { name?: string } }[] }) {
+  // A call we placed: the customer picked up and this carries their SDP answer for the dialling browser.
+  if (c.event === "connect" && (c.session?.sdp_type === "answer" || c.direction === "BUSINESS_INITIATED")) {
+    await db.call.upsert({
+      where: { waCallId: c.id },
+      update: { answerSdp: c.session?.sdp, status: "ANSWERED", answeredAt: new Date() },
+      create: { waCallId: c.id, direction: "OUTGOING", fromPhone: c.to ?? "", answerSdp: c.session?.sdp, status: "ANSWERED", answeredAt: new Date() },
+    });
+  } else if (c.event === "connect" && c.from) {
+    const { number, customers } = await receivingNumber(v.metadata?.phone_number_id);
+    const customer = await db.customer.findFirst({ where: { phone: c.from, ...customers }, select: { id: true, clientId: true } });
+    const callerName = v.contacts?.find((x) => x.wa_id === c.from)?.profile?.name ?? null;
+    await db.call.upsert({
+      where: { waCallId: c.id },
+      update: {},
+      create: {
+        waCallId: c.id,
+        senderId: number?.id,
+        clientId: number?.clientId ?? customer?.clientId,
+        customerId: customer?.id,
+        fromPhone: c.from,
+        callerName,
+        offerSdp: c.session?.sdp,
+      },
+    });
+  } else if (c.event === "terminate") {
+    const call = await db.call.findUnique({ where: { waCallId: c.id }, select: { id: true, status: true } });
+    if (!call) return;
+    await db.call.update({
+      where: { id: call.id },
+      data: {
+        status: call.status === "RINGING" ? "MISSED" : call.status === "REJECTED" ? "REJECTED" : "ENDED",
+        endedAt: new Date(),
+        duration: c.duration ?? null,
+        offerSdp: null,
+      },
+    });
+  }
+}
+
+/** Progress of a call we placed: ringing, accepted or declined by the customer. */
+async function applyCallStatus(s: CallStatusUpdate) {
+  const status = s.status?.toUpperCase();
+  if (status === "REJECTED")
+    await db.call.updateMany({ where: { waCallId: s.id, status: { in: ["RINGING", "ANSWERED"] } }, data: { status: "REJECTED", endedAt: new Date() } });
+}
+
+/** The customer's answer to "may we call you?"; Meta says until when the permission lasts. */
+async function applyCallPermission(phone: string, phoneNumberId: string | undefined, reply: { response?: string; expiration_timestamp?: number | string }) {
+  const { customers } = await receivingNumber(phoneNumberId);
+  const until = reply.response === "accept"
+    ? new Date(reply.expiration_timestamp ? Number(reply.expiration_timestamp) * 1000 : Date.now() + 7 * 86_400_000)
+    : null;
+  await db.customer.updateMany({ where: { phone, ...customers }, data: { callAllowedUntil: until } });
 }
 
 export async function POST(req: NextRequest) {
@@ -80,11 +163,12 @@ export async function POST(req: NextRequest) {
     for (const change of entry.changes ?? []) {
       const v = change.value ?? {};
       if (change.field === "messages") {
-        for (const s of v.statuses ?? []) await applyStatus(s);
+        for (const s of v.statuses ?? []) await (s.type === "payment" ? applyPayment(s) : applyStatus(s));
         for (const m of v.messages ?? []) {
           const { text, kind, media } = metaReplyContent(m);
           const phoneNumberId = v.metadata?.phone_number_id;
           if (OPT_OUT.test(text)) await optOut(m.from, phoneNumberId);
+          if (m.interactive?.type === "call_permission_reply") await applyCallPermission(m.from, phoneNumberId, m.interactive.call_permission_reply ?? {});
           // "JOIN van" from an opt-in QR code or link: add them as an opted-in customer first.
           const join = JOIN_RE.exec(text);
           if (join) {
@@ -94,6 +178,9 @@ export async function POST(req: NextRequest) {
           const customer = await recordReply({ phone: m.from, text, kind, media, waMessageId: m.id, phoneNumberId, at: m.timestamp ? new Date(Number(m.timestamp) * 1000) : undefined });
           if (customer && m.type === "order") await recordOrder(customer, m.id, m).catch((e) => console.error("Could not save order", e));
         }
+      } else if (change.field === "calls") {
+        for (const c of v.calls ?? []) await applyCall(c, v);
+        for (const st of v.statuses ?? []) await applyCallStatus(st);
       } else if (change.field === "phone_number_quality_update") {
         // Meta changed a number's quality or limit; it sends the display number, so match on digits.
         const digits = String(v.display_phone_number ?? "").replace(/\D/g, "");

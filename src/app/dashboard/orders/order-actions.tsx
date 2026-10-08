@@ -6,12 +6,13 @@ import { useState, useTransition } from "react";
 import { Sheet } from "@/components/sheet";
 import { toastResult } from "@/components/toast";
 import { Button, Label } from "@/components/ui";
-import { notifyOrder, saveOrderNote, setOrderStatus, type DispatchDetails } from "../actions/orders";
+import { notifyOrder, requestPayment, saveOrderNote, setOrderStatus, type DispatchDetails } from "../actions/orders";
 
 type Status = "NEW" | "CONFIRMED" | "PAID" | "DISPATCHED" | "DELIVERED" | "CANCELLED";
 
 /** The next steps for an order: tell the customer, move it along, and keep a private note. */
-export function OrderActions({ id, status, note, canEdit }: { id: string; status: Status; note: string | null; canEdit: boolean }) {
+/** payment: whether a "Review and pay" request can go out, and if one already did. */
+export function OrderActions({ id, status, note, canEdit, payment = null }: { id: string; status: Status; note: string | null; canEdit: boolean; payment?: "first" | "again" | null }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [text, setText] = useState(note ?? "");
@@ -39,6 +40,11 @@ export function OrderActions({ id, status, note, canEdit }: { id: string; status
             onClick={() => setDispatchOpen(true)}
           >
             Dispatch & message customer
+          </Button>
+        )}
+        {payment && (status === "NEW" || status === "CONFIRMED") && (
+          <Button size="sm" variant={status === "CONFIRMED" && payment === "first" ? "primary" : "secondary"} disabled={pending} onClick={() => run(() => requestPayment(id))}>
+            {payment === "again" ? "Send payment request again" : "Request payment (UPI)"}
           </Button>
         )}
         {status === "CONFIRMED" && (

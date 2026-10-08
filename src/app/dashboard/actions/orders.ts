@@ -11,7 +11,7 @@ import { normalizePhone } from "@/lib/phone";
 import { senderFor } from "@/lib/senders";
 import { requireManager, requireOrderAccess } from "@/lib/session";
 import { sendText } from "@/lib/waha";
-import { sendTemplateMessage, sendTextMessage } from "@/lib/whatsapp";
+import { sendPaymentRequest, sendPaymentTemplate, sendTemplateMessage, sendTextMessage } from "@/lib/whatsapp";
 import { explainSendError, type SendResult } from "./send-helpers";
 import { saveTemplate } from "./templates";
 
@@ -140,6 +140,83 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
   } catch (e) {
     return { ok: false, message: explainSendError(e).error };
   }
+}
+
+/** Name of the approved "order details" template used once the customer's 24-hour window has closed. */
+export const PAYMENT_TEMPLATE = "payment_request";
+
+/**
+ * Sends the customer WhatsApp's "Review and pay" message for this order, paid by UPI through the
+ * client's payment configuration. Meta's payment webhook marks the order paid.
+ */
+export async function requestPayment(id: string): Promise<SendResult> {
+  const s = await requireOrderAccess();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const order = await db.order.findFirst({
+    where: { id, ...(s.clientId ? { clientId: s.clientId } : {}) },
+    include: { customer: true, client: { select: { name: true, paymentConfig: true } } },
+  });
+  if (!order) return { ok: false, message: "Order not found." };
+  if (order.status === "PAID" || order.paidAt) return { ok: false, message: "This order is already paid." };
+  if (!order.client.paymentConfig) return { ok: false, message: "Set your payment configuration name at the top of Orders first." };
+  if (order.total <= 0) return { ok: false, message: "This order has no total. Add prices before asking for payment." };
+  const c = order.customer;
+  if (c.optedOut) return { ok: false, message: "This customer opted out of messages." };
+
+  const settings = await getSettings();
+  if (settings.provider !== "META") return { ok: false, message: "Payment requests need the WhatsApp Cloud API." };
+  const items = order.items as OrderItem[];
+  const first = c.name.trim().split(/\s+/)[0] || "there";
+  const ref = `#${order.id.slice(-5).toUpperCase()}`;
+  const payment = {
+    referenceId: order.id,
+    configuration: order.client.paymentConfig,
+    items: items.map((i) => ({ id: i.id, name: i.name ?? i.id, quantity: i.quantity, price: i.price })),
+    total: order.total,
+  };
+  const text = `Hello ${first}, here is your ${order.client.name} order ${ref}.\n\nItems: ${itemsText(items)}\nTotal: ${money(order.total, order.currency)}\n\nTap "Review and pay" to pay by UPI.`;
+
+  const lastReply = await db.reply.findFirst({ where: { customerId: c.id }, orderBy: { receivedAt: "desc" }, select: { receivedAt: true, senderId: true } });
+  const open = replyWindowEnd(lastReply?.receivedAt) !== null;
+  const { number, cfg } = await senderFor(c.clientId, lastReply?.senderId);
+
+  try {
+    let res: { id: string; simulated: boolean };
+    let templateName = "Payment request";
+    if (open) {
+      res = await sendPaymentRequest(cfg, c.phone, text, payment);
+    } else {
+      const t = await db.template.findFirst({ where: { clientId: c.clientId, name: PAYMENT_TEMPLATE, status: "APPROVED" }, select: { language: true } });
+      res = await sendPaymentTemplate(cfg, c.phone, { name: PAYMENT_TEMPLATE, language: t?.language ?? "en" }, first, payment);
+      templateName = PAYMENT_TEMPLATE;
+    }
+    await db.message.create({
+      data: {
+        customerId: c.id, templateName, body: text, status: "SENT", waMessageId: res.id, simulated: res.simulated,
+        provider: "META", sentAt: new Date(), senderId: number?.id ?? null,
+      },
+    });
+    await db.order.update({ where: { id: order.id }, data: { paymentRequestedAt: new Date() } });
+    revalidatePath("/dashboard/orders");
+    return { ok: true, message: res.simulated ? "Simulated payment request logged (demo mode)." : `Payment request sent to ${c.name}.` };
+  } catch (e) {
+    const err = explainSendError(e).error;
+    // Outside the window the template is the only way; say what to create when it's missing.
+    if (!open && /template|132001|does not exist/i.test(err))
+      return { ok: false, message: `The customer's 24-hour window has closed, so WhatsApp needs an approved "${PAYMENT_TEMPLATE}" order details template. Create it in WhatsApp Manager, then sync templates.` };
+    return { ok: false, message: err };
+  }
+}
+
+/** The payment configuration name from WhatsApp Manager → Payment configurations; empty turns payment requests off. */
+export async function savePaymentConfig(name: string): Promise<SendResult> {
+  const s = await requireManager(true);
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const value = name.trim();
+  if (value && !/^[\w.-]{1,60}$/.test(value)) return { ok: false, message: "Use the configuration name exactly as WhatsApp Manager shows it." };
+  await db.client.update({ where: { id: s.clientId }, data: { paymentConfig: value || null } });
+  revalidatePath("/dashboard/orders");
+  return { ok: true, message: value ? `Payment requests on, using "${value}".` : "Payment requests turned off." };
 }
 
 /** An order taken by phone, at the shop or on paper, so it can be confirmed and dispatched like a WhatsApp cart. */

@@ -12,7 +12,9 @@ import { itemsText, money, type OrderItem } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { replyWindowEnd } from "@/lib/replies";
 import { getScope, owned } from "@/lib/session";
+import { requestCallPermission } from "../../actions/calls";
 import { setOptOut } from "../../actions/customers";
+import { CallButton } from "./call-button";
 import { SendPanel } from "./send-panel";
 
 export const metadata: Metadata = { title: "Customer" };
@@ -42,6 +44,8 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
   ]);
   // WhatsApp allows typed messages for 24 hours after the customer last wrote to us.
   const windowEnd = replyWindowEnd(c.replies[0]?.receivedAt);
+  // WhatsApp only lets us ring customers who tapped "Allow" on our call request.
+  const callAllowed = Boolean(c.callAllowedUntil && c.callAllowedUntil > new Date());
 
   const sent = c.messages.filter((m) => !["QUEUED", "SKIPPED"].includes(m.status));
   const delivered = sent.filter((m) => m.status === "DELIVERED" || m.status === "READ").length;
@@ -66,12 +70,22 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
       </Link>
       <PageHeader
         title={c.name}
-        description={`${formatPhone(c.phone)}${c.location ? ` · ${c.location}${c.region && c.region !== "Not sure" ? `, ${c.region}` : ""}` : ""}${!scope.clientId ? ` · ${c.client.name}` : ""} · customer since ${fmtDate(c.createdAt, "d MMM yyyy")}`}
+        description={`${formatPhone(c.phone)}${c.location ? ` · ${c.location}${c.region && c.region !== "Not sure" ? `, ${c.region}` : ""}` : ""}${!scope.clientId ? ` · ${c.client.name}` : ""} · customer since ${fmtDate(c.createdAt, "d MMM yyyy")}${c.callAllowedUntil && c.callAllowedUntil > new Date() ? ` · calls allowed until ${fmtDate(c.callAllowedUntil, "d MMM")}` : ""}`}
         actions={
           <>
             <a href={`https://wa.me/${c.phone}`} target="_blank" rel="noreferrer" className={buttonClass("primary")}>
               <MessageCircle className="size-4" /> Message on WhatsApp
             </a>
+            {scope.canOperate && <CallButton customerId={c.id} name={c.name} primary={callAllowed} />}
+            {scope.canOperate && !callAllowed && (
+              <ActionButton
+                action={requestCallPermission.bind(null, c.id)}
+                size="md"
+                title={c.callAskedAt ? `Last asked ${fmtDate(c.callAskedAt, "d MMM, h:mm a")}` : "Sends WhatsApp's \"allow calls?\" prompt"}
+              >
+                {c.callAskedAt ? "Ask to call again" : "Ask to call"}
+              </ActionButton>
+            )}
             {scope.canManage && (
               <ActionButton action={setOptOut.bind(null, c.id, !c.optedOut)} size="md">{c.optedOut ? "Opt back in" : "Opt out"}</ActionButton>
             )}

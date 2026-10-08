@@ -96,6 +96,116 @@ export async function sendTextMessage(cfg: WaConfig, to: string, body: string): 
   return { id: res.messages[0].id, simulated: false };
 }
 
+export type CallAction = "pre_accept" | "accept" | "reject" | "terminate";
+
+/** Answers, rejects or hangs up a WhatsApp voice call; accepting sends the browser's SDP answer. */
+export async function callAction(cfg: WaConfig, callId: string, action: CallAction, sdp?: string) {
+  if (!cfg.live) return;
+  await graph(cfg, `${cfg.phoneNumberId}/calls`, {
+    method: "POST",
+    body: JSON.stringify({ messaging_product: "whatsapp", call_id: callId, action, ...(sdp && { session: { sdp_type: "answer", sdp } }) }),
+  });
+}
+
+/** Rings a customer on WhatsApp with the browser's SDP offer; their answer arrives on the calls webhook. */
+export async function startMetaCall(cfg: WaConfig, to: string, sdp: string): Promise<string> {
+  if (!cfg.live) throw new MetaError("Calling needs the WhatsApp Cloud API connected.");
+  const res = await graph<{ calls?: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/calls`, {
+    method: "POST",
+    body: JSON.stringify({ messaging_product: "whatsapp", to, action: "connect", session: { sdp_type: "offer", sdp } }),
+  });
+  const id = res.calls?.[0]?.id;
+  if (!id) throw new MetaError("Meta did not return a call id.");
+  return id;
+}
+
+/**
+ * Asks a customer to allow calls from us. Like a typed message, WhatsApp only allows it
+ * within 24 hours of the customer's last message.
+ */
+export async function sendCallPermissionRequest(cfg: WaConfig, to: string, body: string): Promise<{ id: string; simulated: boolean }> {
+  if (!cfg.live) return { id: `demo.${crypto.randomUUID()}`, simulated: true };
+  const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "interactive",
+      interactive: { type: "call_permission_request", action: { name: "call_permission_request" }, body: { text: body } },
+    }),
+  });
+  return { id: res.messages[0].id, simulated: false };
+}
+
+/** Rupees as WhatsApp payment amounts: an integer with offset 100 (paise). */
+const paise = (n: number) => ({ value: Math.round(n * 100), offset: 100 });
+
+export type PaymentRequest = {
+  /** Unique per order; Meta echoes it back on the payment webhook. Max 35 characters. */
+  referenceId: string;
+  configuration: string;
+  items: { id: string; name: string; quantity: number; price: number }[];
+  total: number;
+};
+
+/** The order_details parameters behind WhatsApp's "Review and pay" button (UPI). */
+function orderDetails(p: PaymentRequest) {
+  const lines = p.items.filter((i) => i.quantity > 0);
+  const itemsTotal = lines.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  // Meta checks that the items add up to the total; when they don't (prices missing), send one line for the order.
+  const items = itemsTotal > 0 && Math.abs(itemsTotal - p.total) < 0.01
+    ? lines.map((i) => ({ retailer_id: i.id.slice(0, 50), name: i.name.slice(0, 60), amount: paise(i.price), quantity: i.quantity }))
+    : [{ retailer_id: "order", name: "Your order", amount: paise(p.total), quantity: 1 }];
+  return {
+    reference_id: p.referenceId,
+    type: "physical-goods",
+    payment_type: "upi",
+    payment_configuration: p.configuration,
+    currency: "INR",
+    total_amount: paise(p.total),
+    order: { status: "pending", items, subtotal: paise(p.total), tax: { ...paise(0), description: "Included" } },
+  };
+}
+
+/** Within the 24-hour window: an interactive order_details message with the "Review and pay" button. */
+export async function sendPaymentRequest(cfg: WaConfig, to: string, body: string, p: PaymentRequest): Promise<{ id: string; simulated: boolean }> {
+  if (!cfg.live) return { id: `demo.${crypto.randomUUID()}`, simulated: true };
+  const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "interactive",
+      interactive: { type: "order_details", body: { text: body.slice(0, 1024) }, action: { name: "review_and_pay", parameters: orderDetails(p) } },
+    }),
+  });
+  return { id: res.messages[0].id, simulated: false };
+}
+
+/** Outside the window: an approved "order details" template whose body has one variable, the customer's name. */
+export async function sendPaymentTemplate(cfg: WaConfig, to: string, template: { name: string; language: string }, firstName: string, p: PaymentRequest): Promise<{ id: string; simulated: boolean }> {
+  if (!cfg.live) return { id: `demo.${crypto.randomUUID()}`, simulated: true };
+  const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to,
+      type: "template",
+      template: {
+        name: template.name,
+        language: { code: template.language },
+        components: [
+          { type: "body", parameters: [{ type: "text", text: firstName }] },
+          { type: "button", sub_type: "order_details", index: 0, parameters: [{ type: "action", action: { order_details: orderDetails(p) } }] },
+        ],
+      },
+    }),
+  });
+  return { id: res.messages[0].id, simulated: false };
+}
+
 export type MetaTemplate = {
   id: string;
   name: string;

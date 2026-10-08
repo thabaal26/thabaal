@@ -65,7 +65,7 @@ export function metaReplyContent(m: {
   type?: string;
   text?: { body?: string };
   button?: { text?: string };
-  interactive?: { button_reply?: { title?: string }; list_reply?: { title?: string } };
+  interactive?: { type?: string; button_reply?: { title?: string }; list_reply?: { title?: string }; call_permission_reply?: { response?: string } };
   image?: { caption?: string };
   order?: { product_items?: { quantity?: number | string }[] };
   video?: { caption?: string };
@@ -87,6 +87,8 @@ export function metaReplyContent(m: {
     const n = (m.order?.product_items ?? []).reduce((sum, i) => sum + (Number(i.quantity) || 1), 0);
     return { text: `Placed an order from the catalogue (${n} item${n === 1 ? "" : "s"})`, kind: "order" };
   }
+  if (m.interactive?.type === "call_permission_reply")
+    return { text: m.interactive.call_permission_reply?.response === "accept" ? "Allowed you to call them on WhatsApp" : "Declined calls on WhatsApp", kind: "button" };
   const tapped = m.button?.text ?? m.interactive?.button_reply?.title ?? m.interactive?.list_reply?.title;
   if (tapped) return { text: tapped, kind: "button" };
   const caption = m.image?.caption ?? m.video?.caption ?? m.document?.caption ?? m.document?.filename;

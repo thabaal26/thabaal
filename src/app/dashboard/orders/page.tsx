@@ -10,9 +10,10 @@ import { money, type OrderItem } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { getScope, owned } from "@/lib/session";
 import { ActionButton } from "@/components/action-button";
-import { createOrderTemplates } from "../actions/orders";
+import { createOrderTemplates, PAYMENT_TEMPLATE } from "../actions/orders";
 import { NewOrder } from "./new-order";
 import { OrderActions } from "./order-actions";
+import { PaymentForm } from "./payment-form";
 import { RefillForm } from "./refill-form";
 import { WinbackForm } from "./winback-form";
 
@@ -38,19 +39,23 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
   const tab = TABS.find((t) => t.key === show) ?? TABS[0];
   const mine = owned(scope);
 
-  const [orders, counts, orderTemplates, client, approved] = await Promise.all([
+  const [orders, counts, orderTemplates, client, approved, paymentTemplate] = await Promise.all([
     db.order.findMany({
       where: { ...mine, ...(tab.where as object) },
-      include: { customer: { select: { id: true, name: true, phone: true, location: true, client: { select: { name: true } } } } },
+      include: {
+        customer: { select: { id: true, name: true, phone: true, location: true, client: { select: { name: true } } } },
+        client: { select: { paymentConfig: true } },
+      },
       orderBy: { createdAt: "desc" },
       take: 200,
     }),
     db.order.groupBy({ by: ["status"], where: mine, _count: true }),
     scope.clientId ? db.template.findMany({ where: { clientId: scope.clientId, name: { in: [...ORDER_TEMPLATES, ...ORDER_TEMPLATES.map((n) => `thenan_${n}`)] } }, select: { name: true, status: true } }) : [],
-    scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { refillDays: true, refillTemplateId: true, lapsedDays: true, winbackTemplateId: true } }) : null,
+    scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { refillDays: true, refillTemplateId: true, lapsedDays: true, winbackTemplateId: true, paymentConfig: true } }) : null,
     scope.clientId && scope.canManage
       ? db.template.findMany({ where: { clientId: scope.clientId, status: "APPROVED", category: { not: "AUTHENTICATION" }, name: { notIn: ORDER_TEMPLATES } }, select: { id: true, name: true }, orderBy: { name: "asc" } })
       : [],
+    scope.clientId ? db.template.findFirst({ where: { clientId: scope.clientId, name: PAYMENT_TEMPLATE }, select: { status: true } }) : null,
   ]);
   // An order update is covered when either the plain or the picture version is approved.
   const lapsed = scope.clientId && scope.canManage ? await db.customer.count({ where: { clientId: scope.clientId, tags: { has: "lapsed" }, optedOut: false } }) : 0;
@@ -123,6 +128,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         ))}
       </div>
 
+      {scope.canManage && client && <PaymentForm config={client.paymentConfig} template={{ name: PAYMENT_TEMPLATE, status: paymentTemplate?.status ?? null }} />}
       {scope.canManage && client && <RefillForm days={client.refillDays} templateId={client.refillTemplateId} templates={approved} />}
       {scope.canManage && client && <WinbackForm days={client.lapsedDays} templateId={client.winbackTemplateId} templates={approved} lapsed={lapsed} />}
 
@@ -165,7 +171,20 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
                       {o.note}
                     </p>
                   )}
-                  <OrderActions id={o.id} status={o.status} note={o.internalNote} canEdit={canEdit} />
+                  {(o.paidAt || o.paymentRequestedAt) && (
+                    <p className="text-xs text-muted">
+                      {o.paidAt
+                        ? <>Paid on WhatsApp {fmtDate(o.paidAt, "d MMM, h:mm a")}{o.paymentTxnId && <> · UPI ref {o.paymentTxnId}</>}</>
+                        : <>Payment requested {fmtDate(o.paymentRequestedAt, "d MMM, h:mm a")} · waiting for the customer</>}
+                    </p>
+                  )}
+                  <OrderActions
+                    id={o.id}
+                    status={o.status}
+                    note={o.internalNote}
+                    canEdit={canEdit}
+                    payment={o.client.paymentConfig && o.total > 0 && !o.paidAt ? (o.paymentRequestedAt ? "again" : "first") : null}
+                  />
                 </div>
               </Card>
             );

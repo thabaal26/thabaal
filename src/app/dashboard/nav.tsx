@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, CalendarClock, Inbox, LayoutDashboard, Menu, MessagesSquare, Settings, ShoppingBag, SquarePen, Users } from "lucide-react";
+import { Building2, CalendarClock, Inbox, LayoutDashboard, Menu, MessagesSquare, Phone, Settings, ShoppingBag, SquarePen, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -10,6 +10,7 @@ import { cn } from "@/lib/cn";
 export const NAV = [
   { href: "/dashboard", label: "Overview", short: "Home", icon: LayoutDashboard },
   { href: "/dashboard/replies", label: "Replies", short: "Replies", icon: Inbox },
+  { href: "/dashboard/calls", label: "Calls", short: "Calls", icon: Phone },
   { href: "/dashboard/orders", label: "Orders", short: "Orders", icon: ShoppingBag },
   { href: "/dashboard/messages", label: "Message log", short: "Log", icon: MessagesSquare },
   { href: "/dashboard/campaigns", label: "Campaigns", short: "Campaigns", icon: CalendarClock },

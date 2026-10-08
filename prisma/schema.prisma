@@ -41,7 +41,7 @@ model Client {
   logoUrl             String?
   bannerUrl           String?
   /// Image used by image-header templates that have none of their own.
-  defaultImageUrl String?
+  defaultImageUrl     String?
   tagline             String?
   website             String?
   supportPhone        String?
@@ -62,6 +62,8 @@ model Client {
   /// Win-back: customers whose last order is this many days old are tagged "lapsed" and sent winbackTemplate once.
   lapsedDays          Int               @default(60)
   winbackTemplateId   String?
+  /// WhatsApp Manager → Payment configurations: the name of the active one (e.g. a UPI VPA). Null turns payment requests off.
+  paymentConfig       String?
   audiences           Audience[]
   createdAt           DateTime          @default(now())
   users               User[]
@@ -98,6 +100,7 @@ model WhatsAppNumber {
   campaigns         Campaign[]
   messages          Message[]
   replies           Reply[]
+  calls             Call[]
 
   @@index([clientId])
 }
@@ -115,43 +118,47 @@ enum ClientAccess {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String       @id @default(cuid())
+  email        String       @unique
   name         String
   passwordHash String
-  role         Role     @default(CLIENT)
+  role         Role         @default(CLIENT)
   access       ClientAccess @default(STAFF)
   clientId     String?
-  client       Client?  @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  createdAt    DateTime @default(now())
+  client       Client?      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdAt    DateTime     @default(now())
 }
 
 model Customer {
-  id            String    @id @default(cuid())
-  clientId      String
-  client        Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  name          String
-  phone         String // E.164 digits only, e.g. 919876543210
-  tags          String[]  @default([])
-  purchases     String? // items as written on the paper order sheets
+  id               String    @id @default(cuid())
+  clientId         String
+  client           Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name             String
+  phone            String // E.164 digits only, e.g. 919876543210
+  tags             String[]  @default([])
+  purchases        String? // items as written on the paper order sheets
   /// Area, cleaned up (e.g. "Sellur"); region groups areas: Madurai city / Outside Madurai / Not sure.
-  location      String?
-  region        String?
+  location         String?
+  region           String?
   /// The location exactly as written on the order sheet.
-  locationRaw   String?
-  optedOut      Boolean   @default(false)
+  locationRaw      String?
+  optedOut         Boolean   @default(false)
   /// How and when the customer agreed to receive WhatsApp messages (Meta requires opt-in).
-  optInSource   String?
-  optInAt       DateTime?
+  optInSource      String?
+  optInAt          DateTime?
   /// Set when Meta says the number can't receive messages; campaigns skip them.
-  unreachable   Boolean   @default(false)
+  unreachable      Boolean   @default(false)
   /// When the win-back message went out; cleared when they order again so a later lapse can be won back too.
-  winbackSentAt DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  messages      Message[]
-  replies       Reply[]
-  orders        Order[]
+  winbackSentAt    DateTime?
+  /// WhatsApp calling: when we last asked to call them, and until when they allowed it (null = not allowed).
+  callAskedAt      DateTime?
+  callAllowedUntil DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  messages         Message[]
+  replies          Reply[]
+  orders           Order[]
+  calls            Call[]
 
   @@unique([clientId, phone])
   @@index([phone])
@@ -365,28 +372,32 @@ enum OrderStatus {
 
 /// A cart a customer sent from the WhatsApp catalogue.
 model Order {
-  id             String      @id @default(cuid())
-  clientId       String
-  client         Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  customerId     String
-  customer       Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  waMessageId    String?     @unique
-  catalogId      String?
+  id                 String      @id @default(cuid())
+  clientId           String
+  client             Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  customerId         String
+  customer           Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  waMessageId        String?     @unique
+  catalogId          String?
   /// The note the customer typed with the cart, if any.
-  note           String?
+  note               String?
   /// [{ id: retailer id, name?: product name, quantity, price, currency }]
-  items          Json
-  total          Float       @default(0)
-  currency       String      @default("INR")
-  status         OrderStatus @default(NEW)
+  items              Json
+  total              Float       @default(0)
+  currency           String      @default("INR")
+  status             OrderStatus @default(NEW)
   /// Our own notes: payment mode, delivery slot, address.
-  internalNote   String?
+  internalNote       String?
   /// When the refill reminder for this order went out, so it's sent once.
-  reminderSentAt DateTime?
+  reminderSentAt     DateTime?
   /// Where the order came from outside WhatsApp, e.g. a Google Sheet row; keeps a sync from adding it twice.
-  externalRef    String?     @unique
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  externalRef        String?     @unique
+  /// "Review and pay" message sent on WhatsApp; Meta's payment webhook fills paidAt and the UPI transaction id.
+  paymentRequestedAt DateTime?
+  paidAt             DateTime?
+  paymentTxnId       String?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
 
   @@index([clientId, status, createdAt])
   @@index([customerId])
@@ -404,4 +415,46 @@ model Audience {
   createdAt DateTime @default(now())
 
   @@unique([clientId, name])
+}
+
+enum CallDirection {
+  INCOMING
+  OUTGOING
+}
+
+enum CallStatus {
+  RINGING // incoming: ringing in the portal; outgoing: ringing on the customer's phone
+  ANSWERED // someone in the portal picked up; audio flows between their browser and Meta
+  ENDED
+  MISSED // incoming: hung up before anyone answered; outgoing: the customer didn't pick up
+  REJECTED
+}
+
+/// A WhatsApp voice call a customer made to one of our numbers, answered in the browser.
+model Call {
+  id         String          @id @default(cuid())
+  waCallId   String          @unique
+  direction  CallDirection   @default(INCOMING)
+  /// The number that was called; null for the env-configured number.
+  senderId   String?
+  sender     WhatsAppNumber? @relation(fields: [senderId], references: [id], onDelete: SetNull)
+  clientId   String?
+  customerId String?
+  customer   Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  fromPhone  String
+  callerName String?
+  status     CallStatus      @default(RINGING)
+  /// Meta's SDP offer from the connect webhook; the answering browser replies to it.
+  offerSdp   String?
+  /// Outgoing calls: the customer's SDP answer, applied by the browser that dialled.
+  answerSdp  String?
+  answeredBy String?
+  startedAt  DateTime        @default(now())
+  answeredAt DateTime?
+  endedAt    DateTime?
+  /// Seconds, from Meta's terminate webhook.
+  duration   Int?
+
+  @@index([status, startedAt])
+  @@index([clientId, startedAt])
 }
