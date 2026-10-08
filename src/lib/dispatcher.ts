@@ -251,5 +251,6 @@ export async function dispatch() {
     sent += res.sent;
     failed += res.failed;
   }
+  await db.setting.upsert({ where: { id: 1 }, update: { lastDispatchAt: now }, create: { id: 1, lastDispatchAt: now } });
   return { campaignsStarted, runsProcessed: runs.length, sent, failed, ms: Date.now() - startedAt };
 }

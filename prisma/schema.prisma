@@ -20,6 +20,8 @@ model Setting {
   wahaUrl     String?
   wahaApiKey  String?
   wahaSession String   @default("default")
+  /// When the scheduler last ran, so the dashboard can warn if it stopped.
+  lastDispatchAt DateTime?
   updatedAt   DateTime @updatedAt
 }
 

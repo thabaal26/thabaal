@@ -5,6 +5,7 @@ import { Badge, buttonClass, Card, CardHeader, EmptyState, PageHeader, Stat, Sta
 import { db } from "@/lib/db";
 import { APP_TZ, daysAgo, fmtDate, fmtNumber, pct } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
+import { getSettings } from "@/lib/provider";
 import { estimateDuration, formatMinutes } from "@/lib/schedule";
 import { getScope, owned, ownedMessages } from "@/lib/session";
 import { cancelRun, runDispatcherNow } from "./actions/campaigns";
@@ -57,7 +58,7 @@ export default async function Overview() {
     }),
     scope.clientId ? db.customer.groupBy({ by: ["region", "location"], where: { clientId: scope.clientId, optedOut: false }, _count: true }) : [],
   ]);
-  const [customers, optedOut, week, activeRuns, upcoming, recent, daily] = await Promise.all([
+  const [customers, optedOut, week, activeRuns, upcoming, recent, daily, failures, settings] = await Promise.all([
     db.customer.count({ where: { ...mine, optedOut: false } }),
     db.customer.count({ where: { ...mine, optedOut: true } }),
     db.message.groupBy({ by: ["status"], where: { ...myMessages, createdAt: { gte: weekAgo }, status: { notIn: ["QUEUED", "SKIPPED"] } }, _count: true }),
@@ -84,7 +85,13 @@ export default async function Overview() {
       WHERE m."createdAt" >= ${since} AND m.status NOT IN ('QUEUED', 'SKIPPED')
         AND (${scope.clientId}::text IS NULL OR c."clientId" = ${scope.clientId})
       GROUP BY 1, 2`,
+    // Failures in the last day, grouped by reason, so problems show up without opening the log.
+    db.message.groupBy({ by: ["error"], where: { ...myMessages, status: "FAILED", failedAt: { gte: daysAgo(1) } }, _count: true, orderBy: { _count: { error: "desc" } }, take: 3 }),
+    getSettings(),
   ]);
+  const failedToday = failures.reduce((n, f) => n + f._count, 0);
+  // GitHub runs the scheduler every 5 minutes, sometimes late; 20 minutes of silence means it stopped.
+  const schedulerQuiet = scope.isAdmin && (!settings.lastDispatchAt || settings.lastDispatchAt < daysAgo(20 / (24 * 60)));
 
   const count = (s: string) => week.find((w) => w.status === s)?._count ?? 0;
   const read = count("READ");
@@ -130,6 +137,22 @@ export default async function Overview() {
           description={scope.isAdmin ? "All clients together, last 7 days. Pick a client in the sidebar to see one." : "How your WhatsApp campaigns performed over the last 7 days."}
           actions={adminActions}
         />
+      )}
+
+      {schedulerQuiet && (
+        <div className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-600/20">
+          <b>The scheduler hasn&apos;t run {settings.lastDispatchAt ? `since ${fmtDate(settings.lastDispatchAt, "d MMM, h:mm a")}` : "yet"}.</b>{" "}
+          Scheduled campaigns won&apos;t start until it does. Check the &quot;Campaign scheduler&quot; workflow in GitHub → Actions (it pauses after 60 days without commits).
+        </div>
+      )}
+      {failedToday > 0 && (
+        <div className="mb-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-900 ring-1 ring-rose-600/15">
+          <b>{fmtNumber(failedToday)} message{failedToday === 1 ? "" : "s"} failed in the last 24 hours.</b>
+          <ul className="mt-1 list-disc pl-5">
+            {failures.map((f) => <li key={f.error ?? "unknown"}>{f.error ?? "Unknown error"} ({f._count})</li>)}
+          </ul>
+          <Link href="/dashboard/messages?status=FAILED" className="mt-1 inline-block font-medium underline">See failed messages</Link>
+        </div>
       )}
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">

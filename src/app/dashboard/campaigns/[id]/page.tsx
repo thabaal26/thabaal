@@ -35,6 +35,8 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
     // Meta reports per message whether it was billed; it doesn't send the amount.
     db.message.groupBy({ by: ["runId"], where: { runId: { in: c.runs.map((r) => r.id) }, billable: true }, _count: true }),
   ]);
+  const audienceSize = c.audienceTag ? (audience.tags.find((t) => t.tag === c.audienceTag)?.n ?? 0) : audience.all;
+  const sendConfirm = `Send "${c.template.name}" now to ${fmtNumber(audienceSize)} customer${audienceSize === 1 ? "" : "s"} (${c.audienceTag ? `tagged "${c.audienceTag}"` : "ALL customers, no tag"})?`;
   const chargedIn = (runId: string) => charged.find((x) => x.runId === runId)?._count ?? 0;
   const stat = (runId: string, ...s: string[]) =>
     stats.filter((x) => x.runId === runId && s.includes(x.status)).reduce((a, x) => a + x._count, 0);
@@ -49,7 +51,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
         description={c.active && c.nextRunAt ? `Next send ${fmtDate(c.nextRunAt, "EEEE d MMM, h:mm a")}` : "Paused: nothing scheduled"}
         actions={
           scope.isAdmin && <>
-            <ActionButton action={runCampaignNow.bind(null, c.id)} size="md" confirm="Start sending this campaign to its customers now?">
+            <ActionButton action={runCampaignNow.bind(null, c.id)} size="md" confirm={sendConfirm}>
               <Send className="size-4" /> Send now
             </ActionButton>
             <ActionButton action={toggleCampaign.bind(null, c.id, !c.active)} size="md">
