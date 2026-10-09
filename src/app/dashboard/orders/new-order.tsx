@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Sheet } from "@/components/sheet";
 import { toastResult } from "@/components/toast";
-import { Button, Label } from "@/components/ui";
+import { Button, Field } from "@/components/ui";
 import { createOrder } from "../actions/orders";
 
 type Line = { name: string; quantity: number; price: number };
@@ -25,12 +25,12 @@ export function NewOrder() {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)}>
-        <Plus className="size-4" /> New order
+      <Button onClick={() => setOpen(true)} className="max-sm:px-3.5">
+        <Plus aria-hidden className="size-4" /> <span>New<span className="max-sm:sr-only"> order</span></span>
       </Button>
       <Sheet open={open} onClose={() => setOpen(false)} title="New order" className="sm:max-w-lg">
         <form
-          className="space-y-4"
+          className="space-y-5"
           onSubmit={(e) => {
             e.preventDefault();
             start(async () => {
@@ -44,44 +44,51 @@ export function NewOrder() {
             });
           }}
         >
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="no-phone">Customer phone</Label>
-              <input id="no-phone" className="field" required inputMode="tel" value={phone} placeholder="98765 43210" onChange={(e) => setPhone(e.target.value)} />
-            </div>
-            <div>
-              <Label htmlFor="no-name" hint="if new">Name</Label>
-              <input id="no-name" className="field" value={name} placeholder="Priya Sharma" onChange={(e) => setName(e.target.value)} />
-            </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field id="no-phone" label="Customer phone" required>
+              <input className="field" type="tel" inputMode="tel" autoComplete="off" value={phone} placeholder="98765 43210" onChange={(e) => setPhone(e.target.value)} />
+            </Field>
+            <Field id="no-name" label="Name" hint="if new">
+              <input className="field" autoCapitalize="words" value={name} placeholder="Priya Sharma" onChange={(e) => setName(e.target.value)} />
+            </Field>
           </div>
 
-          <div className="space-y-2">
-            <Label>Items</Label>
+          <fieldset className="space-y-2">
+            <legend className="mb-1.5 text-sm font-medium text-ink-2">Items</legend>
             {lines.map((l, k) => (
-              <div key={k} className="grid grid-cols-[1fr_4rem_5.5rem_auto] gap-2">
-                <input className="field" required value={l.name} placeholder="Groundnut oil 1 L" aria-label="Item" onChange={(e) => edit(k, { name: e.target.value })} />
-                <input className="field tabular" type="number" min={1} inputMode="numeric" value={l.quantity || ""} aria-label="Quantity" onChange={(e) => edit(k, { quantity: Number(e.target.value) })} />
-                <input className="field tabular" type="number" min={0} step="0.01" inputMode="decimal" value={l.price || ""} placeholder="₹ each" aria-label="Price each" onChange={(e) => edit(k, { price: Number(e.target.value) })} />
-                <button type="button" aria-label="Remove item" disabled={lines.length === 1} className="grid size-10 place-items-center rounded-lg text-muted hover:bg-canvas disabled:opacity-30" onClick={() => setLines((ls) => ls.filter((_, i) => i !== k))}>
-                  <Trash2 className="size-4" />
+              <div key={k} className="grid grid-cols-[1fr_auto] gap-2 rounded-control bg-sunken p-2 sm:grid-cols-[1fr_4.5rem_6rem_auto] sm:bg-transparent sm:p-0">
+                <input className="field col-span-1" required value={l.name} placeholder="Groundnut oil 1 L" aria-label={`Item ${k + 1}`} onChange={(e) => edit(k, { name: e.target.value })} />
+                <button
+                  type="button"
+                  aria-label={`Remove item ${k + 1}`}
+                  disabled={lines.length === 1}
+                  className="row-span-2 grid size-11 place-items-center self-center rounded-control text-muted transition hover:bg-canvas hover:text-danger disabled:cursor-not-allowed disabled:opacity-40 sm:order-last sm:row-span-1 sm:size-10"
+                  onClick={() => setLines((ls) => ls.filter((_, i) => i !== k))}
+                >
+                  <Trash2 aria-hidden className="size-4" />
                 </button>
+                <div className="grid grid-cols-2 gap-2 sm:contents">
+                  <input className="field tabular" type="number" min={1} inputMode="numeric" value={l.quantity || ""} placeholder="Qty" aria-label={`Quantity of item ${k + 1}`} onChange={(e) => edit(k, { quantity: Number(e.target.value) })} />
+                  <input className="field tabular" type="number" min={0} step="0.01" inputMode="decimal" value={l.price || ""} placeholder="₹ each" aria-label={`Price each of item ${k + 1}`} onChange={(e) => edit(k, { price: Number(e.target.value) })} />
+                </div>
               </div>
             ))}
-            <button type="button" className="text-sm font-medium text-brand-deep" onClick={() => setLines((ls) => [...ls, blank()])}>
-              + Add item
-            </button>
-          </div>
+            <Button variant="ghost" size="sm" className="text-brand-deep" onClick={() => setLines((ls) => [...ls, blank()])}>
+              <Plus aria-hidden className="size-4" /> Add item
+            </Button>
+          </fieldset>
 
-          <div>
-            <Label htmlFor="no-note" hint="optional">Address or note</Label>
-            <input id="no-note" className="field" value={note} placeholder="Delivery address, payment mode…" onChange={(e) => setNote(e.target.value)} />
-          </div>
+          <Field id="no-note" label="Address or note" hint="optional">
+            <input className="field" autoComplete="street-address" value={note} placeholder="Delivery address, payment mode…" onChange={(e) => setNote(e.target.value)} />
+          </Field>
 
-          <div className="flex items-center justify-between rounded-xl bg-canvas px-4 py-3 text-sm font-semibold">
+          <div className="flex items-center justify-between rounded-control bg-sunken px-4 py-3 text-sm font-semibold">
             <span>Total</span>
             <span className="tabular">₹{total.toLocaleString("en-IN")}</span>
           </div>
-          <Button type="submit" className="w-full" disabled={pending}>Add order</Button>
+          <Button type="submit" className="w-full" loading={pending}>
+            Add order
+          </Button>
         </form>
       </Sheet>
     </>

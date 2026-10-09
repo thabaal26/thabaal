@@ -13,6 +13,8 @@ const mix = (a: RGB, b: RGB, t: number): RGB => a.map((v, i) => v + (b[i] - v) *
 
 const WHITE: RGB = [255, 255, 255];
 const BLACK: RGB = [0, 0, 0];
+/** --color-muted in globals.css: secondary text that sits on the canvas. */
+const MUTED: RGB = [0x5f, 0x6b, 0x67];
 
 function luminance([r, g, b]: RGB) {
   const ch = (v: number) => {
@@ -54,14 +56,18 @@ export function themeStyle(b: Brand | null | undefined): CSSProperties | undefin
   const night = mix(brand, BLACK, 0.86);
   // The accent glows on the dark sidebar, so it lightens until it reads there.
   const glow = until(accent, WHITE, night, 6);
+  // Selected chips and nav items put brand-deep text on brand-soft, so the tint lightens until that reads.
+  const soft = until(mix(primary, WHITE, 0.84), WHITE, deep, 4.5);
+  // The page background must keep the grey secondary text (--color-muted) readable.
+  const canvas = until(mix(primary, [247, 247, 244], 0.95), WHITE, MUTED, 4.5);
 
   return {
     "--color-brand": toHex(brand),
     "--color-brand-deep": toHex(deep),
-    "--color-brand-soft": toHex(mix(primary, WHITE, 0.84)),
+    "--color-brand-soft": toHex(soft),
     "--color-night": toHex(night),
     "--color-glow": toHex(glow),
-    "--color-canvas": toHex(mix(primary, [247, 247, 244], 0.95)),
+    "--color-canvas": toHex(canvas),
   } as CSSProperties;
 }
 

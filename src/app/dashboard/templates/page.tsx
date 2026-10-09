@@ -2,9 +2,8 @@ import { Plus, RefreshCw, SquarePen } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ActionButton } from "@/components/action-button";
-import { Badge, buttonClass, Card, EmptyState, PageHeader, StatusBadge } from "@/components/ui";
+import { Badge, buttonClass, Card, EmptyState, FilterChips, PageHeader, StatusBadge } from "@/components/ui";
 import { WhatsAppBubble } from "@/components/whatsapp-preview";
-import { cn } from "@/lib/cn";
 import { DefaultImage } from "./default-image";
 import { db } from "@/lib/db";
 import { fmtDate } from "@/lib/format";
@@ -41,63 +40,68 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
         actions={
           canCreate && <>
             <ActionButton action={syncTemplates} size="md" title="Fetch the latest templates and statuses from Meta">
-              <RefreshCw className="size-4" /> Sync with Meta
+              <RefreshCw aria-hidden className="size-4" /> Sync with Meta
             </ActionButton>
             <Link href="/dashboard/templates/new" className={buttonClass("primary")}>
-              <Plus className="size-4" /> New template
+              <Plus aria-hidden className="size-4" /> New template
             </Link>
           </>
         }
+        tabs={
+          <FilterChips
+            label="Template category"
+            items={[{ key: "", label: "All", n: total }, ...(Object.keys(CATEGORY_INFO) as Category[]).map((c) => ({ key: c, label: CATEGORY_INFO[c].label, n: counts.find((x) => x.category === c)?._count ?? 0 }))].map((tab) => ({
+              href: tab.key ? `/dashboard/templates?category=${tab.key}` : "/dashboard/templates",
+              label: tab.label,
+              count: tab.n,
+              active: (active ?? "") === tab.key,
+            }))}
+          />
+        }
       />
 
-      <div className="mb-5 flex flex-wrap gap-2">
-        {[{ key: "", label: "All", n: total }, ...(Object.keys(CATEGORY_INFO) as Category[]).map((c) => ({ key: c, label: CATEGORY_INFO[c].label, n: counts.find((x) => x.category === c)?._count ?? 0 }))].map((tab) => (
-          <Link
-            key={tab.key}
-            href={tab.key ? `/dashboard/templates?category=${tab.key}` : "/dashboard/templates"}
-            className={cn(
-              "flex h-9 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition active:scale-95 sm:h-auto sm:px-3 sm:py-1.5 sm:text-xs",
-              (active ?? "") === tab.key ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-ink/30",
-            )}
-          >
-            {tab.label} <span className="tabular opacity-60">{tab.n}</span>
-          </Link>
-        ))}
-      </div>
-
-      {scope.canManage && brand && <DefaultImage url={brand.defaultImageUrl} fallback={brand.bannerUrl} />}
+      {scope.canManage && brand && (
+        <div className="mb-4">
+          <DefaultImage url={brand.defaultImageUrl} fallback={brand.bannerUrl} />
+        </div>
+      )}
 
       {templates.length ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
           {templates.map((t) => {
             const r = renderFor({ ...t, headerText: t.headerText ?? "", footer: t.footer ?? "", variables: t.variables as VarMap }, SAMPLE_CUSTOMER);
             return (
-              <Card key={t.id} className="flex flex-col overflow-hidden transition hover:shadow-pop">
-                <Link href={`/dashboard/templates/${t.id}`} className="chat-wall relative block max-h-56 min-h-28 overflow-hidden p-4 [mask-image:linear-gradient(to_bottom,black_80%,transparent)]">
+              <Card key={t.id} className="flex flex-col overflow-hidden">
+                <Link
+                  href={`/dashboard/templates/${t.id}`}
+                  tabIndex={-1}
+                  aria-hidden
+                  className="chat-wall relative block max-h-56 min-h-28 overflow-hidden rounded-t-card p-4 [mask-image:linear-gradient(to_bottom,black_80%,transparent)]"
+                >
                   <WhatsAppBubble
                     header={r.header}
                     headerImage={t.headerType === "IMAGE" ? t.headerMediaUrl || fallbackFor(t.client) : undefined}
                     body={r.body}
                     footer={r.footer}
                     buttons={t.buttons as TemplateButton[]}
-                    className="pointer-events-none origin-top-left scale-[0.9]"
+                    className="pointer-events-none max-w-[17rem]"
                   />
                 </Link>
                 <div className="flex flex-1 flex-col gap-3 border-t border-line p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <Link href={`/dashboard/templates/${t.id}`} className="block truncate font-mono text-sm font-medium hover:underline">{t.name}</Link>
+                      <Link href={`/dashboard/templates/${t.id}`} className="block truncate font-mono text-sm font-medium text-ink hover:underline" title={t.name}>{t.name}</Link>
                       <p className="mt-0.5 text-xs text-muted">{!scope.clientId && `${t.client.name} · `}{t.language} · updated {fmtDate(t.updatedAt, "d MMM")}{t._count.campaigns ? ` · ${t._count.campaigns} campaign${t._count.campaigns > 1 ? "s" : ""}` : ""}</p>
                     </div>
                     <StatusBadge status={t.status} />
                   </div>
                   {t.headerType === "IMAGE" && !t.headerMediaUrl && !fallbackFor(t.client) && (
-                    <Link href={`/dashboard/templates/${t.id}`} className="-mt-1 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800 ring-1 ring-amber-600/20 hover:bg-amber-100">
+                    <Link href={`/dashboard/templates/${t.id}`} className="-mt-1 rounded-control border border-warning-border bg-warning-bg px-2.5 py-1.5 text-xs text-warning">
                       Image missing: sends will fail until you add one here or set a default image above. <span className="font-medium underline">Add image</span>
                     </Link>
                   )}
-                  <div className="mt-auto flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
+                  <div className="mt-auto flex flex-wrap items-center justify-between gap-2">
+                    <span className="flex flex-wrap items-center gap-1.5">
                       <StatusBadge status={t.category} />
                       {t.qualityScore && t.qualityScore !== "UNKNOWN" && (
                         <Badge tone={t.qualityScore === "GREEN" ? "green" : t.qualityScore === "RED" ? "red" : "amber"} dot>
@@ -106,9 +110,9 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
                       )}
                     </span>
                     <div className="flex gap-1">
-                      <Link href={`/dashboard/templates/${t.id}`} className={buttonClass("secondary", "sm")}>{scope.canManage ? "Edit" : "View"}</Link>
+                      <Link href={`/dashboard/templates/${t.id}`} className={buttonClass("secondary", "sm")} aria-label={`${scope.canManage ? "Edit" : "View"} ${t.name}`}>{scope.canManage ? "Edit" : "View"}</Link>
                       {scope.canManage && (
-                        <ActionButton action={deleteTemplate.bind(null, t.id)} variant="ghost" confirm={`Delete "${t.name}"? This also deletes it from Meta.`}>Delete</ActionButton>
+                        <ActionButton action={deleteTemplate.bind(null, t.id)} variant="ghost" confirm={`Delete "${t.name}"? This also deletes it from Meta.`} aria-label={`Delete ${t.name}`}>Delete</ActionButton>
                       )}
                     </div>
                   </div>

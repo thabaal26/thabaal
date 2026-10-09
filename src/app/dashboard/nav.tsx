@@ -8,26 +8,38 @@ import { Sheet } from "@/components/sheet";
 import { cn } from "@/lib/cn";
 
 export const NAV = [
-  { href: "/dashboard", label: "Overview", short: "Home", icon: LayoutDashboard },
-  { href: "/dashboard/replies", label: "Replies", short: "Replies", icon: Inbox },
-  { href: "/dashboard/calls", label: "Calls", short: "Calls", icon: Phone },
-  { href: "/dashboard/orders", label: "Orders", short: "Orders", icon: ShoppingBag },
-  { href: "/dashboard/messages", label: "Message log", short: "Log", icon: MessagesSquare },
-  { href: "/dashboard/campaigns", label: "Campaigns", short: "Campaigns", icon: CalendarClock },
-  { href: "/dashboard/templates", label: "Templates", short: "Templates", icon: SquarePen },
-  { href: "/dashboard/customers", label: "Customers", short: "Customers", icon: Users },
-  { href: "/dashboard/settings", label: "Settings", short: "Settings", icon: Settings },
+  { href: "/dashboard", label: "Overview", short: "Home", icon: LayoutDashboard, group: "Daily work" },
+  { href: "/dashboard/orders", label: "Orders", short: "Orders", icon: ShoppingBag, group: "Daily work" },
+  { href: "/dashboard/replies", label: "Replies", short: "Replies", icon: Inbox, group: "Daily work" },
+  { href: "/dashboard/calls", label: "Calls", short: "Calls", icon: Phone, group: "Daily work" },
+  { href: "/dashboard/campaigns", label: "Campaigns", short: "Campaigns", icon: CalendarClock, group: "Marketing" },
+  { href: "/dashboard/templates", label: "Templates", short: "Templates", icon: SquarePen, group: "Marketing" },
+  { href: "/dashboard/customers", label: "Customers", short: "Customers", icon: Users, group: "Marketing" },
+  { href: "/dashboard/messages", label: "Message log", short: "Log", icon: MessagesSquare, group: "Marketing" },
+  { href: "/dashboard/settings", label: "Settings", short: "Settings", icon: Settings, group: "Account" },
 ];
 
-const ADMIN_NAV = [{ href: "/dashboard/clients", label: "Clients", short: "Clients", icon: Building2 }];
-/** Phone tabs: what people check most. Everything else is under "More". */
-const PHONE_TABS = ["/dashboard", "/dashboard/replies", "/dashboard/customers", "/dashboard/campaigns"];
+const ADMIN_NAV = [{ href: "/dashboard/clients", label: "Clients", short: "Clients", icon: Building2, group: "Account" }];
 
-function CountBadge({ n, className }: { n?: number; className?: string }) {
+/**
+ * Phone tabs: what each role opens most. Staff pack orders and answer customers all day;
+ * owners and managers start from the overview. Everything else is under "More".
+ * This only changes which links come first, never what anyone can open.
+ */
+const PHONE_TABS = {
+  staff: ["/dashboard/orders", "/dashboard/replies", "/dashboard/calls", "/dashboard/customers"],
+  manager: ["/dashboard", "/dashboard/orders", "/dashboard/replies", "/dashboard/customers"],
+};
+
+export type NavRole = keyof typeof PHONE_TABS;
+type Counts = { openReplies?: number; newOrders?: number };
+
+function CountBadge({ n, label, className }: { n?: number; label: string; className?: string }) {
   if (!n) return null;
   return (
-    <span className={cn("tabular grid h-[18px] min-w-[18px] animate-pop place-items-center rounded-full bg-glow px-1 text-[10px] font-bold text-night", className)}>
+    <span className={cn("tabular grid h-[18px] min-w-[18px] animate-pop place-items-center rounded-full px-1 text-2xs font-bold", className)}>
       {n > 99 ? "99+" : n}
+      <span className="sr-only"> {label}</span>
     </span>
   );
 }
@@ -36,90 +48,116 @@ function isActive(path: string, href: string) {
   return href === "/dashboard" ? path === href : path.startsWith(href);
 }
 
-export function SideNav({ isAdmin, openReplies, newOrders }: { isAdmin: boolean; openReplies?: number; newOrders?: number }) {
+const countFor = (href: string, c: Counts) =>
+  href === "/dashboard/replies" ? { n: c.openReplies, label: "open replies" } : href === "/dashboard/orders" ? { n: c.newOrders, label: "orders to handle" } : null;
+
+export function SideNav({ isAdmin, openReplies, newOrders }: { isAdmin: boolean } & Counts) {
   const path = usePathname();
+  const items = [...NAV, ...(isAdmin ? ADMIN_NAV : [])];
+  const groups = [...new Set(items.map((n) => n.group))];
   return (
-    <nav className="space-y-0.5">
-      {[...NAV, ...(isAdmin ? ADMIN_NAV : [])].map(({ href, label, icon: Icon }) => (
-        <Link
-          key={href}
-          href={href}
-          className={cn(
-            "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition",
-            isActive(path, href) ? "bg-white/10 font-medium text-white" : "text-white/60 hover:bg-white/5 hover:text-white",
-          )}
-        >
-          <Icon className={cn("size-4", isActive(path, href) && "text-glow")} />
-          <span className="flex-1">{label}</span>
-          {href === "/dashboard/replies" && <CountBadge n={openReplies} />}
-          {href === "/dashboard/orders" && <CountBadge n={newOrders} />}
-        </Link>
+    <nav aria-label="Main" className="space-y-5">
+      {groups.map((g) => (
+        <div key={g}>
+          <p className="mb-1 px-3 text-2xs font-semibold uppercase tracking-wider text-white/55">{g}</p>
+          <ul className="space-y-0.5">
+            {items
+              .filter((n) => n.group === g)
+              .map(({ href, label, icon: Icon }) => {
+                const active = isActive(path, href);
+                const count = countFor(href, { openReplies, newOrders });
+                return (
+                  <li key={href}>
+                    <Link
+                      href={href}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "flex h-9 items-center gap-3 rounded-control px-3 text-sm transition",
+                        active ? "bg-white/10 font-medium text-white" : "text-white/75 hover:bg-white/5 hover:text-white",
+                      )}
+                    >
+                      <Icon aria-hidden className={cn("size-4 shrink-0", active && "text-glow")} />
+                      <span className="flex-1 truncate">{label}</span>
+                      {count && <CountBadge n={count.n} label={count.label} className="bg-glow text-night" />}
+                    </Link>
+                  </li>
+                );
+              })}
+          </ul>
+        </div>
       ))}
     </nav>
   );
 }
 
-/** Phone tab bar: a floating frosted bar with the everyday sections within thumb reach, and "More" for the rest. */
-export function BottomNav({ isAdmin, openReplies, newOrders }: { isAdmin: boolean; openReplies?: number; newOrders?: number }) {
+/** Phone tab bar, pinned to the bottom edge, above the home indicator. */
+export function BottomNav({ isAdmin, role, openReplies, newOrders }: { isAdmin: boolean; role: NavRole } & Counts) {
   const path = usePathname();
-  const [moreOpen, setMoreOpen] = useState(false);
-  const more = [...NAV, ...(isAdmin ? ADMIN_NAV : [])].filter((n) => !PHONE_TABS.includes(n.href));
+  // Remembers the page "More" was opened on, so the sheet closes by itself once a tapped page opens.
+  const [openedOn, setOpenedOn] = useState<string | null>(null);
+  const moreOpen = openedOn === path;
+  const tabs = PHONE_TABS[role];
+  const all = [...NAV, ...(isAdmin ? ADMIN_NAV : [])];
+  const more = all.filter((n) => !tabs.includes(n.href));
   const moreActive = more.some((n) => isActive(path, n.href));
+  // Counts for sections that live under "More" show on the More tab too.
+  const hiddenCount = more.reduce((sum, n) => sum + (countFor(n.href, { openReplies, newOrders })?.n ?? 0), 0);
+
+  const tabClass = (active: boolean) =>
+    cn("flex h-16 min-w-0 flex-col items-center justify-center gap-1 text-2xs font-medium transition active:scale-95", active ? "text-brand-deep" : "text-muted");
+  const iconWrap = (active: boolean) => cn("relative grid h-7 w-12 place-items-center rounded-full transition", active && "bg-brand-soft");
+  const badge = "absolute -right-1 -top-1 bg-brand text-white ring-2 ring-panel";
+
   return (
-    <nav
-      aria-label="Main"
-      className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 rounded-[1.4rem] border border-white/60 bg-white/80 shadow-[0_10px_40px_-12px_rgb(15_26_23/0.35)] ring-1 ring-black/5 backdrop-blur-xl backdrop-saturate-150 lg:hidden print:hidden"
-    >
-      <div className="mx-auto grid max-w-lg grid-cols-5 px-1">
-        {PHONE_TABS.map((tab) => NAV.find((n) => n.href === tab)!).map(({ href, short, icon: Icon }) => {
+    <nav aria-label="Main" className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-line bg-panel shadow-bar lg:hidden print:hidden">
+      <ul className="mx-auto grid max-w-lg grid-cols-5">
+        {tabs.map((tab) => all.find((n) => n.href === tab)!).map(({ href, short, icon: Icon }) => {
           const active = isActive(path, href);
+          const count = countFor(href, { openReplies, newOrders });
           return (
-            <Link
-              key={href}
-              href={href}
-              aria-current={active ? "page" : undefined}
-              className={cn("flex h-[3.75rem] flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition active:scale-95", active ? "text-brand-deep" : "text-muted")}
-            >
-              <span className={cn("relative grid h-7 w-12 place-items-center rounded-full transition", active && "bg-brand-soft")}>
-                <Icon className="size-[18px]" strokeWidth={active ? 2.4 : 2} />
-                {href === "/dashboard/replies" && <CountBadge n={openReplies} className="absolute -right-0.5 -top-1 ring-2 ring-white" />}
-                {href === "/dashboard/orders" && <CountBadge n={newOrders} className="absolute -right-0.5 -top-1 ring-2 ring-white" />}
-              </span>
-              {short}
-            </Link>
-          );
-        })}
-        <button
-          type="button"
-          onClick={() => setMoreOpen(true)}
-          aria-haspopup="dialog"
-          className={cn("flex h-[3.75rem] flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition active:scale-95", moreActive ? "text-brand-deep" : "text-muted")}
-        >
-          <span className={cn("relative grid h-7 w-12 place-items-center rounded-full transition", moreActive && "bg-brand-soft")}>
-            <Menu className="size-[18px]" strokeWidth={moreActive ? 2.4 : 2} />
-            <CountBadge n={newOrders} className="absolute -right-0.5 -top-1 ring-2 ring-white" />
-          </span>
-          More
-        </button>
-      </div>
-      <Sheet open={moreOpen} onClose={() => setMoreOpen(false)} title="More">
-        <ul className="grid grid-cols-2 gap-2">
-          {more.map(({ href, label, icon: Icon }) => (
-            <li key={href}>
-              <Link
-                href={href}
-                onClick={() => setMoreOpen(false)}
-                className={cn(
-                  "flex h-14 items-center gap-3 rounded-2xl px-4 text-sm font-medium ring-1 ring-line transition active:scale-[0.98]",
-                  isActive(path, href) ? "bg-brand-soft text-brand-deep ring-brand/30" : "bg-panel text-ink hover:bg-canvas",
-                )}
-              >
-                <Icon className="size-5 shrink-0" />
-                <span className="flex-1">{label}</span>
-                {href === "/dashboard/orders" && <CountBadge n={newOrders} />}
+            <li key={href} className="min-w-0">
+              <Link href={href} aria-current={active ? "page" : undefined} className={tabClass(active)}>
+                <span className={iconWrap(active)}>
+                  <Icon aria-hidden className="size-5" strokeWidth={active ? 2.4 : 2} />
+                  {count && <CountBadge n={count.n} label={count.label} className={badge} />}
+                </span>
+                <span className="max-w-full truncate px-0.5">{short}</span>
               </Link>
             </li>
-          ))}
+          );
+        })}
+        <li className="min-w-0">
+          <button type="button" onClick={() => setOpenedOn(path)} aria-haspopup="dialog" aria-expanded={moreOpen} className={cn(tabClass(moreActive), "w-full")}>
+            <span className={iconWrap(moreActive)}>
+              <Menu aria-hidden className="size-5" strokeWidth={moreActive ? 2.4 : 2} />
+              <CountBadge n={hiddenCount} label="to handle" className={badge} />
+            </span>
+            More
+          </button>
+        </li>
+      </ul>
+      <Sheet open={moreOpen} onClose={() => setOpenedOn(null)} title="More">
+        <ul className="grid grid-cols-2 gap-2">
+          {more.map(({ href, label, icon: Icon }) => {
+            const active = isActive(path, href);
+            const count = countFor(href, { openReplies, newOrders });
+            return (
+              <li key={href}>
+                <Link
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "flex h-14 items-center gap-3 rounded-card border px-4 text-sm font-medium transition active:scale-[0.98]",
+                    active ? "border-brand/40 bg-brand-soft text-brand-deep" : "border-line bg-panel text-ink active:bg-sunken",
+                  )}
+                >
+                  <Icon aria-hidden className="size-5 shrink-0" />
+                  <span className="min-w-0 flex-1 truncate">{label}</span>
+                  {count && <CountBadge n={count.n} label={count.label} className="bg-brand text-white" />}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       </Sheet>
     </nav>
@@ -133,9 +171,10 @@ export function SettingsLink() {
     <Link
       href="/dashboard/settings"
       aria-label="Settings"
-      className={cn("grid size-10 place-items-center rounded-full transition active:scale-95", active ? "bg-white/15 text-white" : "text-white/70")}
+      aria-current={active ? "page" : undefined}
+      className={cn("grid size-11 shrink-0 place-items-center rounded-full transition active:scale-95", active ? "bg-white/15 text-white" : "text-white/80 hover:bg-white/10")}
     >
-      <Settings className="size-5" />
+      <Settings aria-hidden className="size-5" />
     </Link>
   );
 }

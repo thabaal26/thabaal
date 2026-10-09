@@ -1,6 +1,4 @@
-import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader, PickClientNotice } from "@/components/ui";
 import { clientAccounts } from "@/lib/senders";
@@ -12,14 +10,11 @@ export const metadata: Metadata = { title: "New template" };
 export default async function NewTemplatePage() {
   const scope = await getScope();
   if (!scope.canManage) redirect("/dashboard/templates");
-  if (!scope.clientId) return <><PageHeader title="New template" /><PickClientNotice what="template" /></>;
+  if (!scope.clientId) return <><PageHeader title="New template" back={{ href: "/dashboard/templates", label: "Templates" }} /><PickClientNotice what="template" /></>;
   const accounts = (await clientAccounts(scope.clientId)).map((a) => ({ id: a.businessAccountId, label: `${a.labels.join(", ")} · account ${a.businessAccountId}` }));
   return (
     <>
-      <Link href="/dashboard/templates" className="-my-2 mb-1 inline-flex items-center gap-1 py-2 text-sm text-muted hover:text-ink sm:mb-3 sm:text-xs">
-        <ArrowLeft className="size-3.5" /> Templates
-      </Link>
-      <PageHeader title="New template" description="Pick a category, write the message and preview it exactly as customers will see it." />
+      <PageHeader title="New template" back={{ href: "/dashboard/templates", label: "Templates" }} description="Pick a category, write the message and preview it exactly as customers will see it." />
       <TemplateEditor
         id={null}
         businessName={scope.clientName ?? process.env.BUSINESS_NAME ?? "Your Business"}

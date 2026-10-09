@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toastResult } from "@/components/toast";
-import { Button, Label } from "@/components/ui";
+import { Button, Field } from "@/components/ui";
 import { addTopUp } from "./actions/spend";
 
 /** Manager form: record money added to the WhatsApp account in Meta's billing. */
@@ -14,7 +14,7 @@ export function TopUpForm() {
   const [note, setNote] = useState("");
   return (
     <form
-      className="flex flex-col gap-3 sm:flex-row sm:items-end"
+      className="grid gap-3 @md:grid-cols-[8rem_1fr_auto] @md:items-end"
       onSubmit={(e) => {
         e.preventDefault();
         start(async () => {
@@ -28,15 +28,15 @@ export function TopUpForm() {
         });
       }}
     >
-      <div className="sm:w-36">
-        <Label htmlFor="topup-amount">Amount added (₹)</Label>
-        <input id="topup-amount" className="field tabular" type="number" min={1} step="0.01" inputMode="decimal" required value={amount} placeholder="1000" onChange={(e) => setAmount(e.target.value)} />
-      </div>
-      <div className="flex-1">
-        <Label htmlFor="topup-note" hint="optional">Note</Label>
-        <input id="topup-note" className="field" maxLength={200} value={note} placeholder="UPI to Meta, invoice no…" onChange={(e) => setNote(e.target.value)} />
-      </div>
-      <Button type="submit" disabled={pending || !(Number(amount) > 0)}>Add top-up</Button>
+      <Field id="topup-amount" label="Amount added (₹)" required>
+        <input className="field tabular" type="number" min={1} step="0.01" inputMode="decimal" value={amount} placeholder="1000" onChange={(e) => setAmount(e.target.value)} />
+      </Field>
+      <Field id="topup-note" label="Note" hint="optional">
+        <input className="field" maxLength={200} value={note} placeholder="UPI to Meta, invoice no…" onChange={(e) => setNote(e.target.value)} />
+      </Field>
+      <Button type="submit" disabled={!(Number(amount) > 0)} loading={pending}>
+        Add top-up
+      </Button>
     </form>
   );
 }

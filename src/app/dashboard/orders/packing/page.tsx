@@ -1,6 +1,5 @@
-import { ArrowLeft, PackageOpen } from "lucide-react";
+import { PackageOpen } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Card, CardHeader, EmptyState, PageHeader, PickClientNotice } from "@/components/ui";
 import { db } from "@/lib/db";
 import { fmtDate, fmtNumber } from "@/lib/format";
@@ -18,12 +17,8 @@ export const dynamic = "force-dynamic";
  */
 export default async function PackingPage() {
   const scope = await getScope();
-  const back = (
-    <Link href="/dashboard/orders" className="-my-2 mb-1 inline-flex items-center gap-1 py-2 text-sm text-muted hover:text-ink sm:mb-3 sm:text-xs print:hidden">
-      <ArrowLeft className="size-3.5" /> Orders
-    </Link>
-  );
-  if (!scope.clientId) return <>{back}<PageHeader title="Packing list" /><PickClientNotice what="packing list" /></>;
+  const back = { href: "/dashboard/orders", label: "Orders" };
+  if (!scope.clientId) return <><PageHeader title="Packing list" back={back} /><PickClientNotice what="packing list" /></>;
 
   const orders = await db.order.findMany({
     where: { clientId: scope.clientId, status: { in: ["CONFIRMED", "PAID"] } },
@@ -45,20 +40,20 @@ export default async function PackingPage() {
 
   return (
     <>
-      {back}
       <PageHeader
         title="Packing list"
-        description={`${fmtNumber(orders.length)} confirmed or paid order${orders.length === 1 ? "" : "s"} waiting to be dispatched, grouped by area. ${fmtDate(new Date(), "EEE d MMM, h:mm a")}`}
+        back={back}
+        meta={`${fmtNumber(orders.length)} confirmed or paid order${orders.length === 1 ? "" : "s"} waiting to be dispatched, grouped by area · ${fmtDate(new Date(), "EEE d MMM, h:mm a")}`}
         actions={orders.length ? <PrintButton /> : undefined}
       />
       {orders.length ? (
-        <div className="space-y-4 print:space-y-3">
-          <Card className="print:break-inside-avoid print:shadow-none">
+        <div className="space-y-6 print:space-y-3">
+          <Card className="print:break-inside-avoid">
             <CardHeader title="Pick list" description="Everything to take from stock for these orders." />
-            <ul className="grid gap-x-6 p-4 text-sm sm:grid-cols-2 sm:p-5">
+            <ul className="grid gap-x-8 px-4 py-2 text-sm sm:grid-cols-2 sm:px-5 lg:grid-cols-3 print:grid-cols-3">
               {picks.map(([name, qty]) => (
-                <li key={name} className="flex justify-between gap-3 border-b border-line py-1.5">
-                  <span>{name}</span>
+                <li key={name} className="flex justify-between gap-3 border-b border-line py-2">
+                  <span className="min-w-0">{name}</span>
                   <b className="tabular">× {fmtNumber(qty)}</b>
                 </li>
               ))}
@@ -67,10 +62,10 @@ export default async function PackingPage() {
 
           {areas.map(([area, list]) => (
             <section key={area} className="space-y-2">
-              <h2 className="text-sm font-semibold text-ink">{area} <span className="font-normal text-muted">· {list.length} order{list.length === 1 ? "" : "s"}</span></h2>
-              <div className="grid gap-3 sm:grid-cols-2 print:grid-cols-2">
+              <h2 className="text-base font-semibold text-ink">{area} <span className="text-sm font-normal text-muted">· {list.length} order{list.length === 1 ? "" : "s"}</span></h2>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 print:grid-cols-2">
                 {list.map((o) => (
-                  <Card key={o.id} className="p-4 text-sm print:break-inside-avoid print:shadow-none">
+                  <Card key={o.id} className="p-4 text-sm print:break-inside-avoid">
                     <div className="flex justify-between gap-2">
                       <div className="min-w-0">
                         <p className="font-semibold">{o.customer.name}</p>
@@ -84,7 +79,7 @@ export default async function PackingPage() {
                     <ul className="mt-2 space-y-0.5">
                       {(o.items as OrderItem[]).map((i, k) => (
                         <li key={k} className="flex gap-2">
-                          <span className="inline-block size-3.5 shrink-0 translate-y-0.5 rounded border border-ink/40" aria-hidden />
+                          <span className="inline-block size-3.5 shrink-0 translate-y-0.5 rounded-sm border border-line-strong" aria-hidden />
                           <span className="flex-1">{i.quantity} × {i.name ?? i.id}</span>
                         </li>
                       ))}

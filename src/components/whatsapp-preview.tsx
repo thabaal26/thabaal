@@ -10,7 +10,7 @@ function formatWa(text: string): ReactNode[] {
     if (/^\*[^*]+\*$/.test(p)) return <strong key={i}>{p.slice(1, -1)}</strong>;
     if (/^_[^_]+_$/.test(p)) return <em key={i}>{p.slice(1, -1)}</em>;
     if (/^~[^~]+~$/.test(p)) return <s key={i}>{p.slice(1, -1)}</s>;
-    if (/^```[^`]+```$/.test(p)) return <code key={i} className="font-mono text-[12px]">{p.slice(3, -3)}</code>;
+    if (/^```[^`]+```$/.test(p)) return <code key={i} className="font-mono text-xs">{p.slice(3, -3)}</code>;
     return p;
   });
 }
@@ -30,30 +30,30 @@ export function WhatsAppBubble({
 }) {
   return (
     <div className={cn("w-full max-w-[300px]", className)}>
-      <div className="overflow-hidden rounded-xl rounded-tl-sm bg-bubble text-[13.5px] leading-snug text-ink shadow-[0_1px_0.5px_rgb(0_0_0/0.13)]">
+      <div className="overflow-hidden rounded-control rounded-tl-sm bg-bubble text-sm leading-snug text-ink shadow-card">
         {headerImage !== undefined && (
           <div className="p-1 pb-0">
             {headerImage ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={headerImage} alt="" className="aspect-[1.91/1] w-full rounded-lg object-cover" />
+              <img src={headerImage} alt="" width={382} height={200} className="aspect-[1.91/1] w-full rounded-[calc(var(--radius-control)-4px)] object-cover" />
             ) : (
-              <div className="grid aspect-[1.91/1] place-items-center rounded-lg bg-zinc-200 text-zinc-400"><ImageIcon className="size-8" /></div>
+              <div className="grid aspect-[1.91/1] place-items-center rounded-[calc(var(--radius-control)-4px)] bg-sunken text-muted"><ImageIcon aria-label="Image header" className="size-8" /></div>
             )}
           </div>
         )}
         <div className="px-2.5 pb-1.5 pt-2">
           {header && <p className="mb-1 font-bold">{formatWa(header)}</p>}
           <p className="whitespace-pre-wrap break-words">{body ? formatWa(body) : <span className="text-muted">Your message…</span>}</p>
-          {footer && <p className="mt-1 text-[12px] text-muted">{footer}</p>}
-          <p className="-mb-0.5 mt-0.5 flex items-center justify-end gap-0.5 text-[10.5px] text-muted">
-            {time} <CheckCheck className="size-3.5 text-sky-500" />
+          {footer && <p className="mt-1 text-xs text-muted">{footer}</p>}
+          <p className="-mb-0.5 mt-0.5 flex items-center justify-end gap-0.5 text-2xs text-muted">
+            {time} <CheckCheck aria-label="Read" className="size-3.5 text-wa-tick" />
           </p>
         </div>
         {buttons?.map((b, i) => {
           const Icon = ICON[b.type];
           return (
-            <div key={i} className="flex items-center justify-center gap-1.5 border-t border-zinc-100 py-2 text-[13.5px] font-medium text-sky-600">
-              <Icon className="size-3.5" />
+            <div key={i} className="flex items-center justify-center gap-1.5 border-t border-line py-2 text-sm font-medium text-wa-link">
+              <Icon aria-hidden className="size-3.5" />
               {b.text || "Button"}
             </div>
           );
@@ -65,17 +65,17 @@ export function WhatsAppBubble({
 
 export function PhoneFrame({ children, name = "Your Business" }: { children: ReactNode; name?: string }) {
   return (
-    <div className="mx-auto w-full max-w-[340px] rounded-[2.2rem] bg-night p-2.5 shadow-pop">
-      <div className="overflow-hidden rounded-[1.7rem]">
-        <div className="flex items-center gap-2.5 bg-[#075e54] px-4 pb-2.5 pt-4 text-white">
-          <span className="grid size-8 place-items-center rounded-full bg-white/20 text-xs font-semibold">{name.slice(0, 1)}</span>
+    <div className="mx-auto w-full max-w-[340px] rounded-sheet bg-night p-2 shadow-pop">
+      <div className="overflow-hidden rounded-card">
+        <div className="flex items-center gap-2.5 bg-wa-bar px-4 pb-2.5 pt-3.5 text-white">
+          <span aria-hidden className="grid size-8 place-items-center rounded-full bg-white/20 text-xs font-semibold">{name.slice(0, 1)}</span>
           <div>
             <p className="text-sm font-medium leading-tight">{name}</p>
-            <p className="text-[11px] text-white/70">Business account</p>
+            <p className="text-2xs text-white/80">Business account</p>
           </div>
         </div>
         <div className="chat-wall min-h-[420px] p-3">
-          <p className="mx-auto mb-3 w-fit rounded-md bg-white/80 px-2 py-0.5 text-[10.5px] text-muted shadow-sm">TODAY</p>
+          <p className="mx-auto mb-3 w-fit rounded-md bg-white/90 px-2 py-0.5 text-2xs text-muted">TODAY</p>
           {children}
         </div>
       </div>

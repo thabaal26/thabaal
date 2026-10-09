@@ -1,34 +1,113 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Geist for Latin; Noto Sans Tamil fills in Tamil characters (it only downloads when a page has some). */
+  --font-sans: var(--font-geist-sans), var(--font-tamil), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
+/*
+ * Design tokens. Components use these names only, never raw palette colours, so a client's
+ * brand (src/lib/theme.ts overrides brand, brand-deep, brand-soft, night, glow and canvas)
+ * re-skins everything, and a dark theme could later swap the values without touching components.
+ * Every text colour here passes 4.5:1 on panel and canvas; `line-strong` and `focus` pass 3:1.
+ */
 @theme {
+  /* Surfaces and text */
   --color-ink: #0f1a17;
   --color-ink-2: #3d4a45;
-  --color-muted: #6b7773;
-  --color-line: #e4e8e5;
+  --color-muted: #5f6b67;
+  --color-line: #e4e8e5; /* dividers between rows and cards (decorative) */
+  --color-line-strong: #8a958f; /* borders that outline a control: fields, checkboxes */
   --color-canvas: #f5f6f3;
   --color-panel: #ffffff;
-  --color-brand: #0f9d58;
+  --color-sunken: #eef0ec; /* inset areas inside a card: item lists, read-only values */
+
+  /* Brand (re-themed per client) */
+  --color-brand: #0d844a; /* white text on it: 4.8:1 */
   --color-brand-deep: #0a6b3d;
   --color-brand-soft: #e3f5ea;
   --color-night: #0c1714;
   --color-glow: #34d399; /* accent on the dark sidebar */
+
+  /* Status: fg on bg passes 4.5:1; border is the outline of tinted blocks */
+  --color-success: #047857;
+  --color-success-bg: #ecfdf5;
+  --color-success-border: #a7f3d0;
+  --color-warning: #92400e;
+  --color-warning-bg: #fffbeb;
+  --color-warning-border: #fcd34d;
+  --color-danger: #be123c;
+  --color-danger-bg: #fff1f2;
+  --color-danger-border: #fecdd3;
+  --color-danger-solid: #be123c; /* filled destructive buttons, white text 6.2:1 */
+  --color-danger-on-dark: #fda4af; /* error icons and text on night surfaces */
+  --color-warning-on-dark: #fcd34d;
+  --color-warning-solid: #d97706; /* bars and dots, never text */
+  --color-info: #0369a1;
+  --color-info-bg: #f0f9ff;
+  --color-info-border: #bae6fd;
+  --color-accent: #6d28d9; /* "read" and marketing: a second, non-status hue */
+  --color-accent-bg: #f5f3ff;
+  --color-accent-border: #ddd6fe;
+  --color-neutral: #52525b;
+  --color-neutral-bg: #f4f4f5;
+  --color-neutral-border: #e4e4e7;
+
+  /* Chart series (message statuses) */
+  --color-series-read: #8b5cf6;
+  --color-series-delivered: #10b981;
+  --color-series-sent: #38bdf8;
+  --color-series-failed: #fb7185;
+
+  /* WhatsApp's own look, for previews and conversations (not the brand) */
   --color-chat: #efeae2;
   --color-bubble: #ffffff;
+  --color-bubble-out: #d9fdd3;
+  --color-wa-bar: #075e54;
+  --color-wa-link: #0284c7;
+  --color-wa-tick: #0ea5e9;
+  --color-call-answer: #22c55e; /* phone convention: green answers, red hangs up (danger-solid) */
+
+  /* Type scale: caption 11, small 12, body 14, body on phones 15, section 16, page title fluid */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm--line-height: 1.3125rem;
+  --text-md: 0.9375rem;
+  --text-md--line-height: 1.375rem;
+  --text-title: clamp(1.375rem, 1.1rem + 0.9vw, 1.625rem);
+  --text-title--line-height: 1.2;
+  --text-hero: clamp(1.25rem, 1rem + 1.2vw, 1.75rem);
+  --text-hero--line-height: 1.2;
+
+  /* Radius: controls, cards, sheets/dialogs (plus full for pills and avatars) */
+  --radius-control: 0.625rem;
+  --radius-card: 1rem;
+  --radius-sheet: 1.5rem;
+
+  /* Elevation: cards at rest, anything floating above the page */
   --shadow-card: 0 1px 2px rgb(15 26 23 / 0.04), 0 4px 16px -6px rgb(15 26 23 / 0.08);
   --shadow-pop: 0 12px 40px -12px rgb(15 26 23 / 0.35);
-  --animate-rise: rise 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  --animate-toast: toast 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  --animate-sheet: sheet 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  --animate-fade: fade 0.2s ease-out both;
-  --animate-pop: pop 0.4s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+  --shadow-bar: 0 -8px 24px -16px rgb(15 26 23 / 0.25); /* bars pinned to the bottom of the screen */
+
+  /* Layout */
+  --container-page: 80rem;
+  --container-form: 42.5rem;
+  --container-read: 40rem;
+
+  /* Motion: short and calm */
+  --ease-snappy: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --default-transition-duration: 180ms;
+  --default-transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-rise: rise 0.25s var(--ease-snappy) both;
+  --animate-toast: toast 0.22s var(--ease-snappy) both;
+  --animate-sheet: sheet 0.25s var(--ease-snappy) both;
+  --animate-fade: fade 0.18s ease-out both;
+  --animate-pop: pop 0.25s var(--ease-snappy) both;
   --animate-ring: ring 1.2s ease-in-out infinite;
   @keyframes pop {
-    from { transform: scale(0.4); opacity: 0; }
+    from { transform: scale(0.6); opacity: 0; }
     to { transform: none; opacity: 1; }
   }
   @keyframes ring {
@@ -49,22 +128,38 @@
     to { opacity: 1; }
   }
   @keyframes rise {
-    from { opacity: 0; transform: translateY(6px); }
+    from { opacity: 0; transform: translateY(4px); }
     to { opacity: 1; transform: none; }
   }
   @keyframes toast {
-    from { opacity: 0; transform: translateY(12px) scale(0.98); }
+    from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: none; }
   }
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  scroll-padding-top: 5rem;
 }
 
 body {
   background: var(--color-canvas);
   color: var(--color-ink);
   font-feature-settings: "ss01", "cv11";
+  line-height: 1.5;
+  /* Long Tamil words, phone numbers and URLs wrap instead of pushing the page sideways. */
+  overflow-wrap: break-word;
 }
 
 ::selection { background: var(--color-brand-soft); color: var(--color-brand-deep); }
+
+/* One focus ring everywhere. Dark surfaces (sidebar, phone header, toasts) switch it to the glow colour. */
+:focus-visible {
+  outline: 2px solid var(--color-focus, var(--color-brand-deep));
+  outline-offset: 2px;
+}
+.surface-dark { --color-focus: var(--color-glow); }
 
 .tabular { font-variant-numeric: tabular-nums; }
 
@@ -75,48 +170,56 @@ body {
   background-size: 14px 14px;
 }
 
-/* 16px text on phones stops iOS from zooming into fields; 44px height fits a thumb.
-   In the components layer so per-field utilities (width, padding) can override it. */
 @layer components {
-.field {
-  @apply min-h-11 w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-base text-ink outline-none transition
-    placeholder:text-muted/70 focus:border-brand focus:ring-4 focus:ring-brand/12 disabled:bg-canvas disabled:text-muted
-    sm:min-h-10 sm:rounded-lg sm:px-3 sm:py-2 sm:text-sm;
-}
+  /* 16px text on phones stops iOS from zooming into fields; 44px height fits a thumb.
+     In the components layer so per-field utilities (width, padding) can override it. */
+  .field {
+    @apply min-h-11 w-full rounded-control border border-line-strong bg-panel px-3.5 py-2.5 text-base text-ink transition-colors
+      placeholder:text-muted disabled:cursor-not-allowed disabled:border-line disabled:bg-sunken disabled:text-muted
+      aria-invalid:border-danger
+      sm:min-h-10 sm:px-3 sm:py-2 sm:text-sm;
+  }
+  .field:focus-visible { outline-offset: 0; border-color: var(--color-brand-deep); }
+  textarea.field { @apply min-h-24 leading-relaxed; }
+  select.field {
+    @apply appearance-none bg-no-repeat pr-10;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%235f6b67' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+    background-position: right 0.75rem center;
+  }
+
+  /* Checkbox and radio: native controls in brand colour, big enough to hit. */
+  .check {
+    @apply size-5 shrink-0 cursor-pointer rounded border-line-strong accent-brand disabled:cursor-not-allowed;
+  }
 }
 
-html {
-  -webkit-tap-highlight-color: transparent;
-  -webkit-text-size-adjust: 100%;
-  scroll-padding-top: 5rem;
-}
-
-/* Space for the phone bottom bar, including the iPhone home indicator. */
+/* Space for the phone bottom bar, including the home indicator. */
 .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
 /* Page sections arrive one after another instead of all at once. */
-.stagger > *, .stagger > .grid > * { animation: rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-.stagger > :nth-child(2) { animation-delay: 40ms; }
-.stagger > :nth-child(3) { animation-delay: 80ms; }
-.stagger > :nth-child(4) { animation-delay: 120ms; }
-.stagger > :nth-child(5) { animation-delay: 160ms; }
-.stagger > :nth-child(6) { animation-delay: 200ms; }
-.stagger > :nth-child(n + 7) { animation-delay: 240ms; }
-.stagger > .grid > :nth-child(2) { animation-delay: 140ms; }
-.stagger > .grid > :nth-child(3) { animation-delay: 180ms; }
-.stagger > .grid > :nth-child(n + 4) { animation-delay: 220ms; }
+.stagger > *, .stagger > .grid > * { animation: rise 0.3s var(--ease-snappy) both; }
+.stagger > :nth-child(2) { animation-delay: 30ms; }
+.stagger > :nth-child(3) { animation-delay: 60ms; }
+.stagger > :nth-child(4) { animation-delay: 90ms; }
+.stagger > :nth-child(n + 5) { animation-delay: 120ms; }
+.stagger > .grid > :nth-child(2) { animation-delay: 90ms; }
+.stagger > .grid > :nth-child(n + 3) { animation-delay: 120ms; }
 
 /* Progress and share bars fill in from the left. */
-.bar { transform-origin: left; animation: grow 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.2s both; }
+.bar { transform-origin: left; animation: grow 0.6s var(--ease-snappy) 0.1s both; }
 
-/* Cards and list rows respond to the pointer on computers; phones get the press feedback instead. */
+/* Clickable cards respond to the pointer on computers; phones get press feedback instead. */
 @media (hover: hover) and (pointer: fine) {
-  .lift { transition: transform 0.2s ease, box-shadow 0.2s ease; }
-  .lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-pop); }
+  .lift { transition: transform 0.18s var(--ease-snappy), box-shadow 0.18s var(--ease-snappy); }
+  .lift:hover { transform: translateY(-1px); box-shadow: var(--shadow-pop); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; }
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+@media print {
+  body { background: white; }
 }

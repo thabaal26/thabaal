@@ -1,7 +1,5 @@
-import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
-import { Card, CardHeader, PageHeader, PickClientNotice } from "@/components/ui";
+import { Callout, Card, CardHeader, PageHeader, PickClientNotice } from "@/components/ui";
 import { db } from "@/lib/db";
 import { fmtDate } from "@/lib/format";
 import { getScope } from "@/lib/session";
@@ -32,13 +30,19 @@ const ORDER_COLUMNS = [
 
 function Columns({ rows }: { rows: string[][] }) {
   return (
-    <div className="overflow-x-auto">
+    <div>
       <table className="w-full text-xs">
+        <thead className="sr-only">
+          <tr>
+            <th scope="col">Column heading</th>
+            <th scope="col">Example</th>
+          </tr>
+        </thead>
         <tbody className="divide-y divide-line">
           {rows.map(([h, ex]) => (
             <tr key={h}>
-              <td className="w-28 py-1.5 pr-3 font-mono font-medium text-ink">{h}</td>
-              <td className="py-1.5 text-muted">{ex}</td>
+              <th scope="row" className="w-28 py-2 pr-3 text-left align-top font-mono font-medium text-ink">{h}</th>
+              <td className="py-2 text-muted">{ex}</td>
             </tr>
           ))}
         </tbody>
@@ -49,12 +53,8 @@ function Columns({ rows }: { rows: string[][] }) {
 
 export default async function SheetPage() {
   const scope = await getScope();
-  const back = (
-    <Link href="/dashboard/customers" className="-my-2 mb-1 inline-flex items-center gap-1 py-2 text-sm text-muted hover:text-ink sm:mb-3 sm:text-xs">
-      <ArrowLeft className="size-3.5" /> Customers
-    </Link>
-  );
-  if (!scope.clientId) return <>{back}<PageHeader title="Google Sheet sync" /><PickClientNotice what="Google Sheet" /></>;
+  const back = { href: "/dashboard/customers", label: "Customers" };
+  if (!scope.clientId) return <><PageHeader title="Google Sheet sync" back={back} /><PickClientNotice what="Google Sheet" /></>;
   const client = await db.client.findUnique({
     where: { id: scope.clientId },
     select: { sheetCustomersUrl: true, sheetOrdersUrl: true, sheetSyncedAt: true, sheetSyncNote: true },
@@ -62,22 +62,22 @@ export default async function SheetPage() {
 
   return (
     <>
-      {back}
       <PageHeader
         title="Google Sheet sync"
+        back={back}
         description="Keep customers and orders in a Google Sheet; the portal reads it every 30 minutes. New rows become customers and orders here, ready for campaigns and dispatch."
       />
-      <div className="grid gap-4 lg:grid-cols-[1fr_24rem]">
-        <div className="space-y-4">
+      <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
+        <div className="space-y-4 sm:space-y-6">
           <Card>
             <CardHeader
               title="Your sheet"
               description={client?.sheetSyncedAt ? `Last synced ${fmtDate(client.sheetSyncedAt, "d MMM, h:mm a")}` : "Not synced yet"}
             />
             {client?.sheetSyncNote && (
-              <p className={`mx-4 mt-4 rounded-lg px-3 py-2 text-xs sm:mx-5 ${/couldn|add a column|doesn't look/i.test(client.sheetSyncNote) ? "bg-rose-50 text-rose-800" : "bg-emerald-50 text-emerald-800"}`}>
+              <Callout className="mx-4 mt-4 sm:mx-5" tone={/couldn|add a column|doesn't look/i.test(client.sheetSyncNote) ? "danger" : "success"} role="status">
                 {client.sheetSyncNote}
-              </p>
+              </Callout>
             )}
             <SheetForm customersUrl={client?.sheetCustomersUrl ?? ""} ordersUrl={client?.sheetOrdersUrl ?? ""} />
           </Card>
@@ -96,7 +96,7 @@ export default async function SheetPage() {
             </div>
           </Card>
         </div>
-        <div className="space-y-4">
+        <div className="space-y-4 sm:space-y-6">
           <Card>
             <CardHeader title="Customers tab columns" description="Any order; extra columns are ignored." />
             <div className="p-4 sm:p-5"><Columns rows={CUSTOMER_COLUMNS} /></div>

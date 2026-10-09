@@ -1,12 +1,12 @@
 "use client";
 
-import { Bold, Braces, Eye, ImageIcon, Italic, Loader2, Plus, Send, Strikethrough, Trash2, TriangleAlert, Upload } from "lucide-react";
+import { Bold, Braces, Eye, ImageIcon, Italic, Plus, Send, Strikethrough, Trash2, TriangleAlert, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { MobileActionBar } from "@/components/mobile-action-bar";
 import { Sheet } from "@/components/sheet";
 import { toastResult } from "@/components/toast";
-import { Badge, Button, buttonClass, Card, CardHeader, Label, StatusBadge } from "@/components/ui";
+import { Badge, Button, buttonClass, Callout, Card, CardHeader, CheckRow, Field, Label, Segmented, Spinner, StatusBadge } from "@/components/ui";
 import { PhoneFrame, WhatsAppBubble } from "@/components/whatsapp-preview";
 import { cn } from "@/lib/cn";
 import {
@@ -146,6 +146,7 @@ export function TemplateEditor({
   }
 
   function save() {
+    if (pending) return;
     start(async () => {
       const r = await saveTemplate(id, t);
       toastResult(r);
@@ -157,46 +158,45 @@ export function TemplateEditor({
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-      <div className="space-y-6">
+    <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
+      <div className="space-y-4 sm:space-y-6">
         {status && (status === "REJECTED" || statusReason) && (
-          <div className="flex gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
-            <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-            <div>
-              <p className="font-medium">{status === "REJECTED" ? "Meta rejected this template" : "Meta returned an error"}</p>
-              {statusReason && <p className="mt-0.5 text-rose-700">{statusReason}</p>}
-              <p className="mt-1 text-rose-700">Edit the content below and save to resubmit.</p>
-            </div>
-          </div>
+          <Callout tone="danger" role="alert" icon={<TriangleAlert />} title={status === "REJECTED" ? "Meta rejected this template" : "Meta returned an error"}>
+            {statusReason && <p>{statusReason}</p>}
+            <p className="mt-1">Edit the content below and save to resubmit.</p>
+          </Callout>
         )}
 
         <Card>
           <CardHeader title="Basics" description={locked ? "Meta doesn't allow the name, language or category to change after submission." : "Meta reviews every template before it can be sent."} />
-          <div className="space-y-5 p-5">
-            <div>
-              <Label>Category</Label>
-              <div className="grid gap-2 sm:grid-cols-3">
+          <div className="space-y-5 p-4 sm:p-5">
+            <fieldset>
+              <legend className="mb-1.5 text-sm font-medium text-ink-2">Category</legend>
+              <div role="radiogroup" aria-label="Category" className="grid gap-2 sm:grid-cols-3">
                 {(Object.keys(CATEGORY_INFO) as Category[]).map((c) => (
                   <button
                     key={c}
                     type="button"
+                    role="radio"
+                    aria-checked={t.category === c}
                     disabled={locked && c !== t.category}
+                    title={locked && c !== t.category ? "Meta doesn't allow the category to change after submission" : undefined}
                     onClick={() => chooseCategory(c)}
                     className={cn(
-                      "rounded-xl border p-3 text-left transition disabled:opacity-40",
-                      t.category === c ? "border-brand bg-brand-soft/60 ring-4 ring-brand/10" : "border-line hover:border-ink/20",
+                      "rounded-control border p-3 text-left transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50",
+                      t.category === c ? "border-brand bg-brand-soft" : "border-line-strong/50 bg-panel hover:border-line-strong",
                     )}
                   >
-                    <p className="text-sm font-medium">{CATEGORY_INFO[c].label}</p>
-                    <p className="mt-0.5 text-xs text-muted">{CATEGORY_INFO[c].hint}</p>
+                    <p className={cn("text-sm font-medium", t.category === c ? "text-brand-deep" : "text-ink")}>{CATEGORY_INFO[c].label}</p>
+                    <p className={cn("mt-0.5 text-xs", t.category === c ? "text-brand-deep" : "text-muted")}>{CATEGORY_INFO[c].hint}</p>
                   </button>
                 ))}
               </div>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-[1fr_200px]">
+            </fieldset>
+            <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_13rem]">
               {accounts.length > 1 && (
                 <div className="sm:col-span-2">
-                  <Label htmlFor="waba" hint="templates are approved per WhatsApp account">WhatsApp account</Label>
+                  <Label htmlFor="waba" hint="approved per WhatsApp account">WhatsApp account</Label>
                   <Picker
                     id="waba"
                     title="WhatsApp account"
@@ -211,6 +211,9 @@ export function TemplateEditor({
                 <Label htmlFor="name" hint="lowercase_with_underscores">Template name</Label>
                 <input
                   id="name"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
                   className="field font-mono"
                   value={t.name}
                   disabled={locked}
@@ -239,55 +242,54 @@ export function TemplateEditor({
         {auth ? (
           <Card>
             <CardHeader title="Passcode message" description="Meta writes the text for authentication templates. You choose these options." />
-            <div className="space-y-4 p-5">
-              <label className="flex items-center gap-3 text-sm">
-                <input type="checkbox" className="size-4 accent-brand" checked={t.securityNote} onChange={(e) => set({ securityNote: e.target.checked })} />
-                Add &ldquo;For your security, do not share this code.&rdquo;
-              </label>
+            <div className="space-y-4 p-4 sm:p-5">
+              <CheckRow label={<>Add &ldquo;For your security, do not share this code.&rdquo;</>} checked={t.securityNote} onChange={(e) => set({ securityNote: e.target.checked })} />
               <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <Label htmlFor="exp" hint="1–90, optional">Code expires after (minutes)</Label>
-                  <input id="exp" type="number" min={1} max={90} className="field" value={t.codeExpiryMins ?? ""} onChange={(e) => set({ codeExpiryMins: e.target.value ? Number(e.target.value) : null })} />
-                </div>
-                <div>
-                  <Label htmlFor="copy">Copy button label</Label>
-                  <input id="copy" className="field" maxLength={25} value={t.buttons[0]?.text ?? "Copy code"} onChange={(e) => set({ buttons: [{ type: "COPY_CODE", text: e.target.value }] })} />
-                </div>
+                <Field id="exp" label="Code expires after (minutes)" hint="1–90, optional">
+                  <input type="number" inputMode="numeric" min={1} max={90} className="field tabular" value={t.codeExpiryMins ?? ""} onChange={(e) => set({ codeExpiryMins: e.target.value ? Number(e.target.value) : null })} />
+                </Field>
+                <Field id="copy" label="Copy button label">
+                  <input className="field" maxLength={25} value={t.buttons[0]?.text ?? "Copy code"} onChange={(e) => set({ buttons: [{ type: "COPY_CODE", text: e.target.value }] })} />
+                </Field>
               </div>
-              <p className="rounded-lg bg-canvas p-3 text-xs text-muted">Authentication templates are sent by your website or app during login, so they can&apos;t be used in campaigns.</p>
+              <p className="rounded-control bg-sunken p-3 text-xs text-muted">Authentication templates are sent by your website or app during login, so they can&apos;t be used in campaigns.</p>
             </div>
           </Card>
         ) : (
           <>
             <Card>
               <CardHeader title="Content" />
-              <div className="space-y-5 p-5">
+              <div className="space-y-5 p-4 sm:p-5">
                 <div>
-                  <Label>Header</Label>
-                  <div className="mb-3 inline-flex rounded-lg bg-canvas p-1">
-                    {(["NONE", "TEXT", "IMAGE"] as const).map((h) => (
-                      <button key={h} type="button" onClick={() => set({ headerType: h })} className={cn("rounded-md px-4 py-2 text-sm font-medium transition sm:px-3 sm:py-1 sm:text-xs", t.headerType === h ? "bg-white text-ink shadow-sm" : "text-muted")}>
-                        {h === "NONE" ? "None" : h === "TEXT" ? "Text" : "Image"}
-                      </button>
-                    ))}
-                  </div>
+                  <p id="header-label" className="mb-1.5 text-sm font-medium text-ink-2">Header</p>
+                  <Segmented
+                    label="Header"
+                    value={t.headerType}
+                    onChange={(headerType) => set({ headerType })}
+                    options={[
+                      { value: "NONE", label: "None" },
+                      { value: "TEXT", label: "Text" },
+                      { value: "IMAGE", label: "Image" },
+                    ]}
+                    className="mb-3"
+                  />
                   {t.headerType === "TEXT" && (
-                    <input className="field" maxLength={60} value={t.headerText} placeholder="Headline, optionally with {{1}}" onChange={(e) => set({ headerText: e.target.value })} />
+                    <input className="field" maxLength={60} value={t.headerText} placeholder="Headline, optionally with {{1}}" aria-labelledby="header-label" onChange={(e) => set({ headerText: e.target.value })} />
                   )}
                   {t.headerType === "IMAGE" && (
                     <div className="space-y-2">
                       <div className="flex items-center gap-3">
-                        <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-canvas ring-1 ring-line">
+                        <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-control bg-sunken ring-1 ring-line">
                           {t.headerMediaUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element -- any URL the admin enters
                             <img src={t.headerMediaUrl} alt="Header image" className="size-full object-cover" />
                           ) : (
-                            <ImageIcon className="size-5 text-muted" />
+                            <ImageIcon aria-label="No image yet" className="size-5 text-muted" />
                           )}
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          <label className={cn(buttonClass("secondary", "sm"), "cursor-pointer", uploading && "pointer-events-none opacity-60")}>
-                            {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+                          <label className={cn(buttonClass("secondary", "sm"), "cursor-pointer has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-brand-deep", uploading && "pointer-events-none opacity-60")}>
+                            {uploading ? <Spinner /> : <Upload aria-hidden className="size-4" />}
                             {uploading ? "Uploading…" : t.headerMediaUrl ? "Replace image" : "Upload image"}
                             <input type="file" accept="image/jpeg,image/png" className="sr-only" onChange={(e) => { uploadImage(e.target.files?.[0]); e.target.value = ""; }} />
                           </label>
@@ -297,11 +299,11 @@ export function TemplateEditor({
                         </div>
                       </div>
                       {!t.headerMediaUrl && (
-                        <p className="flex items-center gap-1.5 text-xs text-amber-700">
-                          <TriangleAlert className="size-3.5" /> Add an image: WhatsApp rejects image-header messages sent without one.
+                        <p className="flex items-center gap-1.5 text-xs text-warning">
+                          <TriangleAlert aria-hidden className="size-3.5 shrink-0" /> Add an image: WhatsApp rejects image-header messages sent without one.
                         </p>
                       )}
-                      <input className="field text-xs" value={t.headerMediaUrl} placeholder="…or paste an image link: https://yourdomain.com/offer.jpg" onChange={(e) => set({ headerMediaUrl: e.target.value })} aria-label="Image link" />
+                      <input className="field sm:text-xs" inputMode="url" value={t.headerMediaUrl} placeholder="…or paste an image link: https://yourdomain.com/offer.jpg" onChange={(e) => set({ headerMediaUrl: e.target.value })} aria-label="Image link" />
                       <p className="text-xs text-muted">JPG or PNG, up to 4 MB. A wide image (about 1200×628) reads best in the chat.</p>
                     </div>
                   )}
@@ -309,20 +311,20 @@ export function TemplateEditor({
 
                 <div>
                   <Label htmlFor="body" hint={`${t.body.length}/1024`}>Message</Label>
-                  <div className="overflow-hidden rounded-lg border border-line focus-within:border-brand focus-within:ring-4 focus-within:ring-brand/12">
-                    <div className="flex items-center gap-0.5 border-b border-line bg-canvas/60 px-1.5 py-1">
+                  <div className="overflow-hidden rounded-control border border-line-strong focus-within:border-brand-deep focus-within:outline-2 focus-within:outline-brand-deep">
+                    <div role="toolbar" aria-label="Formatting" className="flex items-center gap-0.5 border-b border-line bg-sunken px-1.5 py-1">
                       {[
                         { m: "*", I: Bold, l: "Bold" },
                         { m: "_", I: Italic, l: "Italic" },
                         { m: "~", I: Strikethrough, l: "Strikethrough" },
                       ].map(({ m, I, l }) => (
-                        <button key={l} type="button" title={l} onClick={() => wrap(m)} className="grid size-10 place-items-center rounded-lg text-ink-2 hover:bg-white sm:size-7 sm:rounded">
-                          <I className="size-3.5" />
+                        <button key={l} type="button" title={l} aria-label={l} onClick={() => wrap(m)} className="grid size-11 place-items-center rounded-control text-ink-2 transition hover:bg-panel active:bg-panel sm:size-8 sm:pointer-coarse:size-11">
+                          <I aria-hidden className="size-4" />
                         </button>
                       ))}
-                      <span className="mx-1 h-4 w-px bg-line" />
-                      <button type="button" onClick={insertVariable} className="flex h-10 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-brand-deep hover:bg-white sm:h-7 sm:rounded sm:px-2 sm:text-xs">
-                        <Braces className="size-3.5" /> Add variable
+                      <span aria-hidden className="mx-1 h-5 w-px bg-line-strong/40" />
+                      <button type="button" onClick={insertVariable} className="flex h-11 items-center gap-1.5 rounded-control px-2.5 text-sm font-medium text-brand-deep transition hover:bg-panel active:bg-panel sm:h-8 sm:pointer-coarse:h-11">
+                        <Braces aria-hidden className="size-4" /> Add variable
                       </button>
                     </div>
                     <textarea
@@ -332,16 +334,15 @@ export function TemplateEditor({
                       maxLength={1024}
                       value={t.body}
                       onChange={(e) => set({ body: e.target.value })}
-                      className="block w-full resize-y px-3.5 py-3 text-base outline-none sm:px-3 sm:py-2.5 sm:text-sm"
+                      className="block w-full resize-y bg-panel px-3.5 py-3 text-base leading-relaxed text-ink outline-none placeholder:text-muted sm:px-3 sm:py-2.5 sm:text-sm"
                       placeholder="Hi {{1}}, …"
                     />
                   </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="footer" hint={`${t.footer.length}/60 · optional`}>Footer</Label>
-                  <input id="footer" className="field" maxLength={60} value={t.footer} placeholder="Reply STOP to unsubscribe" onChange={(e) => set({ footer: e.target.value })} />
-                </div>
+                <Field id="footer" label="Footer" hint={`${t.footer.length}/60 · optional`}>
+                  <input className="field" maxLength={60} value={t.footer} placeholder="Reply STOP to unsubscribe" onChange={(e) => set({ footer: e.target.value })} />
+                </Field>
               </div>
             </Card>
 
@@ -352,8 +353,8 @@ export function TemplateEditor({
                   {[...(headerVar ? ["h1"] : []), ...bodyVars.map(String)].map((key) => {
                     const v = t.variables[key] ?? { source: "name" };
                     return (
-                      <div key={key} className="grid items-center gap-3 px-5 py-3 sm:grid-cols-[110px_1fr_1fr]">
-                        <span className="font-mono text-xs text-ink-2">{key === "h1" ? "Header {{1}}" : `{{${key}}}`}</span>
+                      <div key={key} className="grid items-center gap-2 px-4 py-3 sm:grid-cols-[7rem_1fr_1fr] sm:gap-3 sm:px-5">
+                        <span className="font-mono text-sm font-medium text-ink-2">{key === "h1" ? "Header {{1}}" : `{{${key}}}`}</span>
                         <Picker
                           title={`What fills ${key === "h1" ? "the header variable" : `{{${key}}}`}`}
                           value={v.source}
@@ -361,7 +362,7 @@ export function TemplateEditor({
                           options={SOURCES.map((s) => ({ value: s.value, label: s.label }))}
                         />
                         {v.source === "static" ? (
-                          <input className="field" placeholder="Text to insert" value={v.value ?? ""} onChange={(e) => setVar(key, { ...v, value: e.target.value })} />
+                          <input className="field" placeholder="Text to insert" aria-label={`Text for ${key === "h1" ? "the header variable" : `{{${key}}}`}`} value={v.value ?? ""} onChange={(e) => setVar(key, { ...v, value: e.target.value })} />
                         ) : (
                           <span className="text-xs text-muted">e.g. {preview.bodyParams[bodyVars.indexOf(Number(key))] ?? preview.headerParams[0]}</span>
                         )}
@@ -377,16 +378,29 @@ export function TemplateEditor({
                 title="Buttons"
                 description="Optional. Up to 10: quick replies, 2 website links and 1 call button."
                 action={
-                  <div className="flex gap-1">
+                  <div className="flex flex-wrap gap-1.5">
                     {(
                       [
                         ["QUICK_REPLY", "Reply"],
                         ["URL", "Link"],
                         ["PHONE_NUMBER", "Call"],
+                        ["CATALOG", "Catalogue"],
                       ] as const
                     ).map(([type, l]) => (
-                      <Button key={type} size="sm" variant="secondary" disabled={t.buttons.length >= 10} onClick={() => set({ buttons: [...t.buttons, { type, text: "" }] })}>
-                        <Plus className="size-3" /> {l}
+                      <Button
+                        key={type}
+                        size="sm"
+                        variant="secondary"
+                        disabled={t.buttons.length >= 10 || t.buttons.some((b) => b.type === "CATALOG")}
+                        title={t.buttons.some((b) => b.type === "CATALOG") ? "A catalogue button has to be the only button" : undefined}
+                        onClick={() =>
+                          // WhatsApp allows a catalogue button only on its own, with no header.
+                          type === "CATALOG"
+                            ? set({ buttons: [{ type, text: "View catalog" }], headerType: "NONE" })
+                            : set({ buttons: [...t.buttons, { type, text: "" }] })
+                        }
+                      >
+                        <Plus aria-hidden className="size-3.5" /> {l}
                       </Button>
                     ))}
                   </div>
@@ -395,36 +409,36 @@ export function TemplateEditor({
               {t.buttons.length ? (
                 <div className="divide-y divide-line">
                   {t.buttons.map((b, i) => (
-                    <div key={i} className="grid items-center gap-2 px-5 py-3 sm:grid-cols-[80px_1fr_1.3fr_auto]">
-                      <Badge tone={b.type === "URL" ? "blue" : b.type === "PHONE_NUMBER" ? "green" : "gray"}>
-                        {b.type === "URL" ? "Link" : b.type === "PHONE_NUMBER" ? "Call" : "Reply"}
+                    <div key={i} className="grid grid-cols-[1fr_auto] items-center gap-2 px-4 py-3 sm:grid-cols-[5rem_1fr_1.3fr_auto] sm:px-5">
+                      <Badge tone={b.type === "URL" ? "blue" : b.type === "PHONE_NUMBER" || b.type === "CATALOG" ? "green" : "gray"}>
+                        {b.type === "URL" ? "Link" : b.type === "PHONE_NUMBER" ? "Call" : b.type === "CATALOG" ? "Catalogue" : "Reply"}
                       </Badge>
-                      <input className="field" maxLength={25} placeholder="Button label" value={b.text} onChange={(e) => setButton(i, { text: e.target.value })} />
+                      <input className="field max-sm:col-span-2" maxLength={25} placeholder="Button label" aria-label={`Button ${i + 1} label`} value={b.text} onChange={(e) => setButton(i, { text: e.target.value })} />
                       {b.type === "URL" ? (
-                        <input className="field" placeholder="https://…" value={b.url ?? ""} onChange={(e) => setButton(i, { url: e.target.value })} />
+                        <input className="field max-sm:col-span-2" inputMode="url" placeholder="https://…" aria-label={`Button ${i + 1} link`} value={b.url ?? ""} onChange={(e) => setButton(i, { url: e.target.value })} />
                       ) : b.type === "PHONE_NUMBER" ? (
-                        <input className="field" placeholder="+91 98765 43210" value={b.phone ?? ""} onChange={(e) => setButton(i, { phone: e.target.value })} />
+                        <input className="field max-sm:col-span-2" type="tel" inputMode="tel" placeholder="+91 98765 43210" aria-label={`Button ${i + 1} phone number`} value={b.phone ?? ""} onChange={(e) => setButton(i, { phone: e.target.value })} />
                       ) : (
-                        <span />
+                        <span className="max-sm:hidden" />
                       )}
-                      <button type="button" title="Remove" onClick={() => set({ buttons: t.buttons.filter((_, j) => j !== i) })} className="grid size-11 place-items-center justify-self-end rounded-lg text-muted hover:bg-rose-50 hover:text-rose-600 sm:size-8">
-                        <Trash2 className="size-4" />
+                      <button type="button" title="Remove" aria-label={`Remove button ${i + 1}`} onClick={() => set({ buttons: t.buttons.filter((_, j) => j !== i) })} className="col-start-2 row-start-1 grid size-11 place-items-center justify-self-end rounded-control text-muted transition hover:bg-danger-bg hover:text-danger sm:col-start-auto sm:row-start-auto sm:size-8 sm:pointer-coarse:size-11">
+                        <Trash2 aria-hidden className="size-4" />
                       </button>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="px-5 py-4 text-sm text-muted">No buttons.</p>
+                <p className="px-4 py-4 text-sm text-muted sm:px-5">No buttons.</p>
               )}
             </Card>
           </>
         )}
       </div>
 
-      <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+      <aside aria-label="Preview and save" className="space-y-4 lg:sticky lg:top-8">
         <div className="hidden space-y-4 lg:block">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted">Live preview</p>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">Live preview</h2>
             {status && <StatusBadge status={status} />}
           </div>
           <PhoneFrame name={businessName}>
@@ -440,16 +454,22 @@ export function TemplateEditor({
         </div>
 
         {errors.length > 0 && (
-          <ul className="space-y-1 rounded-xl bg-amber-50 p-3 text-xs text-amber-900">
-            {errors.map((e) => (
-              <li key={e} className="flex gap-2"><TriangleAlert className="mt-px size-3.5 shrink-0" />{e}</li>
-            ))}
-          </ul>
+          <div role="status" className="rounded-card border border-warning-border bg-warning-bg p-3 text-sm text-warning">
+            <p className="mb-1 font-semibold">Fix before saving</p>
+            <ul className="space-y-1 text-xs">
+              {errors.map((e) => (
+                <li key={e} className="flex gap-2">
+                  <TriangleAlert aria-hidden className="mt-px size-3.5 shrink-0" />
+                  {e}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         <div className="hidden lg:block">
-          <Button className="w-full" disabled={pending || errors.length > 0} onClick={save}>
-            {pending ? <Loader2 className="size-4 animate-spin" /> : id ? "Save changes" : "Create template"}
+          <Button className="w-full" disabled={errors.length > 0} loading={pending} onClick={save}>
+            {id ? "Save changes" : "Create template"}
           </Button>
         </div>
 
@@ -460,24 +480,27 @@ export function TemplateEditor({
               <input id="test" type="tel" inputMode="tel" autoComplete="tel" className="field" placeholder="+91 98765 43210" value={testPhone} onChange={(e) => setTestPhone(e.target.value)} />
               <Button
                 variant="secondary"
+                icon
                 aria-label="Send test"
-                disabled={testing || !testPhone}
+                className="shrink-0 sm:size-10"
+                disabled={!testPhone}
+                loading={testing}
                 onClick={() => startTest(async () => toastResult(await sendTestMessage(id, testPhone)))}
               >
-                {testing ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                <Send aria-hidden className="size-4" />
               </Button>
             </div>
           </Card>
         )}
-      </div>
+      </aside>
 
       {/* Phones: save and preview stay under the thumb instead of at the end of a long form. */}
       <MobileActionBar>
         <Button variant="secondary" className="flex-1" onClick={() => setPreviewOpen(true)}>
-          <Eye className="size-4" /> Preview
+          <Eye aria-hidden className="size-4" /> Preview
         </Button>
-        <Button className="flex-[1.4]" disabled={pending || errors.length > 0} onClick={save}>
-          {pending ? <Loader2 className="size-4 animate-spin" /> : errors.length ? `Fix ${errors.length} issue${errors.length > 1 ? "s" : ""}` : id ? "Save changes" : "Create template"}
+        <Button className="!flex-[1.4]" disabled={errors.length > 0} loading={pending} onClick={save}>
+          {errors.length ? `Fix ${errors.length} issue${errors.length > 1 ? "s" : ""}` : id ? "Save changes" : "Create template"}
         </Button>
       </MobileActionBar>
       <Sheet open={previewOpen} onClose={() => setPreviewOpen(false)} title="Preview" className="bg-canvas">

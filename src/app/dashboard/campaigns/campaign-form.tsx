@@ -1,12 +1,12 @@
 "use client";
 
-import { Clock, Gauge, Loader2, Users } from "lucide-react";
+import { Clock, Gauge, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { MobileActionBar } from "@/components/mobile-action-bar";
 import { Picker } from "@/components/picker";
 import { toastResult } from "@/components/toast";
-import { Button, Card, CardHeader, Label } from "@/components/ui";
+import { Button, Callout, Card, CardHeader, CheckRow, Field, Segmented } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { DAYS, effectiveInterval, estimateDuration, formatMinutes, SCHEDULER_TICK_MINUTES } from "@/lib/schedule";
 import { saveCampaign, type CampaignInput } from "../actions/campaigns";
@@ -49,6 +49,7 @@ export function CampaignForm({
   const chosen = usable.find((t) => t.id === c.templateId);
 
   function save() {
+    if (pending) return;
     start(async () => {
       const r = await saveCampaign(id, c);
       toastResult(r);
@@ -60,18 +61,17 @@ export function CampaignForm({
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-      <div className="space-y-6">
+    <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
+      <div className="space-y-4 sm:space-y-6">
         <Card>
           <CardHeader title="Message" />
-          <div className="grid gap-4 p-5 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <Label htmlFor="cname">Campaign name</Label>
-              <input id="cname" className="field" placeholder="Weekly offers" value={c.name} onChange={(e) => set({ name: e.target.value })} />
-            </div>
+          <div className="grid gap-4 p-4 sm:grid-cols-2 sm:p-5">
+            <Field id="cname" label="Campaign name" className="sm:col-span-2">
+              <input className="field" placeholder="Weekly offers" value={c.name} onChange={(e) => set({ name: e.target.value })} />
+            </Field>
             {numbers.length > 1 && (
               <div className="sm:col-span-2">
-                <Label htmlFor="sender" hint="templates below are the ones approved for this number">Send from</Label>
+                <label htmlFor="sender" className="mb-1.5 block text-sm font-medium text-ink-2">Send from</label>
                 <Picker
                   id="sender"
                   title="Send from"
@@ -86,10 +86,11 @@ export function CampaignForm({
                     ...numbers.map((n) => ({ value: n.id, label: n.label, hint: n.dailyLimit ? `Up to ${n.dailyLimit.toLocaleString("en-IN")} people a day` : "No daily limit" })),
                   ]}
                 />
+                <p className="mt-1.5 text-xs text-muted">Templates below are the ones approved for this number.</p>
               </div>
             )}
             <div>
-              <Label htmlFor="tpl">Template</Label>
+              <label htmlFor="tpl" className="mb-1.5 block text-sm font-medium text-ink-2">Template</label>
               <Picker
                 id="tpl"
                 title="Template"
@@ -102,12 +103,10 @@ export function CampaignForm({
                   hint: `${t.category.charAt(0)}${t.category.slice(1).toLowerCase()}${t.status !== "APPROVED" ? " · not approved yet" : " · approved"}`,
                 }))}
               />
-              {chosen && chosen.status !== "APPROVED" && (
-                <p className="mt-1.5 text-xs text-amber-700">Sending waits until Meta approves this template.</p>
-              )}
+              {chosen && chosen.status !== "APPROVED" && <p className="mt-1.5 text-xs text-warning">Sending waits until Meta approves this template.</p>}
             </div>
             <div>
-              <Label htmlFor="aud">Send to</Label>
+              <label htmlFor="aud" className="mb-1.5 block text-sm font-medium text-ink-2">Send to</label>
               <Picker
                 id="aud"
                 title="Send to"
@@ -124,17 +123,22 @@ export function CampaignForm({
 
         <Card>
           <CardHeader title="Schedule" description="Times are in India Standard Time." />
-          <div className="space-y-5 p-5">
-            <div className="inline-flex rounded-lg bg-canvas p-1">
-              {(["WEEKLY", "ONCE"] as const).map((s) => (
-                <button key={s} type="button" onClick={() => set({ scheduleType: s })} className={cn("rounded-md px-4 py-2.5 text-sm font-medium transition sm:py-1.5 sm:text-xs", c.scheduleType === s ? "bg-white shadow-sm" : "text-muted")}>
-                  {s === "WEEKLY" ? "Repeat weekly" : "Send once"}
-                </button>
-              ))}
-            </div>
+          <div className="space-y-5 p-4 sm:p-5">
+            <Segmented
+              label="How often"
+              value={c.scheduleType}
+              onChange={(scheduleType) => set({ scheduleType })}
+              options={[
+                { value: "WEEKLY", label: "Repeat weekly" },
+                { value: "ONCE", label: "Send once" },
+              ]}
+              className="w-full sm:w-auto"
+            />
             {c.scheduleType === "WEEKLY" ? (
-              <div>
-                <Label hint={`${c.daysOfWeek.length} per week`}>Days</Label>
+              <fieldset>
+                <legend className="mb-1.5 flex w-full items-baseline justify-between gap-2 text-sm font-medium text-ink-2">
+                  Days <span className="text-xs font-normal text-muted">{c.daysOfWeek.length} per week</span>
+                </legend>
                 <div className="flex gap-1.5 sm:flex-wrap sm:gap-2">
                   {DAYS.map((d, i) => {
                     const on = c.daysOfWeek.includes(i);
@@ -144,89 +148,104 @@ export function CampaignForm({
                         type="button"
                         aria-pressed={on}
                         onClick={() => set({ daysOfWeek: on ? c.daysOfWeek.filter((x) => x !== i) : [...c.daysOfWeek, i] })}
-                        className={cn("h-11 min-w-0 flex-1 rounded-xl border text-xs font-medium transition active:scale-95 sm:flex-none sm:w-11", on ? "border-brand bg-brand text-white" : "border-line bg-white text-ink-2 hover:border-ink/30")}
+                        className={cn(
+                          "h-11 min-w-0 flex-1 rounded-control border text-xs font-medium transition active:scale-95 sm:w-12 sm:flex-none",
+                          on ? "border-brand bg-brand text-white" : "border-line-strong/50 bg-panel text-ink-2 hover:border-line-strong",
+                        )}
                       >
                         {d}
                       </button>
                     );
                   })}
                 </div>
-              </div>
+              </fieldset>
             ) : (
-              <div className="max-w-xs">
-                <Label htmlFor="date">Date</Label>
-                <input id="date" type="date" className="field" value={c.runDate} onChange={(e) => set({ runDate: e.target.value })} />
-              </div>
+              <Field id="date" label="Date" className="max-w-xs">
+                <input type="date" className="field" value={c.runDate} onChange={(e) => set({ runDate: e.target.value })} />
+              </Field>
             )}
-            <div className="max-w-xs">
-              <Label htmlFor="time">Start time</Label>
-              <input id="time" type="time" className="field" value={c.sendTime} onChange={(e) => set({ sendTime: e.target.value })} />
-            </div>
+            <Field id="time" label="Start time" className="max-w-xs">
+              <input type="time" className="field" value={c.sendTime} onChange={(e) => set({ sendTime: e.target.value })} />
+            </Field>
           </div>
         </Card>
 
         <Card>
           <CardHeader title="Pacing" description="Send in small batches so your number keeps a good quality rating with Meta." />
-          <div className="space-y-5 p-5">
-            <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
-              {PRESETS.map((p) => (
-                <button
-                  key={p.label}
-                  type="button"
-                  onClick={() => set({ batchSize: p.batch, intervalMinutes: p.interval })}
-                  className={cn(
-                    "rounded-xl border px-3 py-2 text-left text-xs transition",
-                    c.batchSize === p.batch && c.intervalMinutes === p.interval ? "border-brand bg-brand-soft/60" : "border-line hover:border-ink/30",
-                  )}
-                >
-                  <span className="block font-medium">{p.label}</span>
-                  <span className="text-muted">{p.batch} every {p.interval} min</span>
-                </button>
-              ))}
+          <div className="space-y-5 p-4 sm:p-5">
+            <div role="group" aria-label="Pace presets" className="grid gap-2 min-[420px]:grid-cols-3 sm:flex sm:flex-wrap">
+              {PRESETS.map((p) => {
+                const on = c.batchSize === p.batch && c.intervalMinutes === p.interval;
+                return (
+                  <button
+                    key={p.label}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => set({ batchSize: p.batch, intervalMinutes: p.interval })}
+                    className={cn(
+                      "flex min-h-11 items-baseline justify-between gap-2 rounded-control border px-3 py-2 text-left text-xs transition active:scale-[0.98] min-[420px]:block",
+                      on ? "border-brand bg-brand-soft text-brand-deep" : "border-line-strong/50 bg-panel hover:border-line-strong",
+                    )}
+                  >
+                    <span className="block text-sm font-medium">{p.label}</span>
+                    <span className={on ? "text-brand-deep" : "text-muted"}>
+                      {p.batch} every {p.interval} min
+                    </span>
+                  </button>
+                );
+              })}
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <Label htmlFor="batch" hint="1–1,000">Customers per batch</Label>
-                <input id="batch" type="number" inputMode="numeric" min={1} max={1000} className="field tabular" value={c.batchSize || ""} onChange={(e) => set({ batchSize: Number(e.target.value) })} />
-              </div>
-              <div>
-                <Label htmlFor="interval" hint="minutes">Wait between batches</Label>
-                <input id="interval" type="number" inputMode="numeric" min={1} max={1440} className="field tabular" value={c.intervalMinutes || ""} onChange={(e) => set({ intervalMinutes: Number(e.target.value) })} />
-              </div>
+              <Field id="batch" label="Customers per batch" hint="1–1,000">
+                <input type="number" inputMode="numeric" min={1} max={1000} className="field tabular" value={c.batchSize || ""} onChange={(e) => set({ batchSize: Number(e.target.value) })} />
+              </Field>
+              <Field id="interval" label="Wait between batches" hint="minutes">
+                <input type="number" inputMode="numeric" min={1} max={1440} className="field tabular" value={c.intervalMinutes || ""} onChange={(e) => set({ intervalMinutes: Number(e.target.value) })} />
+              </Field>
             </div>
             {c.intervalMinutes > 0 && c.intervalMinutes < SCHEDULER_TICK_MINUTES && (
-              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <Callout tone="warning">
                 Batches go out at most once every {SCHEDULER_TICK_MINUTES} minutes, so {c.intervalMinutes} min works as {SCHEDULER_TICK_MINUTES}. For a faster pace, raise the batch size instead.
-              </p>
+              </Callout>
             )}
           </div>
         </Card>
       </div>
 
-      <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+      <aside aria-label="Summary" className="space-y-4 lg:sticky lg:top-8">
         <Card className="overflow-hidden">
-          <div className="bg-night p-5 text-white">
-            <p className="text-xs uppercase tracking-wider text-white/50">Each send</p>
-            <p className="tabular mt-2 text-3xl font-semibold">{size.toLocaleString("en-IN")} <span className="text-base font-normal text-white/60">customers</span></p>
-            <p className="mt-1 text-sm text-white/70">
+          <div className="surface-dark bg-night p-5 text-white">
+            <p className="text-xs font-semibold uppercase tracking-wider text-white/70">Each send</p>
+            <p className="tabular mt-2 text-3xl font-semibold">
+              {size.toLocaleString("en-IN")} <span className="text-base font-normal text-white/75">customers</span>
+            </p>
+            <p className="mt-1 text-sm text-white/80">
               {batches} batch{batches === 1 ? "" : "es"} · done in {days > 1 ? `about ${days} days` : formatMinutes(mins)}
             </p>
             {days > 1 && sender?.dailyLimit && (
-              <p className="mt-2 rounded-lg bg-white/10 px-2.5 py-1.5 text-xs text-white/80">
+              <p className="mt-2 rounded-control bg-white/10 px-2.5 py-1.5 text-xs text-white/85">
                 {sender.label.split(" · ")[0]} can message {sender.dailyLimit.toLocaleString("en-IN")} people a day, so this send continues automatically each day until everyone is reached.
               </p>
             )}
             {sender?.quality === "RED" && (
-              <p className="mt-2 rounded-lg bg-rose-500/20 px-2.5 py-1.5 text-xs text-rose-100">This number&apos;s quality is low. Sends stay paused until Meta rates it higher.</p>
+              <p className="mt-2 rounded-control bg-white/10 px-2.5 py-1.5 text-xs text-danger-on-dark">This number&apos;s quality is low. Sends stay paused until Meta rates it higher.</p>
             )}
           </div>
           <ul className="space-y-3 p-5 text-sm">
-            <li className="flex gap-3"><Users className="mt-0.5 size-4 text-muted" />{c.batchSize || 0} customers at a time</li>
-            <li className="flex gap-3"><Gauge className="mt-0.5 size-4 text-muted" />then waits {effectiveInterval(c.intervalMinutes || 0)} minute{effectiveInterval(c.intervalMinutes || 0) === 1 ? "" : "s"}</li>
             <li className="flex gap-3">
-              <Clock className="mt-0.5 size-4 text-muted" />
-              {c.sendTime} → about {end.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
-              {end.getDate() !== 1 && " (next day)"}
+              <Users aria-hidden className="mt-0.5 size-4 shrink-0 text-muted" />
+              {c.batchSize || 0} customers at a time
+            </li>
+            <li className="flex gap-3">
+              <Gauge aria-hidden className="mt-0.5 size-4 shrink-0 text-muted" />
+              then waits {effectiveInterval(c.intervalMinutes || 0)} minute{effectiveInterval(c.intervalMinutes || 0) === 1 ? "" : "s"}
+            </li>
+            <li className="flex gap-3">
+              <Clock aria-hidden className="mt-0.5 size-4 shrink-0 text-muted" />
+              <span className="tabular">
+                {c.sendTime} → about {end.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
+                {end.getDate() !== 1 && " (next day)"}
+              </span>
             </li>
           </ul>
           {perWeek > 0 && (
@@ -236,25 +255,26 @@ export function CampaignForm({
           )}
         </Card>
 
-        <label className="flex items-center justify-between rounded-xl border border-line bg-white px-4 py-3 text-sm">
-          Campaign active
-          <input type="checkbox" className="size-5 accent-brand sm:size-4" checked={c.active} onChange={(e) => set({ active: e.target.checked })} />
-        </label>
+        <Card className="px-4 py-1">
+          <CheckRow label="Campaign active" description="Paused campaigns keep their settings but don't send." checked={c.active} onChange={(e) => set({ active: e.target.checked })} />
+        </Card>
 
         <div className="hidden lg:block">
-          <Button className="w-full" disabled={pending} onClick={save}>
-            {pending ? <Loader2 className="size-4 animate-spin" /> : id ? "Save changes" : "Create campaign"}
+          <Button className="w-full" loading={pending} onClick={save}>
+            {id ? "Save changes" : "Create campaign"}
           </Button>
         </div>
         {id && <p className="text-center text-xs text-muted">Pacing changes also apply to a run that is already sending, from its next batch.</p>}
-      </div>
+      </aside>
       <MobileActionBar>
         <div className="min-w-0 flex-1 leading-tight">
           <p className="tabular truncate text-sm font-semibold">{size.toLocaleString("en-IN")} customers</p>
-          <p className="truncate text-xs text-muted">{batches} batch{batches === 1 ? "" : "es"} · {days > 1 ? `about ${days} days` : `done in ${formatMinutes(mins)}`}</p>
+          <p className="truncate text-xs text-muted">
+            {batches} batch{batches === 1 ? "" : "es"} · {days > 1 ? `about ${days} days` : `done in ${formatMinutes(mins)}`}
+          </p>
         </div>
-        <Button className="shrink-0 px-6" disabled={pending} onClick={save}>
-          {pending ? <Loader2 className="size-4 animate-spin" /> : id ? "Save" : "Create"}
+        <Button className="!flex-none shrink-0 px-6" loading={pending} onClick={save}>
+          {id ? "Save" : "Create"}
         </Button>
       </MobileActionBar>
     </div>

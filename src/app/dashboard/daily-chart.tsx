@@ -3,10 +3,10 @@ import { formatInTimeZone } from "date-fns-tz";
 import { APP_TZ } from "@/lib/format";
 
 const SERIES = [
-  { key: "READ", label: "Read", color: "bg-violet-500" },
-  { key: "DELIVERED", label: "Delivered", color: "bg-emerald-500" },
-  { key: "SENT", label: "Sent", color: "bg-sky-400" },
-  { key: "FAILED", label: "Failed", color: "bg-rose-400" },
+  { key: "READ", label: "Read", color: "bg-series-read" },
+  { key: "DELIVERED", label: "Delivered", color: "bg-series-delivered" },
+  { key: "SENT", label: "Sent", color: "bg-series-sent" },
+  { key: "FAILED", label: "Failed", color: "bg-series-failed" },
 ];
 
 const label = (day: string, pattern: string) => formatInTimeZone(new Date(`${day}T12:00:00Z`), "UTC", pattern);
@@ -22,12 +22,29 @@ export function DailyChart({ rows, since }: { rows: { day: string; status: strin
       <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted sm:mb-4">
         {SERIES.map((s) => (
           <span key={s.key} className="flex items-center gap-1.5">
-            <span className={`size-2 rounded-sm ${s.color}`} />
+            <span aria-hidden className={`size-2.5 rounded-sm ${s.color}`} />
             {s.label}
           </span>
         ))}
       </div>
-      <div className="flex h-36 items-end gap-1 border-b border-line sm:h-48 sm:gap-1.5" role="img" aria-label="Messages per day for the last 14 days">
+      <table className="sr-only">
+        <caption>Messages per day for the last 14 days, by latest status</caption>
+        <thead>
+          <tr>
+            <th scope="col">Day</th>
+            {SERIES.map((s) => <th key={s.key} scope="col">{s.label}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {days.map((d) => (
+            <tr key={d}>
+              <th scope="row">{label(d, "EEE d MMM")}</th>
+              {SERIES.map((s) => <td key={s.key}>{val(d, s.key)}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div aria-hidden className="flex h-36 items-end gap-1 border-b border-line sm:h-48 sm:gap-1.5">
         {days.map((d, i) => (
           <div key={d} className="group relative flex h-full flex-1 flex-col justify-end">
             <div
@@ -39,13 +56,13 @@ export function DailyChart({ rows, since }: { rows: { day: string; status: strin
                 return v ? <div key={s.key} className={s.color} style={{ height: `${(v / totals[i]) * 100}%` }} /> : null;
               })}
             </div>
-            <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-lg bg-night px-2.5 py-1.5 text-[11px] text-white shadow-pop group-hover:block">
+            <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-control bg-night px-2.5 py-1.5 text-xs text-white shadow-pop group-hover:block">
               <p className="font-medium">
                 {label(d, "EEE d MMM")} · {totals[i]}
               </p>
               {SERIES.map((s) =>
                 val(d, s.key) ? (
-                  <p key={s.key} className="text-white/70">
+                  <p key={s.key} className="text-white/80">
                     {s.label}: {val(d, s.key)}
                   </p>
                 ) : null,
@@ -54,7 +71,7 @@ export function DailyChart({ rows, since }: { rows: { day: string; status: strin
           </div>
         ))}
       </div>
-      <div className="mt-2 flex gap-1 text-[11px] text-muted sm:gap-1.5">
+      <div aria-hidden className="mt-2 flex gap-1 text-2xs text-muted sm:gap-1.5">
         {days.map((d, i) => (
           <span key={d} className="flex-1 whitespace-nowrap text-center">
             {/* Every 3rd day on phones, every 2nd from tablets up. */}

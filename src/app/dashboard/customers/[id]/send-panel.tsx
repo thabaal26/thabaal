@@ -1,10 +1,11 @@
 "use client";
 
-import { Loader2, MessageSquareText, Send } from "lucide-react";
+import { MessageSquareText, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { confirmAction } from "@/components/confirm";
 import { toastResult } from "@/components/toast";
-import { Button, Card, CardHeader, Label } from "@/components/ui";
+import { Button, Callout, Card, CardHeader, Field } from "@/components/ui";
 import { renderFor, type TemplateButton, type VarMap } from "@/lib/template";
 import { replyToCustomer, sendToCustomer } from "../../actions/send";
 
@@ -62,47 +63,49 @@ export function SendPanel({
   const send = (force: boolean): void =>
     startSend(async () => {
       const r = await sendToCustomer(customer.id, templateId, sender || null, force);
-      if (r.soft && window.confirm(r.message)) return send(true);
-      if (!r.soft) toastResult(r);
+      // A soft warning (e.g. sent recently) asks before sending anyway.
+      if (r.soft) {
+        if (await confirmAction({ message: r.message ?? "Send anyway?", confirmLabel: "Send anyway" })) return send(true);
+      } else toastResult(r);
       router.refresh();
     });
 
   return (
-    <Card className="mt-6">
+    <Card className="@container">
       <CardHeader title={`Message ${customer.name}`} description="Send one message to this customer now, from your portal." />
-      <div className="grid gap-6 p-4 sm:p-5 lg:grid-cols-2">
+      <div className="grid gap-6 p-4 sm:p-5 @2xl:grid-cols-2">
         {canSend && (
-          <div className="space-y-3">
-            <p className="flex items-center gap-1.5 text-sm font-medium"><Send className="size-4 text-brand" /> Send a template</p>
+          <div className="space-y-4">
+            <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+              <Send aria-hidden className="size-4 text-brand-deep" /> Send a template
+            </p>
             {blocked ? (
-              <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{blocked}</p>
+              <Callout tone="warning">{blocked}</Callout>
             ) : templates.length ? (
               <>
-                <div>
-                  <Label htmlFor="tpl">Template</Label>
-                  <select id="tpl" className="field" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
+                <Field id="tpl" label="Template">
+                  <select className="field" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
                     {templates.map((x) => <option key={x.id} value={x.id}>{x.name} · {x.category.toLowerCase()}</option>)}
                   </select>
-                </div>
+                </Field>
                 {numbers.length > 0 && (
-                  <div>
-                    <Label htmlFor="snd">Send from</Label>
-                    <select id="snd" className="field" value={sender} onChange={(e) => setSenderId(e.target.value)}>
+                  <Field id="snd" label="Send from">
+                    <select className="field" value={sender} onChange={(e) => setSenderId(e.target.value)}>
                       {usable.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}
                     </select>
-                  </div>
+                  </Field>
                 )}
                 {preview && (
-                  <div className="rounded-xl bg-[#d9fdd3] px-3 py-2 text-sm shadow-sm">
+                  <div aria-label="Preview" className="rounded-card rounded-tr-sm bg-bubble-out px-3 py-2 text-sm text-ink shadow-card">
                     {t?.headerType === "IMAGE" && <p className="mb-1 text-xs text-muted">[image header]</p>}
                     {preview.header && <p className="font-semibold">{preview.header}</p>}
                     <p className="whitespace-pre-wrap">{preview.body}</p>
                     {preview.footer && <p className="mt-1 text-xs text-muted">{preview.footer}</p>}
-                    {buttons.length > 0 && <p className="mt-2 border-t border-black/10 pt-1.5 text-xs text-brand-deep">{buttons.map((b) => b.text).join(" · ")}</p>}
+                    {buttons.length > 0 && <p className="mt-2 border-t border-black/10 pt-1.5 text-xs font-medium text-brand-deep">{buttons.map((b) => b.text).join(" · ")}</p>}
                   </div>
                 )}
-                <Button className="w-full" disabled={sending || !templateId} onClick={() => send(false)}>
-                  {sending ? <Loader2 className="size-4 animate-spin" /> : <><Send className="size-4" /> Send to {customer.name.split(" ")[0]}</>}
+                <Button className="w-full" disabled={!templateId} loading={sending} onClick={() => send(false)}>
+                  <Send aria-hidden className="size-4" /> Send to {customer.name.split(" ")[0]}
                 </Button>
               </>
             ) : (
@@ -111,15 +114,19 @@ export function SendPanel({
           </div>
         )}
 
-        <div className="space-y-3" id="reply">
-          <p className="flex items-center gap-1.5 text-sm font-medium"><MessageSquareText className="size-4 text-brand" /> Type a reply</p>
+        <div className="scroll-mt-24 space-y-3" id="reply">
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+            <MessageSquareText aria-hidden className="size-4 text-brand-deep" /> Type a reply
+          </p>
           {windowOpen ? (
             <>
-              <p className="text-xs text-muted">They wrote to you recently, so you can reply freely until {windowEndsAt}.</p>
-              <textarea className="field min-h-28" maxLength={4000} placeholder={`Reply to ${customer.name}…`} value={text} onChange={(e) => setText(e.target.value)} />
+              <Field id="reply-text" label={`Reply to ${customer.name}`} help={`They wrote to you recently, so you can reply freely until ${windowEndsAt}.`}>
+                <textarea className="field min-h-28" maxLength={4000} placeholder={`Reply to ${customer.name}…`} value={text} onChange={(e) => setText(e.target.value)} />
+              </Field>
               <Button
                 className="w-full"
-                disabled={replying || !text.trim()}
+                disabled={!text.trim()}
+                loading={replying}
                 onClick={() =>
                   startReply(async () => {
                     const r = await replyToCustomer(customer.id, text);
@@ -129,11 +136,11 @@ export function SendPanel({
                   })
                 }
               >
-                {replying ? <Loader2 className="size-4 animate-spin" /> : <><Send className="size-4" /> Send reply</>}
+                <Send aria-hidden className="size-4" /> Send reply
               </Button>
             </>
           ) : (
-            <p className="rounded-lg bg-canvas px-3 py-2 text-sm text-muted">
+            <p className="rounded-control bg-sunken px-3 py-2 text-sm text-muted">
               Typed messages need the customer to have written to you in the last 24 hours. Until then, send a template.
             </p>
           )}
