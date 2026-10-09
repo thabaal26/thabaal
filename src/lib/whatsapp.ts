@@ -58,6 +58,8 @@ export type SendInput = {
   headerMediaUrl?: string | null;
   headerParams: string[];
   bodyParams: string[];
+  /** Position of a "View catalog" button; Meta needs a parameter for it on every send. */
+  catalogButtonIndex?: number;
 };
 
 export async function sendTemplateMessage(cfg: WaConfig, input: SendInput): Promise<{ id: string; simulated: boolean }> {
@@ -71,6 +73,10 @@ export async function sendTemplateMessage(cfg: WaConfig, input: SendInput): Prom
   }
   if (input.bodyParams.length) {
     components.push({ type: "body", parameters: input.bodyParams.map((text) => ({ type: "text", text })) });
+  }
+  if (input.catalogButtonIndex != null && input.catalogButtonIndex >= 0) {
+    // No thumbnail product given: WhatsApp shows the catalogue's first product.
+    components.push({ type: "button", sub_type: "CATALOG", index: input.catalogButtonIndex, parameters: [{ type: "action", action: {} }] });
   }
 
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {

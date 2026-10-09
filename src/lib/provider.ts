@@ -71,6 +71,7 @@ export async function deliver(s: Setting, t: Sendable, customer: { name: string;
     headerMediaUrl: image,
     headerParams: r.headerParams,
     bodyParams: r.bodyParams,
+    catalogButtonIndex: (t.buttons as TemplateButton[]).findIndex((b) => b.type === "CATALOG"),
   });
   return { ...res, provider, text };
 }

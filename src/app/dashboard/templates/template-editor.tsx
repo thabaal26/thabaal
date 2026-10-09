@@ -384,9 +384,22 @@ export function TemplateEditor({
                         ["QUICK_REPLY", "Reply"],
                         ["URL", "Link"],
                         ["PHONE_NUMBER", "Call"],
+                        ["CATALOG", "Catalogue"],
                       ] as const
                     ).map(([type, l]) => (
-                      <Button key={type} size="sm" variant="secondary" disabled={t.buttons.length >= 10} onClick={() => set({ buttons: [...t.buttons, { type, text: "" }] })}>
+                      <Button
+                        key={type}
+                        size="sm"
+                        variant="secondary"
+                        disabled={t.buttons.length >= 10 || t.buttons.some((b) => b.type === "CATALOG")}
+                        title={t.buttons.some((b) => b.type === "CATALOG") ? "A catalogue button has to be the only button" : undefined}
+                        onClick={() =>
+                          // WhatsApp allows a catalogue button only on its own, with no header.
+                          type === "CATALOG"
+                            ? set({ buttons: [{ type, text: "View catalog" }], headerType: "NONE" })
+                            : set({ buttons: [...t.buttons, { type, text: "" }] })
+                        }
+                      >
                         <Plus aria-hidden className="size-3.5" /> {l}
                       </Button>
                     ))}
@@ -397,8 +410,8 @@ export function TemplateEditor({
                 <div className="divide-y divide-line">
                   {t.buttons.map((b, i) => (
                     <div key={i} className="grid grid-cols-[1fr_auto] items-center gap-2 px-4 py-3 sm:grid-cols-[5rem_1fr_1.3fr_auto] sm:px-5">
-                      <Badge tone={b.type === "URL" ? "blue" : b.type === "PHONE_NUMBER" ? "green" : "gray"}>
-                        {b.type === "URL" ? "Link" : b.type === "PHONE_NUMBER" ? "Call" : "Reply"}
+                      <Badge tone={b.type === "URL" ? "blue" : b.type === "PHONE_NUMBER" || b.type === "CATALOG" ? "green" : "gray"}>
+                        {b.type === "URL" ? "Link" : b.type === "PHONE_NUMBER" ? "Call" : b.type === "CATALOG" ? "Catalogue" : "Reply"}
                       </Badge>
                       <input className="field max-sm:col-span-2" maxLength={25} placeholder="Button label" aria-label={`Button ${i + 1} label`} value={b.text} onChange={(e) => setButton(i, { text: e.target.value })} />
                       {b.type === "URL" ? (
