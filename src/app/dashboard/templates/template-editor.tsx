@@ -318,12 +318,12 @@ export function TemplateEditor({
                         { m: "_", I: Italic, l: "Italic" },
                         { m: "~", I: Strikethrough, l: "Strikethrough" },
                       ].map(({ m, I, l }) => (
-                        <button key={l} type="button" title={l} aria-label={l} onClick={() => wrap(m)} className="grid size-11 place-items-center rounded-control text-ink-2 transition hover:bg-panel active:bg-panel sm:size-8 sm:pointer-coarse:size-11">
+                        <button key={l} type="button" title={l} aria-label={l} onClick={() => wrap(m)} className="grid size-11 shrink-0 place-items-center rounded-control text-ink-2 transition hover:bg-panel active:bg-panel sm:size-8 sm:pointer-coarse:size-11">
                           <I aria-hidden className="size-4" />
                         </button>
                       ))}
-                      <span aria-hidden className="mx-1 h-5 w-px bg-line-strong/40" />
-                      <button type="button" onClick={insertVariable} className="flex h-11 items-center gap-1.5 rounded-control px-2.5 text-sm font-medium text-brand-deep transition hover:bg-panel active:bg-panel sm:h-8 sm:pointer-coarse:h-11">
+                      <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-line-strong/40" />
+                      <button type="button" onClick={insertVariable} className="flex h-11 shrink-0 items-center gap-1.5 rounded-control px-2.5 text-sm font-medium text-brand-deep transition hover:bg-panel active:bg-panel sm:h-8 sm:pointer-coarse:h-11">
                         <Braces aria-hidden className="size-4" /> Add variable
                       </button>
                     </div>

@@ -105,11 +105,11 @@ export function CampaignForm({
   }
 
   return (
-    <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
-      <div className="space-y-4 sm:space-y-6">
+    <div className="min-w-0 grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
+      <div className="min-w-0 space-y-4 sm:space-y-6">
         <Card>
           <CardHeader title="Message" />
-          <div className="grid gap-4 p-4 sm:grid-cols-2 sm:p-5">
+          <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 sm:p-5">
             <Field id="cname" label="Campaign name" className="sm:col-span-2">
               <input className="field" placeholder="Weekly offers" value={c.name} onChange={(e) => set({ name: e.target.value })} />
             </Field>
@@ -252,7 +252,7 @@ export function CampaignForm({
                 <legend className="mb-1.5 flex w-full items-baseline justify-between gap-2 text-sm font-medium text-ink-2">
                   Days <span className="text-xs font-normal text-muted">{c.daysOfWeek.length} per week</span>
                 </legend>
-                <div className="flex gap-1.5 sm:flex-wrap sm:gap-2">
+                <div className="grid grid-cols-7 gap-1 sm:flex sm:flex-wrap sm:gap-2">
                   {DAYS.map((d, i) => {
                     const on = c.daysOfWeek.includes(i);
                     return (
@@ -262,7 +262,7 @@ export function CampaignForm({
                         aria-pressed={on}
                         onClick={() => set({ daysOfWeek: on ? c.daysOfWeek.filter((x) => x !== i) : [...c.daysOfWeek, i] })}
                         className={cn(
-                          "h-11 min-w-0 flex-1 rounded-control border text-xs font-medium transition active:scale-95 sm:w-12 sm:flex-none",
+                          "flex h-11 min-w-0 items-center justify-center rounded-control border px-0.5 text-xs font-medium transition active:scale-95 sm:w-12 sm:flex-none",
                           on ? "border-brand bg-brand text-white" : "border-line-strong/50 bg-panel text-ink-2 hover:border-line-strong",
                         )}
                       >
@@ -308,7 +308,7 @@ export function CampaignForm({
                 );
               })}
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field id="batch" label="Customers per batch" hint="1–1,000">
                 <input type="number" inputMode="numeric" min={1} max={1000} className="field tabular" value={c.batchSize || ""} onChange={(e) => set({ batchSize: Number(e.target.value) })} />
               </Field>
@@ -325,7 +325,7 @@ export function CampaignForm({
         </Card>
       </div>
 
-      <aside aria-label="Summary" className="space-y-4 lg:sticky lg:top-8">
+      <aside aria-label="Summary" className="min-w-0 space-y-4 lg:sticky lg:top-8">
         <Card className="overflow-hidden">
           <div className="surface-dark bg-night p-5 text-white">
             <p className="text-xs font-semibold uppercase tracking-wider text-white/70">Each send</p>

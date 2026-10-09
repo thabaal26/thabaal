@@ -53,7 +53,7 @@ export default async function ClientsPage() {
                     )
                   }
                 />
-                <div className="grid gap-6 p-4 sm:p-5 xl:grid-cols-2">
+                <div className="grid grid-cols-1 gap-6 p-4 sm:p-5 xl:grid-cols-2">
                   <section>
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Logins</h3>
                     {c.users.length ? (
@@ -120,7 +120,7 @@ export default async function ClientsPage() {
                     <AddNumberForm clientId={c.id} hasToken={!!c.waToken} />
                   </section>
 
-                  <section className="border-t border-line pt-5 lg:col-span-2">
+                  <section className="border-t border-line pt-5 xl:col-span-2">
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Sending rules</h3>
                     <p className="mb-3 mt-1 text-xs text-muted">
                       Keeps quality high with Meta: customers who got an offer recently are skipped, and marketing never goes out at night. Utility messages aren&apos;t affected.
@@ -128,7 +128,7 @@ export default async function ClientsPage() {
                     <SendingRulesForm clientId={c.id} initial={{ marketingGapHours: c.marketingGapHours, quietFrom: c.quietFrom, quietTo: c.quietTo }} />
                   </section>
 
-                  <section className="border-t border-line pt-5 lg:col-span-2">
+                  <section className="border-t border-line pt-5 xl:col-span-2">
                     <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                       <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Branding</h3>
                       {c.brandPrimary && (

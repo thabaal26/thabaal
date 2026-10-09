@@ -86,7 +86,7 @@ export function AddLoginForm({ clientId }: { clientId: string }) {
         <Plus aria-hidden className="size-4" /> Add login
       </summary>
       <form
-        className="mt-2 grid gap-4 rounded-card border border-line p-3 sm:grid-cols-2"
+        className="mt-2 grid grid-cols-1 gap-4 rounded-card border border-line p-3 sm:grid-cols-2"
         onSubmit={(e) => {
           e.preventDefault();
           submit(() => createClientUser(clientId, v), () => setV({ name: "", email: "", password: "", access: "STAFF" }));
@@ -275,7 +275,7 @@ export function RefreshNumbersButton({ clientId }: { clientId: string }) {
 export function NumberActions({ id, label, isDefault, dailyCap }: { id: string; label: string; isDefault: boolean; dailyCap: number | null }) {
   const { pending, submit } = useSubmit();
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-1">
+    <div className="flex w-full flex-wrap items-center gap-1 sm:w-auto sm:shrink-0">
       <Button
         type="button"
         size="sm"
@@ -338,14 +338,14 @@ export function BrandingForm({ clientId, name, initial }: { clientId: string; na
     <details className="group">
       <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-control text-sm font-medium text-brand-deep hover:underline sm:min-h-8 [&::-webkit-details-marker]:hidden">Edit branding</summary>
       <form
-        className="mt-3 grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem]"
+        className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_15rem]"
         onSubmit={(e) => {
           e.preventDefault();
           submit(() => saveClientBranding(clientId, v));
         }}
       >
         <div className="space-y-3">
-          <div className="grid gap-3 min-[400px]:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
             {(["brandPrimary", "brandAccent"] as const).map((k) => (
               <div key={k}>
                 <Label htmlFor={`${k}-${clientId}`} hint={k === "brandPrimary" ? "buttons, charts" : "highlights"}>{k === "brandPrimary" ? "Main colour" : "Accent colour"}</Label>
@@ -423,7 +423,7 @@ export function SendingRulesForm({ clientId, initial }: { clientId: string; init
   const { pending, submit } = useSubmit();
   return (
     <form
-      className="grid gap-4 md:grid-cols-[1fr_1.4fr_auto] md:items-end"
+      className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_1.4fr_auto] md:items-end"
       onSubmit={(e) => {
         e.preventDefault();
         submit(() => saveSendingRules(clientId, { marketingGapHours: gap, quietFrom: quietOn ? from : "", quietTo: quietOn ? to : "" }));
@@ -445,9 +445,9 @@ export function SendingRulesForm({ clientId, initial }: { clientId: string; init
           <span className="text-xs text-muted">India time · marketing waits</span>
         </div>
         <div className="flex items-center gap-2">
-          <input id={`qf-${clientId}`} type="time" aria-label="Quiet hours start" className="field" value={from} disabled={!quietOn} onChange={(e) => setFrom(e.target.value)} />
+          <input id={`qf-${clientId}`} type="time" aria-label="Quiet hours start" className="field min-w-0 flex-1" value={from} disabled={!quietOn} onChange={(e) => setFrom(e.target.value)} />
           <span className="text-xs text-muted">to</span>
-          <input type="time" aria-label="Quiet hours end" className="field" value={to} disabled={!quietOn} onChange={(e) => setTo(e.target.value)} />
+          <input type="time" aria-label="Quiet hours end" className="field min-w-0 flex-1" value={to} disabled={!quietOn} onChange={(e) => setTo(e.target.value)} />
         </div>
       </div>
       <Button type="submit" loading={pending} size="sm" className="max-sm:w-full md:mb-px">Save rules</Button>

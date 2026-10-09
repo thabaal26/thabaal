@@ -44,7 +44,7 @@ export function NewOrder() {
             });
           }}
         >
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field id="no-phone" label="Customer phone" required>
               <input className="field" type="tel" inputMode="tel" autoComplete="off" value={phone} placeholder="98765 43210" onChange={(e) => setPhone(e.target.value)} />
             </Field>

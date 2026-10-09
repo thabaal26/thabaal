@@ -455,7 +455,7 @@ export function Segmented<T extends string>({
             aria-checked={on}
             onClick={() => onChange(o.value)}
             className={cn(
-              "min-h-10 flex-1 whitespace-nowrap rounded-[calc(var(--radius-control)-4px)] px-4 text-sm font-medium transition sm:min-h-8 sm:px-3 sm:pointer-coarse:min-h-10",
+              "min-h-11 flex-1 whitespace-nowrap rounded-[calc(var(--radius-control)-4px)] px-4 text-sm font-medium transition sm:min-h-8 sm:px-3 sm:pointer-coarse:min-h-11",
               on ? "bg-panel text-ink shadow-card" : "text-muted hover:text-ink",
             )}
           >

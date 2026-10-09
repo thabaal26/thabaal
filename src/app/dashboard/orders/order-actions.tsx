@@ -93,14 +93,14 @@ export function OrderActions({
       {note && <p className="text-sm sm:hidden"><span className="text-muted">Team note: </span>{note}</p>}
       <div className="flex gap-2 sm:hidden">
         {phoneMain && (
-          <Button className="flex-1" variant={phoneMain.variant} disabled={pending} loading={busy === phoneMain.key} onClick={phoneMain.run}>
-            {phoneMain.label}
+          <Button className="min-w-0 flex-1" variant={phoneMain.variant} disabled={pending} loading={busy === phoneMain.key} onClick={phoneMain.run}>
+            <span className="truncate">{phoneMain.label}</span>
           </Button>
         )}
         <Button
           variant="secondary"
           icon={!!phoneMain}
-          className={phoneMain ? undefined : "flex-1"}
+          className={phoneMain ? "shrink-0" : "flex-1"}
           aria-label={phoneMain ? `More actions for ${who}'s order` : undefined}
           onClick={() => setMoreOpen(true)}
         >
