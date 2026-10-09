@@ -59,3 +59,58 @@ export function formatMinutes(mins: number) {
   const m = mins % 60;
   return [h && `${h}h`, m && `${m}m`].filter(Boolean).join(" ");
 }
+
+export const TIME_PRESETS = [
+  { label: "Morning", time: "09:00", hint: "9:00 AM" },
+  { label: "Midday", time: "11:00", hint: "11:00 AM" },
+  { label: "Afternoon", time: "15:00", hint: "3:00 PM" },
+  { label: "Evening", time: "18:00", hint: "6:00 PM" },
+] as const;
+
+export const WEEKLY_PAIRS = [
+  { label: "Tue & Fri", days: [2, 5] },
+  { label: "Mon & Thu", days: [1, 4] },
+  { label: "Wed & Sat", days: [3, 6] },
+] as const;
+
+export function describeScheduleSummary(
+  scheduleType: "ONCE" | "WEEKLY",
+  daysOfWeek: number[],
+  sendTime: string,
+  runDate?: string
+): string {
+  const [h, m] = (sendTime || "10:00").split(":").map(Number);
+  const timeFormatted = `${(h % 12) || 12}:${String(m || 0).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+
+  if (scheduleType === "ONCE") {
+    if (!runDate) return `Once at ${timeFormatted}`;
+    const [y, mo, d] = runDate.split("-").map(Number);
+    const dateObj = new Date(y, mo - 1, d);
+    const dateFormatted = dateObj.toLocaleDateString("en-IN", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    });
+    return `Once on ${dateFormatted} at ${timeFormatted}`;
+  }
+
+  const sorted = [...new Set(daysOfWeek)].sort();
+  if (sorted.length === 7) return `Daily (every day) at ${timeFormatted}`;
+  if (sorted.length === 5 && sorted.every((d) => d >= 1 && d <= 5)) {
+    return `Every weekday (Mon–Fri) at ${timeFormatted}`;
+  }
+  if (sorted.length === 2 && sorted.includes(0) && sorted.includes(6)) {
+    return `Every weekend (Sat & Sun) at ${timeFormatted}`;
+  }
+  if (sorted.length === 1) {
+    return `Every ${DAYS[sorted[0]]} (once a week) at ${timeFormatted}`;
+  }
+  if (sorted.length === 2) {
+    return `Every ${DAYS[sorted[0]]} & ${DAYS[sorted[1]]} (2× a week) at ${timeFormatted}`;
+  }
+  if (sorted.length > 0) {
+    return `${sorted.length}× a week (${sorted.map((d) => DAYS[d]).join(", ")}) at ${timeFormatted}`;
+  }
+  return `Weekly at ${timeFormatted} (pick at least one day)`;
+}
+

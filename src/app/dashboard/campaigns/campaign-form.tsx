@@ -1,19 +1,31 @@
 "use client";
 
-import { Clock, Gauge, Users, X } from "lucide-react";
+import { Calendar as CalendarIcon, CalendarDays, CalendarRange, Clock, Gauge, Repeat, Users, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { CalendarPicker, getTodayStr } from "@/components/calendar-picker";
 import { MobileActionBar } from "@/components/mobile-action-bar";
 import { MultiPicker } from "@/components/multi-picker";
 import { Picker } from "@/components/picker";
 import { toastResult } from "@/components/toast";
 import { Button, Callout, Card, CardHeader, CheckRow, Field, Segmented } from "@/components/ui";
 import { cn } from "@/lib/cn";
-import { DAYS, effectiveInterval, estimateDuration, formatMinutes, SCHEDULER_TICK_MINUTES } from "@/lib/schedule";
+import { DAYS, describeScheduleSummary, effectiveInterval, estimateDuration, formatMinutes, SCHEDULER_TICK_MINUTES, TIME_PRESETS, WEEKLY_PAIRS } from "@/lib/schedule";
 import { AUDIENCE_PREFIX, decodeTags, describeTags, encodeTags, TAGS_PREFIX, type TagPick } from "@/lib/audience-tags";
 import { countCampaignAudience, saveCampaign, type CampaignInput } from "../actions/campaigns";
 
 type SendTo = "all" | "tags" | "saved";
+type ScheduleMode = "DATE" | "WEEKLY_1" | "WEEKLY_2" | "WEEKDAYS" | "DAILY" | "CUSTOM";
+
+function getInitialScheduleMode(input: CampaignInput): ScheduleMode {
+  if (input.scheduleType === "ONCE") return "DATE";
+  const days = input.daysOfWeek ?? [];
+  if (days.length === 7) return "DAILY";
+  if (days.length === 5 && [1, 2, 3, 4, 5].every((d) => days.includes(d))) return "WEEKDAYS";
+  if (days.length === 2) return "WEEKLY_2";
+  if (days.length === 1) return "WEEKLY_1";
+  return "CUSTOM";
+}
 
 const PRESETS = [
   { label: "Gentle", batch: 50, interval: 15 },
@@ -38,6 +50,44 @@ export function CampaignForm({
   const [pending, start] = useTransition();
   const router = useRouter();
   const set = (patch: Partial<CampaignInput>) => setC((s) => ({ ...s, ...patch }));
+
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>(() => getInitialScheduleMode(initial));
+
+  const todayStr = useMemo(() => getTodayStr(), []);
+
+  function chooseScheduleMode(next: ScheduleMode) {
+    setScheduleMode(next);
+    if (next === "DATE") {
+      set({ scheduleType: "ONCE", runDate: c.runDate || todayStr });
+    } else if (next === "WEEKLY_1") {
+      const day = c.daysOfWeek.length === 1 ? c.daysOfWeek[0] : 1;
+      set({ scheduleType: "WEEKLY", daysOfWeek: [day] });
+    } else if (next === "WEEKLY_2") {
+      const days = c.daysOfWeek.length === 2 ? c.daysOfWeek : [2, 5];
+      set({ scheduleType: "WEEKLY", daysOfWeek: days });
+    } else if (next === "WEEKDAYS") {
+      set({ scheduleType: "WEEKLY", daysOfWeek: [1, 2, 3, 4, 5] });
+    } else if (next === "DAILY") {
+      set({ scheduleType: "WEEKLY", daysOfWeek: [0, 1, 2, 3, 4, 5, 6] });
+    } else if (next === "CUSTOM") {
+      set({ scheduleType: "WEEKLY", daysOfWeek: c.daysOfWeek.length ? c.daysOfWeek : [1, 3, 5] });
+    }
+  }
+
+  const isPastTimeToday = useMemo(() => {
+    if (c.scheduleType !== "ONCE" || c.runDate !== todayStr) return false;
+    try {
+      const nowTime = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Asia/Kolkata",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).format(new Date());
+      return c.sendTime <= nowTime;
+    } catch {
+      return false;
+    }
+  }, [c.scheduleType, c.runDate, c.sendTime, todayStr]);
 
   // "Send to": everyone, one or more tags (any or all of them), or a saved audience.
   const savedOptions = audience.tags.filter((t) => t.tag.startsWith(AUDIENCE_PREFIX));
@@ -237,20 +287,64 @@ export function CampaignForm({
         <Card>
           <CardHeader title="Schedule" description="Times are in India Standard Time." />
           <div className="space-y-5 p-4 sm:p-5">
-            <Segmented
-              label="How often"
-              value={c.scheduleType}
-              onChange={(scheduleType) => set({ scheduleType })}
-              options={[
-                { value: "WEEKLY", label: "Repeat weekly" },
-                { value: "ONCE", label: "Send once" },
-              ]}
-              className="w-full sm:w-auto"
-            />
-            {c.scheduleType === "WEEKLY" ? (
-              <fieldset>
-                <legend className="mb-1.5 flex w-full items-baseline justify-between gap-2 text-sm font-medium text-ink-2">
-                  Days <span className="text-xs font-normal text-muted">{c.daysOfWeek.length} per week</span>
+            {/* Mode selection buttons */}
+            <fieldset>
+              <legend className="mb-2 block text-sm font-medium text-ink-2">Schedule type</legend>
+              <div role="radiogroup" aria-label="Schedule type" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {[
+                  { key: "DATE" as const, title: "Calendar date", hint: "Send once on a date", icon: CalendarIcon },
+                  { key: "WEEKLY_1" as const, title: "Weekly once", hint: "1 day every week", icon: Repeat },
+                  { key: "WEEKLY_2" as const, title: "Weekly twice", hint: "2 days every week", icon: Repeat },
+                  { key: "WEEKDAYS" as const, title: "Weekdays", hint: "Mon–Fri (5×/wk)", icon: CalendarDays },
+                  { key: "DAILY" as const, title: "Every day", hint: "Daily (7 days/wk)", icon: Clock },
+                  { key: "CUSTOM" as const, title: "Custom days", hint: "Pick any days", icon: CalendarRange },
+                ].map((m) => {
+                  const on = scheduleMode === m.key;
+                  const Icon = m.icon;
+                  return (
+                    <button
+                      key={m.key}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      onClick={() => chooseScheduleMode(m.key)}
+                      className={cn(
+                        "flex min-h-12 flex-col justify-center rounded-control border p-2.5 text-left transition active:scale-[0.98] sm:min-h-14 sm:p-3 pointer-coarse:min-h-14",
+                        on
+                          ? "border-brand bg-brand-soft text-brand-deep shadow-sm ring-1 ring-brand/30"
+                          : "border-line-strong/40 bg-panel text-ink hover:border-line-strong hover:bg-sunken/40",
+                      )}
+                    >
+                      <span className="flex items-center gap-1.5 text-xs font-semibold sm:text-sm">
+                        <Icon aria-hidden className="size-3.5 sm:size-4 shrink-0" />
+                        <span className="truncate">{m.title}</span>
+                      </span>
+                      <span className={cn("mt-0.5 truncate text-2xs sm:text-xs", on ? "text-brand-deep/80" : "text-muted")}>
+                        {m.hint}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            {/* If DATE: Show interactive calendar */}
+            {scheduleMode === "DATE" && (
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-ink-2">Pick date from calendar</label>
+                <CalendarPicker
+                  value={c.runDate}
+                  onChange={(runDate) => set({ runDate })}
+                />
+              </div>
+            )}
+
+            {/* If WEEKLY_1: Pick 1 day */}
+            {scheduleMode === "WEEKLY_1" && (
+              <fieldset className="space-y-2">
+                <legend className="flex w-full items-baseline justify-between gap-2 text-sm font-medium text-ink-2">
+                  <span>Day to send each week</span>
+                  <span className="text-xs font-normal text-muted">Pick 1 day</span>
                 </legend>
                 <div className="grid grid-cols-7 gap-1 sm:flex sm:flex-wrap sm:gap-2">
                   {DAYS.map((d, i) => {
@@ -260,10 +354,10 @@ export function CampaignForm({
                         key={d}
                         type="button"
                         aria-pressed={on}
-                        onClick={() => set({ daysOfWeek: on ? c.daysOfWeek.filter((x) => x !== i) : [...c.daysOfWeek, i] })}
+                        onClick={() => set({ daysOfWeek: [i] })}
                         className={cn(
-                          "flex h-11 min-w-0 items-center justify-center rounded-control border px-0.5 text-xs font-medium transition active:scale-95 sm:w-12 sm:flex-none",
-                          on ? "border-brand bg-brand text-white" : "border-line-strong/50 bg-panel text-ink-2 hover:border-line-strong",
+                          "flex h-11 min-w-0 items-center justify-center rounded-control border px-0.5 text-xs font-medium transition active:scale-95 sm:w-12 sm:flex-none pointer-coarse:min-h-11",
+                          on ? "border-brand bg-brand text-white shadow-sm font-semibold" : "border-line-strong/50 bg-panel text-ink-2 hover:border-line-strong",
                         )}
                       >
                         {d}
@@ -271,15 +365,215 @@ export function CampaignForm({
                     );
                   })}
                 </div>
+                <p className="text-xs text-muted">
+                  Sends once every week on <b>{c.daysOfWeek.length ? DAYS[c.daysOfWeek[0]] : "selected day"}</b>.
+                </p>
               </fieldset>
-            ) : (
-              <Field id="date" label="Date" className="max-w-xs">
-                <input type="date" className="field" value={c.runDate} onChange={(e) => set({ runDate: e.target.value })} />
-              </Field>
             )}
-            <Field id="time" label="Start time" className="max-w-xs">
-              <input type="time" className="field" value={c.sendTime} onChange={(e) => set({ sendTime: e.target.value })} />
-            </Field>
+
+            {/* If WEEKLY_2: Pick 2 days */}
+            {scheduleMode === "WEEKLY_2" && (
+              <fieldset className="space-y-3">
+                <legend className="flex w-full items-baseline justify-between gap-2 text-sm font-medium text-ink-2">
+                  <span>Days to send each week</span>
+                  <span className="text-xs font-normal text-muted">{c.daysOfWeek.length} of 2 selected</span>
+                </legend>
+                {/* Quick pair presets */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs text-muted mr-1">Popular pairs:</span>
+                  {WEEKLY_PAIRS.map((p) => {
+                    const activePair = c.daysOfWeek.length === 2 && c.daysOfWeek.includes(p.days[0]) && c.daysOfWeek.includes(p.days[1]);
+                    return (
+                      <button
+                        key={p.label}
+                        type="button"
+                        onClick={() => set({ daysOfWeek: [...p.days] })}
+                        className={cn(
+                          "min-h-8 rounded-full border px-2.5 py-1 text-xs font-medium transition active:scale-95 pointer-coarse:min-h-10 pointer-coarse:px-3",
+                          activePair
+                            ? "border-brand bg-brand text-white shadow-sm"
+                            : "border-line bg-sunken/60 text-ink-2 hover:border-line-strong",
+                        )}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* 7 day buttons */}
+                <div className="grid grid-cols-7 gap-1 sm:flex sm:flex-wrap sm:gap-2">
+                  {DAYS.map((d, i) => {
+                    const on = c.daysOfWeek.includes(i);
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => {
+                          if (on) {
+                            set({ daysOfWeek: c.daysOfWeek.filter((x) => x !== i) });
+                          } else if (c.daysOfWeek.length < 2) {
+                            set({ daysOfWeek: [...c.daysOfWeek, i].sort() });
+                          } else {
+                            // Replace first day with new day
+                            set({ daysOfWeek: [c.daysOfWeek[1], i].sort() });
+                          }
+                        }}
+                        className={cn(
+                          "flex h-11 min-w-0 items-center justify-center rounded-control border px-0.5 text-xs font-medium transition active:scale-95 sm:w-12 sm:flex-none pointer-coarse:min-h-11",
+                          on ? "border-brand bg-brand text-white shadow-sm font-semibold" : "border-line-strong/50 bg-panel text-ink-2 hover:border-line-strong",
+                        )}
+                      >
+                        {d}
+                      </button>
+                    );
+                  })}
+                </div>
+                {c.daysOfWeek.length < 2 ? (
+                  <p className="text-xs text-warning">Pick 1 more day to make 2 days per week.</p>
+                ) : (
+                  <p className="text-xs text-muted">
+                    Sends twice a week on <b>{DAYS[c.daysOfWeek[0]]}</b> and <b>{DAYS[c.daysOfWeek[1]]}</b>.
+                  </p>
+                )}
+              </fieldset>
+            )}
+
+            {/* If WEEKDAYS: Mon-Fri */}
+            {scheduleMode === "WEEKDAYS" && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm font-medium text-ink-2">
+                  <span>Every weekday</span>
+                  <span className="text-xs font-normal text-muted">5 days per week</span>
+                </div>
+                <div className="grid grid-cols-7 gap-1 sm:flex sm:flex-wrap sm:gap-2">
+                  {DAYS.map((d, i) => {
+                    const on = i >= 1 && i <= 5;
+                    return (
+                      <div
+                        key={d}
+                        className={cn(
+                          "flex h-11 min-w-0 items-center justify-center rounded-control border px-0.5 text-xs font-medium sm:w-12 sm:flex-none",
+                          on ? "border-brand bg-brand text-white shadow-sm font-semibold" : "border-line bg-sunken text-muted/50 opacity-60",
+                        )}
+                      >
+                        {d}
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted">Sends Monday through Friday (skips weekends).</p>
+              </div>
+            )}
+
+            {/* If DAILY: All 7 days */}
+            {scheduleMode === "DAILY" && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm font-medium text-ink-2">
+                  <span>Every day</span>
+                  <span className="text-xs font-normal text-muted">7 days per week</span>
+                </div>
+                <div className="grid grid-cols-7 gap-1 sm:flex sm:flex-wrap sm:gap-2">
+                  {DAYS.map((d) => (
+                    <div
+                      key={d}
+                      className="flex h-11 min-w-0 items-center justify-center rounded-control border border-brand bg-brand text-white shadow-sm px-0.5 text-xs font-semibold sm:w-12 sm:flex-none"
+                    >
+                      {d}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted">Sends every day, Sunday through Saturday.</p>
+              </div>
+            )}
+
+            {/* If CUSTOM: Toggle any days */}
+            {scheduleMode === "CUSTOM" && (
+              <fieldset className="space-y-2">
+                <legend className="flex w-full items-baseline justify-between gap-2 text-sm font-medium text-ink-2">
+                  <span>Custom days</span>
+                  <span className="text-xs font-normal text-muted">{c.daysOfWeek.length} per week</span>
+                </legend>
+                <div className="grid grid-cols-7 gap-1 sm:flex sm:flex-wrap sm:gap-2">
+                  {DAYS.map((d, i) => {
+                    const on = c.daysOfWeek.includes(i);
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => set({ daysOfWeek: on ? c.daysOfWeek.filter((x) => x !== i) : [...c.daysOfWeek, i].sort() })}
+                        className={cn(
+                          "flex h-11 min-w-0 items-center justify-center rounded-control border px-0.5 text-xs font-medium transition active:scale-95 sm:w-12 sm:flex-none pointer-coarse:min-h-11",
+                          on ? "border-brand bg-brand text-white shadow-sm font-semibold" : "border-line-strong/50 bg-panel text-ink-2 hover:border-line-strong",
+                        )}
+                      >
+                        {d}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted">
+                  {c.daysOfWeek.length === 0
+                    ? "Pick at least one day."
+                    : `Sends on ${c.daysOfWeek.map((d) => DAYS[d]).join(", ")} (${c.daysOfWeek.length}× per week).`}
+                </p>
+              </fieldset>
+            )}
+
+            {/* Start Time section */}
+            <div className="space-y-2.5 border-t border-line/60 pt-4">
+              <div className="flex items-center justify-between">
+                <label htmlFor="time" className="text-sm font-medium text-ink-2">Start time (IST)</label>
+                <span className="text-xs text-muted">India Standard Time</span>
+              </div>
+              {/* Quick time chips */}
+              <div className="flex flex-wrap gap-1.5">
+                {TIME_PRESETS.map((tp) => {
+                  const on = c.sendTime === tp.time;
+                  return (
+                    <button
+                      key={tp.time}
+                      type="button"
+                      onClick={() => set({ sendTime: tp.time })}
+                      className={cn(
+                        "min-h-8 rounded-full border px-2.5 py-1 text-xs font-medium transition active:scale-95 pointer-coarse:min-h-10 pointer-coarse:px-3",
+                        on
+                          ? "border-brand bg-brand text-white shadow-sm"
+                          : "border-line bg-sunken/60 text-ink-2 hover:border-line-strong",
+                      )}
+                    >
+                      {tp.label} ({tp.hint})
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="max-w-xs">
+                <input
+                  id="time"
+                  type="time"
+                  className="field tabular"
+                  value={c.sendTime}
+                  onChange={(e) => set({ sendTime: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {/* Schedule Live Preview Banner */}
+            <div className="flex items-center gap-2.5 rounded-control bg-brand-soft/70 px-3.5 py-2.5 text-xs text-brand-deep border border-brand/20">
+              <Clock aria-hidden className="size-4 shrink-0 text-brand" />
+              <div className="min-w-0">
+                <span className="font-semibold">Schedule summary: </span>
+                <span>{describeScheduleSummary(c.scheduleType, c.daysOfWeek, c.sendTime, c.runDate)}</span>
+              </div>
+            </div>
+
+            {/* Validation warning if past date/time chosen */}
+            {isPastTimeToday && (
+              <Callout tone="warning">
+                The time {c.sendTime} has already passed for today. Please choose a later time or select tomorrow.
+              </Callout>
+            )}
           </div>
         </Card>
 
@@ -366,6 +660,10 @@ export function CampaignForm({
               {perWeek}× a week ≈ <b className="text-ink">{(size * perWeek).toLocaleString("en-IN")}</b> messages weekly.
             </p>
           )}
+          <div className="border-t border-line px-5 py-3 text-xs text-muted">
+            <p className="font-semibold text-ink">Schedule</p>
+            <p className="mt-0.5">{describeScheduleSummary(c.scheduleType, c.daysOfWeek, c.sendTime, c.runDate)}</p>
+          </div>
         </Card>
 
         <Card className="px-4 py-1">

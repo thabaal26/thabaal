@@ -102,17 +102,32 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
                   {c.active ? <Badge tone="green" dot>Active</Badge> : <Badge dot>Paused</Badge>}
                 </div>
 
-                <div className="mt-4">
-                  {c.scheduleType === "WEEKLY" ? (
+                <div className="mt-4 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    {c.scheduleType === "WEEKLY" ? (
+                      <Badge tone="brand">
+                        {c.daysOfWeek.length === 7
+                          ? "Daily · 7 days"
+                          : c.daysOfWeek.length === 5 && c.daysOfWeek.every((d) => d >= 1 && d <= 5)
+                            ? "Weekdays · Mon–Fri"
+                            : c.daysOfWeek.length === 1
+                              ? `Weekly once · ${DAYS[c.daysOfWeek[0]]}`
+                              : c.daysOfWeek.length === 2
+                                ? `Weekly twice · ${DAYS[c.daysOfWeek[0]]} & ${DAYS[c.daysOfWeek[1]]}`
+                                : `${c.daysOfWeek.length}× a week`}
+                      </Badge>
+                    ) : (
+                      <Badge tone="blue">Calendar · {fmtDate(c.runAt, "EEE d MMM yyyy")}</Badge>
+                    )}
+                  </div>
+                  {c.scheduleType === "WEEKLY" && (
                     <ul aria-label={`Sends every ${c.daysOfWeek.map((d) => DAYS[d]).join(", ")}`} className="grid max-w-80 grid-cols-7 gap-1">
                       {DAYS.map((d, i) => (
-                        <li key={d} aria-hidden className={cn("grid h-7 place-items-center rounded-md text-2xs font-medium", c.daysOfWeek.includes(i) ? "bg-brand text-white" : "bg-sunken text-muted")}>
+                        <li key={d} aria-hidden className={cn("grid h-7 place-items-center rounded-md text-2xs font-medium", c.daysOfWeek.includes(i) ? "bg-brand text-white font-semibold" : "bg-sunken text-muted")}>
                           {d}
                         </li>
                       ))}
                     </ul>
-                  ) : (
-                    <Badge tone="blue">Once · {fmtDate(c.runAt, "d MMM yyyy")}</Badge>
                   )}
                 </div>
 

@@ -13,7 +13,7 @@ import { db } from "@/lib/db";
 import { money } from "@/lib/orders";
 import { APP_TZ, fmtDate, fmtNumber, pct } from "@/lib/format";
 import { formatInTimeZone } from "date-fns-tz";
-import { DAYS, effectiveInterval, TEST_TAG } from "@/lib/schedule";
+import { describeScheduleSummary, effectiveInterval, TEST_TAG } from "@/lib/schedule";
 import { getScope, owned } from "@/lib/session";
 import { cancelRun, deleteCampaign, runCampaignNow, sendCampaignTest, toggleCampaign } from "../../actions/campaigns";
 import { CampaignForm } from "../campaign-form";
@@ -134,7 +134,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
             <div>
               <dt className="text-xs text-muted">Schedule</dt>
               <dd className="mt-1">
-                {c.scheduleType === "WEEKLY" ? `Every ${c.daysOfWeek.map((d) => DAYS[d]).join(", ")}` : `Once on ${fmtDate(c.runAt, "d MMM yyyy")}`} at {c.sendTime}
+                {describeScheduleSummary(c.scheduleType, c.daysOfWeek, c.sendTime, c.runAt ? formatInTimeZone(c.runAt, APP_TZ, "yyyy-MM-dd") : undefined)}
               </dd>
             </div>
             <div>
