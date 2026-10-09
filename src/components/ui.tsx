@@ -30,6 +30,7 @@ export function PageHeader({
   actions,
   back,
   tabs,
+  inlineActions,
 }: {
   title: string;
   description?: ReactNode;
@@ -37,21 +38,26 @@ export function PageHeader({
   actions?: ReactNode;
   back?: { href: string; label: string };
   tabs?: ReactNode;
+  /** Phones: keep one or two compact actions beside the title instead of a row of full-width buttons. */
+  inlineActions?: boolean;
 }) {
   return (
     <header className="mb-4 sm:mb-6">
       {back && <BackLink href={back.href}>{back.label}</BackLink>}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+      <div className={cn("flex gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6", inlineActions ? "items-start" : "flex-col")}>
         <div className="min-w-0 flex-1">
           <PageInfo title={title} description={description} />
           {meta && <div className="mt-1 text-sm text-muted">{meta}</div>}
         </div>
-        {/* Phones: buttons share the row and wrap two-up instead of squeezing four into one line. */}
-        {actions && (
-          <div className="flex flex-wrap gap-2 *:min-w-[calc(50%-0.25rem)] *:flex-1 sm:shrink-0 sm:justify-end sm:*:min-w-0 sm:*:flex-none print:hidden">
-            {actions}
-          </div>
-        )}
+        {actions &&
+          (inlineActions ? (
+            <div className="flex shrink-0 gap-2 sm:justify-end print:hidden">{actions}</div>
+          ) : (
+            // Phones: buttons share the row and wrap two-up instead of squeezing four into one line.
+            <div className="flex flex-wrap gap-2 *:min-w-[calc(50%-0.25rem)] *:flex-1 sm:shrink-0 sm:justify-end sm:*:min-w-0 sm:*:flex-none print:hidden">
+              {actions}
+            </div>
+          ))}
       </div>
       {tabs && <div className="mt-4">{tabs}</div>}
     </header>
