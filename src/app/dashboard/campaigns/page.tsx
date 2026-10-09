@@ -80,22 +80,22 @@ export default async function CampaignsPage() {
                   )}
                 </div>
 
-                <dl className="tabular mt-4 grid grid-cols-3 gap-3 border-t border-line pt-3 text-xs">
+                <dl className="tabular mt-4 flex justify-between gap-3 border-t border-line pt-3 text-xs sm:grid sm:grid-cols-3">
                   <div>
                     <dt className="text-muted">Time</dt>
-                    <dd className="mt-0.5 text-sm font-medium text-ink">{c.sendTime}</dd>
+                    <dd className="mt-0.5 whitespace-nowrap text-sm font-medium text-ink">{c.sendTime}</dd>
                   </div>
                   <div>
                     <dt className="text-muted">Pace</dt>
-                    <dd className="mt-0.5 text-sm font-medium text-ink">{c.batchSize} / {effectiveInterval(c.intervalMinutes)} min</dd>
+                    <dd className="mt-0.5 whitespace-nowrap text-sm font-medium text-ink">{c.batchSize} / {effectiveInterval(c.intervalMinutes)} min</dd>
                   </div>
                   <div>
                     <dt className="text-muted">Takes</dt>
-                    <dd className="mt-0.5 text-sm font-medium text-ink">~{formatMinutes(estimateDuration(audienceOf(c.clientId), c.batchSize, c.intervalMinutes))}</dd>
+                    <dd className="mt-0.5 whitespace-nowrap text-sm font-medium text-ink">~{formatMinutes(estimateDuration(audienceOf(c.clientId), c.batchSize, c.intervalMinutes))}</dd>
                   </div>
                 </dl>
 
-                <div className="mt-auto flex items-center justify-between gap-3 pt-4 text-xs">
+                <div className="mt-auto flex flex-col gap-3 pt-4 text-xs min-[400px]:flex-row min-[400px]:items-center min-[400px]:justify-between">
                   <span className="min-w-0 text-muted">
                     {c.template.status !== "APPROVED" ? (
                       <span className="text-warning">Template waiting for approval</span>
@@ -113,7 +113,7 @@ export default async function CampaignsPage() {
                       "Not scheduled"
                     )}
                   </span>
-                  <div className="flex shrink-0 items-center gap-2">
+                  <div className="flex shrink-0 items-center justify-end gap-2">
                     {last && ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"].includes(last.status) && <StatusBadge status={last.status} />}
                     {scope.canManage && (
                       <ActionButton className="relative z-10" action={toggleCampaign.bind(null, c.id, !c.active)} aria-label={`${c.active ? "Pause" : "Resume"} ${c.name}`}>
