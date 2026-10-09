@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Camera,
   Check,
   CheckCircle2,
   Copy,
@@ -8,21 +9,24 @@ import {
   ExternalLink,
   Eye,
   Filter,
+  Image as ImageIcon,
+  Loader2,
   MessageSquare,
   Package,
   RefreshCw,
   Search,
   Sparkles,
+  Upload,
   X,
   XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { toast, toastResult } from "@/components/toast";
-import { Badge, Button, Card, CardHeader, Field } from "@/components/ui";
+import { Badge, Button, Card, Field } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import type { CatalogProductDetail } from "@/lib/catalog";
-import { updateProduct } from "../actions/catalog";
+import { updateProduct, uploadProductImage } from "../actions/catalog";
 
 export function CatalogueManager({
   products: initialProducts,
@@ -45,7 +49,10 @@ export function CatalogueManager({
   const [editing, setEditing] = useState<CatalogProductDetail | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [editImageUrl, setEditImageUrl] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [pending, startTransition] = useTransition();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Categories list
   const categories = useMemo(() => {
@@ -110,7 +117,6 @@ export function CatalogueManager({
   // Quick 1-click stock toggle
   const handleToggleStock = (product: CatalogProductDetail) => {
     const nextStock = !product.inStock;
-    // Optimistic update
     setProducts((prev) =>
       prev.map((p) => (p.id === product.id ? { ...p, inStock: nextStock } : p))
     );
@@ -126,6 +132,32 @@ export function CatalogueManager({
     });
   };
 
+  // Open edit modal
+  const handleOpenEdit = (item: CatalogProductDetail) => {
+    setEditing(item);
+    setEditImageUrl(item.imageUrl ?? null);
+  };
+
+  // Handle image file upload
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await uploadProductImage(formData);
+    setUploadingImage(false);
+
+    if (res.ok && res.url) {
+      setEditImageUrl(res.url);
+      toast(true, "Image uploaded successfully");
+    } else {
+      toast(false, res.message ?? "Failed to upload image");
+    }
+  };
+
   // Save edit modal
   const handleSaveEdit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -135,8 +167,8 @@ export function CatalogueManager({
     const inStock = form.inStock.value === "true";
     const name = form.productName.value.trim();
     const description = form.description.value.trim();
+    const imageUrl = editImageUrl?.trim() || null;
 
-    // Optimistic update
     setProducts((prev) =>
       prev.map((p) =>
         p.id === editing.id
@@ -147,6 +179,7 @@ export function CatalogueManager({
               inStock,
               name: name || p.name,
               description,
+              imageUrl,
             }
           : p
       )
@@ -163,6 +196,7 @@ export function CatalogueManager({
         inStock,
         name,
         description,
+        imageUrl,
       });
       toastResult(res);
       router.refresh();
@@ -209,7 +243,7 @@ export function CatalogueManager({
               href={commerceManagerUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex min-h-9 items-center gap-1.5 rounded-control border border-line bg-surface px-3 text-xs font-medium text-ink shadow-subtle hover:bg-hover hover:text-ink active:bg-sunken"
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-control border border-line bg-panel px-3 text-xs font-medium text-ink shadow-subtle hover:bg-hover hover:text-ink active:bg-sunken"
             >
               <ExternalLink className="size-3.5 text-muted" />
               Meta Commerce Manager
@@ -232,7 +266,7 @@ export function CatalogueManager({
               "rounded-full px-3 py-1 text-xs font-medium transition",
               category === c
                 ? "bg-ink text-white"
-                : "bg-surface text-ink-2 ring-1 ring-line hover:bg-hover"
+                : "bg-panel text-ink-2 ring-1 ring-line hover:bg-hover"
             )}
           >
             {c === "ALL" ? "All Items" : c}
@@ -254,7 +288,7 @@ export function CatalogueManager({
             className={cn(
               "rounded-control px-2.5 py-1 text-xs font-medium ring-1 transition",
               stockFilter === "ALL"
-                ? "bg-surface text-ink-2 ring-line"
+                ? "bg-panel text-ink-2 ring-line"
                 : stockFilter === "IN_STOCK"
                 ? "bg-emerald-50 text-emerald-800 ring-emerald-200"
                 : "bg-amber-50 text-amber-800 ring-amber-200"
@@ -329,7 +363,7 @@ export function CatalogueManager({
             <div
               key={item.id}
               className={cn(
-                "group relative flex flex-col justify-between overflow-hidden rounded-card border bg-surface p-4 transition-all shadow-subtle hover:shadow-card",
+                "group relative flex flex-col justify-between overflow-hidden rounded-card border bg-panel p-4 transition-all shadow-subtle hover:shadow-card",
                 !item.inStock ? "border-amber-200/70 bg-amber-50/20" : "border-line"
               )}
             >
@@ -409,7 +443,7 @@ export function CatalogueManager({
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => setEditing(item)}
+                    onClick={() => handleOpenEdit(item)}
                     className="shrink-0"
                     title="Edit price & details"
                   >
@@ -427,28 +461,115 @@ export function CatalogueManager({
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-fade overflow-y-auto"
         >
-          <div className="w-full max-w-md rounded-2xl bg-surface p-5 sm:p-6 shadow-2xl ring-1 ring-line animate-pop">
+          {/* Solid opaque white card - no transparency */}
+          <div className="relative w-full max-w-lg rounded-2xl bg-white p-5 sm:p-6 shadow-2xl ring-1 ring-black/10 border border-line animate-pop dark:bg-stone-900 dark:ring-white/10 my-auto">
             <div className="flex items-center justify-between border-b border-line pb-3">
               <div>
                 <h3 className="text-base font-semibold text-ink">
                   Edit Menu Item
                 </h3>
                 <p className="text-xs text-muted">
-                  SKU: <span className="font-mono">{editing.retailerId}</span>
+                  SKU: <span className="font-mono font-medium">{editing.retailerId}</span>
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setEditing(null)}
-                className="rounded-full p-1 text-muted hover:bg-hover hover:text-ink"
+                className="rounded-full p-1 text-muted hover:bg-sunken hover:text-ink transition"
               >
                 <X className="size-5" />
               </button>
             </div>
 
             <form onSubmit={handleSaveEdit} className="mt-4 space-y-4">
+              {/* Product Photo Upload Section */}
+              <div className="rounded-xl border border-line bg-canvas p-3.5 sm:p-4">
+                <label className="block text-xs font-medium text-ink mb-2">
+                  Product Photo
+                </label>
+                <div className="flex items-center gap-4">
+                  {/* Image Preview */}
+                  <div className="relative size-20 shrink-0 overflow-hidden rounded-xl border border-line bg-panel shadow-sm">
+                    {editImageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={editImageUrl}
+                        alt="Product preview"
+                        className="size-full object-cover object-center"
+                      />
+                    ) : (
+                      <div className="grid size-full place-items-center text-muted">
+                        <ImageIcon className="size-8 opacity-40" />
+                      </div>
+                    )}
+                    {uploadingImage && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white">
+                        <Loader2 className="size-5 animate-spin" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Upload Controls */}
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/jpg"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={uploadingImage}
+                        onClick={() => fileInputRef.current?.click()}
+                        className="text-xs"
+                      >
+                        {uploadingImage ? (
+                          <>
+                            <Loader2 className="size-3.5 animate-spin" /> Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="size-3.5" /> Upload Image
+                          </>
+                        )}
+                      </Button>
+
+                      {editImageUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setEditImageUrl(null)}
+                          className="text-xs text-danger hover:underline"
+                        >
+                          Remove photo
+                        </button>
+                      )}
+                    </div>
+
+                    <p className="text-3xs text-muted">
+                      JPG, PNG or WebP under 5MB. Shows in WhatsApp catalog.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Optional Image URL Input */}
+                <div className="mt-3 pt-3 border-t border-line/60">
+                  <input
+                    type="url"
+                    placeholder="Or paste external image URL (https://...)"
+                    value={editImageUrl ?? ""}
+                    onChange={(e) => setEditImageUrl(e.target.value)}
+                    className="field text-xs h-8"
+                  />
+                </div>
+              </div>
+
               <Field id="productName" label="Product Name">
                 <input
                   name="productName"
@@ -480,7 +601,7 @@ export function CatalogueManager({
                   <select
                     name="inStock"
                     defaultValue={editing.inStock ? "true" : "false"}
-                    className="field text-sm"
+                    className="field text-sm font-medium"
                   >
                     <option value="true">In Stock</option>
                     <option value="false">Out of Stock</option>
@@ -501,11 +622,11 @@ export function CatalogueManager({
               <div className="rounded-lg bg-sunken p-3 text-xs text-muted flex items-start gap-2">
                 <Sparkles className="size-4 text-amber-500 shrink-0 mt-0.5" />
                 <p>
-                  Updates sync directly to your Meta WhatsApp Business Catalog. Customers tapping &quot;View catalog&quot; will see the updated price and availability immediately.
+                  Updates sync directly to your Meta WhatsApp Business Catalog. Customers tapping &quot;View catalog&quot; will see the updated photo, price, and availability immediately.
                 </p>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
                 <Button
                   type="button"
                   variant="secondary"
@@ -513,7 +634,7 @@ export function CatalogueManager({
                 >
                   Cancel
                 </Button>
-                <Button type="submit" loading={pending}>
+                <Button type="submit" loading={pending || uploadingImage}>
                   Save & Update WhatsApp
                 </Button>
               </div>

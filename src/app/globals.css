@@ -21,6 +21,7 @@
   --color-line-strong: #8a958f; /* borders that outline a control: fields, checkboxes */
   --color-canvas: #f5f6f3;
   --color-panel: #ffffff;
+  --color-surface: #ffffff;
   --color-sunken: #eef0ec; /* inset areas inside a card: item lists, read-only values */
 
   /* Brand (re-themed per client) */

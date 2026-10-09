@@ -304,6 +304,7 @@ export async function updateCatalogProductItem(
     inStock?: boolean;
     name?: string;
     description?: string;
+    imageUrl?: string | null;
   }
 ): Promise<{ ok: boolean; message: string; metaUpdated: boolean }> {
   const { cfg } = await senderFor(clientId);
@@ -314,6 +315,7 @@ export async function updateCatalogProductItem(
     ...(params.inStock !== undefined && { inStock: params.inStock }),
     ...(params.name && { name: params.name }),
     ...(params.description !== undefined && { description: params.description }),
+    ...(params.imageUrl !== undefined && { imageUrl: params.imageUrl }),
   });
 
   if (cfg.live) {

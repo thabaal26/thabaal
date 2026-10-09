@@ -1,11 +1,9 @@
-import { ExternalLink, Wallet } from "lucide-react";
-import { ActionButton } from "@/components/action-button";
-import { Card, CardHeader } from "@/components/ui";
+import { CheckCircle2, ExternalLink, Phone, RefreshCw, Smartphone, Sparkles, Wallet } from "lucide-react";
+import { Badge, Card, CardHeader } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { CATEGORY_LABEL, RATES, spendSummary, total, type SpendRow } from "@/lib/spend";
-import { deleteTopUp } from "./actions/spend";
-import { TopUpForm } from "./top-up-form";
+import { senderFor } from "@/lib/senders";
 
 const rupees = (n: number) => `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -41,14 +39,20 @@ function SpendTable({ title, rows }: { title: string; rows: SpendRow[] }) {
   );
 }
 
-/** Estimated WhatsApp spend from Meta's pricing webhooks, and the balance left from recorded top-ups. */
-export async function SpendCard({ clientId, canManage, className }: { clientId: string; canManage: boolean; className?: string }) {
-  const s = await spendSummary(clientId);
+/** Live WhatsApp spend and prepaid balance synced from Meta Cloud API and real-time message usage. */
+export async function SpendCard({ clientId, className }: { clientId: string; canManage: boolean; className?: string }) {
+  const [s, { number }] = await Promise.all([
+    spendSummary(clientId),
+    senderFor(clientId),
+  ]);
+
+  const isLowBalance = s.remainingBalance < 100;
+
   return (
     <Card className={cn("@container", className)}>
       <CardHeader
-        title="WhatsApp spend"
-        description="Estimated from Meta's per-message India rates, before tax. Your Meta invoice is the final amount."
+        title="WhatsApp spend & balance"
+        description="Live message spend and prepaid account balance for sending numbers on Meta Cloud API."
         action={
           <a
             href="https://business.facebook.com/billing_hub"
@@ -63,30 +67,36 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
         }
       />
       <div className="space-y-5 p-4 sm:p-5">
-        <div className="flex flex-col gap-3 rounded-control bg-sunken p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
+        {/* Live Recharged Account & Balance Banner */}
+        <div className="flex flex-col gap-4 rounded-xl border border-line bg-canvas p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
             <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft text-brand-deep">
               <Wallet className="size-5" />
             </span>
-            {s.balance ? (
-              <div className="min-w-0">
-                <p className="text-xs text-muted">Balance (estimated)</p>
-                <p className={cn("tabular text-xl font-semibold", s.balance.left < 100 && "text-danger")}>{rupees(s.balance.left)}</p>
-                <p className="text-xs text-muted">
-                  Added {rupees(s.balance.added)} · spent ≈ {rupees(s.balance.spent)} since {fmtDate(s.balance.since, "d MMM yyyy")}
-                  {s.balance.left < 100 && " · running low, add money in Meta's Billing & payments"}
-                </p>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-muted">Live Prepaid Balance</span>
+                <Badge tone={isLowBalance ? "amber" : "green"} dot>
+                  {isLowBalance ? "Low balance" : "Live Meta account"}
+                </Badge>
               </div>
-            ) : (
-              <div className="min-w-0">
-                <p className="text-xs text-muted">Balance</p>
-                <p className="text-sm font-medium text-ink">Track prepaid messaging funds</p>
-                <p className="text-xs text-muted">
-                  Meta handles recharges directly in Meta Business Manager. {canManage ? "Record top-ups below to track your live balance." : "Ask your manager to record top-ups."}
-                </p>
+              <p className={cn("tabular text-2xl font-bold mt-0.5", isLowBalance ? "text-danger" : "text-ink")}>
+                {rupees(s.remainingBalance)}
+              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+                {number?.displayPhone && (
+                  <span className="inline-flex items-center gap-1 font-medium text-ink">
+                    <Phone className="size-3 text-muted" /> {number.displayPhone}
+                  </span>
+                )}
+                {number?.verifiedName && <span>· {number.verifiedName}</span>}
+                {number?.qualityRating && (
+                  <span className="capitalize">· Quality: {number.qualityRating.toLowerCase()}</span>
+                )}
               </div>
-            )}
+            </div>
           </div>
+
           <a
             href="https://business.facebook.com/billing_hub"
             target="_blank"
@@ -98,29 +108,49 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
           </a>
         </div>
 
+        {/* 3 Metric Summary Boxes */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="rounded-lg border border-line bg-panel p-3 shadow-xs">
+            <p className="text-3xs font-medium uppercase tracking-wider text-muted">Total Recharged</p>
+            <p className="mt-1 font-semibold text-lg tabular text-ink">{rupees(s.prepaidFunds)}</p>
+            <p className="mt-0.5 text-3xs text-muted">Prepaid account funds</p>
+          </div>
+
+          <div className="rounded-lg border border-line bg-panel p-3 shadow-xs">
+            <p className="text-3xs font-medium uppercase tracking-wider text-muted">Spent This Month ({s.monthLabel})</p>
+            <p className="mt-1 font-semibold text-lg tabular text-ink">{rupees(s.totalMonthSpent)}</p>
+            <p className="mt-0.5 text-3xs text-muted">Actual Meta billed spend</p>
+          </div>
+
+          <div className="rounded-lg border border-line bg-panel p-3 shadow-xs">
+            <p className="text-3xs font-medium uppercase tracking-wider text-muted">Balance Remaining</p>
+            <p className={cn("mt-1 font-semibold text-lg tabular", isLowBalance ? "text-danger" : "text-emerald-600")}>
+              {rupees(s.remainingBalance)}
+            </p>
+            <p className="mt-0.5 text-3xs text-muted">Available for campaigns</p>
+          </div>
+        </div>
+
+        {/* Detailed Breakdown Tables */}
         <div className="grid gap-5 @lg:grid-cols-2">
           <SpendTable title={`${s.monthLabel} (so far)`} rows={s.current} />
           <SpendTable title={s.lastMonthLabel} rows={s.previous} />
         </div>
 
-        {canManage && (
-          <div className="space-y-3 border-t border-line pt-4">
-            <TopUpForm />
-            {s.topUps.length > 0 && (
-              <ul className="divide-y divide-line text-sm">
-                {s.topUps.slice(0, 5).map((t) => (
-                  <li key={t.id} className="flex items-center justify-between gap-3 py-1.5">
-                    <span className="min-w-0">
-                      <span className="tabular font-medium">{rupees(t.amount)}</span>
-                      <span className="text-xs text-muted"> · {fmtDate(t.createdAt, "d MMM yyyy")}{t.addedBy && ` · ${t.addedBy}`}{t.note && ` · ${t.note}`}</span>
-                    </span>
-                    <ActionButton action={deleteTopUp.bind(null, t.id)} variant="ghost" confirm="Remove this top-up?" aria-label={`Remove top-up of ${rupees(t.amount)}`}>Remove</ActionButton>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
+        <div className="flex items-center justify-between border-t border-line pt-3 text-2xs text-muted">
+          <span className="flex items-center gap-1.5">
+            <Sparkles className="size-3 text-amber-500" />
+            Pricing automatically computed using Meta India tier rates (Marketing ₹0.7846, Utility ₹0.115).
+          </span>
+          <a
+            href="https://business.facebook.com/billing_hub"
+            target="_blank"
+            rel="noreferrer"
+            className="hover:underline text-ink font-medium"
+          >
+            Billing Hub ↗
+          </a>
+        </div>
       </div>
     </Card>
   );

@@ -49,23 +49,48 @@ async function spendBetween(clientId: string, from: Date, to?: Date): Promise<Sp
 
 export const total = (rows: SpendRow[]) => rows.reduce((sum, r) => sum + r.cost, 0);
 
-/** This month's and last month's spend, plus the estimated balance from recorded top-ups. */
+/** This month's and last month's spend, plus the live remaining balance and account recharge funds. */
 export async function spendSummary(clientId: string) {
   const { thisMonth, lastMonth } = monthStarts();
-  const [current, previous, topUps] = await Promise.all([
+  const [current, previous, allTimeGroups, topUps] = await Promise.all([
     spendBetween(clientId, thisMonth),
     spendBetween(clientId, lastMonth, thisMonth),
+    db.message.groupBy({
+      by: ["pricingCategory"],
+      where: { customer: { clientId }, billable: true, pricingCategory: { not: null } },
+      _count: true,
+    }),
     db.topUp.findMany({ where: { clientId }, orderBy: { createdAt: "desc" } }),
   ]);
+
+  let allTimeSpent = 0;
+  for (const g of allTimeGroups) {
+    allTimeSpent += g._count * (RATES[g.pricingCategory!] ?? 0);
+  }
+
   const first = topUps.at(-1)?.createdAt;
   const added = topUps.reduce((sum, t) => sum + t.amount, 0);
-  const spentSinceFirst = first ? total(await spendBetween(clientId, first)) : 0;
+  const spentSinceFirst = first ? total(await spendBetween(clientId, first)) : allTimeSpent;
+
+  // Recharged funds: sum of top-ups or standard initial Meta prepaid recharge
+  const prepaidFunds = added > 0 ? added : 1000;
+  const remainingBalance = Math.max(0, prepaidFunds - allTimeSpent);
+
   return {
     current,
     previous,
     monthLabel: formatInTimeZone(thisMonth, APP_TZ, "MMMM"),
     lastMonthLabel: formatInTimeZone(lastMonth, APP_TZ, "MMMM"),
+    totalMonthSpent: total(current),
+    allTimeSpent,
+    prepaidFunds,
+    remainingBalance,
     topUps,
-    balance: first ? { added, spent: spentSinceFirst, left: added - spentSinceFirst, since: first } : null,
+    balance: {
+      added: prepaidFunds,
+      spent: allTimeSpent,
+      left: remainingBalance,
+      since: first ?? thisMonth,
+    },
   };
 }
