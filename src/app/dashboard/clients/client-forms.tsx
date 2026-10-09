@@ -1,12 +1,13 @@
 "use client";
 
-import { KeyRound, Loader2, Plus } from "lucide-react";
+import { KeyRound, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Picker } from "@/components/picker";
+import { confirmAction, promptText } from "@/components/confirm";
 import { Sheet } from "@/components/sheet";
 import { toastResult } from "@/components/toast";
-import { Button, Label } from "@/components/ui";
+import { Button, CheckRow, Field, Label } from "@/components/ui";
 import { HEX, themeStyle } from "@/lib/theme";
 import { cn } from "@/lib/cn";
 import {
@@ -30,6 +31,9 @@ import {
 
 type Result = { ok: boolean; message?: string; errors?: string[] };
 
+/** The colour pickers start here when no brand colour is set: the portal's default brand green. */
+const DEFAULT_BRAND = "#0d844a";
+
 /** Runs an action with a spinner, shows the result and refreshes the page on success. */
 function useSubmit() {
   const [pending, start] = useTransition();
@@ -46,8 +50,6 @@ function useSubmit() {
   return { pending, submit };
 }
 
-const spin = <Loader2 className="size-4 animate-spin" />;
-
 export function NewClientForm() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -55,7 +57,7 @@ export function NewClientForm() {
   return (
     <>
       <Button onClick={() => setOpen(true)}>
-        <Plus className="size-4" /> New client
+        <Plus aria-hidden className="size-4" /> New client
       </Button>
       <Sheet open={open} onClose={() => setOpen(false)} title="New client">
         <form
@@ -65,12 +67,10 @@ export function NewClientForm() {
             submit(() => createClient(name), () => { setName(""); setOpen(false); });
           }}
         >
-          <div>
-            <Label htmlFor="client-name">Business name</Label>
-            <input id="client-name" className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Thenan Oils" required autoFocus />
-          </div>
-          <p className="text-xs text-muted">Next, add their login and WhatsApp details on this page, then pick them in the sidebar to import customers.</p>
-          <Button disabled={pending} className="w-full sm:w-auto">{pending ? spin : "Add client"}</Button>
+          <Field id="client-name" label="Business name" required help="Next, add their login and WhatsApp details on this page, then pick them in the sidebar to import customers.">
+            <input className="field" autoCapitalize="words" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Thenan Oils" />
+          </Field>
+          <Button type="submit" loading={pending} className="w-full sm:w-auto">Add client</Button>
         </form>
       </Sheet>
     </>
@@ -82,34 +82,32 @@ export function AddLoginForm({ clientId }: { clientId: string }) {
   const { pending, submit } = useSubmit();
   return (
     <details className="group mt-3">
-      <summary className="cursor-pointer list-none text-sm font-medium text-brand-deep hover:underline">+ Add login</summary>
+      <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-control text-sm font-medium text-brand-deep hover:underline sm:min-h-8 [&::-webkit-details-marker]:hidden">
+        <Plus aria-hidden className="size-4" /> Add login
+      </summary>
       <form
-        className="mt-3 grid gap-3 sm:grid-cols-2"
+        className="mt-2 grid gap-4 rounded-card border border-line p-3 sm:grid-cols-2"
         onSubmit={(e) => {
           e.preventDefault();
           submit(() => createClientUser(clientId, v), () => setV({ name: "", email: "", password: "", access: "STAFF" }));
         }}
       >
-        <div>
-          <Label htmlFor={`n-${clientId}`}>Name</Label>
-          <input id={`n-${clientId}`} className="field" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} required />
-        </div>
-        <div>
-          <Label htmlFor={`e-${clientId}`}>Email</Label>
-          <input id={`e-${clientId}`} type="email" autoComplete="off" className="field" value={v.email} onChange={(e) => setV({ ...v, email: e.target.value })} required />
-        </div>
-        <div className="sm:col-span-2">
-          <Label htmlFor={`p-${clientId}`} hint="8+ characters, share it with them privately">Password</Label>
-          <input id={`p-${clientId}`} type="text" autoComplete="new-password" minLength={8} className="field font-mono" value={v.password} onChange={(e) => setV({ ...v, password: e.target.value })} required />
-        </div>
-        <div className="sm:col-span-2">
-          <Label htmlFor={`a-${clientId}`}>Access</Label>
-          <select id={`a-${clientId}`} className="field" value={v.access} onChange={(e) => setV({ ...v, access: e.target.value as typeof v.access })}>
+        <Field id={`n-${clientId}`} label="Name" required>
+          <input autoComplete="off" className="field" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} />
+        </Field>
+        <Field id={`e-${clientId}`} label="Email" required>
+          <input type="email" inputMode="email" autoComplete="off" className="field" value={v.email} onChange={(e) => setV({ ...v, email: e.target.value })} />
+        </Field>
+        <Field id={`p-${clientId}`} label="Password" hint="8+ characters, share it with them privately" required className="sm:col-span-2">
+          <input type="text" autoComplete="new-password" minLength={8} className="field font-mono" value={v.password} onChange={(e) => setV({ ...v, password: e.target.value })} />
+        </Field>
+        <Field id={`a-${clientId}`} label="Access" className="sm:col-span-2">
+          <select className="field" value={v.access} onChange={(e) => setV({ ...v, access: e.target.value as typeof v.access })}>
             {ACCESS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
-        </div>
+        </Field>
         <div className="sm:col-span-2">
-          <Button disabled={pending} size="sm">{pending ? spin : "Create login"}</Button>
+          <Button type="submit" loading={pending} size="sm" className="max-sm:w-full">Create login</Button>
         </div>
       </form>
     </details>
@@ -128,7 +126,7 @@ export function AccessSelect({ userId, access }: { userId: string; access: "MANA
   return (
     <select
       aria-label="Access"
-      className="field h-9 w-auto py-0 text-xs"
+      className="field w-auto py-0 sm:min-h-8 sm:text-xs sm:pointer-coarse:min-h-11"
       disabled={pending}
       defaultValue={access}
       onChange={(e) => submit(() => setUserAccess(userId, e.target.value as typeof access))}
@@ -147,14 +145,15 @@ export function ResetPasswordButton({ userId, email }: { userId: string; email: 
       type="button"
       variant="ghost"
       size="sm"
-      disabled={pending}
+      loading={pending}
       title="Set a new password"
-      onClick={() => {
-        const pw = window.prompt(`New password for ${email} (8+ characters):`);
+      aria-label={`Reset password for ${email}`}
+      onClick={async () => {
+        const pw = await promptText(`New password for ${email} (8+ characters):`, { label: "New password", type: "text" }, { title: "Reset password" });
         if (pw) submit(() => resetUserPassword(userId, pw));
       }}
     >
-      {pending ? spin : <><KeyRound className="size-3.5" /> Reset</>}
+      <KeyRound aria-hidden className="size-4" /> Reset
     </Button>
   );
 }
@@ -177,7 +176,7 @@ export function TokenForm({ clientId, hasToken }: { clientId: string; hasToken: 
         <Label htmlFor={`tok-${clientId}`} hint={hasToken ? "saved · paste a new one to replace it" : "permanent System User token"}>Access token</Label>
         <input id={`tok-${clientId}`} name="wa-token" type="password" {...noFill} autoComplete="new-password" className="field font-mono" value={token} onChange={(e) => setToken(e.target.value)} placeholder={hasToken ? "••••••••" : "EAA…"} />
       </div>
-      <Button disabled={pending || !token.trim()} size="sm" variant="secondary">{pending ? spin : hasToken ? "Replace token" : "Save token"}</Button>
+      <Button type="submit" disabled={!token.trim()} loading={pending} size="sm" variant="secondary" className="sm:mb-px">{hasToken ? "Replace token" : "Save token"}</Button>
     </form>
   );
 }
@@ -204,8 +203,10 @@ export function AddNumberForm({ clientId, hasToken }: { clientId: string; hasTok
 
   return (
     <details className="group mt-3">
-      <summary className="cursor-pointer list-none text-sm font-medium text-brand-deep hover:underline">+ Add a WhatsApp number</summary>
-      <div className="mt-3 space-y-3 rounded-xl border border-line p-3">
+      <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-control text-sm font-medium text-brand-deep hover:underline sm:min-h-8 [&::-webkit-details-marker]:hidden">
+        <Plus aria-hidden className="size-4" /> Add a WhatsApp number
+      </summary>
+      <div className="mt-2 space-y-3 rounded-card border border-line p-3">
         <div>
           <Label htmlFor={`waba-${clientId}`} hint="WhatsApp Manager → API setup">WhatsApp Business Account ID</Label>
           <div className="flex gap-2">
@@ -219,14 +220,14 @@ export function AddNumberForm({ clientId, hasToken }: { clientId: string; hasTok
               onChange={(e) => { setWaba(e.target.value.replace(/\D/g, "")); setFound(null); }}
               placeholder="1124232406755071"
             />
-            <Button type="button" variant="secondary" disabled={finding || waba.length < 6} onClick={find}>{finding ? spin : "Find numbers"}</Button>
+            <Button type="button" variant="secondary" className="shrink-0" disabled={waba.length < 6} loading={finding} onClick={find}>Find numbers</Button>
           </div>
         </div>
         <details>
-          <summary className="cursor-pointer text-xs text-muted hover:text-ink">This account needs a different token?</summary>
-          <input name="wa-number-token" type="password" {...noFill} autoComplete="new-password" className="field mt-2 font-mono" value={ownToken} onChange={(e) => setOwnToken(e.target.value)} placeholder="EAA… (leave blank to use the client's token)" />
+          <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm text-muted hover:text-ink sm:min-h-8 sm:text-xs">This account needs a different token?</summary>
+          <input name="wa-number-token" aria-label="Access token for this account" type="password" {...noFill} autoComplete="new-password" className="field mt-2 font-mono" value={ownToken} onChange={(e) => setOwnToken(e.target.value)} placeholder="EAA… (leave blank to use the client's token)" />
         </details>
-        {!hasToken && !ownToken && <p className="text-xs text-amber-700">Save the client&apos;s access token above first, or paste one for this account.</p>}
+        {!hasToken && !ownToken && <p className="text-xs text-warning">Save the client&apos;s access token above first, or paste one for this account.</p>}
 
         {found && (
           <form
@@ -239,23 +240,22 @@ export function AddNumberForm({ clientId, hasToken }: { clientId: string; hasTok
             }}
           >
             <fieldset className="space-y-1.5">
-              <legend className="mb-1.5 text-xs font-medium text-ink-2">Numbers in this account</legend>
+              <legend className="mb-1.5 text-sm font-medium text-ink-2">Numbers in this account</legend>
               {found.map((n) => (
-                <label key={n.phoneNumberId} className={cn("flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-sm", pick === n.phoneNumberId ? "border-brand bg-brand-soft/50" : "border-line", n.addedTo && "cursor-not-allowed opacity-60")}>
-                  <input type="radio" name={`pick-${clientId}`} className="accent-brand" checked={pick === n.phoneNumberId} disabled={!!n.addedTo} onChange={() => setPick(n.phoneNumberId)} />
+                <label key={n.phoneNumberId} className={cn("flex min-h-11 cursor-pointer items-center gap-3 rounded-control border px-3 py-2.5 text-sm", pick === n.phoneNumberId ? "border-brand bg-brand-soft" : "border-line", n.addedTo && "cursor-not-allowed opacity-60")}>
+                  <input type="radio" name={`pick-${clientId}`} className="check rounded-full" checked={pick === n.phoneNumberId} disabled={!!n.addedTo} onChange={() => setPick(n.phoneNumberId)} />
                   <span className="min-w-0 flex-1">
-                    <span className="block font-medium">{n.displayPhone} <span className="font-normal text-muted">· {n.verifiedName}</span></span>
-                    <span className="block font-mono text-[11px] text-muted">ID {n.phoneNumberId}{n.addedTo ? ` · already added to ${n.addedTo}` : ""}</span>
+                    <span className="block font-medium text-ink">{n.displayPhone} <span className="font-normal text-muted">· {n.verifiedName}</span></span>
+                    <span className="block font-mono text-2xs text-muted">ID {n.phoneNumberId}{n.addedTo ? ` · already added to ${n.addedTo}` : ""}</span>
                   </span>
-                  {n.quality && <span className="text-[11px] text-muted">{n.quality.toLowerCase()}</span>}
+                  {n.quality && <span className="text-2xs text-muted">{n.quality.toLowerCase()}</span>}
                 </label>
               ))}
             </fieldset>
-            <div>
-              <Label htmlFor={`label-${clientId}`} hint="shown when picking who sends">Name for this number</Label>
-              <input id={`label-${clientId}`} {...noFill} className="field" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Main, Madurai, Test…" />
-            </div>
-            <Button disabled={pending || !pick || !label.trim()} size="sm">{pending ? spin : "Add number"}</Button>
+            <Field id={`label-${clientId}`} label="Name for this number" hint="shown when picking who sends">
+              <input {...noFill} className="field" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Main, Madurai, Test…" />
+            </Field>
+            <Button type="submit" disabled={!pick || !label.trim()} loading={pending} size="sm" className="max-sm:w-full">Add number</Button>
           </form>
         )}
       </div>
@@ -266,8 +266,8 @@ export function AddNumberForm({ clientId, hasToken }: { clientId: string; hasTok
 export function RefreshNumbersButton({ clientId }: { clientId: string }) {
   const { pending, submit } = useSubmit();
   return (
-    <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => submit(() => refreshClientNumbers(clientId))} title="Fetch quality and limits from Meta">
-      {pending ? spin : "Refresh from Meta"}
+    <Button type="button" size="sm" variant="ghost" loading={pending} onClick={() => submit(() => refreshClientNumbers(clientId))} title="Fetch quality and limits from Meta">
+      Refresh from Meta
     </Button>
   );
 }
@@ -282,9 +282,13 @@ export function NumberActions({ id, label, isDefault, dailyCap }: { id: string; 
         variant="ghost"
         disabled={pending}
         title="Message fewer people a day than Meta allows while a new number builds quality"
-        onClick={() => {
-          const next = window.prompt(`Warm-up cap for ${label}: most people to message per day.
-Leave empty to follow Meta's limit.`, dailyCap?.toString() ?? "");
+        onClick={async () => {
+          const next = await promptText(
+            `Warm-up cap for ${label}: most people to message per day.
+Leave empty to follow Meta's limit.`,
+            { label: "People per day", defaultValue: dailyCap?.toString() ?? "", inputMode: "numeric" },
+            { title: "Warm-up cap" },
+          );
           if (next !== null) submit(() => setDailyCap(id, next));
         }}
       >
@@ -296,8 +300,8 @@ Leave empty to follow Meta's limit.`, dailyCap?.toString() ?? "");
         size="sm"
         variant="ghost"
         disabled={pending}
-        onClick={() => {
-          const next = window.prompt("Name for this number:", label);
+        onClick={async () => {
+          const next = await promptText("Name for this number:", { label: "Name", defaultValue: label }, { title: "Rename number" });
           if (next && next !== label) submit(() => renameNumber(id, next));
         }}
       >
@@ -308,8 +312,8 @@ Leave empty to follow Meta's limit.`, dailyCap?.toString() ?? "");
         size="sm"
         variant="ghost"
         disabled={pending}
-        onClick={() => {
-          if (window.confirm(`Remove ${label}? Campaigns that send from it will use the default number instead.`)) submit(() => removeClientNumber(id));
+        onClick={async () => {
+          if (await confirmAction({ message: `Remove ${label}? Campaigns that send from it will use the default number instead.`, confirmLabel: "Remove number", danger: true })) submit(() => removeClientNumber(id));
         }}
       >
         Remove
@@ -332,16 +336,16 @@ export function BrandingForm({ clientId, name, initial }: { clientId: string; na
   const preview = themeStyle({ brandPrimary: HEX.test(v.brandPrimary) ? v.brandPrimary : null, brandAccent: HEX.test(v.brandAccent) ? v.brandAccent : null });
   return (
     <details className="group">
-      <summary className="cursor-pointer list-none text-sm font-medium text-brand-deep hover:underline">Edit branding</summary>
+      <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-control text-sm font-medium text-brand-deep hover:underline sm:min-h-8 [&::-webkit-details-marker]:hidden">Edit branding</summary>
       <form
-        className="mt-3 grid gap-4 lg:grid-cols-[1fr_15rem]"
+        className="mt-3 grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem]"
         onSubmit={(e) => {
           e.preventDefault();
           submit(() => saveClientBranding(clientId, v));
         }}
       >
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 min-[400px]:grid-cols-2">
             {(["brandPrimary", "brandAccent"] as const).map((k) => (
               <div key={k}>
                 <Label htmlFor={`${k}-${clientId}`} hint={k === "brandPrimary" ? "buttons, charts" : "highlights"}>{k === "brandPrimary" ? "Main colour" : "Accent colour"}</Label>
@@ -349,9 +353,9 @@ export function BrandingForm({ clientId, name, initial }: { clientId: string; na
                   <input
                     type="color"
                     aria-label={`${k === "brandPrimary" ? "Main" : "Accent"} colour picker`}
-                    value={HEX.test(v[k]) ? v[k] : "#0f9d58"}
+                    value={HEX.test(v[k]) ? v[k] : DEFAULT_BRAND}
                     onChange={(e) => setV({ ...v, [k]: e.target.value })}
-                    className="h-11 w-12 shrink-0 cursor-pointer rounded-lg border border-line bg-white p-1 sm:h-10"
+                    className="h-11 w-12 shrink-0 cursor-pointer rounded-control border border-line-strong bg-panel p-1 sm:h-10"
                   />
                   <input id={`${k}-${clientId}`} className="field font-mono" value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} placeholder="#f5c400" />
                 </div>
@@ -359,35 +363,41 @@ export function BrandingForm({ clientId, name, initial }: { clientId: string; na
             ))}
           </div>
           {BRAND_FIELDS.map((f) => (
-            <div key={f.key}>
-              <Label htmlFor={`${f.key}-${clientId}`} hint={f.hint}>{f.label}</Label>
-              <input id={`${f.key}-${clientId}`} className="field" value={v[f.key]} onChange={(e) => setV({ ...v, [f.key]: e.target.value })} placeholder={f.placeholder} />
-            </div>
+            <Field key={f.key} id={`${f.key}-${clientId}`} label={f.label} hint={f.hint}>
+              <input
+                className="field"
+                type={f.key === "supportPhone" ? "tel" : "text"}
+                inputMode={f.key === "supportPhone" ? "tel" : f.key === "website" || f.key === "logoUrl" || f.key === "bannerUrl" ? "url" : undefined}
+                value={v[f.key]}
+                onChange={(e) => setV({ ...v, [f.key]: e.target.value })}
+                placeholder={f.placeholder}
+              />
+            </Field>
           ))}
-          <Button disabled={pending} size="sm">{pending ? spin : "Save branding"}</Button>
+          <Button type="submit" loading={pending} size="sm" className="max-sm:w-full">Save branding</Button>
         </div>
 
         {/* Live preview with the same theme maths the portal uses, so contrast fixes show here too. */}
-        <div style={preview} className="h-fit overflow-hidden rounded-2xl border border-line bg-canvas text-xs shadow-card">
+        <div style={preview} aria-label="Preview of their portal colours" role="img" className="h-fit overflow-hidden rounded-card border border-line bg-canvas text-xs shadow-card">
           <div className="flex items-center gap-2 bg-night p-3">
             {v.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element -- preview of an admin-supplied image
-              <img src={v.logoUrl} alt="" className="size-8 rounded-lg object-cover" />
+              <img src={v.logoUrl} alt="" className="size-8 rounded-control object-cover" />
             ) : (
-              <span className="size-8 rounded-lg bg-brand" />
+              <span className="size-8 rounded-control bg-brand" />
             )}
             <div className="min-w-0">
               <p className="truncate font-semibold text-white">{name}</p>
-              <p className="truncate text-[11px] text-white/55">{v.tagline || "WhatsApp campaigns"}</p>
+              <p className="truncate text-2xs text-white/70">{v.tagline || "WhatsApp campaigns"}</p>
             </div>
           </div>
           <div className="space-y-1 bg-night px-3 pb-3">
             <p className="rounded-md bg-white/10 px-2 py-1 font-medium text-white"><span className="text-glow">●</span> Overview</p>
-            <p className="px-2 py-1 text-white/60">Campaigns</p>
+            <p className="px-2 py-1 text-white/75">Campaigns</p>
           </div>
           <div className="space-y-2 p-3">
-            <span className="inline-flex rounded-lg bg-brand px-3 py-1.5 font-medium text-white">Button</span>
-            <div className="h-2 overflow-hidden rounded-full bg-white"><div className="h-full w-2/3 rounded-full bg-brand" /></div>
+            <span className="inline-flex rounded-control bg-brand px-3 py-1.5 font-medium text-white">Button</span>
+            <div className="h-2 overflow-hidden rounded-full bg-panel"><div className="h-full w-2/3 rounded-full bg-brand" /></div>
             <span className="inline-flex rounded-full bg-brand-soft px-2 py-0.5 font-medium text-brand-deep">coconut-oil</span>
           </div>
         </div>
@@ -413,7 +423,7 @@ export function SendingRulesForm({ clientId, initial }: { clientId: string; init
   const { pending, submit } = useSubmit();
   return (
     <form
-      className="grid gap-3 sm:grid-cols-[1fr_1.4fr_auto] sm:items-end"
+      className="grid gap-4 md:grid-cols-[1fr_1.4fr_auto] md:items-end"
       onSubmit={(e) => {
         e.preventDefault();
         submit(() => saveSendingRules(clientId, { marketingGapHours: gap, quietFrom: quietOn ? from : "", quietTo: quietOn ? to : "" }));
@@ -430,19 +440,17 @@ export function SendingRulesForm({ clientId, initial }: { clientId: string; init
         />
       </div>
       <div>
-        <Label htmlFor={`qf-${clientId}`} hint="India time · marketing waits">
-          <span className="inline-flex items-center gap-2">
-            <input type="checkbox" className="size-5 accent-brand sm:size-4" checked={quietOn} onChange={(e) => setQuietOn(e.target.checked)} aria-label="Use quiet hours" />
-            Quiet hours
-          </span>
-        </Label>
+        <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-2">
+          <CheckRow label="Quiet hours" className="min-h-0 py-0" checked={quietOn} onChange={(e) => setQuietOn(e.target.checked)} />
+          <span className="text-xs text-muted">India time · marketing waits</span>
+        </div>
         <div className="flex items-center gap-2">
-          <input id={`qf-${clientId}`} type="time" className="field" value={from} disabled={!quietOn} onChange={(e) => setFrom(e.target.value)} />
+          <input id={`qf-${clientId}`} type="time" aria-label="Quiet hours start" className="field" value={from} disabled={!quietOn} onChange={(e) => setFrom(e.target.value)} />
           <span className="text-xs text-muted">to</span>
           <input type="time" aria-label="Quiet hours end" className="field" value={to} disabled={!quietOn} onChange={(e) => setTo(e.target.value)} />
         </div>
       </div>
-      <Button disabled={pending} size="sm">{pending ? spin : "Save rules"}</Button>
+      <Button type="submit" loading={pending} size="sm" className="max-sm:w-full md:mb-px">Save rules</Button>
     </form>
   );
 }

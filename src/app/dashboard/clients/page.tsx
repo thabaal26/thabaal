@@ -2,10 +2,9 @@ import { Building2, CheckCircle2, Circle } from "lucide-react";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
-import { Badge, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
+import { Badge, Card, CardHeader, EmptyState, PageHeader, QualityBadge } from "@/components/ui";
 import { db } from "@/lib/db";
 import { numberHealth } from "@/lib/limits";
-import { QualityBadge } from "@/components/ui";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { getScope } from "@/lib/session";
 import { deleteClientUser } from "../actions/clients";
@@ -37,7 +36,7 @@ export default async function ClientsPage() {
       />
 
       {clients.length ? (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {clients.map((c) => {
             const usable = c.numbers.filter((n) => n.token || c.waToken);
             const accounts = new Set(c.numbers.map((n) => n.businessAccountId)).size;
@@ -54,20 +53,20 @@ export default async function ClientsPage() {
                     )
                   }
                 />
-                <div className="grid gap-6 p-4 sm:p-5 lg:grid-cols-2">
+                <div className="grid gap-6 p-4 sm:p-5 xl:grid-cols-2">
                   <section>
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Logins</h3>
                     {c.users.length ? (
-                      <ul className="mt-2 divide-y divide-line rounded-xl border border-line">
+                      <ul className="mt-2 divide-y divide-line rounded-card border border-line">
                         {c.users.map((u) => (
                           <li key={u.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2.5">
                             <div className="min-w-0 basis-full sm:basis-auto sm:flex-1">
-                              <p className="truncate text-sm font-medium">{u.name}</p>
+                              <p className="truncate text-sm font-medium text-ink">{u.name}</p>
                               <p className="truncate text-xs text-muted">{u.email}</p>
                             </div>
                             <AccessSelect userId={u.id} access={u.access} />
                             <ResetPasswordButton userId={u.id} email={u.email} />
-                            <ActionButton action={deleteClientUser.bind(null, u.id)} variant="ghost" confirm={`Remove ${u.email}? They won't be able to sign in.`}>
+                            <ActionButton action={deleteClientUser.bind(null, u.id)} variant="ghost" confirm={`Remove ${u.email}? They won't be able to sign in.`} aria-label={`Remove ${u.email}`}>
                               Remove
                             </ActionButton>
                           </li>
@@ -88,18 +87,18 @@ export default async function ClientsPage() {
                       <TokenForm clientId={c.id} hasToken={!!c.waToken} />
                     </div>
                     {c.numbers.length ? (
-                      <ul className="mt-3 divide-y divide-line rounded-xl border border-line">
+                      <ul className="mt-3 divide-y divide-line rounded-card border border-line">
                         {c.numbers.map((n) => (
                           <li key={n.id} className="flex flex-wrap items-center gap-2 px-3 py-2.5">
-                            {n.token || c.waToken ? <CheckCircle2 className="size-4 shrink-0 text-brand" /> : <Circle className="size-4 shrink-0 text-line" />}
+                            {n.token || c.waToken ? <CheckCircle2 aria-label="Has a token" className="size-4 shrink-0 text-success" /> : <Circle aria-label="No token" className="size-4 shrink-0 text-line-strong" />}
                             <div className="min-w-0 flex-1">
-                              <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
+                              <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-ink">
                                 {n.label}
                                 {n.isDefault && <Badge tone="green">Default</Badge>}
                                 {n.verifiedName === "Test Number" && <Badge tone="amber">Test</Badge>}
                                 <QualityBadge rating={n.qualityRating} />
                               </p>
-                              <p className="truncate text-xs text-muted">
+                              <p className="tabular truncate text-xs text-muted">
                                 {n.displayPhone ?? "—"}
                                 {n.verifiedName && n.verifiedName !== "Test Number" ? ` · ${n.verifiedName}` : ""}
                                 {accounts > 1 ? ` · account ${n.businessAccountId}` : ""}
@@ -130,12 +129,12 @@ export default async function ClientsPage() {
                   </section>
 
                   <section className="border-t border-line pt-5 lg:col-span-2">
-                    <div className="mb-2 flex items-center gap-3">
+                    <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                       <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Branding</h3>
                       {c.brandPrimary && (
                         <span className="flex gap-1">
                           {[c.brandPrimary, c.brandAccent].filter(Boolean).map((hex) => (
-                            <span key={hex} title={hex!} className="size-4 rounded-full ring-1 ring-black/10" style={{ background: hex! }} />
+                            <span key={hex} title={hex!} aria-label={`Colour ${hex}`} role="img" className="size-4 rounded-full ring-1 ring-line-strong/50" style={{ background: hex! }} />
                           ))}
                         </span>
                       )}
