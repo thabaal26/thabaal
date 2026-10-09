@@ -199,7 +199,9 @@ body {
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
 /* Page sections arrive one after another instead of all at once. */
-.stagger > *, .stagger > .grid > * { animation: rise 0.3s var(--ease-snappy) both; }
+/* Fade only: a transform here would make these sections the containing block for anything
+   position: fixed inside them, unpinning the phone action bars (Create, Save) from the screen. */
+.stagger > *, .stagger > .grid > * { animation: fade 0.3s var(--ease-snappy) both; }
 .stagger > :nth-child(2) { animation-delay: 30ms; }
 .stagger > :nth-child(3) { animation-delay: 60ms; }
 .stagger > :nth-child(4) { animation-delay: 90ms; }
@@ -222,4 +224,9 @@ body {
 
 @media print {
   body { background: white; }
+}
+
+/* Phones and tablets: a page with a pinned action bar (Create, Save) keeps its last content clear of it. */
+@media (width < 64rem) {
+  #main:has([data-action-bar]) { padding-bottom: calc(10rem + env(safe-area-inset-bottom)); }
 }
