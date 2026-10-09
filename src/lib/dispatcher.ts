@@ -5,6 +5,7 @@ import { computeNextRun } from "./schedule";
 import { fmtDate } from "./format";
 import { deliver, getSettings, isSimulated, readiness, templateSendable } from "./provider";
 import { allowance, refreshStaleNumbers, windowFreesAt } from "./limits";
+import { marketingPaused, retryHeldBack } from "./held";
 import { explainError, metaError } from "./meta-errors";
 import { applyFailure, quietUntil, recentlyMarketed } from "./rules";
 import { sendRefillReminders } from "./refill";
@@ -147,6 +148,8 @@ async function processRun(runId: string, now: Date, deadline: number) {
 
   // Customers who got any marketing message recently are skipped, so nobody is flooded with offers.
   const recent = marketing ? await recentlyMarketed(batch.map((m) => m.customerId), campaign.client.marketingGapHours) : new Map<string, Date>();
+  // Meta recently held marketing back from these customers; another offer now would only be held again.
+  const paused = marketing ? await marketingPaused(batch.map((m) => m.customerId)) : new Map<string, Date>();
 
   // The local session sends one by one with human-like gaps; Meta can take parallel sends.
   const local = settings.provider === "LOCAL" && !isSimulated(settings, cfg);
@@ -165,6 +168,14 @@ async function processRun(runId: string, now: Date, deadline: number) {
     if (throttled || restricted) return false;
     if (m.customer.optedOut || m.customer.unreachable) {
       await db.message.update({ where: { id: m.id }, data: { status: "SKIPPED", error: m.customer.optedOut ? "Customer opted out" : "Number can't receive WhatsApp messages" } });
+      return;
+    }
+    const until = paused.get(m.customerId);
+    if (until) {
+      await db.message.update({
+        where: { id: m.id },
+        data: { status: "SKIPPED", error: `Meta is holding back marketing to this customer until about ${fmtDate(until, "d MMM")}` },
+      });
       return;
     }
     const last = recent.get(m.customerId);
@@ -254,6 +265,8 @@ export async function dispatch() {
     sent += res.sent;
     failed += res.failed;
   }
+  // Messages Meta held back a few days ago get their one retry.
+  if (Date.now() < deadline) await retryHeldBack({ now, deadline }).catch((e) => console.error("Held-back retries failed", e));
   if (Date.now() < deadline) await sendRefillReminders(now).catch((e) => console.error("Refill reminders failed", e));
   if (Date.now() < deadline) await syncDueSheets(now).catch((e) => console.error("Sheet sync failed", e));
   if (Date.now() < deadline) await backfillOrderNames().catch((e) => console.error("Order name backfill failed", e));

@@ -17,7 +17,7 @@ const ERRORS: Record<number, { title: string; kind: ErrorKind }> = {
   131026: { title: "Can't receive WhatsApp messages: not on WhatsApp, an old app version, or they blocked the number", kind: "unreachable" },
   131021: { title: "Recipient is the sending number itself", kind: "unreachable" },
   131050: { title: "Customer turned off marketing messages from this business", kind: "stopped-marketing" },
-  131049: { title: "Meta held this marketing message back because the customer gets many; try again in a few days", kind: "marketing-limit" },
+  131049: { title: "Meta held this marketing message back because the customer gets many; campaign messages are retried once after a few days", kind: "marketing-limit" },
   130472: { title: "Customer is part of a Meta experiment that limits marketing messages", kind: "marketing-limit" },
   131056: { title: "Too many messages to this customer in a short time", kind: "rate" },
   130429: { title: "Sending faster than Meta allows for this number", kind: "rate" },

@@ -9,6 +9,7 @@ import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
+import { marketingPaused } from "@/lib/held";
 import { getScope, owned } from "@/lib/session";
 import { deleteCustomer, setOptOut } from "../actions/customers";
 import { CustomerActions, CustomerMenu } from "./customer-tools";
@@ -50,6 +51,8 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
       WHERE ${scope.clientId}::text IS NULL OR "clientId" = ${scope.clientId} GROUP BY 1 ORDER BY 2 DESC, 1`,
     db.customer.groupBy({ by: ["region", "location"], where: owned(scope), _count: true }),
   ]);
+  // Customers Meta is currently holding marketing back from (their campaign messages wait).
+  const paused = await marketingPaused(rows.map((c) => c.id));
   const regionCount = (r: string | null) => areas.filter((a) => a.region === r).reduce((n, a) => n + a._count, 0);
   const noLocation = areas.filter((a) => !a.location).reduce((n, a) => n + a._count, 0);
   const areaOptions = [
@@ -77,6 +80,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
     <>
       {c.optedOut && <Badge tone="red">Opted out</Badge>}
       {c.unreachable && <Badge tone="amber">Can&apos;t receive</Badge>}
+      {paused.has(c.id) && <Badge tone="amber">Offers paused till {fmtDate(paused.get(c.id)!, "d MMM")}</Badge>}
     </>
   );
   const lastMessage = (c: (typeof rows)[number]) => (c.messages[0] ? `${fmtDate(c.messages[0].createdAt, "d MMM")} · ${c.messages[0].status.toLowerCase()}` : null);
@@ -143,7 +147,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
                       {lastMessage(c) && ` · ${lastMessage(c)}`}
                     </p>
                     {c.purchases && <p className="mt-0.5 line-clamp-2 text-xs text-ink-2">{c.purchases}</p>}
-                    {(c.optedOut || c.unreachable || rowTags(c.tags, c.client?.name).length > 0) && (
+                    {(c.optedOut || c.unreachable || paused.has(c.id) || rowTags(c.tags, c.client?.name).length > 0) && (
                       <div className="mt-1.5 flex flex-wrap gap-1">
                         {flags(c)}
                         {rowTags(c.tags, c.client?.name).map((t) => <Badge key={t}>{t}</Badge>)}

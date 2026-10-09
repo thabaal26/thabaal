@@ -12,6 +12,7 @@ import { fmtDate, fmtNumber, pct } from "@/lib/format";
 import { itemsText, money, type OrderItem } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { replyWindowEnd } from "@/lib/replies";
+import { marketingPaused } from "@/lib/held";
 import { getScope, owned } from "@/lib/session";
 import { sendableTemplates } from "@/lib/senders";
 import { META_SAMPLES } from "@/lib/template";
@@ -42,10 +43,12 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
   });
   if (!c) notFound();
 
-  const [templates, numbers] = await Promise.all([
+  const [templates, numbers, paused] = await Promise.all([
     db.template.findMany({ where: { clientId: c.clientId, status: "APPROVED", category: { not: "AUTHENTICATION" }, name: { notIn: META_SAMPLES }, ...(await sendableTemplates(c.clientId)) }, orderBy: { name: "asc" } }),
     db.whatsAppNumber.findMany({ where: { clientId: c.clientId }, orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }], select: { id: true, label: true, businessAccountId: true } }),
+    marketingPaused([c.id]),
   ]);
+  const pausedUntil = paused.get(c.id);
   // WhatsApp allows typed messages for 24 hours after the customer last wrote to us.
   const windowEnd = replyWindowEnd(c.replies[0]?.receivedAt);
   // WhatsApp only lets us ring customers who tapped "Allow" on our call request.
@@ -227,6 +230,15 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                     {c.locationRaw && c.locationRaw !== c.location ? ` · written as "${c.locationRaw}"` : ""}
                   </p>
                 </div>
+              </div>
+            )}
+            {pausedUntil && (
+              <div className="rounded-control border border-warning-border bg-warning-bg px-3 py-2 text-xs text-warning">
+                <p className="font-semibold">Offers paused until about {fmtDate(pausedUntil, "d MMM")}</p>
+                <p className="mt-0.5">
+                  Meta held back a marketing message because this customer gets a lot of offers. Campaigns skip them until then, and the held message is sent once more.
+                  Order updates and typed replies still go through.
+                </p>
               </div>
             )}
             <div className="rounded-control bg-sunken px-3 py-2 text-xs">
