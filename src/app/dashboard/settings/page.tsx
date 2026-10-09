@@ -16,10 +16,10 @@ export const dynamic = "force-dynamic";
 
 function Check({ ok, label, hint }: { ok: boolean; label: string; hint: string }) {
   return (
-    <li className="flex gap-3 px-5 py-3">
-      {ok ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-brand" /> : <Circle className="mt-0.5 size-4 shrink-0 text-line" />}
-      <div>
-        <p className={cn("text-sm font-medium", !ok && "text-ink-2")}>{label}</p>
+    <li className="flex gap-3 px-4 py-3 sm:px-5">
+      {ok ? <CheckCircle2 aria-label="Set" className="mt-0.5 size-4 shrink-0 text-success" /> : <Circle aria-label="Not set" className="mt-0.5 size-4 shrink-0 text-line-strong" />}
+      <div className="min-w-0">
+        <p className={cn("text-sm font-medium", ok ? "text-ink" : "text-ink-2")}>{label}</p>
         <p className="text-xs text-muted">{hint}</p>
       </div>
     </li>
@@ -29,8 +29,8 @@ function Check({ ok, label, hint }: { ok: boolean; label: string; hint: string }
 function Copyable({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="mb-1 text-xs font-medium text-ink-2">{label}</p>
-      <code className="block select-all break-all rounded-lg bg-canvas px-3 py-2 font-mono text-xs leading-relaxed">{value}</code>
+      <p className="mb-1.5 text-sm font-medium text-ink-2">{label}</p>
+      <code className="block select-all break-all rounded-control bg-sunken px-3 py-2 font-mono text-xs leading-relaxed text-ink">{value}</code>
     </div>
   );
 }
@@ -41,9 +41,9 @@ export default async function SettingsPage() {
     <Card>
       <CardHeader title="Your account" description={`Signed in as ${user.email}`} />
       <PasswordForm />
-      <form action={logout} className="border-t border-line p-5 pt-4">
+      <form action={logout} className="border-t border-line p-4 sm:p-5">
         <button className={buttonClass("secondary") + " w-full sm:w-auto"}>
-          <LogOut className="size-4" /> Sign out
+          <LogOut aria-hidden className="size-4" /> Sign out
         </button>
       </form>
     </Card>
@@ -54,9 +54,9 @@ export default async function SettingsPage() {
         <PageHeader
           title="Settings"
           description={user.client ? `Your login for ${user.client.name}.` : "Your account."}
-          actions={<Link href="/dashboard/templates" className={buttonClass("secondary") + " lg:hidden"}><SquarePen className="size-4" /> Templates</Link>}
+          actions={<Link href="/dashboard/templates" className={buttonClass("secondary") + " lg:hidden"}><SquarePen aria-hidden className="size-4" /> Templates</Link>}
         />
-        <div className="max-w-xl">{account}</div>
+        <div className="max-w-form">{account}</div>
       </>
     );
   }
@@ -73,13 +73,13 @@ export default async function SettingsPage() {
         description="WhatsApp connection, scheduler and your account."
         actions={
           <>
-            <Link href="/dashboard/templates" className={buttonClass("secondary") + " lg:hidden"}><SquarePen className="size-4" /> Templates</Link>
-            <Link href="/dashboard/clients" className={buttonClass("secondary")}><Building2 className="size-4" /> Clients</Link>
+            <Link href="/dashboard/templates" className={buttonClass("secondary") + " lg:hidden"}><SquarePen aria-hidden className="size-4" /> Templates</Link>
+            <Link href="/dashboard/clients" className={buttonClass("secondary")}><Building2 aria-hidden className="size-4" /> Clients</Link>
           </>
         }
       />
       <ProviderSwitch provider={settings.provider} metaLive={cfg.live} localReady={!!wahaConfig(settings)} />
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <div className="mt-4 grid items-start gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-2">
         <LocalSessionPanel
           url={settings.wahaUrl ?? ""}
           hasKey={!!settings.wahaApiKey}
@@ -100,15 +100,15 @@ export default async function SettingsPage() {
             <Check ok={!!process.env.META_APP_SECRET} label="App secret" hint="META_APP_SECRET, used to verify that webhooks really come from Meta." />
             <Check ok={!!process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN} label="Webhook verify token" hint="WHATSAPP_WEBHOOK_VERIFY_TOKEN: any secret string, entered in Meta too." />
           </ul>
-          <div className="space-y-3 border-t border-line p-5">
+          <div className="space-y-3 border-t border-line p-4 sm:p-5">
             <Copyable label="Webhook callback URL (subscribe to messages and message_template_status_update)" value={`${origin}/api/webhook`} />
           </div>
         </Card>
 
-        <div className="space-y-6 lg:col-span-2 lg:grid lg:grid-cols-2 lg:gap-6 lg:space-y-0">
+        <div className="space-y-4 sm:space-y-6 lg:col-span-2 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
           <Card>
             <CardHeader title="Scheduler" description="Something must call this URL every 5 minutes (every minute with the local session) to start campaigns and send batches." />
-            <div className="space-y-3 p-5">
+            <div className="space-y-3 p-4 sm:p-5">
               <Copyable label="Cron URL" value={`${origin}/api/cron?key=•••CRON_SECRET•••`} />
               <p className="text-xs text-muted">
                 {process.env.CRON_SECRET ? "CRON_SECRET is set." : "Set CRON_SECRET first."} On Vercel Pro, add a cron to <code>vercel.json</code>. On the free Hobby plan, use a free service
