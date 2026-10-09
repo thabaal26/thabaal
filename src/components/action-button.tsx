@@ -1,14 +1,14 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useTransition, type ReactNode } from "react";
+import { useRef, useTransition, type ReactNode } from "react";
+import { confirmAction } from "./confirm";
 import { toastResult } from "./toast";
-import { Button } from "./ui";
+import { Button, type ButtonSize, type ButtonVariant } from "./ui";
 
 type Result = { ok: boolean; message?: string; errors?: string[] };
 
-/** Runs a bound server action, with optional confirmation, then shows the result. */
+/** Runs a bound server action, with optional confirmation, then shows the result. Ignores repeat taps while it runs. */
 export function ActionButton({
   action,
   children,
@@ -17,34 +17,43 @@ export function ActionButton({
   size = "sm",
   title,
   className,
+  "aria-label": ariaLabel,
 }: {
   action: () => Promise<Result>;
   children: ReactNode;
   confirm?: string;
-  variant?: "primary" | "secondary" | "ghost" | "danger";
-  size?: "sm" | "md";
+  variant?: ButtonVariant;
+  size?: ButtonSize;
   title?: string;
   className?: string;
+  "aria-label"?: string;
 }) {
   const [pending, start] = useTransition();
+  const busy = useRef(false);
   const router = useRouter();
   return (
     <Button
-      type="button"
       variant={variant}
       size={size}
       title={title}
+      aria-label={ariaLabel}
       className={className}
-      disabled={pending}
-      onClick={() => {
-        if (confirm && !window.confirm(confirm)) return;
-        start(async () => {
-          toastResult(await action());
-          router.refresh();
-        });
+      loading={pending}
+      onClick={async () => {
+        if (busy.current) return;
+        busy.current = true;
+        try {
+          if (confirm && !(await confirmAction(confirm))) return;
+          start(async () => {
+            toastResult(await action());
+            router.refresh();
+          });
+        } finally {
+          busy.current = false;
+        }
       }}
     >
-      {pending ? <Loader2 className="size-3.5 animate-spin" /> : children}
+      {children}
     </Button>
   );
 }

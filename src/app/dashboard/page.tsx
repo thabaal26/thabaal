@@ -163,7 +163,6 @@ export default async function Overview() {
           value={fmtNumber(total)}
           sub={`${fmtNumber(failed)} failed`}
           icon={<Send className="size-4" />}
-          accent="bg-sky-50 text-sky-700"
         />
         <Stat label="Delivery rate" value={`${pct(delivered, total)}%`} sub={`${fmtNumber(delivered)} delivered`} icon={<CheckCheck className="size-4" />} />
         <Stat
@@ -171,7 +170,6 @@ export default async function Overview() {
           value={`${pct(read, delivered)}%`}
           sub={`${fmtNumber(read)} of delivered were read`}
           icon={<Eye className="size-4" />}
-          accent="bg-violet-50 text-violet-700"
         />
       </div>
 

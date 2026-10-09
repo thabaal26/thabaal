@@ -40,12 +40,12 @@ export function HeaderClientSwitcher({ clients, current, title, children }: { cl
       onChange={change}
       disabled={pending}
       options={options(clients)}
-      className={cn("min-w-0 flex-1", pending && "opacity-60")}
+      className={cn("-my-1 min-h-11 min-w-0 flex-1 rounded-control py-1", pending && "opacity-60")}
       trigger={() => (
         <span className="block min-w-0">
           <span className="flex items-center gap-1 text-sm font-semibold leading-tight text-white">
             <span className="truncate">{title}</span>
-            <ChevronDown className="size-4 shrink-0 text-white/60" />
+            <ChevronDown aria-hidden className="size-4 shrink-0 text-white/70" />
           </span>
           {children}
         </span>
@@ -66,10 +66,10 @@ export function ClientSwitcher({ clients, current, dark }: { clients: Clients; c
       options={options(clients)}
       className={cn("w-full", pending && "opacity-60")}
       trigger={(selected) => (
-        <span className={cn("flex h-10 items-center gap-2 rounded-lg px-2.5 text-sm font-medium transition", dark ? "bg-white/10 text-white hover:bg-white/15" : "border border-line bg-white text-ink")}>
-          <Building2 className={cn("size-4 shrink-0", dark ? "text-glow" : "text-brand-deep")} />
+        <span className={cn("flex h-10 items-center gap-2 rounded-control px-2.5 text-sm font-medium transition", dark ? "bg-white/10 text-white hover:bg-white/15" : "border border-line-strong bg-panel text-ink")}>
+          <Building2 aria-hidden className={cn("size-4 shrink-0", dark ? "text-glow" : "text-brand-deep")} />
           <span className="min-w-0 flex-1 truncate">{selected?.label ?? "All clients"}</span>
-          <ChevronDown className={cn("size-4 shrink-0", dark ? "text-white/60" : "text-muted")} />
+          <ChevronDown aria-hidden className={cn("size-4 shrink-0", dark ? "text-white/70" : "text-muted")} />
         </span>
       )}
     />

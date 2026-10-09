@@ -224,7 +224,8 @@ export function CallWidget() {
         <div
           role="dialog"
           aria-live="assertive"
-          className="animate-toast fixed inset-x-3 top-[calc(4rem+env(safe-area-inset-top))] z-50 mx-auto max-w-sm rounded-2xl bg-night p-4 text-white shadow-2xl ring-1 ring-white/10 lg:left-auto lg:right-6 lg:top-6 print:hidden"
+          aria-label={live ? "WhatsApp call" : incoming ? "Incoming WhatsApp call" : "Call problem"}
+          className="surface-dark animate-toast fixed inset-x-3 top-[calc(4rem+env(safe-area-inset-top))] z-50 mx-auto max-w-sm rounded-card bg-night p-4 text-white shadow-pop ring-1 ring-white/10 lg:left-auto lg:right-6 lg:top-6 print:hidden"
         >
           {live ? (
             <>
@@ -233,10 +234,10 @@ export function CallWidget() {
               </p>
               <p className="mt-0.5 truncate text-lg font-semibold">{live.who}</p>
               <div className="mt-4 flex gap-2">
-                <button onClick={toggleMute} className={cn("flex h-11 flex-1 items-center justify-center gap-2 rounded-xl text-sm font-medium", muted ? "bg-amber-500 text-night" : "bg-white/10")}>
+                <button onClick={toggleMute} aria-pressed={muted} className={cn("flex h-11 flex-1 items-center justify-center gap-2 rounded-control text-sm font-medium transition active:scale-[0.98]", muted ? "bg-warning-on-dark text-night" : "bg-white/10 hover:bg-white/15")}>
                   {muted ? <MicOff className="size-4" /> : <Mic className="size-4" />} {muted ? "Unmute" : "Mute"}
                 </button>
-                <button disabled={busy} onClick={end} className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-rose-600 text-sm font-medium disabled:opacity-50">
+                <button disabled={busy} onClick={end} className="flex h-11 flex-1 items-center justify-center gap-2 rounded-control bg-danger-solid text-sm font-medium transition active:scale-[0.98] disabled:opacity-50">
                   <PhoneOff className="size-4" /> {live.since ? "Hang up" : "Cancel"}
                 </button>
               </div>
@@ -247,13 +248,13 @@ export function CallWidget() {
                 <Phone className="size-3.5 animate-ring" /> Incoming WhatsApp call
               </p>
               <p className="mt-0.5 truncate text-lg font-semibold">{who(incoming)}</p>
-              <p className="text-xs text-white/55">{formatPhone(incoming.fromPhone)}</p>
+              <p className="tabular text-xs text-white/70">{formatPhone(incoming.fromPhone)}</p>
               <div className="mt-4 flex gap-2">
-                <button disabled={busy} onClick={() => decline(incoming)} className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-rose-600 text-sm font-medium disabled:opacity-50">
+                <button disabled={busy} onClick={() => decline(incoming)} className="flex h-11 flex-1 items-center justify-center gap-2 rounded-control bg-danger-solid text-sm font-medium transition active:scale-[0.98] disabled:opacity-50">
                   <PhoneOff className="size-4" /> Decline
                 </button>
-                <button disabled={busy} onClick={() => answer(incoming)} className="relative flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-500 text-sm font-medium text-night disabled:opacity-50">
-                  {!busy && <span aria-hidden className="absolute inset-0 animate-ping rounded-xl bg-emerald-400/40" />}
+                <button disabled={busy} onClick={() => answer(incoming)} className="relative flex h-11 flex-1 items-center justify-center gap-2 rounded-control bg-call-answer text-sm font-semibold text-night transition active:scale-[0.98] disabled:opacity-50">
+                  {!busy && <span aria-hidden className="absolute inset-0 animate-ping rounded-control bg-call-answer/40" />}
                   <Phone className="size-4" /> {busy ? "Connecting…" : "Answer"}
                 </button>
               </div>
@@ -261,7 +262,7 @@ export function CallWidget() {
           ) : (
             <div className="flex items-start justify-between gap-3">
               <p className="text-sm">{error}</p>
-              <button onClick={() => setError(null)} className="text-xs text-white/60">Dismiss</button>
+              <button onClick={() => setError(null)} className="-my-2 -mr-2 min-h-11 shrink-0 rounded-control px-3 text-sm text-white/80 hover:bg-white/10">Dismiss</button>
             </div>
           )}
         </div>

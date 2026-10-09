@@ -89,16 +89,16 @@ export function Picker({
           trigger(selected)
         ) : (
           <>
-            <span className={cn("min-w-0 truncate", !selected && "text-muted/80")}>{selected?.label ?? placeholder}</span>
-            <ChevronDown className="size-4 shrink-0 text-muted" />
+            <span className={cn("min-w-0 truncate", !selected && "text-muted")}>{selected?.label ?? placeholder}</span>
+            <ChevronDown aria-hidden className="size-4 shrink-0 text-muted" />
           </>
         )}
       </button>
       <Sheet open={open} onClose={() => { setOpen(false); setQuery(""); }} title={title}>
         {options.length > 8 && (
           <div className="relative mb-3">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
-            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search" className="field pl-10" />
+            <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
+            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search" aria-label={`Search ${title.toLowerCase()}`} className="field pl-10" />
           </div>
         )}
         <ul role="listbox" aria-label={title} className="-mx-2 space-y-0.5">
@@ -113,15 +113,15 @@ export function Picker({
                   disabled={o.disabled}
                   onClick={() => pick(o.value)}
                   className={cn(
-                    "flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[15px] transition active:scale-[0.99] disabled:opacity-40 sm:min-h-10 sm:text-sm",
-                    active ? "bg-brand-soft font-medium text-brand-deep" : "hover:bg-canvas",
+                    "flex min-h-12 w-full items-center gap-3 rounded-control px-3 py-2.5 text-left text-md transition active:bg-sunken disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-10 sm:text-sm sm:pointer-coarse:min-h-12",
+                    active ? "bg-brand-soft font-medium text-brand-deep" : "text-ink hover:bg-canvas",
                   )}
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block [overflow-wrap:anywhere]">{o.label}</span>
-                    {o.hint && <span className={cn("mt-0.5 block text-xs", active ? "text-brand-deep/70" : "text-muted")}>{o.hint}</span>}
+                    {o.hint && <span className={cn("mt-0.5 block text-xs", active ? "text-brand-deep" : "text-muted")}>{o.hint}</span>}
                   </span>
-                  {active && <Check className="size-4 shrink-0" />}
+                  {active && <Check aria-hidden className="size-4 shrink-0" />}
                 </button>
               </li>
             );
