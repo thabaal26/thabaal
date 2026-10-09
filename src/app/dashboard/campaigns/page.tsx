@@ -40,21 +40,24 @@ export default async function CampaignsPage() {
         actions={
           canCreate && (
             <Link href="/dashboard/campaigns/new" className={buttonClass("primary")}>
-              <Plus className="size-4" /> New campaign
+              <Plus aria-hidden className="size-4" /> New<span className="max-sm:sr-only"> campaign</span>
             </Link>
           )
         }
+        inlineActions
       />
 
       {campaigns.length ? (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-3 sm:gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {campaigns.map((c) => {
             const last = c.runs[0];
             return (
-              <Card key={c.id} className={cn("relative p-4 transition hover:shadow-pop active:bg-canvas/60 sm:p-5", !c.active && "opacity-75")}>
+              <Card key={c.id} className={cn("lift relative flex flex-col p-4 active:bg-sunken sm:p-5", !c.active && "bg-canvas")}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <Link href={`/dashboard/campaigns/${c.id}`} className="block truncate text-base font-semibold after:absolute after:inset-0 hover:underline">{c.name}</Link>
+                    <Link href={`/dashboard/campaigns/${c.id}`} className="block truncate text-base font-semibold text-ink outline-none after:absolute after:inset-0 after:rounded-card hover:underline focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-[var(--color-brand-deep)]">
+                      {c.name}
+                    </Link>
                     <p className="mt-0.5 truncate font-mono text-xs text-muted">
                       {!scope.clientId && <span className="font-sans font-medium text-ink-2">{c.client.name} · </span>}
                       {c.template.name}
@@ -63,41 +66,45 @@ export default async function CampaignsPage() {
                   {c.active ? <Badge tone="green" dot>Active</Badge> : <Badge dot>Paused</Badge>}
                 </div>
 
-                <div className="mt-4 flex flex-wrap gap-1">
+                <div className="mt-4">
                   {c.scheduleType === "WEEKLY" ? (
-                    DAYS.map((d, i) => (
-                      <span key={d} className={cn("grid h-7 w-9 place-items-center rounded-md text-[11px] font-medium", c.daysOfWeek.includes(i) ? "bg-brand text-white" : "bg-canvas text-muted")}>{d}</span>
-                    ))
+                    <ul aria-label={`Sends every ${c.daysOfWeek.map((d) => DAYS[d]).join(", ")}`} className="grid max-w-80 grid-cols-7 gap-1">
+                      {DAYS.map((d, i) => (
+                        <li key={d} aria-hidden className={cn("grid h-7 place-items-center rounded-md text-2xs font-medium", c.daysOfWeek.includes(i) ? "bg-brand text-white" : "bg-sunken text-muted")}>
+                          {d}
+                        </li>
+                      ))}
+                    </ul>
                   ) : (
                     <Badge tone="blue">Once · {fmtDate(c.runAt, "d MMM yyyy")}</Badge>
                   )}
                 </div>
 
-                <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-line pt-4 text-xs">
+                <dl className="tabular mt-4 grid grid-cols-3 gap-3 border-t border-line pt-3 text-xs">
                   <div>
                     <dt className="text-muted">Time</dt>
-                    <dd className="mt-0.5 font-medium">{c.sendTime}</dd>
+                    <dd className="mt-0.5 text-sm font-medium text-ink">{c.sendTime}</dd>
                   </div>
                   <div>
                     <dt className="text-muted">Pace</dt>
-                    <dd className="mt-0.5 font-medium">{c.batchSize} / {effectiveInterval(c.intervalMinutes)} min</dd>
+                    <dd className="mt-0.5 text-sm font-medium text-ink">{c.batchSize} / {effectiveInterval(c.intervalMinutes)} min</dd>
                   </div>
                   <div>
                     <dt className="text-muted">Takes</dt>
-                    <dd className="mt-0.5 font-medium">~{formatMinutes(estimateDuration(audienceOf(c.clientId), c.batchSize, c.intervalMinutes))}</dd>
+                    <dd className="mt-0.5 text-sm font-medium text-ink">~{formatMinutes(estimateDuration(audienceOf(c.clientId), c.batchSize, c.intervalMinutes))}</dd>
                   </div>
                 </dl>
 
-                <div className="mt-4 flex items-center justify-between gap-2 text-xs">
-                  <span className="text-muted">
+                <div className="mt-auto flex items-center justify-between gap-3 pt-4 text-xs">
+                  <span className="min-w-0 text-muted">
                     {c.template.status !== "APPROVED" ? (
-                      <span className="text-amber-700">Template waiting for approval</span>
+                      <span className="text-warning">Template waiting for approval</span>
                     ) : c.active && c.nextRunAt ? (
                       <>
                         Starts <b className="text-ink">{timeUntil(c.nextRunAt, now)}</b> · {fmtDate(c.nextRunAt, "EEE d MMM, h:mm a")}
                         {c.template.category === "MARKETING" && (() => {
                           const resume = quietUntil(c.client, c.nextRunAt);
-                          return resume ? <span className="block text-amber-700">Quiet hours: it will wait and start at {fmtDate(resume, "h:mm a")}</span> : null;
+                          return resume ? <span className="block text-warning">Quiet hours: it will wait and start at {fmtDate(resume, "h:mm a")}</span> : null;
                         })()}
                       </>
                     ) : last ? (
@@ -106,10 +113,12 @@ export default async function CampaignsPage() {
                       "Not scheduled"
                     )}
                   </span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-2">
                     {last && ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"].includes(last.status) && <StatusBadge status={last.status} />}
                     {scope.canManage && (
-                      <ActionButton className="relative z-10" action={toggleCampaign.bind(null, c.id, !c.active)}>{c.active ? "Pause" : "Resume"}</ActionButton>
+                      <ActionButton className="relative z-10" action={toggleCampaign.bind(null, c.id, !c.active)} aria-label={`${c.active ? "Pause" : "Resume"} ${c.name}`}>
+                        {c.active ? "Pause" : "Resume"}
+                      </ActionButton>
                     )}
                   </div>
                 </div>

@@ -1,9 +1,11 @@
-import { ArrowLeft, FlaskConical, Pause, Play, Send } from "lucide-react";
+import { ChevronRight, FlaskConical, Pause, Play, Send, Trash2 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
-import { Badge, Card, CardHeader, PageHeader, StatusBadge } from "@/components/ui";
+import { OverflowMenu } from "@/components/overflow-menu";
+import { Badge, Card, CardHeader, EmptyState, PageHeader, rowClass, StatusBadge, Table, Td, Th } from "@/components/ui";
+import { cn } from "@/lib/cn";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { money } from "@/lib/orders";
@@ -59,36 +61,54 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
   const stat = (runId: string, ...s: string[]) =>
     stats.filter((x) => x.runId === runId && s.includes(x.status)).reduce((a, x) => a + x._count, 0);
 
+  const running = (status: string) => ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"].includes(status);
+
   return (
     <>
-      <Link href="/dashboard/campaigns" className="-my-2 mb-1 inline-flex items-center gap-1 py-2 text-sm text-muted hover:text-ink sm:mb-3 sm:text-xs">
-        <ArrowLeft className="size-3.5" /> Campaigns
-      </Link>
       <PageHeader
         title={c.name}
-        description={c.active && c.nextRunAt ? `Next send ${fmtDate(c.nextRunAt, "EEEE d MMM, h:mm a")}` : "Paused: nothing scheduled"}
+        back={{ href: "/dashboard/campaigns", label: "Campaigns" }}
+        meta={
+          <span className="flex flex-wrap items-center gap-2">
+            {c.active ? <Badge tone="green" dot>Active</Badge> : <Badge dot>Paused</Badge>}
+            {c.active && c.nextRunAt ? `Next send ${fmtDate(c.nextRunAt, "EEEE d MMM, h:mm a")}` : "Paused: nothing scheduled"}
+          </span>
+        }
+        rowActions
         actions={
-          scope.canManage && <>
-            <ActionButton action={sendCampaignTest.bind(null, c.id)} size="md" title={`Send one copy to your own numbers (customers tagged "${TEST_TAG}")`}>
-              <FlaskConical className="size-4" /> Send test to me
-            </ActionButton>
-            <ActionButton action={runCampaignNow.bind(null, c.id)} size="md" confirm={sendConfirm}>
-              <Send className="size-4" /> Send now
-            </ActionButton>
-            <ActionButton action={toggleCampaign.bind(null, c.id, !c.active)} size="md">
-              {c.active ? <><Pause className="size-4" /> Pause</> : <><Play className="size-4" /> Resume</>}
-            </ActionButton>
-            <ActionButton action={deleteCampaign.bind(null, c.id)} variant="danger" size="md" confirm="Delete this campaign? Messages already sent stay in the log.">
-              Delete
-            </ActionButton>
-          </>
+          scope.canManage && (
+            <>
+              <ActionButton action={runCampaignNow.bind(null, c.id)} size="md" confirm={sendConfirm}>
+                <Send aria-hidden className="size-4" /> Send now
+              </ActionButton>
+              <ActionButton action={toggleCampaign.bind(null, c.id, !c.active)} size="md">
+                {c.active ? (
+                  <>
+                    <Pause aria-hidden className="size-4" /> Pause
+                  </>
+                ) : (
+                  <>
+                    <Play aria-hidden className="size-4" /> Resume
+                  </>
+                )}
+              </ActionButton>
+              <OverflowMenu title={c.name} label="More campaign actions">
+                <ActionButton action={sendCampaignTest.bind(null, c.id)} size="md" title={`Send one copy to your own numbers (customers tagged "${TEST_TAG}")`}>
+                  <FlaskConical aria-hidden className="size-4" /> Send test to me
+                </ActionButton>
+                <ActionButton action={deleteCampaign.bind(null, c.id)} variant="danger" size="md" confirm="Delete this campaign? Messages already sent stay in the log.">
+                  <Trash2 aria-hidden className="size-4" /> Delete
+                </ActionButton>
+              </OverflowMenu>
+            </>
+          )
         }
       />
 
       {!scope.canManage ? (
         <Card>
           <CardHeader title="Campaign details" />
-          <dl className="grid gap-4 p-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <dl className="grid gap-4 p-4 text-sm sm:grid-cols-2 sm:p-5 lg:grid-cols-3 xl:grid-cols-5">
             <div>
               <dt className="text-xs text-muted">Template</dt>
               <dd className="mt-1 flex flex-wrap items-center gap-2 font-mono">{c.template.name} <StatusBadge status={c.template.status} /></dd>
@@ -119,114 +139,140 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
           </dl>
         </Card>
       ) : (
-      <CampaignForm
-        id={c.id}
-        templates={templates}
-        audience={audience}
-        numbers={numbers}
-        initial={{
-          name: c.name,
-          templateId: c.templateId,
-          senderId: c.senderId ?? "",
-          audienceTag: c.audienceTag ?? "",
-          scheduleType: c.scheduleType,
-          daysOfWeek: c.daysOfWeek,
-          sendTime: c.sendTime,
-          runDate: c.runAt ? formatInTimeZone(c.runAt, APP_TZ, "yyyy-MM-dd") : new Date().toISOString().slice(0, 10),
-          batchSize: c.batchSize,
-          intervalMinutes: c.intervalMinutes,
-          active: c.active,
-        }}
-      />
+        <CampaignForm
+          id={c.id}
+          templates={templates}
+          audience={audience}
+          numbers={numbers}
+          initial={{
+            name: c.name,
+            templateId: c.templateId,
+            senderId: c.senderId ?? "",
+            audienceTag: c.audienceTag ?? "",
+            scheduleType: c.scheduleType,
+            daysOfWeek: c.daysOfWeek,
+            sendTime: c.sendTime,
+            runDate: c.runAt ? formatInTimeZone(c.runAt, APP_TZ, "yyyy-MM-dd") : new Date().toISOString().slice(0, 10),
+            batchSize: c.batchSize,
+            intervalMinutes: c.intervalMinutes,
+            active: c.active,
+          }}
+        />
       )}
 
-      <Card className="mt-6">
-        <CardHeader title="Send history" description={`The last 20 runs of this campaign.${totalOrders ? ` Brought ${fmtNumber(totalOrders)} order${totalOrders === 1 ? "" : "s"} worth ${money(totalRevenue)} within 7 days of sending.` : ""}`} />
+      <Card className="mt-4 sm:mt-6">
+        <CardHeader
+          title="Send history"
+          description={`The last 20 runs of this campaign.${totalOrders ? ` Brought ${fmtNumber(totalOrders)} order${totalOrders === 1 ? "" : "s"} worth ${money(totalRevenue)} within 7 days of sending.` : ""}`}
+        />
         {c.runs.length ? (
           <>
-          <ul className="divide-y divide-line sm:hidden">
-            {c.runs.map((r) => {
-              const delivered = stat(r.id, "DELIVERED", "READ");
-              const read = stat(r.id, "READ");
-              const failed = stat(r.id, "FAILED");
-              const running = ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"].includes(r.status);
-              return (
-                <li key={r.id} className="px-4 py-3.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium">{fmtDate(r.startedAt, "EEE d MMM, h:mm a")}</p>
-                    <StatusBadge status={r.status} />
-                  </div>
-                  <dl className="tabular mt-2 grid grid-cols-4 gap-2 text-center">
-                    {[
-                      ["Sent to", fmtNumber(r.total)],
-                      ["Delivered", `${pct(delivered, r.total)}%`],
-                      ["Read", `${pct(read, r.total)}%`],
-                      ["Failed", fmtNumber(failed)],
-                    ].map(([k, v]) => (
-                      <div key={k} className="rounded-lg bg-canvas px-1 py-1.5">
-                        <dd className={`text-sm font-semibold ${k === "Failed" && failed ? "text-rose-600" : ""}`}>{v}</dd>
-                        <dt className="text-[10px] text-muted">{k}</dt>
-                      </div>
-                    ))}
-                  </dl>
-                  <div className="mt-2 flex justify-end">
-                    {running && scope.canManage ? (
-                      <ActionButton action={cancelRun.bind(null, r.id)} variant="danger" confirm="Stop this run?">Stop sending</ActionButton>
-                    ) : (
-                      <Link href={`/dashboard/messages?campaign=${c.id}`} className="py-2 text-sm font-medium text-brand-deep">View messages →</Link>
+            <ul className="divide-y divide-line sm:hidden">
+              {c.runs.map((r) => {
+                const delivered = stat(r.id, "DELIVERED", "READ");
+                const read = stat(r.id, "READ");
+                const failed = stat(r.id, "FAILED");
+                return (
+                  <li key={r.id} className="px-4 py-3.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="tabular text-sm font-medium text-ink">{fmtDate(r.startedAt, "EEE d MMM, h:mm a")}</p>
+                      <StatusBadge status={r.status} />
+                    </div>
+                    <dl className="tabular mt-2 grid grid-cols-4 gap-1.5 text-center">
+                      {[
+                        ["Sent to", fmtNumber(r.total)],
+                        ["Delivered", `${pct(delivered, r.total)}%`],
+                        ["Read", `${pct(read, r.total)}%`],
+                        ["Failed", fmtNumber(failed)],
+                      ].map(([k, v]) => (
+                        <div key={k} className="flex flex-col-reverse rounded-control bg-sunken px-1 py-1.5">
+                          <dt className="text-2xs text-muted">{k}</dt>
+                          <dd className={cn("text-sm font-semibold", k === "Failed" && failed > 0 && "text-danger")}>{v}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                    {salesOf(r.id) && (
+                      <p className="tabular mt-2 text-xs text-muted">
+                        Sales in 7 days: {fmtNumber(Number(salesOf(r.id)!.orders))} · {money(Number(salesOf(r.id)!.revenue))}
+                      </p>
                     )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-          <div className="hidden overflow-x-auto sm:block">
-            <table className="w-full min-w-[720px] text-sm">
-              <thead>
-                <tr className="border-b border-line text-left text-xs text-muted">
-                  <th className="px-5 py-2.5 font-medium">Started</th>
-                  <th className="px-5 py-2.5 font-medium">Status</th>
-                  <th className="px-5 py-2.5 text-right font-medium">Customers</th>
-                  <th className="px-5 py-2.5 text-right font-medium">Delivered</th>
-                  <th className="px-5 py-2.5 text-right font-medium">Read</th>
-                  <th className="px-5 py-2.5 text-right font-medium">Failed</th>
-                  <th className="px-5 py-2.5 text-right font-medium" title="Messages Meta billed (marketing rate)">Charged</th>
-                  <th className="px-5 py-2.5 text-right font-medium" title="Orders placed within 7 days of receiving this run's message">Sales (7 days)</th>
-                  <th className="px-5 py-2.5" />
-                </tr>
-              </thead>
-              <tbody className="tabular divide-y divide-line">
-                {c.runs.map((r) => {
-                  const delivered = stat(r.id, "DELIVERED", "READ");
-                  const read = stat(r.id, "READ");
-                  return (
-                    <tr key={r.id}>
-                      <td className="px-5 py-3">{fmtDate(r.startedAt)}</td>
-                      <td className="px-5 py-3"><StatusBadge status={r.status} /></td>
-                      <td className="px-5 py-3 text-right">{fmtNumber(r.total)}</td>
-                      <td className="px-5 py-3 text-right">{fmtNumber(delivered)} <span className="text-xs text-muted">{pct(delivered, r.total)}%</span></td>
-                      <td className="px-5 py-3 text-right">{fmtNumber(read)} <span className="text-xs text-muted">{pct(read, r.total)}%</span></td>
-                      <td className="px-5 py-3 text-right text-rose-600">{fmtNumber(stat(r.id, "FAILED"))}</td>
-                      <td className="px-5 py-3 text-right">{fmtNumber(chargedIn(r.id))}</td>
-                      <td className="px-5 py-3 text-right">
-                        {salesOf(r.id) ? <>{fmtNumber(Number(salesOf(r.id)!.orders))} <span className="text-xs text-muted">· {money(Number(salesOf(r.id)!.revenue))}</span></> : "—"}
-                      </td>
-                      <td className="px-5 py-3 text-right">
-                        {scope.canManage && ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"].includes(r.status) ? (
-                          <ActionButton action={cancelRun.bind(null, r.id)} variant="danger" confirm="Stop this run?">Stop</ActionButton>
-                        ) : (
-                          <Link href={`/dashboard/messages?campaign=${c.id}`} className="text-xs font-medium text-brand-deep hover:underline">Log</Link>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                    <div className="mt-1 flex justify-end">
+                      {running(r.status) && scope.canManage ? (
+                        <ActionButton action={cancelRun.bind(null, r.id)} variant="danger" confirm="Stop this run?">
+                          Stop sending
+                        </ActionButton>
+                      ) : (
+                        <Link href={`/dashboard/messages?campaign=${c.id}`} className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-brand-deep">
+                          View messages <ChevronRight aria-hidden className="size-4" />
+                        </Link>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="max-sm:hidden">
+              <Table>
+                <thead>
+                  <tr>
+                    <Th>Started</Th>
+                    <Th>Status</Th>
+                    <Th numeric>Customers</Th>
+                    <Th numeric>Delivered</Th>
+                    <Th numeric>Read</Th>
+                    <Th numeric>Failed</Th>
+                    <Th numeric className="max-lg:hidden" title="Messages Meta billed (marketing rate)">Charged</Th>
+                    <Th numeric title="Orders placed within 7 days of receiving this run's message">Sales (7 days)</Th>
+                    <Th><span className="sr-only">Actions</span></Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {c.runs.map((r) => {
+                    const delivered = stat(r.id, "DELIVERED", "READ");
+                    const read = stat(r.id, "READ");
+                    const failed = stat(r.id, "FAILED");
+                    return (
+                      <tr key={r.id} className={rowClass}>
+                        <Td className="tabular whitespace-nowrap">{fmtDate(r.startedAt)}</Td>
+                        <Td><StatusBadge status={r.status} /></Td>
+                        <Td numeric>{fmtNumber(r.total)}</Td>
+                        <Td numeric className="whitespace-nowrap">
+                          {fmtNumber(delivered)} <span className="text-xs text-muted">{pct(delivered, r.total)}%</span>
+                        </Td>
+                        <Td numeric className="whitespace-nowrap">
+                          {fmtNumber(read)} <span className="text-xs text-muted">{pct(read, r.total)}%</span>
+                        </Td>
+                        <Td numeric className={failed ? "text-danger" : undefined}>{fmtNumber(failed)}</Td>
+                        <Td numeric className="max-lg:hidden">{fmtNumber(chargedIn(r.id))}</Td>
+                        <Td numeric className="whitespace-nowrap">
+                          {salesOf(r.id) ? (
+                            <>
+                              {fmtNumber(Number(salesOf(r.id)!.orders))} <span className="text-xs text-muted">· {money(Number(salesOf(r.id)!.revenue))}</span>
+                            </>
+                          ) : (
+                            "—"
+                          )}
+                        </Td>
+                        <Td className="py-2 text-right">
+                          {scope.canManage && running(r.status) ? (
+                            <ActionButton action={cancelRun.bind(null, r.id)} variant="danger" confirm="Stop this run?">
+                              Stop
+                            </ActionButton>
+                          ) : (
+                            <Link href={`/dashboard/messages?campaign=${c.id}`} className="inline-flex min-h-8 items-center text-xs font-medium text-brand-deep hover:underline">
+                              Log
+                            </Link>
+                          )}
+                        </Td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </Table>
+            </div>
           </>
         ) : (
-          <p className="px-5 py-6 text-sm text-muted">This campaign hasn&apos;t sent yet.</p>
+          <EmptyState title="This campaign hasn't sent yet." />
         )}
       </Card>
     </>

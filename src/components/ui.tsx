@@ -431,6 +431,44 @@ export function FilterChips({ label, items }: { label: string; items: { href: st
   );
 }
 
+/** Pick one of a few options in place (a radio group that looks like a switch). Use from client components. */
+export function Segmented<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  className,
+}: {
+  label: string;
+  value: T;
+  options: readonly { value: T; label: ReactNode }[];
+  onChange: (v: T) => void;
+  className?: string;
+}) {
+  return (
+    <div role="radiogroup" aria-label={label} className={cn("inline-flex max-w-full rounded-control bg-sunken p-1", className)}>
+      {options.map((o) => {
+        const on = o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => onChange(o.value)}
+            className={cn(
+              "min-h-10 flex-1 whitespace-nowrap rounded-[calc(var(--radius-control)-4px)] px-4 text-sm font-medium transition sm:min-h-8 sm:px-3 sm:pointer-coarse:min-h-10",
+              on ? "bg-panel text-ink shadow-card" : "text-muted hover:text-ink",
+            )}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /** A round initial for a person. */
 export function Avatar({ name, className }: { name: string; className?: string }) {
   return (
