@@ -4,7 +4,7 @@ import { ActionButton } from "@/components/action-button";
 import { Badge, Card, CardHeader, type Tone } from "@/components/ui";
 import { db } from "@/lib/db";
 import { fmtDate, fmtNumber } from "@/lib/format";
-import { heldSummary, HELD_CODES, RETRY_AFTER_DAYS, RETRY_UNTIL_DAYS } from "@/lib/held";
+import { heldSummary, HELD_CODES, RETRY_AFTER_DAYS, RETRY_UNTIL_DAYS, type HeldSummary } from "@/lib/held";
 import { metaError, type ErrorKind } from "@/lib/meta-errors";
 import { retryHeldBackNow } from "../actions/campaigns";
 
@@ -39,8 +39,23 @@ export async function FailureSummary({ campaignId, runIds, canManage }: { campai
     const kind = (metaError(g.errorCode)?.kind ?? "other") as keyof typeof NEXT;
     groups.set(kind, (groups.get(kind) ?? 0) + g._count);
   }
+  return <FailureSummaryView campaignId={campaignId} groups={[...groups]} held={held} canManage={canManage} />;
+}
+
+/** The card itself, from already-counted failures (kept separate so it can be previewed with sample data). */
+export function FailureSummaryView({
+  campaignId,
+  groups,
+  held,
+  canManage,
+}: {
+  campaignId: string;
+  groups: [string, number][];
+  held: HeldSummary;
+  canManage: boolean;
+}) {
   const heldTotal = held.waiting + held.retriedOk + held.heldTwice + held.expired;
-  if (!heldTotal && !groups.size) return null;
+  if (!heldTotal && !groups.length) return null;
 
   return (
     <Card className="mt-4 sm:mt-6">
@@ -56,7 +71,7 @@ export async function FailureSummary({ campaignId, runIds, canManage }: { campai
       <ul className="divide-y divide-line">
         {heldTotal > 0 && (
           <li className="px-4 py-3.5 sm:px-5">
-            <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1">
                 <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink">
                   Held back by Meta <Badge tone="amber">{fmtNumber(heldTotal)}</Badge>
@@ -89,6 +104,7 @@ export async function FailureSummary({ campaignId, runIds, canManage }: { campai
               </div>
               {canManage && held.waiting > 0 && (
                 <ActionButton
+                  className="shrink-0 max-sm:w-full"
                   action={retryHeldBackNow.bind(null, campaignId)}
                   confirm={`Send the ${held.waiting} held-back message${held.waiting === 1 ? "" : "s"} again now? Meta suggests waiting a few days; retrying early often gets held back again, and each customer only gets one retry.`}
                 >
@@ -98,7 +114,7 @@ export async function FailureSummary({ campaignId, runIds, canManage }: { campai
             </div>
           </li>
         )}
-        {[...groups].map(([kind, n]) => {
+        {groups.map(([kind, n]) => {
           const g = NEXT[kind as keyof typeof NEXT];
           return (
             <li key={kind} className="px-4 py-3.5 sm:px-5">

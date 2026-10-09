@@ -20,6 +20,7 @@ import { sendCatalogue } from "../../actions/catalog";
 import { requestCallPermission } from "../../actions/calls";
 import { setOptOut } from "../../actions/customers";
 import { CallButton } from "./call-button";
+import { PausedOffersNote } from "./paused-offers-note";
 import { SendPanel } from "./send-panel";
 
 export const metadata: Metadata = { title: "Customer" };
@@ -232,15 +233,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                 </div>
               </div>
             )}
-            {pausedUntil && (
-              <div className="rounded-control border border-warning-border bg-warning-bg px-3 py-2 text-xs text-warning">
-                <p className="font-semibold">Offers paused until about {fmtDate(pausedUntil, "d MMM")}</p>
-                <p className="mt-0.5">
-                  Meta held back a marketing message because this customer gets a lot of offers. Campaigns skip them until then, and the held message is sent once more.
-                  Order updates and typed replies still go through.
-                </p>
-              </div>
-            )}
+            {pausedUntil && <PausedOffersNote until={pausedUntil} />}
             <div className="rounded-control bg-sunken px-3 py-2 text-xs">
               <p className="font-medium text-ink-2">Agreed to WhatsApp messages</p>
               {c.optInSource ? (
