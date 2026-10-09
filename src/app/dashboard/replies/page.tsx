@@ -49,8 +49,10 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
           n(false) > 0 && (
             <ActionButton action={handleAllReplies} size="md" confirm="Mark every open reply as handled?" aria-label="Mark all handled">
               <CheckCheck aria-hidden className="size-4" />
-              <span className="sm:hidden">All handled</span>
-              <span className="max-sm:hidden">Mark all handled</span>
+              <span>
+                <span className="max-sm:hidden">Mark all</span>
+                <span className="sm:hidden">All</span> handled
+              </span>
             </ActionButton>
           )
         }

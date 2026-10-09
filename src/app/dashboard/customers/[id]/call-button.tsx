@@ -8,7 +8,7 @@ import { Button } from "@/components/ui";
 export function CallButton({ customerId, name, primary }: { customerId: string; name: string; primary: boolean }) {
   return (
     <Button type="button" variant={primary ? "primary" : "secondary"} onClick={() => placeCall({ customerId, name })}>
-      <Phone aria-hidden className="size-4" /> Call<span className="max-sm:sr-only"> on WhatsApp</span>
+      <Phone aria-hidden className="size-4" /> <span>Call<span className="max-sm:sr-only"> on WhatsApp</span></span>
     </Button>
   );
 }

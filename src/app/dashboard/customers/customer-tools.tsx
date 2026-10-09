@@ -37,7 +37,7 @@ export function CustomerActions({ canManage }: { canManage: boolean }) {
             <FileUp aria-hidden className="size-4" /> Import CSV
           </Button>
           <Button onClick={() => setOpen("add")} className="max-sm:px-3.5">
-            <UserPlus aria-hidden className="size-4" /> Add<span className="max-sm:sr-only"> customer</span>
+            <UserPlus aria-hidden className="size-4" /> <span>Add<span className="max-sm:sr-only"> customer</span></span>
           </Button>
         </>
       )}

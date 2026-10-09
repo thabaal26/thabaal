@@ -26,7 +26,7 @@ export function NewOrder() {
   return (
     <>
       <Button onClick={() => setOpen(true)} className="max-sm:px-3.5">
-        <Plus aria-hidden className="size-4" /> New<span className="max-sm:sr-only"> order</span>
+        <Plus aria-hidden className="size-4" /> <span>New<span className="max-sm:sr-only"> order</span></span>
       </Button>
       <Sheet open={open} onClose={() => setOpen(false)} title="New order" className="sm:max-w-lg">
         <form

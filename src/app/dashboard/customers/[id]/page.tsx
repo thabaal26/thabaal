@@ -109,8 +109,10 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
         actions={
           <>
             <a href={`https://wa.me/${c.phone}`} target="_blank" rel="noreferrer" className={buttonClass("primary")}>
-              <MessageCircle aria-hidden className="size-4" /> <span className="sm:hidden">WhatsApp</span>
-              <span className="max-sm:sr-only">Message on WhatsApp</span>
+              <MessageCircle aria-hidden className="size-4" />
+              <span>
+                <span className="max-sm:sr-only">Message on </span>WhatsApp
+              </span>
             </a>
             {scope.canOperate && <CallButton customerId={c.id} name={c.name} primary={callAllowed} />}
             {more.length > 0 && (

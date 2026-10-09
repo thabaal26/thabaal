@@ -55,8 +55,10 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
         inlineActions
         actions={
           <a href={`/api/messages/export?${exportQs}`} className={cn(buttonClass("secondary"), "max-sm:px-3.5")} aria-label="Export CSV">
-            <Download aria-hidden className="size-4" /> <span className="max-sm:hidden">Export CSV</span>
-            <span className="sm:hidden">CSV</span>
+            <Download aria-hidden className="size-4" />
+            <span>
+              <span className="max-sm:sr-only">Export </span>CSV
+            </span>
           </a>
         }
         tabs={

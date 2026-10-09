@@ -47,7 +47,7 @@ export function ReplyInbox({ replies, picked, show, canOperate, showClient }: { 
 
   const actions = (r: InboxReply, wide?: boolean) =>
     canOperate && (
-      <div className={cn("flex gap-2", !wide && "*:flex-1")}>
+      <div className={cn("flex gap-2", !wide && "max-sm:*:flex-1")}>
         <Link href={`/dashboard/customers/${r.customer.id}#reply`} className={buttonClass("primary", wide ? "md" : "sm")}>
           <MessageCircle aria-hidden className="size-4" /> Reply here
         </Link>

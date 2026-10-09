@@ -40,7 +40,7 @@ export default async function CampaignsPage() {
         actions={
           canCreate && (
             <Link href="/dashboard/campaigns/new" className={buttonClass("primary")}>
-              <Plus aria-hidden className="size-4" /> New<span className="max-sm:sr-only"> campaign</span>
+              <Plus aria-hidden className="size-4" /> <span>New<span className="max-sm:sr-only"> campaign</span></span>
             </Link>
           )
         }
