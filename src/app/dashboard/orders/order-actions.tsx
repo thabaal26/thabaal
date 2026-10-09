@@ -177,14 +177,9 @@ export function OrderActions({
           <Field id={`eta-${id}`} label="Reaches them by" required>
             <input className="field" value={d.eta} placeholder="today evening, tomorrow 11 AM…" onChange={(e) => setD({ ...d, eta: e.target.value })} />
           </Field>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field id={`by-${id}`} label="Delivery person" hint="optional">
-              <input className="field" value={d.by} placeholder="Ravi, or DTDC" onChange={(e) => setD({ ...d, by: e.target.value })} />
-            </Field>
-            <Field id={`ph-${id}`} label="Their phone" hint="optional">
-              <input className="field" type="tel" inputMode="tel" autoComplete="off" value={d.phone} placeholder="98765 43210" onChange={(e) => setD({ ...d, phone: e.target.value })} />
-            </Field>
-          </div>
+          <Field id={`by-${id}`} label="Delivery person or courier" hint="optional">
+            <input className="field" value={d.by} placeholder="Ravi, DTDC, Porter, etc." onChange={(e) => setD({ ...d, by: e.target.value })} />
+          </Field>
           <Field id={`tr-${id}`} label="Tracking link or number" hint="optional">
             <input className="field" value={d.link} placeholder="Courier tracking link or AWB number" onChange={(e) => setD({ ...d, link: e.target.value })} />
           </Field>

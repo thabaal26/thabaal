@@ -9,6 +9,7 @@ import { nightColor, themeCss, themeStyle } from "@/lib/theme";
 import { logout } from "../login/actions";
 import { ClientSwitcher, HeaderClientSwitcher } from "./client-switcher";
 import { BottomNav, SettingsLink, SideNav, type NavRole } from "./nav";
+import { NotificationBell, NotificationProvider } from "@/components/notification-center";
 
 /** The client whose look the dashboard wears: a client login's own, or the one an admin picked. */
 async function brandedClient() {
@@ -74,62 +75,70 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
     </span>
   ) : null;
 
+  const unreadNotifications = openReplies + newOrders;
+
   return (
-    <div style={themeStyle(client)} className="min-h-dvh w-full overflow-x-clip bg-canvas lg:pl-64 print:bg-white print:pl-0 lg:print:pl-0">
-      {client && themeCss(client) && <style>{themeCss(client)}</style>}
-      <a href="#main" className="sr-only z-[70] rounded-control bg-panel px-4 py-2 text-sm font-medium text-ink shadow-pop focus:not-sr-only focus:fixed focus:left-4 focus:top-4">
-        Skip to content
-      </a>
+    <NotificationProvider>
+      <div style={themeStyle(client)} className="min-h-dvh w-full overflow-x-clip bg-canvas lg:pl-64 print:bg-white print:pl-0 lg:print:pl-0">
+        {client && themeCss(client) && <style>{themeCss(client)}</style>}
+        <a href="#main" className="sr-only z-[70] rounded-control bg-panel px-4 py-2 text-sm font-medium text-ink shadow-pop focus:not-sr-only focus:fixed focus:left-4 focus:top-4">
+          Skip to content
+        </a>
 
-      <aside className="surface-dark fixed inset-y-0 left-0 hidden w-64 flex-col overflow-y-auto bg-night px-3 py-5 no-scrollbar lg:flex print:!hidden">
-        <div className="mb-6 flex items-center gap-3 px-2">
-          <BrandMark logoUrl={client?.logoUrl} name={name} size="md" />
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-white">{name}</p>
-            <p className="line-clamp-2 text-xs text-white/70">{subtitle}</p>
-          </div>
-        </div>
-        {scope.isAdmin && <div className="mb-5 px-1"><ClientSwitcher clients={clients} current={scope.clientId} dark /></div>}
-        <SideNav isAdmin={scope.isAdmin} openReplies={openReplies} newOrders={newOrders} />
-        <div className="mt-auto space-y-3 border-t border-white/10 px-2 pt-4">
-          {status && <div className="text-xs">{status}</div>}
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="truncate text-sm text-white">{user.name}</p>
-              <p className="truncate text-xs text-white/70">{user.email}</p>
+        <aside className="surface-dark fixed inset-y-0 left-0 hidden w-64 flex-col overflow-y-auto bg-night px-3 py-5 no-scrollbar lg:flex print:!hidden">
+          <div className="mb-6 flex items-center justify-between gap-2 px-2">
+            <div className="flex items-center gap-3 min-w-0">
+              <BrandMark logoUrl={client?.logoUrl} name={name} size="md" />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-white">{name}</p>
+                <p className="line-clamp-2 text-xs text-white/70">{subtitle}</p>
+              </div>
             </div>
-            <form action={logout}>
-              <button aria-label="Sign out" title="Sign out" className="grid size-9 place-items-center rounded-control text-white/75 transition hover:bg-white/10 hover:text-white">
-                <LogOut aria-hidden className="size-4" />
-              </button>
-            </form>
+            <NotificationBell dark />
           </div>
-          {!scope.isAdmin && <p className="text-2xs text-white/55">Powered by Campaign Portal</p>}
-        </div>
-      </aside>
-
-      <header className="surface-dark sticky top-0 z-30 w-full bg-night pt-[env(safe-area-inset-top)] lg:hidden print:hidden">
-        <div className="flex h-14 items-center gap-3 pl-4 pr-2">
-          <BrandMark logoUrl={client?.logoUrl} name={name} size="sm" />
-          {scope.isAdmin ? (
-            <HeaderClientSwitcher clients={clients} current={scope.clientId} title={client ? name : "All clients"}>
-              <span className="block text-2xs leading-tight">{status}</span>
-            </HeaderClientSwitcher>
-          ) : (
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold leading-tight text-white">{name}</p>
-              <div className="text-2xs leading-tight">{status ?? <span className="block truncate text-white/70">{subtitle}</span>}</div>
+          {scope.isAdmin && <div className="mb-5 px-1"><ClientSwitcher clients={clients} current={scope.clientId} dark /></div>}
+          <SideNav isAdmin={scope.isAdmin} openReplies={openReplies} newOrders={newOrders} unreadNotifications={unreadNotifications} />
+          <div className="mt-auto space-y-3 border-t border-white/10 px-2 pt-4">
+            {status && <div className="text-xs">{status}</div>}
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-sm text-white">{user.name}</p>
+                <p className="truncate text-xs text-white/70">{user.email}</p>
+              </div>
+              <form action={logout}>
+                <button aria-label="Sign out" title="Sign out" className="grid size-9 place-items-center rounded-control text-white/75 transition hover:bg-white/10 hover:text-white">
+                  <LogOut aria-hidden className="size-4" />
+                </button>
+              </form>
             </div>
-          )}
-          <SettingsLink />
-        </div>
-      </header>
+            {!scope.isAdmin && <p className="text-2xs text-white/55">Powered by Campaign Portal</p>}
+          </div>
+        </aside>
 
-      <main id="main" className="stagger mx-auto w-full max-w-page px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pb-12 lg:pt-8 print:p-0">
-        {children}
-      </main>
-      {scope.canOperate && <CallWidget />}
-      <BottomNav isAdmin={scope.isAdmin} role={role} openReplies={openReplies} newOrders={newOrders} />
-    </div>
+        <header className="surface-dark sticky top-0 z-30 w-full bg-night pt-[env(safe-area-inset-top)] lg:hidden print:hidden">
+          <div className="flex h-14 items-center gap-3 pl-4 pr-2">
+            <BrandMark logoUrl={client?.logoUrl} name={name} size="sm" />
+            {scope.isAdmin ? (
+              <HeaderClientSwitcher clients={clients} current={scope.clientId} title={client ? name : "All clients"}>
+                <span className="block text-2xs leading-tight">{status}</span>
+              </HeaderClientSwitcher>
+            ) : (
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold leading-tight text-white">{name}</p>
+                <div className="text-2xs leading-tight">{status ?? <span className="block truncate text-white/70">{subtitle}</span>}</div>
+              </div>
+            )}
+            <NotificationBell dark />
+            <SettingsLink />
+          </div>
+        </header>
+
+        <main id="main" className="stagger mx-auto w-full max-w-page px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pb-12 lg:pt-8 print:p-0">
+          {children}
+        </main>
+        {scope.canOperate && <CallWidget />}
+        <BottomNav isAdmin={scope.isAdmin} role={role} openReplies={openReplies} newOrders={newOrders} unreadNotifications={unreadNotifications} />
+      </div>
+    </NotificationProvider>
   );
 }

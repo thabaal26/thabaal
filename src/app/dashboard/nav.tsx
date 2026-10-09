@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, CalendarClock, Inbox, LayoutDashboard, Menu, MessagesSquare, Phone, Settings, ShoppingBag, SquarePen, Users } from "lucide-react";
+import { Bell, Building2, CalendarClock, Inbox, LayoutDashboard, Menu, MessagesSquare, Phone, Settings, ShoppingBag, SquarePen, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -9,6 +9,7 @@ import { cn } from "@/lib/cn";
 
 export const NAV = [
   { href: "/dashboard", label: "Overview", short: "Home", icon: LayoutDashboard, group: "Daily work" },
+  { href: "/dashboard/notifications", label: "Notifications", short: "Alerts", icon: Bell, group: "Daily work" },
   { href: "/dashboard/orders", label: "Orders", short: "Orders", icon: ShoppingBag, group: "Daily work" },
   { href: "/dashboard/replies", label: "Replies", short: "Replies", icon: Inbox, group: "Daily work" },
   { href: "/dashboard/calls", label: "Calls", short: "Calls", icon: Phone, group: "Daily work" },
@@ -32,7 +33,7 @@ const PHONE_TABS = {
 };
 
 export type NavRole = keyof typeof PHONE_TABS;
-type Counts = { openReplies?: number; newOrders?: number };
+type Counts = { openReplies?: number; newOrders?: number; unreadNotifications?: number };
 
 function CountBadge({ n, label, className }: { n?: number; label: string; className?: string }) {
   if (!n) return null;
@@ -49,9 +50,15 @@ function isActive(path: string, href: string) {
 }
 
 const countFor = (href: string, c: Counts) =>
-  href === "/dashboard/replies" ? { n: c.openReplies, label: "open replies" } : href === "/dashboard/orders" ? { n: c.newOrders, label: "orders to handle" } : null;
+  href === "/dashboard/replies"
+    ? { n: c.openReplies, label: "open replies" }
+    : href === "/dashboard/orders"
+    ? { n: c.newOrders, label: "orders to handle" }
+    : href === "/dashboard/notifications"
+    ? { n: c.unreadNotifications, label: "unread notifications" }
+    : null;
 
-export function SideNav({ isAdmin, openReplies, newOrders }: { isAdmin: boolean } & Counts) {
+export function SideNav({ isAdmin, openReplies, newOrders, unreadNotifications }: { isAdmin: boolean } & Counts) {
   const path = usePathname();
   const items = [...NAV, ...(isAdmin ? ADMIN_NAV : [])];
   const groups = [...new Set(items.map((n) => n.group))];
@@ -65,7 +72,7 @@ export function SideNav({ isAdmin, openReplies, newOrders }: { isAdmin: boolean 
               .filter((n) => n.group === g)
               .map(({ href, label, icon: Icon }) => {
                 const active = isActive(path, href);
-                const count = countFor(href, { openReplies, newOrders });
+                const count = countFor(href, { openReplies, newOrders, unreadNotifications });
                 return (
                   <li key={href}>
                     <Link
@@ -91,7 +98,7 @@ export function SideNav({ isAdmin, openReplies, newOrders }: { isAdmin: boolean 
 }
 
 /** Phone tab bar, pinned to the bottom edge, above the home indicator. */
-export function BottomNav({ isAdmin, role, openReplies, newOrders }: { isAdmin: boolean; role: NavRole } & Counts) {
+export function BottomNav({ isAdmin, role, openReplies, newOrders, unreadNotifications }: { isAdmin: boolean; role: NavRole } & Counts) {
   const path = usePathname();
   // Remembers the page "More" was opened on, so the sheet closes by itself once a tapped page opens.
   const [openedOn, setOpenedOn] = useState<string | null>(null);
@@ -101,7 +108,7 @@ export function BottomNav({ isAdmin, role, openReplies, newOrders }: { isAdmin: 
   const more = all.filter((n) => !tabs.includes(n.href));
   const moreActive = more.some((n) => isActive(path, n.href));
   // Counts for sections that live under "More" show on the More tab too.
-  const hiddenCount = more.reduce((sum, n) => sum + (countFor(n.href, { openReplies, newOrders })?.n ?? 0), 0);
+  const hiddenCount = more.reduce((sum, n) => sum + (countFor(n.href, { openReplies, newOrders, unreadNotifications })?.n ?? 0), 0);
 
   const tabClass = (active: boolean) =>
     cn("flex h-16 min-w-0 flex-col items-center justify-center gap-1 text-2xs font-medium transition active:scale-95", active ? "text-brand-deep" : "text-muted");
@@ -113,7 +120,7 @@ export function BottomNav({ isAdmin, role, openReplies, newOrders }: { isAdmin: 
       <ul className="mx-auto grid max-w-lg grid-cols-5">
         {tabs.map((tab) => all.find((n) => n.href === tab)!).map(({ href, short, icon: Icon }) => {
           const active = isActive(path, href);
-          const count = countFor(href, { openReplies, newOrders });
+          const count = countFor(href, { openReplies, newOrders, unreadNotifications });
           return (
             <li key={href} className="min-w-0">
               <Link href={href} aria-current={active ? "page" : undefined} className={tabClass(active)}>
@@ -140,7 +147,7 @@ export function BottomNav({ isAdmin, role, openReplies, newOrders }: { isAdmin: 
         <ul className="grid grid-cols-2 gap-2">
           {more.map(({ href, label, icon: Icon }) => {
             const active = isActive(path, href);
-            const count = countFor(href, { openReplies, newOrders });
+            const count = countFor(href, { openReplies, newOrders, unreadNotifications });
             return (
               <li key={href}>
                 <Link

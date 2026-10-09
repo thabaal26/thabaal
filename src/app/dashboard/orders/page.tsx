@@ -18,7 +18,7 @@ import { NewOrder } from "./new-order";
 import { OrderCard } from "./order-card";
 import { PaymentForm } from "./payment-form";
 import { RefillForm } from "./refill-form";
-import { WinbackForm } from "./winback-form";
+import { OrdersRefreshButton } from "./orders-refresh-button";
 
 /** The utility templates that let order updates go out after the customer's 24-hour window. */
 const ORDER_TEMPLATES = ["order_confirmation", "order_dispatched", "order_delivered"];
@@ -168,7 +168,6 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
   };
 
   // An order update is covered when either the plain or the picture version is approved.
-  const lapsed = scope.clientId && scope.canManage ? await db.customer.count({ where: { clientId: scope.clientId, tags: { has: "lapsed" }, optedOut: false } }) : 0;
   const notReady = ORDER_TEMPLATES.filter((name) => !orderTemplates.some((t) => (t.name === name || t.name === `thenan_${name}`) && t.status === "APPROVED"));
   const pictureStatus = ORDER_TEMPLATES.map((name) => ({ name: `thenan_${name}`, status: orderTemplates.find((t) => t.name === `thenan_${name}`)?.status ?? null }));
   const h = await headers();
@@ -197,14 +196,17 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         title="Orders"
         description="WhatsApp catalogue carts and orders you add by hand. Confirm, dispatch and deliver them here; the customer gets a WhatsApp update at each step."
         actions={
-          scope.clientId && canEdit ? (
-            <>
-              <Link href="/dashboard/orders/packing" aria-label="Packing list" className={cn(buttonClass("secondary"), "max-sm:w-11 max-sm:px-0")}>
-                <PackageOpen aria-hidden className="size-4" /> <span className="max-sm:hidden">Packing list</span>
-              </Link>
-              <NewOrder />
-            </>
-          ) : undefined
+          <div className="flex items-center gap-2">
+            <OrdersRefreshButton className="max-sm:w-11 max-sm:px-0" />
+            {scope.clientId && canEdit ? (
+              <>
+                <Link href="/dashboard/orders/packing" aria-label="Packing list" className={cn(buttonClass("secondary"), "max-sm:w-11 max-sm:px-0")}>
+                  <PackageOpen aria-hidden className="size-4" /> <span className="max-sm:hidden">Packing list</span>
+                </Link>
+                <NewOrder />
+              </>
+            ) : null}
+          </div>
         }
         inlineActions
         tabs={
@@ -327,7 +329,6 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
             <div className="grid items-start gap-4 xl:grid-cols-2">
               <PaymentForm config={client.paymentConfig} own={{ name: PAYMENT_TEMPLATE, status: ownPaymentTemplate?.status ?? null }} using={paymentTemplate?.name ?? null} />
               <RefillForm days={client.refillDays} templateId={client.refillTemplateId} templates={approved} />
-              <WinbackForm days={client.lapsedDays} templateId={client.winbackTemplateId} templates={approved} lapsed={lapsed} />
             </div>
           )}
         </Section>

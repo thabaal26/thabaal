@@ -13,6 +13,7 @@ import { toggleCampaign } from "../actions/campaigns";
 
 import { fmtNumber } from "@/lib/format";
 import { FilterChips } from "@/components/ui";
+import { WinbackForm } from "./winback-form";
 
 export const metadata: Metadata = { title: "Campaigns" };
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ const TABS = [
 export default async function CampaignsPage({ searchParams }: PageProps<"/dashboard/campaigns">) {
   const { show = "" } = await searchParams;
   const scope = await getScope();
-  const [campaigns, audiences] = await Promise.all([
+  const [campaigns, audiences, clientData, templates, lapsed] = await Promise.all([
     db.campaign.findMany({
       where: owned(scope),
       include: {
@@ -37,6 +38,24 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
       orderBy: [{ active: "desc" }, { nextRunAt: "asc" }],
     }),
     db.customer.groupBy({ by: ["clientId"], where: { ...owned(scope), optedOut: false }, _count: true }),
+    scope.clientId && scope.canManage
+      ? db.client.findUnique({
+          where: { id: scope.clientId },
+          select: { lapsedDays: true, winbackTemplateId: true },
+        })
+      : null,
+    scope.clientId && scope.canManage
+      ? db.template.findMany({
+          where: { clientId: scope.clientId, status: "APPROVED", category: { not: "AUTHENTICATION" } },
+          select: { id: true, name: true },
+          orderBy: { name: "asc" },
+        })
+      : [],
+    scope.clientId && scope.canManage
+      ? db.customer.count({
+          where: { clientId: scope.clientId, tags: { has: "lapsed" }, optedOut: false },
+        })
+      : 0,
   ]);
   const audienceOf = (clientId: string) => audiences.find((a) => a.clientId === clientId)?._count ?? 0;
   const canCreate = scope.canManage && scope.clientId;
@@ -191,6 +210,17 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
               : "Campaigns set up for you will appear here."}
           </EmptyState>
         </Card>
+      )}
+
+      {clientData && (
+        <div className="mt-6 sm:mt-8">
+          <WinbackForm
+            days={clientData.lapsedDays}
+            templateId={clientData.winbackTemplateId}
+            templates={templates}
+            lapsed={lapsed}
+          />
+        </div>
       )}
     </>
   );

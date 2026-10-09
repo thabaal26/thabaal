@@ -15,6 +15,7 @@ import { numberHealth } from "@/lib/limits";
 import { codesOf, PAUSING_KINDS } from "@/lib/meta-errors";
 import { DailyChart } from "./daily-chart";
 import { SpendCard } from "./spend-card";
+import { AreaChips } from "./area-chips";
 
 export const dynamic = "force-dynamic";
 
@@ -133,7 +134,12 @@ export default async function Overview() {
   const byRegion = [...REGIONS.map((r) => ({ key: r, label: r, n: areaRows.filter((a) => a.region === r).reduce((t, a) => t + a._count, 0), href: `region:${r}` })),
     { key: "none", label: "No location noted", n: areaRows.filter((a) => !a.location).reduce((t, a) => t + a._count, 0), href: "none" }].filter((r) => r.n);
   const regionTotal = byRegion.reduce((t, r) => t + r.n, 0);
-  const topAreas = areaRows.filter((a) => a.location).sort((a, b) => b._count - a._count).slice(0, 10);
+  const sortedAreas = areaRows
+    .filter((a): a is typeof a & { location: string } => typeof a.location === "string" && a.location.length > 0)
+    .sort((a, b) => b._count - a._count)
+    .map((a) => ({ location: a.location as string, _count: a._count }));
+  const topAreas = sortedAreas.slice(0, 10);
+  const otherAreas = sortedAreas.slice(10);
   const byProduct = results
     .filter((r) => r.tag !== clientTag || results.length === 1)
     .map((r) => ({ tag: r.tag, sent: Number(r.sent), delivered: Number(r.delivered), read: Number(r.read), failed: Number(r.failed), replies: Number(repliesByTag.find((x) => x.tag === r.tag)?.n ?? 0) }));
@@ -202,8 +208,8 @@ export default async function Overview() {
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Stat label="Active customers" value={fmtNumber(customers)} sub={`${fmtNumber(optedOut)} opted out`} icon={<Users className="size-4" />} />
         <Stat label="Messages sent · 7 days" value={fmtNumber(total)} sub={`${fmtNumber(failed)} failed`} icon={<Send className="size-4" />} />
-        <Stat label="Delivery rate" value={`${pct(delivered, total)}%`} sub={`${fmtNumber(delivered)} delivered`} icon={<CheckCheck className="size-4" />} />
-        <Stat label="Read rate" value={`${pct(read, delivered)}%`} sub={`${fmtNumber(read)} of delivered were read`} icon={<Eye className="size-4" />} />
+        <Stat label="Message delivery rate" value={`${pct(delivered, total)}%`} sub={`${fmtNumber(delivered)} delivered`} icon={<CheckCheck className="size-4" />} />
+        <Stat label="Message read rate" value={`${pct(read, delivered)}%`} sub={`${fmtNumber(read)} of delivered were read`} icon={<Eye className="size-4" />} />
       </div>
 
       {/*
@@ -373,22 +379,7 @@ export default async function Overview() {
                     ))}
                   </ul>
                 </div>
-                {topAreas.length > 0 && (
-                  <div>
-                    <p className="mb-2 text-xs font-medium text-muted">Top areas</p>
-                    <div className="flex flex-wrap gap-2">
-                      {topAreas.map((a) => (
-                        <Link
-                          key={a.location}
-                          href={`/dashboard/customers?area=${encodeURIComponent(`loc:${a.location}`)}`}
-                          className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line-strong/50 bg-panel px-3 text-sm transition hover:border-brand hover:bg-brand-soft/50 active:bg-sunken sm:min-h-8"
-                        >
-                          {a.location} <span className="tabular text-xs text-muted">{a._count}</span>
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <AreaChips topAreas={topAreas} otherAreas={otherAreas} />
               </div>
             </Card>
           )}

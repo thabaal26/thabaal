@@ -321,6 +321,7 @@ export async function saveWinbackRule(days: number, templateId: string): Promise
     if (!t) return { ok: false, message: "Choose a template." };
   }
   await db.client.update({ where: { id: s.clientId }, data: { lapsedDays: n, winbackTemplateId: templateId || null } });
+  revalidatePath("/dashboard/campaigns");
   revalidatePath("/dashboard/orders");
   return { ok: true, message: templateId ? `Win-back on: customers with no order for ${n} days get one message (up to 200 a day).` : `Win-back off. Customers are still tagged "lapsed" after ${n} days.` };
 }

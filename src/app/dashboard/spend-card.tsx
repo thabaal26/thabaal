@@ -1,4 +1,4 @@
-import { Wallet } from "lucide-react";
+import { ExternalLink, Wallet } from "lucide-react";
 import { ActionButton } from "@/components/action-button";
 import { Card, CardHeader } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -49,26 +49,53 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
       <CardHeader
         title="WhatsApp spend"
         description="Estimated from Meta's per-message India rates, before tax. Your Meta invoice is the final amount."
+        action={
+          <a
+            href="https://business.facebook.com/billing_hub"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Recharge prepaid balance or view invoices on Meta Business Suite"
+            className="inline-flex min-h-8 items-center gap-1.5 rounded-control border border-line-strong/50 bg-panel px-3 text-xs font-medium text-ink transition hover:border-brand hover:text-brand-deep active:bg-sunken"
+          >
+            <span>Recharge in Meta</span>
+            <ExternalLink aria-hidden className="size-3.5 text-muted" />
+          </a>
+        }
       />
       <div className="space-y-5 p-4 sm:p-5">
-        <div className="flex items-center gap-3 rounded-control bg-sunken px-4 py-3">
-          <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft text-brand-deep">
-            <Wallet className="size-5" />
-          </span>
-          {s.balance ? (
-            <div className="min-w-0">
-              <p className="text-xs text-muted">Balance (estimated)</p>
-              <p className={cn("tabular text-xl font-semibold", s.balance.left < 100 && "text-danger")}>{rupees(s.balance.left)}</p>
-              <p className="text-xs text-muted">
-                Added {rupees(s.balance.added)} · spent ≈ {rupees(s.balance.spent)} since {fmtDate(s.balance.since, "d MMM yyyy")}
-                {s.balance.left < 100 && " · running low, add money in Meta's Billing & payments"}
-              </p>
-            </div>
-          ) : (
-            <p className="text-sm text-muted">
-              Meta doesn&apos;t share your account balance. {canManage ? "Record each amount you add to WhatsApp billing below" : "Ask your manager to record top-ups"} to see what&apos;s left.
-            </p>
-          )}
+        <div className="flex flex-col gap-3 rounded-control bg-sunken p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft text-brand-deep">
+              <Wallet className="size-5" />
+            </span>
+            {s.balance ? (
+              <div className="min-w-0">
+                <p className="text-xs text-muted">Balance (estimated)</p>
+                <p className={cn("tabular text-xl font-semibold", s.balance.left < 100 && "text-danger")}>{rupees(s.balance.left)}</p>
+                <p className="text-xs text-muted">
+                  Added {rupees(s.balance.added)} · spent ≈ {rupees(s.balance.spent)} since {fmtDate(s.balance.since, "d MMM yyyy")}
+                  {s.balance.left < 100 && " · running low, add money in Meta's Billing & payments"}
+                </p>
+              </div>
+            ) : (
+              <div className="min-w-0">
+                <p className="text-xs text-muted">Balance</p>
+                <p className="text-sm font-medium text-ink">Track prepaid messaging funds</p>
+                <p className="text-xs text-muted">
+                  Meta handles recharges directly in Meta Business Manager. {canManage ? "Record top-ups below to track your live balance." : "Ask your manager to record top-ups."}
+                </p>
+              </div>
+            )}
+          </div>
+          <a
+            href="https://business.facebook.com/billing_hub"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-control bg-brand px-3.5 text-xs font-medium text-white shadow-sm transition hover:bg-brand-deep active:scale-95 sm:self-center"
+          >
+            <span>Add funds on Meta</span>
+            <ExternalLink aria-hidden className="size-3.5" />
+          </a>
         </div>
 
         <div className="grid gap-5 @lg:grid-cols-2">
