@@ -1,10 +1,11 @@
 import { ReplyMedia } from "@/components/reply-media";
-import { ArrowLeft, CheckCheck, Eye, MapPin, MessageCircle, Send, ShoppingBag } from "lucide-react";
+import { CheckCheck, Eye, MapPin, MessageCircle, Send, ShoppingBag } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
-import { Badge, buttonClass, Card, CardHeader, PageHeader, Stat, StatusBadge } from "@/components/ui";
+import { OverflowMenu } from "@/components/overflow-menu";
+import { Badge, buttonClass, Card, CardHeader, EmptyState, PageHeader, Stat, StatusBadge } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { fmtDate, fmtNumber, pct } from "@/lib/format";
@@ -66,36 +67,56 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
   const plain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
   const productTags = c.tags.filter((t) => plain(t) !== plain(c.client.name));
 
+  const meta = [
+    formatPhone(c.phone),
+    c.location ? `${c.location}${c.region && c.region !== "Not sure" ? `, ${c.region}` : ""}` : null,
+    !scope.clientId ? c.client.name : null,
+    `customer since ${fmtDate(c.createdAt, "d MMM yyyy")}`,
+    c.callAllowedUntil && c.callAllowedUntil > new Date() ? `calls allowed until ${fmtDate(c.callAllowedUntil, "d MMM")}` : null,
+  ].filter(Boolean);
+
+  // Secondary actions: inline on computers, in a "⋯" sheet on phones.
+  const more = [
+    scope.canOperate && windowEnd && !c.optedOut && (
+      <ActionButton key="cat" action={sendCatalogue.bind(null, c.id)} size="md" title="Free while the customer's 24-hour window is open">
+        <ShoppingBag aria-hidden className="size-4" /> Send catalogue
+      </ActionButton>
+    ),
+    scope.canOperate && !callAllowed && (
+      <ActionButton
+        key="ask"
+        action={requestCallPermission.bind(null, c.id)}
+        size="md"
+        title={c.callAskedAt ? `Last asked ${fmtDate(c.callAskedAt, "d MMM, h:mm a")}` : "Sends WhatsApp's \"allow calls?\" prompt"}
+      >
+        {c.callAskedAt ? "Ask to call again" : "Ask to call"}
+      </ActionButton>
+    ),
+    scope.canManage && (
+      <ActionButton key="opt" action={setOptOut.bind(null, c.id, !c.optedOut)} size="md">
+        {c.optedOut ? "Opt back in" : "Opt out"}
+      </ActionButton>
+    ),
+  ].filter(Boolean);
+
   return (
     <>
-      <Link href="/dashboard/customers" className="-my-2 mb-1 inline-flex items-center gap-1 py-2 text-sm text-muted hover:text-ink sm:mb-3 sm:text-xs">
-        <ArrowLeft className="size-3.5" /> Customers
-      </Link>
       <PageHeader
         title={c.name}
-        description={`${formatPhone(c.phone)}${c.location ? ` · ${c.location}${c.region && c.region !== "Not sure" ? `, ${c.region}` : ""}` : ""}${!scope.clientId ? ` · ${c.client.name}` : ""} · customer since ${fmtDate(c.createdAt, "d MMM yyyy")}${c.callAllowedUntil && c.callAllowedUntil > new Date() ? ` · calls allowed until ${fmtDate(c.callAllowedUntil, "d MMM")}` : ""}`}
+        back={{ href: "/dashboard/customers", label: "Customers" }}
+        meta={<span className="tabular">{meta.join(" · ")}</span>}
+        rowActions
         actions={
           <>
             <a href={`https://wa.me/${c.phone}`} target="_blank" rel="noreferrer" className={buttonClass("primary")}>
-              <MessageCircle className="size-4" /> Message on WhatsApp
+              <MessageCircle aria-hidden className="size-4" /> <span className="sm:hidden">WhatsApp</span>
+              <span className="max-sm:sr-only">Message on WhatsApp</span>
             </a>
-            {scope.canOperate && windowEnd && !c.optedOut && (
-              <ActionButton action={sendCatalogue.bind(null, c.id)} size="md" title="Free while the customer's 24-hour window is open">
-                Send catalogue
-              </ActionButton>
-            )}
             {scope.canOperate && <CallButton customerId={c.id} name={c.name} primary={callAllowed} />}
-            {scope.canOperate && !callAllowed && (
-              <ActionButton
-                action={requestCallPermission.bind(null, c.id)}
-                size="md"
-                title={c.callAskedAt ? `Last asked ${fmtDate(c.callAskedAt, "d MMM, h:mm a")}` : "Sends WhatsApp's \"allow calls?\" prompt"}
-              >
-                {c.callAskedAt ? "Ask to call again" : "Ask to call"}
-              </ActionButton>
-            )}
-            {scope.canManage && (
-              <ActionButton action={setOptOut.bind(null, c.id, !c.optedOut)} size="md">{c.optedOut ? "Opt back in" : "Opt out"}</ActionButton>
+            {more.length > 0 && (
+              <OverflowMenu title={c.name} label={`More actions for ${c.name}`}>
+                {more}
+              </OverflowMenu>
             )}
           </>
         }
@@ -107,17 +128,60 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
         <Stat label="Replies" value={fmtNumber(c.replies.length)} sub={c.replies[0] ? `Last ${fmtDate(c.replies[0].receivedAt, "d MMM")}` : "None yet"} icon={<CheckCheck className="size-4" />} />
       </div>
 
-      <SendPanel
-        customer={{ id: c.id, name: c.name, phone: c.phone }}
-        templates={templates}
-        numbers={numbers}
-        canSend={scope.canManage}
-        windowEndsAt={windowEnd ? fmtDate(windowEnd, "d MMM, h:mm a") : null}
-        blocked={c.optedOut ? "This customer opted out of messages. Opt them back in to send." : c.unreachable ? "WhatsApp says this number can't receive messages." : null}
-      />
+      {/* Computers: the profile in a sticky side column beside the send panel and conversation. */}
+      <div className="mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:items-start">
+        <div className="min-w-0 space-y-4 sm:space-y-6 lg:col-start-2 lg:row-start-1">
+          <SendPanel
+            customer={{ id: c.id, name: c.name, phone: c.phone }}
+            templates={templates}
+            numbers={numbers}
+            canSend={scope.canManage}
+            windowEndsAt={windowEnd ? fmtDate(windowEnd, "d MMM, h:mm a") : null}
+            blocked={c.optedOut ? "This customer opted out of messages. Opt them back in to send." : c.unreachable ? "WhatsApp says this number can't receive messages." : null}
+          />
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1.6fr]">
-        <Card className="h-fit">
+          <Card>
+            <CardHeader title="Conversation" description="Campaign messages and their replies, newest first." />
+            {timeline.length ? (
+              <ol className="chat-wall space-y-2.5 rounded-b-card p-3 sm:p-5">
+                {timeline.map((e) =>
+                  e.type === "in" ? (
+                    <li key={e.id} className="flex">
+                      <div className="max-w-[85%] rounded-card rounded-tl-sm bg-bubble px-3 py-2 text-sm text-ink shadow-card">
+                        {e.kind === "button" && <p className="mb-0.5 text-xs font-medium text-brand-deep">Tapped a button</p>}
+                        <p className="whitespace-pre-wrap">{e.text}</p>
+                        {e.mediaId && <ReplyMedia id={e.id} type={e.mediaType} />}
+                        <p className="tabular mt-1 text-right text-2xs text-muted">
+                          {e.via && `to ${e.via} · `}
+                          {fmtDate(e.at, "d MMM, h:mm a")}
+                        </p>
+                      </div>
+                    </li>
+                  ) : (
+                    <li key={e.id} className="flex justify-end">
+                      <div className={cn("max-w-[85%] rounded-card rounded-tr-sm px-3 py-2 text-sm text-ink shadow-card", e.status === "FAILED" ? "bg-danger-bg ring-1 ring-danger-border" : "bg-bubble-out")}>
+                        <p className="mb-1 flex flex-wrap items-center gap-x-1.5 text-xs text-ink-2">
+                          <span className="font-mono">{e.template}</span>
+                          {e.campaign && <span className="text-muted">· {e.campaign}</span>}
+                          {e.via && <span className="text-muted">· from {e.via}</span>}
+                        </p>
+                        {e.body && <p className="line-clamp-6 whitespace-pre-wrap">{e.body}</p>}
+                        {e.error && <p className="mt-1 text-xs text-danger">{e.error}</p>}
+                        <p className="tabular mt-1.5 flex flex-wrap items-center justify-end gap-2 text-2xs text-muted">
+                          {fmtDate(e.at, "d MMM, h:mm a")} <StatusBadge status={e.status} />
+                        </p>
+                      </div>
+                    </li>
+                  ),
+                )}
+              </ol>
+            ) : (
+              <EmptyState title="No messages with this customer yet" />
+            )}
+          </Card>
+        </div>
+
+        <Card className="lg:sticky lg:top-8 lg:col-start-1 lg:row-start-1">
           <CardHeader title="What they buy" />
           <div className="space-y-4 p-4 sm:p-5">
             {c.orders.length > 0 && (
@@ -126,11 +190,13 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                   <span>Orders ({c.orders.length})</span>
                   <span className="tabular">Spent {money(c.orders.filter((o) => o.status !== "CANCELLED").reduce((sum, o) => sum + o.total, 0))}</span>
                 </p>
-                <ul className="divide-y divide-line rounded-lg bg-canvas px-3 text-sm">
+                <ul className="divide-y divide-line rounded-control bg-sunken px-3 text-sm">
                   {c.orders.map((o) => (
                     <li key={o.id} className="py-2">
                       <div className="flex justify-between gap-2 text-xs text-muted">
-                        <span>{fmtDate(o.createdAt, "d MMM yyyy")} · {o.status.toLowerCase()}</span>
+                        <span>
+                          {fmtDate(o.createdAt, "d MMM yyyy")} · {o.status.toLowerCase()}
+                        </span>
                         <span className="tabular">{money(o.total, o.currency)}</span>
                       </div>
                       <p className="mt-0.5 line-clamp-2">{itemsText(o.items as OrderItem[])}</p>
@@ -140,15 +206,20 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
               </div>
             )}
             {c.purchases ? (
-              <p className="flex gap-2 text-sm"><ShoppingBag className="mt-0.5 size-4 shrink-0 text-brand" />{c.purchases}</p>
+              <p className="flex gap-2 text-sm">
+                <ShoppingBag aria-hidden className="mt-0.5 size-4 shrink-0 text-brand-deep" />
+                {c.purchases}
+              </p>
             ) : (
               c.orders.length === 0 && <p className="text-sm text-muted">No purchase recorded.</p>
             )}
             {c.location && (
               <div className="flex items-start gap-2 text-sm">
-                <MapPin className="mt-0.5 size-4 shrink-0 text-brand" />
+                <MapPin aria-hidden className="mt-0.5 size-4 shrink-0 text-brand-deep" />
                 <div>
-                  <Link href={`/dashboard/customers?area=${encodeURIComponent(`loc:${c.location}`)}`} className="hover:underline">{c.location}</Link>
+                  <Link href={`/dashboard/customers?area=${encodeURIComponent(`loc:${c.location}`)}`} className="hover:underline">
+                    {c.location}
+                  </Link>
                   <p className="text-xs text-muted">
                     {c.region}
                     {c.locationRaw && c.locationRaw !== c.location ? ` · written as "${c.locationRaw}"` : ""}
@@ -156,12 +227,15 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                 </div>
               </div>
             )}
-            <div className="rounded-lg bg-canvas px-3 py-2 text-xs">
+            <div className="rounded-control bg-sunken px-3 py-2 text-xs">
               <p className="font-medium text-ink-2">Agreed to WhatsApp messages</p>
               {c.optInSource ? (
-                <p className="mt-0.5 text-muted">{c.optInSource}{c.optInAt ? ` · ${fmtDate(c.optInAt, "d MMM yyyy")}` : ""}</p>
+                <p className="mt-0.5 text-muted">
+                  {c.optInSource}
+                  {c.optInAt ? ` · ${fmtDate(c.optInAt, "d MMM yyyy")}` : ""}
+                </p>
               ) : (
-                <p className="mt-0.5 text-amber-700">Not recorded. Meta requires consent before marketing messages.</p>
+                <p className="mt-0.5 text-warning">Not recorded. Meta requires consent before marketing messages.</p>
               )}
             </div>
             {(productTags.length > 0 || c.optedOut || c.unreachable) && (
@@ -171,49 +245,14 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                   {c.optedOut && <Badge tone="red">Opted out</Badge>}
                   {c.unreachable && <Badge tone="amber">Can&apos;t receive WhatsApp</Badge>}
                   {productTags.map((t) => (
-                    <Link key={t} href={`/dashboard/customers?tag=${encodeURIComponent(t)}`} className="-my-1 py-1"><Badge>{t === "no-item-info" ? "no item recorded" : t}</Badge></Link>
+                    <Link key={t} href={`/dashboard/customers?tag=${encodeURIComponent(t)}`} className="rounded-full py-1">
+                      <Badge>{t === "no-item-info" ? "no item recorded" : t}</Badge>
+                    </Link>
                   ))}
                 </div>
               </div>
             )}
           </div>
-        </Card>
-
-        <Card>
-          <CardHeader title="Conversation" description="Campaign messages and their replies, newest first." />
-          {timeline.length ? (
-            <ol className="chat-wall space-y-3 p-4 sm:p-5">
-              {timeline.map((e) =>
-                e.type === "in" ? (
-                  <li key={e.id} className="flex">
-                    <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-bubble px-3 py-2 text-sm shadow-sm">
-                      {e.kind === "button" && <p className="mb-0.5 text-[11px] font-medium text-brand-deep">Tapped a button</p>}
-                      <p className="whitespace-pre-wrap">{e.text}</p>
-                      {e.mediaId && <ReplyMedia id={e.id} type={e.mediaType} />}
-                      <p className="mt-1 text-right text-[10px] text-muted">{e.via && `to ${e.via} · `}{fmtDate(e.at, "d MMM, h:mm a")}</p>
-                    </div>
-                  </li>
-                ) : (
-                  <li key={e.id} className="flex justify-end">
-                    <div className={cn("max-w-[85%] rounded-2xl rounded-tr-sm px-3 py-2 text-sm shadow-sm", e.status === "FAILED" ? "bg-rose-50" : "bg-[#d9fdd3]")}>
-                      <p className="mb-1 flex flex-wrap items-center gap-1.5 text-[11px] text-ink-2">
-                        <span className="font-mono">{e.template}</span>
-                        {e.campaign && <span className="text-muted">· {e.campaign}</span>}
-                        {e.via && <span className="text-muted">· from {e.via}</span>}
-                      </p>
-                      {e.body && <p className="line-clamp-6 whitespace-pre-wrap">{e.body}</p>}
-                      {e.error && <p className="mt-1 text-xs text-rose-700">{e.error}</p>}
-                      <p className="mt-1.5 flex items-center justify-end gap-2 text-[10px] text-muted">
-                        {fmtDate(e.at, "d MMM, h:mm a")} <StatusBadge status={e.status} />
-                      </p>
-                    </div>
-                  </li>
-                ),
-              )}
-            </ol>
-          ) : (
-            <p className="px-5 py-8 text-center text-sm text-muted">No messages with this customer yet.</p>
-          )}
         </Card>
       </div>
     </>

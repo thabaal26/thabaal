@@ -1,10 +1,9 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { toastResult } from "@/components/toast";
-import { Button, Card, CardHeader, Label } from "@/components/ui";
+import { Button, Card, CardHeader, Field, Spinner } from "@/components/ui";
 import type { AudienceFilter } from "@/lib/audiences";
 import { countAudience, saveAudience } from "../../actions/audiences";
 
@@ -76,42 +75,42 @@ export function AudienceBuilder({ regions }: { regions: string[] }) {
           });
         }}
       >
-        <div className="flex flex-wrap gap-2">
-          <span className="self-center text-xs text-muted">Start from:</span>
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Start from a preset">
+          <span className="text-sm text-muted">Start from:</span>
           {PRESETS.map((p) => (
-            <button key={p.label} type="button" onClick={() => preset(p)} className="rounded-full px-3 py-1.5 text-xs font-medium ring-1 ring-line hover:bg-canvas">
+            <button
+              key={p.label}
+              type="button"
+              onClick={() => preset(p)}
+              className="inline-flex min-h-11 items-center rounded-full border border-line-strong/50 bg-panel px-3.5 text-sm font-medium text-ink transition hover:bg-canvas active:bg-sunken sm:min-h-8 sm:px-3"
+            >
               {p.label}
             </button>
           ))}
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="a-tags" hint="comma-separated">Has tags</Label>
-            <input id="a-tags" className="field" value={tags} placeholder="ghee, vip" onChange={(e) => setTags(e.target.value)} />
-          </div>
-          <div>
-            <Label htmlFor="a-ex" hint="comma-separated">Without tags</Label>
-            <input id="a-ex" className="field" value={exclude} placeholder="test" onChange={(e) => setExclude(e.target.value)} />
-          </div>
-          <div>
-            <Label htmlFor="a-region">Region</Label>
-            <select id="a-region" className="field" value={region} onChange={(e) => setRegion(e.target.value)}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field id="a-tags" label="Has tags" hint="comma-separated">
+            <input className="field" value={tags} placeholder="ghee, vip" onChange={(e) => setTags(e.target.value)} />
+          </Field>
+          <Field id="a-ex" label="Without tags" hint="comma-separated">
+            <input className="field" value={exclude} placeholder="test" onChange={(e) => setExclude(e.target.value)} />
+          </Field>
+          <Field id="a-region" label="Region">
+            <select className="field" value={region} onChange={(e) => setRegion(e.target.value)}>
               <option value="">Any</option>
               {regions.map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
             </select>
-          </div>
+          </Field>
+          <Field id="a-area" label="Area contains">
+            <input className="field" value={area} placeholder="Sellur" onChange={(e) => setArea(e.target.value)} />
+          </Field>
+          <Field id="a-bought" label="Bought">
+            <input className="field" value={bought} placeholder="ghee, groundnut, coconut…" onChange={(e) => setBought(e.target.value)} />
+          </Field>
           <div>
-            <Label htmlFor="a-area">Area contains</Label>
-            <input id="a-area" className="field" value={area} placeholder="Sellur" onChange={(e) => setArea(e.target.value)} />
-          </div>
-          <div>
-            <Label htmlFor="a-bought">Bought</Label>
-            <input id="a-bought" className="field" value={bought} placeholder="ghee, groundnut, coconut…" onChange={(e) => setBought(e.target.value)} />
-          </div>
-          <div>
-            <Label htmlFor="a-orders">Orders</Label>
+            <label htmlFor="a-orders" className="mb-1.5 block text-sm font-medium text-ink-2">Orders</label>
             <div className="flex gap-2">
               <select id="a-orders" className="field" value={orders} onChange={(e) => setOrders(e.target.value as typeof orders)}>
                 <option value="">Any</option>
@@ -120,20 +119,19 @@ export function AudienceBuilder({ regions }: { regions: string[] }) {
                 <option value="never">Never ordered</option>
               </select>
               {(orders === "within" || orders === "none-for") && (
-                <input type="number" min={1} max={3650} className="field w-24 tabular" value={days || ""} aria-label="Days" onChange={(e) => setDays(Number(e.target.value))} />
+                <input type="number" min={1} max={3650} inputMode="numeric" className="field w-24 shrink-0 tabular" value={days || ""} aria-label="Days" onChange={(e) => setDays(Number(e.target.value))} />
               )}
             </div>
           </div>
         </div>
-        <div className="flex flex-col gap-3 rounded-xl bg-canvas p-3 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <Label htmlFor="a-name">Audience name</Label>
-            <input id="a-name" className="field" required value={name} placeholder="Ghee buyers in Madurai" onChange={(e) => setName(e.target.value)} />
-          </div>
-          <p className="tabular text-sm sm:pb-2.5">
-            {count === null ? <Loader2 className="inline size-4 animate-spin" /> : <b>{count.toLocaleString("en-IN")}</b>} customers now
+        <div className="flex flex-col gap-3 rounded-card bg-sunken p-3 sm:flex-row sm:items-end">
+          <Field id="a-name" label="Audience name" required className="flex-1">
+            <input className="field" value={name} placeholder="Ghee buyers in Madurai" onChange={(e) => setName(e.target.value)} />
+          </Field>
+          <p className="tabular flex min-h-10 items-center gap-1 text-sm sm:pb-0" aria-live="polite">
+            {count === null ? <Spinner className="text-muted" /> : <b className="text-ink">{count.toLocaleString("en-IN")}</b>} customers now
           </p>
-          <Button type="submit" disabled={pending}>Save audience</Button>
+          <Button type="submit" loading={pending}>Save audience</Button>
         </div>
       </form>
     </Card>

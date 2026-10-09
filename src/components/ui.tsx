@@ -31,6 +31,7 @@ export function PageHeader({
   back,
   tabs,
   inlineActions,
+  rowActions,
 }: {
   title: string;
   description?: ReactNode;
@@ -40,6 +41,8 @@ export function PageHeader({
   tabs?: ReactNode;
   /** Phones: keep one or two compact actions beside the title instead of a row of full-width buttons. */
   inlineActions?: boolean;
+  /** Phones: all actions share one row under the title (use short labels and an OverflowMenu). */
+  rowActions?: boolean;
 }) {
   return (
     <header className="mb-4 sm:mb-6">
@@ -52,6 +55,10 @@ export function PageHeader({
         {actions &&
           (inlineActions ? (
             <div className="flex shrink-0 gap-2 sm:justify-end print:hidden">{actions}</div>
+          ) : rowActions ? (
+            <div className="flex gap-2 *:flex-1 sm:shrink-0 sm:justify-end sm:*:flex-none print:hidden">{actions}</div>
+          ) : rowActions ? (
+            <div className="flex gap-2 *:flex-1 sm:shrink-0 sm:justify-end sm:*:flex-none print:hidden">{actions}</div>
           ) : (
             // Phones: buttons share the row and wrap two-up instead of squeezing four into one line.
             <div className="flex flex-wrap gap-2 *:min-w-[calc(50%-0.25rem)] *:flex-1 sm:shrink-0 sm:justify-end sm:*:min-w-0 sm:*:flex-none print:hidden">

@@ -1,4 +1,4 @@
-import { ArrowLeft, Download, QrCode } from "lucide-react";
+import { Download, QrCode } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import QR from "qrcode";
@@ -36,16 +36,11 @@ export default async function GrowPage({ searchParams }: PageProps<"/dashboard/c
   const number = numbers.find((n) => n.isDefault) ?? numbers[0];
   const digits = number?.displayPhone?.replace(/\D/g, "");
 
-  const back = (
-    <Link href="/dashboard/customers" className="-my-2 mb-1 inline-flex items-center gap-1 py-2 text-sm text-muted hover:text-ink sm:mb-3 sm:text-xs">
-      <ArrowLeft className="size-3.5" /> Customers
-    </Link>
-  );
+  const back = { href: "/dashboard/customers", label: "Customers" };
   if (!digits) {
     return (
       <>
-        {back}
-        <PageHeader title="Get more customers" />
+        <PageHeader title="Get more customers" back={back} />
         <Card><EmptyState icon={<QrCode className="size-5" />} title="Add a WhatsApp number first">Opt-in codes open a chat with your number. Add one on the Clients page.</EmptyState></Card>
       </>
     );
@@ -60,33 +55,34 @@ export default async function GrowPage({ searchParams }: PageProps<"/dashboard/c
 
   return (
     <>
-      {back}
       <PageHeader
         title="Get more customers"
+        back={back}
         description="Put a QR code where customers see you. They scan it, send the ready-typed message, and are added here as opted-in customers with a welcome reply."
       />
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
+      <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <Card>
           <CardHeader title="1. Where will this code go?" description="Each place gets its own code, so you can see which one brings customers." />
-          <div className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-3 sm:p-5">
+          <nav aria-label="Where the code goes" className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-3 sm:p-5">
             {SOURCES.map((s) => (
               <Link
                 key={s.key}
                 href={`?source=${s.key}`}
+                aria-current={source === s.key ? "true" : undefined}
                 className={cn(
-                  "rounded-xl px-3 py-2.5 text-sm ring-1 transition active:scale-[0.98]",
-                  source === s.key ? "bg-brand-soft font-medium text-brand-deep ring-brand/30" : "bg-panel text-ink ring-line hover:bg-canvas",
+                  "rounded-control border px-3 py-2.5 text-sm transition active:scale-[0.98]",
+                  source === s.key ? "border-brand/40 bg-brand-soft font-medium text-brand-deep" : "border-line bg-panel text-ink hover:bg-canvas",
                 )}
               >
                 {s.label}
-                <span className="mt-0.5 block text-xs font-normal text-muted">{fmtNumber(count(s.key))} joined</span>
+                <span className={cn("mt-0.5 block text-xs font-normal", source === s.key ? "text-brand-deep" : "text-muted")}>{fmtNumber(count(s.key))} joined</span>
               </Link>
             ))}
-          </div>
+          </nav>
           <form className="flex gap-2 border-t border-line p-4 sm:p-5">
-            <input name="source" defaultValue={SOURCES.some((s) => s.key === source) ? "" : source} placeholder="Or name your own, e.g. diwali-stall" className="field" maxLength={30} />
-            <button className={buttonClass("secondary")}>Make code</button>
+            <input name="source" defaultValue={SOURCES.some((s) => s.key === source) ? "" : source} placeholder="Or name your own, e.g. diwali-stall" aria-label="Name your own place" className="field" maxLength={30} />
+            <button className={cn(buttonClass("secondary"), "shrink-0")}>Make code</button>
           </form>
           <div className="space-y-2 border-t border-line p-4 text-sm text-ink-2 sm:p-5">
             <p className="font-medium text-ink">What customers see</p>
@@ -99,17 +95,17 @@ export default async function GrowPage({ searchParams }: PageProps<"/dashboard/c
           </div>
         </Card>
 
-        <Card className="self-start">
+        <Card className="lg:sticky lg:top-8">
           <CardHeader title={`2. Your code: ${source}`} />
           <div className="space-y-4 p-4 sm:p-5">
             {/* Generated locally from our own link, so the markup is safe to inline. */}
-            <div className="mx-auto w-full max-w-64 rounded-2xl bg-white p-3 ring-1 ring-line" dangerouslySetInnerHTML={{ __html: svg }} />
+            <div role="img" aria-label={`QR code that opens WhatsApp to join (${source})`} className="mx-auto aspect-square w-full max-w-64 rounded-card bg-white p-3 ring-1 ring-line" dangerouslySetInnerHTML={{ __html: svg }} />
             <a href={png} download={`join-${source}-qr.png`} className={cn(buttonClass("primary"), "w-full")}>
-              <Download className="size-4" /> Download QR (PNG)
+              <Download aria-hidden className="size-4" /> Download QR (PNG)
             </a>
             <div>
-              <p className="mb-1 text-xs font-medium text-ink-2">Link for website, Instagram bio or SMS</p>
-              <input readOnly value={link} className="field font-mono text-xs" aria-label="Opt-in link" />
+              <label htmlFor="optin-link" className="mb-1.5 block text-sm font-medium text-ink-2">Link for website, Instagram bio or SMS</label>
+              <input id="optin-link" readOnly value={link} className="field font-mono sm:text-xs" />
             </div>
           </div>
         </Card>

@@ -1,6 +1,5 @@
-import { ArrowLeft, UsersRound } from "lucide-react";
+import { UsersRound } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { ActionButton } from "@/components/action-button";
 import { Card, CardHeader, EmptyState, PageHeader, PickClientNotice } from "@/components/ui";
 import { audienceWhere, describeFilter, type AudienceFilter } from "@/lib/audiences";
@@ -15,12 +14,8 @@ export const dynamic = "force-dynamic";
 
 export default async function AudiencesPage() {
   const scope = await getScope();
-  const back = (
-    <Link href="/dashboard/customers" className="-my-2 mb-1 inline-flex items-center gap-1 py-2 text-sm text-muted hover:text-ink sm:mb-3 sm:text-xs">
-      <ArrowLeft className="size-3.5" /> Customers
-    </Link>
-  );
-  if (!scope.clientId || !scope.canManage) return <>{back}<PageHeader title="Audiences" /><PickClientNotice what="audiences" /></>;
+  const back = { href: "/dashboard/customers", label: "Customers" };
+  if (!scope.clientId || !scope.canManage) return <><PageHeader title="Audiences" back={back} /><PickClientNotice what="audiences" /></>;
   const clientId = scope.clientId;
 
   const [saved, regionRows] = await Promise.all([
@@ -31,25 +26,25 @@ export default async function AudiencesPage() {
 
   return (
     <>
-      {back}
       <PageHeader
         title="Audiences"
+        back={back}
         description="Saved groups of customers, like ghee buyers with no order for 30 days. Pick one under Send to in a campaign; it's counted again every time the campaign runs."
       />
-      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+      <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <AudienceBuilder regions={regionRows.map((r) => r.region!).sort()} />
-        <Card className="self-start">
+        <Card className="lg:sticky lg:top-8">
           <CardHeader title="Saved audiences" />
           {saved.length ? (
             <ul className="divide-y divide-line">
               {saved.map((a, k) => (
                 <li key={a.id} className="flex items-start gap-3 px-4 py-3 sm:px-5">
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium">{a.name}</p>
+                    <p className="font-medium text-ink">{a.name}</p>
                     <p className="text-xs text-muted">{describeFilter(a.filter as AudienceFilter)}</p>
                   </div>
-                  <span className="tabular shrink-0 text-sm">{fmtNumber(counts[k])}</span>
-                  <ActionButton action={deleteAudience.bind(null, a.id)} variant="ghost" size="sm" confirm={`Delete "${a.name}"?`}>Delete</ActionButton>
+                  <span className="tabular shrink-0 pt-0.5 text-sm font-medium" title="Customers now">{fmtNumber(counts[k])}</span>
+                  <ActionButton action={deleteAudience.bind(null, a.id)} variant="ghost" size="sm" confirm={`Delete "${a.name}"?`} aria-label={`Delete ${a.name}`}>Delete</ActionButton>
                 </li>
               ))}
             </ul>
