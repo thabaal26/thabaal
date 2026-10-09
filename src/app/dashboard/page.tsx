@@ -1,7 +1,7 @@
-import { CalendarClock, CheckCheck, Eye, Send, TriangleAlert, Users } from "lucide-react";
+import { CalendarClock, CheckCheck, Clock, Eye, Send, TriangleAlert, Users } from "lucide-react";
 import Link from "next/link";
 import { ActionButton } from "@/components/action-button";
-import { Badge, buttonClass, Card, CardHeader, EmptyState, PageHeader, Stat, StatusBadge } from "@/components/ui";
+import { Badge, buttonClass, Callout, Card, CardHeader, EmptyState, Meter, PageHeader, rowClass, Stat, StatusBadge, Table, Td, Th } from "@/components/ui";
 import { db } from "@/lib/db";
 import { APP_TZ, daysAgo, fmtDate, fmtNumber, pct } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
@@ -16,6 +16,9 @@ import { DailyChart } from "./daily-chart";
 import { SpendCard } from "./spend-card";
 
 export const dynamic = "force-dynamic";
+
+/** Region share colours: brand, accent, then neutrals. */
+const REGION_COLORS = ["bg-brand", "bg-glow", "bg-line-strong", "bg-line"];
 
 const tagLabel = (tag: string) => (tag === "no-item-info" ? "No item recorded" : tag.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase()));
 
@@ -140,295 +143,310 @@ export default async function Overview() {
         />
       )}
 
-      {schedulerQuiet && (
-        <div className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-600/20">
-          <b>The scheduler hasn&apos;t run {settings.lastDispatchAt ? `since ${fmtDate(settings.lastDispatchAt, "d MMM, h:mm a")}` : "yet"}.</b>{" "}
-          Scheduled campaigns won&apos;t start until it does. Check the &quot;Campaign scheduler&quot; workflow in GitHub → Actions (it pauses after 60 days without commits).
-        </div>
-      )}
-      {failedToday > 0 && (
-        <div className="mb-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-900 ring-1 ring-rose-600/15">
-          <b>{fmtNumber(failedToday)} message{failedToday === 1 ? "" : "s"} failed in the last 24 hours.</b>
-          <ul className="mt-1 list-disc pl-5">
-            {failures.map((f) => <li key={f.error ?? "unknown"}>{f.error ?? "Unknown error"} ({f._count})</li>)}
-          </ul>
-          <Link href="/dashboard/messages?status=FAILED" className="mt-1 inline-block font-medium underline">See failed messages</Link>
+      {(schedulerQuiet || failedToday > 0 || blocked.length > 0) && (
+        <div className="mb-4 space-y-3">
+          {schedulerQuiet && (
+            <Callout tone="warning" icon={<Clock />} title={`The scheduler hasn't run ${settings.lastDispatchAt ? `since ${fmtDate(settings.lastDispatchAt, "d MMM, h:mm a")}` : "yet"}.`}>
+              Scheduled campaigns won&apos;t start until it does. Check the &quot;Campaign scheduler&quot; workflow in GitHub → Actions (it pauses after 60 days without commits).
+            </Callout>
+          )}
+          {failedToday > 0 && (
+            <Callout tone="danger" icon={<TriangleAlert />} title={`${fmtNumber(failedToday)} message${failedToday === 1 ? "" : "s"} failed in the last 24 hours.`}>
+              <ul className="mt-0.5 list-disc pl-5">
+                {failures.map((f) => <li key={f.error ?? "unknown"}>{f.error ?? "Unknown error"} ({f._count})</li>)}
+              </ul>
+              <Link href="/dashboard/messages?status=FAILED" className="mt-1 inline-flex min-h-11 items-center sm:min-h-0">See failed messages</Link>
+            </Callout>
+          )}
+          {blocked.length > 0 && (
+            <Callout role="alert" tone="danger" icon={<TriangleAlert />} title={`${blocked.length === 1 ? "A campaign can't send" : `${blocked.length} campaigns can't send`}: Meta stopped the template`}>
+              <ul className="space-y-1">
+                {blocked.map((c) => (
+                  <li key={c.id}>
+                    <Link href={`/dashboard/campaigns/${c.id}`}>{c.name}</Link>: template <span className="font-mono">{c.template.name}</span> is{" "}
+                    {c.template.status === "PAUSED" ? "paused by Meta for low quality" : c.template.status === "DISABLED" ? "disabled by Meta" : "rejected"}
+                    {c.template.statusReason ? ` (${c.template.statusReason.toLowerCase().replace(/_/g, " ")})` : ""}.
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1 text-xs">Edit the template so it&apos;s more useful to customers, or switch the campaign to another approved template.</p>
+            </Callout>
+          )}
         </div>
       )}
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Stat label="Active customers" value={fmtNumber(customers)} sub={`${fmtNumber(optedOut)} opted out`} icon={<Users className="size-4" />} />
-        <Stat
-          label="Messages sent · 7 days"
-          value={fmtNumber(total)}
-          sub={`${fmtNumber(failed)} failed`}
-          icon={<Send className="size-4" />}
-        />
+        <Stat label="Messages sent · 7 days" value={fmtNumber(total)} sub={`${fmtNumber(failed)} failed`} icon={<Send className="size-4" />} />
         <Stat label="Delivery rate" value={`${pct(delivered, total)}%`} sub={`${fmtNumber(delivered)} delivered`} icon={<CheckCheck className="size-4" />} />
-        <Stat
-          label="Read rate"
-          value={`${pct(read, delivered)}%`}
-          sub={`${fmtNumber(read)} of delivered were read`}
-          icon={<Eye className="size-4" />}
-        />
+        <Stat label="Read rate" value={`${pct(read, delivered)}%`} sub={`${fmtNumber(read)} of delivered were read`} icon={<Eye className="size-4" />} />
       </div>
 
-      {blocked.length > 0 && (
-        <div role="alert" className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 sm:p-5">
-          <p className="flex items-center gap-2 font-semibold"><TriangleAlert className="size-4" /> {blocked.length === 1 ? "A campaign can't send" : `${blocked.length} campaigns can't send`}: Meta stopped the template</p>
-          <ul className="mt-2 space-y-1">
-            {blocked.map((c) => (
-              <li key={c.id}>
-                <Link href={`/dashboard/campaigns/${c.id}`} className="font-medium underline">{c.name}</Link>: template <span className="font-mono">{c.template.name}</span> is{" "}
-                {c.template.status === "PAUSED" ? "paused by Meta for low quality" : c.template.status === "DISABLED" ? "disabled by Meta" : "rejected"}
-                {c.template.statusReason ? ` (${c.template.statusReason.toLowerCase().replace(/_/g, " ")})` : ""}.
-              </li>
-            ))}
-          </ul>
-          <p className="mt-2 text-xs text-rose-800">Edit the template so it&apos;s more useful to customers, or switch the campaign to another approved template.</p>
-        </div>
-      )}
+      {/*
+        Desktop: main column (sending, chart, results) beside a side column (health, upcoming, spend).
+        Phones: the columns dissolve and `order` puts what's happening now first.
+      */}
+      <div className="mt-4 flex flex-col gap-4 sm:mt-6 sm:gap-6 lg:grid lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)] lg:items-start">
+        <div className="contents lg:flex lg:flex-col lg:gap-6">
+          {activeRuns.length > 0 && (
+            <Card className="order-1">
+              <CardHeader title="Sending now" description="Campaigns delivering in batches. Batch size or interval changes apply from the next batch." />
+              <ul className="divide-y divide-line">
+                {activeRuns.map((r) => {
+                  const by = (s: string) => runProgress.find((p) => p.runId === r.id && p.status === s)?._count ?? 0;
+                  const queued = by("QUEUED");
+                  const done = r.total - queued;
+                  const eta = estimateDuration(queued, r.campaign.batchSize, r.campaign.intervalMinutes);
+                  return (
+                    <li key={r.id} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:px-5">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link href={`/dashboard/campaigns/${r.campaignId}`} className="font-medium text-ink hover:underline">
+                            {r.campaign.name}
+                          </Link>
+                          <StatusBadge status={r.status} />
+                        </div>
+                        <Meter className="mt-2" value={pct(done, r.total)} label={`${r.campaign.name} progress`} />
+                        <p className="tabular mt-1.5 text-xs text-muted">
+                          {fmtNumber(done)} of {fmtNumber(r.total)} processed · {by("FAILED")} failed ·{" "}
+                          {queued
+                            ? `${r.campaign.batchSize} every ${r.campaign.intervalMinutes} min, about ${formatMinutes(eta)} left · next batch ${fmtDate(r.nextBatchAt, "h:mm a")}`
+                            : "finishing"}
+                        </p>
+                      </div>
+                      {scope.isAdmin && (
+                        <ActionButton action={cancelRun.bind(null, r.id)} variant="danger" confirm="Stop this run? Queued messages will not be sent.">
+                          Stop
+                        </ActionButton>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </Card>
+          )}
 
-      <NumberHealth numbers={health} />
-      {scope.clientId && <SpendCard clientId={scope.clientId} canManage={scope.canManage} />}
+          <Card className="order-3">
+            <CardHeader title="Messages per day" description="Last 14 days, by latest status" />
+            <DailyChart rows={daily.map((d) => ({ day: d.day, status: d.status, n: Number(d.n) }))} since={since} />
+          </Card>
 
-      {activeRuns.length > 0 && (
-        <Card className="mt-6">
-          <CardHeader title="Sending now" description="Campaigns delivering in batches. Batch size or interval changes apply from the next batch." />
-          <ul className="divide-y divide-line">
-            {activeRuns.map((r) => {
-              const by = (s: string) => runProgress.find((p) => p.runId === r.id && p.status === s)?._count ?? 0;
-              const queued = by("QUEUED");
-              const done = r.total - queued;
-              const eta = estimateDuration(queued, r.campaign.batchSize, r.campaign.intervalMinutes);
-              return (
-                <li key={r.id} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:px-5">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Link href={`/dashboard/campaigns/${r.campaignId}`} className="-my-2 py-2 font-medium hover:underline">
-                        {r.campaign.name}
+          {byProduct.length > 0 && (
+            <Card className="order-7">
+              <CardHeader title="Campaign results by product" description="Last 30 days. Which customer groups read your messages and write back." />
+              {/* Phones: one compact row per product instead of a sideways-scrolling table. */}
+              <ul className="divide-y divide-line sm:hidden">
+                {byProduct.map((r) => (
+                  <li key={r.tag} className="px-4 py-3">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <Link href={`/dashboard/customers?tag=${encodeURIComponent(r.tag)}`} className="min-w-0 truncate text-sm font-medium text-ink">
+                        {tagLabel(r.tag)}
                       </Link>
-                      <StatusBadge status={r.status} />
+                      <span className="tabular shrink-0 text-xs text-muted">
+                        {fmtNumber(r.sent)} sent{r.failed > 0 && <span className="text-danger"> · {r.failed} failed</span>}
+                      </span>
                     </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-canvas">
-                      <div className="bar h-full rounded-full bg-brand transition-all" style={{ width: `${pct(done, r.total)}%` }} />
-                    </div>
-                    <p className="tabular mt-1.5 text-xs text-muted">
-                      {fmtNumber(done)} of {fmtNumber(r.total)} processed · {by("FAILED")} failed ·{" "}
-                      {queued
-                        ? `${r.campaign.batchSize} every ${r.campaign.intervalMinutes} min, about ${formatMinutes(eta)} left · next batch ${fmtDate(r.nextBatchAt, "h:mm a")}`
-                        : "finishing"}
-                    </p>
-                  </div>
-                  {scope.isAdmin && (
-                    <ActionButton action={cancelRun.bind(null, r.id)} variant="danger" confirm="Stop this run? Queued messages will not be sent.">
-                      Stop
-                    </ActionButton>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-      )}
-
-      {shown.length > 0 && (
-        <Card className="mt-6">
-          <CardHeader title="What your customers buy" description="Customers per product or group. Each can be targeted with its own campaign." />
-          <ul className="grid gap-x-8 gap-y-3 p-4 sm:grid-cols-2 sm:p-5">
-            {shown.map((t) => (
-              <li key={t.tag}>
-                <Link href={`/dashboard/customers?tag=${encodeURIComponent(t.tag)}`} className="group block">
-                  <div className="flex items-baseline justify-between gap-2 text-sm">
-                    <span className="truncate font-medium group-hover:underline">{tagLabel(t.tag)}</span>
-                    <span className="tabular text-xs text-muted">{fmtNumber(t.n)}</span>
-                  </div>
-                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-canvas">
-                    <div className="bar h-full rounded-full bg-brand" style={{ width: `${Math.max(4, pct(t.n, top))}%` }} />
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
-
-      {byRegion.length > 1 && (
-        <Card className="mt-6">
-          <CardHeader title="Customers by area" description="Where your customers are, from the order sheets. Tap any area to see its customers." />
-          <div className="space-y-5 p-4 sm:p-5">
-            <div>
-              <div className="flex h-3 overflow-hidden rounded-full bg-canvas">
-                {byRegion.map((r, i) => (
-                  <div key={r.key} className={["bg-brand", "bg-glow", "bg-zinc-400", "bg-line"][i] ?? "bg-line"} style={{ width: `${pct(r.n, regionTotal)}%` }} />
+                    <dl className="tabular mt-2 grid grid-cols-3 gap-2 text-center">
+                      {[
+                        ["Delivered", `${pct(r.delivered, r.sent)}%`],
+                        ["Read", `${pct(r.read, r.delivered)}%`],
+                        ["Replies", fmtNumber(r.replies)],
+                      ].map(([k, v]) => (
+                        <div key={k} className="flex flex-col-reverse rounded-control bg-sunken px-1 py-1.5">
+                          <dt className="text-xs text-muted">{k}</dt>
+                          <dd className="text-sm font-semibold">{v}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </li>
                 ))}
+              </ul>
+              <div className="max-sm:hidden">
+                <Table>
+                  <thead>
+                    <tr>
+                      <Th>Product</Th>
+                      <Th numeric>Sent</Th>
+                      <Th numeric>Delivered</Th>
+                      <Th numeric>Read</Th>
+                      <Th numeric>Replies</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {byProduct.map((r) => (
+                      <tr key={r.tag} className={rowClass}>
+                        <Td className="font-medium">
+                          <Link href={`/dashboard/customers?tag=${encodeURIComponent(r.tag)}`} className="hover:underline">
+                            {tagLabel(r.tag)}
+                          </Link>
+                        </Td>
+                        <Td numeric>
+                          {fmtNumber(r.sent)}
+                          {r.failed > 0 && <span className="ml-1 text-xs text-danger">({r.failed} failed)</span>}
+                        </Td>
+                        <Td numeric>{pct(r.delivered, r.sent)}%</Td>
+                        <Td numeric>
+                          <span className="inline-flex items-center gap-2">
+                            <Meter className="hidden w-16 md:block" value={pct(r.read, r.delivered)} />
+                            {pct(r.read, r.delivered)}%
+                          </span>
+                        </Td>
+                        <Td numeric>
+                          {r.replies ? (
+                            <Link href="/dashboard/replies?show=all" className="font-medium text-brand-deep hover:underline">
+                              {fmtNumber(r.replies)}
+                            </Link>
+                          ) : (
+                            "0"
+                          )}
+                        </Td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
               </div>
-              <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:flex sm:flex-wrap sm:gap-x-6">
-                {byRegion.map((r, i) => (
-                  <li key={r.key}>
-                    <Link href={`/dashboard/customers?area=${encodeURIComponent(r.href)}`} className="group flex items-center gap-2 text-sm">
-                      <span className={`size-2.5 shrink-0 rounded-full ${["bg-brand", "bg-glow", "bg-zinc-400", "bg-line"][i] ?? "bg-line"}`} />
-                      <span className="group-hover:underline">{r.label}</span>
-                      <span className="tabular text-xs text-muted">{fmtNumber(r.n)}</span>
+            </Card>
+          )}
+
+          {shown.length > 0 && (
+            <Card className="order-8">
+              <CardHeader title="What your customers buy" description="Customers per product or group. Each can be targeted with its own campaign." />
+              <ul className="grid gap-x-8 gap-y-1 p-2 sm:grid-cols-2 sm:p-3">
+                {shown.map((t) => (
+                  <li key={t.tag}>
+                    <Link href={`/dashboard/customers?tag=${encodeURIComponent(t.tag)}`} className="group block rounded-control px-2 py-2 transition hover:bg-canvas active:bg-sunken">
+                      <div className="flex items-baseline justify-between gap-2 text-sm">
+                        <span className="truncate font-medium text-ink group-hover:underline">{tagLabel(t.tag)}</span>
+                        <span className="tabular text-xs text-muted">{fmtNumber(t.n)}</span>
+                      </div>
+                      <Meter className="mt-1.5" value={Math.max(4, pct(t.n, top))} />
                     </Link>
                   </li>
                 ))}
               </ul>
-            </div>
-            {topAreas.length > 0 && (
-              <div>
-                <p className="mb-2 text-xs font-medium text-muted">Top areas</p>
-                <div className="flex flex-wrap gap-2">
-                  {topAreas.map((a) => (
-                    <Link
-                      key={a.location}
-                      href={`/dashboard/customers?area=${encodeURIComponent(`loc:${a.location}`)}`}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-sm transition hover:border-brand/40 hover:bg-brand-soft/40"
-                    >
-                      {a.location} <span className="tabular text-xs text-muted">{a._count}</span>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </Card>
-      )}
-
-      {byProduct.length > 0 && (
-        <Card className="mt-6">
-          <CardHeader title="Campaign results by product" description="Last 30 days. Which customer groups read your messages and write back." />
-          {/* Phones: one compact card per product instead of a sideways-scrolling table. */}
-          <ul className="divide-y divide-line sm:hidden">
-            {byProduct.map((r) => (
-              <li key={r.tag} className="px-4 py-3">
-                <div className="flex items-baseline justify-between gap-2">
-                  <Link href={`/dashboard/customers?tag=${encodeURIComponent(r.tag)}`} className="truncate text-sm font-medium">{tagLabel(r.tag)}</Link>
-                  <span className="tabular shrink-0 text-xs text-muted">{fmtNumber(r.sent)} sent{r.failed > 0 && <span className="text-rose-600"> · {r.failed} failed</span>}</span>
-                </div>
-                <dl className="tabular mt-2 grid grid-cols-3 gap-2 text-center">
-                  {[
-                    ["Delivered", `${pct(r.delivered, r.sent)}%`],
-                    ["Read", `${pct(r.read, r.delivered)}%`],
-                    ["Replies", fmtNumber(r.replies)],
-                  ].map(([k, v]) => (
-                    <div key={k} className="rounded-lg bg-canvas px-1 py-1.5">
-                      <dd className="text-sm font-semibold">{v}</dd>
-                      <dt className="text-[11px] text-muted">{k}</dt>
-                    </div>
-                  ))}
-                </dl>
-              </li>
-            ))}
-          </ul>
-          <div className="hidden overflow-x-auto sm:block">
-            <table className="w-full min-w-[560px] text-sm">
-              <thead>
-                <tr className="border-b border-line text-left text-xs text-muted">
-                  <th className="px-5 py-2.5 font-medium">Product</th>
-                  <th className="px-5 py-2.5 text-right font-medium">Sent</th>
-                  <th className="px-5 py-2.5 text-right font-medium">Delivered</th>
-                  <th className="px-5 py-2.5 text-right font-medium">Read</th>
-                  <th className="px-5 py-2.5 text-right font-medium">Replies</th>
-                </tr>
-              </thead>
-              <tbody className="tabular divide-y divide-line">
-                {byProduct.map((r) => (
-                  <tr key={r.tag} className="hover:bg-canvas/60">
-                    <td className="px-5 py-3 font-medium">
-                      <Link href={`/dashboard/customers?tag=${encodeURIComponent(r.tag)}`} className="hover:underline">{tagLabel(r.tag)}</Link>
-                    </td>
-                    <td className="px-5 py-3 text-right">{fmtNumber(r.sent)}{r.failed > 0 && <span className="ml-1 text-xs text-rose-600">({r.failed} failed)</span>}</td>
-                    <td className="px-5 py-3 text-right">{pct(r.delivered, r.sent)}%</td>
-                    <td className="px-5 py-3 text-right">
-                      <span className="inline-flex items-center gap-2">
-                        <span className="hidden h-1.5 w-16 overflow-hidden rounded-full bg-canvas sm:block"><span className="block h-full rounded-full bg-brand" style={{ width: `${pct(r.read, r.delivered)}%` }} /></span>
-                        {pct(r.read, r.delivered)}%
-                      </span>
-                    </td>
-                    <td className="px-5 py-3 text-right">{r.replies ? <Link href="/dashboard/replies?show=all" className="font-medium text-brand-deep hover:underline">{fmtNumber(r.replies)}</Link> : "0"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1.6fr_1fr]">
-        <Card>
-          <CardHeader title="Messages per day" description="Last 14 days, by latest status" />
-          <DailyChart rows={daily.map((d) => ({ day: d.day, status: d.status, n: Number(d.n) }))} since={since} />
-        </Card>
-
-        <Card>
-          <CardHeader
-            title="Coming up"
-            action={
-              <Link href="/dashboard/campaigns" className="-my-2 py-2 text-sm font-medium text-brand-deep hover:underline sm:text-xs">
-                All campaigns
-              </Link>
-            }
-          />
-          {upcoming.length ? (
-            <ul className="divide-y divide-line">
-              {upcoming.map((c) => (
-                <li key={c.id} className="relative flex items-center gap-3 px-4 py-3.5 active:bg-canvas sm:px-5">
-                  <div className="grid w-12 shrink-0 place-items-center rounded-lg bg-canvas py-1.5 text-center">
-                    <span className="text-[10px] font-medium uppercase text-muted">{fmtDate(c.nextRunAt, "EEE")}</span>
-                    <span className="tabular text-sm font-semibold">{fmtDate(c.nextRunAt, "d")}</span>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <Link href={`/dashboard/campaigns/${c.id}`} className="block truncate text-sm font-medium after:absolute after:inset-0 hover:underline">
-                      {c.name}
-                    </Link>
-                    <p className="truncate text-xs text-muted">
-                      {fmtDate(c.nextRunAt, "h:mm a")} · {c.template.name}
-                    </p>
-                  </div>
-                  {c.template.status !== "APPROVED" && <Badge tone="amber">Template not approved</Badge>}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyState icon={<CalendarClock className="size-5" />} title="Nothing scheduled">
-              {scope.isAdmin ? "Create a weekly campaign to start sending automatically." : "Upcoming campaigns will show here."}
-            </EmptyState>
+            </Card>
           )}
-        </Card>
-      </div>
 
-      <Card className="mt-6">
-        <CardHeader
-          title="Latest messages"
-          action={
-            <Link href="/dashboard/messages" className="-my-2 py-2 text-sm font-medium text-brand-deep hover:underline sm:text-xs">
-              Open log
-            </Link>
-          }
-        />
-        {recent.length ? (
-          <ul className="divide-y divide-line">
-            {recent.map((m) => (
-              <li key={m.id} className="flex items-center gap-3 px-4 py-3 text-sm sm:gap-4 sm:px-5">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">
-                    {m.customer.name} <span className="font-normal text-muted">{formatPhone(m.customer.phone)}</span>
-                  </p>
-                  <p className="truncate text-xs text-muted">{m.body ?? m.templateName}</p>
+          {byRegion.length > 1 && (
+            <Card className="order-9">
+              <CardHeader title="Customers by area" description="Where your customers are, from the order sheets. Tap any area to see its customers." />
+              <div className="space-y-5 p-4 sm:p-5">
+                <div>
+                  <div className="flex h-3 overflow-hidden rounded-full bg-sunken" aria-hidden>
+                    {byRegion.map((r, i) => (
+                      <div key={r.key} className={REGION_COLORS[i] ?? "bg-line"} style={{ width: `${pct(r.n, regionTotal)}%` }} />
+                    ))}
+                  </div>
+                  <ul className="mt-2 grid grid-cols-1 gap-x-4 min-[360px]:grid-cols-2 sm:flex sm:flex-wrap sm:gap-x-2">
+                    {byRegion.map((r, i) => (
+                      <li key={r.key}>
+                        <Link href={`/dashboard/customers?area=${encodeURIComponent(r.href)}`} className="group flex min-h-11 items-center gap-2 rounded-control px-1 text-sm transition hover:bg-canvas sm:min-h-9 sm:px-2">
+                          <span aria-hidden className={`size-2.5 shrink-0 rounded-full ${REGION_COLORS[i] ?? "bg-line"}`} />
+                          <span className="group-hover:underline">{r.label}</span>
+                          <span className="tabular text-xs text-muted">{fmtNumber(r.n)}</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                {m.status === "FAILED" && <TriangleAlert className="size-4 text-rose-500" />}
-                <StatusBadge status={m.status} />
-                <span className="hidden w-32 text-right text-xs text-muted sm:block">{fmtDate(m.sentAt ?? m.createdAt, "d MMM, h:mm a")}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <EmptyState icon={<Send className="size-5" />} title="No messages yet">
-            Sent messages will appear here with their delivery status.
-          </EmptyState>
-        )}
-      </Card>
+                {topAreas.length > 0 && (
+                  <div>
+                    <p className="mb-2 text-xs font-medium text-muted">Top areas</p>
+                    <div className="flex flex-wrap gap-2">
+                      {topAreas.map((a) => (
+                        <Link
+                          key={a.location}
+                          href={`/dashboard/customers?area=${encodeURIComponent(`loc:${a.location}`)}`}
+                          className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line-strong/50 bg-panel px-3 text-sm transition hover:border-brand hover:bg-brand-soft/50 active:bg-sunken sm:min-h-8"
+                        >
+                          {a.location} <span className="tabular text-xs text-muted">{a._count}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
+
+          <Card className="order-4">
+            <CardHeader
+              title="Latest messages"
+              action={
+                <Link href="/dashboard/messages" className="-my-2 inline-flex min-h-11 items-center text-sm font-medium text-brand-deep hover:underline sm:min-h-8">
+                  Open log
+                </Link>
+              }
+            />
+            {recent.length ? (
+              <ul className="divide-y divide-line">
+                {recent.map((m) => (
+                  <li key={m.id} className="flex items-center gap-3 px-4 py-3 text-sm sm:px-5">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-ink">
+                        {m.customer.name} <span className="tabular font-normal text-muted">{formatPhone(m.customer.phone)}</span>
+                      </p>
+                      <p className="truncate text-xs text-muted">{m.body ?? m.templateName}</p>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <StatusBadge status={m.status} />
+                      <time className="tabular text-xs text-muted max-sm:hidden" dateTime={(m.sentAt ?? m.createdAt).toISOString()}>
+                        {fmtDate(m.sentAt ?? m.createdAt, "d MMM, h:mm a")}
+                      </time>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState icon={<Send className="size-5" />} title="No messages yet">
+                Sent messages will appear here with their delivery status.
+              </EmptyState>
+            )}
+          </Card>
+        </div>
+
+        <div className="contents lg:flex lg:flex-col lg:gap-6">
+          <NumberHealth numbers={health} className="order-5" />
+
+          <Card className="order-2">
+            <CardHeader
+              title="Coming up"
+              action={
+                <Link href="/dashboard/campaigns" className="-my-2 inline-flex min-h-11 items-center text-sm font-medium text-brand-deep hover:underline sm:min-h-8">
+                  All campaigns
+                </Link>
+              }
+            />
+            {upcoming.length ? (
+              <ul className="divide-y divide-line">
+                {upcoming.map((c) => (
+                  <li key={c.id} className="relative flex items-center gap-3 px-4 py-3 transition-colors hover:bg-canvas/70 active:bg-sunken sm:px-5">
+                    <div className="grid w-12 shrink-0 place-items-center rounded-control bg-sunken py-1.5 text-center">
+                      <span className="text-2xs font-medium uppercase text-muted">{fmtDate(c.nextRunAt, "EEE")}</span>
+                      <span className="tabular text-sm font-semibold">{fmtDate(c.nextRunAt, "d")}</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <Link href={`/dashboard/campaigns/${c.id}`} className="block truncate text-sm font-medium text-ink after:absolute after:inset-0">
+                        {c.name}
+                      </Link>
+                      <p className="truncate text-xs text-muted">
+                        {fmtDate(c.nextRunAt, "h:mm a")} · {c.template.name}
+                      </p>
+                    </div>
+                    {c.template.status !== "APPROVED" && <Badge tone="amber">Template not approved</Badge>}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState icon={<CalendarClock className="size-5" />} title="Nothing scheduled">
+                {scope.isAdmin ? "Create a weekly campaign to start sending automatically." : "Upcoming campaigns will show here."}
+              </EmptyState>
+            )}
+          </Card>
+
+          {scope.clientId && <SpendCard clientId={scope.clientId} canManage={scope.canManage} className="order-6" />}
+        </div>
+      </div>
     </>
   );
 }
