@@ -13,11 +13,13 @@ const NEXT: Record<Exclude<ErrorKind, "marketing-limit">, { label: string; next:
   unreachable: { label: "Can't receive WhatsApp", next: "Not on WhatsApp, an old app or they blocked you. Left out of future campaigns automatically.", tone: "gray" },
   "stopped-marketing": { label: "Turned off your offers", next: "They stopped marketing from your business in WhatsApp. Opted out automatically.", tone: "gray" },
   rate: { label: "Sent too fast", next: "Meta asked to slow down. Lower the batch size if this keeps happening.", tone: "amber" },
+  temporary: { label: "Meta briefly unavailable", next: "Campaigns keep these queued and try again a few minutes later.", tone: "gray" },
+  setup: { label: "Access token or app permissions", next: "Campaigns pause until it's fixed. An admin needs to replace the token on the Clients page or fix the app in Meta.", tone: "red" },
   "number-restricted": { label: "Number limited by Meta", next: "Sending paused to protect the number. Check WhatsApp number health on the Overview.", tone: "red" },
   window: { label: "Outside the 24-hour window", next: "Only templates can go out after 24 hours. Nothing to do for campaigns.", tone: "gray" },
   template: { label: "Template problem", next: "Fix or replace the template, then send again.", tone: "red" },
   "test-list": { label: "Not a test recipient", next: "A Meta test number can only message its listed recipients. Add the number in Meta → API setup.", tone: "amber" },
-  account: { label: "Meta account problem", next: "Payment or registration issue in Meta Business settings. Ask your admin.", tone: "red" },
+  account: { label: "Meta account problem", next: "Payment, registration or account setting in Meta. Campaigns pause until an admin fixes it.", tone: "red" },
   other: { label: "Other errors", next: "See the message log for Meta's exact words.", tone: "gray" },
 };
 

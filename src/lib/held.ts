@@ -2,7 +2,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { db } from "./db";
 import { allowance } from "./limits";
-import { explainError, metaError } from "./meta-errors";
+import { explainError, metaError, PAUSING_KINDS } from "./meta-errors";
 import { deliver, getSettings, readiness, templateSendable } from "./provider";
 import { applyFailure, quietUntil, recentlyMarketed } from "./rules";
 import { senderFor } from "./senders";
@@ -166,10 +166,10 @@ export async function retryHeldBack({ now = new Date(), deadline = Date.now() + 
       } catch (e) {
         const code = e instanceof MetaError ? (e.code ?? null) : null;
         const kind = metaError(code)?.kind;
-        // Too fast: give the slot back and try on a later call.
-        if (kind === "rate") {
+        // Too fast, Meta briefly down, or a token/account problem: give the slot back and try on a later call.
+        if (kind === "rate" || kind === "temporary" || (kind && PAUSING_KINDS.includes(kind))) {
           await db.message.delete({ where: { id: row.id } });
-          result.waiting.push("Meta asked to slow down");
+          result.waiting.push(kind === "rate" ? "Meta asked to slow down" : kind === "temporary" ? "Meta is briefly unavailable" : (metaError(code)?.title ?? "there's an account problem"));
           break;
         }
         await db.message.update({

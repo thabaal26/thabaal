@@ -12,6 +12,7 @@ import { cancelRun, runDispatcherNow } from "./actions/campaigns";
 import { BrandHero } from "./brand-hero";
 import { NumberHealth } from "./number-health";
 import { numberHealth } from "@/lib/limits";
+import { codesOf, PAUSING_KINDS } from "@/lib/meta-errors";
 import { DailyChart } from "./daily-chart";
 import { SpendCard } from "./spend-card";
 
@@ -94,6 +95,12 @@ export default async function Overview() {
     getSettings(),
   ]);
   const failedToday = failures.reduce((n, f) => n + f._count, 0);
+  // A campaign paused because the token, app permissions or Meta account stopped every send.
+  const paused = await db.message.findFirst({
+    where: { ...myMessages, status: "QUEUED", OR: [{ errorCode: { in: codesOf(PAUSING_KINDS) } }, { errorCode: { gte: 200, lte: 299 } }] },
+    orderBy: { createdAt: "desc" },
+    select: { error: true, run: { select: { campaign: { select: { id: true, name: true } } } } },
+  });
   // GitHub runs the scheduler every 5 minutes, sometimes late; 20 minutes of silence means it stopped.
   const schedulerQuiet = scope.isAdmin && (!settings.lastDispatchAt || settings.lastDispatchAt < daysAgo(20 / (24 * 60)));
 
@@ -143,8 +150,25 @@ export default async function Overview() {
         />
       )}
 
-      {(schedulerQuiet || failedToday > 0 || blocked.length > 0) && (
+      {(schedulerQuiet || failedToday > 0 || blocked.length > 0 || paused) && (
         <div className="mb-4 space-y-3">
+          {paused && (
+            <Callout role="alert" tone="danger" icon={<TriangleAlert />} title="Campaigns are paused: WhatsApp can't send right now">
+              {scope.isAdmin ? (
+                <>
+                  {paused.error}. Queued messages are kept and go out automatically once it&apos;s fixed
+                  {paused.run && (
+                    <>
+                      {" "}(first seen on <Link href={`/dashboard/campaigns/${paused.run.campaign.id}`}>{paused.run.campaign.name}</Link>)
+                    </>
+                  )}
+                  .
+                </>
+              ) : (
+                <>There&apos;s a problem with the WhatsApp account setup. Queued messages are kept and go out once your admin fixes it.</>
+              )}
+            </Callout>
+          )}
           {schedulerQuiet && (
             <Callout tone="warning" icon={<Clock />} title={`The scheduler hasn't run ${settings.lastDispatchAt ? `since ${fmtDate(settings.lastDispatchAt, "d MMM, h:mm a")}` : "yet"}.`}>
               Scheduled campaigns won&apos;t start until it does. Check the &quot;Campaign scheduler&quot; workflow in GitHub → Actions (it pauses after 60 days without commits).
