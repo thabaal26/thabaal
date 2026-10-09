@@ -2,6 +2,7 @@ import { PhoneCall, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing } from "
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
+import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { fmtDate } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
@@ -44,22 +45,28 @@ export default async function CallsPage() {
               const Icon = outgoing && c.status !== "MISSED" ? PhoneOutgoing : s.icon;
               const label = outgoing ? { RINGING: "Ringing", ANSWERED: "On call", ENDED: "Connected", MISSED: "No answer", REJECTED: "Declined" }[c.status] : s.label;
               return (
-                <li key={c.id} className="flex items-center gap-3 px-4 py-3.5 sm:px-5">
-                  <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft text-brand-deep">
+                <li key={c.id} className={cn("relative flex items-start gap-3 px-4 py-3 sm:px-5", c.customer && "transition-colors hover:bg-canvas/70 active:bg-sunken")}>
+                  <span aria-hidden className={cn("grid size-10 shrink-0 place-items-center rounded-full", c.status === "MISSED" ? "bg-danger-bg text-danger" : "bg-brand-soft text-brand-deep")}>
                     <Icon className="size-4" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      {c.customer ? (
-                        <Link href={`/dashboard/customers/${c.customer.id}`} className="font-medium hover:underline">{c.customer.name}</Link>
-                      ) : (
-                        <span className="font-medium">{c.callerName || "Unknown caller"}</span>
-                      )}
-                      <span className="tabular text-xs text-muted">{formatPhone(c.fromPhone)}</span>
-                      <Badge tone={s.tone}>{label}</Badge>
-                      {outgoing && <Badge tone="blue">Outgoing</Badge>}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        {c.customer ? (
+                          <Link href={`/dashboard/customers/${c.customer.id}`} className="font-medium text-ink after:absolute after:inset-0 hover:underline">
+                            {c.customer.name}
+                          </Link>
+                        ) : (
+                          <span className="font-medium text-ink">{c.callerName || "Unknown caller"}</span>
+                        )}
+                        <p className="tabular text-xs text-muted">{formatPhone(c.fromPhone)}</p>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                        <Badge tone={s.tone}>{label}</Badge>
+                        {outgoing && <Badge tone="blue">Outgoing</Badge>}
+                      </div>
                     </div>
-                    <p className="mt-1 text-xs text-muted">
+                    <p className="tabular mt-1 text-xs text-muted">
                       {fmtDate(c.startedAt, "EEE d MMM, h:mm a")}
                       {c.duration != null && c.status === "ENDED" && <> · {mmss(c.duration)}</>}
                       {c.answeredBy && <> · {outgoing ? "called" : "answered"} by {c.answeredBy}</>}
