@@ -15,6 +15,7 @@ import { DAYS, effectiveInterval, TEST_TAG } from "@/lib/schedule";
 import { getScope, owned } from "@/lib/session";
 import { cancelRun, deleteCampaign, runCampaignNow, sendCampaignTest, toggleCampaign } from "../../actions/campaigns";
 import { CampaignForm } from "../campaign-form";
+import { FailureSummary } from "../failure-summary";
 import { campaignFormData } from "../form-data";
 
 export const metadata: Metadata = { title: "Campaign" };
@@ -275,6 +276,8 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
           <EmptyState title="This campaign hasn't sent yet." />
         )}
       </Card>
+
+      <FailureSummary campaignId={c.id} runIds={runIds} canManage={scope.canManage} />
     </>
   );
 }

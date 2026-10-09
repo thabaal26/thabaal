@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { dispatch, startRun } from "@/lib/dispatcher";
 import { APP_TZ } from "@/lib/format";
+import { retryHeldBack } from "@/lib/held";
 import { getSettings, templateSendable } from "@/lib/provider";
 import { isQuietTime } from "@/lib/rules";
 import { computeNextRun, TEST_TAG } from "@/lib/schedule";
@@ -146,6 +147,26 @@ export async function sendCampaignTest(id: string): Promise<ActionResult> {
   return failed.length
     ? { ok: false, message: `Test failed: ${failed[0].message}` }
     : { ok: true, message: `Test sent to ${testers.map((t) => t.name).join(", ")}. Check your phone.` };
+}
+
+/**
+ * Sends this campaign's held-back messages (Meta error 131049/130472) once more right away,
+ * instead of waiting for the automatic retry. Same rules as a normal send.
+ */
+export async function retryHeldBackNow(campaignId: string): Promise<ActionResult> {
+  const s = await requireManager();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const c = await db.campaign.findUnique({ where: { id: campaignId }, select: { clientId: true } });
+  if (!c || !mine(s, c.clientId)) return { ok: false, message: "Campaign not found." };
+  const r = await retryHeldBack({ campaignId, ignoreWait: true });
+  refresh();
+  if (!r.retried && !r.failed) {
+    return { ok: false, message: r.waiting.length ? `Nothing sent yet: ${[...new Set(r.waiting)].join(", ")}. The scheduler will try again.` : "No held-back messages are waiting for a retry." };
+  }
+  return {
+    ok: true,
+    message: `Retried ${r.retried + r.failed}: ${r.retried} sent${r.failed ? `, ${r.failed} failed again` : ""}.`,
+  };
 }
 
 export async function cancelRun(runId: string): Promise<ActionResult> {

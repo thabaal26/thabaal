@@ -316,7 +316,7 @@ const STATUS: Record<string, { tone: Tone; label: string }> = {
   DISABLED: { tone: "red", label: "Disabled" },
   RUNNING: { tone: "blue", label: "Sending" },
   WAITING_TEMPLATE: { tone: "amber", label: "Waiting for approval" },
-  WAITING_CONNECTION: { tone: "amber", label: "Phone disconnected" },
+  WAITING_CONNECTION: { tone: "amber", label: "Paused: connection problem" },
   WAITING_LIMIT: { tone: "amber", label: "Daily limit reached" },
   WAITING_QUALITY: { tone: "red", label: "Paused: low quality" },
   WAITING_QUIET: { tone: "gray", label: "Waiting: quiet hours" },

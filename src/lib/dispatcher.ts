@@ -5,7 +5,8 @@ import { computeNextRun } from "./schedule";
 import { fmtDate } from "./format";
 import { deliver, getSettings, isSimulated, readiness, templateSendable } from "./provider";
 import { allowance, refreshStaleNumbers, windowFreesAt } from "./limits";
-import { explainError, metaError } from "./meta-errors";
+import { marketingPaused, retryHeldBack } from "./held";
+import { explainError, metaError, PAUSING_KINDS } from "./meta-errors";
 import { applyFailure, quietUntil, recentlyMarketed } from "./rules";
 import { sendRefillReminders } from "./refill";
 import { syncDueSheets } from "./sheets";
@@ -147,6 +148,8 @@ async function processRun(runId: string, now: Date, deadline: number) {
 
   // Customers who got any marketing message recently are skipped, so nobody is flooded with offers.
   const recent = marketing ? await recentlyMarketed(batch.map((m) => m.customerId), campaign.client.marketingGapHours) : new Map<string, Date>();
+  // Meta recently held marketing back from these customers; another offer now would only be held again.
+  const paused = marketing ? await marketingPaused(batch.map((m) => m.customerId)) : new Map<string, Date>();
 
   // The local session sends one by one with human-like gaps; Meta can take parallel sends.
   const local = settings.provider === "LOCAL" && !isSimulated(settings, cfg);
@@ -156,15 +159,24 @@ async function processRun(runId: string, now: Date, deadline: number) {
   let disconnected = false;
   let throttled = false;
   let restricted = false;
+  let setupProblem = false;
 
   await inPool(batch, local ? 1 : CONCURRENCY, async (m) => {
     if (Date.now() > deadline) {
       outOfTime = true; // stays QUEUED for the next call
       return false;
     }
-    if (throttled || restricted) return false;
+    if (throttled || restricted || setupProblem) return false;
     if (m.customer.optedOut || m.customer.unreachable) {
       await db.message.update({ where: { id: m.id }, data: { status: "SKIPPED", error: m.customer.optedOut ? "Customer opted out" : "Number can't receive WhatsApp messages" } });
+      return;
+    }
+    const until = paused.get(m.customerId);
+    if (until) {
+      await db.message.update({
+        where: { id: m.id },
+        data: { status: "SKIPPED", error: `Meta is holding back marketing to this customer until about ${fmtDate(until, "d MMM")}` },
+      });
       return;
     }
     const last = recent.get(m.customerId);
@@ -181,6 +193,8 @@ async function processRun(runId: string, now: Date, deadline: number) {
         where: { id: m.id },
         data: {
           status: "SENT",
+          error: null,
+          errorCode: null,
           waMessageId: res.id,
           simulated: res.simulated,
           provider: res.provider,
@@ -198,11 +212,19 @@ async function processRun(runId: string, now: Date, deadline: number) {
       }
       const code = e instanceof MetaError ? (e.code ?? null) : null;
       const kind = metaError(code)?.kind;
-      // Too fast: leave it queued and slow down. Restricted number: stop the whole run.
-      if (kind === "rate") {
+      // Too fast, or Meta briefly down: leave it queued and try again shortly.
+      if (kind === "rate" || kind === "temporary") {
         throttled = true;
         return false;
       }
+      // Token, permissions, billing or registration: every send would fail the same way, so keep the
+      // message queued (noting why, for the Overview warning) and pause the run until it's fixed.
+      if (kind && PAUSING_KINDS.includes(kind)) {
+        setupProblem = true;
+        await db.message.update({ where: { id: m.id }, data: { errorCode: code, error: explainError(code, e instanceof Error ? e.message : String(e)) } });
+        return false;
+      }
+      // Restricted number: fail this one and stop the whole run.
       if (kind === "number-restricted") restricted = true;
       await db.message.update({
         where: { id: m.id },
@@ -221,6 +243,7 @@ async function processRun(runId: string, now: Date, deadline: number) {
   });
 
   if (disconnected) await pause("WAITING_CONNECTION", 2);
+  else if (setupProblem) await pause("WAITING_CONNECTION", 30);
   else if (restricted) await pause("WAITING_QUALITY", 6 * 60);
   else if (throttled) await db.campaignRun.update({ where: { id: run.id }, data: { nextBatchAt: new Date(Date.now() + 5 * 60_000) } });
   // Finish the rest of this batch on the next scheduler call instead of waiting a full interval.
@@ -254,6 +277,8 @@ export async function dispatch() {
     sent += res.sent;
     failed += res.failed;
   }
+  // Messages Meta held back a few days ago get their one retry.
+  if (Date.now() < deadline) await retryHeldBack({ now, deadline }).catch((e) => console.error("Held-back retries failed", e));
   if (Date.now() < deadline) await sendRefillReminders(now).catch((e) => console.error("Refill reminders failed", e));
   if (Date.now() < deadline) await syncDueSheets(now).catch((e) => console.error("Sheet sync failed", e));
   if (Date.now() < deadline) await backfillOrderNames().catch((e) => console.error("Order name backfill failed", e));

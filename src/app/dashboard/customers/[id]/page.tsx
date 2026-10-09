@@ -12,6 +12,7 @@ import { fmtDate, fmtNumber, pct } from "@/lib/format";
 import { itemsText, money, type OrderItem } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { replyWindowEnd } from "@/lib/replies";
+import { marketingPaused } from "@/lib/held";
 import { getScope, owned } from "@/lib/session";
 import { sendableTemplates } from "@/lib/senders";
 import { META_SAMPLES } from "@/lib/template";
@@ -19,6 +20,7 @@ import { sendCatalogue } from "../../actions/catalog";
 import { requestCallPermission } from "../../actions/calls";
 import { setOptOut } from "../../actions/customers";
 import { CallButton } from "./call-button";
+import { PausedOffersNote } from "./paused-offers-note";
 import { SendPanel } from "./send-panel";
 
 export const metadata: Metadata = { title: "Customer" };
@@ -42,10 +44,12 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
   });
   if (!c) notFound();
 
-  const [templates, numbers] = await Promise.all([
+  const [templates, numbers, paused] = await Promise.all([
     db.template.findMany({ where: { clientId: c.clientId, status: "APPROVED", category: { not: "AUTHENTICATION" }, name: { notIn: META_SAMPLES }, ...(await sendableTemplates(c.clientId)) }, orderBy: { name: "asc" } }),
     db.whatsAppNumber.findMany({ where: { clientId: c.clientId }, orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }], select: { id: true, label: true, businessAccountId: true } }),
+    marketingPaused([c.id]),
   ]);
+  const pausedUntil = paused.get(c.id);
   // WhatsApp allows typed messages for 24 hours after the customer last wrote to us.
   const windowEnd = replyWindowEnd(c.replies[0]?.receivedAt);
   // WhatsApp only lets us ring customers who tapped "Allow" on our call request.
@@ -229,6 +233,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                 </div>
               </div>
             )}
+            {pausedUntil && <PausedOffersNote until={pausedUntil} />}
             <div className="rounded-control bg-sunken px-3 py-2 text-xs">
               <p className="font-medium text-ink-2">Agreed to WhatsApp messages</p>
               {c.optInSource ? (
