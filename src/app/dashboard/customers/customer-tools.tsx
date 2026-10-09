@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, ChevronRight, FileUp, MoreHorizontal, QrCode, Sheet as SheetIcon, Trash2, UserCheck, UserPlus, UsersRound } from "lucide-react";
+import { Ban, ChevronRight, Download, FileUp, MoreHorizontal, QrCode, Sheet as SheetIcon, Trash2, UserCheck, UserPlus, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -18,20 +18,34 @@ const LINKS = [
 ];
 
 /**
- * The customers page's actions. Computers show them all; phones keep "Add customer"
- * beside the title and put the rest in a "More" sheet.
+ * The customers page's actions: Export, Import and Add up front (phones keep only Add), and the
+ * page links (Get more customers, Google Sheet, Audiences) in the "⋯" sheet. In the admin's "All clients" view
+ * only the export is offered; everything else needs a client picked.
  */
-export function CustomerActions({ canManage }: { canManage: boolean }) {
+export function CustomerActions({
+  canManage,
+  hasClient = true,
+  exportHref = null,
+  exportCount = 0,
+}: {
+  canManage: boolean;
+  hasClient?: boolean;
+  /** CSV download of the customers currently listed (managers and admins only). */
+  exportHref?: string | null;
+  exportCount?: number;
+}) {
   const [open, setOpen] = useState<"add" | "import" | "more" | null>(null);
-  const links = LINKS.filter((l) => canManage || !l.manager);
+  const links = hasClient ? LINKS.filter((l) => canManage || !l.manager) : [];
+  const manage = canManage && hasClient;
+  const exportLabel = `Export ${exportCount.toLocaleString("en-IN")} customer${exportCount === 1 ? "" : "s"} as CSV`;
   return (
     <>
-      {links.map(({ href, label, icon: Icon }) => (
-        <Link key={href} href={href} className={cn(buttonClass("secondary"), "max-sm:hidden")}>
-          <Icon aria-hidden className="size-4" /> {label}
-        </Link>
-      ))}
-      {canManage && (
+      {exportHref && (
+        <a href={exportHref} download className={cn(buttonClass("secondary"), "max-sm:hidden")} title={exportLabel}>
+          <Download aria-hidden className="size-4" /> Export CSV
+        </a>
+      )}
+      {manage && (
         <>
           <Button variant="secondary" className="max-sm:hidden" onClick={() => setOpen("import")}>
             <FileUp aria-hidden className="size-4" /> Import CSV
@@ -41,9 +55,11 @@ export function CustomerActions({ canManage }: { canManage: boolean }) {
           </Button>
         </>
       )}
-      <Button variant="secondary" icon className="sm:hidden" aria-label="More customer tools" onClick={() => setOpen("more")}>
-        <MoreHorizontal aria-hidden className="size-5" />
-      </Button>
+      {(links.length > 0 || manage || exportHref) && (
+        <Button variant="secondary" icon aria-label="More customer tools" onClick={() => setOpen("more")}>
+          <MoreHorizontal aria-hidden className="size-5" />
+        </Button>
+      )}
 
       <Sheet open={open === "more"} onClose={() => setOpen(null)} title="Customer tools">
         <ul className="-mx-2 space-y-0.5">
@@ -56,7 +72,18 @@ export function CustomerActions({ canManage }: { canManage: boolean }) {
               </Link>
             </li>
           ))}
-          {canManage && (
+          {exportHref && (
+            <li>
+              <a href={exportHref} download onClick={() => setOpen(null)} className="flex min-h-12 items-center gap-3 rounded-control px-3 text-md font-medium text-ink transition active:bg-sunken">
+                <Download aria-hidden className="size-5 text-brand-deep" />
+                <span className="flex-1">
+                  Export CSV
+                  <span className="block text-xs font-normal text-muted">{exportLabel}</span>
+                </span>
+              </a>
+            </li>
+          )}
+          {manage && (
             <li>
               <button type="button" onClick={() => setOpen("import")} className="flex min-h-12 w-full items-center gap-3 rounded-control px-3 text-left text-md font-medium text-ink transition active:bg-sunken">
                 <FileUp aria-hidden className="size-5 text-brand-deep" />

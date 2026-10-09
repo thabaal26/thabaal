@@ -48,20 +48,18 @@ export function PageHeader({
     <header className="mb-4 sm:mb-6">
       {back && <BackLink href={back.href}>{back.label}</BackLink>}
       <div className={cn("flex gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6", inlineActions ? "items-start" : "flex-col")}>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 sm:min-w-48">
           <PageInfo title={title} description={description} />
           {meta && <div className="mt-1 text-sm text-muted">{meta}</div>}
         </div>
         {actions &&
           (inlineActions ? (
-            <div className="flex shrink-0 gap-2 sm:justify-end print:hidden">{actions}</div>
+            <div className="flex shrink-0 gap-2 sm:max-w-[70%] sm:shrink sm:flex-wrap sm:justify-end print:hidden">{actions}</div>
           ) : rowActions ? (
-            <div className="flex gap-2 *:flex-1 sm:shrink-0 sm:justify-end sm:*:flex-none print:hidden">{actions}</div>
-          ) : rowActions ? (
-            <div className="flex gap-2 *:flex-1 sm:shrink-0 sm:justify-end sm:*:flex-none print:hidden">{actions}</div>
+            <div className="flex gap-2 *:flex-1 sm:max-w-[70%] sm:flex-wrap sm:justify-end sm:*:flex-none print:hidden">{actions}</div>
           ) : (
             // Phones: buttons share the row and wrap two-up instead of squeezing four into one line.
-            <div className="flex flex-wrap gap-2 *:min-w-[calc(50%-0.25rem)] *:flex-1 sm:shrink-0 sm:justify-end sm:*:min-w-0 sm:*:flex-none print:hidden">
+            <div className="flex flex-wrap gap-2 *:min-w-[calc(50%-0.25rem)] *:flex-1 sm:max-w-[70%] sm:justify-end sm:*:min-w-0 sm:*:flex-none print:hidden">
               {actions}
             </div>
           ))}
