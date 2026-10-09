@@ -1,9 +1,10 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
+import { AUDIENCE_PREFIX, decodeTags } from "./audience-tags";
 import { db } from "./db";
 
 // Saved audiences: a named filter over a client's customers that campaigns can send to.
-// Campaigns store it as audienceTag "aud:<id>"; a plain tag still works as before.
+// Campaigns store it as audienceTag "aud:<id>"; tags work too (see src/lib/audience-tags.ts).
 
 export type AudienceFilter = {
   /** Customer must have every one of these tags. */
@@ -23,7 +24,7 @@ export type AudienceFilter = {
 };
 
 const DAY = 86_400_000;
-export const AUDIENCE_PREFIX = "aud:";
+export { AUDIENCE_PREFIX };
 
 export function cleanFilter(f: AudienceFilter): AudienceFilter {
   const tags = (xs?: string[]) => [...new Set((xs ?? []).map((t) => t.trim().toLowerCase()).filter(Boolean))];
@@ -80,13 +81,19 @@ export function describeFilter(raw: AudienceFilter) {
   return parts.length ? parts.join(" · ") : "all opted-in customers";
 }
 
-/** The customer filter for a campaign's audienceTag: a saved audience, a tag, or everyone. */
+/** The customer filter for a campaign's audienceTag: a saved audience, one or more tags, or everyone. */
 export async function campaignAudienceWhere(clientId: string, audienceTag: string | null): Promise<Prisma.CustomerWhereInput> {
-  if (audienceTag?.startsWith(AUDIENCE_PREFIX)) {
+  const base = { clientId, optedOut: false, unreachable: false };
+  if (!audienceTag) return base;
+  if (audienceTag.startsWith(AUDIENCE_PREFIX)) {
     const a = await db.audience.findFirst({ where: { id: audienceTag.slice(AUDIENCE_PREFIX.length), clientId } });
     // A deleted audience must not fall back to "everyone".
     if (!a) return { id: { in: [] } };
     return audienceWhere(clientId, a.filter as AudienceFilter);
   }
-  return { clientId, optedOut: false, unreachable: false, ...(audienceTag ? { tags: { has: audienceTag } } : {}) };
+  const pick = decodeTags(audienceTag);
+  // A tag list that can't be read must not fall back to "everyone" either.
+  if (!pick?.tags.length) return { id: { in: [] } };
+  if (pick.tags.length === 1) return { ...base, tags: { has: pick.tags[0] } };
+  return { ...base, tags: pick.match === "all" ? { hasEvery: pick.tags } : { hasSome: pick.tags } };
 }

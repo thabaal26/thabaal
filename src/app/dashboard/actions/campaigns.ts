@@ -6,6 +6,8 @@ import { db } from "@/lib/db";
 import { dispatch, startRun } from "@/lib/dispatcher";
 import { APP_TZ } from "@/lib/format";
 import { retryHeldBack } from "@/lib/held";
+import { campaignAudienceWhere } from "@/lib/audiences";
+import { decodeTags, TAGS_PREFIX } from "@/lib/audience-tags";
 import { getSettings, templateSendable } from "@/lib/provider";
 import { isQuietTime } from "@/lib/rules";
 import { computeNextRun, TEST_TAG } from "@/lib/schedule";
@@ -51,6 +53,7 @@ export async function saveCampaign(id: string | null, input: CampaignInput): Pro
     errors.push(`"${template.name}" is approved in a different WhatsApp account than ${sender.label}. Pick a template from that number's account.`);
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(input.sendTime)) errors.push("Choose a send time.");
   if (input.scheduleType === "WEEKLY" && !input.daysOfWeek.length) errors.push("Pick at least one day of the week.");
+  if (input.audienceTag.startsWith(TAGS_PREFIX) && !decodeTags(input.audienceTag)?.tags.length) errors.push('Pick at least one tag under "Send to", or choose All customers.');
   if (input.scheduleType === "ONCE" && !/^\d{4}-\d{2}-\d{2}$/.test(input.runDate)) errors.push("Choose a date.");
   if (!Number.isInteger(input.batchSize) || input.batchSize < 1 || input.batchSize > 1000) errors.push("Batch size must be between 1 and 1,000.");
   if (!Number.isInteger(input.intervalMinutes) || input.intervalMinutes < 1 || input.intervalMinutes > 1440)
@@ -167,6 +170,23 @@ export async function retryHeldBackNow(campaignId: string): Promise<ActionResult
     ok: true,
     message: `Retried ${r.retried + r.failed}: ${r.retried} sent${r.failed ? `, ${r.failed} failed again` : ""}.`,
   };
+}
+
+/**
+ * How many customers a "Send to" choice reaches right now, for the campaign form's live count
+ * (several tags can overlap, so the form can't add up per-tag counts itself).
+ */
+export async function countCampaignAudience(campaignId: string | null, audienceTag: string): Promise<{ ok: boolean; n: number }> {
+  const s = await requireManager();
+  if ("denied" in s) return { ok: false, n: 0 };
+  let clientId = s.clientId;
+  if (campaignId) {
+    const c = await db.campaign.findUnique({ where: { id: campaignId }, select: { clientId: true } });
+    if (!c || !mine(s, c.clientId)) return { ok: false, n: 0 };
+    clientId = c.clientId;
+  }
+  if (!clientId) return { ok: false, n: 0 };
+  return { ok: true, n: await db.customer.count({ where: await campaignAudienceWhere(clientId, audienceTag.trim() || null) }) };
 }
 
 export async function cancelRun(runId: string): Promise<ActionResult> {

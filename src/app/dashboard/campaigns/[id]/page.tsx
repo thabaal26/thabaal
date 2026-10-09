@@ -7,6 +7,8 @@ import { OverflowMenu } from "@/components/overflow-menu";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, rowClass, StatusBadge, Table, Td, Th } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { Prisma } from "@prisma/client";
+import { campaignAudienceWhere } from "@/lib/audiences";
+import { decodeTags, describeTags } from "@/lib/audience-tags";
 import { db } from "@/lib/db";
 import { money } from "@/lib/orders";
 import { APP_TZ, fmtDate, fmtNumber, pct } from "@/lib/format";
@@ -41,8 +43,10 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
     db.message.groupBy({ by: ["runId"], where: { runId: { in: c.runs.map((r) => r.id) }, billable: true }, _count: true }),
   ]);
   const picked = c.audienceTag ? audience.tags.find((t) => t.tag === c.audienceTag) : undefined;
-  const audienceSize = c.audienceTag ? (picked?.n ?? 0) : audience.all;
-  const audienceName = picked?.label ?? c.audienceTag;
+  // Several tags can overlap, so their reach is counted, not looked up.
+  const tagPick = picked ? null : decodeTags(c.audienceTag);
+  const audienceSize = !c.audienceTag ? audience.all : picked ? picked.n : await db.customer.count({ where: await campaignAudienceWhere(c.clientId, c.audienceTag) });
+  const audienceName = picked?.label ?? (tagPick ? describeTags(tagPick) : c.audienceTag);
   const sendConfirm = `Send "${c.template.name}" now to ${fmtNumber(audienceSize)} customer${audienceSize === 1 ? "" : "s"} (${c.audienceTag ? `"${audienceName}"` : "ALL customers, no tag"})?`;
   // Sales credited to a run: orders a recipient placed within 7 days of getting its message.
   const runIds = c.runs.map((r) => r.id);
