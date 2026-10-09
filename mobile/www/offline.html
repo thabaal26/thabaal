@@ -8,15 +8,17 @@
   body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #f5f6f3; color: #0f1a17;
          font: 16px/1.5 system-ui, -apple-system, Roboto, sans-serif; padding: 24px; box-sizing: border-box; }
   main { max-width: 320px; text-align: center; }
-  .icon { width: 64px; height: 64px; margin: 0 auto 20px; border-radius: 18px; background: #0f9d58; display: flex; align-items: center; justify-content: center; }
+  .icon { width: 64px; height: 64px; margin: 0 auto 20px; border-radius: 16px; background: #0d844a; display: flex; align-items: center; justify-content: center; }
   h1 { font-size: 22px; margin: 0 0 8px; }
-  p { color: #6b7773; margin: 0 0 24px; }
-  a { display: block; height: 48px; line-height: 48px; border-radius: 12px; background: #0f9d58; color: #fff; font-weight: 600; text-decoration: none; }
+  p { color: #5f6b67; margin: 0 0 24px; }
+  a { display: block; height: 48px; line-height: 48px; border-radius: 10px; background: #0d844a; color: #fff; font-weight: 600; text-decoration: none; }
+  a:active { background: #0a6b3d; }
+  a:focus-visible { outline: 2px solid #0a6b3d; outline-offset: 2px; }
 </style>
 </head>
 <body>
 <main>
-  <div class="icon"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg></div>
+  <div class="icon" aria-hidden="true"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg></div>
   <h1>You're offline</h1>
   <p>Campaigns keep sending on the server. Connect to the internet to see the latest messages.</p>
   <a href="https://campaign-seven-ruddy.vercel.app/login">Try again</a>
