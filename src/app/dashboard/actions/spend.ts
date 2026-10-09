@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { fetchMetaLiveStatus, setMetaAccountBalance } from "@/lib/meta-balance";
 import { requireManager, requireUser } from "@/lib/session";
 import type { ActionResult } from "./templates";
 
@@ -24,4 +25,36 @@ export async function deleteTopUp(id: string): Promise<ActionResult> {
   if (!r.count) return { ok: false, message: "Top-up not found." };
   revalidatePath("/dashboard");
   return { ok: true, message: "Top-up removed." };
+}
+
+/** Syncs the live Meta WhatsApp prepaid balance with Meta Business Suite. */
+export async function syncMetaAccountBalanceAction(wabaId: string, balance: number): Promise<ActionResult> {
+  const s = await requireManager(true);
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const val = Number(balance);
+  if (isNaN(val) || val < 0 || val > 10_000_000) {
+    return { ok: false, message: "Please enter a valid prepaid balance amount in rupees." };
+  }
+  const user = await requireUser();
+  const updated = await setMetaAccountBalance(wabaId, val, user.name);
+  revalidatePath("/dashboard");
+  return {
+    ok: true,
+    message: `Meta balance synced successfully: ₹${updated.liveBalance.toFixed(2)} active on ${updated.accountName}.`,
+  };
+}
+
+/** Verifies live Meta Cloud API connectivity and health for sending numbers. */
+export async function refreshMetaLiveStatusAction(clientId: string): Promise<ActionResult> {
+  const s = await requireManager(true);
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const status = await fetchMetaLiveStatus(clientId);
+  revalidatePath("/dashboard");
+  if (status.liveConnected) {
+    return {
+      ok: true,
+      message: `Meta Cloud API connected: ${status.wabaName} (${status.displayPhone}) · Quality: ${status.qualityRating}`,
+    };
+  }
+  return { ok: false, message: "Could not reach Meta Cloud API. Check API credentials." };
 }
