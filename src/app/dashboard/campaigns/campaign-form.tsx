@@ -1,15 +1,19 @@
 "use client";
 
-import { Clock, Gauge, Users } from "lucide-react";
+import { Clock, Gauge, Users, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { MobileActionBar } from "@/components/mobile-action-bar";
+import { MultiPicker } from "@/components/multi-picker";
 import { Picker } from "@/components/picker";
 import { toastResult } from "@/components/toast";
 import { Button, Callout, Card, CardHeader, CheckRow, Field, Segmented } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { DAYS, effectiveInterval, estimateDuration, formatMinutes, SCHEDULER_TICK_MINUTES } from "@/lib/schedule";
-import { saveCampaign, type CampaignInput } from "../actions/campaigns";
+import { AUDIENCE_PREFIX, decodeTags, describeTags, encodeTags, TAGS_PREFIX, type TagPick } from "@/lib/audience-tags";
+import { countCampaignAudience, saveCampaign, type CampaignInput } from "../actions/campaigns";
+
+type SendTo = "all" | "tags" | "saved";
 
 const PRESETS = [
   { label: "Gentle", batch: 50, interval: 15 },
@@ -35,7 +39,47 @@ export function CampaignForm({
   const router = useRouter();
   const set = (patch: Partial<CampaignInput>) => setC((s) => ({ ...s, ...patch }));
 
-  const size = c.audienceTag ? (audience.tags.find((t) => t.tag === c.audienceTag)?.n ?? 0) : audience.all;
+  // "Send to": everyone, one or more tags (any or all of them), or a saved audience.
+  const savedOptions = audience.tags.filter((t) => t.tag.startsWith(AUDIENCE_PREFIX));
+  const tagOptions = audience.tags.filter((t) => !t.tag.startsWith(AUDIENCE_PREFIX));
+  const [sendTo, setSendTo] = useState<SendTo>(!initial.audienceTag ? "all" : initial.audienceTag.startsWith(AUDIENCE_PREFIX) ? "saved" : "tags");
+  const [pick, setPick] = useState<TagPick>(decodeTags(initial.audienceTag) ?? { match: "any", tags: [] });
+  // No tags picked yet stays a (rejected) tag list, never quietly "everyone".
+  const tagValue = (p: TagPick) => encodeTags(p) || `${TAGS_PREFIX}${JSON.stringify({ match: p.match, tags: [] })}`;
+  const chooseSendTo = (v: SendTo) => {
+    setSendTo(v);
+    set({ audienceTag: v === "all" ? "" : v === "tags" ? tagValue(pick) : (savedOptions.find((o) => o.tag === c.audienceTag)?.tag ?? savedOptions[0]?.tag ?? "") });
+  };
+  const choosePick = (next: TagPick) => {
+    setPick(next);
+    set({ audienceTag: tagValue(next) });
+  };
+
+  // Several tags can overlap, so their reach is counted on the server.
+  const multi = sendTo === "tags" && pick.tags.length > 1;
+  const [counted, setCounted] = useState<{ key: string; n: number } | null>(null);
+  useEffect(() => {
+    if (!multi) return;
+    const key = c.audienceTag;
+    const t = setTimeout(async () => {
+      const r = await countCampaignAudience(id, key).catch(() => ({ ok: false, n: 0 }));
+      setCounted({ key, n: r.ok ? r.n : -1 }); // -1: couldn't count
+    }, 300);
+    return () => clearTimeout(t);
+  }, [multi, c.audienceTag, id]);
+  const counting = multi && counted?.key !== c.audienceTag;
+
+  const size =
+    sendTo === "all" || !c.audienceTag
+      ? audience.all
+      : multi
+        ? Math.max(0, counted?.n ?? 0)
+        : sendTo === "tags" && !pick.tags.length
+          ? 0
+          : (audience.tags.find((t) => t.tag === (sendTo === "tags" ? pick.tags[0] : c.audienceTag))?.n ?? 0);
+  const tagLabel = (tag: string) => tagOptions.find((t) => t.tag === tag)?.label ?? tag;
+  // While several tags are being counted (or couldn't be), the summary shows that instead of 0.
+  const sizeKnown = !multi || (!counting && (counted?.n ?? -1) >= 0);
   const batches = c.batchSize > 0 ? Math.ceil(size / c.batchSize) : 0;
   const mins = estimateDuration(size, c.batchSize, c.intervalMinutes);
   const [h, m] = c.sendTime.split(":").map(Number);
@@ -89,7 +133,7 @@ export function CampaignForm({
                 <p className="mt-1.5 text-xs text-muted">Templates below are the ones approved for this number.</p>
               </div>
             )}
-            <div>
+            <div className="sm:col-span-2">
               <label htmlFor="tpl" className="mb-1.5 block text-sm font-medium text-ink-2">Template</label>
               <Picker
                 id="tpl"
@@ -105,19 +149,88 @@ export function CampaignForm({
               />
               {chosen && chosen.status !== "APPROVED" && <p className="mt-1.5 text-xs text-warning">Sending waits until Meta approves this template.</p>}
             </div>
-            <div>
-              <label htmlFor="aud" className="mb-1.5 block text-sm font-medium text-ink-2">Send to</label>
-              <Picker
-                id="aud"
-                title="Send to"
-                value={c.audienceTag}
-                onChange={(audienceTag) => set({ audienceTag })}
+            <fieldset className="space-y-3 sm:col-span-2">
+              <legend className="mb-1.5 text-sm font-medium text-ink-2">Send to</legend>
+              <Segmented
+                label="Send to"
+                value={sendTo}
+                onChange={chooseSendTo}
                 options={[
-                  { value: "", label: "All customers", hint: `${audience.all.toLocaleString("en-IN")} customers` },
-                  ...audience.tags.map((t) => ({ value: t.tag, label: t.label, hint: `${t.n.toLocaleString("en-IN")} customers${t.hint ? ` · ${t.hint}` : ""}` })),
+                  { value: "all", label: "Everyone" },
+                  { value: "tags", label: "Tags" },
+                  ...(savedOptions.length ? [{ value: "saved" as const, label: "Audience" }] : []),
                 ]}
+                className="w-full sm:w-auto"
               />
-            </div>
+
+              {sendTo === "tags" && (
+                <div className="space-y-3">
+                  <MultiPicker
+                    id="aud-tags"
+                    title="Customers tagged"
+                    placeholder={tagOptions.length ? "Choose one or more tags…" : "No tags yet"}
+                    value={pick.tags}
+                    onChange={(tags) => choosePick({ ...pick, tags })}
+                    options={tagOptions.map((t) => ({ value: t.tag, label: t.label, hint: `${t.n.toLocaleString("en-IN")} customers` }))}
+                  />
+                  {pick.tags.length > 0 && (
+                    <ul aria-label="Chosen tags" className="flex flex-wrap gap-1.5">
+                      {pick.tags.map((tag) => (
+                        <li key={tag}>
+                          <span className="inline-flex min-h-8 items-center gap-1 rounded-full bg-brand-soft py-0.5 pl-3 pr-1 text-sm font-medium text-brand-deep">
+                            {tagLabel(tag)}
+                            <button
+                              type="button"
+                              aria-label={`Remove ${tagLabel(tag)}`}
+                              onClick={() => choosePick({ ...pick, tags: pick.tags.filter((x) => x !== tag) })}
+                              className="grid size-7 place-items-center rounded-full transition hover:bg-brand/15 active:bg-brand/20 pointer-coarse:size-9"
+                            >
+                              <X aria-hidden className="size-3.5" />
+                            </button>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {pick.tags.length > 1 && (
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                      <span className="text-sm text-ink-2">Customers with</span>
+                      <Segmented
+                        label="Customers with"
+                        value={pick.match}
+                        onChange={(match) => choosePick({ ...pick, match })}
+                        options={[
+                          { value: "any", label: "any of these" },
+                          { value: "all", label: "all of these" },
+                        ]}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {sendTo === "saved" && (
+                <Picker
+                  id="aud"
+                  title="Saved audience"
+                  value={c.audienceTag}
+                  onChange={(audienceTag) => set({ audienceTag })}
+                  options={savedOptions.map((t) => ({ value: t.tag, label: t.label.replace(/^★\s*/, ""), hint: `${t.n.toLocaleString("en-IN")} customers${t.hint ? ` · ${t.hint}` : ""}` }))}
+                />
+              )}
+
+              <p className="tabular text-sm text-muted" aria-live="polite">
+                {sendTo === "all"
+                  ? `All ${audience.all.toLocaleString("en-IN")} opted-in customers.`
+                  : sendTo === "tags" && !pick.tags.length
+                    ? "Pick at least one tag."
+                    : counting
+                      ? "Counting customers…"
+                      : multi && counted?.n === -1
+                        ? `Customers tagged ${describeTags(pick, tagLabel)}. Couldn't count them right now; the campaign still reaches everyone who matches.`
+                      : `${size.toLocaleString("en-IN")} customer${size === 1 ? "" : "s"}${sendTo === "tags" ? ` tagged ${describeTags(pick, tagLabel)}` : ""}.`}
+              </p>
+            </fieldset>
           </div>
         </Card>
 
@@ -217,10 +330,10 @@ export function CampaignForm({
           <div className="surface-dark bg-night p-5 text-white">
             <p className="text-xs font-semibold uppercase tracking-wider text-white/70">Each send</p>
             <p className="tabular mt-2 text-3xl font-semibold">
-              {size.toLocaleString("en-IN")} <span className="text-base font-normal text-white/75">customers</span>
+              {sizeKnown ? size.toLocaleString("en-IN") : "…"} <span className="text-base font-normal text-white/75">customers</span>
             </p>
             <p className="mt-1 text-sm text-white/80">
-              {batches} batch{batches === 1 ? "" : "es"} · done in {days > 1 ? `about ${days} days` : formatMinutes(mins)}
+              {!sizeKnown ? "Counting customers…" : !size ? "No customers match yet" : <>{batches} batch{batches === 1 ? "" : "es"} · done in {days > 1 ? `about ${days} days` : formatMinutes(mins)}</>}
             </p>
             {days > 1 && sender?.dailyLimit && (
               <p className="mt-2 rounded-control bg-white/10 px-2.5 py-1.5 text-xs text-white/85">
@@ -248,7 +361,7 @@ export function CampaignForm({
               </span>
             </li>
           </ul>
-          {perWeek > 0 && (
+          {perWeek > 0 && sizeKnown && (
             <p className="border-t border-line px-5 py-3 text-xs text-muted">
               {perWeek}× a week ≈ <b className="text-ink">{(size * perWeek).toLocaleString("en-IN")}</b> messages weekly.
             </p>
@@ -268,9 +381,9 @@ export function CampaignForm({
       </aside>
       <MobileActionBar>
         <div className="min-w-0 flex-1 leading-tight">
-          <p className="tabular truncate text-sm font-semibold">{size.toLocaleString("en-IN")} customers</p>
+          <p className="tabular truncate text-sm font-semibold">{sizeKnown ? `${size.toLocaleString("en-IN")} customers` : "Counting…"}</p>
           <p className="truncate text-xs text-muted">
-            {batches} batch{batches === 1 ? "" : "es"} · {days > 1 ? `about ${days} days` : `done in ${formatMinutes(mins)}`}
+            {!sizeKnown ? `Tagged ${describeTags(pick, tagLabel)}` : !size ? "No customers match yet" : `${batches} batch${batches === 1 ? "" : "es"} · ${days > 1 ? `about ${days} days` : `done in ${formatMinutes(mins)}`}`}
           </p>
         </div>
         <Button className="!flex-none shrink-0 px-6" loading={pending} onClick={save}>
