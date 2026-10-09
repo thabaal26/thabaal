@@ -27,23 +27,25 @@ export function DailyChart({ rows, since }: { rows: { day: string; status: strin
           </span>
         ))}
       </div>
-      <table className="sr-only">
-        <caption>Messages per day for the last 14 days, by latest status</caption>
-        <thead>
-          <tr>
-            <th scope="col">Day</th>
-            {SERIES.map((s) => <th key={s.key} scope="col">{s.label}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {days.map((d) => (
-            <tr key={d}>
-              <th scope="row">{label(d, "EEE d MMM")}</th>
-              {SERIES.map((s) => <td key={s.key}>{val(d, s.key)}</td>)}
+      <div className="sr-only">
+        <table>
+          <caption>Messages per day for the last 14 days, by latest status</caption>
+          <thead>
+            <tr>
+              <th scope="col">Day</th>
+              {SERIES.map((s) => <th key={s.key} scope="col">{s.label}</th>)}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {days.map((d) => (
+              <tr key={d}>
+                <th scope="row">{label(d, "EEE d MMM")}</th>
+                {SERIES.map((s) => <td key={s.key}>{val(d, s.key)}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <div aria-hidden className="flex h-36 items-end gap-1 border-b border-line sm:h-48 sm:gap-1.5">
         {days.map((d, i) => (
           <div key={d} className="group relative flex h-full flex-1 flex-col justify-end">

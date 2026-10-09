@@ -75,7 +75,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
   ) : null;
 
   return (
-    <div style={themeStyle(client)} className="min-h-dvh overflow-x-clip bg-canvas lg:pl-64 print:bg-white print:pl-0 lg:print:pl-0">
+    <div style={themeStyle(client)} className="min-h-dvh w-full overflow-x-clip bg-canvas lg:pl-64 print:bg-white print:pl-0 lg:print:pl-0">
       {client && themeCss(client) && <style>{themeCss(client)}</style>}
       <a href="#main" className="sr-only z-[70] rounded-control bg-panel px-4 py-2 text-sm font-medium text-ink shadow-pop focus:not-sr-only focus:fixed focus:left-4 focus:top-4">
         Skip to content
@@ -108,7 +108,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
         </div>
       </aside>
 
-      <header className="surface-dark sticky top-0 z-30 bg-night pt-[env(safe-area-inset-top)] lg:hidden print:hidden">
+      <header className="surface-dark sticky top-0 z-30 w-full bg-night pt-[env(safe-area-inset-top)] lg:hidden print:hidden">
         <div className="flex h-14 items-center gap-3 pl-4 pr-2">
           <BrandMark logoUrl={client?.logoUrl} name={name} size="sm" />
           {scope.isAdmin ? (
@@ -125,7 +125,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
         </div>
       </header>
 
-      <main id="main" className="stagger mx-auto max-w-page px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pb-12 lg:pt-8 print:p-0">
+      <main id="main" className="stagger mx-auto w-full max-w-page px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pb-12 lg:pt-8 print:p-0">
         {children}
       </main>
       {scope.canOperate && <CallWidget />}
