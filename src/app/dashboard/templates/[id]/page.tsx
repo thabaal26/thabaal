@@ -1,6 +1,4 @@
-import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageHeader, StatusBadge } from "@/components/ui";
 import { WhatsAppBubble } from "@/components/whatsapp-preview";
@@ -19,19 +17,22 @@ export default async function EditTemplatePage({ params }: PageProps<"/dashboard
   const t = await db.template.findFirst({ where: { id, ...owned(scope) }, include: { client: { select: { name: true } } } });
   if (!t) notFound();
 
-  const back = (
-    <Link href="/dashboard/templates" className="-my-2 mb-1 inline-flex items-center gap-1 py-2 text-sm text-muted hover:text-ink sm:mb-3 sm:text-xs">
-      <ArrowLeft className="size-3.5" /> Templates
-    </Link>
-  );
+  const back = { href: "/dashboard/templates", label: "Templates" };
 
   if (!scope.canManage) {
     const r = renderFor({ ...t, headerText: t.headerText ?? "", footer: t.footer ?? "", variables: t.variables as VarMap }, SAMPLE_CUSTOMER);
     return (
       <>
-        {back}
-        <PageHeader title={t.name} description={`${t.language} · last changed ${fmtDate(t.updatedAt)}`} actions={<StatusBadge status={t.status} />} />
-        <Card className="chat-wall max-w-md p-5">
+        <PageHeader
+          title={t.name}
+          back={back}
+          meta={
+            <span className="flex flex-wrap items-center gap-2">
+              <StatusBadge status={t.status} /> {t.language} · last changed {fmtDate(t.updatedAt)}
+            </span>
+          }
+        />
+        <Card className="chat-wall max-w-md p-4 sm:p-5">
           <WhatsAppBubble
             header={r.header}
             headerImage={t.headerType === "IMAGE" ? t.headerMediaUrl : undefined}
@@ -46,10 +47,10 @@ export default async function EditTemplatePage({ params }: PageProps<"/dashboard
 
   return (
     <>
-      {back}
       <PageHeader
         title={t.name}
-        description={`${t.client.name} · last changed ${fmtDate(t.updatedAt)}${t.lastSyncedAt ? ` · synced with Meta ${fmtDate(t.lastSyncedAt)}` : ""}`}
+        back={back}
+        meta={`${t.client.name} · last changed ${fmtDate(t.updatedAt)}${t.lastSyncedAt ? ` · synced with Meta ${fmtDate(t.lastSyncedAt)}` : ""}`}
       />
       <TemplateEditor
         id={t.id}
