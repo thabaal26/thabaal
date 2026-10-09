@@ -60,7 +60,14 @@ export function Sheet({
 
     // Phones: the back button closes the sheet instead of leaving the page.
     // (Skipped when React re-runs this effect in development and the entry is already there.)
-    if (window.history.state?.__sheet !== id) window.history.pushState({ ...window.history.state, __sheet: id }, "");
+    // When one sheet hands over to another (e.g. order actions → dispatch), the new sheet takes
+    // over the closing sheet's entry instead of stacking a second one, so one back press closes it.
+    const current = window.history.state?.__sheet;
+    if (current !== id) {
+      const entry = { ...window.history.state, __sheet: id };
+      if (current && !stack.includes(current)) window.history.replaceState(entry, "");
+      else window.history.pushState(entry, "");
+    }
     const onPop = () => {
       if (window.history.state?.__sheet !== id && stack.includes(id)) close();
     };
