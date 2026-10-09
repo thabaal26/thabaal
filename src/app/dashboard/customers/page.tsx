@@ -1,4 +1,3 @@
-import type { Prisma } from "@prisma/client";
 import { ChevronLeft, ChevronRight, Search, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -10,6 +9,7 @@ import { db } from "@/lib/db";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { marketingPaused } from "@/lib/held";
+import { customerFilters, customerWhere } from "@/lib/customer-query";
 import { getScope, owned } from "@/lib/session";
 import { deleteCustomer, setOptOut } from "../actions/customers";
 import { CustomerActions, CustomerMenu } from "./customer-tools";
@@ -21,19 +21,15 @@ const PAGE_SIZE = 50;
 
 export default async function CustomersPage({ searchParams }: PageProps<"/dashboard/customers">) {
   const sp = await searchParams;
-  const q = typeof sp.q === "string" ? sp.q.trim() : "";
-  const tag = typeof sp.tag === "string" ? sp.tag : "";
   // Area filter: "region:Madurai city", "loc:Sellur" or "none" (no location noted).
-  const area = typeof sp.area === "string" ? sp.area : "";
+  const { q, tag, area } = customerFilters(sp);
   const page = Math.max(1, Number(sp.page) || 1);
   const scope = await getScope();
 
-  const where: Prisma.CustomerWhereInput = {
-    ...owned(scope),
-    ...(tag === "__optout" ? { optedOut: true } : tag ? { tags: { has: tag } } : {}),
-    ...(area === "none" ? { location: null } : area.startsWith("region:") ? { region: area.slice(7) } : area.startsWith("loc:") ? { location: area.slice(4) } : {}),
-    ...(q && { OR: [{ name: { contains: q, mode: "insensitive" } }, { phone: { contains: q.replace(/\D/g, "") || q } }] }),
-  };
+  // Shared with the CSV export, so a download always matches the list.
+  const where = customerWhere(scope, { q, tag, area });
+  const filterQs = new URLSearchParams(Object.entries({ q, tag, area }).filter(([, v]) => v) as [string, string][]);
+  const exportHref = `/api/customers/export${filterQs.size ? `?${filterQs}` : ""}`;
   const [rows, total, tags, areas] = await Promise.all([
     db.customer.findMany({
       where,
@@ -97,7 +93,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
         }
         description="Customers who reply STOP are opted out automatically."
         inlineActions
-        actions={scope.clientId ? <CustomerActions canManage={scope.canManage} /> : undefined}
+        actions={scope.clientId || scope.isAdmin ? <CustomerActions canManage={scope.canManage} hasClient={!!scope.clientId} exportHref={scope.canManage && total > 0 ? exportHref : null} exportCount={total} /> : undefined}
       />
 
       <Card>
