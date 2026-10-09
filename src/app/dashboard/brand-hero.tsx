@@ -31,8 +31,11 @@ export function BrandHero({
     <section aria-labelledby="hero-title" className="surface-dark relative mb-4 overflow-hidden rounded-card bg-night text-white shadow-card sm:mb-6">
       {client.bannerUrl && (
         // Phones: a slim strip across the top, so the banner shows without filling the screen.
-        // eslint-disable-next-line @next/next/no-img-element -- admin-supplied banner of any size
-        <img src={client.bannerUrl} alt={`${client.name} banner`} width={800} height={160} className="h-24 w-full object-cover object-center md:hidden" />
+        <div className="relative h-28 w-full overflow-hidden md:hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element -- admin-supplied banner of any size */}
+          <img src={client.bannerUrl} alt={`${client.name} banner`} width={800} height={160} className="size-full object-cover object-center" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-night to-transparent" />
+        </div>
       )}
       <div className="flex items-stretch">
         <div className="min-w-0 flex-1 p-4 sm:p-6">
@@ -64,9 +67,10 @@ export function BrandHero({
         </div>
         {client.bannerUrl && (
           // The text sets the height; the banner fills the side instead of stretching the strip.
-          <div className="relative hidden w-[34%] max-w-md shrink-0 md:block">
+          <div className="relative hidden w-[36%] max-w-md shrink-0 overflow-hidden md:block">
             {/* eslint-disable-next-line @next/next/no-img-element -- admin-supplied banner of any size */}
             <img src={client.bannerUrl} alt="" className="absolute inset-0 size-full object-cover object-center" />
+            <div className="pointer-events-none absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-night via-night/60 to-transparent" />
           </div>
         )}
       </div>

@@ -10,12 +10,28 @@ import { normalizePhone } from "./phone";
 // "anyone with the link can view"; each tab's link is saved per client. Columns are found by
 // their heading, so their order doesn't matter and extra columns are ignored.
 
-/** Download link for one tab: the sheet id plus the tab's gid from a link like …/d/<id>/edit#gid=123. */
-export function csvUrl(link: string) {
-  const id = link.match(/\/spreadsheets\/d\/([\w-]+)/)?.[1];
+/** Extracts the spreadsheet ID from any Google Sheets link (edit, share, view, export, or bare ID). */
+export function extractSheetId(link: string): string | null {
+  if (!link) return null;
+  const match = link.match(/\/spreadsheets\/d\/([\w-]+)/);
+  if (match) return match[1];
+  const trimmed = link.trim();
+  if (/^[a-zA-Z0-9_-]{20,}$/.test(trimmed)) return trimmed;
+  return null;
+}
+
+/** Download link for one tab: by explicit gid or by tab name via gviz/tq. */
+export function csvUrl(link: string, sheetName?: string) {
+  const id = extractSheetId(link);
   if (!id) return null;
-  const gid = link.match(/[#?&]gid=(\d+)/)?.[1] ?? "0";
-  return `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}`;
+  if (sheetName) {
+    return `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+  }
+  const gid = link.match(/[#?&]gid=(\d+)/)?.[1];
+  if (gid) {
+    return `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}`;
+  }
+  return `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=0`;
 }
 
 /** RFC 4180 CSV: quoted fields may hold commas, quotes ("") and line breaks. */
@@ -42,14 +58,72 @@ export function parseCsv(text: string) {
   return rows.filter((r) => r.some((c) => c.trim()));
 }
 
-async function fetchTab(link: string) {
-  const url = csvUrl(link);
-  if (!url) throw new Error("That doesn't look like a Google Sheets link.");
-  const res = await fetch(url, { cache: "no-store", redirect: "follow" });
-  const type = res.headers.get("content-type") ?? "";
-  // A private sheet answers with Google's sign-in page instead of CSV.
-  if (!res.ok || !type.includes("csv")) throw new Error("Couldn't read the sheet. Set sharing to \"Anyone with the link can view\".");
-  return parseCsv(await res.text());
+export async function fetchTab(link: string, expectedTab?: "Customers" | "Orders") {
+  const id = extractSheetId(link);
+  if (!id) throw new Error("That doesn't look like a Google Sheets link.");
+
+  const candidates: string[] = [];
+  const gidMatch = link.match(/[#?&]gid=(\d+)/)?.[1];
+
+  if (expectedTab === "Customers") {
+    // 1. Try named tab "Customers" or "Customer"
+    candidates.push(`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=Customers`);
+    candidates.push(`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=Customer`);
+    // 2. If explicit gid provided, try it
+    if (gidMatch) candidates.push(`https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gidMatch}`);
+    // 3. Fallback to first sheet (gid=0)
+    candidates.push(`https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=0`);
+  } else if (expectedTab === "Orders") {
+    // 1. Try named tab "Orders" or "Order"
+    candidates.push(`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=Orders`);
+    candidates.push(`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=Order`);
+    // 2. If explicit gid provided (and not 0), try it
+    if (gidMatch && gidMatch !== "0") {
+      candidates.push(`https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gidMatch}`);
+    }
+  } else {
+    if (gidMatch) {
+      candidates.push(`https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gidMatch}`);
+    }
+    candidates.push(`https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=0`);
+  }
+
+  let lastError = "Couldn't read the sheet. Set sharing to \"Anyone with the link can view\".";
+  for (const url of candidates) {
+    try {
+      const res = await fetch(url, { cache: "no-store", redirect: "follow" });
+      if (!res.ok) continue;
+      const text = await res.text();
+      // Google redirects to login on private sheets
+      if (!text || text.includes("<!DOCTYPE html") || text.includes("<html") || text.includes("accounts.google.com")) {
+        continue;
+      }
+      const rows = parseCsv(text);
+      if (rows.length === 0) continue;
+
+      if (expectedTab === "Customers") {
+        const head = rows[0].map((c) => c.toLowerCase());
+        const hasPhone = head.some((c) => /phone|mobile|whatsapp|contact|number|no\.?/.test(c));
+        if (hasPhone) return rows;
+      } else if (expectedTab === "Orders") {
+        const head = rows[0].map((c) => c.toLowerCase());
+        const hasItem = head.some((c) => /item|product|qty|quantity|order|price|amount/.test(c));
+        if (hasItem) return rows;
+      } else {
+        return rows;
+      }
+    } catch {
+      // try next candidate
+    }
+  }
+
+  if (expectedTab === "Customers") {
+    throw new Error("Could not find a Customers tab with a Phone column. Make sure the sheet has a Customers tab and sharing is set to 'Anyone with the link can view'.");
+  }
+  if (expectedTab === "Orders") {
+    throw new Error("Could not find an Orders tab with an Item column. Make sure the sheet has an Orders tab and sharing is set to 'Anyone with the link can view'.");
+  }
+  throw new Error(lastError);
 }
 
 /** Finds columns by heading; returns a getter for one row. */
@@ -199,26 +273,41 @@ async function syncOrders(clientId: string, rows: string[][]) {
   return `Orders: ${added} added${known ? `, ${known} already here` : ""}`;
 }
 
-/** Reads the client's sheet tabs and updates Customers and Orders. Records the outcome for the sheet page. */
 export async function syncSheet(clientId: string) {
   const client = await db.client.findUnique({ where: { id: clientId }, select: { sheetCustomersUrl: true, sheetOrdersUrl: true } });
   if (!client?.sheetCustomersUrl && !client?.sheetOrdersUrl) return null;
   const notes: string[] = [];
   let ok = true;
-  for (const [link, run, label] of [
-    [client.sheetCustomersUrl, syncCustomers, "Customers"],
-    [client.sheetOrdersUrl, syncOrders, "Orders"],
-  ] as const) {
-    if (!link) continue;
+
+  const custLink = client.sheetCustomersUrl || client.sheetOrdersUrl;
+  const ordLink = client.sheetOrdersUrl || client.sheetCustomersUrl;
+
+  if (custLink) {
     try {
-      const rows = await fetchTab(link);
-      notes.push(rows.length > 1 ? await run(clientId, rows) : `${label}: tab is empty`);
+      const rows = await fetchTab(custLink, "Customers");
+      notes.push(rows.length > 1 ? await syncCustomers(clientId, rows) : "Customers: tab is empty");
     } catch (e) {
       ok = false;
-      notes.push(`${label}: ${e instanceof Error ? e.message : String(e)}`);
+      notes.push(`Customers: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
-  const note = notes.join(" · ");
+
+  if (ordLink) {
+    try {
+      const rows = await fetchTab(ordLink, "Orders");
+      notes.push(rows.length > 1 ? await syncOrders(clientId, rows) : "Orders: tab is empty");
+    } catch (e) {
+      // If a single sheet was shared and there is no Orders tab, keep Customers success without error
+      if (ordLink === custLink && ok && notes.length > 0) {
+        // Orders tab not found is optional
+      } else {
+        ok = false;
+        notes.push(`Orders: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+  }
+
+  const note = notes.join(" · ") || "Synced";
   await db.client.update({ where: { id: clientId }, data: { sheetSyncedAt: new Date(), sheetSyncNote: note } });
   return { ok, note };
 }

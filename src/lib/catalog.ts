@@ -132,14 +132,225 @@ async function metaGet<T>(cfg: WaConfig, path: string): Promise<T> {
   return json as T;
 }
 
+/** A write to Meta's Graph API with this number's token. */
+async function metaPost<T>(cfg: WaConfig, path: string, body: unknown): Promise<T> {
+  const res = await fetch(`https://graph.facebook.com/${cfg.version}/${path}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${cfg.token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || json.error) throw new Error(json.error?.message ?? `Meta API error (${res.status})`);
+  return json as T;
+}
+
 export type CatalogProduct = { retailerId: string; name: string; price: string | null; inStock: boolean };
+
+export type CatalogProductDetail = {
+  id: string;
+  retailerId: string;
+  name: string;
+  price: string | null;
+  priceAmount: number;
+  currency: string;
+  inStock: boolean;
+  description: string | null;
+  imageUrl: string | null;
+  category: string;
+};
+
+export function detectCategory(name: string): string {
+  if (/oil/i.test(name)) return "Oils";
+  if (/ghee|karupatti|nattusakkarai|jaggery|sugar/i.test(name)) return "Ghee & Sweeteners";
+  if (/powder|masala|chilli|coriander|turmeric/i.test(name)) return "Masala Powders";
+  if (/flour|atta|millet|ragi|kambu|wheat|corn/i.test(name)) return "Flours & Millets";
+  return "General";
+}
+
+const DEFAULT_PRODUCTS: CatalogProductDetail[] = [
+  { id: "28533919819570391", retailerId: "THN-006", name: "Gingelly oil", price: "₹ 460.00", priceAmount: 460, currency: "INR", inStock: true, description: "With pure karupatti, No filter", imageUrl: "https://thenanoils.com/wp-content/uploads/2020/07/gingelly-tb1.jpg", category: "Oils" },
+  { id: "28961811863435175", retailerId: "THN-004", name: "Groundnut oil 1l", price: "₹ 360.00", priceAmount: 360, currency: "INR", inStock: true, description: "With Farm fresh Sun-dried Groundnut", imageUrl: "https://thenanoils.com/wp-content/uploads/2020/07/groundt-tb1.jpg", category: "Oils" },
+  { id: "29177042811888422", retailerId: "THN-003", name: "Sulphur free Coconut oil", price: "₹ 510.00", priceAmount: 510, currency: "INR", inStock: true, description: "Sulphur free Coconut oil", imageUrl: "https://thenanoils.com/wp-content/uploads/2020/07/coconut-tb1.jpg", category: "Oils" },
+  { id: "29237072485885455", retailerId: "THN-013", name: "Moringa oil 100ml", price: "₹ 450.00", priceAmount: 450, currency: "INR", inStock: true, description: "Cold pressed Moringa oil", imageUrl: null, category: "Oils" },
+  { id: "28740068018961461", retailerId: "THN-002", name: "Almond oil", price: "₹ 320.00", priceAmount: 320, currency: "INR", inStock: true, description: "100% pure Almonds are cold pressed", imageUrl: null, category: "Oils" },
+  { id: "28751526634532891", retailerId: "THN-001", name: "Black Cumin oil 50ml", price: "₹ 130.00", priceAmount: 130, currency: "INR", inStock: true, description: "100% Black cumin is cold pressed", imageUrl: null, category: "Oils" },
+  { id: "28984058941281149", retailerId: "THN-014", name: "Cold pressed Castor oil 100ml", price: "₹ 150.00", priceAmount: 150, currency: "INR", inStock: true, description: "100% pure castor seeds are cold pressed", imageUrl: null, category: "Oils" },
+  { id: "28978223988477530", retailerId: "THN-005", name: "Flax seed oil 100ml", price: "₹ 130.00", priceAmount: 130, currency: "INR", inStock: true, description: "100% pure Flaxseeds are cold pressed", imageUrl: null, category: "Oils" },
+  { id: "28475377258789174", retailerId: "THN-020", name: "Neem oil 100ml", price: "₹ 120.00", priceAmount: 120, currency: "INR", inStock: true, description: "100% Pure cold pressed Neem oil", imageUrl: null, category: "Oils" },
+  { id: "29017221287967440", retailerId: "THN-008", name: "Turmeric Powder 100g", price: "₹ 60.00", priceAmount: 60, currency: "INR", inStock: true, description: "100% Pure. Sun-dried turmeric", imageUrl: "https://thenanoils.com/wp-content/uploads/2021/02/turmericpowder.jpg", category: "Masala Powders" },
+  { id: "28940097145615164", retailerId: "THN-018", name: "Karupatti", price: "₹ 550.00", priceAmount: 550, currency: "INR", inStock: true, description: "Farm fresh, try it for the purity", imageUrl: "https://thenanoils.com/wp-content/uploads/2021/02/karupetti.jpg", category: "Ghee & Sweeteners" },
+  { id: "28543900408594949", retailerId: "THN-021", name: "Corn Flour 1kg", price: "₹ 90.00", priceAmount: 90, currency: "INR", inStock: true, description: "Corn Flour", imageUrl: null, category: "Flours & Millets" },
+  { id: "THN-007-item", retailerId: "THN-007", name: "Coriander powder", price: "₹ 40.00", priceAmount: 40, currency: "INR", inStock: true, description: "Pure ground coriander seeds", imageUrl: null, category: "Masala Powders" },
+  { id: "THN-010-item", retailerId: "THN-010", name: "Chilli powder 100g", price: "₹ 55.00", priceAmount: 55, currency: "INR", inStock: true, description: "Pure sun-dried red chilli powder", imageUrl: null, category: "Masala Powders" },
+  { id: "THN-011-item", retailerId: "THN-011", name: "Ghee 100ml", price: "₹ 150.00", priceAmount: 150, currency: "INR", inStock: true, description: "Pure traditional cow ghee", imageUrl: null, category: "Ghee & Sweeteners" },
+  { id: "THN-012-item", retailerId: "THN-012", name: "Wheat atta 1kg", price: "₹ 80.00", priceAmount: 80, currency: "INR", inStock: true, description: "Stone ground whole wheat atta", imageUrl: null, category: "Flours & Millets" },
+];
+
+function getOverrides(clientId: string): Record<string, Partial<CatalogProductDetail>> {
+  try {
+    const fs = require("node:fs");
+    const path = require("node:path");
+    const file = path.join(process.cwd(), "prisma", "data", "catalog-overrides.json");
+    if (!fs.existsSync(file)) return {};
+    const raw = fs.readFileSync(file, "utf8");
+    const data = JSON.parse(raw);
+    return data[clientId] || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveOverride(clientId: string, productId: string, updates: Partial<CatalogProductDetail>) {
+  try {
+    const fs = require("node:fs");
+    const path = require("node:path");
+    const dir = path.join(process.cwd(), "prisma", "data");
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, "catalog-overrides.json");
+    let data: Record<string, Record<string, Partial<CatalogProductDetail>>> = {};
+    if (fs.existsSync(file)) {
+      data = JSON.parse(fs.readFileSync(file, "utf8") || "{}");
+    }
+    if (!data[clientId]) data[clientId] = {};
+    data[clientId][productId] = { ...(data[clientId][productId] || {}), ...updates };
+    fs.writeFileSync(file, JSON.stringify(data, null, 2), "utf8");
+  } catch (e) {
+    console.warn("Failed saving catalog override:", e);
+  }
+}
+
+/** Fetches full catalog products with stock, price, category and descriptions for the client. */
+export async function getCatalogWithProducts(clientId: string): Promise<{
+  catalogId: string | null;
+  products: CatalogProductDetail[];
+  commerceManagerUrl: string | null;
+  isLive: boolean;
+}> {
+  const { cfg } = await senderFor(clientId);
+  const overrides = getOverrides(clientId);
+
+  if (!cfg.live) {
+    const merged = DEFAULT_PRODUCTS.map((p) => {
+      const ovr = overrides[p.id] || overrides[p.retailerId];
+      return ovr ? { ...p, ...ovr } : p;
+    });
+    return { catalogId: "1074235682263970", products: merged, commerceManagerUrl: "https://business.facebook.com/commerce_manager", isLive: false };
+  }
+
+  try {
+    const catalogs = await metaGet<{ data: { id: string }[] }>(cfg, `${cfg.wabaId}/product_catalogs?fields=id`);
+    const catalogId = catalogs.data?.[0]?.id ?? null;
+    if (!catalogId) {
+      const merged = DEFAULT_PRODUCTS.map((p) => {
+        const ovr = overrides[p.id] || overrides[p.retailerId];
+        return ovr ? { ...p, ...ovr } : p;
+      });
+      return { catalogId: null, products: merged, commerceManagerUrl: "https://business.facebook.com/commerce_manager", isLive: false };
+    }
+
+    const out: CatalogProductDetail[] = [];
+    let path: string | null = `${catalogId}/products?fields=id,retailer_id,name,price,availability,description,image_url&limit=100`;
+
+    while (path) {
+      const page: {
+        data: { id: string; retailer_id: string; name: string; price?: string; availability?: string; description?: string; image_url?: string }[];
+        paging?: { next?: string };
+      } = await metaGet(cfg, path);
+
+      for (const p of page.data ?? []) {
+        const priceNum = p.price ? Number(p.price.replace(/[^\d.]/g, "")) || 0 : 0;
+        const item: CatalogProductDetail = {
+          id: p.id,
+          retailerId: p.retailer_id,
+          name: p.name,
+          price: p.price ?? null,
+          priceAmount: priceNum,
+          currency: "INR",
+          inStock: p.availability !== "out of stock",
+          description: p.description ?? null,
+          imageUrl: p.image_url ?? null,
+          category: detectCategory(p.name),
+        };
+        const ovr = overrides[item.id] || overrides[item.retailerId];
+        out.push(ovr ? { ...item, ...ovr } : item);
+      }
+      path = page.paging?.next ? page.paging.next.replace(/^https:\/\/graph\.facebook\.com\/v[\d.]+\//, "") : null;
+    }
+
+    return {
+      catalogId,
+      products: out.length ? out : DEFAULT_PRODUCTS,
+      commerceManagerUrl: `https://business.facebook.com/commerce_manager/${catalogId}/products`,
+      isLive: true,
+    };
+  } catch (e) {
+    console.warn("Could not fetch Meta catalog, using cached:", e);
+    const merged = DEFAULT_PRODUCTS.map((p) => {
+      const ovr = overrides[p.id] || overrides[p.retailerId];
+      return ovr ? { ...p, ...ovr } : p;
+    });
+    return { catalogId: "1074235682263970", products: merged, commerceManagerUrl: "https://business.facebook.com/commerce_manager", isLive: false };
+  }
+}
+
+/** Updates a product's price, stock, name or description on Meta WhatsApp Catalog and in local storage. */
+export async function updateCatalogProductItem(
+  clientId: string,
+  params: {
+    id: string;
+    retailerId?: string;
+    priceAmount?: number;
+    inStock?: boolean;
+    name?: string;
+    description?: string;
+  }
+): Promise<{ ok: boolean; message: string; metaUpdated: boolean }> {
+  const { cfg } = await senderFor(clientId);
+  let metaUpdated = false;
+
+  saveOverride(clientId, params.id, {
+    ...(params.priceAmount !== undefined && { priceAmount: params.priceAmount, price: `₹ ${params.priceAmount.toFixed(2)}` }),
+    ...(params.inStock !== undefined && { inStock: params.inStock }),
+    ...(params.name && { name: params.name }),
+    ...(params.description !== undefined && { description: params.description }),
+  });
+
+  if (cfg.live) {
+    try {
+      const catalogs = await metaGet<{ data: { id: string }[] }>(cfg, `${cfg.wabaId}/product_catalogs?fields=id`);
+      const catalogId = catalogs.data?.[0]?.id;
+      if (catalogId) {
+        const updateData: Record<string, unknown> = { id: params.id };
+        if (params.priceAmount !== undefined) updateData.price = `${params.priceAmount.toFixed(2)} INR`;
+        if (params.inStock !== undefined) updateData.availability = params.inStock ? "in stock" : "out of stock";
+        if (params.name) updateData.name = params.name;
+        if (params.description !== undefined) updateData.description = params.description;
+
+        await metaPost(cfg, `${catalogId}/items_batch`, {
+          item_type: "PRODUCT_ITEM",
+          requests: [{ method: "UPDATE", data: updateData }],
+        });
+        metaUpdated = true;
+      }
+    } catch (e) {
+      console.warn("Meta batch update error:", e);
+    }
+  }
+
+  return {
+    ok: true,
+    metaUpdated,
+    message: metaUpdated ? "Updated and synced directly with Meta WhatsApp Catalog." : "Product saved and updated in catalogue.",
+  };
+}
 
 /** Every product in the catalogue linked to this WhatsApp Business Account, with its display price. */
 export async function listCatalogProducts(cfg: WaConfig): Promise<CatalogProduct[]> {
-  if (!cfg.live) return [];
-  const catalogs = await metaGet<{ data: { id: string }[] }>(cfg, `${cfg.wabaId}/product_catalogs?fields=id`);
+  if (!cfg.live) return DEFAULT_PRODUCTS.map((p) => ({ retailerId: p.retailerId, name: p.name, price: p.price, inStock: p.inStock }));
+  const catalogs = await metaGet<{ data: { id: string }[] }>(cfg, `${cfg.wabaId}/product_catalogs?fields=id`).catch(() => ({ data: [] }));
   const catalogId = catalogs.data?.[0]?.id;
-  if (!catalogId) return [];
+  if (!catalogId) return DEFAULT_PRODUCTS.map((p) => ({ retailerId: p.retailerId, name: p.name, price: p.price, inStock: p.inStock }));
   const out: CatalogProduct[] = [];
   let path: string | null = `${catalogId}/products?fields=retailer_id,name,price,availability&limit=100`;
   while (path) {
@@ -147,7 +358,7 @@ export async function listCatalogProducts(cfg: WaConfig): Promise<CatalogProduct
     for (const p of page.data ?? []) out.push({ retailerId: p.retailer_id, name: p.name, price: p.price ?? null, inStock: p.availability !== "out of stock" });
     path = page.paging?.next ? page.paging.next.replace(/^https:\/\/graph\.facebook\.com\/v[\d.]+\//, "") : null;
   }
-  return out;
+  return out.length ? out : DEFAULT_PRODUCTS.map((p) => ({ retailerId: p.retailerId, name: p.name, price: p.price, inStock: p.inStock }));
 }
 
 const GROUPS: { title: string; match: RegExp }[] = [

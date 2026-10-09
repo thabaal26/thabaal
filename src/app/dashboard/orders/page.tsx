@@ -1,4 +1,4 @@
-import { PackageCheck, PackageOpen, Search, ShoppingBag } from "lucide-react";
+import { PackageCheck, PackageOpen, Search, ShoppingBag, Store } from "lucide-react";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
@@ -198,6 +198,9 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         actions={
           <div className="flex items-center gap-2">
             <OrdersRefreshButton className="max-sm:w-11 max-sm:px-0" />
+            <Link href="/dashboard/catalogue" aria-label="Catalogue Menu" className={cn(buttonClass("secondary"), "max-sm:w-11 max-sm:px-0")}>
+              <Store aria-hidden className="size-4" /> <span className="max-sm:hidden">Catalogue</span>
+            </Link>
             {scope.clientId && canEdit ? (
               <>
                 <Link href="/dashboard/orders/packing" aria-label="Packing list" className={cn(buttonClass("secondary"), "max-sm:w-11 max-sm:px-0")}>

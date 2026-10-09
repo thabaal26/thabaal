@@ -84,10 +84,10 @@ export default async function SheetPage() {
           <Card>
             <CardHeader title="How to set it up" />
             <ol className="list-decimal space-y-2 p-4 pl-9 text-sm text-ink-2 sm:p-5 sm:pl-10">
-              <li>Make a Google Sheet with two tabs: <b>Customers</b> and <b>Orders</b>. Put the column headings from the right in the first row.</li>
-              <li>Click <b>Share</b> → General access → <b>Anyone with the link</b> → Viewer. Keep the link among staff only: anyone who has it can see the customers.</li>
-              <li>Open the Customers tab and copy the address bar link (it ends with <code>#gid=…</code>). Do the same for the Orders tab. Paste both here and press Save &amp; sync.</li>
-              <li>From then on, staff just add rows. Changes arrive within 30 minutes, or press Sync now.</li>
+              <li>Make a Google Sheet with two tabs: <b>Customers</b> and <b>Orders</b>. Put the column headings from the right in the first row of each tab.</li>
+              <li>Click the top-right <b>Share</b> button in Google Sheets → General access → <b>Anyone with the link</b> → <b>Viewer</b>.</li>
+              <li>Click <b>Copy link</b>, paste it in the field above, and press <b>Save &amp; sync</b>. Both Customers and Orders sync automatically!</li>
+              <li>From then on, staff just add or update rows in Google Sheets. Changes arrive every 30 minutes, or press <b>Sync now</b>.</li>
             </ol>
             <div className="space-y-1 border-t border-line p-4 text-xs text-muted sm:p-5">
               <p>• The sheet adds and updates; it never deletes customers or changes an order already here (track those in Orders).</p>

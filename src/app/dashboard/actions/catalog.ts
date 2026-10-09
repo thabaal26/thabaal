@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { sendCatalogueTo } from "@/lib/catalog";
+import { sendCatalogueTo, updateCatalogProductItem } from "@/lib/catalog";
 import { getScope, owned } from "@/lib/session";
 import type { ActionResult } from "./templates";
 
@@ -15,4 +15,23 @@ export async function sendCatalogue(customerId: string): Promise<ActionResult> {
   const r = await sendCatalogueTo(c.id);
   revalidatePath(`/dashboard/customers/${c.id}`);
   return r;
+}
+
+/** Update product price, stock availability, name or description in WhatsApp Catalog. */
+export async function updateProduct(data: {
+  id: string;
+  retailerId: string;
+  priceAmount?: number;
+  inStock?: boolean;
+  name?: string;
+  description?: string;
+}): Promise<ActionResult> {
+  const scope = await getScope();
+  if (!scope.canOperate) return { ok: false, message: "Your login can view but not change products." };
+  if (!scope.clientId) return { ok: false, message: "No client selected." };
+
+  const res = await updateCatalogProductItem(scope.clientId, data);
+  revalidatePath("/dashboard/catalogue");
+  revalidatePath("/dashboard/orders");
+  return res;
 }

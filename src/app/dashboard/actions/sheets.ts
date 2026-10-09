@@ -7,13 +7,24 @@ import { requireOrderAccess } from "@/lib/session";
 import type { SendResult } from "./send-helpers";
 
 /** Saves the Customers and Orders tab links and syncs right away, so mistakes show up immediately. */
-export async function saveSheetLinks(customersUrl: string, ordersUrl: string): Promise<SendResult> {
+export async function saveSheetLinks(customersUrl: string, ordersUrl?: string): Promise<SendResult> {
   const s = await requireOrderAccess();
   if ("denied" in s) return { ok: false, message: s.denied };
   if (!s.clientId) return { ok: false, message: "Pick a client in the sidebar first." };
-  const links = [customersUrl.trim(), ordersUrl.trim()];
-  if (links.some((l) => l && !csvUrl(l))) return { ok: false, message: "Paste the full Google Sheets link of each tab (it contains /spreadsheets/d/…)." };
-  await db.client.update({ where: { id: s.clientId }, data: { sheetCustomersUrl: links[0] || null, sheetOrdersUrl: links[1] || null } });
+  const cUrl = customersUrl.trim();
+  const oUrl = (ordersUrl ?? "").trim();
+  const links = [cUrl, oUrl].filter(Boolean);
+  if (links.some((l) => !csvUrl(l))) {
+    return { ok: false, message: "Paste a valid Google Sheets link (it contains /spreadsheets/d/… or your Google Sheet share link)." };
+  }
+  // If only one link is provided, use it for both so a single share link syncs both Customers and Orders
+  const finalCust = cUrl || oUrl || null;
+  const finalOrd = oUrl ? oUrl : cUrl || null;
+
+  await db.client.update({
+    where: { id: s.clientId },
+    data: { sheetCustomersUrl: finalCust, sheetOrdersUrl: finalOrd },
+  });
   return syncNow();
 }
 
