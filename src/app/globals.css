@@ -179,7 +179,11 @@ body {
       aria-invalid:border-danger
       sm:min-h-10 sm:px-3 sm:py-2 sm:text-sm;
   }
-  .field:focus-visible { outline-offset: 0; border-color: var(--color-brand-deep); }
+  .field:focus-visible {
+    outline: none;
+    border-color: var(--color-brand-deep);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand-deep) 18%, transparent);
+  }
   textarea.field { @apply min-h-24 leading-relaxed; }
   select.field {
     @apply appearance-none bg-no-repeat pr-10;

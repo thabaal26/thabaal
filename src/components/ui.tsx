@@ -199,12 +199,12 @@ export function Button({
 
 export function Label({ children, hint, htmlFor, required }: { children: ReactNode; hint?: ReactNode; htmlFor?: string; required?: boolean }) {
   return (
-    <label htmlFor={htmlFor} className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-2 text-sm font-medium text-ink-2">
-      <span>
+    <label htmlFor={htmlFor} className="mb-1.5 flex items-baseline justify-between gap-x-2 text-sm font-medium text-ink-2">
+      <span className="min-w-0">
         {children}
         {required && <span aria-hidden className="ml-0.5 text-danger">*</span>}
       </span>
-      {hint && <span className="text-xs font-normal text-muted">{hint}</span>}
+      {hint && <span className="shrink-0 text-xs font-normal text-muted">{hint}</span>}
     </label>
   );
 }

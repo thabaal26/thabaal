@@ -164,6 +164,7 @@ export function OrderActions({
         onClose={() => setDispatchOpen(false)}
         title="Dispatch order"
         description="The customer gets these details on WhatsApp, and they're saved in this order's note."
+        className="sm:max-w-lg"
       >
         <form
           className="space-y-4"
@@ -176,8 +177,8 @@ export function OrderActions({
           <Field id={`eta-${id}`} label="Reaches them by" required>
             <input className="field" value={d.eta} placeholder="today evening, tomorrow 11 AM…" onChange={(e) => setD({ ...d, eta: e.target.value })} />
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field id={`by-${id}`} label="Delivery person / courier" hint="optional">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field id={`by-${id}`} label="Delivery person" hint="optional">
               <input className="field" value={d.by} placeholder="Ravi, or DTDC" onChange={(e) => setD({ ...d, by: e.target.value })} />
             </Field>
             <Field id={`ph-${id}`} label="Their phone" hint="optional">

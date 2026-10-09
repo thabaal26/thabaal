@@ -1,9 +1,11 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useCallback, useEffect, useId, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
+
+const noop = () => () => {};
 
 /** Open overlays, innermost last: only the top one answers Esc, Tab and the back button. */
 const stack: string[] = [];
@@ -39,6 +41,7 @@ export function Sheet({
   role?: "dialog" | "alertdialog";
 }) {
   const id = useId();
+  const mounted = useSyncExternalStore(noop, () => true, () => false);
   const panel = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   useEffect(() => {
@@ -114,7 +117,7 @@ export function Sheet({
     };
   }, [open, id, close]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
   const titleId = `${id}-title`;
   const descId = `${id}-desc`;
   return createPortal(
@@ -128,7 +131,8 @@ export function Sheet({
         aria-describedby={description ? descId : undefined}
         tabIndex={-1}
         className={cn(
-          "relative flex max-h-[92dvh] w-full animate-sheet flex-col rounded-t-sheet bg-panel shadow-pop outline-none sm:max-w-md sm:animate-rise sm:rounded-sheet",
+          "relative flex max-h-[92dvh] w-full animate-sheet flex-col rounded-t-sheet bg-panel shadow-pop outline-none sm:animate-rise sm:rounded-sheet",
+          className?.includes("max-w-") ? "" : "sm:max-w-md",
           className,
         )}
       >
