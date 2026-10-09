@@ -18,6 +18,9 @@ export type ErrorKind =
 /** Kinds that stop every message from this number, so a campaign pauses instead of failing its whole audience. */
 export const PAUSING_KINDS: ErrorKind[] = ["setup", "account"];
 
+/** Not the customer's fault: an automatic message hit by one of these is tried again on a later scheduler run. */
+export const TRY_LATER_KINDS: ErrorKind[] = ["rate", "temporary", "setup", "account", "number-restricted"];
+
 const ERRORS: Record<number, { title: string; kind: ErrorKind }> = {
   // The customer
   131026: { title: "Can't receive WhatsApp messages: not on WhatsApp, an old app version, or they blocked the number", kind: "unreachable" },

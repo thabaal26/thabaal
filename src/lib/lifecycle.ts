@@ -3,6 +3,7 @@ import { db } from "./db";
 import { deliver, getSettings, templateSendable } from "./provider";
 import { applyFailure, quietUntil } from "./rules";
 import { senderFor } from "./senders";
+import { explainError, metaError, TRY_LATER_KINDS } from "./meta-errors";
 import { MetaError } from "./whatsapp";
 
 // Automatic tags from what customers do, kept up to date by the scheduler:
@@ -81,8 +82,16 @@ export async function sendWinbacks(now = new Date()) {
         sent++;
       } catch (e) {
         const code = e instanceof MetaError ? (e.code ?? null) : null;
+        const kind = metaError(code)?.kind;
+        // Token, account, speed or Meta outage: not the customer's fault. Give the win-back back so a
+        // later run sends it, and stop this client's win-backs for now instead of failing them all.
+        if (kind && TRY_LATER_KINDS.includes(kind)) {
+          await db.customer.update({ where: { id: c.id }, data: { winbackSentAt: null } });
+          console.error(`Win-back paused for client ${client.id}: ${explainError(code, e instanceof Error ? e.message : String(e))}`);
+          break;
+        }
         await db.message.create({
-          data: { customerId: c.id, templateId: template.id, templateName: template.name, status: "FAILED", provider: settings.provider, errorCode: code, error: `Win-back: ${e instanceof Error ? e.message : String(e)}`, failedAt: new Date() },
+          data: { customerId: c.id, templateId: template.id, templateName: template.name, status: "FAILED", provider: settings.provider, errorCode: code, error: `Win-back: ${explainError(code, e instanceof Error ? e.message : String(e))}`, failedAt: new Date() },
         });
         await applyFailure(c.id, code);
       }
