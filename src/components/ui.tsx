@@ -402,25 +402,25 @@ export function Callout({
 /* ───────────────────────── Lists, tabs, tables ───────────────────────── */
 
 /**
- * Tabs that are links (the choice lives in the URL), with optional counts. Scrolls sideways
- * on phones instead of wrapping onto a second line.
+ * Tabs that are links (the choice lives in the URL), with optional counts.
+ * Wraps cleanly on mobile and desktop so all filters are visible without horizontal swiping.
  */
-export function FilterChips({ label, items }: { label: string; items: { href: string; label: string; count?: number | string; active: boolean }[] }) {
+export function FilterChips({ label, items, className }: { label: string; items: { href: string; label: string; count?: number | string; active: boolean }[]; className?: string }) {
   return (
-    <nav aria-label={label} className="-mx-4 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:px-0">
-      <ul className="flex w-max gap-1.5 sm:w-auto sm:flex-wrap">
+    <nav aria-label={label} className={cn("w-full", className)}>
+      <ul className="flex flex-wrap items-center gap-1.5 sm:gap-2">
         {items.map((t) => (
           <li key={t.href}>
             <Link
               href={t.href}
               aria-current={t.active ? "page" : undefined}
               className={cn(
-                "flex h-11 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 text-sm font-medium transition active:scale-[0.97] sm:h-8 sm:px-3 sm:pointer-coarse:h-11",
-                t.active ? "border-ink bg-ink text-white" : "border-line-strong/50 bg-panel text-ink-2 hover:border-line-strong hover:text-ink",
+                "flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition active:scale-[0.97] sm:h-8 sm:px-3 sm:text-sm sm:pointer-coarse:h-10",
+                t.active ? "border-ink bg-ink text-white shadow-xs" : "border-line-strong/50 bg-panel text-ink-2 hover:border-line-strong hover:text-ink",
               )}
             >
               {t.label}
-              {t.count !== undefined && <span className={cn("tabular text-xs", t.active ? "text-white/75" : "text-muted")}>{t.count}</span>}
+              {t.count !== undefined && <span className={cn("tabular text-2xs sm:text-xs", t.active ? "text-white/75" : "text-muted")}>{t.count}</span>}
             </Link>
           </li>
         ))}

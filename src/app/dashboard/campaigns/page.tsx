@@ -11,10 +11,20 @@ import { DAYS, effectiveInterval, estimateDuration, formatMinutes, timeUntil } f
 import { getScope, owned } from "@/lib/session";
 import { toggleCampaign } from "../actions/campaigns";
 
+import { fmtNumber } from "@/lib/format";
+import { FilterChips } from "@/components/ui";
+
 export const metadata: Metadata = { title: "Campaigns" };
 export const dynamic = "force-dynamic";
 
-export default async function CampaignsPage() {
+const TABS = [
+  { key: "", label: "All" },
+  { key: "active", label: "Active" },
+  { key: "paused", label: "Paused" },
+] as const;
+
+export default async function CampaignsPage({ searchParams }: PageProps<"/dashboard/campaigns">) {
+  const { show = "" } = await searchParams;
   const scope = await getScope();
   const [campaigns, audiences] = await Promise.all([
     db.campaign.findMany({
@@ -32,6 +42,21 @@ export default async function CampaignsPage() {
   const canCreate = scope.canManage && scope.clientId;
   const now = new Date();
 
+  const activeCount = campaigns.filter((c) => c.active).length;
+  const pausedCount = campaigns.length - activeCount;
+  const tabCounts: Record<string, number> = {
+    "": campaigns.length,
+    active: activeCount,
+    paused: pausedCount,
+  };
+
+  const visible =
+    show === "active"
+      ? campaigns.filter((c) => c.active)
+      : show === "paused"
+        ? campaigns.filter((c) => !c.active)
+        : campaigns;
+
   return (
     <>
       <PageHeader
@@ -45,11 +70,22 @@ export default async function CampaignsPage() {
           )
         }
         inlineActions
+        tabs={
+          <FilterChips
+            label="Campaign status"
+            items={TABS.map((t) => ({
+              href: t.key ? `/dashboard/campaigns?show=${t.key}` : "/dashboard/campaigns",
+              label: t.label,
+              count: fmtNumber(tabCounts[t.key]),
+              active: (show || "") === t.key,
+            }))}
+          />
+        }
       />
 
-      {campaigns.length ? (
+      {visible.length ? (
         <div className="grid gap-3 sm:gap-4 md:grid-cols-2 2xl:grid-cols-3">
-          {campaigns.map((c) => {
+          {visible.map((c) => {
             const last = c.runs[0];
             return (
               <Card key={c.id} className={cn("lift relative flex flex-col p-4 active:bg-sunken sm:p-5", !c.active && "bg-canvas")}>

@@ -1,7 +1,8 @@
-import { PackageCheck, PackageOpen, ShoppingBag } from "lucide-react";
+import { PackageCheck, PackageOpen, Search, ShoppingBag } from "lucide-react";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
+import { Picker } from "@/components/picker";
 import { buttonClass, Callout, Card, EmptyState, FilterChips, PageHeader, Section } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
@@ -28,28 +29,123 @@ export const dynamic = "force-dynamic";
 const TABS = [
   { key: "", label: "Active", where: { status: { in: ["NEW", "CONFIRMED", "PAID", "DISPATCHED"] } } },
   { key: "new", label: "New", where: { status: "NEW" } },
+  { key: "confirmed", label: "Confirmed", where: { status: "CONFIRMED" } },
+  { key: "paid", label: "Paid", where: { OR: [{ status: "PAID" }, { paidAt: { not: null } }] } },
+  { key: "unpaid", label: "Unpaid", where: { status: { in: ["NEW", "CONFIRMED", "DISPATCHED"] }, paidAt: null } },
+  { key: "dispatched", label: "Dispatched", where: { status: "DISPATCHED" } },
   { key: "done", label: "Delivered", where: { status: "DELIVERED" } },
   { key: "cancelled", label: "Cancelled", where: { status: "CANCELLED" } },
   { key: "all", label: "All", where: {} },
 ] as const;
 
+const DATE_RANGES = [
+  { value: "", label: "All time" },
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "7d", label: "Last 7 days" },
+  { value: "month", label: "This month" },
+];
+
+const SORT_OPTIONS = [
+  { value: "new", label: "Newest first" },
+  { value: "old", label: "Oldest first" },
+  { value: "total", label: "Amount: High to low" },
+];
+
+function getDateWhere(range?: string) {
+  if (!range) return {};
+  const now = new Date();
+  if (range === "today") {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return { createdAt: { gte: start } };
+  }
+  if (range === "yesterday") {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return { createdAt: { gte: start, lt: end } };
+  }
+  if (range === "7d") {
+    const start = new Date(Date.now() - 7 * 86400000);
+    return { createdAt: { gte: start } };
+  }
+  if (range === "month") {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { createdAt: { gte: start } };
+  }
+  return {};
+}
+
 export default async function OrdersPage({ searchParams }: PageProps<"/dashboard/orders">) {
-  const { show = "" } = await searchParams;
+  const sp = await searchParams;
+  const show = typeof sp.show === "string" ? sp.show : "";
+  const date = typeof sp.date === "string" ? sp.date : "";
+  const q = typeof sp.q === "string" ? sp.q.trim() : "";
+  const sort = typeof sp.sort === "string" ? sp.sort : "new";
+
   const scope = await getScope();
   const tab = TABS.find((t) => t.key === show) ?? TABS[0];
   const mine = owned(scope);
+  const dateWhere = getDateWhere(date);
 
-  const [orders, counts, orderTemplates, client, approved, ownPaymentTemplate, paymentTemplate] = await Promise.all([
+  const cleanPhone = q.replace(/\D/g, "");
+  const orderNumMatch = q.match(/(?:rg-?)?(\d+)/i);
+  const orderNum = orderNumMatch ? parseInt(orderNumMatch[1], 10) : null;
+  const searchWhere = q
+    ? {
+        OR: [
+          { customer: { name: { contains: q, mode: "insensitive" as const } } },
+          { internalNote: { contains: q, mode: "insensitive" as const } },
+          { note: { contains: q, mode: "insensitive" as const } },
+          ...(cleanPhone.length >= 3 ? [{ customer: { phone: { contains: cleanPhone } } }] : []),
+          ...(orderNum && !isNaN(orderNum) ? [{ number: orderNum }] : []),
+        ],
+      }
+    : {};
+
+  const orderBy =
+    sort === "old"
+      ? [{ createdAt: "asc" as const }]
+      : sort === "total"
+        ? [{ total: "desc" as const }]
+        : [{ createdAt: "desc" as const }];
+
+  const baseWhere = { ...mine, ...(tab.where as object), ...dateWhere, ...searchWhere };
+
+  const [
+    orders,
+    activeCount,
+    newCount,
+    confirmedCount,
+    paidCount,
+    unpaidCount,
+    dispatchedCount,
+    deliveredCount,
+    cancelledCount,
+    allCount,
+    orderTemplates,
+    client,
+    approved,
+    ownPaymentTemplate,
+    paymentTemplate,
+  ] = await Promise.all([
     db.order.findMany({
-      where: { ...mine, ...(tab.where as object) },
+      where: baseWhere,
       include: {
         customer: { select: { id: true, name: true, phone: true, location: true, client: { select: { name: true } } } },
         client: { select: { paymentConfig: true } },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy,
       take: 200,
     }),
-    db.order.groupBy({ by: ["status"], where: mine, _count: true }),
+    db.order.count({ where: { ...mine, ...dateWhere, status: { in: ["NEW", "CONFIRMED", "PAID", "DISPATCHED"] } } }),
+    db.order.count({ where: { ...mine, ...dateWhere, status: "NEW" } }),
+    db.order.count({ where: { ...mine, ...dateWhere, status: "CONFIRMED" } }),
+    db.order.count({ where: { ...mine, ...dateWhere, OR: [{ status: "PAID" }, { paidAt: { not: null } }] } }),
+    db.order.count({ where: { ...mine, ...dateWhere, status: { in: ["NEW", "CONFIRMED", "DISPATCHED"] }, paidAt: null } }),
+    db.order.count({ where: { ...mine, ...dateWhere, status: "DISPATCHED" } }),
+    db.order.count({ where: { ...mine, ...dateWhere, status: "DELIVERED" } }),
+    db.order.count({ where: { ...mine, ...dateWhere, status: "CANCELLED" } }),
+    db.order.count({ where: { ...mine, ...dateWhere } }),
     scope.clientId ? db.template.findMany({ where: { clientId: scope.clientId, name: { in: [...ORDER_TEMPLATES, ...ORDER_TEMPLATES.map((n) => `thenan_${n}`)] } }, select: { name: true, status: true } }) : [],
     scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { refillDays: true, refillTemplateId: true, lapsedDays: true, winbackTemplateId: true, paymentConfig: true } }) : null,
     scope.clientId && scope.canManage
@@ -58,6 +154,19 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     scope.clientId ? db.template.findFirst({ where: { clientId: scope.clientId, name: PAYMENT_TEMPLATE }, select: { status: true } }) : null,
     scope.clientId ? paymentTemplateFor(scope.clientId) : null,
   ]);
+
+  const tabCount: Record<string, number> = {
+    "": activeCount,
+    new: newCount,
+    confirmed: confirmedCount,
+    paid: paidCount,
+    unpaid: unpaidCount,
+    dispatched: dispatchedCount,
+    done: deliveredCount,
+    cancelled: cancelledCount,
+    all: allCount,
+  };
+
   // An order update is covered when either the plain or the picture version is approved.
   const lapsed = scope.clientId && scope.canManage ? await db.customer.count({ where: { clientId: scope.clientId, tags: { has: "lapsed" }, optedOut: false } }) : 0;
   const notReady = ORDER_TEMPLATES.filter((name) => !orderTemplates.some((t) => (t.name === name || t.name === `thenan_${name}`) && t.status === "APPROVED"));
@@ -67,13 +176,19 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
   const missing = ORDER_TEMPLATES.filter((name) => !orderTemplates.some((t) => t.name === name));
   // Client staff pack and dispatch their own orders, so they get the order buttons too.
   const canEdit = scope.canOperate && (scope.canManage || !!scope.clientId);
-  const n = (...s: string[]) => counts.filter((c) => s.includes(c.status)).reduce((sum, c) => sum + c._count, 0);
-  const tabCount: Record<string, number> = {
-    "": n("NEW", "CONFIRMED", "PAID", "DISPATCHED"),
-    new: n("NEW"),
-    done: n("DELIVERED"),
-    cancelled: n("CANCELLED"),
-    all: counts.reduce((sum, c) => sum + c._count, 0),
+
+  const filtered = Boolean(q || date || (sort && sort !== "new"));
+
+  const qs = (patch: Record<string, string | undefined>) => {
+    const next = {
+      show: tab.key || undefined,
+      date: date || undefined,
+      sort: sort !== "new" ? sort : undefined,
+      q: q || undefined,
+      ...patch,
+    };
+    const s = new URLSearchParams(Object.entries(next).filter(([, v]) => v) as [string, string][]);
+    return `/dashboard/orders${s.size ? `?${s}` : ""}`;
   };
 
   return (
@@ -96,7 +211,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
           <FilterChips
             label="Order status"
             items={TABS.map((t) => ({
-              href: t.key ? `/dashboard/orders?show=${t.key}` : "/dashboard/orders",
+              href: qs({ show: t.key || undefined }),
               label: t.label,
               count: fmtNumber(tabCount[t.key]),
               active: tab.key === t.key,
@@ -105,41 +220,87 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         }
       />
 
-      {/* Phones put this setup notice after the orders, so today's orders come first. */}
       <div className="flex flex-col gap-4">
-      {scope.clientId && notReady.length > 0 && (
-        <Callout
-          className="order-last sm:order-first"
-          title="Order updates after 24 hours need approved templates."
-          action={
-            scope.canManage &&
-            missing.length > 0 && (
-              <ActionButton action={createOrderTemplates} confirm={`Create and submit ${missing.join(", ")} to Meta?`}>
-                Create order templates
-              </ActionButton>
-            )
-          }
-        >
-          Not ready yet: {notReady.join(", ")}.{" "}
-          {missing.length === 0 ? "They're waiting for Meta's approval." : scope.canManage ? "Create them once and Meta usually approves within minutes." : "Ask your admin to create them."}
-        </Callout>
-      )}
-
-      {orders.length ? (
-        <ul className="grid gap-3 sm:gap-4 xl:grid-cols-2">
-          {orders.map((o) => (
-            <li key={o.id} className="min-w-0">
-              <OrderCard order={o} items={o.items as OrderItem[]} showClient={!scope.clientId} canEdit={canEdit} />
-            </li>
-          ))}
-        </ul>
-      ) : (
         <Card>
-          <EmptyState icon={show === "done" ? <PackageCheck className="size-5" /> : <ShoppingBag className="size-5" />} title="No orders here yet">
-            When a customer sends a cart from your WhatsApp catalogue, it appears here with items, total and a one-tap confirmation.
-          </EmptyState>
+          <form role="search" aria-label="Filter orders" className="grid gap-2 p-3 sm:flex sm:flex-wrap sm:items-center">
+            {tab.key && <input type="hidden" name="show" value={tab.key} />}
+            <div className="relative min-w-0 sm:min-w-56 sm:flex-1">
+              <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
+              <input
+                name="q"
+                type="search"
+                enterKeyHint="search"
+                defaultValue={q}
+                placeholder="Search customer, phone, RG-1001, item…"
+                aria-label="Search customer, phone, order number or item"
+                className="field pl-10"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:contents">
+              <Picker
+                name="date"
+                autoSubmit
+                title="Time range"
+                defaultValue={date}
+                className="sm:w-40"
+                options={DATE_RANGES}
+              />
+              <Picker
+                name="sort"
+                autoSubmit
+                title="Sort orders"
+                defaultValue={sort}
+                className="sm:w-48"
+                options={SORT_OPTIONS}
+              />
+            </div>
+            <button className={cn(buttonClass("secondary"), "max-sm:hidden")}>Filter</button>
+            {filtered && (
+              <Link
+                href={tab.key ? `/dashboard/orders?show=${tab.key}` : "/dashboard/orders"}
+                className={cn(buttonClass("ghost"), "max-sm:h-9 max-sm:justify-self-start max-sm:px-1 max-sm:text-sm")}
+              >
+                Clear filters
+              </Link>
+            )}
+          </form>
         </Card>
-      )}
+
+        {scope.clientId && notReady.length > 0 && (
+          <Callout
+            className="order-last sm:order-first"
+            title="Order updates after 24 hours need approved templates."
+            action={
+              scope.canManage &&
+              missing.length > 0 && (
+                <ActionButton action={createOrderTemplates} confirm={`Create and submit ${missing.join(", ")} to Meta?`}>
+                  Create order templates
+                </ActionButton>
+              )
+            }
+          >
+            Not ready yet: {notReady.join(", ")}.{" "}
+            {missing.length === 0 ? "They're waiting for Meta's approval." : scope.canManage ? "Create them once and Meta usually approves within minutes." : "Ask your admin to create them."}
+          </Callout>
+        )}
+
+        {orders.length ? (
+          <ul className="grid gap-3 sm:gap-4 xl:grid-cols-2">
+            {orders.map((o) => (
+              <li key={o.id} className="min-w-0">
+                <OrderCard order={o} items={o.items as OrderItem[]} showClient={!scope.clientId} canEdit={canEdit} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <Card>
+            <EmptyState icon={show === "done" ? <PackageCheck className="size-5" /> : <ShoppingBag className="size-5" />} title="No orders here yet">
+              {filtered
+                ? "No orders matched your active filters. Try picking another status, time range or clearing your search."
+                : "When a customer sends a cart from your WhatsApp catalogue, it appears here with items, total and a one-tap confirmation."}
+            </EmptyState>
+          </Card>
+        )}
       </div>
 
       {/* Settings below the orders, so staff on a phone see today's orders first. */}
