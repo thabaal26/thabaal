@@ -4,7 +4,6 @@ import { cn } from "@/lib/cn";
 import { fmtNumber } from "@/lib/format";
 import { CATEGORY_LABEL, RATES, spendSummary, total, type SpendRow } from "@/lib/spend";
 import { senderFor } from "@/lib/senders";
-import { MetaSyncDialog } from "./meta-sync-dialog";
 
 const rupees = (n: number) => `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -103,20 +102,14 @@ export async function SpendCard({ clientId, className }: { clientId: string; can
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-line/60 @md:pt-0 @md:border-t-0 @md:shrink-0">
-            <MetaSyncDialog
-              metaAccount={metaAcc}
-              clientId={clientId}
-              displayPhone={number?.displayPhone}
-              qualityRating={number?.qualityRating}
-            />
+          <div className="flex shrink-0 items-center gap-2 pt-2 border-t border-line/60 @md:pt-0 @md:border-t-0">
             <a
               href={metaAcc.billingUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-control bg-brand px-3 text-xs font-semibold text-white shadow-xs transition hover:bg-brand-deep active:scale-95"
+              className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-control bg-brand px-3.5 text-xs font-semibold text-white shadow-xs transition hover:bg-brand-deep active:scale-95"
             >
-              <span>Add funds on Meta</span>
+              <span>Recharge on Meta</span>
               <ExternalLink aria-hidden className="size-3.5" />
             </a>
           </div>
