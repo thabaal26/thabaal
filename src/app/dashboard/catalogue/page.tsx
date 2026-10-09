@@ -1,4 +1,4 @@
-import { CheckCircle2, ExternalLink, Package, ShoppingBag, Store, XCircle } from "lucide-react";
+import { CheckCircle2, ExternalLink, ShoppingBag, Store, XCircle } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge, buttonClass, Card, PageHeader, PickClientNotice } from "@/components/ui";

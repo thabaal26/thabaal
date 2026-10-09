@@ -31,6 +31,13 @@
   --color-night: #0c1714;
   --color-glow: #34d399; /* accent on the dark sidebar */
 
+  /* Thabaal Official Brand Tokens */
+  --color-thabaal-ink: #10283b;
+  --color-thabaal-mango: #ffc329;
+  --color-thabaal-coral: #f46b4e;
+  --color-thabaal-green: #20c985;
+  --color-thabaal-cream: #fff9f0;
+
   /* Status: fg on bg passes 4.5:1; border is the outline of tinted blocks */
   --color-success: #047857;
   --color-success-bg: #ecfdf5;
@@ -196,6 +203,65 @@ body {
   .check {
     @apply size-5 shrink-0 cursor-pointer rounded border-line-strong accent-brand disabled:cursor-not-allowed;
   }
+
+  /* Premium Glass Effects for Floating Bars & Components */
+  .glass-card {
+    @apply rounded-card border border-line/75 bg-panel/85 shadow-card backdrop-blur-md;
+  }
+  .glass-panel {
+    @apply rounded-sheet border border-line/75 bg-panel/85 shadow-pop backdrop-blur-xl;
+  }
+  .glass-bar {
+    @apply border-t border-line/75 bg-panel/85 shadow-bar backdrop-blur-xl;
+  }
+  .glass-modal {
+    @apply border border-line/70 bg-panel/92 shadow-pop backdrop-blur-2xl;
+  }
+  .glass-dark {
+    @apply border border-white/10 bg-night/85 text-white shadow-pop backdrop-blur-xl;
+  }
+}
+
+/* Ambient Subtle Background Animation */
+@keyframes ambient-glow {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translate3d(24px, -16px, 0) scale(1.06);
+    opacity: 0.55;
+  }
+}
+.animate-ambient {
+  animation: ambient-glow 14s ease-in-out infinite alternate;
+}
+
+/* Thabaal Creative Flight & Sky Keyframes */
+@keyframes drift {
+  from { transform: translateX(135%); }
+  to { transform: translateX(-45%); }
+}
+@keyframes puff {
+  from { transform: scale(1, 1); }
+  to { transform: scale(1.035, 1.06); }
+}
+@keyframes float {
+  0%, 100% { transform: translate(0, -10px) rotate(-2.2deg); }
+  50% { transform: translate(8px, 14px) rotate(2.4deg); }
+}
+@keyframes flap {
+  0%, 100% { transform: rotate(8deg); }
+  50% { transform: rotate(-14deg); }
+}
+@keyframes streak {
+  0% { transform: translateX(50px); opacity: 0; }
+  25% { opacity: 0.8; }
+  100% { transform: translateX(-80px); opacity: 0; }
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.2; transform: scale(0.7); }
+  50% { opacity: 1; transform: scale(1.15); }
 }
 
 /* Space for the phone bottom bar, including the home indicator. */

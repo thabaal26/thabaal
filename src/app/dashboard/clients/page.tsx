@@ -41,9 +41,21 @@ export default async function ClientsPage() {
             const usable = c.numbers.filter((n) => n.token || c.waToken);
             const accounts = new Set(c.numbers.map((n) => n.businessAccountId)).size;
             return (
-              <Card key={c.id}>
+              <Card key={c.id} className="glass-card transition-all duration-200 hover:shadow-pop">
                 <CardHeader
-                  title={c.name}
+                  title={
+                    <span className="flex items-center gap-3">
+                      {c.logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={c.logoUrl} alt="" className="size-9 shrink-0 rounded-control object-cover ring-1 ring-line shadow-xs" />
+                      ) : (
+                        <span className="grid size-9 shrink-0 place-items-center rounded-control bg-thabaal-mango/20 font-bold text-thabaal-ink">
+                          {c.name.slice(0, 1).toUpperCase()}
+                        </span>
+                      )}
+                      <span>{c.name}</span>
+                    </span>
+                  }
                   description={`${fmtNumber(c._count.customers)} customers · ${c._count.campaigns} campaigns · ${c._count.templates} templates${c._count.pending ? ` · ${c._count.pending} without a phone number` : ""} · added ${fmtDate(c.createdAt, "d MMM yyyy")}`}
                   action={
                     usable.length ? (

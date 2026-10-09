@@ -1,4 +1,4 @@
-import { CheckCircle2, ExternalLink, Phone, ShieldCheck, Sparkles, Wallet } from "lucide-react";
+import { ExternalLink, Phone, ShieldCheck, Sparkles, Wallet } from "lucide-react";
 import { Badge, Card, CardHeader } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { fmtNumber } from "@/lib/format";

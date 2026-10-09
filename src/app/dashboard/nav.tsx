@@ -117,7 +117,7 @@ export function BottomNav({ isAdmin, role, openReplies, newOrders, unreadNotific
   const badge = "absolute -right-1 -top-1 bg-brand text-white ring-2 ring-panel";
 
   return (
-    <nav aria-label="Main" className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-line bg-panel shadow-bar lg:hidden print:hidden">
+    <nav aria-label="Main" className="pb-safe glass-bar fixed inset-x-0 bottom-0 z-30 lg:hidden print:hidden">
       <ul className="mx-auto grid max-w-lg grid-cols-5">
         {tabs.map((tab) => all.find((n) => n.href === tab)!).map(({ href, short, icon: Icon }) => {
           const active = isActive(path, href);

@@ -225,7 +225,7 @@ export function CallWidget() {
           role="dialog"
           aria-live="assertive"
           aria-label={live ? "WhatsApp call" : incoming ? "Incoming WhatsApp call" : "Call problem"}
-          className="surface-dark animate-toast fixed inset-x-3 top-[calc(4rem+env(safe-area-inset-top))] z-50 mx-auto max-w-sm rounded-card bg-night p-4 text-white shadow-pop ring-1 ring-white/10 lg:left-auto lg:right-6 lg:top-6 print:hidden"
+          className="glass-dark surface-dark animate-toast fixed inset-x-3 top-[calc(4rem+env(safe-area-inset-top))] z-50 mx-auto max-w-sm p-4 ring-1 ring-white/15 lg:left-auto lg:right-6 lg:top-6 print:hidden"
         >
           {live ? (
             <>

@@ -88,7 +88,7 @@ export async function fetchTab(link: string, expectedTab?: "Customers" | "Orders
     candidates.push(`https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=0`);
   }
 
-  let lastError = "Couldn't read the sheet. Set sharing to \"Anyone with the link can view\".";
+  const lastError = "Couldn't read the sheet. Set sharing to \"Anyone with the link can view\".";
   for (const url of candidates) {
     try {
       const res = await fetch(url, { cache: "no-store", redirect: "follow" });

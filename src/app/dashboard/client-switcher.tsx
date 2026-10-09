@@ -66,7 +66,7 @@ export function ClientSwitcher({ clients, current, dark }: { clients: Clients; c
       options={options(clients)}
       className={cn("w-full", pending && "opacity-60")}
       trigger={(selected) => (
-        <span className={cn("flex h-10 items-center gap-2 rounded-control px-2.5 text-sm font-medium transition", dark ? "bg-white/10 text-white hover:bg-white/15" : "border border-line-strong bg-panel text-ink")}>
+        <span className={cn("flex h-10 items-center gap-2 rounded-control px-2.5 text-sm font-medium transition backdrop-blur-md", dark ? "bg-white/10 text-white hover:bg-white/15" : "border border-line-strong/60 bg-panel/90 text-ink shadow-xs")}>
           <Building2 aria-hidden className={cn("size-4 shrink-0", dark ? "text-glow" : "text-brand-deep")} />
           <span className="min-w-0 flex-1 truncate">{selected?.label ?? "All clients"}</span>
           <ChevronDown aria-hidden className={cn("size-4 shrink-0", dark ? "text-white/70" : "text-muted")} />

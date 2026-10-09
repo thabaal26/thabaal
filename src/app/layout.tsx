@@ -12,10 +12,10 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 const tamil = Noto_Sans_Tamil({ variable: "--font-tamil", subsets: ["tamil"], weight: ["400", "500", "600", "700"], display: "swap", preload: false });
 
 export const metadata: Metadata = {
-  title: { default: "WhatsApp Campaign Portal", template: "%s · Campaign Portal" },
-  description: "Schedule WhatsApp campaigns, manage templates and track every message.",
+  title: { default: "Thabaal · Customer Messaging & Campaigns", template: "%s · Thabaal" },
+  description: "Thabaal (தபால்) — A message with momentum. Warm, quick, and dependable identity for customer messaging, campaigns, and orders.",
   robots: { index: false, follow: false },
-  appleWebApp: { capable: true, title: "Campaigns", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: "Thabaal", statusBarStyle: "black-translucent" },
   formatDetection: { telephone: false },
 };
 

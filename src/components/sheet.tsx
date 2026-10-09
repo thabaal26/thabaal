@@ -131,7 +131,7 @@ export function Sheet({
         aria-describedby={description ? descId : undefined}
         tabIndex={-1}
         className={cn(
-          "relative flex max-h-[92dvh] w-full animate-sheet flex-col rounded-t-sheet bg-panel shadow-pop outline-none sm:animate-rise sm:rounded-sheet",
+          "relative flex max-h-[92dvh] w-full animate-sheet flex-col rounded-t-sheet glass-modal outline-none sm:animate-rise sm:rounded-sheet",
           className?.includes("max-w-") ? "" : "sm:max-w-md",
           className,
         )}

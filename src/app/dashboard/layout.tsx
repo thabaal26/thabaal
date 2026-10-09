@@ -1,4 +1,4 @@
-import { LogOut, MessageCircle } from "lucide-react";
+import { LogOut } from "lucide-react";
 import type { Metadata, Viewport } from "next";
 import { CallWidget } from "@/components/call-widget";
 import { db } from "@/lib/db";
@@ -39,9 +39,12 @@ function BrandMark({ logoUrl, name, size }: { logoUrl?: string | null; name: str
     return <img src={logoUrl} alt={`${name} logo`} className={`${box} shrink-0 object-cover ring-1 ring-white/15`} />;
   }
   return (
-    <span aria-hidden className={`grid ${box} shrink-0 place-items-center bg-brand text-white`}>
-      <MessageCircle className={size === "md" ? "size-5" : "size-[18px]"} />
-    </span>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/brands/thabaal/thabaal-logo-en.png"
+      alt="Thabaal"
+      className={`${box} shrink-0 object-contain p-0.5 rounded-control bg-white/90 ring-1 ring-white/15 shadow-sm`}
+    />
   );
 }
 
@@ -55,8 +58,8 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
     db.reply.count({ where: { handled: false, ...ownedMessages(scope) } }),
     db.order.count({ where: { status: { in: ["NEW", "PAID"] }, ...owned(scope) } }).catch(() => 0), // 0 until the Order table exists (npm run db:push)
   ]);
-  const name = client?.name ?? "Campaign Portal";
-  const subtitle = client?.tagline || (scope.isAdmin ? (client ? "Admin view" : "Admin · all clients") : "WhatsApp campaigns");
+  const name = client?.name ?? "Thabaal";
+  const subtitle = client?.tagline || (scope.isAdmin ? (client ? "Admin view" : "Admin · all clients") : "A message with momentum");
   const via = settings.provider === "LOCAL" ? "Local session" : "Meta Cloud API";
   const live = !isSimulated(settings, client ? (await senderFor(client.id)).cfg : undefined);
 
@@ -111,11 +114,18 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
                 </button>
               </form>
             </div>
-            {!scope.isAdmin && <p className="text-2xs text-white/55">Powered by Campaign Portal</p>}
+            {!scope.isAdmin && <p className="text-2xs text-white/55">Powered by Thabaal (தபால்)</p>}
           </div>
         </aside>
 
-        <header className="surface-dark sticky top-0 z-30 w-full bg-night pt-[env(safe-area-inset-top)] lg:hidden print:hidden">
+        {/* Subtle, living ambient backdrop glow with high-end glass depth */}
+        <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden print:hidden">
+          <div className="animate-ambient absolute -left-20 -top-20 size-[32rem] rounded-full bg-brand-soft/45 blur-[100px]" />
+          <div className="animate-ambient absolute -right-20 top-1/4 size-[28rem] rounded-full bg-thabaal-mango/15 blur-[120px]" style={{ animationDelay: "-6s" }} />
+          <div className="animate-ambient absolute bottom-0 left-1/3 size-[36rem] rounded-full bg-brand/10 blur-[130px]" style={{ animationDelay: "-11s" }} />
+        </div>
+
+        <header className="glass-nav surface-dark sticky top-0 z-30 w-full pt-[env(safe-area-inset-top)] lg:hidden print:hidden">
           <div className="flex h-14 items-center gap-3 pl-4 pr-2">
             <BrandMark logoUrl={client?.logoUrl} name={name} size="sm" />
             {scope.isAdmin ? (
@@ -133,7 +143,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           </div>
         </header>
 
-        <main id="main" className="stagger mx-auto w-full max-w-page px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pb-12 lg:pt-8 print:p-0">
+        <main id="main" className="stagger relative z-10 mx-auto w-full max-w-page px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pb-12 lg:pt-8 print:p-0">
           {children}
         </main>
         {scope.canOperate && <CallWidget />}

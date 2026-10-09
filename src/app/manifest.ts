@@ -4,9 +4,9 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "WhatsApp Campaign Portal",
-    short_name: "Campaigns",
-    description: "Schedule WhatsApp campaigns, manage templates and track every message.",
+    name: "Thabaal · Customer Messaging",
+    short_name: "Thabaal",
+    description: "Thabaal (தபால்) — A message with momentum. Warm, quick, and dependable identity for customer messaging, campaigns, and orders.",
     start_url: "/login", // signed-in users are forwarded to the dashboard
     scope: "/",
     display: "standalone",

@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import { db } from "./db";
-import { waConfig } from "./whatsapp";
 
 export type MetaAccountRecord = {
   accountName: string;
@@ -168,7 +167,7 @@ export async function fetchMetaLiveStatus(clientId: string) {
       displayPhone: phoneRes?.display_phone_number || "+91 94999 00439",
       qualityRating: phoneRes?.quality_rating || "GREEN",
     };
-  } catch (e: any) {
+  } catch (_e: unknown) {
     return {
       liveConnected: true, // fallback to known live status
       wabaId: "2326100124852715",

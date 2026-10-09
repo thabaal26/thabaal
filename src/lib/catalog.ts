@@ -1,4 +1,6 @@
 import "server-only";
+import fs from "node:fs";
+import path from "node:path";
 import { explainSendError } from "@/app/dashboard/actions/send-helpers";
 import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { db } from "./db";
@@ -189,8 +191,6 @@ const DEFAULT_PRODUCTS: CatalogProductDetail[] = [
 
 function getOverrides(clientId: string): Record<string, Partial<CatalogProductDetail>> {
   try {
-    const fs = require("node:fs");
-    const path = require("node:path");
     const file = path.join(process.cwd(), "prisma", "data", "catalog-overrides.json");
     if (!fs.existsSync(file)) return {};
     const raw = fs.readFileSync(file, "utf8");
@@ -203,8 +203,6 @@ function getOverrides(clientId: string): Record<string, Partial<CatalogProductDe
 
 function saveOverride(clientId: string, productId: string, updates: Partial<CatalogProductDetail>) {
   try {
-    const fs = require("node:fs");
-    const path = require("node:path");
     const dir = path.join(process.cwd(), "prisma", "data");
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     const file = path.join(dir, "catalog-overrides.json");

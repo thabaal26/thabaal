@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Camera,
   Check,
   CheckCircle2,
   Copy,
@@ -13,7 +12,6 @@ import {
   Loader2,
   MessageSquare,
   Package,
-  RefreshCw,
   Search,
   Sparkles,
   Upload,
@@ -30,10 +28,10 @@ import { updateProduct, uploadProductImage } from "../actions/catalog";
 
 export function CatalogueManager({
   products: initialProducts,
-  catalogId,
+  catalogId: _catalogId,
   commerceManagerUrl,
   clientName,
-  isLive,
+  isLive: _isLive,
 }: {
   products: CatalogProductDetail[];
   catalogId: string | null;
