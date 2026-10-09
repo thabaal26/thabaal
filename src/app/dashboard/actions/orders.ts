@@ -18,6 +18,38 @@ import { saveTemplate } from "./templates";
 
 const STATUSES: OrderStatus[] = ["NEW", "CONFIRMED", "PAID", "DISPATCHED", "DELIVERED", "CANCELLED"];
 
+/** Name of the utility template used to tell a customer about a cancellation after their 24-hour window. */
+const CANCEL_TEMPLATE = "order_cancelled";
+
+/**
+ * Tells the customer their order was cancelled: on the WhatsApp order card when there is one, else a typed
+ * message inside the 24-hour window, else the approved order_cancelled template. False if none could go out.
+ */
+async function tellCancelled(order: Parameters<typeof updateOrderCard>[0] & { customer: { name: string }; client: { name: string } }) {
+  const first = order.customer.name.trim().split(/\s+/)[0] || "there";
+  const ref = orderRef(order);
+  const text = `Hello ${first}, your ${order.client.name} order ${ref} has been cancelled. If you have already paid, we will contact you about the refund. Reply to this message if you have any questions.`;
+  if (await updateOrderCard(order, "canceled", text)) return true;
+  const settings = await getSettings();
+  if (settings.provider !== "META") return false;
+  const last = await db.reply.findFirst({ where: { customerId: order.customer.id }, orderBy: { receivedAt: "desc" }, select: { receivedAt: true, senderId: true } });
+  const { number, cfg } = await senderFor(order.customer.clientId, last?.senderId);
+  let res: { id: string; simulated: boolean };
+  let templateName = "Typed reply";
+  if (replyWindowEnd(last?.receivedAt)) {
+    res = await sendTextMessage(cfg, order.customer.phone, text);
+  } else {
+    const t = await db.template.findFirst({ where: { clientId: order.customer.clientId, name: CANCEL_TEMPLATE, status: "APPROVED" }, select: { name: true, language: true } });
+    if (!t) return false;
+    res = await sendTemplateMessage(cfg, { to: order.customer.phone, templateName: t.name, language: t.language, headerType: "NONE", headerParams: [], bodyParams: [first, ref] });
+    templateName = t.name;
+  }
+  await db.message.create({
+    data: { customerId: order.customer.id, templateName, body: text, status: "SENT", waMessageId: res.id, simulated: res.simulated, provider: "META", sentAt: new Date(), senderId: number?.id ?? null },
+  });
+  return true;
+}
+
 export async function setOrderStatus(id: string, status: OrderStatus): Promise<SendResult> {
   const s = await requireOrderAccess();
   if ("denied" in s) return { ok: false, message: s.denied };
@@ -35,9 +67,7 @@ export async function setOrderStatus(id: string, status: OrderStatus): Promise<S
   }
   await db.order.update({ where: { id: order.id }, data: { status } });
   let told = false;
-  if (status === "CANCELLED" && !order.customer.optedOut)
-    told = await updateOrderCard(order, "canceled", `Hello ${order.customer.name.trim().split(/\s+/)[0] || "there"}, your ${order.client.name} order ${orderRef(order)} has been cancelled. Reply to this message if you have any questions.`)
-      .catch((e) => (console.error("Could not update the order card", e), false));
+  if (status === "CANCELLED" && !order.customer.optedOut) told = await tellCancelled(order).catch((e) => (console.error("Could not tell the customer about the cancellation", e), false));
   revalidatePath("/dashboard", "layout");
   return { ok: true, message: `Marked ${status.toLowerCase()}.${told ? " The customer was told on WhatsApp." : ""}` };
 }
