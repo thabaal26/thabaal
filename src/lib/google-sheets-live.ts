@@ -7,7 +7,7 @@ import { itemsText, orderRef, type OrderItem } from "./orders";
 
 // The client's Google Sheet live log (deploy/google-sheets/Code.gs): each event lands in its own tab.
 
-export type SheetLiveEvent = "NEW_CHAT" | "BUTTON_CLICK" | "NEW_ORDER" | "ORDER_UPDATE" | "CAMPAIGN_STATUS";
+export type SheetLiveEvent = "NEW_CHAT" | "BUTTON_CLICK" | "NEW_ORDER" | "ORDER_UPDATE" | "CAMPAIGN_STATUS" | "TEST";
 
 async function send(url: string, event: SheetLiveEvent, data: Record<string, unknown>) {
   try {
@@ -34,10 +34,47 @@ function later(job: () => Promise<void>) {
   }
 }
 
+/** The webhook URL, forgiving the usual paste mistakes (surrounding quotes or spaces). */
+const rawHook = () => (process.env.GOOGLE_SHEET_WEBHOOK_URL ?? "").trim().replace(/^["']+|["']+$/g, "").trim();
+
 const hook = () => {
-  const url = process.env.GOOGLE_SHEET_WEBHOOK_URL;
-  return url && url.startsWith("https://script.google.com") ? url : null;
+  const url = rawHook();
+  return url.startsWith("https://script.google.com/") ? url : null;
 };
+
+/** Whether this deployment can send to the sheet, for the Sheet page. Never reveals the URL. */
+export function sheetHookStatus(): { state: "on" | "off" | "invalid"; hint: string } {
+  const raw = rawHook();
+  if (!raw) return { state: "off", hint: "GOOGLE_SHEET_WEBHOOK_URL isn't set in this deployment's environment variables." };
+  if (!hook()) return { state: "invalid", hint: "GOOGLE_SHEET_WEBHOOK_URL is set but isn't an Apps Script web app link (it must start with https://script.google.com/)." };
+  return { state: "on", hint: process.env.GOOGLE_SHEET_WEBHOOK_SECRET ? "Sending with a shared secret." : "Sending without a shared secret." };
+}
+
+/** Sends a test event right away and reports the script's own answer, so the setup can be checked from the portal. */
+export async function testSheetPush(): Promise<{ ok: boolean; message: string }> {
+  const url = hook();
+  const status = sheetHookStatus();
+  if (!url) return { ok: false, message: status.hint };
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      redirect: "follow",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event: "TEST", data: { note: "Test from the portal's Google Sheet page" }, secret: process.env.GOOGLE_SHEET_WEBHOOK_SECRET || undefined }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    const text = await res.text();
+    let reply: { status?: string; message?: string; version?: string } | null = null;
+    try {
+      reply = JSON.parse(text);
+    } catch {}
+    if (!res.ok || !reply) return { ok: false, message: `The script didn't answer as expected (HTTP ${res.status}). Check it's deployed as a web app with access "Anyone".` };
+    if (reply.status !== "success") return { ok: false, message: `The script refused it: ${reply.message ?? "unknown reason"}.` };
+    return { ok: true, message: `Connected: the sheet saved a test row in "Other Events"${reply.version ? ` (${reply.version})` : ""}.` };
+  } catch (e) {
+    return { ok: false, message: `Couldn't reach the script: ${e instanceof Error ? e.message : "network error"}.` };
+  }
+}
 
 /**
  * Sends an event to the configured Google Apps Script webhook without slowing the request down.

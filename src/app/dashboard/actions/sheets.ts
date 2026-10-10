@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { testSheetPush } from "@/lib/google-sheets-live";
 import { csvUrl, syncSheet } from "@/lib/sheets";
 import { requireOrderAccess } from "@/lib/session";
 import type { SendResult } from "./send-helpers";
@@ -26,6 +27,13 @@ export async function saveSheetLinks(customersUrl: string, ordersUrl?: string): 
     data: { sheetCustomersUrl: finalCust, sheetOrdersUrl: finalOrd },
   });
   return syncNow();
+}
+
+/** Sends one test event to the live-log sheet and reports the script's answer. */
+export async function testSheetConnection(): Promise<SendResult> {
+  const s = await requireOrderAccess();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  return testSheetPush();
 }
 
 export async function syncNow(): Promise<SendResult> {

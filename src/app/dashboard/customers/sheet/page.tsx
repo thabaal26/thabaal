@@ -1,5 +1,9 @@
+import { Radio, Send } from "lucide-react";
 import type { Metadata } from "next";
-import { Callout, Card, CardHeader, PageHeader, PickClientNotice } from "@/components/ui";
+import { ActionButton } from "@/components/action-button";
+import { Badge, Callout, Card, CardHeader, PageHeader, PickClientNotice } from "@/components/ui";
+import { sheetHookStatus } from "@/lib/google-sheets-live";
+import { testSheetConnection } from "../../actions/sheets";
 import { db } from "@/lib/db";
 import { fmtDate } from "@/lib/format";
 import { getScope } from "@/lib/session";
@@ -51,6 +55,50 @@ function Columns({ rows }: { rows: string[][] }) {
   );
 }
 
+const LIVE_TABS = [
+  ["Live Orders", "one row per order, kept up to date as it's confirmed, paid, dispatched, delivered"],
+  ["Order History", "every order change, as a log"],
+  ["Chats", "messages customers send"],
+  ["Button Clicks", "buttons customers tap"],
+  ["Campaign Messages", "each campaign message and its delivery status"],
+];
+
+/** Portal → sheet: whether this deployment sends events, and a button that proves it end to end. */
+function LiveUpdatesCard() {
+  const s = sheetHookStatus();
+  return (
+    <Card className="card-3d">
+      <CardHeader
+        tone="gold"
+        icon={<Radio />}
+        title="Live updates to the sheet"
+        description="Orders, chats and campaign results are written to your sheet as they happen"
+        action={<Badge tone={s.state === "on" ? "green" : "red"} dot>{s.state === "on" ? "On" : "Off"}</Badge>}
+      />
+      <div className="space-y-4 p-4 sm:p-5">
+        {s.state === "on" ? (
+          <p className="text-sm text-ink-2">{s.hint} Use the test to check the sheet answers.</p>
+        ) : (
+          <Callout tone="warning" title="Live updates are off in this deployment">
+            {s.hint} Add it in Vercel → Settings → Environment Variables (Production), then redeploy.
+          </Callout>
+        )}
+        <ul className="space-y-1.5 text-sm">
+          {LIVE_TABS.map(([tab, what]) => (
+            <li key={tab} className="flex gap-2">
+              <span className="w-36 shrink-0 font-medium text-ink">{tab}</span>
+              <span className="text-muted">{what}</span>
+            </li>
+          ))}
+        </ul>
+        <ActionButton action={testSheetConnection} size="md">
+          <Send aria-hidden className="size-4" /> Send test to the sheet
+        </ActionButton>
+      </div>
+    </Card>
+  );
+}
+
 export default async function SheetPage() {
   const scope = await getScope();
   const back = { href: "/dashboard/customers", label: "Customers" };
@@ -82,6 +130,7 @@ export default async function SheetPage() {
             )}
             <SheetForm customersUrl={client?.sheetCustomersUrl ?? ""} ordersUrl={client?.sheetOrdersUrl ?? ""} />
           </Card>
+          <LiveUpdatesCard />
           <Card className="card-3d">
             <CardHeader tone="info" title="How to set it up" />
             <ol className="list-decimal space-y-2 p-4 pl-9 text-sm text-ink-2 sm:p-5 sm:pl-10">
