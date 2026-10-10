@@ -1,7 +1,7 @@
 import "server-only";
-import { put } from "@vercel/blob";
 import { db } from "./db";
 import type { MetaComponent } from "./template";
+import { storePublicImage } from "./uploaded-image";
 
 /** Full https link for a path like /brands/thenan/banner.jpg, since WhatsApp downloads images by link. */
 export function absoluteUrl(path: string | null | undefined) {
@@ -17,7 +17,7 @@ export function absoluteUrl(path: string | null | undefined) {
  */
 export async function headerImageFor(t: { clientId: string; headerType: string; headerMediaUrl: string | null }) {
   if (t.headerType !== "IMAGE") return null;
-  if (t.headerMediaUrl?.trim()) return t.headerMediaUrl.trim();
+  if (t.headerMediaUrl?.trim()) return absoluteUrl(t.headerMediaUrl.trim()) ?? t.headerMediaUrl.trim();
   const c = await db.client.findUnique({ where: { id: t.clientId }, select: { defaultImageUrl: true, bannerUrl: true } });
   return absoluteUrl(c?.defaultImageUrl) ?? absoluteUrl(c?.bannerUrl);
 }
@@ -35,13 +35,16 @@ export async function syncedHeaderImage(name: string, components: MetaComponent[
     if (r?.ok && r.headers.get("content-type")?.startsWith("image/")) return own;
   }
   const sample = components.find((c) => c.type === "HEADER" && c.format === "IMAGE")?.example?.header_handle?.[0];
-  if (!sample?.startsWith("https://") || !process.env.BLOB_READ_WRITE_TOKEN) return null;
+  if (!sample?.startsWith("https://")) return null;
   try {
     const r = await fetch(sample, { cache: "no-store" });
     const type = r.headers.get("content-type") ?? "";
     if (!r.ok || !type.startsWith("image/")) return null;
-    const blob = await put(`templates/${name}.${type.includes("png") ? "png" : "jpg"}`, await r.arrayBuffer(), { access: "public", contentType: type, addRandomSuffix: true });
-    return blob.url;
+    return await storePublicImage({
+      bytes: await r.arrayBuffer(),
+      contentType: type,
+      filename: `${name}.${type.includes("png") ? "png" : "jpg"}`,
+    });
   } catch (e) {
     console.warn(`Could not copy the sample image for ${name}`, e);
     return null;
