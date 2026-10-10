@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { isSectionEnabled } from "@/lib/client-sections";
 import { db } from "@/lib/db";
 import { daysAgo, fmtNumber } from "@/lib/format";
 import { getMetaAccountAlerts } from "@/lib/meta-balance";
@@ -29,30 +30,48 @@ export async function GET() {
   const oneDayAgo = daysAgo(1);
   const sevenDaysAgo = daysAgo(7);
 
-  const [replies, orders, calls, failures, numbers, flaggedTemplates] = await Promise.all([
-    db.reply.findMany({
-      where: { ...myMessages },
-      include: { customer: { select: { id: true, name: true, phone: true } } },
-      orderBy: { receivedAt: "desc" },
-      take: 15,
-    }),
-    db.order.findMany({
-      where: { ...mine },
-      include: { customer: { select: { id: true, name: true, phone: true, location: true } } },
-      orderBy: { createdAt: "desc" },
-      take: 15,
-    }).catch(() => []),
-    db.call.findMany({
-      where: { ...mine, startedAt: { gte: oneDayAgo } },
-      include: { customer: { select: { id: true, name: true } } },
-      orderBy: { startedAt: "desc" },
-      take: 10,
-    }).catch(() => []),
+  const client = scope.clientId
+    ? await db.client.findUnique({ where: { id: scope.clientId }, select: { disabledSections: true } })
+    : null;
+  const disabledSections = client?.disabledSections ?? [];
+  const ordersOn = isSectionEnabled(disabledSections, "orders");
+  const repliesOn = isSectionEnabled(disabledSections, "replies");
+  const callsOn = isSectionEnabled(disabledSections, "calls");
+
+  const [replies, orders, calls, failures, recentSuccesses, numbers, flaggedTemplates] = await Promise.all([
+    repliesOn
+      ? db.reply.findMany({
+          where: { ...myMessages },
+          include: { customer: { select: { id: true, name: true, phone: true } } },
+          orderBy: { receivedAt: "desc" },
+          take: 15,
+        })
+      : [],
+    ordersOn
+      ? db.order.findMany({
+          where: { ...mine },
+          include: { customer: { select: { id: true, name: true, phone: true, location: true } } },
+          orderBy: { createdAt: "desc" },
+          take: 15,
+        }).catch(() => [])
+      : [],
+    callsOn
+      ? db.call.findMany({
+          where: { ...mine, startedAt: { gte: oneDayAgo } },
+          include: { customer: { select: { id: true, name: true } } },
+          orderBy: { startedAt: "desc" },
+          take: 10,
+        }).catch(() => [])
+      : [],
     db.message.findMany({
       where: { status: "FAILED", failedAt: { gte: oneDayAgo }, ...myMessages },
       include: { customer: { select: { id: true, name: true } } },
       orderBy: { failedAt: "desc" },
       take: 5,
+    }),
+    db.message.findMany({
+      where: { status: { in: ["SENT", "DELIVERED", "READ"] }, createdAt: { gte: oneDayAgo }, ...myMessages },
+      select: { customerId: true, templateName: true, createdAt: true },
     }),
     db.whatsAppNumber.findMany({
       where: { ...mine },
@@ -120,6 +139,14 @@ export async function GET() {
   }
 
   for (const f of failures) {
+    const failTime = (f.failedAt ?? f.createdAt).getTime();
+    const superseded = recentSuccesses.some(
+      (s) =>
+        s.customerId === f.customerId &&
+        s.templateName === f.templateName &&
+        s.createdAt.getTime() > failTime,
+    );
+    if (superseded) continue;
     items.push({
       id: `fail-${f.id}`,
       type: "alert",

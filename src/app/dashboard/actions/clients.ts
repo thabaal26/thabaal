@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
+import { CLIENT_SECTIONS, sanitizeDisabledSections } from "@/lib/client-sections";
 import { CLIENT_COOKIE, requireAdmin } from "@/lib/session";
 import { HEX } from "@/lib/theme";
 import { listPhoneNumbers, waConfig } from "@/lib/whatsapp";
@@ -26,15 +27,41 @@ export async function setActiveClient(clientId: string): Promise<ActionResult> {
   return { ok: true };
 }
 
-export async function createClient(name: string): Promise<ActionResult> {
+export async function createClient(name: string, disabledSections?: string[]): Promise<ActionResult> {
   const s = await requireAdmin();
   if ("denied" in s) return { ok: false, message: s.denied };
   const clean = name.trim();
   if (!clean) return { ok: false, message: "Enter the client's business name." };
   if (await db.client.findUnique({ where: { name: clean } })) return { ok: false, message: `${clean} already exists.` };
-  const c = await db.client.create({ data: { name: clean } });
+  const sanitized = sanitizeDisabledSections(disabledSections);
+  const c = await db.client.create({ data: { name: clean, disabledSections: sanitized } });
   refresh();
   return { ok: true, id: c.id, message: `${clean} added.` };
+}
+
+/** Enables or disables portal sections for a specific client as configured by the portal owner. */
+export async function saveClientSections(clientId: string, disabledSections: string[]): Promise<ActionResult> {
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const sanitized = sanitizeDisabledSections(disabledSections);
+  if (sanitized.length >= CLIENT_SECTIONS.length) {
+    return { ok: false, message: "Keep at least one portal section enabled for this client." };
+  }
+  const client = await db.client.findUnique({ where: { id: clientId }, select: { name: true } });
+  if (!client) return { ok: false, message: "Client not found." };
+  await db.client.update({
+    where: { id: clientId },
+    data: { disabledSections: sanitized },
+  });
+  refresh();
+  const enabledCount = CLIENT_SECTIONS.length - sanitized.length;
+  return {
+    ok: true,
+    message:
+      sanitized.length === 0
+        ? `All ${CLIENT_SECTIONS.length} portal sections enabled for ${client.name}.`
+        : `Saved for ${client.name}: ${enabledCount} of ${CLIENT_SECTIONS.length} sections enabled.`,
+  };
 }
 
 /** The access token the client's numbers share. Blank keeps the saved one, so the form never shows it. */

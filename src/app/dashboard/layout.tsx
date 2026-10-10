@@ -2,6 +2,7 @@ import { LogOut } from "lucide-react";
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { CallWidget } from "@/components/call-widget";
+import { isSectionEnabled } from "@/lib/client-sections";
 import { db } from "@/lib/db";
 import { getScope, owned, ownedMessages, requireUser } from "@/lib/session";
 import { getSettings, isSimulated } from "@/lib/provider";
@@ -20,12 +21,26 @@ async function brandedClient() {
 
 export async function generateMetadata(): Promise<Metadata> {
   const client = await brandedClient();
-  if (!client) return {};
+  const defaultIcons = {
+    icon: [
+      { url: "/icon", type: "image/png", sizes: "512x512" },
+      { url: "/brands/thabaal/mark.png", type: "image/png" },
+    ],
+    shortcut: "/icon",
+    apple: [{ url: "/apple-icon", sizes: "180x180", type: "image/png" }],
+  };
+  if (!client) {
+    return {
+      title: { default: "Thabaal · Customer Messaging", template: "%s · Thabaal" },
+      icons: defaultIcons,
+      appleWebApp: { capable: true, title: "Thabaal", statusBarStyle: "black-translucent" },
+    };
+  }
   return {
-    title: { absolute: `${client.name} · Campaigns`, template: `%s · ${client.name}` },
+    title: { default: `Thabaal · ${client.name}`, template: `%s · ${client.name} · Thabaal` },
     manifest: `/api/manifest/${client.id}`,
-    ...(client.logoUrl && { icons: { icon: client.logoUrl, apple: client.logoUrl } }),
-    appleWebApp: { capable: true, title: client.name, statusBarStyle: "black-translucent" },
+    icons: client.logoUrl ? { icon: client.logoUrl, shortcut: client.logoUrl, apple: client.logoUrl } : defaultIcons,
+    appleWebApp: { capable: true, title: "Thabaal", statusBarStyle: "black-translucent" },
   };
 }
 
@@ -56,13 +71,24 @@ const initials = (name: string) =>
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
   const user = await requireUser();
   const scope = await getScope();
-  const [settings, client, clients, openReplies, newOrders] = await Promise.all([
+  const [settings, client, clients, rawOpenReplies, rawNewOrders] = await Promise.all([
     getSettings(),
     brandedClient(),
     scope.isAdmin ? db.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }) : [],
     db.reply.count({ where: { handled: false, ...ownedMessages(scope) } }),
-    db.order.count({ where: { status: { in: ["NEW", "PAID"] }, ...owned(scope) } }).catch(() => 0), // 0 until the Order table exists (npm run db:push)
+    db.order.count({ where: { status: { in: ["NEW", "PAID"] }, ...owned(scope) } }).catch(() => 0),
   ]);
+
+  const disabledSections = client?.disabledSections ?? [];
+  const ordersOn = isSectionEnabled(disabledSections, "orders");
+  const repliesOn = isSectionEnabled(disabledSections, "replies");
+  const callsOn = isSectionEnabled(disabledSections, "calls");
+  const notificationsOn = isSectionEnabled(disabledSections, "notifications");
+
+  const openReplies = repliesOn ? rawOpenReplies : 0;
+  const newOrders = ordersOn ? rawNewOrders : 0;
+  const unreadNotifications = openReplies + newOrders;
+
   const name = client?.name ?? "Thabaal";
   const subtitle = client?.tagline || (scope.isAdmin ? (client ? "Admin view" : "Admin · all clients") : "A message with momentum");
   const via = settings.provider === "LOCAL" ? "Local session" : "Meta Cloud API";
@@ -84,10 +110,8 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
     </span>
   ) : null;
 
-  const unreadNotifications = openReplies + newOrders;
-
   return (
-    <NotificationProvider>
+    <NotificationProvider initialUnreadCount={unreadNotifications} customIconUrl={client?.logoUrl}>
       <div style={themeStyle(client)} className="min-h-dvh w-full overflow-x-clip bg-canvas lg:pl-64 print:bg-white print:pl-0 lg:print:pl-0">
         {client && themeCss(client) && <style>{themeCss(client)}</style>}
         <a href="#main" className="sr-only z-[70] rounded-control bg-panel px-4 py-2 text-sm font-medium text-ink shadow-pop focus:not-sr-only focus:fixed focus:left-4 focus:top-4">
@@ -109,7 +133,13 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
             </div>
           )}
           <div className="thin-scroll relative min-h-0 flex-1 overflow-y-auto px-3 py-3 [scrollbar-color:rgb(255_255_255/0.15)_transparent]">
-            <SideNav isAdmin={scope.isAdmin} openReplies={openReplies} newOrders={newOrders} unreadNotifications={unreadNotifications} />
+            <SideNav
+              isAdmin={scope.isAdmin}
+              disabledSections={disabledSections}
+              openReplies={openReplies}
+              newOrders={newOrders}
+              unreadNotifications={unreadNotifications}
+            />
           </div>
           <div className="relative shrink-0 space-y-3 border-t border-white/[0.08] bg-black/15 p-3">
             {status && <div className="px-1 text-xs">{status}</div>}
@@ -140,7 +170,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
         <header className="sticky top-0 z-30 hidden h-16 transform-gpu items-center gap-4 border-b border-line bg-panel px-6 lg:flex xl:px-8 print:!hidden">
           <TopbarTrail workspace={client ? name : scope.isAdmin ? "All clients" : name} />
           <div className="ml-auto flex items-center gap-2">
-            {newOrders > 0 && (
+            {ordersOn && newOrders > 0 && (
               <Link
                 href="/dashboard/orders"
                 className="inline-flex h-8 items-center gap-1.5 rounded-full border border-warning-border bg-warning-bg px-3 text-xs font-semibold text-warning shadow-2xs transition hover:brightness-95"
@@ -149,7 +179,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
                 <span className="tabular">{newOrders}</span> order{newOrders === 1 ? "" : "s"} to handle
               </Link>
             )}
-            {openReplies > 0 && (
+            {repliesOn && openReplies > 0 && (
               <Link
                 href="/dashboard/replies"
                 className="inline-flex h-8 items-center gap-1.5 rounded-full border border-brand/25 bg-brand-soft px-3 text-xs font-semibold text-brand-deep shadow-2xs transition hover:brightness-95"
@@ -158,7 +188,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
                 <span className="tabular">{openReplies}</span> open repl{openReplies === 1 ? "y" : "ies"}
               </Link>
             )}
-            <NotificationBell />
+            {notificationsOn && <NotificationBell />}
             <span aria-hidden className="mx-1 h-6 w-px bg-line" />
             <Link
               href="/dashboard/settings"
@@ -190,7 +220,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
                 <div className="text-2xs leading-tight">{status ?? <span className="block truncate text-white/70">{subtitle}</span>}</div>
               </div>
             )}
-            <NotificationBell dark />
+            {notificationsOn && <NotificationBell dark />}
             <SettingsLink />
           </div>
         </header>
@@ -198,8 +228,15 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
         <main id="main" className="stagger relative mx-auto w-full max-w-page px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pb-12 lg:pt-7 print:p-0">
           {children}
         </main>
-        {scope.canOperate && <CallWidget />}
-        <BottomNav isAdmin={scope.isAdmin} role={role} openReplies={openReplies} newOrders={newOrders} unreadNotifications={unreadNotifications} />
+        {callsOn && scope.canOperate && <CallWidget />}
+        <BottomNav
+          isAdmin={scope.isAdmin}
+          role={role}
+          disabledSections={disabledSections}
+          openReplies={openReplies}
+          newOrders={newOrders}
+          unreadNotifications={unreadNotifications}
+        />
       </div>
     </NotificationProvider>
   );

@@ -7,7 +7,14 @@ import { Picker } from "@/components/picker";
 import { confirmAction, promptText } from "@/components/confirm";
 import { Sheet } from "@/components/sheet";
 import { toastResult } from "@/components/toast";
-import { Button, CheckRow, Field, Label } from "@/components/ui";
+import { Badge, Button, CheckRow, Field, Label } from "@/components/ui";
+import {
+  CLIENT_PLAN_PRESETS,
+  CLIENT_SECTIONS,
+  detectPlanPreset,
+  sanitizeDisabledSections,
+  type ClientSectionId,
+} from "@/lib/client-sections";
 import { HEX, themeStyle } from "@/lib/theme";
 import { cn } from "@/lib/cn";
 import {
@@ -22,6 +29,7 @@ import {
   resetUserPassword,
   setUserAccess,
   saveClientBranding,
+  saveClientSections,
   saveClientToken,
   saveSendingRules,
   setDefaultNumber,
@@ -53,7 +61,9 @@ function useSubmit() {
 export function NewClientForm() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
+  const [presetId, setPresetId] = useState<string>("full");
   const { pending, submit } = useSubmit();
+  const selectedPreset = CLIENT_PLAN_PRESETS.find((p) => p.id === presetId) ?? CLIENT_PLAN_PRESETS[0];
   return (
     <>
       <Button onClick={() => setOpen(true)}>
@@ -64,12 +74,52 @@ export function NewClientForm() {
           className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
-            submit(() => createClient(name), () => { setName(""); setOpen(false); });
+            submit(
+              () => createClient(name, selectedPreset.disabledSections),
+              () => {
+                setName("");
+                setPresetId("full");
+                setOpen(false);
+              },
+            );
           }}
         >
           <Field id="client-name" label="Business name" required help="Next, add their login and WhatsApp details on this page, then pick them in the sidebar to import customers.">
             <input className="field" autoCapitalize="words" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Thenan Oils" />
           </Field>
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium text-ink-2">Portal plan & sections</legend>
+            <p className="text-xs text-muted">Choose which sections this client needs. You can also toggle individual sections anytime after adding them.</p>
+            <div className="space-y-2 pt-1">
+              {CLIENT_PLAN_PRESETS.map((p) => {
+                const active = presetId === p.id;
+                return (
+                  <label
+                    key={p.id}
+                    className={cn(
+                      "flex cursor-pointer items-start gap-3 rounded-card border p-3 text-sm transition",
+                      active ? "border-brand bg-brand-soft/60 ring-1 ring-brand/30" : "border-line bg-panel hover:border-line-strong",
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="client-plan-preset"
+                      className="check mt-0.5 rounded-full"
+                      checked={active}
+                      onChange={() => setPresetId(p.id)}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-center gap-2 font-medium text-ink">
+                        <span>{p.label}</span>
+                        <Badge tone={active ? "green" : "gray"}>{p.badge}</Badge>
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted">{p.description}</span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
           <Button type="submit" loading={pending} className="w-full sm:w-auto">Add client</Button>
         </form>
       </Sheet>
@@ -453,6 +503,123 @@ export function SendingRulesForm({ clientId, initial }: { clientId: string; init
         </div>
       </div>
       <Button type="submit" loading={pending} size="sm" className="max-sm:w-full md:mb-px">Save rules</Button>
+    </form>
+  );
+}
+
+/**
+ * Portal owner control to enable or disable individual sections (or apply a 1-click plan preset)
+ * for a client, e.g. hiding Orders & Catalogue for clients who only send templates/campaigns.
+ */
+export function ClientSectionsForm({
+  clientId,
+  initialDisabled,
+}: {
+  clientId: string;
+  initialDisabled: readonly string[];
+}) {
+  const [disabled, setDisabled] = useState<ClientSectionId[]>(() => sanitizeDisabledSections(initialDisabled));
+  const { pending, submit } = useSubmit();
+
+  const activePreset = detectPlanPreset(disabled);
+  const enabledCount = CLIENT_SECTIONS.length - disabled.length;
+
+  const toggleSection = (id: ClientSectionId, enabled: boolean) => {
+    setDisabled((prev) => {
+      if (enabled) return prev.filter((x) => x !== id);
+      return prev.includes(id) ? prev : [...prev, id];
+    });
+  };
+
+  const applyPreset = (presetDisabled: readonly ClientSectionId[]) => {
+    setDisabled([...presetDisabled]);
+  };
+
+  const groups = ["Daily work", "Marketing"] as const;
+
+  return (
+    <form
+      className="space-y-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit(() => saveClientSections(clientId, disabled));
+      }}
+    >
+      {/* 1-Click Plan Presets */}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {CLIENT_PLAN_PRESETS.map((preset) => {
+          const isCurrent = activePreset === preset.id;
+          return (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => applyPreset(preset.disabledSections)}
+              className={cn(
+                "flex flex-col items-start justify-between gap-1.5 rounded-card border p-3 text-left transition active:scale-[0.99]",
+                isCurrent
+                  ? "border-brand bg-brand-soft/60 ring-1 ring-brand/30"
+                  : "border-line bg-panel hover:border-line-strong hover:bg-subtle",
+              )}
+            >
+              <div className="flex w-full items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-ink">{preset.label}</span>
+                <Badge tone={isCurrent ? "green" : "gray"}>{preset.badge}</Badge>
+              </div>
+              <p className="text-2xs leading-relaxed text-muted">{preset.description}</p>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Individual Section Toggles */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {groups.map((group) => (
+          <div key={group} className="rounded-card border border-line bg-sunken/35 p-3">
+            <p className="mb-2 text-2xs font-semibold uppercase tracking-wider text-muted">{group} sections</p>
+            <div className="space-y-2">
+              {CLIENT_SECTIONS.filter((s) => s.group === group).map((sec) => {
+                const enabled = !disabled.includes(sec.id);
+                return (
+                  <label
+                    key={sec.id}
+                    className={cn(
+                      "flex cursor-pointer items-start gap-3 rounded-control border px-3 py-2.5 transition",
+                      enabled
+                        ? "border-line bg-panel text-ink"
+                        : "border-dashed border-line bg-canvas/60 text-muted opacity-75",
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      className="check mt-0.5"
+                      checked={enabled}
+                      onChange={(e) => toggleSection(sec.id, e.target.checked)}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium text-ink">{sec.label}</span>
+                        <span className={cn("text-2xs font-semibold", enabled ? "text-success" : "text-muted")}>
+                          {enabled ? "Enabled" : "Hidden"}
+                        </span>
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted">{sec.description}</span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-muted">
+          <span className="font-semibold text-ink">{enabledCount}</span> of {CLIENT_SECTIONS.length} sections enabled · Overview &amp; Settings stay on automatically.
+        </p>
+        <Button type="submit" loading={pending} size="sm" className="max-sm:w-full">
+          Save sections
+        </Button>
+      </div>
     </form>
   );
 }

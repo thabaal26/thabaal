@@ -1,14 +1,104 @@
 import "server-only";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { db } from "./db";
 import type { MetaComponent } from "./template";
-import { storePublicImage } from "./uploaded-image";
+import { getStoredPublicImage, storePublicImage } from "./uploaded-image";
 
-/** Full https link for a path like /brands/thenan/banner.jpg, since WhatsApp downloads images by link. */
-export function absoluteUrl(path: string | null | undefined) {
-  if (!path) return null;
-  if (/^https:\/\//.test(path)) return path;
-  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL ?? "campaign-seven-ruddy.vercel.app";
-  return path.startsWith("/") && host ? `https://${host}${path}` : null;
+const CANONICAL_HOST = "campaign-seven-ruddy.vercel.app";
+
+/** Full https link for a path like /brands/thenan/banner.jpg, and rewrites stale preview domains. */
+export function absoluteUrl(rawPath: string | null | undefined) {
+  if (!rawPath) return null;
+  const trimmed = rawPath.trim();
+  if (!trimmed) return null;
+  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL ?? CANONICAL_HOST;
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const u = new URL(trimmed);
+      if (u.hostname === "whatsapp-portal-six.vercel.app" || u.hostname === "localhost") {
+        return `https://${host}${u.pathname}${u.search}`;
+      }
+      return trimmed;
+    } catch {
+      return trimmed;
+    }
+  }
+  return trimmed.startsWith("/") && host ? `https://${host}${trimmed}` : null;
+}
+
+/**
+ * Resolves the raw binary bytes and verified MIME type for a header image URL or path:
+ * 1. Reads directly from PostgreSQL ("PortalUploadedImage") for /api/upload/[id] URLs
+ * 2. Reads directly from local /public filesystem if the file exists in /public
+ * 3. Falls back to HTTP fetch over the network
+ */
+export async function resolveImageBytes(
+  urlOrPath: string,
+): Promise<{ bytes: Buffer; mimeType: "image/jpeg" | "image/png"; filename: string } | null> {
+  const clean = urlOrPath.trim();
+  if (!clean) return null;
+
+  let pathname = clean;
+  try {
+    if (/^https?:\/\//i.test(clean)) {
+      pathname = new URL(clean).pathname;
+    }
+  } catch {
+    // keep as-is
+  }
+
+  const detectFormat = (buf: Buffer, fallbackName = "header"): { bytes: Buffer; mimeType: "image/jpeg" | "image/png"; filename: string } => {
+    const isPng = buf.length >= 4 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
+    const mimeType = isPng ? "image/png" : "image/jpeg";
+    const ext = isPng ? "png" : "jpg";
+    const base = path.basename(fallbackName).replace(/\.[a-z0-9]+$/i, "").replace(/[^\w.-]+/g, "-") || "header";
+    return { bytes: buf, mimeType, filename: `${base}.${ext}` };
+  };
+
+  // 1. Direct DB lookup for /api/upload/[id]
+  const uploadMatch = pathname.match(/^\/api\/upload\/([^/?#]+)$/);
+  if (uploadMatch) {
+    const stored = await getStoredPublicImage(decodeURIComponent(uploadMatch[1]));
+    if (stored?.data) {
+      return detectFormat(Buffer.from(stored.data), uploadMatch[1]);
+    }
+  }
+
+  // 2. Direct local /public file lookup (0ms, no external HTTP dependencies)
+  if (pathname.startsWith("/") && !pathname.startsWith("/api/")) {
+    const rel = pathname.replace(/^\/+/, "");
+    const publicRoot = path.resolve(process.cwd(), "public");
+    const candidate = path.resolve(publicRoot, rel);
+    if (candidate.startsWith(publicRoot)) {
+      try {
+        const fileBuf = await readFile(candidate);
+        if (fileBuf.byteLength > 0) {
+          return detectFormat(fileBuf, rel);
+        }
+      } catch {
+        // Not a local public file, proceed to HTTP fetch
+      }
+    }
+  }
+
+  // 3. Network fetch with normalized URL
+  const targetUrl = absoluteUrl(clean) ?? clean;
+  if (/^https?:\/\//i.test(targetUrl)) {
+    try {
+      const res = await fetch(targetUrl, { cache: "no-store" });
+      if (res.ok) {
+        const ab = await res.arrayBuffer();
+        if (ab.byteLength > 0) {
+          return detectFormat(Buffer.from(ab), pathname);
+        }
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -29,11 +119,10 @@ export async function headerImageFor(t: { clientId: string; headerType: string; 
  * Null when neither can be found.
  */
 export async function syncedHeaderImage(name: string, components: MetaComponent[]) {
-  const own = absoluteUrl(`/${name.replace(/_/g, "-")}.jpg`);
-  if (own) {
-    const r = await fetch(own, { method: "HEAD", cache: "no-store" }).catch(() => null);
-    if (r?.ok && r.headers.get("content-type")?.startsWith("image/")) return own;
-  }
+  const localRel = `/${name.replace(/_/g, "-")}.jpg`;
+  const localResolved = await resolveImageBytes(localRel);
+  if (localResolved) return absoluteUrl(localRel);
+
   const sample = components.find((c) => c.type === "HEADER" && c.format === "IMAGE")?.example?.header_handle?.[0];
   if (!sample?.startsWith("https://")) return null;
   try {

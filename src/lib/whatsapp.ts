@@ -1,4 +1,5 @@
 import "server-only";
+import { absoluteUrl, resolveImageBytes } from "./media";
 import type { MetaComponent } from "./template";
 
 // WhatsApp Cloud API client. When the Meta variables are missing the portal runs in
@@ -6,6 +7,10 @@ import type { MetaComponent } from "./template";
 
 const VERSION = process.env.META_GRAPH_VERSION ?? "v23.0";
 const GRAPH = `https://graph.facebook.com/${VERSION}`;
+
+/** Cache of uploaded WhatsApp media IDs keyed by `${phoneNumberId}:${url}` (Meta media IDs last 30 days; we refresh every 12h). */
+const mediaIdCache = new Map<string, { id: string; expiresAt: number }>();
+const MEDIA_TTL_MS = 12 * 60 * 60 * 1000;
 
 /** Credentials of one sending number: its token, phone number ID and WhatsApp Business Account. */
 export type WaSource = { token: string | null; phoneNumberId: string | null; businessAccountId: string | null };
@@ -50,6 +55,46 @@ async function graph<T>(cfg: WaConfig, path: string, init: RequestInit = {}): Pr
   return json as T;
 }
 
+/**
+ * Uploads an image directly to Meta's WhatsApp Media endpoint (`/{phone_number_id}/media`) and returns its `media_id`.
+ * Sending `image: { id: mediaId }` instead of `image: { link }` guarantees Meta already holds the verified binary
+ * before queueing the message, permanently preventing asynchronous webhook error 131053.
+ */
+export async function uploadWhatsAppMedia(cfg: WaConfig, imageUrl: string): Promise<string | null> {
+  if (!cfg.live || !cfg.phoneNumberId || !cfg.token) return null;
+  const normalizedKey = absoluteUrl(imageUrl) ?? imageUrl.trim();
+  const cacheKey = `${cfg.phoneNumberId}:${normalizedKey}`;
+  const cached = mediaIdCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.id;
+  }
+
+  try {
+    const resolved = await resolveImageBytes(imageUrl);
+    if (!resolved) return null;
+
+    const form = new FormData();
+    form.append("messaging_product", "whatsapp");
+    form.append("type", resolved.mimeType);
+    form.append("file", new Blob([new Uint8Array(resolved.bytes)], { type: resolved.mimeType }), resolved.filename);
+
+    const res = await fetch(`${GRAPH}/${cfg.phoneNumberId}/media`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${cfg.token}` },
+      body: form,
+      cache: "no-store",
+    });
+    const json = (await res.json().catch(() => ({}))) as { id?: string };
+    if (res.ok && json.id) {
+      mediaIdCache.set(cacheKey, { id: json.id, expiresAt: Date.now() + MEDIA_TTL_MS });
+      return json.id;
+    }
+  } catch (e) {
+    console.warn("WhatsApp direct media upload failed, falling back to link:", e instanceof Error ? e.message : e);
+  }
+  return null;
+}
+
 export type SendInput = {
   to: string;
   templateName: string;
@@ -80,7 +125,12 @@ export async function sendTemplateMessage(cfg: WaConfig, input: SendInput): Prom
     });
   } else {
     if (input.headerType === "IMAGE" && input.headerMediaUrl) {
-      components.push({ type: "header", parameters: [{ type: "image", image: { link: input.headerMediaUrl } }] });
+      const mediaId = await uploadWhatsAppMedia(cfg, input.headerMediaUrl);
+      const fallbackLink = absoluteUrl(input.headerMediaUrl) ?? input.headerMediaUrl;
+      components.push({
+        type: "header",
+        parameters: [{ type: "image", image: mediaId ? { id: mediaId } : { link: fallbackLink } }],
+      });
     } else if (input.headerType === "TEXT" && input.headerParams.length) {
       components.push({ type: "header", parameters: input.headerParams.map((text) => ({ type: "text", text })) });
     }
@@ -133,9 +183,16 @@ export async function sendMediaMessage(
   if (!cfg.live) return { id: `demo.${crypto.randomUUID()}`, simulated: true };
   const isPdf = /\.pdf(\?|$)/i.test(mediaUrl);
   const type = isPdf ? "document" : "image";
+  const normalizedUrl = absoluteUrl(mediaUrl) ?? mediaUrl;
+  let mediaId: string | null = null;
+  if (!isPdf) {
+    mediaId = await uploadWhatsAppMedia(cfg, mediaUrl);
+  }
   const payload = isPdf
-    ? { link: mediaUrl, ...(caption ? { caption } : {}), filename: "attachment.pdf" }
-    : { link: mediaUrl, ...(caption ? { caption } : {}) };
+    ? { link: normalizedUrl, ...(caption ? { caption } : {}), filename: "attachment.pdf" }
+    : mediaId
+    ? { id: mediaId, ...(caption ? { caption } : {}) }
+    : { link: normalizedUrl, ...(caption ? { caption } : {}) };
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
     body: JSON.stringify({
@@ -260,6 +317,8 @@ export async function sendPaymentTemplate(
   p: PaymentRequest,
 ): Promise<{ id: string; simulated: boolean }> {
   if (!cfg.live) return { id: `demo.${crypto.randomUUID()}`, simulated: true };
+  const mediaId = template.headerImage ? await uploadWhatsAppMedia(cfg, template.headerImage) : null;
+  const fallbackLink = template.headerImage ? (absoluteUrl(template.headerImage) ?? template.headerImage) : null;
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
     body: JSON.stringify({
@@ -270,7 +329,14 @@ export async function sendPaymentTemplate(
         name: template.name,
         language: { code: template.language },
         components: [
-          ...(template.headerImage ? [{ type: "header", parameters: [{ type: "image", image: { link: template.headerImage } }] }] : []),
+          ...(template.headerImage
+            ? [
+                {
+                  type: "header",
+                  parameters: [{ type: "image", image: mediaId ? { id: mediaId } : { link: fallbackLink } }],
+                },
+              ]
+            : []),
           ...(template.headerParams.length ? [{ type: "header", parameters: template.headerParams.map((text) => ({ type: "text", text })) }] : []),
           ...(template.bodyParams.length ? [{ type: "body", parameters: template.bodyParams.map((text) => ({ type: "text", text })) }] : []),
           { type: "button", sub_type: "order_details", index: 0, parameters: [{ type: "action", action: { order_details: orderDetails(p) } }] },
@@ -375,10 +441,19 @@ export async function deleteMetaTemplate(cfg: WaConfig, name: string, metaId: st
 export async function uploadHeaderSample(cfg: WaConfig, imageUrl: string) {
   const { token } = cfg;
   let { appId } = cfg;
-  const img = await fetch(imageUrl);
-  if (!img.ok) throw new MetaError("Could not download the header image. Check the URL is public.");
-  const bytes = await img.arrayBuffer();
-  const type = img.headers.get("content-type")?.split(";")[0] ?? "image/jpeg";
+
+  const resolved = await resolveImageBytes(imageUrl);
+  let bytes: ArrayBuffer;
+  let type = "image/jpeg";
+  if (resolved) {
+    bytes = resolved.bytes.buffer.slice(resolved.bytes.byteOffset, resolved.bytes.byteOffset + resolved.bytes.byteLength) as ArrayBuffer;
+    type = resolved.mimeType;
+  } else {
+    const img = await fetch(absoluteUrl(imageUrl) ?? imageUrl, { cache: "no-store" });
+    if (!img.ok) throw new MetaError("Could not download the header image. Check the URL is public.");
+    bytes = await img.arrayBuffer();
+    type = img.headers.get("content-type")?.split(";")[0] ?? "image/jpeg";
+  }
 
   // Resolve the exact Meta App ID that issued this token if not matching or missing
   try {

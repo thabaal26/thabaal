@@ -4,12 +4,13 @@ import { redirect } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
 import { Building3D, Calendar3D, Phone3D, Users3D } from "@/components/icons-3d";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, QualityBadge, Stat } from "@/components/ui";
+import { CLIENT_PLAN_PRESETS, CLIENT_SECTIONS, detectPlanPreset } from "@/lib/client-sections";
 import { db } from "@/lib/db";
 import { numberHealth } from "@/lib/limits";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { getScope } from "@/lib/session";
 import { deleteClientUser } from "../actions/clients";
-import { AccessSelect, AddLoginForm, AddNumberForm, BrandingForm, NewClientForm, NumberActions, RefreshNumbersButton, ResetPasswordButton, SendingRulesForm, TokenForm } from "./client-forms";
+import { AccessSelect, AddLoginForm, AddNumberForm, BrandingForm, ClientSectionsForm, NewClientForm, NumberActions, RefreshNumbersButton, ResetPasswordButton, SendingRulesForm, TokenForm } from "./client-forms";
 
 export const metadata: Metadata = { title: "Clients" };
 export const dynamic = "force-dynamic";
@@ -36,7 +37,7 @@ export default async function ClientsPage() {
     <>
       <PageHeader
         title="Clients"
-        description="Each client sees only their own customers, campaigns, templates and message log when they sign in. Each login is a Manager (everything for their business), Staff (orders, dispatch, replies) or Viewer."
+        description="Each client sees only their own customers, campaigns, templates and enabled sections when they sign in. As portal owner, you can enable or disable sections per client."
         actions={<NewClientForm />}
       />
 
@@ -76,6 +77,10 @@ export default async function ClientsPage() {
           {clients.map((c) => {
             const usable = c.numbers.filter((n) => n.token || c.waToken);
             const accounts = new Set(c.numbers.map((n) => n.businessAccountId)).size;
+            const disabledSections = c.disabledSections ?? [];
+            const presetId = detectPlanPreset(disabledSections);
+            const presetMeta = CLIENT_PLAN_PRESETS.find((p) => p.id === presetId);
+            const enabledCount = CLIENT_SECTIONS.length - disabledSections.length;
             return (
               <Card key={c.id} className="card-3d transition-all duration-200">
                 <CardHeader
@@ -95,11 +100,16 @@ export default async function ClientsPage() {
                   }
                   description={`${fmtNumber(c._count.customers)} customers · ${c._count.campaigns} campaigns · ${c._count.templates} templates${c._count.pending ? ` · ${c._count.pending} without a phone number` : ""} · added ${fmtDate(c.createdAt, "d MMM yyyy")}`}
                   action={
-                    usable.length ? (
-                      <Badge tone="green" dot>{usable.length === 1 ? "Own WhatsApp number" : `${usable.length} WhatsApp numbers`}</Badge>
-                    ) : (
-                      <Badge tone="amber" dot>Uses default number</Badge>
-                    )
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge tone={disabledSections.length === 0 ? "green" : "gray"}>
+                        {presetMeta ? presetMeta.badge : `${enabledCount}/${CLIENT_SECTIONS.length} sections`}
+                      </Badge>
+                      {usable.length ? (
+                        <Badge tone="green" dot>{usable.length === 1 ? "Own WhatsApp number" : `${usable.length} WhatsApp numbers`}</Badge>
+                      ) : (
+                        <Badge tone="amber" dot>Uses default number</Badge>
+                      )}
+                    </div>
                   }
                 />
                 <div className="grid grid-cols-1 gap-6 p-4 sm:p-5 xl:grid-cols-2">
@@ -167,6 +177,21 @@ export default async function ClientsPage() {
                       <p className="mt-3 text-xs text-muted">No numbers yet, so this client&apos;s campaigns send from the default number in Settings.</p>
                     )}
                     <AddNumberForm clientId={c.id} hasToken={!!c.waToken} />
+                  </section>
+
+                  <section className="border-t border-line pt-5 xl:col-span-2">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Portal sections &amp; plan</h3>
+                        <p className="mt-1 text-xs text-muted">
+                          Enable or disable sections for this client (for example, hide Orders &amp; Catalogue if they only send templates and campaigns).
+                        </p>
+                      </div>
+                      <Badge tone={disabledSections.length === 0 ? "green" : "amber"}>
+                        {presetMeta ? presetMeta.label : `Custom plan (${enabledCount} of ${CLIENT_SECTIONS.length} sections)`}
+                      </Badge>
+                    </div>
+                    <ClientSectionsForm clientId={c.id} initialDisabled={disabledSections} />
                   </section>
 
                   <section className="border-t border-line pt-5 xl:col-span-2">

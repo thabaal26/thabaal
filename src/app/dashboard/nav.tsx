@@ -2,8 +2,8 @@
 
 import { ChevronRight, Menu } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   Bell3D,
   Building3D,
@@ -19,6 +19,7 @@ import {
   Users3D,
 } from "@/components/icons-3d";
 import { Sheet } from "@/components/sheet";
+import { isHrefEnabled } from "@/lib/client-sections";
 import { cn } from "@/lib/cn";
 
 export const NAV = [
@@ -73,10 +74,25 @@ const countFor = (href: string, c: Counts) =>
     ? { n: c.unreadNotifications, label: "unread notifications" }
     : null;
 
-export function SideNav({ isAdmin, openReplies, newOrders, unreadNotifications }: { isAdmin: boolean } & Counts) {
+export function SideNav({
+  isAdmin,
+  disabledSections,
+  openReplies,
+  newOrders,
+  unreadNotifications,
+}: { isAdmin: boolean; disabledSections?: readonly string[] } & Counts) {
   const path = usePathname();
-  const items = [...NAV, ...(isAdmin ? ADMIN_NAV : [])];
+  const router = useRouter();
+  const enabledNav = NAV.filter((n) => isHrefEnabled(n.href, disabledSections));
+  const items = [...enabledNav, ...(isAdmin ? ADMIN_NAV : [])];
   const groups = [...new Set(items.map((n) => n.group))];
+
+  useEffect(() => {
+    if (!isHrefEnabled(path, disabledSections)) {
+      router.replace("/dashboard");
+    }
+  }, [path, disabledSections, router]);
+
   return (
     <nav aria-label="Main" className="space-y-5">
       {groups.map((g) => (
@@ -125,13 +141,29 @@ export function SideNav({ isAdmin, openReplies, newOrders, unreadNotifications }
 }
 
 /** Phone tab bar, pinned to the bottom edge, above the home indicator. */
-export function BottomNav({ isAdmin, role, openReplies, newOrders, unreadNotifications }: { isAdmin: boolean; role: NavRole } & Counts) {
+export function BottomNav({
+  isAdmin,
+  role,
+  disabledSections,
+  openReplies,
+  newOrders,
+  unreadNotifications,
+}: { isAdmin: boolean; role: NavRole; disabledSections?: readonly string[] } & Counts) {
   const path = usePathname();
   // Remembers the page "More" was opened on, so the sheet closes by itself once a tapped page opens.
   const [openedOn, setOpenedOn] = useState<string | null>(null);
   const moreOpen = openedOn === path;
-  const tabs = PHONE_TABS[role];
-  const all = [...NAV, ...(isAdmin ? ADMIN_NAV : [])];
+  const enabledNav = NAV.filter((n) => isHrefEnabled(n.href, disabledSections));
+  const all = [...enabledNav, ...(isAdmin ? ADMIN_NAV : [])];
+
+  // Pick up to 4 primary phone tabs from preferred role tabs first, filling from remaining enabled sections if some are disabled.
+  const preferredHrefs = PHONE_TABS[role].filter((href) => all.some((n) => n.href === href));
+  const fallbackHrefs = enabledNav
+    .map((n) => n.href)
+    .filter((href) => href !== "/dashboard/settings" && !preferredHrefs.includes(href));
+  const tabs = [...preferredHrefs, ...fallbackHrefs].slice(0, 4);
+  const tabItems = tabs.map((tab) => all.find((n) => n.href === tab)).filter((x): x is (typeof all)[number] => Boolean(x));
+
   const more = all.filter((n) => !tabs.includes(n.href));
   const moreActive = more.some((n) => isActive(path, n.href));
   // Counts for sections that live under "More" show on the More tab too.
@@ -149,8 +181,11 @@ export function BottomNav({ isAdmin, role, openReplies, newOrders, unreadNotific
 
   return (
     <nav aria-label="Main" className="pb-safe glass-bar fixed inset-x-0 bottom-0 z-30 lg:hidden print:hidden">
-      <ul className="mx-auto grid max-w-lg grid-cols-5">
-        {tabs.map((tab) => all.find((n) => n.href === tab)!).map(({ href, short, icon: Icon, cube }) => {
+      <ul
+        className="mx-auto grid max-w-lg"
+        style={{ gridTemplateColumns: `repeat(${tabItems.length + 1}, minmax(0, 1fr))` }}
+      >
+        {tabItems.map(({ href, short, icon: Icon, cube }) => {
           const active = isActive(path, href);
           const count = countFor(href, { openReplies, newOrders, unreadNotifications });
           return (

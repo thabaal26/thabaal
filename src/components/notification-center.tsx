@@ -46,13 +46,114 @@ function KindIcon({ type }: { type: NotificationItem["type"] }) {
   );
 }
 
-export function NotificationProvider({ children }: { children: ReactNode }) {
+function stripTitlePrefix(title: string): string {
+  const cleaned = title.replace(/^(?:🔔\s*|\(\d+\+?\)\s*)+/g, "").trim();
+  return cleaned || "Thabaal · Customer Messaging";
+}
+
+function updateDynamicFavicon(count: number, iconSrc: string) {
+  if (typeof document === "undefined") return;
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.onload = () => {
+    const size = 64;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Rounded white tile background so the Thabaal bird pops on both dark & light browser tabs
+    const r = 14;
+    ctx.beginPath();
+    ctx.moveTo(r, 0);
+    ctx.lineTo(size - r, 0);
+    ctx.quadraticCurveTo(size, 0, size, r);
+    ctx.lineTo(size, size - r);
+    ctx.quadraticCurveTo(size, size, size - r, size);
+    ctx.lineTo(r, size);
+    ctx.quadraticCurveTo(0, size, 0, size - r);
+    ctx.lineTo(0, r);
+    ctx.quadraticCurveTo(0, 0, r, 0);
+    ctx.closePath();
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#e2e8f0";
+    ctx.stroke();
+
+    // Draw the Thabaal bird mark (or custom logo) preserving aspect ratio
+    const pad = 6;
+    const maxW = size - pad * 2;
+    const maxH = size - pad * 2;
+    const ratio = Math.min(maxW / (img.naturalWidth || 64), maxH / (img.naturalHeight || 64));
+    const drawW = (img.naturalWidth || 64) * ratio;
+    const drawH = (img.naturalHeight || 64) * ratio;
+    const drawX = (size - drawW) / 2;
+    const drawY = (size - drawH) / 2;
+    ctx.drawImage(img, drawX, drawY, drawW, drawH);
+
+    // Draw live notification badge in top-right corner when unreadCount > 0
+    if (count > 0) {
+      const label = count > 9 ? "9+" : String(count);
+      const badgeR = label.length > 1 ? 15 : 13;
+      const cx = size - badgeR - 1;
+      const cy = badgeR + 1;
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, badgeR + 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, badgeR, 0, Math.PI * 2);
+      ctx.fillStyle = "#e11d48";
+      ctx.fill();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `800 ${label.length > 1 ? 14 : 16}px system-ui, -apple-system, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, cx, cy + 1);
+    }
+
+    const dataUrl = canvas.toDataURL("image/png");
+    const links = document.querySelectorAll<HTMLLinkElement>('link[rel*="icon"]');
+    if (links.length > 0) {
+      links.forEach((link) => {
+        if (link.rel !== "apple-touch-icon") {
+          link.type = "image/png";
+          link.href = dataUrl;
+        }
+      });
+    } else {
+      const link = document.createElement("link");
+      link.rel = "icon";
+      link.type = "image/png";
+      link.href = dataUrl;
+      document.head.appendChild(link);
+    }
+  };
+  img.src = iconSrc || "/brands/thabaal/mark.png";
+}
+
+export function NotificationProvider({
+  children,
+  initialUnreadCount = 0,
+  customIconUrl,
+}: {
+  children: ReactNode;
+  initialUnreadCount?: number;
+  customIconUrl?: string | null;
+}) {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
   const [openSheet, setOpenSheet] = useState(false);
   const [toasts, setToasts] = useState<NotificationItem[]>([]);
+  const [flashTitle, setFlashTitle] = useState<string | null>(null);
   const seenIdsRef = useRef<Set<string>>(new Set());
   const initialFetchRef = useRef(true);
+  const updatingTitleRef = useRef(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -91,6 +192,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           }
           if (newItems.length > 0) {
             setToasts((prev) => [...newItems.slice(0, 3), ...prev].slice(0, 4));
+            setFlashTitle(newItems[0].title);
           }
         }
       } catch {
@@ -106,10 +208,75 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Keep browser tab title and favicon badge synced with unread notifications
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const applyTabState = () => {
+      if (updatingTitleRef.current) return;
+      updatingTitleRef.current = true;
+      const base = stripTitlePrefix(document.title);
+      const countText = unreadCount > 99 ? "99+" : String(unreadCount);
+      const nextTitle = unreadCount > 0 ? `(${countText}) ${base}` : base;
+      if (document.title !== nextTitle) {
+        document.title = nextTitle;
+      }
+      updatingTitleRef.current = false;
+    };
+
+    applyTabState();
+    updateDynamicFavicon(unreadCount, customIconUrl || "/brands/thabaal/mark.png");
+
+    // Also update OS / PWA app badge when supported
+    const nav = navigator as Navigator & {
+      setAppBadge?: (n?: number) => Promise<void>;
+      clearAppBadge?: () => Promise<void>;
+    };
+    if (unreadCount > 0) {
+      nav.setAppBadge?.(unreadCount).catch(() => {});
+    } else {
+      nav.clearAppBadge?.().catch(() => {});
+    }
+
+    const titleEl = document.querySelector("head > title");
+    if (!titleEl) return;
+    const observer = new MutationObserver(() => {
+      if (!updatingTitleRef.current && !flashTitle) {
+        applyTabState();
+      }
+    });
+    observer.observe(titleEl, { childList: true, characterData: true, subtree: true });
+    return () => observer.disconnect();
+  }, [unreadCount, customIconUrl, flashTitle]);
+
+  // Briefly pulse the tab title when a brand-new live notification arrives
+  useEffect(() => {
+    if (!flashTitle || unreadCount <= 0 || typeof document === "undefined") return;
+    let step = 0;
+    const base = stripTitlePrefix(document.title);
+    const countText = unreadCount > 99 ? "99+" : String(unreadCount);
+    const timer = setInterval(() => {
+      step += 1;
+      updatingTitleRef.current = true;
+      if (step % 2 === 1) {
+        document.title = `🔔 (${countText}) ${flashTitle} · Thabaal`;
+      } else {
+        document.title = `(${countText}) ${base}`;
+      }
+      updatingTitleRef.current = false;
+      if (step >= 8) {
+        clearInterval(timer);
+        setFlashTitle(null);
+      }
+    }, 1200);
+    return () => clearInterval(timer);
+  }, [flashTitle, unreadCount]);
+
   const markAllRead = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
     setUnreadCount(0);
     setToasts([]);
+    setFlashTitle(null);
   };
 
   const dismissToast = (id: string) => {

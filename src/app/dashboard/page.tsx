@@ -1,10 +1,11 @@
-import { BarChart3, Clock, MapPin, Send, TriangleAlert } from "lucide-react";
+import { BarChart3, CheckCheck, Clock, MapPin, Send, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { addDays } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { ActionButton } from "@/components/action-button";
-import { Calendar3D, Eye3D, Messages3D, Rupee3D, Send3D, ShoppingBag3D } from "@/components/icons-3d";
+import { Calendar3D, Eye3D, Messages3D, Rupee3D, Send3D, ShoppingBag3D, Template3D } from "@/components/icons-3d";
 import { Avatar, Badge, buttonClass, Callout, Card, CardHeader, EmptyState, Meter, rowClass, StatusBadge, Table, Td, Th } from "@/components/ui";
+import { isSectionEnabled } from "@/lib/client-sections";
 import { db } from "@/lib/db";
 import { APP_TZ, daysAgo, fmtDate, fmtNumber, pct } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
@@ -224,6 +225,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
   const replies = replySeries.reduce((n, r) => n + Number(r.n), 0);
 
   const sentSpark = keys.map((k) => at(k));
+  const deliveredSpark = keys.map((k) => at(k, "DELIVERED") + at(k, "READ"));
   const readSpark = keys.map((k) => at(k, "READ"));
   const readRateSpark = keys.map((k) => {
     const d = at(k, "DELIVERED") + at(k, "READ");
@@ -231,6 +233,12 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
   });
   const revenueSpark = keys.map((k) => curOrders.filter((o) => keyOf(o.createdAt) === k).reduce((n, o) => n + o.total, 0));
   const replySpark = keys.map((k) => Number(replySeries.find((r) => r.k === k)?.n ?? 0));
+
+  const disabledSections = client?.disabledSections ?? [];
+  const ordersOn = isSectionEnabled(disabledSections, "orders");
+  const repliesOn = isSectionEnabled(disabledSections, "replies");
+  const campaignsOn = isSectionEnabled(disabledSections, "campaigns");
+  const templatesOn = isSectionEnabled(disabledSections, "templates");
 
   // Best sellers from this period's order lines.
   const productMap = new Map<string, { name: string; qty: number; revenue: number }>();
@@ -255,12 +263,20 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
 
   const adminActions = scope.isAdmin && (
     <>
-      <ActionButton action={runDispatcherNow} size="md" title="Process due campaigns and batches now">
-        <Send className="size-4" /> Run scheduler
-      </ActionButton>
-      <Link href="/dashboard/campaigns/new" className={buttonClass("primary")}>
-        <Calendar3D className="size-4" /> New campaign
-      </Link>
+      {campaignsOn && (
+        <ActionButton action={runDispatcherNow} size="md" title="Process due campaigns and batches now">
+          <Send className="size-4" /> Run scheduler
+        </ActionButton>
+      )}
+      {campaignsOn ? (
+        <Link href="/dashboard/campaigns/new" className={buttonClass("primary")}>
+          <Calendar3D className="size-4" /> New campaign
+        </Link>
+      ) : templatesOn ? (
+        <Link href="/dashboard/templates" className={buttonClass("primary")}>
+          <Template3D className="size-4" /> Templates
+        </Link>
+      ) : null}
     </>
   );
 
@@ -363,19 +379,38 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       )}
 
       {/* Headline figures for the period, each with its real change against the stretch before. */}
-      <div role="group" aria-label={`Figures for ${periodText}`} className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <KpiTile
-          label="Sales"
-          value={revenue}
-          format="inr"
-          sub={`${fmtNumber(curOrders.length)} order${curOrders.length === 1 ? "" : "s"}${curOrders.length ? ` · avg ₹${Math.round(revenue / curOrders.length).toLocaleString("en-IN")}` : ""}`}
-          icon={Rupee3D}
-          color={C.gold}
-          spark={revenueSpark}
-          delta={{ cur: revenue, prev: prevRevenue, kind: "pct" }}
-          vs={prevLabel}
-          href="/dashboard/orders?show=all"
-        />
+      <div
+        role="group"
+        aria-label={`Figures for ${periodText}`}
+        className={`grid grid-cols-2 gap-3 sm:gap-4 ${repliesOn ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}
+      >
+        {ordersOn ? (
+          <KpiTile
+            label="Sales"
+            value={revenue}
+            format="inr"
+            sub={`${fmtNumber(curOrders.length)} order${curOrders.length === 1 ? "" : "s"}${curOrders.length ? ` · avg ₹${Math.round(revenue / curOrders.length).toLocaleString("en-IN")}` : ""}`}
+            icon={Rupee3D}
+            color={C.gold}
+            spark={revenueSpark}
+            delta={{ cur: revenue, prev: prevRevenue, kind: "pct" }}
+            vs={prevLabel}
+            href="/dashboard/orders?show=all"
+          />
+        ) : (
+          <KpiTile
+            label="Messages delivered"
+            value={delivered}
+            format="count"
+            sub={`${pct(delivered, total)}% delivery rate · ${fmtNumber(read)} read`}
+            icon={CheckCheck}
+            color={C.read}
+            spark={deliveredSpark}
+            delta={{ cur: delivered, prev: prevDelivered, kind: "pct" }}
+            vs={prevLabel}
+            href="/dashboard/messages?status=DELIVERED"
+          />
+        )}
         <KpiTile
           label="Messages sent"
           value={total}
@@ -399,18 +434,20 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
           delta={prevDelivered ? { cur: pct(read, delivered), prev: pct(prevRead, prevDelivered), kind: "pts" } : null}
           vs={prevLabel}
         />
-        <KpiTile
-          label="Customer replies"
-          value={replies}
-          format="count"
-          sub={`from ${fmtNumber(repliers.length)} customer${repliers.length === 1 ? "" : "s"}`}
-          icon={Messages3D}
-          color={C.info}
-          spark={replySpark}
-          delta={{ cur: replies, prev: prevReplies, kind: "pct" }}
-          vs={prevLabel}
-          href="/dashboard/replies"
-        />
+        {repliesOn && (
+          <KpiTile
+            label="Customer replies"
+            value={replies}
+            format="count"
+            sub={`from ${fmtNumber(repliers.length)} customer${repliers.length === 1 ? "" : "s"}`}
+            icon={Messages3D}
+            color={C.info}
+            spark={replySpark}
+            delta={{ cur: replies, prev: prevReplies, kind: "pct" }}
+            vs={prevLabel}
+            href="/dashboard/replies"
+          />
+        )}
       </div>
 
       {activeRuns.length > 0 && (
@@ -461,7 +498,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
             series={[
               { key: "sent", label: "Sent", color: C.brand, values: sentSpark },
               { key: "read", label: "Read", color: C.read, values: readSpark },
-              { key: "replies", label: "Replies", color: C.info, values: replySpark, area: false },
+              ...(repliesOn ? [{ key: "replies", label: "Replies", color: C.info, values: replySpark, area: false }] : []),
             ]}
           />
         </div>
@@ -473,7 +510,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       {/* Outcomes, live status and sending limits. */}
       <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-5 sm:gap-5 md:grid-cols-2 xl:grid-cols-12">
         <div className="min-w-0 md:col-span-2 xl:col-span-5">
-          <FunnelCard f={funnel} revenue={Number(f?.revenue ?? 0)} />
+          <FunnelCard f={funnel} revenue={Number(f?.revenue ?? 0)} showOrders={ordersOn} showReplies={repliesOn} />
         </div>
         <div className="min-w-0 xl:col-span-4">
           <TodayCard
@@ -481,7 +518,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
             sent={todayHours.reduce((n, h) => n + h.sent, 0)}
             replies={todayHours.reduce((n, h) => n + h.replies, 0)}
             sending={activeRuns.map((r) => ({ name: r.campaign.name, total: r.total, done: r.total - (runProgress.find((p) => p.runId === r.id && p.status === "QUEUED")?._count ?? 0) }))}
-            next={upcoming[0]?.nextRunAt ? { name: upcoming[0].name, at: upcoming[0].nextRunAt } : null}
+            next={campaignsOn && upcoming[0]?.nextRunAt ? { name: upcoming[0].name, at: upcoming[0].nextRunAt } : null}
           />
         </div>
         <div className="min-w-0 xl:col-span-3">
@@ -490,14 +527,20 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       </div>
 
       {/* When to send, and what sells. */}
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-5 sm:gap-5 xl:grid-cols-12">
-        <div className="min-w-0 xl:col-span-7">
-          <BestTimeCard cells={heat.map((h) => ({ d: h.d, b: h.b, n: Number(h.n) }))} days={90} />
+      {(repliesOn || ordersOn) && (
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-5 sm:gap-5 xl:grid-cols-12">
+          {repliesOn && (
+            <div className={`min-w-0 ${ordersOn ? "xl:col-span-7" : "xl:col-span-12"}`}>
+              <BestTimeCard cells={heat.map((h) => ({ d: h.d, b: h.b, n: Number(h.n) }))} days={90} />
+            </div>
+          )}
+          {ordersOn && (
+            <div className={`min-w-0 ${repliesOn ? "xl:col-span-5" : "xl:col-span-12"}`}>
+              <TopProductsCard items={topProducts} rangeLabel={hourly ? "Today" : `Last ${days} days`} />
+            </div>
+          )}
         </div>
-        <div className="min-w-0 xl:col-span-5">
-          <TopProductsCard items={topProducts} rangeLabel={hourly ? "Today" : `Last ${days} days`} />
-        </div>
-      </div>
+      )}
 
       {/* Day-to-day detail. */}
       <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-5 sm:gap-5 xl:grid-cols-12">
@@ -623,44 +666,46 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         </div>
 
         <div className="min-w-0 space-y-4 sm:space-y-5 xl:col-span-5">
-          <Card className="card-3d">
-            <CardHeader
-              tone="violet"
-              icon={<Calendar3D />}
-              title="Coming up"
-              description="Next scheduled campaign sends"
-              action={
-                <Link href="/dashboard/campaigns" className={buttonClass("ghost", "sm")}>
-                  All campaigns
-                </Link>
-              }
-            />
-            {upcoming.length ? (
-              <ul className="divide-y divide-line">
-                {upcoming.map((c) => (
-                  <li key={c.id} className="relative flex items-center gap-3 px-4 py-3 transition-colors hover:bg-subtle active:bg-sunken sm:px-5">
-                    <div className="grid w-11 shrink-0 place-items-center rounded-control border border-line bg-panel py-1 text-center">
-                      <span className="text-2xs font-medium uppercase text-muted">{fmtDate(c.nextRunAt, "EEE")}</span>
-                      <span className="tabular text-sm font-semibold leading-tight text-ink">{fmtDate(c.nextRunAt, "d")}</span>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <Link href={`/dashboard/campaigns/${c.id}`} className="block truncate text-sm font-medium text-ink after:absolute after:inset-0">
-                        {c.name}
-                      </Link>
-                      <p className="truncate text-xs text-muted">
-                        {fmtDate(c.nextRunAt, "h:mm a")} · {c.template.name}
-                      </p>
-                    </div>
-                    {c.template.status !== "APPROVED" && <Badge tone="amber">Template not approved</Badge>}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyState icon={<Calendar3D />} title="Nothing scheduled">
-                {scope.isAdmin ? "Create a weekly campaign to start sending automatically." : "Upcoming campaigns will show here."}
-              </EmptyState>
-            )}
-          </Card>
+          {campaignsOn && (
+            <Card className="card-3d">
+              <CardHeader
+                tone="violet"
+                icon={<Calendar3D />}
+                title="Coming up"
+                description="Next scheduled campaign sends"
+                action={
+                  <Link href="/dashboard/campaigns" className={buttonClass("ghost", "sm")}>
+                    All campaigns
+                  </Link>
+                }
+              />
+              {upcoming.length ? (
+                <ul className="divide-y divide-line">
+                  {upcoming.map((c) => (
+                    <li key={c.id} className="relative flex items-center gap-3 px-4 py-3 transition-colors hover:bg-subtle active:bg-sunken sm:px-5">
+                      <div className="grid w-11 shrink-0 place-items-center rounded-control border border-line bg-panel py-1 text-center">
+                        <span className="text-2xs font-medium uppercase text-muted">{fmtDate(c.nextRunAt, "EEE")}</span>
+                        <span className="tabular text-sm font-semibold leading-tight text-ink">{fmtDate(c.nextRunAt, "d")}</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <Link href={`/dashboard/campaigns/${c.id}`} className="block truncate text-sm font-medium text-ink after:absolute after:inset-0">
+                          {c.name}
+                        </Link>
+                        <p className="truncate text-xs text-muted">
+                          {fmtDate(c.nextRunAt, "h:mm a")} · {c.template.name}
+                        </p>
+                      </div>
+                      {c.template.status !== "APPROVED" && <Badge tone="amber">Template not approved</Badge>}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <EmptyState icon={<Calendar3D />} title="Nothing scheduled">
+                  {scope.isAdmin ? "Create a weekly campaign to start sending automatically." : "Upcoming campaigns will show here."}
+                </EmptyState>
+              )}
+            </Card>
+          )}
 
           {cid && <SpendCard clientId={cid} canManage={scope.canManage} />}
 

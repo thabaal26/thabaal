@@ -14,7 +14,16 @@ const tamil = Noto_Sans_Tamil({ variable: "--font-tamil", subsets: ["tamil"], we
 
 export const metadata: Metadata = {
   title: { default: "Thabaal · Customer Messaging & Campaigns", template: "%s · Thabaal" },
+  applicationName: "Thabaal",
   description: "Thabaal (தபால்) — A message with momentum. Warm, quick, and dependable identity for customer messaging, campaigns, and orders.",
+  icons: {
+    icon: [
+      { url: "/icon", type: "image/png", sizes: "512x512" },
+      { url: "/brands/thabaal/mark.png", type: "image/png" },
+    ],
+    shortcut: "/icon",
+    apple: [{ url: "/apple-icon", sizes: "180x180", type: "image/png" }],
+  },
   robots: { index: false, follow: false },
   appleWebApp: { capable: true, title: "Thabaal", statusBarStyle: "black-translucent" },
   formatDetection: { telephone: false },

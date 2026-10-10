@@ -228,14 +228,30 @@ const FUNNEL: { key: "messaged" | "delivered" | "read" | "replied" | "ordered"; 
 ];
 
 /** People, not messages: each step is a share of everyone messaged in the period. */
-export function FunnelCard({ f, revenue }: { f: Record<(typeof FUNNEL)[number]["key"], number>; revenue: number }) {
+export function FunnelCard({
+  f,
+  revenue,
+  showOrders = true,
+  showReplies = true,
+}: {
+  f: Record<(typeof FUNNEL)[number]["key"], number>;
+  revenue: number;
+  showOrders?: boolean;
+  showReplies?: boolean;
+}) {
   const base = f.messaged;
+  const steps = FUNNEL.filter((s) => (s.key !== "ordered" || showOrders) && (s.key !== "replied" || showReplies));
   return (
     <Card className="card-3d h-full">
-      <CardHeader tone="gold" icon={<TrendingUp />} title="From message to order" description="Customers messaged this period, and how far they went" />
+      <CardHeader
+        tone="gold"
+        icon={<TrendingUp />}
+        title={showOrders ? "From message to order" : "Customer engagement funnel"}
+        description="Customers messaged this period, and how far they went"
+      />
       {base ? (
         <ul className="space-y-1 p-3 sm:p-4">
-          {FUNNEL.map((s) => {
+          {steps.map((s) => {
             const share = pct(f[s.key], base);
             return (
               <li key={s.key} className="group flex items-center gap-3 rounded-control px-2 py-2">
@@ -260,10 +276,12 @@ export function FunnelCard({ f, revenue }: { f: Record<(typeof FUNNEL)[number]["
               </li>
             );
           })}
-          <li className="mx-2 mt-2 flex items-center justify-between rounded-control bg-gold-soft px-3 py-2.5 text-sm">
-            <span className="text-gold-deep">Sales from those orders</span>
-            <span className="tabular font-semibold text-gold-deep">{formatValue(revenue, "inr")}</span>
-          </li>
+          {showOrders && (
+            <li className="mx-2 mt-2 flex items-center justify-between rounded-control bg-gold-soft px-3 py-2.5 text-sm">
+              <span className="text-gold-deep">Sales from those orders</span>
+              <span className="tabular font-semibold text-gold-deep">{formatValue(revenue, "inr")}</span>
+            </li>
+          )}
         </ul>
       ) : (
         <p className="p-5 text-sm text-muted">Nobody was messaged in this period yet.</p>
