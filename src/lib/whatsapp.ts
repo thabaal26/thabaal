@@ -373,12 +373,21 @@ export async function deleteMetaTemplate(cfg: WaConfig, name: string, metaId: st
 
 /** Uploads an image through the Resumable Upload API and returns the handle Meta needs as an example. */
 export async function uploadHeaderSample(cfg: WaConfig, imageUrl: string) {
-  const { appId, token } = cfg;
-  if (!appId) throw new MetaError("Set META_APP_ID to use image headers.");
+  const { token } = cfg;
+  let { appId } = cfg;
   const img = await fetch(imageUrl);
   if (!img.ok) throw new MetaError("Could not download the header image. Check the URL is public.");
   const bytes = await img.arrayBuffer();
   const type = img.headers.get("content-type")?.split(";")[0] ?? "image/jpeg";
+
+  // Resolve the exact Meta App ID that issued this token if not matching or missing
+  try {
+    const appInfo = await graph<{ id?: string }>(cfg, "app");
+    if (appInfo?.id) appId = appInfo.id;
+  } catch {
+    // Fallback to configured appId
+  }
+  if (!appId) throw new MetaError("Set META_APP_ID to use image headers.");
 
   const session = await graph<{ id: string }>(
     cfg,
