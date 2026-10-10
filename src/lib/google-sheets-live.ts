@@ -34,19 +34,36 @@ function later(job: () => Promise<void>) {
   }
 }
 
-/** The webhook URL, forgiving the usual paste mistakes (surrounding quotes or spaces). */
-const rawHook = () => (process.env.GOOGLE_SHEET_WEBHOOK_URL ?? "").trim().replace(/^["']+|["']+$/g, "").trim();
+const rawHook = () => (process.env.GOOGLE_SHEET_WEBHOOK_URL ?? "").trim();
 
+/**
+ * The Apps Script web app URL, found inside whatever was pasted into the variable: the URL itself (with
+ * quotes or spaces), a whole "NAME=https://…" line, or just the deployment ID (AKfycb…).
+ */
 const hook = () => {
-  const url = rawHook();
-  return url.startsWith("https://script.google.com/") ? url : null;
+  const raw = rawHook();
+  const url = raw.match(/https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec/)?.[0];
+  if (url) return url;
+  const id = raw.replace(/^["'\s]+|["'\s]+$/g, "").match(/^AKfycb[\w-]{20,}$/)?.[0];
+  return id ? `https://script.google.com/macros/s/${id}/exec` : null;
 };
 
-/** Whether this deployment can send to the sheet, for the Sheet page. Never reveals the URL. */
+/** Whether this deployment can send to the sheet, for the Sheet page. Never reveals the value. */
 export function sheetHookStatus(): { state: "on" | "off" | "invalid"; hint: string } {
   const raw = rawHook();
   if (!raw) return { state: "off", hint: "GOOGLE_SHEET_WEBHOOK_URL isn't set in this deployment's environment variables." };
-  if (!hook()) return { state: "invalid", hint: "GOOGLE_SHEET_WEBHOOK_URL is set but isn't an Apps Script web app link (it must start with https://script.google.com/)." };
+  if (!hook()) {
+    const what = /script\.google\.com\/home|projects\//.test(raw)
+      ? "the Apps Script editor's address, not the web app link"
+      : /^1[\w-]{40,}$/.test(raw)
+        ? "the Script ID, not the web app link"
+        : /\/dev/.test(raw)
+          ? "the test (/dev) link; use the deployment's /exec link"
+          : /script\.google\.com/.test(raw)
+            ? "a script.google.com address that isn't a web app /exec link"
+            : `something that isn't an Apps Script link (${raw.length} characters)`;
+    return { state: "invalid", hint: `GOOGLE_SHEET_WEBHOOK_URL is set, but it holds ${what}. Use Deploy → Manage deployments → Web app URL (ends in /exec).` };
+  }
   return { state: "on", hint: process.env.GOOGLE_SHEET_WEBHOOK_SECRET ? "Sending with a shared secret." : "Sending without a shared secret." };
 }
 
