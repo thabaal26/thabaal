@@ -301,3 +301,14 @@ body {
 @media (width < 64rem) {
   #main:has([data-action-bar]) { padding-bottom: calc(10rem + env(safe-area-inset-bottom)); }
 }
+
+/* Dark mode / dark input autofill transparency fix */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: #ffffff !important;
+  transition: background-color 9999s ease-in-out 0s;
+  box-shadow: inset 0 0 0 1000px rgba(255, 255, 255, 0.08) !important;
+}
+

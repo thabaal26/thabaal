@@ -80,13 +80,17 @@ export function SideNav({ isAdmin, openReplies, newOrders, unreadNotifications }
                       href={href}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "flex h-9 items-center gap-3 rounded-control px-3 text-sm transition",
-                        active ? "bg-white/10 font-medium text-white" : "text-white/75 hover:bg-white/5 hover:text-white",
+                        "flex h-10 items-center gap-3 rounded-full px-3.5 text-sm transition",
+                        active ? "bg-white/15 font-semibold text-white shadow-sm" : "text-white/80 hover:bg-white/10 hover:text-white font-medium",
                       )}
                     >
-                      <Icon aria-hidden className={cn("size-4 shrink-0", active && "text-glow")} />
+                      <Icon aria-hidden className={cn("size-4 shrink-0", active ? "text-white" : "text-white/70")} />
                       <span className="flex-1 truncate">{label}</span>
-                      {count && <CountBadge n={count.n} label={count.label} className="bg-glow text-night" />}
+                      {count ? (
+                        <CountBadge n={count.n} label={count.label} className="bg-white text-[#247458]" />
+                      ) : active ? (
+                        <span className="size-2 rounded-full bg-white ml-auto shrink-0 shadow-sm" />
+                      ) : null}
                     </Link>
                   </li>
                 );

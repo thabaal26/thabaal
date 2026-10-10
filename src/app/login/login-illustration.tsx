@@ -6,46 +6,65 @@ export function LoginIllustration({ isNight = false }: { isNight?: boolean }) {
       <svg
         viewBox="0 0 500 650"
         preserveAspectRatio="xMidYMid slice"
-        className="h-full w-full"
+        className="h-full w-full transition-all duration-700"
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
-          {/* Sunset Sky Gradient */}
-          <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          {/* Day / Sunset Sky Gradient */}
+          <linearGradient id="skyGradDay" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stopColor="#FFAA80" />
-            <stop offset="35%" stopColor="#FF976A" />
-            <stop offset="65%" stopColor="#F9826C" />
+            <stop offset="30%" stopColor="#FF9566" />
+            <stop offset="65%" stopColor="#F9806B" />
             <stop offset="100%" stopColor="#E26D77" />
           </linearGradient>
 
-          {/* Night Sky Gradient (Optional) */}
-          <linearGradient id="nightSkyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#0D1127" />
-            <stop offset="45%" stopColor="#1B1742" />
-            <stop offset="100%" stopColor="#2E1C53" />
+          {/* Night Sky Gradient */}
+          <linearGradient id="skyGradNight" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#080C1F" />
+            <stop offset="40%" stopColor="#151236" />
+            <stop offset="75%" stopColor="#251648" />
+            <stop offset="100%" stopColor="#351B5A" />
           </linearGradient>
 
-          {/* Terrace Water Shelf Gradients */}
-          <linearGradient id="shelfGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#7B69B2" />
-            <stop offset="100%" stopColor="#9281C7" />
+          {/* Terrace Water Shelf Gradients - Day */}
+          <linearGradient id="shelfGradDay1" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#7E6EB4" />
+            <stop offset="100%" stopColor="#9685C9" />
           </linearGradient>
-          <linearGradient id="shelfGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#9A8AC9" />
-            <stop offset="100%" stopColor="#B3A4DB" />
+          <linearGradient id="shelfGradDay2" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#9C8DCC" />
+            <stop offset="100%" stopColor="#B6A8DD" />
           </linearGradient>
-          <linearGradient id="shelfGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#B7A8E0" />
-            <stop offset="100%" stopColor="#CFC4EC" />
+          <linearGradient id="shelfGradDay3" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#B9ABE2" />
+            <stop offset="100%" stopColor="#D2C7EE" />
           </linearGradient>
-          <linearGradient id="shelfGrad4" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#D5C9F2" />
-            <stop offset="100%" stopColor="#E6DEF7" />
+          <linearGradient id="shelfGradDay4" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#D8CCF4" />
+            <stop offset="100%" stopColor="#EDE6F9" />
+          </linearGradient>
+
+          {/* Terrace Water Shelf Gradients - Night */}
+          <linearGradient id="shelfGradNight1" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#382862" />
+            <stop offset="100%" stopColor="#4A377D" />
+          </linearGradient>
+          <linearGradient id="shelfGradNight2" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#4A377D" />
+            <stop offset="100%" stopColor="#5E499B" />
+          </linearGradient>
+          <linearGradient id="shelfGradNight3" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#5E499B" />
+            <stop offset="100%" stopColor="#7A65BC" />
+          </linearGradient>
+          <linearGradient id="shelfGradNight4" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#7A65BC" />
+            <stop offset="100%" stopColor="#9A85DB" />
           </linearGradient>
 
           {/* Soft Glow Filter */}
-          <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="6" result="blur" />
+          <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="8" result="blur" />
             <feComposite in="SourceGraphic" in2="blur" operator="over" />
           </filter>
         </defs>
@@ -54,11 +73,56 @@ export function LoginIllustration({ isNight = false }: { isNight?: boolean }) {
         <rect
           width="500"
           height="650"
-          fill={isNight ? "url(#nightSkyGrad)" : "url(#skyGrad)"}
+          fill={isNight ? "url(#skyGradNight)" : "url(#skyGradDay)"}
         />
 
-        {/* 2. CLOUDS (Top warm sunset puffy clouds) */}
-        <g className="animate-[puff_7s_ease-in-out_infinite_alternate]">
+        {/* 2. NIGHT CELESTIAL STARS (Shown in Night mode) */}
+        {isNight && (
+          <g opacity="0.9">
+            {[
+              [50, 45, 1.5], [110, 80, 2], [160, 35, 1.5], [210, 95, 2.5],
+              [260, 40, 1.8], [310, 75, 1.5], [80, 130, 2], [140, 150, 1.5],
+              [240, 140, 2], [280, 120, 1.8], [420, 35, 1.5], [460, 75, 2],
+              [35, 180, 1.8], [190, 190, 1.5], [440, 160, 1.8]
+            ].map(([cx, cy, r], idx) => (
+              <circle
+                key={idx}
+                cx={cx}
+                cy={cy}
+                r={r}
+                fill="#FFFFFF"
+                className="animate-[twinkle_3s_ease-in-out_infinite]"
+                style={{ animationDelay: `${(idx * 0.25) % 3}s` }}
+              />
+            ))}
+          </g>
+        )}
+
+        {/* 3. SUN (Day mode) or MOON (Night mode) */}
+        {!isNight ? (
+          /* Radiant Sunset Sun */
+          <g className="animate-[puff_6s_ease-in-out_infinite_alternate]">
+            <circle cx="360" cy="90" r="46" fill="#FFEAA7" opacity="0.35" filter="url(#softGlow)" />
+            <circle cx="360" cy="90" r="36" fill="#FFF2A3" opacity="0.65" filter="url(#softGlow)" />
+            <circle cx="360" cy="90" r="28" fill="#FFE26B" />
+          </g>
+        ) : (
+          /* Glowing Crescent Moon */
+          <g filter="url(#softGlow)">
+            <path
+              d="M 370 65 
+                 A 26 26 0 1 0 390 114 
+                 A 22 22 0 1 1 370 65 Z"
+              fill="#FBF7DF"
+            />
+          </g>
+        )}
+
+        {/* 4. CLOUDS (Top warm sunset / nocturnal drifting clouds) */}
+        <g
+          className="animate-[puff_7s_ease-in-out_infinite_alternate]"
+          opacity={isNight ? 0.75 : 0.96}
+        >
           {/* Top-Right Large Cloud */}
           <path
             d="M 370 42 
@@ -69,8 +133,7 @@ export function LoginIllustration({ isNight = false }: { isNight?: boolean }) {
                C 314 126, 302 114, 302 98 
                C 302 85, 311 74, 324 70 
                C 326 54, 345 42, 370 42 Z"
-            fill="#FFFFFF"
-            opacity="0.95"
+            fill={isNight ? "#C5BDE3" : "#FFFFFF"}
           />
 
           {/* Top-Right Secondary Soft Cloud */}
@@ -83,8 +146,7 @@ export function LoginIllustration({ isNight = false }: { isNight?: boolean }) {
                C 396 162, 386 153, 386 140 
                C 386 129, 394 120, 404 117 
                C 406 104, 422 95, 440 95 Z"
-            fill="#FFFFFF"
-            opacity="0.85"
+            fill={isNight ? "#B2A7D8" : "#FFFFFF"}
           />
 
           {/* Top-Left Small Drifting Cloud */}
@@ -97,13 +159,12 @@ export function LoginIllustration({ isNight = false }: { isNight?: boolean }) {
                C 6 166, -4 157, -4 144 
                C -4 133, 4 124, 14 121 
                C 16 108, 30 100, 40 100 Z"
-            fill="#FFFFFF"
-            opacity="0.88"
+            fill={isNight ? "#C5BDE3" : "#FFFFFF"}
           />
         </g>
 
-        {/* 3. DISTANT MOUNTAIN RANGES */}
-        {/* Far Mountain 1 (Soft purple silhouette) */}
+        {/* 5. DISTANT MOUNTAIN RANGES */}
+        {/* Far Mountain 1 */}
         <path
           d="M 0 320 
              Q 90 240, 190 260 
@@ -111,11 +172,11 @@ export function LoginIllustration({ isNight = false }: { isNight?: boolean }) {
              Q 440 170, 500 200 
              L 500 450 
              L 0 450 Z"
-          fill="#633194"
+          fill={isNight ? "#351C5C" : "#633194"}
           opacity="0.9"
         />
 
-        {/* Mid Mountain 2 (Rich deep purple slope) */}
+        {/* Mid Mountain 2 */}
         <path
           d="M 0 350 
              Q 120 280, 240 310 
@@ -123,7 +184,7 @@ export function LoginIllustration({ isNight = false }: { isNight?: boolean }) {
              L 500 290 
              L 500 480 
              L 0 480 Z"
-          fill="#4A1E73"
+          fill={isNight ? "#241144" : "#4A1E73"}
         />
 
         {/* Right Mountain Silhouette Slope with Forest/Bush accents */}
@@ -132,111 +193,71 @@ export function LoginIllustration({ isNight = false }: { isNight?: boolean }) {
              Q 380 230, 500 250 
              L 500 450 
              Q 400 370, 280 430 Z"
-          fill="#3B145E"
+          fill={isNight ? "#1B0B36" : "#3B145E"}
         />
 
         {/* Silhouette foliage / tea bushes on slope */}
-        <g fill="#2A0B47">
+        <g fill={isNight ? "#110526" : "#2A0B47"}>
           <path d="M 400 340 q 6 -18 14 -12 q 10 12 4 24 z" />
           <path d="M 412 335 q 8 -24 18 -15 q 10 18 2 28 z" />
           <path d="M 370 380 q 4 -14 10 -10 q 8 10 3 18 z" />
           <path d="M 350 410 q 6 -16 12 -12 q 8 12 2 20 z" />
         </g>
 
-        {/* 4. CASCADING STEPPED TERRACES (Rice & Tea Plateaus) */}
+        {/* 6. CASCADING STEPPED TERRACES */}
 
-        {/* Terrace Tier 1 (Highest / Furthest Tier) */}
-        {/* Shadow Wall */}
+        {/* Terrace Tier 1 (Highest Tier) */}
         <path
-          d="M 370 340 
-             Q 450 330, 500 360 
-             L 500 395 
-             Q 430 360, 360 375 Z"
-          fill="#2C124D"
+          d="M 370 340 Q 450 330, 500 360 L 500 395 Q 430 360, 360 375 Z"
+          fill={isNight ? "#190833" : "#2C124D"}
         />
-        {/* Terrace Water Bed */}
         <path
-          d="M 370 340 
-             Q 440 335, 500 360 
-             L 500 375 
-             Q 440 350, 370 355 Z"
-          fill="url(#shelfGrad1)"
+          d="M 370 340 Q 440 335, 500 360 L 500 375 Q 440 350, 370 355 Z"
+          fill={isNight ? "url(#shelfGradNight1)" : "url(#shelfGradDay1)"}
         />
 
         {/* Terrace Tier 2 */}
-        {/* Shadow Wall */}
         <path
-          d="M 260 370 
-             Q 380 340, 500 390 
-             L 500 440 
-             Q 370 385, 245 420 Z"
-          fill="#280E46"
+          d="M 260 370 Q 380 340, 500 390 L 500 440 Q 370 385, 245 420 Z"
+          fill={isNight ? "#15062C" : "#280E46"}
         />
-        {/* Water Bed */}
         <path
-          d="M 255 375 
-             Q 375 348, 500 395 
-             L 500 415 
-             Q 370 370, 250 390 Z"
-          fill="url(#shelfGrad2)"
+          d="M 255 375 Q 375 348, 500 395 L 500 415 Q 370 370, 250 390 Z"
+          fill={isNight ? "url(#shelfGradNight2)" : "url(#shelfGradDay2)"}
         />
 
         {/* Terrace Tier 3 */}
-        {/* Shadow Wall */}
         <path
-          d="M 130 420 
-             Q 280 375, 450 430 
-             L 450 490 
-             Q 260 435, 115 480 Z"
-          fill="#220B3D"
+          d="M 130 420 Q 280 375, 450 430 L 450 490 Q 260 435, 115 480 Z"
+          fill={isNight ? "#110425" : "#220B3D"}
         />
-        {/* Water Bed */}
         <path
-          d="M 125 425 
-             Q 275 380, 445 435 
-             L 445 460 
-             Q 270 410, 120 445 Z"
-          fill="url(#shelfGrad3)"
+          d="M 125 425 Q 275 380, 445 435 L 445 460 Q 270 410, 120 445 Z"
+          fill={isNight ? "url(#shelfGradNight3)" : "url(#shelfGradDay3)"}
         />
 
         {/* Terrace Tier 4 */}
-        {/* Shadow Wall */}
         <path
-          d="M 30 475 
-             Q 180 430, 380 490 
-             L 380 560 
-             Q 170 500, 15 545 Z"
-          fill="#1C0834"
+          d="M 30 475 Q 180 430, 380 490 L 380 560 Q 170 500, 15 545 Z"
+          fill={isNight ? "#0D031D" : "#1C0834"}
         />
-        {/* Water Bed */}
         <path
-          d="M 25 480 
-             Q 175 435, 375 495 
-             L 375 525 
-             Q 170 470, 20 510 Z"
-          fill="url(#shelfGrad4)"
+          d="M 25 480 Q 175 435, 375 495 L 375 525 Q 170 470, 20 510 Z"
+          fill={isNight ? "url(#shelfGradNight4)" : "url(#shelfGradDay4)"}
         />
 
         {/* Terrace Tier 5 (Foreground Large Mirror Tier) */}
-        {/* Shadow Wall */}
         <path
-          d="M -10 540 
-             Q 120 495, 320 565 
-             L 320 660 
-             L -10 660 Z"
-          fill="#150529"
+          d="M -10 540 Q 120 495, 320 565 L 320 660 L -10 660 Z"
+          fill={isNight ? "#080113" : "#150529"}
         />
-        {/* Water Bed */}
         <path
-          d="M -10 545 
-             Q 115 500, 315 570 
-             L 315 620 
-             Q 110 550, -10 580 Z"
-          fill="#EDE6FC"
+          d="M -10 545 Q 115 500, 315 570 L 315 620 Q 110 550, -10 580 Z"
+          fill={isNight ? "#B8A5E8" : "#EDE6FC"}
         />
 
-        {/* 5. FINE VERTICAL SHOOTS / REEDS IN TERRACE WATER (Distinctive Texture) */}
-        <g stroke="#3E246A" strokeWidth="1.2" strokeLinecap="round" opacity="0.65">
+        {/* 7. FINE VERTICAL SHOOTS / REEDS IN TERRACE WATER */}
+        <g stroke={isNight ? "#1E103B" : "#3E246A"} strokeWidth="1.2" strokeLinecap="round" opacity={isNight ? 0.45 : 0.65}>
           {/* Tier 1 shoots */}
           <line x1="400" y1="345" x2="400" y2="355" />
           <line x1="420" y1="348" x2="420" y2="360" />
@@ -281,13 +302,13 @@ export function LoginIllustration({ isNight = false }: { isNight?: boolean }) {
           <line x1="245" y1="550" x2="245" y2="588" />
         </g>
 
-        {/* 6. THABAAL SWIFT CARRIER BIRD / POSTAL GLIDER IN FLIGHT */}
+        {/* 8. THABAAL SWIFT CARRIER BIRD / POSTAL GLIDER IN FLIGHT */}
         <g
           className="animate-[float_4s_ease-in-out_infinite]"
           transform="translate(140, 180)"
         >
           {/* Subtle glow circle */}
-          <circle cx="20" cy="15" r="32" fill="#FFE58F" opacity="0.3" filter="url(#softGlow)" />
+          <circle cx="20" cy="15" r="32" fill="#FFE58F" opacity={isNight ? 0.2 : 0.4} filter="url(#softGlow)" />
 
           {/* Glider / Bird Silhouette in Crisp White */}
           <path

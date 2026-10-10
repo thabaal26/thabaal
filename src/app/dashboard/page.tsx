@@ -14,6 +14,7 @@ import { NumberHealth } from "./number-health";
 import { numberHealth } from "@/lib/limits";
 import { codesOf, PAUSING_KINDS } from "@/lib/meta-errors";
 import { DailyChart } from "./daily-chart";
+import { DonutGauges } from "./donut-gauges";
 import { SpendCard } from "./spend-card";
 import { AreaChips } from "./area-chips";
 
@@ -256,10 +257,20 @@ export default async function Overview() {
             </Card>
           )}
 
-          <Card className="order-3">
-            <CardHeader title="Messages per day" description="Last 14 days, by latest status" />
+          <Card className="order-3 overflow-hidden">
             <DailyChart rows={daily.map((d) => ({ day: d.day, status: d.status, n: Number(d.n) }))} since={since} />
           </Card>
+
+          <div className="order-4">
+            <DonutGauges
+              deliveryRate={pct(delivered, total)}
+              readRate={pct(read, delivered)}
+              replyRate={pct(repliesByTag.reduce((acc, r) => acc + Number(r.n), 0), Math.max(delivered, 1))}
+              deliveredCount={delivered}
+              readCount={read}
+              repliesCount={repliesByTag.reduce((acc, r) => acc + Number(r.n), 0)}
+            />
+          </div>
 
           {byProduct.length > 0 && (
             <Card className="order-7">

@@ -1,5 +1,6 @@
 import { LogOut } from "lucide-react";
 import type { Metadata, Viewport } from "next";
+import Link from "next/link";
 import { CallWidget } from "@/components/call-widget";
 import { db } from "@/lib/db";
 import { getScope, owned, ownedMessages, requireUser } from "@/lib/session";
@@ -101,20 +102,24 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           </div>
           {scope.isAdmin && <div className="mb-5 px-1"><ClientSwitcher clients={clients} current={scope.clientId} dark /></div>}
           <SideNav isAdmin={scope.isAdmin} openReplies={openReplies} newOrders={newOrders} unreadNotifications={unreadNotifications} />
-          <div className="mt-auto space-y-3 border-t border-white/10 px-2 pt-4">
-            {status && <div className="text-xs">{status}</div>}
-            <div className="flex items-center justify-between gap-2">
+          <div className="mt-auto space-y-3.5 border-t border-white/15 px-1 pt-4">
+            {status && <div className="text-xs px-1">{status}</div>}
+            <div className="flex items-center justify-between gap-2 px-1">
               <div className="min-w-0">
-                <p className="truncate text-sm text-white">{user.name}</p>
+                <p className="truncate text-sm font-semibold text-white">{user.name}</p>
                 <p className="truncate text-xs text-white/70">{user.email}</p>
               </div>
-              <form action={logout}>
-                <button aria-label="Sign out" title="Sign out" className="grid size-9 place-items-center rounded-control text-white/75 transition hover:bg-white/10 hover:text-white">
-                  <LogOut aria-hidden className="size-4" />
-                </button>
-              </form>
             </div>
-            {!scope.isAdmin && <p className="text-2xs text-white/55">Powered by Thabaal (தபால்)</p>}
+            <form action={logout} className="w-full pt-1">
+              <button
+                type="submit"
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-[#247458] shadow-sm transition hover:bg-white/95 active:scale-[0.98]"
+              >
+                <LogOut aria-hidden className="size-4" />
+                <span>Logout</span>
+              </button>
+            </form>
+            {!scope.isAdmin && <p className="text-center text-2xs text-white/60">Powered by Thabaal (தபால்)</p>}
           </div>
         </aside>
 
@@ -123,6 +128,37 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           <div className="animate-ambient absolute -left-20 -top-20 size-[32rem] rounded-full bg-brand-soft/45 blur-[100px]" />
           <div className="animate-ambient absolute -right-20 top-1/4 size-[28rem] rounded-full bg-thabaal-mango/15 blur-[120px]" style={{ animationDelay: "-6s" }} />
           <div className="animate-ambient absolute bottom-0 left-1/3 size-[36rem] rounded-full bg-brand/10 blur-[130px]" style={{ animationDelay: "-11s" }} />
+        </div>
+
+        {/* Desktop Top Header Bar (Matching Reference Mockup) */}
+        <div className="hidden lg:flex items-center justify-between gap-4 px-6 lg:px-8 pt-6 pb-1 relative z-10 print:hidden">
+          <div className="relative w-full max-w-sm">
+            <input
+              type="search"
+              placeholder="Search..."
+              className="h-10 w-full rounded-full border border-black/[0.06] bg-white px-5 pr-10 text-sm text-ink shadow-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[#247458]/25"
+            />
+            <svg className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/dashboard/campaigns/new"
+              className="flex h-9 items-center gap-1.5 rounded-full bg-[#247458] px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-[#1a5b44] active:scale-95"
+            >
+              <span>+ New Campaign</span>
+            </Link>
+            <div className="grid size-9 place-items-center rounded-full bg-white shadow-sm border border-black/5">
+              <NotificationBell />
+            </div>
+            <div
+              title={user.name}
+              className="grid size-9 place-items-center rounded-full bg-white border border-black/5 text-[#247458] font-bold text-xs shadow-sm"
+            >
+              {user.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase() || "TH"}
+            </div>
+          </div>
         </div>
 
         <header className="glass-nav surface-dark sticky top-0 z-30 w-full pt-[env(safe-area-inset-top)] lg:hidden print:hidden">
@@ -143,7 +179,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           </div>
         </header>
 
-        <main id="main" className="stagger relative z-10 mx-auto w-full max-w-page px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pb-12 lg:pt-8 print:p-0">
+        <main id="main" className="stagger relative z-10 mx-auto w-full max-w-page px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pt-4 lg:px-8 lg:pb-12 lg:pt-4 print:p-0">
           {children}
         </main>
         {scope.canOperate && <CallWidget />}
