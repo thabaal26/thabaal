@@ -1,6 +1,7 @@
 import "server-only";
 import type { Campaign } from "@prisma/client";
 import { db } from "./db";
+import { pushToGoogleSheet } from "./google-sheets-live";
 import { computeNextRun } from "./schedule";
 import { fmtDate } from "./format";
 import { deliver, getSettings, isSimulated, readiness, templateSendable } from "./provider";
@@ -84,7 +85,7 @@ function sessionDown(e: unknown) {
 async function processRun(runId: string, now: Date, deadline: number) {
   const run = await db.campaignRun.findUnique({
     where: { id: runId },
-    include: { campaign: { include: { template: true, client: { select: { marketingGapHours: true, quietFrom: true, quietTo: true } } } } },
+    include: { campaign: { include: { template: true, client: { select: { name: true, marketingGapHours: true, quietFrom: true, quietTo: true } } } } },
   });
   if (!run) return { sent: 0, failed: 0 };
   const { campaign } = run;
@@ -205,6 +206,13 @@ async function processRun(runId: string, now: Date, deadline: number) {
         },
       });
       sent++;
+      pushToGoogleSheet("CAMPAIGN_STATUS", {
+        campaign: t.name,
+        phone: m.customer.phone,
+        status: "SENT",
+        waMessageId: res.id,
+        client: campaign.client.name || "Thabaal",
+      });
     } catch (e) {
       if (sessionDown(e)) {
         disconnected = true;
@@ -238,6 +246,13 @@ async function processRun(runId: string, now: Date, deadline: number) {
       });
       await applyFailure(m.customerId, code);
       failed++;
+      pushToGoogleSheet("CAMPAIGN_STATUS", {
+        campaign: t.name,
+        phone: m.customer.phone,
+        status: "FAILED",
+        waMessageId: "",
+        client: campaign.client.name || "Thabaal",
+      });
     }
     if (local) await sleep(LOCAL_GAP_MS[0] + Math.random() * (LOCAL_GAP_MS[1] - LOCAL_GAP_MS[0]));
   });

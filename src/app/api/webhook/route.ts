@@ -1,12 +1,12 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
+import { pushToGoogleSheet } from "@/lib/google-sheets-live";
 import { refreshNumberStatus } from "@/lib/limits";
 import { explainError } from "@/lib/meta-errors";
 import { applyFailure } from "@/lib/rules";
-import { recordOrder } from "@/lib/orders";
+import { orderRef, orderWhereRef, recordOrder } from "@/lib/orders";
 import { metaReplyContent, receivingNumber, recordReply } from "@/lib/replies";
-import { orderWhereRef } from "@/lib/orders";
 import { autoRequestPayment, confirmPayment } from "@/lib/payments";
 import { autoReplyToButton, autoSendCatalogue, catalogueTrigger, firstMessageToday } from "@/lib/catalog";
 import { mapMetaStatus } from "@/lib/whatsapp";
@@ -38,7 +38,16 @@ function validSignature(raw: string, header: string | null) {
 }
 
 async function applyStatus(s: StatusUpdate) {
-  const msg = await db.message.findUnique({ where: { waMessageId: s.id }, select: { id: true, status: true, customerId: true } });
+  const msg = await db.message.findUnique({
+    where: { waMessageId: s.id },
+    select: {
+      id: true,
+      status: true,
+      customerId: true,
+      templateName: true,
+      customer: { select: { phone: true, name: true } },
+    },
+  });
   if (!msg) return;
   // Every status carries Meta's pricing; keep it for cost reporting even when the status itself is stale.
   if (s.pricing?.category)
@@ -53,6 +62,13 @@ async function applyStatus(s: StatusUpdate) {
       data: { status: "FAILED", failedAt: at, errorCode: code, error: explainError(code, err?.error_data?.details || err?.message || err?.title || "Delivery failed") },
     });
     await applyFailure(msg.customerId, code);
+    pushToGoogleSheet("CAMPAIGN_STATUS", {
+      campaign: msg.templateName || "Campaign Message",
+      phone: msg.customer?.phone || "",
+      status: "FAILED",
+      waMessageId: s.id,
+      client: "Thabaal",
+    });
     return;
   }
   if (!(next in RANK) || RANK[next as keyof typeof RANK] <= RANK[msg.status]) return;
@@ -63,6 +79,14 @@ async function applyStatus(s: StatusUpdate) {
       ...(next === "DELIVERED" && { deliveredAt: at }),
       ...(next === "READ" && { readAt: at }),
     },
+  });
+
+  pushToGoogleSheet("CAMPAIGN_STATUS", {
+    campaign: msg.templateName || "Campaign Message",
+    phone: msg.customer?.phone || "",
+    status: next,
+    waMessageId: s.id,
+    client: "Thabaal",
   });
 }
 
@@ -175,6 +199,29 @@ export async function POST(req: NextRequest) {
             await joinFromWhatsApp({ phone: m.from, profileName, source: join[1], phoneNumberId }).catch((e) => console.error("Could not add joining customer", e));
           }
           const customer = await recordReply({ phone: m.from, text, kind, media, waMessageId: m.id, phoneNumberId, at: m.timestamp ? new Date(Number(m.timestamp) * 1000) : undefined });
+
+          if (kind === "button") {
+            const contactName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name;
+            const actionVal = m.button?.payload ?? m.interactive?.button_reply?.id ?? m.interactive?.list_reply?.id ?? text;
+            pushToGoogleSheet("BUTTON_CLICK", {
+              phone: m.from,
+              name: customer?.name || contactName || "",
+              campaign: "WhatsApp Portal",
+              buttonText: text,
+              actionValue: actionVal,
+              client: "Thabaal",
+            });
+          } else if (m.type !== "order") {
+            const contactName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name;
+            pushToGoogleSheet("NEW_CHAT", {
+              phone: m.from,
+              name: customer?.name || contactName || "",
+              message: text,
+              source: join ? `Opt-in (${join[1]})` : "Inbound WhatsApp",
+              client: "Thabaal",
+            });
+          }
+
           // Said hi, asked about products or prices (e.g. tapped "Send price list"), or wrote for the first time
           // today: reply with the free catalogue message (at most once every 12 hours).
           // Buttons with their own answer ("Make a gift pack", "Happy Deepavali") get that instead.
@@ -186,7 +233,22 @@ export async function POST(req: NextRequest) {
           if (customer && m.type === "order") {
             const order = await recordOrder(customer, m.id, m).catch((e) => (console.error("Could not save order", e), null));
             // A new cart: send "Review and pay" right away while the customer is in the chat.
-            if (order) await autoRequestPayment(order).catch((e) => console.error("Automatic payment request failed", e));
+            if (order) {
+              await autoRequestPayment(order).catch((e) => console.error("Automatic payment request failed", e));
+              const itemsList = Array.isArray(order.items)
+                ? (order.items as Array<{ quantity?: number; name?: string; id?: string }>).map((i) => `${i.quantity ?? 1}x ${i.name ?? i.id}`).join(", ")
+                : "";
+              pushToGoogleSheet("NEW_ORDER", {
+                orderId: orderRef(order),
+                phone: customer.phone,
+                name: customer.name || "",
+                items: itemsList,
+                total: order.total,
+                status: order.status,
+                address: customer.location || "",
+                client: "Thabaal",
+              });
+            }
           }
         }
       } else if (change.field === "calls") {

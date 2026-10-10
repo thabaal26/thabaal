@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { pushToGoogleSheet } from "@/lib/google-sheets-live";
 import { fmtDate } from "@/lib/format";
 import { allowance } from "@/lib/limits";
 import { deliver, getSettings, readiness, templateSendable, wahaConfig } from "@/lib/provider";
@@ -61,6 +62,13 @@ export async function sendToCustomer(customerId: string, templateId: string, sen
         senderId: res.provider === "META" ? (number?.id ?? null) : null,
       },
     });
+    pushToGoogleSheet("CAMPAIGN_STATUS", {
+      campaign: t.name,
+      phone: customer.phone,
+      status: "SENT",
+      waMessageId: res.id,
+      client: customer.client.name || "Thabaal",
+    });
     revalidatePath(`/dashboard/customers/${customer.id}`);
     revalidatePath("/dashboard/messages");
     return { ok: true, message: res.simulated ? "Simulated send logged (demo mode)." : `Sent to ${customer.name}${number?.displayPhone ? ` from ${number.displayPhone}` : ""}.` };
@@ -70,6 +78,13 @@ export async function sendToCustomer(customerId: string, templateId: string, sen
       data: { customerId: customer.id, templateId: t.id, templateName: t.name, status: "FAILED", provider: settings.provider, errorCode: code, error, failedAt: new Date() },
     });
     await applyFailure(customer.id, code);
+    pushToGoogleSheet("CAMPAIGN_STATUS", {
+      campaign: t.name,
+      phone: customer.phone,
+      status: "FAILED",
+      waMessageId: "",
+      client: customer.client.name || "Thabaal",
+    });
     revalidatePath(`/dashboard/customers/${customer.id}`);
     return { ok: false, message: error };
   }

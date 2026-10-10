@@ -3,6 +3,7 @@
 import type { OrderStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { pushToGoogleSheet } from "@/lib/google-sheets-live";
 import { itemsText, itemsWithNames, money, orderRef, type OrderItem } from "@/lib/orders";
 import { confirmPayment, sendPaymentRequestFor, updateOrderCard } from "@/lib/payments";
 import { getSettings, wahaConfig } from "@/lib/provider";
@@ -243,6 +244,18 @@ export async function createOrder(input: { phone: string; name: string; items: {
       internalNote: "Entered by hand",
     },
   });
+
+  pushToGoogleSheet("NEW_ORDER", {
+    orderId: orderRef(order),
+    phone,
+    name: input.name.trim() || `+${phone}`,
+    items: itemsText(items),
+    total: order.total,
+    status: order.status,
+    address: "",
+    client: "Thabaal",
+  });
+
   revalidatePath("/dashboard", "layout");
   return { ok: true, message: `Order ${orderRef(order)} added.` };
 }

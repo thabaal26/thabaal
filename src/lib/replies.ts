@@ -46,8 +46,29 @@ export async function recordReply(r: IncomingReply) {
     where,
     select: { id: true, messages: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } } },
   });
-  if (!candidates.length) return null;
-  const customer = candidates.sort((a, b) => (b.messages[0]?.createdAt.getTime() ?? 0) - (a.messages[0]?.createdAt.getTime() ?? 0))[0];
+  let customer = candidates.sort((a, b) => (b.messages[0]?.createdAt.getTime() ?? 0) - (a.messages[0]?.createdAt.getTime() ?? 0))[0];
+  if (!customer) {
+    const { number } = await receivingNumber(r.phoneNumberId);
+    if (number?.clientId) {
+      try {
+        const newCust = await db.customer.create({
+          data: {
+            clientId: number.clientId,
+            phone: r.phone,
+            name: `+${r.phone}`,
+            optInSource: "Inbound WhatsApp Chat",
+            optInAt: new Date(),
+          },
+          select: { id: true },
+        });
+        customer = { id: newCust.id, messages: [] };
+      } catch {
+        return null;
+      }
+    } else {
+      return null;
+    }
+  }
 
   try {
     await db.reply.create({
@@ -57,7 +78,7 @@ export async function recordReply(r: IncomingReply) {
     // Webhooks retry; the same message id arriving twice is expected.
     if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) throw e;
   }
-  return db.customer.findUnique({ where: { id: customer.id }, select: { id: true, clientId: true } });
+  return db.customer.findUnique({ where: { id: customer.id }, select: { id: true, clientId: true, phone: true, name: true, location: true } });
 }
 
 /** Text and kind of a Cloud API inbound message. */
