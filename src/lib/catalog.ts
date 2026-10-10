@@ -218,6 +218,81 @@ function saveOverride(clientId: string, productId: string, updates: Partial<Cata
   }
 }
 
+/** The demo catalogue (sends simulated) with any edits made in demo mode. */
+function demoProducts(clientId: string) {
+  const overrides = getOverrides(clientId);
+  return DEFAULT_PRODUCTS.map((p) => {
+    const ovr = overrides[p.id] || overrides[p.retailerId];
+    return ovr ? { ...p, ...ovr } : p;
+  });
+}
+
+/** The catalogue connected to this WhatsApp Business Account, or null when none is. */
+async function catalogIdFor(cfg: WaConfig): Promise<string | null> {
+  const catalogs = await metaGet<{ data: { id: string }[] }>(cfg, `${cfg.wabaId}/product_catalogs?fields=id`);
+  return catalogs.data?.[0]?.id ?? null;
+}
+
+type MetaProduct = { id: string; retailer_id: string; name?: string; price?: string; availability?: string; description?: string; image_url?: string };
+
+function toDetail(p: MetaProduct): CatalogProductDetail {
+  // Items created without a title (e.g. by a bad upsert) have no name; show their SKU instead of crashing.
+  const name = p.name?.trim() || p.retailer_id;
+  return {
+    id: p.id,
+    retailerId: p.retailer_id,
+    name,
+    price: p.price ?? null,
+    priceAmount: p.price ? Number(p.price.replace(/[^\d.]/g, "")) || 0 : 0,
+    currency: "INR",
+    inStock: p.availability !== "out of stock",
+    description: p.description ?? null,
+    imageUrl: p.image_url ?? null,
+    category: detectCategory(name),
+  };
+}
+
+/** One product of the catalogue by its SKU (retailer id), or null if it isn't there. */
+async function findByRetailerId(cfg: WaConfig, catalogId: string, retailerId: string) {
+  const filter = encodeURIComponent(JSON.stringify({ retailer_id: { eq: retailerId } }));
+  const res = await metaGet<{ data: MetaProduct[] }>(cfg, `${catalogId}/products?fields=id,retailer_id,name,image_url&filter=${filter}`);
+  return res.data?.find((p) => p.retailer_id === retailerId) ?? null;
+}
+
+/**
+ * Meta's catalogue batch API: items are identified by their SKU (`data.id` is the retailer id, never
+ * Meta's own product id). `allow_upsert: false` makes an UPDATE of an unknown SKU fail instead of
+ * quietly creating a new, nameless product. Meta applies batches asynchronously, so this waits briefly
+ * for the outcome and reports Meta's own errors.
+ */
+async function runBatch(cfg: WaConfig, catalogId: string, request: { method: "CREATE" | "UPDATE" | "DELETE"; data: Record<string, unknown> }) {
+  const res = await metaPost<{ handles?: string[]; validation_status?: { retailer_id?: string; errors?: { message: string }[] }[] }>(cfg, `${catalogId}/items_batch`, {
+    item_type: "PRODUCT_ITEM",
+    allow_upsert: false,
+    requests: [request],
+  });
+  const invalid = (res.validation_status ?? []).flatMap((v) => v.errors ?? []).map((e) => e.message);
+  if (invalid.length) return { ok: false as const, message: `Meta rejected the change: ${invalid.join("; ")}` };
+  const handle = res.handles?.[0];
+  if (!handle) return { ok: false as const, message: "Meta didn't accept the change. Try again in a minute." };
+
+  for (let i = 0; i < 8; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    const st = await metaGet<{ data?: { status?: string; errors_total_count?: number; errors?: { message: string }[] }[] }>(
+      cfg,
+      `${catalogId}/check_batch_request_status?handle=${encodeURIComponent(handle)}&fields=status,errors,errors_total_count`,
+    ).catch(() => null);
+    const s = st?.data?.[0];
+    if (!s) continue;
+    if (s.errors_total_count) return { ok: false as const, message: `Meta rejected the change: ${s.errors?.map((e) => e.message).join("; ") || "unknown error"}` };
+    if (s.status === "finished") return { ok: true as const, pending: false };
+  }
+  return { ok: true as const, pending: true };
+}
+
+/** Meta downloads product photos itself, so only a public https link can be sent. */
+const publicImage = (url: string | null | undefined) => (url && /^https:\/\//i.test(url) ? url : null);
+
 /** Fetches full catalog products with stock, price, category and descriptions for the client. */
 export async function getCatalogWithProducts(clientId: string): Promise<{
   catalogId: string | null;
@@ -226,73 +301,32 @@ export async function getCatalogWithProducts(clientId: string): Promise<{
   isLive: boolean;
 }> {
   const { cfg } = await senderFor(clientId);
-  const overrides = getOverrides(clientId);
-
-  if (!cfg.live) {
-    const merged = DEFAULT_PRODUCTS.map((p) => {
-      const ovr = overrides[p.id] || overrides[p.retailerId];
-      return ovr ? { ...p, ...ovr } : p;
-    });
-    return { catalogId: "1074235682263970", products: merged, commerceManagerUrl: "https://business.facebook.com/commerce_manager", isLive: false };
-  }
+  const fallback = { catalogId: null, products: demoProducts(clientId), commerceManagerUrl: "https://business.facebook.com/commerce_manager", isLive: false };
+  if (!cfg.live) return fallback;
 
   try {
-    const catalogs = await metaGet<{ data: { id: string }[] }>(cfg, `${cfg.wabaId}/product_catalogs?fields=id`);
-    const catalogId = catalogs.data?.[0]?.id ?? null;
-    if (!catalogId) {
-      const merged = DEFAULT_PRODUCTS.map((p) => {
-        const ovr = overrides[p.id] || overrides[p.retailerId];
-        return ovr ? { ...p, ...ovr } : p;
-      });
-      return { catalogId: null, products: merged, commerceManagerUrl: "https://business.facebook.com/commerce_manager", isLive: false };
-    }
+    const catalogId = await catalogIdFor(cfg);
+    if (!catalogId) return fallback;
 
+    // Live: Meta is the only source of truth. Local demo edits are never layered on top.
     const out: CatalogProductDetail[] = [];
     let path: string | null = `${catalogId}/products?fields=id,retailer_id,name,price,availability,description,image_url&limit=100`;
-
     while (path) {
-      const page: {
-        data: { id: string; retailer_id: string; name: string; price?: string; availability?: string; description?: string; image_url?: string }[];
-        paging?: { next?: string };
-      } = await metaGet(cfg, path);
-
-      for (const p of page.data ?? []) {
-        const priceNum = p.price ? Number(p.price.replace(/[^\d.]/g, "")) || 0 : 0;
-        const item: CatalogProductDetail = {
-          id: p.id,
-          retailerId: p.retailer_id,
-          name: p.name,
-          price: p.price ?? null,
-          priceAmount: priceNum,
-          currency: "INR",
-          inStock: p.availability !== "out of stock",
-          description: p.description ?? null,
-          imageUrl: p.image_url ?? null,
-          category: detectCategory(p.name),
-        };
-        const ovr = overrides[item.id] || overrides[item.retailerId];
-        out.push(ovr ? { ...item, ...ovr } : item);
-      }
+      const page: { data: MetaProduct[]; paging?: { next?: string } } = await metaGet(cfg, path);
+      for (const p of page.data ?? []) out.push(toDetail(p));
       path = page.paging?.next ? page.paging.next.replace(/^https:\/\/graph\.facebook\.com\/v[\d.]+\//, "") : null;
     }
-
-    return {
-      catalogId,
-      products: out.length ? out : DEFAULT_PRODUCTS,
-      commerceManagerUrl: `https://business.facebook.com/commerce_manager/${catalogId}/products`,
-      isLive: true,
-    };
+    out.sort((a, b) => a.retailerId.localeCompare(b.retailerId, undefined, { numeric: true }));
+    return { catalogId, products: out, commerceManagerUrl: `https://business.facebook.com/commerce_manager/${catalogId}/products`, isLive: true };
   } catch (e) {
-    console.warn("Could not fetch Meta catalog, using cached:", e);
-    const merged = DEFAULT_PRODUCTS.map((p) => {
-      const ovr = overrides[p.id] || overrides[p.retailerId];
-      return ovr ? { ...p, ...ovr } : p;
-    });
-    return { catalogId: "1074235682263970", products: merged, commerceManagerUrl: "https://business.facebook.com/commerce_manager", isLive: false };
+    console.warn("Could not fetch Meta catalog, showing the demo list:", e);
+    return fallback;
   }
 }
 
-/** Updates a product's price, stock, name or description on Meta WhatsApp Catalog and in local storage. */
+type Result = { ok: boolean; message: string; metaUpdated: boolean };
+
+/** Updates a product's price, stock, name, description or photo, identified by its SKU. */
 export async function updateCatalogProductItem(
   clientId: string,
   params: {
@@ -304,45 +338,111 @@ export async function updateCatalogProductItem(
     description?: string;
     imageUrl?: string | null;
   }
-): Promise<{ ok: boolean; message: string; metaUpdated: boolean }> {
+): Promise<Result> {
   const { cfg } = await senderFor(clientId);
-  let metaUpdated = false;
 
-  saveOverride(clientId, params.id, {
-    ...(params.priceAmount !== undefined && { priceAmount: params.priceAmount, price: `₹ ${params.priceAmount.toFixed(2)}` }),
-    ...(params.inStock !== undefined && { inStock: params.inStock }),
-    ...(params.name && { name: params.name }),
-    ...(params.description !== undefined && { description: params.description }),
-    ...(params.imageUrl !== undefined && { imageUrl: params.imageUrl }),
-  });
-
-  if (cfg.live) {
-    try {
-      const catalogs = await metaGet<{ data: { id: string }[] }>(cfg, `${cfg.wabaId}/product_catalogs?fields=id`);
-      const catalogId = catalogs.data?.[0]?.id;
-      if (catalogId) {
-        const updateData: Record<string, unknown> = { id: params.id };
-        if (params.priceAmount !== undefined) updateData.price = `${params.priceAmount.toFixed(2)} INR`;
-        if (params.inStock !== undefined) updateData.availability = params.inStock ? "in stock" : "out of stock";
-        if (params.name) updateData.name = params.name;
-        if (params.description !== undefined) updateData.description = params.description;
-
-        await metaPost(cfg, `${catalogId}/items_batch`, {
-          item_type: "PRODUCT_ITEM",
-          requests: [{ method: "UPDATE", data: updateData }],
-        });
-        metaUpdated = true;
-      }
-    } catch (e) {
-      console.warn("Meta batch update error:", e);
-    }
+  // Demo mode (no WhatsApp Cloud API): edits are kept locally so the screens can be tried.
+  if (!cfg.live) {
+    saveOverride(clientId, params.id, {
+      ...(params.priceAmount !== undefined && { priceAmount: params.priceAmount, price: `₹ ${params.priceAmount.toFixed(2)}` }),
+      ...(params.inStock !== undefined && { inStock: params.inStock }),
+      ...(params.name && { name: params.name }),
+      ...(params.description !== undefined && { description: params.description }),
+      ...(params.imageUrl !== undefined && { imageUrl: params.imageUrl }),
+    });
+    return { ok: true, metaUpdated: false, message: "Saved in demo mode. Connect the WhatsApp Cloud API to change the real catalogue." };
   }
 
-  return {
-    ok: true,
-    metaUpdated,
-    message: metaUpdated ? "Updated and synced directly with Meta WhatsApp Catalog." : "Product saved and updated in catalogue.",
-  };
+  if (!params.retailerId) return { ok: false, metaUpdated: false, message: "This product has no SKU, so it can't be updated. Refresh the page and try again." };
+  if (params.priceAmount !== undefined && !(params.priceAmount > 0)) return { ok: false, metaUpdated: false, message: "Enter a price above ₹0." };
+
+  try {
+    const catalogId = await catalogIdFor(cfg);
+    if (!catalogId) return { ok: false, metaUpdated: false, message: "No catalogue is connected to this WhatsApp account in Meta." };
+    const current = await findByRetailerId(cfg, catalogId, params.retailerId);
+    if (!current) return { ok: false, metaUpdated: false, message: `${params.retailerId} is no longer in the catalogue. Refresh the page.` };
+
+    const data: Record<string, unknown> = { id: params.retailerId };
+    if (params.priceAmount !== undefined) data.price = `${params.priceAmount.toFixed(2)} INR`;
+    if (params.inStock !== undefined) data.availability = params.inStock ? "in stock" : "out of stock";
+    if (params.name?.trim()) data.title = params.name.trim().slice(0, 100);
+    if (params.description !== undefined) data.description = (params.description.trim() || params.name?.trim() || current.name || params.retailerId).slice(0, 5000);
+    // The client sends imageUrl only when the user picked a different photo.
+    const image = publicImage(params.imageUrl);
+    const changedImage = params.imageUrl !== undefined;
+    if (image) data.image_link = image;
+
+    const r = await runBatch(cfg, catalogId, { method: "UPDATE", data });
+    if (!r.ok) return { ok: false, metaUpdated: false, message: r.message };
+    const photoNote = !changedImage || image
+      ? ""
+      : params.imageUrl
+        ? " The photo wasn't changed: Meta can only use a public https:// image link."
+        : " The photo wasn't changed: Meta needs a photo, so replace it with another one instead of removing it.";
+    return {
+      ok: true,
+      metaUpdated: true,
+      message: (r.pending ? "Sent to Meta. It can take a minute to show in WhatsApp." : "Updated in your WhatsApp catalogue.") + photoNote,
+    };
+  } catch (e) {
+    return { ok: false, metaUpdated: false, message: `Couldn't update the catalogue: ${e instanceof Error ? e.message : "Meta API error"}` };
+  }
+}
+
+/** Adds a product to the live catalogue. Meta needs a SKU, title, price, description and a public photo. */
+export async function createCatalogProductItem(
+  clientId: string,
+  p: { retailerId: string; name: string; priceAmount: number; inStock: boolean; description: string; imageUrl: string | null; brand: string; link: string },
+): Promise<Result> {
+  const { cfg } = await senderFor(clientId);
+  if (!cfg.live) return { ok: false, metaUpdated: false, message: "Adding products needs the WhatsApp Cloud API connected." };
+  const retailerId = p.retailerId.trim();
+  if (!/^[\w.-]{1,50}$/.test(retailerId)) return { ok: false, metaUpdated: false, message: "SKU can use letters, numbers, dots, dashes and underscores (up to 50)." };
+  if (!p.name.trim()) return { ok: false, metaUpdated: false, message: "Enter a product name." };
+  if (!(p.priceAmount > 0)) return { ok: false, metaUpdated: false, message: "Enter a price above ₹0." };
+  const image = publicImage(p.imageUrl);
+  if (!image) return { ok: false, metaUpdated: false, message: "Upload a photo: WhatsApp shows every product with one." };
+
+  try {
+    const catalogId = await catalogIdFor(cfg);
+    if (!catalogId) return { ok: false, metaUpdated: false, message: "No catalogue is connected to this WhatsApp account in Meta." };
+    if (await findByRetailerId(cfg, catalogId, retailerId)) return { ok: false, metaUpdated: false, message: `SKU ${retailerId} is already used by another product.` };
+
+    const r = await runBatch(cfg, catalogId, {
+      method: "CREATE",
+      data: {
+        id: retailerId,
+        title: p.name.trim().slice(0, 100),
+        description: (p.description.trim() || p.name.trim()).slice(0, 5000),
+        price: `${p.priceAmount.toFixed(2)} INR`,
+        availability: p.inStock ? "in stock" : "out of stock",
+        condition: "new",
+        brand: p.brand.slice(0, 100),
+        link: p.link,
+        image_link: image,
+      },
+    });
+    if (!r.ok) return { ok: false, metaUpdated: false, message: r.message };
+    return { ok: true, metaUpdated: true, message: r.pending ? "Sent to Meta. The new product can take a minute to appear." : "Product added to your WhatsApp catalogue." };
+  } catch (e) {
+    return { ok: false, metaUpdated: false, message: `Couldn't add the product: ${e instanceof Error ? e.message : "Meta API error"}` };
+  }
+}
+
+/** Removes a product (by SKU) from the live catalogue. Past orders keep their item names. */
+export async function deleteCatalogProductItem(clientId: string, retailerId: string): Promise<Result> {
+  const { cfg } = await senderFor(clientId);
+  if (!cfg.live) return { ok: false, metaUpdated: false, message: "Deleting products needs the WhatsApp Cloud API connected." };
+  try {
+    const catalogId = await catalogIdFor(cfg);
+    if (!catalogId) return { ok: false, metaUpdated: false, message: "No catalogue is connected to this WhatsApp account in Meta." };
+    if (!(await findByRetailerId(cfg, catalogId, retailerId))) return { ok: false, metaUpdated: false, message: `${retailerId} is not in the catalogue any more. Refresh the page.` };
+    const r = await runBatch(cfg, catalogId, { method: "DELETE", data: { id: retailerId } });
+    if (!r.ok) return { ok: false, metaUpdated: false, message: r.message };
+    return { ok: true, metaUpdated: true, message: r.pending ? "Sent to Meta. It can take a minute to disappear from WhatsApp." : "Product deleted from your WhatsApp catalogue." };
+  } catch (e) {
+    return { ok: false, metaUpdated: false, message: `Couldn't delete the product: ${e instanceof Error ? e.message : "Meta API error"}` };
+  }
 }
 
 /** Every product in the catalogue linked to this WhatsApp Business Account, with its display price. */
@@ -355,7 +455,7 @@ export async function listCatalogProducts(cfg: WaConfig): Promise<CatalogProduct
   let path: string | null = `${catalogId}/products?fields=retailer_id,name,price,availability&limit=100`;
   while (path) {
     const page: { data: { retailer_id: string; name: string; price?: string; availability?: string }[]; paging?: { next?: string } } = await metaGet(cfg, path);
-    for (const p of page.data ?? []) out.push({ retailerId: p.retailer_id, name: p.name, price: p.price ?? null, inStock: p.availability !== "out of stock" });
+    for (const p of page.data ?? []) if (p.name?.trim()) out.push({ retailerId: p.retailer_id, name: p.name, price: p.price ?? null, inStock: p.availability !== "out of stock" });
     path = page.paging?.next ? page.paging.next.replace(/^https:\/\/graph\.facebook\.com\/v[\d.]+\//, "") : null;
   }
   return out.length ? out : DEFAULT_PRODUCTS.map((p) => ({ retailerId: p.retailerId, name: p.name, price: p.price, inStock: p.inStock }));

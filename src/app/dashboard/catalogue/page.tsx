@@ -81,6 +81,7 @@ export default async function CataloguePage() {
         commerceManagerUrl={commerceManagerUrl}
         clientName={client?.name ?? "Business"}
         isLive={isLive}
+        canManage={scope.canManage}
       />
     </>
   );
