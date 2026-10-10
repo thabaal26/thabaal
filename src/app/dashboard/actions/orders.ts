@@ -219,6 +219,16 @@ export async function savePaymentConfig(name: string): Promise<SendResult> {
 }
 
 /** An order taken by phone, at the shop or on paper, so it can be confirmed and dispatched like a WhatsApp cart. */
+/** While typing a phone in New order: is this an existing customer of the client, or a new one? */
+export async function lookupOrderCustomer(rawPhone: string): Promise<{ valid: false } | { valid: true; existing: { id: string; name: string; optedOut: boolean } | null }> {
+  const s = await requireOrderAccess();
+  if ("denied" in s || !s.clientId) return { valid: false };
+  const phone = normalizePhone(rawPhone);
+  if (!phone) return { valid: false };
+  const existing = await db.customer.findUnique({ where: { clientId_phone: { clientId: s.clientId, phone } }, select: { id: true, name: true, optedOut: true } });
+  return { valid: true, existing };
+}
+
 export async function createOrder(input: { phone: string; name: string; items: { name: string; quantity: number; price: number }[]; note?: string }): Promise<SendResult> {
   const s = await requireOrderAccess();
   if ("denied" in s) return { ok: false, message: s.denied };
@@ -230,9 +240,17 @@ export async function createOrder(input: { phone: string; name: string; items: {
     .filter((i) => i.name);
   if (!lines.length) return { ok: false, message: "Add at least one item." };
 
-  const customer =
-    (await db.customer.findUnique({ where: { clientId_phone: { clientId: s.clientId, phone } }, select: { id: true } })) ??
-    (await db.customer.create({ data: { clientId: s.clientId, phone, name: input.name.trim() || `+${phone}`, tags: ["manual-order"] }, select: { id: true } }));
+  // A phone not in this client's customers becomes a new customer, so later orders, replies and
+  // campaigns find them. They aren't marked as agreeing to marketing: an order isn't that consent.
+  const name = input.name.trim();
+  const existing = await db.customer.findUnique({ where: { clientId_phone: { clientId: s.clientId, phone } }, select: { id: true, name: true } });
+  if (!existing && !name) return { ok: false, message: "This is a new customer: enter their name so they can be saved." };
+  const customer = existing
+    ? // Fill in a real name for a customer saved earlier with only their number.
+      existing.name === `+${phone}` && name
+      ? await db.customer.update({ where: { id: existing.id }, data: { name }, select: { id: true, name: true } })
+      : existing
+    : await db.customer.create({ data: { clientId: s.clientId, phone, name, tags: ["manual-order"] }, select: { id: true, name: true } });
   const items: OrderItem[] = lines.map((i, k) => ({ id: `manual-${k + 1}`, name: i.name, quantity: i.quantity, price: i.price, currency: "INR" }));
   const order = await db.order.create({
     data: {
@@ -248,7 +266,7 @@ export async function createOrder(input: { phone: string; name: string; items: {
   pushToGoogleSheet("NEW_ORDER", {
     orderId: orderRef(order),
     phone,
-    name: input.name.trim() || `+${phone}`,
+    name: customer.name,
     items: itemsText(items),
     total: order.total,
     status: order.status,
@@ -257,7 +275,7 @@ export async function createOrder(input: { phone: string; name: string; items: {
   });
 
   revalidatePath("/dashboard", "layout");
-  return { ok: true, message: `Order ${orderRef(order)} added.` };
+  return { ok: true, message: existing ? `Order ${orderRef(order)} added for ${customer.name}.` : `Order ${orderRef(order)} added, and ${customer.name} was saved as a new customer.` };
 }
 
 const ORDER_TEMPLATES: { name: string; body: string; samples: string[] }[] = [

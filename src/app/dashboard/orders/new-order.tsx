@@ -1,12 +1,15 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Trash2, UserCheck, UserPlus } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Sheet } from "@/components/sheet";
 import { toastResult } from "@/components/toast";
-import { Button, Field } from "@/components/ui";
-import { createOrder } from "../actions/orders";
+import { Badge, Button, Field } from "@/components/ui";
+import { createOrder, lookupOrderCustomer } from "../actions/orders";
+
+type Lookup = { phone: string; state: "checking" } | { phone: string; state: "existing"; id: string; name: string; optedOut: boolean } | { phone: string; state: "new" } | null;
 
 type Line = { name: string; quantity: number; price: number };
 const blank = (): Line => ({ name: "", quantity: 1, price: 0 });
@@ -22,6 +25,28 @@ export function NewOrder() {
   const [lines, setLines] = useState<Line[]>([blank()]);
   const total = lines.reduce((sum, l) => sum + (Number(l.price) || 0) * (Number(l.quantity) || 0), 0);
   const edit = (k: number, patch: Partial<Line>) => setLines((ls) => ls.map((l, i) => (i === k ? { ...l, ...patch } : l)));
+
+  // Look the phone up as it's typed (after a short pause), so the form can say whether the
+  // order is for an existing customer or will add a new one.
+  const [lookup, setLookup] = useState<Lookup>(null);
+  const digits = phone.replace(/\D/g, "");
+  useEffect(() => {
+    if (digits.length < 10) return;
+    let live = true;
+    const t = setTimeout(async () => {
+      setLookup({ phone: digits, state: "checking" });
+      const r = await lookupOrderCustomer(digits);
+      if (!live) return;
+      if (!r.valid) setLookup(null);
+      else setLookup(r.existing ? { phone: digits, state: "existing", ...r.existing } : { phone: digits, state: "new" });
+    }, 350);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [digits]);
+  const found = lookup?.phone === digits && digits.length >= 10 ? lookup : null;
+  const isNew = found?.state === "new";
 
   return (
     <>
@@ -44,13 +69,43 @@ export function NewOrder() {
             });
           }}
         >
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field id="no-phone" label="Customer phone" required>
-              <input className="field" type="tel" inputMode="tel" autoComplete="off" value={phone} placeholder="98765 43210" onChange={(e) => setPhone(e.target.value)} />
-            </Field>
-            <Field id="no-name" label="Name" hint="if new">
-              <input className="field" autoCapitalize="words" value={name} placeholder="Priya Sharma" onChange={(e) => setName(e.target.value)} />
-            </Field>
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field id="no-phone" label="Customer phone" required>
+                <input className="field" type="tel" inputMode="tel" autoComplete="off" value={phone} placeholder="98765 43210" onChange={(e) => setPhone(e.target.value)} />
+              </Field>
+              {found?.state === "existing" ? (
+                <div>
+                  <p className="mb-1.5 text-sm font-medium text-ink">Name</p>
+                  <p className="flex min-h-11 items-center truncate rounded-control border border-line bg-subtle px-3 text-sm text-ink-2 sm:min-h-10">{found.name}</p>
+                </div>
+              ) : (
+                <Field id="no-name" label="Name" hint={isNew ? "new customer" : "if new"} required={isNew}>
+                  <input className="field" autoCapitalize="words" value={name} placeholder="Priya Sharma" onChange={(e) => setName(e.target.value)} />
+                </Field>
+              )}
+            </div>
+            <div aria-live="polite" className="min-h-6 text-sm">
+              {found?.state === "checking" && (
+                <span className="inline-flex items-center gap-1.5 text-muted">
+                  <Loader2 aria-hidden className="size-3.5 animate-spin" /> Checking customers…
+                </span>
+              )}
+              {found?.state === "existing" && (
+                <span className="inline-flex flex-wrap items-center gap-1.5 text-ink-2">
+                  <UserCheck aria-hidden className="size-4 text-success" /> Existing customer:
+                  <Link href={`/dashboard/customers/${found.id}`} className="font-medium text-ink underline-offset-2 hover:underline">
+                    {found.name}
+                  </Link>
+                  {found.optedOut && <Badge tone="red">Opted out of messages</Badge>}
+                </span>
+              )}
+              {isNew && (
+                <span className="inline-flex items-center gap-1.5 text-ink-2">
+                  <UserPlus aria-hidden className="size-4 text-info" /> New customer: they&apos;ll be added to Customers with this order.
+                </span>
+              )}
+            </div>
           </div>
 
           <fieldset className="space-y-2">
@@ -87,7 +142,7 @@ export function NewOrder() {
             <span className="tabular">₹{total.toLocaleString("en-IN")}</span>
           </div>
           <Button type="submit" className="w-full" loading={pending}>
-            Add order
+            {isNew ? "Add order and save customer" : "Add order"}
           </Button>
         </form>
       </Sheet>
