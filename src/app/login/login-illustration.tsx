@@ -6,6 +6,7 @@ import { useSyncExternalStore } from "react";
 interface LoginIllustrationProps {
   isNight?: boolean;
   onToggleTheme?: () => void;
+  lang?: "en" | "ta";
 }
 
 const noop = () => () => {};
@@ -34,11 +35,12 @@ const STARS = Array.from({ length: 70 }).map((_, i) => ({
   delay: `${((i % 7) * 0.35).toFixed(1)}s`,
 }));
 
-export function LoginIllustration({ isNight = false, onToggleTheme }: LoginIllustrationProps) {
+export function LoginIllustration({ isNight = false, onToggleTheme, lang = "en" }: LoginIllustrationProps) {
+  const ta = lang === "ta";
   const mounted = useSyncExternalStore(noop, () => true, () => false);
 
   return (
-    <section className="thabaal-right" aria-label="Animated sky">
+    <section className="thabaal-right" aria-label={ta ? "அனிமேஷன் வானம்" : "Animated sky"}>
       {/* 1. SKY GRADIENTS */}
       <div className="thabaal-sky day" />
       <div className="thabaal-sky night" />
@@ -168,7 +170,8 @@ export function LoginIllustration({ isNight = false, onToggleTheme }: LoginIllus
               onClick={onToggleTheme}
               role="switch"
               aria-checked={isNight}
-              aria-label={isNight ? "Switch to day" : "Switch to night"}
+              aria-label={ta ? (isNight ? "பகல் தோற்றத்திற்கு மாற்று" : "இரவு தோற்றத்திற்கு மாற்று") : isNight ? "Switch to day" : "Switch to night"}
+              title={ta ? (isNight ? "பகல் தோற்றம்" : "இரவு தோற்றம்") : isNight ? "Day mode" : "Night mode"}
             >
               {/* Night Sky track */}
               <span className="thabaal-tk thabaal-tk-night">

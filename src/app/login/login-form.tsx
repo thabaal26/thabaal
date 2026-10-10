@@ -8,10 +8,17 @@ interface LoginFormProps {
   lang?: "en" | "ta";
 }
 
+/** The sign-in errors the server sends, in Tamil. Anything unexpected is shown as sent. */
+const TA_ERRORS: Record<string, string> = {
+  "Enter your email and password.": "மின்னஞ்சல் மற்றும் கடவுச்சொல்லை உள்ளிடவும்.",
+  "Email or password is incorrect.": "மின்னஞ்சல் அல்லது கடவுச்சொல் தவறாக உள்ளது.",
+};
+
 export function LoginForm({ lang = "en" }: LoginFormProps) {
   const [state, action, pending] = useActionState(login, undefined);
   const [showPassword, setShowPassword] = useState(false);
   const isTamil = lang === "ta";
+  const error = state?.error && (isTamil ? (TA_ERRORS[state.error] ?? state.error) : state.error);
 
   return (
     <div className="thabaal-formwrap">
@@ -26,12 +33,12 @@ export function LoginForm({ lang = "en" }: LoginFormProps) {
         {/* Sign-in is by email only: there's no Google sign-in behind the portal, so no button for one. */}
 
         {/* Error Alert */}
-        {state?.error && (
+        {error && (
           <div
             role="alert"
             className="w-full mb-3 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-center text-xs font-semibold text-red-400"
           >
-            {state.error}
+            {error}
           </div>
         )}
 
@@ -72,7 +79,7 @@ export function LoginForm({ lang = "en" }: LoginFormProps) {
             type="button"
             className="thabaal-eye"
             onClick={() => setShowPassword(!showPassword)}
-            aria-label={showPassword ? "Hide password" : "Show password"}
+            aria-label={isTamil ? (showPassword ? "கடவுச்சொல்லை மறை" : "கடவுச்சொல்லைக் காட்டு") : showPassword ? "Hide password" : "Show password"}
           >
             {showPassword ? (
               <EyeOff className="size-4.5 text-[#5d6e86]" />
