@@ -1,0 +1,864 @@
+:root {
+  --navy: #062548;
+  --yellow: #FDB913;
+  --coral: #FF6B45;
+  --green: #00C050;
+  --bg: #ffffff;
+  --fg: #062548;
+  --muted: #5d6e86;
+  --line: #dbe3ee;
+  --field: #f5f8fc;
+  --plate: 0;
+  --btn-bg: #062548;
+  --btn-fg: #fff;
+  --btn-hover-bg: #FDB913;
+  --btn-hover-fg: #062548;
+  --link: #e0900a;
+  --ease: cubic-bezier(.4, 0, .2, 1);
+}
+
+[data-theme="night"] {
+  --bg: #07142b;
+  --fg: #eef3fb;
+  --muted: #9db0cc;
+  --line: #233a5f;
+  --field: rgba(255, 255, 255, .05);
+  --plate: 1;
+  --btn-bg: #FDB913;
+  --btn-fg: #062548;
+  --btn-hover-bg: #ffffff;
+  --btn-hover-fg: #062548;
+  --link: #FDB913;
+}
+
+.thabaal-page {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100vh;
+  width: 100%;
+  font-family: var(--font-nunito), "Nunito", ui-rounded, system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  transition: background 1s var(--ease), color 1s var(--ease);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============ LEFT: SIGN IN ============ */
+.thabaal-left {
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  padding: 32px 48px;
+  transition: background 1s var(--ease);
+  justify-content: center;
+  align-items: center;
+  gap: clamp(20px, 4vh, 36px);
+  position: relative;
+  z-index: 10;
+}
+
+.thabaal-brand {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.thabaal-brand .mark {
+  display: block;
+  width: clamp(140px, 13.5vw, 190px);
+  height: auto;
+  transition: filter 1s var(--ease);
+}
+
+[data-theme="night"] .thabaal-brand .mark {
+  filter: drop-shadow(0 0 1.5px rgba(255, 255, 255, .9)) drop-shadow(0 0 16px rgba(253, 185, 19, .4));
+}
+
+.thabaal-brand .words {
+  position: relative;
+  width: clamp(220px, 23vw, 340px);
+  aspect-ratio: 900 / 252;
+}
+
+.thabaal-brand .words img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  transition: opacity 1s var(--ease);
+}
+
+.thabaal-brand .w-night {
+  opacity: 0;
+}
+
+[data-theme="night"] .thabaal-brand .w-night {
+  opacity: 1;
+}
+
+[data-theme="night"] .thabaal-brand .w-day {
+  opacity: 0;
+}
+
+.thabaal-formwrap {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  width: 100%;
+}
+
+.thabaal-form {
+  width: 100%;
+  max-width: 384px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.thabaal-form h1 {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -.5px;
+  line-height: 1.1;
+  color: var(--fg);
+  text-align: center;
+}
+
+.thabaal-form .sub {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 8px;
+  text-align: center;
+  transition: color 1s var(--ease);
+}
+
+.thabaal-google {
+  width: 100%;
+  height: 48px;
+  margin-top: 24px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--field);
+  color: var(--fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font: 700 14px var(--font-nunito), "Nunito", system-ui;
+  cursor: pointer;
+  transition: background .25s, border-color 1s, transform .15s;
+}
+
+.thabaal-google:hover {
+  transform: translateY(-1px);
+  border-color: var(--yellow);
+}
+
+.thabaal-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin: 22px 0;
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.thabaal-divider i {
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+  transition: background 1s;
+}
+
+.thabaal-field {
+  position: relative;
+  width: 100%;
+  margin-top: 16px;
+}
+
+.thabaal-field:first-of-type {
+  margin-top: 0;
+}
+
+.thabaal-field svg.ic {
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  stroke: var(--muted);
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.thabaal-field input {
+  width: 100%;
+  height: 48px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--field);
+  color: var(--fg);
+  padding: 0 48px 0 50px;
+  font: 600 14px var(--font-nunito), "Nunito", system-ui;
+  outline: none;
+  transition: border-color .25s, box-shadow .25s, background 1s, color 1s;
+}
+
+.thabaal-field input::placeholder {
+  color: var(--muted);
+  opacity: .85;
+}
+
+.thabaal-field input:focus {
+  border-color: var(--yellow);
+  box-shadow: 0 0 0 4px rgba(253, 185, 19, .22);
+}
+
+.thabaal-eye {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.thabaal-eye svg {
+  width: 18px;
+  height: 18px;
+  stroke: var(--muted);
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.thabaal-eye:hover {
+  background: rgba(127, 150, 190, .15);
+}
+
+.thabaal-row {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 22px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.thabaal-row label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.thabaal-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--yellow);
+}
+
+.thabaal-row a {
+  text-decoration: underline;
+  color: inherit;
+}
+
+.thabaal-row a:hover {
+  color: var(--fg);
+}
+
+.thabaal-login-btn {
+  margin-top: 26px;
+  width: 100%;
+  height: 46px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font: 800 15px var(--font-nunito), "Nunito", system-ui;
+  cursor: pointer;
+  transition: background .3s, color .3s, transform .15s, box-shadow .3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.thabaal-login-btn:hover {
+  background: var(--btn-hover-bg);
+  color: var(--btn-hover-fg);
+  box-shadow: 0 8px 22px -8px rgba(253, 185, 19, .8);
+  transform: translateY(-1px);
+}
+
+.thabaal-login-btn:active {
+  transform: scale(0.99);
+}
+
+.thabaal-login-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.thabaal-signup {
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.thabaal-signup a {
+  color: var(--link);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.thabaal-signup a:hover {
+  text-decoration: underline;
+}
+
+.thabaal-lang-pill {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--field);
+  padding: 2px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.thabaal-lang-pill button {
+  border-radius: 999px;
+  padding: 3px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all .2s;
+}
+
+.thabaal-lang-pill button.active {
+  background: var(--yellow);
+  color: #062548;
+}
+
+/* ============ RIGHT: ANIMATED SKY ============ */
+.thabaal-right {
+  position: relative;
+  overflow: hidden;
+  container-type: inline-size;
+  min-height: 100vh;
+}
+
+.thabaal-sky {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 1s var(--ease);
+}
+
+.thabaal-sky.day {
+  background: linear-gradient(180deg, #76bff8 0%, #a9d8ff 42%, #ffe0c2 82%, #ffcba3 100%);
+  opacity: 1;
+}
+
+.thabaal-sky.night {
+  background: linear-gradient(180deg, #040a1d 0%, #0c1844 52%, #2b2e72 100%);
+}
+
+[data-theme="night"] .thabaal-sky.day {
+  opacity: 0;
+}
+
+[data-theme="night"] .thabaal-sky.night {
+  opacity: 1;
+}
+
+.thabaal-sun {
+  position: absolute;
+  top: 13%;
+  right: 16%;
+  width: min(15cqw, 120px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #fffbe0, #ffd84d 60%, #ffc533);
+  box-shadow: 0 0 70px 26px rgba(255, 220, 120, .65), 0 0 160px 70px rgba(255, 200, 120, .3);
+  transition: opacity 1s var(--ease), transform 1.2s var(--ease);
+}
+
+[data-theme="night"] .thabaal-sun {
+  opacity: 0;
+  transform: translateY(60px) scale(.75);
+}
+
+.thabaal-moon {
+  position: absolute;
+  top: 12%;
+  right: 17%;
+  width: min(13cqw, 100px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  box-shadow: inset -.3em .08em 0 0 #f8f4de;
+  filter: drop-shadow(0 0 16px rgba(255, 248, 210, .55));
+  opacity: 0;
+  transform: translateY(-50px) scale(.8);
+  transition: opacity 1s var(--ease), transform 1.2s var(--ease);
+  font-size: min(13cqw, 100px);
+}
+
+[data-theme="night"] .thabaal-moon {
+  opacity: 1;
+  transform: none;
+}
+
+.thabaal-stars {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 1s var(--ease);
+}
+
+[data-theme="night"] .thabaal-stars {
+  opacity: 1;
+}
+
+.thabaal-star {
+  position: absolute;
+  width: var(--s);
+  height: var(--s);
+  border-radius: 50%;
+  background: #fff;
+  animation: starTwinkle var(--d) ease-in-out infinite;
+  animation-delay: var(--dl);
+}
+
+@keyframes starTwinkle {
+  0%, 100% {
+    opacity: .15;
+    transform: scale(.7);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+/* Clouds */
+.thabaal-clouds {
+  position: absolute;
+  inset: 0;
+  color: #fff;
+  transition: color 1s var(--ease), opacity 1s var(--ease);
+  pointer-events: none;
+}
+
+[data-theme="night"] .thabaal-clouds {
+  color: #8ea3cb;
+}
+
+.thabaal-cloud {
+  position: absolute;
+  top: var(--top);
+  left: 0;
+  width: var(--w);
+  opacity: var(--op);
+  animation: cloudDrift var(--dur) linear infinite;
+  animation-delay: var(--delay);
+  will-change: transform;
+}
+
+.thabaal-cloud svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  transform-origin: 15% 100%;
+  animation: cloudPuff var(--puff) ease-in-out infinite alternate;
+  animation-delay: var(--delay);
+}
+
+.thabaal-cloud.l-far {
+  z-index: 1;
+}
+.thabaal-cloud.l-mid {
+  z-index: 2;
+}
+.thabaal-cloud.l-near {
+  z-index: 5;
+}
+
+@keyframes cloudDrift {
+  from { transform: translateX(135cqw); }
+  to { transform: translateX(-45cqw); }
+}
+
+@keyframes cloudPuff {
+  from { transform: scale(1, 1); }
+  to { transform: scale(1.035, 1.06); }
+}
+
+/* Carrier Bird in Flight */
+.thabaal-birdpos {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.thabaal-birdfloat {
+  position: relative;
+  width: min(62cqw, 470px);
+  animation: birdFloat 3.4s ease-in-out infinite;
+  filter: drop-shadow(0 14px 18px rgba(6, 37, 72, .22));
+  transition: filter 1s var(--ease);
+}
+
+[data-theme="night"] .thabaal-birdfloat {
+  filter: drop-shadow(0 0 22px rgba(253, 185, 19, .38)) drop-shadow(0 10px 14px rgba(0, 0, 0, .35));
+}
+
+@keyframes birdFloat {
+  0%, 100% {
+    transform: translate(0, -10px) rotate(-2.2deg);
+  }
+  50% {
+    transform: translate(8px, 14px) rotate(2.4deg);
+  }
+}
+
+.thabaal-bird {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 640 / 354;
+}
+
+.thabaal-bird img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.thabaal-bird .wing {
+  z-index: 0;
+  transform-origin: 54.4% 30.5%;
+  animation: birdFlap .62s ease-in-out infinite;
+}
+
+.thabaal-bird .body {
+  z-index: 1;
+}
+
+@keyframes birdFlap {
+  0%, 100% {
+    transform: rotate(8deg);
+  }
+  50% {
+    transform: rotate(-15deg);
+  }
+}
+
+.thabaal-streak {
+  position: absolute;
+  height: 5px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, .85);
+  opacity: 0;
+  animation: birdStreak 1.3s linear infinite;
+}
+
+[data-theme="night"] .thabaal-streak {
+  background: rgba(160, 185, 255, .7);
+}
+
+.thabaal-streak:nth-child(1) {
+  left: -4%;
+  top: 70%;
+  width: 15%;
+  animation-delay: 0s;
+}
+
+.thabaal-streak:nth-child(2) {
+  left: 2%;
+  top: 80%;
+  width: 22%;
+  animation-delay: .45s;
+}
+
+.thabaal-streak:nth-child(3) {
+  left: -9%;
+  top: 90%;
+  width: 12%;
+  animation-delay: .85s;
+}
+
+@keyframes birdStreak {
+  0% { transform: translateX(50px); opacity: 0; }
+  25% { opacity: .8; }
+  100% { transform: translateX(-80px); opacity: 0; }
+}
+
+/* ============ TOGGLE SWITCH (Top Right & Bottom) ============ */
+.thabaal-togglewrap {
+  position: absolute;
+  right: 32px;
+  top: 28px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.thabaal-tgbox {
+  position: relative;
+  width: 110px;
+  height: 52px;
+}
+
+.thabaal-pulse {
+  position: absolute;
+  inset: -5px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, .85);
+  pointer-events: none;
+  animation: togglePulse 2s ease-out infinite;
+}
+
+[data-theme="night"] .thabaal-pulse {
+  border-color: rgba(253, 185, 19, .9);
+}
+
+.thabaal-togglewrap.used .thabaal-pulse {
+  animation: none;
+  opacity: 0;
+}
+
+@keyframes togglePulse {
+  0% { transform: scale(.96); opacity: .9; }
+  100% { transform: scale(1.3, 1.5); opacity: 0; }
+}
+
+.thabaal-toggle {
+  position: absolute;
+  inset: 0;
+  width: 110px;
+  height: 52px;
+  z-index: 10;
+  border-radius: 999px;
+  border: 3.5px solid #0b0b0f;
+  background: #0b0b0f;
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, .45);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.thabaal-tk {
+  position: absolute;
+  inset: 0;
+  transition: opacity .8s var(--ease);
+}
+
+.thabaal-tk-night {
+  background: linear-gradient(180deg, #080b18, #1b2147);
+  opacity: 1;
+}
+
+.thabaal-tk-day {
+  background: linear-gradient(180deg, #1b64c8, #66b5f6);
+  opacity: 0;
+}
+
+[data-theme="night"] .thabaal-tk-night {
+  opacity: 0;
+}
+
+[data-theme="night"] .thabaal-tk-day {
+  opacity: 1;
+}
+
+.thabaal-tk .dot {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: #fff;
+  animation: starTwinkle 2.4s ease-in-out infinite;
+}
+
+.thabaal-tc {
+  position: absolute;
+  height: 16px;
+  border-radius: 16px;
+  background: currentColor;
+}
+
+.thabaal-tc::before, .thabaal-tc::after {
+  content: "";
+  position: absolute;
+  background: currentColor;
+  border-radius: 50%;
+}
+
+.thabaal-tc::before {
+  width: 15px;
+  height: 15px;
+  left: 7px;
+  bottom: 6px;
+}
+
+.thabaal-tc::after {
+  width: 11px;
+  height: 11px;
+  left: 20px;
+  bottom: 5px;
+}
+
+.thabaal-tk-night .thabaal-tc {
+  color: #7e8494;
+  bottom: -5px;
+  animation: tcdrift 7s ease-in-out infinite alternate;
+}
+
+.thabaal-tk-day .thabaal-tc {
+  color: #fff;
+  bottom: -5px;
+  animation: tcdrift 7s ease-in-out infinite alternate;
+}
+
+@keyframes tcdrift {
+  from { transform: translateX(-4px); }
+  to { transform: translateX(5px); }
+}
+
+.thabaal-ringwrap {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 38px;
+  height: 38px;
+  transition: transform .9s cubic-bezier(.34, 1.35, .5, 1);
+}
+
+[data-theme="night"] .thabaal-ringwrap {
+  transform: translateX(58px);
+}
+
+.thabaal-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .07);
+  transform: translate(-50%, -50%);
+}
+
+.thabaal-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 38px;
+  height: 38px;
+  transform: translateX(0) rotate(0);
+  transition: transform .9s cubic-bezier(.34, 1.35, .5, 1);
+}
+
+[data-theme="night"] .thabaal-knob {
+  transform: translateX(58px) rotate(360deg);
+}
+
+.thabaal-knob .face {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  transition: opacity .6s;
+}
+
+.thabaal-knob .sunface {
+  background: radial-gradient(circle at 38% 34%, #fff3a0, #ffd52e 65%, #f7b81c);
+  box-shadow: 0 0 14px 3px rgba(255, 213, 46, .55);
+}
+
+.thabaal-knob .moonface {
+  background: radial-gradient(circle at 36% 32%, #f2f2f2, #cfcfd2 70%, #b9b9be);
+  opacity: 0;
+}
+
+.thabaal-knob .moonface::before {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #a9a9b0;
+  left: 20px;
+  top: 20px;
+  box-shadow: -11px -8px 0 -2px #b4b4ba, -3px 8px 0 -3px #b0b0b6;
+}
+
+[data-theme="night"] .thabaal-knob .sunface {
+  opacity: 0;
+}
+
+[data-theme="night"] .thabaal-knob .moonface {
+  opacity: 1;
+}
+
+/* ============ RESPONSIVE (Mobile / Tablet) ============ */
+@media (max-width: 900px) {
+  .thabaal-page {
+    grid-template-columns: 1fr;
+    grid-template-rows: 230px auto;
+  }
+  .thabaal-right {
+    order: -1;
+    min-height: 0;
+    height: 230px;
+  }
+  .thabaal-left {
+    padding: 24px 20px 40px;
+  }
+  .thabaal-birdfloat {
+    width: min(52cqw, 230px);
+  }
+  .thabaal-sun, .thabaal-moon {
+    top: 18%;
+  }
+  .thabaal-togglewrap {
+    top: 16px;
+    right: 16px;
+    gap: 0;
+  }
+  .thabaal-tgbox {
+    transform: scale(.7);
+    transform-origin: top right;
+  }
+}

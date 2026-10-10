@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Noto_Sans_Tamil } from "next/font/google";
+import { Geist, Geist_Mono, Noto_Sans_Tamil, Nunito } from "next/font/google";
 import { ConfirmHost } from "@/components/confirm";
 import { ServiceWorkerRegister } from "@/components/sw-register";
 import { Toaster } from "@/components/toast";
@@ -7,6 +7,7 @@ import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"], display: "swap" });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"], display: "swap", preload: false });
+const nunito = Nunito({ variable: "--font-nunito", subsets: ["latin"], weight: ["400", "600", "700", "800"], display: "swap" });
 // Campaign text, replies and the catalogue are often Tamil. The font's unicode-range means
 // browsers only fetch it on pages that actually contain Tamil, so it isn't preloaded.
 const tamil = Noto_Sans_Tamil({ variable: "--font-tamil", subsets: ["tamil"], weight: ["400", "500", "600", "700"], display: "swap", preload: false });
@@ -28,7 +29,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${tamil.variable} h-full antialiased`}>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${tamil.variable} ${nunito.variable} h-full antialiased`}>
       <body className="min-h-full font-sans">
         {children}
         <Toaster />

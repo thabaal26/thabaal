@@ -5,180 +5,208 @@ import { useSyncExternalStore } from "react";
 
 interface LoginIllustrationProps {
   isNight?: boolean;
-  isTamil?: boolean;
   onToggleTheme?: () => void;
 }
 
 const noop = () => () => {};
 
+// 11 cloud configurations: [top%, width px, duration s, phase 0-1, opacity, layer, symbol]
 const CLOUDS = [
-  { top: 8, w: 130, dur: 36, delay: 0, opacity: 0.6 },
-  { top: 24, w: 110, dur: 44, delay: -6, opacity: 0.55 },
-  { top: 58, w: 190, dur: 28, delay: -10, opacity: 0.75 },
-  { top: 74, w: 210, dur: 32, delay: -4, opacity: 0.8 },
-  { top: 14, w: 250, dur: 22, delay: -14, opacity: 0.85 },
+  { top: 6, w: 150, dur: 110, delay: -11.0, op: 0.55, layer: "far", symbol: "cB" },
+  { top: 24, w: 130, dur: 120, delay: -66.0, op: 0.50, layer: "far", symbol: "cA" },
+  { top: 44, w: 140, dur: 105, delay: -84.0, op: 0.50, layer: "far", symbol: "cC" },
+  { top: 68, w: 150, dur: 115, delay: -40.2, op: 0.50, layer: "far", symbol: "cB" },
+  { top: 14, w: 230, dur: 70, delay: -21.0, op: 0.85, layer: "mid", symbol: "cA" },
+  { top: 36, w: 210, dur: 64, delay: -48.0, op: 0.90, layer: "mid", symbol: "cC" },
+  { top: 58, w: 240, dur: 72, delay: -3.6, op: 0.85, layer: "mid", symbol: "cB" },
+  { top: 80, w: 220, dur: 66, delay: -33.0, op: 0.90, layer: "mid", symbol: "cA" },
+  { top: 3, w: 340, dur: 44, delay: -26.4, op: 1.00, layer: "near", symbol: "cC" },
+  { top: 52, w: 360, dur: 40, delay: -8.0, op: 1.00, layer: "near", symbol: "cA" },
+  { top: 84, w: 330, dur: 46, delay: -41.4, op: 1.00, layer: "near", symbol: "cB" },
 ];
 
-export function LoginIllustration({
-  isNight = false,
-  isTamil = false,
-  onToggleTheme,
-}: LoginIllustrationProps) {
+// Pre-computed 70 stars with deterministic coordinates to avoid hydration mismatches
+const STARS = Array.from({ length: 70 }).map((_, i) => ({
+  left: `${((i * 17.3 + 11) % 96 + 2).toFixed(1)}%`,
+  top: `${((i * 23.7 + 7) % 68 + 2).toFixed(1)}%`,
+  size: `${((i % 4) * 0.5 + 1.2).toFixed(1)}px`,
+  duration: `${((i % 5) * 0.4 + 2.2).toFixed(1)}s`,
+  delay: `${((i % 7) * 0.35).toFixed(1)}s`,
+}));
+
+export function LoginIllustration({ isNight = false, onToggleTheme }: LoginIllustrationProps) {
   const mounted = useSyncExternalStore(noop, () => true, () => false);
 
   return (
-    <div className="relative h-full w-full min-h-[500px] select-none overflow-hidden rounded-[26px]">
-      {/* 1. ANIMATED SKY GRADIENT */}
-      <div
-        className={`absolute inset-0 transition-opacity duration-1000 ${
-          isNight
-            ? "bg-gradient-to-b from-[#040a1d] via-[#0c1844] to-[#2b2e72] opacity-100"
-            : "bg-gradient-to-b from-[#76bff8] via-[#a9d8ff] to-[#ffcba3] opacity-100"
-        }`}
-      />
+    <section className="thabaal-right" aria-label="Animated sky">
+      {/* 1. SKY GRADIENTS */}
+      <div className="thabaal-sky day" />
+      <div className="thabaal-sky night" />
 
-      {/* 2. TWINKLING STARS (Night Mode) */}
-      {mounted && isNight && (
-        <div className="absolute inset-0 transition-opacity duration-1000">
-          {Array.from({ length: 48 }).map((_, i) => (
-            <span
-              key={i}
-              className="absolute rounded-full bg-white animate-[twinkle_3s_ease-in-out_infinite]"
-              style={{
-                left: `${(i * 2.3 * 13) % 94 + 3}%`,
-                top: `${(i * 1.9 * 11) % 68 + 4}%`,
-                width: `${(i % 3) + 1.5}px`,
-                height: `${(i % 3) + 1.5}px`,
-                animationDelay: `${(i * 0.17) % 3}s`,
-              }}
+      {/* 2. CELESTIAL BODIES */}
+      <div className="thabaal-sun" />
+      <div className="thabaal-moon" />
+
+      {/* 3. TWINKLING STARS (Night Mode) */}
+      <div className="thabaal-stars">
+        {mounted &&
+          STARS.map((s, idx) => (
+            <i
+              key={idx}
+              className="thabaal-star"
+              style={
+                {
+                  left: s.left,
+                  top: s.top,
+                  "--s": s.size,
+                  "--d": s.duration,
+                  "--dl": s.delay,
+                } as React.CSSProperties
+              }
             />
           ))}
-        </div>
-      )}
+      </div>
 
-      {/* 3. CELESTIAL BODY: RADIANT SUN (Day) / GLOWING CRESCENT MOON (Night) */}
-      <div
-        className={`absolute right-[14%] top-[12%] size-24 sm:size-28 rounded-full transition-all duration-1000 ${
-          isNight
-            ? "translate-y-2 scale-90 bg-transparent shadow-[inset_-0.55em_0.15em_0_0_#f8f4de] drop-shadow-[0_0_24px_rgba(255,248,210,0.65)]"
-            : "bg-radial from-[#fffbe0] via-[#ffd84d] to-[#ffc533] shadow-[0_0_80px_30px_rgba(255,220,120,0.7),0_0_160px_60px_rgba(255,200,120,0.35)] animate-[puff_6s_ease-in-out_infinite_alternate]"
-        }`}
-      />
+      {/* 4. CLOUDS SVG SYMBOLS */}
+      <svg width="0" height="0" className="absolute" aria-hidden="true">
+        <defs>
+          <symbol id="cA" viewBox="0 0 300 100">
+            <path
+              fill="currentColor"
+              d="M14 94C10 86 16 80 13 70C10 56 22 40 38 36C48 20 70 12 86 20C94 24 98 30 99 38C104 33 114 33 122 38C133 45 136 58 134 68C133 73 132 78 138 78C145 78 150 74 158 77C168 80 180 80 200 80C230 80 256 80 276 81C288 82 292 90 284 94Z"
+            />
+            <path
+              fill="#7a6a58"
+              fillOpacity=".09"
+              d="M14 94C10 86 16 80 13 70C10 56 22 40 38 36C48 22 62 14 76 15C60 24 48 40 44 56C42 68 46 82 48 94Z"
+            />
+          </symbol>
+          <symbol id="cB" viewBox="0 0 300 100">
+            <path
+              fill="currentColor"
+              d="M16 94C10 88 14 80 14 72C14 56 30 46 46 48C54 32 78 24 98 32C110 37 116 46 116 54C128 52 140 58 142 70C143 76 142 78 148 79C158 80 172 80 196 81C230 82 262 82 280 84C290 86 290 94 280 94Z"
+            />
+            <path
+              fill="#7a6a58"
+              fillOpacity=".09"
+              d="M16 94C10 88 14 80 14 72C14 56 30 46 46 48C54 32 70 25 86 26C70 36 62 50 60 64C59 76 62 86 64 94Z"
+            />
+          </symbol>
+          <symbol id="cC" viewBox="0 0 300 100">
+            <path
+              fill="currentColor"
+              d="M12 94C8 86 14 78 14 70C14 56 28 46 44 48C50 36 66 30 80 36C86 28 100 24 114 30C128 36 132 48 130 56C142 56 152 64 152 74C152 78 150 80 156 80C170 80 190 80 220 81C250 82 276 82 288 86C292 90 290 94 282 94Z"
+            />
+            <path
+              fill="#7a6a58"
+              fillOpacity=".09"
+              d="M12 94C8 86 14 78 14 70C14 56 28 46 44 48C50 36 62 31 74 33C58 42 50 54 48 66C47 78 50 86 52 94Z"
+            />
+          </symbol>
+        </defs>
+      </svg>
 
-      {/* 4. FLOATING CLOUDS LAYER */}
-      <div
-        className={`pointer-events-none absolute inset-0 transition-colors duration-1000 ${
-          isNight ? "text-[#8ea3cb]/40" : "text-white/85"
-        }`}
-      >
-        {CLOUDS.map((c, i) => (
+      {/* 5. DRIFTING & PUFFING CLOUDS */}
+      <div className="thabaal-clouds">
+        {CLOUDS.map((c, idx) => (
           <div
-            key={i}
-            className="absolute animate-[drift_linear_infinite]"
-            style={{
-              top: `${c.top}%`,
-              width: `${c.w}px`,
-              opacity: c.opacity,
-              animationDuration: `${c.dur}s`,
-              animationDelay: `${c.delay}s`,
-            }}
+            key={idx}
+            className={`thabaal-cloud l-${c.layer}`}
+            style={
+              {
+                "--top": `${c.top}%`,
+                "--w": `${c.w}px`,
+                "--dur": `${c.dur}s`,
+                "--delay": `${c.delay}s`,
+                "--op": c.op,
+                "--puff": "6s",
+              } as React.CSSProperties
+            }
           >
-            <svg
-              viewBox="0 0 300 100"
-              className="w-full animate-[puff_6s_ease-in-out_infinite_alternate]"
-            >
-              <path
-                fill="currentColor"
-                d="M14 94C10 86 16 80 13 70C10 56 22 40 38 36C48 20 70 12 86 20C94 24 98 30 99 38C104 33 114 33 122 38C133 45 136 58 134 68C133 73 132 78 138 78C145 78 150 74 158 77C168 80 180 80 200 80C230 80 256 80 276 81C288 82 292 90 284 94Z"
-              />
+            <svg>
+              <use href={`#${c.symbol}`} />
             </svg>
           </div>
         ))}
       </div>
 
-      {/* 5. CENTER HERO: FLYING THABAAL CARRIER BIRD (Adapts perfectly to Day & Night!) */}
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center -translate-y-6 sm:-translate-y-8">
-        <div className="relative flex flex-col items-center">
-          {/* Wind Speed Streaks */}
-          <div className="relative w-64 sm:w-72">
-            <span className="absolute -left-4 top-6 h-1 w-14 animate-[streak_1.4s_linear_infinite] rounded-full bg-white/70" />
-            <span className="absolute -left-10 top-14 h-1 w-20 animate-[streak_1.8s_linear_infinite_0.4s] rounded-full bg-white/60" />
-            <span className="absolute -left-2 top-22 h-1 w-12 animate-[streak_1.2s_linear_infinite_0.8s] rounded-full bg-white/50" />
-          </div>
-
-          {/* Genuine Thabaal Carrier Bird Logo in Flight */}
-          <div className="relative h-28 w-60 sm:h-32 sm:w-68 animate-[float_3.4s_ease-in-out_infinite] drop-shadow-2xl">
+      {/* 6. CENTER FLYING THABAAL CARRIER BIRD */}
+      <div className="thabaal-birdpos" aria-hidden="true">
+        <div className="thabaal-birdfloat">
+          <i className="thabaal-streak" />
+          <i className="thabaal-streak" />
+          <i className="thabaal-streak" />
+          <div className="thabaal-bird">
             <Image
-              src={
-                isNight
-                  ? isTamil
-                    ? "/brands/thabaal/thabaal-logo-ta-dark.png"
-                    : "/brands/thabaal/thabaal-logo-en-dark.png"
-                  : isTamil
-                    ? "/brands/thabaal/thabaal-logo-ta.png"
-                    : "/brands/thabaal/thabaal-logo-en.png"
-              }
-              alt="Thabaal in flight"
-              fill
+              src="/brands/thabaal/wing.png"
+              className="wing"
+              alt=""
+              width={640}
+              height={354}
               priority
-              className="object-contain"
             />
-          </div>
-
-          {/* Slogan Pill Badge */}
-          <div
-            className={`mt-4 rounded-full border px-4 py-2 text-center backdrop-blur-md shadow-lg transition-colors duration-700 ${
-              isNight ? "border-white/20 bg-black/40" : "border-white/30 bg-black/25"
-            }`}
-          >
-            <p className="text-xs sm:text-sm font-bold tracking-wide text-white">
-              {isTamil ? "செய்திகள் கொண்டு செல்லும் வேகம்" : "Messages that move business"}
-            </p>
-            <p className="text-2xs text-white/80">
-              {isNight
-                ? "Active 24/7 · High Throughput Infrastructure"
-                : "Warm, quick, dependable customer campaigns"}
-            </p>
+            <Image
+              src="/brands/thabaal/body.png"
+              className="body"
+              alt="thabaal bird"
+              width={640}
+              height={354}
+              priority
+            />
           </div>
         </div>
       </div>
 
-      {/* 6. INTERACTIVE SLIDING ORBIT THEME SWITCHER */}
+      {/* 7. SLIDING THEME TOGGLE (Positioned at Top-Right as in Laptop Photo) */}
       {onToggleTheme && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 z-20">
-          <button
-            type="button"
-            onClick={onToggleTheme}
-            aria-label={isNight ? "Switch to day mode" : "Switch to night mode"}
-            className="group relative flex h-12 w-24 cursor-pointer items-center rounded-full border-2 border-white/50 bg-black/40 p-1 shadow-xl backdrop-blur-md transition active:scale-95"
-          >
-            {/* Track background */}
-            <span className="absolute inset-0 rounded-full overflow-hidden">
-              <span
-                className={`absolute inset-0 transition-opacity duration-500 ${
-                  isNight
-                    ? "bg-gradient-to-r from-[#091124] to-[#1c294e] opacity-100"
-                    : "bg-gradient-to-r from-[#2177d6] to-[#74baf7] opacity-100"
-                }`}
-              />
-            </span>
-
-            {/* Sliding knob with sun/moon face */}
-            <span
-              className={`relative z-10 flex size-9 items-center justify-center rounded-full shadow-md transition-transform duration-500 ${
-                isNight
-                  ? "translate-x-12 bg-gradient-to-br from-[#f2f2f2] to-[#b9b9be] text-gray-800"
-                  : "translate-x-0 bg-gradient-to-br from-[#fff3a0] to-[#f7b81c] text-amber-900"
-              }`}
+        <div className="thabaal-togglewrap" id="togglewrap">
+          <div className="thabaal-tgbox">
+            <span className="thabaal-pulse" aria-hidden="true" />
+            <button
+              type="button"
+              className="thabaal-toggle"
+              onClick={onToggleTheme}
+              role="switch"
+              aria-checked={isNight}
+              aria-label={isNight ? "Switch to day" : "Switch to night"}
             >
-              <span className="text-sm select-none">{isNight ? "🌙" : "☀️"}</span>
-            </span>
-          </button>
-          <span className="text-3xs font-extrabold uppercase tracking-widest text-white/90 drop-shadow">
-            {isNight ? "Night Sky (Click to switch)" : "Day Sky (Click to switch)"}
-          </span>
+              {/* Night Sky track */}
+              <span className="thabaal-tk thabaal-tk-night">
+                <i className="dot" style={{ left: "14px", top: "9px" }} />
+                <i className="dot" style={{ left: "46px", top: "7px", animationDelay: ".6s" }} />
+                <i className="dot" style={{ left: "28px", top: "24px", animationDelay: "1.2s" }} />
+                <span className="thabaal-tc" style={{ right: "6px", width: "42px" }} />
+                <span
+                  className="thabaal-tc"
+                  style={{ right: "40px", width: "30px", bottom: "-9px" }}
+                />
+              </span>
+
+              {/* Day Sky track */}
+              <span className="thabaal-tk thabaal-tk-day">
+                <span className="thabaal-tc" style={{ left: "4px", width: "42px" }} />
+                <span
+                  className="thabaal-tc"
+                  style={{ left: "36px", width: "36px", bottom: "-9px" }}
+                />
+                <span
+                  className="thabaal-tc"
+                  style={{ left: "70px", width: "24px", bottom: "-7px" }}
+                />
+              </span>
+
+              {/* Knob with Sun & Moon Face */}
+              <span className="thabaal-ringwrap">
+                <span className="thabaal-ring" style={{ width: "52px", height: "52px" }} />
+              </span>
+              <span className="thabaal-knob">
+                <span className="face sunface" />
+                <span className="face moonface" />
+              </span>
+            </button>
+          </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }
