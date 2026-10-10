@@ -265,7 +265,7 @@ export function NewOrder({
                 <Badge tone="green">Auto-filled from saved profile</Badge>
               )}
               {addressSource === "chat" && (
-                <Badge tone="info">Auto-detected from WhatsApp chat</Badge>
+                <Badge tone="blue">Auto-detected from WhatsApp chat</Badge>
               )}
             </div>
 
