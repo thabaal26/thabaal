@@ -1,7 +1,7 @@
-import { ArrowDownRight, ArrowUpRight, CheckCheck, Eye, MessageCircle, Send, ShoppingBag, ShieldAlert, type LucideIcon } from "lucide-react";
+import { Activity, ArrowDownRight, ArrowUpRight, CheckCheck, Clock3, Eye, Gauge, MessageCircle, PieChart, Send, ShoppingBag, ShieldAlert, TrendingUp, Trophy, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { CountUp, Ring, Sparkline, TrendChart, type Series } from "@/components/charts";
+import { CountUp, Ring3D, Sparkline, TrendChart, type Series } from "@/components/charts";
 import { formatValue, type ValueFormat } from "@/lib/chart-math";
 import { Card, CardHeader, QualityBadge, buttonClass } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -97,9 +97,16 @@ export function KpiTile({
 }) {
   const body = (
     <>
+      <span aria-hidden className="absolute inset-x-0 top-0 h-[3px]" style={{ background: color }} />
       <div className="flex items-center justify-between gap-2 px-3.5 pt-3.5 sm:px-5 sm:pt-5">
-        <p className="min-w-0 truncate text-xs font-medium text-muted sm:text-sm">{label}</p>
-        <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-control sm:size-8" style={{ background: `${color}14`, color }}>
+        <p className="min-w-0 text-[0.6875rem] font-semibold uppercase leading-tight tracking-wide sm:text-[0.8125rem]" style={{ color }}>
+          {label}
+        </p>
+        <span
+          aria-hidden
+          className="grid size-8 shrink-0 place-items-center rounded-[10px] text-white ring-1 ring-inset ring-white/25 sm:size-9"
+          style={{ background: `linear-gradient(145deg, rgb(255 255 255 / 0.38), rgb(255 255 255 / 0) 60%), ${color}`, boxShadow: `0 5px 12px -4px ${color}99` }}
+        >
           <Icon className="size-4" />
         </span>
       </div>
@@ -116,12 +123,16 @@ export function KpiTile({
       </div>
     </>
   );
+  // A faint wash of the tile's own colour from the top, over the raised 3D surface.
+  const surface = { background: `linear-gradient(180deg, ${color}14 0%, #ffffff 46%, #fbfcfe 100%)` };
   return href ? (
-    <Link href={href} className="lift flex h-full min-w-0 flex-col overflow-hidden rounded-card border border-line bg-panel shadow-card">
+    <Link href={href} className="card-3d relative flex h-full min-w-0 flex-col overflow-hidden rounded-card border" style={surface}>
       {body}
     </Link>
   ) : (
-    <Card className="flex h-full flex-col overflow-hidden">{body}</Card>
+    <Card className="card-3d relative flex h-full flex-col overflow-hidden" style={surface}>
+      {body}
+    </Card>
   );
 }
 
@@ -129,8 +140,10 @@ export function KpiTile({
 
 export function ActivityCard({ labels, tooltipLabels, series, every, title, description }: { labels: string[]; tooltipLabels: string[]; series: Series[]; every: number; title: string; description: string }) {
   return (
-    <Card className="h-full">
+    <Card className="card-3d h-full">
       <CardHeader
+        tone="brand"
+        icon={<Activity />}
         title={title}
         description={description}
         action={
@@ -145,7 +158,7 @@ export function ActivityCard({ labels, tooltipLabels, series, every, title, desc
         }
       />
       <div className="px-2 pb-3 pt-4 sm:px-4">
-        <TrendChart labels={labels} tooltipLabels={tooltipLabels} series={series} every={every} height={260} />
+        <TrendChart labels={labels} tooltipLabels={tooltipLabels} series={series} every={every} height={330} />
       </div>
       {/* The same figures for screen readers. */}
       <table className="sr-only">
@@ -188,20 +201,23 @@ export function DeliveryCard({ read, delivered, sent, failed }: { read: number; 
     { key: "failed", label: "Failed", value: failed, color: C.failed },
   ];
   return (
-    <Card className="h-full">
-      <CardHeader title="Delivery health" description="Where this period's messages ended up" />
-      <div className="flex flex-col items-center gap-5 p-5 sm:flex-row xl:flex-col 2xl:flex-row">
-        <Ring segments={segs} size={164} thickness={13} label={`${pct(reached, total)}% of ${total} messages delivered`}>
-          <p className="text-2xl font-semibold tracking-tight text-ink">
+    <Card className="card-3d h-full">
+      <CardHeader tone="violet" icon={<PieChart />} title="Delivery health" description="Where this period's messages ended up" />
+      <div className="flex flex-col gap-5 p-5">
+        <div>
+          <p className="text-[1.75rem] font-semibold leading-tight tracking-tight text-ink">
             <CountUp value={pct(reached, total)} format="percent" />
           </p>
-          <p className="text-xs text-muted">delivered</p>
-        </Ring>
-        <ul className="w-full min-w-0 flex-1 space-y-2.5">
+          <p className="text-sm text-muted">
+            of {fmtNumber(total)} messages reached the customer
+          </p>
+        </div>
+        <Ring3D segments={segs} label={`${pct(reached, total)}% of ${total} messages delivered`} />
+        <ul className="grid grid-cols-1 gap-x-5 gap-y-2.5 min-[420px]:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
           {segs.map((s) => (
             <li key={s.key} className="flex items-center gap-2.5 text-sm">
               <span aria-hidden className="size-2.5 shrink-0 rounded-[3px]" style={{ background: s.color }} />
-              <span className="min-w-0 flex-1 truncate text-ink-2">{s.label}</span>
+              <span className="min-w-0 flex-1 text-ink-2">{s.label}</span>
               <span className="tabular font-medium text-ink">{fmtNumber(s.value)}</span>
               <span className="tabular w-11 text-right text-xs text-muted">{pct(s.value, total)}%</span>
             </li>
@@ -226,15 +242,19 @@ const FUNNEL: { key: "messaged" | "delivered" | "read" | "replied" | "ordered"; 
 export function FunnelCard({ f, revenue }: { f: Record<(typeof FUNNEL)[number]["key"], number>; revenue: number }) {
   const base = f.messaged;
   return (
-    <Card className="h-full">
-      <CardHeader title="From message to order" description="Customers messaged this period, and how far they went" />
+    <Card className="card-3d h-full">
+      <CardHeader tone="gold" icon={<TrendingUp />} title="From message to order" description="Customers messaged this period, and how far they went" />
       {base ? (
         <ul className="space-y-1 p-3 sm:p-4">
           {FUNNEL.map((s) => {
             const share = pct(f[s.key], base);
             return (
               <li key={s.key} className="flex items-center gap-3 rounded-control px-2 py-2">
-                <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full" style={{ background: `${s.color}14`, color: s.color }}>
+                <span
+                  aria-hidden
+                  className="grid size-9 shrink-0 place-items-center rounded-full text-white ring-1 ring-inset ring-white/25"
+                  style={{ background: `linear-gradient(145deg, rgb(255 255 255 / 0.38), rgb(255 255 255 / 0) 60%), ${s.color}`, boxShadow: `0 4px 10px -3px ${s.color}88` }}
+                >
                   <s.icon className="size-4" />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -244,8 +264,8 @@ export function FunnelCard({ f, revenue }: { f: Record<(typeof FUNNEL)[number]["
                       <b className="font-semibold text-ink">{fmtNumber(f[s.key])}</b> <span className="text-xs text-muted">· {share}%</span>
                     </span>
                   </div>
-                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-sunken" role="meter" aria-label={`${s.label}: ${share}%`} aria-valuenow={share} aria-valuemin={0} aria-valuemax={100}>
-                    <div className="bar h-full rounded-full" style={{ width: `${Math.max(share, f[s.key] ? 2 : 0)}%`, background: s.color }} />
+                  <div className="track-3d mt-1.5 h-2 overflow-hidden rounded-full" role="meter" aria-label={`${s.label}: ${share}%`} aria-valuenow={share} aria-valuemin={0} aria-valuemax={100}>
+                    <div className="bar bar-3d h-full rounded-full" style={{ width: `${Math.max(share, f[s.key] ? 2 : 0)}%`, backgroundColor: s.color }} />
                   </div>
                 </div>
               </li>
@@ -280,7 +300,10 @@ export function TodayCard({
   next: { name: string; at: Date } | null;
 }) {
   return (
-    <section aria-labelledby="today-title" className="surface-dark relative flex h-full flex-col overflow-hidden rounded-card bg-night text-white shadow-card">
+    <section
+      aria-labelledby="today-title"
+      className="surface-dark relative flex h-full flex-col overflow-hidden rounded-card bg-night text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.1),0_2px_4px_rgb(16_24_40/0.12),0_22px_40px_-16px_rgb(16_24_40/0.55)]"
+    >
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_80%_at_100%_0%,rgb(22_125_99/0.55),transparent_60%),radial-gradient(80%_60%_at_0%_100%,rgb(234_191_38/0.16),transparent_70%)]" />
       <div className="relative flex items-start justify-between gap-3 px-5 pt-5">
         <div>
@@ -346,46 +369,79 @@ export function TodayCard({
 
 type Health = Awaited<ReturnType<typeof numberHealth>>;
 
-/** Each sending number's 24-hour people limit as a progress ring, with Meta's quality rating. */
+/** A usage ring with the figures beside it: used of limit, how many more today, and the safety reserve. */
+function LimitRing({ used, limit, left, label }: { used: number; limit: number | null; left: number | null; label: string }) {
+  const full = left === 0;
+  // The portal stops a little under Meta's limit so retries never tip a number over it.
+  const reserve = limit !== null && left !== null ? Math.max(0, limit - used - left) : 0;
+  return (
+    <div className="flex items-center gap-4">
+      <div className="shrink-0">
+        <Ring3D
+          width={104}
+          depth={10}
+          thickness={26}
+          segments={[
+            { key: "used", label: "Used", value: Math.max(used, 0), color: full ? C.failed : C.brand },
+            { key: "free", label: "Free", value: limit === null ? 0 : Math.max(limit - used, 0), color: "#dfe4ea" },
+          ]}
+          label={limit === null ? `${label}: no limit` : `${label}: ${used} of ${limit} people messaged`}
+        />
+      </div>
+      <div className="min-w-0 text-sm">
+        <p className="tabular text-ink">
+          <b className="font-semibold">{fmtNumber(used)}</b> of {limit === null ? "unlimited" : fmtNumber(limit)} people
+        </p>
+        <p className="tabular text-xs text-ink-2">
+          {left === null ? "No daily limit" : full ? <b className="text-warning">Limit reached, sends resume as the 24 hours roll on</b> : `${fmtNumber(left)} more can be messaged now`}
+        </p>
+        {reserve > 0 && !full && <p className="tabular text-xs text-muted">{fmtNumber(reserve)} kept spare so retries never go over</p>}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Meta caps how many different people a business may message in 24 hours. The cap and the quality
+ * rating come from Meta (refreshed by the scheduler); usage is counted from what this portal sent.
+ * Numbers without their own warm-up cap share one business-wide limit, so it's shown once.
+ */
 export function NumberLimitsCard({ numbers }: { numbers: Health }) {
   if (!numbers.length) return null;
+  const shared = numbers.filter((n) => n.dailyCap == null);
+  const head = shared[0];
+  const checked = numbers.map((n) => n.statusCheckedAt).filter((d): d is Date => Boolean(d)).sort((a, b) => a.getTime() - b.getTime())[0];
   return (
-    <Card className="h-full">
-      <CardHeader title="Number limits" description="People messaged in the last 24 hours" />
+    <Card className="card-3d flex h-full flex-col">
+      <CardHeader tone="info" icon={<Gauge />} title="Daily sending limit" description="Different people messaged in the last 24 hours" />
+      {head && (
+        <div className="border-b border-line px-4 py-4 sm:px-5">
+          <LimitRing used={head.used} limit={head.limit} left={head.left} label="Business limit" />
+          {shared.length > 1 && <p className="mt-2 text-xs text-muted">Shared by your {shared.length} numbers: Meta counts the whole business.</p>}
+        </div>
+      )}
       <ul className="divide-y divide-line">
-        {numbers.map((n) => {
-          const used = n.limit ? pct(n.used, n.limit) : 0;
-          const full = n.left === 0;
-          return (
-            <li key={n.id} className="flex items-center gap-4 px-4 py-4 sm:px-5">
-              <Ring
-                segments={[{ key: "used", label: "Used", value: n.limit ? Math.max(n.used, 0) : 0, color: full ? C.failed : n.qualityRating === "RED" ? C.failed : C.brand }]}
-                max={n.limit ?? 1}
-                size={64}
-                thickness={11}
-                label={n.limit === null ? `${n.label}: no limit` : `${n.label}: ${n.used} of ${n.limit} people used`}
-              >
-                <span className="tabular text-xs font-semibold text-ink">{n.limit === null ? "∞" : `${used}%`}</span>
-              </Ring>
-              <div className="min-w-0 flex-1">
+        {numbers.map((n) => (
+          <li key={n.id} className="space-y-2 px-4 py-3 sm:px-5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-ink">{n.label}</p>
                 <p className="tabular truncate text-xs text-muted">{n.displayPhone}</p>
-                <p className="tabular mt-1 text-xs text-ink-2">
-                  {fmtNumber(n.used)} of {n.limit === null ? "unlimited" : fmtNumber(n.limit)} · {n.left === null ? "no limit" : full ? <b className="text-warning">limit reached</b> : `${fmtNumber(n.left)} left`}
-                </p>
-                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                  <QualityBadge rating={n.qualityRating} />
-                  {n.qualityRating === "RED" && (
-                    <span className="inline-flex items-center gap-1 text-xs text-danger">
-                      <ShieldAlert aria-hidden className="size-3.5" /> Campaigns paused
-                    </span>
-                  )}
-                </div>
               </div>
-            </li>
-          );
-        })}
+              <QualityBadge rating={n.qualityRating} />
+            </div>
+            {n.qualityRating === "RED" && (
+              <p className="inline-flex items-center gap-1 text-xs text-danger">
+                <ShieldAlert aria-hidden className="size-3.5" /> Campaigns paused to protect this number
+              </p>
+            )}
+            {n.dailyCap != null && <LimitRing used={n.used} limit={n.limit} left={n.left} label={`${n.label} warm-up cap`} />}
+          </li>
+        ))}
       </ul>
+      <p className="mt-auto border-t border-line px-4 py-2.5 text-xs text-muted sm:px-5">
+        Limit and quality from Meta{checked ? `, checked ${fmtDate(checked, "d MMM, h:mm a")}` : ""}. Usage counts messages sent from this portal.
+      </p>
     </Card>
   );
 }
@@ -403,8 +459,10 @@ export function BestTimeCard({ cells, days }: { cells: { d: number; b: number; n
   // Monday first, the way the week is planned.
   const order = [1, 2, 3, 4, 5, 6, 0];
   return (
-    <Card className="h-full">
+    <Card className="card-3d h-full">
       <CardHeader
+        tone="brand"
+        icon={<Clock3 />}
         title="Best time to reach customers"
         description={`When customers wrote back, last ${days} days`}
         action={
@@ -447,8 +505,11 @@ export function BestTimeCard({ cells, days }: { cells: { d: number; b: number; n
                         const v = n(d, bi);
                         const a = v ? 0.12 + 0.88 * (v / max) : 0;
                         return (
-                          <td key={b} className="h-8 rounded-[5px] bg-sunken p-0 text-center" title={`${DAYS[d]} ${b}: ${v} replies`}>
-                            <span className="grid size-full min-h-8 place-items-center rounded-[5px] font-medium" style={{ background: v ? `rgb(22 125 99 / ${a})` : undefined, color: a > 0.55 ? "#fff" : "#344054" }}>
+                          <td key={b} className="track-3d h-8 rounded-[6px] p-0 text-center" title={`${DAYS[d]} ${b}: ${v} replies`}>
+                            <span
+                              className={cn("grid size-full min-h-8 place-items-center rounded-[6px] font-semibold", v > 0 && "tile-3d")}
+                              style={{ background: v ? `linear-gradient(180deg, rgb(255 255 255 / 0.18), rgb(255 255 255 / 0)), rgb(22 125 99 / ${a})` : undefined, color: a > 0.55 ? "#fff" : "#344054" }}
+                            >
                               {v || ""}
                               <span className="sr-only">{v ? "" : "0"}</span>
                             </span>
@@ -472,8 +533,10 @@ export function BestTimeCard({ cells, days }: { cells: { d: number; b: number; n
 export function TopProductsCard({ items, rangeLabel }: { items: { name: string; qty: number; revenue: number }[]; rangeLabel: string }) {
   const max = Math.max(1, ...items.map((i) => i.revenue));
   return (
-    <Card className="h-full">
+    <Card className="card-3d h-full">
       <CardHeader
+        tone="gold"
+        icon={<Trophy />}
         title="Best sellers"
         description={`From orders, ${rangeLabel.toLowerCase()}`}
         action={
@@ -486,15 +549,20 @@ export function TopProductsCard({ items, rangeLabel }: { items: { name: string; 
         <ol className="space-y-3 p-4 sm:p-5">
           {items.map((it, i) => (
             <li key={it.name} className="flex items-center gap-3">
-              <span className="tabular grid size-7 shrink-0 place-items-center rounded-full bg-sunken text-xs font-semibold text-ink-2">{i + 1}</span>
+              <span
+                className={cn("tabular tile-3d grid size-7 shrink-0 place-items-center rounded-full text-xs font-semibold", i === 0 ? "text-white" : "bg-sunken text-ink-2")}
+                style={i === 0 ? { background: "linear-gradient(145deg, #f5d55c, #b98a05)" } : undefined}
+              >
+                {i + 1}
+              </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-2 text-sm">
                   <span className="truncate font-medium text-ink">{it.name}</span>
                   <span className="tabular shrink-0 font-semibold text-ink">{formatValue(it.revenue, "inr")}</span>
                 </div>
                 <div className="mt-1 flex items-center gap-2">
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-sunken">
-                    <div className="bar h-full rounded-full" style={{ width: `${pct(it.revenue, max)}%`, background: C.gold }} />
+                  <div className="track-3d h-2 flex-1 overflow-hidden rounded-full">
+                    <div className="bar bar-3d h-full rounded-full" style={{ width: `${pct(it.revenue, max)}%`, backgroundColor: C.gold }} />
                   </div>
                   <span className="tabular w-14 shrink-0 text-right text-xs text-muted">{fmtNumber(it.qty)} sold</span>
                 </div>

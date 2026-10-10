@@ -104,22 +104,54 @@ export function Card({ className, ...p }: ComponentProps<"div">) {
 /** Padding inside a card body; the same everywhere. */
 export const cardPad = "p-4 sm:p-5";
 
+/**
+ * Coloured header treatments: a soft tinted band, an accent strip along the card's top edge and a
+ * glossy icon tile. Each card on a busy page gets its own colour so it can be found at a glance.
+ */
+const headerTones = {
+  brand: { band: "from-brand-soft/90", strip: "before:bg-brand", tile: "from-[#2fb08c] to-brand-deep shadow-[0_4px_10px_-3px_rgb(22_125_99/0.55)]" },
+  violet: { band: "from-accent-bg", strip: "before:bg-accent", tile: "from-[#9479e8] to-accent shadow-[0_4px_10px_-3px_rgb(105_65_198/0.5)]" },
+  gold: { band: "from-gold-soft", strip: "before:bg-gold", tile: "from-[#f5d55c] to-[#b98a05] shadow-[0_4px_10px_-3px_rgb(185_138_5/0.5)]" },
+  info: { band: "from-info-bg", strip: "before:bg-info", tile: "from-[#4f93d8] to-info shadow-[0_4px_10px_-3px_rgb(29_100_168/0.5)]" },
+  rose: { band: "from-danger-bg", strip: "before:bg-danger-solid", tile: "from-[#e46a6a] to-danger shadow-[0_4px_10px_-3px_rgb(180_46_46/0.5)]" },
+};
+export type HeaderTone = keyof typeof headerTones;
+
 export function CardHeader({
   title,
   description,
   action,
   as: H = "h2",
+  tone,
+  icon,
 }: {
   title: ReactNode;
   description?: ReactNode;
   action?: ReactNode;
   as?: "h2" | "h3";
+  /** A coloured header band and accent strip (used on the Overview's 3D cards). */
+  tone?: HeaderTone;
+  /** An icon in a glossy tile beside the title; shown when `tone` is set. */
+  icon?: ReactNode;
 }) {
+  const t = tone ? headerTones[tone] : null;
   return (
-    <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 border-b border-line px-4 py-3.5 sm:flex-nowrap sm:gap-4 sm:px-5 sm:py-4">
-      <div className="min-w-0 flex-1 basis-40">
-        <H className="text-[0.9375rem] font-semibold leading-6 text-ink">{title}</H>
-        {description && <p className="mt-0.5 text-xs leading-relaxed text-muted sm:text-sm">{description}</p>}
+    <div
+      className={cn(
+        "relative flex flex-wrap items-start justify-between gap-x-3 gap-y-2 border-b border-line px-4 py-3.5 sm:flex-nowrap sm:gap-4 sm:px-5 sm:py-4",
+        t && ["rounded-t-[inherit] bg-gradient-to-r to-transparent to-75%", t.band, "before:absolute before:inset-x-0 before:top-0 before:h-[3px] before:rounded-t-[inherit]", t.strip],
+      )}
+    >
+      <div className="flex min-w-0 flex-1 basis-40 items-start gap-3">
+        {t && icon && (
+          <span aria-hidden className={cn("grid size-9 shrink-0 place-items-center rounded-[10px] bg-gradient-to-br text-white ring-1 ring-inset ring-white/25 [&>svg]:size-[18px]", t.tile)}>
+            {icon}
+          </span>
+        )}
+        <div className="min-w-0">
+          <H className="text-[0.9375rem] font-semibold leading-6 text-ink">{title}</H>
+          {description && <p className="mt-0.5 text-xs leading-relaxed text-muted sm:text-sm">{description}</p>}
+        </div>
       </div>
       {action && <div className="flex min-w-0 max-w-full shrink-0 items-center gap-2 self-center">{action}</div>}
     </div>
@@ -604,7 +636,7 @@ export function Stat({ label, value, sub, icon, href }: { label: string; value: 
 }
 
 /** A thin progress or share bar. */
-export function Meter({ value, tone = "brand", label, className }: { value: number; tone?: "brand" | "warning"; label?: string; className?: string }) {
+export function Meter({ value, tone = "brand", label, className, raised }: { value: number; tone?: "brand" | "warning"; label?: string; className?: string; /** Glossy bar in a recessed track (3D cards). */ raised?: boolean }) {
   return (
     <div
       role={label ? "meter" : undefined}
@@ -612,9 +644,9 @@ export function Meter({ value, tone = "brand", label, className }: { value: numb
       aria-valuenow={label ? Math.round(value) : undefined}
       aria-valuemin={label ? 0 : undefined}
       aria-valuemax={label ? 100 : undefined}
-      className={cn("h-1.5 overflow-hidden rounded-full bg-sunken", className)}
+      className={cn("overflow-hidden rounded-full", raised ? "track-3d h-2" : "h-1.5 bg-sunken", className)}
     >
-      <div className={cn("bar h-full rounded-full", tone === "warning" ? "bg-warning-solid" : "bg-brand")} style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
+      <div className={cn("bar h-full rounded-full", raised && "bar-3d", tone === "warning" ? "bg-warning-solid" : "bg-brand")} style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
     </div>
   );
 }

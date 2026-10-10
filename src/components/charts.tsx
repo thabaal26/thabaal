@@ -152,7 +152,17 @@ export function TrendChart({
             return (
               <g key={s.key}>
                 {s.area !== false && <path d={`${line} L${x(n - 1)},${y(0)} L${x(0)},${y(0)} Z`} fill={`url(#a${uid}${s.key})`} className="chart-fade" />}
-                <path d={line} fill="none" stroke={s.color} strokeWidth={2.25} strokeLinecap="round" strokeLinejoin="round" pathLength={1} className="chart-draw" />
+                <path
+                  d={line}
+                  fill="none"
+                  stroke={s.color}
+                  strokeWidth={2.5}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  pathLength={1}
+                  className="chart-draw"
+                  style={{ filter: `drop-shadow(0 5px 5px ${s.color}55)` }}
+                />
               </g>
             );
           })}
@@ -262,6 +272,128 @@ export function Ring({
           })}
       </svg>
       <div className="relative text-center">{children}</div>
+    </div>
+  );
+}
+
+/* ───────────────────────── 3D ring ───────────────────────── */
+
+/** A colour made darker (f < 0) or lighter (f > 0), for the shaded side of the 3D ring. */
+function shade(hex: string, f: number) {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => Math.round(f < 0 ? c * (1 + f) : c + (255 - c) * f));
+  return `rgb(${ch.join(",")})`;
+}
+
+/**
+ * A donut seen from above at an angle: the top face carries the segments, a darker extruded wall
+ * gives it depth, and a soft shadow grounds it. Tilt exaggerates the front segments a little, so
+ * pair it with a legend that states the exact figures. Draws itself in once.
+ */
+export function Ring3D({
+  segments,
+  width = 260,
+  thickness = 22,
+  tilt = 0.56,
+  depth = 12,
+  label,
+  children,
+}: {
+  segments: RingSegment[];
+  width?: number;
+  thickness?: number;
+  /** How flattened the ellipse is (1 = seen from straight above). */
+  tilt?: number;
+  /** Height of the side wall, in viewBox units (the ring is 100 wide). */
+  depth?: number;
+  label: string;
+  children?: ReactNode;
+}) {
+  const [drawn, setDrawn] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setDrawn(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const uid = useId().replace(/:/g, "");
+  const total = segments.reduce((a, s) => a + s.value, 0);
+  const shown = segments.filter((s) => s.value > 0);
+  const gap = shown.length > 1 ? 0.6 : 0;
+  const r = 50 - thickness / 2 - 1;
+  const top = 50 * tilt; // centre of the top face
+  const h = 100 * tilt + depth + 8; // room for the wall and the shadow
+
+  const ringLayer = (dy: number, colorOf: (s: RingSegment) => string, key: string) => {
+    let offset = 0;
+    return (
+      <g key={key} transform={`translate(0 ${dy}) scale(1 ${tilt})`}>
+        <g transform="rotate(-90 50 50)">
+          {total > 0 &&
+            segments.map((s) => {
+              const len = Math.max(0, (s.value / total) * 100 - gap);
+              const el =
+                s.value > 0 ? (
+                  <circle
+                    key={s.key}
+                    cx="50"
+                    cy="50"
+                    r={r}
+                    fill="none"
+                    stroke={colorOf(s)}
+                    strokeWidth={thickness}
+                    pathLength={100}
+                    strokeDasharray={`${drawn ? len : 0} 100`}
+                    strokeDashoffset={-offset}
+                    className="transition-[stroke-dasharray] duration-[900ms] ease-out motion-reduce:transition-none"
+                  />
+                ) : null;
+              offset += (s.value / total) * 100;
+              return el;
+            })}
+        </g>
+      </g>
+    );
+  };
+
+  // The wall: the ring repeated downwards in darker shades, bottom first, so the top face covers it.
+  const steps = Math.max(2, Math.round(depth / 1.2));
+  const wall = Array.from({ length: steps }, (_, i) => {
+    const dy = depth - (i * depth) / steps;
+    return ringLayer(dy, (s) => shade(s.color, -0.42 + (i / steps) * 0.12), `w${i}`);
+  });
+
+  return (
+    <div role="img" aria-label={label} className="relative mx-auto" style={{ width, height: (width * h) / 100 }}>
+      <svg viewBox={`0 0 100 ${h}`} className="absolute inset-0 size-full overflow-visible">
+        <defs>
+          <radialGradient id={`sh${uid}`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#101828" stopOpacity="0.22" />
+            <stop offset="100%" stopColor="#101828" stopOpacity="0" />
+          </radialGradient>
+          <linearGradient id={`hl${uid}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.22" />
+            <stop offset="55%" stopColor="#ffffff" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {/* Floor shadow */}
+        <ellipse cx="50" cy={top + depth + 3} rx="48" ry={50 * tilt * 0.9} fill={`url(#sh${uid})`} />
+        {/* Empty track when there's nothing to show */}
+        {total === 0 && (
+          <g transform={`scale(1 ${tilt})`}>
+            <circle cx="50" cy="50" r={r} fill="none" stroke="#e2e6ec" strokeWidth={thickness} />
+          </g>
+        )}
+        {wall}
+        {ringLayer(0, (s) => s.color, "top")}
+        {/* Soft light across the top face */}
+        <g transform={`scale(1 ${tilt})`} pointerEvents="none">
+          <circle cx="50" cy="50" r={r} fill="none" stroke={`url(#hl${uid})`} strokeWidth={thickness} />
+        </g>
+      </svg>
+      {children && (
+        <div className="absolute inset-x-0 flex flex-col items-center justify-center text-center" style={{ top: 0, height: `${((top * 2) / h) * 100}%` }}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }

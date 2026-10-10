@@ -266,6 +266,38 @@ body {
 .bar { transform-origin: left; animation: grow 0.6s var(--ease-snappy) 0.1s both; }
 .bar-y { transform-origin: bottom; animation: grow-y 0.5s var(--ease-snappy) both; }
 
+/*
+ * Raised "3D" cards (the Overview): a soft top-lit surface, a bright top edge, layered shadows that
+ * give real depth, and a lift on hover. Phones get the depth without the hover.
+ */
+.card-3d {
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+  border-color: rgb(16 24 40 / 0.08);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255),
+    0 1px 2px rgb(16 24 40 / 0.06),
+    0 6px 12px -4px rgb(16 24 40 / 0.08),
+    0 18px 36px -16px rgb(16 24 40 / 0.18);
+}
+@media (hover: hover) and (pointer: fine) {
+  .card-3d { transition: transform 0.25s var(--ease-snappy), box-shadow 0.25s var(--ease-snappy); }
+  .card-3d:hover {
+    transform: translateY(-3px);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255),
+      0 2px 4px rgb(16 24 40 / 0.06),
+      0 12px 20px -6px rgb(16 24 40 / 0.12),
+      0 28px 48px -18px rgb(16 24 40 / 0.24);
+  }
+}
+
+/* Glossy filled bars over a recessed track. */
+.track-3d { background: var(--color-sunken); box-shadow: inset 0 1px 2px rgb(16 24 40 / 0.14); }
+.bar-3d { background-image: linear-gradient(180deg, rgb(255 255 255 / 0.38), rgb(255 255 255 / 0) 55%, rgb(0 0 0 / 0.1)); box-shadow: 0 1px 2px rgb(16 24 40 / 0.18); }
+
+/* Raised tiles (heatmap cells, icon chips). */
+.tile-3d { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.35), inset 0 -1px 0 rgb(0 0 0 / 0.08), 0 1px 2px rgb(16 24 40 / 0.12); }
+
 /* Chart lines draw themselves in once; areas and markers fade in after them. */
 .chart-draw { stroke-dasharray: 1; animation: chart-draw 0.9s var(--ease-snappy) both; }
 .chart-fade { animation: fade 0.5s ease-out 0.35s both; }

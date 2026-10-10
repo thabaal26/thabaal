@@ -72,9 +72,10 @@ export function BrandHero({
         </div>
       </div>
       {client?.bannerUrl && (
-        <div className="relative hidden w-[22rem] shrink-0 overflow-hidden rounded-card bg-night shadow-card ring-1 ring-line lg:block xl:w-[26rem]">
+        // The banner keeps its own proportions (no cropping); the tile is as tall as the image.
+        <div className="card-3d relative hidden w-[22rem] shrink-0 self-start overflow-hidden rounded-card border bg-night lg:block xl:w-[26rem]">
           {/* eslint-disable-next-line @next/next/no-img-element -- admin-supplied banner of any size */}
-          <img src={client.bannerUrl} alt={`${name} banner`} className="absolute inset-0 size-full object-cover" />
+          <img src={client.bannerUrl} alt={`${name} banner`} className="block h-auto w-full" />
           {client.tagline && (
             <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-night/85 to-transparent px-4 pb-3 pt-8 text-xs font-medium text-white">{client.tagline}</p>
           )}

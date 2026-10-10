@@ -1,4 +1,4 @@
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Wallet } from "lucide-react";
 import { Badge, buttonClass, Card, CardHeader } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { fmtNumber } from "@/lib/format";
@@ -43,8 +43,10 @@ export async function SpendCard({ clientId, className }: { clientId: string; can
   const low = recorded && s.remainingBalance < 50;
 
   return (
-    <Card className={className}>
+    <Card className={cn("card-3d", className)}>
       <CardHeader
+        tone="gold"
+        icon={<Wallet />}
         title="WhatsApp spend"
         description="Estimated at Meta's India rates"
         action={

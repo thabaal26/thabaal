@@ -1,4 +1,4 @@
-import { CalendarClock, Clock, IndianRupee, MessageCircle, Eye, Send, TriangleAlert } from "lucide-react";
+import { BarChart3, CalendarClock, Clock, Eye, IndianRupee, MapPin, MessageCircle, MessagesSquare, Send, ShoppingBasket, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { addDays } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
@@ -12,6 +12,7 @@ import { estimateDuration, formatMinutes } from "@/lib/schedule";
 import { getScope, owned, ownedMessages } from "@/lib/session";
 import { numberHealth } from "@/lib/limits";
 import { codesOf, PAUSING_KINDS } from "@/lib/meta-errors";
+import { HELD_CODES } from "@/lib/held";
 import type { OrderItem } from "@/lib/orders";
 import { cancelRun, runDispatcherNow } from "./actions/campaigns";
 import { BrandHero } from "./brand-hero";
@@ -128,7 +129,13 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       }),
       db.message.findMany({ where: { ...myMessages, status: { not: "QUEUED" } }, include: { customer: true }, orderBy: { createdAt: "desc" }, take: 6 }),
       // Failures in the last day, grouped by reason, so problems show up without opening the log.
-      db.message.groupBy({ by: ["error"], where: { ...myMessages, status: "FAILED", failedAt: { gte: daysAgo(1) } }, _count: true, orderBy: { _count: { error: "desc" } }, take: 3 }),
+      db.message.groupBy({
+        by: ["error"],
+        where: { ...myMessages, status: "FAILED", failedAt: { gte: daysAgo(1) }, OR: [{ errorCode: null }, { errorCode: { notIn: HELD_CODES } }] },
+        _count: true,
+        orderBy: { _count: { error: "desc" } },
+        take: 3,
+      }),
       getSettings(),
       // Orders of this period and the comparison stretch (cancelled ones aren't sales).
       db.order.findMany({ where: { ...mine, status: { not: "CANCELLED" }, createdAt: { gte: prevStart } }, select: { createdAt: true, total: true, items: true } }).catch(() => []),
@@ -177,6 +184,9 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         GROUP BY 1`,
     ]);
 
+  // Messages Meta held back (too much marketing to that person) are retried automatically and not
+  // charged: worth knowing, but nothing to fix, so they don't count as something needing attention.
+  const heldToday = await db.message.count({ where: { ...myMessages, status: "FAILED", failedAt: { gte: daysAgo(1) }, errorCode: { in: HELD_CODES } } });
   const failedToday = failures.reduce((n, f) => n + f._count, 0);
   // A campaign paused because the token, app permissions or Meta account stopped every send.
   const paused = await db.message.findFirst({
@@ -288,6 +298,14 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         period={<RangeTabs range={range} />}
       />
 
+      {heldToday > 0 && (
+        <Callout tone="info" icon={<Clock />} className="mb-5" title={`Meta held back ${fmtNumber(heldToday)} marketing message${heldToday === 1 ? "" : "s"} in the last 24 hours. No action needed.`}>
+          Those customers recently got a lot of marketing from businesses on WhatsApp, so Meta paused delivery to them. Held messages aren&apos;t charged, and campaign messages are
+          retried automatically after a few days.{" "}
+          <Link href="/dashboard/messages?status=FAILED">See them in the log</Link>
+        </Callout>
+      )}
+
       {issues > 0 && (
         <div className="mb-5 space-y-3">
           {paused && (
@@ -395,8 +413,8 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       </div>
 
       {activeRuns.length > 0 && (
-        <Card className="mt-4 sm:mt-5">
-          <CardHeader title="Sending now" description="Campaigns delivering in batches. Batch size or interval changes apply from the next batch." />
+        <Card className="card-3d mt-4 sm:mt-5">
+          <CardHeader tone="brand" icon={<Send />} title="Sending now" description="Campaigns delivering in batches. Batch size or interval changes apply from the next batch." />
           <ul className="divide-y divide-line">
             {activeRuns.map((r) => {
               const by = (s: string) => runProgress.find((p) => p.runId === r.id && p.status === s)?._count ?? 0;
@@ -412,7 +430,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
                       </Link>
                       <StatusBadge status={r.status} />
                     </div>
-                    <Meter className="mt-2" value={pct(done, r.total)} label={`${r.campaign.name} progress`} />
+                    <Meter raised className="mt-2" value={pct(done, r.total)} label={`${r.campaign.name} progress`} />
                     <p className="tabular mt-1.5 text-xs text-muted">
                       {fmtNumber(done)} of {fmtNumber(r.total)} processed · {by("FAILED")} failed ·{" "}
                       {queued ? `${r.campaign.batchSize} every ${r.campaign.intervalMinutes} min, about ${formatMinutes(eta)} left · next batch ${fmtDate(r.nextBatchAt, "h:mm a")}` : "finishing"}
@@ -483,8 +501,10 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       {/* Day-to-day detail. */}
       <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-5 sm:gap-5 xl:grid-cols-12">
         <div className="min-w-0 space-y-4 sm:space-y-5 xl:col-span-7">
-          <Card>
+          <Card className="card-3d">
             <CardHeader
+              tone="info"
+              icon={<MessagesSquare />}
               title="Latest messages"
               description="Sent from the portal, newest first"
               action={
@@ -524,8 +544,8 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
           </Card>
 
           {byProduct.length > 0 && (
-            <Card>
-              <CardHeader title="Campaign results by product" description="Last 30 days · which customer groups read your messages and write back" />
+            <Card className="card-3d">
+              <CardHeader tone="brand" icon={<BarChart3 />} title="Campaign results by product" description="Last 30 days · which customer groups read your messages and write back" />
               {/* Phones: one compact row per product instead of a sideways-scrolling table. */}
               <ul className="divide-y divide-line sm:hidden">
                 {byProduct.map((r) => (
@@ -579,7 +599,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
                         <Td numeric>{pct(r.delivered, r.sent)}%</Td>
                         <Td numeric>
                           <span className="inline-flex items-center gap-2">
-                            <Meter className="hidden w-16 md:block" value={pct(r.read, r.delivered)} />
+                            <Meter raised className="hidden w-16 md:block" value={pct(r.read, r.delivered)} />
                             {pct(r.read, r.delivered)}%
                           </span>
                         </Td>
@@ -602,8 +622,10 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         </div>
 
         <div className="min-w-0 space-y-4 sm:space-y-5 xl:col-span-5">
-          <Card>
+          <Card className="card-3d">
             <CardHeader
+              tone="violet"
+              icon={<CalendarClock />}
               title="Coming up"
               description="Next scheduled campaign sends"
               action={
@@ -642,8 +664,8 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
           {cid && <SpendCard clientId={cid} canManage={scope.canManage} />}
 
           {shown.length > 0 && (
-            <Card>
-              <CardHeader title="What your customers buy" description="Customers per product or group · each can get its own campaign" />
+            <Card className="card-3d">
+              <CardHeader tone="gold" icon={<ShoppingBasket />} title="What your customers buy" description="Customers per product or group · each can get its own campaign" />
               <ul className="grid gap-x-6 gap-y-0.5 p-2 sm:grid-cols-2 sm:p-3">
                 {shown.map((t) => (
                   <li key={t.tag}>
@@ -652,7 +674,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
                         <span className="truncate font-medium text-ink group-hover:underline">{tagLabel(t.tag)}</span>
                         <span className="tabular text-xs font-medium text-ink-2">{fmtNumber(t.n)}</span>
                       </div>
-                      <Meter className="mt-1.5" value={Math.max(4, pct(t.n, top))} />
+                      <Meter raised className="mt-1.5" value={Math.max(4, pct(t.n, top))} />
                     </Link>
                   </li>
                 ))}
@@ -663,8 +685,8 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       </div>
 
       {byRegion.length > 1 && (
-        <Card className="mt-4 sm:mt-5">
-          <CardHeader title="Customers by area" description="From the order sheets · tap an area to see its customers" />
+        <Card className="card-3d mt-4 sm:mt-5">
+          <CardHeader tone="info" icon={<MapPin />} title="Customers by area" description="From the order sheets · tap an area to see its customers" />
           <div className="space-y-5 p-4 sm:p-5">
             <div>
               <div className="flex h-2.5 gap-0.5 overflow-hidden rounded-full" aria-hidden>
