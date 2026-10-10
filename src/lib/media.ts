@@ -7,7 +7,7 @@ import type { MetaComponent } from "./template";
 export function absoluteUrl(path: string | null | undefined) {
   if (!path) return null;
   if (/^https:\/\//.test(path)) return path;
-  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL;
+  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL ?? "campaign-seven-ruddy.vercel.app";
   return path.startsWith("/") && host ? `https://${host}${path}` : null;
 }
 

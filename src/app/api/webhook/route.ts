@@ -1,12 +1,12 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { pushToGoogleSheet } from "@/lib/google-sheets-live";
+import { pushOrderToSheet, pushToGoogleSheet } from "@/lib/google-sheets-live";
 import { refreshNumberStatus } from "@/lib/limits";
 import { recordMetaAccountAlert } from "@/lib/meta-balance";
 import { explainError } from "@/lib/meta-errors";
 import { applyFailure } from "@/lib/rules";
-import { orderRef, orderWhereRef, recordOrder } from "@/lib/orders";
+import { orderWhereRef, recordOrder } from "@/lib/orders";
 import { metaReplyContent, receivingNumber, recordReply } from "@/lib/replies";
 import { autoRequestPayment, confirmPayment } from "@/lib/payments";
 import { autoReplyToButton, autoSendCatalogue, catalogueTrigger, firstMessageToday } from "@/lib/catalog";
@@ -238,19 +238,7 @@ export async function POST(req: NextRequest) {
             // A new cart: send "Review and pay" right away while the customer is in the chat.
             if (order) {
               await autoRequestPayment(order).catch((e) => console.error("Automatic payment request failed", e));
-              const itemsList = Array.isArray(order.items)
-                ? (order.items as Array<{ quantity?: number; name?: string; id?: string }>).map((i) => `${i.quantity ?? 1}x ${i.name ?? i.id}`).join(", ")
-                : "";
-              pushToGoogleSheet("NEW_ORDER", {
-                orderId: orderRef(order),
-                phone: customer.phone,
-                name: customer.name || "",
-                items: itemsList,
-                total: order.total,
-                status: order.status,
-                address: customer.location || "",
-                client: clientName,
-              });
+              pushOrderToSheet(order.id, "NEW_ORDER");
             }
           }
         }

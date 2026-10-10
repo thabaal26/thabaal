@@ -1,7 +1,13 @@
 import "server-only";
+import { formatInTimeZone } from "date-fns-tz";
 import { after } from "next/server";
+import { db } from "./db";
+import { APP_TZ } from "./format";
+import { itemsText, orderRef, type OrderItem } from "./orders";
 
-export type SheetLiveEvent = "NEW_CHAT" | "BUTTON_CLICK" | "NEW_ORDER" | "CAMPAIGN_STATUS";
+// The client's Google Sheet live log (deploy/google-sheets/Code.gs): each event lands in its own tab.
+
+export type SheetLiveEvent = "NEW_CHAT" | "BUTTON_CLICK" | "NEW_ORDER" | "ORDER_UPDATE" | "CAMPAIGN_STATUS";
 
 async function send(url: string, event: SheetLiveEvent, data: Record<string, unknown>) {
   try {
@@ -9,7 +15,8 @@ async function send(url: string, event: SheetLiveEvent, data: Record<string, unk
       method: "POST",
       redirect: "follow",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ event, data }),
+      // The script checks `secret` when its SECRET property is set, so only the portal can write.
+      body: JSON.stringify({ event, data, secret: process.env.GOOGLE_SHEET_WEBHOOK_SECRET || undefined }),
       signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) console.warn(`[GoogleSheetLive] ${event}: webhook returned status ${res.status}`);
@@ -18,18 +25,57 @@ async function send(url: string, event: SheetLiveEvent, data: Record<string, unk
   }
 }
 
+/** Runs `job` after the response, keeping a serverless function alive until it's done; directly outside a request. */
+function later(job: () => Promise<void>) {
+  try {
+    after(job);
+  } catch {
+    void job();
+  }
+}
+
+const hook = () => {
+  const url = process.env.GOOGLE_SHEET_WEBHOOK_URL;
+  return url && url.startsWith("https://script.google.com") ? url : null;
+};
+
 /**
  * Sends an event to the configured Google Apps Script webhook without slowing the request down.
- * It runs in `after()`, which keeps a serverless function alive until the send finishes: a
- * fire-and-forget promise is dropped on Vercel once the response has gone, so rows never arrived.
- * Outside a request (scripts), it's sent directly. Failures are logged, never thrown.
+ * It runs in `after()`: a fire-and-forget promise is dropped on Vercel once the response has gone,
+ * so rows never arrived. Failures are logged, never thrown.
  */
 export function pushToGoogleSheet(event: SheetLiveEvent, data: Record<string, unknown>): void {
-  const url = process.env.GOOGLE_SHEET_WEBHOOK_URL;
-  if (!url || !url.startsWith("https://script.google.com")) return;
-  try {
-    after(() => send(url, event, data));
-  } catch {
-    void send(url, event, data);
-  }
+  const url = hook();
+  if (url) later(() => send(url, event, data));
+}
+
+const STATUS_WORD: Record<string, string> = { NEW: "New", CONFIRMED: "Confirmed", PAID: "Paid", DISPATCHED: "Dispatched", DELIVERED: "Delivered", CANCELLED: "Cancelled" };
+
+/**
+ * The order's full, current row for the sheet's Live Orders tab (one row per order, updated in place)
+ * and a line in Order History. Reads the order after the change, so the sheet always matches the portal.
+ */
+export function pushOrderToSheet(orderId: string, event: "NEW_ORDER" | "ORDER_UPDATE", change?: string): void {
+  const url = hook();
+  if (!url) return;
+  later(async () => {
+    const o = await db.order
+      .findUnique({ where: { id: orderId }, include: { customer: { select: { name: true, phone: true, location: true } }, client: { select: { name: true } } } })
+      .catch(() => null);
+    if (!o) return;
+    const status = STATUS_WORD[o.status] ?? o.status;
+    await send(url, event, {
+      orderId: orderRef(o),
+      created: formatInTimeZone(o.createdAt, APP_TZ, "yyyy-MM-dd HH:mm:ss"),
+      status,
+      name: o.customer.name,
+      phone: o.customer.phone,
+      items: itemsText((o.items as OrderItem[] | null) ?? []),
+      total: o.total,
+      paid: o.paidAt ? `Yes, ${formatInTimeZone(o.paidAt, APP_TZ, "d MMM h:mm a")}${o.paymentTxnId ? ` (${o.paymentTxnId})` : ""}` : "No",
+      address: o.note || o.customer.location || "",
+      client: o.client.name,
+      change: change ?? status,
+    });
+  });
 }

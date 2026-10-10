@@ -2,6 +2,7 @@ import "server-only";
 import { explainSendError } from "@/app/dashboard/actions/send-helpers";
 import { db } from "./db";
 import { headerImageFor } from "./media";
+import { pushOrderToSheet } from "./google-sheets-live";
 import { getOrderPricing, itemsText, itemsWithNames, money, orderRef } from "./orders";
 import { getSettings } from "./provider";
 import { replyWindowEnd } from "./replies";
@@ -140,6 +141,7 @@ export async function confirmPayment(orderId: string, txnId?: string | null) {
     where: { id: order.id },
     data: { paidAt: new Date(), paymentTxnId: txnId ?? null, ...((order.status === "NEW" || order.status === "CONFIRMED") && { status: "PAID" as const }) },
   });
+  pushOrderToSheet(order.id, "ORDER_UPDATE", "Payment received");
   const c = order.customer;
   const ref = orderRef(order);
   const text = `Hello ${firstName(c.name)}, we have received your payment of ${money(order.total, order.currency)} for order ${ref}. Thank you! We are packing your order and will message you when it is dispatched.`;

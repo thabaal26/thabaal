@@ -2,7 +2,7 @@
 
 import { Check, Loader2, MapPin, MessageSquareQuote, PencilLine, Plus, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { Sheet } from "@/components/sheet";
 import { toastResult } from "@/components/toast";
 import { Badge, Button, Field } from "@/components/ui";
@@ -60,18 +60,16 @@ export function OrderAddressControl({
   const [chatCandidates, setChatCandidates] = useState<ChatAddressCandidate[]>([]);
   const [recentMessages, setRecentMessages] = useState<{ text: string; receivedAt: string }[]>([]);
 
-  useEffect(() => {
-    if (!open) return;
+  const openSheet = () => {
     setAddress(effectiveAddress);
     setArea(effectiveArea);
     setAreaTouched(Boolean(customerLocation?.trim()));
     setSyncToCustomer(true);
-
-    let active = true;
+    setOpen(true);
     setLoadingChat(true);
     getCustomerAddressSuggestions(customerId)
       .then((res) => {
-        if (!active || !res.ok) return;
+        if (!res.ok) return;
         setChatCandidates(res.chatAddresses);
         setRecentMessages(res.recentChatMessages);
         // If order and customer have no address yet, pre-fill the top detected WhatsApp chat address
@@ -81,13 +79,9 @@ export function OrderAddressControl({
         }
       })
       .finally(() => {
-        if (active) setLoadingChat(false);
+        setLoadingChat(false);
       });
-
-    return () => {
-      active = false;
-    };
-  }, [open, customerId, effectiveAddress, effectiveArea, customerLocation]);
+  };
 
   const handleAddressInput = (val: string) => {
     setAddress(val);
@@ -146,7 +140,7 @@ export function OrderAddressControl({
         {canEdit && (
           <button
             type="button"
-            onClick={() => setOpen(true)}
+            onClick={openSheet}
             className={cn(
               "print:hidden inline-flex shrink-0 items-center gap-1 rounded-control px-2.5 py-1 text-xs font-semibold transition",
               effectiveAddress

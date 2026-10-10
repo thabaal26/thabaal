@@ -4,7 +4,7 @@ import type { OrderStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { findAddressesInReplies, parseAddressText } from "@/lib/address";
 import { db } from "@/lib/db";
-import { pushToGoogleSheet } from "@/lib/google-sheets-live";
+import { pushOrderToSheet } from "@/lib/google-sheets-live";
 import { DEFAULT_SHIPPING_FEE, getOrderPricing, itemsText, itemsWithNames, money, orderRef, type OrderItem } from "@/lib/orders";
 import { confirmPayment, sendPaymentRequestFor, updateOrderCard } from "@/lib/payments";
 import { getSettings, wahaConfig } from "@/lib/provider";
@@ -77,6 +77,7 @@ export async function setOrderStatus(id: string, status: OrderStatus): Promise<S
     return { ok: true, message: "Marked paid and thanked the customer." };
   }
   await db.order.update({ where: { id: order.id }, data: { status } });
+  pushOrderToSheet(order.id, "ORDER_UPDATE");
   let told = false;
   if (status === "CANCELLED" && !order.customer.optedOut) told = await tellCancelled(order).catch((e) => (console.error("Could not tell the customer about the cancellation", e), false));
   revalidatePath("/dashboard", "layout");
@@ -166,6 +167,7 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
     } else if (open && order.paymentRequestedAt && (await updateOrderCard(order, kind === "confirm" ? "processing" : kind === "dispatch" ? "shipped" : "completed", text).catch(() => false))) {
       // Sent on the order card from "Review and pay", which also moves its status; already logged.
       await db.order.update({ where: { id: order.id }, data: { status: nextStatus } });
+      pushOrderToSheet(order.id, "ORDER_UPDATE");
       revalidatePath("/dashboard", "layout");
       return { ok: true, message: `Order updated on ${c.name}'s WhatsApp order card.` };
     } else if (open) {
@@ -178,6 +180,7 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
         // A delivery thank-you is optional: still close the order when there's no way to message.
         if (kind === "deliver") {
           await db.order.update({ where: { id: order.id }, data: { status: "DELIVERED" } });
+          pushOrderToSheet(order.id, "ORDER_UPDATE");
           revalidatePath("/dashboard", "layout");
           return { ok: true, message: "Marked delivered. No message sent: the 24-hour window has closed and order_delivered isn't approved yet." };
         }
@@ -200,6 +203,7 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
       where: { id: order.id },
       data: { status: nextStatus, ...(record && { internalNote: [order.internalNote, record].filter(Boolean).join("\n").slice(0, 1000) }) },
     });
+    pushOrderToSheet(order.id, "ORDER_UPDATE");
     revalidatePath("/dashboard", "layout");
     const label = kind === "confirm" ? "Confirmation" : kind === "dispatch" ? "Dispatch update" : "Delivery thank-you";
     return { ok: true, message: simulated ? "Simulated message logged (demo mode)." : `${label} sent to ${c.name}.` };
@@ -429,6 +433,7 @@ export async function saveOrderAddress(
     where: { id: order.id },
     data: { note: cleanAddr || null },
   });
+  pushOrderToSheet(order.id, "ORDER_UPDATE", "Address updated");
 
   // 2. Two-way sync with Customer profile:
   // Always save if customer has no address yet, OR when staff leaves "Update customer's saved address" checked.
@@ -580,16 +585,7 @@ export async function createOrder(input: {
     },
   });
 
-  pushToGoogleSheet("NEW_ORDER", {
-    orderId: orderRef(order),
-    phone,
-    name: customer.name,
-    items: itemsText(items),
-    total: order.total,
-    status: order.status,
-    address: finalOrderNote || resolvedArea || "",
-    client: client?.name || "Thabaal",
-  });
+  pushOrderToSheet(order.id, "NEW_ORDER");
 
   let paymentNote = "";
   if (input.requestPaymentNow && total > 0 && client?.paymentConfig) {
@@ -662,6 +658,7 @@ export async function updateOrderItems(
       ...(input.note !== undefined && { note: input.note?.trim() || null }),
     },
   });
+  pushOrderToSheet(order.id, "ORDER_UPDATE", "Items changed");
 
   // Also sync address to customer profile if note/area was provided
   if (input.note !== undefined || input.area !== undefined) {
