@@ -56,15 +56,23 @@ function RowsSkeleton({ rows = 6, avatar = true }: { rows?: number; avatar?: boo
 export function OverviewSkeleton() {
   return (
     <Loading>
-      <Skeleton className="mb-4 h-40 rounded-card sm:mb-6 sm:h-44" />
+      <div className="mb-5 flex justify-between gap-5 sm:mb-6">
+        <div className="flex-1 space-y-3">
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="h-9 w-full max-w-md" />
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-10 w-72" />
+        </div>
+        <Skeleton className="hidden h-36 w-[22rem] rounded-card lg:block" />
+      </div>
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-24 rounded-card sm:h-32" />
+          <Skeleton key={i} className="h-40 rounded-card sm:h-48" />
         ))}
       </div>
-      <div className="mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
-        <Card className="h-72" />
-        <Card className="h-72" />
+      <div className="mt-4 grid gap-4 sm:mt-5 sm:gap-5 xl:grid-cols-12">
+        <Card className="h-80 xl:col-span-8" />
+        <Card className="h-80 xl:col-span-4" />
       </div>
     </Loading>
   );

@@ -1,22 +1,36 @@
-import { CalendarClock, CheckCheck, Clock, Eye, Send, TriangleAlert, Users } from "lucide-react";
+import { CalendarClock, Clock, IndianRupee, MessageCircle, Eye, Send, TriangleAlert } from "lucide-react";
 import Link from "next/link";
+import { addDays } from "date-fns";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { ActionButton } from "@/components/action-button";
-import { Avatar, Badge, buttonClass, Callout, Card, CardHeader, EmptyState, Meter, PageHeader, rowClass, Stat, StatusBadge, Table, Td, Th } from "@/components/ui";
+import { Avatar, Badge, buttonClass, Callout, Card, CardHeader, EmptyState, Meter, rowClass, StatusBadge, Table, Td, Th } from "@/components/ui";
 import { db } from "@/lib/db";
 import { APP_TZ, daysAgo, fmtDate, fmtNumber, pct } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { getSettings } from "@/lib/provider";
 import { estimateDuration, formatMinutes } from "@/lib/schedule";
 import { getScope, owned, ownedMessages } from "@/lib/session";
-import { cancelRun, runDispatcherNow } from "./actions/campaigns";
-import { BrandHero } from "./brand-hero";
-import { NumberHealth } from "./number-health";
 import { numberHealth } from "@/lib/limits";
 import { codesOf, PAUSING_KINDS } from "@/lib/meta-errors";
-import { DailyChart } from "./daily-chart";
-import { RepliesCard } from "./replies-card";
-import { SpendCard } from "./spend-card";
+import type { OrderItem } from "@/lib/orders";
+import { cancelRun, runDispatcherNow } from "./actions/campaigns";
+import { BrandHero } from "./brand-hero";
 import { AreaChips } from "./area-chips";
+import { SpendCard } from "./spend-card";
+import {
+  ActivityCard,
+  BestTimeCard,
+  C,
+  DeliveryCard,
+  FunnelCard,
+  KpiTile,
+  NumberLimitsCard,
+  RANGES,
+  RangeTabs,
+  TodayCard,
+  TopProductsCard,
+  type Range,
+} from "./overview-cards";
 
 export const dynamic = "force-dynamic";
 
@@ -25,22 +39,47 @@ const REGION_COLORS = ["bg-series-read", "bg-series-delivered", "bg-series-sent"
 
 const tagLabel = (tag: string) => (tag === "no-item-info" ? "No item recorded" : tag.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase()));
 
-export default async function Overview() {
-  const weekAgo = daysAgo(7);
-  const since = daysAgo(13);
+/** Midnight of the given moment's day, in the app's time zone. */
+const dayStart = (d: Date) => fromZonedTime(`${formatInTimeZone(d, APP_TZ, "yyyy-MM-dd")}T00:00:00`, APP_TZ);
+const hourLabel = (h: number) => `${h % 12 || 12} ${h < 12 ? "am" : "pm"}`;
+
+export default async function Overview({ searchParams }: PageProps<"/dashboard">) {
+  const sp = await searchParams;
+  const range: Range = sp.range === "today" || sp.range === "30d" ? sp.range : "7d";
+  const { days, prev: prevLabel } = RANGES[range];
+  const hourly = range === "today";
+
   const scope = await getScope();
   const mine = owned(scope);
   const myMessages = ownedMessages(scope);
+  const cid = scope.clientId;
 
+  // The period, and the same stretch of time just before it (today so far vs yesterday up to now).
+  const now = new Date();
+  const start = dayStart(daysAgo(days - 1));
+  const span = days * 86_400_000;
+  const prevStart = new Date(start.getTime() - span);
+  const prevEnd = new Date(now.getTime() - span);
+  const todayStart = dayStart(now);
   const monthAgo = daysAgo(30);
+
+  // Buckets for the charts: hours of today, or calendar days of the period.
+  const bucketSql = hourly ? "HH24" : "YYYY-MM-DD";
+  const keys = hourly
+    ? Array.from({ length: Number(formatInTimeZone(now, APP_TZ, "H")) + 1 }, (_, h) => String(h).padStart(2, "0"))
+    : Array.from({ length: days }, (_, i) => formatInTimeZone(addDays(start, i), APP_TZ, "yyyy-MM-dd"));
+  const labelFor = (k: string) => (hourly ? hourLabel(Number(k)) : formatInTimeZone(new Date(`${k}T12:00:00Z`), "UTC", days > 7 ? "d MMM" : "EEE d"));
+  const tipFor = (k: string) => (hourly ? `${hourLabel(Number(k))} – ${hourLabel((Number(k) + 1) % 24)}` : formatInTimeZone(new Date(`${k}T12:00:00Z`), "UTC", "EEE d MMM"));
+  const keyOf = (d: Date) => formatInTimeZone(d, APP_TZ, hourly ? "HH" : "yyyy-MM-dd");
+
   const [client, segments, results, repliesByTag, health, blocked, areaRows] = await Promise.all([
-    scope.clientId ? db.client.findUnique({ where: { id: scope.clientId } }) : null,
-    scope.clientId
+    cid ? db.client.findUnique({ where: { id: cid } }) : null,
+    cid
       ? db.$queryRaw<{ tag: string; n: bigint }[]>`
           SELECT unnest(tags) AS tag, count(*) AS n FROM "Customer"
-          WHERE "clientId" = ${scope.clientId} AND "optedOut" = false GROUP BY 1 ORDER BY 2 DESC, 1`
+          WHERE "clientId" = ${cid} AND "optedOut" = false GROUP BY 1 ORDER BY 2 DESC, 1`
       : [],
-    scope.clientId
+    cid
       ? db.$queryRaw<{ tag: string; sent: bigint; delivered: bigint; read: bigint; failed: bigint }[]>`
           SELECT t.tag,
             count(*) AS sent,
@@ -48,57 +87,96 @@ export default async function Overview() {
             count(*) FILTER (WHERE m.status = 'READ') AS read,
             count(*) FILTER (WHERE m.status = 'FAILED') AS failed
           FROM "Message" m JOIN "Customer" c ON c.id = m."customerId" CROSS JOIN LATERAL unnest(c.tags) AS t(tag)
-          WHERE c."clientId" = ${scope.clientId} AND m."createdAt" >= ${monthAgo} AND m.status NOT IN ('QUEUED', 'SKIPPED')
+          WHERE c."clientId" = ${cid} AND m."createdAt" >= ${monthAgo} AND m.status NOT IN ('QUEUED', 'SKIPPED')
           GROUP BY 1 ORDER BY 2 DESC`
       : [],
-    scope.clientId
+    cid
       ? db.$queryRaw<{ tag: string; n: bigint }[]>`
           SELECT t.tag, count(*) AS n
           FROM "Reply" r JOIN "Customer" c ON c.id = r."customerId" CROSS JOIN LATERAL unnest(c.tags) AS t(tag)
-          WHERE c."clientId" = ${scope.clientId} AND r."receivedAt" >= ${monthAgo} GROUP BY 1`
+          WHERE c."clientId" = ${cid} AND r."receivedAt" >= ${monthAgo} GROUP BY 1`
       : [],
-    scope.clientId ? numberHealth(scope.clientId) : [],
+    cid ? numberHealth(cid) : [],
     // Active campaigns whose template Meta paused, disabled or rejected can't send.
     db.campaign.findMany({
-      where: { ...owned(scope), active: true, template: { status: { in: ["PAUSED", "DISABLED", "REJECTED"] } } },
+      where: { ...mine, active: true, template: { status: { in: ["PAUSED", "DISABLED", "REJECTED"] } } },
       select: { id: true, name: true, template: { select: { name: true, status: true, statusReason: true } } },
     }),
-    scope.clientId ? db.customer.groupBy({ by: ["region", "location"], where: { clientId: scope.clientId, optedOut: false }, _count: true }) : [],
+    cid ? db.customer.groupBy({ by: ["region", "location"], where: { clientId: cid, optedOut: false }, _count: true }) : [],
   ]);
-  const [customers, optedOut, week, activeRuns, upcoming, recent, daily, failures, settings, repliesWeek, openReplies] = await Promise.all([
-    db.customer.count({ where: { ...mine, optedOut: false } }),
-    db.customer.count({ where: { ...mine, optedOut: true } }),
-    db.message.groupBy({ by: ["status"], where: { ...myMessages, createdAt: { gte: weekAgo }, status: { notIn: ["QUEUED", "SKIPPED"] } }, _count: true }),
-    db.campaignRun.findMany({
-      where: { campaign: mine, status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"] } },
-      include: { campaign: true },
-      orderBy: { startedAt: "desc" },
-    }),
-    db.campaign.findMany({
-      where: { ...mine, active: true, nextRunAt: { not: null } },
-      include: { template: { select: { name: true, status: true } } },
-      orderBy: { nextRunAt: "asc" },
-      take: 5,
-    }),
-    db.message.findMany({
-      where: { ...myMessages, status: { not: "QUEUED" } },
-      include: { customer: true },
-      orderBy: { createdAt: "desc" },
-      take: 6,
-    }),
-    db.$queryRaw<{ day: string; status: string; n: bigint }[]>`
-      SELECT to_char((m."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${APP_TZ}, 'YYYY-MM-DD') AS day, m.status::text AS status, count(*) AS n
-      FROM "Message" m JOIN "Customer" c ON c.id = m."customerId"
-      WHERE m."createdAt" >= ${since} AND m.status NOT IN ('QUEUED', 'SKIPPED')
-        AND (${scope.clientId}::text IS NULL OR c."clientId" = ${scope.clientId})
-      GROUP BY 1, 2`,
-    // Failures in the last day, grouped by reason, so problems show up without opening the log.
-    db.message.groupBy({ by: ["error"], where: { ...myMessages, status: "FAILED", failedAt: { gte: daysAgo(1) } }, _count: true, orderBy: { _count: { error: "desc" } }, take: 3 }),
-    getSettings(),
-    // Replies per customer in the same 7 days as the figures above.
-    db.reply.groupBy({ by: ["customerId"], where: { ...myMessages, receivedAt: { gte: weekAgo } }, _count: true }),
-    db.reply.count({ where: { ...myMessages, handled: false } }),
-  ]);
+
+  const [customers, optedOut, prevStatus, msgSeries, activeRuns, upcoming, recent, failures, settings, orders, replySeries, repliers, prevReplies, funnelRows, heat, todayMsgs, todayReplies] =
+    await Promise.all([
+      db.customer.count({ where: { ...mine, optedOut: false } }),
+      db.customer.count({ where: { ...mine, optedOut: true } }),
+      db.message.groupBy({ by: ["status"], where: { ...myMessages, createdAt: { gte: prevStart, lt: prevEnd }, status: { notIn: ["QUEUED", "SKIPPED"] } }, _count: true }),
+      db.$queryRaw<{ k: string; status: string; n: bigint }[]>`
+        SELECT to_char((m."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${APP_TZ}, ${bucketSql}) AS k, m.status::text AS status, count(*) AS n
+        FROM "Message" m JOIN "Customer" c ON c.id = m."customerId"
+        WHERE m."createdAt" >= ${start} AND m.status NOT IN ('QUEUED', 'SKIPPED') AND (${cid}::text IS NULL OR c."clientId" = ${cid})
+        GROUP BY 1, 2`,
+      db.campaignRun.findMany({
+        where: { campaign: mine, status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"] } },
+        include: { campaign: true },
+        orderBy: { startedAt: "desc" },
+      }),
+      db.campaign.findMany({
+        where: { ...mine, active: true, nextRunAt: { not: null } },
+        include: { template: { select: { name: true, status: true } } },
+        orderBy: { nextRunAt: "asc" },
+        take: 5,
+      }),
+      db.message.findMany({ where: { ...myMessages, status: { not: "QUEUED" } }, include: { customer: true }, orderBy: { createdAt: "desc" }, take: 6 }),
+      // Failures in the last day, grouped by reason, so problems show up without opening the log.
+      db.message.groupBy({ by: ["error"], where: { ...myMessages, status: "FAILED", failedAt: { gte: daysAgo(1) } }, _count: true, orderBy: { _count: { error: "desc" } }, take: 3 }),
+      getSettings(),
+      // Orders of this period and the comparison stretch (cancelled ones aren't sales).
+      db.order.findMany({ where: { ...mine, status: { not: "CANCELLED" }, createdAt: { gte: prevStart } }, select: { createdAt: true, total: true, items: true } }).catch(() => []),
+      db.$queryRaw<{ k: string; n: bigint }[]>`
+        SELECT to_char((r."receivedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${APP_TZ}, ${bucketSql}) AS k, count(*) AS n
+        FROM "Reply" r JOIN "Customer" c ON c.id = r."customerId"
+        WHERE r."receivedAt" >= ${start} AND (${cid}::text IS NULL OR c."clientId" = ${cid})
+        GROUP BY 1`,
+      db.reply.groupBy({ by: ["customerId"], where: { ...myMessages, receivedAt: { gte: start } }, _count: true }),
+      db.reply.count({ where: { ...myMessages, receivedAt: { gte: prevStart, lt: prevEnd } } }),
+      // People messaged in the period and how far each got: received, read, replied, ordered within 7 days.
+      db.$queryRaw<{ messaged: bigint; delivered: bigint; read: bigint; replied: bigint; ordered: bigint; revenue: number }[]>`
+        WITH sent AS (
+          SELECT m."customerId" AS cid, min(m."createdAt") AS first_at,
+            bool_or(m.status IN ('DELIVERED', 'READ')) AS delivered, bool_or(m.status = 'READ') AS read
+          FROM "Message" m JOIN "Customer" c ON c.id = m."customerId"
+          WHERE m."createdAt" >= ${start} AND m.status NOT IN ('QUEUED', 'SKIPPED') AND (${cid}::text IS NULL OR c."clientId" = ${cid})
+          GROUP BY 1
+        ), ord AS (
+          SELECT DISTINCT o.id, o.total, o."customerId" FROM "Order" o JOIN sent s ON s.cid = o."customerId"
+          WHERE o.status <> 'CANCELLED' AND o."createdAt" >= s.first_at AND o."createdAt" < s.first_at + interval '7 days'
+        )
+        SELECT count(*) AS messaged,
+          count(*) FILTER (WHERE delivered) AS delivered,
+          count(*) FILTER (WHERE read) AS read,
+          count(*) FILTER (WHERE EXISTS (SELECT 1 FROM "Reply" r WHERE r."customerId" = sent.cid AND r."receivedAt" >= sent.first_at)) AS replied,
+          (SELECT count(DISTINCT "customerId") FROM ord) AS ordered,
+          (SELECT coalesce(sum(total), 0)::float FROM ord) AS revenue
+        FROM sent`.catch(() => []),
+      // Replies by weekday and 3-hour block over 90 days: when customers actually answer.
+      db.$queryRaw<{ d: number; b: number; n: bigint }[]>`
+        SELECT extract(dow FROM (r."receivedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${APP_TZ})::int AS d,
+          (extract(hour FROM (r."receivedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${APP_TZ})::int / 3) AS b, count(*) AS n
+        FROM "Reply" r JOIN "Customer" c ON c.id = r."customerId"
+        WHERE r."receivedAt" >= ${daysAgo(90)} AND (${cid}::text IS NULL OR c."clientId" = ${cid})
+        GROUP BY 1, 2`,
+      db.$queryRaw<{ k: string; n: bigint }[]>`
+        SELECT to_char((m."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${APP_TZ}, 'HH24') AS k, count(*) AS n
+        FROM "Message" m JOIN "Customer" c ON c.id = m."customerId"
+        WHERE m."createdAt" >= ${todayStart} AND m.status NOT IN ('QUEUED', 'SKIPPED') AND (${cid}::text IS NULL OR c."clientId" = ${cid})
+        GROUP BY 1`,
+      db.$queryRaw<{ k: string; n: bigint }[]>`
+        SELECT to_char((r."receivedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${APP_TZ}, 'HH24') AS k, count(*) AS n
+        FROM "Reply" r JOIN "Customer" c ON c.id = r."customerId"
+        WHERE r."receivedAt" >= ${todayStart} AND (${cid}::text IS NULL OR c."clientId" = ${cid})
+        GROUP BY 1`,
+    ]);
+
   const failedToday = failures.reduce((n, f) => n + f._count, 0);
   // A campaign paused because the token, app permissions or Meta account stopped every send.
   const paused = await db.message.findFirst({
@@ -108,35 +186,83 @@ export default async function Overview() {
   });
   // GitHub runs the scheduler every 5 minutes, sometimes late; 20 minutes of silence means it stopped.
   const schedulerQuiet = scope.isAdmin && (!settings.lastDispatchAt || settings.lastDispatchAt < daysAgo(20 / (24 * 60)));
-
-  const count = (s: string) => week.find((w) => w.status === s)?._count ?? 0;
-  const read = count("READ");
-  const delivered = count("DELIVERED") + read;
-  const failed = count("FAILED");
-  const total = delivered + count("SENT") + failed;
+  const issues = [paused, schedulerQuiet, failedToday > 0, blocked.length > 0].filter(Boolean).length;
 
   const runProgress = activeRuns.length
     ? await db.message.groupBy({ by: ["runId", "status"], where: { runId: { in: activeRuns.map((r) => r.id) } }, _count: true })
     : [];
 
+  /* ── Period figures ── */
+  const at = (k: string, s?: string) => msgSeries.filter((r) => r.k === k && (!s || r.status === s)).reduce((n, r) => n + Number(r.n), 0);
+  const tally = (s: string) => msgSeries.filter((r) => r.status === s).reduce((n, r) => n + Number(r.n), 0);
+  const read = tally("READ");
+  const deliveredOnly = tally("DELIVERED");
+  const sentOnly = tally("SENT");
+  const failed = tally("FAILED");
+  const delivered = deliveredOnly + read;
+  const total = delivered + sentOnly + failed;
+  const prevCount = (s: string) => prevStatus.find((r) => r.status === s)?._count ?? 0;
+  const prevRead = prevCount("READ");
+  const prevDelivered = prevCount("DELIVERED") + prevRead;
+  const prevTotal = prevDelivered + prevCount("SENT") + prevCount("FAILED");
+
+  const curOrders = orders.filter((o) => o.createdAt >= start);
+  const prevOrders = orders.filter((o) => o.createdAt >= prevStart && o.createdAt < prevEnd);
+  const revenue = curOrders.reduce((n, o) => n + o.total, 0);
+  const prevRevenue = prevOrders.reduce((n, o) => n + o.total, 0);
+  const replies = replySeries.reduce((n, r) => n + Number(r.n), 0);
+
+  const sentSpark = keys.map((k) => at(k));
+  const readSpark = keys.map((k) => at(k, "READ"));
+  const readRateSpark = keys.map((k) => {
+    const d = at(k, "DELIVERED") + at(k, "READ");
+    return d ? (at(k, "READ") / d) * 100 : 0;
+  });
+  const revenueSpark = keys.map((k) => curOrders.filter((o) => keyOf(o.createdAt) === k).reduce((n, o) => n + o.total, 0));
+  const replySpark = keys.map((k) => Number(replySeries.find((r) => r.k === k)?.n ?? 0));
+
+  // Best sellers from this period's order lines.
+  const productMap = new Map<string, { name: string; qty: number; revenue: number }>();
+  for (const o of curOrders)
+    for (const it of (o.items as OrderItem[] | null) ?? []) {
+      const name = it.name ?? it.id;
+      const row = productMap.get(name) ?? { name, qty: 0, revenue: 0 };
+      row.qty += Number(it.quantity) || 0;
+      row.revenue += (Number(it.price) || 0) * (Number(it.quantity) || 0);
+      productMap.set(name, row);
+    }
+  const topProducts = [...productMap.values()].sort((a, b) => b.revenue - a.revenue || b.qty - a.qty).slice(0, 6);
+
+  const f = funnelRows[0];
+  const funnel = { messaged: Number(f?.messaged ?? 0), delivered: Number(f?.delivered ?? 0), read: Number(f?.read ?? 0), replied: Number(f?.replied ?? 0), ordered: Number(f?.ordered ?? 0) };
+
+  const nowHour = Number(formatInTimeZone(now, APP_TZ, "H"));
+  const todayHours = Array.from({ length: nowHour + 1 }, (_, h) => {
+    const k = String(h).padStart(2, "0");
+    return { label: hourLabel(h), tip: `${hourLabel(h)} – ${hourLabel((h + 1) % 24)}`, sent: Number(todayMsgs.find((r) => r.k === k)?.n ?? 0), replies: Number(todayReplies.find((r) => r.k === k)?.n ?? 0) };
+  });
+
   const adminActions = scope.isAdmin && (
     <>
       <ActionButton action={runDispatcherNow} size="md" title="Process due campaigns and batches now">
-        <Send className="size-4" /> Run scheduler now
+        <Send className="size-4" /> Run scheduler
       </ActionButton>
       <Link href="/dashboard/campaigns/new" className={buttonClass("primary")}>
         <CalendarClock className="size-4" /> New campaign
       </Link>
     </>
   );
+
   // Product and segment tags, largest first; the client-wide tag (e.g. thenan-oils) says nothing on its own.
   const clientTag = client?.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
   const shown = segments.map((t) => ({ tag: t.tag, n: Number(t.n) })).filter((t) => t.tag !== clientTag || segments.length === 1).slice(0, 8);
   const top = shown[0]?.n ?? 0;
   // Location view: city vs outside, plus the busiest areas.
   const REGIONS = ["Madurai city", "Outside Madurai", "Not sure"];
-  const byRegion = [...REGIONS.map((r) => ({ key: r, label: r, n: areaRows.filter((a) => a.region === r).reduce((t, a) => t + a._count, 0), href: `region:${r}` })),
-    { key: "none", label: "No location noted", n: areaRows.filter((a) => !a.location).reduce((t, a) => t + a._count, 0), href: "none" }].filter((r) => r.n);
+  const byRegion = [
+    ...REGIONS.map((r) => ({ key: r, label: r, n: areaRows.filter((a) => a.region === r).reduce((t, a) => t + a._count, 0), href: `region:${r}` })),
+    { key: "none", label: "No location noted", n: areaRows.filter((a) => !a.location).reduce((t, a) => t + a._count, 0), href: "none" },
+  ].filter((r) => r.n);
   const regionTotal = byRegion.reduce((t, r) => t + r.n, 0);
   const sortedAreas = areaRows
     .filter((a): a is typeof a & { location: string } => typeof a.location === "string" && a.location.length > 0)
@@ -148,20 +274,22 @@ export default async function Overview() {
     .filter((r) => r.tag !== clientTag || results.length === 1)
     .map((r) => ({ tag: r.tag, sent: Number(r.sent), delivered: Number(r.delivered), read: Number(r.read), failed: Number(r.failed), replies: Number(repliesByTag.find((x) => x.tag === r.tag)?.n ?? 0) }));
 
+  const every = hourly ? 3 : days > 7 ? 5 : 1;
+  const periodText = hourly ? "today so far" : `the last ${days} days`;
+
   return (
     <>
-      {client ? (
-        <BrandHero client={client} customers={customers} actions={adminActions} />
-      ) : (
-        <PageHeader
-          title="Overview"
-          description={scope.isAdmin ? "All clients together, last 7 days. Pick a client in the sidebar to see one." : "How your WhatsApp campaigns performed over the last 7 days."}
-          actions={adminActions}
-        />
-      )}
+      <BrandHero
+        client={client}
+        name={client?.name ?? (scope.isAdmin ? "all clients" : "there")}
+        customers={customers}
+        issues={issues}
+        actions={adminActions}
+        period={<RangeTabs range={range} />}
+      />
 
-      {(schedulerQuiet || failedToday > 0 || blocked.length > 0 || paused) && (
-        <div className="mb-4 space-y-3">
+      {issues > 0 && (
+        <div className="mb-5 space-y-3">
           {paused && (
             <Callout role="alert" tone="danger" icon={<TriangleAlert />} title="Campaigns are paused: WhatsApp can't send right now">
               {scope.isAdmin ? (
@@ -187,9 +315,15 @@ export default async function Overview() {
           {failedToday > 0 && (
             <Callout tone="danger" icon={<TriangleAlert />} title={`${fmtNumber(failedToday)} message${failedToday === 1 ? "" : "s"} failed in the last 24 hours.`}>
               <ul className="mt-0.5 list-disc pl-5">
-                {failures.map((f) => <li key={f.error ?? "unknown"}>{f.error ?? "Unknown error"} ({f._count})</li>)}
+                {failures.map((x) => (
+                  <li key={x.error ?? "unknown"}>
+                    {x.error ?? "Unknown error"} ({x._count})
+                  </li>
+                ))}
               </ul>
-              <Link href="/dashboard/messages?status=FAILED" className="mt-1 inline-flex min-h-11 items-center sm:min-h-0">See failed messages</Link>
+              <Link href="/dashboard/messages?status=FAILED" className="mt-1 inline-flex min-h-11 items-center sm:min-h-0">
+                See failed messages
+              </Link>
             </Callout>
           )}
           {blocked.length > 0 && (
@@ -209,63 +343,188 @@ export default async function Overview() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4" aria-label="Last 7 days at a glance" role="group">
-        <Stat label="Active customers" value={fmtNumber(customers)} sub={`${fmtNumber(optedOut)} opted out`} icon={<Users className="size-4" />} />
-        <Stat label="Messages sent · 7 days" value={fmtNumber(total)} sub={`${fmtNumber(failed)} failed`} icon={<Send className="size-4" />} />
-        <Stat label="Message delivery rate" value={`${pct(delivered, total)}%`} sub={`${fmtNumber(delivered)} delivered`} icon={<CheckCheck className="size-4" />} />
-        <Stat label="Message read rate" value={`${pct(read, delivered)}%`} sub={`${fmtNumber(read)} of delivered were read`} icon={<Eye className="size-4" />} />
+      {/* Headline figures for the period, each with its real change against the stretch before. */}
+      <div role="group" aria-label={`Figures for ${periodText}`} className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <KpiTile
+          label="Sales"
+          value={revenue}
+          format="inr"
+          sub={`${fmtNumber(curOrders.length)} order${curOrders.length === 1 ? "" : "s"}${curOrders.length ? ` · avg ₹${Math.round(revenue / curOrders.length).toLocaleString("en-IN")}` : ""}`}
+          icon={IndianRupee}
+          color={C.gold}
+          spark={revenueSpark}
+          delta={{ cur: revenue, prev: prevRevenue, kind: "pct" }}
+          vs={prevLabel}
+          href="/dashboard/orders?show=all"
+        />
+        <KpiTile
+          label="Messages sent"
+          value={total}
+          format="count"
+          sub={`${fmtNumber(failed)} failed · ${fmtNumber(customers)} active customers${optedOut ? `, ${fmtNumber(optedOut)} opted out` : ""}`}
+          icon={Send}
+          color={C.brand}
+          spark={sentSpark}
+          delta={{ cur: total, prev: prevTotal, kind: "pct" }}
+          vs={prevLabel}
+          href="/dashboard/messages"
+        />
+        <KpiTile
+          label="Read rate"
+          value={pct(read, delivered)}
+          format="percent"
+          sub={`${fmtNumber(read)} of ${fmtNumber(delivered)} delivered were read`}
+          icon={Eye}
+          color={C.read}
+          spark={readRateSpark}
+          delta={prevDelivered ? { cur: pct(read, delivered), prev: pct(prevRead, prevDelivered), kind: "pts" } : null}
+          vs={prevLabel}
+        />
+        <KpiTile
+          label="Customer replies"
+          value={replies}
+          format="count"
+          sub={`from ${fmtNumber(repliers.length)} customer${repliers.length === 1 ? "" : "s"}`}
+          icon={MessageCircle}
+          color={C.info}
+          spark={replySpark}
+          delta={{ cur: replies, prev: prevReplies, kind: "pct" }}
+          vs={prevLabel}
+          href="/dashboard/replies"
+        />
       </div>
 
-      {/*
-        Wide screens: main column (sending, chart, results) beside a side column (health, upcoming, spend).
-        Phones: the columns dissolve and `order` puts what's happening now first.
-      */}
-      <div className="mt-4 flex flex-col gap-4 sm:mt-5 sm:gap-5 xl:grid xl:grid-cols-[minmax(0,1.7fr)_minmax(20rem,1fr)] xl:items-start">
-        <div className="contents xl:flex xl:flex-col xl:gap-5">
-          {activeRuns.length > 0 && (
-            <Card className="order-1">
-              <CardHeader title="Sending now" description="Campaigns delivering in batches. Batch size or interval changes apply from the next batch." />
-              <ul className="divide-y divide-line">
-                {activeRuns.map((r) => {
-                  const by = (s: string) => runProgress.find((p) => p.runId === r.id && p.status === s)?._count ?? 0;
-                  const queued = by("QUEUED");
-                  const done = r.total - queued;
-                  const eta = estimateDuration(queued, r.campaign.batchSize, r.campaign.intervalMinutes);
-                  return (
-                    <li key={r.id} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:px-5">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Link href={`/dashboard/campaigns/${r.campaignId}`} className="font-medium text-ink hover:underline">
-                            {r.campaign.name}
-                          </Link>
-                          <StatusBadge status={r.status} />
-                        </div>
-                        <Meter className="mt-2" value={pct(done, r.total)} label={`${r.campaign.name} progress`} />
-                        <p className="tabular mt-1.5 text-xs text-muted">
-                          {fmtNumber(done)} of {fmtNumber(r.total)} processed · {by("FAILED")} failed ·{" "}
-                          {queued
-                            ? `${r.campaign.batchSize} every ${r.campaign.intervalMinutes} min, about ${formatMinutes(eta)} left · next batch ${fmtDate(r.nextBatchAt, "h:mm a")}`
-                            : "finishing"}
-                        </p>
-                      </div>
-                      {scope.isAdmin && (
-                        <ActionButton action={cancelRun.bind(null, r.id)} variant="danger" confirm="Stop this run? Queued messages will not be sent.">
-                          Stop
-                        </ActionButton>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </Card>
-          )}
+      {activeRuns.length > 0 && (
+        <Card className="mt-4 sm:mt-5">
+          <CardHeader title="Sending now" description="Campaigns delivering in batches. Batch size or interval changes apply from the next batch." />
+          <ul className="divide-y divide-line">
+            {activeRuns.map((r) => {
+              const by = (s: string) => runProgress.find((p) => p.runId === r.id && p.status === s)?._count ?? 0;
+              const queued = by("QUEUED");
+              const done = r.total - queued;
+              const eta = estimateDuration(queued, r.campaign.batchSize, r.campaign.intervalMinutes);
+              return (
+                <li key={r.id} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:px-5">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link href={`/dashboard/campaigns/${r.campaignId}`} className="font-medium text-ink hover:underline">
+                        {r.campaign.name}
+                      </Link>
+                      <StatusBadge status={r.status} />
+                    </div>
+                    <Meter className="mt-2" value={pct(done, r.total)} label={`${r.campaign.name} progress`} />
+                    <p className="tabular mt-1.5 text-xs text-muted">
+                      {fmtNumber(done)} of {fmtNumber(r.total)} processed · {by("FAILED")} failed ·{" "}
+                      {queued ? `${r.campaign.batchSize} every ${r.campaign.intervalMinutes} min, about ${formatMinutes(eta)} left · next batch ${fmtDate(r.nextBatchAt, "h:mm a")}` : "finishing"}
+                    </p>
+                  </div>
+                  {scope.isAdmin && (
+                    <ActionButton action={cancelRun.bind(null, r.id)} variant="danger" confirm="Stop this run? Queued messages will not be sent.">
+                      Stop
+                    </ActionButton>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
 
-          <Card className="order-3">
-            <DailyChart rows={daily.map((d) => ({ day: d.day, status: d.status, n: Number(d.n) }))} since={since} />
+      {/* Activity and delivery. */}
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-5 sm:gap-5 xl:grid-cols-12">
+        <div className="min-w-0 xl:col-span-8">
+          <ActivityCard
+            title="Message activity"
+            description={hourly ? "By hour, today so far" : `By day, the last ${days} days`}
+            labels={keys.map(labelFor)}
+            tooltipLabels={keys.map(tipFor)}
+            every={every}
+            series={[
+              { key: "sent", label: "Sent", color: C.brand, values: sentSpark },
+              { key: "read", label: "Read", color: C.read, values: readSpark },
+              { key: "replies", label: "Replies", color: C.info, values: replySpark, area: false },
+            ]}
+          />
+        </div>
+        <div className="min-w-0 xl:col-span-4">
+          <DeliveryCard read={read} delivered={deliveredOnly} sent={sentOnly} failed={failed} />
+        </div>
+      </div>
+
+      {/* Outcomes, live status and sending limits. */}
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-5 sm:gap-5 md:grid-cols-2 xl:grid-cols-12">
+        <div className="min-w-0 md:col-span-2 xl:col-span-5">
+          <FunnelCard f={funnel} revenue={Number(f?.revenue ?? 0)} />
+        </div>
+        <div className="min-w-0 xl:col-span-4">
+          <TodayCard
+            hours={todayHours}
+            sent={todayHours.reduce((n, h) => n + h.sent, 0)}
+            replies={todayHours.reduce((n, h) => n + h.replies, 0)}
+            sending={activeRuns.map((r) => ({ name: r.campaign.name, total: r.total, done: r.total - (runProgress.find((p) => p.runId === r.id && p.status === "QUEUED")?._count ?? 0) }))}
+            next={upcoming[0]?.nextRunAt ? { name: upcoming[0].name, at: upcoming[0].nextRunAt } : null}
+          />
+        </div>
+        <div className="min-w-0 xl:col-span-3">
+          <NumberLimitsCard numbers={health} />
+        </div>
+      </div>
+
+      {/* When to send, and what sells. */}
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-5 sm:gap-5 xl:grid-cols-12">
+        <div className="min-w-0 xl:col-span-7">
+          <BestTimeCard cells={heat.map((h) => ({ d: h.d, b: h.b, n: Number(h.n) }))} days={90} />
+        </div>
+        <div className="min-w-0 xl:col-span-5">
+          <TopProductsCard items={topProducts} rangeLabel={hourly ? "Today" : `Last ${days} days`} />
+        </div>
+      </div>
+
+      {/* Day-to-day detail. */}
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-5 sm:gap-5 xl:grid-cols-12">
+        <div className="min-w-0 space-y-4 sm:space-y-5 xl:col-span-7">
+          <Card>
+            <CardHeader
+              title="Latest messages"
+              description="Sent from the portal, newest first"
+              action={
+                <Link href="/dashboard/messages" className={buttonClass("ghost", "sm")}>
+                  Open log
+                </Link>
+              }
+            />
+            {recent.length ? (
+              <ul className="divide-y divide-line">
+                {recent.map((m) => (
+                  <li key={m.id} className="relative flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-subtle sm:px-5">
+                    <Avatar name={m.customer.name} className="size-8 text-xs max-sm:hidden" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-ink">
+                        <Link href={`/dashboard/customers/${m.customerId}`} className="after:absolute after:inset-0">
+                          {m.customer.name}
+                        </Link>{" "}
+                        <span className="tabular font-normal text-muted">{formatPhone(m.customer.phone)}</span>
+                      </p>
+                      <p className="truncate text-xs text-muted">{m.body ?? m.templateName}</p>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <StatusBadge status={m.status} />
+                      <time className="tabular text-xs text-muted max-sm:hidden" dateTime={(m.sentAt ?? m.createdAt).toISOString()}>
+                        {fmtDate(m.sentAt ?? m.createdAt, "d MMM, h:mm a")}
+                      </time>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState icon={<Send />} title="No messages yet">
+                Sent messages will appear here with their delivery status.
+              </EmptyState>
+            )}
           </Card>
 
           {byProduct.length > 0 && (
-            <Card className="order-8">
+            <Card>
               <CardHeader title="Campaign results by product" description="Last 30 days · which customer groups read your messages and write back" />
               {/* Phones: one compact row per product instead of a sideways-scrolling table. */}
               <ul className="divide-y divide-line sm:hidden">
@@ -340,98 +599,10 @@ export default async function Overview() {
               </div>
             </Card>
           )}
-
-          {shown.length > 0 && (
-            <Card className="order-9">
-              <CardHeader title="What your customers buy" description="Customers per product or group · each can get its own campaign" />
-              <ul className="grid gap-x-6 gap-y-0.5 p-2 sm:grid-cols-2 sm:p-3">
-                {shown.map((t) => (
-                  <li key={t.tag}>
-                    <Link href={`/dashboard/customers?tag=${encodeURIComponent(t.tag)}`} className="group block rounded-control px-2.5 py-2.5 transition hover:bg-subtle active:bg-sunken">
-                      <div className="flex items-baseline justify-between gap-2 text-sm">
-                        <span className="truncate font-medium text-ink group-hover:underline">{tagLabel(t.tag)}</span>
-                        <span className="tabular text-xs font-medium text-ink-2">{fmtNumber(t.n)}</span>
-                      </div>
-                      <Meter className="mt-1.5" value={Math.max(4, pct(t.n, top))} />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
-
-          {byRegion.length > 1 && (
-            <Card className="order-10">
-              <CardHeader title="Customers by area" description="From the order sheets · tap an area to see its customers" />
-              <div className="space-y-5 p-4 sm:p-5">
-                <div>
-                  <div className="flex h-2.5 gap-0.5 overflow-hidden rounded-full" aria-hidden>
-                    {byRegion.map((r, i) => (
-                      <div key={r.key} className={`${REGION_COLORS[i] ?? "bg-line-2"} first:rounded-l-full last:rounded-r-full`} style={{ width: `${pct(r.n, regionTotal)}%` }} />
-                    ))}
-                  </div>
-                  <ul className="mt-2 grid grid-cols-1 gap-x-4 min-[360px]:grid-cols-2 sm:flex sm:flex-wrap sm:gap-x-2">
-                    {byRegion.map((r, i) => (
-                      <li key={r.key}>
-                        <Link href={`/dashboard/customers?area=${encodeURIComponent(r.href)}`} className="group flex min-h-11 items-center gap-2 rounded-control px-1 text-sm transition hover:bg-subtle sm:min-h-9 sm:px-2">
-                          <span aria-hidden className={`size-2.5 shrink-0 rounded-[3px] ${REGION_COLORS[i] ?? "bg-line-2"}`} />
-                          <span className="text-ink-2 group-hover:underline">{r.label}</span>
-                          <span className="tabular text-xs text-muted">
-                            {fmtNumber(r.n)} · {pct(r.n, regionTotal)}%
-                          </span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <AreaChips topAreas={topAreas} otherAreas={otherAreas} />
-              </div>
-            </Card>
-          )}
-
-          <Card className="order-4">
-            <CardHeader
-              title="Latest messages"
-              description="Sent from the portal, newest first"
-              action={
-                <Link href="/dashboard/messages" className={buttonClass("ghost", "sm")}>
-                  Open log
-                </Link>
-              }
-            />
-            {recent.length ? (
-              <ul className="divide-y divide-line">
-                {recent.map((m) => (
-                  <li key={m.id} className="relative flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-subtle sm:px-5">
-                    <Avatar name={m.customer.name} className="size-8 text-xs max-sm:hidden" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-ink">
-                        <Link href={`/dashboard/customers/${m.customerId}`} className="after:absolute after:inset-0">
-                          {m.customer.name}
-                        </Link>{" "}
-                        <span className="tabular font-normal text-muted">{formatPhone(m.customer.phone)}</span>
-                      </p>
-                      <p className="truncate text-xs text-muted">{m.body ?? m.templateName}</p>
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      <StatusBadge status={m.status} />
-                      <time className="tabular text-xs text-muted max-sm:hidden" dateTime={(m.sentAt ?? m.createdAt).toISOString()}>
-                        {fmtDate(m.sentAt ?? m.createdAt, "d MMM, h:mm a")}
-                      </time>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyState icon={<Send className="size-5" />} title="No messages yet">
-                Sent messages will appear here with their delivery status.
-              </EmptyState>
-            )}
-          </Card>
         </div>
 
-        <div className="contents xl:flex xl:flex-col xl:gap-5">
-          <Card className="order-2">
+        <div className="min-w-0 space-y-4 sm:space-y-5 xl:col-span-5">
+          <Card>
             <CardHeader
               title="Coming up"
               description="Next scheduled campaign sends"
@@ -462,19 +633,63 @@ export default async function Overview() {
                 ))}
               </ul>
             ) : (
-              <EmptyState icon={<CalendarClock className="size-5" />} title="Nothing scheduled">
+              <EmptyState icon={<CalendarClock />} title="Nothing scheduled">
                 {scope.isAdmin ? "Create a weekly campaign to start sending automatically." : "Upcoming campaigns will show here."}
               </EmptyState>
             )}
           </Card>
 
-          <RepliesCard className="order-5" replies={repliesWeek.reduce((n, r) => n + r._count, 0)} customers={repliesWeek.length} open={openReplies} />
+          {cid && <SpendCard clientId={cid} canManage={scope.canManage} />}
 
-          <NumberHealth numbers={health} className="order-6" />
-
-          {scope.clientId && <SpendCard clientId={scope.clientId} canManage={scope.canManage} className="order-7" />}
+          {shown.length > 0 && (
+            <Card>
+              <CardHeader title="What your customers buy" description="Customers per product or group · each can get its own campaign" />
+              <ul className="grid gap-x-6 gap-y-0.5 p-2 sm:grid-cols-2 sm:p-3">
+                {shown.map((t) => (
+                  <li key={t.tag}>
+                    <Link href={`/dashboard/customers?tag=${encodeURIComponent(t.tag)}`} className="group block rounded-control px-2.5 py-2.5 transition hover:bg-subtle active:bg-sunken">
+                      <div className="flex items-baseline justify-between gap-2 text-sm">
+                        <span className="truncate font-medium text-ink group-hover:underline">{tagLabel(t.tag)}</span>
+                        <span className="tabular text-xs font-medium text-ink-2">{fmtNumber(t.n)}</span>
+                      </div>
+                      <Meter className="mt-1.5" value={Math.max(4, pct(t.n, top))} />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
         </div>
       </div>
+
+      {byRegion.length > 1 && (
+        <Card className="mt-4 sm:mt-5">
+          <CardHeader title="Customers by area" description="From the order sheets · tap an area to see its customers" />
+          <div className="space-y-5 p-4 sm:p-5">
+            <div>
+              <div className="flex h-2.5 gap-0.5 overflow-hidden rounded-full" aria-hidden>
+                {byRegion.map((r, i) => (
+                  <div key={r.key} className={`${REGION_COLORS[i] ?? "bg-line-2"} first:rounded-l-full last:rounded-r-full`} style={{ width: `${pct(r.n, regionTotal)}%` }} />
+                ))}
+              </div>
+              <ul className="mt-2 grid grid-cols-1 gap-x-4 min-[360px]:grid-cols-2 sm:flex sm:flex-wrap sm:gap-x-2">
+                {byRegion.map((r, i) => (
+                  <li key={r.key}>
+                    <Link href={`/dashboard/customers?area=${encodeURIComponent(r.href)}`} className="group flex min-h-11 items-center gap-2 rounded-control px-1 text-sm transition hover:bg-subtle sm:min-h-9 sm:px-2">
+                      <span aria-hidden className={`size-2.5 shrink-0 rounded-[3px] ${REGION_COLORS[i] ?? "bg-line-2"}`} />
+                      <span className="text-ink-2 group-hover:underline">{r.label}</span>
+                      <span className="tabular text-xs text-muted">
+                        {fmtNumber(r.n)} · {pct(r.n, regionTotal)}%
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <AreaChips topAreas={topAreas} otherAreas={otherAreas} />
+          </div>
+        </Card>
+      )}
     </>
   );
 }

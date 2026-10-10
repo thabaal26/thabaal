@@ -266,6 +266,11 @@ body {
 .bar { transform-origin: left; animation: grow 0.6s var(--ease-snappy) 0.1s both; }
 .bar-y { transform-origin: bottom; animation: grow-y 0.5s var(--ease-snappy) both; }
 
+/* Chart lines draw themselves in once; areas and markers fade in after them. */
+.chart-draw { stroke-dasharray: 1; animation: chart-draw 0.9s var(--ease-snappy) both; }
+.chart-fade { animation: fade 0.5s ease-out 0.35s both; }
+@keyframes chart-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+
 /* Clickable cards respond to the pointer on computers; phones get press feedback instead. */
 @media (hover: hover) and (pointer: fine) {
   .lift { transition: border-color 0.16s var(--ease-snappy), box-shadow 0.16s var(--ease-snappy); }
