@@ -1,7 +1,7 @@
 import { Activity, ArrowDownRight, ArrowUpRight, CheckCheck, Clock3, Eye, Gauge, MessageCircle, PieChart, Send, ShoppingBag, ShieldAlert, TrendingUp, Trophy, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { CountUp, Ring3D, Sparkline, TrendChart, type Series } from "@/components/charts";
+import { CountUp, RadialRings, Sparkline, TickRing, TrendChart, type Series } from "@/components/charts";
 import { formatValue, type ValueFormat } from "@/lib/chart-math";
 import { Card, CardHeader, QualityBadge, buttonClass } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -194,29 +194,41 @@ export function ActivityCard({ labels, tooltipLabels, series, every, title, desc
 export function DeliveryCard({ read, delivered, sent, failed }: { read: number; delivered: number; sent: number; failed: number }) {
   const total = read + delivered + sent + failed;
   const reached = read + delivered;
+  // Each ring is one status's share of all the period's messages, in a two-tone gradient.
   const segs = [
-    { key: "read", label: "Read", value: read, color: C.read },
-    { key: "delivered", label: "Delivered, unread", value: delivered, color: C.brand },
-    { key: "sent", label: "Not delivered yet", value: sent, color: C.pending },
-    { key: "failed", label: "Failed", value: failed, color: C.failed },
+    { key: "read", label: "Read", value: read, from: "#a78bfa", to: "#6941c6" },
+    { key: "delivered", label: "Delivered, unread", value: delivered, from: "#4ade9f", to: "#167d63" },
+    { key: "sent", label: "Not delivered yet", value: sent, from: "#cbd5e1", to: "#8b95a5" },
+    { key: "failed", label: "Failed", value: failed, from: "#fb8a8a", to: "#c93636" },
   ];
   return (
     <Card className="card-3d h-full">
       <CardHeader tone="violet" icon={<PieChart />} title="Delivery health" description="Where this period's messages ended up" />
       <div className="flex flex-col gap-5 p-5">
-        <div>
-          <p className="text-[1.75rem] font-semibold leading-tight tracking-tight text-ink">
+        <RadialRings
+          rings={segs.map((s) => ({ ...s, max: total }))}
+          ticks={{ value: total ? reached / total : 0, from: "#6941c6", to: "#16a37a" }}
+          label={`${pct(reached, total)}% of ${total} messages delivered`}
+        >
+          <span
+            aria-hidden
+            className="mb-1 grid size-8 place-items-center rounded-full text-white ring-1 ring-inset ring-white/25"
+            style={{ background: "linear-gradient(145deg, #a78bfa, #6941c6)", boxShadow: "0 4px 10px -3px #6941c699" }}
+          >
+            <CheckCheck className="size-4" />
+          </span>
+          <p className="text-2xl font-semibold leading-none tracking-tight text-ink">
             <CountUp value={pct(reached, total)} format="percent" />
           </p>
-          <p className="text-sm text-muted">
-            of {fmtNumber(total)} messages reached the customer
-          </p>
-        </div>
-        <Ring3D segments={segs} label={`${pct(reached, total)}% of ${total} messages delivered`} />
+          <p className="mt-1 text-2xs font-medium uppercase tracking-wider text-muted">delivered</p>
+        </RadialRings>
+        <p className="-mt-1 text-center text-sm text-muted">
+          {fmtNumber(reached)} of {fmtNumber(total)} messages reached the customer
+        </p>
         <ul className="grid grid-cols-1 gap-x-5 gap-y-2.5 min-[420px]:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
           {segs.map((s) => (
             <li key={s.key} className="flex items-center gap-2.5 text-sm">
-              <span aria-hidden className="size-2.5 shrink-0 rounded-[3px]" style={{ background: s.color }} />
+              <span aria-hidden className="size-2.5 shrink-0 rounded-full" style={{ background: `linear-gradient(135deg, ${s.from}, ${s.to})` }} />
               <span className="min-w-0 flex-1 text-ink-2">{s.label}</span>
               <span className="tabular font-medium text-ink">{fmtNumber(s.value)}</span>
               <span className="tabular w-11 text-right text-xs text-muted">{pct(s.value, total)}%</span>
@@ -376,18 +388,17 @@ function LimitRing({ used, limit, left, label }: { used: number; limit: number |
   const reserve = limit !== null && left !== null ? Math.max(0, limit - used - left) : 0;
   return (
     <div className="flex items-center gap-4">
-      <div className="shrink-0">
-        <Ring3D
-          width={104}
-          depth={10}
-          thickness={26}
-          segments={[
-            { key: "used", label: "Used", value: Math.max(used, 0), color: full ? C.failed : C.brand },
-            { key: "free", label: "Free", value: limit === null ? 0 : Math.max(limit - used, 0), color: "#dfe4ea" },
-          ]}
-          label={limit === null ? `${label}: no limit` : `${label}: ${used} of ${limit} people messaged`}
-        />
-      </div>
+      <TickRing
+        value={Math.max(used, 0)}
+        max={limit}
+        from={full ? "#fb8a8a" : "#4f93d8"}
+        to={full ? "#c93636" : "#16a37a"}
+        size={108}
+        label={limit === null ? `${label}: no limit` : `${label}: ${used} of ${limit} people messaged`}
+      >
+        <span className="tabular text-lg font-semibold leading-none text-ink">{fmtNumber(used)}</span>
+        <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-muted">{limit === null ? "no limit" : `of ${fmtNumber(limit)}`}</span>
+      </TickRing>
       <div className="min-w-0 text-sm">
         <p className="tabular text-ink">
           <b className="font-semibold">{fmtNumber(used)}</b> of {limit === null ? "unlimited" : fmtNumber(limit)} people

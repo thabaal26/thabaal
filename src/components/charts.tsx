@@ -209,191 +209,166 @@ export function TrendChart({
   );
 }
 
-/* ───────────────────────── Ring ───────────────────────── */
+/* ───────────────────────── Radial rings ───────────────────────── */
 
-export type RingSegment = { key: string; label: string; value: number; color: string };
+export type RadialRing = { key: string; label: string; value: number; max: number; from: string; to: string };
 
-/**
- * A donut for a part-of-a-whole (with a surface gap between segments), or a single progress ring
- * when given one segment and a `max`. It draws itself in once.
- */
-export function Ring({
-  segments,
-  max,
-  size = 160,
-  thickness = 14,
-  track = "#f1f4f8",
-  children,
-  label,
-}: {
-  segments: RingSegment[];
-  /** For a progress ring: the full-circle value. Defaults to the sum of the segments. */
-  max?: number;
-  size?: number;
-  thickness?: number;
-  track?: string;
-  children?: ReactNode;
-  label: string;
-}) {
+/** Hook: true on the frame after mount, so arcs can animate from empty to their value once. */
+function useDrawn() {
   const [drawn, setDrawn] = useState(false);
   useEffect(() => {
     const id = requestAnimationFrame(() => setDrawn(true));
     return () => cancelAnimationFrame(id);
   }, []);
-  const total = max ?? segments.reduce((a, s) => a + s.value, 0);
-  const r = 50 - thickness / 2;
-  const gap = segments.filter((s) => s.value > 0).length > 1 ? 0.8 : 0;
-  let offset = 0;
-  return (
-    <div role="img" aria-label={label} className="relative grid shrink-0 place-items-center" style={{ width: size, height: size }}>
-      <svg viewBox="0 0 100 100" className="absolute inset-0 -rotate-90">
-        <circle cx="50" cy="50" r={r} fill="none" stroke={track} strokeWidth={thickness} />
-        {total > 0 &&
-          segments.map((s) => {
-            const len = Math.max(0, (s.value / total) * 100 - gap);
-            const el = (
-              <circle
-                key={s.key}
-                cx="50"
-                cy="50"
-                r={r}
-                fill="none"
-                stroke={s.color}
-                strokeWidth={thickness}
-                strokeLinecap={segments.length === 1 ? "round" : "butt"}
-                pathLength={100}
-                strokeDasharray={`${drawn ? len : 0} 100`}
-                strokeDashoffset={-offset}
-                className="transition-[stroke-dasharray] duration-700 ease-out motion-reduce:transition-none"
-              />
-            );
-            offset += (s.value / total) * 100;
-            return s.value > 0 ? el : null;
-          })}
-      </svg>
-      <div className="relative text-center">{children}</div>
-    </div>
-  );
+  return drawn;
 }
 
-/* ───────────────────────── 3D ring ───────────────────────── */
-
-/** A colour made darker (f < 0) or lighter (f > 0), for the shaded side of the 3D ring. */
-function shade(hex: string, f: number) {
-  const n = parseInt(hex.slice(1), 16);
-  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => Math.round(f < 0 ? c * (1 + f) : c + (255 - c) * f));
+/** Colour between two hex colours, for ticks that run along a gradient. */
+function blend(a: string, b: string, t: number) {
+  const pa = parseInt(a.slice(1), 16);
+  const pb = parseInt(b.slice(1), 16);
+  const ch = [16, 8, 0].map((sh) => Math.round(((pa >> sh) & 255) + (((pb >> sh) & 255) - ((pa >> sh) & 255)) * t));
   return `rgb(${ch.join(",")})`;
 }
 
 /**
- * A donut seen from above at an angle: the top face carries the segments, a darker extruded wall
- * gives it depth, and a soft shadow grounds it. Tilt exaggerates the front segments a little, so
- * pair it with a legend that states the exact figures. Draws itself in once.
+ * Concentric progress rings, one per measure, each a rounded gradient arc with a soft glow over a
+ * faint track of its own colour, inside an outer ring of fine ticks that fills to `ticks.value`.
+ * Rings of different radii aren't equal in length, so pair it with a legend stating the figures.
  */
-export function Ring3D({
-  segments,
-  width = 260,
-  thickness = 22,
-  tilt = 0.56,
-  depth = 12,
+export function RadialRings({
+  rings,
+  ticks,
+  size = 240,
   label,
   children,
 }: {
-  segments: RingSegment[];
-  width?: number;
-  thickness?: number;
-  /** How flattened the ellipse is (1 = seen from straight above). */
-  tilt?: number;
-  /** Height of the side wall, in viewBox units (the ring is 100 wide). */
-  depth?: number;
+  rings: RadialRing[];
+  /** The outer tick ring: share filled (0–1) and its gradient. */
+  ticks?: { value: number; from: string; to: string; count?: number };
+  size?: number;
   label: string;
   children?: ReactNode;
 }) {
-  const [drawn, setDrawn] = useState(false);
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setDrawn(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
+  const drawn = useDrawn();
   const uid = useId().replace(/:/g, "");
-  const total = segments.reduce((a, s) => a + s.value, 0);
-  const shown = segments.filter((s) => s.value > 0);
-  const gap = shown.length > 1 ? 0.6 : 0;
-  const r = 50 - thickness / 2 - 1;
-  const top = 50 * tilt; // centre of the top face
-  const h = 100 * tilt + depth + 8; // room for the wall and the shadow
-
-  const ringLayer = (dy: number, colorOf: (s: RingSegment) => string, key: string) => {
-    let offset = 0;
-    return (
-      <g key={key} transform={`translate(0 ${dy}) scale(1 ${tilt})`}>
-        <g transform="rotate(-90 50 50)">
-          {total > 0 &&
-            segments.map((s) => {
-              const len = Math.max(0, (s.value / total) * 100 - gap);
-              const el =
-                s.value > 0 ? (
-                  <circle
-                    key={s.key}
-                    cx="50"
-                    cy="50"
-                    r={r}
-                    fill="none"
-                    stroke={colorOf(s)}
-                    strokeWidth={thickness}
-                    pathLength={100}
-                    strokeDasharray={`${drawn ? len : 0} 100`}
-                    strokeDashoffset={-offset}
-                    className="transition-[stroke-dasharray] duration-[900ms] ease-out motion-reduce:transition-none"
-                  />
-                ) : null;
-              offset += (s.value / total) * 100;
-              return el;
-            })}
-        </g>
-      </g>
-    );
-  };
-
-  // The wall: the ring repeated downwards in darker shades, bottom first, so the top face covers it.
-  const steps = Math.max(2, Math.round(depth / 1.2));
-  const wall = Array.from({ length: steps }, (_, i) => {
-    const dy = depth - (i * depth) / steps;
-    return ringLayer(dy, (s) => shade(s.color, -0.42 + (i / steps) * 0.12), `w${i}`);
-  });
-
+  const stroke = rings.length > 3 ? 9 : 11;
+  const gap = 5;
+  const outer = ticks ? 82 : 94;
+  const n = ticks?.count ?? 72;
+  const on = ticks ? Math.round(n * Math.min(1, Math.max(0, ticks.value))) : 0;
   return (
-    <div role="img" aria-label={label} className="relative mx-auto" style={{ width, height: (width * h) / 100 }}>
-      <svg viewBox={`0 0 100 ${h}`} className="absolute inset-0 size-full overflow-visible">
+    <div role="img" aria-label={label} className="relative mx-auto grid place-items-center" style={{ width: size, height: size }}>
+      <svg viewBox="0 0 200 200" className="absolute inset-0 size-full overflow-visible">
         <defs>
-          <radialGradient id={`sh${uid}`} cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#101828" stopOpacity="0.22" />
-            <stop offset="100%" stopColor="#101828" stopOpacity="0" />
-          </radialGradient>
-          <linearGradient id={`hl${uid}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.22" />
-            <stop offset="55%" stopColor="#ffffff" stopOpacity="0" />
-          </linearGradient>
+          {rings.map((r) => (
+            <linearGradient key={r.key} id={`g${uid}${r.key}`} x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor={r.from} />
+              <stop offset="100%" stopColor={r.to} />
+            </linearGradient>
+          ))}
         </defs>
-        {/* Floor shadow */}
-        <ellipse cx="50" cy={top + depth + 3} rx="48" ry={50 * tilt * 0.9} fill={`url(#sh${uid})`} />
-        {/* Empty track when there's nothing to show */}
-        {total === 0 && (
-          <g transform={`scale(1 ${tilt})`}>
-            <circle cx="50" cy="50" r={r} fill="none" stroke="#e2e6ec" strokeWidth={thickness} />
-          </g>
-        )}
-        {wall}
-        {ringLayer(0, (s) => s.color, "top")}
-        {/* Soft light across the top face */}
-        <g transform={`scale(1 ${tilt})`} pointerEvents="none">
-          <circle cx="50" cy="50" r={r} fill="none" stroke={`url(#hl${uid})`} strokeWidth={thickness} />
+        {ticks &&
+          Array.from({ length: n }, (_, i) => {
+            const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+            const lit = i < on;
+            const r1 = 90;
+            const r2 = i % 6 === 0 ? 99 : 97;
+            return (
+              <line
+                key={i}
+                x1={100 + r1 * Math.cos(a)}
+                y1={100 + r1 * Math.sin(a)}
+                x2={100 + r2 * Math.cos(a)}
+                y2={100 + r2 * Math.sin(a)}
+                stroke={lit ? blend(ticks.from, ticks.to, i / Math.max(1, n - 1)) : "#e2e6ec"}
+                strokeWidth={2.2}
+                strokeLinecap="round"
+                style={{ opacity: lit && !drawn ? 0 : 1, transition: `opacity 0.3s ease ${(i / n) * 0.7}s` }}
+              />
+            );
+          })}
+        <g transform="rotate(-90 100 100)">
+          {rings.map((r, i) => {
+            const rad = outer - i * (stroke + gap);
+            const share = r.max > 0 ? Math.min(100, (r.value / r.max) * 100) : 0;
+            return (
+              <g key={r.key}>
+                <circle cx="100" cy="100" r={rad} fill="none" stroke={r.to} strokeOpacity={0.1} strokeWidth={stroke} />
+                {share > 0 && (
+                  <circle
+                    cx="100"
+                    cy="100"
+                    r={rad}
+                    fill="none"
+                    stroke={`url(#g${uid}${r.key})`}
+                    strokeWidth={stroke}
+                    strokeLinecap="round"
+                    pathLength={100}
+                    strokeDasharray={`${drawn ? Math.max(share, 0.6) : 0} 100`}
+                    style={{ filter: `drop-shadow(0 3px 5px ${r.to}66)`, transition: `stroke-dasharray 1s cubic-bezier(.2,.8,.2,1) ${i * 0.12}s` }}
+                    className="motion-reduce:transition-none"
+                  />
+                )}
+              </g>
+            );
+          })}
         </g>
       </svg>
-      {children && (
-        <div className="absolute inset-x-0 flex flex-col items-center justify-center text-center" style={{ top: 0, height: `${((top * 2) / h) * 100}%` }}>
-          {children}
-        </div>
-      )}
+      {children && <div className="relative flex flex-col items-center text-center">{children}</div>}
+    </div>
+  );
+}
+
+/**
+ * A ring of short segments that light up along a gradient to show a share (e.g. people messaged of
+ * the daily limit), with the figure in the middle.
+ */
+export function TickRing({
+  value,
+  max,
+  from,
+  to,
+  size = 112,
+  count = 40,
+  label,
+  children,
+}: {
+  value: number;
+  max: number | null;
+  from: string;
+  to: string;
+  size?: number;
+  count?: number;
+  label: string;
+  children?: ReactNode;
+}) {
+  const drawn = useDrawn();
+  const share = max ? Math.min(1, Math.max(0, value / max)) : 0;
+  // Any use at all lights at least one segment, so a small figure is still visible.
+  const on = value > 0 ? Math.max(1, Math.round(count * share)) : 0;
+  return (
+    <div role="img" aria-label={label} className="relative grid shrink-0 place-items-center" style={{ width: size, height: size }}>
+      <svg viewBox="0 0 100 100" className="absolute inset-0 size-full">
+        {Array.from({ length: count }, (_, i) => {
+          const a = (i / count) * Math.PI * 2 - Math.PI / 2;
+          const lit = i < on;
+          return (
+            <line
+              key={i}
+              x1={50 + 36 * Math.cos(a)}
+              y1={50 + 36 * Math.sin(a)}
+              x2={50 + 46 * Math.cos(a)}
+              y2={50 + 46 * Math.sin(a)}
+              stroke={lit ? blend(from, to, i / Math.max(1, count - 1)) : "#e2e6ec"}
+              strokeWidth={4.2}
+              strokeLinecap="round"
+              style={{ opacity: lit && !drawn ? 0.15 : 1, transition: `opacity 0.3s ease ${(i / count) * 0.6}s` }}
+            />
+          );
+        })}
+      </svg>
+      {children && <div className="relative flex flex-col items-center text-center">{children}</div>}
     </div>
   );
 }
