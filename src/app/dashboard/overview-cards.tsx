@@ -1,7 +1,7 @@
-import { Activity, ArrowDownRight, ArrowUpRight, CheckCheck, Clock3, PieChart, ShieldAlert, TrendingUp } from "lucide-react";
+import { Activity, ArrowDownRight, ArrowUpRight, CheckCheck, Clock3, ShieldAlert, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
-import { CountUp, RadialRings, Sparkline, TickRing, TrendChart, type Series } from "@/components/charts";
+import { CountUp, DeliveryChronoDonut, Sparkline, TickRing, TrendChart, type Series } from "@/components/charts";
 import { Eye3D, Gauge3D, Messages3D, Send3D, ShoppingBag3D, Trophy3D } from "@/components/icons-3d";
 import { formatValue, type ValueFormat } from "@/lib/chart-math";
 import { Card, CardHeader, QualityBadge, buttonClass } from "@/components/ui";
@@ -193,49 +193,16 @@ export function ActivityCard({ labels, tooltipLabels, series, every, title, desc
 
 /** Where this period's messages ended up: each counted once, under its latest status. */
 export function DeliveryCard({ read, delivered, sent, failed }: { read: number; delivered: number; sent: number; failed: number }) {
-  const total = read + delivered + sent + failed;
-  const reached = read + delivered;
-  // Each ring is one status's share of all the period's messages, in a two-tone gradient.
-  const segs = [
-    { key: "read", label: "Read", value: read, from: "#a78bfa", to: "#6941c6" },
-    { key: "delivered", label: "Delivered, unread", value: delivered, from: "#4ade9f", to: "#167d63" },
-    { key: "sent", label: "Not delivered yet", value: sent, from: "#cbd5e1", to: "#8b95a5" },
-    { key: "failed", label: "Failed", value: failed, from: "#fb8a8a", to: "#c93636" },
-  ];
   return (
     <Card className="card-3d h-full">
-      <CardHeader tone="violet" icon={<PieChart />} title="Delivery health" description="Where this period's messages ended up" />
-      <div className="flex flex-col gap-5 p-5">
-        <RadialRings
-          rings={segs.map((s) => ({ ...s, max: total }))}
-          ticks={{ value: total ? reached / total : 0, from: "#6941c6", to: "#16a37a" }}
-          label={`${pct(reached, total)}% of ${total} messages delivered`}
-        >
-          <span
-            aria-hidden
-            className="icon-cube-3d mb-1 grid size-8 place-items-center rounded-full text-white ring-1 ring-inset ring-white/25"
-            style={{ background: "linear-gradient(145deg, #a78bfa, #6941c6)", boxShadow: "0 4px 10px -3px #6941c699" }}
-          >
-            <CheckCheck className="size-4" />
-          </span>
-          <p className="text-2xl font-semibold leading-none tracking-tight text-ink">
-            <CountUp value={pct(reached, total)} format="percent" />
-          </p>
-          <p className="mt-1 text-2xs font-medium uppercase tracking-wider text-muted">delivered</p>
-        </RadialRings>
-        <p className="-mt-1 text-center text-sm text-muted">
-          {fmtNumber(reached)} of {fmtNumber(total)} messages reached the customer
-        </p>
-        <ul className="grid grid-cols-1 gap-x-5 gap-y-2.5 min-[420px]:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-          {segs.map((s) => (
-            <li key={s.key} className="flex items-center gap-2.5 text-sm">
-              <span aria-hidden className="size-2.5 shrink-0 rounded-full" style={{ background: `linear-gradient(135deg, ${s.from}, ${s.to})` }} />
-              <span className="min-w-0 flex-1 text-ink-2">{s.label}</span>
-              <span className="tabular font-medium text-ink">{fmtNumber(s.value)}</span>
-              <span className="tabular w-11 text-right text-xs text-muted">{pct(s.value, total)}%</span>
-            </li>
-          ))}
-        </ul>
+      <CardHeader
+        tone="violet"
+        icon={<Gauge3D />}
+        title="Message delivery health"
+        description="How many WhatsApp messages reached and were read by customers"
+      />
+      <div className="p-4 sm:p-5">
+        <DeliveryChronoDonut read={read} delivered={delivered} sent={sent} failed={failed} />
       </div>
     </Card>
   );
