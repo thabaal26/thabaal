@@ -1,8 +1,9 @@
-import { CalendarClock, ChevronRight, FlaskConical, IndianRupee, Pause, Play, Send, ShoppingBag, Trash2, Users } from "lucide-react";
+import { ChevronRight, FlaskConical, Pause, Play, Send, Trash2 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
+import { Calendar3D, Rupee3D, Send3D, ShoppingBag3D, Users3D } from "@/components/icons-3d";
 import { OverflowMenu } from "@/components/overflow-menu";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, rowClass, Stat, StatusBadge, Table, Td, Th } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -115,35 +116,35 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
           label="Audience size"
           value={fmtNumber(audienceSize)}
           sub={c.audienceTag ? `${audienceName}` : "All opted-in customers"}
-          icon={<Users />}
+          icon={<Users3D />}
           tone="info"
         />
         <Stat
           label="Recent runs"
           value={fmtNumber(c.runs.length)}
           sub={c.runs[0] ? `Last ${fmtDate(c.runs[0].startedAt, "d MMM")}` : "Never run yet"}
-          icon={<CalendarClock />}
+          icon={<Calendar3D />}
           tone="brand"
         />
         <Stat
           label="Orders (7 days)"
           value={fmtNumber(totalOrders)}
           sub="Attributed within 7d of send"
-          icon={<ShoppingBag />}
+          icon={<ShoppingBag3D />}
           tone="violet"
         />
         <Stat
           label="Sales (7 days)"
           value={money(totalRevenue)}
           sub="From attributed orders"
-          icon={<IndianRupee />}
+          icon={<Rupee3D />}
           tone="gold"
         />
       </div>
 
       {!scope.canManage ? (
         <Card className="card-3d">
-          <CardHeader tone="brand" icon={<CalendarClock />} title="Campaign details" />
+          <CardHeader tone="brand" icon={<Calendar3D />} title="Campaign details" />
           <dl className="grid gap-4 p-4 text-sm sm:grid-cols-2 sm:p-5 lg:grid-cols-3 xl:grid-cols-5">
             <div>
               <dt className="text-xs text-muted">Template</dt>
@@ -199,7 +200,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
       <Card className="card-3d mt-4 sm:mt-6">
         <CardHeader
           tone="info"
-          icon={<Send />}
+          icon={<Send3D />}
           title="Send history"
           description={`The last 20 runs of this campaign.${totalOrders ? ` Brought ${fmtNumber(totalOrders)} order${totalOrders === 1 ? "" : "s"} worth ${money(totalRevenue)} within 7 days of sending.` : ""}`}
         />

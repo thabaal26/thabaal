@@ -1,7 +1,8 @@
-import { IndianRupee, PackageCheck, PackageOpen, Search, ShoppingBag, Store, Truck } from "lucide-react";
+import { PackageCheck, PackageOpen, Search, Store, Truck } from "lucide-react";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
+import { Rupee3D, ShoppingBag3D } from "@/components/icons-3d";
 import { Picker } from "@/components/picker";
 import { buttonClass, Callout, Card, DistributionBar, EmptyState, FilterChips, PageHeader, Section, Stat } from "@/components/ui";
 import { getCatalogWithProducts } from "@/lib/catalog";
@@ -250,7 +251,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
           label="Active pipeline"
           value={fmtNumber(activeCount)}
           sub={`${fmtNumber(unpaidCount)} unpaid · ${fmtNumber(dispatchedCount)} in transit`}
-          icon={<ShoppingBag />}
+          icon={<ShoppingBag3D />}
           tone="brand"
           href={qs({ show: undefined })}
         />
@@ -274,7 +275,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
           label="Shown order value"
           value={money(orders.filter((o) => o.status !== "CANCELLED").reduce((sum, o) => sum + o.total, 0))}
           sub={`${fmtNumber(deliveredCount)} delivered · ${fmtNumber(allCount)} total`}
-          icon={<IndianRupee />}
+          icon={<Rupee3D />}
           tone="gold"
           href={qs({ show: "done" })}
         />
@@ -374,7 +375,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
           </ul>
         ) : (
           <Card className="card-3d">
-            <EmptyState icon={show === "done" ? <PackageCheck className="size-5" /> : <ShoppingBag className="size-5" />} title="No orders here yet">
+            <EmptyState icon={show === "done" ? <PackageCheck className="size-5" /> : <ShoppingBag3D className="size-5" />} title="No orders here yet">
               {filtered
                 ? "No orders matched your active filters. Try picking another status, time range or clearing your search."
                 : "When a customer sends a cart from your WhatsApp catalogue, it appears here with items, total and a one-tap confirmation."}

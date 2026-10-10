@@ -1,7 +1,8 @@
-import { Bell, ChevronRight, Inbox, Phone, ShoppingBag, TriangleAlert } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Badge, Card, EmptyState, FilterChips, PageHeader, Stat } from "@/components/ui";
+import { Alert3D, Bell3D, Inbox3D, Phone3D, ShoppingBag3D } from "@/components/icons-3d";
+import { Badge, Card, EmptyState, FilterChips, type HeaderTone, IconCube, PageHeader, Stat } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { daysAgo, fmtDate, fmtNumber } from "@/lib/format";
@@ -33,13 +34,13 @@ const TABS = [
   { key: "alerts", label: "Alerts" },
 ] as const;
 
-/** One icon, tint and action word per kind, so the list can be scanned before it's read. */
-const KIND = {
-  order: { icon: ShoppingBag, tile: "bg-info-bg text-info ring-1 ring-info/20", action: "View order" },
-  reply: { icon: Inbox, tile: "bg-brand-soft text-brand-deep ring-1 ring-brand/20", action: "Reply" },
-  call: { icon: Phone, tile: "bg-accent-bg text-accent ring-1 ring-accent/20", action: "View call" },
-  alert: { icon: TriangleAlert, tile: "bg-danger-bg text-danger ring-1 ring-danger/20", action: "View log" },
-} as const;
+/** One 3D icon cube, tone and action word per kind, so the list can be scanned before it's read. */
+const KIND: Record<NotificationRow["type"], { icon: typeof ShoppingBag3D; tone: HeaderTone; action: string }> = {
+  order: { icon: ShoppingBag3D, tone: "info", action: "View order" },
+  reply: { icon: Inbox3D, tone: "brand", action: "Reply" },
+  call: { icon: Phone3D, tone: "violet", action: "View call" },
+  alert: { icon: Alert3D, tone: "rose", action: "View log" },
+};
 
 export default async function NotificationsPage({
   searchParams,
@@ -210,28 +211,28 @@ export default async function NotificationsPage({
           label="Unread items"
           value={fmtNumber(unreadCount)}
           sub={unreadCount > 0 ? "Needs staff action" : "All caught up"}
-          icon={<Bell className="size-4" />}
+          icon={<Bell3D className="size-4" />}
           tone={unreadCount > 0 ? "amber" : "brand"}
         />
         <Stat
           label="Order events"
           value={fmtNumber(orderCount)}
           sub="Recent order activity"
-          icon={<ShoppingBag className="size-4" />}
+          icon={<ShoppingBag3D className="size-4" />}
           tone="info"
         />
         <Stat
           label="Customer replies"
           value={fmtNumber(replyCount)}
           sub="Recent WhatsApp messages"
-          icon={<Inbox className="size-4" />}
+          icon={<Inbox3D className="size-4" />}
           tone="brand"
         />
         <Stat
           label="Calls & alerts"
           value={fmtNumber(callCount + alertCount)}
           sub={alertCount > 0 ? `${fmtNumber(alertCount)} delivery alerts` : "Last 24 hours"}
-          icon={<Phone className="size-4" />}
+          icon={<Phone3D className="size-4" />}
           tone={alertCount > 0 ? "amber" : "violet"}
         />
       </section>
@@ -250,9 +251,9 @@ export default async function NotificationsPage({
                     return (
                       <li key={item.id} className="group relative flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-subtle sm:items-center sm:px-5">
                         {item.unread && <span aria-hidden className="absolute inset-y-3 left-0 w-[3px] rounded-r-full bg-brand" />}
-                        <span aria-hidden className={cn("grid size-9 shrink-0 place-items-center rounded-full shadow-xs", k.tile)}>
+                        <IconCube tone={k.tone} size="md">
                           <k.icon className="size-[18px]" />
-                        </span>
+                        </IconCube>
 
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
@@ -289,7 +290,7 @@ export default async function NotificationsPage({
         </div>
       ) : (
         <Card className="card-3d">
-          <EmptyState icon={<Bell />} title={show === "unread" ? "You're all caught up" : "Nothing here yet"}>
+          <EmptyState icon={<Bell3D />} title={show === "unread" ? "You're all caught up" : "Nothing here yet"}>
             {show === "unread" ? "Every reply, order and alert has been handled." : "New replies, orders, calls and delivery problems will show up here."}
           </EmptyState>
         </Card>

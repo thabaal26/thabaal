@@ -1,9 +1,10 @@
-import { CheckCheck, Eye, MapPin, MessageCircle, Send, ShoppingBag } from "lucide-react";
+import { MapPin, MessageCircle, ShoppingBag } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
 import { Conversation, type ConversationEntry } from "@/components/conversation";
+import { Eye3D, Inbox3D, Messages3D, Send3D, ShoppingBag3D } from "@/components/icons-3d";
 import { OverflowMenu } from "@/components/overflow-menu";
 import { Badge, buttonClass, Card, CardHeader, EmptyState, PageHeader, Stat } from "@/components/ui";
 import { db } from "@/lib/db";
@@ -125,9 +126,9 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
       />
 
       <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
-        <Stat label="Messages received" value={fmtNumber(sent.length)} sub={c.optedOut ? "Opted out of campaigns" : "From your campaigns"} icon={<Send className="size-4" />} tone="brand" />
-        <Stat label="Read" value={`${pct(read, delivered)}%`} sub={`${read} of ${delivered} delivered`} icon={<Eye className="size-4" />} tone="info" meter={pct(read, delivered)} />
-        <Stat label="Replies" value={fmtNumber(c.replies.length)} sub={c.replies[0] ? `Last ${fmtDate(c.replies[0].receivedAt, "d MMM")}` : "None yet"} icon={<CheckCheck className="size-4" />} tone="violet" />
+        <Stat label="Messages received" value={fmtNumber(sent.length)} sub={c.optedOut ? "Opted out of campaigns" : "From your campaigns"} icon={<Send3D />} tone="brand" />
+        <Stat label="Read" value={`${pct(read, delivered)}%`} sub={`${read} of ${delivered} delivered`} icon={<Eye3D />} tone="info" meter={pct(read, delivered)} />
+        <Stat label="Replies" value={fmtNumber(c.replies.length)} sub={c.replies[0] ? `Last ${fmtDate(c.replies[0].receivedAt, "d MMM")}` : "None yet"} icon={<Inbox3D />} tone="violet" />
       </div>
 
       {/* Computers: the profile in a sticky side column beside the send panel and conversation. */}
@@ -143,11 +144,11 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
           />
 
           <Card className="card-3d overflow-hidden">
-            <CardHeader tone="brand" title="Conversation" description="Messages sent to this customer and what they wrote back. The newest is at the bottom." />
+            <CardHeader tone="brand" icon={<Messages3D />} title="Conversation" description="Messages sent to this customer and what they wrote back. The newest is at the bottom." />
             {timeline.length ? (
               <Conversation entries={timeline} className="max-h-[36rem] min-h-48" />
             ) : (
-              <EmptyState icon={<MessageCircle />} title="No messages with this customer yet">
+              <EmptyState icon={<Messages3D />} title="No messages with this customer yet">
                 Campaign messages and their replies will appear here.
               </EmptyState>
             )}
@@ -155,7 +156,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
         </div>
 
         <Card className="card-3d lg:sticky lg:top-24 lg:col-start-1 lg:row-start-1">
-          <CardHeader tone="violet" title="What they buy" />
+          <CardHeader tone="violet" icon={<ShoppingBag3D />} title="What they buy" />
           <div className="space-y-4 p-4 sm:p-5">
             {c.orders.length > 0 && (
               <div>

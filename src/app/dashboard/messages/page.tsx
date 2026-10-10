@@ -1,6 +1,7 @@
-import { CheckCheck, ChevronDown, ChevronLeft, ChevronRight, Download, Eye, MessagesSquare, Search, TriangleAlert } from "lucide-react";
+import { CheckCheck, ChevronDown, ChevronLeft, ChevronRight, Download, Search } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Alert3D, Eye3D, Messages3D } from "@/components/icons-3d";
 import { Picker } from "@/components/picker";
 import { Avatar, Badge, buttonClass, Card, DistributionBar, EmptyState, FilterChips, PageHeader, rowClass, Stat, StatusBadge, Table, Td, Th } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -87,7 +88,7 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
           label="Total logged"
           value={fmtNumber(allCount)}
           sub={queuedCount > 0 ? `${fmtNumber(queuedCount)} queued right now` : "Across filtered range"}
-          icon={<MessagesSquare className="size-4" />}
+          icon={<Messages3D />}
           tone="brand"
         />
         <Stat
@@ -102,7 +103,7 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
           label="Read rate"
           value={`${pct(readCount, deliveredTotal)}%`}
           sub={`${fmtNumber(readCount)} opened on WhatsApp`}
-          icon={<Eye className="size-4" />}
+          icon={<Eye3D />}
           tone="violet"
           meter={pct(readCount, deliveredTotal)}
         />
@@ -110,7 +111,7 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
           label="Failed"
           value={fmtNumber(failedCount)}
           sub={failedCount > 0 ? "Tap Failed chip to inspect" : "Zero delivery errors"}
-          icon={<TriangleAlert className="size-4" />}
+          icon={<Alert3D />}
           tone={failedCount > 0 ? "amber" : "gold"}
         />
       </section>
@@ -264,7 +265,7 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
             </div>
           </>
         ) : (
-          <EmptyState icon={<MessagesSquare className="size-5" />} title="No messages found">
+          <EmptyState icon={<Messages3D className="size-5" />} title="No messages found">
             {filtered ? "Try clearing the filters." : "Messages appear here as soon as a campaign or test send goes out."}
           </EmptyState>
         )}

@@ -1,7 +1,8 @@
-import { CheckCircle2, Clock, Megaphone, Plus, RefreshCw, SquarePen } from "lucide-react";
+import { CheckCircle2, Clock, Megaphone, Plus, RefreshCw } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ActionButton } from "@/components/action-button";
+import { Template3D } from "@/components/icons-3d";
 import { Badge, buttonClass, Card, EmptyState, FilterChips, PageHeader, Stat, StatusBadge } from "@/components/ui";
 import { WhatsAppBubble } from "@/components/whatsapp-preview";
 import { DefaultImage } from "./default-image";
@@ -64,7 +65,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
       />
 
       <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <Stat label="Total templates" value={fmtNumber(total)} sub="Synced with Meta" icon={<SquarePen />} tone="info" href="/dashboard/templates" />
+        <Stat label="Total templates" value={fmtNumber(total)} sub="Synced with Meta" icon={<Template3D />} tone="info" href="/dashboard/templates" />
         <Stat
           label="Approved"
           value={fmtNumber(approvedCount)}
@@ -145,7 +146,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
       ) : (
         <Card className="card-3d">
           <EmptyState
-            icon={<SquarePen className="size-5" />}
+            icon={<Template3D className="size-5" />}
             title={active ? `No ${CATEGORY_INFO[active].label.toLowerCase()} templates` : "No templates yet"}
             action={canCreate && <Link href="/dashboard/templates/new" className={buttonClass("primary")}><Plus className="size-4" /> New template</Link>}
           >

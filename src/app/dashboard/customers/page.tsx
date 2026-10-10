@@ -1,6 +1,7 @@
-import { CheckCircle2, ChevronLeft, ChevronRight, MapPin, Search, UserX, Users } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, MapPin, Search, UserX } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Users3D } from "@/components/icons-3d";
 import { Picker } from "@/components/picker";
 import { ActionButton } from "@/components/action-button";
 import { Avatar, Badge, buttonClass, Card, EmptyState, PageHeader, rowClass, Stat, Table, Td, Th } from "@/components/ui";
@@ -105,7 +106,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
           label="Total directory"
           value={fmtNumber(totalAll)}
           sub={filtered ? `${fmtNumber(total)} matching filters` : "All saved contacts"}
-          icon={<Users className="size-4" />}
+          icon={<Users3D />}
           tone="brand"
         />
         <Stat
@@ -277,7 +278,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
             </div>
           </>
         ) : (
-          <EmptyState icon={<Users className="size-5" />} title={filtered ? "No matching customers" : "No customers yet"}>
+          <EmptyState icon={<Users3D className="size-5" />} title={filtered ? "No matching customers" : "No customers yet"}>
             {filtered ? "Try a different search or filter." : scope.canManage ? "Import your customer list as a CSV to get started." : "Customers will appear here once they're added."}
           </EmptyState>
         )}

@@ -1,7 +1,8 @@
-import { CalendarClock, PauseCircle, PlayCircle, Plus, Sparkles, Users } from "lucide-react";
+import { PauseCircle, Plus, Sparkles } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ActionButton } from "@/components/action-button";
+import { Calendar3D, Users3D } from "@/components/icons-3d";
 import { Badge, buttonClass, Card, EmptyState, FilterChips, PageHeader, Stat, StatusBadge } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
@@ -105,7 +106,7 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
           label="Active schedules"
           value={fmtNumber(activeCount)}
           sub={`of ${fmtNumber(campaigns.length)} total campaigns`}
-          icon={<PlayCircle />}
+          icon={<Calendar3D />}
           tone="brand"
           meter={campaigns.length > 0 ? Math.round((activeCount / campaigns.length) * 100) : 0}
           href="/dashboard/campaigns?show=active"
@@ -122,7 +123,7 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
           label="Reachable customers"
           value={fmtNumber(totalReach)}
           sub="Opted-in recipients"
-          icon={<Users />}
+          icon={<Users3D />}
           tone="info"
           href="/dashboard/customers"
         />
@@ -241,7 +242,7 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
       ) : (
         <Card className="card-3d">
           <EmptyState
-            icon={<CalendarClock className="size-5" />}
+            icon={<Calendar3D className="size-5" />}
             title="No campaigns yet"
             action={canCreate && <Link href="/dashboard/campaigns/new" className={buttonClass("primary")}><Plus className="size-4" /> New campaign</Link>}
           >

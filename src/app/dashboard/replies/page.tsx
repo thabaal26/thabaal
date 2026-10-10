@@ -1,7 +1,8 @@
-import { CheckCheck, Inbox, MessageCircle, ShoppingBag } from "lucide-react";
+import { CheckCheck } from "lucide-react";
 import type { Metadata } from "next";
 import { ActionButton } from "@/components/action-button";
 import type { ConversationEntry } from "@/components/conversation";
+import { Inbox3D, Messages3D, ShoppingBag3D } from "@/components/icons-3d";
 import { Card, EmptyState, FilterChips, PageHeader, Stat } from "@/components/ui";
 import { db } from "@/lib/db";
 import { fmtNumber } from "@/lib/format";
@@ -99,7 +100,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
           label="Open replies"
           value={fmtNumber(tabCount[""])}
           sub={tabCount[""] > 0 ? "Need a response" : "Inbox zero!"}
-          icon={<Inbox />}
+          icon={<Inbox3D />}
           tone={tabCount[""] > 0 ? "amber" : "brand"}
           href="/dashboard/replies"
         />
@@ -107,7 +108,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
           label="Order & rate taps"
           value={fmtNumber(orderInquiryCount)}
           sub="In current view"
-          icon={<ShoppingBag />}
+          icon={<ShoppingBag3D />}
           tone="gold"
         />
         <Stat
@@ -123,7 +124,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
           label="Total replies"
           value={fmtNumber(tabCount.all)}
           sub="Across all customers"
-          icon={<MessageCircle />}
+          icon={<Messages3D />}
           tone="info"
           href="/dashboard/replies?show=all"
         />
@@ -133,7 +134,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
         <ReplyInbox replies={replies} selectedId={selected?.id} thread={thread} show={typeof show === "string" ? show : ""} canOperate={scope.canOperate} showClient={!scope.clientId} />
       ) : (
         <Card className="card-3d">
-          <EmptyState icon={<Inbox />} title={show === "handled" ? "Nothing handled yet" : show === "all" ? "No replies yet" : "You're all caught up"}>
+          <EmptyState icon={<Inbox3D className="size-5" />} title={show === "handled" ? "Nothing handled yet" : show === "all" ? "No replies yet" : "You're all caught up"}>
             When customers tap &ldquo;Order now&rdquo; or write back after a campaign, their messages appear here.
           </EmptyState>
         </Card>

@@ -1,7 +1,8 @@
-import { Building2, CalendarClock, CheckCircle2, Circle, Phone, Users } from "lucide-react";
+import { CheckCircle2, Circle } from "lucide-react";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
+import { Building3D, Calendar3D, Phone3D, Users3D } from "@/components/icons-3d";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, QualityBadge, Stat } from "@/components/ui";
 import { db } from "@/lib/db";
 import { numberHealth } from "@/lib/limits";
@@ -44,28 +45,28 @@ export default async function ClientsPage() {
           label="Active businesses"
           value={fmtNumber(clients.length)}
           sub={`${fmtNumber(totalUsers)} staff & manager logins`}
-          icon={<Building2 className="size-4" />}
+          icon={<Building3D />}
           tone="gold"
         />
         <Stat
           label="Total customers"
           value={fmtNumber(totalCustomers)}
           sub="Across all client accounts"
-          icon={<Users className="size-4" />}
+          icon={<Users3D />}
           tone="brand"
         />
         <Stat
           label="WhatsApp numbers"
           value={fmtNumber(totalNumbers)}
           sub="Connected sender lines"
-          icon={<Phone className="size-4" />}
+          icon={<Phone3D />}
           tone="info"
         />
         <Stat
           label="Client campaigns"
           value={fmtNumber(totalCampaigns)}
           sub="Scheduled & one-off"
-          icon={<CalendarClock className="size-4" />}
+          icon={<Calendar3D />}
           tone="violet"
         />
       </section>
@@ -208,8 +209,8 @@ export default async function ClientsPage() {
           })}
         </div>
       ) : (
-        <Card>
-          <EmptyState icon={<Building2 className="size-5" />} title="No clients yet">
+        <Card className="card-3d">
+          <EmptyState icon={<Building3D className="size-5" />} title="No clients yet">
             Add your first client, then upload their customers and give them a login.
           </EmptyState>
         </Card>

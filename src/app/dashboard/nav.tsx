@@ -1,27 +1,41 @@
 "use client";
 
-import { Bell, Building2, CalendarClock, ChevronRight, Inbox, LayoutDashboard, Menu, MessagesSquare, Phone, Settings, ShoppingBag, SquarePen, Store, Users } from "lucide-react";
+import { ChevronRight, Menu } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import {
+  Bell3D,
+  Building3D,
+  Calendar3D,
+  Dashboard3D,
+  Inbox3D,
+  Messages3D,
+  Phone3D,
+  Settings3D,
+  ShoppingBag3D,
+  Store3D,
+  Template3D,
+  Users3D,
+} from "@/components/icons-3d";
 import { Sheet } from "@/components/sheet";
 import { cn } from "@/lib/cn";
 
 export const NAV = [
-  { href: "/dashboard", label: "Overview", short: "Home", icon: LayoutDashboard, group: "Daily work" },
-  { href: "/dashboard/notifications", label: "Notifications", short: "Alerts", icon: Bell, group: "Daily work" },
-  { href: "/dashboard/orders", label: "Orders", short: "Orders", icon: ShoppingBag, group: "Daily work" },
-  { href: "/dashboard/catalogue", label: "Catalogue", short: "Menu", icon: Store, group: "Daily work" },
-  { href: "/dashboard/replies", label: "Replies", short: "Replies", icon: Inbox, group: "Daily work" },
-  { href: "/dashboard/calls", label: "Calls", short: "Calls", icon: Phone, group: "Daily work" },
-  { href: "/dashboard/campaigns", label: "Campaigns", short: "Campaigns", icon: CalendarClock, group: "Marketing" },
-  { href: "/dashboard/templates", label: "Templates", short: "Templates", icon: SquarePen, group: "Marketing" },
-  { href: "/dashboard/customers", label: "Customers", short: "Customers", icon: Users, group: "Marketing" },
-  { href: "/dashboard/messages", label: "Message log", short: "Log", icon: MessagesSquare, group: "Marketing" },
-  { href: "/dashboard/settings", label: "Settings", short: "Settings", icon: Settings, group: "Account" },
+  { href: "/dashboard", label: "Overview", short: "Home", icon: Dashboard3D, group: "Daily work" },
+  { href: "/dashboard/notifications", label: "Notifications", short: "Alerts", icon: Bell3D, group: "Daily work" },
+  { href: "/dashboard/orders", label: "Orders", short: "Orders", icon: ShoppingBag3D, group: "Daily work" },
+  { href: "/dashboard/catalogue", label: "Catalogue", short: "Menu", icon: Store3D, group: "Daily work" },
+  { href: "/dashboard/replies", label: "Replies", short: "Replies", icon: Inbox3D, group: "Daily work" },
+  { href: "/dashboard/calls", label: "Calls", short: "Calls", icon: Phone3D, group: "Daily work" },
+  { href: "/dashboard/campaigns", label: "Campaigns", short: "Campaigns", icon: Calendar3D, group: "Marketing" },
+  { href: "/dashboard/templates", label: "Templates", short: "Templates", icon: Template3D, group: "Marketing" },
+  { href: "/dashboard/customers", label: "Customers", short: "Customers", icon: Users3D, group: "Marketing" },
+  { href: "/dashboard/messages", label: "Message log", short: "Log", icon: Messages3D, group: "Marketing" },
+  { href: "/dashboard/settings", label: "Settings", short: "Settings", icon: Settings3D, group: "Account" },
 ];
 
-const ADMIN_NAV = [{ href: "/dashboard/clients", label: "Clients", short: "Clients", icon: Building2, group: "Account" }];
+const ADMIN_NAV = [{ href: "/dashboard/clients", label: "Clients", short: "Clients", icon: Building3D, group: "Account" }];
 
 /**
  * Phone tabs: what each role opens most. Staff pack orders and answer customers all day;
@@ -68,7 +82,7 @@ export function SideNav({ isAdmin, openReplies, newOrders, unreadNotifications }
       {groups.map((g) => (
         <div key={g} role="group" aria-labelledby={`nav-${g}`}>
           <p id={`nav-${g}`} className="mb-1.5 px-3 text-2xs font-medium uppercase tracking-wider text-white/50">{g}</p>
-          <ul className="space-y-0.5">
+          <ul className="space-y-1">
             {items
               .filter((n) => n.group === g)
               .map(({ href, label, icon: Icon }) => {
@@ -80,12 +94,22 @@ export function SideNav({ isAdmin, openReplies, newOrders, unreadNotifications }
                       href={href}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "relative flex h-9 items-center gap-3 rounded-control px-3 text-sm font-medium transition",
-                        active ? "bg-night-2 text-white" : "text-white/70 hover:bg-white/[0.06] hover:text-white",
+                        "group relative flex h-10 items-center gap-3 rounded-control px-2.5 text-sm font-medium transition",
+                        active ? "bg-night-2 text-white shadow-xs ring-1 ring-white/10" : "text-white/75 hover:bg-white/[0.06] hover:text-white",
                       )}
                     >
                       {active && <span aria-hidden className="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-glow" />}
-                      <Icon aria-hidden className={cn("size-[18px] shrink-0", active ? "text-glow" : "text-white/55")} strokeWidth={1.9} />
+                      <span
+                        aria-hidden
+                        className={cn(
+                          "grid size-7 shrink-0 place-items-center rounded-[8px] transition-transform duration-200 group-hover:scale-105",
+                          active
+                            ? "icon-cube-3d bg-gradient-to-br from-[#f5d55c] to-[#b98a05] text-night ring-1 ring-white/30"
+                            : "bg-white/[0.07] text-white/75 ring-1 ring-inset ring-white/10 group-hover:bg-white/[0.12] group-hover:text-white",
+                        )}
+                      >
+                        <Icon className="size-4" />
+                      </span>
                       <span className="flex-1 truncate">{label}</span>
                       {count && <CountBadge n={count.n} label={count.label} className={active ? "bg-glow text-night" : "bg-white/10 text-white/90"} />}
                     </Link>
@@ -113,8 +137,12 @@ export function BottomNav({ isAdmin, role, openReplies, newOrders, unreadNotific
   const hiddenCount = more.reduce((sum, n) => sum + (countFor(n.href, { openReplies, newOrders, unreadNotifications })?.n ?? 0), 0);
 
   const tabClass = (active: boolean) =>
-    cn("flex h-16 min-w-0 flex-col items-center justify-center gap-1 text-2xs font-medium transition active:scale-95", active ? "text-brand-deep" : "text-ink-2/80");
-  const iconWrap = (active: boolean) => cn("relative grid h-7 w-12 place-items-center rounded-full transition", active && "bg-brand-soft");
+    cn("flex h-16 min-w-0 flex-col items-center justify-center gap-1 text-2xs font-medium transition active:scale-95", active ? "text-brand-deep font-semibold" : "text-ink-2/80");
+  const iconWrap = (active: boolean) =>
+    cn(
+      "relative grid h-8 w-12 place-items-center rounded-full transition",
+      active && "icon-cube-3d bg-gradient-to-br from-[#2fb08c] to-brand-deep text-white",
+    );
   const badge = "absolute -right-1 -top-1 bg-danger-solid text-white ring-2 ring-panel";
 
   return (
@@ -127,7 +155,7 @@ export function BottomNav({ isAdmin, role, openReplies, newOrders, unreadNotific
             <li key={href} className="min-w-0">
               <Link href={href} aria-current={active ? "page" : undefined} className={tabClass(active)}>
                 <span className={iconWrap(active)}>
-                  <Icon aria-hidden className="size-5" strokeWidth={active ? 2.4 : 2} />
+                  <Icon aria-hidden className="size-5" />
                   {count && <CountBadge n={count.n} label={count.label} className={badge} />}
                 </span>
                 <span className="max-w-full truncate px-0.5">{short}</span>
@@ -156,11 +184,19 @@ export function BottomNav({ isAdmin, role, openReplies, newOrders, unreadNotific
                   href={href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex h-14 items-center gap-3 rounded-control border px-4 text-sm font-medium transition active:scale-[0.98]",
+                    "flex h-14 items-center gap-3 rounded-control border px-3.5 text-sm font-medium transition active:scale-[0.98]",
                     active ? "border-brand/30 bg-brand-soft text-brand-deep" : "border-line bg-panel text-ink active:bg-sunken",
                   )}
                 >
-                  <Icon aria-hidden className="size-5 shrink-0" />
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "icon-cube-3d grid size-8 shrink-0 place-items-center rounded-[9px] text-white",
+                      active ? "bg-gradient-to-br from-[#2fb08c] to-brand-deep" : "bg-gradient-to-br from-slate-600 to-slate-800",
+                    )}
+                  >
+                    <Icon className="size-4" />
+                  </span>
                   <span className="min-w-0 flex-1 truncate">{label}</span>
                   {count && <CountBadge n={count.n} label={count.label} className="bg-danger-solid text-white" />}
                 </Link>
@@ -236,7 +272,7 @@ export function SettingsLink() {
       aria-current={active ? "page" : undefined}
       className={cn("grid size-11 shrink-0 place-items-center rounded-control transition active:scale-95", active ? "bg-night-2 text-glow" : "text-white/80 hover:bg-white/10")}
     >
-      <Settings aria-hidden className="size-5" />
+      <Settings3D aria-hidden className="size-5" />
     </Link>
   );
 }

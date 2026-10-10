@@ -1,8 +1,9 @@
-import { BarChart3, CalendarClock, Clock, Eye, IndianRupee, MapPin, MessageCircle, MessagesSquare, Send, ShoppingBasket, TriangleAlert } from "lucide-react";
+import { BarChart3, Clock, MapPin, Send, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { addDays } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { ActionButton } from "@/components/action-button";
+import { Calendar3D, Eye3D, Messages3D, Rupee3D, Send3D, ShoppingBag3D } from "@/components/icons-3d";
 import { Avatar, Badge, buttonClass, Callout, Card, CardHeader, EmptyState, Meter, rowClass, StatusBadge, Table, Td, Th } from "@/components/ui";
 import { db } from "@/lib/db";
 import { APP_TZ, daysAgo, fmtDate, fmtNumber, pct } from "@/lib/format";
@@ -258,7 +259,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         <Send className="size-4" /> Run scheduler
       </ActionButton>
       <Link href="/dashboard/campaigns/new" className={buttonClass("primary")}>
-        <CalendarClock className="size-4" /> New campaign
+        <Calendar3D className="size-4" /> New campaign
       </Link>
     </>
   );
@@ -368,7 +369,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
           value={revenue}
           format="inr"
           sub={`${fmtNumber(curOrders.length)} order${curOrders.length === 1 ? "" : "s"}${curOrders.length ? ` · avg ₹${Math.round(revenue / curOrders.length).toLocaleString("en-IN")}` : ""}`}
-          icon={IndianRupee}
+          icon={Rupee3D}
           color={C.gold}
           spark={revenueSpark}
           delta={{ cur: revenue, prev: prevRevenue, kind: "pct" }}
@@ -380,7 +381,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
           value={total}
           format="count"
           sub={`${fmtNumber(failed)} failed · ${fmtNumber(customers)} active customers${optedOut ? `, ${fmtNumber(optedOut)} opted out` : ""}`}
-          icon={Send}
+          icon={Send3D}
           color={C.brand}
           spark={sentSpark}
           delta={{ cur: total, prev: prevTotal, kind: "pct" }}
@@ -392,7 +393,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
           value={pct(read, delivered)}
           format="percent"
           sub={`${fmtNumber(read)} of ${fmtNumber(delivered)} delivered were read`}
-          icon={Eye}
+          icon={Eye3D}
           color={C.read}
           spark={readRateSpark}
           delta={prevDelivered ? { cur: pct(read, delivered), prev: pct(prevRead, prevDelivered), kind: "pts" } : null}
@@ -403,7 +404,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
           value={replies}
           format="count"
           sub={`from ${fmtNumber(repliers.length)} customer${repliers.length === 1 ? "" : "s"}`}
-          icon={MessageCircle}
+          icon={Messages3D}
           color={C.info}
           spark={replySpark}
           delta={{ cur: replies, prev: prevReplies, kind: "pct" }}
@@ -414,7 +415,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
 
       {activeRuns.length > 0 && (
         <Card className="card-3d mt-4 sm:mt-5">
-          <CardHeader tone="brand" icon={<Send />} title="Sending now" description="Campaigns delivering in batches. Batch size or interval changes apply from the next batch." />
+          <CardHeader tone="brand" icon={<Send3D />} title="Sending now" description="Campaigns delivering in batches. Batch size or interval changes apply from the next batch." />
           <ul className="divide-y divide-line">
             {activeRuns.map((r) => {
               const by = (s: string) => runProgress.find((p) => p.runId === r.id && p.status === s)?._count ?? 0;
@@ -504,7 +505,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
           <Card className="card-3d">
             <CardHeader
               tone="info"
-              icon={<MessagesSquare />}
+              icon={<Messages3D />}
               title="Latest messages"
               description="Sent from the portal, newest first"
               action={
@@ -537,7 +538,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
                 ))}
               </ul>
             ) : (
-              <EmptyState icon={<Send />} title="No messages yet">
+              <EmptyState icon={<Send3D />} title="No messages yet">
                 Sent messages will appear here with their delivery status.
               </EmptyState>
             )}
@@ -625,7 +626,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
           <Card className="card-3d">
             <CardHeader
               tone="violet"
-              icon={<CalendarClock />}
+              icon={<Calendar3D />}
               title="Coming up"
               description="Next scheduled campaign sends"
               action={
@@ -655,7 +656,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
                 ))}
               </ul>
             ) : (
-              <EmptyState icon={<CalendarClock />} title="Nothing scheduled">
+              <EmptyState icon={<Calendar3D />} title="Nothing scheduled">
                 {scope.isAdmin ? "Create a weekly campaign to start sending automatically." : "Upcoming campaigns will show here."}
               </EmptyState>
             )}
@@ -665,7 +666,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
 
           {shown.length > 0 && (
             <Card className="card-3d">
-              <CardHeader tone="gold" icon={<ShoppingBasket />} title="What your customers buy" description="Customers per product or group · each can get its own campaign" />
+              <CardHeader tone="gold" icon={<ShoppingBag3D />} title="What your customers buy" description="Customers per product or group · each can get its own campaign" />
               <ul className="grid gap-x-6 gap-y-0.5 p-2 sm:grid-cols-2 sm:p-3">
                 {shown.map((t) => (
                   <li key={t.tag}>

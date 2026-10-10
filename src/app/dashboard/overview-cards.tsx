@@ -1,7 +1,8 @@
-import { Activity, ArrowDownRight, ArrowUpRight, CheckCheck, Clock3, Eye, Gauge, MessageCircle, PieChart, Send, ShoppingBag, ShieldAlert, TrendingUp, Trophy, type LucideIcon } from "lucide-react";
+import { Activity, ArrowDownRight, ArrowUpRight, CheckCheck, Clock3, PieChart, ShieldAlert, TrendingUp } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { CountUp, RadialRings, Sparkline, TickRing, TrendChart, type Series } from "@/components/charts";
+import { Eye3D, Gauge3D, Messages3D, Send3D, ShoppingBag3D, Trophy3D } from "@/components/icons-3d";
 import { formatValue, type ValueFormat } from "@/lib/chart-math";
 import { Card, CardHeader, QualityBadge, buttonClass } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -88,7 +89,7 @@ export function KpiTile({
   value: number;
   format: ValueFormat;
   sub: ReactNode;
-  icon: LucideIcon;
+  icon: ComponentType<{ className?: string }>;
   color: string;
   spark: number[];
   delta: Delta;
@@ -104,10 +105,10 @@ export function KpiTile({
         </p>
         <span
           aria-hidden
-          className="grid size-8 shrink-0 place-items-center rounded-[10px] text-white ring-1 ring-inset ring-white/25 sm:size-9"
-          style={{ background: `linear-gradient(145deg, rgb(255 255 255 / 0.38), rgb(255 255 255 / 0) 60%), ${color}`, boxShadow: `0 5px 12px -4px ${color}99` }}
+          className="icon-cube-3d grid size-9 shrink-0 place-items-center rounded-[11px] text-white ring-1 ring-inset ring-white/30 sm:size-10"
+          style={{ background: `linear-gradient(145deg, rgb(255 255 255 / 0.38), rgb(255 255 255 / 0) 60%), ${color}`, boxShadow: `inset 0 1.5px 0 rgb(255 255 255 / 0.55), inset 0 -2px 0 rgb(0 0 0 / 0.22), 0 6px 14px -3px ${color}99` }}
         >
-          <Icon className="size-4" />
+          <Icon className="size-[18px] sm:size-5" />
         </span>
       </div>
       <div className="px-3.5 sm:px-5">
@@ -212,7 +213,7 @@ export function DeliveryCard({ read, delivered, sent, failed }: { read: number; 
         >
           <span
             aria-hidden
-            className="mb-1 grid size-8 place-items-center rounded-full text-white ring-1 ring-inset ring-white/25"
+            className="icon-cube-3d mb-1 grid size-8 place-items-center rounded-full text-white ring-1 ring-inset ring-white/25"
             style={{ background: "linear-gradient(145deg, #a78bfa, #6941c6)", boxShadow: "0 4px 10px -3px #6941c699" }}
           >
             <CheckCheck className="size-4" />
@@ -242,12 +243,12 @@ export function DeliveryCard({ read, delivered, sent, failed }: { read: number; 
 
 /* ───────────────────────── Message → order funnel ───────────────────────── */
 
-const FUNNEL: { key: "messaged" | "delivered" | "read" | "replied" | "ordered"; label: string; icon: LucideIcon; color: string }[] = [
-  { key: "messaged", label: "Messaged", icon: Send, color: C.brand },
+const FUNNEL: { key: "messaged" | "delivered" | "read" | "replied" | "ordered"; label: string; icon: ComponentType<{ className?: string }>; color: string }[] = [
+  { key: "messaged", label: "Messaged", icon: Send3D, color: C.brand },
   { key: "delivered", label: "Received it", icon: CheckCheck, color: C.brand },
-  { key: "read", label: "Read it", icon: Eye, color: C.read },
-  { key: "replied", label: "Replied", icon: MessageCircle, color: C.info },
-  { key: "ordered", label: "Ordered within 7 days", icon: ShoppingBag, color: C.gold },
+  { key: "read", label: "Read it", icon: Eye3D, color: C.read },
+  { key: "replied", label: "Replied", icon: Messages3D, color: C.info },
+  { key: "ordered", label: "Ordered within 7 days", icon: ShoppingBag3D, color: C.gold },
 ];
 
 /** People, not messages: each step is a share of everyone messaged in the period. */
@@ -261,11 +262,11 @@ export function FunnelCard({ f, revenue }: { f: Record<(typeof FUNNEL)[number]["
           {FUNNEL.map((s) => {
             const share = pct(f[s.key], base);
             return (
-              <li key={s.key} className="flex items-center gap-3 rounded-control px-2 py-2">
+              <li key={s.key} className="group flex items-center gap-3 rounded-control px-2 py-2">
                 <span
                   aria-hidden
-                  className="grid size-9 shrink-0 place-items-center rounded-full text-white ring-1 ring-inset ring-white/25"
-                  style={{ background: `linear-gradient(145deg, rgb(255 255 255 / 0.38), rgb(255 255 255 / 0) 60%), ${s.color}`, boxShadow: `0 4px 10px -3px ${s.color}88` }}
+                  className="icon-cube-3d grid size-9 shrink-0 place-items-center rounded-[11px] text-white ring-1 ring-inset ring-white/30"
+                  style={{ background: `linear-gradient(145deg, rgb(255 255 255 / 0.38), rgb(255 255 255 / 0) 60%), ${s.color}`, boxShadow: `inset 0 1.5px 0 rgb(255 255 255 / 0.55), inset 0 -2px 0 rgb(0 0 0 / 0.22), 0 4px 10px -3px ${s.color}88` }}
                 >
                   <s.icon className="size-4" />
                 </span>
@@ -424,7 +425,7 @@ export function NumberLimitsCard({ numbers }: { numbers: Health }) {
   const checked = numbers.map((n) => n.statusCheckedAt).filter((d): d is Date => Boolean(d)).sort((a, b) => a.getTime() - b.getTime())[0];
   return (
     <Card className="card-3d flex h-full flex-col">
-      <CardHeader tone="info" icon={<Gauge />} title="Daily sending limit" description="Different people messaged in the last 24 hours" />
+      <CardHeader tone="info" icon={<Gauge3D />} title="Daily sending limit" description="Different people messaged in the last 24 hours" />
       {head && (
         <div className="border-b border-line px-4 py-4 sm:px-5">
           <LimitRing used={head.used} limit={head.limit} left={head.left} label="Business limit" />
@@ -547,7 +548,7 @@ export function TopProductsCard({ items, rangeLabel }: { items: { name: string; 
     <Card className="card-3d h-full">
       <CardHeader
         tone="gold"
-        icon={<Trophy />}
+        icon={<Trophy3D />}
         title="Best sellers"
         description={`From orders, ${rangeLabel.toLowerCase()}`}
         action={

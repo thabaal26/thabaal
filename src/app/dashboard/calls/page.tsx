@@ -1,7 +1,8 @@
 import { PhoneCall, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Badge, Card, CardHeader, EmptyState, PageHeader, Stat } from "@/components/ui";
+import { Phone3D } from "@/components/icons-3d";
+import { Badge, Card, CardHeader, EmptyState, IconCube, PageHeader, Stat } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { fmtDate, fmtNumber } from "@/lib/format";
@@ -42,7 +43,7 @@ export default async function CallsPage() {
       />
 
       <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <Stat label="Total calls" value={fmtNumber(calls.length)} sub="Recent call log" icon={<PhoneCall />} tone="info" />
+        <Stat label="Total calls" value={fmtNumber(calls.length)} sub="Recent call log" icon={<Phone3D />} tone="info" />
         <Stat
           label="Connected"
           value={fmtNumber(connectedCount)}
@@ -63,7 +64,7 @@ export default async function CallsPage() {
 
       {calls.length ? (
         <Card className="card-3d overflow-hidden">
-          <CardHeader tone="brand" icon={<PhoneCall />} title="Call history" description="Tap a customer to open their profile and conversation" />
+          <CardHeader tone="brand" icon={<Phone3D />} title="Call history" description="Tap a customer to open their profile and conversation" />
           <ul className="divide-y divide-line">
             {calls.map((c) => {
               const s = STATUS[c.status];
@@ -72,9 +73,9 @@ export default async function CallsPage() {
               const label = outgoing ? { RINGING: "Ringing", ANSWERED: "On call", ENDED: "Connected", MISSED: "No answer", REJECTED: "Declined" }[c.status] : s.label;
               return (
                 <li key={c.id} className={cn("relative flex items-start gap-3 px-4 py-3.5 sm:px-5", c.customer && "transition-colors hover:bg-subtle active:bg-sunken")}>
-                  <span aria-hidden className={cn("grid size-10 shrink-0 place-items-center rounded-full ring-1 ring-inset", c.status === "MISSED" ? "bg-danger-bg text-danger ring-danger-border" : "bg-brand-soft text-brand-deep ring-brand/20")}>
-                    <Icon className="size-4" />
-                  </span>
+                  <IconCube tone={c.status === "MISSED" ? "rose" : "brand"} size="md">
+                    <Icon />
+                  </IconCube>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -106,7 +107,7 @@ export default async function CallsPage() {
         </Card>
       ) : (
         <Card className="card-3d">
-          <EmptyState icon={<PhoneCall className="size-5" />} title="No calls yet">
+          <EmptyState icon={<Phone3D className="size-5" />} title="No calls yet">
             When a customer calls your WhatsApp number, it rings in every open portal tab and shows up here.
           </EmptyState>
         </Card>

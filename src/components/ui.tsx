@@ -118,6 +118,34 @@ const headerTones = {
 };
 export type HeaderTone = keyof typeof headerTones;
 
+export function IconCube({
+  tone = "brand",
+  size = "md",
+  children,
+  className,
+}: {
+  tone?: HeaderTone;
+  size?: "sm" | "md" | "lg";
+  children: ReactNode;
+  className?: string;
+}) {
+  const t = headerTones[tone] ?? headerTones.brand;
+  const dims =
+    size === "sm"
+      ? "size-8 rounded-[10px] [&>svg]:size-4"
+      : size === "lg"
+        ? "size-11 rounded-[13px] [&>svg]:size-5"
+        : "size-9 rounded-[11px] [&>svg]:size-[18px]";
+  return (
+    <span
+      aria-hidden
+      className={cn("icon-cube-3d grid shrink-0 place-items-center bg-gradient-to-br text-white ring-1 ring-inset ring-white/30", dims, t.tile, className)}
+    >
+      {children}
+    </span>
+  );
+}
+
 export function CardHeader({
   title,
   description,
@@ -144,11 +172,7 @@ export function CardHeader({
       )}
     >
       <div className="flex min-w-0 flex-1 basis-40 items-start gap-3">
-        {t && icon && (
-          <span aria-hidden className={cn("grid size-9 shrink-0 place-items-center rounded-[10px] bg-gradient-to-br text-white ring-1 ring-inset ring-white/25 [&>svg]:size-[18px]", t.tile)}>
-            {icon}
-          </span>
-        )}
+        {t && icon && <IconCube tone={tone} size="md">{icon}</IconCube>}
         <div className="min-w-0">
           <H className="text-[0.9375rem] font-semibold leading-6 text-ink">{title}</H>
           {description && <p className="mt-0.5 text-xs leading-relaxed text-muted sm:text-sm">{description}</p>}
@@ -616,7 +640,11 @@ export function ListRow({
 export function EmptyState({ icon, title, children, action }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center px-6 py-10 text-center sm:py-14">
-      {icon && <div aria-hidden className="tile-3d mb-4 grid size-12 place-items-center rounded-2xl bg-gradient-to-b from-panel to-sunken text-brand-deep ring-1 ring-line">{icon}</div>}
+      {icon && (
+        <div aria-hidden className="pedestal-3d mb-4 grid size-14 place-items-center rounded-2xl text-brand-deep ring-1 ring-line [&>svg]:size-6">
+          {icon}
+        </div>
+      )}
       <h3 className="text-[0.9375rem] font-semibold text-ink">{title}</h3>
       {children && <p className="mt-1 max-w-sm text-sm text-muted">{children}</p>}
       {action && <div className="mt-5">{action}</div>}
@@ -647,7 +675,7 @@ const STAT_TONES: Record<HeaderTone, { color: string; tile: string }> = {
 };
 
 /**
- * A 3D KPI tile (Tremor / Origin style): label, the figure, glossy icon tile, top accent bar,
+ * A 3D KPI tile (Tremor / Origin style): label, the figure, glossy 3D icon cube, top accent bar,
  * optional progress meter, and one line of real context.
  */
 export function Stat({
@@ -676,14 +704,7 @@ export function Stat({
         <p className="min-w-0 truncate text-[0.6875rem] font-semibold uppercase tracking-wide sm:text-xs" style={{ color: t.color }}>
           {label}
         </p>
-        {icon && (
-          <span
-            aria-hidden
-            className={cn("grid size-8 shrink-0 place-items-center rounded-[10px] bg-gradient-to-br text-white ring-1 ring-inset ring-white/25 [&>svg]:size-4", t.tile)}
-          >
-            {icon}
-          </span>
-        )}
+        {icon && <IconCube tone={tone} size="sm">{icon}</IconCube>}
       </div>
       <div className="tabular mt-2 text-xl font-semibold leading-tight tracking-tight text-ink sm:mt-2.5 sm:text-kpi">{value}</div>
       {meter !== undefined && <Meter raised value={meter} tone={tone === "amber" || tone === "rose" ? "warning" : "brand"} className="mt-2.5" />}

@@ -1,6 +1,7 @@
-import { CheckCircle2, CloudOff, ExternalLink, Package, ShoppingBag, XCircle } from "lucide-react";
+import { CheckCircle2, CloudOff, ExternalLink, ShoppingBag, XCircle } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ShoppingBag3D, Store3D } from "@/components/icons-3d";
 import { Badge, buttonClass, Callout, PageHeader, PickClientNotice, Stat } from "@/components/ui";
 import { getCatalogWithProducts } from "@/lib/catalog";
 import { db } from "@/lib/db";
@@ -61,7 +62,7 @@ export default async function CataloguePage() {
       )}
 
       <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <Stat label="Products" value={fmtNumber(total)} sub="In the catalogue" icon={<Package className="size-4" />} tone="info" />
+        <Stat label="Products" value={fmtNumber(total)} sub="In the catalogue" icon={<Store3D />} tone="info" />
         <Stat
           label="In stock"
           value={fmtNumber(inStock)}
@@ -80,7 +81,7 @@ export default async function CataloguePage() {
         <Stat
           label="Meta catalogue"
           tone="violet"
-          icon={<ShoppingBag className="size-4" />}
+          icon={<ShoppingBag3D />}
           value={
             <Badge tone={isLive ? "green" : "gray"} dot className="text-sm">
               {isLive ? "Live sync" : "Saved copy"}
