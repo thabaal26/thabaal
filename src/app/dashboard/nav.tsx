@@ -22,20 +22,20 @@ import { Sheet } from "@/components/sheet";
 import { cn } from "@/lib/cn";
 
 export const NAV = [
-  { href: "/dashboard", label: "Overview", short: "Home", icon: Dashboard3D, group: "Daily work" },
-  { href: "/dashboard/notifications", label: "Notifications", short: "Alerts", icon: Bell3D, group: "Daily work" },
-  { href: "/dashboard/orders", label: "Orders", short: "Orders", icon: ShoppingBag3D, group: "Daily work" },
-  { href: "/dashboard/catalogue", label: "Catalogue", short: "Menu", icon: Store3D, group: "Daily work" },
-  { href: "/dashboard/replies", label: "Replies", short: "Replies", icon: Inbox3D, group: "Daily work" },
-  { href: "/dashboard/calls", label: "Calls", short: "Calls", icon: Phone3D, group: "Daily work" },
-  { href: "/dashboard/campaigns", label: "Campaigns", short: "Campaigns", icon: Calendar3D, group: "Marketing" },
-  { href: "/dashboard/templates", label: "Templates", short: "Templates", icon: Template3D, group: "Marketing" },
-  { href: "/dashboard/customers", label: "Customers", short: "Customers", icon: Users3D, group: "Marketing" },
-  { href: "/dashboard/messages", label: "Message log", short: "Log", icon: Messages3D, group: "Marketing" },
-  { href: "/dashboard/settings", label: "Settings", short: "Settings", icon: Settings3D, group: "Account" },
+  { href: "/dashboard", label: "Overview", short: "Home", icon: Dashboard3D, group: "Daily work", cube: "from-[#34d399] via-[#10b981] to-[#059669]" },
+  { href: "/dashboard/notifications", label: "Notifications", short: "Alerts", icon: Bell3D, group: "Daily work", cube: "from-[#fbbf24] via-[#f59e0b] to-[#d97706]" },
+  { href: "/dashboard/orders", label: "Orders", short: "Orders", icon: ShoppingBag3D, group: "Daily work", cube: "from-[#38bdf8] via-[#0ea5e9] to-[#0284c7]" },
+  { href: "/dashboard/catalogue", label: "Catalogue", short: "Menu", icon: Store3D, group: "Daily work", cube: "from-[#2dd4bf] via-[#14b8a6] to-[#0d9488]" },
+  { href: "/dashboard/replies", label: "Replies", short: "Replies", icon: Inbox3D, group: "Daily work", cube: "from-[#c084fc] via-[#9333ea] to-[#7e22ce]" },
+  { href: "/dashboard/calls", label: "Calls", short: "Calls", icon: Phone3D, group: "Daily work", cube: "from-[#4ade80] via-[#16a34a] to-[#15803d]" },
+  { href: "/dashboard/campaigns", label: "Campaigns", short: "Campaigns", icon: Calendar3D, group: "Marketing", cube: "from-[#fb7185] via-[#f43f5e] to-[#e11d48]" },
+  { href: "/dashboard/templates", label: "Templates", short: "Templates", icon: Template3D, group: "Marketing", cube: "from-[#818cf8] via-[#6366f1] to-[#4f46e5]" },
+  { href: "/dashboard/customers", label: "Customers", short: "Customers", icon: Users3D, group: "Marketing", cube: "from-[#38bdf8] via-[#0284c7] to-[#0369a1]" },
+  { href: "/dashboard/messages", label: "Message log", short: "Log", icon: Messages3D, group: "Marketing", cube: "from-[#a78bfa] via-[#7c3aed] to-[#6d28d9]" },
+  { href: "/dashboard/settings", label: "Settings", short: "Settings", icon: Settings3D, group: "Account", cube: "from-[#fb923c] via-[#ea580c] to-[#c2410c]" },
 ];
 
-const ADMIN_NAV = [{ href: "/dashboard/clients", label: "Clients", short: "Clients", icon: Building3D, group: "Account" }];
+const ADMIN_NAV = [{ href: "/dashboard/clients", label: "Clients", short: "Clients", icon: Building3D, group: "Account", cube: "from-[#fde047] via-[#eab308] to-[#ca8a04]" }];
 
 /**
  * Phone tabs: what each role opens most. Staff pack orders and answer customers all day;
@@ -85,7 +85,7 @@ export function SideNav({ isAdmin, openReplies, newOrders, unreadNotifications }
           <ul className="space-y-1">
             {items
               .filter((n) => n.group === g)
-              .map(({ href, label, icon: Icon }) => {
+              .map(({ href, label, icon: Icon, cube }) => {
                 const active = isActive(path, href);
                 const count = countFor(href, { openReplies, newOrders, unreadNotifications });
                 return (
@@ -95,23 +95,24 @@ export function SideNav({ isAdmin, openReplies, newOrders, unreadNotifications }
                       aria-current={active ? "page" : undefined}
                       className={cn(
                         "group relative flex h-10 items-center gap-3 rounded-control px-2.5 text-sm font-medium transition",
-                        active ? "bg-night-2 text-white shadow-xs ring-1 ring-white/10" : "text-white/75 hover:bg-white/[0.06] hover:text-white",
+                        active ? "bg-night-2 text-white shadow-xs ring-1 ring-white/15" : "text-white/85 hover:bg-white/[0.08] hover:text-white",
                       )}
                     >
                       {active && <span aria-hidden className="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-glow" />}
                       <span
                         aria-hidden
                         className={cn(
-                          "grid size-7 shrink-0 place-items-center rounded-[8px] transition-transform duration-200 group-hover:scale-105",
+                          "icon-cube-3d grid size-7 shrink-0 place-items-center rounded-[8px] bg-gradient-to-br text-white transition-transform duration-200 group-hover:scale-105",
+                          cube,
                           active
-                            ? "icon-cube-3d bg-gradient-to-br from-[#f5d55c] to-[#b98a05] text-night ring-1 ring-white/30"
-                            : "bg-white/[0.07] text-white/75 ring-1 ring-inset ring-white/10 group-hover:bg-white/[0.12] group-hover:text-white",
+                            ? "ring-2 ring-glow/80 shadow-[0_0_12px_rgb(250_204_21/0.4)]"
+                            : "ring-1 ring-inset ring-white/35",
                         )}
                       >
                         <Icon className="size-4" />
                       </span>
                       <span className="flex-1 truncate">{label}</span>
-                      {count && <CountBadge n={count.n} label={count.label} className={active ? "bg-glow text-night" : "bg-white/10 text-white/90"} />}
+                      {count && <CountBadge n={count.n} label={count.label} className={active ? "bg-glow text-night" : "bg-white/15 text-white"} />}
                     </Link>
                   </li>
                 );
@@ -137,24 +138,25 @@ export function BottomNav({ isAdmin, role, openReplies, newOrders, unreadNotific
   const hiddenCount = more.reduce((sum, n) => sum + (countFor(n.href, { openReplies, newOrders, unreadNotifications })?.n ?? 0), 0);
 
   const tabClass = (active: boolean) =>
-    cn("flex h-16 min-w-0 flex-col items-center justify-center gap-1 text-2xs font-medium transition active:scale-95", active ? "text-brand-deep font-semibold" : "text-ink-2/80");
-  const iconWrap = (active: boolean) =>
+    cn("flex h-16 min-w-0 flex-col items-center justify-center gap-1 text-2xs font-medium transition active:scale-95", active ? "text-brand-deep font-semibold" : "text-ink-2/90");
+  const iconWrap = (active: boolean, cube = "from-[#34d399] via-[#10b981] to-[#059669]") =>
     cn(
-      "relative grid h-8 w-12 place-items-center rounded-full transition",
-      active && "icon-cube-3d bg-gradient-to-br from-[#2fb08c] to-brand-deep text-white",
+      "icon-cube-3d relative grid h-8 w-11 place-items-center rounded-[10px] bg-gradient-to-br text-white transition",
+      cube,
+      active ? "ring-2 ring-brand-deep/40 scale-105" : "ring-1 ring-inset ring-white/35 opacity-95",
     );
   const badge = "absolute -right-1 -top-1 bg-danger-solid text-white ring-2 ring-panel";
 
   return (
     <nav aria-label="Main" className="pb-safe glass-bar fixed inset-x-0 bottom-0 z-30 lg:hidden print:hidden">
       <ul className="mx-auto grid max-w-lg grid-cols-5">
-        {tabs.map((tab) => all.find((n) => n.href === tab)!).map(({ href, short, icon: Icon }) => {
+        {tabs.map((tab) => all.find((n) => n.href === tab)!).map(({ href, short, icon: Icon, cube }) => {
           const active = isActive(path, href);
           const count = countFor(href, { openReplies, newOrders, unreadNotifications });
           return (
             <li key={href} className="min-w-0">
               <Link href={href} aria-current={active ? "page" : undefined} className={tabClass(active)}>
-                <span className={iconWrap(active)}>
+                <span className={iconWrap(active, cube)}>
                   <Icon aria-hidden className="size-5" />
                   {count && <CountBadge n={count.n} label={count.label} className={badge} />}
                 </span>
@@ -165,8 +167,8 @@ export function BottomNav({ isAdmin, role, openReplies, newOrders, unreadNotific
         })}
         <li className="min-w-0">
           <button type="button" onClick={() => setOpenedOn(path)} aria-haspopup="dialog" aria-expanded={moreOpen} className={cn(tabClass(moreActive), "w-full")}>
-            <span className={iconWrap(moreActive)}>
-              <Menu aria-hidden className="size-5" strokeWidth={moreActive ? 2.4 : 2} />
+            <span className={iconWrap(moreActive, "from-[#818cf8] via-[#6366f1] to-[#4f46e5]")}>
+              <Menu aria-hidden className="size-5" strokeWidth={2.3} />
               <CountBadge n={hiddenCount} label="to handle" className={badge} />
             </span>
             More
@@ -175,7 +177,7 @@ export function BottomNav({ isAdmin, role, openReplies, newOrders, unreadNotific
       </ul>
       <Sheet open={moreOpen} onClose={() => setOpenedOn(null)} title="More">
         <ul className="grid grid-cols-2 gap-2">
-          {more.map(({ href, label, icon: Icon }) => {
+          {more.map(({ href, label, icon: Icon, cube }) => {
             const active = isActive(path, href);
             const count = countFor(href, { openReplies, newOrders, unreadNotifications });
             return (
@@ -191,11 +193,11 @@ export function BottomNav({ isAdmin, role, openReplies, newOrders, unreadNotific
                   <span
                     aria-hidden
                     className={cn(
-                      "icon-cube-3d grid size-8 shrink-0 place-items-center rounded-[9px] text-white",
-                      active ? "bg-gradient-to-br from-[#2fb08c] to-brand-deep" : "bg-gradient-to-br from-slate-600 to-slate-800",
+                      "icon-cube-3d grid size-8 shrink-0 place-items-center rounded-[9px] bg-gradient-to-br text-white ring-1 ring-inset ring-white/40",
+                      cube,
                     )}
                   >
-                    <Icon className="size-4" />
+                    <Icon className="size-[18px]" />
                   </span>
                   <span className="min-w-0 flex-1 truncate">{label}</span>
                   {count && <CountBadge n={count.n} label={count.label} className="bg-danger-solid text-white" />}

@@ -2,7 +2,7 @@ import "server-only";
 import { explainSendError } from "@/app/dashboard/actions/send-helpers";
 import { db } from "./db";
 import { headerImageFor } from "./media";
-import { itemsText, itemsWithNames, money, orderRef } from "./orders";
+import { getOrderPricing, itemsText, itemsWithNames, money, orderRef } from "./orders";
 import { getSettings } from "./provider";
 import { replyWindowEnd } from "./replies";
 import { senderFor } from "./senders";
@@ -79,17 +79,22 @@ export async function sendPaymentRequestFor(orderId: string, opts: { reminder?: 
   if ((await getSettings()).provider !== "META") return { ok: false, message: "Payment requests need the WhatsApp Cloud API." };
 
   const items = await itemsWithNames(order);
+  const pricing = getOrderPricing(items, order.total, { applyDefaultWhenEqual: true });
   const ref = orderRef(order);
   const payment = {
     referenceId: ref,
     configuration: order.client.paymentConfig,
     items: items.map((i) => ({ id: i.id, name: i.name ?? i.id, quantity: i.quantity, price: i.price })),
-    total: order.total,
+    total: pricing.total,
     catalogId: order.catalogId,
   };
+  const breakdownLines =
+    pricing.shipping > 0
+      ? `Items: ${itemsText(items)} (${money(pricing.subtotal, order.currency)})\nShipping: ${money(pricing.shipping, order.currency)}\nTotal: ${money(pricing.total, order.currency)}`
+      : `Items: ${itemsText(items)}\nTotal: ${money(pricing.total, order.currency)}`;
   const text = opts.reminder
-    ? `Hello ${firstName(c.name)}, a reminder that your ${order.client.name} order ${ref} is waiting for payment.\n\nItems: ${itemsText(items)}\nTotal: ${money(order.total, order.currency)}\n\nTap "Review and pay" to pay by UPI, and we will pack it right away.`
-    : `Hello ${firstName(c.name)}, here is your ${order.client.name} order ${ref}.\n\nItems: ${itemsText(items)}\nTotal: ${money(order.total, order.currency)}\n\nTap "Review and pay" to pay by UPI.`;
+    ? `Hello ${firstName(c.name)}, a reminder that your ${order.client.name} order ${ref} is waiting for payment.\n\n${breakdownLines}\n\nTap "Review and pay" to pay by UPI, and we will pack it right away.`
+    : `Hello ${firstName(c.name)}, here is your ${order.client.name} order ${ref}.\n\n${breakdownLines}\n\nTap "Review and pay" to pay by UPI.`;
   const { open, number, cfg } = await replyContext(c);
 
   try {

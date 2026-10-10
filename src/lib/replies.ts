@@ -1,5 +1,6 @@
 import "server-only";
 import { Prisma } from "@prisma/client";
+import { parseAddressText } from "./address";
 import { db } from "./db";
 
 /**
@@ -78,9 +79,63 @@ export async function recordReply(r: IncomingReply) {
     // Webhooks retry; the same message id arriving twice is expected.
     if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) throw e;
   }
+
+  // Automatically detect delivery addresses sent in chat (text or shared location pin)
+  // and sync to the customer profile (if missing) and any active open order without an address.
+  if (r.kind === "text" || (r.kind === "media" && /^Location:/i.test(r.text))) {
+    try {
+      const parsed = parseAddressText(r.text);
+      const currentCust = await db.customer.findUnique({
+        where: { id: customer.id },
+        select: {
+          id: true,
+          location: true,
+          locationRaw: true,
+          region: true,
+          orders: {
+            where: { status: { in: ["NEW", "CONFIRMED", "PAID"] } },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { id: true, note: true },
+          },
+        },
+      });
+      if (currentCust) {
+        const activeOrder = currentCust.orders[0];
+        const hasOpenOrderWithoutNote = Boolean(activeOrder && !activeOrder.note?.trim());
+        const shouldUseAsAddress =
+          parsed.isLikelyAddress || (hasOpenOrderWithoutNote && parsed.confidence >= 30 && Boolean(parsed.area || parsed.pincode));
+
+        if (shouldUseAsAddress && parsed.fullAddress) {
+          const customerHasNoAddress = !currentCust.locationRaw?.trim() && !currentCust.location?.trim();
+          if (customerHasNoAddress || (!currentCust.locationRaw?.trim() && parsed.fullAddress.length > (currentCust.location?.length ?? 0))) {
+            await db.customer.update({
+              where: { id: currentCust.id },
+              data: {
+                locationRaw: parsed.fullAddress.slice(0, 500),
+                ...(parsed.area && !currentCust.location ? { location: parsed.area } : {}),
+                ...(parsed.region !== "Not sure" && (!currentCust.region || currentCust.region === "Not sure")
+                  ? { region: parsed.region }
+                  : {}),
+              },
+            });
+          }
+          if (activeOrder && !activeOrder.note?.trim()) {
+            await db.order.update({
+              where: { id: activeOrder.id },
+              data: { note: parsed.fullAddress.slice(0, 500) },
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Auto address extraction from reply failed", err);
+    }
+  }
+
   return db.customer.findUnique({
     where: { id: customer.id },
-    select: { id: true, clientId: true, phone: true, name: true, location: true, client: { select: { name: true } } },
+    select: { id: true, clientId: true, phone: true, name: true, location: true, locationRaw: true, region: true, client: { select: { name: true } } },
   });
 }
 

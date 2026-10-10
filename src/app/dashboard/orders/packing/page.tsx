@@ -1,12 +1,20 @@
 import { PackageOpen } from "lucide-react";
 import type { Metadata } from "next";
 import { Badge, Card, CardHeader, EmptyState, FilterChips, PageHeader, PickClientNotice } from "@/components/ui";
+import { parseAddressText } from "@/lib/address";
 import { db } from "@/lib/db";
 import { fmtDate, fmtNumber } from "@/lib/format";
+import { getOrderPricing } from "@/lib/order-pricing";
 import { money, orderRef, type OrderItem } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { getScope } from "@/lib/session";
-import { PrintButton } from "./print-button";
+import { OrderAddressControl } from "../order-address-sheet";
+import {
+  PrintButton,
+  SingleSlipExportButtons,
+  type ExportableOrderRow,
+  type ExportablePickItem,
+} from "./print-button";
 import { SortSwitch } from "./sort-switch";
 
 export const metadata: Metadata = { title: "Packing list" };
@@ -20,7 +28,8 @@ const PAY = [
 
 /**
  * What to pack and where it goes: confirmed and paid orders not yet dispatched, a total pick
- * list across them, then one slip per order grouped by area. Prints cleanly on A4.
+ * list across them, then one slip per order grouped by area. Prints cleanly on A4, or exports
+ * as PDF, Image (PNG) for WhatsApp, or Excel (.xls / .csv).
  * ?pay=paid|unpaid narrows it (e.g. pack paid orders first), ?sort=old lists oldest first.
  */
 export default async function PackingPage({ searchParams }: PageProps<"/dashboard/orders/packing">) {
@@ -33,15 +42,23 @@ export default async function PackingPage({ searchParams }: PageProps<"/dashboar
 
   const all = await db.order.findMany({
     where: { clientId: scope.clientId, status: { in: ["CONFIRMED", "PAID"] } },
-    include: { customer: { select: { name: true, phone: true, location: true } } },
+    include: {
+      customer: {
+        select: { id: true, name: true, phone: true, location: true, locationRaw: true },
+      },
+    },
     orderBy: { createdAt: sort === "old" ? "asc" : "desc" },
   });
+  const canEdit = scope.canOperate && (scope.canManage || !!scope.clientId);
+
   // Paid by status, or a payment recorded on the order (UPI on WhatsApp, Mark paid).
   const isPaid = (o: (typeof all)[number]) => o.status === "PAID" || o.paidAt != null;
   const paidCount = all.filter(isPaid).length;
   const count = { "": all.length, paid: paidCount, unpaid: all.length - paidCount };
   const orders = pay === "paid" ? all.filter(isPaid) : pay === "unpaid" ? all.filter((o) => !isPaid(o)) : all;
-  const toCollect = orders.filter((o) => !isPaid(o)).reduce((sum, o) => sum + o.total, 0);
+  const toCollect = orders
+    .filter((o) => !isPaid(o))
+    .reduce((sum, o) => sum + getOrderPricing(o.items as OrderItem[], o.total, { applyDefaultWhenEqual: true }).total, 0);
   const qs = (patch: { pay?: string; sort?: string }) => {
     const q = new URLSearchParams(Object.entries({ pay, sort: sort === "old" ? "old" : "", ...patch }).filter(([, v]) => v) as [string, string][]);
     return `/dashboard/orders/packing${q.size ? `?${q}` : ""}`;
@@ -53,12 +70,56 @@ export default async function PackingPage({ searchParams }: PageProps<"/dashboar
   for (const o of orders) for (const i of o.items as OrderItem[]) pick.set(i.name ?? i.id, (pick.get(i.name ?? i.id) ?? 0) + i.quantity);
   const picks = [...pick].sort((a, b) => a[0].localeCompare(b[0]));
 
+  const resolveArea = (o: (typeof orders)[number]) => {
+    const explicit = o.customer.location?.trim();
+    if (explicit) return explicit;
+    const rawAddr = o.note?.trim() || o.customer.locationRaw?.trim() || "";
+    if (rawAddr) {
+      const parsed = parseAddressText(rawAddr);
+      if (parsed.area) return parsed.area;
+    }
+    return "Area not noted";
+  };
+
   const byArea = new Map<string, typeof orders>();
   for (const o of orders) {
-    const area = o.customer.location?.trim() || "Area not noted";
+    const area = resolveArea(o);
     byArea.set(area, [...(byArea.get(area) ?? []), o]);
   }
   const areas = [...byArea].sort((a, b) => (a[0] === "Area not noted" ? 1 : b[0] === "Area not noted" ? -1 : a[0].localeCompare(b[0])));
+
+  const exportPicks: ExportablePickItem[] = picks.map(([name, quantity]) => ({
+    name,
+    quantity,
+  }));
+
+  const toExportRow = (o: (typeof orders)[number]): ExportableOrderRow => {
+    const items = (o.items as OrderItem[]).map((i) => ({
+      name: i.name ?? i.id,
+      quantity: i.quantity,
+      price: i.price,
+    }));
+    const pricing = getOrderPricing(items, o.total, { applyDefaultWhenEqual: true });
+    const fullAddress =
+      o.note?.trim() || o.customer.locationRaw?.trim() || o.customer.location?.trim() || "";
+    return {
+      id: o.id,
+      orderRef: orderRef(o),
+      createdAt: fmtDate(o.createdAt, "EEE d MMM, h:mm a"),
+      status: o.status,
+      isPaid: isPaid(o),
+      customerName: o.customer.name,
+      customerPhone: formatPhone(o.customer.phone),
+      area: resolveArea(o),
+      address: fullAddress,
+      items,
+      total: pricing.total,
+      currency: o.currency,
+      note: [o.note, o.internalNote].filter(Boolean).join(" · "),
+    };
+  };
+
+  const exportOrders: ExportableOrderRow[] = orders.map(toExportRow);
 
   return (
     <>
@@ -71,7 +132,16 @@ export default async function PackingPage({ searchParams }: PageProps<"/dashboar
             {toCollect > 0 && <> · <b className="tabular font-semibold text-ink">{money(toCollect)}</b> to collect</>} · {fmtDate(new Date(), "EEE d MMM, h:mm a")}
           </>
         }
-        actions={orders.length ? <PrintButton /> : undefined}
+        actions={
+          orders.length ? (
+            <PrintButton
+              orders={exportOrders}
+              picks={exportPicks}
+              title="Packing & Delivery List"
+              filenamePrefix="packing-list"
+            />
+          ) : undefined
+        }
         tabs={
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between print:hidden">
             <FilterChips label="Payment" items={PAY.map((t) => ({ href: qs({ pay: t.key }), label: t.label, count: fmtNumber(count[t.key]), active: pay === t.key }))} />
@@ -102,37 +172,65 @@ export default async function PackingPage({ searchParams }: PageProps<"/dashboar
                 <Badge tone="brand">{list.length} order{list.length === 1 ? "" : "s"}</Badge>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 print:grid-cols-2">
-                {list.map((o) => (
-                  <Card key={o.id} className="card-3d relative overflow-hidden p-4 text-sm print:break-inside-avoid">
-                    <span aria-hidden className="absolute inset-x-0 top-0 h-[3px] bg-brand print:hidden" />
-                    <div className="flex justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="font-semibold text-ink">{o.customer.name}</p>
-                        <p className="tabular text-xs text-muted">{formatPhone(o.customer.phone)}</p>
+                {list.map((o) => {
+                  const exportRow = toExportRow(o);
+                  const pricing = getOrderPricing(o.items as OrderItem[], o.total, { applyDefaultWhenEqual: true });
+                  return (
+                    <Card key={o.id} className="card-3d relative flex flex-col gap-2.5 overflow-hidden p-4 text-sm print:break-inside-avoid">
+                      <span aria-hidden className="absolute inset-x-0 top-0 h-[3px] bg-brand print:hidden" />
+                      <div className="flex justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-ink">{o.customer.name}</p>
+                          <p className="tabular text-xs text-muted">{formatPhone(o.customer.phone)}</p>
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-1 text-xs text-muted">
+                          <div className="flex items-center gap-1.5">
+                            <SingleSlipExportButtons order={exportRow} />
+                            <p className="rounded bg-sunken px-1.5 py-0.5 font-mono font-semibold text-ink ring-1 ring-line">{orderRef(o)}</p>
+                          </div>
+                          {isPaid(o) ? <Badge tone="green" dot>Paid</Badge> : <Badge tone="amber" dot>To collect</Badge>}
+                        </div>
                       </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1 text-xs text-muted">
-                        <p className="rounded bg-sunken px-1.5 py-0.5 font-mono font-semibold text-ink ring-1 ring-line">{orderRef(o)}</p>
-                        {isPaid(o) ? <Badge tone="green" dot>Paid</Badge> : <Badge tone="amber" dot>To collect</Badge>}
+
+                      <OrderAddressControl
+                        orderId={o.id}
+                        orderRefText={orderRef(o)}
+                        customerId={o.customer.id}
+                        customerName={o.customer.name}
+                        currentOrderNote={o.note}
+                        customerLocation={o.customer.location}
+                        customerLocationRaw={o.customer.locationRaw}
+                        canEdit={canEdit}
+                        compact
+                      />
+
+                      <ul className="space-y-1 rounded-control bg-sunken/70 p-2.5">
+                        {(o.items as OrderItem[]).map((i, k) => (
+                          <li key={k} className="flex gap-2">
+                            <span className="inline-block size-3.5 shrink-0 translate-y-0.5 rounded-sm border border-line-strong bg-white" aria-hidden />
+                            <span className="flex-1 text-ink">
+                              <b className="tabular font-semibold">{i.quantity} ×</b> {i.name ?? i.id}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="tabular mt-auto text-xs text-muted">{fmtDate(o.createdAt, "EEE d MMM, h:mm a")}</p>
+                      <div className="space-y-0.5 border-t border-line pt-2 text-xs">
+                        {pricing.subtotal > 0 && (
+                          <p className="flex justify-between text-muted">
+                            <span>Items ({money(pricing.subtotal, o.currency)}) + Shipping</span>
+                            <span className="tabular">+ {money(pricing.shipping, o.currency)}</span>
+                          </p>
+                        )}
+                        <p className="flex justify-between text-sm font-semibold text-ink">
+                          <span>Final Total</span>
+                          <span className="tabular">{money(pricing.total, o.currency)}</span>
+                        </p>
                       </div>
-                    </div>
-                    <ul className="mt-2.5 space-y-1 rounded-control bg-sunken/70 p-2.5">
-                      {(o.items as OrderItem[]).map((i, k) => (
-                        <li key={k} className="flex gap-2">
-                          <span className="inline-block size-3.5 shrink-0 translate-y-0.5 rounded-sm border border-line-strong bg-white" aria-hidden />
-                          <span className="flex-1 text-ink">
-                            <b className="tabular font-semibold">{i.quantity} ×</b> {i.name ?? i.id}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="tabular mt-2 text-xs text-muted">{fmtDate(o.createdAt, "EEE d MMM, h:mm a")}</p>
-                    <p className="mt-2 flex justify-between border-t border-line pt-2 font-semibold text-ink">
-                      <span>Total</span>
-                      <span className="tabular">{money(o.total, o.currency)}</span>
-                    </p>
-                    {(o.note || o.internalNote) && <p className="mt-1.5 rounded bg-subtle px-2 py-1 text-xs text-muted">{[o.note, o.internalNote].filter(Boolean).join(" · ")}</p>}
-                  </Card>
-                ))}
+                      {o.internalNote && <p className="rounded bg-subtle px-2 py-1 text-xs text-muted">{o.internalNote}</p>}
+                    </Card>
+                  );
+                })}
               </div>
             </section>
           ))}

@@ -1,7 +1,11 @@
 import "server-only";
+import { findAddressesInReplies, parseAddressText } from "./address";
 import { db } from "./db";
+import { DEFAULT_SHIPPING_FEE, calcItemsSubtotal, getOrderPricing } from "./order-pricing";
 import { senderFor } from "./senders";
 import { catalogProductNames } from "./whatsapp";
+
+export { DEFAULT_SHIPPING_FEE, calcItemsSubtotal, getOrderPricing };
 
 /** The order number people see and quote, e.g. RG-1001. */
 export const orderRef = (o: { number: number }) => `RG-${1000 + o.number}`;
@@ -16,7 +20,7 @@ export type OrderItem = { id: string; name?: string; quantity: number; price: nu
 
 type MetaOrder = { catalog_id?: string; text?: string; product_items?: { product_retailer_id?: string; quantity?: number | string; item_price?: number | string; currency?: string }[] };
 
-/** Items, total and note from a Cloud API "order" message (a cart sent from the catalogue). */
+/** Items, subtotal, ₹60 shipping, final total and note from a Cloud API "order" message (a cart sent from the catalogue). */
 export function parseOrder(m: { order?: MetaOrder }) {
   const o = m.order ?? {};
   const items: OrderItem[] = (o.product_items ?? []).map((p) => ({
@@ -25,8 +29,8 @@ export function parseOrder(m: { order?: MetaOrder }) {
     price: Number(p.item_price) || 0,
     currency: p.currency ?? "INR",
   }));
-  const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-  return { items, total, currency: items[0]?.currency ?? "INR", catalogId: o.catalog_id ?? null, note: o.text?.trim() || null };
+  const { subtotal, shipping, total } = getOrderPricing(items);
+  return { items, subtotal, shipping, total, currency: items[0]?.currency ?? "INR", catalogId: o.catalog_id ?? null, note: o.text?.trim() || null };
 }
 
 /** One line per item, e.g. "2 × Coconut oil 500 ml". */
@@ -42,8 +46,59 @@ export async function recordOrder(customer: { id: string; clientId: string }, wa
   const known = names ?? (await lookupNames(customer.clientId, o.catalogId, o.items.map((i) => i.id)));
   const items = o.items.map((i) => ({ ...i, name: known.get(i.id) }));
   if (waMessageId && (await db.order.findUnique({ where: { waMessageId }, select: { id: true } }))) return null;
+
+  // Resolve address: if order note has an address and customer has none, save to customer;
+  // if order has no note, check customer's saved address or recent WhatsApp chat replies.
+  let orderNote = o.note;
+  try {
+    const cust = await db.customer.findUnique({
+      where: { id: customer.id },
+      select: {
+        location: true,
+        locationRaw: true,
+        region: true,
+        replies: { orderBy: { receivedAt: "desc" }, take: 15, select: { text: true, receivedAt: true } },
+      },
+    });
+    if (cust) {
+      if (orderNote) {
+        const parsed = parseAddressText(orderNote);
+        if ((parsed.isLikelyAddress || parsed.area) && !cust.locationRaw?.trim()) {
+          await db.customer.update({
+            where: { id: customer.id },
+            data: {
+              locationRaw: parsed.fullAddress.slice(0, 500),
+              ...(parsed.area && !cust.location ? { location: parsed.area } : {}),
+              ...(parsed.region !== "Not sure" && (!cust.region || cust.region === "Not sure") ? { region: parsed.region } : {}),
+            },
+          });
+        }
+      } else {
+        const savedAddr = cust.locationRaw?.trim() || cust.location?.trim() || null;
+        if (savedAddr) {
+          orderNote = savedAddr;
+        } else {
+          const fromChat = findAddressesInReplies(cust.replies)[0];
+          if (fromChat) {
+            orderNote = fromChat.fullAddress;
+            await db.customer.update({
+              where: { id: customer.id },
+              data: {
+                locationRaw: fromChat.fullAddress.slice(0, 500),
+                ...(fromChat.area && !cust.location ? { location: fromChat.area } : {}),
+                ...(fromChat.region !== "Not sure" && (!cust.region || cust.region === "Not sure") ? { region: fromChat.region } : {}),
+              },
+            });
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Could not sync order address with customer", e);
+  }
+
   return db.order.create({
-    data: { clientId: customer.clientId, customerId: customer.id, waMessageId, catalogId: o.catalogId, note: o.note, items, total: o.total, currency: o.currency },
+    data: { clientId: customer.clientId, customerId: customer.id, waMessageId, catalogId: o.catalogId, note: orderNote, items, total: o.total, currency: o.currency },
   });
 }
 

@@ -26,12 +26,12 @@ const CLOUDS = [
   { top: 84, w: 330, dur: 46, delay: -41.4, op: 1.00, layer: "near", symbol: "cB" },
 ];
 
-// Pre-computed 70 stars with deterministic coordinates to avoid hydration mismatches
-const STARS = Array.from({ length: 70 }).map((_, i) => ({
-  left: `${((i * 17.3 + 11) % 96 + 2).toFixed(1)}%`,
-  top: `${((i * 23.7 + 7) % 68 + 2).toFixed(1)}%`,
-  size: `${((i % 4) * 0.5 + 1.2).toFixed(1)}px`,
-  duration: `${((i % 5) * 0.4 + 2.2).toFixed(1)}s`,
+// Pre-computed 36 stars with deterministic coordinates to avoid hydration mismatches & keep 120fps compositing
+const STARS = Array.from({ length: 36 }).map((_, i) => ({
+  left: `${((i * 27.3 + 11) % 96 + 2).toFixed(1)}%`,
+  top: `${((i * 31.7 + 7) % 68 + 2).toFixed(1)}%`,
+  size: `${((i % 4) * 0.5 + 1.4).toFixed(1)}px`,
+  duration: `${((i % 5) * 0.5 + 2.4).toFixed(1)}s`,
   delay: `${((i % 7) * 0.35).toFixed(1)}s`,
 }));
 

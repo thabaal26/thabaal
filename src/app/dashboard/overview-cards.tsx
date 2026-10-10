@@ -20,6 +20,15 @@ export const C = {
   glow: "#eabf26",
 };
 
+function brightCubeGradient(color: string) {
+  if (color === C.brand) return "linear-gradient(145deg, #34d399 0%, #10b981 52%, #059669 100%)";
+  if (color === C.read) return "linear-gradient(145deg, #c084fc 0%, #9333ea 52%, #7e22ce 100%)";
+  if (color === C.gold) return "linear-gradient(145deg, #fde047 0%, #f59e0b 52%, #d97706 100%)";
+  if (color === C.info) return "linear-gradient(145deg, #38bdf8 0%, #0ea5e9 52%, #0284c7 100%)";
+  if (color === C.failed) return "linear-gradient(145deg, #fb7185 0%, #f43f5e 52%, #e11d48 100%)";
+  return `linear-gradient(145deg, rgb(255 255 255 / 0.42), rgb(255 255 255 / 0) 60%), ${color}`;
+}
+
 /* ───────────────────────── Period switch ───────────────────────── */
 
 export const RANGES = { today: { days: 1, label: "Today", prev: "yesterday" }, "7d": { days: 7, label: "7 days", prev: "the 7 days before" }, "30d": { days: 30, label: "30 days", prev: "the 30 days before" } } as const;
@@ -105,10 +114,10 @@ export function KpiTile({
         </p>
         <span
           aria-hidden
-          className="icon-cube-3d grid size-9 shrink-0 place-items-center rounded-[11px] text-white ring-1 ring-inset ring-white/30 sm:size-10"
-          style={{ background: `linear-gradient(145deg, rgb(255 255 255 / 0.38), rgb(255 255 255 / 0) 60%), ${color}`, boxShadow: `inset 0 1.5px 0 rgb(255 255 255 / 0.55), inset 0 -2px 0 rgb(0 0 0 / 0.22), 0 6px 14px -3px ${color}99` }}
+          className="icon-cube-3d grid size-9 shrink-0 place-items-center rounded-[11px] text-white ring-1 ring-inset ring-white/40 sm:size-10"
+          style={{ background: brightCubeGradient(color), boxShadow: `inset 0 1.5px 0 rgb(255 255 255 / 0.65), inset 0 -2px 0 rgb(0 0 0 / 0.2), 0 6px 14px -3px ${color}99` }}
         >
-          <Icon className="size-[18px] sm:size-5" />
+          <Icon className="size-5 sm:size-[22px]" />
         </span>
       </div>
       <div className="px-3.5 sm:px-5">
@@ -232,10 +241,10 @@ export function FunnelCard({ f, revenue }: { f: Record<(typeof FUNNEL)[number]["
               <li key={s.key} className="group flex items-center gap-3 rounded-control px-2 py-2">
                 <span
                   aria-hidden
-                  className="icon-cube-3d grid size-9 shrink-0 place-items-center rounded-[11px] text-white ring-1 ring-inset ring-white/30"
-                  style={{ background: `linear-gradient(145deg, rgb(255 255 255 / 0.38), rgb(255 255 255 / 0) 60%), ${s.color}`, boxShadow: `inset 0 1.5px 0 rgb(255 255 255 / 0.55), inset 0 -2px 0 rgb(0 0 0 / 0.22), 0 4px 10px -3px ${s.color}88` }}
+                  className="icon-cube-3d grid size-9 shrink-0 place-items-center rounded-[11px] text-white ring-1 ring-inset ring-white/40"
+                  style={{ background: brightCubeGradient(s.color), boxShadow: `inset 0 1.5px 0 rgb(255 255 255 / 0.65), inset 0 -2px 0 rgb(0 0 0 / 0.2), 0 4px 10px -3px ${s.color}88` }}
                 >
-                  <s.icon className="size-4" />
+                  <s.icon className="size-[18px]" />
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline justify-between gap-2 text-sm">

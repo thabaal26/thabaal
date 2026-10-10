@@ -2,9 +2,10 @@
 
 import type { OrderStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { findAddressesInReplies, parseAddressText } from "@/lib/address";
 import { db } from "@/lib/db";
 import { pushToGoogleSheet } from "@/lib/google-sheets-live";
-import { itemsText, itemsWithNames, money, orderRef, type OrderItem } from "@/lib/orders";
+import { DEFAULT_SHIPPING_FEE, getOrderPricing, itemsText, itemsWithNames, money, orderRef, type OrderItem } from "@/lib/orders";
 import { confirmPayment, sendPaymentRequestFor, updateOrderCard } from "@/lib/payments";
 import { getSettings, wahaConfig } from "@/lib/provider";
 import { replyWindowEnd } from "@/lib/replies";
@@ -126,15 +127,20 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
   if (c.optedOut) return { ok: false, message: "This customer opted out of messages." };
 
   const items = await itemsWithNames(order);
+  const pricing = getOrderPricing(items, order.total, { applyDefaultWhenEqual: true });
   const first = c.name.trim().split(/\s+/)[0] || "there";
   const ref = orderRef(order);
   const when = dispatchLine(details);
   const contact = [details.by?.trim() && `Delivery by: ${details.by.trim()}`, details.phone?.trim() && `Contact: ${details.phone.trim()}`, details.link?.trim() && `Track: ${details.link.trim()}`]
     .filter(Boolean)
     .join("\n");
+  const confirmPricingText =
+    pricing.shipping > 0
+      ? `Items: ${itemsText(items)} (${money(pricing.subtotal, order.currency)})\nShipping: ${money(pricing.shipping, order.currency)}\nTotal: ${money(pricing.total, order.currency)}`
+      : `Items: ${itemsText(items)}\nTotal: ${money(pricing.total, order.currency)}`;
   const text =
     kind === "confirm"
-      ? `Hello ${first}, thank you for your order with ${order.client.name}.\n\nItems: ${itemsText(items)}\nTotal: ${money(order.total, order.currency)}\n\nWe will confirm your delivery slot shortly.`
+      ? `Hello ${first}, thank you for your order with ${order.client.name}.\n\n${confirmPricingText}\n\nWe will confirm your delivery slot shortly.`
       : kind === "dispatch"
         ? `Hello ${first}, your ${order.client.name} order ${ref} is on its way and will reach you by ${details.eta?.trim() || "soon"}.${contact ? `\n\n${contact}` : ""}\n\nFor any help, reply to this message.`
         : `Hello ${first}, your ${order.client.name} order ${ref} has been delivered. Thank you for shopping with us!\n\nIf anything is not right, reply to this message.`;
@@ -177,7 +183,7 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
         }
         return { ok: false, message: `The customer's 24-hour window has closed, so WhatsApp needs an approved ${TEMPLATE_NAMES[kind][0]} template. Use "Create order templates" at the top of Orders.` };
       }
-      const bodyParams = kind === "confirm" ? [first, itemsText(items).slice(0, 300), String(Math.round(order.total))] : kind === "dispatch" ? [first, ref, when] : [first, ref];
+      const bodyParams = kind === "confirm" ? [first, `${itemsText(items).slice(0, 260)}${pricing.shipping > 0 ? ` (+ Rs ${pricing.shipping} shipping)` : ""}`, String(Math.round(pricing.total))] : kind === "dispatch" ? [first, ref, when] : [first, ref];
       ({ id: waId, simulated } = await sendTemplateMessage(cfg, { to: c.phone, templateName: t.name, language: t.language, headerType: t.headerType, headerMediaUrl: await headerImageFor(t), headerParams: [], bodyParams }));
       templateName = t.name;
       templateId = t.id;
@@ -227,21 +233,252 @@ export async function savePaymentConfig(name: string): Promise<SendResult> {
   return { ok: true, message: value ? `Payment requests on, using "${value}".` : "Payment requests turned off." };
 }
 
+export type ChatAddressCandidate = {
+  text: string;
+  fullAddress: string;
+  area: string | null;
+  region: "Madurai city" | "Outside Madurai" | "Not sure";
+  pincode: string | null;
+  receivedAt: string;
+};
+
 /** An order taken by phone, at the shop or on paper, so it can be confirmed and dispatched like a WhatsApp cart. */
-/** While typing a phone in New order: is this an existing customer of the client, or a new one? */
-export async function lookupOrderCustomer(rawPhone: string): Promise<{ valid: false } | { valid: true; existing: { id: string; name: string; optedOut: boolean } | null }> {
+/** While typing a phone in New order: is this an existing customer of the client, or a new one? Also returns saved address and any address found in their WhatsApp chat. */
+export async function lookupOrderCustomer(rawPhone: string): Promise<
+  | { valid: false }
+  | {
+      valid: true;
+      existing: {
+        id: string;
+        name: string;
+        optedOut: boolean;
+        location: string | null;
+        locationRaw: string | null;
+        region: string | null;
+        chatAddresses: ChatAddressCandidate[];
+      } | null;
+    }
+> {
   const s = await requireOrderAccess();
   if ("denied" in s || !s.clientId) return { valid: false };
   const phone = normalizePhone(rawPhone);
   if (!phone) return { valid: false };
-  const existing = await db.customer.findUnique({ where: { clientId_phone: { clientId: s.clientId, phone } }, select: { id: true, name: true, optedOut: true } });
-  return { valid: true, existing };
+  const existing = await db.customer.findUnique({
+    where: { clientId_phone: { clientId: s.clientId, phone } },
+    select: {
+      id: true,
+      name: true,
+      optedOut: true,
+      location: true,
+      locationRaw: true,
+      region: true,
+      replies: {
+        orderBy: { receivedAt: "desc" },
+        take: 25,
+        select: { text: true, receivedAt: true },
+      },
+      orders: {
+        where: { note: { not: null } },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: { note: true, createdAt: true },
+      },
+    },
+  });
+  if (!existing) return { valid: true, existing: null };
+
+  const combinedMessages = [
+    ...existing.replies,
+    ...existing.orders
+      .filter((o) => o.note?.trim())
+      .map((o) => ({ text: o.note!, receivedAt: o.createdAt })),
+  ];
+  const detected = findAddressesInReplies(combinedMessages).slice(0, 4).map((c) => ({
+    text: c.text,
+    fullAddress: c.fullAddress,
+    area: c.area,
+    region: c.region,
+    pincode: c.pincode,
+    receivedAt: c.receivedAt.toISOString(),
+  }));
+
+  return {
+    valid: true,
+    existing: {
+      id: existing.id,
+      name: existing.name,
+      optedOut: existing.optedOut,
+      location: existing.location,
+      locationRaw: existing.locationRaw,
+      region: existing.region,
+      chatAddresses: detected,
+    },
+  };
+}
+
+/** Fetches address suggestions from a customer's recent WhatsApp chat replies and past orders. */
+export async function getCustomerAddressSuggestions(customerId: string): Promise<{
+  ok: boolean;
+  location: string | null;
+  locationRaw: string | null;
+  region: string | null;
+  chatAddresses: ChatAddressCandidate[];
+  recentChatMessages: { text: string; receivedAt: string }[];
+}> {
+  const s = await requireOrderAccess();
+  if ("denied" in s) {
+    return { ok: false, location: null, locationRaw: null, region: null, chatAddresses: [], recentChatMessages: [] };
+  }
+  const cust = await db.customer.findFirst({
+    where: { id: customerId, ...(s.clientId ? { clientId: s.clientId } : {}) },
+    select: {
+      location: true,
+      locationRaw: true,
+      region: true,
+      replies: {
+        orderBy: { receivedAt: "desc" },
+        take: 30,
+        select: { text: true, receivedAt: true, kind: true },
+      },
+      orders: {
+        where: { note: { not: null } },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: { note: true, createdAt: true },
+      },
+    },
+  });
+  if (!cust) {
+    return { ok: false, location: null, locationRaw: null, region: null, chatAddresses: [], recentChatMessages: [] };
+  }
+
+  const combined = [
+    ...cust.replies.map((r) => ({ text: r.text, receivedAt: r.receivedAt })),
+    ...cust.orders
+      .filter((o) => o.note?.trim())
+      .map((o) => ({ text: o.note!, receivedAt: o.createdAt })),
+  ];
+  const chatAddresses = findAddressesInReplies(combined)
+    .slice(0, 5)
+    .map((c) => ({
+      text: c.text,
+      fullAddress: c.fullAddress,
+      area: c.area,
+      region: c.region,
+      pincode: c.pincode,
+      receivedAt: c.receivedAt.toISOString(),
+    }));
+
+  const recentChatMessages = cust.replies
+    .filter((r) => r.kind === "text" || /^Location:/i.test(r.text))
+    .slice(0, 6)
+    .map((r) => ({ text: r.text, receivedAt: r.receivedAt.toISOString() }));
+
+  return {
+    ok: true,
+    location: cust.location,
+    locationRaw: cust.locationRaw,
+    region: cust.region,
+    chatAddresses,
+    recentChatMessages,
+  };
+}
+
+/**
+ * Adds or updates the delivery address on an order AND keeps the customer's address in sync:
+ * - If the customer has no saved address yet, always saves it to the Customer profile.
+ * - If the customer already has a saved address and `syncToCustomer` is true (default), updates the Customer profile too.
+ * - Optionally fills any other open orders for this customer that still have no address.
+ */
+export async function saveOrderAddress(
+  orderId: string,
+  input: {
+    address: string;
+    area?: string;
+    syncToCustomer?: boolean;
+    syncOtherActiveOrders?: boolean;
+  },
+): Promise<SendResult> {
+  const s = await requireOrderAccess();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const order = await db.order.findFirst({
+    where: { id: orderId, ...(s.clientId ? { clientId: s.clientId } : {}) },
+    include: {
+      customer: {
+        select: { id: true, name: true, phone: true, location: true, locationRaw: true, region: true },
+      },
+      client: { select: { name: true } },
+    },
+  });
+  if (!order) return { ok: false, message: "Order not found." };
+
+  const cleanAddr = input.address.trim().slice(0, 500);
+  const parsed = parseAddressText(cleanAddr);
+  const resolvedArea =
+    input.area?.trim().slice(0, 120) ||
+    parsed.area ||
+    order.customer.location ||
+    null;
+  const resolvedRegion =
+    parsed.region !== "Not sure"
+      ? parsed.region
+      : order.customer.region || "Not sure";
+
+  // 1. Update this order's delivery address / note
+  await db.order.update({
+    where: { id: order.id },
+    data: { note: cleanAddr || null },
+  });
+
+  // 2. Two-way sync with Customer profile:
+  // Always save if customer has no address yet, OR when staff leaves "Update customer's saved address" checked.
+  const customerHasNoAddress =
+    !order.customer.location?.trim() && !order.customer.locationRaw?.trim();
+  const shouldSyncCustomer =
+    Boolean(cleanAddr || resolvedArea) &&
+    (customerHasNoAddress || input.syncToCustomer !== false);
+
+  if (shouldSyncCustomer) {
+    await db.customer.update({
+      where: { id: order.customer.id },
+      data: {
+        ...(cleanAddr ? { locationRaw: cleanAddr } : {}),
+        ...(resolvedArea ? { location: resolvedArea } : {}),
+        ...(resolvedRegion ? { region: resolvedRegion } : {}),
+      },
+    });
+  }
+
+  // 3. Also fill other active orders for the same customer that are missing an address
+  if (cleanAddr && (customerHasNoAddress || input.syncOtherActiveOrders !== false)) {
+    await db.order.updateMany({
+      where: {
+        customerId: order.customer.id,
+        id: { not: order.id },
+        status: { in: ["NEW", "CONFIRMED", "PAID"] },
+        OR: [{ note: null }, { note: "" }],
+      },
+      data: { note: cleanAddr },
+    });
+  }
+
+  revalidatePath("/dashboard", "layout");
+  return {
+    ok: true,
+    message: shouldSyncCustomer
+      ? `Updated delivery address for ${orderRef(order)} and saved to ${order.customer.name}'s profile${resolvedArea ? ` (${resolvedArea})` : ""}.`
+      : `Updated delivery address for ${orderRef(order)} only.`,
+  };
 }
 
 export async function createOrder(input: {
   phone: string;
   name: string;
   items: { id?: string; name: string; quantity: number; price: number }[];
+  shippingFee?: number;
+  address?: string;
+  area?: string;
+  syncCustomerAddress?: boolean;
   note?: string;
   catalogId?: string | null;
   requestPaymentNow?: boolean;
@@ -263,17 +500,59 @@ export async function createOrder(input: {
 
   const client = await db.client.findUnique({ where: { id: s.clientId }, select: { name: true, paymentConfig: true } });
 
+  // Parse delivery address and area
+  const rawAddr = (input.address?.trim() || input.note?.trim() || "").slice(0, 500);
+  const parsedAddr = parseAddressText(rawAddr);
+  const resolvedArea = input.area?.trim().slice(0, 120) || parsedAddr.area || null;
+  const resolvedRegion = parsedAddr.region !== "Not sure" ? parsedAddr.region : null;
+  const combinedOrderNote = [input.address?.trim(), input.note?.trim()]
+    .filter((v, idx, arr) => Boolean(v) && arr.indexOf(v) === idx)
+    .join(" · ")
+    .slice(0, 500) || null;
+
   // A phone not in this client's customers becomes a new customer, so later orders, replies and
   // campaigns find them. They aren't marked as agreeing to marketing: an order isn't that consent.
   const name = input.name.trim();
-  const existing = await db.customer.findUnique({ where: { clientId_phone: { clientId: s.clientId, phone } }, select: { id: true, name: true } });
+  const existing = await db.customer.findUnique({
+    where: { clientId_phone: { clientId: s.clientId, phone } },
+    select: { id: true, name: true, location: true, locationRaw: true, region: true },
+  });
   if (!existing && !name) return { ok: false, message: "This is a new customer: enter their name so they can be saved." };
-  const customer = existing
-    ? // Fill in a real name for a customer saved earlier with only their number.
-      existing.name === `+${phone}` && name
-      ? await db.customer.update({ where: { id: existing.id }, data: { name }, select: { id: true, name: true } })
-      : existing
-    : await db.customer.create({ data: { clientId: s.clientId, phone, name, tags: ["manual-order"] }, select: { id: true, name: true } });
+
+  let customer: { id: string; name: string };
+  if (existing) {
+    const customerHasNoAddress = !existing.location?.trim() && !existing.locationRaw?.trim();
+    const shouldSyncAddr = (rawAddr || resolvedArea) && (customerHasNoAddress || input.syncCustomerAddress !== false);
+    const shouldUpdateName = existing.name === `+${phone}` && Boolean(name);
+
+    if (shouldSyncAddr || shouldUpdateName) {
+      customer = await db.customer.update({
+        where: { id: existing.id },
+        data: {
+          ...(shouldUpdateName ? { name } : {}),
+          ...(shouldSyncAddr && rawAddr ? { locationRaw: rawAddr } : {}),
+          ...(shouldSyncAddr && resolvedArea ? { location: resolvedArea } : {}),
+          ...(shouldSyncAddr && resolvedRegion ? { region: resolvedRegion } : {}),
+        },
+        select: { id: true, name: true },
+      });
+    } else {
+      customer = existing;
+    }
+  } else {
+    customer = await db.customer.create({
+      data: {
+        clientId: s.clientId,
+        phone,
+        name,
+        tags: ["manual-order"],
+        location: resolvedArea,
+        locationRaw: rawAddr || null,
+        region: resolvedRegion,
+      },
+      select: { id: true, name: true },
+    });
+  }
 
   const allFromCatalog = Boolean(input.catalogId && lines.every((i) => Boolean(i.id)));
   const items: OrderItem[] = lines.map((i, k) => ({
@@ -283,7 +562,11 @@ export async function createOrder(input: {
     price: i.price,
     currency: "INR",
   }));
-  const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const shippingFee = input.shippingFee !== undefined ? Math.max(0, Number(input.shippingFee) || 0) : DEFAULT_SHIPPING_FEE;
+  const { total } = getOrderPricing(items, null, { customShippingFee: shippingFee });
+
+  const finalOrderNote =
+    combinedOrderNote || existing?.locationRaw?.trim() || existing?.location?.trim() || null;
 
   const order = await db.order.create({
     data: {
@@ -292,7 +575,7 @@ export async function createOrder(input: {
       catalogId: allFromCatalog ? input.catalogId : null,
       items,
       total,
-      note: input.note?.trim() || null,
+      note: finalOrderNote,
       internalNote: "Entered by hand",
     },
   });
@@ -304,7 +587,7 @@ export async function createOrder(input: {
     items: itemsText(items),
     total: order.total,
     status: order.status,
-    address: input.note?.trim() || "",
+    address: finalOrderNote || resolvedArea || "",
     client: client?.name || "Thabaal",
   });
 
@@ -319,17 +602,20 @@ export async function createOrder(input: {
     ok: true,
     message:
       (existing
-        ? `Order ${orderRef(order)} added for ${customer.name}.`
+        ? `Order ${orderRef(order)} added for ${customer.name} (total ${money(total, "INR")}).`
         : `Order ${orderRef(order)} added, and ${customer.name} was saved as a new customer.`) + paymentNote,
   };
 }
 
-/** Updates an existing order's items, quantities, prices, or customer note (common for every order). */
+/** Updates an existing order's items, quantities, prices, shipping fee, or customer note/address (common for every order). */
 export async function updateOrderItems(
   id: string,
   input: {
     items: { id?: string; name: string; quantity: number; price: number }[];
+    shippingFee?: number;
     note?: string | null;
+    area?: string | null;
+    syncCustomerAddress?: boolean;
     catalogId?: string | null;
   },
 ): Promise<SendResult> {
@@ -337,7 +623,12 @@ export async function updateOrderItems(
   if ("denied" in s) return { ok: false, message: s.denied };
   const order = await db.order.findFirst({
     where: { id, ...(s.clientId ? { clientId: s.clientId } : {}) },
-    select: { id: true, number: true, catalogId: true },
+    select: {
+      id: true,
+      number: true,
+      catalogId: true,
+      customer: { select: { id: true, location: true, locationRaw: true, region: true } },
+    },
   });
   if (!order) return { ok: false, message: "Order not found." };
 
@@ -359,7 +650,8 @@ export async function updateOrderItems(
     price: i.price,
     currency: "INR",
   }));
-  const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const shippingFee = input.shippingFee !== undefined ? Math.max(0, Number(input.shippingFee) || 0) : DEFAULT_SHIPPING_FEE;
+  const { total } = getOrderPricing(items, null, { customShippingFee: shippingFee });
 
   await db.order.update({
     where: { id: order.id },
@@ -370,6 +662,28 @@ export async function updateOrderItems(
       ...(input.note !== undefined && { note: input.note?.trim() || null }),
     },
   });
+
+  // Also sync address to customer profile if note/area was provided
+  if (input.note !== undefined || input.area !== undefined) {
+    const cleanNote = input.note?.trim() || "";
+    const parsed = parseAddressText(cleanNote);
+    const resolvedArea = input.area?.trim() || parsed.area || null;
+    const customerHasNoAddress = !order.customer.location?.trim() && !order.customer.locationRaw?.trim();
+    const shouldSync =
+      (cleanNote || resolvedArea) &&
+      (customerHasNoAddress || input.syncCustomerAddress !== false);
+
+    if (shouldSync) {
+      await db.customer.update({
+        where: { id: order.customer.id },
+        data: {
+          ...(cleanNote ? { locationRaw: cleanNote.slice(0, 500) } : {}),
+          ...(resolvedArea ? { location: resolvedArea.slice(0, 120) } : {}),
+          ...(parsed.region !== "Not sure" ? { region: parsed.region } : {}),
+        },
+      });
+    }
+  }
 
   revalidatePath("/dashboard", "layout");
   return { ok: true, message: `Updated ${orderRef(order)} items and total (${money(total, "INR")}).` };

@@ -7,6 +7,7 @@ import { confirmAction } from "@/components/confirm";
 import { Sheet } from "@/components/sheet";
 import { toastResult } from "@/components/toast";
 import { Button, Field, type ButtonVariant } from "@/components/ui";
+import { DEFAULT_SHIPPING_FEE, getOrderPricing } from "@/lib/order-pricing";
 import type { OrderItem } from "@/lib/orders";
 import {
   notifyOrder,
@@ -90,21 +91,25 @@ export function OrderActions({
   const [editLines, setEditLines] = useState<EditableOrderLine[]>(() =>
     toEditableLines(items, catalogProducts),
   );
+  const [editShipping, setEditShipping] = useState<number>(() => {
+    const initial = getOrderPricing(items, total, { applyDefaultWhenEqual: true });
+    return initial.shipping > 0 ? initial.shipping : DEFAULT_SHIPPING_FEE;
+  });
   const [editCustNote, setEditCustNote] = useState(customerNote ?? "");
 
   if (!canEdit) return null;
 
   const openEditSheet = () => {
     setEditLines(toEditableLines(items, catalogProducts));
+    const initial = getOrderPricing(items, total, { applyDefaultWhenEqual: true });
+    setEditShipping(initial.shipping > 0 ? initial.shipping : DEFAULT_SHIPPING_FEE);
     setEditCustNote(customerNote ?? "");
     setMoreOpen(false);
     setEditOpen(true);
   };
 
-  const editTotal = editLines.reduce(
-    (sum, l) => sum + (Number(l.price) || 0) * (Number(l.quantity) || 0),
-    0,
-  );
+  const editPricing = getOrderPricing(editLines, null, { customShippingFee: editShipping });
+  const editTotal = editPricing.total;
 
   const run = (key: string, fn: () => Promise<Result>, after?: (r: Result) => void) =>
     start(async () => {
@@ -350,6 +355,7 @@ export function OrderActions({
                     quantity: l.quantity,
                     price: l.price,
                   })),
+                  shippingFee: editShipping,
                   note: editCustNote,
                 }),
               (r) => r.ok && setEditOpen(false),
@@ -372,13 +378,42 @@ export function OrderActions({
             />
           </Field>
 
-          <div className="flex items-center justify-between rounded-control bg-sunken px-4 py-3 text-sm font-semibold">
-            <span>Updated total</span>
-            <span className="tabular">₹{editTotal.toLocaleString("en-IN")}</span>
+          <div className="space-y-2 rounded-control border border-line bg-sunken px-4 py-3 text-sm">
+            <div className="flex items-center justify-between text-xs text-ink-2">
+              <span>Items subtotal</span>
+              <span className="tabular font-medium">₹{editPricing.subtotal.toLocaleString("en-IN")}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2 text-xs text-ink-2">
+              <label htmlFor={`edit-ship-${id}`} className="flex items-center gap-1.5">
+                <span>Shipping charge</span>
+                <span className="rounded bg-brand-soft px-1.5 py-0.5 text-2xs font-semibold text-brand-deep">
+                  ₹{DEFAULT_SHIPPING_FEE} standard
+                </span>
+              </label>
+              <div className="relative w-24">
+                <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted">
+                  ₹
+                </span>
+                <input
+                  id={`edit-ship-${id}`}
+                  type="number"
+                  min={0}
+                  step="1"
+                  inputMode="numeric"
+                  value={editShipping}
+                  onChange={(e) => setEditShipping(Math.max(0, Number(e.target.value) || 0))}
+                  className="field tabular h-8 min-h-8 pl-6 pr-2 text-right text-xs font-semibold"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between border-t border-line pt-2 font-semibold text-ink">
+              <span>Updated Final Total</span>
+              <span className="tabular text-base">₹{editTotal.toLocaleString("en-IN")}</span>
+            </div>
           </div>
 
           <Button type="submit" className="w-full" disabled={pending} loading={busy === "edit"}>
-            Save order items
+            Save order items &amp; total
           </Button>
         </form>
       </Sheet>

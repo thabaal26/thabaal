@@ -109,12 +109,12 @@ export const cardPad = "p-4 sm:p-5";
  * glossy icon tile. Each card on a busy page gets its own colour so it can be found at a glance.
  */
 const headerTones = {
-  brand: { band: "from-brand-soft/90", strip: "before:bg-brand", tile: "from-[#2fb08c] to-brand-deep shadow-[0_4px_10px_-3px_rgb(22_125_99/0.55)]" },
-  violet: { band: "from-accent-bg", strip: "before:bg-accent", tile: "from-[#9479e8] to-accent shadow-[0_4px_10px_-3px_rgb(105_65_198/0.5)]" },
-  gold: { band: "from-gold-soft", strip: "before:bg-gold", tile: "from-[#f5d55c] to-[#b98a05] shadow-[0_4px_10px_-3px_rgb(185_138_5/0.5)]" },
-  info: { band: "from-info-bg", strip: "before:bg-info", tile: "from-[#4f93d8] to-info shadow-[0_4px_10px_-3px_rgb(29_100_168/0.5)]" },
-  rose: { band: "from-danger-bg", strip: "before:bg-danger-solid", tile: "from-[#e46a6a] to-danger shadow-[0_4px_10px_-3px_rgb(180_46_46/0.5)]" },
-  amber: { band: "from-warning-bg", strip: "before:bg-warning-solid", tile: "from-[#e09f3e] to-warning shadow-[0_4px_10px_-3px_rgb(183_121_31/0.5)]" },
+  brand: { band: "from-brand-soft/90", strip: "before:bg-brand", tile: "from-[#34d399] via-[#10b981] to-[#059669] shadow-[0_5px_12px_-3px_rgb(16_185_129/0.55)]" },
+  violet: { band: "from-accent-bg", strip: "before:bg-accent", tile: "from-[#c084fc] via-[#9333ea] to-[#7e22ce] shadow-[0_5px_12px_-3px_rgb(147_51_234/0.55)]" },
+  gold: { band: "from-gold-soft", strip: "before:bg-gold", tile: "from-[#fde047] via-[#f59e0b] to-[#d97706] shadow-[0_5px_12px_-3px_rgb(245_158_11/0.55)]" },
+  info: { band: "from-info-bg", strip: "before:bg-info", tile: "from-[#38bdf8] via-[#0ea5e9] to-[#0284c7] shadow-[0_5px_12px_-3px_rgb(14_165_233/0.55)]" },
+  rose: { band: "from-danger-bg", strip: "before:bg-danger-solid", tile: "from-[#fb7185] via-[#f43f5e] to-[#e11d48] shadow-[0_5px_12px_-3px_rgb(244_63_94/0.55)]" },
+  amber: { band: "from-warning-bg", strip: "before:bg-warning-solid", tile: "from-[#fbbf24] via-[#f59e0b] to-[#d97706] shadow-[0_5px_12px_-3px_rgb(245_158_11/0.55)]" },
 };
 export type HeaderTone = keyof typeof headerTones;
 
@@ -132,14 +132,14 @@ export function IconCube({
   const t = headerTones[tone] ?? headerTones.brand;
   const dims =
     size === "sm"
-      ? "size-8 rounded-[10px] [&>svg]:size-4"
+      ? "size-8 rounded-[10px] [&>svg]:size-[18px]"
       : size === "lg"
-        ? "size-11 rounded-[13px] [&>svg]:size-5"
-        : "size-9 rounded-[11px] [&>svg]:size-[18px]";
+        ? "size-11 rounded-[13px] [&>svg]:size-6"
+        : "size-9 rounded-[11px] [&>svg]:size-5";
   return (
     <span
       aria-hidden
-      className={cn("icon-cube-3d grid shrink-0 place-items-center bg-gradient-to-br text-white ring-1 ring-inset ring-white/30", dims, t.tile, className)}
+      className={cn("icon-cube-3d grid shrink-0 place-items-center bg-gradient-to-br text-white ring-1 ring-inset ring-white/40", dims, t.tile, className)}
     >
       {children}
     </span>
@@ -578,7 +578,7 @@ export function Th({ numeric, className, ...p }: ComponentProps<"th"> & { numeri
     <th
       scope="col"
       className={cn(
-        "sticky top-0 z-[1] whitespace-nowrap border-b border-line bg-subtle/95 px-4 py-2.5 text-left text-[0.6875rem] font-semibold uppercase tracking-wider text-muted backdrop-blur-xs lg:top-16",
+        "sticky top-0 z-[1] whitespace-nowrap border-b border-line bg-subtle px-4 py-2.5 text-left text-[0.6875rem] font-semibold uppercase tracking-wider text-muted lg:top-16",
         numeric && "text-right",
         className,
       )}
@@ -641,7 +641,7 @@ export function EmptyState({ icon, title, children, action }: { icon?: ReactNode
   return (
     <div className="flex flex-col items-center px-6 py-10 text-center sm:py-14">
       {icon && (
-        <div aria-hidden className="pedestal-3d mb-4 grid size-14 place-items-center rounded-2xl text-brand-deep ring-1 ring-line [&>svg]:size-6">
+        <div aria-hidden className="pedestal-3d icon-cube-3d mb-4 grid size-14 place-items-center rounded-2xl text-white ring-1 ring-inset ring-white/45 [&>svg]:size-7">
           {icon}
         </div>
       )}

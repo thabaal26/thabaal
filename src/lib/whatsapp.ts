@@ -208,8 +208,9 @@ export type PaymentRequest = {
 function orderDetails(p: PaymentRequest) {
   const lines = p.items.filter((i) => i.quantity > 0);
   const itemsTotal = lines.reduce((sum, i) => sum + i.price * i.quantity, 0);
-  // Meta checks that the items add up to the total; when they don't (prices missing), send one line for the order.
-  const itemized = itemsTotal > 0 && Math.abs(itemsTotal - p.total) < 0.01;
+  const shippingAmount = itemsTotal > 0 ? Math.max(0, Math.round((p.total - itemsTotal) * 100) / 100) : 0;
+  // Meta checks that items + shipping + tax == total_amount; when item prices are missing, send one line for the order.
+  const itemized = itemsTotal > 0 && Math.abs(itemsTotal + shippingAmount - p.total) < 0.01;
   const items = itemized
     ? lines.map((i) => ({ retailer_id: i.id.slice(0, 50), name: i.name.slice(0, 60), amount: paise(i.price), quantity: i.quantity }))
     : [{ retailer_id: "order", name: "Your order", amount: paise(p.total), quantity: 1 }];
@@ -221,7 +222,14 @@ function orderDetails(p: PaymentRequest) {
     currency: "INR",
     total_amount: paise(p.total),
     // Only itemized carts can point at the catalogue: every retailer_id must be one of its products.
-    order: { status: "pending", ...(itemized && p.catalogId && { catalog_id: p.catalogId }), items, subtotal: paise(p.total), tax: { ...paise(0), description: "Included" } },
+    order: {
+      status: "pending",
+      ...(itemized && p.catalogId && { catalog_id: p.catalogId }),
+      items,
+      subtotal: paise(itemized ? itemsTotal : p.total),
+      ...(itemized && shippingAmount > 0 ? { shipping: { ...paise(shippingAmount), description: "Shipping" } } : {}),
+      tax: { ...paise(0), description: "Included" },
+    },
   };
 }
 

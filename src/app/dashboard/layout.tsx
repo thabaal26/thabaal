@@ -94,7 +94,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           Skip to content
         </a>
 
-        <aside className="surface-dark fixed inset-y-0 left-0 z-40 hidden w-64 flex-col overflow-hidden border-r border-white/[0.08] bg-night lg:flex print:!hidden">
+        <aside className="surface-dark fixed inset-y-0 left-0 z-40 hidden w-64 transform-gpu flex-col overflow-hidden border-r border-white/[0.08] bg-night lg:flex print:!hidden">
           <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_60%_at_0%_0%,rgb(22_125_99/0.22),transparent_55%),radial-gradient(90%_50%_at_100%_100%,rgb(234_191_38/0.1),transparent_60%)]" />
           <div className="relative flex h-16 shrink-0 items-center gap-3 border-b border-white/[0.06] px-4">
             <BrandMark logoUrl={client?.logoUrl} name={name} size="md" />
@@ -137,7 +137,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
         </aside>
 
         {/* Computers: where you are, and the account controls. Phones use the dark header below. */}
-        <header className="sticky top-0 z-30 hidden h-16 items-center gap-4 border-b border-line bg-panel/95 px-6 backdrop-blur-md lg:flex xl:px-8 print:!hidden">
+        <header className="sticky top-0 z-30 hidden h-16 transform-gpu items-center gap-4 border-b border-line bg-panel px-6 lg:flex xl:px-8 print:!hidden">
           <TopbarTrail workspace={client ? name : scope.isAdmin ? "All clients" : name} />
           <div className="ml-auto flex items-center gap-2">
             {newOrders > 0 && (

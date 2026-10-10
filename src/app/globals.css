@@ -162,6 +162,7 @@ html {
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
   scroll-padding-top: 5rem;
+  overflow-x: clip;
 }
 
 body {
@@ -171,6 +172,8 @@ body {
   line-height: 1.5;
   /* Long Tamil words, phone numbers and URLs wrap instead of pushing the page sideways. */
   overflow-wrap: break-word;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeSpeed;
 }
 
 ::selection { background: var(--color-brand-soft); color: var(--color-brand-deep); }
@@ -184,11 +187,14 @@ body {
 
 .tabular { font-variant-numeric: tabular-nums; }
 
-/* WhatsApp chat wallpaper */
+/* WhatsApp chat wallpaper — GPU-promoted so scrolling long chat histories stays at 120 FPS */
 .chat-wall {
   background-color: var(--color-chat);
   background-image: radial-gradient(rgb(0 0 0 / 0.045) 1px, transparent 1px);
   background-size: 14px 14px;
+  contain: layout style paint;
+  transform: translateZ(0);
+  -webkit-overflow-scrolling: touch;
 }
 
 @layer components {
@@ -221,7 +227,7 @@ body {
     @apply size-5 shrink-0 cursor-pointer rounded border-line-strong accent-brand disabled:cursor-not-allowed sm:size-4;
   }
 
-  /* Surfaces that float: solid, bordered and softly shadowed (no glass blur: it costs paint and hurts legibility). */
+  /* Surfaces that float: solid, bordered and softly shadowed (no backdrop blur: keeps scrolling locked at 120 FPS). */
   .glass-card {
     @apply rounded-card border border-line bg-panel shadow-card;
   }
@@ -229,10 +235,14 @@ body {
     @apply rounded-sheet border border-line bg-panel shadow-pop;
   }
   .glass-bar {
-    @apply border-t border-line bg-panel/95 shadow-bar backdrop-blur-sm;
+    @apply border-t border-line bg-panel shadow-bar;
+    transform: translateZ(0);
+    backface-visibility: hidden;
   }
   .glass-modal {
     @apply border border-line bg-panel shadow-pop;
+    transform: translateZ(0);
+    backface-visibility: hidden;
   }
   .glass-dark {
     @apply border border-white/10 bg-night text-white shadow-pop;
@@ -240,6 +250,8 @@ body {
   /* Phone header bar on the dark sidebar colour. */
   .glass-nav {
     @apply border-b border-white/10 bg-night;
+    transform: translateZ(0);
+    backface-visibility: hidden;
   }
 }
 
@@ -248,115 +260,133 @@ body {
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
-/* Thin, quiet scrollbars for panes that scroll on their own (inbox, sidebar). */
-.thin-scroll { scrollbar-width: thin; scrollbar-color: var(--color-line-2) transparent; }
+/* Thin, quiet scrollbars for panes that scroll on their own (inbox, sidebar, modals). */
+.thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-2) transparent;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/*
+ * 60–120 FPS Scroll Acceleration & Layout Containment:
+ * Isolates card, list, and table row subtrees so scrolling never triggers layout/paint cascades
+ * across offscreen items.
+ */
+tbody > tr {
+  contain: layout style;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 56px;
+}
+
+.chat-wall ol > li {
+  contain: layout style;
+}
 
 /* Page sections arrive one after another instead of all at once. */
 /* Fade only: a transform here would make these sections the containing block for anything
    position: fixed inside them, unpinning the phone action bars (Create, Save) from the screen. */
-.stagger > *, .stagger > .grid > * { animation: fade 0.25s var(--ease-snappy) both; }
-.stagger > :nth-child(2) { animation-delay: 30ms; }
-.stagger > :nth-child(3) { animation-delay: 60ms; }
-.stagger > :nth-child(4) { animation-delay: 90ms; }
-.stagger > :nth-child(n + 5) { animation-delay: 120ms; }
-.stagger > .grid > :nth-child(2) { animation-delay: 90ms; }
-.stagger > .grid > :nth-child(n + 3) { animation-delay: 120ms; }
+.stagger > *, .stagger > .grid > * { animation: fade 0.2s var(--ease-snappy) both; }
+.stagger > :nth-child(2) { animation-delay: 25ms; }
+.stagger > :nth-child(3) { animation-delay: 50ms; }
+.stagger > :nth-child(4) { animation-delay: 75ms; }
+.stagger > :nth-child(n + 5) { animation-delay: 100ms; }
+.stagger > .grid > :nth-child(2) { animation-delay: 60ms; }
+.stagger > .grid > :nth-child(n + 3) { animation-delay: 90ms; }
 
 /* Progress and share bars fill in from the left; chart columns grow from the axis. */
-.bar { transform-origin: left; animation: grow 0.6s var(--ease-snappy) 0.1s both; }
-.bar-y { transform-origin: bottom; animation: grow-y 0.5s var(--ease-snappy) both; }
+.bar { transform-origin: left; animation: grow 0.55s var(--ease-snappy) 0.08s both; will-change: transform; }
+.bar-y { transform-origin: bottom; animation: grow-y 0.45s var(--ease-snappy) both; will-change: transform; }
 
 /*
- * Raised "3D" cards (the Overview): a soft top-lit surface, a bright top edge, layered shadows that
- * give real depth, and a lift on hover. Phones get the depth without the hover.
+ * Raised "3D" cards: top-lit surface, bright top edge, GPU-friendly shadows, and layout/style
+ * containment so scrolling 100+ cards stays locked at 60–120 FPS.
  */
 .card-3d {
+  contain: layout style;
   background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
   border-color: rgb(16 24 40 / 0.08);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255),
-    0 1px 2px rgb(16 24 40 / 0.06),
-    0 6px 12px -4px rgb(16 24 40 / 0.08),
-    0 18px 36px -16px rgb(16 24 40 / 0.18);
+    0 1px 2px rgb(16 24 40 / 0.05),
+    0 8px 20px -6px rgb(16 24 40 / 0.1);
 }
 @media (hover: hover) and (pointer: fine) {
-  .card-3d { transition: transform 0.25s var(--ease-snappy), box-shadow 0.25s var(--ease-snappy); }
+  .card-3d {
+    transition: transform 0.2s var(--ease-snappy), border-color 0.2s var(--ease-snappy);
+    backface-visibility: hidden;
+  }
   .card-3d:hover {
-    transform: translateY(-3px);
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255),
-      0 2px 4px rgb(16 24 40 / 0.06),
-      0 12px 20px -6px rgb(16 24 40 / 0.12),
-      0 28px 48px -18px rgb(16 24 40 / 0.24);
+    transform: translate3d(0, -2px, 0);
+    border-color: rgb(16 24 40 / 0.14);
   }
 }
 
 /* Glossy filled bars over a recessed track. */
 .track-3d { background: var(--color-sunken); box-shadow: inset 0 1px 2px rgb(16 24 40 / 0.14); }
-.bar-3d { background-image: linear-gradient(180deg, rgb(255 255 255 / 0.38), rgb(255 255 255 / 0) 55%, rgb(0 0 0 / 0.1)); box-shadow: 0 1px 2px rgb(16 24 40 / 0.18); }
+.bar-3d { background-image: linear-gradient(180deg, rgb(255 255 255 / 0.38), rgb(255 255 255 / 0) 55%, rgb(0 0 0 / 0.1)); box-shadow: 0 1px 2px rgb(16 24 40 / 0.16); }
 
 /* Raised tiles (heatmap cells, icon chips). */
-.tile-3d { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.35), inset 0 -1px 0 rgb(0 0 0 / 0.08), 0 1px 2px rgb(16 24 40 / 0.12); }
+.tile-3d { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.35), inset 0 -1px 0 rgb(0 0 0 / 0.08), 0 1px 2px rgb(16 24 40 / 0.1); }
 
 /*
- * 3D Tactile Icon Cube: top specular highlight, diagonal glass sheen, 3D extruded bottom ledge,
- * and volumetric drop shadow on the inner SVG.
+ * 3D Tactile Icon Cube: top specular highlight, diagonal glass sheen, and 3D extruded bottom ledge.
+ * Uses pure GPU-composited box-shadow & transform (no per-SVG filter drop-shadow pass) for 120 FPS scrolling.
  */
 .icon-cube-3d {
   position: relative;
   overflow: hidden;
+  contain: layout paint style;
+  backface-visibility: hidden;
   box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.55),
-    inset 0 -2px 0 rgb(0 0 0 / 0.22),
-    0 2px 0 0 rgb(16 24 40 / 0.14),
-    0 8px 16px -4px rgb(16 24 40 / 0.28);
-  transition: transform 0.22s var(--ease-snappy), box-shadow 0.22s var(--ease-snappy);
+    inset 0 1.5px 0 rgb(255 255 255 / 0.65),
+    inset 0 -2px 0 rgb(0 0 0 / 0.18),
+    0 2px 0 0 rgb(16 24 40 / 0.1),
+    0 6px 14px -3px rgb(16 24 40 / 0.2);
+  transition: transform 0.2s var(--ease-snappy);
 }
 .icon-cube-3d::after {
   content: "";
   pointer-events: none;
   position: absolute;
   inset: 0;
+  z-index: 0;
   border-radius: inherit;
-  background: linear-gradient(135deg, rgb(255 255 255 / 0.42) 0%, rgb(255 255 255 / 0.08) 44%, transparent 52%);
+  background: linear-gradient(135deg, rgb(255 255 255 / 0.34) 0%, rgb(255 255 255 / 0.06) 36%, transparent 45%);
 }
 .icon-cube-3d > svg {
   position: relative;
   z-index: 1;
-  filter: drop-shadow(0 2px 2.5px rgb(0 0 0 / 0.26));
 }
 @media (hover: hover) and (pointer: fine) {
   .card-3d:hover .icon-cube-3d,
   a:hover > .icon-cube-3d,
   .group:hover .icon-cube-3d {
-    transform: translateY(-1.5px) scale(1.05);
+    transform: translate3d(0, -1.5px, 0) scale(1.04);
   }
 }
 
-/* 3D EmptyState glass pedestal with floating depth and subtle inner rim. */
+/* 3D EmptyState luminous emerald pedestal with floating depth and bright inner rim. */
 .pedestal-3d {
   position: relative;
-  background: linear-gradient(155deg, #ffffff 0%, #f1f5f9 65%, #e2e8f0 100%);
+  contain: layout paint style;
+  background: linear-gradient(145deg, #34d399 0%, #10b981 52%, #059669 100%);
   box-shadow:
-    inset 0 2px 0 rgb(255 255 255),
-    inset 0 -2px 0 rgb(16 24 40 / 0.08),
-    0 4px 0 -1px rgb(16 24 40 / 0.07),
-    0 14px 28px -8px rgb(22 125 99 / 0.22),
-    0 6px 12px -4px rgb(16 24 40 / 0.1);
-}
-.pedestal-3d > svg {
-  filter: drop-shadow(0 3px 4px rgb(22 125 99 / 0.25));
+    inset 0 2px 0 rgb(255 255 255 / 0.65),
+    inset 0 -2.5px 0 rgb(0 0 0 / 0.2),
+    0 4px 0 -1px rgb(5 150 105 / 0.25),
+    0 12px 24px -6px rgb(16 185 129 / 0.45);
 }
 
 /* Chart lines draw themselves in once; areas and markers fade in after them. */
-.chart-draw { stroke-dasharray: 1; animation: chart-draw 0.9s var(--ease-snappy) both; }
-.chart-fade { animation: fade 0.5s ease-out 0.35s both; }
+.chart-draw { stroke-dasharray: 1; animation: chart-draw 0.8s var(--ease-snappy) both; }
+.chart-fade { animation: fade 0.45s ease-out 0.3s both; }
 @keyframes chart-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 
 /* Clickable cards respond to the pointer on computers; phones get press feedback instead. */
 @media (hover: hover) and (pointer: fine) {
-  .lift { transition: border-color 0.16s var(--ease-snappy), box-shadow 0.16s var(--ease-snappy); }
-  .lift:hover { border-color: var(--color-line-2); box-shadow: 0 4px 12px -4px rgb(16 24 40 / 0.1); }
+  .lift { transition: border-color 0.16s var(--ease-snappy), transform 0.16s var(--ease-snappy); backface-visibility: hidden; }
+  .lift:hover { border-color: var(--color-line-2); transform: translate3d(0, -1px, 0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -365,6 +395,7 @@ body {
 
 @media print {
   body { background: white; }
+  tbody > tr { content-visibility: visible; }
 }
 
 /* Phones and tablets: a page with a pinned action bar (Create, Save) keeps its last content clear of it. */

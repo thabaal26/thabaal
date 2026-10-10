@@ -55,6 +55,7 @@
   gap: clamp(20px, 4vh, 36px);
   position: relative;
   z-index: 10;
+  contain: layout style;
 }
 
 .thabaal-brand {
@@ -377,6 +378,9 @@
   overflow: hidden;
   container-type: inline-size;
   min-height: 100vh;
+  contain: layout paint style;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .thabaal-sky {
@@ -413,11 +417,12 @@
   background: radial-gradient(circle at 40% 35%, #fffbe0, #ffd84d 60%, #ffc533);
   box-shadow: 0 0 70px 26px rgba(255, 220, 120, .65), 0 0 160px 70px rgba(255, 200, 120, .3);
   transition: opacity 1s var(--ease), transform 1.2s var(--ease);
+  transform: translate3d(0, 0, 0);
 }
 
 [data-theme="night"] .thabaal-sun {
   opacity: 0;
-  transform: translateY(60px) scale(.75);
+  transform: translate3d(0, 60px, 0) scale(.75);
 }
 
 .thabaal-moon {
@@ -427,17 +432,16 @@
   width: min(13cqw, 100px);
   aspect-ratio: 1;
   border-radius: 50%;
-  box-shadow: inset -.3em .08em 0 0 #f8f4de;
-  filter: drop-shadow(0 0 16px rgba(255, 248, 210, .55));
+  box-shadow: inset -.3em .08em 0 0 #f8f4de, 0 0 28px rgba(255, 248, 210, .4);
   opacity: 0;
-  transform: translateY(-50px) scale(.8);
+  transform: translate3d(0, -50px, 0) scale(.8);
   transition: opacity 1s var(--ease), transform 1.2s var(--ease);
   font-size: min(13cqw, 100px);
 }
 
 [data-theme="night"] .thabaal-moon {
   opacity: 1;
-  transform: none;
+  transform: translate3d(0, 0, 0);
 }
 
 .thabaal-stars {
@@ -445,6 +449,7 @@
   inset: 0;
   opacity: 0;
   transition: opacity 1s var(--ease);
+  pointer-events: none;
 }
 
 [data-theme="night"] .thabaal-stars {
@@ -459,16 +464,22 @@
   background: #fff;
   animation: starTwinkle var(--d) ease-in-out infinite;
   animation-delay: var(--dl);
+  animation-play-state: paused;
+  backface-visibility: hidden;
+}
+
+[data-theme="night"] .thabaal-star {
+  animation-play-state: running;
 }
 
 @keyframes starTwinkle {
   0%, 100% {
     opacity: .15;
-    transform: scale(.7);
+    transform: scale3d(.7, .7, 1);
   }
   50% {
     opacity: 1;
-    transform: scale(1.15);
+    transform: scale3d(1.15, 1.15, 1);
   }
 }
 
@@ -494,6 +505,7 @@
   animation: cloudDrift var(--dur) linear infinite;
   animation-delay: var(--delay);
   will-change: transform;
+  backface-visibility: hidden;
 }
 
 .thabaal-cloud svg {
@@ -501,9 +513,6 @@
   width: 100%;
   height: auto;
   overflow: visible;
-  transform-origin: 15% 100%;
-  animation: cloudPuff var(--puff) ease-in-out infinite alternate;
-  animation-delay: var(--delay);
 }
 
 .thabaal-cloud.l-far {
@@ -517,13 +526,8 @@
 }
 
 @keyframes cloudDrift {
-  from { transform: translateX(135cqw); }
-  to { transform: translateX(-45cqw); }
-}
-
-@keyframes cloudPuff {
-  from { transform: scale(1, 1); }
-  to { transform: scale(1.035, 1.06); }
+  from { transform: translate3d(135cqw, 0, 0); }
+  to { transform: translate3d(-45cqw, 0, 0); }
 }
 
 /* Carrier Bird in Flight */
@@ -540,20 +544,33 @@
   position: relative;
   width: min(62cqw, 470px);
   animation: birdFloat 3.4s ease-in-out infinite;
-  filter: drop-shadow(0 14px 18px rgba(6, 37, 72, .22));
-  transition: filter 1s var(--ease);
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
-[data-theme="night"] .thabaal-birdfloat {
-  filter: drop-shadow(0 0 22px rgba(253, 185, 19, .38)) drop-shadow(0 10px 14px rgba(0, 0, 0, .35));
+/* Pure GPU ambient halo behind bird instead of per-frame pixel filter: drop-shadow */
+.thabaal-birdfloat::before {
+  content: "";
+  position: absolute;
+  inset: 14% 12% 8% 12%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(6, 37, 72, .18) 0%, transparent 70%);
+  transform: translate3d(0, 14px, 0);
+  transition: background 1s var(--ease);
+  pointer-events: none;
+  z-index: -1;
+}
+
+[data-theme="night"] .thabaal-birdfloat::before {
+  background: radial-gradient(ellipse at center, rgba(253, 185, 19, .30) 0%, rgba(0, 0, 0, .25) 45%, transparent 72%);
 }
 
 @keyframes birdFloat {
   0%, 100% {
-    transform: translate(0, -10px) rotate(-2.2deg);
+    transform: translate3d(0, -10px, 0) rotate(-2.2deg);
   }
   50% {
-    transform: translate(8px, 14px) rotate(2.4deg);
+    transform: translate3d(8px, 14px, 0) rotate(2.4deg);
   }
 }
 
@@ -569,24 +586,27 @@
   width: 100%;
   height: 100%;
   display: block;
+  backface-visibility: hidden;
 }
 
 .thabaal-bird .wing {
   z-index: 0;
   transform-origin: 54.4% 30.5%;
   animation: birdFlap .62s ease-in-out infinite;
+  will-change: transform;
 }
 
 .thabaal-bird .body {
   z-index: 1;
+  transform: translateZ(0);
 }
 
 @keyframes birdFlap {
   0%, 100% {
-    transform: rotate(8deg);
+    transform: rotate3d(0, 0, 1, 8deg);
   }
   50% {
-    transform: rotate(-15deg);
+    transform: rotate3d(0, 0, 1, -15deg);
   }
 }
 
@@ -597,6 +617,8 @@
   background: rgba(255, 255, 255, .85);
   opacity: 0;
   animation: birdStreak 1.3s linear infinite;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
 }
 
 [data-theme="night"] .thabaal-streak {
@@ -625,9 +647,9 @@
 }
 
 @keyframes birdStreak {
-  0% { transform: translateX(50px); opacity: 0; }
+  0% { transform: translate3d(50px, 0, 0); opacity: 0; }
   25% { opacity: .8; }
-  100% { transform: translateX(-80px); opacity: 0; }
+  100% { transform: translate3d(-80px, 0, 0); opacity: 0; }
 }
 
 /* ============ TOGGLE SWITCH (Top Right & Bottom) ============ */

@@ -156,12 +156,21 @@ export function TrendChart({
                   d={line}
                   fill="none"
                   stroke={s.color}
+                  strokeOpacity={0.22}
+                  strokeWidth={6}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="chart-fade"
+                />
+                <path
+                  d={line}
+                  fill="none"
+                  stroke={s.color}
                   strokeWidth={2.5}
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   pathLength={1}
                   className="chart-draw"
-                  style={{ filter: `drop-shadow(0 5px 5px ${s.color}55)` }}
                 />
               </g>
             );
@@ -488,10 +497,19 @@ export function DeliveryChronoDonut({
                 onClick={() => setActiveKey((prev) => (prev === arc.key ? null : arc.key))}
                 style={{
                   opacity: isDimmed ? 0.34 : 1,
-                  transition: "opacity 0.22s ease, filter 0.22s ease",
-                  filter: `drop-shadow(0 ${isHovered ? 6 : 3}px ${isHovered ? 10 : 6}px ${arc.to}${isHovered ? "88" : "50"})`,
+                  transition: "opacity 0.22s ease",
                 }}
               >
+                {/* Soft 3D Ambient Vector Glow Under-Stroke (120 FPS GPU-friendly) */}
+                <path
+                  d={dMain}
+                  fill="none"
+                  stroke={arc.to}
+                  strokeOpacity={isHovered ? 0.28 : 0.14}
+                  strokeWidth={sw + (isHovered ? 8 : 5)}
+                  strokeLinecap="round"
+                  className="pointer-events-none"
+                />
                 {/* Main 3D Bevelled Gradient Arc */}
                 <path
                   d={dMain}
@@ -508,7 +526,7 @@ export function DeliveryChronoDonut({
                   <path
                     d={dSpecular}
                     fill="none"
-                    stroke="rgba(255, 255, 255, 0.45)"
+                    stroke="rgba(255, 255, 255, 0.5)"
                     strokeWidth={1.8}
                     strokeLinecap="round"
                     className="pointer-events-none"
@@ -529,7 +547,6 @@ export function DeliveryChronoDonut({
                 strokeWidth="5"
                 strokeLinecap="round"
                 style={{
-                  filter: "drop-shadow(0 2px 4px rgba(105, 65, 198, 0.35))",
                   transition: "d 0.9s cubic-bezier(.2,.8,.2,1) 0.15s",
                 }}
               />
@@ -547,6 +564,7 @@ export function DeliveryChronoDonut({
           )}
 
           {/* Inner 3D Glass Medallion Pedestal Disc (r = 49) */}
+          <circle cx="120" cy="122" r="49.5" fill="rgba(16, 24, 40, 0.06)" />
           <circle
             cx="120"
             cy="120"
@@ -554,7 +572,6 @@ export function DeliveryChronoDonut({
             fill={`url(#well-${uid})`}
             stroke="#e4e8f0"
             strokeWidth="1.2"
-            style={{ filter: "drop-shadow(0 6px 14px rgba(16, 24, 40, 0.09))" }}
           />
           <circle cx="120" cy="120" r="47.5" fill="none" stroke="#ffffff" strokeWidth="1.5" />
         </svg>
@@ -563,12 +580,12 @@ export function DeliveryChronoDonut({
         <div className="relative z-10 flex w-[92px] flex-col items-center text-center">
           <span
             aria-hidden
-            className="icon-cube-3d mb-1 grid size-7 place-items-center rounded-[9px] text-white ring-1 ring-inset ring-white/30 transition-all duration-200"
+            className="icon-cube-3d mb-1 grid size-7 place-items-center rounded-[9px] text-white ring-1 ring-inset ring-white/40 transition-all duration-200"
             style={{
               background: activeSeg
                 ? `linear-gradient(145deg, ${activeSeg.from}, ${activeSeg.to})`
-                : "linear-gradient(145deg, #a78bfa 0%, #6941c6 55%, #167d63 100%)",
-              boxShadow: `inset 0 1.5px 0 rgba(255,255,255,0.5), inset 0 -1.5px 0 rgba(0,0,0,0.22), 0 4px 10px -2px ${activeSeg ? activeSeg.to : "#6941c6"}88`,
+                : "linear-gradient(145deg, #c084fc 0%, #9333ea 52%, #10b981 100%)",
+              boxShadow: `inset 0 1.5px 0 rgba(255,255,255,0.6), inset 0 -1.5px 0 rgba(0,0,0,0.2), 0 4px 10px -2px ${activeSeg ? activeSeg.to : "#9333ea"}88`,
             }}
           >
             <svg viewBox="0 0 20 20" fill="none" className="size-4">
@@ -744,7 +761,7 @@ export function RadialRings({
                     strokeLinecap="round"
                     pathLength={100}
                     strokeDasharray={`${drawn ? Math.max(share, 0.6) : 0} 100`}
-                    style={{ filter: `drop-shadow(0 3px 5px ${r.to}66)`, transition: `stroke-dasharray 1s cubic-bezier(.2,.8,.2,1) ${i * 0.12}s` }}
+                    style={{ transition: `stroke-dasharray 1s cubic-bezier(.2,.8,.2,1) ${i * 0.12}s` }}
                     className="motion-reduce:transition-none"
                   />
                 )}
@@ -823,7 +840,6 @@ export function TickRing({
             stroke={`url(#tr-${uid})`}
             strokeWidth="5.5"
             strokeLinecap="round"
-            style={{ filter: `drop-shadow(0 2px 4px ${to}55)` }}
           />
         )}
         {/* Center 3D Glass Medallion */}

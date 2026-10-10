@@ -1,10 +1,12 @@
-import { CheckCircle2, Clock, MapPin, MessageSquareText } from "lucide-react";
+import { CheckCircle2, Clock, MapPin, Truck } from "lucide-react";
 import Link from "next/link";
 import { Avatar, Badge, Card, OrderStatusBadge, OrderStepper } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
+import { getOrderPricing } from "@/lib/order-pricing";
 import { money, orderRef, type OrderItem } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { OrderActions } from "./order-actions";
+import { OrderAddressControl } from "./order-address-sheet";
 import type { CatalogProductOption } from "./order-items-editor";
 
 export type OrderCardData = {
@@ -19,7 +21,14 @@ export type OrderCardData = {
   paidAt: Date | null;
   paymentTxnId: string | null;
   paymentRequestedAt: Date | null;
-  customer: { id: string; name: string; phone: string; location: string | null; client: { name: string } };
+  customer: {
+    id: string;
+    name: string;
+    phone: string;
+    location: string | null;
+    locationRaw?: string | null;
+    client: { name: string };
+  };
   client: { paymentConfig: string | null };
 };
 
@@ -32,7 +41,7 @@ const STATUS_ACCENT: Record<OrderCardData["status"], string> = {
   CANCELLED: "#8b95a5",
 };
 
-/** One order: who, what, the total, where it stands, and the buttons that move it along. */
+/** One order: who, what, the total, where it stands, delivery address, and the buttons that move it along. */
 export function OrderCard({
   order: o,
   items,
@@ -50,6 +59,8 @@ export function OrderCard({
 }) {
   const isPaid = o.status === "PAID" || o.paidAt !== null;
   const accent = STATUS_ACCENT[o.status] ?? "#167d63";
+  const refText = orderRef(o);
+  const pricing = getOrderPricing(items, o.total, { applyDefaultWhenEqual: true });
 
   return (
     <Card className="card-3d relative flex h-full flex-col gap-3.5 overflow-hidden p-4 sm:p-5">
@@ -64,7 +75,7 @@ export function OrderCard({
                 {o.customer.name}
               </Link>
               <span className="rounded-control bg-sunken px-1.5 py-0.5 font-mono text-2xs font-semibold text-ink-2 ring-1 ring-inset ring-line">
-                {orderRef(o)}
+                {refText}
               </span>
             </div>
             <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
@@ -101,11 +112,39 @@ export function OrderCard({
             </li>
           ))}
         </ul>
-        <div className="flex items-center justify-between gap-3 border-t border-line py-2.5 font-semibold text-ink">
-          <span className="text-xs uppercase tracking-wider text-muted">Order Total</span>
-          <span className="tabular text-base">{money(o.total, o.currency)}</span>
+        <div className="space-y-1 border-t border-line py-2.5">
+          {pricing.subtotal > 0 && (
+            <>
+              <div className="flex items-center justify-between gap-3 text-xs text-muted">
+                <span>Items subtotal</span>
+                <span className="tabular font-medium text-ink-2">{money(pricing.subtotal, o.currency)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 text-xs text-muted">
+                <span className="inline-flex items-center gap-1">
+                  <Truck aria-hidden className="size-3 text-brand-deep" /> Shipping charge
+                </span>
+                <span className="tabular font-medium text-ink-2">+ {money(pricing.shipping, o.currency)}</span>
+              </div>
+            </>
+          )}
+          <div className="flex items-center justify-between gap-3 pt-1 font-semibold text-ink">
+            <span className="text-xs uppercase tracking-wider text-muted">Final Total</span>
+            <span className="tabular text-base">{money(pricing.total, o.currency)}</span>
+          </div>
         </div>
       </div>
+
+      {/* Delivery Address & Area with Add / Update + WhatsApp Chat Auto-Detect */}
+      <OrderAddressControl
+        orderId={o.id}
+        orderRefText={refText}
+        customerId={o.customer.id}
+        customerName={o.customer.name}
+        currentOrderNote={o.note}
+        customerLocation={o.customer.location}
+        customerLocationRaw={o.customer.locationRaw}
+        canEdit={canEdit}
+      />
 
       <div className="space-y-1.5 text-xs text-muted">
         <p className="tabular flex items-center justify-between gap-2">
@@ -120,15 +159,6 @@ export function OrderCard({
             </span>
           ) : null}
         </p>
-        {o.note && (
-          <p className="flex items-start gap-1.5 rounded-control bg-subtle px-2.5 py-1.5 text-xs text-ink">
-            <MessageSquareText aria-hidden className="mt-0.5 size-3.5 shrink-0 text-muted" />
-            <span>
-              <span className="font-medium text-muted">Customer note: </span>
-              {o.note}
-            </span>
-          </p>
-        )}
       </div>
 
       <OrderActions
@@ -147,4 +177,3 @@ export function OrderCard({
     </Card>
   );
 }
-

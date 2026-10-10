@@ -1,13 +1,19 @@
 "use client";
 
-import { Loader2, Plus, UserCheck, UserPlus } from "lucide-react";
+import { Check, Loader2, MapPin, MessageSquareQuote, Plus, Sparkles, UserCheck, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { Sheet } from "@/components/sheet";
 import { toastResult } from "@/components/toast";
 import { Badge, Button, Field } from "@/components/ui";
-import { createOrder, lookupOrderCustomer } from "../actions/orders";
+import { parseAddressText } from "@/lib/address";
+import { DEFAULT_SHIPPING_FEE, getOrderPricing } from "@/lib/order-pricing";
+import {
+  createOrder,
+  lookupOrderCustomer,
+  type ChatAddressCandidate,
+} from "../actions/orders";
 import {
   blankOrderLine,
   OrderItemsEditor,
@@ -17,7 +23,17 @@ import {
 
 type Lookup =
   | { phone: string; state: "checking" }
-  | { phone: string; state: "existing"; id: string; name: string; optedOut: boolean }
+  | {
+      phone: string;
+      state: "existing";
+      id: string;
+      name: string;
+      optedOut: boolean;
+      location: string | null;
+      locationRaw: string | null;
+      region: string | null;
+      chatAddresses: ChatAddressCandidate[];
+    }
   | { phone: string; state: "new" }
   | null;
 
@@ -38,18 +54,22 @@ export function NewOrder({
   const [pending, start] = useTransition();
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
+  const [address, setAddress] = useState("");
+  const [area, setArea] = useState("");
+  const [areaTouched, setAreaTouched] = useState(false);
+  const [addressSource, setAddressSource] = useState<"saved" | "chat" | "manual" | null>(null);
+  const [syncCustomerAddress, setSyncCustomerAddress] = useState(true);
   const [note, setNote] = useState("");
+  const [shippingFee, setShippingFee] = useState<number>(DEFAULT_SHIPPING_FEE);
   const [requestPaymentNow, setRequestPaymentNow] = useState(false);
   const [lines, setLines] = useState<EditableOrderLine[]>(() => [
     blankOrderLine(),
   ]);
-  const total = lines.reduce(
-    (sum, l) => sum + (Number(l.price) || 0) * (Number(l.quantity) || 0),
-    0,
-  );
+  const pricing = getOrderPricing(lines, null, { customShippingFee: shippingFee });
+  const total = pricing.total;
 
   // Look the phone up as it's typed (after a short pause), so the form can say whether the
-  // order is for an existing customer or will add a new one.
+  // order is for an existing customer or will add a new one, and auto-fill their saved or chat address.
   const [lookup, setLookup] = useState<Lookup>(null);
   const digits = phone.replace(/\D/g, "");
   useEffect(() => {
@@ -60,20 +80,45 @@ export function NewOrder({
       const r = await lookupOrderCustomer(digits);
       if (!live) return;
       if (!r.valid) setLookup(null);
-      else
-        setLookup(
-          r.existing
-            ? { phone: digits, state: "existing", ...r.existing }
-            : { phone: digits, state: "new" },
-        );
+      else if (r.existing) {
+        const ex = r.existing;
+        setLookup({ phone: digits, state: "existing", ...ex });
+        // Auto-fill from saved address or best WhatsApp chat address if staff hasn't typed a manual address yet
+        const savedFull = ex.locationRaw?.trim() || ex.location?.trim() || "";
+        const bestChat = ex.chatAddresses[0];
+        if (savedFull) {
+          setAddress((prev) => (prev.trim() ? prev : savedFull));
+          setArea((prev) => (prev.trim() ? prev : ex.location?.trim() || parseAddressText(savedFull).area || ""));
+          setAddressSource((prev) => prev ?? "saved");
+        } else if (bestChat) {
+          setAddress((prev) => (prev.trim() ? prev : bestChat.fullAddress));
+          setArea((prev) => (prev.trim() ? prev : bestChat.area || ""));
+          setAddressSource((prev) => prev ?? "chat");
+        }
+      } else {
+        setLookup({ phone: digits, state: "new" });
+      }
     }, 350);
     return () => {
       live = false;
       clearTimeout(t);
     };
   }, [digits]);
+
   const found = lookup?.phone === digits && digits.length >= 10 ? lookup : null;
   const isNew = found?.state === "new";
+  const existingCustomerHasAddress =
+    found?.state === "existing" &&
+    Boolean(found.location?.trim() || found.locationRaw?.trim());
+
+  const handleAddressChange = (val: string) => {
+    setAddress(val);
+    setAddressSource("manual");
+    if (!areaTouched) {
+      const detected = parseAddressText(val);
+      if (detected.area) setArea(detected.area);
+    }
+  };
 
   return (
     <>
@@ -87,7 +132,7 @@ export function NewOrder({
         open={open}
         onClose={() => setOpen(false)}
         title="New order"
-        description="Select items from your WhatsApp Catalogue or enter custom items and prices."
+        description="Select items from your WhatsApp Catalogue or enter custom items, prices and delivery address."
         className="sm:max-w-xl"
       >
         <form
@@ -104,6 +149,10 @@ export function NewOrder({
                   quantity: l.quantity,
                   price: l.price,
                 })),
+                shippingFee,
+                address,
+                area,
+                syncCustomerAddress,
                 note,
                 catalogId,
                 requestPaymentNow: hasPaymentConfig && total > 0 && requestPaymentNow,
@@ -113,7 +162,13 @@ export function NewOrder({
                 setOpen(false);
                 setPhone("");
                 setName("");
+                setAddress("");
+                setArea("");
+                setAreaTouched(false);
+                setAddressSource(null);
+                setSyncCustomerAddress(true);
                 setNote("");
+                setShippingFee(DEFAULT_SHIPPING_FEE);
                 setRequestPaymentNow(false);
                 setLines([blankOrderLine()]);
                 router.refresh();
@@ -131,7 +186,10 @@ export function NewOrder({
                   autoComplete="off"
                   value={phone}
                   placeholder="98765 43210"
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    setAddressSource(null);
+                  }}
                 />
               </Field>
               {found?.state === "existing" ? (
@@ -161,7 +219,7 @@ export function NewOrder({
             <div aria-live="polite" className="min-h-6 text-sm">
               {found?.state === "checking" && (
                 <span className="inline-flex items-center gap-1.5 text-muted">
-                  <Loader2 aria-hidden className="size-3.5 animate-spin" /> Checking customers…
+                  <Loader2 aria-hidden className="size-3.5 animate-spin" /> Checking customer & recent WhatsApp chat…
                 </span>
               )}
               {found?.state === "existing" && (
@@ -173,12 +231,17 @@ export function NewOrder({
                   >
                     {found.name}
                   </Link>
+                  {found.location && (
+                    <Badge tone="brand">
+                      <MapPin aria-hidden className="mr-0.5 inline size-3" /> {found.location}
+                    </Badge>
+                  )}
                   {found.optedOut && <Badge tone="red">Opted out of messages</Badge>}
                 </span>
               )}
               {isNew && (
                 <span className="inline-flex items-center gap-1.5 text-ink-2">
-                  <UserPlus aria-hidden className="size-4 text-info" /> New customer: they&apos;ll be added to Customers with this order.
+                  <UserPlus aria-hidden className="size-4 text-info" /> New customer: they&apos;ll be added to Customers with this order & address.
                 </span>
               )}
             </div>
@@ -191,12 +254,117 @@ export function NewOrder({
             isLiveCatalog={isLiveCatalog}
           />
 
-          <Field id="no-note" label="Address or note" hint="optional">
+          {/* Delivery Address & Area section with automatic WhatsApp chat detection */}
+          <div className="space-y-3 rounded-card border border-line bg-subtle/50 p-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+                <MapPin aria-hidden className="size-4 text-brand-deep" />
+                <span>Delivery Address & Area</span>
+              </div>
+              {addressSource === "saved" && (
+                <Badge tone="green">Auto-filled from saved profile</Badge>
+              )}
+              {addressSource === "chat" && (
+                <Badge tone="info">Auto-detected from WhatsApp chat</Badge>
+              )}
+            </div>
+
+            {found?.state === "existing" && found.chatAddresses.length > 0 && (
+              <div className="space-y-1.5 rounded-control border border-brand/25 bg-brand-soft/40 p-2.5 text-xs">
+                <p className="flex items-center gap-1.5 font-semibold text-brand-deep">
+                  <Sparkles aria-hidden className="size-3.5 shrink-0" />
+                  Address spotted in {found.name}&apos;s WhatsApp messages (tap to use):
+                </p>
+                <div className="space-y-1.5">
+                  {found.chatAddresses.map((cand, idx) => {
+                    const active = address.trim() === cand.fullAddress.trim();
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setAddress(cand.fullAddress);
+                          if (cand.area) setArea(cand.area);
+                          setAddressSource("chat");
+                          setSyncCustomerAddress(true);
+                        }}
+                        className="flex w-full items-start justify-between gap-2 rounded-control border border-line bg-panel px-2.5 py-2 text-left text-xs text-ink transition hover:border-brand"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <MessageSquareQuote aria-hidden className="mr-1 inline size-3.5 text-muted" />
+                          <span className="font-medium">{cand.fullAddress}</span>
+                          {cand.area && (
+                            <span className="ml-1.5 inline-block rounded bg-sunken px-1.5 py-0.5 text-2xs font-semibold text-ink-2">
+                              {cand.area}
+                            </span>
+                          )}
+                        </span>
+                        <span className="shrink-0 font-semibold text-brand-deep">
+                          {active ? (
+                            <span className="inline-flex items-center gap-0.5 text-success">
+                              <Check className="size-3.5" /> Selected
+                            </span>
+                          ) : (
+                            "Use"
+                          )}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_11rem]">
+              <Field id="no-address" label="Full delivery address" hint="door no, street, landmark, pincode">
+                <textarea
+                  rows={2}
+                  className="field"
+                  autoComplete="street-address"
+                  value={address}
+                  placeholder="Door No. 12, 3rd Cross Street, Anna Nagar, Madurai - 625020"
+                  onChange={(e) => handleAddressChange(e.target.value)}
+                />
+              </Field>
+              <Field id="no-area" label="Area / Locality" hint="for packing list">
+                <input
+                  className="field"
+                  value={area}
+                  placeholder="e.g. Anna Nagar"
+                  onChange={(e) => {
+                    setArea(e.target.value);
+                    setAreaTouched(true);
+                  }}
+                />
+              </Field>
+            </div>
+
+            { (address.trim() || area.trim()) && (
+              existingCustomerHasAddress ? (
+                <label className="flex cursor-pointer items-center gap-2 text-xs text-ink-2">
+                  <input
+                    type="checkbox"
+                    className="size-4 rounded border-line text-brand focus:ring-brand"
+                    checked={syncCustomerAddress}
+                    onChange={(e) => setSyncCustomerAddress(e.target.checked)}
+                  />
+                  <span>
+                    Also update <b>{found?.state === "existing" ? found.name : "customer"}&apos;s</b> saved default address
+                  </span>
+                </label>
+              ) : (
+                <p className="text-xs text-muted">
+                  This customer has no saved address yet — this address will automatically be saved to their customer profile too.
+                </p>
+              )
+            )}
+          </div>
+
+          <Field id="no-note" label="Order note / instructions" hint="optional">
             <input
               className="field"
-              autoComplete="street-address"
               value={note}
-              placeholder="Delivery address, custom pack instructions, payment mode…"
+              placeholder="Custom pack instructions, delivery timing, payment mode…"
               onChange={(e) => setNote(e.target.value)}
             />
           </Field>
@@ -218,9 +386,38 @@ export function NewOrder({
             </label>
           )}
 
-          <div className="flex items-center justify-between rounded-control bg-sunken px-4 py-3 text-sm font-semibold">
-            <span>Total</span>
-            <span className="tabular">₹{total.toLocaleString("en-IN")}</span>
+          <div className="space-y-2 rounded-control border border-line bg-sunken px-4 py-3 text-sm">
+            <div className="flex items-center justify-between text-xs text-ink-2">
+              <span>Items subtotal</span>
+              <span className="tabular font-medium">₹{pricing.subtotal.toLocaleString("en-IN")}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2 text-xs text-ink-2">
+              <label htmlFor="no-shipping" className="flex items-center gap-1.5">
+                <span>Shipping charge</span>
+                <span className="rounded bg-brand-soft px-1.5 py-0.5 text-2xs font-semibold text-brand-deep">
+                  ₹{DEFAULT_SHIPPING_FEE} standard
+                </span>
+              </label>
+              <div className="relative w-24">
+                <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted">
+                  ₹
+                </span>
+                <input
+                  id="no-shipping"
+                  type="number"
+                  min={0}
+                  step="1"
+                  inputMode="numeric"
+                  value={shippingFee}
+                  onChange={(e) => setShippingFee(Math.max(0, Number(e.target.value) || 0))}
+                  className="field tabular h-8 min-h-8 pl-6 pr-2 text-right text-xs font-semibold"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between border-t border-line pt-2 font-semibold text-ink">
+              <span>Final Total</span>
+              <span className="tabular text-base">₹{pricing.total.toLocaleString("en-IN")}</span>
+            </div>
           </div>
           <Button type="submit" className="w-full" loading={pending}>
             {isNew ? "Add order and save customer" : "Add order"}

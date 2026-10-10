@@ -5,11 +5,14 @@ import Link from "next/link";
 import { Rupee3D, ShoppingBag3D } from "@/components/icons-3d";
 import { Picker } from "@/components/picker";
 import { buttonClass, Callout, Card, DistributionBar, EmptyState, FilterChips, PageHeader, Section, Stat } from "@/components/ui";
+import { parseAddressText } from "@/lib/address";
 import { getCatalogWithProducts } from "@/lib/catalog";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
-import { fmtNumber } from "@/lib/format";
-import { money, type OrderItem } from "@/lib/orders";
+import { fmtDate, fmtNumber } from "@/lib/format";
+import { getOrderPricing } from "@/lib/order-pricing";
+import { money, orderRef, type OrderItem } from "@/lib/orders";
+import { formatPhone } from "@/lib/phone";
 import { getScope, owned } from "@/lib/session";
 import { sendableTemplates } from "@/lib/senders";
 import { META_SAMPLES } from "@/lib/template";
@@ -19,6 +22,7 @@ import { createOrderTemplates } from "../actions/orders";
 import { NewOrder } from "./new-order";
 import { OrderCard } from "./order-card";
 import type { CatalogProductOption } from "./order-items-editor";
+import { PrintButton, type ExportableOrderRow } from "./packing/print-button";
 import { PaymentForm } from "./payment-form";
 import { RefillForm } from "./refill-form";
 import { OrdersRefreshButton } from "./orders-refresh-button";
@@ -97,6 +101,8 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     ? {
         OR: [
           { customer: { name: { contains: q, mode: "insensitive" as const } } },
+          { customer: { location: { contains: q, mode: "insensitive" as const } } },
+          { customer: { locationRaw: { contains: q, mode: "insensitive" as const } } },
           { internalNote: { contains: q, mode: "insensitive" as const } },
           { note: { contains: q, mode: "insensitive" as const } },
           ...(cleanPhone.length >= 3 ? [{ customer: { phone: { contains: cleanPhone } } }] : []),
@@ -135,7 +141,16 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     db.order.findMany({
       where: baseWhere,
       include: {
-        customer: { select: { id: true, name: true, phone: true, location: true, client: { select: { name: true } } } },
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            location: true,
+            locationRaw: true,
+            client: { select: { name: true } },
+          },
+        },
         client: { select: { paymentConfig: true } },
       },
       orderBy,
@@ -170,6 +185,36 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
   }));
   const catalogId = catalogData?.catalogId ?? null;
   const isLiveCatalog = Boolean(catalogData?.isLive);
+
+  const exportOrders: ExportableOrderRow[] = orders.map((o) => {
+    const items = (o.items as OrderItem[]).map((i) => ({
+      name: i.name ?? i.id,
+      quantity: i.quantity,
+      price: i.price,
+    }));
+    const pricing = getOrderPricing(items, o.total, { applyDefaultWhenEqual: true });
+    const fullAddress =
+      o.note?.trim() || o.customer.locationRaw?.trim() || o.customer.location?.trim() || "";
+    const area =
+      o.customer.location?.trim() ||
+      (fullAddress ? parseAddressText(fullAddress).area : null) ||
+      "Area not noted";
+    return {
+      id: o.id,
+      orderRef: orderRef(o),
+      createdAt: fmtDate(o.createdAt, "EEE d MMM, h:mm a"),
+      status: o.status,
+      isPaid: o.status === "PAID" || o.paidAt !== null,
+      customerName: o.customer.name,
+      customerPhone: formatPhone(o.customer.phone),
+      area,
+      address: fullAddress,
+      items,
+      total: pricing.total,
+      currency: o.currency,
+      note: [o.note, o.internalNote].filter(Boolean).join(" · "),
+    };
+  });
 
   const tabCount: Record<string, number> = {
     "": activeCount,
@@ -273,7 +318,11 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         />
         <Stat
           label="Shown order value"
-          value={money(orders.filter((o) => o.status !== "CANCELLED").reduce((sum, o) => sum + o.total, 0))}
+          value={money(
+            orders
+              .filter((o) => o.status !== "CANCELLED")
+              .reduce((sum, o) => sum + getOrderPricing(o.items as OrderItem[], o.total, { applyDefaultWhenEqual: true }).total, 0),
+          )}
           sub={`${fmtNumber(deliveredCount)} delivered · ${fmtNumber(allCount)} total`}
           icon={<Rupee3D />}
           tone="gold"
@@ -335,6 +384,19 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
                   { key: "done", label: "Delivered", value: deliveredCount, color: "#167d63", href: qs({ show: "done" }) },
                   { key: "cancelled", label: "Cancelled", value: cancelledCount, color: "#98a2b3", href: qs({ show: "cancelled" }) },
                 ]}
+              />
+            </div>
+          )}
+          {exportOrders.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line bg-subtle/40 px-3 py-2.5 sm:px-4">
+              <span className="text-xs font-medium text-muted">
+                Export or print {exportOrders.length} shown order{exportOrders.length === 1 ? "" : "s"} ({tab.label}):
+              </span>
+              <PrintButton
+                orders={exportOrders}
+                picks={[]}
+                title={`Orders · ${tab.label}`}
+                filenamePrefix={`orders-${tab.key || "active"}`}
               />
             </div>
           )}
