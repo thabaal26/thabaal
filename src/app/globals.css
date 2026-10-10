@@ -7,66 +7,70 @@
 }
 
 /*
- * Design tokens. Components use these names only, never raw palette colours, so a client's
- * brand (src/lib/theme.ts overrides brand, brand-deep, brand-soft, night, glow and canvas)
- * re-skins everything, and a dark theme could later swap the values without touching components.
+ * Design tokens. Components use these names only, never raw palette colours.
+ * Neutral surfaces, a dark slate sidebar, green for primary actions and the brand yellow for
+ * highlights (logo, active navigation). A client's brand colour only re-tints those highlights
+ * (src/lib/theme.ts), so every workspace keeps the same readable surfaces.
  * Every text colour here passes 4.5:1 on panel and canvas; `line-strong` and `focus` pass 3:1.
  */
 @theme {
   /* Surfaces and text */
-  --color-ink: #0f1a17;
-  --color-ink-2: #3d4a45;
-  --color-muted: #5f6b67;
-  --color-line: #e4e8e5; /* dividers between rows and cards (decorative) */
-  --color-line-strong: #8a958f; /* borders that outline a control: fields, checkboxes */
-  --color-canvas: #f5f6f3;
+  --color-ink: #111827;
+  --color-ink-2: #344054; /* body copy and labels a step below headings */
+  --color-muted: #667085; /* secondary text: 4.6:1 on canvas */
+  --color-faint: #98a2b3; /* icons and decoration only, never text that must be read */
+  --color-line: #e2e6ec; /* dividers between rows and cards (decorative) */
+  --color-line-2: #d0d5dd; /* outlines of buttons and chips, whose labels identify them */
+  --color-line-strong: #8b95a5; /* borders that alone outline a control: fields, checkboxes (3:1) */
+  --color-canvas: #f5f7fa;
   --color-panel: #ffffff;
   --color-surface: #ffffff;
-  --color-sunken: #eef0ec; /* inset areas inside a card: item lists, read-only values */
+  --color-subtle: #f8fafc; /* secondary surface: table heads, quiet panels */
+  --color-sunken: #f1f4f8; /* inset areas inside a card: item lists, read-only values, segmented tracks */
 
-  /* Brand (re-themed per client) */
-  --color-brand: #0d844a; /* white text on it: 4.8:1 */
-  --color-brand-deep: #0a6b3d;
-  --color-brand-soft: #e3f5ea;
-  --color-night: #0c1714;
-  --color-glow: #34d399; /* accent on the dark sidebar */
+  /* Primary action */
+  --color-brand: #167d63; /* white text on it: 5.1:1 */
+  --color-brand-deep: #11634f;
+  --color-brand-soft: #e8f5f0; /* brand-deep on it: 6.4:1 */
 
-  /* Thabaal Official Brand Tokens */
-  --color-thabaal-ink: #10283b;
-  --color-thabaal-mango: #ffc329;
-  --color-thabaal-coral: #f46b4e;
-  --color-thabaal-green: #20c985;
-  --color-thabaal-cream: #fff9f0;
+  /* Sidebar and brand highlights */
+  --color-night: #171b24;
+  --color-night-2: #252c38; /* active row on the sidebar */
+  --color-glow: #eabf26; /* brand yellow: accents on dark surfaces (9.8:1 on night) */
+  --color-gold: #eabf26; /* brand yellow on light surfaces: fills and marks only, never text */
+  --color-gold-soft: #fdf6dc;
+  --color-gold-deep: #7a5a00; /* text on gold-soft: 6.2:1 */
 
-  /* Status: fg on bg passes 4.5:1; border is the outline of tinted blocks */
-  --color-success: #047857;
-  --color-success-bg: #ecfdf5;
-  --color-success-border: #a7f3d0;
-  --color-warning: #92400e;
-  --color-warning-bg: #fffbeb;
-  --color-warning-border: #fcd34d;
-  --color-danger: #be123c;
-  --color-danger-bg: #fff1f2;
-  --color-danger-border: #fecdd3;
-  --color-danger-solid: #be123c; /* filled destructive buttons, white text 6.2:1 */
-  --color-danger-on-dark: #fda4af; /* error icons and text on night surfaces */
-  --color-warning-on-dark: #fcd34d;
-  --color-warning-solid: #d97706; /* bars and dots, never text */
-  --color-info: #0369a1;
-  --color-info-bg: #f0f9ff;
-  --color-info-border: #bae6fd;
-  --color-accent: #6d28d9; /* "read" and marketing: a second, non-status hue */
-  --color-accent-bg: #f5f3ff;
-  --color-accent-border: #ddd6fe;
-  --color-neutral: #52525b;
-  --color-neutral-bg: #f4f4f5;
-  --color-neutral-border: #e4e4e7;
+  /* Status: fg on bg passes 4.5:1; -solid is the pure hue for bars, dots and filled buttons */
+  --color-success: #11704c;
+  --color-success-solid: #16845b;
+  --color-success-bg: #ecf8f2;
+  --color-success-border: #b5e3cd;
+  --color-warning: #8f5b0f;
+  --color-warning-solid: #b7791f;
+  --color-warning-bg: #fff8eb;
+  --color-warning-border: #f3d7a6;
+  --color-danger: #b42e2e;
+  --color-danger-solid: #c93636; /* filled destructive buttons, white text 5.2:1 */
+  --color-danger-bg: #fef2f2;
+  --color-danger-border: #f6c9c9;
+  --color-danger-on-dark: #fca5a5; /* error icons and text on night surfaces */
+  --color-warning-on-dark: #f5d77a;
+  --color-info: #1d64a8;
+  --color-info-bg: #eff6ff;
+  --color-info-border: #c3daf5;
+  --color-accent: #6941c6; /* "read" and marketing: a second, non-status hue */
+  --color-accent-bg: #f4f3ff;
+  --color-accent-border: #d9d6fe;
+  --color-neutral: #475467;
+  --color-neutral-bg: #f2f4f7;
+  --color-neutral-border: #e2e6ec;
 
-  /* Chart series (message statuses) */
-  --color-series-read: #8b5cf6;
-  --color-series-delivered: #10b981;
-  --color-series-sent: #38bdf8;
-  --color-series-failed: #fb7185;
+  /* Chart series (message statuses), ordered along the delivery funnel */
+  --color-series-read: #167d63;
+  --color-series-delivered: #4fa889;
+  --color-series-sent: #a3d2c0;
+  --color-series-failed: #c93636;
 
   /* WhatsApp's own look, for previews and conversations (not the brand) */
   --color-chat: #efeae2;
@@ -77,42 +81,47 @@
   --color-wa-tick: #0ea5e9;
   --color-call-answer: #22c55e; /* phone convention: green answers, red hangs up (danger-solid) */
 
-  /* Type scale: caption 11, small 12, body 14, body on phones 15, section 16, page title fluid */
+  /* Type scale: micro 10, caption 11, small 12, body 14, body on phones 15, section 16, page title fluid */
+  --text-3xs: 0.625rem;
+  --text-3xs--line-height: 0.875rem;
   --text-2xs: 0.6875rem;
   --text-2xs--line-height: 1rem;
   --text-xs--line-height: 1.125rem;
   --text-sm--line-height: 1.3125rem;
   --text-md: 0.9375rem;
   --text-md--line-height: 1.375rem;
-  --text-title: clamp(1.375rem, 1.1rem + 0.9vw, 1.625rem);
-  --text-title--line-height: 1.2;
-  --text-hero: clamp(1.25rem, 1rem + 1.2vw, 1.75rem);
+  --text-title: clamp(1.375rem, 1.15rem + 0.6vw, 1.5rem);
+  --text-title--line-height: 1.25;
+  --text-hero: clamp(1.25rem, 1.05rem + 0.8vw, 1.625rem);
   --text-hero--line-height: 1.2;
+  --text-kpi: 1.75rem;
+  --text-kpi--line-height: 1.15;
 
   /* Radius: controls, cards, sheets/dialogs (plus full for pills and avatars) */
-  --radius-control: 0.625rem;
-  --radius-card: 1rem;
-  --radius-sheet: 1.5rem;
+  --radius-control: 0.5rem;
+  --radius-card: 0.75rem;
+  --radius-sheet: 1rem;
 
   /* Elevation: cards at rest, anything floating above the page */
-  --shadow-card: 0 1px 2px rgb(15 26 23 / 0.04), 0 4px 16px -6px rgb(15 26 23 / 0.08);
-  --shadow-pop: 0 12px 40px -12px rgb(15 26 23 / 0.35);
-  --shadow-bar: 0 -8px 24px -16px rgb(15 26 23 / 0.25); /* bars pinned to the bottom of the screen */
+  --shadow-xs: 0 1px 2px rgb(16 24 40 / 0.05);
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.03);
+  --shadow-pop: 0 16px 40px -12px rgb(16 24 40 / 0.22), 0 4px 10px -4px rgb(16 24 40 / 0.08);
+  --shadow-bar: 0 -1px 0 rgb(16 24 40 / 0.06), 0 -8px 24px -16px rgb(16 24 40 / 0.18); /* bars pinned to the bottom of the screen */
 
   /* Layout */
-  --container-page: 80rem;
+  --container-page: 92rem;
   --container-form: 42.5rem;
   --container-read: 40rem;
 
   /* Motion: short and calm */
   --ease-snappy: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --default-transition-duration: 180ms;
+  --default-transition-duration: 160ms;
   --default-transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --animate-rise: rise 0.25s var(--ease-snappy) both;
+  --animate-rise: rise 0.22s var(--ease-snappy) both;
   --animate-toast: toast 0.22s var(--ease-snappy) both;
   --animate-sheet: sheet 0.25s var(--ease-snappy) both;
   --animate-fade: fade 0.18s ease-out both;
-  --animate-pop: pop 0.25s var(--ease-snappy) both;
+  --animate-pop: pop 0.22s var(--ease-snappy) both;
   --animate-ring: ring 1.2s ease-in-out infinite;
   @keyframes pop {
     from { transform: scale(0.6); opacity: 0; }
@@ -125,6 +134,10 @@
   }
   @keyframes grow {
     from { transform: scaleX(0); }
+    to { transform: none; }
+  }
+  @keyframes grow-y {
+    from { transform: scaleY(0); }
     to { transform: none; }
   }
   @keyframes sheet {
@@ -164,7 +177,7 @@ body {
 
 /* One focus ring everywhere. Dark surfaces (sidebar, phone header, toasts) switch it to the glow colour. */
 :focus-visible {
-  outline: 2px solid var(--color-focus, var(--color-brand-deep));
+  outline: 2px solid var(--color-focus, var(--color-brand));
   outline-offset: 2px;
 }
 .surface-dark { --color-focus: var(--color-glow); }
@@ -182,86 +195,52 @@ body {
   /* 16px text on phones stops iOS from zooming into fields; 44px height fits a thumb.
      In the components layer so per-field utilities (width, padding) can override it. */
   .field {
-    @apply min-h-11 w-full rounded-control border border-line-strong bg-panel px-3.5 py-2.5 text-base text-ink transition-colors
-      placeholder:text-muted disabled:cursor-not-allowed disabled:border-line disabled:bg-sunken disabled:text-muted
-      aria-invalid:border-danger
+    @apply min-h-11 w-full rounded-control border border-line-strong/70 bg-panel px-3.5 py-2.5 text-base text-ink shadow-xs transition-[border-color,box-shadow]
+      placeholder:text-muted hover:border-line-strong disabled:cursor-not-allowed disabled:border-line disabled:bg-sunken disabled:text-muted disabled:shadow-none
+      aria-invalid:border-danger-solid
       sm:min-h-10 sm:px-3 sm:py-2 sm:text-sm;
   }
   .field:focus-visible {
     outline: none;
-    border-color: var(--color-brand-deep);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand-deep) 18%, transparent);
+    border-color: var(--color-brand);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 20%, transparent);
+  }
+  .field[aria-invalid="true"]:focus-visible {
+    border-color: var(--color-danger-solid);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-danger-solid) 18%, transparent);
   }
   textarea.field { @apply min-h-24 leading-relaxed; }
   select.field {
     @apply appearance-none bg-no-repeat pr-10;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%235f6b67' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23667085' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
     background-position: right 0.75rem center;
   }
 
   /* Checkbox and radio: native controls in brand colour, big enough to hit. */
   .check {
-    @apply size-5 shrink-0 cursor-pointer rounded border-line-strong accent-brand disabled:cursor-not-allowed;
+    @apply size-5 shrink-0 cursor-pointer rounded border-line-strong accent-brand disabled:cursor-not-allowed sm:size-4;
   }
 
-  /* Premium Glass Effects for Floating Bars & Components */
+  /* Surfaces that float: solid, bordered and softly shadowed (no glass blur: it costs paint and hurts legibility). */
   .glass-card {
-    @apply rounded-card border border-line/75 bg-panel/85 shadow-card backdrop-blur-md;
+    @apply rounded-card border border-line bg-panel shadow-card;
   }
   .glass-panel {
-    @apply rounded-sheet border border-line/75 bg-panel/85 shadow-pop backdrop-blur-xl;
+    @apply rounded-sheet border border-line bg-panel shadow-pop;
   }
   .glass-bar {
-    @apply border-t border-line/75 bg-panel/85 shadow-bar backdrop-blur-xl;
+    @apply border-t border-line bg-panel/95 shadow-bar backdrop-blur-sm;
   }
   .glass-modal {
-    @apply border border-line/70 bg-panel/92 shadow-pop backdrop-blur-2xl;
+    @apply border border-line bg-panel shadow-pop;
   }
   .glass-dark {
-    @apply border border-white/10 bg-night/85 text-white shadow-pop backdrop-blur-xl;
+    @apply border border-white/10 bg-night text-white shadow-pop;
   }
-}
-
-/* Ambient Subtle Background Animation */
-@keyframes ambient-glow {
-  0%, 100% {
-    transform: translate3d(0, 0, 0) scale(1);
-    opacity: 0.35;
+  /* Phone header bar on the dark sidebar colour. */
+  .glass-nav {
+    @apply border-b border-white/10 bg-night;
   }
-  50% {
-    transform: translate3d(24px, -16px, 0) scale(1.06);
-    opacity: 0.55;
-  }
-}
-.animate-ambient {
-  animation: ambient-glow 14s ease-in-out infinite alternate;
-}
-
-/* Thabaal Creative Flight & Sky Keyframes */
-@keyframes drift {
-  from { transform: translateX(135%); }
-  to { transform: translateX(-45%); }
-}
-@keyframes puff {
-  from { transform: scale(1, 1); }
-  to { transform: scale(1.035, 1.06); }
-}
-@keyframes float {
-  0%, 100% { transform: translate(0, -10px) rotate(-2.2deg); }
-  50% { transform: translate(8px, 14px) rotate(2.4deg); }
-}
-@keyframes flap {
-  0%, 100% { transform: rotate(8deg); }
-  50% { transform: rotate(-14deg); }
-}
-@keyframes streak {
-  0% { transform: translateX(50px); opacity: 0; }
-  25% { opacity: 0.8; }
-  100% { transform: translateX(-80px); opacity: 0; }
-}
-@keyframes twinkle {
-  0%, 100% { opacity: 0.2; transform: scale(0.7); }
-  50% { opacity: 1; transform: scale(1.15); }
 }
 
 /* Space for the phone bottom bar, including the home indicator. */
@@ -269,10 +248,13 @@ body {
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
+/* Thin, quiet scrollbars for panes that scroll on their own (inbox, sidebar). */
+.thin-scroll { scrollbar-width: thin; scrollbar-color: var(--color-line-2) transparent; }
+
 /* Page sections arrive one after another instead of all at once. */
 /* Fade only: a transform here would make these sections the containing block for anything
    position: fixed inside them, unpinning the phone action bars (Create, Save) from the screen. */
-.stagger > *, .stagger > .grid > * { animation: fade 0.3s var(--ease-snappy) both; }
+.stagger > *, .stagger > .grid > * { animation: fade 0.25s var(--ease-snappy) both; }
 .stagger > :nth-child(2) { animation-delay: 30ms; }
 .stagger > :nth-child(3) { animation-delay: 60ms; }
 .stagger > :nth-child(4) { animation-delay: 90ms; }
@@ -280,13 +262,14 @@ body {
 .stagger > .grid > :nth-child(2) { animation-delay: 90ms; }
 .stagger > .grid > :nth-child(n + 3) { animation-delay: 120ms; }
 
-/* Progress and share bars fill in from the left. */
+/* Progress and share bars fill in from the left; chart columns grow from the axis. */
 .bar { transform-origin: left; animation: grow 0.6s var(--ease-snappy) 0.1s both; }
+.bar-y { transform-origin: bottom; animation: grow-y 0.5s var(--ease-snappy) both; }
 
 /* Clickable cards respond to the pointer on computers; phones get press feedback instead. */
 @media (hover: hover) and (pointer: fine) {
-  .lift { transition: transform 0.18s var(--ease-snappy), box-shadow 0.18s var(--ease-snappy); }
-  .lift:hover { transform: translateY(-1px); box-shadow: var(--shadow-pop); }
+  .lift { transition: border-color 0.16s var(--ease-snappy), box-shadow 0.16s var(--ease-snappy); }
+  .lift:hover { border-color: var(--color-line-2); box-shadow: 0 4px 12px -4px rgb(16 24 40 / 0.1); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -320,9 +303,7 @@ input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
-  -webkit-text-fill-color: #10283b !important;
+  -webkit-text-fill-color: #111827 !important;
   transition: background-color 9999s ease-in-out 0s;
   box-shadow: inset 0 0 0 1000px #f8fafc !important;
 }
-
-

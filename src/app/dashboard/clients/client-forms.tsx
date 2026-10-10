@@ -348,7 +348,7 @@ export function BrandingForm({ clientId, name, initial }: { clientId: string; na
           <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
             {(["brandPrimary", "brandAccent"] as const).map((k) => (
               <div key={k}>
-                <Label htmlFor={`${k}-${clientId}`} hint={k === "brandPrimary" ? "buttons, charts" : "highlights"}>{k === "brandPrimary" ? "Main colour" : "Accent colour"}</Label>
+                <Label htmlFor={`${k}-${clientId}`} hint={k === "brandPrimary" ? "used when no accent" : "sidebar highlights"}>{k === "brandPrimary" ? "Main colour" : "Accent colour"}</Label>
                 <div className="flex gap-2">
                   <input
                     type="color"
@@ -384,7 +384,7 @@ export function BrandingForm({ clientId, name, initial }: { clientId: string; na
               // eslint-disable-next-line @next/next/no-img-element -- preview of an admin-supplied image
               <img src={v.logoUrl} alt="" className="size-8 rounded-control object-cover" />
             ) : (
-              <span className="size-8 rounded-control bg-brand" />
+              <span className="size-8 rounded-control bg-gold" />
             )}
             <div className="min-w-0">
               <p className="truncate font-semibold text-white">{name}</p>
@@ -392,13 +392,15 @@ export function BrandingForm({ clientId, name, initial }: { clientId: string; na
             </div>
           </div>
           <div className="space-y-1 bg-night px-3 pb-3">
-            <p className="rounded-md bg-white/10 px-2 py-1 font-medium text-white"><span className="text-glow">●</span> Overview</p>
-            <p className="px-2 py-1 text-white/75">Campaigns</p>
+            <p className="relative rounded-control bg-night-2 px-2.5 py-1.5 font-medium text-white">
+              <span aria-hidden className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-glow" />
+              Overview
+            </p>
+            <p className="px-2.5 py-1.5 text-white/70">Campaigns</p>
           </div>
           <div className="space-y-2 p-3">
             <span className="inline-flex rounded-control bg-brand px-3 py-1.5 font-medium text-white">Button</span>
-            <div className="h-2 overflow-hidden rounded-full bg-panel"><div className="h-full w-2/3 rounded-full bg-brand" /></div>
-            <span className="inline-flex rounded-full bg-brand-soft px-2 py-0.5 font-medium text-brand-deep">coconut-oil</span>
+            <p className="text-2xs text-muted">Pages, text and buttons keep the portal&apos;s neutral look; the brand colour marks the highlights.</p>
           </div>
         </div>
       </form>

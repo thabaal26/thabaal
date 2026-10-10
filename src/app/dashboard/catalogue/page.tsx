@@ -1,9 +1,10 @@
-import { CheckCircle2, ExternalLink, ShoppingBag, Store, XCircle } from "lucide-react";
+import { CheckCircle2, CloudOff, ExternalLink, Package, ShoppingBag, XCircle } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Badge, buttonClass, Card, PageHeader, PickClientNotice } from "@/components/ui";
+import { Badge, buttonClass, Callout, PageHeader, PickClientNotice, Stat } from "@/components/ui";
 import { getCatalogWithProducts } from "@/lib/catalog";
 import { db } from "@/lib/db";
+import { fmtNumber } from "@/lib/format";
 import { getScope } from "@/lib/session";
 import { CatalogueManager } from "./catalogue-manager";
 
@@ -36,67 +37,42 @@ export default async function CataloguePage() {
     <>
       <PageHeader
         title="Catalogue & Menu"
-        description="Manage your WhatsApp product items, menu prices, and stock availability. Changes sync directly to customer WhatsApp chats and incoming orders."
+        description="Products, prices and stock that customers see when they tap View catalog in WhatsApp."
+        rowActions
         actions={
-          <div className="flex flex-wrap items-center gap-2">
+          <>
             <Link href="/dashboard/orders" className={buttonClass("secondary")}>
-              <ShoppingBag aria-hidden className="size-4" /> View Orders
+              <ShoppingBag aria-hidden className="size-4" /> Orders
             </Link>
             {commerceManagerUrl && (
-              <a
-                href={commerceManagerUrl}
-                target="_blank"
-                rel="noreferrer"
-                className={buttonClass("primary")}
-              >
-                <ExternalLink aria-hidden className="size-4" /> Meta Commerce Manager
+              <a href={commerceManagerUrl} target="_blank" rel="noreferrer" className={buttonClass("secondary")}>
+                <ExternalLink aria-hidden className="size-4" /> Commerce Manager
+                <span className="sr-only">(opens Meta)</span>
               </a>
             )}
-          </div>
+          </>
         }
       />
 
-      {/* Stats row */}
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-        <Card className="p-4 sm:p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted">Total Products</span>
-            <Store className="size-4 text-muted opacity-70" />
-          </div>
-          <p className="mt-2 text-2xl font-bold tabular text-ink">{total}</p>
-          <p className="text-3xs text-muted mt-0.5">Active in catalogue</p>
-        </Card>
+      {!isLive && (
+        <Callout tone="info" icon={<CloudOff />} title="Showing the portal's saved product list" className="mb-4">
+          Meta&apos;s live catalogue couldn&apos;t be read for this WhatsApp account, so prices and stock here may differ from what customers see in WhatsApp.
+        </Callout>
+      )}
 
-        <Card className="p-4 sm:p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted">In Stock</span>
-            <CheckCircle2 className="size-4 text-emerald-600" />
-          </div>
-          <p className="mt-2 text-2xl font-bold tabular text-emerald-600">{inStock}</p>
-          <p className="text-3xs text-muted mt-0.5">Available to order</p>
-        </Card>
-
-        <Card className="p-4 sm:p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted">Out of Stock</span>
-            <XCircle className="size-4 text-amber-500" />
-          </div>
-          <p className="mt-2 text-2xl font-bold tabular text-amber-600">{outOfStock}</p>
-          <p className="text-3xs text-muted mt-0.5">Hidden from orders</p>
-        </Card>
-
-        <Card className="p-4 sm:p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted">Meta Catalog Sync</span>
-            <Badge tone={isLive ? "green" : "gray"} dot>
-              {isLive ? "Live" : "Local"}
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <Stat label="Products" value={fmtNumber(total)} sub="In the catalogue" icon={<Package className="size-4" />} />
+        <Stat label="In stock" value={fmtNumber(inStock)} sub="Customers can order these" icon={<CheckCircle2 className="size-4" />} />
+        <Stat label="Out of stock" value={fmtNumber(outOfStock)} sub="Hidden from new orders" icon={<XCircle className="size-4" />} />
+        <Stat
+          label="Meta catalogue"
+          value={
+            <Badge tone={isLive ? "green" : "gray"} dot className="text-sm">
+              {isLive ? "Live" : "Saved copy"}
             </Badge>
-          </div>
-          <p className="mt-2 truncate font-mono text-xs font-medium text-ink">
-            {catalogId ? `ID: ${catalogId}` : "Connected"}
-          </p>
-          <p className="text-3xs text-muted mt-0.5">WhatsApp Cloud API</p>
-        </Card>
+          }
+          sub={catalogId ? <span className="font-mono">ID {catalogId}</span> : "No catalogue linked"}
+        />
       </div>
 
       <CatalogueManager

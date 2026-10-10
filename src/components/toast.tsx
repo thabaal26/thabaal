@@ -37,7 +37,7 @@ export function Toaster() {
       {items.map((t) => (
         <div key={t.id} className="surface-dark pointer-events-auto flex w-full max-w-sm animate-toast items-start gap-3 rounded-card bg-night py-3 pl-4 pr-2 text-sm text-white shadow-pop">
           {t.ok ? (
-            <CheckCircle2 aria-hidden className="mt-0.5 size-4 shrink-0 text-glow" />
+            <CheckCircle2 aria-hidden className="mt-0.5 size-4 shrink-0 text-call-answer" />
           ) : (
             <XCircle aria-hidden className="mt-0.5 size-4 shrink-0 text-danger-on-dark" />
           )}

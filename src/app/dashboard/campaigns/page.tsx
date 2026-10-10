@@ -142,7 +142,7 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
                   {c.scheduleType === "WEEKLY" && (
                     <ul aria-label={`Sends every ${c.daysOfWeek.map((d) => DAYS[d]).join(", ")}`} className="grid max-w-80 grid-cols-7 gap-1">
                       {DAYS.map((d, i) => (
-                        <li key={d} aria-hidden className={cn("grid h-7 place-items-center rounded-md text-2xs font-medium", c.daysOfWeek.includes(i) ? "bg-brand text-white font-semibold" : "bg-sunken text-muted")}>
+                        <li key={d} aria-hidden className={cn("grid h-7 place-items-center rounded-[6px] text-2xs font-medium", c.daysOfWeek.includes(i) ? "bg-brand text-white font-semibold" : "bg-sunken text-muted")}>
                           {d}
                         </li>
                       ))}

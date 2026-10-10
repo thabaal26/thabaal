@@ -143,7 +143,7 @@ export function Sheet({
               <h2 id={titleId} className="text-base font-semibold leading-snug text-ink [overflow-wrap:anywhere]">{title}</h2>
               {description && <p id={descId} className="mt-1 text-sm text-muted">{description}</p>}
             </div>
-            <button type="button" onClick={close} aria-label="Close" className="-mr-2 grid size-11 shrink-0 place-items-center rounded-full text-muted transition hover:bg-canvas hover:text-ink active:bg-sunken">
+            <button type="button" onClick={close} aria-label="Close" className="-mr-2 grid size-11 shrink-0 place-items-center rounded-control text-muted transition hover:bg-sunken hover:text-ink active:bg-sunken sm:size-9">
               <X className="size-5" />
             </button>
           </div>

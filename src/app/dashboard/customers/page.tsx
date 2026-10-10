@@ -223,7 +223,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
                             <ActionButton action={setOptOut.bind(null, c.id, !c.optedOut)} variant="ghost" aria-label={`${c.optedOut ? "Opt in" : "Opt out"} ${c.name}`}>
                               {c.optedOut ? "Opt in" : "Opt out"}
                             </ActionButton>
-                            <ActionButton action={deleteCustomer.bind(null, c.id)} variant="ghost" confirm={`Delete ${c.name} and their message history?`} aria-label={`Delete ${c.name}`}>
+                            <ActionButton action={deleteCustomer.bind(null, c.id)} variant="ghost" className="text-danger hover:bg-danger-bg hover:text-danger" confirm={`Delete ${c.name} and their message history?`} aria-label={`Delete ${c.name}`}>
                               Delete
                             </ActionButton>
                           </div>

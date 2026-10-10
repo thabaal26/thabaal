@@ -1,7 +1,7 @@
-import { Bell, Inbox, Phone, ShoppingBag, TriangleAlert } from "lucide-react";
+import { Bell, ChevronRight, Inbox, Phone, ShoppingBag, TriangleAlert } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Badge, buttonClass, Card, EmptyState, FilterChips, PageHeader } from "@/components/ui";
+import { Badge, Card, EmptyState, FilterChips, PageHeader } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { daysAgo, fmtDate, fmtNumber } from "@/lib/format";
@@ -32,6 +32,14 @@ const TABS = [
   { key: "calls", label: "Calls" },
   { key: "alerts", label: "Alerts" },
 ] as const;
+
+/** One icon, tint and action word per kind, so the list can be scanned before it's read. */
+const KIND = {
+  order: { icon: ShoppingBag, tile: "bg-info-bg text-info", action: "View order" },
+  reply: { icon: Inbox, tile: "bg-brand-soft text-brand-deep", action: "Reply" },
+  call: { icon: Phone, tile: "bg-accent-bg text-accent", action: "View call" },
+  alert: { icon: TriangleAlert, tile: "bg-danger-bg text-danger", action: "View log" },
+} as const;
 
 export default async function NotificationsPage({
   searchParams,
@@ -165,11 +173,25 @@ export default async function NotificationsPage({
     return true;
   });
 
+  // Grouped by day in the app's time zone, newest first (the list is already sorted).
+  const today = fmtDate(new Date(), "yyyy-MM-dd");
+  const yesterday = fmtDate(daysAgo(1), "yyyy-MM-dd");
+  const days: { key: string; label: string; items: NotificationRow[] }[] = [];
+  for (const item of filtered) {
+    const key = fmtDate(item.date, "yyyy-MM-dd");
+    let group = days.find((d) => d.key === key);
+    if (!group) {
+      group = { key, label: key === today ? "Today" : key === yesterday ? "Yesterday" : fmtDate(item.date, "EEEE d MMMM"), items: [] };
+      days.push(group);
+    }
+    group.items.push(item);
+  }
+
   return (
     <>
       <PageHeader
         title="Notifications"
-        description="Unified live notifications for customer replies, catalogue orders, incoming WhatsApp calls, and message delivery alerts."
+        description="Customer replies, orders, WhatsApp calls and delivery problems in one place. Unread items still need someone to act on them."
         tabs={
           <FilterChips
             label="Filter notifications"
@@ -184,89 +206,60 @@ export default async function NotificationsPage({
       />
 
       {filtered.length > 0 ? (
-        <Card>
-          <ul className="divide-y divide-line">
-            {filtered.map((item) => {
-              const isOrder = item.type === "order";
-              const isReply = item.type === "reply";
-              const isCall = item.type === "call";
-              const isAlert = item.type === "alert";
+        <div className="space-y-5">
+          {days.map((day) => (
+            <section key={day.key} aria-labelledby={`day-${day.key}`}>
+              <h2 id={`day-${day.key}`} className="mb-2 px-1 text-xs font-medium text-muted">
+                {day.label}
+              </h2>
+              <Card className="overflow-hidden">
+                <ul className="divide-y divide-line">
+                  {day.items.map((item) => {
+                    const k = KIND[item.type];
+                    return (
+                      <li key={item.id} className="group relative flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-subtle sm:items-center sm:px-5">
+                        {item.unread && <span aria-hidden className="absolute inset-y-3 left-0 w-[3px] rounded-r-full bg-brand" />}
+                        <span aria-hidden className={cn("grid size-9 shrink-0 place-items-center rounded-full", k.tile)}>
+                          <k.icon className="size-[18px]" />
+                        </span>
 
-              return (
-                <li
-                  key={item.id}
-                  className={cn(
-                    "flex flex-col gap-3 p-4 transition-colors sm:flex-row sm:items-center sm:justify-between sm:px-5",
-                    item.unread ? "bg-panel hover:bg-canvas/50" : "bg-panel/60 hover:bg-panel text-muted"
-                  )}
-                >
-                  <div className="flex items-start gap-3 min-w-0">
-                    <span
-                      aria-hidden
-                      className={cn(
-                        "grid size-10 shrink-0 place-items-center rounded-full",
-                        isOrder && "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
-                        isReply && "bg-brand-soft text-brand-deep",
-                        isCall && (item.urgent ? "bg-amber-100 text-amber-700 animate-pulse" : "bg-glow/20 text-glow"),
-                        isAlert && "bg-danger-bg text-danger"
-                      )}
-                    >
-                      {isOrder && <ShoppingBag className="size-5" />}
-                      {isReply && <Inbox className="size-5" />}
-                      {isCall && <Phone className="size-5" />}
-                      {isAlert && <TriangleAlert className="size-5" />}
-                    </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className={cn("min-w-0 truncate text-sm", item.unread ? "font-semibold text-ink" : "font-medium text-ink-2")}>
+                              <Link href={item.href} className="outline-none after:absolute after:inset-0 focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-brand">
+                                {item.title}
+                              </Link>
+                            </p>
+                            {item.urgent && <Badge tone="amber" dot>Ringing</Badge>}
+                            {item.unread && <span className="sr-only">(unread)</span>}
+                          </div>
+                          <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted sm:line-clamp-1">{item.description}</p>
+                          <p className="tabular mt-1 text-xs text-muted sm:hidden">
+                            {fmtDate(item.date, "h:mm a")}
+                            {item.phone && ` · ${formatPhone(item.phone)}`}
+                          </p>
+                        </div>
 
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className={cn("text-sm font-semibold truncate", item.unread ? "text-ink" : "text-ink-muted")}>
-                          {item.title}
-                        </p>
-                        {item.unread && (
-                          <span className="size-2 rounded-full bg-brand shrink-0" aria-label="Unread" />
-                        )}
-                        {item.urgent && (
-                          <Badge tone="amber">Ringing</Badge>
-                        )}
-                      </div>
-
-                      <p className="mt-0.5 text-xs text-muted leading-relaxed line-clamp-2">
-                        {item.description}
-                      </p>
-
-                      <p className="mt-1 text-2xs text-muted">
-                        {fmtDate(item.date, "EEE d MMM, h:mm a")}
-                        {item.phone && ` · ${formatPhone(item.phone)}`}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex shrink-0 items-center gap-2 pt-1 sm:pt-0">
-                    <Link
-                      href={item.href}
-                      className={cn(
-                        buttonClass(item.unread ? "primary" : "secondary"),
-                        "text-xs min-h-11 sm:min-h-8 max-sm:w-full justify-center"
-                      )}
-                    >
-                      {isOrder && "View order"}
-                      {isReply && "Reply in chat"}
-                      {isCall && "View call"}
-                      {isAlert && "View log"}
-                    </Link>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
+                        <div className="hidden shrink-0 text-right sm:block">
+                          <p className="tabular text-xs text-muted">{fmtDate(item.date, "h:mm a")}</p>
+                          {item.phone && <p className="tabular text-xs text-muted">{formatPhone(item.phone)}</p>}
+                        </div>
+                        <span className="hidden w-24 shrink-0 items-center justify-end gap-1 text-xs font-medium text-brand-deep md:flex">
+                          {k.action} <ChevronRight aria-hidden className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+                        </span>
+                        <ChevronRight aria-hidden className="mt-2 size-4 shrink-0 text-faint md:hidden" />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Card>
+            </section>
+          ))}
+        </div>
       ) : (
         <Card>
-          <EmptyState
-            icon={<Bell className="size-6 text-muted" />}
-            title="No notifications in this view"
-          >
-            All updates and messages in this category have been handled.
+          <EmptyState icon={<Bell />} title={show === "unread" ? "You're all caught up" : "Nothing here yet"}>
+            {show === "unread" ? "Every reply, order and alert has been handled." : "New replies, orders, calls and delivery problems will show up here."}
           </EmptyState>
         </Card>
       )}

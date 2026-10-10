@@ -175,7 +175,7 @@ export function CalendarPicker({
   }, [value, todayStr]);
 
   return (
-    <div className={cn("space-y-3 rounded-card border border-line bg-panel p-3.5 sm:p-4 shadow-sm", className)}>
+    <div className={cn("space-y-3 rounded-card border border-line bg-panel p-3.5 sm:p-4 shadow-xs", className)}>
       {/* Quick presets pills */}
       <div className="space-y-1.5">
         <div className="flex items-center gap-1.5 text-xs font-medium text-ink-2">
@@ -198,7 +198,7 @@ export function CalendarPicker({
                 className={cn(
                   "min-h-8 rounded-full border px-2.5 py-1 text-xs font-medium transition active:scale-95 pointer-coarse:min-h-10 pointer-coarse:px-3",
                   on
-                    ? "border-brand bg-brand text-white shadow-sm"
+                    ? "border-brand bg-brand text-white shadow-xs"
                     : "border-line bg-sunken/60 text-ink-2 hover:border-line-strong hover:bg-sunken",
                 )}
               >
@@ -277,7 +277,7 @@ export function CalendarPicker({
                 className={cn(
                   "relative flex h-9 sm:h-10 w-full items-center justify-center rounded-control text-xs sm:text-sm font-medium transition active:scale-95 pointer-coarse:min-h-10",
                   c.isSelected
-                    ? "border border-brand bg-brand text-white shadow-sm font-semibold"
+                    ? "border border-brand bg-brand text-white shadow-xs font-semibold"
                     : c.isToday
                       ? "border border-brand text-brand-deep bg-brand-soft/50 font-semibold hover:bg-brand-soft"
                       : c.isPast

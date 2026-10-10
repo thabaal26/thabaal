@@ -14,7 +14,7 @@ export default function DashboardError({ error, retry }: { error: Error & { dige
   return (
     <Card role="alert" className="mx-auto mt-6 max-w-lg">
       <div className="flex flex-col items-center px-6 py-10 text-center sm:py-14">
-        <div aria-hidden className="mb-3 grid size-11 place-items-center rounded-card bg-danger-bg text-danger">
+        <div aria-hidden className="mb-4 grid size-12 place-items-center rounded-full bg-danger-bg text-danger ring-8 ring-danger-bg/40">
           <TriangleAlert className="size-5" />
         </div>
         <h1 className="text-base font-semibold text-ink">This page couldn&apos;t load</h1>

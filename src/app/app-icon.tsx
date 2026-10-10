@@ -1,7 +1,7 @@
 // Shared artwork for the favicon and home-screen icons.
 
 /** The default brand green (--color-brand in globals.css); image routes can't read CSS variables. */
-export const ICON_GREEN = "#0d844a";
+export const ICON_GREEN = "#167d63";
 
 export function AppIcon({ size }: { size: number }) {
   const s = size;

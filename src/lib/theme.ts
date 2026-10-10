@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-// Turns a client's two brand colours into the portal's colour tokens. Text contrast is
+// Turns a client's brand colours into the portal's highlight tokens. Text contrast is
 // enforced here (WCAG AA, 4.5:1), so any colours an admin picks stay readable.
 
 type RGB = [number, number, number];
@@ -41,33 +41,30 @@ export type Brand = {
   brandAccent: string | null;
 };
 
+/** The sidebar and phone header colour (--color-night in globals.css). */
+const NIGHT: RGB = [0x17, 0x1b, 0x24];
+
 /**
- * CSS custom properties that re-theme everything inside the element they're set on.
- * Returns undefined when the client has no brand colours, keeping the default theme.
+ * CSS custom properties that carry a client's brand inside the element they're set on.
+ * Surfaces, text and primary actions stay on the portal's neutral design system (a tinted
+ * page background or brand-coloured buttons made yellow and olive brands hard to read), so a
+ * client's colour only re-tints the highlights: the sidebar's active marker and accents.
+ * Returns undefined when the client has no brand colours, keeping the default brand yellow.
  */
 export function themeStyle(b: Brand | null | undefined): CSSProperties | undefined {
-  if (!b?.brandPrimary || !HEX.test(b.brandPrimary)) return undefined;
-  const primary = parse(b.brandPrimary);
-  const accent = b.brandAccent && HEX.test(b.brandAccent) ? parse(b.brandAccent) : primary;
-
-  // Buttons carry white text, so the brand colour darkens until white reads on it.
-  const brand = until(primary, BLACK, WHITE, 4.6);
-  const deep = until(mix(brand, BLACK, 0.25), BLACK, WHITE, 7);
-  const night = mix(brand, BLACK, 0.86);
+  const hex = b?.brandAccent && HEX.test(b.brandAccent) ? b.brandAccent : b?.brandPrimary && HEX.test(b.brandPrimary) ? b.brandPrimary : null;
+  if (!hex) return undefined;
   // The accent glows on the dark sidebar, so it lightens until it reads there.
-  const glow = until(accent, WHITE, night, 6);
-  // Selected chips and nav items put brand-deep text on brand-soft, so the tint lightens until that reads.
-  const soft = until(mix(primary, WHITE, 0.84), WHITE, deep, 4.5);
-  // The page background must keep the grey secondary text (--color-muted) readable.
-  const canvas = until(mix(primary, [247, 247, 244], 0.95), WHITE, MUTED, 4.5);
-
+  const glow = until(parse(hex), WHITE, NIGHT, 6);
+  // Light-surface marks (fills, dots) use the colour itself; its tint stays pale enough for ink text.
+  const gold = parse(hex);
+  const soft = until(mix(gold, WHITE, 0.86), WHITE, MUTED, 4.5);
+  const deep = until(mix(gold, BLACK, 0.45), BLACK, soft, 4.5);
   return {
-    "--color-brand": toHex(brand),
-    "--color-brand-deep": toHex(deep),
-    "--color-brand-soft": toHex(soft),
-    "--color-night": toHex(night),
     "--color-glow": toHex(glow),
-    "--color-canvas": toHex(canvas),
+    "--color-gold": toHex(gold),
+    "--color-gold-soft": toHex(soft),
+    "--color-gold-deep": toHex(deep),
   } as CSSProperties;
 }
 
@@ -80,8 +77,7 @@ export function themeCss(b: Brand | null | undefined) {
   return s ? `:root{${Object.entries(s).map(([k, v]) => `${k}:${v}`).join(";")}}` : "";
 }
 
-/** The sidebar colour, for the browser's theme-color. */
-export function nightColor(b: Brand | null | undefined) {
-  const s = themeStyle(b) as Record<string, string> | undefined;
-  return s?.["--color-night"] ?? "#0c1714";
+/** The sidebar colour, for the browser's theme-color. The same for every client. */
+export function nightColor() {
+  return toHex(NIGHT);
 }

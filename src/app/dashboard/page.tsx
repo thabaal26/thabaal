@@ -1,7 +1,7 @@
 import { CalendarClock, CheckCheck, Clock, Eye, Send, TriangleAlert, Users } from "lucide-react";
 import Link from "next/link";
 import { ActionButton } from "@/components/action-button";
-import { Badge, buttonClass, Callout, Card, CardHeader, EmptyState, Meter, PageHeader, rowClass, Stat, StatusBadge, Table, Td, Th } from "@/components/ui";
+import { Avatar, Badge, buttonClass, Callout, Card, CardHeader, EmptyState, Meter, PageHeader, rowClass, Stat, StatusBadge, Table, Td, Th } from "@/components/ui";
 import { db } from "@/lib/db";
 import { APP_TZ, daysAgo, fmtDate, fmtNumber, pct } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
@@ -14,14 +14,14 @@ import { NumberHealth } from "./number-health";
 import { numberHealth } from "@/lib/limits";
 import { codesOf, PAUSING_KINDS } from "@/lib/meta-errors";
 import { DailyChart } from "./daily-chart";
-import { DonutGauges } from "./donut-gauges";
+import { RepliesCard } from "./replies-card";
 import { SpendCard } from "./spend-card";
 import { AreaChips } from "./area-chips";
 
 export const dynamic = "force-dynamic";
 
-/** Region share colours: brand, accent, then neutrals. */
-const REGION_COLORS = ["bg-brand", "bg-glow", "bg-line-strong", "bg-line"];
+/** Region share colours: a ramp of the brand green, then neutral for "no location". */
+const REGION_COLORS = ["bg-series-read", "bg-series-delivered", "bg-series-sent", "bg-line-2"];
 
 const tagLabel = (tag: string) => (tag === "no-item-info" ? "No item recorded" : tag.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase()));
 
@@ -65,7 +65,7 @@ export default async function Overview() {
     }),
     scope.clientId ? db.customer.groupBy({ by: ["region", "location"], where: { clientId: scope.clientId, optedOut: false }, _count: true }) : [],
   ]);
-  const [customers, optedOut, week, activeRuns, upcoming, recent, daily, failures, settings] = await Promise.all([
+  const [customers, optedOut, week, activeRuns, upcoming, recent, daily, failures, settings, repliesWeek, openReplies] = await Promise.all([
     db.customer.count({ where: { ...mine, optedOut: false } }),
     db.customer.count({ where: { ...mine, optedOut: true } }),
     db.message.groupBy({ by: ["status"], where: { ...myMessages, createdAt: { gte: weekAgo }, status: { notIn: ["QUEUED", "SKIPPED"] } }, _count: true }),
@@ -95,6 +95,9 @@ export default async function Overview() {
     // Failures in the last day, grouped by reason, so problems show up without opening the log.
     db.message.groupBy({ by: ["error"], where: { ...myMessages, status: "FAILED", failedAt: { gte: daysAgo(1) } }, _count: true, orderBy: { _count: { error: "desc" } }, take: 3 }),
     getSettings(),
+    // Replies per customer in the same 7 days as the figures above.
+    db.reply.groupBy({ by: ["customerId"], where: { ...myMessages, receivedAt: { gte: weekAgo } }, _count: true }),
+    db.reply.count({ where: { ...myMessages, handled: false } }),
   ]);
   const failedToday = failures.reduce((n, f) => n + f._count, 0);
   // A campaign paused because the token, app permissions or Meta account stopped every send.
@@ -206,7 +209,7 @@ export default async function Overview() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4" aria-label="Last 7 days at a glance" role="group">
         <Stat label="Active customers" value={fmtNumber(customers)} sub={`${fmtNumber(optedOut)} opted out`} icon={<Users className="size-4" />} />
         <Stat label="Messages sent · 7 days" value={fmtNumber(total)} sub={`${fmtNumber(failed)} failed`} icon={<Send className="size-4" />} />
         <Stat label="Message delivery rate" value={`${pct(delivered, total)}%`} sub={`${fmtNumber(delivered)} delivered`} icon={<CheckCheck className="size-4" />} />
@@ -214,11 +217,11 @@ export default async function Overview() {
       </div>
 
       {/*
-        Desktop: main column (sending, chart, results) beside a side column (health, upcoming, spend).
+        Wide screens: main column (sending, chart, results) beside a side column (health, upcoming, spend).
         Phones: the columns dissolve and `order` puts what's happening now first.
       */}
-      <div className="mt-4 flex flex-col gap-4 sm:mt-6 sm:gap-6 lg:grid lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)] lg:items-start">
-        <div className="contents lg:flex lg:flex-col lg:gap-6">
+      <div className="mt-4 flex flex-col gap-4 sm:mt-5 sm:gap-5 xl:grid xl:grid-cols-[minmax(0,1.7fr)_minmax(20rem,1fr)] xl:items-start">
+        <div className="contents xl:flex xl:flex-col xl:gap-5">
           {activeRuns.length > 0 && (
             <Card className="order-1">
               <CardHeader title="Sending now" description="Campaigns delivering in batches. Batch size or interval changes apply from the next batch." />
@@ -257,24 +260,13 @@ export default async function Overview() {
             </Card>
           )}
 
-          <Card className="order-3 overflow-hidden">
+          <Card className="order-3">
             <DailyChart rows={daily.map((d) => ({ day: d.day, status: d.status, n: Number(d.n) }))} since={since} />
           </Card>
 
-          <div className="order-4">
-            <DonutGauges
-              deliveryRate={pct(delivered, total)}
-              readRate={pct(read, delivered)}
-              replyRate={pct(repliesByTag.reduce((acc, r) => acc + Number(r.n), 0), Math.max(delivered, 1))}
-              deliveredCount={delivered}
-              readCount={read}
-              repliesCount={repliesByTag.reduce((acc, r) => acc + Number(r.n), 0)}
-            />
-          </div>
-
           {byProduct.length > 0 && (
-            <Card className="order-7">
-              <CardHeader title="Campaign results by product" description="Last 30 days. Which customer groups read your messages and write back." />
+            <Card className="order-8">
+              <CardHeader title="Campaign results by product" description="Last 30 days · which customer groups read your messages and write back" />
               {/* Phones: one compact row per product instead of a sideways-scrolling table. */}
               <ul className="divide-y divide-line sm:hidden">
                 {byProduct.map((r) => (
@@ -350,15 +342,15 @@ export default async function Overview() {
           )}
 
           {shown.length > 0 && (
-            <Card className="order-8">
-              <CardHeader title="What your customers buy" description="Customers per product or group. Each can be targeted with its own campaign." />
-              <ul className="grid gap-x-8 gap-y-1 p-2 sm:grid-cols-2 sm:p-3">
+            <Card className="order-9">
+              <CardHeader title="What your customers buy" description="Customers per product or group · each can get its own campaign" />
+              <ul className="grid gap-x-6 gap-y-0.5 p-2 sm:grid-cols-2 sm:p-3">
                 {shown.map((t) => (
                   <li key={t.tag}>
-                    <Link href={`/dashboard/customers?tag=${encodeURIComponent(t.tag)}`} className="group block rounded-control px-2 py-2 transition hover:bg-canvas active:bg-sunken">
+                    <Link href={`/dashboard/customers?tag=${encodeURIComponent(t.tag)}`} className="group block rounded-control px-2.5 py-2.5 transition hover:bg-subtle active:bg-sunken">
                       <div className="flex items-baseline justify-between gap-2 text-sm">
                         <span className="truncate font-medium text-ink group-hover:underline">{tagLabel(t.tag)}</span>
-                        <span className="tabular text-xs text-muted">{fmtNumber(t.n)}</span>
+                        <span className="tabular text-xs font-medium text-ink-2">{fmtNumber(t.n)}</span>
                       </div>
                       <Meter className="mt-1.5" value={Math.max(4, pct(t.n, top))} />
                     </Link>
@@ -369,22 +361,24 @@ export default async function Overview() {
           )}
 
           {byRegion.length > 1 && (
-            <Card className="order-9">
-              <CardHeader title="Customers by area" description="Where your customers are, from the order sheets. Tap any area to see its customers." />
+            <Card className="order-10">
+              <CardHeader title="Customers by area" description="From the order sheets · tap an area to see its customers" />
               <div className="space-y-5 p-4 sm:p-5">
                 <div>
-                  <div className="flex h-3 overflow-hidden rounded-full bg-sunken" aria-hidden>
+                  <div className="flex h-2.5 gap-0.5 overflow-hidden rounded-full" aria-hidden>
                     {byRegion.map((r, i) => (
-                      <div key={r.key} className={REGION_COLORS[i] ?? "bg-line"} style={{ width: `${pct(r.n, regionTotal)}%` }} />
+                      <div key={r.key} className={`${REGION_COLORS[i] ?? "bg-line-2"} first:rounded-l-full last:rounded-r-full`} style={{ width: `${pct(r.n, regionTotal)}%` }} />
                     ))}
                   </div>
                   <ul className="mt-2 grid grid-cols-1 gap-x-4 min-[360px]:grid-cols-2 sm:flex sm:flex-wrap sm:gap-x-2">
                     {byRegion.map((r, i) => (
                       <li key={r.key}>
-                        <Link href={`/dashboard/customers?area=${encodeURIComponent(r.href)}`} className="group flex min-h-11 items-center gap-2 rounded-control px-1 text-sm transition hover:bg-canvas sm:min-h-9 sm:px-2">
-                          <span aria-hidden className={`size-2.5 shrink-0 rounded-full ${REGION_COLORS[i] ?? "bg-line"}`} />
-                          <span className="group-hover:underline">{r.label}</span>
-                          <span className="tabular text-xs text-muted">{fmtNumber(r.n)}</span>
+                        <Link href={`/dashboard/customers?area=${encodeURIComponent(r.href)}`} className="group flex min-h-11 items-center gap-2 rounded-control px-1 text-sm transition hover:bg-subtle sm:min-h-9 sm:px-2">
+                          <span aria-hidden className={`size-2.5 shrink-0 rounded-[3px] ${REGION_COLORS[i] ?? "bg-line-2"}`} />
+                          <span className="text-ink-2 group-hover:underline">{r.label}</span>
+                          <span className="tabular text-xs text-muted">
+                            {fmtNumber(r.n)} · {pct(r.n, regionTotal)}%
+                          </span>
                         </Link>
                       </li>
                     ))}
@@ -398,8 +392,9 @@ export default async function Overview() {
           <Card className="order-4">
             <CardHeader
               title="Latest messages"
+              description="Sent from the portal, newest first"
               action={
-                <Link href="/dashboard/messages" className="-my-2 inline-flex min-h-11 items-center text-sm font-medium text-brand-deep hover:underline sm:min-h-8">
+                <Link href="/dashboard/messages" className={buttonClass("ghost", "sm")}>
                   Open log
                 </Link>
               }
@@ -407,10 +402,14 @@ export default async function Overview() {
             {recent.length ? (
               <ul className="divide-y divide-line">
                 {recent.map((m) => (
-                  <li key={m.id} className="flex items-center gap-3 px-4 py-3 text-sm sm:px-5">
+                  <li key={m.id} className="relative flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-subtle sm:px-5">
+                    <Avatar name={m.customer.name} className="size-8 text-xs max-sm:hidden" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-ink">
-                        {m.customer.name} <span className="tabular font-normal text-muted">{formatPhone(m.customer.phone)}</span>
+                        <Link href={`/dashboard/customers/${m.customerId}`} className="after:absolute after:inset-0">
+                          {m.customer.name}
+                        </Link>{" "}
+                        <span className="tabular font-normal text-muted">{formatPhone(m.customer.phone)}</span>
                       </p>
                       <p className="truncate text-xs text-muted">{m.body ?? m.templateName}</p>
                     </div>
@@ -431,14 +430,13 @@ export default async function Overview() {
           </Card>
         </div>
 
-        <div className="contents lg:flex lg:flex-col lg:gap-6">
-          <NumberHealth numbers={health} className="order-5" />
-
+        <div className="contents xl:flex xl:flex-col xl:gap-5">
           <Card className="order-2">
             <CardHeader
               title="Coming up"
+              description="Next scheduled campaign sends"
               action={
-                <Link href="/dashboard/campaigns" className="-my-2 inline-flex min-h-11 items-center text-sm font-medium text-brand-deep hover:underline sm:min-h-8">
+                <Link href="/dashboard/campaigns" className={buttonClass("ghost", "sm")}>
                   All campaigns
                 </Link>
               }
@@ -446,10 +444,10 @@ export default async function Overview() {
             {upcoming.length ? (
               <ul className="divide-y divide-line">
                 {upcoming.map((c) => (
-                  <li key={c.id} className="relative flex items-center gap-3 px-4 py-3 transition-colors hover:bg-canvas/70 active:bg-sunken sm:px-5">
-                    <div className="grid w-12 shrink-0 place-items-center rounded-control bg-sunken py-1.5 text-center">
+                  <li key={c.id} className="relative flex items-center gap-3 px-4 py-3 transition-colors hover:bg-subtle active:bg-sunken sm:px-5">
+                    <div className="grid w-11 shrink-0 place-items-center rounded-control border border-line bg-panel py-1 text-center">
                       <span className="text-2xs font-medium uppercase text-muted">{fmtDate(c.nextRunAt, "EEE")}</span>
-                      <span className="tabular text-sm font-semibold">{fmtDate(c.nextRunAt, "d")}</span>
+                      <span className="tabular text-sm font-semibold leading-tight text-ink">{fmtDate(c.nextRunAt, "d")}</span>
                     </div>
                     <div className="min-w-0 flex-1">
                       <Link href={`/dashboard/campaigns/${c.id}`} className="block truncate text-sm font-medium text-ink after:absolute after:inset-0">
@@ -470,7 +468,11 @@ export default async function Overview() {
             )}
           </Card>
 
-          {scope.clientId && <SpendCard clientId={scope.clientId} canManage={scope.canManage} className="order-6" />}
+          <RepliesCard className="order-5" replies={repliesWeek.reduce((n, r) => n + r._count, 0)} customers={repliesWeek.length} open={openReplies} />
+
+          <NumberHealth numbers={health} className="order-6" />
+
+          {scope.clientId && <SpendCard clientId={scope.clientId} canManage={scope.canManage} className="order-7" />}
         </div>
       </div>
     </>

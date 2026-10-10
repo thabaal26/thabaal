@@ -49,7 +49,7 @@ export default async function ClientsPage() {
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={c.logoUrl} alt="" className="size-9 shrink-0 rounded-control object-cover ring-1 ring-line shadow-xs" />
                       ) : (
-                        <span className="grid size-9 shrink-0 place-items-center rounded-control bg-thabaal-mango/20 font-bold text-thabaal-ink">
+                        <span className="grid size-9 shrink-0 place-items-center rounded-control bg-gold-soft font-semibold text-gold-deep">
                           {c.name.slice(0, 1).toUpperCase()}
                         </span>
                       )}

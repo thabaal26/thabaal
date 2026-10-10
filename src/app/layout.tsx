@@ -24,7 +24,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover", // lets the layout use safe-area insets
-  themeColor: "#0c1714",
+  themeColor: "#171b24",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -1,14 +1,14 @@
-import { CheckCheck, MessageCircle, RotateCcw, ShoppingBag } from "lucide-react";
+import { CheckCheck, ChevronRight, MessageCircle, RotateCcw, ShoppingBag, UserRound } from "lucide-react";
 import Link from "next/link";
 import { ActionButton } from "@/components/action-button";
-import { ReplyMedia } from "@/components/reply-media";
+import { Conversation, type ConversationEntry } from "@/components/conversation";
 import { Avatar, Badge, Card, buttonClass } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { fmtDate } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { setReplyHandled } from "../actions/replies";
 
-const ORDER = /(order|buy|need|want|send|price|rate|available|venum|vendum)|வேண்டும்|ஆர்டர்/i;
+const ORDER = /(order|buy|need|want|send|price|rate|available|venum|vendum)|வேண்டும்|ஆர்டர்/i;
 
 export type InboxReply = {
   id: string;
@@ -22,13 +22,32 @@ export type InboxReply = {
   sender: { label: string } | null;
 };
 
+/** What a reply shows in the list when it has no text (media, stickers). */
+const preview = (r: InboxReply) =>
+  r.text ||
+  (r.mediaType === "image" ? "Photo" : r.mediaType === "audio" ? "Voice note" : r.mediaType === "video" ? "Video" : r.mediaType === "sticker" ? "Sticker" : r.mediaType ? "File" : "Message");
+
 /**
- * The replies list. Phones and tablets: each reply with its message and buttons. Wide screens:
- * a compact list beside the selected reply (?r=<id>, the newest by default).
+ * The replies inbox. Computers: the reply list scrolls on its own beside the picked reply's
+ * conversation (?r=<id>, the newest by default). Phones and tablets: a list whose rows open the
+ * customer's conversation and composer, with "Handled" right on the row for quick triage.
  */
-export function ReplyInbox({ replies, picked, show, canOperate, showClient }: { replies: InboxReply[]; picked?: string; show: string; canOperate: boolean; showClient: boolean }) {
-  // Wide screens show one reply beside the list (?r=<id>); the newest is open by default.
-  const selected = replies.find((x) => x.id === picked) ?? replies[0];
+export function ReplyInbox({
+  replies,
+  selectedId,
+  thread,
+  show,
+  canOperate,
+  showClient,
+}: {
+  replies: InboxReply[];
+  selectedId?: string;
+  thread: ConversationEntry[];
+  show: string;
+  canOperate: boolean;
+  showClient: boolean;
+}) {
+  const selected = replies.find((x) => x.id === selectedId);
   const hrefFor = (id: string) => `/dashboard/replies?${new URLSearchParams({ ...(show && { show: String(show) }), r: id })}`;
   const isOrder = (r: InboxReply) => r.kind === "button" || ORDER.test(r.text);
 
@@ -37,7 +56,7 @@ export function ReplyInbox({ replies, picked, show, canOperate, showClient }: { 
       {showClient && <Badge>{r.customer.client.name}</Badge>}
       {isOrder(r) && (
         <Badge tone="green">
-          <ShoppingBag aria-hidden className="mr-1 inline size-3 align-[-2px]" />
+          <ShoppingBag aria-hidden />
           {r.kind === "button" ? "Tapped button" : "Possible order"}
         </Badge>
       )}
@@ -45,104 +64,92 @@ export function ReplyInbox({ replies, picked, show, canOperate, showClient }: { 
     </>
   );
 
-  const actions = (r: InboxReply, wide?: boolean) =>
-    canOperate && (
-      <div className={cn("flex gap-2", !wide && "max-sm:*:flex-1")}>
-        <Link href={`/dashboard/customers/${r.customer.id}#reply`} className={buttonClass("primary", wide ? "md" : "sm")}>
-          <MessageCircle aria-hidden className="size-4" /> Reply here
-        </Link>
-        <ActionButton action={setReplyHandled.bind(null, r.id, !r.handled)} size={wide ? "md" : "sm"}>
-          {r.handled ? (
-            <>
-              <RotateCcw aria-hidden className="size-4" /> Reopen
-            </>
-          ) : (
-            <>
-              <CheckCheck aria-hidden className="size-4" /> Handled
-            </>
-          )}
-        </ActionButton>
-      </div>
-    );
+  const handledButton = (r: InboxReply, size: "sm" | "md") => (
+    <ActionButton action={setReplyHandled.bind(null, r.id, !r.handled)} size={size}>
+      {r.handled ? <RotateCcw aria-hidden className="size-4" /> : <CheckCheck aria-hidden className="size-4" />}
+      {r.handled ? "Reopen" : "Mark handled"}
+    </ActionButton>
+  );
 
   return (
-        <div className="xl:grid xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] xl:items-start xl:gap-6">
-          <Card>
-            <ul className="divide-y divide-line">
-              {replies.map((r) => {
-                const current = selected?.id === r.id;
-                return (
-                  <li key={r.id} className={cn("relative flex gap-3 px-4 py-3.5 sm:px-5 xl:py-3 xl:transition-colors xl:hover:bg-canvas/70", current && "xl:bg-brand-soft/60 xl:hover:bg-brand-soft/60")}>
-                    {/* Wide screens: the whole row opens the reply in the side panel. */}
-                    <Link href={hrefFor(r.id)} scroll={false} aria-current={current ? "true" : undefined} className="absolute inset-0 hidden rounded-[inherit] xl:block">
-                      <span className="sr-only">Open reply from {r.customer.name}</span>
-                    </Link>
-                    <Avatar name={r.customer.name} className="max-sm:hidden xl:size-9" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <Link href={`/dashboard/customers/${r.customer.id}`} className="relative min-w-0 truncate font-medium text-ink hover:underline xl:pointer-events-none">
-                          {r.customer.name}
-                        </Link>
-                        <time className="tabular shrink-0 text-xs text-muted" dateTime={r.receivedAt.toISOString()}>
-                          {fmtDate(r.receivedAt, "d MMM, h:mm a")}
-                        </time>
-                      </div>
-                      <p className="tabular text-xs text-muted">{formatPhone(r.customer.phone)}</p>
-                      <p className="mt-2 w-fit max-w-full whitespace-pre-wrap rounded-card rounded-tl-sm bg-bubble px-3 py-2 text-sm text-ink shadow-card ring-1 ring-line xl:line-clamp-2 xl:w-auto xl:bg-transparent xl:p-0 xl:pb-0.5 xl:text-muted xl:shadow-none xl:ring-0">
-                        {r.text}
-                      </p>
-                      <div className="xl:hidden">
-                        {r.mediaId && <ReplyMedia id={r.id} type={r.mediaType} />}
-                        <p className="mt-1.5 text-xs text-muted">
-                          {r.sender && <>To {r.sender.label}</>}
-                          {r.sender && r.customer.purchases && " · "}
-                          {r.customer.purchases && <>Bought before: {r.customer.purchases}</>}
-                        </p>
-                      </div>
-                      <div className="mt-1.5 flex flex-wrap gap-1 empty:hidden">{tags(r)}</div>
-                      {canOperate && <div className="relative mt-3 xl:hidden">{actions(r)}</div>}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </Card>
-
-          {selected && (
-            <Card className="sticky top-8 hidden xl:block" aria-label="Selected reply">
-              <div className="flex items-start gap-3 border-b border-line px-5 py-4">
-                <Avatar name={selected.customer.name} />
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-base font-semibold text-ink">
-                    <Link href={`/dashboard/customers/${selected.customer.id}`} className="hover:underline">
-                      {selected.customer.name}
-                    </Link>
-                  </h2>
-                  <p className="tabular text-sm text-muted">{formatPhone(selected.customer.phone)}</p>
+    <Card className="overflow-hidden lg:grid lg:h-[calc(100dvh-16.5rem)] lg:min-h-[34rem] lg:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]">
+      {/* The list. */}
+      <ul aria-label="Replies" className="thin-scroll divide-y divide-line lg:overflow-y-auto lg:border-r lg:border-line">
+        {replies.map((r) => {
+          const current = selected?.id === r.id;
+          return (
+            <li key={r.id} className={cn("relative flex gap-3 px-4 py-3.5 transition-colors hover:bg-subtle", current && "lg:bg-brand-soft/60 lg:hover:bg-brand-soft/60")}>
+              {current && <span aria-hidden className="absolute inset-y-0 left-0 hidden w-[3px] bg-brand lg:block" />}
+              {/* Phones: the row opens the customer's conversation. Computers: it opens it beside the list. */}
+              <Link href={`/dashboard/customers/${r.customer.id}#reply`} className="absolute inset-0 lg:hidden">
+                <span className="sr-only">Open conversation with {r.customer.name}</span>
+              </Link>
+              <Link href={hrefFor(r.id)} scroll={false} aria-current={current ? "true" : undefined} className="absolute inset-0 hidden lg:block">
+                <span className="sr-only">Show reply from {r.customer.name}</span>
+              </Link>
+              <Avatar name={r.customer.name} className="size-9 text-xs" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className={cn("min-w-0 truncate text-sm text-ink", r.handled ? "font-medium" : "font-semibold")}>{r.customer.name}</p>
+                  <time className="tabular shrink-0 text-xs text-muted" dateTime={r.receivedAt.toISOString()}>
+                    {fmtDate(r.receivedAt, "d MMM, h:mm a")}
+                  </time>
                 </div>
-                <div className="flex flex-wrap justify-end gap-1">{tags(selected)}</div>
-              </div>
-              <div className="chat-wall px-5 py-6">
-                <div className="w-fit max-w-[85%] rounded-card rounded-tl-sm bg-bubble px-3.5 py-2.5 text-md text-ink shadow-card">
-                  {selected.kind === "button" && <p className="mb-0.5 text-xs font-medium text-brand-deep">Tapped a button</p>}
-                  <p className="whitespace-pre-wrap">{selected.text}</p>
-                  {selected.mediaId && <ReplyMedia id={selected.id} type={selected.mediaType} />}
-                  <p className="mt-1 text-right text-2xs text-muted">{fmtDate(selected.receivedAt, "EEE d MMM, h:mm a")}</p>
-                </div>
-              </div>
-              <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 px-5 py-4 text-sm">
-                {selected.sender && (
-                  <>
-                    <dt className="text-muted">Sent to</dt>
-                    <dd>{selected.sender.label}</dd>
-                  </>
+                <p className={cn("mt-0.5 line-clamp-2 text-sm [overflow-wrap:anywhere]", r.handled ? "text-muted" : "text-ink-2")}>
+                  {r.kind === "button" && <span className="text-muted">Tapped: </span>}
+                  {preview(r)}
+                </p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1 empty:hidden">{tags(r)}</div>
+                {canOperate && (
+                  <div className="relative z-[1] mt-2.5 flex gap-2 lg:hidden">
+                    {handledButton(r, "sm")}
+                    <span className="ml-auto inline-flex items-center gap-1 self-center text-xs font-medium text-brand-deep">
+                      Open <ChevronRight aria-hidden className="size-3.5" />
+                    </span>
+                  </div>
                 )}
-                <dt className="text-muted">Bought before</dt>
-                <dd>{selected.customer.purchases ?? <span className="text-muted">Nothing recorded</span>}</dd>
-              </dl>
-              {canOperate && <div className="border-t border-line px-5 py-4">{actions(selected, true)}</div>}
-            </Card>
-          )}
-        </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      {/* Computers: the picked customer's conversation. */}
+      {selected && (
+        <section aria-label={`Conversation with ${selected.customer.name}`} className="hidden min-h-0 flex-col lg:flex">
+          <header className="flex items-start gap-3 border-b border-line px-5 py-3.5">
+            <Avatar name={selected.customer.name} className="size-10" />
+            <div className="min-w-0 flex-1">
+              <h2 className="truncate text-[0.9375rem] font-semibold text-ink">{selected.customer.name}</h2>
+              <p className="tabular text-sm text-muted">
+                {formatPhone(selected.customer.phone)}
+                {selected.sender && <> · wrote to {selected.sender.label}</>}
+              </p>
+              {selected.customer.purchases && (
+                <p className="mt-1 line-clamp-1 text-xs text-muted">
+                  <ShoppingBag aria-hidden className="mr-1 inline size-3 align-[-2px]" />
+                  Bought before: {selected.customer.purchases}
+                </p>
+              )}
+            </div>
+            <div className="flex shrink-0 flex-wrap justify-end gap-1">{tags(selected)}</div>
+          </header>
+
+          <Conversation entries={thread} className="min-h-0 flex-1" />
+
+          <footer className="flex flex-wrap items-center gap-2 border-t border-line bg-panel px-5 py-3">
+            {canOperate && (
+              <Link href={`/dashboard/customers/${selected.customer.id}#reply`} className={buttonClass("primary")}>
+                <MessageCircle aria-hidden className="size-4" /> Reply
+              </Link>
+            )}
+            {canOperate && handledButton(selected, "md")}
+            <Link href={`/dashboard/customers/${selected.customer.id}`} className={cn(buttonClass("ghost"), "ml-auto")}>
+              <UserRound aria-hidden className="size-4" /> <span className="max-xl:sr-only">Customer profile</span>
+            </Link>
+          </footer>
+        </section>
+      )}
+    </Card>
   );
 }

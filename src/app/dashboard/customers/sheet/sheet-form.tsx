@@ -69,7 +69,7 @@ export function SheetForm({ customersUrl, ordersUrl }: { customersUrl: string; o
             </div>
           </Field>
           <p className="flex items-center gap-1.5 pt-0.5 text-xs text-muted">
-            <Sparkles className="size-3.5 shrink-0 text-amber-500" />
+            <Sparkles aria-hidden className="size-3.5 shrink-0 text-gold" />
             Paste your Google Sheet share link here. We automatically detect and sync both the <b>Customers</b> and <b>Orders</b> tabs!
           </p>
         </div>

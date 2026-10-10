@@ -29,17 +29,21 @@ function timeAgo(dateStr: string) {
   return `${days}d ago`;
 }
 
-function getIcon(type: NotificationItem["type"]) {
-  switch (type) {
-    case "order":
-      return <ShoppingBag className="size-4 text-emerald-600" />;
-    case "reply":
-      return <Inbox className="size-4 text-brand-deep" />;
-    case "call":
-      return <Phone className="size-4 text-glow" />;
-    case "alert":
-      return <TriangleAlert className="size-4 text-danger" />;
-  }
+/** One icon and tint per kind, so the list can be scanned by type before reading. */
+const KIND = {
+  order: { icon: ShoppingBag, tile: "bg-info-bg text-info" },
+  reply: { icon: Inbox, tile: "bg-brand-soft text-brand-deep" },
+  call: { icon: Phone, tile: "bg-accent-bg text-accent" },
+  alert: { icon: TriangleAlert, tile: "bg-danger-bg text-danger" },
+} as const;
+
+function KindIcon({ type }: { type: NotificationItem["type"] }) {
+  const k = KIND[type] ?? KIND.alert;
+  return (
+    <span aria-hidden className={cn("grid size-8 shrink-0 place-items-center rounded-control", k.tile)}>
+      <k.icon className="size-4" />
+    </span>
+  );
 }
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
@@ -136,26 +140,22 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             <div
               key={toast.id}
               className={cn(
-                "pointer-events-auto flex items-start gap-3 rounded-card border bg-panel p-3.5 shadow-pop transition-all animate-toast",
-                toast.urgent
-                  ? "border-amber-500/80 bg-amber-50/90 dark:bg-amber-950/40"
-                  : "border-line-strong/60"
+                "pointer-events-auto flex items-start gap-3 rounded-card border bg-panel p-3.5 shadow-pop animate-toast",
+                toast.urgent ? "border-warning-border border-l-4 border-l-warning-solid" : "border-line"
               )}
             >
-              <div className="grid size-8 shrink-0 place-items-center rounded-control bg-canvas">
-                {getIcon(toast.type)}
-              </div>
+              <KindIcon type={toast.type} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
                   <p className="truncate text-xs font-semibold text-ink">{toast.title}</p>
                   <span className="shrink-0 text-2xs text-muted">{timeAgo(toast.timestamp)}</span>
                 </div>
-                <p className="mt-0.5 line-clamp-2 text-xs text-ink-muted">{toast.description}</p>
+                <p className="mt-0.5 line-clamp-2 text-xs text-muted">{toast.description}</p>
                 <div className="mt-2 flex items-center gap-2">
                   <Link
                     href={toast.href}
                     onClick={() => dismissToast(toast.id)}
-                    className="inline-flex min-h-11 items-center gap-1 rounded-control bg-brand-deep px-2.5 text-xs font-semibold text-white transition hover:bg-brand active:scale-95 sm:min-h-7"
+                    className="inline-flex min-h-11 items-center gap-1 rounded-control bg-brand px-2.5 text-xs font-semibold text-white transition hover:bg-brand-deep active:scale-95 sm:min-h-7"
                   >
                     <span>View</span>
                     <ExternalLink className="size-3" />
@@ -210,10 +210,10 @@ export function NotificationBell({
       title="Notifications"
       aria-label={`Notifications, ${unreadCount} unread`}
       className={cn(
-        "relative grid size-11 place-items-center rounded-full transition active:scale-95",
+        "relative grid size-11 place-items-center rounded-control transition active:scale-95 sm:pointer-fine:size-9",
         dark
           ? "text-white/80 hover:bg-white/10 hover:text-white"
-          : "text-ink-muted hover:bg-canvas hover:text-ink",
+          : "text-ink-2 hover:bg-sunken hover:text-ink",
         className
       )}
     >
@@ -221,10 +221,10 @@ export function NotificationBell({
       {unreadCount > 0 && (
         <span
           className={cn(
-            "tabular absolute right-1.5 top-1.5 grid h-[18px] min-w-[18px] animate-pop place-items-center rounded-full px-1 text-2xs font-bold ring-2",
+            "tabular absolute -right-0.5 -top-0.5 grid h-[18px] min-w-[18px] animate-pop place-items-center rounded-full px-1 text-2xs font-semibold ring-2",
             dark
               ? "bg-glow text-night ring-night"
-              : "bg-brand text-white ring-panel"
+              : "bg-danger-solid text-white ring-panel"
           )}
         >
           {unreadCount > 99 ? "99+" : unreadCount}
@@ -277,10 +277,10 @@ function NotificationDrawer() {
                 type="button"
                 onClick={() => setFilter(t.id)}
                 className={cn(
-                  "min-h-11 rounded-full px-3 text-xs font-semibold transition sm:min-h-7",
+                  "min-h-11 rounded-full border px-3 text-xs font-medium transition sm:min-h-7",
                   filter === t.id
-                    ? "bg-brand text-white"
-                    : "bg-canvas text-muted hover:text-ink"
+                    ? "border-ink bg-ink text-white"
+                    : "border-line-2 bg-panel text-ink-2 hover:border-line-strong hover:text-ink"
                 )}
               >
                 {t.label}
@@ -302,30 +302,26 @@ function NotificationDrawer() {
         {/* List of items */}
         {filtered.length === 0 ? (
           <div className="py-12 text-center text-sm text-muted">
-            <Bell className="mx-auto mb-2 size-8 text-muted/50" />
+            <Bell aria-hidden className="mx-auto mb-2 size-8 text-faint" />
             <p className="font-medium text-ink">No notifications</p>
             <p className="text-xs text-muted">Nothing to see in this category right now.</p>
           </div>
         ) : (
-          <ul className="space-y-2 max-h-[60vh] overflow-y-auto no-scrollbar pr-0.5">
+          <ul className="thin-scroll -mx-1 max-h-[60vh] space-y-1 overflow-y-auto px-1">
             {filtered.map((item) => (
               <li key={item.id}>
                 <Link
                   href={item.href}
                   onClick={() => setOpenSheet(false)}
                   className={cn(
-                    "flex items-start gap-3 rounded-card border p-3 transition hover:border-brand/50 active:bg-sunken",
-                    item.unread
-                      ? "border-line-strong bg-brand-soft/20 text-ink"
-                      : "border-line/70 bg-panel text-ink-muted"
+                    "flex items-start gap-3 rounded-control border p-3 transition hover:bg-subtle active:bg-sunken",
+                    item.unread ? "border-line bg-panel" : "border-transparent"
                   )}
                 >
-                  <div className="grid size-8 shrink-0 place-items-center rounded-control bg-canvas">
-                    {getIcon(item.type)}
-                  </div>
+                  <KindIcon type={item.type} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-1">
-                      <p className="truncate text-xs font-semibold text-ink">
+                      <p className={cn("truncate text-sm text-ink", item.unread ? "font-semibold" : "font-medium")}>
                         {item.title}
                       </p>
                       <span className="shrink-0 text-2xs text-muted">
@@ -337,10 +333,9 @@ function NotificationDrawer() {
                     </p>
                   </div>
                   {item.unread && (
-                    <span
-                      aria-label="Unread"
-                      className="size-2 shrink-0 rounded-full bg-brand"
-                    />
+                    <span className="mt-1.5 size-2 shrink-0 rounded-full bg-brand">
+                      <span className="sr-only">Unread</span>
+                    </span>
                   )}
                 </Link>
               </li>

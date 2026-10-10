@@ -63,7 +63,7 @@ export function AreaChips({
             <Link
               key={a.location}
               href={`/dashboard/customers?area=${encodeURIComponent(`loc:${a.location}`)}`}
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line bg-canvas/80 px-3 text-sm text-ink-muted transition hover:border-brand hover:bg-brand-soft/50 hover:text-ink active:bg-sunken sm:min-h-8"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line bg-canvas/80 px-3 text-sm text-muted transition hover:border-brand hover:bg-brand-soft/50 hover:text-ink active:bg-sunken sm:min-h-8"
             >
               <span className="truncate max-w-[180px]">{a.location}</span>{" "}
               <span className="tabular text-xs text-muted">{a._count}</span>
@@ -74,7 +74,7 @@ export function AreaChips({
           <button
             type="button"
             onClick={() => setExpanded(true)}
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-dashed border-line-strong bg-canvas px-3.5 text-sm font-medium text-ink-muted transition hover:border-brand hover:bg-brand-soft/60 hover:text-brand-deep active:bg-sunken sm:min-h-8"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-dashed border-line-strong bg-canvas px-3.5 text-sm font-medium text-muted transition hover:border-brand hover:bg-brand-soft/60 hover:text-brand-deep active:bg-sunken sm:min-h-8"
           >
             <span>+ {otherAreas.length} others</span>
             <ChevronDown className="size-3.5 text-muted" />

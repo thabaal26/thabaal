@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Building2, CalendarClock, Inbox, LayoutDashboard, Menu, MessagesSquare, Phone, Settings, ShoppingBag, SquarePen, Store, Users } from "lucide-react";
+import { Bell, Building2, CalendarClock, ChevronRight, Inbox, LayoutDashboard, Menu, MessagesSquare, Phone, Settings, ShoppingBag, SquarePen, Store, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -66,8 +66,8 @@ export function SideNav({ isAdmin, openReplies, newOrders, unreadNotifications }
   return (
     <nav aria-label="Main" className="space-y-5">
       {groups.map((g) => (
-        <div key={g}>
-          <p className="mb-1 px-3 text-2xs font-semibold uppercase tracking-wider text-white/55">{g}</p>
+        <div key={g} role="group" aria-labelledby={`nav-${g}`}>
+          <p id={`nav-${g}`} className="mb-1.5 px-3 text-2xs font-medium uppercase tracking-wider text-white/50">{g}</p>
           <ul className="space-y-0.5">
             {items
               .filter((n) => n.group === g)
@@ -80,17 +80,14 @@ export function SideNav({ isAdmin, openReplies, newOrders, unreadNotifications }
                       href={href}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "flex h-10 items-center gap-3 rounded-full px-3.5 text-sm transition",
-                        active ? "bg-white/15 font-semibold text-white shadow-sm" : "text-white/80 hover:bg-white/10 hover:text-white font-medium",
+                        "relative flex h-9 items-center gap-3 rounded-control px-3 text-sm font-medium transition",
+                        active ? "bg-night-2 text-white" : "text-white/70 hover:bg-white/[0.06] hover:text-white",
                       )}
                     >
-                      <Icon aria-hidden className={cn("size-4 shrink-0", active ? "text-white" : "text-white/70")} />
+                      {active && <span aria-hidden className="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-glow" />}
+                      <Icon aria-hidden className={cn("size-[18px] shrink-0", active ? "text-glow" : "text-white/55")} strokeWidth={1.9} />
                       <span className="flex-1 truncate">{label}</span>
-                      {count ? (
-                        <CountBadge n={count.n} label={count.label} className="bg-white text-[#247458]" />
-                      ) : active ? (
-                        <span className="size-2 rounded-full bg-white ml-auto shrink-0 shadow-sm" />
-                      ) : null}
+                      {count && <CountBadge n={count.n} label={count.label} className={active ? "bg-glow text-night" : "bg-white/10 text-white/90"} />}
                     </Link>
                   </li>
                 );
@@ -116,9 +113,9 @@ export function BottomNav({ isAdmin, role, openReplies, newOrders, unreadNotific
   const hiddenCount = more.reduce((sum, n) => sum + (countFor(n.href, { openReplies, newOrders, unreadNotifications })?.n ?? 0), 0);
 
   const tabClass = (active: boolean) =>
-    cn("flex h-16 min-w-0 flex-col items-center justify-center gap-1 text-2xs font-medium transition active:scale-95", active ? "text-brand-deep" : "text-muted");
+    cn("flex h-16 min-w-0 flex-col items-center justify-center gap-1 text-2xs font-medium transition active:scale-95", active ? "text-brand-deep" : "text-ink-2/80");
   const iconWrap = (active: boolean) => cn("relative grid h-7 w-12 place-items-center rounded-full transition", active && "bg-brand-soft");
-  const badge = "absolute -right-1 -top-1 bg-brand text-white ring-2 ring-panel";
+  const badge = "absolute -right-1 -top-1 bg-danger-solid text-white ring-2 ring-panel";
 
   return (
     <nav aria-label="Main" className="pb-safe glass-bar fixed inset-x-0 bottom-0 z-30 lg:hidden print:hidden">
@@ -159,19 +156,72 @@ export function BottomNav({ isAdmin, role, openReplies, newOrders, unreadNotific
                   href={href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex h-14 items-center gap-3 rounded-card border px-4 text-sm font-medium transition active:scale-[0.98]",
-                    active ? "border-brand/40 bg-brand-soft text-brand-deep" : "border-line bg-panel text-ink active:bg-sunken",
+                    "flex h-14 items-center gap-3 rounded-control border px-4 text-sm font-medium transition active:scale-[0.98]",
+                    active ? "border-brand/30 bg-brand-soft text-brand-deep" : "border-line bg-panel text-ink active:bg-sunken",
                   )}
                 >
                   <Icon aria-hidden className="size-5 shrink-0" />
                   <span className="min-w-0 flex-1 truncate">{label}</span>
-                  {count && <CountBadge n={count.n} label={count.label} className="bg-brand text-white" />}
+                  {count && <CountBadge n={count.n} label={count.label} className="bg-danger-solid text-white" />}
                 </Link>
               </li>
             );
           })}
         </ul>
       </Sheet>
+    </nav>
+  );
+}
+
+/** Sub-pages that aren't in the menu, named for the top bar's trail. */
+const SUBPAGES: Record<string, string> = {
+  new: "New",
+  packing: "Packing list",
+  audiences: "Audiences",
+  grow: "Grow your list",
+  sheet: "Google Sheet",
+};
+
+/**
+ * Computers' top bar: the workspace, then the section and any sub-page, so a deep page always
+ * says where it is. Sections link back; the current page doesn't.
+ */
+export function TopbarTrail({ workspace }: { workspace: string }) {
+  const path = usePathname();
+  const all = [...NAV, ...ADMIN_NAV];
+  const section = all.filter((n) => isActive(path, n.href)).sort((a, b) => b.href.length - a.href.length)[0];
+  const rest = section ? path.slice(section.href.length).split("/").filter(Boolean) : [];
+  const sub = rest.length ? SUBPAGES[rest[0]] ?? "Details" : null;
+  const crumb = "truncate text-sm";
+  return (
+    <nav aria-label="Breadcrumb" className="min-w-0">
+      <ol className="flex min-w-0 items-center gap-1.5">
+        <li className={cn(crumb, "max-w-60 font-medium text-muted")}>{workspace}</li>
+        {section && (
+          <>
+            <ChevronRight aria-hidden className="size-4 shrink-0 text-faint" />
+            <li className="min-w-0">
+              {sub ? (
+                <Link href={section.href} className={cn(crumb, "block font-medium text-muted transition hover:text-ink")}>
+                  {section.label}
+                </Link>
+              ) : (
+                <span aria-current="page" className={cn(crumb, "block font-semibold text-ink")}>
+                  {section.label}
+                </span>
+              )}
+            </li>
+          </>
+        )}
+        {sub && (
+          <>
+            <ChevronRight aria-hidden className="size-4 shrink-0 text-faint" />
+            <li aria-current="page" className={cn(crumb, "font-semibold text-ink")}>
+              {sub}
+            </li>
+          </>
+        )}
+      </ol>
     </nav>
   );
 }
@@ -184,7 +234,7 @@ export function SettingsLink() {
       href="/dashboard/settings"
       aria-label="Settings"
       aria-current={active ? "page" : undefined}
-      className={cn("grid size-11 shrink-0 place-items-center rounded-full transition active:scale-95", active ? "bg-white/15 text-white" : "text-white/80 hover:bg-white/10")}
+      className={cn("grid size-11 shrink-0 place-items-center rounded-control transition active:scale-95", active ? "bg-night-2 text-glow" : "text-white/80 hover:bg-white/10")}
     >
       <Settings aria-hidden className="size-5" />
     </Link>

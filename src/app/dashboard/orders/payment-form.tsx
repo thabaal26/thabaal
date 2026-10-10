@@ -33,7 +33,7 @@ export function PaymentForm({
           <Badge tone={isConfigured ? "green" : "gray"} className="shrink-0">
             {isConfigured ? (
               <>
-                <CheckCircle2 className="size-3 text-emerald-600" /> Active
+                <CheckCircle2 aria-hidden className="size-3 text-success" /> Active
               </>
             ) : (
               <>
@@ -56,7 +56,7 @@ export function PaymentForm({
               <p className="text-muted leading-relaxed">
                 <b className="text-ink">Yes!</b> When configured, our portal automatically sends native{" "}
                 <b className="text-ink">&ldquo;Review and pay&rdquo;</b> interactive WhatsApp buttons to customers.
-                When paid, Meta sends an instant webhook to this portal, marking the order as <b className="text-emerald-700 font-semibold">PAID</b> and dispatching an automated WhatsApp receipt.
+                When paid, Meta sends an instant webhook to this portal, marking the order as <b className="font-semibold text-success">PAID</b> and dispatching an automated WhatsApp receipt.
               </p>
             </div>
           </div>
@@ -83,7 +83,7 @@ export function PaymentForm({
               <p>
                 As required by <b className="text-ink">RBI & NPCI regulations</b>, merchant bank accounts and UPI VPAs must be verified inside your official Meta WhatsApp Business account for security compliance:
               </p>
-              <ol className="list-decimal space-y-1 pl-4 text-ink-muted">
+              <ol className="list-decimal space-y-1 pl-4 text-muted">
                 <li>
                   Open your <b className="text-ink">WhatsApp Manager → Payment configurations</b>.
                 </li>

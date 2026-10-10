@@ -1,12 +1,11 @@
-import { ReplyMedia } from "@/components/reply-media";
 import { CheckCheck, Eye, MapPin, MessageCircle, Send, ShoppingBag } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
+import { Conversation, type ConversationEntry } from "@/components/conversation";
 import { OverflowMenu } from "@/components/overflow-menu";
-import { Badge, buttonClass, Card, CardHeader, EmptyState, PageHeader, Stat, StatusBadge } from "@/components/ui";
-import { cn } from "@/lib/cn";
+import { Badge, buttonClass, Card, CardHeader, EmptyState, PageHeader, Stat } from "@/components/ui";
 import { db } from "@/lib/db";
 import { fmtDate, fmtNumber, pct } from "@/lib/format";
 import { itemsText, money, type OrderItem } from "@/lib/orders";
@@ -26,9 +25,6 @@ import { SendPanel } from "./send-panel";
 export const metadata: Metadata = { title: "Customer" };
 export const dynamic = "force-dynamic";
 
-type Entry =
-  | { at: Date; type: "out"; id: string; template: string; campaign: string | null; status: string; body: string | null; readAt: Date | null; error: string | null; via: string | null }
-  | { at: Date; type: "in"; id: string; text: string; kind: string; mediaId: string | null; mediaType: string | null; via: string | null };
 
 export default async function CustomerPage({ params }: PageProps<"/dashboard/customers/[id]">) {
   const { id } = await params;
@@ -59,7 +55,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
   const delivered = sent.filter((m) => m.status === "DELIVERED" || m.status === "READ").length;
   const read = sent.filter((m) => m.status === "READ").length;
 
-  const timeline: Entry[] = [
+  const timeline: ConversationEntry[] = [
     ...c.messages.map((m) => ({
       at: m.sentAt ?? m.createdAt, type: "out" as const, id: m.id, template: m.templateName, campaign: m.run?.campaign.name ?? null,
       status: m.status, body: m.body, readAt: m.readAt, error: m.error, via: m.sender?.label ?? null,
@@ -146,48 +142,19 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
             blocked={c.optedOut ? "This customer opted out of messages. Opt them back in to send." : c.unreachable ? "WhatsApp says this number can't receive messages." : null}
           />
 
-          <Card>
-            <CardHeader title="Conversation" description="Campaign messages and their replies, newest first." />
+          <Card className="overflow-hidden">
+            <CardHeader title="Conversation" description="Messages sent to this customer and what they wrote back. The newest is at the bottom." />
             {timeline.length ? (
-              <ol className="chat-wall space-y-2.5 rounded-b-card p-3 sm:p-5">
-                {timeline.map((e) =>
-                  e.type === "in" ? (
-                    <li key={e.id} className="flex">
-                      <div className="max-w-[85%] rounded-card rounded-tl-sm bg-bubble px-3 py-2 text-sm text-ink shadow-card">
-                        {e.kind === "button" && <p className="mb-0.5 text-xs font-medium text-brand-deep">Tapped a button</p>}
-                        <p className="whitespace-pre-wrap">{e.text}</p>
-                        {e.mediaId && <ReplyMedia id={e.id} type={e.mediaType} />}
-                        <p className="tabular mt-1 text-right text-2xs text-muted">
-                          {e.via && `to ${e.via} · `}
-                          {fmtDate(e.at, "d MMM, h:mm a")}
-                        </p>
-                      </div>
-                    </li>
-                  ) : (
-                    <li key={e.id} className="flex justify-end">
-                      <div className={cn("max-w-[85%] rounded-card rounded-tr-sm px-3 py-2 text-sm text-ink shadow-card", e.status === "FAILED" ? "bg-danger-bg ring-1 ring-danger-border" : "bg-bubble-out")}>
-                        <p className="mb-1 flex flex-wrap items-center gap-x-1.5 text-xs text-ink-2">
-                          <span className="font-mono">{e.template}</span>
-                          {e.campaign && <span className="text-muted">· {e.campaign}</span>}
-                          {e.via && <span className="text-muted">· from {e.via}</span>}
-                        </p>
-                        {e.body && <p className="line-clamp-6 whitespace-pre-wrap">{e.body}</p>}
-                        {e.error && <p className="mt-1 text-xs text-danger">{e.error}</p>}
-                        <p className="tabular mt-1.5 flex flex-wrap items-center justify-end gap-2 text-2xs text-muted">
-                          {fmtDate(e.at, "d MMM, h:mm a")} <StatusBadge status={e.status} />
-                        </p>
-                      </div>
-                    </li>
-                  ),
-                )}
-              </ol>
+              <Conversation entries={timeline} className="max-h-[36rem] min-h-48" />
             ) : (
-              <EmptyState title="No messages with this customer yet" />
+              <EmptyState icon={<MessageCircle />} title="No messages with this customer yet">
+                Campaign messages and their replies will appear here.
+              </EmptyState>
             )}
           </Card>
         </div>
 
-        <Card className="lg:sticky lg:top-8 lg:col-start-1 lg:row-start-1">
+        <Card className="lg:sticky lg:top-24 lg:col-start-1 lg:row-start-1">
           <CardHeader title="What they buy" />
           <div className="space-y-4 p-4 sm:p-5">
             {c.orders.length > 0 && (

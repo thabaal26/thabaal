@@ -45,12 +45,12 @@ export function PageHeader({
   rowActions?: boolean;
 }) {
   return (
-    <header className="mb-4 sm:mb-6">
+    <header className="mb-5 sm:mb-6">
       {back && <BackLink href={back.href}>{back.label}</BackLink>}
       <div className={cn("flex gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6", inlineActions ? "items-start" : "flex-col")}>
         <div className="min-w-0 flex-1 sm:min-w-48">
           <PageInfo title={title} description={description} />
-          {meta && <div className="mt-1 text-sm text-muted">{meta}</div>}
+          {meta && <div className="mt-1.5 text-sm text-muted">{meta}</div>}
         </div>
         {actions &&
           (inlineActions ? (
@@ -64,7 +64,7 @@ export function PageHeader({
             </div>
           ))}
       </div>
-      {tabs && <div className="mt-4">{tabs}</div>}
+      {tabs && <div className="mt-5">{tabs}</div>}
     </header>
   );
 }
@@ -116,10 +116,10 @@ export function CardHeader({
   as?: "h2" | "h3";
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 border-b border-line px-4 py-3 sm:flex-nowrap sm:gap-4 sm:px-5 sm:py-3.5">
+    <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 border-b border-line px-4 py-3.5 sm:flex-nowrap sm:gap-4 sm:px-5 sm:py-4">
       <div className="min-w-0 flex-1 basis-40">
-        <H className="text-sm font-semibold leading-6 text-ink sm:text-base">{title}</H>
-        {description && <p className="mt-0.5 text-xs text-muted sm:text-sm">{description}</p>}
+        <H className="text-[0.9375rem] font-semibold leading-6 text-ink">{title}</H>
+        {description && <p className="mt-0.5 text-xs leading-relaxed text-muted sm:text-sm">{description}</p>}
       </div>
       {action && <div className="flex min-w-0 max-w-full shrink-0 items-center gap-2 self-center">{action}</div>}
     </div>
@@ -129,11 +129,13 @@ export function CardHeader({
 /* ───────────────────────── Buttons ───────────────────────── */
 
 const variants = {
-  primary: "bg-brand text-white hover:bg-brand-deep active:bg-brand-deep",
-  secondary: "border border-line-strong/60 bg-panel text-ink hover:border-line-strong hover:bg-canvas active:bg-sunken",
+  primary: "bg-brand text-white shadow-xs hover:bg-brand-deep active:bg-brand-deep",
+  secondary: "border border-line-2 bg-panel text-ink-2 shadow-xs hover:bg-subtle hover:text-ink active:bg-sunken",
   ghost: "text-ink-2 hover:bg-sunken hover:text-ink active:bg-sunken",
-  danger: "border border-danger-border bg-panel text-danger hover:bg-danger-bg active:bg-danger-bg",
-  dangerSolid: "bg-danger-solid text-white hover:brightness-95 active:brightness-90",
+  danger: "border border-danger-border bg-panel text-danger shadow-xs hover:bg-danger-bg active:bg-danger-bg",
+  dangerSolid: "bg-danger-solid text-white shadow-xs hover:brightness-95 active:brightness-90",
+  /** Text-only action inside a sentence or card header. */
+  link: "text-brand-deep underline-offset-4 hover:underline",
   /** For the dark sidebar and phone header. */
   onDark: "text-white/80 hover:bg-white/10 hover:text-white active:bg-white/15",
 };
@@ -146,15 +148,15 @@ export type ButtonSize = "sm" | "md";
  */
 export function buttonClass(variant: ButtonVariant = "primary", size: ButtonSize = "md", icon = false) {
   return cn(
-    "relative inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-control font-medium transition active:scale-[0.98]",
+    "relative inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-control font-medium transition active:scale-[0.98] [&_svg]:shrink-0 [&_svg:not([class*=size-])]:size-4",
     "disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 aria-disabled:pointer-events-none aria-disabled:opacity-50",
     icon
       ? size === "sm"
         ? "size-11 sm:size-8 sm:pointer-coarse:size-11"
         : "size-11 sm:size-10 sm:pointer-coarse:size-11"
       : size === "sm"
-        ? "h-11 px-3.5 text-md sm:h-8 sm:px-3 sm:text-xs sm:pointer-coarse:h-11 sm:pointer-coarse:text-sm"
-        : "h-11 px-4 text-md sm:h-10 sm:text-sm sm:pointer-coarse:h-11",
+        ? "h-11 px-3.5 text-md sm:h-8 sm:px-3 sm:text-[0.8125rem] sm:pointer-coarse:h-11 sm:pointer-coarse:text-sm"
+        : "h-11 px-4 text-md sm:h-10 sm:px-3.5 sm:text-sm sm:pointer-coarse:h-11",
     variants[variant],
   );
 }
@@ -199,10 +201,11 @@ export function Button({
 
 export function Label({ children, hint, htmlFor, required }: { children: ReactNode; hint?: ReactNode; htmlFor?: string; required?: boolean }) {
   return (
-    <label htmlFor={htmlFor} className="mb-1.5 flex items-baseline justify-between gap-x-2 text-sm font-medium text-ink-2">
+    <label htmlFor={htmlFor} className="mb-1.5 flex items-baseline justify-between gap-x-2 text-sm font-medium text-ink">
       <span className="min-w-0">
         {children}
         {required && <span aria-hidden className="ml-0.5 text-danger">*</span>}
+        {required && <span className="sr-only"> (required)</span>}
       </span>
       {hint && <span className="shrink-0 text-xs font-normal text-muted">{hint}</span>}
     </label>
@@ -285,16 +288,17 @@ const tones = {
   red: "bg-danger-bg text-danger ring-danger-border",
   gray: "bg-neutral-bg text-neutral ring-neutral-border",
   violet: "bg-accent-bg text-accent ring-accent-border",
-  brand: "bg-brand-soft text-brand-deep ring-brand/25",
+  brand: "bg-brand-soft text-brand-deep ring-brand/20",
+  gold: "bg-gold-soft text-gold-deep ring-gold/40",
 };
 export type Tone = keyof typeof tones;
 
 /** A short status label. Colour supports the text, never replaces it. */
 export function Badge({ tone = "gray", children, dot, className }: { tone?: Tone; children: ReactNode; dot?: boolean; className?: string }) {
   return (
-    <span className={cn("inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset", tones[tone], className)}>
+    <span className={cn("inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-px text-xs font-medium leading-5 ring-1 ring-inset", tones[tone], className)}>
       {dot && <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-current" />}
-      <span className="truncate">{children}</span>
+      <span className="truncate [&>svg]:mr-1 [&>svg]:inline [&>svg]:size-3 [&>svg]:align-[-2px]">{children}</span>
     </span>
   );
 }
@@ -386,7 +390,7 @@ export function Callout({
   role?: "alert" | "status";
 }) {
   return (
-    <div role={role} className={cn("flex flex-col gap-3 rounded-card border px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between", calloutTones[tone], className)}>
+    <div role={role} className={cn("flex flex-col gap-3 rounded-card border px-4 py-3.5 text-sm sm:flex-row sm:items-center sm:justify-between", calloutTones[tone], className)}>
       <div className="flex min-w-0 gap-2.5">
         {icon && <span aria-hidden className="mt-0.5 shrink-0 [&>svg]:size-4">{icon}</span>}
         <div className="min-w-0">
@@ -415,8 +419,8 @@ export function FilterChips({ label, items, className }: { label: string; items:
               href={t.href}
               aria-current={t.active ? "page" : undefined}
               className={cn(
-                "flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition active:scale-[0.97] sm:h-8 sm:px-3 sm:text-sm sm:pointer-coarse:h-10",
-                t.active ? "border-ink bg-ink text-white shadow-xs" : "border-line-strong/50 bg-panel text-ink-2 hover:border-line-strong hover:text-ink",
+                "flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition active:scale-[0.97] sm:h-8 sm:px-3 sm:text-[0.8125rem] sm:pointer-coarse:h-10",
+                t.active ? "border-ink bg-ink text-white shadow-xs" : "border-line-2 bg-panel text-ink-2 hover:border-line-strong hover:bg-subtle hover:text-ink",
               )}
             >
               {t.label}
@@ -456,7 +460,7 @@ export function Segmented<T extends string>({
             onClick={() => onChange(o.value)}
             className={cn(
               "min-h-11 flex-1 whitespace-nowrap rounded-[calc(var(--radius-control)-4px)] px-4 text-sm font-medium transition sm:min-h-8 sm:px-3 sm:pointer-coarse:min-h-11",
-              on ? "bg-panel text-ink shadow-card" : "text-muted hover:text-ink",
+              on ? "bg-panel text-ink shadow-xs ring-1 ring-line" : "text-muted hover:text-ink",
             )}
           >
             {o.label}
@@ -470,7 +474,7 @@ export function Segmented<T extends string>({
 /** A round initial for a person. */
 export function Avatar({ name, className }: { name: string; className?: string }) {
   return (
-    <span aria-hidden className={cn("grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft text-sm font-semibold text-brand-deep", className)}>
+    <span aria-hidden className={cn("grid size-10 shrink-0 place-items-center rounded-full bg-sunken text-sm font-semibold text-ink-2 ring-1 ring-line", className)}>
       {name.trim().slice(0, 1).toUpperCase() || "?"}
     </span>
   );
@@ -479,7 +483,7 @@ export function Avatar({ name, className }: { name: string; className?: string }
 /** Table pieces: sticky header, dense rows, numbers right-aligned and tabular. */
 export function Table({ className, children, ...p }: ComponentProps<"table">) {
   return (
-    <div className="max-lg:overflow-x-auto">
+    <div className="thin-scroll max-lg:overflow-x-auto">
       <table className={cn("w-full text-sm", className)} {...p}>
         {children}
       </table>
@@ -492,7 +496,7 @@ export function Th({ numeric, className, ...p }: ComponentProps<"th"> & { numeri
     <th
       scope="col"
       className={cn(
-        "sticky top-0 z-[1] border-b border-line bg-panel px-4 py-2.5 text-left text-xs font-medium text-muted lg:top-0",
+        "sticky top-0 z-[1] whitespace-nowrap border-b border-line bg-subtle px-4 py-2.5 text-left text-xs font-medium text-muted lg:top-16",
         numeric && "text-right",
         className,
       )}
@@ -506,7 +510,7 @@ export function Td({ numeric, className, ...p }: ComponentProps<"td"> & { numeri
 }
 
 /** Table body rows: dividers and a hover tint. */
-export const rowClass = "border-b border-line last:border-0 transition-colors hover:bg-canvas/70";
+export const rowClass = "border-b border-line last:border-0 transition-colors hover:bg-subtle";
 
 /** A mobile list row that leads somewhere: the whole row is the link, with press feedback. */
 export function ListRow({
@@ -527,7 +531,7 @@ export function ListRow({
   className?: string;
 }) {
   return (
-    <li className={cn("relative flex items-start gap-3 px-4 py-3 sm:px-5", href && "transition-colors active:bg-sunken has-[a:hover]:bg-canvas/70", className)}>
+    <li className={cn("relative flex items-start gap-3 px-4 py-3 sm:px-5", href && "transition-colors active:bg-sunken has-[a:hover]:bg-subtle", className)}>
       {leading}
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
@@ -554,8 +558,8 @@ export function ListRow({
 export function EmptyState({ icon, title, children, action }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center px-6 py-10 text-center sm:py-14">
-      {icon && <div aria-hidden className="mb-3 grid size-11 place-items-center rounded-card bg-brand-soft text-brand-deep">{icon}</div>}
-      <h3 className="text-base font-semibold text-ink">{title}</h3>
+      {icon && <div aria-hidden className="mb-4 grid size-12 place-items-center rounded-full bg-sunken text-ink-2 ring-8 ring-subtle">{icon}</div>}
+      <h3 className="text-[0.9375rem] font-semibold text-ink">{title}</h3>
       {children && <p className="mt-1 max-w-sm text-sm text-muted">{children}</p>}
       {action && <div className="mt-5">{action}</div>}
     </div>
@@ -572,26 +576,30 @@ export function PickClientNotice({ what }: { what: string }) {
 }
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div aria-hidden className={cn("animate-pulse rounded-control bg-line/70", className)} />;
+  return <div aria-hidden className={cn("animate-pulse rounded-control bg-line/60", className)} />;
 }
 
+/**
+ * A KPI tile: label, the figure, and one line of real context (never an invented trend).
+ * Tiles in a row share one height so their figures line up.
+ */
 export function Stat({ label, value, sub, icon, href }: { label: string; value: ReactNode; sub?: ReactNode; icon?: ReactNode; href?: string }) {
   const body = (
     <>
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-xs font-medium text-muted sm:text-sm">{label}</p>
-        {icon && <span aria-hidden className="hidden size-8 shrink-0 place-items-center rounded-control bg-brand-soft text-brand-deep sm:grid">{icon}</span>}
+      <div className="flex items-center justify-between gap-2">
+        <p className="min-w-0 text-xs font-medium text-muted sm:text-sm">{label}</p>
+        {icon && <span aria-hidden className="hidden size-8 shrink-0 place-items-center rounded-control bg-sunken text-ink-2 sm:grid">{icon}</span>}
       </div>
-      <p className="tabular mt-1 text-2xl font-semibold leading-tight tracking-tight text-ink sm:mt-2 sm:text-3xl">{value}</p>
+      <p className="tabular mt-2 text-2xl font-semibold leading-tight tracking-tight text-ink sm:mt-3 sm:text-kpi">{value}</p>
       {sub && <p className="mt-1 text-xs text-muted">{sub}</p>}
     </>
   );
   return href ? (
-    <Link href={href} className="lift block min-w-0 rounded-card border border-line bg-panel p-3.5 shadow-card active:bg-sunken sm:p-5">
+    <Link href={href} className="lift block h-full min-w-0 rounded-card border border-line bg-panel p-4 shadow-card active:bg-sunken sm:p-5">
       {body}
     </Link>
   ) : (
-    <Card className="p-3.5 sm:p-5">{body}</Card>
+    <Card className="h-full p-4 sm:p-5">{body}</Card>
   );
 }
 
@@ -604,7 +612,7 @@ export function Meter({ value, tone = "brand", label, className }: { value: numb
       aria-valuenow={label ? Math.round(value) : undefined}
       aria-valuemin={label ? 0 : undefined}
       aria-valuemax={label ? 100 : undefined}
-      className={cn("h-2 overflow-hidden rounded-full bg-sunken", className)}
+      className={cn("h-1.5 overflow-hidden rounded-full bg-sunken", className)}
     >
       <div className={cn("bar h-full rounded-full", tone === "warning" ? "bg-warning-solid" : "bg-brand")} style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
     </div>

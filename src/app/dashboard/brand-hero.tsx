@@ -11,7 +11,7 @@ function greeting(now = new Date()) {
 const host = (url: string) => url.replace(/^https?:\/\//, "").replace(/\/$/, "");
 
 const chip =
-  "inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-full bg-white/10 px-3 text-white ring-1 ring-white/15 transition hover:bg-white/20 active:bg-white/25";
+  "inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full bg-white/[0.08] px-3 text-white/90 ring-1 ring-white/10 transition hover:bg-white/15 active:bg-white/20";
 
 /**
  * First thing a client sees after signing in: their name, numbers and banner, kept to a
@@ -28,7 +28,7 @@ export function BrandHero({
   actions?: ReactNode;
 }) {
   return (
-    <section aria-labelledby="hero-title" className="surface-dark relative mb-4 overflow-hidden rounded-card bg-night text-white shadow-card sm:mb-6">
+    <section aria-labelledby="hero-title" className="surface-dark relative mb-4 overflow-hidden rounded-card bg-night text-white shadow-card sm:mb-5">
       {client.bannerUrl && (
         // Phones: a slim strip across the top, so the banner shows without filling the screen.
         <div className="relative h-28 w-full overflow-hidden md:hidden">
@@ -63,7 +63,7 @@ export function BrandHero({
               </a>
             )}
           </div>
-          {actions && <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">{actions}</div>}
+          {actions && <div className="mt-4 flex flex-wrap gap-2 *:flex-1 *:basis-40 sm:*:flex-none sm:*:basis-auto">{actions}</div>}
         </div>
         {client.bannerUrl && (
           // The text sets the height; the banner fills the side instead of stretching the strip.
