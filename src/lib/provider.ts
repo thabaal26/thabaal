@@ -41,14 +41,24 @@ export type Sendable = Pick<
 >;
 
 /** Sends one rendered template to one customer through the active provider, from the given number. */
-export async function deliver(s: Setting, t: Sendable, customer: { name: string; phone: string }, cfg: WaConfig = waConfig()) {
+export async function deliver(
+  s: Setting,
+  t: Sendable,
+  customer: { name: string; phone: string },
+  cfg: WaConfig = waConfig(),
+  otpCode?: string,
+) {
+  const isAuth = t.category === "AUTHENTICATION";
+  const resolvedOtp = isAuth ? (otpCode?.trim() || String(Math.floor(100000 + Math.random() * 900000))) : null;
   const r = renderFor({ ...t, headerText: t.headerText ?? "", footer: t.footer ?? "", variables: t.variables as VarMap }, customer);
   const provider = s.provider as ProviderName;
   // A template without its own picture uses the client's default image.
-  const image = await headerImageFor(t);
+  const image = isAuth ? null : await headerImageFor(t);
 
   if (provider === "LOCAL") {
-    const text = toPlainText(r, t.buttons as TemplateButton[]);
+    const text = isAuth
+      ? `${resolvedOtp} is your verification code.${t.securityNote ? " For your security, do not share this code." : ""}`
+      : toPlainText(r, t.buttons as TemplateButton[]);
     const cfg = wahaConfig(s);
     if (!cfg) return { id: `demo.${crypto.randomUUID()}`, simulated: true, provider, text };
     const id =
@@ -59,10 +69,18 @@ export async function deliver(s: Setting, t: Sendable, customer: { name: string;
   }
 
   // Meta rejects an image-header template sent without its image (error 132012), so say what's missing.
-  if (cfg.live && t.headerType === "IMAGE" && !image)
+  if (cfg.live && !isAuth && t.headerType === "IMAGE" && !image)
     throw new Error(`"${t.name}" has an image header but no image. Set a default image on the Templates page, or add one to this template.`);
 
-  const text = [r.header, r.body, r.footer].filter(Boolean).join("\n\n");
+  const buttons = (t.buttons as TemplateButton[]) ?? [];
+  const catIdx = buttons.findIndex((b) => b.type === "CATALOG");
+  const catBtn = catIdx >= 0 ? buttons[catIdx] : null;
+  const catalogThumbnailProductId =
+    catBtn && catBtn.type === "CATALOG" ? (catBtn.thumbnailProductId?.trim() || null) : null;
+
+  const text = isAuth
+    ? `${resolvedOtp} is your verification code.${t.securityNote ? " For your security, do not share this code." : ""}`
+    : [r.header, r.body, r.footer].filter(Boolean).join("\n\n");
   const res = await sendTemplateMessage(cfg, {
     to: customer.phone,
     templateName: t.name,
@@ -71,14 +89,15 @@ export async function deliver(s: Setting, t: Sendable, customer: { name: string;
     headerMediaUrl: image,
     headerParams: r.headerParams,
     bodyParams: r.bodyParams,
-    catalogButtonIndex: (t.buttons as TemplateButton[]).findIndex((b) => b.type === "CATALOG"),
+    catalogButtonIndex: catIdx,
+    catalogThumbnailProductId,
+    otpCode: resolvedOtp,
   });
   return { ...res, provider, text };
 }
 
 /** Meta needs an approved template; the local session can send any saved one. */
 export function templateSendable(s: Setting, t: Pick<Template, "status" | "category">) {
-  if (t.category === "AUTHENTICATION") return false;
   return s.provider === "LOCAL" || t.status === "APPROVED";
 }
 

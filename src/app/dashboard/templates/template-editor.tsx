@@ -376,7 +376,7 @@ export function TemplateEditor({
             <Card>
               <CardHeader
                 title="Buttons"
-                description="Optional. Up to 10: quick replies, 2 website links and 1 call button."
+                description="Optional. Up to 10: quick replies, 2 website links, 1 call button, or a single Catalogue / Review & pay button."
                 action={
                   <div className="flex flex-wrap gap-1.5">
                     {(
@@ -385,39 +385,47 @@ export function TemplateEditor({
                         ["URL", "Link"],
                         ["PHONE_NUMBER", "Call"],
                         ["CATALOG", "Catalogue"],
+                        ["ORDER_DETAILS", "Review & pay"],
                       ] as const
-                    ).map(([type, l]) => (
-                      <Button
-                        key={type}
-                        size="sm"
-                        variant="secondary"
-                        disabled={t.buttons.length >= 10 || t.buttons.some((b) => b.type === "CATALOG")}
-                        title={t.buttons.some((b) => b.type === "CATALOG") ? "A catalogue button has to be the only button" : undefined}
-                        onClick={() =>
-                          // WhatsApp allows a catalogue button only on its own, with no header.
-                          type === "CATALOG"
-                            ? set({ buttons: [{ type, text: "View catalog" }], headerType: "NONE" })
-                            : set({ buttons: [...t.buttons, { type, text: "" }] })
-                        }
-                      >
-                        <Plus aria-hidden className="size-3.5" /> {l}
-                      </Button>
-                    ))}
+                    ).map(([type, l]) => {
+                      const hasSingleOnly = t.buttons.some((b) => b.type === "CATALOG" || b.type === "ORDER_DETAILS");
+                      return (
+                        <Button
+                          key={type}
+                          size="sm"
+                          variant="secondary"
+                          disabled={t.buttons.length >= 10 || hasSingleOnly}
+                          title={hasSingleOnly ? "Catalogue and Review & pay buttons must be the only button on a template" : undefined}
+                          onClick={() =>
+                            // WhatsApp allows a catalogue button only on its own, with no header.
+                            type === "CATALOG"
+                              ? set({ buttons: [{ type, text: "View catalog" }], headerType: "NONE", category: "MARKETING" })
+                              : type === "ORDER_DETAILS"
+                                ? set({ buttons: [{ type, text: "Review and pay" }] })
+                                : set({ buttons: [...t.buttons, { type, text: "" }] })
+                          }
+                        >
+                          <Plus aria-hidden className="size-3.5" /> {l}
+                        </Button>
+                      );
+                    })}
                   </div>
                 }
               />
               {t.buttons.length ? (
                 <div className="divide-y divide-line">
                   {t.buttons.map((b, i) => (
-                    <div key={i} className="grid grid-cols-[1fr_auto] items-center gap-2 px-4 py-3 sm:grid-cols-[5rem_1fr_1.3fr_auto] sm:px-5">
-                      <Badge tone={b.type === "URL" ? "blue" : b.type === "PHONE_NUMBER" || b.type === "CATALOG" ? "green" : "gray"}>
-                        {b.type === "URL" ? "Link" : b.type === "PHONE_NUMBER" ? "Call" : b.type === "CATALOG" ? "Catalogue" : "Reply"}
+                    <div key={i} className="grid grid-cols-[1fr_auto] items-center gap-2 px-4 py-3 sm:grid-cols-[6rem_1fr_1.3fr_auto] sm:px-5">
+                      <Badge tone={b.type === "URL" ? "blue" : b.type === "PHONE_NUMBER" || b.type === "CATALOG" || b.type === "ORDER_DETAILS" ? "green" : "gray"}>
+                        {b.type === "URL" ? "Link" : b.type === "PHONE_NUMBER" ? "Call" : b.type === "CATALOG" ? "Catalogue" : b.type === "ORDER_DETAILS" ? "Review & pay" : "Reply"}
                       </Badge>
                       <input className="field max-sm:col-span-2" maxLength={25} placeholder="Button label" aria-label={`Button ${i + 1} label`} value={b.text} onChange={(e) => setButton(i, { text: e.target.value })} />
                       {b.type === "URL" ? (
                         <input className="field max-sm:col-span-2" inputMode="url" placeholder="https://…" aria-label={`Button ${i + 1} link`} value={b.url ?? ""} onChange={(e) => setButton(i, { url: e.target.value })} />
                       ) : b.type === "PHONE_NUMBER" ? (
                         <input className="field max-sm:col-span-2" type="tel" inputMode="tel" placeholder="+91 98765 43210" aria-label={`Button ${i + 1} phone number`} value={b.phone ?? ""} onChange={(e) => setButton(i, { phone: e.target.value })} />
+                      ) : b.type === "CATALOG" ? (
+                        <input className="field max-sm:col-span-2 font-mono text-xs" placeholder="Thumbnail SKU (optional, e.g. THN-006)" aria-label="Catalogue thumbnail product SKU" value={b.thumbnailProductId ?? ""} onChange={(e) => setButton(i, { thumbnailProductId: e.target.value })} />
                       ) : (
                         <span className="max-sm:hidden" />
                       )}
@@ -473,9 +481,9 @@ export function TemplateEditor({
           </Button>
         </div>
 
-        {id && !auth && (
+        {id && (
           <Card className="p-4">
-            <Label htmlFor="test">Send a test</Label>
+            <Label htmlFor="test">{auth ? "Send a test OTP" : "Send a test"}</Label>
             <div className="flex gap-2">
               <input id="test" type="tel" inputMode="tel" autoComplete="tel" className="field" placeholder="+91 98765 43210" value={testPhone} onChange={(e) => setTestPhone(e.target.value)} />
               <Button
@@ -493,6 +501,7 @@ export function TemplateEditor({
           </Card>
         )}
       </aside>
+
 
       {/* Phones: save and preview stay under the thumb instead of at the end of a long form. */}
       <MobileActionBar>

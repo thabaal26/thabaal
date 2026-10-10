@@ -293,7 +293,7 @@ export function CatalogueManager({
   return (
     <div className="space-y-4">
       {/* Toolbar: search, stock and price list on one row; categories under it. */}
-      <Card className="space-y-3 p-3 sm:p-4">
+      <Card className="card-3d space-y-3 p-3 sm:p-4">
         <div className="flex flex-col gap-2 md:flex-row md:items-center">
           <div className="relative min-w-0 flex-1 md:max-w-sm">
             <label htmlFor="catalogue-search" className="sr-only">
@@ -355,7 +355,7 @@ export function CatalogueManager({
 
       {/* The automatic price list reply, as WhatsApp will show it. */}
       {previewOpen && (
-        <Card className="animate-rise">
+        <Card className="card-3d animate-rise">
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-4 py-3.5 sm:px-5">
             <div className="min-w-0">
               <h3 className="flex items-center gap-2 text-[0.9375rem] font-semibold text-ink">
@@ -382,7 +382,7 @@ export function CatalogueManager({
 
       {/* Products Grid */}
       {filtered.length === 0 ? (
-        <Card>
+        <Card className="card-3d">
           <EmptyState icon={<Package />} title={products.length ? "No products match" : "No products yet"}>
             {products.length ? "Try another search, category or stock filter." : canAdd ? "Add your first product to start taking orders on WhatsApp." : "Products added in Meta Commerce Manager will show here."}
           </EmptyState>
@@ -390,9 +390,10 @@ export function CatalogueManager({
       ) : (
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4">
           {filtered.map((item) => (
-            <li key={item.id} className="flex flex-col rounded-card border border-line bg-panel shadow-card transition hover:border-line-2">
+            <li key={item.id} className="card-3d relative flex flex-col overflow-hidden rounded-card border border-line bg-panel">
+              <span aria-hidden className={cn("absolute inset-x-0 top-0 h-[3px]", item.inStock ? "bg-brand" : "bg-warning-solid")} />
               <div className="flex gap-3 p-4">
-                <div className={cn("relative size-16 shrink-0 overflow-hidden rounded-control bg-subtle ring-1 ring-line", !item.inStock && "opacity-60 grayscale")}>
+                <div className={cn("relative size-16 shrink-0 overflow-hidden rounded-control bg-subtle shadow-2xs ring-1 ring-line", !item.inStock && "opacity-60 grayscale")}>
                   {item.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={item.imageUrl} alt="" className="size-full object-cover" />
@@ -404,21 +405,20 @@ export function CatalogueManager({
                 </div>
                 <div className="min-w-0 flex-1">
                   <h4 className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-ink">{item.name}</h4>
-                  <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted">
-                    <span className="truncate">{item.category || "Uncategorised"}</span>
-                    <span aria-hidden>·</span>
-                    <span className="shrink-0 font-mono">{item.retailerId}</span>
-                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+                    <Badge tone="brand" className="text-2xs">{item.category || "General"}</Badge>
+                    <span className="rounded bg-sunken px-1.5 py-0.5 font-mono text-2xs font-medium text-ink-2 ring-1 ring-line">{item.retailerId}</span>
+                  </div>
                 </div>
               </div>
               <p className="line-clamp-2 min-h-[2lh] px-4 text-xs leading-relaxed text-muted">{item.description}</p>
               <div className="mt-auto flex items-center justify-between gap-2 px-4 pb-3 pt-3">
-                <span className="tabular text-lg font-semibold text-ink">₹{item.priceAmount.toLocaleString("en-IN")}</span>
+                <span className="tabular text-xl font-bold tracking-tight text-ink">₹{item.priceAmount.toLocaleString("en-IN")}</span>
                 <Badge tone={item.inStock ? "green" : "amber"} dot>
                   {item.inStock ? "In stock" : "Out of stock"}
                 </Badge>
               </div>
-              <div className="flex gap-2 border-t border-line p-3">
+              <div className="flex gap-2 border-t border-line bg-subtle/50 p-3">
                 <Button variant="secondary" size="sm" onClick={() => handleToggleStock(item)} loading={togglingId === item.id} disabled={togglingId !== null} className="flex-1">
                   {item.inStock ? <XCircle aria-hidden /> : <CheckCircle2 aria-hidden />}
                   {item.inStock ? "Mark out of stock" : "Mark in stock"}

@@ -40,9 +40,18 @@ async function tellCancelled(order: Parameters<typeof updateOrderCard>[0] & { cu
   if (replyWindowEnd(last?.receivedAt)) {
     res = await sendTextMessage(cfg, order.customer.phone, text);
   } else {
-    const t = await db.template.findFirst({ where: { clientId: order.customer.clientId, name: CANCEL_TEMPLATE, status: "APPROVED" }, select: { name: true, language: true } });
+    const options = await db.template.findMany({ where: { clientId: order.customer.clientId, name: { in: [CANCEL_TEMPLATE, `thenan_${CANCEL_TEMPLATE}`] }, status: "APPROVED" } });
+    const t = options.find((x) => x.headerType === "IMAGE") ?? options.find((x) => x.headerType === "NONE") ?? null;
     if (!t) return false;
-    res = await sendTemplateMessage(cfg, { to: order.customer.phone, templateName: t.name, language: t.language, headerType: "NONE", headerParams: [], bodyParams: [first, ref] });
+    res = await sendTemplateMessage(cfg, {
+      to: order.customer.phone,
+      templateName: t.name,
+      language: t.language,
+      headerType: t.headerType,
+      headerMediaUrl: await headerImageFor(t),
+      headerParams: [],
+      bodyParams: [first, ref],
+    });
     templateName = t.name;
   }
   await db.message.create({
@@ -229,16 +238,30 @@ export async function lookupOrderCustomer(rawPhone: string): Promise<{ valid: fa
   return { valid: true, existing };
 }
 
-export async function createOrder(input: { phone: string; name: string; items: { name: string; quantity: number; price: number }[]; note?: string }): Promise<SendResult> {
+export async function createOrder(input: {
+  phone: string;
+  name: string;
+  items: { id?: string; name: string; quantity: number; price: number }[];
+  note?: string;
+  catalogId?: string | null;
+  requestPaymentNow?: boolean;
+}): Promise<SendResult> {
   const s = await requireOrderAccess();
   if ("denied" in s) return { ok: false, message: s.denied };
   if (!s.clientId) return { ok: false, message: "Pick a client in the sidebar first." };
   const phone = normalizePhone(input.phone);
   if (!phone) return { ok: false, message: "Enter a valid phone number." };
   const lines = input.items
-    .map((i) => ({ name: i.name.trim(), quantity: Math.max(1, Math.round(Number(i.quantity) || 1)), price: Math.max(0, Number(i.price) || 0) }))
+    .map((i) => ({
+      id: i.id?.trim() || undefined,
+      name: i.name.trim(),
+      quantity: Math.max(1, Math.round(Number(i.quantity) || 1)),
+      price: Math.max(0, Number(i.price) || 0),
+    }))
     .filter((i) => i.name);
   if (!lines.length) return { ok: false, message: "Add at least one item." };
+
+  const client = await db.client.findUnique({ where: { id: s.clientId }, select: { name: true, paymentConfig: true } });
 
   // A phone not in this client's customers becomes a new customer, so later orders, replies and
   // campaigns find them. They aren't marked as agreeing to marketing: an order isn't that consent.
@@ -251,13 +274,24 @@ export async function createOrder(input: { phone: string; name: string; items: {
       ? await db.customer.update({ where: { id: existing.id }, data: { name }, select: { id: true, name: true } })
       : existing
     : await db.customer.create({ data: { clientId: s.clientId, phone, name, tags: ["manual-order"] }, select: { id: true, name: true } });
-  const items: OrderItem[] = lines.map((i, k) => ({ id: `manual-${k + 1}`, name: i.name, quantity: i.quantity, price: i.price, currency: "INR" }));
+
+  const allFromCatalog = Boolean(input.catalogId && lines.every((i) => Boolean(i.id)));
+  const items: OrderItem[] = lines.map((i, k) => ({
+    id: i.id || `manual-${k + 1}`,
+    name: i.name,
+    quantity: i.quantity,
+    price: i.price,
+    currency: "INR",
+  }));
+  const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+
   const order = await db.order.create({
     data: {
       clientId: s.clientId,
       customerId: customer.id,
+      catalogId: allFromCatalog ? input.catalogId : null,
       items,
-      total: items.reduce((sum, i) => sum + i.price * i.quantity, 0),
+      total,
       note: input.note?.trim() || null,
       internalNote: "Entered by hand",
     },
@@ -270,12 +304,75 @@ export async function createOrder(input: { phone: string; name: string; items: {
     items: itemsText(items),
     total: order.total,
     status: order.status,
-    address: "",
-    client: "Thabaal",
+    address: input.note?.trim() || "",
+    client: client?.name || "Thabaal",
+  });
+
+  let paymentNote = "";
+  if (input.requestPaymentNow && total > 0 && client?.paymentConfig) {
+    const payRes = await sendPaymentRequestFor(order.id);
+    paymentNote = payRes.ok ? " Sent WhatsApp payment request." : ` (${payRes.message})`;
+  }
+
+  revalidatePath("/dashboard", "layout");
+  return {
+    ok: true,
+    message:
+      (existing
+        ? `Order ${orderRef(order)} added for ${customer.name}.`
+        : `Order ${orderRef(order)} added, and ${customer.name} was saved as a new customer.`) + paymentNote,
+  };
+}
+
+/** Updates an existing order's items, quantities, prices, or customer note (common for every order). */
+export async function updateOrderItems(
+  id: string,
+  input: {
+    items: { id?: string; name: string; quantity: number; price: number }[];
+    note?: string | null;
+    catalogId?: string | null;
+  },
+): Promise<SendResult> {
+  const s = await requireOrderAccess();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const order = await db.order.findFirst({
+    where: { id, ...(s.clientId ? { clientId: s.clientId } : {}) },
+    select: { id: true, number: true, catalogId: true },
+  });
+  if (!order) return { ok: false, message: "Order not found." };
+
+  const lines = input.items
+    .map((i) => ({
+      id: i.id?.trim() || undefined,
+      name: i.name.trim(),
+      quantity: Math.max(1, Math.round(Number(i.quantity) || 1)),
+      price: Math.max(0, Number(i.price) || 0),
+    }))
+    .filter((i) => i.name);
+  if (!lines.length) return { ok: false, message: "An order must have at least one item." };
+
+  const allFromCatalog = Boolean((input.catalogId ?? order.catalogId) && lines.every((i) => Boolean(i.id && !i.id.startsWith("manual-"))));
+  const items: OrderItem[] = lines.map((i, k) => ({
+    id: i.id || `manual-${k + 1}`,
+    name: i.name,
+    quantity: i.quantity,
+    price: i.price,
+    currency: "INR",
+  }));
+  const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+
+  await db.order.update({
+    where: { id: order.id },
+    data: {
+      items,
+      total,
+      catalogId: allFromCatalog ? (input.catalogId ?? order.catalogId) : null,
+      ...(input.note !== undefined && { note: input.note?.trim() || null }),
+    },
   });
 
   revalidatePath("/dashboard", "layout");
-  return { ok: true, message: existing ? `Order ${orderRef(order)} added for ${customer.name}.` : `Order ${orderRef(order)} added, and ${customer.name} was saved as a new customer.` };
+  return { ok: true, message: `Updated ${orderRef(order)} items and total (${money(total, "INR")}).` };
 }
 
 const ORDER_TEMPLATES: { name: string; body: string; samples: string[] }[] = [
@@ -294,11 +391,16 @@ const ORDER_TEMPLATES: { name: string; body: string; samples: string[] }[] = [
     body: "Hello {{1}}, your order {{2}} has been delivered. Thank you for shopping with us! Reply to this message if anything is not right.",
     samples: ["Priya", "#A1B2C"],
   },
+  {
+    name: "order_cancelled",
+    body: "Hello {{1}}, your order {{2}} has been cancelled. If you have already paid, we will contact you about the refund. Reply to this message if you have any questions.",
+    samples: ["Priya", "#RG-1001"],
+  },
 ];
 
 /**
- * Creates the three order update templates (utility, so they can be sent any time after an
- * order) and submits them to Meta. Skips any the client already has.
+ * Creates the four order update templates (confirmation, dispatched, delivered, cancelled)
+ * and submits them to Meta. Skips any the client already has.
  */
 export async function createOrderTemplates(imageUrl?: string): Promise<SendResult> {
   const s = await requireManager(true);
@@ -309,7 +411,7 @@ export async function createOrderTemplates(imageUrl?: string): Promise<SendResul
   const named = ORDER_TEMPLATES.map((t) => ({ ...t, name: image ? `thenan_${t.name}` : t.name }));
   const existing = await db.template.findMany({ where: { clientId: s.clientId, name: { in: named.map((t) => t.name) } }, select: { name: true } });
   const missing = named.filter((t) => !existing.some((e) => e.name === t.name));
-  if (!missing.length) return { ok: true, message: `All three ${image ? "picture " : ""}order templates already exist.` };
+  if (!missing.length) return { ok: true, message: `All ${image ? "picture " : ""}order templates already exist.` };
 
   const failed: string[] = [];
   for (const t of missing) {
@@ -324,6 +426,36 @@ export async function createOrderTemplates(imageUrl?: string): Promise<SendResul
   return failed.length
     ? { ok: false, message: `Some templates weren't created. ${failed.join(" · ")}` }
     : { ok: true, message: `Submitted ${missing.map((t) => t.name).join(", ")} to Meta. Approval usually takes minutes.` };
+}
+
+/** Creates the `payment_request` utility template with an ORDER_DETAILS ("Review and pay") button and submits it to Meta. */
+export async function createPaymentTemplate(): Promise<SendResult> {
+  const s = await requireManager(true);
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const existing = await db.template.findFirst({ where: { clientId: s.clientId, name: "payment_request" }, select: { id: true, status: true } });
+  if (existing) {
+    return { ok: true, message: `Template "payment_request" already exists (${existing.status.toLowerCase()}).` };
+  }
+  const r = await saveTemplate(null, {
+    name: "payment_request",
+    language: "en",
+    category: "UTILITY",
+    headerType: "NONE",
+    headerText: "",
+    headerMediaUrl: "",
+    body: "Hello {{1}}, thank you for your order with us. Tap Review and pay below to complete your payment by UPI.",
+    footer: "",
+    buttons: [{ type: "ORDER_DETAILS", text: "Review and pay" }],
+    variables: { "1": { source: "first_name" } },
+    codeExpiryMins: null,
+    securityNote: false,
+  });
+  revalidatePath("/dashboard/orders");
+  revalidatePath("/dashboard/templates");
+  if (!r.ok) {
+    return { ok: false, message: r.message ?? r.errors?.join(" · ") ?? "Could not create payment_request template." };
+  }
+  return { ok: true, message: 'Submitted "payment_request" (with Review and pay button) to Meta for approval.' };
 }
 
 /** Refill reminders: send `templateId` this many days after each order; 0 days turns them off. */
@@ -356,3 +488,4 @@ export async function saveWinbackRule(days: number, templateId: string): Promise
   revalidatePath("/dashboard/orders");
   return { ok: true, message: templateId ? `Win-back on: customers with no order for ${n} days get one message (up to 200 a day).` : `Win-back off. Customers are still tagged "lapsed" after ${n} days.` };
 }
+

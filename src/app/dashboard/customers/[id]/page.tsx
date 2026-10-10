@@ -41,7 +41,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
   if (!c) notFound();
 
   const [templates, numbers, paused] = await Promise.all([
-    db.template.findMany({ where: { clientId: c.clientId, status: "APPROVED", category: { not: "AUTHENTICATION" }, name: { notIn: META_SAMPLES }, ...(await sendableTemplates(c.clientId)) }, orderBy: { name: "asc" } }),
+    db.template.findMany({ where: { clientId: c.clientId, status: "APPROVED", name: { notIn: META_SAMPLES }, ...(await sendableTemplates(c.clientId)) }, orderBy: { name: "asc" } }),
     db.whatsAppNumber.findMany({ where: { clientId: c.clientId }, orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }], select: { id: true, label: true, businessAccountId: true } }),
     marketingPaused([c.id]),
   ]);
@@ -125,9 +125,9 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
       />
 
       <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
-        <Stat label="Messages received" value={fmtNumber(sent.length)} sub={c.optedOut ? "Opted out of campaigns" : "From your campaigns"} icon={<Send className="size-4" />} />
-        <Stat label="Read" value={`${pct(read, delivered)}%`} sub={`${read} of ${delivered} delivered`} icon={<Eye className="size-4" />} />
-        <Stat label="Replies" value={fmtNumber(c.replies.length)} sub={c.replies[0] ? `Last ${fmtDate(c.replies[0].receivedAt, "d MMM")}` : "None yet"} icon={<CheckCheck className="size-4" />} />
+        <Stat label="Messages received" value={fmtNumber(sent.length)} sub={c.optedOut ? "Opted out of campaigns" : "From your campaigns"} icon={<Send className="size-4" />} tone="brand" />
+        <Stat label="Read" value={`${pct(read, delivered)}%`} sub={`${read} of ${delivered} delivered`} icon={<Eye className="size-4" />} tone="info" meter={pct(read, delivered)} />
+        <Stat label="Replies" value={fmtNumber(c.replies.length)} sub={c.replies[0] ? `Last ${fmtDate(c.replies[0].receivedAt, "d MMM")}` : "None yet"} icon={<CheckCheck className="size-4" />} tone="violet" />
       </div>
 
       {/* Computers: the profile in a sticky side column beside the send panel and conversation. */}
@@ -142,8 +142,8 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
             blocked={c.optedOut ? "This customer opted out of messages. Opt them back in to send." : c.unreachable ? "WhatsApp says this number can't receive messages." : null}
           />
 
-          <Card className="overflow-hidden">
-            <CardHeader title="Conversation" description="Messages sent to this customer and what they wrote back. The newest is at the bottom." />
+          <Card className="card-3d overflow-hidden">
+            <CardHeader tone="brand" title="Conversation" description="Messages sent to this customer and what they wrote back. The newest is at the bottom." />
             {timeline.length ? (
               <Conversation entries={timeline} className="max-h-[36rem] min-h-48" />
             ) : (
@@ -154,8 +154,8 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
           </Card>
         </div>
 
-        <Card className="lg:sticky lg:top-24 lg:col-start-1 lg:row-start-1">
-          <CardHeader title="What they buy" />
+        <Card className="card-3d lg:sticky lg:top-24 lg:col-start-1 lg:row-start-1">
+          <CardHeader tone="violet" title="What they buy" />
           <div className="space-y-4 p-4 sm:p-5">
             {c.orders.length > 0 && (
               <div>

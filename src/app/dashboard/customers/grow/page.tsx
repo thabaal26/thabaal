@@ -62,8 +62,8 @@ export default async function GrowPage({ searchParams }: PageProps<"/dashboard/c
       />
 
       <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <Card>
-          <CardHeader title="1. Where will this code go?" description="Each place gets its own code, so you can see which one brings customers." />
+        <Card className="card-3d">
+          <CardHeader tone="brand" title="1. Where will this code go?" description="Each place gets its own code, so you can see which one brings customers." />
           <nav aria-label="Where the code goes" className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-3 sm:p-5">
             {SOURCES.map((s) => (
               <Link
@@ -72,7 +72,7 @@ export default async function GrowPage({ searchParams }: PageProps<"/dashboard/c
                 aria-current={source === s.key ? "true" : undefined}
                 className={cn(
                   "rounded-control border px-3 py-2.5 text-sm transition active:scale-[0.98]",
-                  source === s.key ? "border-brand/40 bg-brand-soft font-medium text-brand-deep" : "border-line bg-panel text-ink hover:bg-canvas",
+                  source === s.key ? "border-brand/40 bg-brand-soft font-medium text-brand-deep shadow-xs" : "border-line bg-panel text-ink hover:bg-canvas",
                 )}
               >
                 {s.label}
@@ -95,8 +95,8 @@ export default async function GrowPage({ searchParams }: PageProps<"/dashboard/c
           </div>
         </Card>
 
-        <Card className="lg:sticky lg:top-8">
-          <CardHeader title={`2. Your code: ${source}`} />
+        <Card className="card-3d lg:sticky lg:top-8">
+          <CardHeader tone="gold" title={`2. Your code: ${source}`} />
           <div className="space-y-4 p-4 sm:p-5">
             {/* Generated locally from our own link, so the markup is safe to inline. */}
             <div role="img" aria-label={`QR code that opens WhatsApp to join (${source})`} className="mx-auto aspect-square w-full max-w-64 rounded-card bg-white p-3 ring-1 ring-line" dangerouslySetInnerHTML={{ __html: svg }} />

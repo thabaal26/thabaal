@@ -258,7 +258,6 @@ export async function sendTestMessage(id: string, rawPhone: string): Promise<Act
   if (!phone) return { ok: false, message: "Enter a valid mobile number." };
   const t = await db.template.findUnique({ where: { id } });
   if (!t || !mine(s, t.clientId)) return { ok: false, message: "Template not found." };
-  if (t.category === "AUTHENTICATION") return { ok: false, message: "Authentication templates are sent by your app's login flow, not from here." };
   const settings = await getSettings();
   if (!templateSendable(settings, t)) return { ok: false, message: "Only templates approved by Meta can be sent." };
   // Sent from a number in the account that approved the template.

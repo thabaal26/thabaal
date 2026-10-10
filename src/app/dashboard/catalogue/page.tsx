@@ -24,7 +24,7 @@ export default async function CataloguePage() {
 
   const client = await db.client.findUnique({
     where: { id: scope.clientId },
-    select: { id: true, name: true, waBusinessAccountId: true },
+    select: { id: true, name: true },
   });
 
   const { catalogId, products, commerceManagerUrl, isLive } = await getCatalogWithProducts(scope.clientId);
@@ -61,14 +61,29 @@ export default async function CataloguePage() {
       )}
 
       <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <Stat label="Products" value={fmtNumber(total)} sub="In the catalogue" icon={<Package className="size-4" />} />
-        <Stat label="In stock" value={fmtNumber(inStock)} sub="Customers can order these" icon={<CheckCircle2 className="size-4" />} />
-        <Stat label="Out of stock" value={fmtNumber(outOfStock)} sub="Hidden from new orders" icon={<XCircle className="size-4" />} />
+        <Stat label="Products" value={fmtNumber(total)} sub="In the catalogue" icon={<Package className="size-4" />} tone="info" />
+        <Stat
+          label="In stock"
+          value={fmtNumber(inStock)}
+          sub="Customers can order these"
+          icon={<CheckCircle2 className="size-4" />}
+          tone="brand"
+          meter={total > 0 ? Math.round((inStock / total) * 100) : 0}
+        />
+        <Stat
+          label="Out of stock"
+          value={fmtNumber(outOfStock)}
+          sub="Hidden from new orders"
+          icon={<XCircle className="size-4" />}
+          tone={outOfStock > 0 ? "amber" : "gold"}
+        />
         <Stat
           label="Meta catalogue"
+          tone="violet"
+          icon={<ShoppingBag className="size-4" />}
           value={
             <Badge tone={isLive ? "green" : "gray"} dot className="text-sm">
-              {isLive ? "Live" : "Saved copy"}
+              {isLive ? "Live sync" : "Saved copy"}
             </Badge>
           }
           sub={catalogId ? <span className="font-mono">ID {catalogId}</span> : "No catalogue linked"}

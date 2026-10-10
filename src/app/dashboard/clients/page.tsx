@@ -1,8 +1,8 @@
-import { Building2, CheckCircle2, Circle } from "lucide-react";
+import { Building2, CalendarClock, CheckCircle2, Circle, Phone, Users } from "lucide-react";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
-import { Badge, Card, CardHeader, EmptyState, PageHeader, QualityBadge } from "@/components/ui";
+import { Badge, Card, CardHeader, EmptyState, PageHeader, QualityBadge, Stat } from "@/components/ui";
 import { db } from "@/lib/db";
 import { numberHealth } from "@/lib/limits";
 import { fmtDate, fmtNumber } from "@/lib/format";
@@ -26,6 +26,10 @@ export default async function ClientsPage() {
     orderBy: { name: "asc" },
   });
   const health = new Map((await Promise.all(clients.map((c) => numberHealth(c.id)))).flat().map((h) => [h.id, h]));
+  const totalCustomers = clients.reduce((sum, c) => sum + c._count.customers, 0);
+  const totalCampaigns = clients.reduce((sum, c) => sum + c._count.campaigns, 0);
+  const totalNumbers = clients.reduce((sum, c) => sum + c.numbers.length, 0);
+  const totalUsers = clients.reduce((sum, c) => sum + c.users.length, 0);
 
   return (
     <>
@@ -35,21 +39,53 @@ export default async function ClientsPage() {
         actions={<NewClientForm />}
       />
 
+      <section aria-label="Clients summary" className="mb-4 grid grid-cols-2 gap-2.5 sm:mb-5 sm:gap-3.5 lg:grid-cols-4">
+        <Stat
+          label="Active businesses"
+          value={fmtNumber(clients.length)}
+          sub={`${fmtNumber(totalUsers)} staff & manager logins`}
+          icon={<Building2 className="size-4" />}
+          tone="gold"
+        />
+        <Stat
+          label="Total customers"
+          value={fmtNumber(totalCustomers)}
+          sub="Across all client accounts"
+          icon={<Users className="size-4" />}
+          tone="brand"
+        />
+        <Stat
+          label="WhatsApp numbers"
+          value={fmtNumber(totalNumbers)}
+          sub="Connected sender lines"
+          icon={<Phone className="size-4" />}
+          tone="info"
+        />
+        <Stat
+          label="Client campaigns"
+          value={fmtNumber(totalCampaigns)}
+          sub="Scheduled & one-off"
+          icon={<CalendarClock className="size-4" />}
+          tone="violet"
+        />
+      </section>
+
       {clients.length ? (
         <div className="space-y-4 sm:space-y-6">
           {clients.map((c) => {
             const usable = c.numbers.filter((n) => n.token || c.waToken);
             const accounts = new Set(c.numbers.map((n) => n.businessAccountId)).size;
             return (
-              <Card key={c.id} className="glass-card transition-all duration-200 hover:shadow-pop">
+              <Card key={c.id} className="card-3d transition-all duration-200">
                 <CardHeader
+                  tone="gold"
                   title={
                     <span className="flex items-center gap-3">
                       {c.logoUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={c.logoUrl} alt="" className="size-9 shrink-0 rounded-control object-cover ring-1 ring-line shadow-xs" />
                       ) : (
-                        <span className="grid size-9 shrink-0 place-items-center rounded-control bg-gold-soft font-semibold text-gold-deep">
+                        <span className="grid size-9 shrink-0 place-items-center rounded-control bg-gold-soft font-semibold text-gold-deep ring-1 ring-gold/25">
                           {c.name.slice(0, 1).toUpperCase()}
                         </span>
                       )}

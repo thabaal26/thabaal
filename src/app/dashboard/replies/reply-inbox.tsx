@@ -6,6 +6,7 @@ import { Avatar, Badge, Card, buttonClass } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { fmtDate } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
+import { sendCatalogue } from "../actions/catalog";
 import { setReplyHandled } from "../actions/replies";
 
 const ORDER = /(order|buy|need|want|send|price|rate|available|venum|vendum)|வேண்டும்|ஆர்டர்/i;
@@ -72,7 +73,7 @@ export function ReplyInbox({
   );
 
   return (
-    <Card className="overflow-hidden lg:grid lg:h-[calc(100dvh-16.5rem)] lg:min-h-[34rem] lg:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]">
+    <Card className="card-3d overflow-hidden lg:grid lg:h-[calc(100dvh-21rem)] lg:min-h-[34rem] lg:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]">
       {/* The list. */}
       <ul aria-label="Replies" className="thin-scroll divide-y divide-line lg:overflow-y-auto lg:border-r lg:border-line">
         {replies.map((r) => {
@@ -80,6 +81,7 @@ export function ReplyInbox({
           return (
             <li key={r.id} className={cn("relative flex gap-3 px-4 py-3.5 transition-colors hover:bg-subtle", current && "lg:bg-brand-soft/60 lg:hover:bg-brand-soft/60")}>
               {current && <span aria-hidden className="absolute inset-y-0 left-0 hidden w-[3px] bg-brand lg:block" />}
+              {!r.handled && !current && <span aria-hidden className="absolute inset-y-3 left-0 w-[3px] rounded-r-full bg-amber-500/70 lg:hidden" />}
               {/* Phones: the row opens the customer's conversation. Computers: it opens it beside the list. */}
               <Link href={`/dashboard/customers/${r.customer.id}#reply`} className="absolute inset-0 lg:hidden">
                 <span className="sr-only">Open conversation with {r.customer.name}</span>
@@ -117,7 +119,7 @@ export function ReplyInbox({
       {/* Computers: the picked customer's conversation. */}
       {selected && (
         <section aria-label={`Conversation with ${selected.customer.name}`} className="hidden min-h-0 flex-col lg:flex">
-          <header className="flex items-start gap-3 border-b border-line px-5 py-3.5">
+          <header className="flex items-start gap-3 border-b border-line bg-gradient-to-r from-brand-soft/60 to-transparent px-5 py-3.5">
             <Avatar name={selected.customer.name} className="size-10" />
             <div className="min-w-0 flex-1">
               <h2 className="truncate text-[0.9375rem] font-semibold text-ink">{selected.customer.name}</h2>
@@ -142,6 +144,15 @@ export function ReplyInbox({
               <Link href={`/dashboard/customers/${selected.customer.id}#reply`} className={buttonClass("primary")}>
                 <MessageCircle aria-hidden className="size-4" /> Reply
               </Link>
+            )}
+            {canOperate && (
+              <ActionButton
+                action={sendCatalogue.bind(null, selected.customer.id)}
+                size="md"
+                title="Send interactive WhatsApp catalogue (free inside the 24-hour window)"
+              >
+                <ShoppingBag aria-hidden className="size-4" /> Send catalogue
+              </ActionButton>
             )}
             {canOperate && handledButton(selected, "md")}
             <Link href={`/dashboard/customers/${selected.customer.id}`} className={cn(buttonClass("ghost"), "ml-auto")}>

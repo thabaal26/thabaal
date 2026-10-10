@@ -69,8 +69,9 @@ export default async function SheetPage() {
       />
       <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="space-y-4 sm:space-y-6">
-          <Card>
+          <Card className="card-3d">
             <CardHeader
+              tone="brand"
               title="Your sheet"
               description={client?.sheetSyncedAt ? `Last synced ${fmtDate(client.sheetSyncedAt, "d MMM, h:mm a")}` : "Not synced yet"}
             />
@@ -81,8 +82,8 @@ export default async function SheetPage() {
             )}
             <SheetForm customersUrl={client?.sheetCustomersUrl ?? ""} ordersUrl={client?.sheetOrdersUrl ?? ""} />
           </Card>
-          <Card>
-            <CardHeader title="How to set it up" />
+          <Card className="card-3d">
+            <CardHeader tone="info" title="How to set it up" />
             <ol className="list-decimal space-y-2 p-4 pl-9 text-sm text-ink-2 sm:p-5 sm:pl-10">
               <li>Make a Google Sheet with two tabs: <b>Customers</b> and <b>Orders</b>. Put the column headings from the right in the first row of each tab.</li>
               <li>Click the top-right <b>Share</b> button in Google Sheets → General access → <b>Anyone with the link</b> → <b>Viewer</b>.</li>
@@ -97,12 +98,12 @@ export default async function SheetPage() {
           </Card>
         </div>
         <div className="space-y-4 sm:space-y-6">
-          <Card>
-            <CardHeader title="Customers tab columns" description="Any order; extra columns are ignored." />
+          <Card className="card-3d">
+            <CardHeader tone="violet" title="Customers tab columns" description="Any order; extra columns are ignored." />
             <div className="p-4 sm:p-5"><Columns rows={CUSTOMER_COLUMNS} /></div>
           </Card>
-          <Card>
-            <CardHeader title="Orders tab columns" />
+          <Card className="card-3d">
+            <CardHeader tone="gold" title="Orders tab columns" />
             <div className="p-4 sm:p-5"><Columns rows={ORDER_COLUMNS} /></div>
           </Card>
         </div>

@@ -114,6 +114,7 @@ const headerTones = {
   gold: { band: "from-gold-soft", strip: "before:bg-gold", tile: "from-[#f5d55c] to-[#b98a05] shadow-[0_4px_10px_-3px_rgb(185_138_5/0.5)]" },
   info: { band: "from-info-bg", strip: "before:bg-info", tile: "from-[#4f93d8] to-info shadow-[0_4px_10px_-3px_rgb(29_100_168/0.5)]" },
   rose: { band: "from-danger-bg", strip: "before:bg-danger-solid", tile: "from-[#e46a6a] to-danger shadow-[0_4px_10px_-3px_rgb(180_46_46/0.5)]" },
+  amber: { band: "from-warning-bg", strip: "before:bg-warning-solid", tile: "from-[#e09f3e] to-warning shadow-[0_4px_10px_-3px_rgb(183_121_31/0.5)]" },
 };
 export type HeaderTone = keyof typeof headerTones;
 
@@ -451,12 +452,23 @@ export function FilterChips({ label, items, className }: { label: string; items:
               href={t.href}
               aria-current={t.active ? "page" : undefined}
               className={cn(
-                "flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition active:scale-[0.97] sm:h-8 sm:px-3 sm:text-[0.8125rem] sm:pointer-coarse:h-10",
-                t.active ? "border-ink bg-ink text-white shadow-xs" : "border-line-2 bg-panel text-ink-2 hover:border-line-strong hover:bg-subtle hover:text-ink",
+                "flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition active:scale-[0.97] sm:h-8 sm:px-3.5 sm:text-[0.8125rem] sm:pointer-coarse:h-10",
+                t.active
+                  ? "border-ink bg-ink text-white shadow-xs"
+                  : "border-line-2 bg-panel text-ink-2 shadow-2xs hover:border-line-strong hover:bg-subtle hover:text-ink",
               )}
             >
-              {t.label}
-              {t.count !== undefined && <span className={cn("tabular text-2xs sm:text-xs", t.active ? "text-white/75" : "text-muted")}>{t.count}</span>}
+              <span>{t.label}</span>
+              {t.count !== undefined && (
+                <span
+                  className={cn(
+                    "tabular rounded-full px-1.5 py-px text-2xs font-semibold leading-4",
+                    t.active ? "bg-white/20 text-white" : "bg-sunken text-muted",
+                  )}
+                >
+                  {t.count}
+                </span>
+              )}
             </Link>
           </li>
         ))}
@@ -503,11 +515,25 @@ export function Segmented<T extends string>({
   );
 }
 
-/** A round initial for a person. */
+const AVATAR_TONES = [
+  "bg-brand-soft text-brand-deep ring-brand/25",
+  "bg-accent-bg text-accent ring-accent-border",
+  "bg-info-bg text-info ring-info-border",
+  "bg-gold-soft text-gold-deep ring-gold/40",
+  "bg-warning-bg text-warning ring-warning-border",
+  "bg-success-bg text-success ring-success-border",
+];
+
+/** A round initial for a person, tinted deterministically by name so lists scan at a glance. */
 export function Avatar({ name, className }: { name: string; className?: string }) {
+  const clean = name.trim();
+  const hash = clean.split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  const tone = AVATAR_TONES[hash % AVATAR_TONES.length] ?? AVATAR_TONES[0];
+  const parts = clean.split(/\s+/).filter(Boolean);
+  const initials = parts.length > 1 ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase() : (clean.slice(0, 1).toUpperCase() || "?");
   return (
-    <span aria-hidden className={cn("grid size-10 shrink-0 place-items-center rounded-full bg-sunken text-sm font-semibold text-ink-2 ring-1 ring-line", className)}>
-      {name.trim().slice(0, 1).toUpperCase() || "?"}
+    <span aria-hidden className={cn("grid size-10 shrink-0 place-items-center rounded-full text-xs font-semibold ring-1 ring-inset", tone, className)}>
+      {initials}
     </span>
   );
 }
@@ -528,7 +554,7 @@ export function Th({ numeric, className, ...p }: ComponentProps<"th"> & { numeri
     <th
       scope="col"
       className={cn(
-        "sticky top-0 z-[1] whitespace-nowrap border-b border-line bg-subtle px-4 py-2.5 text-left text-xs font-medium text-muted lg:top-16",
+        "sticky top-0 z-[1] whitespace-nowrap border-b border-line bg-subtle/95 px-4 py-2.5 text-left text-[0.6875rem] font-semibold uppercase tracking-wider text-muted backdrop-blur-xs lg:top-16",
         numeric && "text-right",
         className,
       )}
@@ -542,7 +568,7 @@ export function Td({ numeric, className, ...p }: ComponentProps<"td"> & { numeri
 }
 
 /** Table body rows: dividers and a hover tint. */
-export const rowClass = "border-b border-line last:border-0 transition-colors hover:bg-subtle";
+export const rowClass = "border-b border-line last:border-0 transition-colors hover:bg-subtle/80";
 
 /** A mobile list row that leads somewhere: the whole row is the link, with press feedback. */
 export function ListRow({
@@ -590,7 +616,7 @@ export function ListRow({
 export function EmptyState({ icon, title, children, action }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center px-6 py-10 text-center sm:py-14">
-      {icon && <div aria-hidden className="mb-4 grid size-12 place-items-center rounded-full bg-sunken text-ink-2 ring-8 ring-subtle">{icon}</div>}
+      {icon && <div aria-hidden className="tile-3d mb-4 grid size-12 place-items-center rounded-2xl bg-gradient-to-b from-panel to-sunken text-brand-deep ring-1 ring-line">{icon}</div>}
       <h3 className="text-[0.9375rem] font-semibold text-ink">{title}</h3>
       {children && <p className="mt-1 max-w-sm text-sm text-muted">{children}</p>}
       {action && <div className="mt-5">{action}</div>}
@@ -601,7 +627,7 @@ export function EmptyState({ icon, title, children, action }: { icon?: ReactNode
 /** Shown to an admin in "All clients" view on pages that create something for one client. */
 export function PickClientNotice({ what }: { what: string }) {
   return (
-    <Card>
+    <Card className="card-3d">
       <EmptyState title="Pick a client first">Choose a client in the sidebar switcher, then add the {what} for them.</EmptyState>
     </Card>
   );
@@ -611,27 +637,67 @@ export function Skeleton({ className }: { className?: string }) {
   return <div aria-hidden className={cn("animate-pulse rounded-control bg-line/60", className)} />;
 }
 
+const STAT_TONES: Record<HeaderTone, { color: string; tile: string }> = {
+  brand: { color: "#167d63", tile: headerTones.brand.tile },
+  violet: { color: "#6941c6", tile: headerTones.violet.tile },
+  gold: { color: "#d4a514", tile: headerTones.gold.tile },
+  info: { color: "#1d64a8", tile: headerTones.info.tile },
+  rose: { color: "#c93636", tile: headerTones.rose.tile },
+  amber: { color: "#b7791f", tile: headerTones.amber.tile },
+};
+
 /**
- * A KPI tile: label, the figure, and one line of real context (never an invented trend).
- * Tiles in a row share one height so their figures line up.
+ * A 3D KPI tile (Tremor / Origin style): label, the figure, glossy icon tile, top accent bar,
+ * optional progress meter, and one line of real context.
  */
-export function Stat({ label, value, sub, icon, href }: { label: string; value: ReactNode; sub?: ReactNode; icon?: ReactNode; href?: string }) {
+export function Stat({
+  label,
+  value,
+  sub,
+  icon,
+  href,
+  tone = "brand",
+  meter,
+}: {
+  label: string;
+  value: ReactNode;
+  sub?: ReactNode;
+  icon?: ReactNode;
+  href?: string;
+  tone?: HeaderTone;
+  meter?: number;
+}) {
+  const t = STAT_TONES[tone] ?? STAT_TONES.brand;
+  const surface = { background: `linear-gradient(180deg, ${t.color}12 0%, #ffffff 48%, #fbfcfe 100%)` };
   const body = (
     <>
+      <span aria-hidden className="absolute inset-x-0 top-0 h-[3px]" style={{ background: t.color }} />
       <div className="flex items-center justify-between gap-2">
-        <p className="min-w-0 text-xs font-medium text-muted sm:text-sm">{label}</p>
-        {icon && <span aria-hidden className="hidden size-8 shrink-0 place-items-center rounded-control bg-sunken text-ink-2 sm:grid">{icon}</span>}
+        <p className="min-w-0 truncate text-[0.6875rem] font-semibold uppercase tracking-wide sm:text-xs" style={{ color: t.color }}>
+          {label}
+        </p>
+        {icon && (
+          <span
+            aria-hidden
+            className={cn("grid size-8 shrink-0 place-items-center rounded-[10px] bg-gradient-to-br text-white ring-1 ring-inset ring-white/25 [&>svg]:size-4", t.tile)}
+          >
+            {icon}
+          </span>
+        )}
       </div>
-      <p className="tabular mt-2 text-2xl font-semibold leading-tight tracking-tight text-ink sm:mt-3 sm:text-kpi">{value}</p>
-      {sub && <p className="mt-1 text-xs text-muted">{sub}</p>}
+      <div className="tabular mt-2 text-xl font-semibold leading-tight tracking-tight text-ink sm:mt-2.5 sm:text-kpi">{value}</div>
+      {meter !== undefined && <Meter raised value={meter} tone={tone === "amber" || tone === "rose" ? "warning" : "brand"} className="mt-2.5" />}
+      {sub && <p className="mt-1.5 text-xs text-muted">{sub}</p>}
     </>
   );
   return href ? (
-    <Link href={href} className="lift block h-full min-w-0 rounded-card border border-line bg-panel p-4 shadow-card active:bg-sunken sm:p-5">
+    <Link href={href} style={surface} className="card-3d relative flex h-full min-w-0 flex-col justify-between overflow-hidden rounded-card border p-3.5 active:bg-sunken sm:p-4">
       {body}
     </Link>
   ) : (
-    <Card className="h-full p-4 sm:p-5">{body}</Card>
+    <Card style={surface} className="card-3d relative flex h-full flex-col justify-between overflow-hidden p-3.5 sm:p-4">
+      {body}
+    </Card>
   );
 }
 
@@ -650,3 +716,118 @@ export function Meter({ value, tone = "brand", label, className, raised }: { val
     </div>
   );
 }
+
+/**
+ * Tremor-style multi-segment distribution bar with a compact legend underneath.
+ * Useful for visualising message delivery breakdown, order pipeline, or stock split.
+ */
+export function DistributionBar({
+  segments,
+  className,
+}: {
+  segments: { key: string; label: string; value: number; color: string; href?: string }[];
+  className?: string;
+}) {
+  const total = segments.reduce((sum, s) => sum + s.value, 0);
+  if (total <= 0) return null;
+  return (
+    <div className={cn("space-y-2.5", className)}>
+      <div className="track-3d flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full p-0.5" aria-hidden>
+        {segments
+          .filter((s) => s.value > 0)
+          .map((s) => {
+            const share = Math.max(2, Math.round((s.value / total) * 100));
+            return <div key={s.key} className="bar bar-3d h-full first:rounded-l-full last:rounded-r-full" style={{ width: `${share}%`, backgroundColor: s.color }} />;
+          })}
+      </div>
+      <ul className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
+        {segments.map((s) => {
+          const share = Math.round((s.value / total) * 100);
+          const content = (
+            <>
+              <span aria-hidden className="size-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: s.color }} />
+              <span className="font-medium text-ink-2">{s.label}</span>
+              <span className="tabular font-semibold text-ink">{s.value.toLocaleString("en-IN")}</span>
+              <span className="tabular text-muted">({share}%)</span>
+            </>
+          );
+          return (
+            <li key={s.key}>
+              {s.href ? (
+                <Link href={s.href} className="inline-flex items-center gap-1.5 rounded-control px-1.5 py-0.5 transition hover:bg-sunken">
+                  {content}
+                </Link>
+              ) : (
+                <span className="inline-flex items-center gap-1.5">{content}</span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+const ORDER_STEPS = [
+  { key: "NEW", label: "Placed" },
+  { key: "CONFIRMED", label: "Confirmed" },
+  { key: "PAID", label: "Paid" },
+  { key: "DISPATCHED", label: "Dispatched" },
+  { key: "DELIVERED", label: "Delivered" },
+] as const;
+
+/** Visual 5-step order fulfilment tracker bar for OrderCard. */
+export function OrderStepper({ status, isPaid }: { status: string; isPaid: boolean }) {
+  if (status === "CANCELLED") {
+    return (
+      <div className="flex items-center gap-2 rounded-control border border-danger-border/60 bg-danger-bg/60 px-3 py-1.5 text-xs font-medium text-danger">
+        <span aria-hidden className="size-2 rounded-full bg-danger-solid" />
+        Order cancelled
+      </div>
+    );
+  }
+  const activeIdx =
+    status === "DELIVERED"
+      ? 4
+      : status === "DISPATCHED"
+        ? 3
+        : status === "PAID"
+          ? 2
+          : status === "CONFIRMED"
+            ? isPaid
+              ? 2
+              : 1
+            : 0;
+
+  return (
+    <div aria-label={`Order progress: ${ORDER_STEPS[activeIdx]?.label}`} className="space-y-1">
+      <div className="grid grid-cols-5 gap-1" aria-hidden>
+        {ORDER_STEPS.map((step, idx) => {
+          const done = idx <= activeIdx || (step.key === "PAID" && isPaid);
+          const current = idx === activeIdx;
+          return (
+            <div
+              key={step.key}
+              className={cn(
+                "h-1.5 rounded-full transition-colors",
+                done ? (current ? "bg-brand bar-3d" : "bg-brand/75") : "bg-sunken",
+              )}
+            />
+          );
+        })}
+      </div>
+      <div className="flex justify-between text-[10px] font-medium text-muted" aria-hidden>
+        {ORDER_STEPS.map((step, idx) => {
+          const done = idx <= activeIdx || (step.key === "PAID" && isPaid);
+          const current = idx === activeIdx;
+          return (
+            <span key={step.key} className={cn(current ? "font-semibold text-brand-deep" : done ? "text-ink-2" : "text-muted/70")}>
+              {step.label}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+

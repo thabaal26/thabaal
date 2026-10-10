@@ -9,8 +9,8 @@ import { deliver, getSettings, readiness, templateSendable, wahaConfig } from "@
 import { applyFailure, quietUntil, recentlyMarketed } from "@/lib/rules";
 import { senderFor } from "@/lib/senders";
 import { getScope, owned, requireManager } from "@/lib/session";
-import { sendText, WahaError } from "@/lib/waha";
-import { sendTextMessage } from "@/lib/whatsapp";
+import { sendImage, sendText, WahaError } from "@/lib/waha";
+import { sendMediaMessage, sendTextMessage } from "@/lib/whatsapp";
 import { explainSendError, type SendResult } from "./send-helpers";
 
 const WINDOW_MS = 24 * 3_600_000;
@@ -20,7 +20,13 @@ const WINDOW_MS = 24 * 3_600_000;
  * receive WhatsApp are never overridden; quiet hours and the gap between marketing
  * messages ask for confirmation (`force`) instead.
  */
-export async function sendToCustomer(customerId: string, templateId: string, senderId: string | null, force = false): Promise<SendResult> {
+export async function sendToCustomer(
+  customerId: string,
+  templateId: string,
+  senderId: string | null,
+  force = false,
+  otpCode?: string,
+): Promise<SendResult> {
   const s = await requireManager();
   if ("denied" in s) return { ok: false, message: s.denied };
   const customer = await db.customer.findFirst({ where: { id: customerId, ...owned(s) }, include: { client: true } });
@@ -54,7 +60,7 @@ export async function sendToCustomer(customerId: string, templateId: string, sen
   }
 
   try {
-    const res = await deliver(settings, t, customer, cfg);
+    const res = await deliver(settings, t, customer, cfg, otpCode);
     await db.message.create({
       data: {
         customerId: customer.id, templateId: t.id, templateName: t.name, body: res.text, status: "SENT",
@@ -91,15 +97,23 @@ export async function sendToCustomer(customerId: string, templateId: string, sen
 }
 
 /**
- * A typed reply to a customer who wrote to us in the last 24 hours (the only time WhatsApp
- * allows free text). Client logins may do this for their own customers, like handling replies.
+ * A typed reply (or image/document attachment) to a customer who wrote to us in the last 24 hours
+ * (the only time WhatsApp allows free text/media). Client logins may do this for their own customers.
  */
-export async function replyToCustomer(customerId: string, text: string): Promise<SendResult> {
+export async function replyToCustomer(
+  customerId: string,
+  text: string,
+  mediaUrl?: string | null,
+): Promise<SendResult> {
   const scope = await getScope();
   if (!scope.canOperate) return { ok: false, message: "Your login can view but not change anything." };
   const body = text.trim();
-  if (!body) return { ok: false, message: "Type a message first." };
+  const cleanMedia = mediaUrl?.trim() || null;
+  if (!body && !cleanMedia) return { ok: false, message: "Type a message or attach an image first." };
   if (body.length > 4000) return { ok: false, message: "Keep the message under 4000 characters." };
+  if (cleanMedia && !/^https:\/\/\S+$/i.test(cleanMedia)) {
+    return { ok: false, message: "Media attachment must be a public https:// link." };
+  }
   const customer = await db.customer.findFirst({ where: { id: customerId, ...owned(scope) } });
   if (!customer) return { ok: false, message: "Customer not found." };
   if (customer.optedOut) return { ok: false, message: "This customer opted out of messages." };
@@ -112,29 +126,53 @@ export async function replyToCustomer(customerId: string, text: string): Promise
 
   // Answer from the number they wrote to, so the chat stays in one thread for them.
   const { number, cfg } = await senderFor(customer.clientId, last?.senderId);
+  const loggedBody = cleanMedia ? (body ? `${body}\n[Media: ${cleanMedia}]` : `[Media: ${cleanMedia}]`) : body;
   try {
     let id: string;
     let simulated = false;
     if (local) {
       const w = wahaConfig(settings);
-      if (w) id = await sendText(w, customer.phone, body);
-      else { id = `demo.${crypto.randomUUID()}`; simulated = true; }
+      if (w) {
+        id = cleanMedia ? await sendImage(w, customer.phone, cleanMedia, body) : await sendText(w, customer.phone, body);
+      } else {
+        id = `demo.${crypto.randomUUID()}`;
+        simulated = true;
+      }
+    } else if (cleanMedia) {
+      ({ id, simulated } = await sendMediaMessage(cfg, customer.phone, cleanMedia, body || undefined));
     } else {
       ({ id, simulated } = await sendTextMessage(cfg, customer.phone, body));
     }
     await db.message.create({
       data: {
-        customerId: customer.id, templateName: "Typed reply", body, status: "SENT", waMessageId: id, simulated,
-        provider: settings.provider, sentAt: new Date(), senderId: !local ? (number?.id ?? null) : null,
+        customerId: customer.id,
+        templateName: cleanMedia ? "Media reply" : "Typed reply",
+        body: loggedBody,
+        status: "SENT",
+        waMessageId: id,
+        simulated,
+        provider: settings.provider,
+        sentAt: new Date(),
+        senderId: !local ? (number?.id ?? null) : null,
       },
     });
     revalidatePath(`/dashboard/customers/${customer.id}`);
     revalidatePath("/dashboard/messages");
+    revalidatePath("/dashboard/replies");
     return { ok: true, message: simulated ? "Simulated reply logged (demo mode)." : "Reply sent." };
   } catch (e) {
     const { code, error } = explainSendError(e);
     await db.message.create({
-      data: { customerId: customer.id, templateName: "Typed reply", body, status: "FAILED", provider: settings.provider, errorCode: code, error, failedAt: new Date() },
+      data: {
+        customerId: customer.id,
+        templateName: cleanMedia ? "Media reply" : "Typed reply",
+        body: loggedBody,
+        status: "FAILED",
+        provider: settings.provider,
+        errorCode: code,
+        error,
+        failedAt: new Date(),
+      },
     });
     return { ok: false, message: e instanceof WahaError ? e.message : error };
   }

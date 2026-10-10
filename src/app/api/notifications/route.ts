@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { daysAgo, fmtNumber } from "@/lib/format";
+import { getMetaAccountAlerts } from "@/lib/meta-balance";
 import { formatPhone } from "@/lib/phone";
 import { getScope, owned, ownedMessages, readSessionUserId, SESSION_COOKIE } from "@/lib/session";
 
@@ -26,8 +27,9 @@ export async function GET() {
   const mine = owned(scope);
   const myMessages = ownedMessages(scope);
   const oneDayAgo = daysAgo(1);
+  const sevenDaysAgo = daysAgo(7);
 
-  const [replies, orders, calls, failures] = await Promise.all([
+  const [replies, orders, calls, failures, numbers, flaggedTemplates] = await Promise.all([
     db.reply.findMany({
       where: { ...myMessages },
       include: { customer: { select: { id: true, name: true, phone: true } } },
@@ -52,6 +54,23 @@ export async function GET() {
       orderBy: { failedAt: "desc" },
       take: 5,
     }),
+    db.whatsAppNumber.findMany({
+      where: { ...mine },
+      select: { id: true, label: true, displayPhone: true, businessAccountId: true, qualityRating: true, statusCheckedAt: true, createdAt: true },
+    }).catch(() => []),
+    db.template.findMany({
+      where: {
+        ...mine,
+        updatedAt: { gte: sevenDaysAgo },
+        OR: [
+          { status: { in: ["PAUSED", "DISABLED", "REJECTED"] } },
+          { qualityScore: "RED" },
+        ],
+      },
+      select: { id: true, name: true, status: true, statusReason: true, qualityScore: true, updatedAt: true },
+      orderBy: { updatedAt: "desc" },
+      take: 5,
+    }).catch(() => []),
   ]);
 
   const items: NotificationItem[] = [];
@@ -108,6 +127,52 @@ export async function GET() {
       description: f.error || "Delivery failed",
       timestamp: (f.failedAt ?? f.createdAt).toISOString(),
       href: `/dashboard/messages?status=FAILED`,
+      unread: true,
+    });
+  }
+
+  // Surface WhatsApp number quality alerts (RED / YELLOW)
+  for (const n of numbers) {
+    if (n.qualityRating === "RED" || n.qualityRating === "YELLOW") {
+      items.push({
+        id: `num-quality-${n.id}-${n.qualityRating}`,
+        type: "alert",
+        title: `WhatsApp number quality is ${n.qualityRating.toLowerCase()}: ${n.label}`,
+        description: n.qualityRating === "RED"
+          ? `${n.displayPhone || n.label} is paused to protect the number.`
+          : `${n.displayPhone || n.label} quality dropped to yellow — monitor recent campaigns.`,
+        timestamp: (n.statusCheckedAt ?? n.createdAt).toISOString(),
+        href: "/dashboard/clients",
+        unread: true,
+        urgent: n.qualityRating === "RED",
+      });
+    }
+  }
+
+  // Surface paused, disabled, or rejected templates from Meta
+  for (const t of flaggedTemplates) {
+    items.push({
+      id: `tpl-alert-${t.id}-${t.status}-${t.qualityScore ?? ""}`,
+      type: "alert",
+      title: `Template ${t.status.toLowerCase()}: ${t.name}`,
+      description: t.statusReason || (t.qualityScore === "RED" ? "Meta marked this template's quality as low (red)." : `Meta updated status to ${t.status.toLowerCase()}.`),
+      timestamp: t.updatedAt.toISOString(),
+      href: `/dashboard/templates/${t.id}`,
+      unread: true,
+    });
+  }
+
+  // Surface Meta account_update / account_alerts webhook events
+  const allowedWabas = new Set(numbers.map((n) => n.businessAccountId));
+  for (const a of getMetaAccountAlerts(scope.clientId)) {
+    if (scope.clientId && a.wabaId && allowedWabas.size > 0 && !allowedWabas.has(a.wabaId)) continue;
+    items.push({
+      id: a.id,
+      type: "alert",
+      title: a.title,
+      description: a.detail,
+      timestamp: a.receivedAt,
+      href: "/dashboard/settings",
       unread: true,
     });
   }

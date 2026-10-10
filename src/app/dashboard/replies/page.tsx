@@ -1,8 +1,8 @@
-import { CheckCheck, Inbox } from "lucide-react";
+import { CheckCheck, Inbox, MessageCircle, ShoppingBag } from "lucide-react";
 import type { Metadata } from "next";
 import { ActionButton } from "@/components/action-button";
 import type { ConversationEntry } from "@/components/conversation";
-import { Card, EmptyState, FilterChips, PageHeader } from "@/components/ui";
+import { Card, EmptyState, FilterChips, PageHeader, Stat } from "@/components/ui";
 import { db } from "@/lib/db";
 import { fmtNumber } from "@/lib/format";
 import { getScope, ownedMessages } from "@/lib/session";
@@ -38,6 +38,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
   ]);
   const n = (h: boolean) => counts.find((c) => c.handled === h)?._count ?? 0;
   const tabCount = { "": n(false), handled: n(true), all: n(false) + n(true) };
+  const orderInquiryCount = replies.filter((r) => r.kind === "button" || /(order|buy|need|want|send|price|rate|available|venum|vendum)|வேண்டும்|ஆர்டர்/i.test(r.text)).length;
 
   // Computers show the picked reply's customer conversation beside the list (the newest reply by default).
   const selected = replies.find((x) => x.id === picked) ?? replies[0];
@@ -93,10 +94,45 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
         }
       />
 
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <Stat
+          label="Open replies"
+          value={fmtNumber(tabCount[""])}
+          sub={tabCount[""] > 0 ? "Need a response" : "Inbox zero!"}
+          icon={<Inbox />}
+          tone={tabCount[""] > 0 ? "amber" : "brand"}
+          href="/dashboard/replies"
+        />
+        <Stat
+          label="Order & rate taps"
+          value={fmtNumber(orderInquiryCount)}
+          sub="In current view"
+          icon={<ShoppingBag />}
+          tone="gold"
+        />
+        <Stat
+          label="Handled"
+          value={fmtNumber(tabCount.handled)}
+          sub="Answered & closed"
+          icon={<CheckCheck />}
+          tone="brand"
+          meter={tabCount.all > 0 ? Math.round((tabCount.handled / tabCount.all) * 100) : 0}
+          href="/dashboard/replies?show=handled"
+        />
+        <Stat
+          label="Total replies"
+          value={fmtNumber(tabCount.all)}
+          sub="Across all customers"
+          icon={<MessageCircle />}
+          tone="info"
+          href="/dashboard/replies?show=all"
+        />
+      </div>
+
       {replies.length ? (
         <ReplyInbox replies={replies} selectedId={selected?.id} thread={thread} show={typeof show === "string" ? show : ""} canOperate={scope.canOperate} showClient={!scope.clientId} />
       ) : (
-        <Card>
+        <Card className="card-3d">
           <EmptyState icon={<Inbox />} title={show === "handled" ? "Nothing handled yet" : show === "all" ? "No replies yet" : "You're all caught up"}>
             When customers tap &ldquo;Order now&rdquo; or write back after a campaign, their messages appear here.
           </EmptyState>
@@ -105,3 +141,4 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
     </>
   );
 }
+

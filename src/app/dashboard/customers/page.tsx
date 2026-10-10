@@ -1,12 +1,12 @@
-import { ChevronLeft, ChevronRight, Search, Users } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, MapPin, Search, UserX, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Picker } from "@/components/picker";
 import { ActionButton } from "@/components/action-button";
-import { Avatar, Badge, buttonClass, Card, EmptyState, PageHeader, rowClass, Table, Td, Th } from "@/components/ui";
+import { Avatar, Badge, buttonClass, Card, EmptyState, PageHeader, rowClass, Stat, Table, Td, Th } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
-import { fmtDate, fmtNumber } from "@/lib/format";
+import { fmtDate, fmtNumber, pct } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { marketingPaused } from "@/lib/held";
 import { customerFilters, customerWhere } from "@/lib/customer-query";
@@ -30,7 +30,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
   const where = customerWhere(scope, { q, tag, area });
   const filterQs = new URLSearchParams(Object.entries({ q, tag, area }).filter(([, v]) => v) as [string, string][]);
   const exportHref = `/api/customers/export${filterQs.size ? `?${filterQs}` : ""}`;
-  const [rows, total, tags, areas] = await Promise.all([
+  const [rows, total, tags, areas, totalAll, optedOutCount] = await Promise.all([
     db.customer.findMany({
       where,
       include: {
@@ -46,11 +46,15 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
       SELECT unnest(tags) AS tag, count(*) AS n FROM "Customer"
       WHERE ${scope.clientId}::text IS NULL OR "clientId" = ${scope.clientId} GROUP BY 1 ORDER BY 2 DESC, 1`,
     db.customer.groupBy({ by: ["region", "location"], where: owned(scope), _count: true }),
+    db.customer.count({ where: owned(scope) }),
+    db.customer.count({ where: { ...owned(scope), OR: [{ optedOut: true }, { unreachable: true }] } }),
   ]);
   // Customers Meta is currently holding marketing back from (their campaign messages wait).
   const paused = await marketingPaused(rows.map((c) => c.id));
   const regionCount = (r: string | null) => areas.filter((a) => a.region === r).reduce((n, a) => n + a._count, 0);
   const noLocation = areas.filter((a) => !a.location).reduce((n, a) => n + a._count, 0);
+  const reachableAll = Math.max(0, totalAll - optedOutCount);
+  const maduraiCount = regionCount("Madurai city");
   const areaOptions = [
     { value: "", label: "All areas" },
     ...["Madurai city", "Outside Madurai", "Not sure"].filter((r) => regionCount(r)).map((r) => ({ value: `region:${r}`, label: r, hint: `${fmtNumber(regionCount(r))} customers` })),
@@ -96,8 +100,40 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
         actions={scope.clientId || scope.isAdmin ? <CustomerActions canManage={scope.canManage} hasClient={!!scope.clientId} exportHref={scope.canManage && total > 0 ? exportHref : null} exportCount={total} /> : undefined}
       />
 
-      <Card>
-        <form role="search" aria-label="Find customers" className="grid gap-2 border-b border-line p-3 sm:flex sm:flex-wrap">
+      <section aria-label="Customer summary" className="mb-4 grid grid-cols-2 gap-2.5 sm:mb-5 sm:gap-3.5 lg:grid-cols-4">
+        <Stat
+          label="Total directory"
+          value={fmtNumber(totalAll)}
+          sub={filtered ? `${fmtNumber(total)} matching filters` : "All saved contacts"}
+          icon={<Users className="size-4" />}
+          tone="brand"
+        />
+        <Stat
+          label="Reachable on WhatsApp"
+          value={fmtNumber(reachableAll)}
+          sub={`${pct(reachableAll, totalAll)}% of directory`}
+          icon={<CheckCircle2 className="size-4" />}
+          tone="info"
+          meter={pct(reachableAll, totalAll)}
+        />
+        <Stat
+          label="Madurai city"
+          value={fmtNumber(maduraiCount)}
+          sub={noLocation > 0 ? `${fmtNumber(noLocation)} without area` : "Local delivery zone"}
+          icon={<MapPin className="size-4" />}
+          tone="violet"
+        />
+        <Stat
+          label="Opted out / Unreachable"
+          value={fmtNumber(optedOutCount)}
+          sub={optedOutCount > 0 ? "Skipped by campaigns" : "Everyone can receive"}
+          icon={<UserX className="size-4" />}
+          tone={optedOutCount > 0 ? "amber" : "gold"}
+        />
+      </section>
+
+      <Card className="card-3d">
+        <form role="search" aria-label="Find customers" className="grid gap-2 border-b border-line bg-subtle/40 p-3 sm:flex sm:flex-wrap">
           <div className="relative min-w-0 sm:min-w-56 sm:flex-1">
             <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
             <input name="q" type="search" enterKeyHint="search" defaultValue={q} placeholder="Search by name or phone number" aria-label="Search by name or phone number" className="field pl-10" />
@@ -177,16 +213,21 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
                 <tbody>
                   {rows.map((c) => (
                     <tr key={c.id} className={rowClass}>
-                      <Td className="min-w-48">
-                        <Link href={`/dashboard/customers/${c.id}`} className="font-medium text-ink hover:underline">
-                          {c.name}
-                        </Link>
-                        <p className="tabular text-xs text-muted">{formatPhone(c.phone)}</p>
-                        {!scope.clientId && <p className="text-xs text-ink-2 lg:hidden">{c.client.name}</p>}
-                        {c.purchases && <p className="mt-0.5 line-clamp-1 max-w-xs text-xs text-ink-2 xl:hidden" title={c.purchases}>{c.purchases}</p>}
-                        <div className="mt-1 flex flex-wrap gap-1 empty:hidden lg:hidden">
-                          {flags(c)}
-                          {rowTags(c.tags, c.client?.name).map((t) => <Badge key={t}>{t}</Badge>)}
+                      <Td className="min-w-52">
+                        <div className="flex items-start gap-2.5">
+                          <Avatar name={c.name} />
+                          <div className="min-w-0">
+                            <Link href={`/dashboard/customers/${c.id}`} className="font-medium text-ink hover:underline">
+                              {c.name}
+                            </Link>
+                            <p className="tabular text-xs text-muted">{formatPhone(c.phone)}</p>
+                            {!scope.clientId && <p className="text-xs text-ink-2 lg:hidden">{c.client.name}</p>}
+                            {c.purchases && <p className="mt-0.5 line-clamp-1 max-w-xs text-xs text-ink-2 xl:hidden" title={c.purchases}>{c.purchases}</p>}
+                            <div className="mt-1 flex flex-wrap gap-1 empty:hidden lg:hidden">
+                              {flags(c)}
+                              {rowTags(c.tags, c.client?.name).map((t) => <Badge key={t}>{t}</Badge>)}
+                            </div>
+                          </div>
                         </div>
                       </Td>
                       {!scope.clientId && <Td className="text-xs text-ink-2 max-lg:hidden">{c.client.name}</Td>}

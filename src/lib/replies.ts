@@ -78,7 +78,10 @@ export async function recordReply(r: IncomingReply) {
     // Webhooks retry; the same message id arriving twice is expected.
     if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) throw e;
   }
-  return db.customer.findUnique({ where: { id: customer.id }, select: { id: true, clientId: true, phone: true, name: true, location: true } });
+  return db.customer.findUnique({
+    where: { id: customer.id },
+    select: { id: true, clientId: true, phone: true, name: true, location: true, client: { select: { name: true } } },
+  });
 }
 
 /** Text and kind of a Cloud API inbound message. */

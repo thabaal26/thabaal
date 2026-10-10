@@ -36,11 +36,11 @@ export async function syncMetaAccountBalanceAction(wabaId: string, balance: numb
     return { ok: false, message: "Please enter a valid prepaid balance amount in rupees." };
   }
   const user = await requireUser();
-  const updated = await setMetaAccountBalance(wabaId, val, user.name);
+  const updated = await setMetaAccountBalance(wabaId, val, user.name, s.clientId);
   revalidatePath("/dashboard");
   return {
     ok: true,
-    message: `Meta balance synced successfully: ₹${updated.liveBalance.toFixed(2)} active on ${updated.accountName}.`,
+    message: `Meta balance synced: ₹${updated.liveBalance.toFixed(2)} on ${updated.accountName}.`,
   };
 }
 
@@ -56,5 +56,6 @@ export async function refreshMetaLiveStatusAction(clientId: string): Promise<Act
       message: `Meta Cloud API connected: ${status.wabaName} (${status.displayPhone}) · Quality: ${status.qualityRating}`,
     };
   }
-  return { ok: false, message: "Could not reach Meta Cloud API. Check API credentials." };
+  return { ok: false, message: status.reason ?? "Could not reach Meta Cloud API. Check API credentials." };
 }
+

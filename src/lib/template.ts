@@ -13,6 +13,8 @@ export type TemplateButton = {
   text: string;
   url?: string;
   phone?: string;
+  /** Optional SKU (retailer_id) of the product whose image WhatsApp shows on a CATALOG button. */
+  thumbnailProductId?: string;
 };
 
 export type VarSource = { source: "name" | "first_name" | "phone" | "static"; value?: string };
@@ -123,6 +125,7 @@ export function toPlainText(
       : b.type === "PHONE_NUMBER" ? `📞 ${b.text}: ${b.phone}`
       : b.type === "QUICK_REPLY" ? `↩️ Reply "${b.text}"`
       : b.type === "CATALOG" ? `🛍️ Reply "catalogue" to see our products`
+      : b.type === "ORDER_DETAILS" ? `💳 ${b.text || "Review and pay"}`
       : "",
     )
     .filter(Boolean);
@@ -168,6 +171,10 @@ export function validateDraft(t: TemplateDraft): string[] {
     if (t.headerType !== "NONE") errors.push("Catalogue templates can't have a header: WhatsApp shows a product picture there.");
     if (t.category !== "MARKETING") errors.push("Catalogue templates must be in the Marketing category.");
   }
+  if (t.buttons.some((b) => b.type === "ORDER_DETAILS")) {
+    if (t.buttons.length > 1) errors.push("A 'Review and pay' button must be the template's only button.");
+    if (t.category !== "UTILITY" && t.category !== "MARKETING") errors.push("Order payment templates must be in the Utility or Marketing category.");
+  }
   return errors;
 }
 
@@ -207,12 +214,15 @@ export function toMetaComponents(t: TemplateDraft, headerHandle?: string) {
             ? { type: "PHONE_NUMBER", text: b.text, phone_number: b.phone?.replace(/\s/g, "") }
             : b.type === "CATALOG"
               ? { type: "CATALOG", text: b.text }
-              : { type: "QUICK_REPLY", text: b.text },
+              : b.type === "ORDER_DETAILS"
+                ? { type: "ORDER_DETAILS", text: b.text || "Review and pay" }
+                : { type: "QUICK_REPLY", text: b.text },
       ),
     });
   }
   return c;
 }
+
 
 export type MetaComponent = {
   type: string;

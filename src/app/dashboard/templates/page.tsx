@@ -1,12 +1,12 @@
-import { Plus, RefreshCw, SquarePen } from "lucide-react";
+import { CheckCircle2, Clock, Megaphone, Plus, RefreshCw, SquarePen } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ActionButton } from "@/components/action-button";
-import { Badge, buttonClass, Card, EmptyState, FilterChips, PageHeader, StatusBadge } from "@/components/ui";
+import { Badge, buttonClass, Card, EmptyState, FilterChips, PageHeader, Stat, StatusBadge } from "@/components/ui";
 import { WhatsAppBubble } from "@/components/whatsapp-preview";
 import { DefaultImage } from "./default-image";
 import { db } from "@/lib/db";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, fmtNumber } from "@/lib/format";
 import { getScope, owned } from "@/lib/session";
 import { CATEGORY_INFO, renderFor, SAMPLE_CUSTOMER, type Category, type TemplateButton, type VarMap } from "@/lib/template";
 import { deleteTemplate, syncTemplates } from "../actions/templates";
@@ -28,6 +28,9 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
     db.template.groupBy({ by: ["category"], where: owned(scope), _count: true }),
   ]);
   const total = counts.reduce((a, c) => a + c._count, 0);
+  const approvedCount = templates.filter((t) => t.status === "APPROVED").length;
+  const pendingCount = templates.filter((t) => t.status === "PENDING" || t.status === "DRAFT").length;
+  const marketingCount = counts.find((c) => c.category === "MARKETING")?._count ?? 0;
   const brand = scope.clientId ? await db.client.findUnique({ where: { id: scope.clientId }, select: { defaultImageUrl: true, bannerUrl: true } }) : null;
   // What an image template without its own picture will send.
   const fallbackFor = (c: { defaultImageUrl: string | null; bannerUrl: string | null }) => c.defaultImageUrl ?? c.bannerUrl;
@@ -60,6 +63,20 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
         }
       />
 
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <Stat label="Total templates" value={fmtNumber(total)} sub="Synced with Meta" icon={<SquarePen />} tone="info" href="/dashboard/templates" />
+        <Stat
+          label="Approved"
+          value={fmtNumber(approvedCount)}
+          sub="Ready to send"
+          icon={<CheckCircle2 />}
+          tone="brand"
+          meter={templates.length > 0 ? Math.round((approvedCount / templates.length) * 100) : 0}
+        />
+        <Stat label="Marketing" value={fmtNumber(marketingCount)} sub="Promotions & offers" icon={<Megaphone />} tone="violet" href="/dashboard/templates?category=MARKETING" />
+        <Stat label="In review / Draft" value={fmtNumber(pendingCount)} sub="Waiting on Meta" icon={<Clock />} tone="amber" />
+      </div>
+
       {scope.canManage && brand && (
         <div className="mb-4">
           <DefaultImage url={brand.defaultImageUrl} fallback={brand.bannerUrl} />
@@ -71,12 +88,16 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
           {templates.map((t) => {
             const r = renderFor({ ...t, headerText: t.headerText ?? "", footer: t.footer ?? "", variables: t.variables as VarMap }, SAMPLE_CUSTOMER);
             return (
-              <Card key={t.id} className="flex flex-col overflow-hidden">
+              <Card key={t.id} className="card-3d flex flex-col overflow-hidden">
+                <div className="flex items-center justify-between bg-wa-bar px-3.5 py-2 text-2xs font-medium text-white/90">
+                  <span className="truncate font-semibold">{t.client.name}</span>
+                  <span className="font-mono text-white/70">{t.language}</span>
+                </div>
                 <Link
                   href={`/dashboard/templates/${t.id}`}
                   tabIndex={-1}
                   aria-hidden
-                  className="chat-wall relative block max-h-56 min-h-28 overflow-hidden rounded-t-card p-4 [mask-image:linear-gradient(to_bottom,black_80%,transparent)]"
+                  className="chat-wall relative block max-h-56 min-h-28 overflow-hidden p-4 [mask-image:linear-gradient(to_bottom,black_80%,transparent)]"
                 >
                   <WhatsAppBubble
                     header={r.header}
@@ -90,7 +111,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
                 <div className="flex flex-1 flex-col gap-3 border-t border-line p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <Link href={`/dashboard/templates/${t.id}`} className="block truncate font-mono text-sm font-medium text-ink hover:underline" title={t.name}>{t.name}</Link>
+                      <Link href={`/dashboard/templates/${t.id}`} className="block truncate font-mono text-sm font-semibold text-ink hover:underline" title={t.name}>{t.name}</Link>
                       <p className="mt-0.5 text-xs text-muted">{!scope.clientId && `${t.client.name} · `}{t.language} · updated {fmtDate(t.updatedAt, "d MMM")}{t._count.campaigns ? ` · ${t._count.campaigns} campaign${t._count.campaigns > 1 ? "s" : ""}` : ""}</p>
                     </div>
                     <StatusBadge status={t.status} />
@@ -100,7 +121,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
                       Image missing: sends will fail until you add one here or set a default image above. <span className="font-medium underline">Add image</span>
                     </Link>
                   )}
-                  <div className="mt-auto flex flex-wrap items-center justify-between gap-2">
+                  <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-line/70 pt-3">
                     <span className="flex flex-wrap items-center gap-1.5">
                       <StatusBadge status={t.category} />
                       {t.qualityScore && t.qualityScore !== "UNKNOWN" && (
@@ -122,7 +143,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
           })}
         </div>
       ) : (
-        <Card>
+        <Card className="card-3d">
           <EmptyState
             icon={<SquarePen className="size-5" />}
             title={active ? `No ${CATEGORY_INFO[active].label.toLowerCase()} templates` : "No templates yet"}
@@ -139,3 +160,4 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
     </>
   );
 }
+

@@ -60,23 +60,44 @@ export type SendInput = {
   bodyParams: string[];
   /** Position of a "View catalog" button; Meta needs a parameter for it on every send. */
   catalogButtonIndex?: number;
+  /** Optional SKU (retailer_id) to display as the thumbnail on a CATALOG button. */
+  catalogThumbnailProductId?: string | null;
+  /** One-time passcode for AUTHENTICATION (OTP) templates. */
+  otpCode?: string | null;
 };
 
 export async function sendTemplateMessage(cfg: WaConfig, input: SendInput): Promise<{ id: string; simulated: boolean }> {
   if (!cfg.live) return { id: `demo.${crypto.randomUUID()}`, simulated: true };
 
   const components: Record<string, unknown>[] = [];
-  if (input.headerType === "IMAGE" && input.headerMediaUrl) {
-    components.push({ type: "header", parameters: [{ type: "image", image: { link: input.headerMediaUrl } }] });
-  } else if (input.headerType === "TEXT" && input.headerParams.length) {
-    components.push({ type: "header", parameters: input.headerParams.map((text) => ({ type: "text", text })) });
-  }
-  if (input.bodyParams.length) {
-    components.push({ type: "body", parameters: input.bodyParams.map((text) => ({ type: "text", text })) });
-  }
-  if (input.catalogButtonIndex != null && input.catalogButtonIndex >= 0) {
-    // No thumbnail product given: WhatsApp shows the catalogue's first product.
-    components.push({ type: "button", sub_type: "CATALOG", index: input.catalogButtonIndex, parameters: [{ type: "action", action: {} }] });
+  if (input.otpCode) {
+    components.push({ type: "body", parameters: [{ type: "text", text: input.otpCode }] });
+    components.push({
+      type: "button",
+      sub_type: "url",
+      index: 0,
+      parameters: [{ type: "text", text: input.otpCode }],
+    });
+  } else {
+    if (input.headerType === "IMAGE" && input.headerMediaUrl) {
+      components.push({ type: "header", parameters: [{ type: "image", image: { link: input.headerMediaUrl } }] });
+    } else if (input.headerType === "TEXT" && input.headerParams.length) {
+      components.push({ type: "header", parameters: input.headerParams.map((text) => ({ type: "text", text })) });
+    }
+    if (input.bodyParams.length) {
+      components.push({ type: "body", parameters: input.bodyParams.map((text) => ({ type: "text", text })) });
+    }
+    if (input.catalogButtonIndex != null && input.catalogButtonIndex >= 0) {
+      const action = input.catalogThumbnailProductId
+        ? { thumbnail_product_retailer_id: input.catalogThumbnailProductId }
+        : {};
+      components.push({
+        type: "button",
+        sub_type: "CATALOG",
+        index: input.catalogButtonIndex,
+        parameters: [{ type: "action", action }],
+      });
+    }
   }
 
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
@@ -98,6 +119,32 @@ export async function sendTextMessage(cfg: WaConfig, to: string, body: string): 
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
     body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to, type: "text", text: { body, preview_url: false } }),
+  });
+  return { id: res.messages[0].id, simulated: false };
+}
+
+/** Sends an image or document inside the customer's 24-hour service window. */
+export async function sendMediaMessage(
+  cfg: WaConfig,
+  to: string,
+  mediaUrl: string,
+  caption?: string,
+): Promise<{ id: string; simulated: boolean }> {
+  if (!cfg.live) return { id: `demo.${crypto.randomUUID()}`, simulated: true };
+  const isPdf = /\.pdf(\?|$)/i.test(mediaUrl);
+  const type = isPdf ? "document" : "image";
+  const payload = isPdf
+    ? { link: mediaUrl, ...(caption ? { caption } : {}), filename: "attachment.pdf" }
+    : { link: mediaUrl, ...(caption ? { caption } : {}) };
+  const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type,
+      [type]: payload,
+    }),
   });
   return { id: res.messages[0].id, simulated: false };
 }

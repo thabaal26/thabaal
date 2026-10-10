@@ -1,11 +1,11 @@
-import { ChevronDown, ChevronLeft, ChevronRight, Download, MessagesSquare, Search } from "lucide-react";
+import { CheckCheck, ChevronDown, ChevronLeft, ChevronRight, Download, Eye, MessagesSquare, Search, TriangleAlert } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Picker } from "@/components/picker";
-import { Badge, buttonClass, Card, EmptyState, FilterChips, PageHeader, rowClass, StatusBadge, Table, Td, Th } from "@/components/ui";
+import { Avatar, Badge, buttonClass, Card, DistributionBar, EmptyState, FilterChips, PageHeader, rowClass, Stat, StatusBadge, Table, Td, Th } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
-import { fmtDate, fmtNumber } from "@/lib/format";
+import { fmtDate, fmtNumber, pct } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { MESSAGE_STATUSES, messageWhere } from "@/lib/queries";
 import { getScope, owned, ownedMessages } from "@/lib/session";
@@ -43,6 +43,14 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
   ]);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const allCount = byStatus.reduce((a, s) => a + s._count, 0);
+  const statusCount = (k: string) => byStatus.find((b) => b.status === k)?._count ?? 0;
+  const readCount = statusCount("READ");
+  const deliveredOnlyCount = statusCount("DELIVERED");
+  const sentOnlyCount = statusCount("SENT");
+  const failedCount = statusCount("FAILED");
+  const queuedCount = statusCount("QUEUED");
+  const deliveredTotal = readCount + deliveredOnlyCount;
+  const sentTotal = deliveredTotal + sentOnlyCount + failedCount;
   const exportQs = new URLSearchParams(Object.entries({ ...p, page: undefined }).filter(([, v]) => v) as [string, string][]);
 
   const filtered = Boolean(p.q || p.status || p.campaign || p.range);
@@ -74,7 +82,53 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
         }
       />
 
-      <Card>
+      <section aria-label="Delivery summary" className="mb-4 grid grid-cols-2 gap-2.5 sm:mb-5 sm:gap-3.5 lg:grid-cols-4">
+        <Stat
+          label="Total logged"
+          value={fmtNumber(allCount)}
+          sub={queuedCount > 0 ? `${fmtNumber(queuedCount)} queued right now` : "Across filtered range"}
+          icon={<MessagesSquare className="size-4" />}
+          tone="brand"
+        />
+        <Stat
+          label="Delivered"
+          value={`${pct(deliveredTotal, sentTotal)}%`}
+          sub={`${fmtNumber(deliveredTotal)} reached phones`}
+          icon={<CheckCheck className="size-4" />}
+          tone="info"
+          meter={pct(deliveredTotal, sentTotal)}
+        />
+        <Stat
+          label="Read rate"
+          value={`${pct(readCount, deliveredTotal)}%`}
+          sub={`${fmtNumber(readCount)} opened on WhatsApp`}
+          icon={<Eye className="size-4" />}
+          tone="violet"
+          meter={pct(readCount, deliveredTotal)}
+        />
+        <Stat
+          label="Failed"
+          value={fmtNumber(failedCount)}
+          sub={failedCount > 0 ? "Tap Failed chip to inspect" : "Zero delivery errors"}
+          icon={<TriangleAlert className="size-4" />}
+          tone={failedCount > 0 ? "amber" : "gold"}
+        />
+      </section>
+
+      <Card className="card-3d">
+        {allCount > 0 && (
+          <div className="border-b border-line bg-subtle/40 px-4 py-3">
+            <DistributionBar
+              segments={[
+                { key: "READ", label: "Read", value: readCount, color: "bg-brand", href: href(p, { status: "READ", page: undefined }) },
+                { key: "DELIVERED", label: "Delivered", value: deliveredOnlyCount, color: "bg-info", href: href(p, { status: "DELIVERED", page: undefined }) },
+                { key: "SENT", label: "Sent", value: sentOnlyCount, color: "bg-accent", href: href(p, { status: "SENT", page: undefined }) },
+                { key: "QUEUED", label: "Queued", value: queuedCount, color: "bg-gold", href: href(p, { status: "QUEUED", page: undefined }) },
+                { key: "FAILED", label: "Failed", value: failedCount, color: "bg-danger", href: href(p, { status: "FAILED", page: undefined }) },
+              ]}
+            />
+          </div>
+        )}
         <form role="search" aria-label="Filter messages" className="grid gap-2 border-b border-line p-3 sm:flex sm:flex-wrap">
           {p.status && <input type="hidden" name="status" value={p.status} />}
           <div className="relative min-w-0 sm:min-w-56 sm:flex-1">
@@ -120,6 +174,7 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
                 <li key={m.id}>
                   <details className="group">
                     <summary className="flex cursor-pointer list-none gap-3 px-4 py-3 transition-colors active:bg-sunken [&::-webkit-details-marker]:hidden">
+                      <Avatar name={m.customer.name} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
                           <p className="truncate font-medium text-ink">{m.customer.name}</p>
@@ -166,9 +221,16 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
                 <tbody>
                   {rows.map((m) => (
                     <tr key={m.id} className={rowClass}>
-                      <Td className="min-w-40">
-                        <p className="font-medium text-ink">{m.customer.name}</p>
-                        <p className="tabular text-xs text-muted">{formatPhone(m.customer.phone)}</p>
+                      <Td className="min-w-44">
+                        <div className="flex items-center gap-2.5">
+                          <Avatar name={m.customer.name} />
+                          <div className="min-w-0">
+                            <Link href={`/dashboard/customers/${m.customer.id}`} className="block truncate font-medium text-ink hover:underline">
+                              {m.customer.name}
+                            </Link>
+                            <p className="tabular text-xs text-muted">{formatPhone(m.customer.phone)}</p>
+                          </div>
+                        </div>
                       </Td>
                       <Td className="max-w-md">
                         <details className="group">

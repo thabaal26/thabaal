@@ -1,10 +1,10 @@
 import { PhoneCall, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
+import { Badge, Card, CardHeader, EmptyState, PageHeader, Stat } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, fmtNumber } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { getScope, owned } from "@/lib/session";
 
@@ -30,14 +30,40 @@ export default async function CallsPage() {
     take: 200,
   });
 
+  const connectedCount = calls.filter((c) => c.status === "ENDED" || c.status === "ANSWERED").length;
+  const missedCount = calls.filter((c) => c.status === "MISSED" || c.status === "REJECTED").length;
+  const outgoingCount = calls.filter((c) => c.direction === "OUTGOING").length;
+
   return (
     <>
       <PageHeader
         title="Calls"
         description="WhatsApp voice calls with customers. Keep the portal open in a tab: incoming calls ring here. To call a customer, open their page and use Call on WhatsApp."
       />
+
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <Stat label="Total calls" value={fmtNumber(calls.length)} sub="Recent call log" icon={<PhoneCall />} tone="info" />
+        <Stat
+          label="Connected"
+          value={fmtNumber(connectedCount)}
+          sub="Answered on WhatsApp"
+          icon={<PhoneIncoming />}
+          tone="brand"
+          meter={calls.length > 0 ? Math.round((connectedCount / calls.length) * 100) : 0}
+        />
+        <Stat
+          label="Missed / Declined"
+          value={fmtNumber(missedCount)}
+          sub={missedCount > 0 ? "Follow up with customer" : "No missed calls"}
+          icon={<PhoneMissed />}
+          tone={missedCount > 0 ? "rose" : "gold"}
+        />
+        <Stat label="Outgoing" value={fmtNumber(outgoingCount)} sub="Placed from the portal" icon={<PhoneOutgoing />} tone="violet" />
+      </div>
+
       {calls.length ? (
-        <Card>
+        <Card className="card-3d overflow-hidden">
+          <CardHeader tone="brand" icon={<PhoneCall />} title="Call history" description="Tap a customer to open their profile and conversation" />
           <ul className="divide-y divide-line">
             {calls.map((c) => {
               const s = STATUS[c.status];
@@ -45,24 +71,24 @@ export default async function CallsPage() {
               const Icon = outgoing && c.status !== "MISSED" ? PhoneOutgoing : s.icon;
               const label = outgoing ? { RINGING: "Ringing", ANSWERED: "On call", ENDED: "Connected", MISSED: "No answer", REJECTED: "Declined" }[c.status] : s.label;
               return (
-                <li key={c.id} className={cn("relative flex items-start gap-3 px-4 py-3 sm:px-5", c.customer && "transition-colors hover:bg-canvas/70 active:bg-sunken")}>
-                  <span aria-hidden className={cn("grid size-10 shrink-0 place-items-center rounded-full", c.status === "MISSED" ? "bg-danger-bg text-danger" : "bg-brand-soft text-brand-deep")}>
+                <li key={c.id} className={cn("relative flex items-start gap-3 px-4 py-3.5 sm:px-5", c.customer && "transition-colors hover:bg-subtle active:bg-sunken")}>
+                  <span aria-hidden className={cn("grid size-10 shrink-0 place-items-center rounded-full ring-1 ring-inset", c.status === "MISSED" ? "bg-danger-bg text-danger ring-danger-border" : "bg-brand-soft text-brand-deep ring-brand/20")}>
                     <Icon className="size-4" />
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         {c.customer ? (
-                          <Link href={`/dashboard/customers/${c.customer.id}`} className="font-medium text-ink after:absolute after:inset-0 hover:underline">
+                          <Link href={`/dashboard/customers/${c.customer.id}`} className="font-semibold text-ink after:absolute after:inset-0 hover:underline">
                             {c.customer.name}
                           </Link>
                         ) : (
-                          <span className="font-medium text-ink">{c.callerName || "Unknown caller"}</span>
+                          <span className="font-semibold text-ink">{c.callerName || "Unknown caller"}</span>
                         )}
                         <p className="tabular text-xs text-muted">{formatPhone(c.fromPhone)}</p>
                       </div>
                       <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                        <Badge tone={s.tone}>{label}</Badge>
+                        <Badge tone={s.tone} dot>{label}</Badge>
                         {outgoing && <Badge tone="blue">Outgoing</Badge>}
                       </div>
                     </div>
@@ -79,7 +105,7 @@ export default async function CallsPage() {
           </ul>
         </Card>
       ) : (
-        <Card>
+        <Card className="card-3d">
           <EmptyState icon={<PhoneCall className="size-5" />} title="No calls yet">
             When a customer calls your WhatsApp number, it rings in every open portal tab and shows up here.
           </EmptyState>
@@ -88,3 +114,4 @@ export default async function CallsPage() {
     </>
   );
 }
+

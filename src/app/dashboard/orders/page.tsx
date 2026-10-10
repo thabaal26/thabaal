@@ -1,13 +1,14 @@
-import { PackageCheck, PackageOpen, Search, ShoppingBag, Store } from "lucide-react";
+import { IndianRupee, PackageCheck, PackageOpen, Search, ShoppingBag, Store, Truck } from "lucide-react";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { Picker } from "@/components/picker";
-import { buttonClass, Callout, Card, EmptyState, FilterChips, PageHeader, Section } from "@/components/ui";
+import { buttonClass, Callout, Card, DistributionBar, EmptyState, FilterChips, PageHeader, Section, Stat } from "@/components/ui";
+import { getCatalogWithProducts } from "@/lib/catalog";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { fmtNumber } from "@/lib/format";
-import type { OrderItem } from "@/lib/orders";
+import { money, type OrderItem } from "@/lib/orders";
 import { getScope, owned } from "@/lib/session";
 import { sendableTemplates } from "@/lib/senders";
 import { META_SAMPLES } from "@/lib/template";
@@ -16,12 +17,13 @@ import { PAYMENT_TEMPLATE, paymentTemplateFor } from "@/lib/payments";
 import { createOrderTemplates } from "../actions/orders";
 import { NewOrder } from "./new-order";
 import { OrderCard } from "./order-card";
+import type { CatalogProductOption } from "./order-items-editor";
 import { PaymentForm } from "./payment-form";
 import { RefillForm } from "./refill-form";
 import { OrdersRefreshButton } from "./orders-refresh-button";
 
 /** The utility templates that let order updates go out after the customer's 24-hour window. */
-const ORDER_TEMPLATES = ["order_confirmation", "order_dispatched", "order_delivered"];
+const ORDER_TEMPLATES = ["order_confirmation", "order_dispatched", "order_delivered", "order_cancelled"];
 
 export const metadata: Metadata = { title: "Orders" };
 export const dynamic = "force-dynamic";
@@ -127,6 +129,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     approved,
     ownPaymentTemplate,
     paymentTemplate,
+    catalogData,
   ] = await Promise.all([
     db.order.findMany({
       where: baseWhere,
@@ -153,7 +156,19 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
       : [],
     scope.clientId ? db.template.findFirst({ where: { clientId: scope.clientId, name: PAYMENT_TEMPLATE }, select: { status: true } }) : null,
     scope.clientId ? paymentTemplateFor(scope.clientId) : null,
+    scope.clientId ? getCatalogWithProducts(scope.clientId) : null,
   ]);
+
+  const catalogProducts: CatalogProductOption[] = (catalogData?.products ?? []).map((p) => ({
+    id: p.id,
+    retailerId: p.retailerId,
+    name: p.name,
+    priceAmount: p.priceAmount,
+    category: p.category,
+    inStock: p.inStock,
+  }));
+  const catalogId = catalogData?.catalogId ?? null;
+  const isLiveCatalog = Boolean(catalogData?.isLive);
 
   const tabCount: Record<string, number> = {
     "": activeCount,
@@ -206,7 +221,12 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
                 <Link href="/dashboard/orders/packing" aria-label="Packing list" className={cn(buttonClass("secondary"), "max-sm:w-11 max-sm:px-0")}>
                   <PackageOpen aria-hidden className="size-4" /> <span className="max-sm:hidden">Packing list</span>
                 </Link>
-                <NewOrder />
+                <NewOrder
+                  catalogProducts={catalogProducts}
+                  catalogId={catalogId}
+                  isLiveCatalog={isLiveCatalog}
+                  hasPaymentConfig={Boolean(client?.paymentConfig)}
+                />
               </>
             ) : null}
           </div>
@@ -225,9 +245,44 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         }
       />
 
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <Stat
+          label="Active pipeline"
+          value={fmtNumber(activeCount)}
+          sub={`${fmtNumber(unpaidCount)} unpaid · ${fmtNumber(dispatchedCount)} in transit`}
+          icon={<ShoppingBag />}
+          tone="brand"
+          href={qs({ show: undefined })}
+        />
+        <Stat
+          label="New · To confirm"
+          value={fmtNumber(newCount)}
+          sub={newCount > 0 ? "Waiting for confirmation" : "All caught up"}
+          icon={<PackageOpen />}
+          tone="amber"
+          href={qs({ show: "new" })}
+        />
+        <Stat
+          label="To pack & dispatch"
+          value={fmtNumber(confirmedCount + paidCount)}
+          sub={`${fmtNumber(confirmedCount)} confirmed · ${fmtNumber(paidCount)} paid`}
+          icon={<Truck />}
+          tone="info"
+          href="/dashboard/orders/packing"
+        />
+        <Stat
+          label="Shown order value"
+          value={money(orders.filter((o) => o.status !== "CANCELLED").reduce((sum, o) => sum + o.total, 0))}
+          sub={`${fmtNumber(deliveredCount)} delivered · ${fmtNumber(allCount)} total`}
+          icon={<IndianRupee />}
+          tone="gold"
+          href={qs({ show: "done" })}
+        />
+      </div>
+
       <div className="flex flex-col gap-4">
-        <Card>
-          <form role="search" aria-label="Filter orders" className="grid gap-2 p-3 sm:flex sm:flex-wrap sm:items-center">
+        <Card className="card-3d">
+          <form role="search" aria-label="Filter orders" className="grid gap-2 p-3 sm:flex sm:flex-wrap sm:items-center sm:p-4">
             {tab.key && <input type="hidden" name="show" value={tab.key} />}
             <div className="relative min-w-0 sm:min-w-56 sm:flex-1">
               <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
@@ -269,6 +324,19 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
               </Link>
             )}
           </form>
+          {allCount > 0 && (
+            <div className="border-t border-line px-3 py-3 sm:px-4">
+              <DistributionBar
+                segments={[
+                  { key: "new", label: "New", value: newCount, color: "#b7791f", href: qs({ show: "new" }) },
+                  { key: "confirmed", label: "Confirmed", value: confirmedCount, color: "#1d64a8", href: qs({ show: "confirmed" }) },
+                  { key: "dispatched", label: "Dispatched", value: dispatchedCount, color: "#6941c6", href: qs({ show: "dispatched" }) },
+                  { key: "done", label: "Delivered", value: deliveredCount, color: "#167d63", href: qs({ show: "done" }) },
+                  { key: "cancelled", label: "Cancelled", value: cancelledCount, color: "#98a2b3", href: qs({ show: "cancelled" }) },
+                ]}
+              />
+            </div>
+          )}
         </Card>
 
         {scope.clientId && notReady.length > 0 && (
@@ -293,12 +361,19 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
           <ul className="grid gap-3 sm:gap-4 xl:grid-cols-2">
             {orders.map((o) => (
               <li key={o.id} className="min-w-0">
-                <OrderCard order={o} items={o.items as OrderItem[]} showClient={!scope.clientId} canEdit={canEdit} />
+                <OrderCard
+                  order={o}
+                  items={o.items as OrderItem[]}
+                  showClient={!scope.clientId}
+                  canEdit={canEdit}
+                  catalogProducts={catalogProducts}
+                  isLiveCatalog={isLiveCatalog}
+                />
               </li>
             ))}
           </ul>
         ) : (
-          <Card>
+          <Card className="card-3d">
             <EmptyState icon={show === "done" ? <PackageCheck className="size-5" /> : <ShoppingBag className="size-5" />} title="No orders here yet">
               {filtered
                 ? "No orders matched your active filters. Try picking another status, time range or clearing your search."
@@ -311,7 +386,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
       {/* Settings below the orders, so staff on a phone see today's orders first. */}
       {scope.canManage && scope.clientId && (
         <Section title="Order settings" description="Order message pictures, WhatsApp payments, refill reminders and win-back messages.">
-          <Card>
+          <Card className="card-3d">
             <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:p-5">
               {/* eslint-disable-next-line @next/next/no-img-element -- our own public image */}
               <img src="/thenan-order-header.jpg" alt="Order message picture" width={64} height={64} className="size-16 shrink-0 rounded-control object-cover ring-1 ring-line" />

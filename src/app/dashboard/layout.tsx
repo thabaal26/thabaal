@@ -94,8 +94,9 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           Skip to content
         </a>
 
-        <aside className="surface-dark fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-white/[0.06] bg-night lg:flex print:!hidden">
-          <div className="flex h-16 shrink-0 items-center gap-3 px-4">
+        <aside className="surface-dark fixed inset-y-0 left-0 z-40 hidden w-64 flex-col overflow-hidden border-r border-white/[0.08] bg-night lg:flex print:!hidden">
+          <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_60%_at_0%_0%,rgb(22_125_99/0.22),transparent_55%),radial-gradient(90%_50%_at_100%_100%,rgb(234_191_38/0.1),transparent_60%)]" />
+          <div className="relative flex h-16 shrink-0 items-center gap-3 border-b border-white/[0.06] px-4">
             <BrandMark logoUrl={client?.logoUrl} name={name} size="md" />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-white">{name}</p>
@@ -103,17 +104,17 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
             </div>
           </div>
           {scope.isAdmin && (
-            <div className="shrink-0 px-3 pb-2">
+            <div className="relative shrink-0 px-3 pt-2.5 pb-1">
               <ClientSwitcher clients={clients} current={scope.clientId} dark />
             </div>
           )}
-          <div className="thin-scroll min-h-0 flex-1 overflow-y-auto px-3 py-3 [scrollbar-color:rgb(255_255_255/0.15)_transparent]">
+          <div className="thin-scroll relative min-h-0 flex-1 overflow-y-auto px-3 py-3 [scrollbar-color:rgb(255_255_255/0.15)_transparent]">
             <SideNav isAdmin={scope.isAdmin} openReplies={openReplies} newOrders={newOrders} unreadNotifications={unreadNotifications} />
           </div>
-          <div className="shrink-0 space-y-3 border-t border-white/[0.06] p-3">
+          <div className="relative shrink-0 space-y-3 border-t border-white/[0.08] bg-black/15 p-3">
             {status && <div className="px-1 text-xs">{status}</div>}
             <div className="flex items-center gap-2.5 rounded-control px-1">
-              <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full bg-night-2 text-xs font-semibold text-white ring-1 ring-white/10">
+              <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full bg-night-2 text-xs font-semibold text-glow ring-1 ring-white/15">
                 {initials(user.name)}
               </span>
               <div className="min-w-0 flex-1">
@@ -136,17 +137,35 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
         </aside>
 
         {/* Computers: where you are, and the account controls. Phones use the dark header below. */}
-        <header className="sticky top-0 z-30 hidden h-16 items-center gap-4 border-b border-line bg-panel/95 px-6 backdrop-blur-sm lg:flex xl:px-8 print:!hidden">
+        <header className="sticky top-0 z-30 hidden h-16 items-center gap-4 border-b border-line bg-panel/95 px-6 backdrop-blur-md lg:flex xl:px-8 print:!hidden">
           <TopbarTrail workspace={client ? name : scope.isAdmin ? "All clients" : name} />
-          <div className="ml-auto flex items-center gap-1">
+          <div className="ml-auto flex items-center gap-2">
+            {newOrders > 0 && (
+              <Link
+                href="/dashboard/orders"
+                className="inline-flex h-8 items-center gap-1.5 rounded-full border border-warning-border bg-warning-bg px-3 text-xs font-semibold text-warning shadow-2xs transition hover:brightness-95"
+              >
+                <span aria-hidden className="size-1.5 rounded-full bg-warning-solid" />
+                <span className="tabular">{newOrders}</span> order{newOrders === 1 ? "" : "s"} to handle
+              </Link>
+            )}
+            {openReplies > 0 && (
+              <Link
+                href="/dashboard/replies"
+                className="inline-flex h-8 items-center gap-1.5 rounded-full border border-brand/25 bg-brand-soft px-3 text-xs font-semibold text-brand-deep shadow-2xs transition hover:brightness-95"
+              >
+                <span aria-hidden className="size-1.5 rounded-full bg-brand" />
+                <span className="tabular">{openReplies}</span> open repl{openReplies === 1 ? "y" : "ies"}
+              </Link>
+            )}
             <NotificationBell />
-            <span aria-hidden className="mx-2 h-6 w-px bg-line" />
+            <span aria-hidden className="mx-1 h-6 w-px bg-line" />
             <Link
               href="/dashboard/settings"
               title="Account settings"
               className="flex min-w-0 items-center gap-2.5 rounded-control py-1 pl-1 pr-2 transition hover:bg-sunken"
             >
-              <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-deep">
+              <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-deep ring-1 ring-brand/20">
                 {initials(user.name)}
               </span>
               <span className="hidden min-w-0 text-left xl:block">

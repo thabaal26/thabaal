@@ -81,48 +81,56 @@ export default async function PackingPage({ searchParams }: PageProps<"/dashboar
       />
       {orders.length ? (
         <div className="space-y-6 print:space-y-3">
-          <Card className="print:break-inside-avoid">
-            <CardHeader title="Pick list" description="Everything to take from stock for these orders." />
+          <Card className="card-3d print:break-inside-avoid">
+            <CardHeader tone="brand" icon={<PackageOpen />} title="Pick list" description="Everything to take from stock for these orders." />
             <ul className="grid gap-x-8 px-4 py-2 text-sm sm:grid-cols-2 sm:px-5 lg:grid-cols-3 print:grid-cols-3">
               {picks.map(([name, qty]) => (
-                <li key={name} className="flex justify-between gap-3 border-b border-line py-2">
-                  <span className="min-w-0">{name}</span>
-                  <b className="tabular shrink-0 whitespace-nowrap">× {fmtNumber(qty)}</b>
+                <li key={name} className="flex items-center justify-between gap-3 border-b border-line py-2.5">
+                  <span className="min-w-0 font-medium text-ink">{name}</span>
+                  <span className="tabular shrink-0 whitespace-nowrap rounded-control bg-brand-soft px-2 py-0.5 text-xs font-bold text-brand-deep ring-1 ring-inset ring-brand/20">
+                    × {fmtNumber(qty)}
+                  </span>
                 </li>
               ))}
             </ul>
           </Card>
 
           {areas.map(([area, list]) => (
-            <section key={area} className="space-y-2">
-              <h2 className="text-base font-semibold text-ink">{area} <span className="text-sm font-normal text-muted">· {list.length} order{list.length === 1 ? "" : "s"}</span></h2>
+            <section key={area} className="space-y-2.5">
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-semibold text-ink">{area}</h2>
+                <Badge tone="brand">{list.length} order{list.length === 1 ? "" : "s"}</Badge>
+              </div>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 print:grid-cols-2">
                 {list.map((o) => (
-                  <Card key={o.id} className="p-4 text-sm print:break-inside-avoid">
+                  <Card key={o.id} className="card-3d relative overflow-hidden p-4 text-sm print:break-inside-avoid">
+                    <span aria-hidden className="absolute inset-x-0 top-0 h-[3px] bg-brand print:hidden" />
                     <div className="flex justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="font-semibold">{o.customer.name}</p>
+                        <p className="font-semibold text-ink">{o.customer.name}</p>
                         <p className="tabular text-xs text-muted">{formatPhone(o.customer.phone)}</p>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1 text-xs text-muted">
-                        <p className="font-mono font-medium text-ink">{orderRef(o)}</p>
+                        <p className="rounded bg-sunken px-1.5 py-0.5 font-mono font-semibold text-ink ring-1 ring-line">{orderRef(o)}</p>
                         {isPaid(o) ? <Badge tone="green" dot>Paid</Badge> : <Badge tone="amber" dot>To collect</Badge>}
                       </div>
                     </div>
-                    <ul className="mt-2 space-y-0.5">
+                    <ul className="mt-2.5 space-y-1 rounded-control bg-sunken/70 p-2.5">
                       {(o.items as OrderItem[]).map((i, k) => (
                         <li key={k} className="flex gap-2">
-                          <span className="inline-block size-3.5 shrink-0 translate-y-0.5 rounded-sm border border-line-strong" aria-hidden />
-                          <span className="flex-1">{i.quantity} × {i.name ?? i.id}</span>
+                          <span className="inline-block size-3.5 shrink-0 translate-y-0.5 rounded-sm border border-line-strong bg-white" aria-hidden />
+                          <span className="flex-1 text-ink">
+                            <b className="tabular font-semibold">{i.quantity} ×</b> {i.name ?? i.id}
+                          </span>
                         </li>
                       ))}
                     </ul>
-                    <p className="tabular mt-1.5 text-xs text-muted">{fmtDate(o.createdAt, "EEE d MMM, h:mm a")}</p>
-                    <p className="mt-2 flex justify-between border-t border-line pt-2 font-semibold">
+                    <p className="tabular mt-2 text-xs text-muted">{fmtDate(o.createdAt, "EEE d MMM, h:mm a")}</p>
+                    <p className="mt-2 flex justify-between border-t border-line pt-2 font-semibold text-ink">
                       <span>Total</span>
                       <span className="tabular">{money(o.total, o.currency)}</span>
                     </p>
-                    {(o.note || o.internalNote) && <p className="mt-1 text-xs text-muted">{[o.note, o.internalNote].filter(Boolean).join(" · ")}</p>}
+                    {(o.note || o.internalNote) && <p className="mt-1.5 rounded bg-subtle px-2 py-1 text-xs text-muted">{[o.note, o.internalNote].filter(Boolean).join(" · ")}</p>}
                   </Card>
                 ))}
               </div>
@@ -130,7 +138,7 @@ export default async function PackingPage({ searchParams }: PageProps<"/dashboar
           ))}
         </div>
       ) : (
-        <Card>
+        <Card className="card-3d">
           <EmptyState icon={<PackageOpen className="size-5" />} title={pay ? `No ${pay} orders to pack` : "Nothing to pack"}>
             {pay ? "Try All to see every confirmed and paid order." : "Confirmed and paid orders appear here until they're dispatched."}
           </EmptyState>

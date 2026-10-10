@@ -1,18 +1,15 @@
-import { CalendarClock, Plus } from "lucide-react";
+import { CalendarClock, PauseCircle, PlayCircle, Plus, Sparkles, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ActionButton } from "@/components/action-button";
-import { Badge, buttonClass, Card, EmptyState, PageHeader, StatusBadge } from "@/components/ui";
+import { Badge, buttonClass, Card, EmptyState, FilterChips, PageHeader, Stat, StatusBadge } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, fmtNumber } from "@/lib/format";
 import { quietUntil } from "@/lib/rules";
 import { DAYS, effectiveInterval, estimateDuration, formatMinutes, timeUntil } from "@/lib/schedule";
 import { getScope, owned } from "@/lib/session";
 import { toggleCampaign } from "../actions/campaigns";
-
-import { fmtNumber } from "@/lib/format";
-import { FilterChips } from "@/components/ui";
 import { WinbackForm } from "./winback-form";
 
 export const metadata: Metadata = { title: "Campaigns" };
@@ -58,6 +55,7 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
       : 0,
   ]);
   const audienceOf = (clientId: string) => audiences.find((a) => a.clientId === clientId)?._count ?? 0;
+  const totalReach = audiences.reduce((sum, a) => sum + a._count, 0);
   const canCreate = scope.canManage && scope.clientId;
   const now = new Date();
 
@@ -102,12 +100,49 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
         }
       />
 
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <Stat
+          label="Active schedules"
+          value={fmtNumber(activeCount)}
+          sub={`of ${fmtNumber(campaigns.length)} total campaigns`}
+          icon={<PlayCircle />}
+          tone="brand"
+          meter={campaigns.length > 0 ? Math.round((activeCount / campaigns.length) * 100) : 0}
+          href="/dashboard/campaigns?show=active"
+        />
+        <Stat
+          label="Paused"
+          value={fmtNumber(pausedCount)}
+          sub="Hold until resumed"
+          icon={<PauseCircle />}
+          tone="amber"
+          href="/dashboard/campaigns?show=paused"
+        />
+        <Stat
+          label="Reachable customers"
+          value={fmtNumber(totalReach)}
+          sub="Opted-in recipients"
+          icon={<Users />}
+          tone="info"
+          href="/dashboard/customers"
+        />
+        <Stat
+          label="Lapsed customers"
+          value={fmtNumber(lapsed)}
+          sub={clientData?.winbackTemplateId ? "Auto win-back enabled" : "Ready for win-back"}
+          icon={<Sparkles />}
+          tone="gold"
+          href="/dashboard/customers?tag=lapsed"
+        />
+      </div>
+
       {visible.length ? (
         <div className="grid gap-3 sm:gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {visible.map((c) => {
             const last = c.runs[0];
             return (
-              <Card key={c.id} className={cn("lift relative flex flex-col p-4 active:bg-sunken sm:p-5", !c.active && "bg-canvas")}>
+              <Card key={c.id} className={cn("card-3d relative flex flex-col overflow-hidden p-4 active:bg-sunken sm:p-5", !c.active && "opacity-90")}>
+                <span aria-hidden className={cn("absolute inset-x-0 top-0 h-[3px]", c.active ? "bg-brand" : "bg-line-strong")} />
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <Link href={`/dashboard/campaigns/${c.id}`} className="block truncate text-base font-semibold text-ink outline-none after:absolute after:inset-0 after:rounded-card hover:underline focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-[var(--color-brand-deep)]">
@@ -121,7 +156,7 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
                   {c.active ? <Badge tone="green" dot>Active</Badge> : <Badge dot>Paused</Badge>}
                 </div>
 
-                <div className="mt-4 space-y-1.5">
+                <div className="mt-4 space-y-2">
                   <div className="flex items-center gap-2">
                     {c.scheduleType === "WEEKLY" ? (
                       <Badge tone="brand">
@@ -142,7 +177,14 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
                   {c.scheduleType === "WEEKLY" && (
                     <ul aria-label={`Sends every ${c.daysOfWeek.map((d) => DAYS[d]).join(", ")}`} className="grid max-w-80 grid-cols-7 gap-1">
                       {DAYS.map((d, i) => (
-                        <li key={d} aria-hidden className={cn("grid h-7 place-items-center rounded-[6px] text-2xs font-medium", c.daysOfWeek.includes(i) ? "bg-brand text-white font-semibold" : "bg-sunken text-muted")}>
+                        <li
+                          key={d}
+                          aria-hidden
+                          className={cn(
+                            "grid h-7 place-items-center rounded-[6px] text-2xs font-medium",
+                            c.daysOfWeek.includes(i) ? "tile-3d bg-brand font-semibold text-white" : "bg-sunken text-muted",
+                          )}
+                        >
                           {d}
                         </li>
                       ))}
@@ -150,18 +192,18 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
                   )}
                 </div>
 
-                <dl className="tabular mt-4 flex justify-between gap-3 border-t border-line pt-3 text-xs sm:grid sm:grid-cols-3">
+                <dl className="tabular mt-4 grid grid-cols-3 gap-2 rounded-control bg-sunken/75 p-2.5 text-xs">
                   <div>
                     <dt className="text-muted">Time</dt>
-                    <dd className="mt-0.5 whitespace-nowrap text-sm font-medium text-ink">{c.sendTime}</dd>
+                    <dd className="mt-0.5 whitespace-nowrap text-sm font-semibold text-ink">{c.sendTime}</dd>
                   </div>
                   <div>
                     <dt className="text-muted">Pace</dt>
-                    <dd className="mt-0.5 whitespace-nowrap text-sm font-medium text-ink">{c.batchSize} / {effectiveInterval(c.intervalMinutes)} min</dd>
+                    <dd className="mt-0.5 whitespace-nowrap text-sm font-semibold text-ink">{c.batchSize} / {effectiveInterval(c.intervalMinutes)}m</dd>
                   </div>
                   <div>
                     <dt className="text-muted">Takes</dt>
-                    <dd className="mt-0.5 whitespace-nowrap text-sm font-medium text-ink">~{formatMinutes(estimateDuration(audienceOf(c.clientId), c.batchSize, c.intervalMinutes))}</dd>
+                    <dd className="mt-0.5 whitespace-nowrap text-sm font-semibold text-ink">~{formatMinutes(estimateDuration(audienceOf(c.clientId), c.batchSize, c.intervalMinutes))}</dd>
                   </div>
                 </dl>
 
@@ -197,7 +239,7 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
           })}
         </div>
       ) : (
-        <Card>
+        <Card className="card-3d">
           <EmptyState
             icon={<CalendarClock className="size-5" />}
             title="No campaigns yet"
@@ -225,3 +267,4 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
     </>
   );
 }
+

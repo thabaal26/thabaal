@@ -1,9 +1,12 @@
-import { ExternalLink, Wallet } from "lucide-react";
+import { ExternalLink, Trash2, Wallet } from "lucide-react";
+import { ActionButton } from "@/components/action-button";
 import { Badge, buttonClass, Card, CardHeader } from "@/components/ui";
 import { cn } from "@/lib/cn";
-import { fmtNumber } from "@/lib/format";
+import { fmtDate, fmtNumber } from "@/lib/format";
 import { senderFor } from "@/lib/senders";
 import { CATEGORY_LABEL, RATES, spendSummary, total, type SpendRow } from "@/lib/spend";
+import { deleteTopUp } from "./actions/spend";
+import { TopUpForm } from "./top-up-form";
 
 const rupees = (n: number) => `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -35,11 +38,12 @@ function SpendRows({ rows }: { rows: SpendRow[] }) {
  * prepaid balance last recorded for the client's WhatsApp account. Neither is read live from Meta,
  * so the card says so and links to Meta's Billing Hub for the authoritative figures.
  */
-export async function SpendCard({ clientId, className }: { clientId: string; canManage: boolean; className?: string }) {
+export async function SpendCard({ clientId, canManage, className }: { clientId: string; canManage: boolean; className?: string }) {
   const [s, { number }] = await Promise.all([spendSummary(clientId), senderFor(clientId)]);
   const acc = s.metaAccount;
-  // The balance store falls back to another account when it has no record for this one; only show a match.
-  const recorded = Boolean(number?.businessAccountId && acc.wabaId === number.businessAccountId);
+  const wabaId = number?.businessAccountId || acc.wabaId;
+  // Show balance when the WABA matches or when top-ups/syncs have been recorded for this client.
+  const recorded = Boolean((number?.businessAccountId && acc.wabaId === number.businessAccountId) || s.topUps.length > 0 || new Date(s.lastSyncedAt).getTime() > 0);
   const low = recorded && s.remainingBalance < 50;
 
   return (
@@ -81,13 +85,13 @@ export async function SpendCard({ clientId, className }: { clientId: string; can
               </div>
               <p className="tabular mt-1 text-2xl font-semibold leading-tight text-ink">{rupees(s.remainingBalance)}</p>
               <p className="mt-1 text-xs text-muted">
-                {acc.accountName} · not read live from Meta, so check the Billing Hub before a large campaign.
+                {acc.accountName} · check Meta&apos;s Billing Hub before a large campaign, or sync/top up below.
               </p>
             </>
           ) : (
             <>
               <p className="text-xs font-medium text-ink-2">Prepaid balance</p>
-              <p className="mt-1 text-sm text-muted">No balance is recorded for this WhatsApp account. See it on Meta&apos;s Billing Hub.</p>
+              <p className="mt-1 text-sm text-muted">No balance is recorded for this WhatsApp account yet. Sync it below or see Meta&apos;s Billing Hub.</p>
             </>
           )}
           <a href={acc.billingUrl} target="_blank" rel="noopener noreferrer" className={cn(buttonClass(low ? "primary" : "secondary", "sm"), "mt-3 w-full")}>
@@ -101,6 +105,31 @@ export async function SpendCard({ clientId, className }: { clientId: string; can
           <SpendRows rows={s.current} />
         </div>
 
+        {s.topUps.length > 0 && (
+          <div className="border-t border-line pt-3">
+            <p className="mb-1.5 text-xs font-medium text-muted">Recent top-ups</p>
+            <ul className="divide-y divide-line text-xs">
+              {s.topUps.map((t) => (
+                <li key={t.id} className="flex items-center justify-between gap-2 py-1.5">
+                  <div className="min-w-0">
+                    <span className="tabular font-medium text-ink">{rupees(t.amount)}</span>
+                    {t.note && <span className="text-muted"> · {t.note}</span>}
+                    <span className="block text-2xs text-muted">{fmtDate(t.createdAt, "d MMM yyyy")}</span>
+                  </div>
+                  {canManage && (
+                    <ActionButton action={deleteTopUp.bind(null, t.id)} variant="ghost" size="sm" confirm="Remove this top-up record?" title="Remove top-up">
+                      <Trash2 aria-hidden className="size-3.5 text-muted hover:text-danger" />
+                      <span className="sr-only">Remove top-up</span>
+                    </ActionButton>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {canManage && <TopUpForm clientId={clientId} wabaId={wabaId} />}
+
         <p className="border-t border-line pt-3 text-xs text-muted">
           All-time estimate <span className="tabular font-medium text-ink-2">{rupees(s.allTimeSpent)}</span> · Marketing ₹{RATES.marketing}, utility ₹{RATES.utility} per
           message. Service replies within 24 hours are free.
@@ -109,3 +138,4 @@ export async function SpendCard({ clientId, className }: { clientId: string; can
     </Card>
   );
 }
+

@@ -38,8 +38,8 @@ function Copyable({ label, value }: { label: string; value: string }) {
 export default async function SettingsPage() {
   const user = await requireUser();
   const account = (
-    <Card>
-      <CardHeader title="Your account" description={`Signed in as ${user.email}`} />
+    <Card className="card-3d">
+      <CardHeader tone="violet" title="Your account" description={`Signed in as ${user.email}`} />
       <PasswordForm />
       <form action={logout} className="border-t border-line p-4 sm:p-5">
         <button className={buttonClass("secondary") + " w-full sm:w-auto"}>
@@ -86,8 +86,9 @@ export default async function SettingsPage() {
           session={settings.wahaSession}
           active={settings.provider === "LOCAL"}
         />
-        <Card>
+        <Card className="card-3d">
           <CardHeader
+            tone="brand"
             title="Meta Cloud API"
             description={`Default number, used by clients without their own WhatsApp details on the Clients page. ${cfg.live ? "Configured in Vercel → Environment Variables." : "Not configured: add these in Vercel → Environment Variables, then redeploy."}`}
             action={settings.provider === "META" ? <Badge tone="green" dot>Active</Badge> : undefined}
@@ -101,13 +102,19 @@ export default async function SettingsPage() {
             <Check ok={!!process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN} label="Webhook verify token" hint="WHATSAPP_WEBHOOK_VERIFY_TOKEN: any secret string, entered in Meta too." />
           </ul>
           <div className="space-y-3 border-t border-line p-4 sm:p-5">
-            <Copyable label="Webhook callback URL (subscribe to messages and message_template_status_update)" value={`${origin}/api/webhook`} />
+            <Copyable label="Webhook callback URL" value={`${origin}/api/webhook`} />
+            <p className="text-xs text-muted leading-relaxed">
+              Subscribe to Meta webhook fields:{" "}
+              <code className="text-ink">
+                messages, calls, message_template_status_update, message_template_quality_update, template_category_update, phone_number_quality_update, account_update, account_alerts
+              </code>
+            </p>
           </div>
         </Card>
 
         <div className="space-y-4 sm:space-y-6 lg:col-span-2 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
-          <Card>
-            <CardHeader title="Scheduler" description="Something must call this URL every 5 minutes (every minute with the local session) to start campaigns and send batches." />
+          <Card className="card-3d">
+            <CardHeader tone="info" title="Scheduler" description="Something must call this URL every 5 minutes (every minute with the local session) to start campaigns and send batches." />
             <div className="space-y-3 p-4 sm:p-5">
               <Copyable label="Cron URL" value={`${origin}/api/cron?key=•••CRON_SECRET•••`} />
               <p className="text-xs text-muted">

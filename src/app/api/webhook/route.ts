@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { pushToGoogleSheet } from "@/lib/google-sheets-live";
 import { refreshNumberStatus } from "@/lib/limits";
+import { recordMetaAccountAlert } from "@/lib/meta-balance";
 import { explainError } from "@/lib/meta-errors";
 import { applyFailure } from "@/lib/rules";
 import { orderRef, orderWhereRef, recordOrder } from "@/lib/orders";
@@ -45,10 +46,11 @@ async function applyStatus(s: StatusUpdate) {
       status: true,
       customerId: true,
       templateName: true,
-      customer: { select: { phone: true, name: true } },
+      customer: { select: { phone: true, name: true, client: { select: { name: true } } } },
     },
   });
   if (!msg) return;
+  const clientName = msg.customer?.client?.name || "Thabaal";
   // Every status carries Meta's pricing; keep it for cost reporting even when the status itself is stale.
   if (s.pricing?.category)
     await db.message.update({ where: { id: msg.id }, data: { pricingCategory: s.pricing.category.toLowerCase(), billable: s.pricing.billable ?? null } });
@@ -67,7 +69,7 @@ async function applyStatus(s: StatusUpdate) {
       phone: msg.customer?.phone || "",
       status: "FAILED",
       waMessageId: s.id,
-      client: "Thabaal",
+      client: clientName,
     });
     return;
   }
@@ -86,7 +88,7 @@ async function applyStatus(s: StatusUpdate) {
     phone: msg.customer?.phone || "",
     status: next,
     waMessageId: s.id,
-    client: "Thabaal",
+    client: clientName,
   });
 }
 
@@ -199,6 +201,7 @@ export async function POST(req: NextRequest) {
             await joinFromWhatsApp({ phone: m.from, profileName, source: join[1], phoneNumberId }).catch((e) => console.error("Could not add joining customer", e));
           }
           const customer = await recordReply({ phone: m.from, text, kind, media, waMessageId: m.id, phoneNumberId, at: m.timestamp ? new Date(Number(m.timestamp) * 1000) : undefined });
+          const clientName = customer?.client?.name || "Thabaal";
 
           if (kind === "button") {
             const contactName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name;
@@ -209,7 +212,7 @@ export async function POST(req: NextRequest) {
               campaign: "WhatsApp Portal",
               buttonText: text,
               actionValue: actionVal,
-              client: "Thabaal",
+              client: clientName,
             });
           } else if (m.type !== "order") {
             const contactName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name;
@@ -218,7 +221,7 @@ export async function POST(req: NextRequest) {
               name: customer?.name || contactName || "",
               message: text,
               source: join ? `Opt-in (${join[1]})` : "Inbound WhatsApp",
-              client: "Thabaal",
+              client: clientName,
             });
           }
 
@@ -246,7 +249,7 @@ export async function POST(req: NextRequest) {
                 total: order.total,
                 status: order.status,
                 address: customer.location || "",
-                client: "Thabaal",
+                client: clientName,
               });
             }
           }
@@ -278,8 +281,19 @@ export async function POST(req: NextRequest) {
           data: { qualityScore: String(v.new_quality_score ?? "UNKNOWN").toUpperCase(), lastSyncedAt: new Date() },
         });
       } else if (change.field === "account_update" || change.field === "account_alerts") {
-        // Restrictions, policy notices and verification results; logged so they show up in Vercel's logs.
+        // Restrictions, policy notices and verification results: persist for notifications and refresh numbers.
         console.warn(`WhatsApp ${change.field}`, JSON.stringify(v));
+        const wabaId = String(entry.id ?? "");
+        await recordMetaAccountAlert({ wabaId, field: change.field, value: v });
+        if (wabaId) {
+          const numbers = await db.whatsAppNumber.findMany({
+            where: { businessAccountId: wabaId },
+            include: { client: { select: { waToken: true } } },
+          });
+          for (const n of numbers) {
+            await refreshNumberStatus(n, n.client.waToken).catch(() => {});
+          }
+        }
       }
     }
   }

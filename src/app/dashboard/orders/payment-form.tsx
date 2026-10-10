@@ -2,10 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { ExternalLink, CheckCircle2, AlertCircle, HelpCircle, ShieldCheck, Landmark } from "lucide-react";
+import { ExternalLink, CheckCircle2, AlertCircle, HelpCircle, ShieldCheck, Landmark, Sparkles } from "lucide-react";
 import { toastResult } from "@/components/toast";
 import { Badge, Button, Card, CardHeader, Field } from "@/components/ui";
-import { savePaymentConfig } from "../actions/orders";
+import { createPaymentTemplate, savePaymentConfig } from "../actions/orders";
 
 /** Manager setting: which WhatsApp payment configuration "Request payment" uses. */
 export function PaymentForm({
@@ -19,6 +19,7 @@ export function PaymentForm({
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const [tplPending, startTpl] = useTransition();
   const [name, setName] = useState(config ?? "");
   const [showGuide, setShowGuide] = useState(false);
 
@@ -151,14 +152,32 @@ export function PaymentForm({
             />
           </Field>
 
-          <Button
-            type="submit"
-            className="max-sm:w-full"
-            disabled={name.trim() === (config ?? "")}
-            loading={pending}
-          >
-            Save configuration
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="submit"
+              className="max-sm:w-full"
+              disabled={name.trim() === (config ?? "")}
+              loading={pending}
+            >
+              Save configuration
+            </Button>
+            {!own.status && (
+              <Button
+                type="button"
+                variant="secondary"
+                className="max-sm:w-full"
+                loading={tplPending}
+                onClick={() =>
+                  startTpl(async () => {
+                    toastResult(await createPaymentTemplate());
+                    router.refresh();
+                  })
+                }
+              >
+                <Sparkles aria-hidden className="size-4" /> Create &ldquo;{own.name}&rdquo; template
+              </Button>
+            )}
+          </div>
         </form>
       </div>
     </Card>

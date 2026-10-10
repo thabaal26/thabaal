@@ -2,7 +2,7 @@ import "server-only";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { db } from "./db";
 import { APP_TZ } from "./format";
-import { getMetaAccountInfo, type MetaAccountRecord } from "./meta-balance";
+import { getMetaAccountInfo, SYNC_NOTE_PREFIX, type MetaAccountRecord } from "./meta-balance";
 
 /**
  * Meta's per-message rates for India, in rupees, before tax. Update these when Meta changes its prices:
@@ -50,10 +50,10 @@ async function spendBetween(clientId: string, from: Date, to?: Date): Promise<Sp
 
 export const total = (rows: SpendRow[]) => rows.reduce((sum, r) => sum + r.cost, 0);
 
-/** This month's and last month's spend, plus the live remaining balance synced from Meta. */
+/** This month's and last month's spend, plus the live remaining balance synced from Meta and manual top-ups. */
 export async function spendSummary(clientId: string) {
   const { thisMonth, lastMonth } = monthStarts();
-  const [current, previous, allTimeGroups, clientNumber] = await Promise.all([
+  const [current, previous, allTimeGroups, clientNumber, allTopUps] = await Promise.all([
     spendBetween(clientId, thisMonth),
     spendBetween(clientId, lastMonth, thisMonth),
     db.message.groupBy({
@@ -65,6 +65,13 @@ export async function spendSummary(clientId: string) {
       where: { clientId },
       orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
     }),
+    db.topUp
+      .findMany({
+        where: { clientId },
+        orderBy: { createdAt: "desc" },
+        take: 25,
+      })
+      .catch(() => []),
   ]);
 
   let allTimeSpent = 0;
@@ -73,16 +80,21 @@ export async function spendSummary(clientId: string) {
   }
 
   // Fetch verified Meta account info and live synced balance
-  const metaAccount: MetaAccountRecord = await getMetaAccountInfo(clientNumber?.businessAccountId);
+  const metaAccount: MetaAccountRecord = await getMetaAccountInfo(clientNumber?.businessAccountId, clientId);
 
   // Compute messages charged since the last balance sync timestamp
   const syncDate = new Date(metaAccount.lastSyncedAt);
-  const validSyncDate = isNaN(syncDate.getTime()) ? thisMonth : syncDate;
+  const validSyncDate = isNaN(syncDate.getTime()) || syncDate.getTime() <= 0 ? thisMonth : syncDate;
   const spentSinceSync = total(await spendBetween(clientId, validSyncDate));
 
-  // The true live balance starts from Meta's prepaid balance minus messages since sync
-  const remainingBalance = Math.max(0, metaAccount.liveBalance - spentSinceSync);
-  const prepaidFunds = metaAccount.liveBalance;
+  // Manual top-ups (excluding internal [META_SYNC] snapshots) added after the balance snapshot
+  const manualTopUps = allTopUps.filter((t) => !t.note?.startsWith(SYNC_NOTE_PREFIX));
+  const addedSinceSync = manualTopUps
+    .filter((t) => t.createdAt >= validSyncDate)
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const prepaidFunds = metaAccount.liveBalance + addedSinceSync;
+  const remainingBalance = Math.max(0, prepaidFunds - spentSinceSync);
 
   return {
     current,
@@ -94,6 +106,7 @@ export async function spendSummary(clientId: string) {
     prepaidFunds,
     remainingBalance,
     metaAccount,
+    topUps: manualTopUps.slice(0, 5),
     lastSyncedAt: metaAccount.lastSyncedAt,
     syncedBy: metaAccount.syncedBy,
     balance: {
@@ -104,3 +117,4 @@ export async function spendSummary(clientId: string) {
     },
   };
 }
+

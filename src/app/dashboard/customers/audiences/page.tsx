@@ -33,8 +33,8 @@ export default async function AudiencesPage() {
       />
       <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <AudienceBuilder regions={regionRows.map((r) => r.region!).sort()} />
-        <Card className="lg:sticky lg:top-8">
-          <CardHeader title="Saved audiences" />
+        <Card className="card-3d lg:sticky lg:top-8">
+          <CardHeader tone="violet" title="Saved audiences" />
           {saved.length ? (
             <ul className="divide-y divide-line">
               {saved.map((a, k) => (
