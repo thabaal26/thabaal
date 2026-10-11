@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { ChartBar3D, Sparkles3D, Trophy3D } from "@/components/icons-3d";
 import { Badge, buttonClass, Card, CardHeader, type Tone } from "@/components/ui";
-import { ActionLine, DonutPanel, RateRing, StackedRows, StatChip, type Slice } from "@/components/viz";
+import { ActionLine, ActivityRings, DonutPanel, StackedRows, StatChip, type Slice } from "@/components/viz";
 import { formatValue } from "@/lib/chart-math";
 import { cn } from "@/lib/cn";
 import { fmtNumber, pct } from "@/lib/format";
@@ -366,11 +366,15 @@ export function CustomerGrowthPlaybookCard({ data }: { data: CustomerWinbackPlay
       <div className="grid grid-cols-1 gap-6 p-4 sm:p-5 xl:grid-cols-12">
         <div className="space-y-5 xl:col-span-5">
           <DonutPanel slices={slices} centerLabel="customers" label="Customers by lifecycle stage" size={160} selected={selectedId} onSelect={(k) => setSelectedId(k as PlaybookScenario["id"])} />
-          <div className="grid grid-cols-3 gap-2 border-t border-line pt-4">
-            <RateRing value={data.retentionRatePct} color="#059669" label="Repeat buyers" size={72} />
-            <RateRing value={pct(data.activeBuyers30d, Math.max(1, data.totalCustomers))} color="#0ea5e9" label="Active now" size={72} />
-            <RateRing value={pct(data.lapsedOver60d, Math.max(1, data.totalCustomers))} color="#e11d48" label="Lapsed" size={72} />
-          </div>
+          <ActivityRings
+            label="Customer health"
+            size={150}
+            rings={[
+              { key: "repeat", label: "Repeat buyers", value: data.retentionRatePct, color: "#5cc90a", to: "#b8ff2e" },
+              { key: "active", label: "Active now", value: pct(data.activeBuyers30d, Math.max(1, data.totalCustomers)), color: "#00b8d4", to: "#62f4ff", sub: `${fmtNumber(data.activeBuyers30d)} customers` },
+              { key: "lapsed", label: "Lapsed", value: pct(data.lapsedOver60d, Math.max(1, data.totalCustomers)), color: "#e8104a", to: "#ff5a8e", sub: `${fmtNumber(data.lapsedOver60d)} to win back` },
+            ]}
+          />
         </div>
 
         <div className="min-w-0 xl:col-span-7">

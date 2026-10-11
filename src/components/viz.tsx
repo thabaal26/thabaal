@@ -536,3 +536,124 @@ export function ColumnChart({
     </div>
   );
 }
+
+/* ───────────────────────── Activity rings ───────────────────────── */
+
+export type ActivityRing = {
+  key: string;
+  label: string;
+  /** Percent of the goal, 0–100 (more than 100 draws a full ring). */
+  value: number;
+  /** Ring colour; its dimmed version is the track. */
+  color: string;
+  /** Lighter end of the ring's gradient. */
+  to?: string;
+  /** Replaces "62%" in the legend, e.g. "38 of 95". */
+  display?: string;
+  sub?: string;
+};
+
+/**
+ * Apple-Watch-style concentric rings: one ring per rate, outermost first, each on a dimmed track of
+ * its own colour with a rounded end and an arrow where it starts. Legend beside it names every ring
+ * with its value. `tone="dark"` puts it on a black tile like the watch face.
+ */
+export function ActivityRings({
+  rings,
+  size = 168,
+  tone = "dark",
+  label,
+  title,
+  layout = "side",
+  className,
+}: {
+  rings: ActivityRing[];
+  size?: number;
+  tone?: "dark" | "light";
+  label: string;
+  title?: string;
+  layout?: "side" | "stack";
+  className?: string;
+}) {
+  const drawn = useDrawn();
+  const n = Math.max(1, rings.length);
+  const sw = Math.min(16, 64 / (n + 0.8)); // stroke width in a 100-unit box
+  const gap = sw * 0.12;
+  const dark = tone === "dark";
+  return (
+    <div
+      className={cn(
+        "flex gap-5",
+        layout === "side" ? "flex-col items-center sm:flex-row sm:items-center" : "flex-col items-center",
+        dark && "rounded-[1.75rem] bg-[#0b0b0d] p-5 text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.06),0_10px_30px_-12px_rgb(0_0_0/0.6)]",
+        className,
+      )}
+    >
+      <div role="img" aria-label={label} className="relative shrink-0" style={{ width: size, height: size }}>
+        <svg viewBox="0 0 100 100" className="size-full -rotate-90 overflow-visible">
+          <defs>
+            {rings.map((r) => (
+              <linearGradient key={r.key} id={`ar-${r.key}`} x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor={r.color} />
+                <stop offset="100%" stopColor={r.to ?? r.color} />
+              </linearGradient>
+            ))}
+          </defs>
+          {rings.map((r, i) => {
+            const rad = 50 - sw / 2 - i * (sw + gap);
+            const v = Math.max(0, Math.min(100, r.value));
+            return (
+              <g key={r.key}>
+                <circle cx="50" cy="50" r={rad} fill="none" stroke={r.color} strokeOpacity={dark ? 0.22 : 0.14} strokeWidth={sw} />
+                {v > 0 && (
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r={rad}
+                    fill="none"
+                    stroke={`url(#ar-${r.key})`}
+                    strokeWidth={sw}
+                    strokeLinecap="round"
+                    pathLength={100}
+                    strokeDasharray={`${drawn ? Math.max(0.5, v) : 0} 100`}
+                    style={{ transition: `stroke-dasharray 1.1s cubic-bezier(.2,.8,.2,1) ${i * 0.12}s` }}
+                    className="motion-reduce:transition-none"
+                  >
+                    <title>{`${r.label}: ${r.display ?? `${Math.round(r.value)}%`}`}</title>
+                  </circle>
+                )}
+                {/* Arrow at the start of the ring, pointing the way it fills. */}
+                <path
+                  d={`M ${50 + rad - sw * 0.18} ${50 - sw * 0.24} L ${50 + rad + sw * 0.06} ${50} L ${50 + rad - sw * 0.18} ${50 + sw * 0.24}`}
+                  transform={`rotate(90 ${50 + rad} 50) translate(0 0)`}
+                  fill="none"
+                  stroke={dark ? "#0b0b0d" : "#ffffff"}
+                  strokeWidth={sw * 0.16}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  opacity={v > 0 ? 0.9 : 0}
+                />
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      <div className="min-w-0">
+        {title && <p className={cn("mb-2 text-sm font-semibold", dark ? "text-white/85" : "text-ink")}>{title}</p>}
+        <ul className="space-y-1.5">
+          {rings.map((r) => (
+            <li key={r.key} className="min-w-0">
+              <p className="text-[0.8125rem] font-bold uppercase leading-tight tracking-wide" style={{ color: dark ? (r.to ?? r.color) : r.color }}>
+                {r.label}
+              </p>
+              <p className={cn("tabular text-lg font-semibold leading-tight", dark ? "text-white" : "text-ink")}>
+                {r.display ?? `${Math.round(r.value)}%`}
+                {r.sub && <span className={cn("ml-1.5 text-2xs font-medium", dark ? "text-white/55" : "text-muted")}>{r.sub}</span>}
+              </p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}

@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { MapPin3D, ShoppingBag3D, Sparkles3D, Target3D } from "@/components/icons-3d";
 import { Badge, Card, CardHeader } from "@/components/ui";
-import { ActionLine, BarList, ChangeDumbbells, Disclosure, DonutPanel, RateRing, StatChip, type Slice } from "@/components/viz";
+import { ActionLine, ActivityRings, BarList, ChangeDumbbells, Disclosure, DonutPanel, StatChip, type Slice } from "@/components/viz";
 import { formatValue } from "@/lib/chart-math";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import type { CartMentalitySummaryData, CustomerScenariosData, ScenarioLead } from "./overview-cards";
@@ -57,10 +57,15 @@ export function CustomerScenariosCard({ data }: { data: CustomerScenariosData })
           )}
         </div>
         <div className="flex flex-col justify-center gap-4 border-line lg:col-span-4 lg:border-l lg:pl-5">
-          <div className="grid grid-cols-2 gap-3">
-            <RateRing value={data.catalogueToCartPct} color="#0284c7" label="Catalogue → cart" />
-            <RateRing value={data.cartToBuyPct} color="#059669" label="Cart → paid" />
-          </div>
+          <ActivityRings
+            label="Conversion rates"
+            size={150}
+            rings={[
+              { key: "cat", label: "Catalogue → cart", value: data.catalogueToCartPct, color: "#e8104a", to: "#ff5a8e" },
+              { key: "paid", label: "Cart → paid", value: data.cartToBuyPct, color: "#5cc90a", to: "#b8ff2e" },
+              { key: "buy", label: "Engaged → bought", value: reached ? Math.round((data.convertedBuyers.customers / reached) * 100) : 0, color: "#00b8d4", to: "#62f4ff", sub: `${fmtNumber(data.convertedBuyers.customers)} of ${fmtNumber(reached)}` },
+            ]}
+          />
           {data.addedToCartUnpaid.value > 0 && (
             <ActionLine href="/dashboard/orders?show=unpaid" cta="Follow up">
               <b className="text-ink">{formatValue(data.addedToCartUnpaid.value, "inr")}</b> is waiting in unpaid carts.
