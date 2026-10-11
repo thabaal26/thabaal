@@ -8,7 +8,7 @@ import { getSettings } from "./provider";
 import { replyWindowEnd } from "./replies";
 import { senderFor } from "./senders";
 import { renderFor, type TemplateButton, type VarMap } from "./template";
-import { MetaError, sendOrderStatus, sendPaymentRequest, sendPaymentTemplate } from "./whatsapp";
+import { MetaError, sendOrderStatus, sendPaymentRequest, sendPaymentTemplate, sendTextMessage } from "./whatsapp";
 
 // WhatsApp payments for orders: the "Review and pay" request, reminders, confirmation and the order card
 // in the customer's chat. Shared by the webhook, the Orders page and the scheduler.
@@ -145,7 +145,21 @@ export async function confirmPayment(orderId: string, txnId?: string | null) {
   const c = order.customer;
   const ref = orderRef(order);
   const text = `Hello ${firstName(c.name)}, we have received your payment of ${money(order.total, order.currency)} for order ${ref}. Thank you! We are packing your order and will message you when it is dispatched.`;
-  await updateOrderCard(order, "processing", text, "Payment received").catch((e) => console.error("Could not send payment confirmation", e));
+  const cardUpdated = await updateOrderCard(order, "processing", text, "Payment received").catch((e) => {
+    console.error("Could not send order_status payment confirmation, falling back to text", e);
+    return false;
+  });
+  if (!cardUpdated && !c.optedOut && (await getSettings()).provider === "META") {
+    try {
+      const { open, number, cfg } = await replyContext(c);
+      if (open) {
+        const res = await sendTextMessage(cfg, c.phone, text);
+        await logMessage(c.id, "Payment received", text, res, number?.id ?? null);
+      }
+    } catch (e) {
+      console.error("Could not send fallback payment confirmation text", e);
+    }
+  }
   return true;
 }
 

@@ -165,6 +165,7 @@ export function OrderCard({
         id={o.id}
         who={o.customer.name}
         status={o.status}
+        isPaid={isPaid}
         note={o.internalNote}
         customerNote={o.note}
         items={items}

@@ -94,15 +94,26 @@ export async function GET() {
 
   const items: NotificationItem[] = [];
 
+  const replyByCustomer = new Map<string, { latest: (typeof replies)[number]; count: number; unread: boolean }>();
   for (const r of replies) {
+    const existing = replyByCustomer.get(r.customerId);
+    if (existing) {
+      existing.count += 1;
+      if (!r.handled) existing.unread = true;
+    } else {
+      replyByCustomer.set(r.customerId, { latest: r, count: 1, unread: !r.handled });
+    }
+  }
+
+  for (const { latest: r, count, unread } of replyByCustomer.values()) {
     items.push({
-      id: `reply-${r.id}`,
+      id: `reply-${r.customerId}-${r.id}`,
       type: "reply",
-      title: `Customer reply: ${r.customer.name}`,
+      title: `Customer reply: ${r.customer.name}${count > 1 ? ` (${count} messages)` : ""}`,
       description: r.text || (r.kind ? `Sent a ${r.kind}` : "Customer responded to WhatsApp message"),
       timestamp: r.receivedAt.toISOString(),
-      href: `/dashboard/replies?show=${r.handled ? "all" : "open"}`,
-      unread: !r.handled,
+      href: `/dashboard/replies?show=${unread ? "open" : "all"}`,
+      unread,
     });
   }
 

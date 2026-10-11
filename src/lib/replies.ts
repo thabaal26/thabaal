@@ -168,13 +168,26 @@ export function metaReplyContent(m: {
   }
   if (m.interactive?.type === "call_permission_reply")
     return { text: m.interactive.call_permission_reply?.response === "accept" ? "Allowed you to call them on WhatsApp" : "Declined calls on WhatsApp", kind: "button" };
+  if (m.type === "payment" || (m as Record<string, unknown>).payment) {
+    return { text: "UPI payment completed on WhatsApp", kind: "order" };
+  }
   const tapped = m.button?.text ?? m.interactive?.button_reply?.title ?? m.interactive?.list_reply?.title;
   if (tapped) return { text: tapped, kind: "button" };
   const caption = m.image?.caption ?? m.video?.caption ?? m.document?.caption ?? m.document?.filename;
   const label =
-    { image: "Photo", video: "Video", audio: "Voice note", document: "Document", sticker: "Sticker", location: "Location",
-      interactive: "Tapped a WhatsApp button", unsupported: "A message type WhatsApp can't show here", request_welcome: "Opened the chat", system: "WhatsApp notice" }[m.type ?? ""] ??
-    (m.type ? `Message (${m.type})` : "Message");
+    {
+      image: "Photo",
+      video: "Video",
+      audio: "Voice note",
+      document: "Document",
+      sticker: "Sticker",
+      location: "Location",
+      interactive: "Tapped a WhatsApp button",
+      errors: "UPI payment / WhatsApp card",
+      unsupported: "UPI payment / WhatsApp card",
+      request_welcome: "Opened the chat",
+      system: "WhatsApp notice",
+    }[m.type ?? ""] ?? (m.type ? `Message (${m.type})` : "Message");
   const file = m.type ? (m as Record<string, { id?: string } | undefined>)[m.type] : undefined;
   const media = file?.id && MEDIA_TYPES.includes(m.type!) ? { id: file.id, type: m.type! } : undefined;
   return { text: caption ? `${label}: ${caption}` : `[${label}]`, kind: "media", media };

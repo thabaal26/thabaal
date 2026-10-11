@@ -92,6 +92,7 @@ export async function recordOrder(customer: { id: string; clientId: string }, wa
           }
         }
       }
+      await syncCustomerOrderedProducts(customer.id, items);
     }
   } catch (e) {
     console.error("Could not sync order address with customer", e);
@@ -100,6 +101,23 @@ export async function recordOrder(customer: { id: string; clientId: string }, wa
   return db.order.create({
     data: { clientId: customer.clientId, customerId: customer.id, waMessageId, catalogId: o.catalogId, note: orderNote, items, total: o.total, currency: o.currency },
   });
+}
+
+/** Merges product names from an order's items into Customer.purchases so every customer profile tracks what they bought. */
+export async function syncCustomerOrderedProducts(customerId: string, items: { name?: string }[]) {
+  const newNames = items
+    .map((i) => i.name?.trim())
+    .filter((n): n is string => Boolean(n && !/^manual-\d+$/i.test(n)));
+  if (!newNames.length) return;
+  const cust = await db.customer.findUnique({ where: { id: customerId }, select: { purchases: true } });
+  const existingNames = (cust?.purchases ?? "")
+    .split(/[,/]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const merged = [...new Set([...existingNames, ...newNames])].join(", ").slice(0, 500);
+  if (merged && merged !== (cust?.purchases ?? "")) {
+    await db.customer.update({ where: { id: customerId }, data: { purchases: merged } });
+  }
 }
 
 /** Item names for a cart's retailer ids, from the client's catalogue; empty when they can't be fetched. */

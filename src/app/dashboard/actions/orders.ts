@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { findAddressesInReplies, parseAddressText } from "@/lib/address";
 import { db } from "@/lib/db";
 import { pushOrderToSheet } from "@/lib/google-sheets-live";
-import { DEFAULT_SHIPPING_FEE, getOrderPricing, itemsText, itemsWithNames, money, orderRef, type OrderItem } from "@/lib/orders";
+import { DEFAULT_SHIPPING_FEE, getOrderPricing, itemsText, itemsWithNames, money, orderRef, syncCustomerOrderedProducts, type OrderItem } from "@/lib/orders";
 import { confirmPayment, sendPaymentRequestFor, updateOrderCard } from "@/lib/payments";
 import { getSettings, wahaConfig } from "@/lib/provider";
 import { replyWindowEnd } from "@/lib/replies";
@@ -585,6 +585,7 @@ export async function createOrder(input: {
     },
   });
 
+  await syncCustomerOrderedProducts(customer.id, items).catch(() => {});
   pushOrderToSheet(order.id, "NEW_ORDER");
 
   let paymentNote = "";
@@ -658,6 +659,7 @@ export async function updateOrderItems(
       ...(input.note !== undefined && { note: input.note?.trim() || null }),
     },
   });
+  await syncCustomerOrderedProducts(order.customer.id, items).catch(() => {});
   pushOrderToSheet(order.id, "ORDER_UPDATE", "Items changed");
 
   // Also sync address to customer profile if note/area was provided

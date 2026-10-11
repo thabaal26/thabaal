@@ -18,10 +18,34 @@ export function customerFilters(sp: Record<string, string | string[] | undefined
  *  q: part of a name, or digits of a phone number
  */
 export function customerWhere(scope: Scope, { q = "", tag = "", area = "" }: CustomerFilters): Prisma.CustomerWhereInput {
+  const productFilter = tag.startsWith("product:") ? tag.slice(8).trim() : "";
+  const productSlug = productFilter ? productFilter.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") : "";
+  const digits = q.replace(/\D/g, "");
   return {
     ...owned(scope),
-    ...(tag === "__optout" ? { optedOut: true } : tag ? { tags: { has: tag } } : {}),
+    ...(tag === "__optout"
+      ? { optedOut: true }
+      : productFilter
+        ? {
+            OR: [
+              { purchases: { contains: productFilter, mode: "insensitive" } },
+              ...(productSlug ? [{ tags: { has: productSlug } }] : []),
+            ],
+          }
+        : tag
+          ? { tags: { has: tag } }
+          : {}),
     ...(area === "none" ? { location: null } : area.startsWith("region:") ? { region: area.slice(7) } : area.startsWith("loc:") ? { location: area.slice(4) } : {}),
-    ...(q && { OR: [{ name: { contains: q, mode: "insensitive" } }, { phone: { contains: q.replace(/\D/g, "") || q } }] }),
+    ...(q && {
+      AND: [
+        {
+          OR: [
+            { name: { contains: q, mode: "insensitive" } },
+            { purchases: { contains: q, mode: "insensitive" } },
+            { phone: { contains: digits || q } },
+          ],
+        },
+      ],
+    }),
   };
 }

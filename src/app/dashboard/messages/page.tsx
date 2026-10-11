@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: "Message log" };
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 50;
-type Params = { q?: string; status?: string; campaign?: string; range?: string; page?: string };
+type Params = { q?: string; status?: string; campaign?: string; range?: string; page?: string; view?: string };
 
 function href(p: Params, patch: Partial<Params>) {
   const next = { ...p, ...patch };
@@ -27,22 +27,30 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
   const raw = await searchParams;
   const p: Params = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v]));
   const page = Math.max(1, Number(p.page) || 1);
+  const groupByCustomer = p.view !== "all";
   const scope = await getScope();
   const where = { ...messageWhere(p), ...ownedMessages(scope) };
 
-  const [rows, total, byStatus, campaigns] = await Promise.all([
+  const [rawRows, customerCounts, total, byStatus, campaigns] = await Promise.all([
     db.message.findMany({
       where,
+      ...(groupByCustomer ? { distinct: ["customerId"] as const } : {}),
       include: { customer: true, run: { include: { campaign: { select: { name: true } } } }, sender: { select: { label: true } } },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
+    groupByCustomer
+      ? db.message.groupBy({ by: ["customerId"], where, _count: true })
+      : Promise.resolve([]),
     db.message.count({ where }),
     db.message.groupBy({ by: ["status"], where: { ...messageWhere({ ...p, status: undefined }), ...ownedMessages(scope) }, _count: true }),
     db.campaign.findMany({ where: owned(scope), select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const countMap = new Map(customerCounts.map((c) => [c.customerId, c._count]));
+  const rows = rawRows.map((m) => ({ ...m, customerMsgCount: countMap.get(m.customerId) ?? 1 }));
+  const effectiveTotal = groupByCustomer ? customerCounts.length : total;
+  const pages = Math.max(1, Math.ceil(effectiveTotal / PAGE_SIZE));
   const allCount = byStatus.reduce((a, s) => a + s._count, 0);
   const statusCount = (k: string) => byStatus.find((b) => b.status === k)?._count ?? 0;
   const readCount = statusCount("READ");
@@ -52,7 +60,7 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
   const queuedCount = statusCount("QUEUED");
   const deliveredTotal = readCount + deliveredOnlyCount;
   const sentTotal = deliveredTotal + sentOnlyCount + failedCount;
-  const exportQs = new URLSearchParams(Object.entries({ ...p, page: undefined }).filter(([, v]) => v) as [string, string][]);
+  const exportQs = new URLSearchParams(Object.entries({ ...p, page: undefined, view: undefined }).filter(([, v]) => v) as [string, string][]);
 
   const filtered = Boolean(p.q || p.status || p.campaign || p.range);
 
@@ -60,15 +68,27 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
     <>
       <PageHeader
         title="Message log"
-        description="Every WhatsApp message sent to your customers, with live delivery and read status."
+        description={
+          groupByCustomer
+            ? "Grouped to one row per customer phone number (showing their latest message). Switch to Every send to inspect individual messages."
+            : "Every WhatsApp message sent to your customers, with live delivery and read status."
+        }
         inlineActions
         actions={
-          <a href={`/api/messages/export?${exportQs}`} className={cn(buttonClass("secondary"), "max-sm:px-3.5")} aria-label="Export CSV">
-            <Download aria-hidden className="size-4" />
-            <span>
-              <span className="max-sm:sr-only">Export </span>CSV
-            </span>
-          </a>
+          <div className="flex items-center gap-2">
+            <Link
+              href={href(p, { view: groupByCustomer ? "all" : undefined, page: undefined })}
+              className={cn(buttonClass("secondary"), "max-sm:px-3")}
+            >
+              {groupByCustomer ? `Show all sends (${fmtNumber(total)})` : `1 per customer`}
+            </Link>
+            <a href={`/api/messages/export?${exportQs}`} className={cn(buttonClass("secondary"), "max-sm:px-3.5")} aria-label="Export CSV">
+              <Download aria-hidden className="size-4" />
+              <span>
+                <span className="max-sm:sr-only">Export </span>CSV
+              </span>
+            </a>
+          </div>
         }
         tabs={
           <FilterChips
@@ -132,6 +152,7 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
         )}
         <form role="search" aria-label="Filter messages" className="grid gap-2 border-b border-line p-3 sm:flex sm:flex-wrap">
           {p.status && <input type="hidden" name="status" value={p.status} />}
+          {p.view && <input type="hidden" name="view" value={p.view} />}
           <div className="relative min-w-0 sm:min-w-56 sm:flex-1">
             <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
             <input name="q" type="search" enterKeyHint="search" defaultValue={p.q} placeholder="Search name, phone or template" aria-label="Search name, phone or template" className="field pl-10" />
@@ -161,7 +182,7 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
           </div>
           <button className={cn(buttonClass("secondary"), "max-sm:hidden")}>Filter</button>
           {filtered && (
-            <Link href="/dashboard/messages" className={cn(buttonClass("ghost"), "max-sm:h-9 max-sm:justify-self-start max-sm:px-1 max-sm:text-sm")}>
+            <Link href={href({ view: p.view }, {})} className={cn(buttonClass("ghost"), "max-sm:h-9 max-sm:justify-self-start max-sm:px-1 max-sm:text-sm")}>
               Clear filters
             </Link>
           )}
@@ -169,7 +190,7 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
 
         {rows.length ? (
           <>
-            {/* Phones: one row per message, status always visible; tap to see the text and timings. */}
+            {/* Phones: one row per customer (or message), status always visible; tap to see the text and timings. */}
             <ul className="divide-y divide-line sm:hidden">
               {rows.map((m) => (
                 <li key={m.id}>
@@ -178,7 +199,14 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
                       <Avatar name={m.customer.name} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="truncate font-medium text-ink">{m.customer.name}</p>
+                          <p className="truncate font-medium text-ink">
+                            {m.customer.name}
+                            {groupByCustomer && m.customerMsgCount > 1 && (
+                              <span className="ml-1.5 inline-flex items-center rounded-full bg-subtle px-1.5 py-0.5 text-[10px] font-semibold text-ink-2">
+                                {m.customerMsgCount} msgs
+                              </span>
+                            )}
+                          </p>
                           <StatusBadge status={m.status} />
                         </div>
                         <p className="mt-0.5 flex items-center justify-between gap-2 text-xs text-muted">
@@ -198,9 +226,12 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
                         <div><dt className="text-muted">Delivered</dt><dd className="tabular text-ink">{m.deliveredAt ? fmtDate(m.deliveredAt, "d MMM, h:mm a") : "—"}</dd></div>
                         <div><dt className="text-muted">Read</dt><dd className="tabular text-ink">{m.readAt ? fmtDate(m.readAt, "d MMM, h:mm a") : "—"}</dd></div>
                       </dl>
-                      <div className="flex gap-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         {m.status !== "QUEUED" && <Badge tone={m.provider === "LOCAL" ? "violet" : "blue"}>{m.provider === "LOCAL" ? "Local session" : "Meta API"}</Badge>}
                         {m.simulated && <Badge tone="amber">Demo</Badge>}
+                        <Link href={`/dashboard/customers/${m.customer.id}`} className="ml-auto text-xs font-semibold text-brand-deep hover:underline">
+                          Open full chat ({m.customerMsgCount}) →
+                        </Link>
                       </div>
                     </div>
                   </details>
@@ -213,7 +244,7 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
                 <thead>
                   <tr>
                     <Th>Customer</Th>
-                    <Th>Message</Th>
+                    <Th>{groupByCustomer ? "Latest message" : "Message"}</Th>
                     <Th className="max-lg:hidden">Campaign</Th>
                     <Th>Status</Th>
                     <Th numeric>Time</Th>
@@ -226,9 +257,20 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
                         <div className="flex items-center gap-2.5">
                           <Avatar name={m.customer.name} />
                           <div className="min-w-0">
-                            <Link href={`/dashboard/customers/${m.customer.id}`} className="block truncate font-medium text-ink hover:underline">
-                              {m.customer.name}
-                            </Link>
+                            <div className="flex items-center gap-1.5">
+                              <Link href={`/dashboard/customers/${m.customer.id}`} className="block truncate font-medium text-ink hover:underline">
+                                {m.customer.name}
+                              </Link>
+                              {groupByCustomer && m.customerMsgCount > 1 && (
+                                <Link
+                                  href={`/dashboard/customers/${m.customer.id}`}
+                                  title="View full conversation history for this customer"
+                                  className="inline-flex shrink-0 items-center rounded-full bg-subtle px-1.5 py-0.5 text-[10px] font-semibold text-ink-2 hover:bg-brand-soft hover:text-brand-deep"
+                                >
+                                  {m.customerMsgCount} msgs
+                                </Link>
+                              )}
+                            </div>
                             <p className="tabular text-xs text-muted">{formatPhone(m.customer.phone)}</p>
                           </div>
                         </div>
@@ -270,10 +312,10 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
           </EmptyState>
         )}
 
-        {total > PAGE_SIZE && (
+        {effectiveTotal > PAGE_SIZE && (
           <nav aria-label="Pages" className="flex items-center justify-between gap-3 border-t border-line px-4 py-3 text-sm text-muted">
             <span className="tabular">
-              {fmtNumber((page - 1) * PAGE_SIZE + 1)}–{fmtNumber(Math.min(page * PAGE_SIZE, total))} of {fmtNumber(total)}
+              {fmtNumber((page - 1) * PAGE_SIZE + 1)}–{fmtNumber(Math.min(page * PAGE_SIZE, effectiveTotal))} of {fmtNumber(effectiveTotal)}
             </span>
             <div className="flex gap-2">
               <Link aria-disabled={page <= 1 || undefined} href={href(p, { page: String(page - 1) })} className={buttonClass("secondary", "sm")}>

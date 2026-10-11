@@ -5,7 +5,8 @@ import type { MetaComponent } from "./template";
 // WhatsApp Cloud API client. When the Meta variables are missing the portal runs in
 // demo mode: sends are simulated and templates are approved locally.
 
-const VERSION = process.env.META_GRAPH_VERSION ?? "v23.0";
+const rawVersion = process.env.META_GRAPH_VERSION?.trim();
+const VERSION = rawVersion && /^v\d+\.\d+$/.test(rawVersion) ? rawVersion : "v23.0";
 const GRAPH = `https://graph.facebook.com/${VERSION}`;
 
 /** Cache of uploaded WhatsApp media IDs keyed by `${phoneNumberId}:${url}` (Meta media IDs last 30 days; we refresh every 12h). */

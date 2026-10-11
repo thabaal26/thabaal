@@ -12,10 +12,28 @@ import type { ActionResult } from "./templates";
 export async function setReplyHandled(id: string, handled: boolean): Promise<ActionResult> {
   const scope = await getScope();
   if (!scope.canOperate) return { ok: false, message: "Your login can view but not change anything." };
-  const r = await db.reply.updateMany({ where: { id, ...ownedMessages(scope) }, data: { handled } });
-  if (!r.count) return { ok: false, message: "Reply not found." };
+  const target = await db.reply.findFirst({
+    where: { id, ...ownedMessages(scope) },
+    select: { id: true, customerId: true },
+  });
+  if (!target) return { ok: false, message: "Reply not found." };
+
+  if (handled) {
+    // One thread per customer: marking handled closes all open replies from this customer at once.
+    const r = await db.reply.updateMany({
+      where: { customerId: target.customerId, handled: false, ...ownedMessages(scope) },
+      data: { handled: true },
+    });
+    revalidatePath("/dashboard", "layout");
+    return {
+      ok: true,
+      message: r.count > 1 ? `Marked conversation (${r.count} messages) as handled.` : "Marked conversation as handled.",
+    };
+  }
+
+  await db.reply.update({ where: { id: target.id }, data: { handled: false } });
   revalidatePath("/dashboard", "layout");
-  return { ok: true, message: handled ? "Marked as handled." : "Moved back to open." };
+  return { ok: true, message: "Moved conversation back to open." };
 }
 
 export async function handleAllReplies(): Promise<ActionResult> {

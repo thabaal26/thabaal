@@ -77,7 +77,12 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
   const plain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
   const clientTag = scope.clientName ? plain(scope.clientName) : undefined;
   const rowTags = (tags: string[], clientName?: string) => tags.filter((t) => plain(t) !== (clientName ? plain(clientName) : clientTag));
-  const tagLabel = (t: string) => (t === "no-item-info" ? "No item recorded" : t.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase()));
+  const tagLabel = (t: string) =>
+    t.startsWith("product:")
+      ? t.slice(8)
+      : t === "no-item-info"
+        ? "No item recorded"
+        : t.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase());
   const qs = (patch: Record<string, string | undefined>) => {
     const s = new URLSearchParams(Object.entries({ q, tag, area, ...patch }).filter(([, v]) => v) as [string, string][]);
     return `/dashboard/customers${s.size ? `?${s}` : ""}`;

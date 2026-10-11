@@ -6,7 +6,7 @@ import { refreshNumberStatus } from "@/lib/limits";
 import { recordMetaAccountAlert } from "@/lib/meta-balance";
 import { explainError } from "@/lib/meta-errors";
 import { applyFailure } from "@/lib/rules";
-import { orderWhereRef, recordOrder } from "@/lib/orders";
+import { money, orderRef, orderWhereRef, recordOrder } from "@/lib/orders";
 import { metaReplyContent, receivingNumber, recordReply } from "@/lib/replies";
 import { autoRequestPayment, confirmPayment } from "@/lib/payments";
 import { autoReplyToButton, autoSendCatalogue, catalogueTrigger, firstMessageToday } from "@/lib/catalog";
@@ -101,22 +101,159 @@ async function applyStatus(s: StatusUpdate) {
 }
 
 type PaymentUpdate = {
+  id?: string;
   status?: string;
+  recipient_id?: string;
   payment?: { reference_id?: string; transaction?: { id?: string; status?: string } };
 };
 
 /** The customer paid (or failed to pay) through "Review and pay"; reference_id is our order number (RG-1001). */
-async function applyPayment(s: PaymentUpdate) {
-  const reference = s.payment?.reference_id;
-  if (!reference) return;
+async function applyPayment(s: PaymentUpdate, phoneNumberId?: string) {
   const txn = s.payment?.transaction;
-  const paid = txn?.status === "success" || s.status === "captured";
+  const paid =
+    txn?.status === "success" ||
+    txn?.status === "completed" ||
+    s.status === "captured" ||
+    s.status === "paid" ||
+    s.status === "completed";
   if (!paid) {
     console.warn("WhatsApp payment not completed", JSON.stringify(s));
     return;
   }
-  const order = await db.order.findFirst({ where: orderWhereRef(reference), select: { id: true } });
-  if (order) await confirmPayment(order.id, txn?.id);
+  const reference = s.payment?.reference_id;
+  let order = reference
+    ? await db.order.findFirst({ where: orderWhereRef(reference), select: { id: true, number: true, total: true, currency: true } })
+    : null;
+  if (!order && s.recipient_id) {
+    const { customers } = await receivingNumber(phoneNumberId);
+    const cust = await db.customer.findFirst({ where: { phone: s.recipient_id, ...customers }, select: { id: true } });
+    if (cust) {
+      order = await db.order.findFirst({
+        where: { customerId: cust.id, paidAt: null, status: { in: ["NEW", "CONFIRMED"] }, paymentRequestedAt: { not: null } },
+        orderBy: [{ paymentRequestedAt: "desc" }, { createdAt: "desc" }],
+        select: { id: true, number: true, total: true, currency: true },
+      });
+    }
+  }
+  if (order) {
+    await confirmPayment(order.id, txn?.id ?? s.id ?? null);
+  }
+}
+
+const NEGATIVE_PAY_RE = /\b(not\s+paid|haven'?t\s+paid|didn'?t\s+pay|how\s+to\s+pay|will\s+pay|pay\s+later|failed|pending|error|issue|problem|unable|can'?t\s+pay|cannot\s+pay)\b/i;
+const POSITIVE_PAY_RE = /\b(paid|payment\s+(done|sent|completed|successful|success)|gpay\s+done|phonepe\s+done|paytm\s+done|upi\s+(done|paid|sent)|money\s+sent|amount\s+(sent|paid))\b/i;
+const UTR_RE = /\b(\d{12})\b/;
+
+/**
+ * Detects when an inbound WhatsApp message represents a completed UPI payment (from WhatsApp's native
+ * "Pay now" bubble across any UPI app, or an explicit GPay/PhonePe/Paytm UTR/confirmation text, or a payment screenshot).
+ */
+async function detectAndApplyUpiPayment(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  m: Record<string, any>,
+  phoneNumberId: string | undefined,
+  base: { text: string; kind: "text" | "button" | "media" | "order"; media?: { id: string; type: string } },
+): Promise<{ text: string; kind: "text" | "button" | "media" | "order"; media?: { id: string; type: string }; handledAsPayment: boolean }> {
+  if (!m.from || m.type === "order") return { ...base, handledAsPayment: false };
+
+  const { customers } = await receivingNumber(phoneNumberId);
+  const cust = await db.customer.findFirst({
+    where: { phone: m.from, ...customers },
+    select: {
+      id: true,
+      orders: {
+        where: { paidAt: null, status: { in: ["NEW", "CONFIRMED"] } },
+        orderBy: [{ paymentRequestedAt: "desc" }, { createdAt: "desc" }],
+        take: 5,
+        select: { id: true, number: true, total: true, currency: true, paymentRequestedAt: true, createdAt: true },
+      },
+    },
+  });
+  if (!cust || !cust.orders.length) return { ...base, handledAsPayment: false };
+
+  // 1. Try matching the exact order via payment.reference_id, context message ID, or RG-xxxx in text
+  let targetOrder = cust.orders[0];
+  const explicitRef = m.payment?.reference_id ?? /\b(RG-\d{4,})\b/i.exec(base.text)?.[1];
+  if (explicitRef) {
+    const matched = cust.orders.find((o) => orderRef(o).toUpperCase() === String(explicitRef).toUpperCase());
+    if (matched) targetOrder = matched;
+  } else if (m.context?.id) {
+    const ctxMsg = await db.message.findUnique({ where: { waMessageId: String(m.context.id) }, select: { body: true } });
+    const ctxRef = ctxMsg?.body ? /\b(RG-\d{4,})\b/i.exec(ctxMsg.body)?.[1] : null;
+    if (ctxRef) {
+      const matched = cust.orders.find((o) => orderRef(o).toUpperCase() === ctxRef.toUpperCase());
+      if (matched) targetOrder = matched;
+    }
+  }
+
+  const ref = orderRef(targetOrder);
+  const totalFormatted = money(targetOrder.total, targetOrder.currency);
+  const hasRecentPaymentRequest =
+    Boolean(targetOrder.paymentRequestedAt) &&
+    Date.now() - targetOrder.paymentRequestedAt!.getTime() < 7 * 86_400_000;
+
+  // Path A: Native WhatsApp UPI payment bubble (triggered when customer pays via GPay/PhonePe/Paytm/WhatsApp Pay from "Pay now" button).
+  // With a direct merchant_vpa (UPI Intent), Meta Cloud API delivers the blue "Sent to <Merchant> · Completed" bubble in v.messages[]
+  // as type "errors" or "unsupported" (131051) or "payment".
+  const isNativePaymentBubble =
+    m.type === "payment" ||
+    Boolean(m.payment) ||
+    m.interactive?.type === "payment" ||
+    ((m.type === "errors" || m.type === "unsupported") && hasRecentPaymentRequest);
+
+  if (isNativePaymentBubble) {
+    const txnId = m.payment?.transaction?.id ?? m.id ?? "WA-UPI";
+    await confirmPayment(targetOrder.id, String(txnId)).catch((e) => console.error("Auto confirmPayment on UPI bubble failed", e));
+    return {
+      text: `UPI payment completed on WhatsApp (${totalFormatted} for ${ref})`,
+      kind: "order",
+      media: base.media,
+      handledAsPayment: true,
+    };
+  }
+
+  // Path B: Customer paid via external UPI app (GPay / PhonePe / Paytm / BHIM) and sent UTR or explicit payment confirmation text.
+  if (m.type === "text" && hasRecentPaymentRequest && !NEGATIVE_PAY_RE.test(base.text)) {
+    const utrMatch = UTR_RE.exec(base.text);
+    const isExplicitPaidText = POSITIVE_PAY_RE.test(base.text) || Boolean(utrMatch && /\b(utr|ref|upi|txn|paid|sent|done)\b/i.test(base.text));
+    if (isExplicitPaidText) {
+      const txnId = utrMatch ? `UTR-${utrMatch[1]}` : "UPI-CONFIRMED";
+      await confirmPayment(targetOrder.id, txnId).catch((e) => console.error("Auto confirmPayment on UPI text failed", e));
+      return {
+        text: `${base.text} · Confirmed ${ref} (${totalFormatted})`,
+        kind: "order",
+        media: base.media,
+        handledAsPayment: true,
+      };
+    }
+  }
+
+  // Path C: Customer sent a Photo screenshot right after a UPI payment request.
+  if (m.type === "image" && hasRecentPaymentRequest) {
+    const caption = m.image?.caption?.trim();
+    // If the screenshot caption itself says "Paid" or has a 12-digit UTR, confirm immediately!
+    if (caption && !NEGATIVE_PAY_RE.test(caption) && (POSITIVE_PAY_RE.test(caption) || UTR_RE.test(caption))) {
+      const utrMatch = UTR_RE.exec(caption);
+      const txnId = utrMatch ? `UTR-${utrMatch[1]}` : "UPI-SCREENSHOT";
+      await confirmPayment(targetOrder.id, txnId).catch((e) => console.error("Auto confirmPayment on screenshot caption failed", e));
+      return {
+        text: `UPI payment screenshot (${totalFormatted} for ${ref}): ${caption}`,
+        kind: "media",
+        media: base.media,
+        handledAsPayment: true,
+      };
+    }
+    return {
+      text: caption
+        ? `Payment screenshot for ${ref} (${totalFormatted}): ${caption}`
+        : `[Payment screenshot / Photo for ${ref} (${totalFormatted})]`,
+      kind: "media",
+      media: base.media,
+      handledAsPayment: false,
+    };
+  }
+
+  return { ...base, handledAsPayment: false };
 }
 
 /** STOP only opts out of the business whose number received it. */
@@ -196,10 +333,15 @@ export async function POST(req: NextRequest) {
     for (const change of entry.changes ?? []) {
       const v = change.value ?? {};
       if (change.field === "messages") {
-        for (const s of v.statuses ?? []) await (s.type === "payment" ? applyPayment(s) : applyStatus(s));
+        for (const s of v.statuses ?? []) {
+          await (s.type === "payment" || Boolean(s.payment)
+            ? applyPayment(s, v.metadata?.phone_number_id)
+            : applyStatus(s));
+        }
         for (const m of v.messages ?? []) {
-          const { text, kind, media } = metaReplyContent(m);
+          const base = metaReplyContent(m);
           const phoneNumberId = v.metadata?.phone_number_id;
+          const { text, kind, media, handledAsPayment } = await detectAndApplyUpiPayment(m, phoneNumberId, base);
           if (OPT_OUT.test(text)) await optOut(m.from, phoneNumberId);
           if (m.interactive?.type === "call_permission_reply") await applyCallPermission(m.from, phoneNumberId, m.interactive.call_permission_reply ?? {});
           // "JOIN van" from an opt-in QR code or link: add them as an opted-in customer first.
@@ -228,7 +370,7 @@ export async function POST(req: NextRequest) {
               phone: m.from,
               name: customer?.name || contactName || "",
               message: text,
-              source: join ? `Opt-in (${join[1]})` : "Inbound WhatsApp",
+              source: join ? `Opt-in (${join[1]})` : handledAsPayment ? "UPI Payment" : "Inbound WhatsApp",
               client: clientName,
             });
           }
@@ -236,8 +378,9 @@ export async function POST(req: NextRequest) {
           // Said hi, asked about products or prices (e.g. tapped "Send price list"), or wrote for the first time
           // today: reply with the free catalogue message (at most once every 12 hours).
           // Buttons with their own answer ("Make a gift pack", "Happy Deepavali") get that instead.
-          const answered = customer && m.type !== "order" ? await autoReplyToButton(customer.id, text, kind).catch((e) => (console.error("Automatic button reply failed", e), true)) : false;
-          if (customer && m.type !== "order" && !answered) {
+          const isSystemOrPayment = handledAsPayment || m.type === "order" || m.type === "errors" || m.type === "unsupported" || m.type === "payment";
+          const answered = customer && !isSystemOrPayment ? await autoReplyToButton(customer.id, text, kind).catch((e) => (console.error("Automatic button reply failed", e), true)) : false;
+          if (customer && !isSystemOrPayment && !answered) {
             const trigger = catalogueTrigger(text, kind) ?? ((await firstMessageToday(customer.id)) ? "greeting" : null);
             if (trigger) await autoSendCatalogue(customer.id, trigger).catch((e) => console.error("Automatic catalogue reply failed", e));
           }

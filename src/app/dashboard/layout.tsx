@@ -75,7 +75,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
     getSettings(),
     brandedClient(),
     scope.isAdmin ? db.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }) : [],
-    db.reply.count({ where: { handled: false, ...ownedMessages(scope) } }),
+    db.reply.groupBy({ by: ["customerId"], where: { handled: false, ...ownedMessages(scope) } }).then((g) => g.length),
     db.order.count({ where: { status: { in: ["NEW", "PAID"] }, ...owned(scope) } }).catch(() => 0),
   ]);
 

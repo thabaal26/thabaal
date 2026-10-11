@@ -83,25 +83,83 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     cid ? db.client.findUnique({ where: { id: cid } }) : null,
     cid
       ? db.$queryRaw<{ tag: string; n: bigint }[]>`
-          SELECT unnest(tags) AS tag, count(*) AS n FROM "Customer"
-          WHERE "clientId" = ${cid} AND "optedOut" = false GROUP BY 1 ORDER BY 2 DESC, 1`
+          SELECT t.tag, count(*) AS n
+          FROM "Customer" c CROSS JOIN LATERAL unnest(c.tags) AS t(tag)
+          WHERE c."clientId" = ${cid} AND c."optedOut" = false
+            AND lower(t.tag) NOT IN ('customer','customers','vip','test','manual-order','lapsed','whatsapp','qr','sheet','no-item-info','thenan-oils','cup-n-saucer','new','pending','imported','lead','admin','staff','friend','family')
+          GROUP BY 1 ORDER BY 2 DESC, 1`
       : [],
     cid
       ? db.$queryRaw<{ tag: string; sent: bigint; delivered: bigint; read: bigint; failed: bigint }[]>`
-          SELECT t.tag,
+          WITH cust_prods AS (
+            SELECT c.id AS cid, p.product AS tag
+            FROM "Customer" c
+            CROSS JOIN LATERAL (
+              SELECT DISTINCT prod AS product FROM (
+                SELECT trim(elem->>'name') AS prod
+                FROM "Order" o, jsonb_array_elements(o.items) AS elem
+                WHERE o."customerId" = c.id
+                  AND trim(coalesce(elem->>'name', '')) <> ''
+                  AND trim(elem->>'name') !~* '^manual-[0-9]+$'
+                UNION
+                SELECT trim(part) AS prod
+                FROM regexp_split_to_table(coalesce(c.purchases, ''), '[,/;&]+') AS part
+                WHERE trim(part) <> ''
+                  AND NOT EXISTS (SELECT 1 FROM "Order" o2 WHERE o2."customerId" = c.id)
+                UNION
+                SELECT initcap(replace(t, '-', ' ')) AS prod
+                FROM unnest(c.tags) AS t
+                WHERE lower(t) NOT IN ('customer','customers','vip','test','manual-order','lapsed','whatsapp','qr','sheet','no-item-info','thenan-oils','cup-n-saucer','new','pending','imported','lead','admin','staff','friend','family')
+                  AND coalesce(trim(c.purchases), '') = ''
+                  AND NOT EXISTS (SELECT 1 FROM "Order" o3 WHERE o3."customerId" = c.id)
+              ) raw_prods
+              WHERE prod IS NOT NULL AND prod <> ''
+            ) p
+            WHERE c."clientId" = ${cid}
+          )
+          SELECT cp.tag,
             count(*) AS sent,
             count(*) FILTER (WHERE m.status IN ('DELIVERED', 'READ')) AS delivered,
             count(*) FILTER (WHERE m.status = 'READ') AS read,
             count(*) FILTER (WHERE m.status = 'FAILED') AS failed
-          FROM "Message" m JOIN "Customer" c ON c.id = m."customerId" CROSS JOIN LATERAL unnest(c.tags) AS t(tag)
-          WHERE c."clientId" = ${cid} AND m."createdAt" >= ${monthAgo} AND m.status NOT IN ('QUEUED', 'SKIPPED')
-          GROUP BY 1 ORDER BY 2 DESC`
+          FROM "Message" m
+          JOIN cust_prods cp ON cp.cid = m."customerId"
+          WHERE m."createdAt" >= ${monthAgo} AND m.status NOT IN ('QUEUED', 'SKIPPED')
+          GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 12`
       : [],
     cid
       ? db.$queryRaw<{ tag: string; n: bigint }[]>`
-          SELECT t.tag, count(*) AS n
-          FROM "Reply" r JOIN "Customer" c ON c.id = r."customerId" CROSS JOIN LATERAL unnest(c.tags) AS t(tag)
-          WHERE c."clientId" = ${cid} AND r."receivedAt" >= ${monthAgo} GROUP BY 1`
+          WITH cust_prods AS (
+            SELECT c.id AS cid, p.product AS tag
+            FROM "Customer" c
+            CROSS JOIN LATERAL (
+              SELECT DISTINCT prod AS product FROM (
+                SELECT trim(elem->>'name') AS prod
+                FROM "Order" o, jsonb_array_elements(o.items) AS elem
+                WHERE o."customerId" = c.id
+                  AND trim(coalesce(elem->>'name', '')) <> ''
+                  AND trim(elem->>'name') !~* '^manual-[0-9]+$'
+                UNION
+                SELECT trim(part) AS prod
+                FROM regexp_split_to_table(coalesce(c.purchases, ''), '[,/;&]+') AS part
+                WHERE trim(part) <> ''
+                  AND NOT EXISTS (SELECT 1 FROM "Order" o2 WHERE o2."customerId" = c.id)
+                UNION
+                SELECT initcap(replace(t, '-', ' ')) AS prod
+                FROM unnest(c.tags) AS t
+                WHERE lower(t) NOT IN ('customer','customers','vip','test','manual-order','lapsed','whatsapp','qr','sheet','no-item-info','thenan-oils','cup-n-saucer','new','pending','imported','lead','admin','staff','friend','family')
+                  AND coalesce(trim(c.purchases), '') = ''
+                  AND NOT EXISTS (SELECT 1 FROM "Order" o3 WHERE o3."customerId" = c.id)
+              ) raw_prods
+              WHERE prod IS NOT NULL AND prod <> ''
+            ) p
+            WHERE c."clientId" = ${cid}
+          )
+          SELECT cp.tag, count(DISTINCT r."customerId") AS n
+          FROM "Reply" r
+          JOIN cust_prods cp ON cp.cid = r."customerId"
+          WHERE r."receivedAt" >= ${monthAgo}
+          GROUP BY 1`
       : [],
     cid ? numberHealth(cid) : [],
     // Active campaigns whose template Meta paused, disabled or rejected can't send.
@@ -112,7 +170,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     cid ? db.customer.groupBy({ by: ["region", "location"], where: { clientId: cid, optedOut: false }, _count: true }) : [],
   ]);
 
-  const [customers, optedOut, prevStatus, msgSeries, activeRuns, upcoming, recent, failures, settings, orders, replySeries, repliers, prevReplies, funnelRows, heat, todayMsgs, todayReplies] =
+  const [customers, optedOut, prevStatus, msgSeries, activeRuns, upcoming, recentRaw, failures, settings, orders, replySeries, repliers, prevReplies, funnelRows, heat, todayMsgs, todayReplies] =
     await Promise.all([
       db.customer.count({ where: { ...mine, optedOut: false } }),
       db.customer.count({ where: { ...mine, optedOut: true } }),
@@ -133,7 +191,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         orderBy: { nextRunAt: "asc" },
         take: 5,
       }),
-      db.message.findMany({ where: { ...myMessages, status: { not: "QUEUED" } }, include: { customer: true }, orderBy: { createdAt: "desc" }, take: 6 }),
+      db.message.findMany({ where: { ...myMessages, status: { not: "QUEUED" } }, include: { customer: true }, orderBy: { createdAt: "desc" }, take: 40 }),
       // Failures in the last day, grouped by reason, so problems show up without opening the log.
       db.message.groupBy({
         by: ["error"],
@@ -505,6 +563,18 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     </>
   );
 
+  // Group Latest messages so each customer appears once (newest message + count of recent messages to them).
+  const recentByCustomer = new Map<string, (typeof recentRaw)[number] & { recentCount: number }>();
+  for (const m of recentRaw) {
+    const existing = recentByCustomer.get(m.customerId);
+    if (existing) {
+      existing.recentCount += 1;
+    } else {
+      recentByCustomer.set(m.customerId, { ...m, recentCount: 1 });
+    }
+  }
+  const recent = [...recentByCustomer.values()].slice(0, 6);
+
   // Product and segment tags, largest first; the client-wide tag (e.g. thenan-oils) says nothing on its own.
   const clientTag = client?.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
   const shown = segments.map((t) => ({ tag: t.tag, n: Number(t.n) })).filter((t) => t.tag !== clientTag || segments.length === 1).slice(0, 8);
@@ -802,7 +872,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
               tone="info"
               icon={<Messages3D />}
               title="Latest messages"
-              description="Sent from the portal, newest first"
+              description="One thread per customer · newest message sent from the portal"
               action={
                 <Link href="/dashboard/messages" className={buttonClass("ghost", "sm")}>
                   Open log
@@ -812,7 +882,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
             {recent.length ? (
               <ul className="divide-y divide-line">
                 {recent.map((m) => (
-                  <li key={m.id} className="relative flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-subtle sm:px-5">
+                  <li key={m.customerId} className="relative flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-subtle sm:px-5">
                     <Avatar name={m.customer.name} className="size-8 text-xs max-sm:hidden" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-ink">
@@ -820,6 +890,11 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
                           {m.customer.name}
                         </Link>{" "}
                         <span className="tabular font-normal text-muted">{formatPhone(m.customer.phone)}</span>
+                        {m.recentCount > 1 && (
+                          <span className="ml-1.5 inline-flex items-center rounded-full bg-subtle px-1.5 py-0.5 text-[10px] font-semibold text-ink-2">
+                            {m.recentCount} msgs
+                          </span>
+                        )}
                       </p>
                       <p className="truncate text-xs text-muted">{m.body ?? m.templateName}</p>
                     </div>
@@ -841,14 +916,14 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
 
           {byProduct.length > 0 && (
             <Card className="card-3d">
-              <CardHeader tone="brand" icon={<BarChart3 />} title="Campaign results by product" description="Last 30 days · which customer groups read your messages and write back" />
+              <CardHeader tone="brand" icon={<BarChart3 />} title="Campaign results by product" description="Last 30 days · which product buyers read your messages and write back" />
               {/* Phones: one compact row per product instead of a sideways-scrolling table. */}
               <ul className="divide-y divide-line sm:hidden">
                 {byProduct.map((r) => (
                   <li key={r.tag} className="px-4 py-3">
                     <div className="flex items-baseline justify-between gap-2">
-                      <Link href={`/dashboard/customers?tag=${encodeURIComponent(r.tag)}`} className="min-w-0 truncate text-sm font-medium text-ink">
-                        {tagLabel(r.tag)}
+                      <Link href={`/dashboard/customers?tag=${encodeURIComponent(`product:${r.tag}`)}`} className="min-w-0 truncate text-sm font-medium text-ink">
+                        {r.tag}
                       </Link>
                       <span className="tabular shrink-0 text-xs text-muted">
                         {fmtNumber(r.sent)} sent{r.failed > 0 && <span className="text-danger"> · {r.failed} failed</span>}
@@ -884,8 +959,8 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
                     {byProduct.map((r) => (
                       <tr key={r.tag} className={rowClass}>
                         <Td className="font-medium">
-                          <Link href={`/dashboard/customers?tag=${encodeURIComponent(r.tag)}`} className="hover:underline">
-                            {tagLabel(r.tag)}
+                          <Link href={`/dashboard/customers?tag=${encodeURIComponent(`product:${r.tag}`)}`} className="hover:underline">
+                            {r.tag}
                           </Link>
                         </Td>
                         <Td numeric>

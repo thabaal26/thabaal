@@ -59,6 +59,7 @@ export function OrderActions({
   id,
   who,
   status,
+  isPaid = false,
   note,
   customerNote = null,
   items = [],
@@ -71,6 +72,7 @@ export function OrderActions({
   id: string;
   who: string;
   status: Status;
+  isPaid?: boolean;
   note: string | null;
   customerNote?: string | null;
   items?: OrderItem[];
@@ -141,6 +143,13 @@ export function OrderActions({
         setDispatchOpen(true);
       },
     });
+  if (!isPaid && (status === "NEW" || status === "CONFIRMED" || status === "DISPATCHED"))
+    steps.push({
+      key: "paid",
+      label: "Mark paid (UPI)",
+      variant: "secondary",
+      run: () => run("paid", () => setOrderStatus(id, "PAID")),
+    });
   if (payment && (status === "NEW" || status === "CONFIRMED"))
     steps.push({
       key: "pay",
@@ -154,13 +163,6 @@ export function OrderActions({
       label: total <= 0 ? "Set price / Customize" : "Customize / Edit items",
       variant: "secondary",
       run: openEditSheet,
-    });
-  if (status === "CONFIRMED")
-    steps.push({
-      key: "paid",
-      label: "Mark paid",
-      variant: "secondary",
-      run: () => run("paid", () => setOrderStatus(id, "PAID")),
     });
   if (status === "DISPATCHED") {
     steps.push({
