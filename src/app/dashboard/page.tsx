@@ -3,7 +3,7 @@ import Link from "next/link";
 import { addDays } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { ActionButton } from "@/components/action-button";
-import { Calendar3D, Eye3D, MapPin3D, Messages3D, Rupee3D, Send3D, ShoppingBag3D, Template3D } from "@/components/icons-3d";
+import { Calendar3D, Eye3D, Messages3D, Rupee3D, Send3D, Template3D } from "@/components/icons-3d";
 import { Avatar, Badge, buttonClass, Callout, Card, CardHeader, EmptyState, Meter, StatusBadge } from "@/components/ui";
 import { getCatalogWithProducts } from "@/lib/catalog";
 import { isSectionEnabled } from "@/lib/client-sections";
@@ -31,13 +31,11 @@ import {
   type CustomerWinbackPlaybookData,
   type PlaybookScenario,
 } from "./intelligence-hub";
+import { BusinessPriorityStrip, CartMentalityCard, CustomerAreasCard, CustomerProductsCard, CustomerScenariosCard } from "./insight-cards";
 import {
   ActivityCard,
   BestTimeCard,
-  BusinessPriorityStrip,
   C,
-  CartMentalityCard,
-  CustomerScenariosCard,
   DeliveryCard,
   FunnelCard,
   KpiTile,
@@ -53,12 +51,12 @@ import {
   type DroppedProductInsight,
   type ProductDemandRow,
   type Range,
+  type View,
+  ViewTabs,
 } from "./overview-cards";
 
 export const dynamic = "force-dynamic";
 
-/** Region share colours: a ramp of the brand green, then neutral for "no location". */
-const REGION_COLORS = ["bg-series-read", "bg-series-delivered", "bg-series-sent", "bg-line-2"];
 
 const tagLabel = (tag: string) => (tag === "no-item-info" ? "No item recorded" : tag.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase()));
 
@@ -814,14 +812,12 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
   // Product and segment tags, largest first; the client-wide tag (e.g. thenan-oils) says nothing on its own.
   const clientTag = client?.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
   const shown = segments.map((t) => ({ tag: t.tag, n: Number(t.n) })).filter((t) => t.tag !== clientTag || segments.length === 1).slice(0, 8);
-  const top = shown[0]?.n ?? 0;
   // Location view: city vs outside, plus the busiest areas.
   const REGIONS = ["Madurai city", "Outside Madurai", "Not sure"];
   const byRegion = [
     ...REGIONS.map((r) => ({ key: r, label: r, n: areaRows.filter((a) => a.region === r).reduce((t, a) => t + a._count, 0), href: `region:${r}` })),
     { key: "none", label: "No location noted", n: areaRows.filter((a) => !a.location).reduce((t, a) => t + a._count, 0), href: "none" },
   ].filter((r) => r.n);
-  const regionTotal = byRegion.reduce((t, r) => t + r.n, 0);
   const sortedAreas = areaRows
     .filter((a): a is typeof a & { location: string } => typeof a.location === "string" && a.location.length > 0)
     .sort((a, b) => b._count - a._count)
@@ -1452,6 +1448,13 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     scenarios: playbookScenarios,
   };
 
+  const views: View[] = ordersOn ? ["overview", "customers", "products", "carts"] : ["overview", "customers"];
+  const view: View = views.includes(sp.view as View) ? (sp.view as View) : "overview";
+  const viewBadges: Partial<Record<View, number>> = {
+    customers: browsedNoCartLeads.length || undefined,
+    carts: cartMentalityData.totalRevisers || undefined,
+  };
+
   return (
     <>
       <BrandHero
@@ -1460,7 +1463,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         customers={customers}
         issues={issues}
         actions={adminActions}
-        period={<RangeTabs range={range} />}
+        period={<RangeTabs range={range} view={view} />}
       />
 
       {heldToday > 0 && (
@@ -1526,16 +1529,20 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         </div>
       )}
 
-      <BusinessPriorityStrip
-        unpaidCartsCount={curUnpaidCarts.length}
-        unpaidCartsValue={unpaidCartRevenue}
-        unpaidCustomersCount={unpaidCartCustomerIds.size}
-        browsedNoCartCount={browsedNoCartLeads.length}
-        toDispatchCount={toDispatchCount}
-        unhandledRepliesCount={unhandledGroup.length}
-        showOrders={ordersOn}
-        showReplies={repliesOn}
-      />
+      <ViewTabs view={view} range={range} views={views} badges={viewBadges} />
+
+      {view === "overview" && (
+        <>
+          <BusinessPriorityStrip
+            unpaidCartsCount={curUnpaidCarts.length}
+            unpaidCartsValue={unpaidCartRevenue}
+            unpaidCustomersCount={unpaidCartCustomerIds.size}
+            browsedNoCartCount={browsedNoCartLeads.length}
+            toDispatchCount={toDispatchCount}
+            unhandledRepliesCount={unhandledGroup.length}
+            showOrders={ordersOn}
+            showReplies={repliesOn}
+          />
 
       {/* Headline figures for the period, each with its real change against the stretch before. */}
       <div
@@ -1697,37 +1704,8 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         </div>
       </div>
 
-      {/* Deep Customer Behaviour & Cart Drop-Off Scenarios */}
-      {ordersOn && <CustomerScenariosCard data={scenariosData} />}
-
-      {/* Multi-Cart Customer Mentality & Product Hesitation Analytics */}
-      {ordersOn && <CartMentalityCard data={cartMentalityData} />}
-
-      {/* Customer Win-Back, Retention & Scenario Action Playbook Engine */}
-      <CustomerGrowthPlaybookCard data={winbackPlaybookData} />
-
-      {/* Full All-Products Analytics (Including 0-Sales / Non-Selling SKUs) */}
-      {ordersOn && <AllProductsIntelligenceCard data={allProductsData} />}
-
-      {/* When to send, and what sells. */}
-      {(repliesOn || ordersOn) && (
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-5 sm:gap-5 xl:grid-cols-12">
-          {repliesOn && (
-            <div className={`min-w-0 ${ordersOn ? "xl:col-span-7" : "xl:col-span-12"}`}>
-              <BestTimeCard cells={heat.map((h) => ({ d: h.d, b: h.b, n: Number(h.n) }))} days={90} />
-            </div>
-          )}
-          {ordersOn && (
-            <div className={`min-w-0 ${repliesOn ? "xl:col-span-5" : "xl:col-span-12"}`}>
-              <TopProductsCard items={topProducts} rangeLabel={hourly ? "Today" : `Last ${days} days`} />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Day-to-day detail. */}
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-5 sm:gap-5 xl:grid-cols-12">
-        <div className="min-w-0 space-y-4 sm:space-y-5 xl:col-span-7">
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-5 sm:gap-5 xl:grid-cols-12">
+            <div className="min-w-0 xl:col-span-7">
           <Card className="card-3d">
             <CardHeader
               tone="info"
@@ -1775,10 +1753,8 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
             )}
           </Card>
 
-          {byProduct.length > 0 && <ProductCampaignGraphCard rows={byProduct} />}
-        </div>
-
-        <div className="min-w-0 space-y-4 sm:space-y-5 xl:col-span-5">
+            </div>
+            <div className="min-w-0 space-y-4 sm:space-y-5 xl:col-span-5">
           {campaignsOn && (
             <Card className="card-3d">
               <CardHeader
@@ -1820,56 +1796,40 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
             </Card>
           )}
 
-          {cid && <SpendCard clientId={cid} canManage={scope.canManage} />}
-
-          {shown.length > 0 && (
-            <Card className="card-3d">
-              <CardHeader tone="gold" icon={<ShoppingBag3D />} title="What your customers buy" description="Customers per product or group · each can get its own campaign" />
-              <ul className="grid gap-x-6 gap-y-0.5 p-2 sm:grid-cols-2 sm:p-3">
-                {shown.map((t) => (
-                  <li key={t.tag}>
-                    <Link href={`/dashboard/customers?tag=${encodeURIComponent(t.tag)}`} className="group block rounded-control px-2.5 py-2.5 transition hover:bg-subtle active:bg-sunken">
-                      <div className="flex items-baseline justify-between gap-2 text-sm">
-                        <span className="truncate font-medium text-ink group-hover:underline">{tagLabel(t.tag)}</span>
-                        <span className="tabular text-xs font-medium text-ink-2">{fmtNumber(t.n)}</span>
-                      </div>
-                      <Meter raised className="mt-1.5" value={Math.max(4, pct(t.n, top))} />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
-        </div>
-      </div>
-
-      {byRegion.length > 1 && (
-        <Card className="card-3d mt-4 sm:mt-5">
-          <CardHeader tone="info" icon={<MapPin3D />} title="Customers by area" description="From the order sheets · tap an area to see its customers" />
-          <div className="space-y-5 p-4 sm:p-5">
-            <div>
-              <div className="flex h-2.5 gap-0.5 overflow-hidden rounded-full" aria-hidden>
-                {byRegion.map((r, i) => (
-                  <div key={r.key} className={`${REGION_COLORS[i] ?? "bg-line-2"} first:rounded-l-full last:rounded-r-full`} style={{ width: `${pct(r.n, regionTotal)}%` }} />
-                ))}
-              </div>
-              <ul className="mt-2 grid grid-cols-1 gap-x-4 min-[360px]:grid-cols-2 sm:flex sm:flex-wrap sm:gap-x-2">
-                {byRegion.map((r, i) => (
-                  <li key={r.key}>
-                    <Link href={`/dashboard/customers?area=${encodeURIComponent(r.href)}`} className="group flex min-h-11 items-center gap-2 rounded-control px-1 text-sm transition hover:bg-subtle sm:min-h-9 sm:px-2">
-                      <span aria-hidden className={`size-2.5 shrink-0 rounded-[3px] ${REGION_COLORS[i] ?? "bg-line-2"}`} />
-                      <span className="text-ink-2 group-hover:underline">{r.label}</span>
-                      <span className="tabular text-xs text-muted">
-                        {fmtNumber(r.n)} · {pct(r.n, regionTotal)}%
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              {cid && <SpendCard clientId={cid} canManage={scope.canManage} />}
             </div>
-            <AreaChips topAreas={topAreas} otherAreas={otherAreas} />
           </div>
-        </Card>
+        </>
+      )}
+
+      {view === "customers" && (
+        <div className="space-y-4 sm:space-y-5">
+          {ordersOn && <CustomerScenariosCard data={scenariosData} />}
+          <CustomerGrowthPlaybookCard data={winbackPlaybookData} />
+          <div className="grid grid-cols-1 gap-4 sm:gap-5 xl:grid-cols-2">
+            <CustomerProductsCard items={shown.map((t) => ({ tag: t.tag, label: tagLabel(t.tag), n: t.n }))} />
+            <CustomerAreasCard regions={byRegion}>
+              <AreaChips topAreas={topAreas} otherAreas={otherAreas} />
+            </CustomerAreasCard>
+          </div>
+          {repliesOn && <BestTimeCard cells={heat.map((h) => ({ d: h.d, b: h.b, n: Number(h.n) }))} days={90} />}
+        </div>
+      )}
+
+      {view === "products" && ordersOn && (
+        <div className="space-y-4 sm:space-y-5">
+          <AllProductsIntelligenceCard data={allProductsData} />
+          <div className="grid grid-cols-1 gap-4 sm:gap-5 xl:grid-cols-2">
+            <TopProductsCard items={topProducts} rangeLabel={hourly ? "Today" : `Last ${days} days`} />
+            {byProduct.length > 0 && <ProductCampaignGraphCard rows={byProduct} />}
+          </div>
+        </div>
+      )}
+
+      {view === "carts" && ordersOn && (
+        <div className="space-y-4 sm:space-y-5">
+          <CartMentalityCard data={cartMentalityData} />
+        </div>
       )}
     </>
   );

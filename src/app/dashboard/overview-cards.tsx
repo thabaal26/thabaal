@@ -3,12 +3,8 @@ import {
   ArrowUpRight,
   BookOpen,
   CheckCheck,
-  PackageCheck,
   ShieldAlert,
   ShoppingCart,
-  Sparkles,
-  UserCheck,
-  XCircle,
 } from "lucide-react";
 import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
@@ -21,12 +17,11 @@ import {
   Messages3D,
   Send3D,
   ShoppingBag3D,
-  Sparkles3D,
   Target3D,
   Trophy3D,
 } from "@/components/icons-3d";
 import { formatValue, type ValueFormat } from "@/lib/chart-math";
-import { Badge, Card, CardHeader, QualityBadge, buttonClass } from "@/components/ui";
+import { Card, CardHeader, QualityBadge, buttonClass } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { fmtDate, fmtNumber, pct } from "@/lib/format";
 import type { numberHealth } from "@/lib/limits";
@@ -56,14 +51,23 @@ function brightCubeGradient(color: string) {
 export const RANGES = { today: { days: 1, label: "Today", prev: "yesterday" }, "7d": { days: 7, label: "7 days", prev: "the 7 days before" }, "30d": { days: 30, label: "30 days", prev: "the 30 days before" } } as const;
 export type Range = keyof typeof RANGES;
 
+/** The dashboard URL for a view and period, leaving out the defaults. */
+export function dashHref(view: string, range: Range) {
+  const q = new URLSearchParams();
+  if (view !== "overview") q.set("view", view);
+  if (range !== "7d") q.set("range", range);
+  const qs = q.toString();
+  return qs ? `/dashboard?${qs}` : "/dashboard";
+}
+
 /** Today / 7 days / 30 days, kept in the URL so the view can be shared and reloaded. */
-export function RangeTabs({ range }: { range: Range }) {
+export function RangeTabs({ range, view = "overview" }: { range: Range; view?: string }) {
   return (
     <nav aria-label="Period" className="inline-flex rounded-control bg-sunken p-1">
       {(Object.keys(RANGES) as Range[]).map((r) => (
         <Link
           key={r}
-          href={r === "7d" ? "/dashboard" : `/dashboard?range=${r}`}
+          href={dashHref(view, r)}
           scroll={false}
           aria-current={r === range ? "page" : undefined}
           className={cn(
@@ -74,6 +78,42 @@ export function RangeTabs({ range }: { range: Range }) {
           {RANGES[r].label}
         </Link>
       ))}
+    </nav>
+  );
+}
+
+/** Dashboard sections: one focused view at a time instead of one very long page. */
+export const VIEWS = {
+  overview: { label: "Overview", hint: "Today's work and headline figures" },
+  customers: { label: "Customers", hint: "Journey, lifecycle and where they are" },
+  products: { label: "Products", hint: "What sells, what sticks in carts" },
+  carts: { label: "Carts", hint: "Revisions and hesitation" },
+} as const;
+export type View = keyof typeof VIEWS;
+
+export function ViewTabs({ view, range, views, badges }: { view: View; range: Range; views: View[]; badges?: Partial<Record<View, number>> }) {
+  return (
+    <nav aria-label="Dashboard sections" className="thin-scroll -mx-1 mb-4 flex gap-1 overflow-x-auto border-b border-line px-1 sm:mb-5">
+      {views.map((v) => {
+        const on = v === view;
+        const n = badges?.[v];
+        return (
+          <Link
+            key={v}
+            href={dashHref(v, range)}
+            scroll={false}
+            title={VIEWS[v].hint}
+            aria-current={on ? "page" : undefined}
+            className={cn(
+              "relative -mb-px inline-flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 px-3.5 text-sm font-medium transition",
+              on ? "border-brand text-ink" : "border-transparent text-muted hover:border-line-2 hover:text-ink",
+            )}
+          >
+            {VIEWS[v].label}
+            {n ? <span className="tabular rounded-full bg-warning-bg px-1.5 py-px text-2xs font-semibold text-warning">{n}</span> : null}
+          </Link>
+        );
+      })}
     </nav>
   );
 }
@@ -612,7 +652,7 @@ export function TopProductsCard({ items, rangeLabel }: { items: ProductDemandRow
         title="Product demand: bought vs. left in cart"
         description={`Paid/confirmed sales vs. items added to cart & unpaid (${rangeLabel.toLowerCase()})`}
         action={
-          <Link href="#all-products-intelligence" className={buttonClass("ghost", "sm")}>
+          <Link href="/dashboard?view=products" className={buttonClass("ghost", "sm")}>
             All products →
           </Link>
         }
@@ -683,138 +723,6 @@ export function TopProductsCard({ items, rangeLabel }: { items: ProductDemandRow
 
 /* ───────────────────────── Business Priority Strip (Top of Dashboard) ───────────────────────── */
 
-export type BusinessPriorityProps = {
-  unpaidCartsCount: number;
-  unpaidCartsValue: number;
-  unpaidCustomersCount: number;
-  browsedNoCartCount: number;
-  toDispatchCount: number;
-  unhandledRepliesCount: number;
-  showOrders: boolean;
-  showReplies: boolean;
-};
-
-/**
- * High-priority business action bar at the top of the Dashboard page.
- * Surfaces revenue sitting in unpaid WhatsApp carts, warm catalogue browsers who haven't added to cart,
- * confirmed orders waiting to be packed, and unanswered customer replies.
- */
-export function BusinessPriorityStrip({
-  unpaidCartsCount,
-  unpaidCartsValue,
-  unpaidCustomersCount,
-  browsedNoCartCount,
-  toDispatchCount,
-  unhandledRepliesCount,
-  showOrders,
-  showReplies,
-}: BusinessPriorityProps) {
-  const cards: {
-    key: string;
-    title: string;
-    metric: string;
-    sub: string;
-    href: string;
-    cta: string;
-    tone: "amber" | "info" | "brand" | "violet";
-    icon: ComponentType<{ className?: string }>;
-  }[] = [];
-
-  if (showOrders && unpaidCartsCount > 0) {
-    cards.push({
-      key: "unpaid-carts",
-      title: "Added to cart · Not bought yet",
-      metric: `${formatValue(unpaidCartsValue, "inr")} in ${fmtNumber(unpaidCartsCount)} cart${unpaidCartsCount === 1 ? "" : "s"}`,
-      sub: `${fmtNumber(unpaidCustomersCount)} customer${unpaidCustomersCount === 1 ? "" : "s"} sent a WhatsApp cart & haven't paid yet`,
-      href: "/dashboard/orders?show=unpaid",
-      cta: "Follow up & close sale →",
-      tone: "amber",
-      icon: ShoppingCart,
-    });
-  }
-
-  if (showOrders && browsedNoCartCount > 0) {
-    cards.push({
-      key: "browsed-no-cart",
-      title: "Viewed catalogue · Didn't add to cart",
-      metric: `${fmtNumber(browsedNoCartCount)} warm lead${browsedNoCartCount === 1 ? "" : "s"}`,
-      sub: "Asked for prices or catalogue, read it, but didn't submit a cart",
-      href: "#customer-scenarios",
-      cta: "See who browsed →",
-      tone: "info",
-      icon: BookOpen,
-    });
-  }
-
-  if (showOrders && toDispatchCount > 0) {
-    cards.push({
-      key: "to-dispatch",
-      title: "Paid / confirmed · Ready to pack",
-      metric: `${fmtNumber(toDispatchCount)} order${toDispatchCount === 1 ? "" : "s"} to ship`,
-      sub: "Payment or confirmation received — ready for packing & dispatch",
-      href: "/dashboard/orders/packing",
-      cta: "Open packing list →",
-      tone: "brand",
-      icon: PackageCheck,
-    });
-  }
-
-  if (showReplies && unhandledRepliesCount > 0) {
-    cards.push({
-      key: "unhandled-replies",
-      title: "Waiting for your reply",
-      metric: `${fmtNumber(unhandledRepliesCount)} open chat${unhandledRepliesCount === 1 ? "" : "s"}`,
-      sub: "Reply within 24 hours for free service messaging on WhatsApp",
-      href: "/dashboard/replies",
-      cta: "Reply in inbox →",
-      tone: "violet",
-      icon: Messages3D,
-    });
-  }
-
-  if (!cards.length) return null;
-
-  const toneStyles: Record<(typeof cards)[number]["tone"], string> = {
-    amber: "border-warning-border bg-warning-bg/70 hover:bg-warning-bg",
-    info: "border-info-border bg-info-bg/70 hover:bg-info-bg",
-    brand: "border-brand/30 bg-brand-soft/60 hover:bg-brand-soft",
-    violet: "border-line bg-subtle hover:bg-sunken",
-  };
-
-  return (
-    <section aria-label="Business priorities needing attention" className="mb-4 sm:mb-5">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-2">
-          <Sparkles aria-hidden className="size-3.5 text-gold" /> Business priorities & revenue recovery
-        </p>
-        <span className="text-xs text-muted">Live action items from WhatsApp activity</span>
-      </div>
-      <div className={cn("grid grid-cols-1 gap-3 sm:grid-cols-2", cards.length >= 4 ? "xl:grid-cols-4" : cards.length === 3 ? "xl:grid-cols-3" : "xl:grid-cols-2")}>
-        {cards.map((c) => {
-          const Icon = c.icon;
-          return (
-            <Link
-              key={c.key}
-              href={c.href}
-              className={cn("card-3d flex flex-col justify-between rounded-card border p-3.5 transition sm:p-4", toneStyles[c.tone])}
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-ink-2">{c.title}</span>
-                  <Icon aria-hidden className="size-4 shrink-0 text-ink-2" />
-                </div>
-                <p className="tabular mt-1.5 text-lg font-semibold leading-tight text-ink sm:text-xl">{c.metric}</p>
-                <p className="mt-1 text-xs text-muted">{c.sub}</p>
-              </div>
-              <p className="mt-2.5 text-xs font-semibold text-brand-deep">{c.cta}</p>
-            </Link>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
 /* ───────────────────────── Customer Behaviour & Cart Scenarios Card ───────────────────────── */
 
 export type ScenarioLead = {
@@ -870,219 +778,6 @@ export type CustomerScenariosData = {
   cartToBuyPct: number;
 };
 
-export function CustomerScenariosCard({ data }: { data: CustomerScenariosData }) {
-  const scenarios = [
-    {
-      key: "cart-unpaid",
-      badge: "High priority · Recoverable revenue",
-      badgeTone: "amber" as const,
-      title: "1. Added to cart, didn't buy yet (Unpaid cart)",
-      explain: "Selected items in the WhatsApp catalogue & sent the cart, received the payment request, and stopped before paying.",
-      stat: `${fmtNumber(data.addedToCartUnpaid.customers)} customer${data.addedToCartUnpaid.customers === 1 ? "" : "s"} · ${fmtNumber(data.addedToCartUnpaid.carts)} cart${data.addedToCartUnpaid.carts === 1 ? "" : "s"}`,
-      count: data.addedToCartUnpaid.customers,
-      money: data.addedToCartUnpaid.value > 0 ? `${formatValue(data.addedToCartUnpaid.value, "inr")} in cart` : null,
-      tip: "Call or message them while intent is warm — common reasons are UPI hesitation, wanting COD, or shipping fee questions.",
-      leads: data.addedToCartUnpaid.leads,
-      icon: ShoppingCart,
-      color: "#d97706",
-      actionHref: "/dashboard/orders?show=unpaid",
-      actionLabel: "View unpaid carts",
-    },
-    {
-      key: "browsed-no-cart",
-      badge: "Warm intent · Browsed only",
-      badgeTone: "blue" as const,
-      title: "2. Viewed catalogue / price list, didn't add to cart",
-      explain: "Tapped 'Order now' or 'Send price list' (or greeted & received the catalogue), read it, but never added items to cart.",
-      stat: `${fmtNumber(data.browsedNoCart.customers)} customer${data.browsedNoCart.customers === 1 ? "" : "s"}`,
-      count: data.browsedNoCart.customers,
-      money: data.catalogueToCartPct > 0 ? `${data.catalogueToCartPct}% catalogue → cart rate` : null,
-      tip: "Send a quick personal recommendation or offer to take their order directly in chat before the 24h free window closes.",
-      leads: data.browsedNoCart.leads,
-      icon: BookOpen,
-      color: "#0284c7",
-      actionHref: "/dashboard/replies",
-      actionLabel: "Open replies inbox",
-    },
-    {
-      key: "cart-cancelled",
-      badge: "Replaced / Dropped cart",
-      badgeTone: "red" as const,
-      title: "3. Added to cart, then replaced or cancelled",
-      explain: "Sent an earlier WhatsApp cart and either replaced it with a revised cart or cancelled.",
-      stat: `${fmtNumber(data.cancelledCarts.customers)} customer${data.cancelledCarts.customers === 1 ? "" : "s"} · ${fmtNumber(data.cancelledCarts.carts)} replaced/cancelled`,
-      count: data.cancelledCarts.customers,
-      money: data.cancelledCarts.value > 0 ? `${formatValue(data.cancelledCarts.value, "inr")} revised/dropped` : null,
-      tip: "See which products they removed when revising their cart — those items indicate price sensitivity or pack-size hesitation.",
-      leads: data.cancelledCarts.leads,
-      icon: XCircle,
-      color: C.failed,
-      actionHref: "/dashboard/orders?show=cancelled",
-      actionLabel: "See replaced/cancelled",
-    },
-    {
-      key: "converted-buyers",
-      badge: "Completed purchase",
-      badgeTone: "green" as const,
-      title: "4. Added to cart & bought (Paid / Confirmed)",
-      explain: "Completed payment or order confirmation after adding to cart.",
-      stat: `${fmtNumber(data.convertedBuyers.customers)} buyer${data.convertedBuyers.customers === 1 ? "" : "s"} (${fmtNumber(data.convertedBuyers.orders)} order${data.convertedBuyers.orders === 1 ? "" : "s"})${data.convertedBuyers.repeatBuyers > 0 ? ` · ${fmtNumber(data.convertedBuyers.repeatBuyers)} repeat` : ""}`,
-      count: data.convertedBuyers.customers,
-      money: `${formatValue(data.convertedBuyers.revenue, "inr")} sales · ${data.cartToBuyPct}% cart → buy`,
-      tip: "Send dispatch updates promptly and schedule automatic refill reminders so they reorder effortlessly.",
-      leads: data.convertedBuyers.leads,
-      icon: UserCheck,
-      color: C.brand,
-      actionHref: "/dashboard/orders?show=all",
-      actionLabel: "View orders",
-    },
-    {
-      key: "inquiry-only",
-      badge: "Chatting · No cart yet",
-      badgeTone: "gray" as const,
-      title: "5. Replied or asked a question, no catalogue/cart yet",
-      explain: "Replied by text, photo, or call permission without browsing the catalogue or sending a cart.",
-      stat: `${fmtNumber(data.repliedInquiryOnly.customers)} customer${data.repliedInquiryOnly.customers === 1 ? "" : "s"}`,
-      count: data.repliedInquiryOnly.customers,
-      money: null,
-      tip: "Use the 'Send catalogue' button in their chat so they can tap and add items to cart in one step.",
-      leads: data.repliedInquiryOnly.leads,
-      icon: Messages3D,
-      color: C.info,
-      actionHref: "/dashboard/replies?show=all",
-      actionLabel: "Open chats",
-    },
-    {
-      key: "read-no-action",
-      badge: "Read only · Silent",
-      badgeTone: "gray" as const,
-      title: "6. Read campaign message, took no action yet",
-      explain: "Opened and read your WhatsApp template message in this period, but didn't tap a button or reply.",
-      stat: `${fmtNumber(data.readNoAction.customers)} customer${data.readNoAction.customers === 1 ? "" : "s"} read without replying`,
-      count: data.readNoAction.customers,
-      money: null,
-      tip: "Test stronger quick-reply buttons (e.g., 'View Price List', 'Order Now') or a regional Tamil/English template on the next campaign.",
-      leads: [],
-      icon: Eye3D,
-      color: C.read,
-      actionHref: "/dashboard/messages?status=READ",
-      actionLabel: "See read log",
-    },
-  ];
-
-  const totalScenarioCustomers = Math.max(1, scenarios.reduce((sum, s) => sum + s.count, 0));
-
-  return (
-    <Card id="customer-scenarios" className="card-3d mt-4 sm:mt-5">
-      <CardHeader
-        tone="brand"
-        icon={<Target3D />}
-        title="Customer behaviour & cart drop-off analytics"
-        description={`How customers acted across ${data.periodLabel} — from reading a message to browsing the catalogue, adding to cart, and buying`}
-        action={
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <Badge tone="blue">Catalogue → Cart: {data.catalogueToCartPct}%</Badge>
-            <Badge tone="green">Cart → Purchase: {data.cartToBuyPct}%</Badge>
-          </div>
-        }
-      />
-
-      {/* Visual 6-Scenario Distribution Bar */}
-      <div className="border-b border-line bg-subtle/40 px-4 py-3.5 sm:px-5">
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-          <span className="font-semibold uppercase tracking-wider text-ink-2">
-            Visual customer action distribution ({data.periodLabel})
-          </span>
-          <span className="text-muted">
-            Catalogue → Cart <b className="text-ink">{data.catalogueToCartPct}%</b> · Cart → Paid <b className="text-success">{data.cartToBuyPct}%</b>
-          </span>
-        </div>
-        <div className="track-3d mt-2 flex h-3 w-full gap-0.5 overflow-hidden rounded-full p-0.5">
-          {scenarios
-            .filter((s) => s.count > 0)
-            .map((s) => (
-              <div
-                key={s.key}
-                className="bar-3d h-full first:rounded-l-full last:rounded-r-full"
-                style={{
-                  width: `${Math.max(5, pct(s.count, totalScenarioCustomers))}%`,
-                  background: s.color,
-                }}
-                title={`${s.title}: ${s.count} customers`}
-              />
-            ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 divide-y divide-line lg:grid-cols-2 lg:divide-x lg:divide-y-0">
-        {scenarios.map((s, idx) => {
-          const Icon = s.icon;
-          return (
-            <div
-              key={s.key}
-              className={cn(
-                "flex flex-col justify-between p-4 sm:p-5",
-                idx >= 2 && "lg:border-t lg:border-line",
-              )}
-            >
-              <div>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Badge tone={s.badgeTone}>{s.badge}</Badge>
-                  {s.money && <span className="tabular text-xs font-semibold text-ink">{s.money}</span>}
-                </div>
-                <div className="mt-2.5 flex items-start gap-3">
-                  <span
-                    aria-hidden
-                    className="icon-cube-3d mt-0.5 grid size-8 shrink-0 place-items-center rounded-[10px] text-white ring-1 ring-inset ring-white/40"
-                    style={{ background: brightCubeGradient(s.color) }}
-                  >
-                    <Icon className="size-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <h4 className="text-sm font-semibold text-ink">{s.title}</h4>
-                    <p className="mt-0.5 text-xs text-muted">{s.explain}</p>
-                    <p className="tabular mt-1.5 text-sm font-semibold text-ink-2">{s.stat}</p>
-                  </div>
-                </div>
-
-                {s.leads.length > 0 && (
-                  <ul className="mt-3 divide-y divide-line rounded-control border border-line bg-subtle px-3 py-1 text-xs">
-                    {s.leads.map((lead) => (
-                      <li key={`${s.key}-${lead.customerId}-${lead.at.toISOString()}`} className="flex items-center justify-between gap-2 py-2">
-                        <div className="min-w-0 flex-1">
-                          <Link href={lead.href} className="font-semibold text-ink hover:underline">
-                            {lead.name}
-                          </Link>
-                          <span className="ml-1.5 text-muted">· {lead.detail}</span>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          {lead.amount !== undefined && lead.amount > 0 && (
-                            <span className="tabular font-semibold text-ink">{formatValue(lead.amount, "inr")}</span>
-                          )}
-                          <span className="tabular text-2xs text-muted">{fmtDate(lead.at, "d MMM, h:mm a")}</span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-2.5 text-xs">
-                <p className="text-muted">
-                  <b className="font-semibold text-ink-2">Next step & solution:</b> {s.tip}
-                </p>
-                <Link href={s.actionHref} className="shrink-0 font-semibold text-brand-deep hover:underline">
-                  {s.actionLabel} →
-                </Link>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </Card>
-  );
-}
-
 /* ───────────────────────── Multi-Cart Customer Mentality & Product Hesitation Card ───────────────────────── */
 
 export type CartRevisionJourney = {
@@ -1135,275 +830,3 @@ export type CartMentalitySummaryData = {
   droppedProducts: DroppedProductInsight[];
   anchorProducts: AnchorProductInsight[];
 };
-
-export function CartMentalityCard({ data }: { data: CartMentalitySummaryData }) {
-  if (data.totalRevisers === 0 && data.droppedProducts.length === 0) return null;
-
-  const totalPatterns = Math.max(1, data.downsizedCount + data.upsizedCount + data.swappedCount + data.retriedCount);
-  const maxDroppedVal = Math.max(1, ...data.droppedProducts.map((d) => d.droppedValue));
-
-  return (
-    <Card className="card-3d mt-4 sm:mt-5">
-      <CardHeader
-        tone="amber"
-        icon={<Sparkles3D />}
-        title="Customer cart mentality & product hesitation intelligence"
-        description={`What happens when customers send multiple carts before paying — budget downsizing, product swaps, high-conviction anchor items, and items dropped (${data.periodLabel})`}
-        action={
-          <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            <Badge tone="amber">
-              {fmtNumber(data.totalRevisers)} cart reviser{data.totalRevisers === 1 ? "" : "s"} ({fmtNumber(data.totalSupersededCarts)} replaced cart{data.totalSupersededCarts === 1 ? "" : "s"})
-            </Badge>
-            {data.downsizedValueLost > 0 && (
-              <Badge tone="red">
-                Budget trimmed: {formatValue(data.downsizedValueLost, "inr")}
-              </Badge>
-            )}
-            {data.upsizedValueGained > 0 && (
-              <Badge tone="green">
-                Cart upsized: +{formatValue(data.upsizedValueGained, "inr")}
-              </Badge>
-            )}
-          </div>
-        }
-      />
-
-      {/* Visual Cart Mentality Pattern Split Bar */}
-      <div className="border-b border-line bg-subtle/40 px-4 pt-3.5 pb-1 sm:px-5">
-        <div className="flex items-center justify-between text-2xs font-semibold uppercase tracking-wider text-muted">
-          <span>Multi-cart revision psychology breakdown</span>
-          <span>Latest cart kept active · Earlier unpaid carts archived</span>
-        </div>
-        <div className="track-3d mt-2 flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full p-0.5">
-          {data.downsizedCount > 0 && (
-            <div
-              className="bar-3d h-full first:rounded-l-full last:rounded-r-full"
-              style={{ width: `${Math.max(8, pct(data.downsizedCount, totalPatterns))}%`, background: "#e11d48" }}
-              title={`Price hesitation / Downsized: ${data.downsizedCount}`}
-            />
-          )}
-          {data.upsizedCount > 0 && (
-            <div
-              className="bar-3d h-full first:rounded-l-full last:rounded-r-full"
-              style={{ width: `${Math.max(8, pct(data.upsizedCount, totalPatterns))}%`, background: "#059669" }}
-              title={`Expanded cart / Upsized: ${data.upsizedCount}`}
-            />
-          )}
-          {data.swappedCount > 0 && (
-            <div
-              className="bar-3d h-full first:rounded-l-full last:rounded-r-full"
-              style={{ width: `${Math.max(8, pct(data.swappedCount, totalPatterns))}%`, background: "#0ea5e9" }}
-              title={`Product swapped: ${data.swappedCount}`}
-            />
-          )}
-          {data.retriedCount > 0 && (
-            <div
-              className="bar-3d h-full first:rounded-l-full last:rounded-r-full"
-              style={{ width: `${Math.max(8, pct(data.retriedCount, totalPatterns))}%`, background: "#d97706" }}
-              title={`Same-cart payment retry: ${data.retriedCount}`}
-            />
-          )}
-        </div>
-      </div>
-
-      {/* Top 4 Mentality Pattern Summary Tiles */}
-      <div className="grid grid-cols-2 divide-x divide-y divide-line border-b border-line bg-subtle/40 sm:grid-cols-4 sm:divide-y-0">
-        <div className="p-3.5 sm:p-4">
-          <p className="text-2xs font-semibold uppercase tracking-wider text-muted">Price hesitation (Downsized)</p>
-          <p className="tabular mt-1 text-base font-semibold text-ink sm:text-lg">
-            {fmtNumber(data.downsizedCount)} customer{data.downsizedCount === 1 ? "" : "s"}
-          </p>
-          <p className="mt-0.5 text-xs text-danger">
-            {data.downsizedValueLost > 0 ? `-${formatValue(data.downsizedValueLost, "inr")} removed from earlier carts` : "No budget cuts"}
-          </p>
-        </div>
-        <div className="p-3.5 sm:p-4">
-          <p className="text-2xs font-semibold uppercase tracking-wider text-muted">Expanded cart (Upsized)</p>
-          <p className="tabular mt-1 text-base font-semibold text-ink sm:text-lg">
-            {fmtNumber(data.upsizedCount)} customer{data.upsizedCount === 1 ? "" : "s"}
-          </p>
-          <p className="mt-0.5 text-xs text-success">
-            {data.upsizedValueGained > 0 ? `+${formatValue(data.upsizedValueGained, "inr")} added on 2nd cart` : "No upsized carts yet"}
-          </p>
-        </div>
-        <div className="p-3.5 sm:p-4">
-          <p className="text-2xs font-semibold uppercase tracking-wider text-muted">Product swaps / comparison</p>
-          <p className="tabular mt-1 text-base font-semibold text-ink sm:text-lg">
-            {fmtNumber(data.swappedCount)} customer{data.swappedCount === 1 ? "" : "s"}
-          </p>
-          <p className="mt-0.5 text-xs text-muted">Replaced items with another option</p>
-        </div>
-        <div className="p-3.5 sm:p-4">
-          <p className="text-2xs font-semibold uppercase tracking-wider text-muted">Same-cart payment retry</p>
-          <p className="tabular mt-1 text-base font-semibold text-ink sm:text-lg">
-            {fmtNumber(data.retriedCount)} customer{data.retriedCount === 1 ? "" : "s"}
-          </p>
-          <p className="mt-0.5 text-xs text-muted">Re-sent identical cart for fresh Pay link</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 divide-y divide-line xl:grid-cols-12 xl:divide-x xl:divide-y-0">
-        {/* Left 7 cols: Customer-by-customer Cart Revision Journeys */}
-        <div className="p-4 sm:p-5 xl:col-span-7">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <div>
-              <h4 className="text-sm font-semibold text-ink">How customers changed their cart (Latest cart vs. earlier carts)</h4>
-              <p className="text-xs text-muted">Every earlier unpaid cart is stored to reveal what each customer wanted first vs. what they kept</p>
-            </div>
-            <Link href="/dashboard/orders" className="shrink-0 text-xs font-semibold text-brand-deep hover:underline">
-              Active orders →
-            </Link>
-          </div>
-
-          {data.journeys.length > 0 ? (
-            <ul className="space-y-3">
-              {data.journeys.map((j) => {
-                const nextActionText = !j.latestPaid
-                  ? `Follow up on ${j.latestOrderRef} (${formatValue(j.latestTotal, "inr")}) with a 1-tap UPI link or COD confirmation.`
-                  : j.droppedItems.length > 0
-                    ? `Customer paid for ${j.latestOrderRef} but dropped ${j.droppedItems.map((d) => d.name).join(", ")} — offer a smaller pack or ₹30 combo on their next refill.`
-                    : `High-intent repeat cart buyer — schedule a 30-day refill reminder.`;
-                return (
-                  <li key={j.latestOrderId} className="rounded-control border border-line bg-sunken/70 p-3.5 text-xs">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <Link href={`/dashboard/customers/${j.customerId}`} className="text-sm font-semibold text-ink hover:underline">
-                          {j.customerName}
-                        </Link>
-                        <Badge tone={j.behavior === "downsized" ? "amber" : j.behavior === "upsized" ? "green" : "blue"}>
-                          {j.attemptCount} carts sent
-                        </Badge>
-                        <Badge tone={j.latestPaid ? "green" : "amber"}>
-                          Current: {j.latestOrderRef} ({formatValue(j.latestTotal, "inr")} · {j.latestPaid ? "Paid" : "Unpaid"})
-                        </Badge>
-                      </div>
-                      <span className="tabular text-2xs text-muted">{fmtDate(j.at, "d MMM, h:mm a")}</span>
-                    </div>
-
-                    <p className="mt-1.5 font-medium text-ink-2">{j.headline}</p>
-
-                    <div className="mt-2 space-y-1">
-                      {j.droppedItems.length > 0 && (
-                        <p>
-                          <span className="font-semibold text-danger">Dropped from earlier cart: </span>
-                          {j.droppedItems
-                            .map((d) => `${d.name}${d.price > 0 ? ` (${formatValue(d.price * d.quantity, "inr")})` : ""}`)
-                            .join(", ")}
-                        </p>
-                      )}
-                      {j.addedItems.length > 0 && (
-                        <p>
-                          <span className="font-semibold text-success">Switched / Added in latest cart: </span>
-                          {j.addedItems
-                            .map((a) => `${a.name}${a.price > 0 ? ` (${formatValue(a.price * a.quantity, "inr")})` : ""}`)
-                            .join(", ")}
-                        </p>
-                      )}
-                      {j.keptItems.length > 0 && (
-                        <p>
-                          <span className="font-semibold text-brand-deep">Kept (high conviction): </span>
-                          {j.keptItems.map((k) => k.name).join(", ")}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="mt-2.5 flex items-center justify-between gap-2 rounded bg-panel/80 px-2.5 py-1.5 text-2xs text-ink-2">
-                      <span>
-                        <b className="font-semibold text-ink">Recommended next step:</b> {nextActionText}
-                      </span>
-                      <Link href={`/dashboard/customers/${j.customerId}`} className="shrink-0 font-semibold text-brand-deep hover:underline">
-                        Act now →
-                      </Link>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="text-sm text-muted">No multi-cart revisions in this period yet.</p>
-          )}
-        </div>
-
-        {/* Right 5 cols: Product Hesitation vs. High-Conviction Anchor Leaderboard */}
-        <div className="space-y-5 p-4 sm:p-5 xl:col-span-5">
-          <div>
-            <h4 className="text-sm font-semibold text-ink">Products added to cart, then dropped (Hesitation items)</h4>
-            <p className="text-xs text-muted">
-              Items customers wanted enough to add to an earlier cart, but removed when revising or abandoning their cart
-            </p>
-            {data.droppedProducts.length > 0 ? (
-              <ul className="mt-2.5 divide-y divide-line rounded-control border border-line bg-subtle px-3 py-1 text-xs">
-                {data.droppedProducts.map((dp) => (
-                  <li key={dp.name} className="py-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <Link
-                          href={`/dashboard/customers?tag=${encodeURIComponent(`product:${dp.name}`)}`}
-                          className="font-semibold text-ink hover:underline"
-                        >
-                          {dp.name}
-                        </Link>
-                        <p className="mt-0.5 truncate text-2xs text-muted">
-                          Dropped by {dp.customerNames.join(", ")}
-                        </p>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <span className="tabular font-semibold text-danger">
-                          {formatValue(dp.droppedValue, "inr")} dropped
-                        </span>
-                        <span className="tabular block text-2xs text-muted">
-                          {dp.droppedQty} unit{dp.droppedQty === 1 ? "" : "s"} in {dp.droppedCount} cart{dp.droppedCount === 1 ? "" : "s"}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="track-3d mt-1.5 h-1.5 w-full overflow-hidden rounded-full">
-                      <div
-                        className="bar-3d h-full rounded-full bg-rose-500"
-                        style={{ width: `${Math.max(8, pct(dp.droppedValue, maxDroppedVal))}%` }}
-                      />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-2 text-xs text-muted">No dropped products recorded in this period.</p>
-            )}
-          </div>
-
-          {data.anchorProducts.length > 0 && (
-            <div className="border-t border-line pt-4">
-              <h4 className="text-sm font-semibold text-ink">High-conviction anchor products (Kept across revisions)</h4>
-              <p className="text-xs text-muted">
-                Items customers refused to remove even when downsizing their cart budget
-              </p>
-              <ul className="mt-2.5 divide-y divide-line rounded-control border border-line bg-brand-soft/35 px-3 py-1 text-xs">
-                {data.anchorProducts.map((ap) => (
-                  <li key={ap.name} className="flex items-center justify-between gap-2 py-2">
-                    <div className="min-w-0 flex-1">
-                      <Link
-                        href={`/dashboard/customers?tag=${encodeURIComponent(`product:${ap.name}`)}`}
-                        className="font-semibold text-ink hover:underline"
-                      >
-                        {ap.name}
-                      </Link>
-                      <span className="ml-1.5 text-2xs text-muted">· Kept by {ap.customerNames.join(", ")}</span>
-                    </div>
-                    <Badge tone="green">Kept {ap.keptCount}×</Badge>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div className="rounded-control border border-warning-border/60 bg-warning-bg/40 p-3 text-xs text-ink-2">
-            <strong className="font-semibold text-ink">Business action tip: </strong>
-            When a product appears under <span className="font-semibold text-danger">Dropped from earlier cart</span>, customers want the product but hesitate at the combined cart total. Offer a <b>smaller trial pack (100ml/250ml)</b> or a <b>combo discount</b> on those exact items in your next WhatsApp campaign.
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-
-

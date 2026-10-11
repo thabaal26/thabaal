@@ -1,16 +1,17 @@
 "use client";
 
-import { ArrowRight, Lightbulb, Sparkles, Zap } from "lucide-react";
+import { ArrowRight, Check, Copy, Zap } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { ChartBar3D, Sparkles3D, Trophy3D } from "@/components/icons-3d";
 import { Badge, buttonClass, Card, CardHeader, type Tone } from "@/components/ui";
+import { ActionLine, DonutPanel, RateRing, StackedRows, StatChip, type Slice } from "@/components/viz";
 import { formatValue } from "@/lib/chart-math";
 import { cn } from "@/lib/cn";
 import { fmtNumber, pct } from "@/lib/format";
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * 1. ALL-PRODUCTS PERFORMANCE, NON-SELLING & SCENARIO INTELLIGENCE HUB
+ * 1. PRODUCT PERFORMANCE
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 export type ProductScenarioStatus =
@@ -74,509 +75,200 @@ export type AllProductsSummaryData = {
   products: AllProductAnalyticsItem[];
 };
 
-type ProductFilterId = "all" | "not_selling" | "hesitation" | "selling";
+const SOLD = "#059669";
+const CART = "#f59e0b";
+const DROPPED = "#e11d48";
 
-const STATUS_META: Record<
-  ProductScenarioStatus,
-  { color: string; bg: string; border: string; short: string }
-> = {
-  top_seller: {
-    color: "#059669",
-    bg: "rgba(16, 185, 129, 0.08)",
-    border: "rgba(16, 185, 129, 0.3)",
-    short: "Top seller",
-  },
-  selling: {
-    color: "#167d63",
-    bg: "rgba(22, 125, 99, 0.07)",
-    border: "rgba(22, 125, 99, 0.25)",
-    short: "Selling",
-  },
-  stuck_in_cart: {
-    color: "#d97706",
-    bg: "rgba(245, 158, 11, 0.09)",
-    border: "rgba(245, 158, 11, 0.32)",
-    short: "In unpaid cart",
-  },
-  dropped_hesitation: {
-    color: "#e11d48",
-    bg: "rgba(225, 29, 72, 0.08)",
-    border: "rgba(225, 29, 72, 0.28)",
-    short: "Added then dropped",
-  },
-  dormant_past: {
-    color: "#6366f1",
-    bg: "rgba(99, 102, 241, 0.08)",
-    border: "rgba(99, 102, 241, 0.28)",
-    short: "0 sales this period (Past buyers exist)",
-  },
-  not_selling: {
-    color: "#64748b",
-    bg: "rgba(100, 116, 139, 0.08)",
-    border: "rgba(100, 116, 139, 0.28)",
-    short: "Not selling (0 orders)",
-  },
+type StatusGroup = "selling" | "stuck_in_cart" | "dropped_hesitation" | "dormant_past" | "not_selling";
+const GROUPS: Record<StatusGroup, { label: string; color: string }> = {
+  selling: { label: "Selling", color: SOLD },
+  stuck_in_cart: { label: "Stuck in unpaid cart", color: CART },
+  dropped_hesitation: { label: "Added, then dropped", color: DROPPED },
+  dormant_past: { label: "Sold before, not now", color: "#6366f1" },
+  not_selling: { label: "Never sold", color: "#94a3b8" },
 };
+const groupOf = (s: ProductScenarioStatus): StatusGroup => (s === "top_seller" ? "selling" : s);
 
 export function AllProductsIntelligenceCard({ data }: { data: AllProductsSummaryData }) {
-  const [filter, setFilter] = useState<ProductFilterId>("all");
+  const [group, setGroup] = useState<StatusGroup | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
 
-  const filtered = data.products.filter((p) => {
-    if (filter === "not_selling") return p.status === "not_selling" || p.status === "dormant_past";
-    if (filter === "hesitation")
-      return p.status === "stuck_in_cart" || p.status === "dropped_hesitation" || p.cartValue > 0 || p.droppedValue > 0;
-    if (filter === "selling") return p.soldQty > 0;
-    return true;
-  });
-
-  const maxTotalActivity = Math.max(
-    1,
-    ...data.products.map((p) => p.soldRevenue + p.cartValue + p.droppedValue + (p.allTimeBuyers > 0 && p.soldRevenue === 0 ? p.priceAmount : 0)),
-  );
-
-  // Category aggregation for visual category bar chart
-  const catMap = new Map<
-    string,
-    { category: string; totalItems: number; sellingItems: number; zeroSaleItems: number; soldRev: number; cartVal: number; droppedVal: number }
-  >();
-  for (const p of data.products) {
-    const row = catMap.get(p.category) ?? {
-      category: p.category,
-      totalItems: 0,
-      sellingItems: 0,
-      zeroSaleItems: 0,
-      soldRev: 0,
-      cartVal: 0,
-      droppedVal: 0,
-    };
-    row.totalItems += 1;
-    if (p.soldQty > 0) row.sellingItems += 1;
-    else row.zeroSaleItems += 1;
-    row.soldRev += p.soldRevenue;
-    row.cartVal += p.cartValue;
-    row.droppedVal += p.droppedValue;
-    catMap.set(p.category, row);
-  }
-  const categories = [...catMap.values()].sort((a, b) => b.soldRev + b.cartVal - (a.soldRev + a.cartVal) || b.totalItems - a.totalItems);
-  const maxCatVal = Math.max(1, ...categories.map((c) => c.soldRev + c.cartVal + c.droppedVal));
-
-  const totalProducts = Math.max(1, data.totalCatalogProducts);
-  const zeroSaleTotal = data.notSellingCount + data.dormantPastCount;
-
-  const filterTabs: { id: ProductFilterId; label: string; count: number; badgeColor: string }[] = [
-    { id: "all", label: "All products", count: data.products.length, badgeColor: "bg-ink text-white" },
-    {
-      id: "not_selling",
-      label: "Not selling (0 sales)",
-      count: zeroSaleTotal,
-      badgeColor: "bg-danger-solid text-white",
-    },
-    {
-      id: "hesitation",
-      label: "In cart / Dropped",
-      count: data.products.filter((p) => p.cartValue > 0 || p.droppedValue > 0).length,
-      badgeColor: "bg-warning-solid text-white",
-    },
-    {
-      id: "selling",
-      label: "Selling well",
-      count: data.sellingCount,
-      badgeColor: "bg-brand text-white",
-    },
+  const statusSlices: Slice[] = (Object.keys(GROUPS) as StatusGroup[]).map((g) => ({
+    key: g,
+    label: GROUPS[g].label,
+    color: GROUPS[g].color,
+    value: data.products.filter((p) => groupOf(p.status) === g).length,
+  }));
+  const moneySlices: Slice[] = [
+    { key: "sold", label: "Paid sales", value: data.totalSoldRevenue, color: SOLD },
+    { key: "cart", label: "In unpaid carts", value: data.totalCartPendingValue, color: CART },
+    { key: "dropped", label: "Dropped from carts", value: data.totalDroppedValue, color: DROPPED },
   ];
 
+  const catMap = new Map<string, { sold: number; cart: number; dropped: number; items: number; zero: number }>();
+  for (const p of data.products) {
+    const c = catMap.get(p.category) ?? { sold: 0, cart: 0, dropped: 0, items: 0, zero: 0 };
+    c.sold += p.soldRevenue;
+    c.cart += p.cartValue;
+    c.dropped += p.droppedValue;
+    c.items += 1;
+    if (!p.soldQty) c.zero += 1;
+    catMap.set(p.category, c);
+  }
+  const categories = [...catMap.entries()].sort((a, b) => b[1].sold + b[1].cart - (a[1].sold + a[1].cart) || b[1].items - a[1].items);
+
+  const list = data.products
+    .filter((p) => !group || groupOf(p.status) === group)
+    .sort((a, b) => b.soldRevenue + b.cartValue + b.droppedValue - (a.soldRevenue + a.cartValue + a.droppedValue) || b.allTimeBuyers - a.allTimeBuyers);
+  const openItem = list.find((p) => p.id === open) ?? null;
+  const zeroSale = data.notSellingCount + data.dormantPastCount;
+
   return (
-    <Card id="all-products-intelligence" className="card-3d mt-4 sm:mt-5">
+    <Card id="all-products-intelligence" className="card-3d scroll-mt-24">
       <CardHeader
         tone="gold"
         icon={<Trophy3D />}
-        title="All products intelligence: selling, cart hesitation & non-selling items"
-        description={`Complete diagnostic across all ${fmtNumber(data.products.length)} products (${data.periodLabel}) — what sells, what gets stuck or dropped in carts, what isn't selling at all, and how to fix each item`}
+        title="Product performance"
+        description={`All ${fmtNumber(data.products.length)} products, ${data.periodLabel}`}
         action={
-          <div className="flex flex-wrap items-center gap-2">
-            <Link href="/dashboard/catalogue" className={buttonClass("secondary", "sm")}>
-              Manage catalogue
-            </Link>
-            <Link href="/dashboard/campaigns/new" className={buttonClass("primary", "sm")}>
-              Promote slow items
-            </Link>
-          </div>
+          <Link href="/dashboard/catalogue" className={buttonClass("secondary", "sm")}>
+            Catalogue
+          </Link>
         }
       />
 
-      {/* Top Visual Portfolio Health Distribution Strip */}
-      <div className="border-b border-line bg-subtle/45 px-4 py-4 sm:px-5">
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-          <span className="font-semibold uppercase tracking-wider text-ink-2">
-            Product portfolio health breakdown ({fmtNumber(data.products.length)} total products)
-          </span>
-          <div className="flex flex-wrap items-center gap-3 text-xs">
-            <span className="tabular font-semibold text-success">
-              Paid sales: {formatValue(data.totalSoldRevenue, "inr")}
-            </span>
-            {data.totalCartPendingValue > 0 && (
-              <span className="tabular font-semibold text-warning">
-                In unpaid carts: {formatValue(data.totalCartPendingValue, "inr")}
-              </span>
-            )}
-            {data.totalDroppedValue > 0 && (
-              <span className="tabular font-semibold text-danger">
-                Dropped from carts: {formatValue(data.totalDroppedValue, "inr")}
-              </span>
-            )}
-          </div>
+      <div className="grid grid-cols-1 gap-6 p-4 sm:p-5 lg:grid-cols-2">
+        <div>
+          <h4 className="mb-3 text-sm font-semibold text-ink">Products by status</h4>
+          <DonutPanel
+            slices={statusSlices}
+            centerLabel="products"
+            label="Products by sales status"
+            size={156}
+            selected={group}
+            onSelect={(k) => {
+              setGroup((g) => (g === k ? null : (k as StatusGroup)));
+              setOpen(null);
+            }}
+          />
         </div>
-
-        {/* Proportional Multi-Segment Portfolio Bar */}
-        <div className="track-3d mt-2.5 flex h-3.5 w-full gap-0.5 overflow-hidden rounded-full p-0.5">
-          {data.sellingCount > 0 && (
-            <div
-              className="bar-3d h-full rounded-l-full transition-all duration-500"
-              style={{
-                width: `${Math.max(6, pct(data.sellingCount, totalProducts))}%`,
-                background: "linear-gradient(90deg, #10b981, #059669)",
-              }}
-              title={`Selling (${data.sellingCount} products)`}
-            />
-          )}
-          {data.stuckInCartCount > 0 && (
-            <div
-              className="bar-3d h-full transition-all duration-500"
-              style={{
-                width: `${Math.max(5, pct(data.stuckInCartCount, totalProducts))}%`,
-                background: "linear-gradient(90deg, #fbbf24, #d97706)",
-              }}
-              title={`Stuck in unpaid cart (${data.stuckInCartCount} products)`}
-            />
-          )}
-          {data.droppedCount > 0 && (
-            <div
-              className="bar-3d h-full transition-all duration-500"
-              style={{
-                width: `${Math.max(5, pct(data.droppedCount, totalProducts))}%`,
-                background: "linear-gradient(90deg, #fb7185, #e11d48)",
-              }}
-              title={`Added then dropped (${data.droppedCount} products)`}
-            />
-          )}
-          {data.dormantPastCount > 0 && (
-            <div
-              className="bar-3d h-full transition-all duration-500"
-              style={{
-                width: `${Math.max(5, pct(data.dormantPastCount, totalProducts))}%`,
-                background: "linear-gradient(90deg, #818cf8, #4f46e5)",
-              }}
-              title={`Dormant this period, sold in past (${data.dormantPastCount} products)`}
-            />
-          )}
-          {data.notSellingCount > 0 && (
-            <div
-              className="h-full rounded-r-full transition-all duration-500"
-              style={{
-                width: `${Math.max(6, pct(data.notSellingCount, totalProducts))}%`,
-                background: "linear-gradient(90deg, #94a3b8, #475569)",
-              }}
-              title={`Zero all-time sales (${data.notSellingCount} products)`}
-            />
-          )}
-        </div>
-
-        {/* 5 Visual Scenario Summary Pills */}
-        <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-5">
-          <div className="rounded-control border border-line bg-panel px-3 py-2.5 shadow-2xs">
-            <div className="flex items-center justify-between gap-1">
-              <span className="text-2xs font-semibold uppercase tracking-wider text-success">1. Selling well</span>
-              <span className="size-2.5 rounded-full bg-emerald-500" />
-            </div>
-            <p className="tabular mt-1 text-base font-bold text-ink">
-              {fmtNumber(data.sellingCount)} <span className="text-xs font-normal text-muted">items</span>
-            </p>
-            <p className="mt-0.5 text-2xs text-muted">{ pct(data.sellingCount, totalProducts) }% of catalogue active</p>
-          </div>
-
-          <div className="rounded-control border border-warning-border/60 bg-warning-bg/35 px-3 py-2.5 shadow-2xs">
-            <div className="flex items-center justify-between gap-1">
-              <span className="text-2xs font-semibold uppercase tracking-wider text-warning">2. Stuck in cart</span>
-              <span className="size-2.5 rounded-full bg-amber-500" />
-            </div>
-            <p className="tabular mt-1 text-base font-bold text-ink">
-              {fmtNumber(data.stuckInCartCount)} <span className="text-xs font-normal text-muted">items</span>
-            </p>
-            <p className="mt-0.5 text-2xs text-muted">Added to cart, 0 paid yet</p>
-          </div>
-
-          <div className="rounded-control border border-danger-border/60 bg-danger-bg/30 px-3 py-2.5 shadow-2xs">
-            <div className="flex items-center justify-between gap-1">
-              <span className="text-2xs font-semibold uppercase tracking-wider text-danger">3. Dropped from cart</span>
-              <span className="size-2.5 rounded-full bg-rose-500" />
-            </div>
-            <p className="tabular mt-1 text-base font-bold text-ink">
-              {fmtNumber(data.droppedCount)} <span className="text-xs font-normal text-muted">items</span>
-            </p>
-            <p className="mt-0.5 text-2xs text-muted">Removed during cart revision</p>
-          </div>
-
-          <div className="rounded-control border border-line bg-panel px-3 py-2.5 shadow-2xs">
-            <div className="flex items-center justify-between gap-1">
-              <span className="text-2xs font-semibold uppercase tracking-wider text-indigo-600">4. Dormant mover</span>
-              <span className="size-2.5 rounded-full bg-indigo-500" />
-            </div>
-            <p className="tabular mt-1 text-base font-bold text-ink">
-              {fmtNumber(data.dormantPastCount)} <span className="text-xs font-normal text-muted">items</span>
-            </p>
-            <p className="mt-0.5 text-2xs text-muted">Sold in past, ₹0 this period</p>
-          </div>
-
-          <div className="rounded-control border border-line bg-panel px-3 py-2.5 shadow-2xs max-xl:col-span-2 max-sm:col-span-2">
-            <div className="flex items-center justify-between gap-1">
-              <span className="text-2xs font-semibold uppercase tracking-wider text-slate-600">5. Never sold (0 orders)</span>
-              <span className="size-2.5 rounded-full bg-slate-500" />
-            </div>
-            <p className="tabular mt-1 text-base font-bold text-ink">
-              {fmtNumber(data.notSellingCount)} <span className="text-xs font-normal text-muted">items</span>
-            </p>
-            <p className="mt-0.5 text-2xs text-muted">Needs combo bundle or spotlight</p>
-          </div>
+        <div>
+          <h4 className="mb-3 text-sm font-semibold text-ink">Where the money is</h4>
+          <DonutPanel slices={moneySlices} format="inr" centerLabel="sold + in carts + dropped" label="Sales value by stage" size={156} />
         </div>
       </div>
 
-      {/* Category Performance Visual Graph + Interactive Filter Bar */}
-      <div className="grid grid-cols-1 divide-y divide-line xl:grid-cols-12 xl:divide-x xl:divide-y-0">
-        {/* Left 4 cols: Visual Category Demand & Dead-Stock Chart */}
-        <div className="p-4 sm:p-5 xl:col-span-4">
-          <h4 className="text-sm font-semibold text-ink">Category sales vs. non-selling stock</h4>
-          <p className="mt-0.5 text-xs text-muted">
-            Which product categories drive revenue vs. where items are sitting unsold
-          </p>
-          <ul className="mt-3.5 space-y-3.5">
-            {categories.map((cat) => {
-              const soldShare = pct(cat.soldRev, maxCatVal);
-              const cartShare = pct(cat.cartVal, maxCatVal);
-              const dropShare = pct(cat.droppedVal, maxCatVal);
-              return (
-                <li key={cat.category} className="rounded-control border border-line bg-subtle/40 p-3">
-                  <div className="flex items-baseline justify-between gap-2 text-xs">
-                    <span className="font-semibold text-ink">{cat.category}</span>
-                    <span className="tabular font-semibold text-ink">
-                      {formatValue(cat.soldRev, "inr")}
-                      {cat.cartVal > 0 && (
-                        <span className="ml-1 font-normal text-warning">(+{formatValue(cat.cartVal, "inr")} cart)</span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="track-3d mt-2 flex h-2.5 w-full overflow-hidden rounded-full">
-                    {cat.soldRev > 0 && (
-                      <div
-                        className="bar-3d h-full"
-                        style={{ width: `${Math.max(5, soldShare)}%`, background: "#059669" }}
-                        title={`Paid sales: ${formatValue(cat.soldRev, "inr")}`}
-                      />
-                    )}
-                    {cat.cartVal > 0 && (
-                      <div
-                        className="h-full"
-                        style={{ width: `${Math.max(4, cartShare)}%`, background: "#f59e0b" }}
-                        title={`In unpaid cart: ${formatValue(cat.cartVal, "inr")}`}
-                      />
-                    )}
-                    {cat.droppedVal > 0 && (
-                      <div
-                        className="h-full"
-                        style={{ width: `${Math.max(4, dropShare)}%`, background: "#e11d48" }}
-                        title={`Dropped from cart: ${formatValue(cat.droppedVal, "inr")}`}
-                      />
-                    )}
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-2xs text-muted">
-                    <span>
-                      <b className="text-success">{cat.sellingItems}</b> selling ·{" "}
-                      <b className={cat.zeroSaleItems > 0 ? "text-danger" : "text-muted"}>{cat.zeroSaleItems}</b> not selling
-                    </span>
-                    <span className="tabular">{cat.totalItems} SKU{cat.totalItems === 1 ? "" : "s"}</span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+      {zeroSale > 0 && (
+        <div className="px-4 pb-4 sm:px-5">
+          <ActionLine href="/dashboard/campaigns/new" cta="Promote them">
+            <b className="text-ink">{plural(zeroSale, "product")}</b> had no sales this period. Pair them as a small add-on with your best seller.
+          </ActionLine>
+        </div>
+      )}
 
-          {/* Smart Portfolio Strategy Callout */}
-          <div className="mt-4 rounded-control border border-brand/25 bg-brand-soft/40 p-3.5 text-xs text-ink-2">
-            <p className="flex items-center gap-1.5 font-semibold text-brand-deep">
-              <Lightbulb aria-hidden className="size-4 shrink-0" /> How to move non-selling products
-            </p>
-            <p className="mt-1 leading-relaxed">
-              In WhatsApp catalogues, 80% of customers only tap the top 3 items they already buy. Pair a{" "}
-              <b>non-selling item</b> (like Masalas, Flours, or Specialty Oils) as a <b>₹20-off add-on combo</b> with your #1 anchor product, or send a targeted broadcast to past oil buyers introducing the item.
-            </p>
-          </div>
+      <div className="grid grid-cols-1 gap-6 border-t border-line p-4 sm:p-5 xl:grid-cols-12">
+        <div className="xl:col-span-4">
+          <h4 className="mb-3 text-sm font-semibold text-ink">By category</h4>
+          <StackedRows
+            format="inr"
+            legend={[
+              { label: "Sold", color: SOLD },
+              { label: "In cart", color: CART },
+              { label: "Dropped", color: DROPPED },
+            ]}
+            rows={categories.map(([name, c]) => ({
+              key: name,
+              label: name,
+              right: `${formatValue(c.sold, "inr")} · ${c.items - c.zero}/${c.items} selling`,
+              parts: [
+                { key: "s", label: "Sold", value: c.sold, color: SOLD },
+                { key: "c", label: "In cart", value: c.cart, color: CART },
+                { key: "d", label: "Dropped", value: c.dropped, color: DROPPED },
+              ],
+            }))}
+          />
         </div>
 
-        {/* Right 8 cols: Interactive All-Products Visual Matrix & Solutions */}
-        <div className="p-4 sm:p-5 xl:col-span-8">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
-            <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Filter products by performance scenario">
-              {filterTabs.map((t) => {
-                const active = filter === t.id;
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    onClick={() => setFilter(t.id)}
-                    className={cn(
-                      "inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition",
-                      active
-                        ? "border-ink bg-ink text-white shadow-2xs"
-                        : "border-line bg-panel text-ink-2 hover:border-line-strong hover:text-ink",
-                    )}
-                  >
-                    <span>{t.label}</span>
-                    <span
-                      className={cn(
-                        "tabular rounded-full px-1.5 py-0.2 text-[10px] font-bold",
-                        active ? "bg-white/20 text-white" : "bg-sunken text-ink-2",
-                      )}
-                    >
-                      {t.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <span className="text-2xs text-muted">
-              Showing {filtered.length} of {data.products.length} products
-            </span>
+        <div className="xl:col-span-8">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-sm font-semibold text-ink">
+              {group ? GROUPS[group].label : "Every product"} <span className="tabular font-normal text-muted">· {list.length}</span>
+            </h4>
+            {group && (
+              <button type="button" onClick={() => setGroup(null)} className="text-xs font-semibold text-brand-deep hover:underline">
+                Show all
+              </button>
+            )}
           </div>
-
-          {/* All Products Visual Cards */}
-          <div className="thin-scroll mt-3.5 max-h-[640px] space-y-2.5 overflow-y-auto pr-1">
-            {filtered.map((p) => {
-              const meta = STATUS_META[p.status];
-              const soldBarW = pct(p.soldRevenue, maxTotalActivity);
-              const cartBarW = pct(p.cartValue, maxTotalActivity);
-              const dropBarW = pct(p.droppedValue, maxTotalActivity);
-              return (
-                <div
-                  key={p.id}
-                  className="rounded-control border border-line bg-panel p-3.5 shadow-2xs transition hover:border-line-strong"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <Link
-                          href={`/dashboard/customers?tag=${encodeURIComponent(`product:${p.name}`)}`}
-                          className="text-sm font-semibold text-ink hover:underline"
-                        >
-                          {p.name}
-                        </Link>
-                        <span className="rounded bg-sunken px-1.5 py-0.5 font-mono text-[10px] text-muted">
-                          {p.retailerId}
-                        </span>
-                        <span className="text-xs text-muted">· {p.category}</span>
-                        {p.priceAmount > 0 && (
-                          <span className="tabular text-xs font-semibold text-ink-2">
-                            · {formatValue(p.priceAmount, "inr")}
-                          </span>
-                        )}
-                        {!p.inStock && <Badge tone="red">Out of stock</Badge>}
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {p.anchorKeptCount > 0 && (
-                        <Badge tone="green">Anchor kept {p.anchorKeptCount}×</Badge>
-                      )}
-                      <Badge tone={p.statusTone}>{p.statusLabel}</Badge>
-                    </div>
-                  </div>
-
-                  {/* Multi-Segment Visual Demand Bar (Sold vs Unpaid Cart vs Dropped) */}
-                  <div className="mt-2.5">
-                    <div className="track-3d flex h-2.5 w-full overflow-hidden rounded-full">
-                      {p.soldRevenue > 0 && (
-                        <div
-                          className="bar-3d h-full"
-                          style={{ width: `${Math.max(4, soldBarW)}%`, background: "#059669" }}
-                          title={`Sold: ${p.soldQty} units (${formatValue(p.soldRevenue, "inr")})`}
-                        />
-                      )}
-                      {p.cartValue > 0 && (
-                        <div
-                          className="h-full"
-                          style={{ width: `${Math.max(4, cartBarW)}%`, background: "#f59e0b" }}
-                          title={`In unpaid cart: ${p.cartQty} units (${formatValue(p.cartValue, "inr")})`}
-                        />
-                      )}
-                      {p.droppedValue > 0 && (
-                        <div
-                          className="h-full"
-                          style={{ width: `${Math.max(4, dropBarW)}%`, background: "#e11d48" }}
-                          title={`Dropped from cart: ${p.droppedQty} units (${formatValue(p.droppedValue, "inr")})`}
-                        />
-                      )}
-                    </div>
-
-                    {/* Telemetry Metrics Strip */}
-                    <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs">
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                        <span className="tabular">
-                          <b className={p.soldQty > 0 ? "text-success" : "text-muted"}>
-                            {fmtNumber(p.soldQty)} sold
-                          </b>{" "}
-                          ({formatValue(p.soldRevenue, "inr")})
-                        </span>
-                        {p.cartQty > 0 && (
-                          <span className="tabular text-warning">
-                            · <b>{fmtNumber(p.cartQty)} in unpaid cart</b> ({formatValue(p.cartValue, "inr")})
-                          </span>
-                        )}
-                        {p.droppedQty > 0 && (
-                          <span className="tabular text-danger">
-                            · <b>{fmtNumber(p.droppedQty)} dropped from cart</b> ({formatValue(p.droppedValue, "inr")})
-                          </span>
-                        )}
-                        <span className="tabular text-muted">
-                          · All-time buyers: <b className="text-ink-2">{fmtNumber(p.allTimeBuyers)}</b>
-                        </span>
-                        {p.campaignSent > 0 && (
-                          <span className="tabular text-muted">
-                            · 30d campaign reach: <b className="text-ink-2">{fmtNumber(p.campaignSent)}</b> ({pct(p.campaignRead, p.campaignSent)}% read, {p.campaignReplies} replies)
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Per-Product Diagnosis & Next-Best-Action Solution Box */}
-                  <div
-                    className="mt-2.5 flex flex-col justify-between gap-2 rounded-control border px-3 py-2 text-xs sm:flex-row sm:items-center"
-                    style={{ background: meta.bg, borderColor: meta.border }}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <span className="font-semibold text-ink">Why: </span>
-                      <span className="text-ink-2">{p.diagnosis} </span>
-                      <span className="font-semibold text-ink">Next action: </span>
-                      <span className="text-ink-2">{p.solution}</span>
-                    </div>
-                    <Link
-                      href={p.nextActionHref}
-                      className="inline-flex shrink-0 items-center gap-1 font-semibold text-brand-deep hover:underline"
-                    >
-                      {p.nextActionLabel} <ArrowRight aria-hidden className="size-3.5" />
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="thin-scroll max-h-[440px] overflow-y-auto pr-1">
+            <StackedRows
+              format="inr"
+              activeKey={open}
+              onRowClick={(k) => setOpen((o) => (o === k ? null : k))}
+              rows={list.map((p) => ({
+                key: p.id,
+                label: p.name,
+                dot: GROUPS[groupOf(p.status)].color,
+                right: p.soldQty ? `${fmtNumber(p.soldQty)} sold · ${formatValue(p.soldRevenue, "inr")}` : p.allTimeBuyers ? `0 now · ${plural(p.allTimeBuyers, "past buyer")}` : "0 sold",
+                parts: [
+                  { key: "s", label: "Sold", value: p.soldRevenue, color: SOLD },
+                  { key: "c", label: "In cart", value: p.cartValue, color: CART },
+                  { key: "d", label: "Dropped", value: p.droppedValue, color: DROPPED },
+                ],
+              }))}
+            />
           </div>
+          {openItem ? (
+            <ProductDetail p={openItem} />
+          ) : (
+            <p className="mt-3 text-2xs text-muted">Tap a product to see why and what to do next.</p>
+          )}
         </div>
       </div>
     </Card>
   );
 }
 
+const plural = (n: number, one: string, many = `${one}s`) => `${fmtNumber(n)} ${n === 1 ? one : many}`;
+
+function ProductDetail({ p }: { p: AllProductAnalyticsItem }) {
+  return (
+    <div className="mt-3 rounded-control border border-line bg-subtle/60 p-3.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Link href={`/dashboard/customers?tag=${encodeURIComponent(`product:${p.name}`)}`} className="text-sm font-semibold text-ink hover:underline">
+          {p.name}
+        </Link>
+        <Badge tone={p.statusTone}>{p.statusLabel}</Badge>
+        {!p.inStock && <Badge tone="red">Out of stock</Badge>}
+        {p.anchorKeptCount > 0 && <Badge tone="green">Kept {p.anchorKeptCount}×</Badge>}
+        {p.priceAmount > 0 && <span className="tabular text-xs text-muted">{formatValue(p.priceAmount, "inr")}</span>}
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <StatChip label="Sold" value={`${fmtNumber(p.soldQty)} · ${formatValue(p.soldRevenue, "inr")}`} tone={p.soldQty ? "good" : "ink"} />
+        <StatChip label="In unpaid cart" value={`${fmtNumber(p.cartQty)} · ${formatValue(p.cartValue, "inr")}`} tone={p.cartQty ? "warn" : "ink"} />
+        <StatChip label="Dropped" value={`${fmtNumber(p.droppedQty)} · ${formatValue(p.droppedValue, "inr")}`} tone={p.droppedQty ? "bad" : "ink"} />
+        <StatChip label="Past buyers" value={fmtNumber(p.allTimeBuyers)} />
+      </div>
+      {p.campaignSent > 0 && (
+        <p className="tabular mt-2 text-2xs text-muted">
+          Last 30 days: messaged {fmtNumber(p.campaignSent)} buyers · {pct(p.campaignRead, p.campaignSent)}% read · {plural(p.campaignReplies, "reply", "replies")}
+        </p>
+      )}
+      <p className="mt-2.5 text-xs text-ink-2">
+        <b className="text-ink">Why:</b> {p.diagnosis}
+      </p>
+      <p className="mt-1 text-xs text-ink-2">
+        <b className="text-ink">Do next:</b> {p.solution}
+      </p>
+      <Link href={p.nextActionHref} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand-deep hover:underline">
+        {p.nextActionLabel} <ArrowRight aria-hidden className="size-3.5" />
+      </Link>
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
- * 2. CUSTOMER WIN-BACK, RETENTION & SCENARIO ACTION PLAYBOOK ENGINE
+ * 2. CUSTOMER LIFECYCLE & WIN-BACK PLAYBOOKS
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 export type PlaybookCohortLead = {
@@ -632,259 +324,128 @@ export type CustomerWinbackPlaybookData = {
   scenarios: PlaybookScenario[];
 };
 
+const COHORTS: { key: string; label: string; color: string; scenario: PlaybookScenario["id"]; field: keyof CustomerWinbackPlaybookData }[] = [
+  { key: "active", label: "Active (≤30 days)", color: "#059669", scenario: "vip_repeat", field: "activeBuyers30d" },
+  { key: "refill", label: "Refill due (31–60 days)", color: "#0ea5e9", scenario: "refill_due", field: "refillDue31to60d" },
+  { key: "lapsed", label: "Lapsed (60+ days)", color: "#e11d48", scenario: "winback_lapsed", field: "lapsedOver60d" },
+  { key: "unpaid", label: "Unpaid cart now", color: "#d97706", scenario: "unpaid_cart_recovery", field: "unpaidCartCustomers" },
+  { key: "warm", label: "Warm, not bought", color: "#7c3aed", scenario: "warm_browsers", field: "warmNonBuyers" },
+  { key: "cold", label: "Never ordered", color: "#94a3b8", scenario: "never_ordered", field: "coldNeverOrdered" },
+];
+
 export function CustomerGrowthPlaybookCard({ data }: { data: CustomerWinbackPlaybookData }) {
   const [selectedId, setSelectedId] = useState<PlaybookScenario["id"]>(
     data.scenarios.find((s) => s.customersCount > 0)?.id ?? data.scenarios[0]?.id ?? "winback_lapsed",
   );
+  const [copied, setCopied] = useState(false);
+  const active = data.scenarios.find((s) => s.id === selectedId) ?? data.scenarios[0];
+  if (!active) return null;
 
-  const activeScenario = data.scenarios.find((s) => s.id === selectedId) ?? data.scenarios[0];
-  if (!activeScenario) return null;
+  const slices: Slice[] = COHORTS.map((c) => ({ key: c.scenario, label: c.label, color: c.color, value: Number(data[c.field]) || 0 }));
 
-  const totalBase = Math.max(1, data.totalCustomers);
-
-  const lifecycleSegments = [
-    {
-      key: "active",
-      label: "Active buyers (≤30d)",
-      count: data.activeBuyers30d,
-      color: "#059669",
-      scenarioId: "vip_repeat" as const,
-    },
-    {
-      key: "refill",
-      label: "Refill window (31–60d)",
-      count: data.refillDue31to60d,
-      color: "#0ea5e9",
-      scenarioId: "refill_due" as const,
-    },
-    {
-      key: "lapsed",
-      label: "Lapsed / Dormant (>60d)",
-      count: data.lapsedOver60d,
-      color: "#e11d48",
-      scenarioId: "winback_lapsed" as const,
-    },
-    {
-      key: "unpaid",
-      label: "Unpaid cart right now",
-      count: data.unpaidCartCustomers,
-      color: "#d97706",
-      scenarioId: "unpaid_cart_recovery" as const,
-    },
-    {
-      key: "warm",
-      label: "Warm browsers / repliers",
-      count: data.warmNonBuyers,
-      color: "#7c3aed",
-      scenarioId: "warm_browsers" as const,
-    },
-    {
-      key: "cold",
-      label: "Never ordered yet",
-      count: data.coldNeverOrdered,
-      color: "#64748b",
-      scenarioId: "never_ordered" as const,
-    },
-  ];
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(active.suggestedWhatsappCopy);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      /* clipboard blocked: the text is still selectable */
+    }
+  };
 
   return (
-    <Card id="growth-playbook" className="card-3d mt-4 sm:mt-5">
+    <Card id="growth-playbook" className="card-3d scroll-mt-24">
       <CardHeader
         tone="brand"
         icon={<Sparkles3D />}
-        title="Customer win-back, retention & next-action growth playbook"
-        description="Live solutions & step-by-step recommendations based on your data — how to win back dormant buyers, convert cart hesitators, and what to do next"
-        action={
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            {data.recoverableRevenuePool > 0 && (
-              <Badge tone="amber">
-                Est. recoverable pool: {formatValue(data.recoverableRevenuePool, "inr")}
-              </Badge>
-            )}
-            <Badge tone="green">Repeat buyer rate: {data.retentionRatePct}%</Badge>
-          </div>
-        }
+        title="Customer lifecycle & win-back"
+        description={`${fmtNumber(data.totalCustomers)} opted-in customers by when they last bought · pick a group for its playbook`}
+        action={data.recoverableRevenuePool > 0 ? <Badge tone="amber">Recoverable: {formatValue(data.recoverableRevenuePool, "inr")}</Badge> : undefined}
       />
 
-      {/* Top Visual Customer Lifecycle Distribution Bar */}
-      <div className="border-b border-line bg-subtle/40 px-4 py-4 sm:px-5">
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-          <span className="font-semibold uppercase tracking-wider text-ink-2">
-            Customer lifecycle & retention radar ({fmtNumber(data.totalCustomers)} opted-in customers)
-          </span>
-          {data.bestReplyDayAndTime && (
-            <span className="text-xs text-muted">
-              Best send window from your data: <b className="font-semibold text-ink">{data.bestReplyDayAndTime}</b>
-            </span>
-          )}
+      <div className="grid grid-cols-1 gap-6 p-4 sm:p-5 xl:grid-cols-12">
+        <div className="space-y-5 xl:col-span-5">
+          <DonutPanel slices={slices} centerLabel="customers" label="Customers by lifecycle stage" size={160} selected={selectedId} onSelect={(k) => setSelectedId(k as PlaybookScenario["id"])} />
+          <div className="grid grid-cols-3 gap-2 border-t border-line pt-4">
+            <RateRing value={data.retentionRatePct} color="#059669" label="Repeat buyers" size={72} />
+            <RateRing value={pct(data.activeBuyers30d, Math.max(1, data.totalCustomers))} color="#0ea5e9" label="Active now" size={72} />
+            <RateRing value={pct(data.lapsedOver60d, Math.max(1, data.totalCustomers))} color="#e11d48" label="Lapsed" size={72} />
+          </div>
         </div>
 
-        {/* Interactive Proportional Lifecycle Bar */}
-        <div className="track-3d mt-2.5 flex h-4 w-full gap-0.5 overflow-hidden rounded-full p-0.5">
-          {lifecycleSegments
-            .filter((seg) => seg.count > 0)
-            .map((seg) => (
+        <div className="min-w-0 xl:col-span-7">
+          <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Playbooks">
+            {data.scenarios.map((s) => (
               <button
-                key={seg.key}
+                key={s.id}
                 type="button"
-                onClick={() => setSelectedId(seg.scenarioId)}
-                className="h-full transition-all duration-300 first:rounded-l-full last:rounded-r-full hover:brightness-110"
-                style={{
-                  width: `${Math.max(5, pct(seg.count, totalBase))}%`,
-                  background: seg.color,
-                }}
-                title={`${seg.label}: ${fmtNumber(seg.count)} customers`}
-              />
-            ))}
-        </div>
-
-        {/* Clickable Lifecycle Cohort Legend Pills */}
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-          {lifecycleSegments.map((seg) => {
-            const isSelected = selectedId === seg.scenarioId;
-            return (
-              <button
-                key={seg.key}
-                type="button"
-                onClick={() => setSelectedId(seg.scenarioId)}
+                role="tab"
+                aria-selected={s.id === active.id}
+                onClick={() => setSelectedId(s.id)}
                 className={cn(
-                  "flex flex-col items-start rounded-control border p-2.5 text-left transition",
-                  isSelected
-                    ? "border-ink bg-panel shadow-sm ring-1 ring-ink"
-                    : "border-line bg-panel/75 hover:border-line-strong hover:bg-panel",
+                  "inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition",
+                  s.id === active.id ? "border-ink bg-ink text-white" : "border-line bg-panel text-ink-2 hover:border-line-2 hover:text-ink",
                 )}
               >
-                <span className="flex items-center gap-1.5 text-2xs font-semibold text-ink-2">
-                  <span className="size-2.5 shrink-0 rounded-full" style={{ background: seg.color }} />
-                  <span className="truncate">{seg.label}</span>
-                </span>
-                <span className="tabular mt-1 text-base font-bold text-ink">
-                  {fmtNumber(seg.count)}{" "}
-                  <span className="text-2xs font-normal text-muted">({pct(seg.count, totalBase)}%)</span>
-                </span>
+                <span aria-hidden className="size-2 rounded-full" style={{ background: s.color }} />
+                {s.shortTitle}
+                <span className="tabular opacity-70">{fmtNumber(s.customersCount)}</span>
               </button>
-            );
-          })}
-        </div>
-      </div>
+            ))}
+          </div>
 
-      {/* Main Playbook Workspace: Left Scenario Selector (5 cols) + Right Action Playbook & Script (7 cols) */}
-      <div className="grid grid-cols-1 divide-y divide-line xl:grid-cols-12 xl:divide-x xl:divide-y-0">
-        {/* Left 5 cols: All Scenarios List */}
-        <div className="p-4 sm:p-5 xl:col-span-5">
-          <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-muted">
-            Select a scenario to see the solution & next steps
-          </p>
-          <ul className="space-y-2">
-            {data.scenarios.map((s) => {
-              const active = s.id === activeScenario.id;
-              return (
-                <li key={s.id}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedId(s.id)}
-                    className={cn(
-                      "w-full rounded-control border p-3 text-left transition",
-                      active
-                        ? "border-brand bg-brand-soft/45 shadow-xs ring-1 ring-brand/40"
-                        : "border-line bg-panel hover:border-line-strong hover:bg-subtle/60",
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <Badge tone={s.badgeTone}>{s.badge}</Badge>
-                      <span className="tabular text-xs font-semibold text-ink">{s.revenueLabel}</span>
-                    </div>
-                    <p className="mt-1.5 text-sm font-semibold text-ink">{s.title}</p>
-                    <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted">
-                      <span className="tabular font-medium text-ink-2">
-                        {fmtNumber(s.customersCount)} customer{s.customersCount === 1 ? "" : "s"}
-                      </span>
-                      <span className="font-semibold text-brand-deep">See solution →</span>
-                    </div>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-
-        {/* Right 7 cols: Active Scenario Deep Solution, Playbook Steps, WhatsApp Copy & Target Leads */}
-        <div className="flex flex-col justify-between p-4 sm:p-5 xl:col-span-7">
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-3.5">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone={activeScenario.badgeTone}>{activeScenario.badge}</Badge>
-                  <span className="tabular text-xs font-semibold text-ink-2">
-                    {fmtNumber(activeScenario.customersCount)} customer{activeScenario.customersCount === 1 ? "" : "s"} · {activeScenario.revenueLabel}
-                  </span>
-                </div>
-                <h3 className="mt-2 text-base font-bold text-ink sm:text-lg">{activeScenario.title}</h3>
+          <div className="mt-4 rounded-card border border-line p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <Badge tone={active.badgeTone}>{active.badge}</Badge>
+                <h3 className="mt-1.5 text-base font-semibold text-ink">{active.title}</h3>
+                <p className="tabular mt-0.5 text-xs text-muted">
+                  {plural(active.customersCount, "customer")} · {active.revenueLabel}
+                </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Link href={activeScenario.primaryCtaHref} className={buttonClass("primary", "sm")}>
-                  {activeScenario.primaryCtaLabel} <ArrowRight aria-hidden className="size-3.5" />
+              <div className="flex flex-wrap gap-2">
+                <Link href={active.primaryCtaHref} className={buttonClass("primary", "sm")}>
+                  {active.primaryCtaLabel}
                 </Link>
-                {activeScenario.secondaryCtaHref && activeScenario.secondaryCtaLabel && (
-                  <Link href={activeScenario.secondaryCtaHref} className={buttonClass("secondary", "sm")}>
-                    {activeScenario.secondaryCtaLabel}
+                {active.secondaryCtaHref && active.secondaryCtaLabel && (
+                  <Link href={active.secondaryCtaHref} className={buttonClass("secondary", "sm")}>
+                    {active.secondaryCtaLabel}
                   </Link>
                 )}
               </div>
             </div>
 
-            {/* Why this happens */}
-            <div className="rounded-control border border-line bg-subtle/60 p-3.5 text-xs">
-              <p className="font-semibold uppercase tracking-wider text-ink-2">
-                1. Diagnosis — Why customers act this way
-              </p>
-              <p className="mt-1 leading-relaxed text-ink-2">{activeScenario.whyItHappens}</p>
+            <div className="mt-4 rounded-control bg-[#e7f6ee] p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-2xs font-semibold uppercase tracking-wide text-brand-deep">Message to send</span>
+                <button type="button" onClick={copy} className="inline-flex items-center gap-1 text-xs font-semibold text-brand-deep hover:underline">
+                  {copied ? <Check aria-hidden className="size-3.5" /> : <Copy aria-hidden className="size-3.5" />}
+                  {copied ? "Copied" : "Copy"}
+                </button>
+              </div>
+              <p className="mt-1.5 rounded-[10px] rounded-tl-none bg-panel px-3 py-2 text-sm leading-relaxed text-ink shadow-2xs">{active.suggestedWhatsappCopy}</p>
             </div>
 
-            {/* Step-by-step Solution & What To Do Next */}
-            <div className="rounded-control border border-brand/25 bg-brand-soft/30 p-3.5 text-xs">
-              <p className="flex items-center gap-1.5 font-semibold uppercase tracking-wider text-brand-deep">
-                <Zap aria-hidden className="size-3.5" /> 2. Actionable Solution — What to do next
-              </p>
-              <ol className="mt-2 space-y-1.5 pl-4 list-decimal text-ink-2">
-                {activeScenario.howToGetThemBack.map((step, i) => (
-                  <li key={i} className="leading-relaxed">
-                    {step}
-                  </li>
+            <details className="group/s mt-3">
+              <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs font-semibold text-ink-2 hover:text-ink [&::-webkit-details-marker]:hidden">
+                <Zap aria-hidden className="size-3.5 text-gold" /> Why it happens & {active.howToGetThemBack.length} steps
+              </summary>
+              <p className="mt-2 text-xs leading-relaxed text-muted">{active.whyItHappens}</p>
+              <ol className="mt-2 list-decimal space-y-1 pl-4 text-xs leading-relaxed text-ink-2">
+                {active.howToGetThemBack.map((step, i) => (
+                  <li key={i}>{step}</li>
                 ))}
               </ol>
-            </div>
+            </details>
 
-            {/* Ready-to-Use WhatsApp Message / Campaign Hook */}
-            <div className="rounded-control border border-warning-border/60 bg-warning-bg/35 p-3.5 text-xs">
-              <p className="flex items-center gap-1.5 font-semibold uppercase tracking-wider text-ink">
-                <Sparkles aria-hidden className="size-3.5 text-gold" /> 3. Recommended WhatsApp message / template hook
-              </p>
-              <blockquote className="mt-1.5 rounded bg-panel/90 px-3 py-2 font-sans text-xs italic leading-relaxed text-ink shadow-2xs">
-                &ldquo;{activeScenario.suggestedWhatsappCopy}&rdquo;
-              </blockquote>
-            </div>
-
-            {/* Named Customers in this Scenario */}
-            {activeScenario.leads.length > 0 && (
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
-                  Customers in this scenario right now (click to open profile & chat)
-                </p>
-                <ul className="divide-y divide-line rounded-control border border-line bg-panel px-3 py-1 text-xs">
-                  {activeScenario.leads.map((lead) => (
-                    <li key={lead.id} className="flex items-center justify-between gap-2 py-2">
-                      <div className="min-w-0 flex-1">
-                        <Link href={lead.href} className="font-semibold text-ink hover:underline">
-                          {lead.name}
-                        </Link>
-                        <span className="ml-1.5 text-muted">· {lead.note}</span>
-                      </div>
-                      <Link
-                        href={lead.href}
-                        className="shrink-0 font-semibold text-brand-deep hover:underline"
-                      >
-                        Open →
+            {active.leads.length > 0 && (
+              <div className="mt-4 border-t border-line pt-3">
+                <p className="mb-2 text-2xs font-semibold uppercase tracking-wide text-muted">Customers in this group</p>
+                <ul className="flex flex-wrap gap-1.5">
+                  {active.leads.map((l) => (
+                    <li key={l.id}>
+                      <Link href={l.href} title={l.note} className="inline-flex max-w-[14rem] items-center rounded-full border border-line bg-panel px-2.5 py-1 text-xs font-medium text-ink-2 hover:border-line-2 hover:text-ink">
+                        <span className="truncate">{l.name}</span>
                       </Link>
                     </li>
                   ))}
@@ -893,24 +454,22 @@ export function CustomerGrowthPlaybookCard({ data }: { data: CustomerWinbackPlay
             )}
           </div>
 
-          {/* Automation Status Footer */}
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3 text-xs text-muted">
-            <div className="flex flex-wrap items-center gap-3">
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+            <span className="flex flex-wrap gap-3">
               <span>
-                Auto-refill reminder:{" "}
-                <b className={data.refillConfigured ? "text-success" : "text-warning"}>
-                  {data.refillConfigured ? "Active" : "Not configured"}
-                </b>
+                Refill reminder <b className={data.refillConfigured ? "text-success" : "text-warning"}>{data.refillConfigured ? "on" : "off"}</b>
               </span>
               <span>
-                Auto win-back (lapsed):{" "}
-                <b className={data.winbackConfigured ? "text-success" : "text-warning"}>
-                  {data.winbackConfigured ? "Active" : "Not configured"}
-                </b>
+                Win-back <b className={data.winbackConfigured ? "text-success" : "text-warning"}>{data.winbackConfigured ? "on" : "off"}</b>
               </span>
-            </div>
+              {data.bestReplyDayAndTime && (
+                <span>
+                  Best time <b className="text-ink">{data.bestReplyDayAndTime}</b>
+                </span>
+              )}
+            </span>
             <Link href="/dashboard/clients" className="font-semibold text-brand-deep hover:underline">
-              Configure automations →
+              Automations →
             </Link>
           </div>
         </div>
@@ -920,7 +479,7 @@ export function CustomerGrowthPlaybookCard({ data }: { data: CustomerWinbackPlay
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * 3. VISUAL CAMPAIGN RESULTS BY PRODUCT GRAPH (Replaces plain HTML table)
+ * 3. CAMPAIGN RESULTS BY PRODUCT GROUP
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 export type ProductCampaignRow = {
@@ -934,107 +493,35 @@ export type ProductCampaignRow = {
 
 export function ProductCampaignGraphCard({ rows }: { rows: ProductCampaignRow[] }) {
   if (!rows.length) return null;
-  const maxSent = Math.max(1, ...rows.map((r) => r.sent));
-  const bestReadRow = [...rows].sort((a, b) => pct(b.read, b.delivered) - pct(a.read, a.delivered))[0];
-  const bestReplyRow = [...rows].sort((a, b) => pct(b.replies, b.read) - pct(a.replies, a.read))[0];
-
+  const best = [...rows].filter((r) => r.delivered >= 5).sort((a, b) => pct(b.read, b.delivered) - pct(a.read, a.delivered))[0];
   return (
-    <Card className="card-3d">
+    <Card className="card-3d h-full">
       <CardHeader
         tone="brand"
         icon={<ChartBar3D />}
-        title="Campaign conversion graph by product segment"
-        description="Last 30 days · visual delivery, read & reply funnel for each product buyer group"
-        action={
-          <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            {bestReadRow && bestReadRow.delivered > 0 && (
-              <Badge tone="green">
-                Best read: {bestReadRow.tag} ({pct(bestReadRow.read, bestReadRow.delivered)}%)
-              </Badge>
-            )}
-          </div>
-        }
+        title="Campaigns by product group"
+        description="Last 30 days · how far messages got with each buyer group"
+        action={best ? <Badge tone="green">Best read: {best.tag}</Badge> : undefined}
       />
-      <div className="space-y-3 p-4 sm:p-5">
-        {rows.map((r) => {
-          const delivPct = pct(r.delivered, r.sent);
-          const readPct = pct(r.read, r.delivered);
-          const replyPct = pct(r.replies, Math.max(1, r.read));
-          const sentWidth = pct(r.sent, maxSent);
-          const delivWidth = pct(r.delivered, maxSent);
-          const readWidth = pct(r.read, maxSent);
-
-          return (
-            <div key={r.tag} className="rounded-control border border-line bg-subtle/40 p-3 transition hover:bg-subtle">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Link
-                    href={`/dashboard/customers?tag=${encodeURIComponent(`product:${r.tag}`)}`}
-                    className="text-sm font-semibold text-ink hover:underline"
-                  >
-                    {r.tag}
-                  </Link>
-                  {r.replies > 0 && (
-                    <Badge tone="blue">
-                      {fmtNumber(r.replies)} repl{r.replies === 1 ? "y" : "ies"} ({replyPct}% of readers)
-                    </Badge>
-                  )}
-                </div>
-                <div className="tabular flex items-center gap-3 text-xs text-muted">
-                  <span>
-                    <b className="text-ink">{fmtNumber(r.sent)}</b> sent
-                  </span>
-                  <span>
-                    <b className="text-emerald-700">{delivPct}%</b> delivered
-                  </span>
-                  <span>
-                    <b className="text-purple-700">{readPct}%</b> read
-                  </span>
-                  {r.failed > 0 && <span className="text-danger">{r.failed} failed</span>}
-                </div>
-              </div>
-
-              {/* Layered Multi-Metric Funnel Bar */}
-              <div className="track-3d relative mt-2 h-3 w-full overflow-hidden rounded-full bg-sunken">
-                <div
-                  className="absolute inset-y-0 left-0 rounded-full opacity-35"
-                  style={{ width: `${Math.max(4, sentWidth)}%`, background: "#167d63" }}
-                  title={`Sent: ${r.sent}`}
-                />
-                <div
-                  className="absolute inset-y-0 left-0 rounded-full opacity-65"
-                  style={{ width: `${Math.max(3, delivWidth)}%`, background: "#10b981" }}
-                  title={`Delivered: ${r.delivered} (${delivPct}%)`}
-                />
-                <div
-                  className="bar-3d absolute inset-y-0 left-0 rounded-full"
-                  style={{ width: `${Math.max(2, readWidth)}%`, background: "linear-gradient(90deg, #9333ea, #6941c6)" }}
-                  title={`Read: ${r.read} (${readPct}%)`}
-                />
-              </div>
-            </div>
-          );
-        })}
-
-        {/* Legend & Action Recommendation */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3 text-xs text-muted">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded-full bg-[#6941c6]" /> Read
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded-full bg-[#10b981]" /> Delivered
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded-full bg-[#167d63]/40" /> Sent
-            </span>
-          </div>
-          {bestReplyRow && bestReplyRow.replies > 0 && (
-            <span>
-              Top responder segment: <b className="text-ink">{bestReplyRow.tag}</b> — prioritize for new product launches
-            </span>
-          )}
-        </div>
+      <div className="p-4 sm:p-5">
+        <StackedRows
+          legend={[
+            { label: "Read", color: "#6941c6" },
+            { label: "Delivered, unread", color: "#34d399" },
+            { label: "Not delivered", color: "#cbd5e1" },
+          ]}
+          rows={rows.map((r) => ({
+            key: r.tag,
+            label: r.tag,
+            href: `/dashboard/customers?tag=${encodeURIComponent(`product:${r.tag}`)}`,
+            right: `${pct(r.read, r.delivered)}% read${r.replies ? ` · ${plural(r.replies, "reply", "replies")}` : ""}`,
+            parts: [
+              { key: "r", label: "Read", value: r.read, color: "#6941c6" },
+              { key: "d", label: "Delivered, unread", value: Math.max(0, r.delivered - r.read), color: "#34d399" },
+              { key: "n", label: "Not delivered", value: Math.max(0, r.sent - r.delivered), color: "#cbd5e1" },
+            ],
+          }))}
+        />
       </div>
     </Card>
   );
