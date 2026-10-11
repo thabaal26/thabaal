@@ -403,6 +403,26 @@ model Order {
   paymentReminderAt  DateTime?
   paidAt             DateTime?
   paymentTxnId       String?
+  /// How the customer pays: upi_whatsapp ("Review and pay"), upi (another UPI app or the shop's QR), cod, cash,
+  /// bank, card or other. Null until someone decides (a WhatsApp cart defaults to UPI when payments are on).
+  paymentMethod      String?
+  /// How the payment was confirmed: meta (WhatsApp payment update), utr (customer sent a UPI reference),
+  /// screenshot, staff (recorded by hand) or verified (a customer's claim checked by staff).
+  paymentSource      String?
+  /// Amount actually received; less than the total means part paid.
+  paidAmount         Float?
+  /// The customer says they paid, but nothing has confirmed it yet: staff check and verify.
+  paymentClaimedAt   DateTime?
+  paymentClaimNote   String?
+  /// The last WhatsApp payment attempt that failed, and Meta's reason.
+  paymentFailedAt    DateTime?
+  paymentFailReason  String?
+  /// Cash on delivery / cash: who collected it.
+  collectedBy        String?
+  /// Money given back after a cancellation or a problem with the order.
+  refundedAt         DateTime?
+  refundAmount       Float?
+  refundNote         String?
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 

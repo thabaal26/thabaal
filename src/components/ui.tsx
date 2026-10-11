@@ -798,7 +798,16 @@ const ORDER_STEPS = [
 ] as const;
 
 /** Visual 5-step order fulfilment tracker bar for OrderCard. */
-export function OrderStepper({ status, isPaid }: { status: string; isPaid: boolean }) {
+export function OrderStepper({
+  status,
+  isPaid,
+  unpaidLabel,
+}: {
+  status: string;
+  isPaid: boolean;
+  /** Set when the order moved past "Paid" without being paid (e.g. "COD", "Not paid"): that step shows amber with this label. */
+  unpaidLabel?: string;
+}) {
   if (status === "CANCELLED") {
     return (
       <div className="flex items-center gap-2 rounded-control border border-danger-border/60 bg-danger-bg/60 px-3 py-1.5 text-xs font-medium text-danger">
@@ -826,12 +835,13 @@ export function OrderStepper({ status, isPaid }: { status: string; isPaid: boole
         {ORDER_STEPS.map((step, idx) => {
           const done = idx <= activeIdx || (step.key === "PAID" && isPaid);
           const current = idx === activeIdx;
+          const owed = unpaidLabel && step.key === "PAID" && !isPaid && idx < activeIdx;
           return (
             <div
               key={step.key}
               className={cn(
                 "h-1.5 rounded-full transition-colors",
-                done ? (current ? "bg-brand bar-3d" : "bg-brand/75") : "bg-sunken",
+                owed ? "bg-warning/60" : done ? (current ? "bg-brand bar-3d" : "bg-brand/75") : "bg-sunken",
               )}
             />
           );
@@ -841,9 +851,10 @@ export function OrderStepper({ status, isPaid }: { status: string; isPaid: boole
         {ORDER_STEPS.map((step, idx) => {
           const done = idx <= activeIdx || (step.key === "PAID" && isPaid);
           const current = idx === activeIdx;
+          const owed = unpaidLabel && step.key === "PAID" && !isPaid && idx < activeIdx;
           return (
-            <span key={step.key} className={cn(current ? "font-semibold text-brand-deep" : done ? "text-ink-2" : "text-muted/70")}>
-              {step.label}
+            <span key={step.key} className={cn(owed ? "font-semibold text-warning" : current ? "font-semibold text-brand-deep" : done ? "text-ink-2" : "text-muted/70")}>
+              {owed ? unpaidLabel : step.label}
             </span>
           );
         })}

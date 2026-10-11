@@ -11,6 +11,10 @@ export type ExportableOrderRow = {
   createdAt: string;
   status: string;
   isPaid: boolean;
+  /** PAID, COD · COLLECT CASH, NOT PAID… (lib/payment-state slipPay); falls back to PAID / TO COLLECT. */
+  payLabel?: string;
+  /** Money the delivery person collects; falls back to the total when not paid. */
+  collect?: number;
   customerName: string;
   customerPhone: string;
   area: string;
@@ -20,6 +24,9 @@ export type ExportableOrderRow = {
   currency: string;
   note: string;
 };
+
+const payText = (o: ExportableOrderRow) => o.payLabel ?? (o.isPaid ? "PAID" : "TO COLLECT");
+const collectOf = (o: ExportableOrderRow, total: number) => o.collect ?? (o.isPaid ? 0 : total);
 
 export type ExportablePickItem = {
   name: string;
@@ -72,7 +79,7 @@ export function downloadOrdersExcel(
         <td style="font-family:monospace;font-weight:bold;">${escapeHtml(o.orderRef)}</td>
         <td>${escapeHtml(o.createdAt)}</td>
         <td>${escapeHtml(o.status)}</td>
-        <td style="color:${o.isPaid ? "#0c6b51" : "#b45309"};font-weight:bold;">${o.isPaid ? "PAID" : "TO COLLECT"}</td>
+        <td style="color:${o.isPaid ? "#0c6b51" : "#b45309"};font-weight:bold;">${payText(o)}</td>
         <td>${escapeHtml(o.customerName)}</td>
         <td style="mso-number-format:'\\@';">${escapeHtml(o.customerPhone)}</td>
         <td><b>${escapeHtml(o.area || "Area not noted")}</b></td>
@@ -82,7 +89,7 @@ export function downloadOrdersExcel(
         <td style="text-align:right;">${pricing.subtotal}</td>
         <td style="text-align:right;">${pricing.shipping}</td>
         <td style="text-align:right;font-weight:bold;">${pricing.total}</td>
-        <td style="text-align:right;color:${o.isPaid ? "#667085" : "#b45309"};font-weight:bold;">${o.isPaid ? 0 : pricing.total}</td>
+        <td style="text-align:right;color:${o.isPaid ? "#667085" : "#b45309"};font-weight:bold;">${collectOf(o, pricing.total)}</td>
         <td>${escapeHtml(o.note || "")}</td>
       </tr>`;
     })
@@ -189,7 +196,7 @@ export function downloadOrdersCsv(
       q(o.orderRef),
       q(o.createdAt),
       q(o.status),
-      q(o.isPaid ? "PAID" : "TO COLLECT"),
+      q(payText(o)),
       q(o.customerName),
       q(o.customerPhone),
       q(o.area || "Area not noted"),
@@ -199,7 +206,7 @@ export function downloadOrdersCsv(
       pricing.subtotal,
       pricing.shipping,
       pricing.total,
-      o.isPaid ? 0 : pricing.total,
+      collectOf(o, pricing.total),
       q(o.note || ""),
     ].join(",");
   });
@@ -286,7 +293,7 @@ export function downloadOrdersImage(
   ctx.font = "700 22px system-ui, -apple-system, sans-serif";
   ctx.fillText(title, pad + 20, y + 30);
 
-  const toCollect = orders.filter((o) => !o.isPaid).reduce((s, o) => s + o.total, 0);
+  const toCollect = orders.reduce((s, o) => s + collectOf(o, o.total), 0);
   const subtitle = `${orders.length} order${orders.length === 1 ? "" : "s"} · To collect: ₹${toCollect.toLocaleString("en-IN")} · ${new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`;
   ctx.fillStyle = "#d1fae5";
   ctx.font = "500 13px system-ui, -apple-system, sans-serif";
@@ -363,7 +370,7 @@ export function downloadOrdersImage(
     // Paid / To Collect pill on right
     const badgeText = o.isPaid
       ? `PAID · ₹${o.total.toLocaleString("en-IN")}`
-      : `COLLECT ₹${o.total.toLocaleString("en-IN")}`;
+      : `${payText(o)} ₹${collectOf(o, o.total).toLocaleString("en-IN")}`;
     ctx.font = "700 12px system-ui, -apple-system, sans-serif";
     const bw = ctx.measureText(badgeText).width + 20;
     ctx.fillStyle = o.isPaid ? "#dcfce7" : "#fef3c7";
@@ -435,9 +442,7 @@ export function openPrintablePdfWindow(
   picks: ExportablePickItem[],
   title = "Packing & Delivery List",
 ) {
-  const toCollect = orders
-    .filter((o) => !o.isPaid)
-    .reduce((s, o) => s + getOrderPricing(o.items, o.total, { applyDefaultWhenEqual: true }).total, 0);
+  const toCollect = orders.reduce((s, o) => s + collectOf(o, getOrderPricing(o.items, o.total, { applyDefaultWhenEqual: true }).total), 0);
   const dateStr = new Date().toLocaleDateString("en-IN", {
     weekday: "short",
     day: "numeric",
@@ -472,7 +477,7 @@ export function openPrintablePdfWindow(
           </div>
           <div class="right-badges">
             <span class="ref">${escapeHtml(o.orderRef)}</span>
-            <span class="pay ${o.isPaid ? "paid" : "collect"}">${o.isPaid ? "PAID" : "TO COLLECT"}</span>
+            <span class="pay ${o.isPaid ? "paid" : "collect"}">${payText(o)}</span>
           </div>
         </div>
         <div class="address-box">

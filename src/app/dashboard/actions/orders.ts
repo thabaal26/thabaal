@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { pushOrderToSheet } from "@/lib/google-sheets-live";
 import { DEFAULT_SHIPPING_FEE, getOrderPricing, itemsText, itemsWithNames, money, orderRef, syncCustomerOrderedProducts, type OrderItem } from "@/lib/orders";
 import { confirmPayment, sendPaymentRequestFor, updateOrderCard } from "@/lib/payments";
+import { dueOf, methodOf, receivedOf } from "@/lib/payment-state";
 import { getSettings, wahaConfig } from "@/lib/provider";
 import { replyWindowEnd } from "@/lib/replies";
 import { headerImageFor } from "@/lib/media";
@@ -72,7 +73,7 @@ export async function setOrderStatus(id: string, status: OrderStatus): Promise<S
   if (!order) return { ok: false, message: "Order not found." };
   // Paid outside WhatsApp (UPI to the shop, cash): record it and thank the customer like an online payment.
   if (status === "PAID" && !order.paidAt) {
-    await confirmPayment(order.id);
+    await confirmPayment(order.id, null, { source: "staff", method: methodOf(order) ?? "upi" });
     revalidatePath("/dashboard", "layout");
     return { ok: true, message: "Marked paid and thanked the customer." };
   }
@@ -139,12 +140,33 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
     pricing.shipping > 0
       ? `Items: ${itemsText(items)} (${money(pricing.subtotal, order.currency)})\nShipping: ${money(pricing.shipping, order.currency)}\nTotal: ${money(pricing.total, order.currency)}`
       : `Items: ${itemsText(items)}\nTotal: ${money(pricing.total, order.currency)}`;
+  // Where the money stands, so the customer knows whether to pay, keep cash ready, or nothing at all.
+  const due = dueOf(order);
+  const cod = methodOf(order) === "cod" && due > 0;
+  const payLine =
+    kind === "confirm"
+      ? order.paidAt
+        ? `Payment received: ${money(receivedOf(order), order.currency)}. Thank you!`
+        : cod
+          ? `Payment: cash on delivery. Please keep ${money(due, order.currency)} ready when it arrives.`
+          : receivedOf(order) > 0
+            ? `Received ${money(receivedOf(order), order.currency)}; ${money(due, order.currency)} still to pay.`
+            : ""
+      : kind === "dispatch"
+        ? cod
+          ? `Cash on delivery: please keep ${money(due, order.currency)} ready.`
+          : !order.paidAt && due > 0 && order.paymentMethod !== "cod"
+            ? `Amount to pay: ${money(due, order.currency)}.`
+            : ""
+        : order.paidAt && (order.paymentMethod === "cod" || order.paymentMethod === "cash")
+          ? `We received ${money(receivedOf(order), order.currency)} in cash. Thank you!`
+          : "";
   const text =
     kind === "confirm"
-      ? `Hello ${first}, thank you for your order with ${order.client.name}.\n\n${confirmPricingText}\n\nWe will confirm your delivery slot shortly.`
+      ? `Hello ${first}, thank you for your order with ${order.client.name}.\n\n${confirmPricingText}${payLine ? `\n${payLine}` : ""}\n\nWe will confirm your delivery slot shortly.`
       : kind === "dispatch"
-        ? `Hello ${first}, your ${order.client.name} order ${ref} is on its way and will reach you by ${details.eta?.trim() || "soon"}.${contact ? `\n\n${contact}` : ""}\n\nFor any help, reply to this message.`
-        : `Hello ${first}, your ${order.client.name} order ${ref} has been delivered. Thank you for shopping with us!\n\nIf anything is not right, reply to this message.`;
+        ? `Hello ${first}, your ${order.client.name} order ${ref} is on its way and will reach you by ${details.eta?.trim() || "soon"}.${contact ? `\n\n${contact}` : ""}${payLine ? `\n\n${payLine}` : ""}\n\nFor any help, reply to this message.`
+        : `Hello ${first}, your ${order.client.name} order ${ref} has been delivered.${payLine ? ` ${payLine}` : ""} Thank you for shopping with us!\n\nIf anything is not right, reply to this message.`;
   const nextStatus = kind === "confirm" ? "CONFIRMED" : kind === "dispatch" ? "DISPATCHED" : "DELIVERED";
 
   const settings = await getSettings();
@@ -186,7 +208,13 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
         }
         return { ok: false, message: `The customer's 24-hour window has closed, so WhatsApp needs an approved ${TEMPLATE_NAMES[kind][0]} template. Use "Create order templates" at the top of Orders.` };
       }
-      const bodyParams = kind === "confirm" ? [first, `${itemsText(items).slice(0, 260)}${pricing.shipping > 0 ? ` (+ Rs ${pricing.shipping} shipping)` : ""}`, String(Math.round(pricing.total))] : kind === "dispatch" ? [first, ref, when] : [first, ref];
+      const codNote = cod ? ` - cash on delivery, please keep Rs ${Math.round(due)} ready` : "";
+      const bodyParams =
+        kind === "confirm"
+          ? [first, `${itemsText(items).slice(0, 240)}${pricing.shipping > 0 ? ` (+ Rs ${pricing.shipping} shipping)` : ""}${cod ? " - cash on delivery" : ""}`, String(Math.round(pricing.total))]
+          : kind === "dispatch"
+            ? [first, ref, `${when}${codNote}`.slice(0, 300)]
+            : [first, ref];
       ({ id: waId, simulated } = await sendTemplateMessage(cfg, { to: c.phone, templateName: t.name, language: t.language, headerType: t.headerType, headerMediaUrl: await headerImageFor(t), headerParams: [], bodyParams }));
       templateName = t.name;
       templateId = t.id;
@@ -487,6 +515,10 @@ export async function createOrder(input: {
   note?: string;
   catalogId?: string | null;
   requestPaymentNow?: boolean;
+  /** How this order is paid: send the WhatsApp UPI request now, cash on delivery, already paid (cash / UPI), or decide later. */
+  paymentMode?: "request" | "cod" | "paid_cash" | "paid_upi" | "later";
+  /** For an already-paid order: the UPI reference, if any. */
+  paymentRef?: string;
 }): Promise<SendResult> {
   const s = await requireOrderAccess();
   if ("denied" in s) return { ok: false, message: s.denied };
@@ -582,16 +614,24 @@ export async function createOrder(input: {
       total,
       note: finalOrderNote,
       internalNote: "Entered by hand",
+      ...(input.paymentMode === "cod" && { paymentMethod: "cod" }),
     },
   });
 
   await syncCustomerOrderedProducts(customer.id, items).catch(() => {});
   pushOrderToSheet(order.id, "NEW_ORDER");
 
+  const mode = input.paymentMode ?? (input.requestPaymentNow ? "request" : "later");
   let paymentNote = "";
-  if (input.requestPaymentNow && total > 0 && client?.paymentConfig) {
+  if (mode === "request" && total > 0 && client?.paymentConfig) {
     const payRes = await sendPaymentRequestFor(order.id);
     paymentNote = payRes.ok ? " Sent WhatsApp payment request." : ` (${payRes.message})`;
+  } else if ((mode === "paid_cash" || mode === "paid_upi") && total > 0) {
+    const method = mode === "paid_cash" ? "cash" : "upi";
+    await confirmPayment(order.id, input.paymentRef?.trim().slice(0, 60) || null, { method, source: "staff" });
+    paymentNote = ` Recorded as paid (${mode === "paid_cash" ? "cash" : "UPI"}).`;
+  } else if (mode === "cod") {
+    paymentNote = ` Cash on delivery: collect ${money(total, "INR")}.`;
   }
 
   revalidatePath("/dashboard", "layout");
@@ -624,6 +664,11 @@ export async function updateOrderItems(
       id: true,
       number: true,
       catalogId: true,
+      total: true,
+      status: true,
+      paidAt: true,
+      paidAmount: true,
+      currency: true,
       customer: { select: { id: true, location: true, locationRaw: true, region: true } },
     },
   });
@@ -685,7 +730,15 @@ export async function updateOrderItems(
   }
 
   revalidatePath("/dashboard", "layout");
-  return { ok: true, message: `Updated ${orderRef(order)} items and total (${money(total, "INR")}).` };
+  // Already paid something: say what the change means for the money.
+  const got = receivedOf(order);
+  const diff = Math.round((total - got) * 100) / 100;
+  const money_ = got > 0 && Math.abs(diff) >= 1
+    ? diff > 0
+      ? ` ${money(got, "INR")} was paid, so ${money(diff, "INR")} is now due.`
+      : ` ${money(got, "INR")} was paid, so ${money(-diff, "INR")} should be refunded (record it on the order).`
+    : "";
+  return { ok: true, message: `Updated ${orderRef(order)} items and total (${money(total, "INR")}).${money_}` };
 }
 
 const ORDER_TEMPLATES: { name: string; body: string; samples: string[] }[] = [

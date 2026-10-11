@@ -9,6 +9,7 @@ import { toastResult } from "@/components/toast";
 import { Button, Field, type ButtonVariant } from "@/components/ui";
 import { DEFAULT_SHIPPING_FEE, getOrderPricing } from "@/lib/order-pricing";
 import type { OrderItem } from "@/lib/orders";
+import type { PayState } from "@/lib/payment-state";
 import {
   notifyOrder,
   requestPayment,
@@ -17,6 +18,8 @@ import {
   updateOrderItems,
   type DispatchDetails,
 } from "../actions/orders";
+import { deliverCod, setPaymentMethod, undoPayment, verifyPaymentClaim } from "../actions/payments";
+import { RecordPaymentSheet, RefundSheet } from "./payment-ui";
 import {
   blankOrderLine,
   OrderItemsEditor,
@@ -27,6 +30,19 @@ import {
 type Status = "NEW" | "CONFIRMED" | "PAID" | "DISPATCHED" | "DELIVERED" | "CANCELLED";
 type Result = { ok: boolean; message?: string };
 type Step = { key: string; label: string; variant: ButtonVariant; run: () => void };
+/** Where the money stands (see lib/payment-state), for the payment buttons. */
+export type PayInfo = {
+  state: PayState;
+  cod: boolean;
+  due: number;
+  /** Paid and not yet given back. */
+  refundable: number;
+  /** Paid more than the (edited) total: the difference to give back. */
+  overpaid: number;
+  canUndo: boolean;
+  hold: boolean;
+};
+const inr = (n: number) => `₹${(Math.round(n * 100) / 100).toLocaleString("en-IN")}`;
 
 function toEditableLines(
   items: OrderItem[],
@@ -66,6 +82,7 @@ export function OrderActions({
   total = 0,
   canEdit,
   payment = null,
+  pay = null,
   catalogProducts = [],
   isLiveCatalog = false,
 }: {
@@ -79,6 +96,7 @@ export function OrderActions({
   total?: number;
   canEdit: boolean;
   payment?: "first" | "again" | null;
+  pay?: PayInfo | null;
   catalogProducts?: CatalogProductOption[];
   isLiveCatalog?: boolean;
 }) {
@@ -89,6 +107,8 @@ export function OrderActions({
   const [dispatchOpen, setDispatchOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
+  const [refundOpen, setRefundOpen] = useState(false);
   const [d, setD] = useState<DispatchDetails>({ eta: "today evening", by: "", phone: "", link: "" });
   const [editLines, setEditLines] = useState<EditableOrderLine[]>(() =>
     toEditableLines(items, catalogProducts),
@@ -124,8 +144,39 @@ export function OrderActions({
     });
   const done = status === "DELIVERED" || status === "CANCELLED";
 
-  // Every action that applies now, in the same order and with the same rules as always.
+  const cod = Boolean(pay?.cod);
+  const due = pay?.due ?? 0;
+  const open = (pay ? due > 0 : !isPaid) && status !== "CANCELLED";
+  const sheet = (fn: (v: boolean) => void) => () => {
+    setMoreOpen(false);
+    fn(true);
+  };
+
+  // Every action that applies now, most useful first (the first one is the big button on phones).
   const steps: Step[] = [];
+  if (pay?.state === "claimed" && open) {
+    steps.push({
+      key: "verify",
+      label: "Payment received",
+      variant: "primary",
+      run: () => run("verify", () => verifyPaymentClaim(id, true)),
+    });
+    steps.push({
+      key: "notpaid",
+      label: "Not received",
+      variant: "secondary",
+      run: async () => {
+        if (
+          await confirmAction({
+            title: "Payment not found?",
+            message: `Mark ${who}'s payment as not received? They'll be asked for the UPI reference (UTR) or a screenshot.`,
+            confirmLabel: "Not received",
+          })
+        )
+          run("notpaid", () => verifyPaymentClaim(id, false));
+      },
+    });
+  }
   if (status === "NEW")
     steps.push({
       key: "confirm",
@@ -133,38 +184,61 @@ export function OrderActions({
       variant: "primary",
       run: () => run("confirm", () => notifyOrder(id, "confirm")),
     });
+  if (status === "NEW" && open && !cod)
+    steps.push({
+      key: "codconfirm",
+      label: "Cash on delivery & confirm",
+      variant: "secondary",
+      run: () => run("codconfirm", () => setPaymentMethod(id, "cod", { confirm: true })),
+    });
   if (status === "CONFIRMED" || status === "PAID")
     steps.push({
       key: "dispatch",
       label: "Dispatch & message customer",
-      variant: "primary",
-      run: () => {
+      variant: pay?.hold ? "secondary" : "primary",
+      run: async () => {
+        if (
+          pay?.hold &&
+          !(await confirmAction({
+            title: "Not paid yet",
+            message: `${who} hasn't paid ${inr(due)} yet${pay.state === "claimed" ? " (they say they did: check first)" : ""}. Dispatch anyway? Or set it as cash on delivery.`,
+            confirmLabel: "Dispatch anyway",
+          }))
+        )
+          return;
         setMoreOpen(false);
         setDispatchOpen(true);
       },
     });
-  if (!isPaid && (status === "NEW" || status === "CONFIRMED" || status === "DISPATCHED"))
+  if (status === "CONFIRMED" && open && !cod)
     steps.push({
-      key: "paid",
-      label: "Mark paid (UPI)",
+      key: "cod",
+      label: "Cash on delivery",
       variant: "secondary",
-      run: () => run("paid", () => setOrderStatus(id, "PAID")),
+      run: () => run("cod", () => setPaymentMethod(id, "cod")),
     });
   if (payment && (status === "NEW" || status === "CONFIRMED"))
     steps.push({
       key: "pay",
       label: payment === "again" ? "Send payment request again" : "Request payment (UPI)",
-      variant: status === "CONFIRMED" && payment === "first" ? "primary" : "secondary",
+      // Confirmed but not paid: asking for the money is the next step.
+      variant: status === "CONFIRMED" && (payment === "first" || pay?.hold) ? "primary" : "secondary",
       run: () => run("pay", () => requestPayment(id)),
     });
-  if (!done)
+  if (status === "DISPATCHED" && cod && open) {
     steps.push({
-      key: "edit",
-      label: total <= 0 ? "Set price / Customize" : "Customize / Edit items",
-      variant: "secondary",
-      run: openEditSheet,
+      key: "codpaid",
+      label: `Delivered & ${inr(due)} cash collected`,
+      variant: "primary",
+      run: () => run("codpaid", () => deliverCod(id, { collected: true })),
     });
-  if (status === "DISPATCHED") {
+    steps.push({
+      key: "codlater",
+      label: "Delivered, cash not collected",
+      variant: "secondary",
+      run: () => run("codlater", () => deliverCod(id, { collected: false })),
+    });
+  } else if (status === "DISPATCHED") {
     steps.push({
       key: "deliver",
       label: "Delivered & thank customer",
@@ -178,6 +252,51 @@ export function OrderActions({
       run: () => run("delivered", () => setOrderStatus(id, "DELIVERED")),
     });
   }
+  if (open)
+    steps.push({
+      key: "record",
+      label: status === "DELIVERED" ? `Record ${inr(due)} received` : "Record payment",
+      variant: status === "DELIVERED" || pay?.state === "part_paid" ? "primary" : "secondary",
+      run: sheet(setPayOpen),
+    });
+  if (pay && pay.refundable > 0 && (pay.state === "refund_due" || pay.overpaid >= 1 || status === "DELIVERED" || status === "CANCELLED"))
+    steps.push({
+      key: "refund",
+      label: pay.overpaid >= 1 ? `Refund extra ${inr(pay.overpaid)}` : "Record refund",
+      variant: pay.state === "refund_due" || pay.overpaid >= 1 ? "primary" : "secondary",
+      run: sheet(setRefundOpen),
+    });
+  if (!done)
+    steps.push({
+      key: "edit",
+      label: total <= 0 ? "Set price / Customize" : "Customize / Edit items",
+      variant: "secondary",
+      run: openEditSheet,
+    });
+  if (cod && open && (status === "NEW" || status === "CONFIRMED"))
+    steps.push({
+      key: "online",
+      label: "Pay online instead",
+      variant: "ghost",
+      run: () => run("online", () => setPaymentMethod(id, "upi")),
+    });
+  if (pay?.canUndo && status !== "CANCELLED")
+    steps.push({
+      key: "undo",
+      label: "Undo payment",
+      variant: "ghost",
+      run: async () => {
+        if (
+          await confirmAction({
+            title: "Undo payment?",
+            message: `Remove the payment recorded on ${who}'s order? Use this only if it was recorded by mistake; for money given back, record a refund.`,
+            confirmLabel: "Undo payment",
+            danger: true,
+          })
+        )
+          run("undo", () => undoPayment(id));
+      },
+    });
   if (!done)
     steps.push({
       key: "cancel",
@@ -186,7 +305,7 @@ export function OrderActions({
       run: async () => {
         if (
           await confirmAction({
-            message: "Cancel this order?",
+            message: pay && pay.refundable > 0 ? `Cancel this order? ${inr(pay.refundable)} was paid, so it will show as refund due.` : "Cancel this order?",
             confirmLabel: "Cancel order",
             danger: true,
           })
@@ -202,6 +321,8 @@ export function OrderActions({
       run: () => run("reopen", () => setOrderStatus(id, "NEW")),
     });
 
+  // The main next step (a primary one) leads, which is also the big button on phones.
+  steps.sort((a, b) => Number(b.variant === "primary") - Number(a.variant === "primary"));
   const [main, ...rest] = steps;
   const phoneMain = main && main.key !== "cancel" ? main : undefined;
   const phoneRest = phoneMain ? rest : steps;
@@ -420,6 +541,9 @@ export function OrderActions({
         </form>
       </Sheet>
 
+      <RecordPaymentSheet open={payOpen} onClose={() => setPayOpen(false)} id={id} who={who} due={due} cod={cod} />
+      {pay && pay.refundable > 0 && <RefundSheet open={refundOpen} onClose={() => setRefundOpen(false)} id={id} who={who} refundable={pay.refundable} suggested={pay.overpaid >= 1 ? pay.overpaid : pay.refundable} />}
+
       <Sheet
         open={dispatchOpen}
         onClose={() => setDispatchOpen(false)}
@@ -459,6 +583,13 @@ export function OrderActions({
               onChange={(e) => setD({ ...d, link: e.target.value })}
             />
           </Field>
+          {open && due > 0 && (
+            <p className="rounded-control border border-line bg-sunken px-3 py-2 text-xs text-ink-2">
+              {cod
+                ? `Cash on delivery: the message asks ${who} to keep ${inr(due)} ready.`
+                : `Not paid yet: the message tells ${who} the amount to pay (${inr(due)}).`}
+            </p>
+          )}
           <Button type="submit" className="w-full" disabled={pending} loading={busy === "dispatch"}>
             Dispatch & send message
           </Button>

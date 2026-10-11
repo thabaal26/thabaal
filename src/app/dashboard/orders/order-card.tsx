@@ -1,13 +1,15 @@
-import { CheckCircle2, Clock, History, MapPin, Sparkles, Truck } from "lucide-react";
+import { History, MapPin, Sparkles, Truck } from "lucide-react";
 import Link from "next/link";
 import { Avatar, Badge, Card, OrderStatusBadge, OrderStepper } from "@/components/ui";
 import { analyzeCartMentality } from "@/lib/cart-mentality";
 import { fmtDate } from "@/lib/format";
 import { getOrderPricing } from "@/lib/order-pricing";
 import { itemsText, money, orderRef, type OrderItem } from "@/lib/orders";
+import { canUndoPayment, dueOf, holdBeforeDispatch, methodOf, paymentState, receivedOf } from "@/lib/payment-state";
 import { formatPhone } from "@/lib/phone";
 import { OrderActions } from "./order-actions";
 import { OrderAddressControl } from "./order-address-sheet";
+import { PaymentSummary } from "./payment-status";
 import type { CatalogProductOption } from "./order-items-editor";
 
 export type OrderCardData = {
@@ -22,6 +24,18 @@ export type OrderCardData = {
   paidAt: Date | null;
   paymentTxnId: string | null;
   paymentRequestedAt: Date | null;
+  paymentReminderAt?: Date | null;
+  paymentMethod?: string | null;
+  paymentSource?: string | null;
+  paidAmount?: number | null;
+  paymentClaimedAt?: Date | null;
+  paymentClaimNote?: string | null;
+  paymentFailedAt?: Date | null;
+  paymentFailReason?: string | null;
+  collectedBy?: string | null;
+  refundedAt?: Date | null;
+  refundAmount?: number | null;
+  refundNote?: string | null;
   customer: {
     id: string;
     name: string;
@@ -70,6 +84,8 @@ export function OrderCard({
   isLiveCatalog?: boolean;
 }) {
   const isPaid = o.status === "PAID" || o.paidAt !== null;
+  const payState = paymentState(o);
+  const received = receivedOf(o);
   const accent = STATUS_ACCENT[o.status] ?? "#167d63";
   const refText = orderRef(o);
   const pricing = getOrderPricing(items, o.total, { applyDefaultWhenEqual: true });
@@ -124,7 +140,7 @@ export function OrderCard({
         </div>
       </div>
 
-      <OrderStepper status={o.status} isPaid={isPaid} />
+      <OrderStepper status={o.status} isPaid={isPaid && payState !== "part_paid"} unpaidLabel={payState === "cod_due" ? "COD" : payState === "part_paid" ? "Part paid" : "Not paid"} />
 
       <div className="rounded-control border border-line/80 bg-sunken/70 px-3.5 py-1 text-sm shadow-[inset_0_1px_2px_rgb(16_24_40/0.04)]">
         <ul className="divide-y divide-line/80">
@@ -227,16 +243,8 @@ export function OrderCard({
       <div className="space-y-1.5 text-xs text-muted">
         <p className="tabular flex items-center justify-between gap-2">
           <span>Placed {fmtDate(o.createdAt, "EEE d MMM, h:mm a")}</span>
-          {isPaid ? (
-            <span className="inline-flex items-center gap-1 font-medium text-success">
-              <CheckCircle2 aria-hidden className="size-3.5" /> Paid{o.paymentTxnId ? ` · UPI ${o.paymentTxnId}` : ""}
-            </span>
-          ) : o.paymentRequestedAt ? (
-            <span className="inline-flex items-center gap-1 font-medium text-warning">
-              <Clock aria-hidden className="size-3.5" /> UPI requested {fmtDate(o.paymentRequestedAt, "d MMM, h:mm a")}
-            </span>
-          ) : null}
         </p>
+        <PaymentSummary o={o} />
       </div>
 
       <OrderActions
@@ -249,7 +257,16 @@ export function OrderCard({
         items={items}
         total={o.total}
         canEdit={canEdit}
-        payment={o.client.paymentConfig && o.total > 0 && !o.paidAt ? (o.paymentRequestedAt ? "again" : "first") : null}
+        payment={o.client.paymentConfig && o.total > 0 && !o.paidAt && received <= 0 && methodOf(o) !== "cod" ? (o.paymentRequestedAt ? "again" : "first") : null}
+        pay={{
+          state: payState,
+          cod: methodOf(o) === "cod",
+          due: dueOf(o),
+          refundable: Math.max(0, received - (o.refundAmount ?? 0)),
+          overpaid: o.status === "CANCELLED" ? 0 : Math.max(0, Math.round((received - (o.refundAmount ?? 0) - o.total) * 100) / 100),
+          canUndo: canUndoPayment(o),
+          hold: holdBeforeDispatch(o),
+        }}
         catalogProducts={catalogProducts}
         isLiveCatalog={isLiveCatalog}
       />

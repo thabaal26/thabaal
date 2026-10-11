@@ -1,4 +1,4 @@
-import { BookOpen, CircleAlert, CircleCheck, Globe, MessageCircle, MoreHorizontal, PackageCheck, Phone, RotateCw, ShoppingBag, ShoppingCart, Store, Users } from "lucide-react";
+import { BookOpen, CircleAlert, CircleCheck, Globe, MessageCircle, MoreHorizontal, PackageCheck, Phone, RotateCw, ShoppingBag, ShoppingCart, Store, Undo2, Users, Wallet } from "lucide-react";
 import { formatInTimeZone } from "date-fns-tz";
 import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
@@ -18,6 +18,10 @@ export type HeroWork = {
   unpaidCartsValue: number;
   browsedNoCartCount: number;
   toDispatchCount: number;
+  /** Customers who say they paid, waiting for staff to check. */
+  paymentsToCheckCount?: number;
+  /** Cancelled after payment, money not given back yet. */
+  refundsDueCount?: number;
   unhandledRepliesCount: number;
   refillsDueCount: number;
   showOrders: boolean;
@@ -28,6 +32,10 @@ type Todo = { key: string; text: ReactNode; href: string; color: string; icon: C
 
 function todosOf(w: HeroWork): Todo[] {
   const t: Todo[] = [];
+  if (w.showOrders && w.paymentsToCheckCount)
+    t.push({ key: "verify", href: "/dashboard/orders?show=verify", color: "#b45309", icon: Wallet, text: <><b>{fmtNumber(w.paymentsToCheckCount)}</b> payment{w.paymentsToCheckCount === 1 ? "" : "s"} to check</> });
+  if (w.showOrders && w.refundsDueCount)
+    t.push({ key: "refund", href: "/dashboard/orders?show=refund", color: "#dc2626", icon: Undo2, text: <><b>{fmtNumber(w.refundsDueCount)}</b> refund{w.refundsDueCount === 1 ? "" : "s"} due</> });
   if (w.showOrders && w.unpaidCartsCount)
     t.push({ key: "unpaid", href: "/dashboard/orders?show=unpaid", color: "#d97706", icon: ShoppingCart, text: <><b>{formatValue(w.unpaidCartsValue, "inr")}</b> in {w.unpaidCartsCount} unpaid cart{w.unpaidCartsCount === 1 ? "" : "s"}</> });
   if (w.showOrders && w.toDispatchCount)

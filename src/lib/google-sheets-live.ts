@@ -4,6 +4,7 @@ import { after } from "next/server";
 import { db } from "./db";
 import { APP_TZ } from "./format";
 import { itemsText, orderRef, type OrderItem } from "./orders";
+import { methodLabel, methodOf } from "./payment-state";
 
 // The client's Google Sheet live log (deploy/google-sheets/Code.gs): each event lands in its own tab.
 
@@ -126,7 +127,15 @@ export function pushOrderToSheet(orderId: string, event: "NEW_ORDER" | "ORDER_UP
       phone: o.customer.phone,
       items: itemsText((o.items as OrderItem[] | null) ?? []),
       total: o.total,
-      paid: o.paidAt ? `Yes, ${formatInTimeZone(o.paidAt, APP_TZ, "d MMM h:mm a")}${o.paymentTxnId ? ` (${o.paymentTxnId})` : ""}` : "No",
+      paid: o.paidAt
+        ? `Yes, ${formatInTimeZone(o.paidAt, APP_TZ, "d MMM h:mm a")} ${methodOf(o) ? `· ${methodLabel(methodOf(o), true)}` : ""}${o.paymentTxnId ? ` (${o.paymentTxnId})` : ""}${o.refundAmount ? ` · refunded ${o.refundAmount}` : ""}`
+        : (o.paidAmount ?? 0) > 0
+          ? `Part: ${o.paidAmount} of ${o.total}`
+          : methodOf(o) === "cod"
+            ? "COD (to collect)"
+            : o.paymentClaimedAt
+              ? "Customer says paid (check)"
+              : "No",
       address: o.note || o.customer.location || "",
       client: o.client.name,
       change: change ?? status,

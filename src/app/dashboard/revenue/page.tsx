@@ -1,10 +1,10 @@
-import { Banknote, CreditCard, ShoppingCart, Wallet } from "lucide-react";
+import { Banknote, CreditCard, Hourglass, ReceiptText, ShoppingCart, Undo2, Wallet } from "lucide-react";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ActionButton } from "@/components/action-button";
 import { Rupee3D } from "@/components/icons-3d";
-import { Card, CardHeader, PageHeader, PickClientNotice, Stat } from "@/components/ui";
+import { Card, CardHeader, DistributionBar, PageHeader, PickClientNotice, Stat } from "@/components/ui";
 import { ColumnChart } from "@/components/viz";
 import { revenueReport, type CashItem } from "@/lib/business-reports";
 import { formatValue } from "@/lib/chart-math";
@@ -19,9 +19,12 @@ export const metadata: Metadata = { title: "Revenue & cash" };
 export const dynamic = "force-dynamic";
 
 const UPI = "#059669";
+const CASH = "#7c3aed";
 const OTHER = "#0ea5e9";
+const PENDING = "#94a3b8";
+const GROUP_COLOR = { upi: UPI, cash: CASH, other: OTHER, pending: PENDING } as const;
 
-function CashList({ title, hint, items, icon, tone, action }: { title: string; hint: string; items: CashItem[]; icon: ReactNode; tone: "amber" | "info" | "violet"; action?: (o: CashItem) => ReactNode }) {
+function CashList({ title, hint, items, icon, tone, action }: { title: string; hint: string; items: CashItem[]; icon: ReactNode; tone: "amber" | "info" | "violet" | "rose"; action?: (o: CashItem) => ReactNode }) {
   const sum = items.reduce((n, o) => n + o.total, 0);
   return (
     <Card className="card-3d h-full">
@@ -83,30 +86,40 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
   const customers = await scopedCustomerIds(scope.clientId, { ...filters, products: [] });
   const r = await revenueReport(scope.clientId, { start: period.start, end: period.end, customers, products: filters.products });
   const weekly = r.days.length < period.days;
-  const toCollect = [...r.awaitingPayment, ...r.codToCollect].reduce((n, o) => n + o.total, 0);
+  const toCollect = [...r.awaitingPayment, ...r.codToCollect, ...r.owed, ...r.toVerify].reduce((n, o) => n + o.total, 0);
   const roi = r.spend > 0 ? r.paid / r.spend : null;
 
   return (
     <>
       {header}
       <div className="mb-4 grid grid-cols-2 gap-3 sm:mb-5 sm:gap-4 xl:grid-cols-4">
-        <Stat label="Paid" value={formatValue(r.paid, "inr")} sub={`${fmtNumber(r.paidOrders)} orders · ${r.upiShare}% by UPI`} icon={<Banknote />} tone="brand" />
-        <Stat label="To collect" value={formatValue(toCollect, "inr")} sub={`${fmtNumber(r.awaitingPayment.length)} pay links · ${fmtNumber(r.codToCollect.length)} COD`} icon={<Wallet />} tone="amber" />
+        <Stat
+          label="Received"
+          value={formatValue(r.received, "inr")}
+          sub={`of ${formatValue(r.paid, "inr")} sold · ${fmtNumber(r.paidOrders)} orders · ${r.upiShare}% UPI${r.refunded ? ` · ${formatValue(r.refunded, "inr")} refunded` : ""}`}
+          icon={<Banknote />}
+          tone="brand"
+        />
+        <Stat
+          label="To collect"
+          value={formatValue(toCollect, "inr")}
+          sub={`${fmtNumber(r.awaitingPayment.length)} pay links · ${fmtNumber(r.codToCollect.length)} COD${r.toVerify.length ? ` · ${fmtNumber(r.toVerify.length)} to check` : ""}`}
+          icon={<Wallet />}
+          tone="amber"
+          href="/dashboard/orders?show=unpaid"
+        />
         <Stat label="WhatsApp cost" value={formatValue(r.spend, "inr")} sub="charged messages, incl. GST (estimate)" icon={<CreditCard />} tone="violet" />
         <Stat label="Return" value={roi === null ? "—" : `${roi.toFixed(roi >= 10 ? 0 : 1)}×`} sub={roi === null ? "no charged messages yet" : "paid sales per ₹1 of messaging"} icon={<Rupee3D />} tone="info" />
       </div>
 
       <Card className="card-3d">
-        <CardHeader tone="brand" icon={<Rupee3D />} title={weekly ? "Paid sales per week" : "Paid sales per day"} description={`${period.label} · by the day the payment came in`} />
+        <CardHeader tone="brand" icon={<Rupee3D />} title={weekly ? "Sales per week" : "Sales per day"} description={`${period.label} · by how they paid, on the day the payment came in`} />
         <div className="p-4 sm:p-5">
           <ColumnChart
             format="inr"
-            label={`Paid sales, ${period.phrase}`}
+            label={`Sales by payment method, ${period.phrase}`}
             minWidth={r.days.length > 31 ? r.days.length * 30 : 560}
-            legend={[
-              { label: "Paid by UPI on WhatsApp", color: UPI },
-              { label: "Confirmed or paid another way", color: OTHER },
-            ]}
+            legend={r.methods.map((m) => ({ label: m.label, color: GROUP_COLOR[m.key] }))}
             columns={r.days.map((d, i) => ({
               key: d.key,
               label: d.label,
@@ -114,14 +127,28 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
               highlight: i === r.days.length - 1,
               parts: [
                 { key: "upi", label: "UPI", value: d.upi, color: UPI },
-                { key: "other", label: "Other", value: d.other, color: OTHER },
+                { key: "cash", label: "Cash / COD", value: d.cash, color: CASH },
+                { key: "other", label: "Bank, card, other", value: d.other, color: OTHER },
+                { key: "pending", label: "Not received yet", value: d.pending, color: PENDING },
               ],
             }))}
           />
+          {r.paid > 0 && (
+            <DistributionBar
+              className="mt-4"
+              segments={r.methods.filter((m) => m.amount > 0).map((m) => ({ key: m.key, label: `${m.label} · ${formatValue(m.amount, "inr")}`, value: Math.round(m.amount), color: GROUP_COLOR[m.key] }))}
+            />
+          )}
         </div>
       </Card>
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-5 sm:gap-5 xl:grid-cols-3">
+        {r.toVerify.length > 0 && (
+          <CashList title="Check payment" hint="Customer says they paid. Check your UPI app or bank, then confirm on the order" items={r.toVerify} icon={<Hourglass className="size-5" />} tone="amber" />
+        )}
+        {r.refundsDue.length > 0 && (
+          <CashList title="Refund due" hint="Cancelled after paying. Send the money back, then record the refund on the order" items={r.refundsDue} icon={<Undo2 className="size-5" />} tone="rose" />
+        )}
         <CashList
           title="Pay link sent"
           hint="WhatsApp “Review and pay” sent, not paid yet"
@@ -129,7 +156,10 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
           icon={<CreditCard className="size-5" />}
           tone="amber"
         />
-        <CashList title="Cash on delivery" hint="Marked COD in the order note, not yet recorded as paid" items={r.codToCollect} icon={<Wallet className="size-5" />} tone="violet" />
+        <CashList title="Cash on delivery" hint="Confirmed as cash on delivery, cash not recorded yet" items={r.codToCollect} icon={<Wallet className="size-5" />} tone="violet" />
+        {r.owed.length > 0 && (
+          <CashList title="Confirmed, not paid" hint="Confirmed or delivered with no payment and no COD: ask for payment or record it" items={r.owed} icon={<ReceiptText className="size-5" />} tone="rose" />
+        )}
         <CashList
           title="Carts without a pay link"
           hint="New carts nobody has asked to pay yet"

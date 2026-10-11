@@ -20,6 +20,7 @@ import {
   type CatalogProductOption,
   type EditableOrderLine,
 } from "./order-items-editor";
+import { PayModePicker, type PayMode } from "./payment-ui";
 
 type Lookup =
   | { phone: string; state: "checking" }
@@ -61,7 +62,8 @@ export function NewOrder({
   const [syncCustomerAddress, setSyncCustomerAddress] = useState(true);
   const [note, setNote] = useState("");
   const [shippingFee, setShippingFee] = useState<number>(DEFAULT_SHIPPING_FEE);
-  const [requestPaymentNow, setRequestPaymentNow] = useState(false);
+  const [payMode, setPayMode] = useState<PayMode>("later");
+  const [payRef, setPayRef] = useState("");
   const [lines, setLines] = useState<EditableOrderLine[]>(() => [
     blankOrderLine(),
   ]);
@@ -155,7 +157,8 @@ export function NewOrder({
                 syncCustomerAddress,
                 note,
                 catalogId,
-                requestPaymentNow: hasPaymentConfig && total > 0 && requestPaymentNow,
+                paymentMode: total > 0 ? (payMode === "request" && !hasPaymentConfig ? "later" : payMode) : "later",
+                paymentRef: payMode === "paid_upi" ? payRef : undefined,
               });
               toastResult(r);
               if (r.ok) {
@@ -169,7 +172,8 @@ export function NewOrder({
                 setSyncCustomerAddress(true);
                 setNote("");
                 setShippingFee(DEFAULT_SHIPPING_FEE);
-                setRequestPaymentNow(false);
+                setPayMode("later");
+                setPayRef("");
                 setLines([blankOrderLine()]);
                 router.refresh();
               }
@@ -369,21 +373,15 @@ export function NewOrder({
             />
           </Field>
 
-          {hasPaymentConfig && total > 0 && (
-            <label className="flex cursor-pointer items-start gap-2.5 rounded-control border border-line bg-canvas/80 px-3.5 py-2.5 text-xs sm:text-sm">
-              <input
-                type="checkbox"
-                className="mt-0.5 size-4 rounded border-line text-brand focus:ring-brand"
-                checked={requestPaymentNow}
-                onChange={(e) => setRequestPaymentNow(e.target.checked)}
-              />
-              <span className="text-ink-2">
-                <b className="font-medium text-ink">Send WhatsApp UPI payment request immediately</b>
-                <span className="block text-xs text-muted">
-                  Sends the itemized &ldquo;Review and pay&rdquo; card on WhatsApp right after saving.
-                </span>
-              </span>
-            </label>
+          {total > 0 && (
+            <PayModePicker
+              value={payMode}
+              onChange={setPayMode}
+              canRequest={hasPaymentConfig}
+              total={total}
+              reference={payRef}
+              onReference={setPayRef}
+            />
           )}
 
           <div className="space-y-2 rounded-control border border-line bg-sunken px-4 py-3 text-sm">

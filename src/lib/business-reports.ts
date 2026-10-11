@@ -5,6 +5,7 @@ import { db } from "./db";
 import { APP_TZ } from "./format";
 import type { OrderItem } from "./orders";
 import { narrowOrders, weekKey } from "./filters";
+import { dueOf, methodOf, paymentState, receivedOf, type PayFields } from "./payment-state";
 import { INDIA_GST_RATE, RATES } from "./spend";
 
 // Read-only reports behind the campaign comparison, revenue, combo and weekly-report pages.
@@ -90,25 +91,47 @@ export async function campaignResults(clientId: string, days = 90): Promise<Camp
 
 /* ───────────────────────── Revenue & cash ───────────────────────── */
 
-export type RevenueDay = { key: string; label: string; sub: string; upi: number; other: number; spend: number };
+export type RevenueDay = { key: string; label: string; sub: string; upi: number; cash: number; other: number; pending: number; spend: number };
 export type CashItem = { id: string; ref: string; customerId: string; name: string; total: number; at: Date; status: string; note: string | null };
+export type MethodShare = { key: "upi" | "cash" | "other" | "pending"; label: string; amount: number; orders: number };
 
 export type RevenueReport = {
   days: RevenueDay[];
+  /** Sales: orders bought in the period (confirmed or paid), whether or not the money is in yet. */
   paid: number;
   paidOrders: number;
+  /** Money actually received for those orders and kept (part payments count, refunds taken off). */
+  received: number;
+  /** Refunds given in the period, on any order (cancelled ones included). */
+  refunded: number;
   upiShare: number;
+  methods: MethodShare[];
   spend: number;
   awaitingPayment: CashItem[];
   codToCollect: CashItem[];
   unpaidCarts: CashItem[];
+  /** Customer says they paid; staff to check the bank or UPI app. */
+  toVerify: CashItem[];
+  /** Confirmed, dispatched or delivered but not paid, and not cash on delivery. */
+  owed: CashItem[];
+  /** Cancelled after payment, not refunded yet. */
+  refundsDue: CashItem[];
 };
 
-const COD_RE = /\b(cod|cash on delivery|cash)\b/i;
+/** UPI (on WhatsApp or to the shop), cash (incl. COD), other (bank, card) — or "pending" while nothing is received. */
+function methodGroup(o: PayFields & { paymentTxnId: string | null }): MethodShare["key"] {
+  if (!o.paidAt && !(o.paidAmount && o.paidAmount > 0)) return "pending";
+  const m = methodOf(o);
+  if (m === "upi" || m === "upi_whatsapp" || (!m && o.paymentTxnId)) return "upi";
+  if (m === "cash" || m === "cod") return "cash";
+  return "other";
+}
+const GROUP_LABEL: Record<MethodShare["key"], string> = { upi: "UPI", cash: "Cash / COD", other: "Bank, card, other", pending: "Not received yet" };
 
 /**
- * Money for a period: paid sales per day (or week, for long periods), what's still to collect and what
- * WhatsApp cost. `customers` limits it to those people; `products` counts only those products' lines.
+ * Money for a period: sales per day (or week, for long periods) split by how they were paid, what's still to
+ * collect, payments to check, refunds due and what WhatsApp cost. `customers` limits it to those people;
+ * `products` counts only those products' lines.
  */
 export async function revenueReport(
   clientId: string,
@@ -120,15 +143,26 @@ export async function revenueReport(
   const days = Math.max(1, Math.round((dayStart(new Date(end.getTime() - 1)).getTime() - dayStart(start).getTime()) / DAY) + 1);
   const weekly = days > 92;
   const who = ids ? { customerId: { in: ids } } : {};
-  const [ordersRaw, openRaw, billable] = await Promise.all([
+  const paySelect = {
+    paidAt: true, status: true, total: true, paymentTxnId: true, paymentMethod: true, paidAmount: true, paymentRequestedAt: true,
+    paymentClaimedAt: true, paymentFailedAt: true, refundedAt: true, refundAmount: true, internalNote: true,
+  } as const;
+  const [ordersRaw, openRaw, refundRows, dueRefundRaw, billable] = await Promise.all([
     db.order.findMany({
       where: { clientId, ...who, createdAt: { gte: start, lt: end }, status: { not: "CANCELLED" } },
-      select: { createdAt: true, paidAt: true, status: true, total: true, paymentTxnId: true, items: true },
+      select: { ...paySelect, createdAt: true, items: true },
     }),
     db.order.findMany({
       where: { clientId, ...who, paidAt: null, status: { in: ["NEW", "CONFIRMED", "DISPATCHED", "DELIVERED"] }, createdAt: { gte: new Date(now.getTime() - 60 * DAY) } },
-      select: { id: true, number: true, customerId: true, total: true, items: true, createdAt: true, status: true, internalNote: true, paymentRequestedAt: true, customer: { select: { name: true } } },
+      select: { ...paySelect, id: true, number: true, customerId: true, items: true, createdAt: true, customer: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
+    }),
+    db.order.aggregate({ where: { clientId, ...who, refundedAt: { gte: start, lt: end } }, _sum: { refundAmount: true } }),
+    db.order.findMany({
+      where: { clientId, ...who, status: "CANCELLED", refundedAt: null, OR: [{ paidAt: { not: null } }, { paidAmount: { gt: 0 } }] },
+      select: { ...paySelect, id: true, number: true, customerId: true, items: true, createdAt: true, customer: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 50,
     }),
     db.$queryRaw<{ k: string; cat: string; n: bigint }[]>`
       SELECT to_char((m."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${APP_TZ}, 'YYYY-MM-DD') AS k, m."pricingCategory" AS cat, count(*) AS n
@@ -147,21 +181,28 @@ export async function revenueReport(
     const d = addDays(start, i);
     const key = keyOf(d);
     if (dayList.some((x) => x.key === key)) continue;
-    dayList.push({ key, label: formatInTimeZone(d, APP_TZ, days > 14 ? "d" : "EEE"), sub: formatInTimeZone(d, APP_TZ, days > 14 ? "MMM" : "d MMM"), upi: 0, other: 0, spend: 0 });
+    dayList.push({ key, label: formatInTimeZone(d, APP_TZ, days > 14 ? "d" : "EEE"), sub: formatInTimeZone(d, APP_TZ, days > 14 ? "MMM" : "d MMM"), upi: 0, cash: 0, other: 0, pending: 0, spend: 0 });
   }
   const byKey = new Map(dayList.map((d) => [d.key, d]));
+  const methods = new Map<MethodShare["key"], MethodShare>((["upi", "cash", "other", "pending"] as const).map((k) => [k, { key: k, label: GROUP_LABEL[k], amount: 0, orders: 0 }]));
   let paid = 0;
   let paidOrders = 0;
-  let upi = 0;
+  let received = 0;
   for (const o of orders) {
     if (!isBought(o)) continue;
     const d = byKey.get(keyOf(o.paidAt ?? o.createdAt)) ?? byKey.get(keyOf(o.createdAt));
     if (!d) continue;
-    if (o.paymentTxnId) {
-      d.upi += o.total;
-      upi += o.total;
-    } else d.other += o.total;
+    const g = methodGroup(o);
+    // Kept after any refund, and never more than the order total (narrowed to some products, that's just their lines).
+    const got = Math.max(0, Math.min(o.total, receivedOf(o) - (o.refundAmount ?? 0)));
+    d[g] += g === "pending" ? o.total : got;
+    if (g !== "pending" && got < o.total) d.pending += o.total - got;
+    const m = methods.get(g)!;
+    m.amount += g === "pending" ? o.total : got;
+    m.orders++;
+    if (g !== "pending" && got < o.total) methods.get("pending")!.amount += o.total - got;
     paid += o.total;
+    received += got;
     paidOrders++;
   }
   let spend = 0;
@@ -172,18 +213,27 @@ export async function revenueReport(
     spend += cost;
   }
 
-  const item = (o: (typeof open)[number]): CashItem => ({ id: o.id, ref: `RG-${1000 + o.number}`, customerId: o.customerId, name: o.customer.name, total: o.total, at: o.createdAt, status: o.status, note: o.internalNote });
-  const cod = open.filter((o) => (o.status === "CONFIRMED" || o.status === "DISPATCHED" || o.status === "DELIVERED") && COD_RE.test(o.internalNote ?? ""));
-  const codIds = new Set(cod.map((o) => o.id));
+  type Row = (typeof open)[number];
+  const item = (o: Row, amount = dueOf(o) || o.total): CashItem => ({ id: o.id, ref: `RG-${1000 + o.number}`, customerId: o.customerId, name: o.customer.name, total: amount, at: o.createdAt, status: o.status, note: o.internalNote });
+  const state = (o: Row) => paymentState(o);
+  const refunded = refundRows._sum.refundAmount ?? 0;
+  const upiAmount = methods.get("upi")!.amount;
+  const inHand = upiAmount + methods.get("cash")!.amount + methods.get("other")!.amount;
   return {
     days: dayList,
     paid,
     paidOrders,
-    upiShare: paid ? Math.round((upi / paid) * 100) : 0,
+    received: Math.round(received * 100) / 100,
+    refunded,
+    upiShare: inHand ? Math.round((upiAmount / inHand) * 100) : 0,
+    methods: [...methods.values()],
     spend,
-    awaitingPayment: open.filter((o) => o.paymentRequestedAt && !codIds.has(o.id)).map(item),
-    codToCollect: cod.map(item),
-    unpaidCarts: open.filter((o) => o.status === "NEW" && !o.paymentRequestedAt && !codIds.has(o.id)).map(item),
+    toVerify: open.filter((o) => state(o) === "claimed").map((o) => item(o)),
+    awaitingPayment: open.filter((o) => ["requested", "failed"].includes(state(o))).map((o) => item(o)),
+    codToCollect: open.filter((o) => state(o) === "cod_due" && o.status !== "NEW").map((o) => item(o)),
+    owed: open.filter((o) => ["unpaid", "part_paid"].includes(state(o)) && o.status !== "NEW").map((o) => item(o)),
+    unpaidCarts: open.filter((o) => o.status === "NEW" && state(o) === "unpaid").map((o) => item(o)),
+    refundsDue: narrowOrders(dueRefundRaw, []).map((o) => item(o, Math.max(0, receivedOf(o) - (o.refundAmount ?? 0)))),
   };
 }
 

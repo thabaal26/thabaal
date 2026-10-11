@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { getOrderPricing } from "@/lib/order-pricing";
 import { money, orderRef, type OrderItem } from "@/lib/orders";
+import { methodOf, slipPay } from "@/lib/payment-state";
 import { formatPhone } from "@/lib/phone";
 import { getScope } from "@/lib/session";
 import { OrderAddressControl } from "../order-address-sheet";
@@ -24,6 +25,7 @@ const PAY = [
   { key: "", label: "All" },
   { key: "paid", label: "Paid" },
   { key: "unpaid", label: "Unpaid" },
+  { key: "cod", label: "Cash on delivery" },
 ] as const;
 
 /**
@@ -34,7 +36,7 @@ const PAY = [
  */
 export default async function PackingPage({ searchParams }: PageProps<"/dashboard/orders/packing">) {
   const sp = await searchParams;
-  const pay = sp.pay === "paid" || sp.pay === "unpaid" ? sp.pay : "";
+  const pay = sp.pay === "paid" || sp.pay === "unpaid" || sp.pay === "cod" ? sp.pay : "";
   const sort = sp.sort === "old" ? "old" : "new";
   const scope = await getScope();
   const back = { href: "/dashboard/orders", label: "Orders" };
@@ -54,16 +56,16 @@ export default async function PackingPage({ searchParams }: PageProps<"/dashboar
   // Paid by status, or a payment recorded on the order (UPI on WhatsApp, Mark paid).
   const isPaid = (o: (typeof all)[number]) => o.status === "PAID" || o.paidAt != null;
   const paidCount = all.filter(isPaid).length;
-  const count = { "": all.length, paid: paidCount, unpaid: all.length - paidCount };
-  const orders = pay === "paid" ? all.filter(isPaid) : pay === "unpaid" ? all.filter((o) => !isPaid(o)) : all;
-  const toCollect = orders
-    .filter((o) => !isPaid(o))
-    .reduce((sum, o) => sum + getOrderPricing(o.items as OrderItem[], o.total, { applyDefaultWhenEqual: true }).total, 0);
+  const isCod = (o: (typeof all)[number]) => !isPaid(o) && methodOf(o) === "cod";
+  const count = { "": all.length, paid: paidCount, unpaid: all.length - paidCount, cod: all.filter(isCod).length };
+  const orders = pay === "paid" ? all.filter(isPaid) : pay === "unpaid" ? all.filter((o) => !isPaid(o)) : pay === "cod" ? all.filter(isCod) : all;
+  const shownTotal = (o: (typeof all)[number]) => getOrderPricing(o.items as OrderItem[], o.total, { applyDefaultWhenEqual: true }).total;
+  const toCollect = orders.reduce((sum, o) => sum + slipPay(o, shownTotal(o)).collect, 0);
   const qs = (patch: { pay?: string; sort?: string }) => {
     const q = new URLSearchParams(Object.entries({ pay, sort: sort === "old" ? "old" : "", ...patch }).filter(([, v]) => v) as [string, string][]);
     return `/dashboard/orders/packing${q.size ? `?${q}` : ""}`;
   };
-  const which = pay === "paid" ? "paid" : pay === "unpaid" ? "unpaid" : "confirmed or paid";
+  const which = pay === "paid" ? "paid" : pay === "unpaid" ? "unpaid" : pay === "cod" ? "cash on delivery" : "confirmed or paid";
 
   // Total of each item across all orders, for picking from stock in one go.
   const pick = new Map<string, number>();
@@ -108,6 +110,8 @@ export default async function PackingPage({ searchParams }: PageProps<"/dashboar
       createdAt: fmtDate(o.createdAt, "EEE d MMM, h:mm a"),
       status: o.status,
       isPaid: isPaid(o),
+      payLabel: slipPay(o, pricing.total).label,
+      collect: slipPay(o, pricing.total).collect,
       customerName: o.customer.name,
       customerPhone: formatPhone(o.customer.phone),
       area: resolveArea(o),
@@ -188,7 +192,13 @@ export default async function PackingPage({ searchParams }: PageProps<"/dashboar
                             <SingleSlipExportButtons order={exportRow} />
                             <p className="rounded bg-sunken px-1.5 py-0.5 font-mono font-semibold text-ink ring-1 ring-line">{orderRef(o)}</p>
                           </div>
-                          {isPaid(o) ? <Badge tone="green" dot>Paid</Badge> : <Badge tone="amber" dot>To collect</Badge>}
+                          {isPaid(o) ? (
+                            <Badge tone="green" dot>Paid</Badge>
+                          ) : isCod(o) ? (
+                            <Badge tone="violet" dot>COD · collect {money(slipPay(o, shownTotal(o)).collect, o.currency)}</Badge>
+                          ) : (
+                            <Badge tone="amber" dot>Not paid · {money(slipPay(o, shownTotal(o)).collect, o.currency)}</Badge>
+                          )}
                         </div>
                       </div>
 

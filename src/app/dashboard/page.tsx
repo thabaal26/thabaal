@@ -305,6 +305,11 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     ]);
 
   // Extra business-scenario queries: catalogue/price-list sends, period replies with customer info, unhandled chats, full product catalog, all-time product buyers, and customer lifecycle cohorts.
+  // Payments that need a person: a customer says they paid, or a cancelled order still owes a refund.
+  const [paymentsToCheckCount, refundsDueCount] = await Promise.all([
+    db.order.count({ where: { ...mineOrders, paidAt: null, paymentClaimedAt: { not: null }, status: { not: "CANCELLED" } } }).catch(() => 0),
+    db.order.count({ where: { ...mineOrders, status: "CANCELLED", refundedAt: null, OR: [{ paidAt: { not: null } }, { paidAmount: { gt: 0 } }] } }).catch(() => 0),
+  ]);
   const [catalogueMsgs, periodReplies, unhandledGroup, toDispatchCount, catalogRes, allTimeProdRows, customerLifecycleRows] = await Promise.all([
     db.message
       .findMany({
@@ -1485,6 +1490,8 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
           unpaidCartsValue: unpaidCartRevenue,
           browsedNoCartCount: browsedNoCartLeads.length,
           toDispatchCount,
+          paymentsToCheckCount,
+          refundsDueCount,
           unhandledRepliesCount: unhandledGroup.length,
           refillsDueCount: refillsWeek.length,
           showOrders: ordersOn,

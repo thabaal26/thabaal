@@ -1,4 +1,4 @@
-import { PackageCheck, PackageOpen, Search, Store, Truck } from "lucide-react";
+import { PackageCheck, PackageOpen, Search, Store, Truck, Wallet } from "lucide-react";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
@@ -15,6 +15,7 @@ import { db } from "@/lib/db";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { getOrderPricing } from "@/lib/order-pricing";
 import { money, orderRef, type OrderItem } from "@/lib/orders";
+import { slipPay } from "@/lib/payment-state";
 import { formatPhone } from "@/lib/phone";
 import { getScope, owned } from "@/lib/session";
 import { sendableTemplates } from "@/lib/senders";
@@ -36,12 +37,30 @@ const ORDER_TEMPLATES = ["order_confirmation", "order_dispatched", "order_delive
 export const metadata: Metadata = { title: "Orders" };
 export const dynamic = "force-dynamic";
 
+/** Cash on delivery not collected yet: the recorded method, or a team note saying COD for older orders. */
+const COD_WHERE = {
+  paidAt: null,
+  status: { in: ["NEW", "CONFIRMED", "DISPATCHED", "DELIVERED"] },
+  OR: [
+    { paymentMethod: "cod" },
+    { paymentMethod: null, internalNote: { contains: "cash on delivery", mode: "insensitive" } },
+    { paymentMethod: null, internalNote: { contains: "COD" } },
+  ],
+};
+const VERIFY_WHERE = { paidAt: null, paymentClaimedAt: { not: null }, status: { not: "CANCELLED" } };
+const REFUND_WHERE = { status: "CANCELLED", refundedAt: null, OR: [{ paidAt: { not: null } }, { paidAmount: { gt: 0 } }] };
+/** Shown only while they have orders (or are open), so the usual tabs stay short. */
+const PAYMENT_TABS = new Set(["cod", "verify", "refund"]);
+
 const TABS = [
   { key: "", label: "Active", where: { status: { in: ["NEW", "CONFIRMED", "PAID", "DISPATCHED"] } } },
   { key: "new", label: "New", where: { status: "NEW" } },
   { key: "confirmed", label: "Confirmed", where: { status: "CONFIRMED" } },
   { key: "paid", label: "Paid", where: { OR: [{ status: "PAID" }, { paidAt: { not: null } }] } },
   { key: "unpaid", label: "Unpaid", where: { status: { in: ["NEW", "CONFIRMED", "DISPATCHED"] }, paidAt: null } },
+  { key: "verify", label: "Check payment", where: VERIFY_WHERE },
+  { key: "cod", label: "Cash to collect", where: COD_WHERE },
+  { key: "refund", label: "Refund due", where: REFUND_WHERE },
   { key: "dispatched", label: "Dispatched", where: { status: "DISPATCHED" } },
   { key: "done", label: "Delivered", where: { status: "DELIVERED" } },
   { key: "cancelled", label: "Cancelled", where: { status: "CANCELLED" } },
@@ -119,7 +138,9 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         ? [{ total: "desc" as const }]
         : [{ createdAt: "desc" as const }];
 
-  const baseWhere = { ...mine, ...(tab.where as object), ...dateWhere, ...extraWhere, ...searchWhere };
+  // AND keeps each part's OR separate (the Paid tab and the search both use OR).
+  const scoped = { ...mine, ...dateWhere, ...extraWhere };
+  const baseWhere = { ...scoped, AND: [tab.where as object, searchWhere] };
 
   const [
     orders,
@@ -132,6 +153,9 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     deliveredCount,
     cancelledCount,
     allCount,
+    verifyCount,
+    codCount,
+    refundCount,
     orderTemplates,
     client,
     approved,
@@ -180,6 +204,9 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     db.order.count({ where: { ...mine, ...dateWhere, ...extraWhere, status: "DELIVERED" } }),
     db.order.count({ where: { ...mine, ...dateWhere, ...extraWhere, status: "CANCELLED" } }),
     db.order.count({ where: { ...mine, ...dateWhere, ...extraWhere } }),
+    db.order.count({ where: { ...scoped, ...VERIFY_WHERE } as object }),
+    db.order.count({ where: { ...scoped, ...COD_WHERE } as object }),
+    db.order.count({ where: { ...scoped, ...REFUND_WHERE } as object }),
     scope.clientId ? db.template.findMany({ where: { clientId: scope.clientId, name: { in: [...ORDER_TEMPLATES, ...ORDER_TEMPLATES.map((n) => `thenan_${n}`)] } }, select: { name: true, status: true } }) : [],
     scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { refillDays: true, refillTemplateId: true, lapsedDays: true, winbackTemplateId: true, paymentConfig: true } }) : null,
     scope.clientId && scope.canManage
@@ -220,6 +247,8 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
       createdAt: fmtDate(o.createdAt, "EEE d MMM, h:mm a"),
       status: o.status,
       isPaid: o.status === "PAID" || o.paidAt !== null,
+      payLabel: slipPay(o, pricing.total).label,
+      collect: slipPay(o, pricing.total).collect,
       customerName: o.customer.name,
       customerPhone: formatPhone(o.customer.phone),
       area,
@@ -241,6 +270,9 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     done: deliveredCount,
     cancelled: cancelledCount,
     all: allCount,
+    verify: verifyCount,
+    cod: codCount,
+    refund: refundCount,
   };
 
   // An order update is covered when either the plain or the picture version is approved.
@@ -296,7 +328,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         tabs={
           <FilterChips
             label="Order status"
-            items={TABS.map((t) => ({
+            items={TABS.filter((t) => !PAYMENT_TABS.has(t.key) || tabCount[t.key] > 0 || tab.key === t.key).map((t) => ({
               href: qs({ show: t.key || undefined }),
               label: t.label,
               count: fmtNumber(tabCount[t.key]),
@@ -426,6 +458,28 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
             </div>
           )}
         </Card>
+
+        {(verifyCount > 0 || refundCount > 0 || codCount > 0) && !PAYMENT_TABS.has(tab.key) && (
+          <Callout tone={verifyCount || refundCount ? "warning" : "info"} icon={<Wallet />} title="Payments that need you">
+            <span className="flex flex-wrap gap-x-4 gap-y-1">
+              {verifyCount > 0 && (
+                <Link className="font-medium underline-offset-4 hover:underline" href={qs({ show: "verify" })}>
+                  {fmtNumber(verifyCount)} customer{verifyCount === 1 ? " says" : "s say"} paid: check and confirm
+                </Link>
+              )}
+              {codCount > 0 && (
+                <Link className="font-medium underline-offset-4 hover:underline" href={qs({ show: "cod" })}>
+                  {fmtNumber(codCount)} cash on delivery to collect
+                </Link>
+              )}
+              {refundCount > 0 && (
+                <Link className="font-medium underline-offset-4 hover:underline" href={qs({ show: "refund" })}>
+                  {fmtNumber(refundCount)} cancelled after payment: refund due
+                </Link>
+              )}
+            </span>
+          </Callout>
+        )}
 
         {scope.clientId && notReady.length > 0 && (
           <Callout

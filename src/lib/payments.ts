@@ -4,6 +4,7 @@ import { db } from "./db";
 import { headerImageFor } from "./media";
 import { pushOrderToSheet } from "./google-sheets-live";
 import { getOrderPricing, itemsText, itemsWithNames, money, orderRef } from "./orders";
+import { dueOf, receivedOf } from "./payment-state";
 import { getSettings } from "./provider";
 import { replyWindowEnd } from "./replies";
 import { senderFor } from "./senders";
@@ -129,22 +130,63 @@ export async function autoRequestPayment(order: { id: string; clientId: string; 
   if (!r.ok) console.warn(`Automatic payment request for order ${order.id} not sent: ${r.message}`);
 }
 
+export type PaymentRecord = {
+  /** upi_whatsapp, upi, cod, cash, bank, card or other (see lib/payment-state). */
+  method?: string | null;
+  /** meta, utr, screenshot, staff or verified. */
+  source?: string;
+  /** Amount received now; defaults to whatever is still due. Less than due records a part payment. */
+  amount?: number | null;
+  collectedBy?: string | null;
+  /** Record it without messaging the customer (e.g. cash taken at the door, already thanked on delivery). */
+  quiet?: boolean;
+};
+
 /**
- * Marks an order paid (from Meta's payment webhook, or staff confirming a UPI payment by hand) and thanks
- * the customer once. Orders already dispatched just record the payment.
+ * Records money received for an order (Meta's payment update, a UPI reference the customer sent, or staff
+ * recording UPI, cash or COD) and thanks the customer once when it's fully paid. A smaller amount is kept as a
+ * part payment. Orders already dispatched just record the payment. False when already paid or not found.
  */
-export async function confirmPayment(orderId: string, txnId?: string | null) {
+export async function confirmPayment(orderId: string, txnId?: string | null, rec: PaymentRecord = {}) {
   const order = await db.order.findUnique({ where: { id: orderId }, include: { customer: true, client: { select: { name: true } } } });
   // Meta may send the same payment twice; only the first one marks it paid and thanks the customer.
-  if (!order || order.paidAt) return false;
+  // (A paid order whose items were later raised still takes the difference.)
+  if (!order || dueOf(order) <= 0) return false;
+  const before = receivedOf(order);
+  const due = dueOf(order);
+  const amount = rec.amount != null && rec.amount > 0 ? rec.amount : due;
+  const received = Math.round((before + amount) * 100) / 100;
+  const full = received + 0.5 >= order.total;
+  const method = rec.method ?? order.paymentMethod ?? (rec.source === "meta" ? "upi_whatsapp" : null);
   await db.order.update({
     where: { id: order.id },
-    data: { paidAt: new Date(), paymentTxnId: txnId ?? null, ...((order.status === "NEW" || order.status === "CONFIRMED") && { status: "PAID" as const }) },
+    data: {
+      paidAmount: received,
+      paymentMethod: method,
+      paymentSource: rec.source ?? "meta",
+      ...(txnId && { paymentTxnId: txnId }),
+      ...(rec.collectedBy && { collectedBy: rec.collectedBy.slice(0, 80) }),
+      paymentClaimedAt: null,
+      paymentFailedAt: null,
+      paymentFailReason: null,
+      ...(full && { paidAt: new Date() }),
+      ...(full && (order.status === "NEW" || order.status === "CONFIRMED") && { status: "PAID" as const }),
+      ...(!full && {
+        internalNote: [order.internalNote, `Part payment ${money(amount, order.currency)} received; ${money(order.total - received, order.currency)} still due`]
+          .filter(Boolean)
+          .join("\n")
+          .slice(0, 1000),
+      }),
+    },
   });
-  pushOrderToSheet(order.id, "ORDER_UPDATE", "Payment received");
+  pushOrderToSheet(order.id, "ORDER_UPDATE", full ? "Payment received" : "Part payment received");
+  if (!full || rec.quiet) return true;
+
   const c = order.customer;
   const ref = orderRef(order);
-  const text = `Hello ${firstName(c.name)}, we have received your payment of ${money(order.total, order.currency)} for order ${ref}. Thank you! We are packing your order and will message you when it is dispatched.`;
+  const how = method === "cod" || method === "cash" ? " in cash" : method === "bank" ? " by bank transfer" : "";
+  const next = order.status === "DISPATCHED" || order.status === "DELIVERED" ? "" : " We are packing your order and will message you when it is dispatched.";
+  const text = `Hello ${firstName(c.name)}, we have received your payment of ${money(received, order.currency)}${how} for order ${ref}. Thank you!${next}`;
   const cardUpdated = await updateOrderCard(order, "processing", text, "Payment received").catch((e) => {
     console.error("Could not send order_status payment confirmation, falling back to text", e);
     return false;
@@ -160,6 +202,33 @@ export async function confirmPayment(orderId: string, txnId?: string | null) {
       console.error("Could not send fallback payment confirmation text", e);
     }
   }
+  return true;
+}
+
+/** The customer says they paid (a "paid" message, a screenshot) but nothing confirms it: flag it for staff to check. */
+export async function recordPaymentClaim(orderId: string, note: string, reference?: string | null) {
+  const order = await db.order.findUnique({ where: { id: orderId }, select: { id: true, paidAt: true, paymentClaimNote: true } });
+  if (!order || order.paidAt) return false;
+  await db.order.update({
+    where: { id: order.id },
+    data: { paymentClaimedAt: new Date(), paymentClaimNote: note.slice(0, 300), ...(reference && { paymentTxnId: reference.slice(0, 60) }) },
+  });
+  pushOrderToSheet(order.id, "ORDER_UPDATE", "Customer says paid");
+  return true;
+}
+
+/** A WhatsApp payment attempt failed (declined, timed out): keep the reason so staff can resend the link or call. */
+export async function recordPaymentFailure(orderId: string, reason: string) {
+  await db.order.updateMany({ where: { id: orderId, paidAt: null }, data: { paymentFailedAt: new Date(), paymentFailReason: reason.slice(0, 200) } });
+}
+
+/** A plain WhatsApp text inside the customer's 24-hour window; false when the window is closed or messages are off. */
+export async function textInWindow(customer: { id: string; clientId: string; phone: string; optedOut: boolean }, text: string, label: string) {
+  if (customer.optedOut || (await getSettings()).provider !== "META") return false;
+  const { open, number, cfg } = await replyContext(customer);
+  if (!open) return false;
+  const res = await sendTextMessage(cfg, customer.phone, text);
+  await logMessage(customer.id, label, text, res, number?.id ?? null);
   return true;
 }
 
@@ -192,6 +261,9 @@ export async function remindUnpaidOrders(now = new Date(), limit = 20) {
       status: { in: ["NEW", "CONFIRMED"] },
       paidAt: null,
       paymentReminderAt: null,
+      // No reminder for cash on delivery, or for someone who says they've paid (staff are checking).
+      paymentClaimedAt: null,
+      OR: [{ paymentMethod: null }, { paymentMethod: { not: "cod" } }],
       paymentRequestedAt: { lte: new Date(now.getTime() - REMIND_AFTER_MS), gte: new Date(now.getTime() - REMIND_WITHIN_MS) },
     },
     select: { id: true },

@@ -8,7 +8,7 @@ import { explainError } from "@/lib/meta-errors";
 import { applyFailure } from "@/lib/rules";
 import { money, orderRef, orderWhereRef, recordOrder } from "@/lib/orders";
 import { metaReplyContent, receivingNumber, recordReply } from "@/lib/replies";
-import { autoRequestPayment, confirmPayment } from "@/lib/payments";
+import { autoRequestPayment, confirmPayment, recordPaymentClaim, recordPaymentFailure } from "@/lib/payments";
 import { autoReplyToButton, autoSendCatalogue, catalogueTrigger, firstMessageToday } from "@/lib/catalog";
 import { mapMetaStatus } from "@/lib/whatsapp";
 import { JOIN_RE, joinFromWhatsApp } from "@/lib/optin";
@@ -104,7 +104,12 @@ type PaymentUpdate = {
   id?: string;
   status?: string;
   recipient_id?: string;
-  payment?: { reference_id?: string; transaction?: { id?: string; status?: string } };
+  payment?: {
+    reference_id?: string;
+    amount?: { value?: number; offset?: number };
+    transaction?: { id?: string; status?: string; error?: { code?: string | number; reason?: string; message?: string } };
+  };
+  errors?: { code?: number; title?: string; message?: string; error_data?: { details?: string } }[];
 };
 
 /** The customer paid (or failed to pay) through "Review and pay"; reference_id is our order number (RG-1001). */
@@ -116,8 +121,10 @@ async function applyPayment(s: PaymentUpdate, phoneNumberId?: string) {
     s.status === "captured" ||
     s.status === "paid" ||
     s.status === "completed";
-  if (!paid) {
-    console.warn("WhatsApp payment not completed", JSON.stringify(s));
+  const failed = !paid && (txn?.status === "failed" || s.status === "failed" || Boolean(txn?.error) || Boolean(s.errors?.length));
+  if (!paid && !failed) {
+    // pending / processing: the final update follows.
+    console.warn("WhatsApp payment not completed yet", JSON.stringify(s));
     return;
   }
   const reference = s.payment?.reference_id;
@@ -135,14 +142,23 @@ async function applyPayment(s: PaymentUpdate, phoneNumberId?: string) {
       });
     }
   }
-  if (order) {
-    await confirmPayment(order.id, txn?.id ?? s.id ?? null);
+  if (!order) return;
+  if (failed) {
+    const reason = txn?.error?.reason ?? txn?.error?.message ?? s.errors?.[0]?.error_data?.details ?? s.errors?.[0]?.title ?? "The UPI payment didn't go through";
+    await recordPaymentFailure(order.id, String(reason));
+    return;
   }
+  // Meta sends the amount in paise-like units: value / 10^offset.
+  const amt = s.payment?.amount;
+  const amount = amt?.value != null ? amt.value / 10 ** (amt.offset ?? 2) : null;
+  await confirmPayment(order.id, txn?.id ?? s.id ?? null, { method: "upi_whatsapp", source: "meta", amount });
 }
 
 const NEGATIVE_PAY_RE = /\b(not\s+paid|haven'?t\s+paid|didn'?t\s+pay|how\s+to\s+pay|will\s+pay|pay\s+later|failed|pending|error|issue|problem|unable|can'?t\s+pay|cannot\s+pay)\b/i;
 const POSITIVE_PAY_RE = /\b(paid|payment\s+(done|sent|completed|successful|success)|gpay\s+done|phonepe\s+done|paytm\s+done|upi\s+(done|paid|sent)|money\s+sent|amount\s+(sent|paid))\b/i;
 const UTR_RE = /\b(\d{12})\b/;
+const COD_ASK_RE = /\b(cod|cash\s+on\s+delivery|pay\s+(by|in|with)\s+cash|cash\s+payment|pay\s+on\s+delivery)\b/i;
+const NO_COD_RE = /\b(no|not|don'?t|without)\s+(cod|cash)\b/i;
 
 /**
  * Detects when an inbound WhatsApp message represents a completed UPI payment (from WhatsApp's native
@@ -195,15 +211,11 @@ async function detectAndApplyUpiPayment(
   // Path A: Native WhatsApp UPI payment bubble (triggered when customer pays via GPay/PhonePe/Paytm/WhatsApp Pay from "Pay now" button).
   // With a direct merchant_vpa (UPI Intent), Meta Cloud API delivers the blue "Sent to <Merchant> · Completed" bubble in v.messages[]
   // as type "errors" or "unsupported" (131051) or "payment".
-  const isNativePaymentBubble =
-    m.type === "payment" ||
-    Boolean(m.payment) ||
-    m.interactive?.type === "payment" ||
-    ((m.type === "errors" || m.type === "unsupported") && hasRecentPaymentRequest);
+  const isNativePaymentBubble = m.type === "payment" || Boolean(m.payment) || m.interactive?.type === "payment";
 
   if (isNativePaymentBubble) {
     const txnId = m.payment?.transaction?.id ?? m.id ?? "WA-UPI";
-    await confirmPayment(targetOrder.id, String(txnId)).catch((e) => console.error("Auto confirmPayment on UPI bubble failed", e));
+    await confirmPayment(targetOrder.id, String(txnId), { method: "upi_whatsapp", source: "meta" }).catch((e) => console.error("Auto confirmPayment on UPI bubble failed", e));
     return {
       text: `UPI payment completed on WhatsApp (${totalFormatted} for ${ref})`,
       kind: "order",
@@ -212,30 +224,46 @@ async function detectAndApplyUpiPayment(
     };
   }
 
+  // A bubble WhatsApp can't show us (often "Sent to <shop> · Completed" from a UPI app) right after a pay link:
+  // likely a payment, but nothing proves it, so staff verify it against the UPI app before packing.
+  if ((m.type === "errors" || m.type === "unsupported") && hasRecentPaymentRequest) {
+    await recordPaymentClaim(targetOrder.id, "WhatsApp showed a payment message we can't read. Check your UPI app for this amount.").catch(() => {});
+    return { text: `Possible UPI payment for ${ref} (${totalFormatted}) · check and verify`, kind: "order", media: base.media, handledAsPayment: true };
+  }
+
+  // The customer asks to pay cash on delivery: set it on the order (staff can switch it back to online).
+  if (m.type === "text" && COD_ASK_RE.test(base.text) && !NO_COD_RE.test(base.text)) {
+    await db.order.updateMany({ where: { id: targetOrder.id, paymentMethod: null }, data: { paymentMethod: "cod" } });
+    return { text: `${base.text} · Asked for cash on delivery on ${ref}`, kind: base.kind, media: base.media, handledAsPayment: false };
+  }
+
   // Path B: Customer paid via external UPI app (GPay / PhonePe / Paytm / BHIM) and sent UTR or explicit payment confirmation text.
   if (m.type === "text" && hasRecentPaymentRequest && !NEGATIVE_PAY_RE.test(base.text)) {
     const utrMatch = UTR_RE.exec(base.text);
     const isExplicitPaidText = POSITIVE_PAY_RE.test(base.text) || Boolean(utrMatch && /\b(utr|ref|upi|txn|paid|sent|done)\b/i.test(base.text));
     if (isExplicitPaidText) {
-      const txnId = utrMatch ? `UTR-${utrMatch[1]}` : "UPI-CONFIRMED";
-      await confirmPayment(targetOrder.id, txnId).catch((e) => console.error("Auto confirmPayment on UPI text failed", e));
-      return {
-        text: `${base.text} · Confirmed ${ref} (${totalFormatted})`,
-        kind: "order",
-        media: base.media,
-        handledAsPayment: true,
-      };
+      // Anyone can type "paid" or 12 digits, so nothing here marks the order paid: staff check the UPI app or
+      // bank (the reference makes that quick) and confirm with one tap, and the order isn't packed until then.
+      if (utrMatch) {
+        await recordPaymentClaim(targetOrder.id, `UPI reference ${utrMatch[1]} sent by the customer`, `UTR-${utrMatch[1]}`).catch(() => {});
+        return { text: `${base.text} · Says paid ${ref} (${totalFormatted}), UPI ref ${utrMatch[1]} · check`, kind: "order", media: base.media, handledAsPayment: true };
+      }
+      await recordPaymentClaim(targetOrder.id, `Customer wrote: "${base.text.slice(0, 200)}"`).catch(() => {});
+      return { text: `${base.text} · Says paid for ${ref} (${totalFormatted}) · verify`, kind: "order", media: base.media, handledAsPayment: true };
     }
   }
 
   // Path C: Customer sent a Photo screenshot right after a UPI payment request.
   if (m.type === "image" && hasRecentPaymentRequest) {
     const caption = m.image?.caption?.trim();
-    // If the screenshot caption itself says "Paid" or has a 12-digit UTR, confirm immediately!
+    // A caption saying "paid" or carrying a 12-digit UTR: flag it with the reference for staff to check.
     if (caption && !NEGATIVE_PAY_RE.test(caption) && (POSITIVE_PAY_RE.test(caption) || UTR_RE.test(caption))) {
       const utrMatch = UTR_RE.exec(caption);
-      const txnId = utrMatch ? `UTR-${utrMatch[1]}` : "UPI-SCREENSHOT";
-      await confirmPayment(targetOrder.id, txnId).catch((e) => console.error("Auto confirmPayment on screenshot caption failed", e));
+      await recordPaymentClaim(
+        targetOrder.id,
+        utrMatch ? `Payment screenshot with UPI reference ${utrMatch[1]}` : `Payment screenshot: "${caption.slice(0, 200)}"`,
+        utrMatch ? `UTR-${utrMatch[1]}` : null,
+      ).catch(() => {});
       return {
         text: `UPI payment screenshot (${totalFormatted} for ${ref}): ${caption}`,
         kind: "media",
@@ -243,6 +271,7 @@ async function detectAndApplyUpiPayment(
         handledAsPayment: true,
       };
     }
+    await recordPaymentClaim(targetOrder.id, caption ? `Photo after the pay link: "${caption.slice(0, 200)}"` : "Photo sent after the pay link (maybe a payment screenshot)").catch(() => {});
     return {
       text: caption
         ? `Payment screenshot for ${ref} (${totalFormatted}): ${caption}`
