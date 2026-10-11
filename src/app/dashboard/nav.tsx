@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Bell3D,
+  ChartBar3D,
   Building3D,
   Calendar3D,
   Clock3D,
@@ -13,6 +14,7 @@ import {
   Inbox3D,
   Messages3D,
   Phone3D,
+  Rupee3D,
   Settings3D,
   ShoppingBag3D,
   Store3D,
@@ -28,12 +30,14 @@ export const NAV = [
   { href: "/dashboard/notifications", label: "Notifications", short: "Alerts", icon: Bell3D, group: "Daily work", cube: "from-[#fbbf24] via-[#f59e0b] to-[#d97706]" },
   { href: "/dashboard/orders", label: "Orders", short: "Orders", icon: ShoppingBag3D, group: "Daily work", cube: "from-[#38bdf8] via-[#0ea5e9] to-[#0284c7]" },
   { href: "/dashboard/refills", label: "Refills", short: "Refills", icon: Clock3D, group: "Daily work", cube: "from-[#86efac] via-[#22c55e] to-[#15803d]" },
+  { href: "/dashboard/revenue", label: "Revenue & cash", short: "Revenue", icon: Rupee3D, group: "Daily work", cube: "from-[#fde68a] via-[#f59e0b] to-[#b45309]" },
   { href: "/dashboard/catalogue", label: "Catalogue", short: "Menu", icon: Store3D, group: "Daily work", cube: "from-[#2dd4bf] via-[#14b8a6] to-[#0d9488]" },
   { href: "/dashboard/replies", label: "Replies", short: "Replies", icon: Inbox3D, group: "Daily work", cube: "from-[#c084fc] via-[#9333ea] to-[#7e22ce]" },
   { href: "/dashboard/calls", label: "Calls", short: "Calls", icon: Phone3D, group: "Daily work", cube: "from-[#4ade80] via-[#16a34a] to-[#15803d]" },
   { href: "/dashboard/campaigns", label: "Campaigns", short: "Campaigns", icon: Calendar3D, group: "Marketing", cube: "from-[#fb7185] via-[#f43f5e] to-[#e11d48]" },
   { href: "/dashboard/templates", label: "Templates", short: "Templates", icon: Template3D, group: "Marketing", cube: "from-[#818cf8] via-[#6366f1] to-[#4f46e5]" },
   { href: "/dashboard/customers", label: "Customers", short: "Customers", icon: Users3D, group: "Marketing", cube: "from-[#38bdf8] via-[#0284c7] to-[#0369a1]" },
+  { href: "/dashboard/report", label: "Weekly report", short: "Report", icon: ChartBar3D, group: "Marketing", cube: "from-[#5eead4] via-[#14b8a6] to-[#0f766e]" },
   { href: "/dashboard/messages", label: "Message log", short: "Log", icon: Messages3D, group: "Marketing", cube: "from-[#a78bfa] via-[#7c3aed] to-[#6d28d9]" },
   { href: "/dashboard/settings", label: "Settings", short: "Settings", icon: Settings3D, group: "Account", cube: "from-[#fb923c] via-[#ea580c] to-[#c2410c]" },
 ];

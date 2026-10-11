@@ -45,6 +45,9 @@ export default async function CataloguePage() {
             <Link href="/dashboard/orders" className={buttonClass("secondary")}>
               <ShoppingBag aria-hidden className="size-4" /> Orders
             </Link>
+            <Link href="/dashboard/catalogue/combos" className={buttonClass("secondary")}>
+              Combo ideas
+            </Link>
             {commerceManagerUrl && (
               <a href={commerceManagerUrl} target="_blank" rel="noreferrer" className={buttonClass("secondary")}>
                 <ExternalLink aria-hidden className="size-4" /> Commerce Manager

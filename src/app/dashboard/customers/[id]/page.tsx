@@ -22,6 +22,7 @@ import { setOptOut } from "../../actions/customers";
 import { EditCustomerButton } from "../customer-tools";
 import { CallButton } from "./call-button";
 import { PausedOffersNote } from "./paused-offers-note";
+import { PurchaseJourney } from "./purchase-journey";
 import { SendPanel } from "./send-panel";
 
 export const metadata: Metadata = { title: "Customer" };
@@ -143,6 +144,8 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
             windowEndsAt={windowEnd ? fmtDate(windowEnd, "d MMM, h:mm a") : null}
             blocked={c.optedOut ? "This customer opted out of messages. Opt them back in to send." : c.unreachable ? "WhatsApp says this number can't receive messages." : null}
           />
+
+          <PurchaseJourney orders={c.orders} />
 
           <Card className="card-3d overflow-hidden">
             <CardHeader tone="brand" icon={<Messages3D />} title="Conversation" description="Messages sent to this customer and what they wrote back. The newest is at the bottom." />

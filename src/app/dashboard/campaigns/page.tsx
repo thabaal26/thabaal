@@ -81,11 +81,16 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
         title="Campaigns"
         description="Recurring or one-off sends. Each one delivers in batches at the pace you set."
         actions={
-          canCreate && (
-            <Link href="/dashboard/campaigns/new" className={buttonClass("primary")}>
-              <Plus aria-hidden className="size-4" /> <span>New<span className="max-sm:sr-only"> campaign</span></span>
+          <>
+            <Link href="/dashboard/campaigns/compare" className={buttonClass("secondary")}>
+              Compare
             </Link>
-          )
+            {canCreate && (
+              <Link href="/dashboard/campaigns/new" className={buttonClass("primary")}>
+                <Plus aria-hidden className="size-4" /> <span>New<span className="max-sm:sr-only"> campaign</span></span>
+              </Link>
+            )}
+          </>
         }
         inlineActions
         tabs={

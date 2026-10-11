@@ -478,3 +478,61 @@ export function ActionLine({ children, href, cta }: { children: ReactNode; href:
     </div>
   );
 }
+
+/* ───────────────────────── Columns ───────────────────────── */
+
+export type Column = { key: string; label: string; sub?: string; parts: StackPart[]; highlight?: boolean };
+
+/**
+ * Vertical stacked columns on one scale (e.g. revenue per day split by how it was paid). Each
+ * column shows its total above it and names every part in its tooltip; scrolls sideways on phones.
+ */
+export function ColumnChart({
+  columns,
+  format = "count",
+  legend,
+  height = 160,
+  minWidth = 560,
+  label,
+}: {
+  columns: Column[];
+  format?: ValueFormat;
+  legend?: { label: string; color: string }[];
+  height?: number;
+  minWidth?: number;
+  label: string;
+}) {
+  const drawn = useDrawn();
+  const sums = columns.map((c) => c.parts.reduce((n, p) => n + p.value, 0));
+  const max = Math.max(1, ...sums);
+  const showTotals = columns.length <= 16;
+  return (
+    <div>
+      {legend && <Legend items={legend} className="mb-3" />}
+      <div className="thin-scroll -mx-1 overflow-x-auto px-1 pb-1">
+        <div role="img" aria-label={label} className="flex items-end gap-1" style={{ minWidth, height: height + 40 }}>
+          {columns.map((c, i) => {
+            const sum = sums[i];
+            const tip = [`${c.label}${c.sub ? ` ${c.sub}` : ""}: ${formatValue(sum, format)}`, ...c.parts.filter((p) => p.value > 0).map((p) => `${p.label}: ${formatValue(p.value, format)}`)].join("\n");
+            return (
+              <div key={c.key} title={tip} className="group flex h-full min-w-0 flex-1 flex-col items-center justify-end">
+                {showTotals && <span className="tabular mb-1 truncate text-[10px] font-semibold text-ink-2">{sum ? formatValue(sum, format) : ""}</span>}
+                <div className="flex w-full max-w-8 flex-col-reverse overflow-hidden rounded-t-[4px] transition group-hover:brightness-95" style={{ height: drawn ? Math.max(sum ? 3 : 2, (sum / max) * height) : 2 }}>
+                  {sum === 0 ? (
+                    <span className="h-full w-full" style={{ background: TRACK }} />
+                  ) : (
+                    c.parts
+                      .filter((p) => p.value > 0)
+                      .map((p) => <span key={p.key} className="block w-full border-t border-panel first:border-t-0" style={{ height: `${(p.value / sum) * 100}%`, background: p.color }} />)
+                  )}
+                </div>
+                <span className={cn("mt-1.5 truncate text-[10px] leading-tight", c.highlight ? "font-semibold text-ink" : "text-muted")}>{c.label}</span>
+                {c.sub && <span className="truncate text-[9px] leading-tight text-muted">{c.sub}</span>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
