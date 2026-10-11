@@ -144,6 +144,8 @@ export function isSectionEnabled(
 }
 
 export function sectionForHref(href: string): ClientSectionId | null {
+  // The refill calendar is built from orders, so it follows the orders section.
+  if (href === "/dashboard/refills" || href.startsWith("/dashboard/refills/")) return "orders";
   for (const s of CLIENT_SECTIONS) {
     if (href === s.href || href.startsWith(`${s.href}/`)) {
       return s.id;

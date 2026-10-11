@@ -1,4 +1,4 @@
-import { BookOpen, MessageCircle, PackageCheck, ShoppingCart } from "lucide-react";
+import { BookOpen, MessageCircle, PackageCheck, RotateCw, ShoppingCart } from "lucide-react";
 import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
 import { MapPin3D, ShoppingBag3D, Sparkles3D, Target3D } from "@/components/icons-3d";
@@ -20,6 +20,8 @@ export type BusinessPriorityProps = {
   browsedNoCartCount: number;
   toDispatchCount: number;
   unhandledRepliesCount: number;
+  refillsDueCount?: number;
+  refillsDueValue?: number;
   showOrders: boolean;
   showReplies: boolean;
 };
@@ -63,14 +65,24 @@ export function BusinessPriorityStrip(p: BusinessPriorityProps) {
       label: "Chats to answer",
       value: fmtNumber(p.unhandledRepliesCount),
       sub: "free within 24 hours",
-      href: "/dashboard/replies",
+      href: "/dashboard/replies/priority",
       color: "#6941c6",
       icon: MessageCircle,
+    });
+  if (p.showOrders && p.refillsDueCount)
+    tiles.push({
+      key: "refills",
+      label: "Refills due",
+      value: fmtNumber(p.refillsDueCount),
+      sub: `this week · ~${formatValue(p.refillsDueValue ?? 0, "inr")}`,
+      href: "/dashboard/refills",
+      color: "#15803d",
+      icon: RotateCw,
     });
   if (!tiles.length) return null;
   return (
     <section aria-label="To do today" className="mb-4 sm:mb-5">
-      <div className={cn("grid grid-cols-1 gap-2.5 min-[480px]:grid-cols-2 sm:gap-3", tiles.length >= 4 ? "xl:grid-cols-4" : tiles.length === 3 ? "sm:grid-cols-3" : "")}>
+      <div className={cn("grid grid-cols-1 gap-2.5 min-[480px]:grid-cols-2 sm:gap-3", tiles.length >= 5 ? "xl:grid-cols-5" : tiles.length === 4 ? "xl:grid-cols-4" : tiles.length === 3 ? "sm:grid-cols-3" : "")}>
         {tiles.map((t) => {
           const Icon = t.icon;
           return (

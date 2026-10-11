@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { fmtNumber } from "@/lib/format";
 import { getScope, ownedMessages } from "@/lib/session";
 import { handleAllReplies } from "../actions/replies";
+import { InboxTabs } from "./inbox-tabs";
 import { ReplyInbox } from "./reply-inbox";
 
 export const metadata: Metadata = { title: "Replies" };
@@ -164,6 +165,8 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
           )
         }
         tabs={
+          <div className="flex flex-wrap items-center gap-3">
+          <InboxTabs active="inbox" />
           <FilterChips
             label="Reply status"
             items={TABS.map((t) => ({
@@ -173,6 +176,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
               active: show === t.key,
             }))}
           />
+          </div>
         }
       />
 

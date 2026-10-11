@@ -1,0 +1,204 @@
+"use client";
+
+import { BellRing, Check, MessageCircle, ShoppingCart } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
+import { confirmAction } from "@/components/confirm";
+import { toastResult } from "@/components/toast";
+import { Badge, Button, Card, CardHeader, EmptyState } from "@/components/ui";
+import { Calendar3D } from "@/components/icons-3d";
+import { Legend } from "@/components/viz";
+import { formatValue } from "@/lib/chart-math";
+import { cn } from "@/lib/cn";
+import { fmtDate, fmtNumber } from "@/lib/format";
+import type { RefillDue } from "@/lib/refill-forecast";
+import { sendRefillNudge } from "../actions/refills";
+
+const OVERDUE = "#e11d48";
+const TODAY = "#d97706";
+const SOON = "#059669";
+const LATER = "#94a3b8";
+
+type Bucket = { key: string; label: string; sub: string; test: (d: number) => boolean; color: string };
+
+/** One column per day for the next two weeks, with overdue and later at the ends. */
+function buckets(today: Date): Bucket[] {
+  const days: Bucket[] = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(today.getTime() + i * 86_400_000);
+    return {
+      key: `d${i}`,
+      label: i === 0 ? "Today" : fmtDate(d, "EEE"),
+      sub: fmtDate(d, "d MMM"),
+      test: (n: number) => n === i,
+      color: i === 0 ? TODAY : SOON,
+    };
+  });
+  return [
+    { key: "over", label: "Overdue", sub: "past due", test: (n) => n < 0, color: OVERDUE },
+    ...days,
+    { key: "later", label: "Later", sub: "14+ days", test: (n) => n >= 14, color: LATER },
+  ];
+}
+
+const dueText = (d: number) => (d < 0 ? `${Math.abs(d)} day${d === -1 ? "" : "s"} overdue` : d === 0 ? "Due today" : d === 1 ? "Due tomorrow" : `Due in ${d} days`);
+
+export function RefillBoard({ rows, today, canSend, templateName }: { rows: RefillDue[]; today: Date; canSend: boolean; templateName: string | null }) {
+  const cols = useMemo(() => buckets(today), [today]);
+  const [pick, setPick] = useState<string | null>(null);
+  const tally = cols.map((c) => {
+    const inCol = rows.filter((r) => c.test(r.daysLeft));
+    return { ...c, n: inCol.length, value: inCol.reduce((s, r) => s + r.avgOrder, 0) };
+  });
+  const max = Math.max(1, ...tally.map((t) => t.n));
+  const active = cols.find((c) => c.key === pick);
+  const list = active ? rows.filter((r) => active.test(r.daysLeft)) : rows.filter((r) => r.daysLeft < 14);
+
+  return (
+    <>
+      <Card className="card-3d">
+        <CardHeader tone="brand" icon={<Calendar3D />} title="Who runs out when" description="Customers due for a refill per day · tap a day to see them" />
+        <div className="p-4 sm:p-5">
+          <Legend
+            className="mb-3"
+            items={[
+              { label: "Overdue", color: OVERDUE },
+              { label: "Today", color: TODAY },
+              { label: "Next 2 weeks", color: SOON },
+              { label: "Later", color: LATER },
+            ]}
+          />
+          <div className="thin-scroll -mx-1 overflow-x-auto px-1 pb-1">
+            <div role="group" aria-label="Refills due per day" className="flex min-w-[640px] items-end gap-1.5" style={{ height: 176 }}>
+              {tally.map((t) => {
+                const on = pick === t.key;
+                const h = t.n ? Math.max(8, (t.n / max) * 120) : 3;
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setPick(on ? null : t.key)}
+                    aria-pressed={on}
+                    title={`${t.label} ${t.sub}: ${fmtNumber(t.n)} customer${t.n === 1 ? "" : "s"} · about ${formatValue(t.value, "inr")}`}
+                    className={cn(
+                      "group flex h-full flex-1 flex-col items-center justify-end rounded-control px-0.5 pb-1 transition",
+                      on ? "bg-subtle ring-1 ring-line-2" : "hover:bg-subtle",
+                      t.key === "over" || t.key === "later" ? "min-w-14" : "min-w-9",
+                    )}
+                  >
+                    <span className="tabular mb-1 text-xs font-semibold text-ink">{t.n || ""}</span>
+                    <span
+                      aria-hidden
+                      className="w-full max-w-7 rounded-t-[4px] transition-[height] duration-500 ease-out"
+                      style={{ height: h, background: t.n ? t.color : "#e2e6ec", opacity: pick && !on ? 0.4 : 1 }}
+                    />
+                    <span className={cn("mt-1.5 text-2xs font-medium", t.key === "d0" ? "text-ink" : "text-ink-2")}>{t.label}</span>
+                    <span className="text-[10px] text-muted">{t.sub}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="card-3d mt-4 sm:mt-5">
+        <CardHeader
+          tone="gold"
+          icon={<BellRing className="size-5" />}
+          title={active ? `${active.label} · ${active.sub}` : "Due in the next two weeks"}
+          description={active ? `${fmtNumber(list.length)} customer${list.length === 1 ? "" : "s"}` : "Most urgent first · overdue at the top"}
+          action={
+            active ? (
+              <button type="button" onClick={() => setPick(null)} className="text-xs font-semibold text-brand-deep hover:underline">
+                Show all
+              </button>
+            ) : undefined
+          }
+        />
+        {list.length ? (
+          <ul className="divide-y divide-line">
+            {list.map((r) => (
+              <RefillRow key={r.customerId} r={r} canSend={canSend} templateName={templateName} />
+            ))}
+          </ul>
+        ) : (
+          <EmptyState icon={<Calendar3D />} title="Nobody due here">
+            Pick another day, or check back after more orders come in.
+          </EmptyState>
+        )}
+      </Card>
+    </>
+  );
+}
+
+function RefillRow({ r, canSend, templateName }: { r: RefillDue; canSend: boolean; templateName: string | null }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [sent, setSent] = useState(false);
+  const tone = r.daysLeft < 0 ? "text-danger" : r.daysLeft === 0 ? "text-warning" : "text-ink-2";
+
+  const send = () =>
+    start(async () => {
+      let res = await sendRefillNudge(r.customerId);
+      if (!res.ok && res.soft && (await confirmAction(res.message))) res = await sendRefillNudge(r.customerId, true);
+      if (res.ok || !res.soft) toastResult(res);
+      if (res.ok) {
+        setSent(true);
+        router.refresh();
+      }
+    });
+
+  const reminded = sent || (r.reminderSentAt && r.reminderSentAt > r.lastOrderAt);
+
+  return (
+    <li className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:px-5">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <Link href={`/dashboard/customers/${r.customerId}`} className="font-medium text-ink hover:underline">
+            {r.name}
+          </Link>
+          <span className={cn("text-xs font-semibold", tone)}>{dueText(r.daysLeft)}</span>
+          {r.openCart && (
+            <Badge tone="amber">
+              <ShoppingCart aria-hidden className="mr-1 inline size-3" />
+              {r.openCart.ref} unpaid · {formatValue(r.openCart.total, "inr")}
+            </Badge>
+          )}
+          {reminded && <Badge tone="green">Reminded</Badge>}
+        </div>
+        <p className="mt-0.5 truncate text-sm text-ink-2">{r.items.length ? r.items.join(" · ") : "Items not recorded"}</p>
+        <p className="tabular mt-0.5 text-2xs text-muted">
+          Every ~{r.cycleDays} days{r.cycleSource === "own" ? ` (their pattern, ${r.orders} orders)` : " (default)"} · last {r.lastOrderRef} on {fmtDate(r.lastOrderAt, "d MMM")} ·
+          usually {formatValue(r.avgOrder, "inr")}
+          {r.area ? ` · ${r.area}` : ""}
+        </p>
+      </div>
+      <div className="flex shrink-0 flex-wrap gap-2">
+        {r.windowOpen && (
+          <Link href={`/dashboard/customers/${r.customerId}`} className="inline-flex min-h-9 items-center gap-1.5 rounded-control border border-line px-3 text-xs font-semibold text-ink-2 hover:bg-subtle">
+            <MessageCircle aria-hidden className="size-3.5" /> Reply free
+          </Link>
+        )}
+        {r.openCart && (
+          <Link href="/dashboard/orders?show=unpaid" className="inline-flex min-h-9 items-center gap-1.5 rounded-control border border-warning-border bg-warning-bg px-3 text-xs font-semibold text-warning hover:brightness-95">
+            <ShoppingCart aria-hidden className="size-3.5" /> Follow up cart
+          </Link>
+        )}
+        {canSend && (
+          <Button
+            size="sm"
+            variant={reminded || r.openCart ? "secondary" : "primary"}
+            loading={pending}
+            disabled={!templateName}
+            title={templateName ? `Sends “${templateName}”` : "Choose a refill template on the Orders page first"}
+            onClick={send}
+          >
+            {reminded ? <Check aria-hidden className="size-3.5" /> : <BellRing aria-hidden className="size-3.5" />}
+            {reminded ? "Send again" : "Remind"}
+          </Button>
+        )}
+      </div>
+    </li>
+  );
+}

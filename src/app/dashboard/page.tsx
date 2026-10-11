@@ -17,6 +17,7 @@ import { numberHealth } from "@/lib/limits";
 import { codesOf, PAUSING_KINDS } from "@/lib/meta-errors";
 import { HELD_CODES } from "@/lib/held";
 import { analyzeCartMentality } from "@/lib/cart-mentality";
+import { refillForecast } from "@/lib/refill-forecast";
 import type { OrderItem } from "@/lib/orders";
 import { cancelRun, runDispatcherNow } from "./actions/campaigns";
 import { BrandHero } from "./brand-hero";
@@ -1448,6 +1449,8 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     scenarios: playbookScenarios,
   };
 
+  const refillsWeek = ordersOn && cid && !sp.view ? (await refillForecast(cid, now).catch(() => null))?.due.filter((d) => d.daysLeft <= 7) ?? [] : [];
+
   const views: View[] = ordersOn ? ["overview", "customers", "products", "carts"] : ["overview", "customers"];
   const view: View = views.includes(sp.view as View) ? (sp.view as View) : "overview";
   const viewBadges: Partial<Record<View, number>> = {
@@ -1540,6 +1543,8 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
             browsedNoCartCount={browsedNoCartLeads.length}
             toDispatchCount={toDispatchCount}
             unhandledRepliesCount={unhandledGroup.length}
+            refillsDueCount={refillsWeek.length}
+            refillsDueValue={refillsWeek.reduce((n, d) => n + d.avgOrder, 0)}
             showOrders={ordersOn}
             showReplies={repliesOn}
           />
