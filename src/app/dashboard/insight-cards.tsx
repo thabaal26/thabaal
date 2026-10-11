@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { MapPin3D, ShoppingBag3D, Sparkles3D, Target3D } from "@/components/icons-3d";
 import { Badge, Card, CardHeader } from "@/components/ui";
-import { ActionLine, ActivityRings, BarList, ChangeDumbbells, Disclosure, DonutPanel, StatChip, type Slice } from "@/components/viz";
+import { ActionLine, BarList, ChangeDumbbells, Disclosure, DonutPanel, ProgressRings, StatChip, type Slice } from "@/components/viz";
 import { formatValue } from "@/lib/chart-math";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import type { CartMentalitySummaryData, CustomerScenariosData, ScenarioLead } from "./overview-cards";
@@ -34,12 +34,12 @@ function LeadChips({ leads }: { leads: ScenarioLead[] }) {
 /** Where customers stopped this period, as one donut, two conversion rings and names on demand. */
 export function CustomerScenariosCard({ data }: { data: CustomerScenariosData }) {
   const groups = [
-    { key: "bought", label: "Bought", color: "#059669", value: data.convertedBuyers.customers, sub: `${formatValue(data.convertedBuyers.revenue, "inr")} · ${plural(data.convertedBuyers.repeatBuyers, "repeat buyer")}`, href: "/dashboard/orders?show=all", leads: data.convertedBuyers.leads, tip: "Send dispatch updates and set a refill reminder." },
-    { key: "unpaid", label: "Cart sent, not paid", color: "#d97706", value: data.addedToCartUnpaid.customers, sub: `${formatValue(data.addedToCartUnpaid.value, "inr")} in ${plural(data.addedToCartUnpaid.carts, "cart")}`, href: "/dashboard/orders?show=unpaid", leads: data.addedToCartUnpaid.leads, tip: "Follow up with a 1-tap UPI link or offer COD." },
-    { key: "replaced", label: "Cart replaced / cancelled", color: "#e11d48", value: data.cancelledCarts.customers, sub: `${formatValue(data.cancelledCarts.value, "inr")} revised away`, href: "/dashboard?view=carts", leads: data.cancelledCarts.leads, tip: "See which items they removed in the Carts view." },
-    { key: "browsed", label: "Browsed, no cart", color: "#0284c7", value: data.browsedNoCart.customers, sub: "viewed catalogue or prices", href: "/dashboard/replies", leads: data.browsedNoCart.leads, tip: "Send a personal pick before the 24h window closes." },
-    { key: "chatting", label: "Chatting, no catalogue", color: "#7c3aed", value: data.repliedInquiryOnly.customers, sub: "asked or replied", href: "/dashboard/replies?show=all", leads: data.repliedInquiryOnly.leads, tip: "Send the catalogue from their chat in one tap." },
-    { key: "silent", label: "Read, no action", color: "#94a3b8", value: data.readNoAction.customers, sub: "opened the message only", href: "/dashboard/messages?status=READ", leads: [], tip: "Try clearer buttons like ‘View price list’ next time." },
+    { key: "bought", label: "Bought", color: "emerald", value: data.convertedBuyers.customers, sub: `${formatValue(data.convertedBuyers.revenue, "inr")} · ${plural(data.convertedBuyers.repeatBuyers, "repeat buyer")}`, href: "/dashboard/orders?show=all", leads: data.convertedBuyers.leads, tip: "Send dispatch updates and set a refill reminder." },
+    { key: "unpaid", label: "Cart sent, not paid", color: "gold", value: data.addedToCartUnpaid.customers, sub: `${formatValue(data.addedToCartUnpaid.value, "inr")} in ${plural(data.addedToCartUnpaid.carts, "cart")}`, href: "/dashboard/orders?show=unpaid", leads: data.addedToCartUnpaid.leads, tip: "Follow up with a 1-tap UPI link or offer COD." },
+    { key: "replaced", label: "Cart replaced / cancelled", color: "red", value: data.cancelledCarts.customers, sub: `${formatValue(data.cancelledCarts.value, "inr")} revised away`, href: "/dashboard?view=carts", leads: data.cancelledCarts.leads, tip: "See which items they removed in the Carts view." },
+    { key: "browsed", label: "Browsed, no cart", color: "blue", value: data.browsedNoCart.customers, sub: "viewed catalogue or prices", href: "/dashboard/replies", leads: data.browsedNoCart.leads, tip: "Send a personal pick before the 24h window closes." },
+    { key: "chatting", label: "Chatting, no catalogue", color: "violet", value: data.repliedInquiryOnly.customers, sub: "asked or replied", href: "/dashboard/replies?show=all", leads: data.repliedInquiryOnly.leads, tip: "Send the catalogue from their chat in one tap." },
+    { key: "silent", label: "Read, no action", color: "neutral", value: data.readNoAction.customers, sub: "opened the message only", href: "/dashboard/messages?status=READ", leads: [], tip: "Try clearer buttons like ‘View price list’ next time." },
   ];
   const slices: Slice[] = groups.map((g) => ({ key: g.key, label: g.label, value: g.value, color: g.color, href: g.href, sub: g.sub }));
   const reached = groups.reduce((n, g) => n + g.value, 0);
@@ -57,13 +57,14 @@ export function CustomerScenariosCard({ data }: { data: CustomerScenariosData })
           )}
         </div>
         <div className="flex flex-col justify-center gap-4 border-line lg:col-span-4 lg:border-l lg:pl-5">
-          <ActivityRings
+          <ProgressRings
             label="Conversion rates"
-            size={150}
+            title="Conversion rates"
+            size={92}
             rings={[
-              { key: "cat", label: "Catalogue → cart", value: data.catalogueToCartPct, color: "#e8104a", to: "#ff5a8e" },
-              { key: "paid", label: "Cart → paid", value: data.cartToBuyPct, color: "#5cc90a", to: "#b8ff2e" },
-              { key: "buy", label: "Engaged → bought", value: reached ? Math.round((data.convertedBuyers.customers / reached) * 100) : 0, color: "#00b8d4", to: "#62f4ff", sub: `${fmtNumber(data.convertedBuyers.customers)} of ${fmtNumber(reached)}` },
+              { key: "cat", label: "Catalogue → cart", value: data.catalogueToCartPct, color: "gold" },
+              { key: "paid", label: "Cart → paid", value: data.cartToBuyPct, color: "emerald" },
+              { key: "buy", label: "Engaged → bought", value: reached ? Math.round((data.convertedBuyers.customers / reached) * 100) : 0, color: "blue", sub: `${fmtNumber(data.convertedBuyers.customers)} of ${fmtNumber(reached)}` },
             ]}
           />
           {data.addedToCartUnpaid.value > 0 && (
@@ -97,10 +98,10 @@ export function CustomerScenariosCard({ data }: { data: CustomerScenariosData })
 /* ───────────────────────── Cart revisions ───────────────────────── */
 
 const BEHAVIOUR = {
-  downsized: { label: "Cut budget", color: "#e11d48" },
-  upsized: { label: "Added more", color: "#059669" },
-  swapped: { label: "Swapped items", color: "#0ea5e9" },
-  duplicate_retry: { label: "Re-sent same cart", color: "#d97706" },
+  downsized: { label: "Cut budget", color: "red" },
+  upsized: { label: "Added more", color: "emerald" },
+  swapped: { label: "Swapped items", color: "blue" },
+  duplicate_retry: { label: "Re-sent same cart", color: "gold" },
 } as const;
 
 function ItemPills({ items, tone }: { items: { name: string; quantity: number; price: number }[]; tone: "red" | "green" | "brand" }) {
@@ -186,7 +187,7 @@ export function CartMentalityCard({ data }: { data: CartMentalitySummaryData }) 
           <p className="mb-3 text-2xs text-muted">Wanted, then removed: price or pack-size hesitation</p>
           <BarList
             format="inr"
-            color="#e11d48"
+            color="red"
             empty="Nothing dropped in this period."
             items={data.droppedProducts.map((d) => ({
               key: d.name,
@@ -201,7 +202,7 @@ export function CartMentalityCard({ data }: { data: CartMentalitySummaryData }) 
           <h4 className="text-sm font-semibold text-ink">Always kept</h4>
           <p className="mb-3 text-2xs text-muted">Never removed, even when the budget was cut</p>
           <BarList
-            color="#059669"
+            color="emerald"
             empty="No anchor products yet."
             items={data.anchorProducts.map((a) => ({
               key: a.name,
@@ -257,16 +258,17 @@ export function CartMentalityCard({ data }: { data: CartMentalitySummaryData }) 
 
 /* ───────────────────────── Customer mix ───────────────────────── */
 
-const MIX_COLORS = ["#059669", "#0ea5e9", "#6941c6", "#d4a514", "#e11d48", "#0284c7", "#f97316", "#64748b"];
+/** Fixed palette order; past six groups the rest fold into "Other". */
+const MIX_COLORS = ["emerald", "blue", "gold", "violet", "coral", "cyan"] as const;
 
 /** What customers buy, as a donut whose slices open that product's customers. */
 export function CustomerProductsCard({ items }: { items: { tag: string; label: string; n: number }[] }) {
   if (!items.length) return null;
-  const top = items.slice(0, 7);
-  const rest = items.slice(7).reduce((n, t) => n + t.n, 0);
+  const top = items.slice(0, 6);
+  const rest = items.slice(6).reduce((n, t) => n + t.n, 0);
   const slices: Slice[] = [
     ...top.map((t, i) => ({ key: t.tag, label: t.label, value: t.n, color: MIX_COLORS[i], href: `/dashboard/customers?tag=${encodeURIComponent(t.tag)}` })),
-    ...(rest ? [{ key: "_other", label: "Other groups", value: rest, color: MIX_COLORS[7], href: "/dashboard/customers" }] : []),
+    ...(rest ? [{ key: "_other", label: "Other groups", value: rest, color: "neutral", href: "/dashboard/customers" }] : []),
   ];
   return (
     <Card className="card-3d h-full">
@@ -278,11 +280,11 @@ export function CustomerProductsCard({ items }: { items: { tag: string; label: s
   );
 }
 
-const AREA_COLORS = ["#059669", "#0ea5e9", "#7c3aed", "#94a3b8"];
+const AREA_COLORS = ["emerald", "blue", "violet", "gold", "coral", "cyan"] as const;
 
 export function CustomerAreasCard({ regions, children }: { regions: { key: string; label: string; n: number; href: string }[]; children?: ReactNode }) {
   if (regions.length < 2) return null;
-  const slices: Slice[] = regions.map((r, i) => ({ key: r.key, label: r.label, value: r.n, color: AREA_COLORS[i] ?? "#cbd5e1", href: `/dashboard/customers?area=${encodeURIComponent(r.href)}` }));
+  const slices: Slice[] = regions.map((r, i) => ({ key: r.key, label: r.label, value: r.n, color: AREA_COLORS[i] ?? "neutral", href: `/dashboard/customers?area=${encodeURIComponent(r.href)}` }));
   return (
     <Card className="card-3d h-full">
       <CardHeader tone="info" icon={<MapPin3D />} title="Customers by area" description="From the order sheets · tap to open" />

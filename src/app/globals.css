@@ -168,6 +168,24 @@
   }
 }
 
+/* Chart palette: always emitted (charts read these at runtime, not only through utilities). */
+@theme static {
+  /* Charts (components/viz.tsx, components/charts.tsx): one validated palette for every chart.
+     Categorical order is fixed (colour follows the thing, never its rank); checked for colour-blind
+     separation on the panel surface in both modes. Red and neutral are status-only. */
+  --color-chart-emerald: #12936e;
+  --color-chart-blue: #2a78d6;
+  --color-chart-gold: #e3a008;
+  --color-chart-violet: #7a5af0;
+  --color-chart-coral: #e5603b;
+  --color-chart-cyan: #0f9fb5;
+  --color-chart-red: #d03b3b;
+  --color-chart-neutral: #b8c1cc;
+  --color-chart-grid: #edf0f4;
+  --color-chart-axis: #8b95a5;
+}
+
+
 html {
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
@@ -496,6 +514,16 @@ input:-webkit-autofill:active {
   --color-chat: #0b141a;
   --color-bubble: #1f2c34;
   --color-bubble-out: #005c4b;
+  --color-chart-emerald: #1fa47c;
+  --color-chart-blue: #4189e2;
+  --color-chart-gold: #b88a12;
+  --color-chart-violet: #8670e6;
+  --color-chart-coral: #da6640;
+  --color-chart-cyan: #169aae;
+  --color-chart-red: #e05656;
+  --color-chart-neutral: #4a5465;
+  --color-chart-grid: #1f2630;
+  --color-chart-axis: #6b7586;
 
   --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.4);
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.35), 0 1px 3px rgb(0 0 0 / 0.25);

@@ -1,4 +1,5 @@
 import { CreditCard, MessageCircle, Store } from "lucide-react";
+import { cssColor, type ChartColor } from "@/lib/chart-theme";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ActionButton } from "@/components/action-button";
@@ -18,11 +19,11 @@ import { InboxTabs } from "../inbox-tabs";
 export const metadata: Metadata = { title: "Priority inbox" };
 export const dynamic = "force-dynamic";
 
-const LANES: Record<Lane, { title: string; hint: string; color: string }> = {
-  money: { title: "Money waiting", hint: "Unpaid cart: close the sale", color: "#d97706" },
-  buying: { title: "Wants to buy", hint: "Asked for price, stock or to order", color: "#059669" },
-  regular: { title: "Past buyers", hint: "Customers who've paid before", color: "#0ea5e9" },
-  other: { title: "Questions & new", hint: "Everything else", color: "#7c3aed" },
+const LANES: Record<Lane, { title: string; hint: string; color: ChartColor }> = {
+  money: { title: "Money waiting", hint: "Unpaid cart: close the sale", color: "gold" },
+  buying: { title: "Wants to buy", hint: "Asked for price, stock or to order", color: "emerald" },
+  regular: { title: "Past buyers", hint: "Customers who've paid before", color: "blue" },
+  other: { title: "Questions & new", hint: "Everything else", color: "violet" },
 };
 const ORDER: Lane[] = ["money", "buying", "regular", "other"];
 
@@ -37,10 +38,10 @@ function ago(from: Date, now: Date) {
 function WindowClock({ h }: { h: number }) {
   if (h <= 0) return <span className="text-2xs font-semibold text-muted">Window closed · template only</span>;
   const pct = Math.max(4, (h / 24) * 100);
-  const color = h < 3 ? "#e11d48" : h < 8 ? "#d97706" : "#059669";
+  const color = cssColor(h < 3 ? "red" : h < 8 ? "gold" : "emerald");
   return (
     <span className="flex items-center gap-2" title="WhatsApp allows free replies for 24 hours after the customer's last message">
-      <span className="h-1.5 w-16 overflow-hidden rounded-full bg-sunken">
+      <span className="h-1.5 w-16 overflow-hidden rounded-full bg-track">
         <span className="block h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
       </span>
       <span className={cn("tabular text-2xs font-semibold", h < 3 ? "text-danger" : "text-ink-2")}>{h < 1 ? `${Math.round(h * 60)}m left` : `${Math.floor(h)}h left`}</span>
@@ -155,7 +156,7 @@ export default async function PriorityInboxPage() {
                     <CardHeader
                       title={
                         <span id={`lane-${l}-h`} className="flex items-center gap-2">
-                          <span aria-hidden className="size-2.5 rounded-full" style={{ background: LANES[l].color }} />
+                          <span aria-hidden className="size-2.5 rounded-full" style={{ background: cssColor(LANES[l].color) }} />
                           {LANES[l].title}
                           <span className="tabular font-normal text-muted">{lane.length}</span>
                         </span>

@@ -1,27 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { VIEWS, type View } from "./overview-cards";
 
 /**
- * One floating control bar for the dashboard: which section (a highlight slides to it and the new
- * view slides in from that side, see .animate-view-in) plus the period and filter buttons. Centred, sticky.
+ * The dashboard's floating section switcher: a highlight slides to the picked section and the new
+ * view slides in from that side (see .animate-view-in). Centred, sticky. Each section shows its own
+ * filters at its top.
  */
 export function ViewTabs({
   view,
   views,
   badges,
   query,
-  trailing,
 }: {
   view: View;
   views: View[];
   badges?: Partial<Record<View, number>>;
   /** The current filters as a query string, kept when switching sections. */
   query: string;
-  trailing?: ReactNode;
 }) {
   const [active, setActive] = useState<View>(view);
   const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
@@ -99,12 +98,6 @@ export function ViewTabs({
             );
           })}
         </nav>
-        {trailing && (
-          <>
-            <span aria-hidden className="mx-0.5 h-6 w-px shrink-0 bg-line sm:mx-1" />
-            {trailing}
-          </>
-        )}
       </div>
     </div>
   );

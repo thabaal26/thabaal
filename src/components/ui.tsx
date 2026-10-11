@@ -1,6 +1,7 @@
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Children, cloneElement, isValidElement, type ComponentProps, type ReactElement, type ReactNode } from "react";
+import { cssColor, type ChartColor } from "@/lib/chart-theme";
 import { cn } from "@/lib/cn";
 import { PageInfo } from "./page-info";
 
@@ -722,8 +723,8 @@ export function Stat({
   );
 }
 
-/** A thin progress or share bar. */
-export function Meter({ value, tone = "brand", label, className, raised }: { value: number; tone?: "brand" | "warning"; label?: string; className?: string; /** Glossy bar in a recessed track (3D cards). */ raised?: boolean }) {
+/** A thin progress bar in the chart palette: emerald, or gold for "needs attention". */
+export function Meter({ value, tone = "brand", label, className, raised }: { value: number; tone?: "brand" | "warning"; label?: string; className?: string; /** Slightly thicker, for KPI cards. */ raised?: boolean }) {
   return (
     <div
       role={label ? "meter" : undefined}
@@ -731,42 +732,46 @@ export function Meter({ value, tone = "brand", label, className, raised }: { val
       aria-valuenow={label ? Math.round(value) : undefined}
       aria-valuemin={label ? 0 : undefined}
       aria-valuemax={label ? 100 : undefined}
-      className={cn("overflow-hidden rounded-full", raised ? "track-3d h-2" : "h-1.5 bg-sunken", className)}
+      className={cn("overflow-hidden rounded-full bg-track", raised ? "h-2" : "h-1.5", className)}
     >
-      <div className={cn("bar h-full rounded-full", raised && "bar-3d", tone === "warning" ? "bg-warning-solid" : "bg-brand")} style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
+      <div className={cn("bar h-full rounded-full", tone === "warning" ? "bg-chart-gold" : "bg-chart-emerald")} style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
     </div>
   );
 }
 
 /**
- * Tremor-style multi-segment distribution bar with a compact legend underneath.
- * Useful for visualising message delivery breakdown, order pipeline, or stock split.
+ * Parts of a whole as one rounded bar with a 2px gap between parts, and a legend underneath that
+ * names each part with its count and share. Colours are chart palette names (lib/chart-theme).
  */
 export function DistributionBar({
   segments,
   className,
 }: {
-  segments: { key: string; label: string; value: number; color: string; href?: string }[];
+  segments: { key: string; label: string; value: number; color: ChartColor; href?: string }[];
   className?: string;
 }) {
   const total = segments.reduce((sum, s) => sum + s.value, 0);
   if (total <= 0) return null;
   return (
     <div className={cn("space-y-2.5", className)}>
-      <div className="track-3d flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full p-0.5" aria-hidden>
+      <div className="flex h-2.5 w-full gap-[2px] overflow-hidden rounded-full" aria-hidden>
         {segments
           .filter((s) => s.value > 0)
-          .map((s) => {
-            const share = Math.max(2, Math.round((s.value / total) * 100));
-            return <div key={s.key} className="bar bar-3d h-full first:rounded-l-full last:rounded-r-full" style={{ width: `${share}%`, backgroundColor: s.color }} />;
-          })}
+          .map((s) => (
+            <div
+              key={s.key}
+              title={`${s.label}: ${s.value.toLocaleString("en-IN")} (${Math.round((s.value / total) * 100)}%)`}
+              className="bar h-full min-w-1.5 first:rounded-l-full last:rounded-r-full"
+              style={{ flexGrow: s.value, flexBasis: 0, backgroundColor: cssColor(s.color) }}
+            />
+          ))}
       </div>
       <ul className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
         {segments.map((s) => {
           const share = Math.round((s.value / total) * 100);
           const content = (
             <>
-              <span aria-hidden className="size-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: s.color }} />
+              <span aria-hidden className="size-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: cssColor(s.color) }} />
               <span className="font-medium text-ink-2">{s.label}</span>
               <span className="tabular font-semibold text-ink">{s.value.toLocaleString("en-IN")}</span>
               <span className="tabular text-muted">({share}%)</span>
@@ -841,7 +846,7 @@ export function OrderStepper({
               key={step.key}
               className={cn(
                 "h-1.5 rounded-full transition-colors",
-                owed ? "bg-warning/60" : done ? (current ? "bg-brand bar-3d" : "bg-brand/75") : "bg-sunken",
+                owed ? "bg-chart-gold/70" : done ? (current ? "bg-chart-emerald" : "bg-chart-emerald/70") : "bg-track",
               )}
             />
           );

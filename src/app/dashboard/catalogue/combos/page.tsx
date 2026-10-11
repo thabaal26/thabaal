@@ -64,8 +64,8 @@ export default async function CombosPage() {
                           {p.a} <span className="text-muted">+</span> {p.b}
                         </p>
                         <div className="mt-1.5 flex items-center gap-2">
-                          <span className="h-1.5 w-28 overflow-hidden rounded-full bg-sunken">
-                            <span className="block h-full rounded-full bg-[#d4a514]" style={{ width: `${Math.min(100, share)}%` }} />
+                          <span className="h-1.5 w-28 overflow-hidden rounded-full bg-track">
+                            <span className="bar block h-full rounded-full bg-chart-gold" style={{ width: `${Math.min(100, share)}%` }} />
                           </span>
                           <span className="tabular text-2xs text-muted">
                             together in {fmtNumber(p.together)} orders · {share}% of the time{p.lift >= 1.5 ? ` · ${p.lift.toFixed(1)}× more than chance` : ""}
@@ -92,7 +92,7 @@ export default async function CombosPage() {
               <CardHeader tone="brand" icon={<Trophy3D />} title="Best sellers" description="Paid orders that include each product" />
               <div className="p-4 sm:p-5">
                 <BarList
-                  color="#059669"
+                  color="emerald"
                   items={r.bestSellers.map((b) => ({ key: b.name, label: b.name, value: b.orders, display: `${fmtNumber(b.orders)} orders`, sub: `${fmtNumber(b.units)} units`, href: `/dashboard/customers?tag=${encodeURIComponent(`product:${b.name}`)}` }))}
                 />
               </div>

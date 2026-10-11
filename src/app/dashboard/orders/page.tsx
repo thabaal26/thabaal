@@ -435,11 +435,11 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
             <div className="border-t border-line px-3 py-3 sm:px-4">
               <DistributionBar
                 segments={[
-                  { key: "new", label: "New", value: newCount, color: "#b7791f", href: qs({ show: "new" }) },
-                  { key: "confirmed", label: "Confirmed", value: confirmedCount, color: "#1d64a8", href: qs({ show: "confirmed" }) },
-                  { key: "dispatched", label: "Dispatched", value: dispatchedCount, color: "#6941c6", href: qs({ show: "dispatched" }) },
-                  { key: "done", label: "Delivered", value: deliveredCount, color: "#167d63", href: qs({ show: "done" }) },
-                  { key: "cancelled", label: "Cancelled", value: cancelledCount, color: "#98a2b3", href: qs({ show: "cancelled" }) },
+                  { key: "new", label: "New", value: newCount, color: "gold", href: qs({ show: "new" }) },
+                  { key: "confirmed", label: "Confirmed", value: confirmedCount, color: "blue", href: qs({ show: "confirmed" }) },
+                  { key: "dispatched", label: "Dispatched", value: dispatchedCount, color: "violet", href: qs({ show: "dispatched" }) },
+                  { key: "done", label: "Delivered", value: deliveredCount, color: "emerald", href: qs({ show: "done" }) },
+                  { key: "cancelled", label: "Cancelled", value: cancelledCount, color: "neutral", href: qs({ show: "cancelled" }) },
                 ]}
               />
             </div>

@@ -8,19 +8,19 @@ import { confirmAction } from "@/components/confirm";
 import { toastResult } from "@/components/toast";
 import { Badge, Button, Card, CardHeader, EmptyState } from "@/components/ui";
 import { Calendar3D } from "@/components/icons-3d";
-import { Legend } from "@/components/viz";
+import { ColumnChart, type ChartColor } from "@/components/viz";
 import { formatValue } from "@/lib/chart-math";
 import { cn } from "@/lib/cn";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import type { RefillDue } from "@/lib/refill-forecast";
 import { sendRefillNudge } from "../actions/refills";
 
-const OVERDUE = "#e11d48";
-const TODAY = "#d97706";
-const SOON = "#059669";
-const LATER = "#94a3b8";
+const OVERDUE: ChartColor = "red";
+const TODAY: ChartColor = "gold";
+const SOON: ChartColor = "emerald";
+const LATER: ChartColor = "neutral";
 
-type Bucket = { key: string; label: string; sub: string; test: (d: number) => boolean; color: string };
+type Bucket = { key: string; label: string; sub: string; test: (d: number) => boolean; color: ChartColor };
 
 /** One column per day for the next two weeks, with overdue and later at the ends. */
 function buckets(today: Date): Bucket[] {
@@ -50,7 +50,6 @@ export function RefillBoard({ rows, today, canSend, templateName }: { rows: Refi
     const inCol = rows.filter((r) => c.test(r.daysLeft));
     return { ...c, n: inCol.length, value: inCol.reduce((s, r) => s + r.avgOrder, 0) };
   });
-  const max = Math.max(1, ...tally.map((t) => t.n));
   const active = cols.find((c) => c.key === pick);
   const list = active ? rows.filter((r) => active.test(r.daysLeft)) : rows.filter((r) => r.daysLeft < 14);
 
@@ -59,46 +58,27 @@ export function RefillBoard({ rows, today, canSend, templateName }: { rows: Refi
       <Card className="card-3d">
         <CardHeader tone="brand" icon={<Calendar3D />} title="Who runs out when" description="Customers due for a refill per day · tap a day to see them" />
         <div className="p-4 sm:p-5">
-          <Legend
-            className="mb-3"
-            items={[
+          <ColumnChart
+            label="Customers due for a refill per day"
+            minWidth={640}
+            height={150}
+            legend={[
               { label: "Overdue", color: OVERDUE },
               { label: "Today", color: TODAY },
               { label: "Next 2 weeks", color: SOON },
               { label: "Later", color: LATER },
             ]}
+            activeKey={pick}
+            onColumnClick={(k) => setPick((p) => (p === k ? null : k))}
+            columns={tally.map((t) => ({
+              key: t.key,
+              label: t.label,
+              sub: t.sub,
+              highlight: t.key === "d0",
+              tip: t.n ? `About ${formatValue(t.value, "inr")} in refills` : undefined,
+              parts: [{ key: "n", label: "Customers", value: t.n, color: t.color }],
+            }))}
           />
-          <div className="thin-scroll -mx-1 overflow-x-auto px-1 pb-1">
-            <div role="group" aria-label="Refills due per day" className="flex min-w-[640px] items-end gap-1.5" style={{ height: 176 }}>
-              {tally.map((t) => {
-                const on = pick === t.key;
-                const h = t.n ? Math.max(8, (t.n / max) * 120) : 3;
-                return (
-                  <button
-                    key={t.key}
-                    type="button"
-                    onClick={() => setPick(on ? null : t.key)}
-                    aria-pressed={on}
-                    title={`${t.label} ${t.sub}: ${fmtNumber(t.n)} customer${t.n === 1 ? "" : "s"} · about ${formatValue(t.value, "inr")}`}
-                    className={cn(
-                      "group flex h-full flex-1 flex-col items-center justify-end rounded-control px-0.5 pb-1 transition",
-                      on ? "bg-subtle ring-1 ring-line-2" : "hover:bg-subtle",
-                      t.key === "over" || t.key === "later" ? "min-w-14" : "min-w-9",
-                    )}
-                  >
-                    <span className="tabular mb-1 text-xs font-semibold text-ink">{t.n || ""}</span>
-                    <span
-                      aria-hidden
-                      className="w-full max-w-7 rounded-t-[4px] transition-[height] duration-500 ease-out"
-                      style={{ height: h, background: t.n ? t.color : "var(--color-line)", opacity: pick && !on ? 0.4 : 1 }}
-                    />
-                    <span className={cn("mt-1.5 text-2xs font-medium", t.key === "d0" ? "text-ink" : "text-ink-2")}>{t.label}</span>
-                    <span className="text-[10px] text-muted">{t.sub}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
         </div>
       </Card>
 

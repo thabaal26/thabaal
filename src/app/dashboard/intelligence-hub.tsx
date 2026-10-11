@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { ChartBar3D, Sparkles3D, Trophy3D } from "@/components/icons-3d";
 import { Badge, buttonClass, Card, CardHeader, type Tone } from "@/components/ui";
-import { ActionLine, ActivityRings, DonutPanel, StackedRows, StatChip, type Slice } from "@/components/viz";
+import { ActionLine, DonutPanel, ProgressRings, StackedRows, StatChip, type ChartColor, type Slice } from "@/components/viz";
+import { cssColor } from "@/lib/chart-theme";
 import { formatValue } from "@/lib/chart-math";
 import { cn } from "@/lib/cn";
 import { fmtNumber, pct } from "@/lib/format";
@@ -75,17 +76,18 @@ export type AllProductsSummaryData = {
   products: AllProductAnalyticsItem[];
 };
 
-const SOLD = "#059669";
-const CART = "#f59e0b";
-const DROPPED = "#e11d48";
+/** The same meaning everywhere: sold = emerald, waiting in a cart = gold, dropped = red. */
+const SOLD: ChartColor = "emerald";
+const CART: ChartColor = "gold";
+const DROPPED: ChartColor = "red";
 
 type StatusGroup = "selling" | "stuck_in_cart" | "dropped_hesitation" | "dormant_past" | "not_selling";
-const GROUPS: Record<StatusGroup, { label: string; color: string }> = {
+const GROUPS: Record<StatusGroup, { label: string; color: ChartColor }> = {
   selling: { label: "Selling", color: SOLD },
   stuck_in_cart: { label: "Stuck in unpaid cart", color: CART },
   dropped_hesitation: { label: "Added, then dropped", color: DROPPED },
-  dormant_past: { label: "Sold before, not now", color: "#6366f1" },
-  not_selling: { label: "Never sold", color: "#94a3b8" },
+  dormant_past: { label: "Sold before, not now", color: "violet" },
+  not_selling: { label: "Never sold", color: "neutral" },
 };
 const groupOf = (s: ProductScenarioStatus): StatusGroup => (s === "top_seller" ? "selling" : s);
 
@@ -329,13 +331,13 @@ export type CustomerWinbackPlaybookData = {
   scenarios: PlaybookScenario[];
 };
 
-const COHORTS: { key: string; label: string; color: string; scenario: PlaybookScenario["id"]; field: keyof CustomerWinbackPlaybookData }[] = [
-  { key: "active", label: "Active (≤30 days)", color: "#059669", scenario: "vip_repeat", field: "activeBuyers30d" },
-  { key: "refill", label: "Refill due (31–60 days)", color: "#0ea5e9", scenario: "refill_due", field: "refillDue31to60d" },
-  { key: "lapsed", label: "Lapsed (60+ days)", color: "#e11d48", scenario: "winback_lapsed", field: "lapsedOver60d" },
-  { key: "unpaid", label: "Unpaid cart now", color: "#d97706", scenario: "unpaid_cart_recovery", field: "unpaidCartCustomers" },
-  { key: "warm", label: "Warm, not bought", color: "#7c3aed", scenario: "warm_browsers", field: "warmNonBuyers" },
-  { key: "cold", label: "Never ordered", color: "#94a3b8", scenario: "never_ordered", field: "coldNeverOrdered" },
+const COHORTS: { key: string; label: string; color: ChartColor; scenario: PlaybookScenario["id"]; field: keyof CustomerWinbackPlaybookData }[] = [
+  { key: "active", label: "Active (≤30 days)", color: "emerald", scenario: "vip_repeat", field: "activeBuyers30d" },
+  { key: "refill", label: "Refill due (31–60 days)", color: "blue", scenario: "refill_due", field: "refillDue31to60d" },
+  { key: "lapsed", label: "Lapsed (60+ days)", color: "red", scenario: "winback_lapsed", field: "lapsedOver60d" },
+  { key: "unpaid", label: "Unpaid cart now", color: "gold", scenario: "unpaid_cart_recovery", field: "unpaidCartCustomers" },
+  { key: "warm", label: "Warm, not bought", color: "violet", scenario: "warm_browsers", field: "warmNonBuyers" },
+  { key: "cold", label: "Never ordered", color: "neutral", scenario: "never_ordered", field: "coldNeverOrdered" },
 ];
 
 export function CustomerGrowthPlaybookCard({ data }: { data: CustomerWinbackPlaybookData }) {
@@ -371,13 +373,14 @@ export function CustomerGrowthPlaybookCard({ data }: { data: CustomerWinbackPlay
       <div className="grid grid-cols-1 gap-6 p-4 sm:p-5 xl:grid-cols-12">
         <div className="space-y-5 xl:col-span-5">
           <DonutPanel slices={slices} centerLabel="customers" label="Customers by lifecycle stage" size={160} selected={selectedId} onSelect={(k) => setSelectedId(k as PlaybookScenario["id"])} />
-          <ActivityRings
+          <ProgressRings
             label="Customer health"
-            size={150}
+            title="Customer health"
+            size={88}
             rings={[
-              { key: "repeat", label: "Repeat buyers", value: data.retentionRatePct, color: "#5cc90a", to: "#b8ff2e" },
-              { key: "active", label: "Active now", value: pct(data.activeBuyers30d, Math.max(1, data.totalCustomers)), color: "#00b8d4", to: "#62f4ff", sub: `${fmtNumber(data.activeBuyers30d)} customers` },
-              { key: "lapsed", label: "Lapsed", value: pct(data.lapsedOver60d, Math.max(1, data.totalCustomers)), color: "#e8104a", to: "#ff5a8e", sub: `${fmtNumber(data.lapsedOver60d)} to win back` },
+              { key: "repeat", label: "Repeat buyers", value: data.retentionRatePct, color: "emerald" },
+              { key: "active", label: "Active now", value: pct(data.activeBuyers30d, Math.max(1, data.totalCustomers)), color: "blue", sub: `${fmtNumber(data.activeBuyers30d)} customers` },
+              { key: "lapsed", label: "Lapsed", value: pct(data.lapsedOver60d, Math.max(1, data.totalCustomers)), color: "red", sub: `${fmtNumber(data.lapsedOver60d)} to win back` },
             ]}
           />
         </div>
@@ -396,7 +399,7 @@ export function CustomerGrowthPlaybookCard({ data }: { data: CustomerWinbackPlay
                   s.id === active.id ? "border-ink bg-ink text-panel" : "border-line bg-panel text-ink-2 hover:border-line-2 hover:text-ink",
                 )}
               >
-                <span aria-hidden className="size-2 rounded-full" style={{ background: s.color }} />
+                <span aria-hidden className="size-2 rounded-full" style={{ background: cssColor(s.color) }} />
                 {s.shortTitle}
                 <span className="tabular opacity-70">{fmtNumber(s.customersCount)}</span>
               </button>
@@ -515,9 +518,9 @@ export function ProductCampaignGraphCard({ rows }: { rows: ProductCampaignRow[] 
       <div className="p-4 sm:p-5">
         <StackedRows
           legend={[
-            { label: "Read", color: "#6941c6" },
-            { label: "Delivered, unread", color: "#34d399" },
-            { label: "Not delivered", color: "#cbd5e1" },
+            { label: "Read", color: "violet" },
+            { label: "Delivered, unread", color: "emerald" },
+            { label: "Not delivered", color: "neutral" },
           ]}
           rows={rows.map((r) => ({
             key: r.tag,
@@ -525,9 +528,9 @@ export function ProductCampaignGraphCard({ rows }: { rows: ProductCampaignRow[] 
             href: `/dashboard/customers?tag=${encodeURIComponent(`product:${r.tag}`)}`,
             right: `${pct(r.read, r.delivered)}% read${r.replies ? ` · ${plural(r.replies, "reply", "replies")}` : ""}`,
             parts: [
-              { key: "r", label: "Read", value: r.read, color: "#6941c6" },
-              { key: "d", label: "Delivered, unread", value: Math.max(0, r.delivered - r.read), color: "#34d399" },
-              { key: "n", label: "Not delivered", value: Math.max(0, r.sent - r.delivered), color: "#cbd5e1" },
+              { key: "r", label: "Read", value: r.read, color: "violet" },
+              { key: "d", label: "Delivered, unread", value: Math.max(0, r.delivered - r.read), color: "emerald" },
+              { key: "n", label: "Not delivered", value: Math.max(0, r.sent - r.delivered), color: "neutral" },
             ],
           }))}
         />

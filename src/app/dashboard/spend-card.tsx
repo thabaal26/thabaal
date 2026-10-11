@@ -2,6 +2,7 @@ import { ExternalLink, Lightbulb, Trash2 } from "lucide-react";
 import { ActionButton } from "@/components/action-button";
 import { Wallet3D } from "@/components/icons-3d";
 import { Badge, buttonClass, Card, CardHeader } from "@/components/ui";
+import { cssColor, type ChartColor } from "@/lib/chart-theme";
 import { cn } from "@/lib/cn";
 import { fmtDate, fmtNumber, pct } from "@/lib/format";
 import { senderFor } from "@/lib/senders";
@@ -11,12 +12,13 @@ import { TopUpForm } from "./top-up-form";
 
 const rupees = (n: number) => `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const CAT_COLORS: Record<string, string> = {
-  marketing: "#f59e0b",
-  utility: "#0ea5e9",
-  authentication: "#6366f1",
-  service: "#10b981",
+const CAT_COLORS: Record<string, ChartColor> = {
+  marketing: "gold",
+  utility: "blue",
+  authentication: "violet",
+  service: "emerald",
 };
+const catColor = (c: string) => cssColor(CAT_COLORS[c] ?? "neutral");
 
 function SpendRows({ rows }: { rows: SpendRow[] }) {
   if (!rows.length) return <p className="py-2 text-sm text-muted">No charged messages yet.</p>;
@@ -27,17 +29,14 @@ function SpendRows({ rows }: { rows: SpendRow[] }) {
     <div className="mt-2 space-y-2.5">
       {/* Stacked Category Distribution Bar */}
       {totalCost > 0 && (
-        <div className="track-3d flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full p-0.5">
+        <div className="flex h-2.5 w-full gap-[2px] overflow-hidden rounded-full">
           {rows
             .filter((r) => r.cost > 0)
             .map((r) => (
               <div
                 key={r.category}
-                className="bar-3d h-full first:rounded-l-full last:rounded-r-full"
-                style={{
-                  width: `${Math.max(6, pct(r.cost, totalCost))}%`,
-                  background: CAT_COLORS[r.category] ?? "#64748b",
-                }}
+                className="bar h-full min-w-1.5 first:rounded-l-full last:rounded-r-full"
+                style={{ flexGrow: r.cost, flexBasis: 0, background: catColor(r.category) }}
                 title={`${CATEGORY_LABEL[r.category] ?? r.category}: ${rupees(r.cost)}`}
               />
             ))}
@@ -46,7 +45,7 @@ function SpendRows({ rows }: { rows: SpendRow[] }) {
 
       <ul className="space-y-2">
         {rows.map((r) => {
-          const color = CAT_COLORS[r.category] ?? "#64748b";
+          const color = catColor(r.category);
           const barW = r.cost > 0 ? Math.max(6, pct(r.cost, maxCost)) : r.free > 0 ? 100 : 0;
           return (
             <li key={r.category} className="rounded-control border border-line bg-subtle/40 px-3 py-2 text-xs">
@@ -57,9 +56,9 @@ function SpendRows({ rows }: { rows: SpendRow[] }) {
                 </span>
                 <span className="tabular font-semibold text-ink">{r.cost ? rupees(r.cost) : "₹0.00 (Free)"}</span>
               </div>
-              <div className="track-3d mt-1.5 h-1.5 w-full overflow-hidden rounded-full">
+              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-track">
                 <div
-                  className="bar-3d h-full rounded-full"
+                  className="bar h-full rounded-full"
                   style={{ width: `${barW}%`, background: color }}
                 />
               </div>
@@ -155,14 +154,8 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
               <p className="tabular mt-1 text-2xl font-semibold leading-tight text-ink">{rupees(s.remainingBalance)}</p>
 
               {/* Visual Balance Runway Meter */}
-              <div className="track-3d mt-2.5 h-2 w-full overflow-hidden rounded-full">
-                <div
-                  className="bar-3d h-full rounded-full transition-all duration-500"
-                  style={{
-                    width: `${runwayPct}%`,
-                    background: low ? "linear-gradient(90deg, #f59e0b, #dc2626)" : "linear-gradient(90deg, #10b981, #059669)",
-                  }}
-                />
+              <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-track">
+                <div className={cn("bar h-full rounded-full", low ? "bg-chart-gold" : "bg-chart-emerald")} style={{ width: `${runwayPct}%` }} />
               </div>
 
               <p className="mt-1.5 text-xs text-muted">

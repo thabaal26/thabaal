@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChartBar3D, Trophy3D } from "@/components/icons-3d";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, PickClientNotice } from "@/components/ui";
-import { ActivityRings, BarList } from "@/components/viz";
+import { BarList, ProgressRings } from "@/components/viz";
 import { campaignResults, type CampaignResult } from "@/lib/business-reports";
 import { formatValue } from "@/lib/chart-math";
 import { cn } from "@/lib/cn";
@@ -14,10 +14,10 @@ export const dynamic = "force-dynamic";
 
 const PERIODS = [30, 90, 180] as const;
 const METRICS = [
-  { key: "read", label: "Read", color: "#e8104a", to: "#ff5a8e", of: (c: CampaignResult) => pct(c.read, c.delivered) },
-  { key: "replied", label: "Replied", color: "#00b8d4", to: "#62f4ff", of: (c: CampaignResult) => pct(c.replied, c.delivered) },
-  { key: "carted", label: "Sent a cart", color: "#ff8a00", to: "#ffcf4d", of: (c: CampaignResult) => pct(c.carted, c.delivered) },
-  { key: "bought", label: "Paid", color: "#5cc90a", to: "#b8ff2e", of: (c: CampaignResult) => pct(c.bought, c.delivered) },
+  { key: "read", label: "Read", color: "violet", of: (c: CampaignResult) => pct(c.read, c.delivered) },
+  { key: "replied", label: "Replied", color: "blue", of: (c: CampaignResult) => pct(c.replied, c.delivered) },
+  { key: "carted", label: "Sent a cart", color: "gold", of: (c: CampaignResult) => pct(c.carted, c.delivered) },
+  { key: "bought", label: "Paid", color: "emerald", of: (c: CampaignResult) => pct(c.bought, c.delivered) },
 ] as const;
 
 function href(days: number, a?: string, b?: string) {
@@ -44,13 +44,13 @@ function Side({ c, other }: { c: CampaignResult; other?: CampaignResult }) {
         }
       />
       <div className="p-4 sm:p-5">
-        <ActivityRings
+        <ProgressRings
           label={`${c.name} results`}
-          size={160}
+          size={84}
           rings={METRICS.map((m) => {
             const v = m.of(c);
             const o = other ? m.of(other) : null;
-            return { key: m.key, label: m.label, value: v, color: m.color, to: m.to, sub: o === null ? undefined : v === o ? "same" : v > o ? `+${v - o} pts` : `${v - o} pts` };
+            return { key: m.key, label: m.label, value: v, color: m.color, sub: o === null ? undefined : v === o ? "same" : v > o ? `+${v - o} pts` : `${v - o} pts` };
           })}
         />
       </div>
@@ -217,7 +217,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
         <div className="p-4 sm:p-5">
           <BarList
             format="inr"
-            color="#059669"
+            color="emerald"
             items={[...all]
               .sort((x, y) => y.revenue - x.revenue)
               .slice(0, 10)

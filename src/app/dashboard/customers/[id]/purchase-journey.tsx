@@ -3,14 +3,16 @@ import { ShoppingBag3D } from "@/components/icons-3d";
 import { Card, CardHeader } from "@/components/ui";
 import { ColumnChart, StatChip } from "@/components/viz";
 import { formatValue } from "@/lib/chart-math";
+import { cssColor } from "@/lib/chart-theme";
 import { cn } from "@/lib/cn";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import type { OrderItem } from "@/lib/orders";
 
 const DAY = 86_400_000;
-const PAID = "#059669";
-const OPEN = "#d97706";
-const DROPPED = "#cbd5e1";
+// Paid = emerald, waiting = gold, replaced or cancelled = neutral: the same meaning as every chart.
+const PAID = "emerald";
+const OPEN = "gold";
+const DROPPED = "neutral";
 
 const bought = (o: Pick<Order, "paidAt" | "status">) => Boolean(o.paidAt) || ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"].includes(o.status);
 const kind = (o: Order) => (o.status === "CANCELLED" ? "dropped" : bought(o) ? "paid" : "open");
@@ -68,7 +70,7 @@ export function PurchaseJourney({ orders, now = new Date() }: { orders: Order[];
               <span
                 aria-hidden
                 className="absolute -left-[23px] top-1 size-3 rounded-full border-2 border-panel"
-                style={{ background: k === "paid" ? PAID : k === "open" ? OPEN : DROPPED }}
+                style={{ background: cssColor(k === "paid" ? PAID : k === "open" ? OPEN : DROPPED) }}
               />
               <p className="flex flex-wrap items-baseline justify-between gap-x-2 text-sm">
                 <span className={cn("font-medium", k === "dropped" ? "text-muted line-through" : "text-ink")}>
@@ -79,7 +81,7 @@ export function PurchaseJourney({ orders, now = new Date() }: { orders: Order[];
                   {gap !== null && gap > 0 ? ` · ${gap}d after previous` : ""}
                 </span>
               </p>
-              <p className="text-2xs font-semibold uppercase tracking-wide" style={{ color: k === "paid" ? PAID : k === "open" ? OPEN : "#98a2b3" }}>
+              <p className={cn("text-2xs font-semibold uppercase tracking-wide", k === "paid" ? "text-success" : k === "open" ? "text-warning" : "text-muted")}>
                 {k === "paid" ? (o.paidAt ? "Paid" : o.status.toLowerCase()) : k === "open" ? "Not paid yet" : /superseded/i.test(o.internalNote ?? "") ? "Replaced by a newer cart" : "Cancelled"}
               </p>
               {items.length > 0 && <p className="mt-0.5 line-clamp-2 text-xs text-ink-2">{items.join(", ")}</p>}

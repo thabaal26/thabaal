@@ -18,10 +18,11 @@ import { requestPayment } from "../actions/orders";
 export const metadata: Metadata = { title: "Revenue & cash" };
 export const dynamic = "force-dynamic";
 
-const UPI = "#059669";
-const CASH = "#7c3aed";
-const OTHER = "#0ea5e9";
-const PENDING = "#94a3b8";
+// Paid by UPI = emerald, cash / COD = violet, other ways = blue, not received yet = neutral.
+const UPI = "emerald";
+const CASH = "violet";
+const OTHER = "blue";
+const PENDING = "neutral";
 const GROUP_COLOR = { upi: UPI, cash: CASH, other: OTHER, pending: PENDING } as const;
 
 function CashList({ title, hint, items, icon, tone, action }: { title: string; hint: string; items: CashItem[]; icon: ReactNode; tone: "amber" | "info" | "violet" | "rose"; action?: (o: CashItem) => ReactNode }) {

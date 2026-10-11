@@ -42,6 +42,7 @@ import {
   NumberLimitsCard,
   TodayCard,
   TopProductsCard,
+  VIEWS,
   type AnchorProductInsight,
   type CartMentalitySummaryData,
   type CartRevisionJourney,
@@ -1562,27 +1563,38 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         </div>
       )}
 
-      <ViewTabs
-        view={view}
-        views={views}
-        badges={viewBadges}
-        query={filterQuery(filters)}
-        trailing={
-          filterOpts ? (
-            <FilterBar compact value={filters} options={filterOpts} basePath="/dashboard" extra={{ view: view === "overview" ? undefined : view }} periodLabel={period.label} />
-          ) : undefined
-        }
-      />
-      <div className="-mt-3 mb-5 flex flex-col items-center gap-2 text-center sm:-mt-4">
-        <p className="text-xs text-muted">
-          <span className="font-semibold text-ink-2">{period.label}</span>
-          {period.prevLabel !== "before" && <> · compared with {prevLabel}</>}
-          {filtered && allowed && <> · {fmtNumber(allowed.length)} customer{allowed.length === 1 ? "" : "s"} in this filter</>}
-        </p>
-        {filterOpts && <ActiveFilters value={filters} options={filterOpts} basePath="/dashboard" extra={{ view: view === "overview" ? undefined : view }} />}
-      </div>
+      <ViewTabs view={view} views={views} badges={viewBadges} query={filterQuery(filters)} />
 
       <div key={view} className="animate-view-in">
+
+      {/* Each section carries its own filters: the period and who/what it covers, right above its figures. */}
+      <section
+        aria-label={`${VIEWS[view].label} filters`}
+        className="mb-4 rounded-card border border-line bg-panel px-3.5 py-3 shadow-xs sm:mb-5 sm:px-4"
+      >
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-ink">
+              {VIEWS[view].label} <span className="font-normal text-muted">· {period.label}</span>
+            </p>
+            <p className="mt-0.5 text-xs text-muted">
+              {period.prevLabel !== "before" ? <>Compared with {prevLabel}</> : VIEWS[view].hint}
+              {filtered && allowed && <> · {fmtNumber(allowed.length)} customer{allowed.length === 1 ? "" : "s"} in this filter</>}
+            </p>
+          </div>
+          {filterOpts && (
+            <FilterBar
+              value={filters}
+              options={filterOpts}
+              basePath="/dashboard"
+              extra={{ view: view === "overview" ? undefined : view }}
+              periodLabel={period.label}
+              className="shrink-0"
+            />
+          )}
+        </div>
+        {filterOpts && <ActiveFilters className="mt-2.5 border-t border-line pt-2.5" value={filters} options={filterOpts} basePath="/dashboard" extra={{ view: view === "overview" ? undefined : view }} />}
+      </section>
 
       {view === "overview" && (
         <>

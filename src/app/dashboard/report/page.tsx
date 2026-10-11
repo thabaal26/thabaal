@@ -111,7 +111,7 @@ export default async function ReportPage() {
                 minWidth={320}
                 height={130}
                 label="Paid sales per day last week"
-                columns={r.daily.map((d) => ({ key: d.key, label: d.label, parts: [{ key: "r", label: "Paid", value: d.revenue, color: "#059669" }] }))}
+                columns={r.daily.map((d) => ({ key: d.key, label: d.label, parts: [{ key: "r", label: "Paid", value: d.revenue, color: "emerald" }] }))}
               />
             </div>
           </Card>

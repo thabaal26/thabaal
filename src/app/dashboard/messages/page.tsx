@@ -150,11 +150,11 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
           <div className="border-b border-line bg-subtle/40 px-4 py-3">
             <DistributionBar
               segments={[
-                { key: "READ", label: "Read", value: readCount, color: "bg-brand", href: href(p, { status: "READ", page: undefined }) },
-                { key: "DELIVERED", label: "Delivered", value: deliveredOnlyCount, color: "bg-info", href: href(p, { status: "DELIVERED", page: undefined }) },
-                { key: "SENT", label: "Sent", value: sentOnlyCount, color: "bg-accent", href: href(p, { status: "SENT", page: undefined }) },
-                { key: "QUEUED", label: "Queued", value: queuedCount, color: "bg-gold", href: href(p, { status: "QUEUED", page: undefined }) },
-                { key: "FAILED", label: "Failed", value: failedCount, color: "bg-danger", href: href(p, { status: "FAILED", page: undefined }) },
+                { key: "READ", label: "Read", value: readCount, color: "violet", href: href(p, { status: "READ", page: undefined }) },
+                { key: "DELIVERED", label: "Delivered", value: deliveredOnlyCount, color: "emerald", href: href(p, { status: "DELIVERED", page: undefined }) },
+                { key: "SENT", label: "Sent", value: sentOnlyCount, color: "blue", href: href(p, { status: "SENT", page: undefined }) },
+                { key: "QUEUED", label: "Queued", value: queuedCount, color: "gold", href: href(p, { status: "QUEUED", page: undefined }) },
+                { key: "FAILED", label: "Failed", value: failedCount, color: "red", href: href(p, { status: "FAILED", page: undefined }) },
               ]}
             />
           </div>

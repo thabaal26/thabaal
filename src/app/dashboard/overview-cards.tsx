@@ -8,7 +8,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
-import { CountUp, DeliveryChronoDonut, Sparkline, TickRing, TrendChart, type Series } from "@/components/charts";
+import { CountUp, DeliveryDonut, HeatGrid, Sparkline, TrendChart, UsageGauge, type Series } from "@/components/charts";
+import { BarList, StackedRows } from "@/components/viz";
+import { cssColor } from "@/lib/chart-theme";
 import {
   ChartBar3D,
   Clock3D,
@@ -161,7 +163,7 @@ export function ActivityCard({ labels, tooltipLabels, series, every, title, desc
           <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-2">
             {series.map((s) => (
               <li key={s.key} className="flex items-center gap-1.5">
-                <span aria-hidden className="h-0.5 w-3 rounded-full" style={{ background: s.color }} />
+                <span aria-hidden className="h-0.5 w-3 rounded-full" style={{ background: cssColor(s.color) }} />
                 {s.label}
               </li>
             ))}
@@ -212,7 +214,7 @@ export function DeliveryCard({ read, delivered, sent, failed }: { read: number; 
         description="How many WhatsApp messages reached and were read by customers"
       />
       <div className="p-4 sm:p-5">
-        <DeliveryChronoDonut read={read} delivered={delivered} sent={sent} failed={failed} />
+        <DeliveryDonut read={read} delivered={delivered} sent={sent} failed={failed} />
       </div>
     </Card>
   );
@@ -226,13 +228,14 @@ const FUNNEL: {
   icon: ComponentType<{ className?: string }>;
   color: string;
 }[] = [
-  { key: "messaged", label: "Messaged", icon: Send3D, color: C.brand },
-  { key: "delivered", label: "Received it", icon: CheckCheck, color: C.brand },
-  { key: "read", label: "Read it", icon: Eye3D, color: C.read },
-  { key: "replied", label: "Replied / tapped button", icon: Messages3D, color: C.info },
-  { key: "browsed", label: "Viewed catalogue / price list", icon: BookOpen, color: "#0284c7" },
-  { key: "addedToCart", label: "Added to cart (sent cart)", icon: ShoppingCart, color: "#d97706" },
-  { key: "ordered", label: "Bought (paid / confirmed)", icon: ShoppingBag3D, color: C.gold },
+  // One hue for every step: a funnel is one quantity shrinking, not different things.
+  { key: "messaged", label: "Messaged", icon: Send3D, color: "emerald" },
+  { key: "delivered", label: "Received it", icon: CheckCheck, color: "emerald" },
+  { key: "read", label: "Read it", icon: Eye3D, color: "emerald" },
+  { key: "replied", label: "Replied / tapped button", icon: Messages3D, color: "emerald" },
+  { key: "browsed", label: "Viewed catalogue / price list", icon: BookOpen, color: "emerald" },
+  { key: "addedToCart", label: "Added to cart (sent cart)", icon: ShoppingCart, color: "emerald" },
+  { key: "ordered", label: "Bought (paid / confirmed)", icon: ShoppingBag3D, color: "emerald" },
 ];
 
 /** People, not messages: each step is a share of everyone messaged in the period. */
@@ -274,35 +277,18 @@ export function FunnelCard({
         description="Customers messaged this period, where they engaged, and where they dropped off"
       />
       {base ? (
-        <ul className="space-y-1 p-3 sm:p-4">
-          {steps.map((s) => {
-            const val = f[s.key] ?? 0;
-            const share = pct(val, base);
-            return (
-              <li key={s.key} className="group flex items-center gap-3 rounded-control px-2 py-1.5">
-                <span
-                  aria-hidden
-                  className="icon-cube-3d grid size-8 shrink-0 place-items-center rounded-[10px] text-white ring-1 ring-inset ring-white/40"
-                  style={{ background: brightCubeGradient(s.color), boxShadow: `inset 0 1.5px 0 rgb(255 255 255 / 0.65), inset 0 -2px 0 rgb(0 0 0 / 0.2), 0 4px 10px -3px ${s.color}88` }}
-                >
-                  <s.icon className="size-4" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline justify-between gap-2 text-sm">
-                    <span className="truncate font-medium text-ink">{s.label}</span>
-                    <span className="tabular shrink-0 text-ink-2">
-                      <b className="font-semibold text-ink">{fmtNumber(val)}</b> <span className="text-xs text-muted">· {share}%</span>
-                    </span>
-                  </div>
-                  <div className="track-3d mt-1 h-2 overflow-hidden rounded-full" role="meter" aria-label={`${s.label}: ${share}%`} aria-valuenow={share} aria-valuemin={0} aria-valuemax={100}>
-                    <div className="bar bar-3d h-full rounded-full" style={{ width: `${Math.max(share, val ? 2 : 0)}%`, backgroundColor: s.color }} />
-                  </div>
-                </div>
-              </li>
-            );
-          })}
+        <div className="space-y-3 p-4 sm:p-5">
+          <BarList
+            max={base}
+            label="Customers at each step, as a share of everyone messaged"
+            items={steps.map((s) => {
+              const val = f[s.key] ?? 0;
+              return { key: s.key, label: s.label, value: val, color: s.color, display: `${fmtNumber(val)} · ${pct(val, base)}%` };
+            })}
+          />
+          <ul className="space-y-1.5">
           {showOrders && (
-            <li className="mx-2 mt-2 space-y-1.5">
+            <li className="space-y-1.5">
               <div className="flex items-center justify-between rounded-control bg-gold-soft px-3 py-2 text-sm">
                 <span className="text-gold-deep">Confirmed sales from those buyers</span>
                 <span className="tabular font-semibold text-gold-deep">{formatValue(revenue, "inr")}</span>
@@ -318,7 +304,8 @@ export function FunnelCard({
               )}
             </li>
           )}
-        </ul>
+          </ul>
+        </div>
       ) : (
         <p className="p-5 text-sm text-muted">Nobody was messaged in this period yet.</p>
       )}
@@ -420,17 +407,16 @@ function LimitRing({ used, limit, left, label }: { used: number; limit: number |
   const reserve = limit !== null && left !== null ? Math.max(0, limit - used - left) : 0;
   return (
     <div className="flex items-center gap-4">
-      <TickRing
+      <UsageGauge
         value={Math.max(used, 0)}
         max={limit}
-        from={full ? "#fb8a8a" : "#4f93d8"}
-        to={full ? "#c93636" : "#16a37a"}
+        full={full}
         size={108}
         label={limit === null ? `${label}: no limit` : `${label}: ${used} of ${limit} people messaged`}
       >
         <span className="tabular text-lg font-semibold leading-none text-ink">{fmtNumber(used)}</span>
         <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-muted">{limit === null ? "no limit" : `of ${fmtNumber(limit)}`}</span>
-      </TickRing>
+      </UsageGauge>
       <div className="min-w-0 text-sm">
         <p className="tabular text-ink">
           <b className="font-semibold">{fmtNumber(used)}</b> of {limit === null ? "unlimited" : fmtNumber(limit)} people
@@ -524,46 +510,13 @@ export function BestTimeCard({ cells, days }: { cells: { d: number; b: number; n
             <p className="mb-4 text-sm text-ink-2">
               Most replies on <b className="font-semibold text-ink">{DAYS[best!.d]}</b>, <b className="font-semibold text-ink">{BLOCKS[best!.b]}</b>.
             </p>
-            <div className="thin-scroll overflow-x-auto">
-              <table className="w-full min-w-[30rem] border-separate border-spacing-1 text-xs">
-                <caption className="sr-only">Customer replies by weekday and time of day</caption>
-                <thead>
-                  <tr>
-                    <th scope="col" className="w-10" />
-                    {BLOCKS.map((b) => (
-                      <th key={b} scope="col" className="px-0.5 pb-1 text-center text-2xs font-normal text-muted">
-                        {b.replace(/ (am|pm)$/, "")}
-                        <span className="block">{b.match(/(am|pm)$/)?.[0]}</span>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {order.map((d) => (
-                    <tr key={d}>
-                      <th scope="row" className="pr-1 text-left font-normal text-muted">
-                        {DAYS[d]}
-                      </th>
-                      {BLOCKS.map((b, bi) => {
-                        const v = n(d, bi);
-                        const a = v ? 0.12 + 0.88 * (v / max) : 0;
-                        return (
-                          <td key={b} className="track-3d h-8 rounded-[6px] p-0 text-center" title={`${DAYS[d]} ${b}: ${v} replies`}>
-                            <span
-                              className={cn("grid size-full min-h-8 place-items-center rounded-[6px] font-semibold", v > 0 && "tile-3d")}
-                              style={{ background: v ? `linear-gradient(180deg, rgb(255 255 255 / 0.18), rgb(255 255 255 / 0)), rgb(22 125 99 / ${a})` : undefined, color: a > 0.55 ? "#fff" : "var(--color-ink-2)" }}
-                            >
-                              {v || ""}
-                              <span className="sr-only">{v ? "" : "0"}</span>
-                            </span>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <HeatGrid
+              label="Customer replies by weekday and time of day"
+              unit="Replies"
+              rows={order.map((d) => DAYS[d])}
+              cols={BLOCKS.map((b) => b.replace(" am", "a").replace(" pm", "p"))}
+              cells={order.flatMap((d, y) => BLOCKS.map((_, bi) => [bi, y, n(d, bi)] as [number, number, number]))}
+            />
           </>
         )}
       </div>
@@ -582,7 +535,6 @@ export type ProductDemandRow = {
 };
 
 export function TopProductsCard({ items, rangeLabel }: { items: ProductDemandRow[]; rangeLabel: string }) {
-  const max = Math.max(1, ...items.map((i) => i.revenue + (i.cartOnlyValue ?? 0)));
   return (
     <Card className="card-3d h-full">
       <CardHeader
@@ -597,62 +549,26 @@ export function TopProductsCard({ items, rangeLabel }: { items: ProductDemandRow
         }
       />
       {items.length ? (
-        <ol className="space-y-3 p-4 sm:p-5">
-          {items.map((it, i) => {
-            const cartQty = it.cartOnlyQty ?? 0;
-            const cartVal = it.cartOnlyValue ?? 0;
-            const boughtShare = pct(it.revenue, max);
-            const cartShare = pct(cartVal, max);
-            return (
-              <li key={it.name} className="flex items-start gap-3">
-                <span
-                  className={cn(
-                    "tabular tile-3d mt-0.5 grid size-7 shrink-0 place-items-center rounded-full text-xs font-semibold",
-                    i === 0 ? "text-white" : "bg-sunken text-ink-2",
-                  )}
-                  style={i === 0 ? { background: "linear-gradient(145deg, #f5d55c, #b98a05)" } : undefined}
-                >
-                  {i + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline justify-between gap-2 text-sm">
-                    <span className="truncate font-medium text-ink">{it.name}</span>
-                    <span className="tabular shrink-0 font-semibold text-ink">
-                      {formatValue(it.revenue, "inr")}
-                      {cartVal > 0 && (
-                        <span className="ml-1.5 text-xs font-normal text-warning">
-                          (+{formatValue(cartVal, "inr")} in cart)
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="mt-1 flex items-center gap-2">
-                    <div className="track-3d flex h-2 flex-1 overflow-hidden rounded-full">
-                      {it.revenue > 0 && (
-                        <div
-                          className="bar bar-3d h-full"
-                          style={{ width: `${Math.max(4, boughtShare)}%`, backgroundColor: C.gold }}
-                          title={`Bought: ${it.qty} (${formatValue(it.revenue, "inr")})`}
-                        />
-                      )}
-                      {cartVal > 0 && (
-                        <div
-                          className="bar h-full opacity-75"
-                          style={{ width: `${Math.max(4, cartShare)}%`, backgroundColor: "#f59e0b" }}
-                          title={`Added to cart, not paid: ${cartQty} (${formatValue(cartVal, "inr")})`}
-                        />
-                      )}
-                    </div>
-                    <span className="tabular shrink-0 text-right text-xs text-muted">
-                      {fmtNumber(it.qty)} sold
-                      {cartQty > 0 ? ` · ${fmtNumber(cartQty)} in cart` : ""}
-                    </span>
-                  </div>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
+        <div className="p-4 sm:p-5">
+          <StackedRows
+            format="inr"
+            label="Product demand: bought vs left in cart"
+            legend={[
+              { label: "Bought", color: "emerald" },
+              { label: "In cart, unpaid", color: "gold" },
+            ]}
+            rows={items.map((it) => ({
+              key: it.name,
+              label: it.name,
+              right: `${formatValue(it.revenue, "inr")}${(it.cartOnlyValue ?? 0) > 0 ? ` +${formatValue(it.cartOnlyValue ?? 0, "inr")}` : ""} · ${fmtNumber(it.qty)} sold`,
+              href: `/dashboard/customers?tag=${encodeURIComponent(`product:${it.name}`)}`,
+              parts: [
+                { key: "b", label: `Bought (${fmtNumber(it.qty)})`, value: it.revenue, color: "emerald" },
+                { key: "c", label: `In cart (${fmtNumber(it.cartOnlyQty ?? 0)})`, value: it.cartOnlyValue ?? 0, color: "gold" },
+              ],
+            }))}
+          />
+        </div>
       ) : (
         <p className="p-5 text-sm text-muted">No orders or carts in this period yet.</p>
       )}

@@ -57,3 +57,15 @@ export function formatValue(v: number, f: ValueFormat = "count") {
   if (f === "percent") return `${Math.round(v * 10) / 10}%`;
   return Math.round(v).toLocaleString("en-IN");
 }
+
+/** Short figures for axes and bar ends: 950, 1.2k, 3.4L (lakh), 1.1Cr (crore). */
+export function formatCompact(v: number, f: ValueFormat = "count") {
+  if (f === "percent") return `${Math.round(v)}%`;
+  const a = Math.abs(v);
+  const pre = f === "inr" ? "₹" : "";
+  const trim = (n: number) => (Math.round(n * 10) / 10).toString().replace(/\.0$/, "");
+  if (a >= 1e7) return `${pre}${trim(v / 1e7)}Cr`;
+  if (a >= 1e5) return `${pre}${trim(v / 1e5)}L`;
+  if (a >= 1e3) return `${pre}${trim(v / 1e3)}k`;
+  return `${pre}${Math.round(v)}`;
+}
