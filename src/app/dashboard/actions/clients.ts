@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { CLIENT_SECTIONS, sanitizeDisabledSections } from "@/lib/client-sections";
 import { CLIENT_COOKIE, requireAdmin } from "@/lib/session";
 import { HEX } from "@/lib/theme";
-import { listPhoneNumbers, waConfig } from "@/lib/whatsapp";
+import { enableMetaCalling, listPhoneNumbers, syncMetaBusinessProfile, waConfig } from "@/lib/whatsapp";
 import { refreshNumberStatus } from "@/lib/limits";
 import type { ActionResult } from "./templates";
 
@@ -151,20 +151,35 @@ export async function addClientNumber(
     },
   });
   await refreshNumberStatus(created, t);
+  const cfg = waConfig({ token: t, phoneNumberId: created.phoneNumberId, businessAccountId: created.businessAccountId });
+  await enableMetaCalling(cfg);
   refresh();
   return { ok: true, message: `${label} (${match.display_phone_number}) added${first ? " as the default number" : ""}.` };
 }
 
-/** Fetches every number's quality and messaging limit from Meta now. */
+/** Fetches every number's quality and messaging limit from Meta now, and ensures calling & profile are synced. */
 export async function refreshClientNumbers(clientId: string): Promise<ActionResult> {
   const s = await requireAdmin();
   if ("denied" in s) return { ok: false, message: s.denied };
   const c = await db.client.findUnique({ where: { id: clientId }, include: { numbers: true } });
   if (!c) return { ok: false, message: "Client not found." };
-  const results = await Promise.all(c.numbers.map((n) => refreshNumberStatus(n, c.waToken)));
+  const results = await Promise.all(
+    c.numbers.map(async (n) => {
+      const ok = await refreshNumberStatus(n, c.waToken);
+      const token = n.token ?? c.waToken;
+      if (token) {
+        const cfg = waConfig({ token, phoneNumberId: n.phoneNumberId, businessAccountId: n.businessAccountId });
+        await enableMetaCalling(cfg);
+        if (c.tagline || c.website) {
+          await syncMetaBusinessProfile(cfg, { about: c.tagline, website: c.website });
+        }
+      }
+      return ok;
+    }),
+  );
   refresh();
   const ok = results.filter(Boolean).length;
-  return ok === c.numbers.length ? { ok: true, message: "Quality and limits updated from Meta." } : { ok: false, message: `Updated ${ok} of ${c.numbers.length}. Check the token can reach the others.` };
+  return ok === c.numbers.length ? { ok: true, message: "Quality, calling settings, and limits updated from Meta." } : { ok: false, message: `Updated ${ok} of ${c.numbers.length}. Check the token can reach the others.` };
 }
 
 /** A lower daily limit than Meta's while a new number warms up. Empty clears it. */
@@ -253,10 +268,23 @@ export async function saveClientBranding(clientId: string, input: BrandingInput)
   if (v.website && !/^https?:\/\/\S+\.\S+/.test(v.website)) errors.push("Website should start with https://");
   if (v.tagline && v.tagline.length > 80) errors.push("Keep the tagline under 80 characters.");
   if (errors.length) return { ok: false, errors: [...new Set(errors)] };
-  if (!(await db.client.findUnique({ where: { id: clientId } }))) return { ok: false, message: "Client not found." };
+  const client = await db.client.findUnique({ where: { id: clientId }, include: { numbers: true } });
+  if (!client) return { ok: false, message: "Client not found." };
   await db.client.update({ where: { id: clientId }, data: v });
+  if (v.tagline || v.website) {
+    await Promise.all(
+      client.numbers.map((n) => {
+        const token = n.token ?? client.waToken;
+        if (!token) return Promise.resolve(false);
+        return syncMetaBusinessProfile(
+          waConfig({ token, phoneNumberId: n.phoneNumberId, businessAccountId: n.businessAccountId }),
+          { about: v.tagline, website: v.website },
+        );
+      }),
+    );
+  }
   refresh();
-  return { ok: true, message: "Branding saved. Their portal uses it from the next page load." };
+  return { ok: true, message: "Branding saved and synced to WhatsApp Business Profile." };
 }
 
 const ACCESS = ["MANAGER", "STAFF", "VIEWER"] as const;

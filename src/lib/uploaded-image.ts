@@ -30,8 +30,22 @@ export async function storePublicImage(opts: {
   origin?: string;
 }): Promise<string> {
   const buf = Buffer.isBuffer(opts.bytes) ? opts.bytes : Buffer.from(opts.bytes);
-  const contentType = opts.contentType.includes("png") ? "image/png" : "image/jpeg";
-  const ext = contentType === "image/png" ? "png" : "jpg";
+  const ct = opts.contentType.toLowerCase();
+  const contentType = ct.includes("pdf")
+    ? "application/pdf"
+    : ct.includes("png")
+      ? "image/png"
+      : ct.includes("webp")
+        ? "image/webp"
+        : "image/jpeg";
+  const ext =
+    contentType === "application/pdf"
+      ? "pdf"
+      : contentType === "image/png"
+        ? "png"
+        : contentType === "image/webp"
+          ? "webp"
+          : "jpg";
   const safeName = (opts.filename ?? `header.${ext}`).replace(/[^\w.-]+/g, "-").slice(-80);
 
   if (process.env.BLOB_READ_WRITE_TOKEN) {
@@ -43,7 +57,7 @@ export async function storePublicImage(opts: {
       });
       return blob.url;
     } catch (e) {
-      console.warn("Vercel Blob unavailable, falling back to built-in DB image storage:", e instanceof Error ? e.message : e);
+      console.warn("Vercel Blob unavailable, falling back to built-in DB media storage:", e instanceof Error ? e.message : e);
     }
   }
 

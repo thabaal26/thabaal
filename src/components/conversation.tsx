@@ -1,4 +1,4 @@
-import { Check, CheckCheck, CircleAlert, Clock } from "lucide-react";
+import { Check, CheckCheck, CircleAlert, Clock, FileText } from "lucide-react";
 import { ReplyMedia } from "@/components/reply-media";
 import { cn } from "@/lib/cn";
 import { fmtDate } from "@/lib/format";
@@ -6,6 +6,15 @@ import { fmtDate } from "@/lib/format";
 export type ConversationEntry =
   | { at: Date; type: "out"; id: string; template: string; campaign: string | null; status: string; body: string | null; readAt: Date | null; error: string | null; via: string | null }
   | { at: Date; type: "in"; id: string; text: string; kind: string; mediaId: string | null; mediaType: string | null; via: string | null };
+
+/** Extracts an optional `[Media: https://...]` attachment tag from an outbound message body. */
+function parseOutboundBody(body: string | null): { text: string; mediaUrl: string | null } {
+  if (!body) return { text: "", mediaUrl: null };
+  const match = body.match(/\[Media:\s*(https?:\/\/[^\]\s]+)\]/i);
+  if (!match) return { text: body, mediaUrl: null };
+  const text = body.replace(match[0], "").trim();
+  return { text, mediaUrl: match[1] };
+}
 
 /** WhatsApp-style ticks for an outgoing message, always with words for screen readers. */
 function Ticks({ status }: { status: string }) {
@@ -72,7 +81,33 @@ export function Conversation({ entries, className }: { entries: ConversationEntr
                   <span className="font-mono">{r.entry.template}</span>
                   {r.entry.campaign && <span className="text-muted">· {r.entry.campaign}</span>}
                 </p>
-                {r.entry.body && <p className="line-clamp-6 whitespace-pre-wrap [overflow-wrap:anywhere]">{r.entry.body}</p>}
+                {(() => {
+                  const { text, mediaUrl } = parseOutboundBody(r.entry.body);
+                  const isPdf = mediaUrl ? /\.pdf(\?|$)/i.test(mediaUrl) : false;
+                  return (
+                    <>
+                      {mediaUrl && (
+                        isPdf ? (
+                          <a
+                            href={mediaUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mb-1.5 flex items-center gap-2 rounded-control border border-black/10 bg-white/70 px-3 py-2 text-xs font-medium text-brand-deep hover:underline"
+                          >
+                            <FileText aria-hidden className="size-4 shrink-0" />
+                            <span className="truncate">Open PDF attachment</span>
+                          </a>
+                        ) : (
+                          <a href={mediaUrl} target="_blank" rel="noreferrer" className="mb-1.5 block overflow-hidden rounded-control border border-black/10">
+                            {/* eslint-disable-next-line @next/next/no-img-element -- outbound attachment preview */}
+                            <img src={mediaUrl} alt="Sent attachment" className="max-h-56 w-auto object-cover" />
+                          </a>
+                        )
+                      )}
+                      {text && <p className="line-clamp-6 whitespace-pre-wrap [overflow-wrap:anywhere]">{text}</p>}
+                    </>
+                  );
+                })()}
                 {r.entry.error && <p className="mt-1 text-xs text-danger">{r.entry.error}</p>}
                 <p className="tabular mt-1 flex flex-wrap items-center justify-end gap-1.5 text-2xs text-muted">
                   {r.entry.via && <span>from {r.entry.via} ·</span>}

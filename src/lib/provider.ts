@@ -2,7 +2,7 @@ import "server-only";
 import { headerImageFor } from "./media";
 import type { Setting, Template } from "@prisma/client";
 import { db } from "./db";
-import { renderFor, toPlainText, type TemplateButton, type VarMap } from "./template";
+import { placeholders, renderFor, resolveVar, toPlainText, type TemplateButton, type VarMap } from "./template";
 import { getSession, sendImage, sendText, type WahaConfig } from "./waha";
 import { sendTemplateMessage, waConfig, type WaConfig } from "./whatsapp";
 
@@ -44,13 +44,14 @@ export type Sendable = Pick<
 export async function deliver(
   s: Setting,
   t: Sendable,
-  customer: { name: string; phone: string },
+  customer: { name: string; phone: string; location?: string | null; purchases?: string | null },
   cfg: WaConfig = waConfig(),
   otpCode?: string,
 ) {
   const isAuth = t.category === "AUTHENTICATION";
   const resolvedOtp = isAuth ? (otpCode?.trim() || String(Math.floor(100000 + Math.random() * 900000))) : null;
-  const r = renderFor({ ...t, headerText: t.headerText ?? "", footer: t.footer ?? "", variables: t.variables as VarMap }, customer);
+  const varMap = (t.variables ?? {}) as VarMap;
+  const r = renderFor({ ...t, headerText: t.headerText ?? "", footer: t.footer ?? "", variables: varMap }, customer);
   const provider = s.provider as ProviderName;
   // A template without its own picture uses the client's default image.
   const image = isAuth ? null : await headerImageFor(t);
@@ -78,6 +79,14 @@ export async function deliver(
   const catalogThumbnailProductId =
     catBtn && catBtn.type === "CATALOG" ? (catBtn.thumbnailProductId?.trim() || null) : null;
 
+  const urlButtonParams = buttons
+    .map((b, index) => {
+      if (b.type !== "URL" || !placeholders(b.url ?? "").length) return null;
+      const value = b.urlExample?.trim() || resolveVar(varMap[`b${index}`] ?? { source: "phone" }, customer);
+      return { index, value };
+    })
+    .filter((x): x is { index: number; value: string } => x !== null);
+
   const text = isAuth
     ? `${resolvedOtp} is your verification code.${t.securityNote ? " For your security, do not share this code." : ""}`
     : [r.header, r.body, r.footer].filter(Boolean).join("\n\n");
@@ -91,6 +100,7 @@ export async function deliver(
     bodyParams: r.bodyParams,
     catalogButtonIndex: catIdx,
     catalogThumbnailProductId,
+    urlButtonParams,
     otpCode: resolvedOtp,
   });
   return { ...res, provider, text };

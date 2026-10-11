@@ -35,7 +35,7 @@ export function absoluteUrl(rawPath: string | null | undefined) {
  */
 export async function resolveImageBytes(
   urlOrPath: string,
-): Promise<{ bytes: Buffer; mimeType: "image/jpeg" | "image/png"; filename: string } | null> {
+): Promise<{ bytes: Buffer; mimeType: "image/jpeg" | "image/png" | "image/webp" | "application/pdf"; filename: string } | null> {
   const clean = urlOrPath.trim();
   if (!clean) return null;
 
@@ -48,11 +48,25 @@ export async function resolveImageBytes(
     // keep as-is
   }
 
-  const detectFormat = (buf: Buffer, fallbackName = "header"): { bytes: Buffer; mimeType: "image/jpeg" | "image/png"; filename: string } => {
+  const detectFormat = (
+    buf: Buffer,
+    fallbackName = "header",
+  ): { bytes: Buffer; mimeType: "image/jpeg" | "image/png" | "image/webp" | "application/pdf"; filename: string } => {
+    const isPdf = buf.length >= 4 && buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46;
     const isPng = buf.length >= 4 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
-    const mimeType = isPng ? "image/png" : "image/jpeg";
-    const ext = isPng ? "png" : "jpg";
-    const base = path.basename(fallbackName).replace(/\.[a-z0-9]+$/i, "").replace(/[^\w.-]+/g, "-") || "header";
+    const isWebp =
+      buf.length >= 12 &&
+      buf[0] === 0x52 &&
+      buf[1] === 0x49 &&
+      buf[2] === 0x46 &&
+      buf[3] === 0x46 &&
+      buf[8] === 0x57 &&
+      buf[9] === 0x45 &&
+      buf[10] === 0x42 &&
+      buf[11] === 0x50;
+    const mimeType = isPdf ? "application/pdf" : isPng ? "image/png" : isWebp ? "image/webp" : "image/jpeg";
+    const ext = isPdf ? "pdf" : isPng ? "png" : isWebp ? "webp" : "jpg";
+    const base = path.basename(fallbackName).replace(/\.[a-z0-9]+$/i, "").replace(/[^\w.-]+/g, "-") || "attachment";
     return { bytes: buf, mimeType, filename: `${base}.${ext}` };
   };
 

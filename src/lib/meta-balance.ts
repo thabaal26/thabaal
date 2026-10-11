@@ -33,6 +33,36 @@ export type MetaAccountAlert = {
 };
 
 const recentAccountAlerts: MetaAccountAlert[] = [];
+let alertsTableEnsured = false;
+
+async function ensureAlertsTable() {
+  if (alertsTableEnsured) return;
+  try {
+    await db.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "PortalMetaAlert" (
+        "id" TEXT PRIMARY KEY,
+        "wabaId" TEXT,
+        "clientId" TEXT,
+        "field" TEXT NOT NULL,
+        "title" TEXT NOT NULL,
+        "detail" TEXT NOT NULL,
+        "receivedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    alertsTableEnsured = true;
+    const rows = await db.$queryRaw<MetaAccountAlert[]>`
+      SELECT "id", "wabaId", "clientId", "field", "title", "detail", "receivedAt"::text AS "receivedAt"
+      FROM "PortalMetaAlert"
+      ORDER BY "receivedAt" DESC
+      LIMIT 30
+    `;
+    if (rows.length && recentAccountAlerts.length === 0) {
+      recentAccountAlerts.push(...rows);
+    }
+  } catch {
+    // ignore if DB not reachable during startup
+  }
+}
 
 /** Records an account_update or account_alerts webhook event from Meta so it surfaces in dashboard notifications. */
 export async function recordMetaAccountAlert(params: {
@@ -40,6 +70,7 @@ export async function recordMetaAccountAlert(params: {
   field: "account_update" | "account_alerts";
   value: Record<string, unknown>;
 }) {
+  await ensureAlertsTable();
   const wabaId = params.wabaId ? String(params.wabaId) : null;
   const num = wabaId
     ? await db.whatsAppNumber.findFirst({ where: { businessAccountId: wabaId }, select: { clientId: true, label: true } }).catch(() => null)
@@ -64,10 +95,16 @@ export async function recordMetaAccountAlert(params: {
   };
   recentAccountAlerts.unshift(alert);
   if (recentAccountAlerts.length > 50) recentAccountAlerts.length = 50;
+  await db.$executeRaw`
+    INSERT INTO "PortalMetaAlert" ("id", "wabaId", "clientId", "field", "title", "detail", "receivedAt")
+    VALUES (${alert.id}, ${alert.wabaId}, ${alert.clientId}, ${alert.field}, ${alert.title}, ${alert.detail}, NOW())
+    ON CONFLICT ("id") DO NOTHING
+  `.catch(() => null);
   return alert;
 }
 
 export function getMetaAccountAlerts(clientId?: string | null): MetaAccountAlert[] {
+  void ensureAlertsTable();
   if (!clientId) return recentAccountAlerts;
   return recentAccountAlerts.filter((a) => !a.clientId || a.clientId === clientId);
 }

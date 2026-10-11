@@ -1,15 +1,15 @@
 "use client";
 
-import { Ban, ChevronRight, Download, FileUp, MoreHorizontal, QrCode, Sheet as SheetIcon, Trash2, UserCheck, UserPlus, UsersRound } from "lucide-react";
+import { AlertCircle, Ban, Check, ChevronRight, Download, FileUp, MoreHorizontal, Pencil, QrCode, Sheet as SheetIcon, Trash2, UserCheck, UserPlus, UsersRound, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { confirmAction } from "@/components/confirm";
 import { toastResult } from "@/components/toast";
 import { Sheet } from "@/components/sheet";
-import { Button, buttonClass, Field } from "@/components/ui";
+import { Badge, Button, buttonClass, Field } from "@/components/ui";
 import { cn } from "@/lib/cn";
-import { importCustomers, saveCustomer } from "../actions/customers";
+import { deletePendingCustomer, importCustomers, promotePendingCustomer, saveCustomer } from "../actions/customers";
 
 const LINKS = [
   { href: "/dashboard/customers/grow", label: "Get more customers", icon: QrCode, manager: false },
@@ -95,13 +95,14 @@ export function CustomerActions({
         </ul>
       </Sheet>
       <Sheet open={open === "add" || open === "import"} onClose={() => setOpen(null)} title={open === "add" ? "Add customer" : "Import customers"}>
-        {open === "add" ? <AddForm done={() => setOpen(null)} /> : <ImportForm done={() => setOpen(null)} />}
+        {open === "add" ? <CustomerForm id={null} done={() => setOpen(null)} /> : <ImportForm done={() => setOpen(null)} />}
       </Sheet>
     </>
   );
 }
 
 const CONSENT = ["Bought from us and gave their number", "Signed up at the shop or stall", "Messaged us on WhatsApp first", "Website or online form", "Asked to join over the phone"];
+const REGIONS = ["Madurai city", "Outside Madurai", "Not sure"] as const;
 
 /** Meta requires customers to have agreed to WhatsApp messages; this records how. */
 function ConsentField({ id, value, onChange }: { id: string; value: string; onChange: (v: string) => void }) {
@@ -116,8 +117,36 @@ function ConsentOptions({ id }: { id: string }) {
   return <datalist id={`${id}-opts`}>{CONSENT.map((c) => <option key={c} value={c} />)}</datalist>;
 }
 
-function AddForm({ done }: { done: () => void }) {
-  const [v, setV] = useState({ name: "", phone: "", tags: "", optInSource: CONSENT[0] });
+export type EditableCustomer = {
+  id: string;
+  name: string;
+  phone: string;
+  tags: string;
+  location: string;
+  locationRaw: string;
+  region: string;
+  purchases: string;
+};
+
+function CustomerForm({
+  id,
+  initial,
+  done,
+}: {
+  id: string | null;
+  initial?: Omit<EditableCustomer, "id">;
+  done: () => void;
+}) {
+  const [v, setV] = useState({
+    name: initial?.name ?? "",
+    phone: initial?.phone ?? "",
+    tags: initial?.tags ?? "",
+    location: initial?.location ?? "",
+    locationRaw: initial?.locationRaw ?? "",
+    region: initial?.region || "Madurai city",
+    purchases: initial?.purchases ?? "",
+    optInSource: CONSENT[0],
+  });
   const [pending, start] = useTransition();
   const router = useRouter();
   return (
@@ -126,9 +155,12 @@ function AddForm({ done }: { done: () => void }) {
       onSubmit={(e) => {
         e.preventDefault();
         start(async () => {
-          const r = await saveCustomer(null, v);
+          const r = await saveCustomer(id, v);
           toastResult(r);
-          if (r.ok) { done(); router.refresh(); }
+          if (r.ok) {
+            done();
+            router.refresh();
+          }
         });
       }}
     >
@@ -138,13 +170,195 @@ function AddForm({ done }: { done: () => void }) {
       <Field id="p" label="WhatsApp number" hint="10-digit numbers get +91" required>
         <input type="tel" inputMode="tel" autoComplete="tel" className="field" placeholder="+91 98765 43210" value={v.phone} onChange={(e) => setV({ ...v, phone: e.target.value })} />
       </Field>
-      <Field id="t" label="Tags" hint="comma separated, optional">
-        <input className="field" placeholder="vip, chennai" value={v.tags} onChange={(e) => setV({ ...v, tags: e.target.value })} />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Field id="loc" label="Area / locality" hint="e.g. Anna Nagar, Sellur">
+          <input className="field" placeholder="Anna Nagar" value={v.location} onChange={(e) => setV({ ...v, location: e.target.value })} />
+        </Field>
+        <Field id="reg" label="Delivery region">
+          <select className="field" value={v.region} onChange={(e) => setV({ ...v, region: e.target.value })}>
+            {REGIONS.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+      <Field id="loc-raw" label="Full street address / notes" hint="optional">
+        <input className="field" placeholder="Door no, street, landmark…" value={v.locationRaw} onChange={(e) => setV({ ...v, locationRaw: e.target.value })} />
       </Field>
-      <ConsentField id="consent-add" value={v.optInSource} onChange={(optInSource) => setV({ ...v, optInSource })} />
-      <ConsentOptions id="consent-add" />
-      <Button type="submit" className="w-full" loading={pending}>Add customer</Button>
+      <Field id="purch" label="What they bought" hint="optional">
+        <input className="field" placeholder="Coconut oil (1 ltr), Gingelly oil (500ml)" value={v.purchases} onChange={(e) => setV({ ...v, purchases: e.target.value })} />
+      </Field>
+      <Field id="t" label="Tags" hint="comma separated, optional">
+        <input className="field" placeholder="vip, coconut-oil" value={v.tags} onChange={(e) => setV({ ...v, tags: e.target.value })} />
+      </Field>
+      {!id && (
+        <>
+          <ConsentField id="consent-add" value={v.optInSource} onChange={(optInSource) => setV({ ...v, optInSource })} />
+          <ConsentOptions id="consent-add" />
+        </>
+      )}
+      <Button type="submit" className="w-full" loading={pending}>
+        {id ? "Save changes" : "Add customer"}
+      </Button>
     </form>
+  );
+}
+
+/** Button + sheet to edit an existing customer's profile, address, region, purchases and tags. */
+export function EditCustomerButton({ customer }: { customer: EditableCustomer }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
+        <Pencil aria-hidden className="size-3.5" /> Edit details
+      </Button>
+      <Sheet open={open} onClose={() => setOpen(false)} title={`Edit ${customer.name}`}>
+        <CustomerForm id={customer.id} initial={customer} done={() => setOpen(false)} />
+      </Sheet>
+    </>
+  );
+}
+
+export type PendingCustomerRow = {
+  id: string;
+  name: string | null;
+  rawPhone: string | null;
+  location: string | null;
+  payment: string | null;
+  items: string | null;
+  notes: string | null;
+  page: string | null;
+};
+
+/** Banner + Sheet on `/dashboard/customers` for reviewing `PendingCustomer` records transcribed without a clear phone number. */
+export function PendingCustomersBanner({ rows }: { rows: PendingCustomerRow[] }) {
+  const [open, setOpen] = useState(false);
+  if (!rows.length) return null;
+
+  return (
+    <>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-card border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-sm">
+        <div className="flex items-start gap-2.5">
+          <AlertCircle aria-hidden className="mt-0.5 size-4 shrink-0 text-amber-700" />
+          <div>
+            <p className="font-semibold text-ink">
+              {rows.length} customer{rows.length === 1 ? "" : "s"} from order sheets need a phone number
+            </p>
+            <p className="text-xs text-muted">
+              These entries had missing, partial, or dual phone numbers when imported. Add a mobile number to move them into your active directory.
+            </p>
+          </div>
+        </div>
+        <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+          Review {rows.length} pending
+        </Button>
+      </div>
+
+      <Sheet open={open} onClose={() => setOpen(false)} title={`Pending customers (${rows.length})`}>
+        <div className="space-y-3">
+          <p className="text-xs text-muted">
+            Enter a 10-digit mobile number for any customer below to move them into your WhatsApp directory, or dismiss entries that can&apos;t be recovered.
+          </p>
+          <ul className="space-y-3">
+            {rows.map((r) => (
+              <PendingRowItem key={r.id} row={r} />
+            ))}
+          </ul>
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+function PendingRowItem({ row }: { row: PendingCustomerRow }) {
+  const router = useRouter();
+  const firstTenDigits = row.rawPhone?.match(/\d{10}/)?.[0] ?? row.rawPhone?.replace(/[^\d+]/g, "") ?? "";
+  const [name, setName] = useState(!row.name || row.name === "(name unclear)" ? "" : row.name);
+  const [phone, setPhone] = useState(firstTenDigits);
+  const [location, setLocation] = useState(row.location ?? "");
+  const [busy, start] = useTransition();
+
+  return (
+    <li className="space-y-2.5 rounded-card border border-line bg-panel p-3 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-1.5">
+        <span className="font-semibold text-ink">{row.name || "(name unclear)"}</span>
+        <div className="flex flex-wrap gap-1">
+          {row.rawPhone && <Badge tone="amber">Raw: {row.rawPhone}</Badge>}
+          {row.page && <Badge tone="gray">Page {row.page}</Badge>}
+        </div>
+      </div>
+      {(row.items || row.notes) && (
+        <p className="text-muted">
+          {row.items && <span>Bought: {row.items}</span>}
+          {row.items && row.notes && " · "}
+          {row.notes && <span>Note: {row.notes}</span>}
+        </p>
+      )}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <input
+          className="field py-1.5 text-xs"
+          placeholder="Customer name"
+          aria-label="Customer name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <input
+          className="field font-mono py-1.5 text-xs"
+          type="tel"
+          inputMode="tel"
+          placeholder="10-digit phone"
+          aria-label="WhatsApp phone number"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+        />
+        <input
+          className="field py-1.5 text-xs"
+          placeholder="Area (optional)"
+          aria-label="Customer area"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+        />
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={busy}
+          onClick={() =>
+            start(async () => {
+              const res = await deletePendingCustomer(row.id);
+              toastResult(res);
+              if (res.ok) router.refresh();
+            })
+          }
+        >
+          <X aria-hidden className="size-3.5" /> Dismiss
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          disabled={busy || !phone.trim() || !name.trim()}
+          loading={busy}
+          onClick={() =>
+            start(async () => {
+              const res = await promotePendingCustomer(row.id, {
+                name,
+                phone,
+                location,
+                purchases: row.items ?? undefined,
+              });
+              toastResult(res);
+              if (res.ok) router.refresh();
+            })
+          }
+        >
+          <Check aria-hidden className="size-3.5" /> Add to directory
+        </Button>
+      </div>
+    </li>
   );
 }
 

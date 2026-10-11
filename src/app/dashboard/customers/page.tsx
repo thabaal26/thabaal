@@ -13,7 +13,7 @@ import { marketingPaused } from "@/lib/held";
 import { customerFilters, customerWhere } from "@/lib/customer-query";
 import { getScope, owned } from "@/lib/session";
 import { deleteCustomer, setOptOut } from "../actions/customers";
-import { CustomerActions, CustomerMenu } from "./customer-tools";
+import { CustomerActions, CustomerMenu, PendingCustomersBanner } from "./customer-tools";
 
 export const metadata: Metadata = { title: "Customers" };
 export const dynamic = "force-dynamic";
@@ -31,7 +31,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
   const where = customerWhere(scope, { q, tag, area });
   const filterQs = new URLSearchParams(Object.entries({ q, tag, area }).filter(([, v]) => v) as [string, string][]);
   const exportHref = `/api/customers/export${filterQs.size ? `?${filterQs}` : ""}`;
-  const [rows, total, tags, areas, totalAll, optedOutCount] = await Promise.all([
+  const [rows, total, tags, areas, totalAll, optedOutCount, pendingRows] = await Promise.all([
     db.customer.findMany({
       where,
       include: {
@@ -49,6 +49,13 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
     db.customer.groupBy({ by: ["region", "location"], where: owned(scope), _count: true }),
     db.customer.count({ where: owned(scope) }),
     db.customer.count({ where: { ...owned(scope), OR: [{ optedOut: true }, { unreachable: true }] } }),
+    scope.canManage
+      ? db.pendingCustomer.findMany({
+          where: owned(scope),
+          orderBy: { createdAt: "desc" },
+          select: { id: true, name: true, rawPhone: true, location: true, payment: true, items: true, notes: true, page: true },
+        })
+      : Promise.resolve([]),
   ]);
   // Customers Meta is currently holding marketing back from (their campaign messages wait).
   const paused = await marketingPaused(rows.map((c) => c.id));
@@ -100,6 +107,8 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
         inlineActions
         actions={scope.clientId || scope.isAdmin ? <CustomerActions canManage={scope.canManage} hasClient={!!scope.clientId} exportHref={scope.canManage && total > 0 ? exportHref : null} exportCount={total} /> : undefined}
       />
+
+      {scope.canManage && pendingRows.length > 0 && <PendingCustomersBanner rows={pendingRows} />}
 
       <section aria-label="Customer summary" className="mb-4 grid grid-cols-2 gap-2.5 sm:mb-5 sm:gap-3.5 lg:grid-cols-4">
         <Stat

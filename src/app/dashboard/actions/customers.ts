@@ -8,22 +8,126 @@ import type { ActionResult } from "./templates";
 
 const parseTags = (s: string) => [...new Set(s.split(/[,;|]/).map((t) => t.trim().toLowerCase()).filter(Boolean))];
 
-export async function saveCustomer(id: string | null, input: { name: string; phone: string; tags: string; optInSource?: string }): Promise<ActionResult> {
-  const s = await requireManager(true);
+export type CustomerInput = {
+  name: string;
+  phone: string;
+  tags: string;
+  optInSource?: string;
+  location?: string;
+  locationRaw?: string;
+  region?: string;
+  purchases?: string;
+};
+
+const VALID_REGIONS = ["Madurai city", "Outside Madurai", "Not sure"] as const;
+
+export async function saveCustomer(id: string | null, input: CustomerInput): Promise<ActionResult> {
+  const s = id ? await requireManager() : await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
+  const existing = id ? await db.customer.findFirst({ where: { id, ...owned(s) } }) : null;
+  if (id && !existing) return { ok: false, message: "Customer not found." };
+  const clientId = existing?.clientId ?? s.clientId!;
+
   const phone = normalizePhone(input.phone);
   if (!input.name.trim()) return { ok: false, message: "Enter the customer's name." };
   if (!phone) return { ok: false, message: "Enter a valid mobile number with country code." };
-  const clash = await db.customer.findUnique({ where: { clientId_phone: { clientId: s.clientId, phone } } });
+  const clash = await db.customer.findUnique({ where: { clientId_phone: { clientId, phone } } });
   if (clash && clash.id !== id) return { ok: false, message: `+${phone} already belongs to ${clash.name}.` };
-  const data = { name: input.name.trim(), phone, tags: parseTags(input.tags) };
-  if (id) await db.customer.update({ where: { id, clientId: s.clientId }, data });
-  else {
+
+  const location = input.location !== undefined ? (input.location.trim() || null) : undefined;
+  const locationRaw = input.locationRaw !== undefined ? (input.locationRaw.trim() || null) : undefined;
+  const region =
+    input.region !== undefined
+      ? VALID_REGIONS.includes(input.region as (typeof VALID_REGIONS)[number])
+        ? input.region
+        : location
+          ? "Madurai city"
+          : null
+      : undefined;
+  const purchases = input.purchases !== undefined ? (input.purchases.trim() || null) : undefined;
+
+  const data = {
+    name: input.name.trim(),
+    phone,
+    tags: parseTags(input.tags),
+    ...(location !== undefined && { location }),
+    ...(locationRaw !== undefined && { locationRaw }),
+    ...(region !== undefined && { region }),
+    ...(purchases !== undefined && { purchases }),
+  };
+
+  if (id) {
+    await db.customer.update({ where: { id }, data });
+    revalidatePath(`/dashboard/customers/${id}`);
+  } else {
     if (!input.optInSource?.trim()) return { ok: false, message: "Note how the customer agreed to WhatsApp messages; Meta requires it." };
-    await db.customer.create({ data: { ...data, clientId: s.clientId, optInSource: input.optInSource.trim(), optInAt: new Date() } });
+    await db.customer.create({ data: { ...data, clientId, optInSource: input.optInSource.trim(), optInAt: new Date() } });
   }
   revalidatePath("/dashboard/customers");
-  return { ok: true, message: id ? "Customer updated." : "Customer added." };
+  return { ok: true, message: id ? "Customer details updated." : "Customer added." };
+}
+
+/** Promotes a PendingCustomer (from transcribed paper order sheets) into an active Customer once their phone number is verified. */
+export async function promotePendingCustomer(
+  pendingId: string,
+  input: { name: string; phone: string; location?: string; region?: string; purchases?: string; optInSource?: string },
+): Promise<ActionResult> {
+  const s = await requireManager();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const row = await db.pendingCustomer.findFirst({ where: { id: pendingId, ...owned(s) } });
+  if (!row) return { ok: false, message: "Pending entry not found." };
+
+  const phone = normalizePhone(input.phone);
+  if (!input.name.trim() || input.name.trim() === "(name unclear)") {
+    return { ok: false, message: "Enter the customer's name before adding them." };
+  }
+  if (!phone) return { ok: false, message: "Enter a valid 10-digit mobile number (or number with country code)." };
+
+  const location = input.location?.trim() || row.location || null;
+  const region =
+    input.region && VALID_REGIONS.includes(input.region as (typeof VALID_REGIONS)[number])
+      ? input.region
+      : location
+        ? "Madurai city"
+        : null;
+  const purchases = input.purchases?.trim() || row.items || null;
+  const optInSource = input.optInSource?.trim() || "Bought from us and gave their number";
+
+  await db.$transaction([
+    db.customer.upsert({
+      where: { clientId_phone: { clientId: row.clientId, phone } },
+      update: {
+        name: input.name.trim(),
+        ...(location && { location }),
+        ...(region && { region }),
+        ...(purchases && { purchases }),
+      },
+      create: {
+        clientId: row.clientId,
+        name: input.name.trim(),
+        phone,
+        location,
+        region,
+        purchases,
+        tags: [],
+        optInSource,
+        optInAt: new Date(),
+      },
+    }),
+    db.pendingCustomer.delete({ where: { id: row.id } }),
+  ]);
+
+  revalidatePath("/dashboard/customers");
+  return { ok: true, message: `${input.name.trim()} added to customer directory.` };
+}
+
+export async function deletePendingCustomer(pendingId: string): Promise<ActionResult> {
+  const s = await requireManager();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const r = await db.pendingCustomer.deleteMany({ where: { id: pendingId, ...owned(s) } });
+  if (!r.count) return { ok: false, message: "Pending entry not found." };
+  revalidatePath("/dashboard/customers");
+  return { ok: true, message: "Pending entry dismissed." };
 }
 
 /** Splits one CSV line, honouring double quotes. */

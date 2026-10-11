@@ -28,6 +28,8 @@ const SOURCES: { value: VarSource["source"]; label: string }[] = [
   { value: "name", label: "Customer full name" },
   { value: "first_name", label: "Customer first name" },
   { value: "phone", label: "Customer phone" },
+  { value: "location", label: "Customer area / location" },
+  { value: "purchases", label: "What they bought" },
   { value: "static", label: "Fixed text" },
 ];
 

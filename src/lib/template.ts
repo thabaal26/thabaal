@@ -12,12 +12,17 @@ export type TemplateButton = {
   type: "QUICK_REPLY" | "URL" | "PHONE_NUMBER" | "COPY_CODE" | "ORDER_DETAILS" | "CATALOG";
   text: string;
   url?: string;
+  /** Optional example suffix value when a URL button ends with {{1}}, e.g. "order-101". */
+  urlExample?: string;
   phone?: string;
   /** Optional SKU (retailer_id) of the product whose image WhatsApp shows on a CATALOG button. */
   thumbnailProductId?: string;
 };
 
-export type VarSource = { source: "name" | "first_name" | "phone" | "static"; value?: string };
+export type VarSource = {
+  source: "name" | "first_name" | "phone" | "location" | "purchases" | "static";
+  value?: string;
+};
 export type VarMap = Record<string, VarSource>;
 
 export type TemplateDraft = {
@@ -37,7 +42,12 @@ export type TemplateDraft = {
   businessAccountId?: string | null;
 };
 
-export type CustomerLike = { name: string; phone: string };
+export type CustomerLike = {
+  name: string;
+  phone: string;
+  location?: string | null;
+  purchases?: string | null;
+};
 
 export const LANGUAGES = [
   { code: "en", label: "English" },
@@ -60,7 +70,12 @@ export const CATEGORY_INFO: Record<Category, { label: string; hint: string }> = 
   AUTHENTICATION: { label: "Authentication", hint: "One-time passcodes. Meta fixes the wording." },
 };
 
-export const SAMPLE_CUSTOMER: CustomerLike = { name: "Priya Sharma", phone: "919876543210" };
+export const SAMPLE_CUSTOMER: CustomerLike = {
+  name: "Priya Sharma",
+  phone: "919876543210",
+  location: "Anna Nagar",
+  purchases: "Cold-pressed coconut oil",
+};
 
 /** Placeholder numbers used in a string, e.g. "Hi {{1}}, {{2}}" → [1, 2]. */
 export function placeholders(text: string) {
@@ -73,6 +88,10 @@ export function resolveVar(v: VarSource | undefined, c: CustomerLike) {
       return c.name.trim().split(/\s+/)[0] || "there";
     case "phone":
       return `+${c.phone}`;
+    case "location":
+      return c.location?.trim() || v.value?.trim() || "your area";
+    case "purchases":
+      return c.purchases?.trim() || v.value?.trim() || "Cold-pressed oil";
     case "static":
       return v.value?.trim() || "—";
     default:
@@ -160,7 +179,14 @@ export function validateDraft(t: TemplateDraft): string[] {
   if (t.buttons.length > 10) errors.push("A template can have at most 10 buttons.");
   t.buttons.forEach((b, i) => {
     if (!b.text.trim() || b.text.length > 25) errors.push(`Button ${i + 1}: label must be 1–25 characters.`);
-    if (b.type === "URL" && !/^https?:\/\/.+/.test(b.url ?? "")) errors.push(`Button ${i + 1}: enter a full website URL.`);
+    if (b.type === "URL") {
+      const u = b.url ?? "";
+      if (!/^https?:\/\/.+/.test(u)) errors.push(`Button ${i + 1}: enter a full website URL.`);
+      const uv = placeholders(u);
+      if (uv.length > 1 || (uv.length === 1 && (uv[0] !== 1 || !/\{\{\s*1\s*\}\}$/.test(u.trim())))) {
+        errors.push(`Button ${i + 1}: a dynamic URL button can only end with {{1}} (e.g. https://example.com/{{1}}).`);
+      }
+    }
     if (b.type === "PHONE_NUMBER" && !/^\+?\d{8,15}$/.test((b.phone ?? "").replace(/\s/g, "")))
       errors.push(`Button ${i + 1}: enter a phone number with country code.`);
   });
@@ -209,7 +235,14 @@ export function toMetaComponents(t: TemplateDraft, headerHandle?: string) {
       type: "BUTTONS",
       buttons: t.buttons.map((b) =>
         b.type === "URL"
-          ? { type: "URL", text: b.text, url: b.url }
+          ? {
+              type: "URL",
+              text: b.text,
+              url: b.url,
+              ...(placeholders(b.url ?? "").length
+                ? { example: [b.urlExample?.trim() || SAMPLE_CUSTOMER.phone] }
+                : {}),
+            }
           : b.type === "PHONE_NUMBER"
             ? { type: "PHONE_NUMBER", text: b.text, phone_number: b.phone?.replace(/\s/g, "") }
             : b.type === "CATALOG"
@@ -230,7 +263,7 @@ export type MetaComponent = {
   text?: string;
   add_security_recommendation?: boolean;
   code_expiration_minutes?: number;
-  buttons?: { type: string; text?: string; url?: string; phone_number?: string }[];
+  buttons?: { type: string; text?: string; url?: string; phone_number?: string; example?: string[] }[];
   /** For an image header, header_handle holds a link to the sample image the template was approved with. */
   example?: { header_handle?: string[] };
 };
@@ -267,6 +300,7 @@ export function fromMetaComponents(components: MetaComponent[]) {
           : "QUICK_REPLY",
         text: b.text ?? "Copy code",
         url: b.url,
+        ...(b.example?.[0] ? { urlExample: b.example[0] } : {}),
         phone: b.phone_number,
       }));
     }

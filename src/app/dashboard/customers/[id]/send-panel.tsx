@@ -36,7 +36,7 @@ export function SendPanel({
   windowEndsAt,
   blocked,
 }: {
-  customer: { id: string; name: string; phone: string };
+  customer: { id: string; name: string; phone: string; location?: string | null; purchases?: string | null };
   templates: PanelTemplate[];
   numbers: PanelNumber[];
   /** Admins can send templates; client logins can only reply. */
@@ -176,12 +176,12 @@ export function SendPanel({
                     )}
                   </div>
                   <div className="flex items-center justify-between gap-2 text-xs text-muted">
-                    <span>Or upload a photo (JPG/PNG/WebP, max 4 MB):</span>
+                    <span>Or upload a photo or PDF (max 4 MB):</span>
                     <label className="cursor-pointer font-semibold text-brand-deep hover:underline">
                       {uploading ? "Uploading…" : "Choose file"}
                       <input
                         type="file"
-                        accept="image/jpeg,image/png,image/webp"
+                        accept="image/jpeg,image/png,image/webp,application/pdf"
                         className="sr-only"
                         disabled={uploading}
                         onChange={(e) => {

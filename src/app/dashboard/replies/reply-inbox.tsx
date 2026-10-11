@@ -6,8 +6,10 @@ import { Avatar, Badge, Card, buttonClass } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { fmtDate } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
+import { replyWindowEnd } from "@/lib/replies";
 import { sendCatalogue } from "../actions/catalog";
 import { setReplyHandled } from "../actions/replies";
+import { InlineReplyBox } from "./inline-reply-box";
 
 const ORDER = /(order|buy|need|want|send|price|rate|available|venum|vendum)|வேண்டும்|ஆர்டர்/i;
 
@@ -49,6 +51,8 @@ export function ReplyInbox({
   showClient: boolean;
 }) {
   const selected = replies.find((x) => x.id === selectedId);
+  const latestInboundAt = thread.find((e) => e.type === "in")?.at ?? selected?.receivedAt;
+  const windowOpen = Boolean(replyWindowEnd(latestInboundAt));
   const hrefFor = (id: string) => `/dashboard/replies?${new URLSearchParams({ ...(show && { show: String(show) }), r: id })}`;
   const isOrder = (r: InboxReply) => r.kind === "button" || ORDER.test(r.text);
 
@@ -139,23 +143,34 @@ export function ReplyInbox({
 
           <Conversation entries={thread} className="min-h-0 flex-1" />
 
-          <footer className="flex flex-wrap items-center gap-2 border-t border-line bg-panel px-5 py-3">
+          {canOperate && (
+            <InlineReplyBox
+              key={selected.id}
+              customerId={selected.customer.id}
+              customerName={selected.customer.name}
+              replyId={selected.id}
+              replyHandled={selected.handled}
+              windowOpen={windowOpen}
+            />
+          )}
+
+          <footer className="flex flex-wrap items-center gap-2 border-t border-line bg-panel px-5 py-2.5">
             {canOperate && (
-              <Link href={`/dashboard/customers/${selected.customer.id}#reply`} className={buttonClass("primary")}>
-                <MessageCircle aria-hidden className="size-4" /> Reply
+              <Link href={`/dashboard/customers/${selected.customer.id}#reply`} className={buttonClass("secondary", "sm")}>
+                <MessageCircle aria-hidden className="size-4" /> Send template
               </Link>
             )}
-            {canOperate && (
+            {canOperate && windowOpen && (
               <ActionButton
                 action={sendCatalogue.bind(null, selected.customer.id)}
-                size="md"
+                size="sm"
                 title="Send interactive WhatsApp catalogue (free inside the 24-hour window)"
               >
                 <ShoppingBag aria-hidden className="size-4" /> Send catalogue
               </ActionButton>
             )}
-            {canOperate && handledButton(selected, "md")}
-            <Link href={`/dashboard/customers/${selected.customer.id}`} className={cn(buttonClass("ghost"), "ml-auto")}>
+            {canOperate && handledButton(selected, "sm")}
+            <Link href={`/dashboard/customers/${selected.customer.id}`} className={cn(buttonClass("ghost", "sm"), "ml-auto")}>
               <UserRound aria-hidden className="size-4" /> <span className="max-xl:sr-only">Customer profile</span>
             </Link>
           </footer>

@@ -107,6 +107,8 @@ export type SendInput = {
   catalogButtonIndex?: number;
   /** Optional SKU (retailer_id) to display as the thumbnail on a CATALOG button. */
   catalogThumbnailProductId?: string | null;
+  /** Dynamic URL button parameters (index + suffix value for {{1}}). */
+  urlButtonParams?: { index: number; value: string }[];
   /** One-time passcode for AUTHENTICATION (OTP) templates. */
   otpCode?: string | null;
 };
@@ -148,6 +150,14 @@ export async function sendTemplateMessage(cfg: WaConfig, input: SendInput): Prom
         parameters: [{ type: "action", action }],
       });
     }
+    for (const ub of input.urlButtonParams ?? []) {
+      components.push({
+        type: "button",
+        sub_type: "url",
+        index: ub.index,
+        parameters: [{ type: "text", text: ub.value }],
+      });
+    }
   }
 
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
@@ -184,15 +194,14 @@ export async function sendMediaMessage(
   const isPdf = /\.pdf(\?|$)/i.test(mediaUrl);
   const type = isPdf ? "document" : "image";
   const normalizedUrl = absoluteUrl(mediaUrl) ?? mediaUrl;
-  let mediaId: string | null = null;
-  if (!isPdf) {
-    mediaId = await uploadWhatsAppMedia(cfg, mediaUrl);
-  }
+  const mediaId = await uploadWhatsAppMedia(cfg, mediaUrl);
   const payload = isPdf
-    ? { link: normalizedUrl, ...(caption ? { caption } : {}), filename: "attachment.pdf" }
+    ? mediaId
+      ? { id: mediaId, ...(caption ? { caption } : {}), filename: "attachment.pdf" }
+      : { link: normalizedUrl, ...(caption ? { caption } : {}), filename: "attachment.pdf" }
     : mediaId
-    ? { id: mediaId, ...(caption ? { caption } : {}) }
-    : { link: normalizedUrl, ...(caption ? { caption } : {}) };
+      ? { id: mediaId, ...(caption ? { caption } : {}) }
+      : { link: normalizedUrl, ...(caption ? { caption } : {}) };
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
     body: JSON.stringify({
@@ -505,4 +514,50 @@ export async function catalogProductNames(cfg: WaConfig, catalogId: string, reta
   const res = await graph<{ data: { retailer_id: string; name: string }[] }>(cfg, `${catalogId}/products?fields=retailer_id,name&limit=100&filter=${filter}`);
   for (const p of res.data ?? []) if (p.retailer_id && p.name) names.set(p.retailer_id, p.name);
   return names;
+}
+
+/** Syncs the WhatsApp Business Profile (about/tagline, website, description) on a phone number in Meta. */
+export async function syncMetaBusinessProfile(
+  cfg: WaConfig,
+  profile: { about?: string | null; description?: string | null; website?: string | null; address?: string | null; email?: string | null },
+) {
+  if (!cfg.live || !cfg.phoneNumberId) return false;
+  const body: Record<string, unknown> = { messaging_product: "whatsapp" };
+  if (profile.about?.trim()) body.about = profile.about.trim().slice(0, 139);
+  if (profile.description?.trim()) body.description = profile.description.trim().slice(0, 512);
+  if (profile.address?.trim()) body.address = profile.address.trim().slice(0, 256);
+  if (profile.email?.trim()) body.email = profile.email.trim().slice(0, 128);
+  if (profile.website?.trim()) body.websites = [profile.website.trim()];
+  if (Object.keys(body).length <= 1) return false;
+  try {
+    await graph(cfg, `${cfg.phoneNumberId}/whatsapp_business_profile`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    return true;
+  } catch (e) {
+    console.warn("Meta business profile sync skipped:", e instanceof Error ? e.message : e);
+    return false;
+  }
+}
+
+/** Ensures WhatsApp Cloud API voice calling is enabled on a phone number in Meta. */
+export async function enableMetaCalling(cfg: WaConfig) {
+  if (!cfg.live || !cfg.phoneNumberId) return false;
+  try {
+    await graph(cfg, `${cfg.phoneNumberId}/settings`, {
+      method: "POST",
+      body: JSON.stringify({
+        calling: {
+          status: "ENABLED",
+          call_icon_visibility: "DEFAULT",
+          callback_permission_status: "ENABLED",
+        },
+      }),
+    });
+    return true;
+  } catch (e) {
+    console.warn("Meta calling settings sync skipped:", e instanceof Error ? e.message : e);
+    return false;
+  }
 }

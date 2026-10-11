@@ -1,10 +1,10 @@
 "use server";
 
-import { put } from "@vercel/blob";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { createCatalogProductItem, deleteCatalogProductItem, sendCatalogueTo, updateCatalogProductItem } from "@/lib/catalog";
 import { getScope, owned } from "@/lib/session";
+import { storePublicImage } from "@/lib/uploaded-image";
 import type { ActionResult } from "./templates";
 
 /** Staff send the free catalogue message to a customer who wrote in the last 24 hours. */
@@ -19,24 +19,29 @@ export async function sendCatalogue(customerId: string): Promise<ActionResult> {
 }
 
 /**
- * Stores a product photo in Vercel Blob and returns its public link. Public because Meta downloads
- * catalogue photos itself; the server's own disk is read-only on Vercel and can't be reached by Meta.
+ * Stores a product photo or reply attachment (JPG/PNG/WebP/PDF) in Vercel Blob (with automatic
+ * PostgreSQL fallback at /api/upload/[id]) and returns its public link.
  */
 export async function uploadProductImage(formData: FormData): Promise<{ ok: boolean; url?: string; message?: string }> {
   const scope = await getScope();
-  if (!scope.canOperate) return { ok: false, message: "Your login can view but not change products." };
+  if (!scope.canOperate) return { ok: false, message: "Your login can view but not upload files." };
   const file = formData.get("file") as File | null;
-  if (!file) return { ok: false, message: "No image file provided." };
-  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) return { ok: false, message: "Only JPG, PNG or WebP images can be used." };
-  if (file.size > 4 * 1024 * 1024) return { ok: false, message: "Image must be under 4 MB." };
+  if (!file) return { ok: false, message: "No file provided." };
+  if (!["image/jpeg", "image/png", "image/webp", "application/pdf"].includes(file.type)) {
+    return { ok: false, message: "Only JPG, PNG, WebP images or PDF files can be used." };
+  }
+  if (file.size > 4 * 1024 * 1024) return { ok: false, message: "File must be under 4 MB." };
 
   try {
-    const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-    const blob = await put(`catalog/product.${ext}`, file, { access: "public", contentType: file.type, addRandomSuffix: true });
-    return { ok: true, url: blob.url };
+    const url = await storePublicImage({
+      bytes: await file.arrayBuffer(),
+      contentType: file.type,
+      filename: file.name,
+    });
+    return { ok: true, url };
   } catch (e) {
-    console.error("Product image upload failed", e);
-    return { ok: false, message: "Couldn't store the photo. Paste an image link (https://…) instead, or try again." };
+    console.error("File upload failed", e);
+    return { ok: false, message: "Couldn't store the file. Paste a public link (https://…) instead, or try again." };
   }
 }
 

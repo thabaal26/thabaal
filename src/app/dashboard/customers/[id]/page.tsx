@@ -19,6 +19,7 @@ import { META_SAMPLES } from "@/lib/template";
 import { sendCatalogue } from "../../actions/catalog";
 import { requestCallPermission } from "../../actions/calls";
 import { setOptOut } from "../../actions/customers";
+import { EditCustomerButton } from "../customer-tools";
 import { CallButton } from "./call-button";
 import { PausedOffersNote } from "./paused-offers-note";
 import { SendPanel } from "./send-panel";
@@ -135,7 +136,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
       <div className="mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:items-start">
         <div className="min-w-0 space-y-4 sm:space-y-6 lg:col-start-2 lg:row-start-1">
           <SendPanel
-            customer={{ id: c.id, name: c.name, phone: c.phone }}
+            customer={{ id: c.id, name: c.name, phone: c.phone, location: c.location, purchases: c.purchases }}
             templates={templates}
             numbers={numbers}
             canSend={scope.canManage}
@@ -156,7 +157,27 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
         </div>
 
         <Card className="card-3d lg:sticky lg:top-24 lg:col-start-1 lg:row-start-1">
-          <CardHeader tone="violet" icon={<ShoppingBag3D />} title="What they buy" />
+          <CardHeader
+            tone="violet"
+            icon={<ShoppingBag3D />}
+            title="What they buy"
+            action={
+              scope.canManage && (
+                <EditCustomerButton
+                  customer={{
+                    id: c.id,
+                    name: c.name,
+                    phone: c.phone,
+                    tags: productTags.join(", "),
+                    location: c.location ?? "",
+                    locationRaw: c.locationRaw ?? "",
+                    region: c.region ?? "Madurai city",
+                    purchases: c.purchases ?? "",
+                  }}
+                />
+              )
+            }
+          />
           <div className="space-y-4 p-4 sm:p-5">
             {c.orders.length > 0 && (
               <div>
