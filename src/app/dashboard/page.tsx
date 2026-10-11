@@ -53,8 +53,8 @@ import {
   type ProductDemandRow,
   type Range,
   type View,
-  ViewTabs,
 } from "./overview-cards";
+import { ViewTabs } from "./view-tabs";
 
 export const dynamic = "force-dynamic";
 
@@ -1534,6 +1534,8 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
 
       <ViewTabs view={view} range={range} views={views} badges={viewBadges} />
 
+      <div key={view} className="animate-view-in">
+
       {view === "overview" && (
         <>
           <BusinessPriorityStrip
@@ -1836,6 +1838,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
           <CartMentalityCard data={cartMentalityData} />
         </div>
       )}
+      </div>
     </>
   );
 }

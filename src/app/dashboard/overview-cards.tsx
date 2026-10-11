@@ -91,33 +91,6 @@ export const VIEWS = {
 } as const;
 export type View = keyof typeof VIEWS;
 
-export function ViewTabs({ view, range, views, badges }: { view: View; range: Range; views: View[]; badges?: Partial<Record<View, number>> }) {
-  return (
-    <nav aria-label="Dashboard sections" className="thin-scroll -mx-1 mb-4 flex gap-1 overflow-x-auto border-b border-line px-1 sm:mb-5">
-      {views.map((v) => {
-        const on = v === view;
-        const n = badges?.[v];
-        return (
-          <Link
-            key={v}
-            href={dashHref(v, range)}
-            scroll={false}
-            title={VIEWS[v].hint}
-            aria-current={on ? "page" : undefined}
-            className={cn(
-              "relative -mb-px inline-flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 px-3.5 text-sm font-medium transition",
-              on ? "border-brand text-ink" : "border-transparent text-muted hover:border-line-2 hover:text-ink",
-            )}
-          >
-            {VIEWS[v].label}
-            {n ? <span className="tabular rounded-full bg-warning-bg px-1.5 py-px text-2xs font-semibold text-warning">{n}</span> : null}
-          </Link>
-        );
-      })}
-    </nav>
-  );
-}
-
 /* ───────────────────────── KPI tile ───────────────────────── */
 
 export type Delta = { cur: number; prev: number; kind: "pct" | "pts"; goodWhenUp?: boolean } | null;

@@ -118,6 +118,7 @@
   --default-transition-duration: 160ms;
   --default-transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
   --animate-rise: rise 0.22s var(--ease-snappy) both;
+  --animate-view-in: view-in 0.38s var(--ease-snappy) both;
   --animate-toast: toast 0.22s var(--ease-snappy) both;
   --animate-sheet: sheet 0.25s var(--ease-snappy) both;
   --animate-fade: fade 0.18s ease-out both;
@@ -147,6 +148,10 @@
   @keyframes fade {
     from { opacity: 0; }
     to { opacity: 1; }
+  }
+  @keyframes view-in {
+    from { opacity: 0; transform: translateX(var(--view-dx, 0)) translateY(6px); }
+    to { opacity: 1; transform: none; }
   }
   @keyframes rise {
     from { opacity: 0; transform: translateY(4px); }
