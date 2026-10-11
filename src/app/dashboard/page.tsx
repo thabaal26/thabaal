@@ -15,6 +15,7 @@ import { getScope, owned, ownedMessages } from "@/lib/session";
 import { numberHealth } from "@/lib/limits";
 import { codesOf, PAUSING_KINDS } from "@/lib/meta-errors";
 import { HELD_CODES } from "@/lib/held";
+import { analyzeCartMentality } from "@/lib/cart-mentality";
 import type { OrderItem } from "@/lib/orders";
 import { cancelRun, runDispatcherNow } from "./actions/campaigns";
 import { BrandHero } from "./brand-hero";
@@ -25,6 +26,7 @@ import {
   BestTimeCard,
   BusinessPriorityStrip,
   C,
+  CartMentalityCard,
   CustomerScenariosCard,
   DeliveryCard,
   FunnelCard,
@@ -34,7 +36,11 @@ import {
   RangeTabs,
   TodayCard,
   TopProductsCard,
+  type AnchorProductInsight,
+  type CartMentalitySummaryData,
+  type CartRevisionJourney,
   type CustomerScenariosData,
+  type DroppedProductInsight,
   type ProductDemandRow,
   type Range,
 } from "./overview-cards";
@@ -547,6 +553,163 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     cartToBuyPct: curAllOrders.length > 0 ? pct(curOrders.length, curAllOrders.length) : 0,
   };
 
+  // Multi-Cart Customer Mentality & Product Hesitation Analytics
+  const ordersByCust = new Map<string, (typeof orders)[number][]>();
+  for (const o of orders) {
+    const arr = ordersByCust.get(o.customerId) ?? [];
+    arr.push(o);
+    ordersByCust.set(o.customerId, arr);
+  }
+
+  const journeys: CartRevisionJourney[] = [];
+  const droppedMap = new Map<string, { name: string; count: number; qty: number; value: number; customers: Set<string> }>();
+  const anchorMap = new Map<string, { name: string; count: number; qty: number; customers: Set<string> }>();
+
+  let totalSupersededCarts = 0;
+  let downsizedCount = 0;
+  let downsizedValueLost = 0;
+  let upsizedCount = 0;
+  let upsizedValueGained = 0;
+  let swappedCount = 0;
+  let retriedCount = 0;
+  const reviserCustomerIds = new Set<string>();
+
+  // Evaluate each non-cancelled order in the current period against that customer's prior cart history
+  for (const o of curAllOrders) {
+    if (o.status === "CANCELLED") continue;
+    const custHistory = (ordersByCust.get(o.customerId) ?? []).map((po) => ({
+      id: po.id,
+      number: po.number,
+      total: po.total,
+      currency: "INR",
+      status: po.status,
+      items: ((po.items as OrderItem[] | null) ?? []),
+      internalNote: po.internalNote ?? null,
+      createdAt: po.createdAt,
+      paidAt: po.paidAt,
+    }));
+    const curItems = ((o.items as OrderItem[] | null) ?? []);
+    const m = analyzeCartMentality(
+      { id: o.id, number: o.number, total: o.total, currency: "INR", items: curItems, createdAt: o.createdAt },
+      custHistory,
+    );
+    if (m.attemptCount > 1 && m.behavior !== "first_cart") {
+      reviserCustomerIds.add(o.customerId);
+      totalSupersededCarts += m.previousCarts.length;
+      if (m.behavior === "downsized") {
+        downsizedCount += 1;
+        downsizedValueLost += Math.abs(m.deltaAmount);
+      } else if (m.behavior === "upsized") {
+        upsizedCount += 1;
+        upsizedValueGained += Math.max(0, m.deltaAmount);
+      } else if (m.behavior === "swapped") {
+        swappedCount += 1;
+      } else if (m.behavior === "duplicate_retry") {
+        retriedCount += 1;
+      }
+
+      const firstCart = m.previousCarts[m.previousCarts.length - 1] ?? m.previousCarts[0];
+      journeys.push({
+        customerId: o.customerId,
+        customerName: o.customer.name,
+        customerPhone: o.customer.phone,
+        latestOrderId: o.id,
+        latestOrderRef: `RG-${1000 + o.number}`,
+        latestStatus: o.status,
+        latestPaid: isBought(o),
+        latestTotal: o.total,
+        firstCartRef: firstCart ? `RG-${1000 + firstCart.number}` : `RG-${1000 + o.number}`,
+        firstCartTotal: firstCart ? firstCart.total : o.total,
+        attemptCount: m.attemptCount,
+        behavior: m.behavior,
+        headline: m.headline,
+        deltaAmount: m.deltaAmount,
+        droppedItems: m.droppedItems,
+        addedItems: m.addedItems,
+        keptItems: m.keptItems,
+        at: o.createdAt,
+      });
+
+      for (const d of m.droppedItems) {
+        const key = d.name.toLowerCase();
+        const row = droppedMap.get(key) ?? { name: d.name, count: 0, qty: 0, value: 0, customers: new Set<string>() };
+        row.count += 1;
+        row.qty += d.quantity;
+        row.value += (d.price || 0) * d.quantity;
+        row.customers.add(o.customer.name);
+        droppedMap.set(key, row);
+      }
+
+      for (const k of m.keptItems) {
+        const key = k.name.toLowerCase();
+        const row = anchorMap.get(key) ?? { name: k.name, count: 0, qty: 0, customers: new Set<string>() };
+        row.count += 1;
+        row.qty += k.quantity;
+        row.customers.add(o.customer.name);
+        anchorMap.set(key, row);
+      }
+    }
+  }
+
+  // Also include items from standalone cancelled carts where the customer hasn't bought that item in any active order
+  for (const co of curCancelledCarts) {
+    if (co.internalNote && /superseded by/i.test(co.internalNote)) continue; // already accounted in journeys above
+    const custActiveItems = new Set(
+      (ordersByCust.get(co.customerId) ?? [])
+        .filter((x) => x.status !== "CANCELLED")
+        .flatMap((x) => ((x.items as OrderItem[] | null) ?? []).map((it) => (it.name ?? it.id).toLowerCase())),
+    );
+    for (const it of (co.items as OrderItem[] | null) ?? []) {
+      const name = (it.name ?? it.id).trim();
+      const key = name.toLowerCase();
+      if (!name || custActiveItems.has(key)) continue;
+      const qty = Number(it.quantity) || 1;
+      const price = Number(it.price) || 0;
+      const row = droppedMap.get(key) ?? { name, count: 0, qty: 0, value: 0, customers: new Set<string>() };
+      row.count += 1;
+      row.qty += qty;
+      row.value += price * qty;
+      row.customers.add(co.customer.name);
+      droppedMap.set(key, row);
+    }
+  }
+
+  const droppedProducts: DroppedProductInsight[] = [...droppedMap.values()]
+    .map((r) => ({
+      name: r.name,
+      droppedCount: r.count,
+      droppedQty: r.qty,
+      droppedValue: r.value,
+      customerNames: [...r.customers],
+    }))
+    .sort((a, b) => b.droppedValue - a.droppedValue || b.droppedCount - a.droppedCount)
+    .slice(0, 6);
+
+  const anchorProducts: AnchorProductInsight[] = [...anchorMap.values()]
+    .map((r) => ({
+      name: r.name,
+      keptCount: r.count,
+      boughtQty: r.qty,
+      customerNames: [...r.customers],
+    }))
+    .sort((a, b) => b.keptCount - a.keptCount || b.boughtQty - a.boughtQty)
+    .slice(0, 5);
+
+  const cartMentalityData: CartMentalitySummaryData = {
+    periodLabel: hourly ? "today so far" : `the last ${days} days`,
+    totalRevisers: reviserCustomerIds.size,
+    totalSupersededCarts,
+    downsizedCount,
+    downsizedValueLost,
+    upsizedCount,
+    upsizedValueGained,
+    swappedCount,
+    retriedCount,
+    journeys: journeys.slice(0, 6),
+    droppedProducts,
+    anchorProducts,
+  };
+
   const nowHour = Number(formatInTimeZone(now, APP_TZ, "H"));
   const todayHours = Array.from({ length: nowHour + 1 }, (_, h) => {
     const k = String(h).padStart(2, "0");
@@ -856,6 +1019,8 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       {/* Deep Customer Behaviour & Cart Drop-Off Scenarios */}
       {ordersOn && <CustomerScenariosCard data={scenariosData} />}
 
+      {/* Multi-Cart Customer Mentality & Product Hesitation Analytics */}
+      {ordersOn && <CartMentalityCard data={cartMentalityData} />}
 
       {/* When to send, and what sells. */}
       {(repliesOn || ordersOn) && (

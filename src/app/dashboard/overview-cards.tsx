@@ -1039,3 +1039,261 @@ export function CustomerScenariosCard({ data }: { data: CustomerScenariosData })
   );
 }
 
+/* ───────────────────────── Multi-Cart Customer Mentality & Product Hesitation Card ───────────────────────── */
+
+export type CartRevisionJourney = {
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  latestOrderId: string;
+  latestOrderRef: string;
+  latestStatus: string;
+  latestPaid: boolean;
+  latestTotal: number;
+  firstCartRef: string;
+  firstCartTotal: number;
+  attemptCount: number;
+  behavior: "downsized" | "upsized" | "swapped" | "duplicate_retry";
+  headline: string;
+  deltaAmount: number;
+  droppedItems: { name: string; quantity: number; price: number }[];
+  addedItems: { name: string; quantity: number; price: number }[];
+  keptItems: { name: string; quantity: number; price: number }[];
+  at: Date;
+};
+
+export type DroppedProductInsight = {
+  name: string;
+  droppedCount: number;
+  droppedQty: number;
+  droppedValue: number;
+  customerNames: string[];
+};
+
+export type AnchorProductInsight = {
+  name: string;
+  keptCount: number;
+  boughtQty: number;
+  customerNames: string[];
+};
+
+export type CartMentalitySummaryData = {
+  periodLabel: string;
+  totalRevisers: number;
+  totalSupersededCarts: number;
+  downsizedCount: number;
+  downsizedValueLost: number;
+  upsizedCount: number;
+  upsizedValueGained: number;
+  swappedCount: number;
+  retriedCount: number;
+  journeys: CartRevisionJourney[];
+  droppedProducts: DroppedProductInsight[];
+  anchorProducts: AnchorProductInsight[];
+};
+
+export function CartMentalityCard({ data }: { data: CartMentalitySummaryData }) {
+  if (data.totalRevisers === 0 && data.droppedProducts.length === 0) return null;
+
+  return (
+    <Card className="card-3d mt-4 sm:mt-5">
+      <CardHeader
+        tone="amber"
+        icon={<Sparkles />}
+        title="Customer cart mentality & product hesitation intelligence"
+        description={`What happens when customers send multiple carts before paying — budget downsizing, product swaps, high-conviction anchor items, and items dropped (${data.periodLabel})`}
+        action={
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <Badge tone="amber">
+              {fmtNumber(data.totalRevisers)} cart reviser{data.totalRevisers === 1 ? "" : "s"} ({fmtNumber(data.totalSupersededCarts)} replaced cart{data.totalSupersededCarts === 1 ? "" : "s"})
+            </Badge>
+            {data.downsizedValueLost > 0 && (
+              <Badge tone="red">
+                Budget trimmed: {formatValue(data.downsizedValueLost, "inr")}
+              </Badge>
+            )}
+            {data.upsizedValueGained > 0 && (
+              <Badge tone="green">
+                Cart upsized: +{formatValue(data.upsizedValueGained, "inr")}
+              </Badge>
+            )}
+          </div>
+        }
+      />
+
+      {/* Top 4 Mentality Pattern Summary Tiles */}
+      <div className="grid grid-cols-2 divide-x divide-y divide-line border-b border-line bg-subtle/40 sm:grid-cols-4 sm:divide-y-0">
+        <div className="p-3.5 sm:p-4">
+          <p className="text-2xs font-semibold uppercase tracking-wider text-muted">Price hesitation (Downsized)</p>
+          <p className="tabular mt-1 text-base font-semibold text-ink sm:text-lg">
+            {fmtNumber(data.downsizedCount)} customer{data.downsizedCount === 1 ? "" : "s"}
+          </p>
+          <p className="mt-0.5 text-xs text-danger">
+            {data.downsizedValueLost > 0 ? `-${formatValue(data.downsizedValueLost, "inr")} removed from earlier carts` : "No budget cuts"}
+          </p>
+        </div>
+        <div className="p-3.5 sm:p-4">
+          <p className="text-2xs font-semibold uppercase tracking-wider text-muted">Expanded cart (Upsized)</p>
+          <p className="tabular mt-1 text-base font-semibold text-ink sm:text-lg">
+            {fmtNumber(data.upsizedCount)} customer{data.upsizedCount === 1 ? "" : "s"}
+          </p>
+          <p className="mt-0.5 text-xs text-success">
+            {data.upsizedValueGained > 0 ? `+${formatValue(data.upsizedValueGained, "inr")} added on 2nd cart` : "No upsized carts yet"}
+          </p>
+        </div>
+        <div className="p-3.5 sm:p-4">
+          <p className="text-2xs font-semibold uppercase tracking-wider text-muted">Product swaps / comparison</p>
+          <p className="tabular mt-1 text-base font-semibold text-ink sm:text-lg">
+            {fmtNumber(data.swappedCount)} customer{data.swappedCount === 1 ? "" : "s"}
+          </p>
+          <p className="mt-0.5 text-xs text-muted">Replaced items with another option</p>
+        </div>
+        <div className="p-3.5 sm:p-4">
+          <p className="text-2xs font-semibold uppercase tracking-wider text-muted">Same-cart payment retry</p>
+          <p className="tabular mt-1 text-base font-semibold text-ink sm:text-lg">
+            {fmtNumber(data.retriedCount)} customer{data.retriedCount === 1 ? "" : "s"}
+          </p>
+          <p className="mt-0.5 text-xs text-muted">Re-sent identical cart for fresh Pay link</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 divide-y divide-line xl:grid-cols-12 xl:divide-x xl:divide-y-0">
+        {/* Left 7 cols: Customer-by-customer Cart Revision Journeys */}
+        <div className="p-4 sm:p-5 xl:col-span-7">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <h4 className="text-sm font-semibold text-ink">How customers changed their cart (Latest cart vs. earlier carts)</h4>
+              <p className="text-xs text-muted">Every earlier unpaid cart is stored to reveal what each customer wanted first vs. what they kept</p>
+            </div>
+            <Link href="/dashboard/orders" className="shrink-0 text-xs font-semibold text-brand-deep hover:underline">
+              Active orders →
+            </Link>
+          </div>
+
+          {data.journeys.length > 0 ? (
+            <ul className="space-y-3">
+              {data.journeys.map((j) => (
+                <li key={j.latestOrderId} className="rounded-control border border-line bg-sunken/70 p-3.5 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Link href={`/dashboard/customers/${j.customerId}`} className="text-sm font-semibold text-ink hover:underline">
+                        {j.customerName}
+                      </Link>
+                      <Badge tone={j.behavior === "downsized" ? "amber" : j.behavior === "upsized" ? "green" : "blue"}>
+                        {j.attemptCount} carts sent
+                      </Badge>
+                      <Badge tone={j.latestPaid ? "green" : "amber"}>
+                        Current: {j.latestOrderRef} ({formatValue(j.latestTotal, "inr")} · {j.latestPaid ? "Paid" : "Unpaid"})
+                      </Badge>
+                    </div>
+                    <span className="tabular text-2xs text-muted">{fmtDate(j.at, "d MMM, h:mm a")}</span>
+                  </div>
+
+                  <p className="mt-1.5 font-medium text-ink-2">{j.headline}</p>
+
+                  <div className="mt-2 space-y-1">
+                    {j.droppedItems.length > 0 && (
+                      <p>
+                        <span className="font-semibold text-danger">Dropped from earlier cart: </span>
+                        {j.droppedItems
+                          .map((d) => `${d.name}${d.price > 0 ? ` (${formatValue(d.price * d.quantity, "inr")})` : ""}`)
+                          .join(", ")}
+                      </p>
+                    )}
+                    {j.addedItems.length > 0 && (
+                      <p>
+                        <span className="font-semibold text-success">Switched / Added in latest cart: </span>
+                        {j.addedItems
+                          .map((a) => `${a.name}${a.price > 0 ? ` (${formatValue(a.price * a.quantity, "inr")})` : ""}`)
+                          .join(", ")}
+                      </p>
+                    )}
+                    {j.keptItems.length > 0 && (
+                      <p>
+                        <span className="font-semibold text-brand-deep">Kept (high conviction): </span>
+                        {j.keptItems.map((k) => k.name).join(", ")}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted">No multi-cart revisions in this period yet.</p>
+          )}
+        </div>
+
+        {/* Right 5 cols: Product Hesitation vs. High-Conviction Anchor Leaderboard */}
+        <div className="space-y-5 p-4 sm:p-5 xl:col-span-5">
+          <div>
+            <h4 className="text-sm font-semibold text-ink">Products added to cart, then dropped (Hesitation items)</h4>
+            <p className="text-xs text-muted">
+              Items customers wanted enough to add to an earlier cart, but removed when revising or abandoning their cart
+            </p>
+            {data.droppedProducts.length > 0 ? (
+              <ul className="mt-2.5 divide-y divide-line rounded-control border border-line bg-subtle px-3 py-1 text-xs">
+                {data.droppedProducts.map((dp) => (
+                  <li key={dp.name} className="flex items-center justify-between gap-2 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        href={`/dashboard/customers?tag=${encodeURIComponent(`product:${dp.name}`)}`}
+                        className="font-semibold text-ink hover:underline"
+                      >
+                        {dp.name}
+                      </Link>
+                      <p className="mt-0.5 truncate text-2xs text-muted">
+                        Dropped by {dp.customerNames.join(", ")}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <span className="tabular font-semibold text-danger">
+                        {formatValue(dp.droppedValue, "inr")} dropped
+                      </span>
+                      <span className="tabular block text-2xs text-muted">
+                        {dp.droppedQty} unit{dp.droppedQty === 1 ? "" : "s"} in {dp.droppedCount} cart{dp.droppedCount === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-xs text-muted">No dropped products recorded in this period.</p>
+            )}
+          </div>
+
+          {data.anchorProducts.length > 0 && (
+            <div className="border-t border-line pt-4">
+              <h4 className="text-sm font-semibold text-ink">High-conviction anchor products (Kept across revisions)</h4>
+              <p className="text-xs text-muted">
+                Items customers refused to remove even when downsizing their cart budget
+              </p>
+              <ul className="mt-2.5 divide-y divide-line rounded-control border border-line bg-brand-soft/35 px-3 py-1 text-xs">
+                {data.anchorProducts.map((ap) => (
+                  <li key={ap.name} className="flex items-center justify-between gap-2 py-2">
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        href={`/dashboard/customers?tag=${encodeURIComponent(`product:${ap.name}`)}`}
+                        className="font-semibold text-ink hover:underline"
+                      >
+                        {ap.name}
+                      </Link>
+                      <span className="ml-1.5 text-2xs text-muted">· Kept by {ap.customerNames.join(", ")}</span>
+                    </div>
+                    <Badge tone="green">Kept {ap.keptCount}×</Badge>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="rounded-control border border-warning-border/60 bg-warning-bg/40 p-3 text-xs text-ink-2">
+            <strong className="font-semibold text-ink">Business action tip: </strong>
+            When a product appears under <span className="font-semibold text-danger">Dropped from earlier cart</span>, customers want the product but hesitate at the combined cart total. Offer a <b>smaller trial pack (100ml/250ml)</b> or a <b>combo discount</b> on those exact items in your next WhatsApp campaign.
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+
