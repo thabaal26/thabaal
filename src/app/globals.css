@@ -265,13 +265,18 @@ body {
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
-/* Thin, quiet scrollbars for panes that scroll on their own (inbox, sidebar, modals). */
+/* Panes that scroll on their own (inbox, sidebar, modals, wide charts): smooth touch scrolling. */
 .thin-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-line-2) transparent;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
+
+/*
+ * No visible scrollbars inside the portal: panes, tables, chart strips and the sidebar still scroll
+ * with the wheel, trackpad, touch and keyboard, but don't draw a bar. Only the page itself keeps one.
+ */
+*:not(html):not(body) { scrollbar-width: none; }
+*:not(html):not(body)::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
 /*
  * 60–120 FPS Scroll Acceleration & Layout Containment:
