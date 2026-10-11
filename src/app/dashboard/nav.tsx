@@ -183,7 +183,7 @@ export function BottomNav({
       cube,
       active ? "ring-2 ring-brand-deep/40 scale-105" : "ring-1 ring-inset ring-white/35 opacity-95",
     );
-  const badge = "absolute -right-1 -top-1 bg-danger-solid text-white ring-2 ring-panel";
+  const badge = "absolute -right-1.5 -top-1.5 z-10 bg-danger-solid text-white ring-2 ring-panel";
 
   return (
     <nav aria-label="Main" className="pb-safe glass-bar fixed inset-x-0 bottom-0 z-30 lg:hidden print:hidden">
@@ -197,8 +197,11 @@ export function BottomNav({
           return (
             <li key={href} className="min-w-0">
               <Link href={href} aria-current={active ? "page" : undefined} className={tabClass(active)}>
-                <span className={iconWrap(active, cube)}>
-                  <Icon aria-hidden className="size-5" />
+                {/* The badge sits outside the tile: the tile clips its contents for the gloss. */}
+                <span className="relative">
+                  <span className={iconWrap(active, cube)}>
+                    <Icon aria-hidden className="size-5" />
+                  </span>
                   {count && <CountBadge n={count.n} label={count.label} className={badge} />}
                 </span>
                 <span className="max-w-full truncate px-0.5">{short}</span>
@@ -208,8 +211,10 @@ export function BottomNav({
         })}
         <li className="min-w-0">
           <button type="button" onClick={() => setOpenedOn(path)} aria-haspopup="dialog" aria-expanded={moreOpen} className={cn(tabClass(moreActive), "w-full")}>
-            <span className={iconWrap(moreActive, "from-[#818cf8] via-[#6366f1] to-[#4f46e5]")}>
-              <Menu className="size-5" strokeWidth={2} />
+            <span className="relative">
+              <span className={iconWrap(moreActive, "from-[#818cf8] via-[#6366f1] to-[#4f46e5]")}>
+                <Menu className="size-5" strokeWidth={2} />
+              </span>
               <CountBadge n={hiddenCount} label="to handle" className={badge} />
             </span>
             More

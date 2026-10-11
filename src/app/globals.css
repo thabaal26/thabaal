@@ -554,3 +554,12 @@ input:-webkit-autofill:active {
 .dark img:not([data-keep]) { filter: brightness(0.94); }
 /* Smooth swap between light and dark (not on first paint). */
 html.theme-anim, html.theme-anim * { transition: background-color 0.25s ease, border-color 0.25s ease, color 0.2s ease !important; }
+/* Icon packs: every icon ships in both sets (components/icons.tsx); the portal shows the
+   client's choice, set on <html data-icons> by the dashboard layout. Hugeicons is the default. */
+:root:not([data-icons="classic"]) .ip-classic,
+:root[data-icons="classic"] .ip-huge { display: none !important; }
+/* Admin's icon-style picker previews each pack whatever pack the page itself shows. */
+.icon-preview[data-icons="classic"] .ip-huge,
+.icon-preview[data-icons="hugeicons"] .ip-classic { display: none !important; }
+.icon-preview[data-icons="classic"] .ip-classic,
+.icon-preview[data-icons="hugeicons"] .ip-huge { display: block !important; }

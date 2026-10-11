@@ -9,8 +9,9 @@ import { db } from "@/lib/db";
 import { numberHealth } from "@/lib/limits";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { getScope } from "@/lib/session";
+import { iconPackOf } from "@/lib/icon-pack";
 import { deleteClientUser } from "../actions/clients";
-import { AccessSelect, AddLoginForm, AddNumberForm, BrandingForm, ClientSectionsForm, NewClientForm, NumberActions, RefreshNumbersButton, ResetPasswordButton, SendingRulesForm, TokenForm } from "./client-forms";
+import { AccessSelect, AddLoginForm, AddNumberForm, BrandingForm, ClientSectionsForm, IconPackForm, NewClientForm, NumberActions, RefreshNumbersButton, ResetPasswordButton, SendingRulesForm, TokenForm } from "./client-forms";
 
 export const metadata: Metadata = { title: "Clients" };
 export const dynamic = "force-dynamic";
@@ -192,6 +193,12 @@ export default async function ClientsPage() {
                       </Badge>
                     </div>
                     <ClientSectionsForm clientId={c.id} initialDisabled={disabledSections} />
+                  </section>
+
+                  <section className="border-t border-line pt-5 xl:col-span-2">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Icon style</h3>
+                    <p className="mb-3 mt-1 text-xs text-muted">The icon set this client&apos;s portal uses, if they prefer the original look.</p>
+                    <IconPackForm clientId={c.id} initial={iconPackOf(c.iconPack)} />
                   </section>
 
                   <section className="border-t border-line pt-5 xl:col-span-2">

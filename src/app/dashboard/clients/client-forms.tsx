@@ -16,6 +16,9 @@ import {
   type ClientSectionId,
 } from "@/lib/client-sections";
 import { HEX, themeStyle } from "@/lib/theme";
+import { ICON_PACKS, type IconPack } from "@/lib/icon-pack";
+import { Dashboard3D, Bell3D, ShoppingBag3D, Users3D } from "@/components/icons-3d";
+import { Search, Send, Truck } from "@/components/icons";
 import { cn } from "@/lib/cn";
 import {
   addClientNumber,
@@ -29,6 +32,7 @@ import {
   resetUserPassword,
   setUserAccess,
   saveClientBranding,
+  saveClientIconPack,
   saveClientSections,
   saveClientToken,
   saveSendingRules,
@@ -618,6 +622,72 @@ export function ClientSectionsForm({
         </p>
         <Button type="submit" loading={pending} size="sm" className="max-sm:w-full">
           Save sections
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+const PREVIEW_TILES = [
+  { Icon: Dashboard3D, bg: "from-[#34d399] via-[#10b981] to-[#059669]" },
+  { Icon: Bell3D, bg: "from-[#fbbf24] via-[#f59e0b] to-[#d97706]" },
+  { Icon: ShoppingBag3D, bg: "from-[#38bdf8] via-[#0ea5e9] to-[#0284c7]" },
+  { Icon: Users3D, bg: "from-[#38bdf8] via-[#0284c7] to-[#0369a1]" },
+];
+
+/** Admin picks the icon pack a client's portal shows. Each card previews its pack in place. */
+export function IconPackForm({ clientId, initial }: { clientId: string; initial: IconPack }) {
+  const [pack, setPack] = useState<IconPack>(initial);
+  const { pending, submit } = useSubmit();
+  return (
+    <form
+      className="space-y-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit(() => saveClientIconPack(clientId, pack));
+      }}
+    >
+      <div role="radiogroup" aria-label="Icon style" className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {ICON_PACKS.map((p) => {
+          const on = pack === p.id;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => setPack(p.id)}
+              className={cn(
+                "flex flex-col gap-2.5 rounded-card border p-3 text-left transition active:scale-[0.99]",
+                on ? "border-brand bg-brand-soft/60 ring-1 ring-brand/30" : "border-line bg-panel hover:border-line-strong hover:bg-subtle",
+              )}
+            >
+              <span className="flex w-full items-center justify-between gap-2">
+                <span className="text-sm font-semibold text-ink">{p.label}</span>
+                {initial === p.id && <Badge tone="green">In use</Badge>}
+              </span>
+              {/* Preview drawn in this pack, whatever pack the admin's own portal shows. */}
+              <span data-icons={p.id} className="icon-preview flex items-center gap-2">
+                {PREVIEW_TILES.map(({ Icon, bg }, i) => (
+                  <span key={i} aria-hidden className={cn("icon-cube-3d grid size-8 place-items-center rounded-[9px] bg-gradient-to-br text-white ring-1 ring-inset ring-white/35", bg)}>
+                    <Icon className="size-[18px]" />
+                  </span>
+                ))}
+                <span aria-hidden className="ml-1 flex items-center gap-2 text-muted">
+                  <Search className="size-4" />
+                  <Send className="size-4" />
+                  <Truck className="size-4" />
+                </span>
+              </span>
+              <span className="text-xs text-muted">{p.hint}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-muted">Changes this client&apos;s whole portal on their next page load.</p>
+        <Button type="submit" loading={pending} size="sm" disabled={pack === initial} className="max-sm:w-full">
+          Save icon style
         </Button>
       </div>
     </form>
