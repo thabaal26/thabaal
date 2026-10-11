@@ -39,7 +39,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: { default: `Thabaal · ${client.name}`, template: `%s · ${client.name} · Thabaal` },
     manifest: `/api/manifest/${client.id}`,
-    icons: client.logoUrl ? { icon: client.logoUrl, shortcut: client.logoUrl, apple: client.logoUrl } : defaultIcons,
+    icons: defaultIcons,
     appleWebApp: { capable: true, title: "Thabaal", statusBarStyle: "black-translucent" },
   };
 }
@@ -111,7 +111,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
   ) : null;
 
   return (
-    <NotificationProvider initialUnreadCount={unreadNotifications} customIconUrl={client?.logoUrl}>
+    <NotificationProvider initialUnreadCount={unreadNotifications}>
       <div style={themeStyle(client)} className="min-h-dvh w-full overflow-x-clip bg-canvas lg:pl-64 print:bg-white print:pl-0 lg:print:pl-0">
         {client && themeCss(client) && <style>{themeCss(client)}</style>}
         <a href="#main" className="sr-only z-[70] rounded-control bg-panel px-4 py-2 text-sm font-medium text-ink shadow-pop focus:not-sr-only focus:fixed focus:left-4 focus:top-4">

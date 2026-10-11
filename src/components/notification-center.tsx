@@ -51,7 +51,7 @@ function stripTitlePrefix(title: string): string {
   return cleaned || "Thabaal · Customer Messaging";
 }
 
-function updateDynamicFavicon(count: number, iconSrc: string) {
+function updateDynamicFavicon(count: number) {
   if (typeof document === "undefined") return;
   const img = new Image();
   img.crossOrigin = "anonymous";
@@ -134,17 +134,15 @@ function updateDynamicFavicon(count: number, iconSrc: string) {
       document.head.appendChild(link);
     }
   };
-  img.src = iconSrc || "/brands/thabaal/mark.png";
+  img.src = "/brands/thabaal/mark.png";
 }
 
 export function NotificationProvider({
   children,
   initialUnreadCount = 0,
-  customIconUrl,
 }: {
   children: ReactNode;
   initialUnreadCount?: number;
-  customIconUrl?: string | null;
 }) {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
@@ -225,7 +223,7 @@ export function NotificationProvider({
     };
 
     applyTabState();
-    updateDynamicFavicon(unreadCount, customIconUrl || "/brands/thabaal/mark.png");
+    updateDynamicFavicon(unreadCount);
 
     // Also update OS / PWA app badge when supported
     const nav = navigator as Navigator & {
@@ -247,7 +245,7 @@ export function NotificationProvider({
     });
     observer.observe(titleEl, { childList: true, characterData: true, subtree: true });
     return () => observer.disconnect();
-  }, [unreadCount, customIconUrl, flashTitle]);
+  }, [unreadCount, flashTitle]);
 
   // Briefly pulse the tab title when a brand-new live notification arrives
   useEffect(() => {

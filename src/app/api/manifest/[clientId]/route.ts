@@ -13,16 +13,11 @@ export async function GET(_: Request, ctx: RouteContext<"/api/manifest/[clientId
   });
   if (!c) return new NextResponse("Not found", { status: 404 });
 
-  const icons = c.logoUrl
-    ? [
-        { src: c.logoUrl, sizes: "512x512", type: "image/png", purpose: "any" },
-        { src: c.logoUrl, sizes: "512x512", type: "image/png", purpose: "maskable" },
-      ]
-    : [
-        { src: "/pwa-icon/192", sizes: "192x192", type: "image/png", purpose: "any" },
-        { src: "/pwa-icon/512", sizes: "512x512", type: "image/png", purpose: "any" },
-        { src: "/pwa-icon/maskable", sizes: "512x512", type: "image/png", purpose: "maskable" },
-      ];
+  const icons = [
+    { src: "/pwa-icon/192", sizes: "192x192", type: "image/png", purpose: "any" },
+    { src: "/pwa-icon/512", sizes: "512x512", type: "image/png", purpose: "any" },
+    { src: "/pwa-icon/maskable", sizes: "512x512", type: "image/png", purpose: "maskable" },
+  ];
 
   return NextResponse.json(
     {
