@@ -8,14 +8,14 @@ export function InboxTabs({ active }: { active: "inbox" | "priority" }) {
     { key: "priority", href: "/dashboard/replies/priority", label: "Priority board" },
   ] as const;
   return (
-    <nav aria-label="Replies views" className="inline-flex rounded-control bg-sunken p-1">
+    <nav aria-label="Replies views" className="inline-flex rounded-control bg-sunken p-0.5 sm:p-1">
       {tabs.map((t) => (
         <Link
           key={t.key}
           href={t.href}
           aria-current={t.key === active ? "page" : undefined}
           className={cn(
-            "inline-flex min-h-10 items-center rounded-[calc(var(--radius-control)-3px)] px-3.5 text-sm font-medium transition sm:min-h-8",
+            "inline-flex min-h-8 items-center rounded-[calc(var(--radius-control)-3px)] px-2.5 text-xs font-medium transition sm:px-3.5 sm:text-sm",
             t.key === active ? "bg-panel text-ink shadow-xs ring-1 ring-line" : "text-muted hover:text-ink",
           )}
         >

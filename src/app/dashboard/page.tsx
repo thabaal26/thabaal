@@ -1502,14 +1502,14 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       {/* Each section carries its own filters: the period and who/what it covers, right above its figures. */}
       <section
         aria-label={`${VIEWS[view].label} filters`}
-        className="mb-4 rounded-card border border-line bg-panel px-3.5 py-3 shadow-xs sm:mb-5 sm:px-4"
+        className="mb-3.5 rounded-card border border-line bg-panel px-3 py-2.5 shadow-xs sm:mb-5 sm:px-4 sm:py-3"
       >
-        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-ink">
+            <p className="text-[13px] font-semibold text-ink sm:text-sm">
               {VIEWS[view].label} <span className="font-normal text-muted">· {period.label}</span>
             </p>
-            <p className="mt-0.5 text-xs text-muted">
+            <p className="mt-0.5 text-[11px] text-muted sm:text-xs">
               {period.prevLabel !== "before" ? <>Compared with {prevLabel}</> : VIEWS[view].hint}
               {filtered && allowed && <> · {fmtNumber(allowed.length)} customer{allowed.length === 1 ? "" : "s"} in this filter</>}
             </p>
@@ -1527,7 +1527,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
             />
           )}
         </div>
-        {filterOpts && <ActiveFilters className="mt-2.5 border-t border-line pt-2.5" value={filters} options={filterOpts} basePath="/dashboard" extra={{ view: view === "overview" ? undefined : view }} />}
+        {filterOpts && <ActiveFilters className="mt-2 border-t border-line pt-2 sm:mt-2.5 sm:pt-2.5" value={filters} options={filterOpts} basePath="/dashboard" extra={{ view: view === "overview" ? undefined : view }} />}
       </section>
 
       {view === "overview" && (
@@ -1537,7 +1537,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       <div
         role="group"
         aria-label={`Figures for ${periodText}`}
-        className={`grid grid-cols-2 gap-3 sm:gap-4 ${repliesOn ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}
+        className={`grid grid-cols-2 gap-2.5 sm:gap-4 ${repliesOn ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}
       >
         {ordersOn ? (
           <KpiTile
@@ -1611,7 +1611,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       </div>
 
       {activeRuns.length > 0 && (
-        <Card className="card-3d mt-4 sm:mt-5">
+        <Card className="card-3d mt-3.5 sm:mt-5">
           <CardHeader tone="brand" icon={<Send3D />} title="Sending now" description="Campaigns delivering in batches. Batch size or interval changes apply from the next batch." />
           <ul className="divide-y divide-line">
             {activeRuns.map((r) => {
@@ -1620,16 +1620,16 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
               const done = r.total - queued;
               const eta = estimateDuration(queued, r.campaign.batchSize, r.campaign.intervalMinutes);
               return (
-                <li key={r.id} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:px-5">
+                <li key={r.id} className="flex flex-col gap-2.5 px-3.5 py-3 sm:flex-row sm:items-center sm:gap-3 sm:px-5 sm:py-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Link href={`/dashboard/campaigns/${r.campaignId}`} className="font-medium text-ink hover:underline">
+                      <Link href={`/dashboard/campaigns/${r.campaignId}`} className="text-[13px] font-medium text-ink hover:underline sm:text-sm">
                         {r.campaign.name}
                       </Link>
                       <StatusBadge status={r.status} />
                     </div>
                     <Meter raised className="mt-2" value={pct(done, r.total)} label={`${r.campaign.name} progress`} />
-                    <p className="tabular mt-1.5 text-xs text-muted">
+                    <p className="tabular mt-1.5 text-[11px] text-muted sm:text-xs">
                       {fmtNumber(done)} of {fmtNumber(r.total)} processed · {by("FAILED")} failed ·{" "}
                       {queued ? `${r.campaign.batchSize} every ${r.campaign.intervalMinutes} min, about ${formatMinutes(eta)} left · next batch ${fmtDate(r.nextBatchAt, "h:mm a")}` : "finishing"}
                     </p>
@@ -1647,7 +1647,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       )}
 
       {/* Activity and delivery. */}
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-5 sm:gap-5 xl:grid-cols-12">
+      <div className="mt-3.5 grid grid-cols-1 gap-3.5 sm:mt-5 sm:gap-5 xl:grid-cols-12">
         <div className="min-w-0 xl:col-span-8">
           <ActivityCard
             title="Message activity"
@@ -1668,7 +1668,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       </div>
 
       {/* Outcomes, live status and sending limits. */}
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-5 sm:gap-5 md:grid-cols-2 xl:grid-cols-12">
+      <div className="mt-3.5 grid grid-cols-1 gap-3.5 sm:mt-5 sm:gap-5 md:grid-cols-2 xl:grid-cols-12">
         <div className="min-w-0 md:col-span-2 xl:col-span-5">
           <FunnelCard
             f={funnel}
@@ -1693,7 +1693,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         </div>
       </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-5 sm:gap-5 xl:grid-cols-12">
+          <div className="mt-3.5 grid grid-cols-1 gap-3.5 sm:mt-5 sm:gap-5 xl:grid-cols-12">
             <div className="min-w-0 xl:col-span-7">
           <Card className="card-3d">
             <CardHeader
@@ -1710,7 +1710,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
             {recent.length ? (
               <ul className="divide-y divide-line">
                 {recent.map((m) => (
-                  <li key={m.customerId} className="relative flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-subtle sm:px-5">
+                  <li key={m.customerId} className="relative flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] transition-colors hover:bg-subtle sm:gap-3 sm:px-5 sm:py-3 sm:text-sm">
                     <Avatar name={m.customer.name} className="size-8 text-xs max-sm:hidden" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-ink">
@@ -1724,7 +1724,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
                           </span>
                         )}
                       </p>
-                      <p className="truncate text-xs text-muted">{m.body ?? m.templateName}</p>
+                      <p className="truncate text-[11px] text-muted sm:text-xs">{m.body ?? m.templateName}</p>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
                       <StatusBadge status={m.status} />
@@ -1743,7 +1743,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
           </Card>
 
             </div>
-            <div className="min-w-0 space-y-4 sm:space-y-5 xl:col-span-5">
+            <div className="min-w-0 space-y-3.5 sm:space-y-5 xl:col-span-5">
           {campaignsOn && (
             <Card className="card-3d">
               <CardHeader
@@ -1760,16 +1760,16 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
               {upcoming.length ? (
                 <ul className="divide-y divide-line">
                   {upcoming.map((c) => (
-                    <li key={c.id} className="relative flex items-center gap-3 px-4 py-3 transition-colors hover:bg-subtle active:bg-sunken sm:px-5">
-                      <div className="grid w-11 shrink-0 place-items-center rounded-control border border-line bg-panel py-1 text-center">
+                    <li key={c.id} className="relative flex items-center gap-2.5 px-3.5 py-2.5 transition-colors hover:bg-subtle active:bg-sunken sm:gap-3 sm:px-5 sm:py-3">
+                      <div className="grid w-10 shrink-0 place-items-center rounded-control border border-line bg-panel py-0.5 text-center sm:w-11 sm:py-1">
                         <span className="text-2xs font-medium uppercase text-muted">{fmtDate(c.nextRunAt, "EEE")}</span>
-                        <span className="tabular text-sm font-semibold leading-tight text-ink">{fmtDate(c.nextRunAt, "d")}</span>
+                        <span className="tabular text-[13px] font-semibold leading-tight text-ink sm:text-sm">{fmtDate(c.nextRunAt, "d")}</span>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <Link href={`/dashboard/campaigns/${c.id}`} className="block truncate text-sm font-medium text-ink after:absolute after:inset-0">
+                        <Link href={`/dashboard/campaigns/${c.id}`} className="block truncate text-[13px] font-medium text-ink after:absolute after:inset-0 sm:text-sm">
                           {c.name}
                         </Link>
-                        <p className="truncate text-xs text-muted">
+                        <p className="truncate text-[11px] text-muted sm:text-xs">
                           {fmtDate(c.nextRunAt, "h:mm a")} · {c.template.name}
                         </p>
                       </div>
@@ -1792,10 +1792,10 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       )}
 
       {view === "customers" && (
-        <div className="space-y-4 sm:space-y-5">
+        <div className="space-y-3.5 sm:space-y-5">
           {ordersOn && <CustomerScenariosCard data={scenariosData} />}
           <CustomerGrowthPlaybookCard data={winbackPlaybookData} />
-          <div className="grid grid-cols-1 gap-4 sm:gap-5 xl:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3.5 sm:gap-5 xl:grid-cols-2">
             <CustomerProductsCard items={shown.map((p) => ({ tag: `product:${p.name}`, label: p.name, n: p.n }))} />
             <CustomerAreasCard regions={byRegion}>
               <AreaChips topAreas={topAreas} otherAreas={otherAreas} />
@@ -1806,9 +1806,9 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       )}
 
       {view === "products" && ordersOn && (
-        <div className="space-y-4 sm:space-y-5">
+        <div className="space-y-3.5 sm:space-y-5">
           <AllProductsIntelligenceCard data={allProductsData} />
-          <div className="grid grid-cols-1 gap-4 sm:gap-5 xl:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3.5 sm:gap-5 xl:grid-cols-2">
             <TopProductsCard items={topProducts} rangeLabel={period.label} />
             {byProduct.length > 0 && <ProductCampaignGraphCard rows={byProduct} />}
           </div>
@@ -1816,7 +1816,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       )}
 
       {view === "carts" && ordersOn && (
-        <div className="space-y-4 sm:space-y-5">
+        <div className="space-y-3.5 sm:space-y-5">
           <CartMentalityCard data={cartMentalityData} />
         </div>
       )}

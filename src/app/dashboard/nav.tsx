@@ -176,10 +176,10 @@ export function BottomNav({
   const hiddenCount = more.reduce((sum, n) => sum + (countFor(n.href, { openReplies, newOrders, unreadNotifications })?.n ?? 0), 0);
 
   const tabClass = (active: boolean) =>
-    cn("flex h-16 min-w-0 flex-col items-center justify-center gap-1 text-2xs font-medium transition active:scale-95", active ? "text-brand-deep font-semibold" : "text-ink-2/90");
+    cn("flex h-14 min-w-0 flex-col items-center justify-center gap-0.5 text-[10px] font-medium leading-tight transition active:scale-95 sm:h-16 sm:gap-1 sm:text-2xs", active ? "text-brand-deep font-semibold" : "text-ink-2/90");
   const iconWrap = (active: boolean, cube = "from-[#34d399] via-[#10b981] to-[#059669]") =>
     cn(
-      "icon-cube-3d relative grid h-8 w-11 place-items-center rounded-[10px] bg-gradient-to-br text-white transition",
+      "icon-cube-3d relative grid h-7 w-9 place-items-center rounded-[9px] bg-gradient-to-br text-white transition sm:h-8 sm:w-11 sm:rounded-[10px]",
       cube,
       active ? "ring-2 ring-brand-deep/40 scale-105" : "ring-1 ring-inset ring-white/35 opacity-95",
     );
@@ -200,7 +200,7 @@ export function BottomNav({
                 {/* The badge sits outside the tile: the tile clips its contents for the gloss. */}
                 <span className="relative">
                   <span className={iconWrap(active, cube)}>
-                    <Icon aria-hidden className="size-5" />
+                    <Icon aria-hidden className="size-4 sm:size-5" />
                   </span>
                   {count && <CountBadge n={count.n} label={count.label} className={badge} />}
                 </span>
@@ -213,7 +213,7 @@ export function BottomNav({
           <button type="button" onClick={() => setOpenedOn(path)} aria-haspopup="dialog" aria-expanded={moreOpen} className={cn(tabClass(moreActive), "w-full")}>
             <span className="relative">
               <span className={iconWrap(moreActive, "from-[#818cf8] via-[#6366f1] to-[#4f46e5]")}>
-                <Menu className="size-5" strokeWidth={2} />
+                <Menu className="size-4 sm:size-5" strokeWidth={2} />
               </span>
               <CountBadge n={hiddenCount} label="to handle" className={badge} />
             </span>
@@ -232,18 +232,18 @@ export function BottomNav({
                   href={href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex h-14 items-center gap-3 rounded-control border px-3.5 text-sm font-medium transition active:scale-[0.98]",
+                    "flex h-12 items-center gap-2.5 rounded-control border px-3 text-xs font-medium transition active:scale-[0.98] sm:h-14 sm:gap-3 sm:px-3.5 sm:text-sm",
                     active ? "border-brand/30 bg-brand-soft text-brand-deep" : "border-line bg-panel text-ink active:bg-sunken",
                   )}
                 >
                   <span
                     aria-hidden
                     className={cn(
-                      "icon-cube-3d grid size-8 shrink-0 place-items-center rounded-[9px] bg-gradient-to-br text-white ring-1 ring-inset ring-white/40",
+                      "icon-cube-3d grid size-7 shrink-0 place-items-center rounded-[8px] bg-gradient-to-br text-white ring-1 ring-inset ring-white/40 sm:size-8 sm:rounded-[9px]",
                       cube,
                     )}
                   >
-                    <Icon className="size-[18px]" />
+                    <Icon className="size-4 sm:size-[18px]" />
                   </span>
                   <span className="min-w-0 flex-1 truncate">{label}</span>
                   {count && <CountBadge n={count.n} label={count.label} className="bg-danger-solid text-white" />}
@@ -318,9 +318,9 @@ export function SettingsLink() {
       href="/dashboard/settings"
       aria-label="Settings"
       aria-current={active ? "page" : undefined}
-      className={cn("grid size-11 shrink-0 place-items-center rounded-control transition active:scale-95", active ? "bg-night-2 text-glow" : "text-white/80 hover:bg-white/10")}
+      className={cn("grid size-9 shrink-0 place-items-center rounded-control transition active:scale-95 sm:size-11", active ? "bg-night-2 text-glow" : "text-white/80 hover:bg-white/10")}
     >
-      <Settings3D aria-hidden className="size-5" />
+      <Settings3D aria-hidden className="size-4 sm:size-5" />
     </Link>
   );
 }

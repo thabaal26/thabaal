@@ -217,7 +217,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
         </header>
 
         <header className="glass-nav surface-dark sticky top-0 z-30 w-full pt-[env(safe-area-inset-top)] lg:hidden print:hidden">
-          <div className="flex h-14 items-center gap-3 pl-4 pr-2">
+          <div className="flex h-12 items-center gap-2.5 pl-3 pr-1.5 sm:h-14 sm:gap-3 sm:pl-4 sm:pr-2">
             <BrandMark logoUrl={client?.logoUrl} name={name} size="sm" />
             {scope.isAdmin ? (
               <HeaderClientSwitcher clients={clients} current={scope.clientId} title={client ? name : "All clients"}>
@@ -225,7 +225,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
               </HeaderClientSwitcher>
             ) : (
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold leading-tight text-white">{name}</p>
+                <p className="truncate text-[0.8125rem] font-semibold leading-tight text-white sm:text-sm">{name}</p>
                 <div className="text-2xs leading-tight">{status ?? <span className="block truncate text-white/70">{subtitle}</span>}</div>
               </div>
             )}
@@ -235,7 +235,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           </div>
         </header>
 
-        <main id="main" className="stagger relative mx-auto w-full max-w-page px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pb-12 lg:pt-7 print:p-0">
+        <main id="main" className="stagger relative mx-auto w-full max-w-page px-3 pb-[calc(4.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pt-6 lg:px-8 lg:pb-12 lg:pt-7 print:p-0">
           {children}
         </main>
         {callsOn && scope.canOperate && <CallWidget />}

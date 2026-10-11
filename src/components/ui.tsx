@@ -12,9 +12,9 @@ export function BackLink({ href, children }: { href: string; children: ReactNode
   return (
     <Link
       href={href}
-      className="-ml-1 mb-1 inline-flex min-h-11 items-center gap-1.5 rounded-control px-1 text-sm font-medium text-muted transition hover:text-ink sm:min-h-8 print:hidden"
+      className="-ml-1 mb-0.5 inline-flex min-h-9 items-center gap-1 rounded-control px-1 text-xs font-medium text-muted transition hover:text-ink sm:mb-1 sm:min-h-8 sm:gap-1.5 sm:text-sm print:hidden"
     >
-      <ArrowLeft aria-hidden className="size-4" /> {children}
+      <ArrowLeft aria-hidden className="size-3.5 sm:size-4" /> {children}
     </Link>
   );
 }
@@ -46,26 +46,26 @@ export function PageHeader({
   rowActions?: boolean;
 }) {
   return (
-    <header className="mb-5 sm:mb-6">
+    <header className="mb-3.5 sm:mb-6">
       {back && <BackLink href={back.href}>{back.label}</BackLink>}
-      <div className={cn("flex gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6", inlineActions ? "items-start" : "flex-col")}>
+      <div className={cn("flex gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-6", inlineActions ? "items-start" : "flex-col")}>
         <div className="min-w-0 flex-1 sm:min-w-48">
           <PageInfo title={title} description={description} />
-          {meta && <div className="mt-1.5 text-sm text-muted">{meta}</div>}
+          {meta && <div className="mt-1 text-xs text-muted sm:mt-1.5 sm:text-sm">{meta}</div>}
         </div>
         {actions &&
           (inlineActions ? (
-            <div className="flex shrink-0 gap-2 sm:max-w-[70%] sm:shrink sm:flex-wrap sm:justify-end print:hidden">{actions}</div>
+            <div className="flex shrink-0 gap-1.5 sm:max-w-[70%] sm:shrink sm:flex-wrap sm:justify-end sm:gap-2 print:hidden">{actions}</div>
           ) : rowActions ? (
-            <div className="flex gap-2 *:flex-1 sm:max-w-[70%] sm:flex-wrap sm:justify-end sm:*:flex-none print:hidden">{actions}</div>
+            <div className="flex gap-1.5 *:flex-1 sm:max-w-[70%] sm:flex-wrap sm:justify-end sm:gap-2 sm:*:flex-none print:hidden">{actions}</div>
           ) : (
             // Phones: buttons share the row and wrap two-up instead of squeezing four into one line.
-            <div className="flex flex-wrap gap-2 *:min-w-[calc(50%-0.25rem)] *:flex-1 sm:max-w-[70%] sm:justify-end sm:*:min-w-0 sm:*:flex-none print:hidden">
+            <div className="flex flex-wrap gap-1.5 *:min-w-[calc(50%-0.1875rem)] *:flex-1 sm:max-w-[70%] sm:justify-end sm:gap-2 sm:*:min-w-0 sm:*:flex-none print:hidden">
               {actions}
             </div>
           ))}
       </div>
-      {tabs && <div className="mt-5">{tabs}</div>}
+      {tabs && <div className="mt-3 sm:mt-5">{tabs}</div>}
     </header>
   );
 }
@@ -85,15 +85,15 @@ export function Section({
   className?: string;
 }) {
   return (
-    <section className={cn("mt-8 sm:mt-10", className)}>
-      <div className="mb-3 flex items-end justify-between gap-3">
+    <section className={cn("mt-5 sm:mt-10", className)}>
+      <div className="mb-2.5 flex items-end justify-between gap-2.5 sm:mb-3 sm:gap-3">
         <div className="min-w-0">
-          <h2 className="text-base font-semibold text-ink">{title}</h2>
-          {description && <p className="mt-0.5 max-w-read text-sm text-muted">{description}</p>}
+          <h2 className="text-sm font-semibold text-ink sm:text-base">{title}</h2>
+          {description && <p className="mt-0.5 max-w-read text-xs text-muted sm:text-sm">{description}</p>}
         </div>
         {action}
       </div>
-      <div className="space-y-4">{children}</div>
+      <div className="space-y-3 sm:space-y-4">{children}</div>
     </section>
   );
 }
@@ -102,8 +102,8 @@ export function Card({ className, ...p }: ComponentProps<"div">) {
   return <div className={cn("min-w-0 rounded-card border border-line bg-panel shadow-card print:shadow-none", className)} {...p} />;
 }
 
-/** Padding inside a card body; the same everywhere. */
-export const cardPad = "p-4 sm:p-5";
+/** Padding inside a card body; compact on mobile, roomy on desktop. */
+export const cardPad = "p-3.5 sm:p-5";
 
 /**
  * Coloured header treatments: a soft tinted band, an accent strip along the card's top edge and a
@@ -133,10 +133,10 @@ export function IconCube({
   const t = headerTones[tone] ?? headerTones.brand;
   const dims =
     size === "sm"
-      ? "size-8 rounded-[10px] [&>svg]:size-[18px]"
+      ? "size-7 rounded-[8px] [&>svg]:size-4 sm:size-8 sm:rounded-[10px] sm:[&>svg]:size-[18px]"
       : size === "lg"
-        ? "size-11 rounded-[13px] [&>svg]:size-6"
-        : "size-9 rounded-[11px] [&>svg]:size-5";
+        ? "size-9 rounded-[11px] [&>svg]:size-5 sm:size-11 sm:rounded-[13px] sm:[&>svg]:size-6"
+        : "size-8 rounded-[9px] [&>svg]:size-[17px] sm:size-9 sm:rounded-[11px] sm:[&>svg]:size-5";
   return (
     <span
       aria-hidden
@@ -168,18 +168,18 @@ export function CardHeader({
   return (
     <div
       className={cn(
-        "relative flex flex-wrap items-start justify-between gap-x-3 gap-y-2 border-b border-line px-4 py-3.5 sm:flex-nowrap sm:gap-4 sm:px-5 sm:py-4",
+        "relative flex flex-wrap items-start justify-between gap-x-2.5 gap-y-1.5 border-b border-line px-3.5 py-2.5 sm:flex-nowrap sm:gap-4 sm:px-5 sm:py-4",
         t && ["rounded-t-[inherit] bg-gradient-to-r to-transparent to-75%", t.band, "before:absolute before:inset-x-0 before:top-0 before:h-[3px] before:rounded-t-[inherit]", t.strip],
       )}
     >
-      <div className="flex min-w-0 flex-1 basis-40 items-start gap-3">
+      <div className="flex min-w-0 flex-1 basis-36 items-start gap-2.5 sm:basis-40 sm:gap-3">
         {t && icon && <IconCube tone={tone} size="md">{icon}</IconCube>}
         <div className="min-w-0">
-          <H className="text-[0.9375rem] font-semibold leading-6 text-ink">{title}</H>
-          {description && <p className="mt-0.5 text-xs leading-relaxed text-muted sm:text-sm">{description}</p>}
+          <H className="text-[0.875rem] font-semibold leading-5 text-ink sm:text-[0.9375rem] sm:leading-6">{title}</H>
+          {description && <p className="mt-0.5 text-[11.5px] leading-snug text-muted sm:text-sm sm:leading-relaxed">{description}</p>}
         </div>
       </div>
-      {action && <div className="flex min-w-0 max-w-full shrink-0 items-center gap-2 self-center">{action}</div>}
+      {action && <div className="flex min-w-0 max-w-full shrink-0 items-center gap-1.5 self-center sm:gap-2">{action}</div>}
     </div>
   );
 }
@@ -201,20 +201,19 @@ export type ButtonVariant = keyof typeof variants;
 export type ButtonSize = "sm" | "md";
 
 /**
- * Button styling, also used on links. Phones and touch screens get 44px targets; computers
- * with a mouse get the denser desktop sizes.
+ * Button styling, also used on links. Compact and balanced on phones while preserving desktop sizes.
  */
 export function buttonClass(variant: ButtonVariant = "primary", size: ButtonSize = "md", icon = false) {
   return cn(
-    "relative inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-control font-medium transition active:scale-[0.98] [&_svg]:shrink-0 [&_svg:not([class*=size-])]:size-4",
+    "relative inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-control font-medium transition active:scale-[0.98] sm:gap-2 [&_svg]:shrink-0 [&_svg:not([class*=size-])]:size-4",
     "disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 aria-disabled:pointer-events-none aria-disabled:opacity-50",
     icon
       ? size === "sm"
-        ? "size-11 sm:size-8 sm:pointer-coarse:size-11"
-        : "size-11 sm:size-10 sm:pointer-coarse:size-11"
+        ? "size-8 sm:size-8"
+        : "size-9 sm:size-10"
       : size === "sm"
-        ? "h-11 px-3.5 text-md sm:h-8 sm:px-3 sm:text-[0.8125rem] sm:pointer-coarse:h-11 sm:pointer-coarse:text-sm"
-        : "h-11 px-4 text-md sm:h-10 sm:px-3.5 sm:text-sm sm:pointer-coarse:h-11",
+        ? "h-8 px-2.5 text-xs sm:h-8 sm:px-3 sm:text-[0.8125rem]"
+        : "h-9 px-3 text-[0.8125rem] sm:h-10 sm:px-3.5 sm:text-sm",
     variants[variant],
   );
 }
@@ -448,12 +447,12 @@ export function Callout({
   role?: "alert" | "status";
 }) {
   return (
-    <div role={role} className={cn("flex flex-col gap-3 rounded-card border px-4 py-3.5 text-sm sm:flex-row sm:items-center sm:justify-between", calloutTones[tone], className)}>
-      <div className="flex min-w-0 gap-2.5">
+    <div role={role} className={cn("flex flex-col gap-2.5 rounded-card border px-3.5 py-2.5 text-xs sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4 sm:py-3.5 sm:text-sm", calloutTones[tone], className)}>
+      <div className="flex min-w-0 gap-2 sm:gap-2.5">
         {icon && <span aria-hidden className="mt-0.5 shrink-0 [&>svg]:size-4">{icon}</span>}
         <div className="min-w-0">
           {title && <p className="font-semibold">{title}</p>}
-          {children && <div className={cn(title && "mt-0.5", "[&_a]:font-medium [&_a]:underline")}>{children}</div>}
+          {children && <div className={cn(title && "mt-0.5", "leading-snug sm:leading-normal [&_a]:font-medium [&_a]:underline")}>{children}</div>}
         </div>
       </div>
       {action && <div className="shrink-0">{action}</div>}
@@ -477,7 +476,7 @@ export function FilterChips({ label, items, className }: { label: string; items:
               href={t.href}
               aria-current={t.active ? "page" : undefined}
               className={cn(
-                "flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition active:scale-[0.97] sm:h-8 sm:px-3.5 sm:text-[0.8125rem] sm:pointer-coarse:h-10",
+                "flex h-8 items-center gap-1 whitespace-nowrap rounded-full border px-2.5 text-xs font-medium transition active:scale-[0.97] sm:h-8 sm:gap-1.5 sm:px-3.5 sm:text-[0.8125rem]",
                 t.active
                   ? "border-ink bg-ink text-panel shadow-xs"
                   : "border-line-2 bg-panel text-ink-2 shadow-2xs hover:border-line-strong hover:bg-subtle hover:text-ink",
@@ -517,7 +516,7 @@ export function Segmented<T extends string>({
   className?: string;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className={cn("inline-flex max-w-full rounded-control bg-sunken p-1", className)}>
+    <div role="radiogroup" aria-label={label} className={cn("inline-flex max-w-full flex-wrap rounded-control bg-sunken p-0.5 sm:flex-nowrap sm:p-1", className)}>
       {options.map((o) => {
         const on = o.value === value;
         return (
@@ -528,7 +527,7 @@ export function Segmented<T extends string>({
             aria-checked={on}
             onClick={() => onChange(o.value)}
             className={cn(
-              "min-h-11 flex-1 whitespace-nowrap rounded-[calc(var(--radius-control)-4px)] px-4 text-sm font-medium transition sm:min-h-8 sm:px-3 sm:pointer-coarse:min-h-11",
+              "min-h-8 flex-1 whitespace-nowrap rounded-[calc(var(--radius-control)-4px)] px-2.5 text-xs font-medium transition sm:min-h-8 sm:px-3 sm:text-sm",
               on ? "bg-panel text-ink shadow-xs ring-1 ring-line" : "text-muted hover:text-ink",
             )}
           >
@@ -557,7 +556,7 @@ export function Avatar({ name, className }: { name: string; className?: string }
   const parts = clean.split(/\s+/).filter(Boolean);
   const initials = parts.length > 1 ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase() : (clean.slice(0, 1).toUpperCase() || "?");
   return (
-    <span aria-hidden className={cn("grid size-10 shrink-0 place-items-center rounded-full text-xs font-semibold ring-1 ring-inset", tone, className)}>
+    <span aria-hidden className={cn("grid size-9 shrink-0 place-items-center rounded-full text-xs font-semibold ring-1 ring-inset sm:size-10", tone, className)}>
       {initials}
     </span>
   );
@@ -614,11 +613,11 @@ export function ListRow({
   className?: string;
 }) {
   return (
-    <li className={cn("relative flex items-start gap-3 px-4 py-3 sm:px-5", href && "transition-colors active:bg-sunken has-[a:hover]:bg-subtle", className)}>
+    <li className={cn("relative flex items-start gap-2.5 px-3.5 py-2.5 sm:gap-3 sm:px-5 sm:py-3", href && "transition-colors active:bg-sunken has-[a:hover]:bg-subtle", className)}>
       {leading}
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
-          <p className="min-w-0 truncate font-medium text-ink">
+          <p className="min-w-0 truncate text-[0.875rem] font-medium text-ink sm:text-base">
             {href ? (
               <Link href={href} className="outline-none after:absolute after:inset-0 after:rounded-[inherit] focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-[var(--color-focus,var(--color-brand-deep))]">
                 {title}
@@ -629,7 +628,7 @@ export function ListRow({
           </p>
           {trailing && <div className="relative z-[1] flex shrink-0 items-center gap-1.5">{trailing}</div>}
         </div>
-        {meta && <div className="mt-0.5 text-xs text-muted">{meta}</div>}
+        {meta && <div className="mt-0.5 text-[11.5px] leading-snug text-muted sm:text-xs">{meta}</div>}
         {children}
       </div>
     </li>
@@ -640,15 +639,15 @@ export function ListRow({
 
 export function EmptyState({ icon, title, children, action }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center px-6 py-10 text-center sm:py-14">
+    <div className="flex flex-col items-center px-4 py-7 text-center sm:px-6 sm:py-14">
       {icon && (
-        <div aria-hidden className="pedestal-3d icon-cube-3d mb-4 grid size-14 place-items-center rounded-2xl text-white ring-1 ring-inset ring-white/45 [&>svg]:size-7">
+        <div aria-hidden className="pedestal-3d icon-cube-3d mb-3 grid size-11 place-items-center rounded-xl text-white ring-1 ring-inset ring-white/45 [&>svg]:size-5 sm:mb-4 sm:size-14 sm:rounded-2xl sm:[&>svg]:size-7">
           {icon}
         </div>
       )}
-      <h3 className="text-[0.9375rem] font-semibold text-ink">{title}</h3>
-      {children && <p className="mt-1 max-w-sm text-sm text-muted">{children}</p>}
-      {action && <div className="mt-5">{action}</div>}
+      <h3 className="text-sm font-semibold text-ink sm:text-[0.9375rem]">{title}</h3>
+      {children && <p className="mt-1 max-w-sm text-xs text-muted sm:text-sm">{children}</p>}
+      {action && <div className="mt-3.5 sm:mt-5">{action}</div>}
     </div>
   );
 }
@@ -701,23 +700,23 @@ export function Stat({
   const body = (
     <>
       <span aria-hidden className="absolute inset-x-0 top-0 h-[3px]" style={{ background: t.color }} />
-      <div className="flex items-center justify-between gap-2">
-        <p className="min-w-0 truncate text-[0.6875rem] font-semibold uppercase tracking-wide sm:text-xs" style={{ color: t.color }}>
+      <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+        <p className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-wide sm:text-xs" style={{ color: t.color }}>
           {label}
         </p>
         {icon && <IconCube tone={tone} size="sm">{icon}</IconCube>}
       </div>
-      <div className="tabular mt-2 text-xl font-semibold leading-tight tracking-tight text-ink sm:mt-2.5 sm:text-kpi">{value}</div>
-      {meter !== undefined && <Meter raised value={meter} tone={tone === "amber" || tone === "rose" ? "warning" : "brand"} className="mt-2.5" />}
-      {sub && <p className="mt-1.5 text-xs text-muted">{sub}</p>}
+      <div className="tabular mt-1.5 text-lg font-semibold leading-tight tracking-tight text-ink sm:mt-2.5 sm:text-kpi">{value}</div>
+      {meter !== undefined && <Meter raised value={meter} tone={tone === "amber" || tone === "rose" ? "warning" : "brand"} className="mt-2 sm:mt-2.5" />}
+      {sub && <p className="mt-1 text-[11px] leading-snug text-muted sm:mt-1.5 sm:text-xs">{sub}</p>}
     </>
   );
   return href ? (
-    <Link href={href} style={surface} className="card-3d relative flex h-full min-w-0 flex-col justify-between overflow-hidden rounded-card border p-3.5 active:bg-sunken sm:p-4">
+    <Link href={href} style={surface} className="card-3d relative flex h-full min-w-0 flex-col justify-between overflow-hidden rounded-card border p-3 active:bg-sunken sm:p-4">
       {body}
     </Link>
   ) : (
-    <Card style={surface} className="card-3d relative flex h-full flex-col justify-between overflow-hidden p-3.5 sm:p-4">
+    <Card style={surface} className="card-3d relative flex h-full flex-col justify-between overflow-hidden p-3 sm:p-4">
       {body}
     </Card>
   );

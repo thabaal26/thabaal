@@ -43,7 +43,7 @@ function Side({ c, other }: { c: CampaignResult; other?: CampaignResult }) {
           </Link>
         }
       />
-      <div className="p-4 sm:p-5">
+      <div className="p-3 sm:p-5">
         <ProgressRings
           label={`${c.name} results`}
           size={84}
@@ -55,17 +55,17 @@ function Side({ c, other }: { c: CampaignResult; other?: CampaignResult }) {
         />
       </div>
       <div className="grid grid-cols-3 border-t border-line text-center">
-        <div className="p-3">
+        <div className="p-2.5 sm:p-3">
           <p className="text-2xs uppercase tracking-wide text-muted">Messaged</p>
-          <p className="tabular text-base font-semibold text-ink">{fmtNumber(c.sent)}</p>
+          <p className="tabular text-sm font-semibold text-ink sm:text-base">{fmtNumber(c.sent)}</p>
         </div>
-        <div className="border-x border-line p-3">
-          <p className="text-2xs uppercase tracking-wide text-muted">Paid within 7 days</p>
-          <p className="tabular text-base font-semibold text-ink">{formatValue(c.revenue, "inr")}</p>
+        <div className="border-x border-line p-2.5 sm:p-3">
+          <p className="text-2xs uppercase tracking-wide text-muted">Paid (7d)</p>
+          <p className="tabular text-sm font-semibold text-ink sm:text-base">{formatValue(c.revenue, "inr")}</p>
         </div>
-        <div className="p-3">
-          <p className="text-2xs uppercase tracking-wide text-muted">Per 100 messaged</p>
-          <p className="tabular text-base font-semibold text-ink">{formatValue(c.sent ? (c.revenue / c.sent) * 100 : 0, "inr")}</p>
+        <div className="p-2.5 sm:p-3">
+          <p className="text-2xs uppercase tracking-wide text-muted">Per 100 sent</p>
+          <p className="tabular text-sm font-semibold text-ink sm:text-base">{formatValue(c.sent ? (c.revenue / c.sent) * 100 : 0, "inr")}</p>
         </div>
       </div>
     </Card>
@@ -81,14 +81,14 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
       back={{ href: "/dashboard/campaigns", label: "Campaigns" }}
       description="What people did after each campaign: read, replied within 3 days, and sent a cart or paid within 7 days."
       tabs={
-        <nav aria-label="Period" className="inline-flex rounded-control bg-sunken p-1">
+        <nav aria-label="Period" className="inline-flex rounded-control bg-sunken p-0.5 sm:p-1">
           {PERIODS.map((d) => (
             <Link
               key={d}
               href={href(d, typeof sp.a === "string" ? sp.a : undefined, typeof sp.b === "string" ? sp.b : undefined)}
               aria-current={Number(sp.days ?? 90) === d ? "page" : undefined}
               className={cn(
-                "inline-flex min-h-10 items-center rounded-[calc(var(--radius-control)-3px)] px-3.5 text-sm font-medium transition sm:min-h-8",
+                "inline-flex min-h-8 items-center rounded-[calc(var(--radius-control)-3px)] px-2.5 text-xs font-medium transition sm:min-h-8 sm:px-3.5 sm:text-sm",
                 Number(sp.days ?? 90) === d ? "bg-panel text-ink shadow-xs ring-1 ring-line" : "text-muted hover:text-ink",
               )}
             >
@@ -131,22 +131,76 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
       {header}
 
       {best && best.revenue > 0 && (
-        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-card border border-brand/25 bg-brand-soft/50 px-4 py-3 text-sm sm:mb-5">
-          <Trophy3D className="size-5" />
+        <div className="mb-3.5 flex flex-wrap items-center gap-2 rounded-card border border-brand/25 bg-brand-soft/50 px-3.5 py-2.5 text-xs sm:mb-5 sm:px-4 sm:py-3 sm:text-sm">
+          <Trophy3D className="size-4 shrink-0 sm:size-5" />
           <span>
             <b className="text-ink">{best.name}</b> earns the most per message: {formatValue((best.revenue / best.sent) * 100, "inr")} for every 100 people messaged.
           </span>
         </div>
       )}
 
-      <div className={cn("grid grid-cols-1 gap-4 sm:gap-5", b && "xl:grid-cols-2")}>
+      <div className={cn("grid grid-cols-1 gap-3.5 sm:gap-5", b && "xl:grid-cols-2")}>
         <Side c={a} other={b} />
         {b && <Side c={b} other={a} />}
       </div>
 
-      <Card className="card-3d mt-4 sm:mt-5">
+      <Card className="card-3d mt-3.5 sm:mt-5">
         <CardHeader tone="info" icon={<ChartBar3D />} title="Every campaign" description={`Last ${days} days · rates are a share of messages delivered · pick two to compare`} />
-        <div className="thin-scroll overflow-x-auto">
+
+        {/* Mobile compact list (zero horizontal swipe) */}
+        <ul className="divide-y divide-line sm:hidden">
+          {all.map((c) => {
+            const picked = c.id === a.id || c.id === b?.id;
+            return (
+              <li key={c.id} className={cn("space-y-2 px-3.5 py-3", picked && "bg-subtle")}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <Link href={`/dashboard/campaigns/${c.id}`} className="block truncate text-xs font-semibold text-ink hover:underline">
+                      {c.name}
+                    </Link>
+                    <p className="truncate text-2xs text-muted">
+                      {c.template} · <span className="tabular">{fmtNumber(c.sent)}</span> sent · <b className="tabular font-semibold text-ink">{formatValue(c.revenue, "inr")}</b> paid
+                    </p>
+                  </div>
+                  <div className="shrink-0">
+                    {picked ? (
+                      <Badge tone="brand">Shown</Badge>
+                    ) : (
+                      <span className="inline-flex items-center gap-2 rounded-control border border-line bg-panel px-2 py-1 text-2xs font-semibold">
+                        <Link href={href(days, c.id, b?.id)} className="text-brand-deep hover:underline">
+                          Left
+                        </Link>
+                        <span aria-hidden className="text-line-strong">·</span>
+                        <Link href={href(days, a.id, c.id)} className="text-brand-deep hover:underline">
+                          Right
+                        </Link>
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {METRICS.map((m) => {
+                    const v = m.of(c);
+                    return (
+                      <div key={m.key} className="rounded-control border border-line/80 bg-panel px-2 py-1">
+                        <div className="flex items-center justify-between gap-1 text-[10px] text-muted">
+                          <span className="truncate">{m.label === "Sent a cart" ? "Cart" : m.label}</span>
+                          <span className="tabular font-semibold text-ink">{v}%</span>
+                        </div>
+                        <div className="mt-1 h-1 overflow-hidden rounded-full bg-sunken">
+                          <div className="h-full rounded-full" style={{ width: `${Math.min(100, v)}%`, background: m.color }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+
+        {/* Desktop table */}
+        <div className="thin-scroll hidden overflow-x-auto sm:block">
           <table className="w-full min-w-[720px] text-sm">
             <thead>
               <tr className="border-b border-line text-left text-2xs uppercase tracking-wide text-muted">
@@ -212,9 +266,9 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
         </div>
       </Card>
 
-      <Card className="card-3d mt-4 sm:mt-5">
+      <Card className="card-3d mt-3.5 sm:mt-5">
         <CardHeader tone="gold" icon={<Trophy3D />} title="Sales after each campaign" description="Paid within 7 days of the message" />
-        <div className="p-4 sm:p-5">
+        <div className="p-3 sm:p-5">
           <BarList
             format="inr"
             color="emerald"

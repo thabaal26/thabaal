@@ -172,7 +172,7 @@ export function DonutPanel({
   const total = slices.reduce((n, s) => n + Math.max(0, s.value), 0);
   const active = hover ?? selected ?? null;
   return (
-    <div className={cn("flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-6", className)}>
+    <div className={cn("flex flex-col items-center gap-3 sm:flex-row sm:items-center sm:gap-6", className)}>
       <Donut slices={slices} format={format} centerLabel={centerLabel} centerValue={centerValue} label={label} size={size} active={active} onActive={setHover} />
       <ul className={cn("w-full min-w-0 flex-1 space-y-0.5 sm:max-w-md", legendClassName)}>
         {slices.map((s) => {
@@ -180,15 +180,15 @@ export function DonutPanel({
             <>
               <span aria-hidden className="size-2.5 shrink-0 rounded-[3px]" style={{ background: cssColor(s.color) }} />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm text-ink-2">{s.label}</span>
+                <span className="block truncate text-xs text-ink-2 sm:text-sm">{s.label}</span>
                 {s.sub && <span className="block truncate text-2xs text-muted">{s.sub}</span>}
               </span>
-              <span className="tabular shrink-0 text-sm font-semibold text-ink">{formatValue(s.value, format)}</span>
-              <span className="tabular w-9 shrink-0 text-right text-2xs text-muted">{share(s.value, total)}%</span>
+              <span className="tabular shrink-0 text-xs font-semibold text-ink sm:text-sm">{formatValue(s.value, format)}</span>
+              <span className="tabular w-8 shrink-0 text-right text-2xs text-muted sm:w-9">{share(s.value, total)}%</span>
             </>
           );
           const cls = cn(
-            "flex w-full items-center gap-2.5 rounded-control px-2 py-1.5 text-left transition",
+            "flex w-full items-center gap-2 rounded-control px-2 py-1 text-left transition sm:gap-2.5 sm:py-1.5",
             (active === s.key || selected === s.key) && "bg-subtle ring-1 ring-line",
             s.value === 0 && "opacity-55",
             (s.href || onSelect) && "hover:bg-subtle",
@@ -263,15 +263,15 @@ function Ring({ ring, size, index }: { ring: ProgressRing; size: number; index: 
   );
   return (
     <div className="flex min-w-0 flex-col items-center text-center">
-      <div className="relative grid place-items-center" style={{ width: size, height: size }}>
+      <div className="relative grid place-items-center max-sm:scale-90" style={{ width: size, height: size }}>
         <EChart option={option} height={size} label={`${r.label}: ${r.display ?? `${Math.round(r.value)}%`}`} className="!absolute inset-0 !rounded-full" />
-        <span className="tabular relative text-lg font-semibold leading-none tracking-tight text-ink">{r.display ?? `${Math.round(r.value)}%`}</span>
+        <span className="tabular relative text-base font-semibold leading-none tracking-tight text-ink sm:text-lg">{r.display ?? `${Math.round(r.value)}%`}</span>
       </div>
-      <span className="mt-2 flex items-center gap-1.5 text-xs font-medium leading-tight text-ink-2">
-        <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: cssColor(r.color) }} />
-        {r.label}
+      <span className="mt-1 flex items-center gap-1 text-[11px] font-medium leading-tight text-ink-2 sm:mt-2 sm:gap-1.5 sm:text-xs">
+        <span aria-hidden className="size-1.5 shrink-0 rounded-full sm:size-2" style={{ background: cssColor(r.color) }} />
+        <span className="truncate">{r.label}</span>
       </span>
-      {r.sub && <span className="mt-0.5 text-2xs leading-tight text-muted">{r.sub}</span>}
+      {r.sub && <span className="mt-0.5 text-[10px] leading-tight text-muted sm:text-2xs">{r.sub}</span>}
     </div>
   );
 }
@@ -283,8 +283,13 @@ function Ring({ ring, size, index }: { ring: ProgressRing; size: number; index: 
 export function ProgressRings({ rings, label, title, size = 96, className }: { rings: ProgressRing[]; label: string; title?: string; size?: number; className?: string }) {
   return (
     <div role="group" aria-label={label} className={cn("min-w-0", className)}>
-      {title && <p className="mb-3 text-sm font-semibold text-ink">{title}</p>}
-      <div className="flex flex-wrap items-start justify-center gap-x-5 gap-y-4">
+      {title && <p className="mb-2.5 text-xs font-semibold text-ink sm:mb-3 sm:text-sm">{title}</p>}
+      <div
+        className={cn(
+          "grid items-start gap-2 sm:flex sm:flex-wrap sm:justify-center sm:gap-x-5 sm:gap-y-4",
+          rings.length === 4 ? "grid-cols-2 min-[380px]:grid-cols-4" : rings.length === 2 ? "grid-cols-2" : "grid-cols-3",
+        )}
+      >
         {rings.map((r, i) => (
           <Ring key={r.key} ring={r} size={size} index={i} />
         ))}
@@ -301,7 +306,8 @@ const BAR = 8;
 /** The label above each bar and the figure at its right end, drawn on a full-width invisible bar. */
 /** The whole row (track included) answers hover and click, so the target is bigger than the bar. */
 function rowLabels(t: ChartTheme, width: number, rows: { name: string; dot?: string; right: string; tag?: string }[], max: number, clickable = false) {
-  const nameW = Math.max(80, width * 0.6);
+  const narrow = width > 0 && width < 400;
+  const nameW = Math.max(70, width * (narrow ? 0.54 : 0.6));
   return [
     {
       type: "bar",
@@ -321,8 +327,8 @@ function rowLabels(t: ChartTheme, width: number, rows: { name: string; dot?: str
           overflow: "truncate",
           formatter: `${r.dot ? "{d|●} " : ""}{n|${r.name.replace(/[{}|]/g, "")}}${r.tag ? `   {t|${r.tag.replace(/[{}|]/g, "")}}` : ""}`,
           rich: {
-            n: { color: t.ink2, fontSize: 13, fontFamily: t.font },
-            t: { color: t.muted, fontSize: 11, fontFamily: t.font },
+            n: { color: t.ink2, fontSize: narrow ? 11.5 : 13, fontFamily: t.font },
+            t: { color: t.muted, fontSize: narrow ? 10 : 11, fontFamily: t.font },
             d: { color: r.dot ?? t.muted, fontSize: 10 },
           },
         },
@@ -338,7 +344,7 @@ function rowLabels(t: ChartTheme, width: number, rows: { name: string; dot?: str
       itemStyle: { color: "transparent" },
       data: rows.map((r) => ({
         value: max,
-        label: { show: true, position: ["100%", -17], align: "right", color: t.ink, fontWeight: 600, fontSize: 12.5, fontFamily: t.font, formatter: r.right.replace(/[{}|]/g, "") },
+        label: { show: true, position: ["100%", -17], align: "right", color: t.ink, fontWeight: 600, fontSize: narrow ? 11 : 12.5, fontFamily: t.font, formatter: r.right.replace(/[{}|]/g, "") },
       })),
       animation: false,
     },
@@ -644,14 +650,13 @@ export type Column = { key: string; label: string; sub?: string; parts: StackPar
 
 /**
  * Vertical stacked columns on one scale (e.g. sales per day split by how they were paid). The total
- * sits on each column, every part is in the tooltip, and it scrolls sideways on phones.
+ * sits on each column, every part is in the tooltip, and it fits cleanly inside mobile viewports.
  */
 export function ColumnChart({
   columns,
   format = "count",
   legend,
   height = 160,
-  minWidth = 560,
   label,
   activeKey,
   onColumnClick,
@@ -677,21 +682,23 @@ export function ColumnChart({
     return seen;
   }, [data]);
   const option = useCallback(
-    (t: ChartTheme) => {
+    (t: ChartTheme, size: { width: number }) => {
+      const narrow = size.width > 0 && size.width < 460;
+      const showTopLabels = showTotals && (!narrow || data.length <= 8);
       const top = data.map((c) => {
         const live = c.parts.filter((p) => p.value > 0);
         return live[live.length - 1]?.key;
       });
       return {
         ...motion(t, 25),
-        grid: { left: 4, right: 4, top: showTotals ? 22 : 12, bottom: 4, containLabel: true },
+        grid: { left: 2, right: 2, top: showTopLabels ? 22 : 12, bottom: 4, containLabel: true },
         xAxis: {
           type: "category",
           data: data.map((c) => c.key),
           axisTick: { show: false },
           axisLine: { lineStyle: { color: t.grid } },
           axisLabel: {
-            interval: 0,
+            interval: narrow && data.length > 8 ? "auto" : 0,
             hideOverlap: true,
             margin: 8,
             formatter: (_: string, i: number) => {
@@ -700,9 +707,9 @@ export function ColumnChart({
               return `{${c.highlight ? "h" : "a"}|${c.label.replace(/[{}|]/g, "")}}${c.sub ? `\n{b|${c.sub.replace(/[{}|]/g, "")}}` : ""}`;
             },
             rich: {
-              a: { color: t.muted, fontSize: 10, fontFamily: t.font, lineHeight: 13 },
-              h: { color: t.ink, fontSize: 10, fontWeight: 700, fontFamily: t.font, lineHeight: 13 },
-              b: { color: t.axis, fontSize: 9, fontFamily: t.font, lineHeight: 12 },
+              a: { color: t.muted, fontSize: narrow ? 9 : 10, fontFamily: t.font, lineHeight: 12 },
+              h: { color: t.ink, fontSize: narrow ? 9 : 10, fontWeight: 700, fontFamily: t.font, lineHeight: 12 },
+              b: { color: t.axis, fontSize: narrow ? 8 : 9, fontFamily: t.font, lineHeight: 11 },
             },
           },
         },
@@ -711,7 +718,7 @@ export function ColumnChart({
           splitNumber: 3,
           minInterval: format === "percent" ? undefined : 1,
           max: allZero ? 4 : undefined,
-          axisLabel: { color: t.axis, fontSize: 10, formatter: (v: number) => formatCompact(v, format) },
+          axisLabel: { color: t.axis, fontSize: narrow ? 9 : 10, formatter: (v: number) => formatCompact(v, format) },
           splitLine: { lineStyle: { color: t.grid } },
         },
         tooltip: {
@@ -737,8 +744,8 @@ export function ColumnChart({
           type: "bar",
           stack: "total",
           name: pk.label,
-          barMaxWidth: 28,
-          barCategoryGap: "32%",
+          barMaxWidth: narrow ? 20 : 28,
+          barCategoryGap: narrow ? "22%" : "32%",
           cursor: onColumnClick ? "pointer" : "default",
           data: data.map((c, i) => {
             const part = c.parts.find((p) => p.key === pk.key);
@@ -752,7 +759,7 @@ export function ColumnChart({
                 borderColor: t.surface,
                 borderWidth: c.parts.filter((p) => p.value > 0).length > 1 ? 1 : 0,
               },
-              label: isTop && showTotals ? { show: true, position: "top", color: t.ink2, fontSize: 10, fontWeight: 600, fontFamily: t.font, formatter: () => formatCompact(sums[i], format) } : { show: false },
+              label: isTop && showTopLabels ? { show: true, position: "top", color: t.ink2, fontSize: narrow ? 9 : 10, fontWeight: 600, fontFamily: t.font, formatter: () => formatCompact(sums[i], format) } : { show: false },
             };
           }),
         })),
@@ -762,20 +769,18 @@ export function ColumnChart({
   );
   return (
     <div>
-      {legend && <Legend items={legend} className="mb-3" />}
-      <div className="thin-scroll -mx-1 overflow-x-auto px-1 pb-1">
-        <div className="relative" style={{ minWidth }}>
-          {allZero && <p className="pointer-events-none absolute inset-x-0 top-[40%] z-10 text-center text-sm text-muted">Nothing in this period yet</p>}
-          <EChart
-            option={option}
-            height={height + 52}
-            label={label}
-            onEvent={(type, e) => {
-              const c = e.dataIndex !== undefined ? data[e.dataIndex] : undefined;
-              if (type === "click" && c && onColumnClick) onColumnClick(c.key);
-            }}
-          />
-        </div>
+      {legend && <Legend items={legend} className="mb-2.5 sm:mb-3" />}
+      <div className="relative w-full">
+        {allZero && <p className="pointer-events-none absolute inset-x-0 top-[40%] z-10 text-center text-sm text-muted">Nothing in this period yet</p>}
+        <EChart
+          option={option}
+          height={height + 44}
+          label={label}
+          onEvent={(type, e) => {
+            const c = e.dataIndex !== undefined ? data[e.dataIndex] : undefined;
+            if (type === "click" && c && onColumnClick) onColumnClick(c.key);
+          }}
+        />
       </div>
       {onColumnClick && (
         <ul className="sr-only">

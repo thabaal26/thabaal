@@ -57,9 +57,9 @@ export function ViewTabs({
   };
 
   return (
-    <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top)+0.5rem)] z-20 mb-5 flex justify-center px-1 lg:top-[4.5rem] sm:mb-6 print:hidden">
-      <div className="flex max-w-full items-center gap-1 rounded-full border border-line/80 bg-panel/85 p-1 shadow-[0_8px_24px_-8px_rgb(16_24_40/0.18),0_2px_6px_-2px_rgb(16_24_40/0.08)] backdrop-blur-md sm:p-1.5">
-        <nav aria-label="Dashboard sections" className="no-scrollbar relative flex min-w-0 gap-0.5 overflow-x-auto sm:min-w-max sm:gap-1 sm:overflow-visible">
+    <div className="sticky top-[calc(3rem+env(safe-area-inset-top)+0.375rem)] z-20 mb-3.5 flex justify-center sm:top-[calc(3.5rem+env(safe-area-inset-top)+0.5rem)] sm:mb-6 sm:px-1 lg:top-[4.5rem] print:hidden">
+      <div className="flex w-full max-w-full items-center rounded-full border border-line/80 bg-panel/90 p-1 shadow-[0_6px_18px_-6px_rgb(16_24_40/0.15),0_2px_5px_-2px_rgb(16_24_40/0.07)] backdrop-blur-md sm:w-auto sm:gap-1 sm:p-1.5">
+        <nav aria-label="Dashboard sections" className="relative flex w-full min-w-0 items-center justify-between gap-0.5 sm:w-auto sm:min-w-max sm:justify-start sm:gap-1">
           {pill && (
             <span
               aria-hidden
@@ -82,15 +82,15 @@ export function ViewTabs({
                 aria-current={v === view ? "page" : undefined}
                 onClick={() => pick(v)}
                 className={cn(
-                  "relative z-10 inline-flex min-h-10 shrink-0 items-center gap-1 rounded-full px-3 text-[0.8125rem] font-medium transition-colors duration-200 sm:gap-1.5 sm:px-4 sm:text-sm",
+                  "relative z-10 inline-flex min-h-8 flex-1 items-center justify-center gap-1 rounded-full px-2 text-xs font-medium transition-colors duration-200 sm:min-h-10 sm:flex-none sm:gap-1.5 sm:px-4 sm:text-sm",
                   on ? "text-white" : "text-ink-2 hover:text-ink",
                   !pill && on && "bg-brand",
                 )}
               >
-                {VIEWS[v].label}
+                <span className="truncate">{VIEWS[v].label}</span>
                 {n ? (
                   <>
-                    <span aria-hidden className={cn("size-1.5 rounded-full sm:hidden", on ? "bg-white/80" : "bg-warning")} />
+                    <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full sm:hidden", on ? "bg-white/85" : "bg-warning")} />
                     <span className={cn("tabular rounded-full px-1.5 py-px text-2xs font-semibold transition-colors max-sm:sr-only", on ? "bg-white/25 text-white" : "bg-warning-bg text-warning")}>{n}</span>
                   </>
                 ) : null}

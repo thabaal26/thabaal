@@ -229,7 +229,7 @@ body {
   /* 16px text on phones stops iOS from zooming into fields; 44px height fits a thumb.
      In the components layer so per-field utilities (width, padding) can override it. */
   .field {
-    @apply min-h-11 w-full rounded-control border border-line-strong/70 bg-panel px-3.5 py-2.5 text-base text-ink shadow-xs transition-[border-color,box-shadow]
+    @apply min-h-10 w-full rounded-control border border-line-strong/70 bg-panel px-3 py-2 text-base text-ink shadow-xs transition-[border-color,box-shadow]
       placeholder:text-muted hover:border-line-strong disabled:cursor-not-allowed disabled:border-line disabled:bg-sunken disabled:text-muted disabled:shadow-none
       aria-invalid:border-danger-solid
       sm:min-h-10 sm:px-3 sm:py-2 sm:text-sm;
@@ -343,6 +343,14 @@ tbody > tr {
     inset 0 1px 0 rgb(255 255 255),
     0 1px 2px rgb(16 24 40 / 0.05),
     0 8px 20px -6px rgb(16 24 40 / 0.1);
+}
+@media (width < 40rem) {
+  .card-3d {
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.9),
+      0 1px 2px rgb(16 24 40 / 0.04),
+      0 3px 10px -4px rgb(16 24 40 / 0.06);
+  }
 }
 @media (hover: hover) and (pointer: fine) {
   .card-3d {

@@ -375,14 +375,14 @@ export function NotificationBell({
       title="Notifications"
       aria-label={`Notifications, ${unreadCount} unread`}
       className={cn(
-        "relative grid size-11 place-items-center rounded-control transition active:scale-95 sm:pointer-fine:size-9",
+        "relative grid size-9 place-items-center rounded-control transition active:scale-95 sm:size-11 sm:pointer-fine:size-9",
         dark
           ? "text-white/80 hover:bg-white/10 hover:text-white"
           : "text-ink-2 hover:bg-sunken hover:text-ink",
         className
       )}
     >
-      <Bell className="size-5 shrink-0" />
+      <Bell className="size-4.5 shrink-0 sm:size-5" />
       {unreadCount > 0 && (
         <span
           className={cn(

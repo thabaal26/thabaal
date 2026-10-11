@@ -88,20 +88,20 @@ export type Delta = { cur: number; prev: number; kind: "pct" | "pts"; goodWhenUp
 function DeltaBadge({ d, vs }: { d: Delta; vs: string }) {
   if (!d) return null;
   const diff = d.kind === "pts" ? d.cur - d.prev : d.prev ? ((d.cur - d.prev) / d.prev) * 100 : null;
-  if (diff === null) return d.cur > 0 ? <span className="text-xs text-muted">New this period</span> : null;
+  if (diff === null) return d.cur > 0 ? <span className="text-[11px] text-muted sm:text-xs">New this period</span> : null;
   const r = Math.round(diff * 10) / 10;
-  if (r === 0) return <span className="text-xs text-muted">Same as {vs}</span>;
+  if (r === 0) return <span className="truncate text-[11px] text-muted sm:text-xs">Same as {vs}</span>;
   const up = r > 0;
   const good = up === (d.goodWhenUp ?? true);
   const Icon = up ? ArrowUpRight : ArrowDownRight;
   return (
-    <span className="inline-flex items-center gap-1 text-xs">
-      <span className={cn("inline-flex items-center gap-0.5 rounded-full px-1.5 py-px font-semibold", good ? "bg-success-bg text-success" : "bg-danger-bg text-danger")}>
+    <span className="inline-flex min-w-0 max-w-full items-center gap-1 text-[11px] sm:text-xs">
+      <span className={cn("inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-px font-semibold", good ? "bg-success-bg text-success" : "bg-danger-bg text-danger")}>
         <Icon aria-hidden className="size-3" />
         {Math.abs(r)}
         {d.kind === "pts" ? " pts" : "%"}
       </span>
-      <span className="text-muted">vs {vs}</span>
+      <span className="truncate text-muted">vs {vs}</span>
     </span>
   );
 }
@@ -132,28 +132,33 @@ export function KpiTile({
   const body = (
     <>
       <span aria-hidden className="absolute inset-x-0 top-0 h-[3px]" style={{ background: color }} />
-      <div className="flex items-center justify-between gap-2 px-3.5 pt-3.5 sm:px-5 sm:pt-5">
-        <p className="min-w-0 text-[0.6875rem] font-semibold uppercase leading-tight tracking-wide sm:text-[0.8125rem]" style={{ color }}>
+      <div className="flex items-center justify-between gap-1.5 px-3 pt-2.5 sm:gap-2 sm:px-5 sm:pt-5">
+        <p className="min-w-0 truncate text-[11px] font-semibold uppercase leading-tight tracking-wide sm:text-[0.8125rem]" style={{ color }}>
           {label}
         </p>
         <span
           aria-hidden
-          className="icon-cube-3d grid size-9 shrink-0 place-items-center rounded-[11px] text-white ring-1 ring-inset ring-white/40 sm:size-10"
+          className="icon-cube-3d grid size-7 shrink-0 place-items-center rounded-[8px] text-white ring-1 ring-inset ring-white/40 sm:size-10 sm:rounded-[11px]"
           style={{ background: brightCubeGradient(color), boxShadow: `inset 0 1.5px 0 rgb(255 255 255 / 0.65), inset 0 -2px 0 rgb(0 0 0 / 0.2), 0 6px 14px -3px ${color}99` }}
         >
-          <Icon className="size-5 sm:size-[22px]" />
+          <Icon className="size-4 sm:size-[22px]" />
         </span>
       </div>
-      <div className="px-3.5 sm:px-5">
-        <p className="mt-2 text-xl font-semibold leading-tight tracking-tight text-ink sm:text-[1.75rem]">
+      <div className="px-3 sm:px-5">
+        <p className="mt-1.5 text-lg font-semibold leading-tight tracking-tight text-ink sm:mt-2 sm:text-[1.75rem]">
           <CountUp value={value} format={format} />
         </p>
-        <p className="mt-1 truncate text-xs text-muted">{sub}</p>
+        <p className="mt-0.5 truncate text-[11px] text-muted sm:mt-1 sm:text-xs">{sub}</p>
       </div>
-      <Sparkline values={spark} color={color} className="mt-2 h-9 sm:h-12" />
-      <div className="mt-auto border-t border-line px-3.5 py-2.5 sm:px-5">
+      <Sparkline values={spark} color={color} className="mt-1.5 h-7 sm:mt-2 sm:h-12" />
+      <div className="mt-auto flex items-center border-t border-line px-3 py-1.5 sm:px-5 sm:py-2.5">
         <DeltaBadge d={delta} vs={vs} />
-        {!delta && <span className="text-xs text-muted">No earlier period to compare</span>}
+        {!delta && (
+          <>
+            <span className="truncate text-[11px] text-muted sm:hidden">No prior data</span>
+            <span className="hidden text-xs text-muted sm:inline">No earlier period to compare</span>
+          </>
+        )}
       </div>
     </>
   );
@@ -181,18 +186,18 @@ export function ActivityCard({ labels, tooltipLabels, series, every, title, desc
         title={title}
         description={description}
         action={
-          <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-2">
+          <ul className="flex flex-wrap gap-x-2.5 gap-y-1 text-[11px] text-ink-2 sm:gap-x-3 sm:text-xs">
             {series.map((s) => (
               <li key={s.key} className="flex items-center gap-1.5">
-                <span aria-hidden className="h-0.5 w-3 rounded-full" style={{ background: cssColor(s.color) }} />
+                <span aria-hidden className="h-0.5 w-2.5 rounded-full sm:w-3" style={{ background: cssColor(s.color) }} />
                 {s.label}
               </li>
             ))}
           </ul>
         }
       />
-      <div className="px-2 pb-3 pt-4 sm:px-4">
-        <TrendChart labels={labels} tooltipLabels={tooltipLabels} series={series} every={every} height={330} />
+      <div className="px-1.5 pb-2.5 pt-3 sm:px-4 sm:pb-3 sm:pt-4">
+        <TrendChart labels={labels} tooltipLabels={tooltipLabels} series={series} every={every} height={290} />
       </div>
       {/* The same figures for screen readers. */}
       <table className="sr-only">
@@ -234,7 +239,7 @@ export function DeliveryCard({ read, delivered, sent, failed }: { read: number; 
         title="Message delivery health"
         description="How many WhatsApp messages reached and were read by customers"
       />
-      <div className="p-4 sm:p-5">
+      <div className="p-3 sm:p-5">
         <DeliveryDonut read={read} delivered={delivered} sent={sent} failed={failed} />
       </div>
     </Card>
@@ -298,7 +303,7 @@ export function FunnelCard({
         description="Customers messaged this period, where they engaged, and where they dropped off"
       />
       {base ? (
-        <div className="space-y-3 p-4 sm:p-5">
+        <div className="space-y-2.5 p-3 sm:space-y-3 sm:p-5">
           <BarList
             max={base}
             label="Customers at each step, as a share of everyone messaged"
@@ -310,17 +315,17 @@ export function FunnelCard({
           <ul className="space-y-1.5">
           {showOrders && (
             <li className="space-y-1.5">
-              <div className="flex items-center justify-between rounded-control bg-gold-soft px-3 py-2 text-sm">
-                <span className="text-gold-deep">Confirmed sales from those buyers</span>
-                <span className="tabular font-semibold text-gold-deep">{formatValue(revenue, "inr")}</span>
+              <div className="flex items-center justify-between gap-2 rounded-control bg-gold-soft px-3 py-1.5 text-xs sm:py-2 sm:text-sm">
+                <span className="truncate text-gold-deep">Confirmed sales from those buyers</span>
+                <span className="tabular shrink-0 font-semibold text-gold-deep">{formatValue(revenue, "inr")}</span>
               </div>
               {unpaidCartCount > 0 && (
                 <Link
                   href="/dashboard/orders?status=NEW"
-                  className="flex items-center justify-between rounded-control border border-warning-border bg-warning-bg px-3 py-2 text-xs font-medium text-warning transition hover:opacity-90"
+                  className="flex items-center justify-between gap-2 rounded-control border border-warning-border bg-warning-bg px-3 py-1.5 text-xs font-medium text-warning transition hover:opacity-90 sm:py-2"
                 >
-                  <span>Added to cart, not paid yet ({fmtNumber(unpaidCartCount)} cart{unpaidCartCount === 1 ? "" : "s"})</span>
-                  <span className="tabular font-semibold">{formatValue(unpaidCartRevenue, "inr")} waiting →</span>
+                  <span className="truncate">Added to cart, unpaid ({fmtNumber(unpaidCartCount)} cart{unpaidCartCount === 1 ? "" : "s"})</span>
+                  <span className="tabular shrink-0 font-semibold">{formatValue(unpaidCartRevenue, "inr")} waiting →</span>
                 </Link>
               )}
             </li>
@@ -328,7 +333,7 @@ export function FunnelCard({
           </ul>
         </div>
       ) : (
-        <p className="p-5 text-sm text-muted">Nobody was messaged in this period yet.</p>
+        <p className="p-4 text-sm text-muted sm:p-5">Nobody was messaged in this period yet.</p>
       )}
     </Card>
   );
@@ -357,9 +362,9 @@ export function TodayCard({
       className="surface-dark relative flex h-full flex-col overflow-hidden rounded-card bg-night text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.1),0_2px_4px_rgb(16_24_40/0.12),0_22px_40px_-16px_rgb(16_24_40/0.55)]"
     >
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_80%_at_100%_0%,rgb(22_125_99/0.55),transparent_60%),radial-gradient(80%_60%_at_0%_100%,rgb(234_191_38/0.16),transparent_70%)]" />
-      <div className="relative flex items-start justify-between gap-3 px-5 pt-5">
+      <div className="relative flex items-start justify-between gap-3 px-3.5 pt-3.5 sm:px-5 sm:pt-5">
         <div>
-          <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-white/60">
+          <p className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-white/60 sm:text-xs">
             {sending.length > 0 && (
               <span aria-hidden className="relative flex size-2">
                 <span className="absolute inline-flex size-full animate-ping rounded-full bg-call-answer opacity-60 motion-reduce:hidden" />
@@ -368,13 +373,13 @@ export function TodayCard({
             )}
             <span id="today-title">Today{sending.length ? " · sending now" : ""}</span>
           </p>
-          <p className="mt-1.5 text-2xl font-semibold tracking-tight">
-            <CountUp value={sent} /> <span className="text-sm font-normal text-white/60">messages</span>
+          <p className="mt-1 text-xl font-semibold tracking-tight sm:mt-1.5 sm:text-2xl">
+            <CountUp value={sent} /> <span className="text-xs font-normal text-white/60 sm:text-sm">messages</span>
           </p>
           <p className="text-xs text-white/60">{fmtNumber(replies)} replies from customers</p>
         </div>
       </div>
-      <div className="relative mt-2 min-h-0 flex-1 px-2">
+      <div className="relative mt-1.5 min-h-0 flex-1 px-1.5 sm:mt-2 sm:px-2">
         <TrendChart
           dark
           labels={hours.map((h) => h.label)}
@@ -384,10 +389,10 @@ export function TodayCard({
             { key: "replies", label: "Replies", color: "#5fd4b0", values: hours.map((h) => h.replies), area: false },
           ]}
           every={Math.max(1, Math.ceil(hours.length / 6))}
-          height={230}
+          height={210}
         />
       </div>
-      <div className="relative space-y-2 border-t border-white/10 px-5 py-3.5 text-sm">
+      <div className="relative space-y-2 border-t border-white/10 px-3.5 py-2.5 text-xs sm:px-5 sm:py-3.5 sm:text-sm">
         {sending.map((s) => (
           <div key={s.name}>
             <div className="flex justify-between gap-2 text-xs">
@@ -427,25 +432,25 @@ function LimitRing({ used, limit, left, label }: { used: number; limit: number |
   // The portal stops a little under Meta's limit so retries never tip a number over it.
   const reserve = limit !== null && left !== null ? Math.max(0, limit - used - left) : 0;
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex items-center gap-3 sm:gap-4">
       <UsageGauge
         value={Math.max(used, 0)}
         max={limit}
         full={full}
-        size={108}
+        size={96}
         label={limit === null ? `${label}: no limit` : `${label}: ${used} of ${limit} people messaged`}
       >
-        <span className="tabular text-lg font-semibold leading-none text-ink">{fmtNumber(used)}</span>
+        <span className="tabular text-base font-semibold leading-none text-ink sm:text-lg">{fmtNumber(used)}</span>
         <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-muted">{limit === null ? "no limit" : `of ${fmtNumber(limit)}`}</span>
       </UsageGauge>
-      <div className="min-w-0 text-sm">
+      <div className="min-w-0 text-xs sm:text-sm">
         <p className="tabular text-ink">
           <b className="font-semibold">{fmtNumber(used)}</b> of {limit === null ? "unlimited" : fmtNumber(limit)} people
         </p>
         <p className="tabular text-xs text-ink-2">
           {left === null ? "No daily limit" : full ? <b className="text-warning">Limit reached, sends resume as the 24 hours roll on</b> : `${fmtNumber(left)} more can be messaged now`}
         </p>
-        {reserve > 0 && !full && <p className="tabular text-xs text-muted">{fmtNumber(reserve)} kept spare so retries never go over</p>}
+        {reserve > 0 && !full && <p className="tabular text-[11px] text-muted sm:text-xs">{fmtNumber(reserve)} kept spare so retries never go over</p>}
       </div>
     </div>
   );
@@ -465,18 +470,18 @@ export function NumberLimitsCard({ numbers }: { numbers: Health }) {
     <Card className="card-3d flex h-full flex-col">
       <CardHeader tone="info" icon={<Gauge3D />} title="Daily sending limit" description="Different people messaged in the last 24 hours" />
       {head && (
-        <div className="border-b border-line px-4 py-4 sm:px-5">
+        <div className="border-b border-line px-3.5 py-3 sm:px-5 sm:py-4">
           <LimitRing used={head.used} limit={head.limit} left={head.left} label="Business limit" />
           {shared.length > 1 && <p className="mt-2 text-xs text-muted">Shared by your {shared.length} numbers: Meta counts the whole business.</p>}
         </div>
       )}
       <ul className="divide-y divide-line">
         {numbers.map((n) => (
-          <li key={n.id} className="space-y-2 px-4 py-3 sm:px-5">
+          <li key={n.id} className="space-y-2 px-3.5 py-2.5 sm:px-5 sm:py-3">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-ink">{n.label}</p>
-                <p className="tabular truncate text-xs text-muted">{n.displayPhone}</p>
+                <p className="truncate text-xs font-medium text-ink sm:text-sm">{n.label}</p>
+                <p className="tabular truncate text-[11px] text-muted sm:text-xs">{n.displayPhone}</p>
               </div>
               <QualityBadge rating={n.qualityRating} />
             </div>
@@ -489,7 +494,7 @@ export function NumberLimitsCard({ numbers }: { numbers: Health }) {
           </li>
         ))}
       </ul>
-      <p className="mt-auto border-t border-line px-4 py-2.5 text-xs text-muted sm:px-5">
+      <p className="mt-auto border-t border-line px-3.5 py-2 text-[11px] text-muted sm:px-5 sm:py-2.5 sm:text-xs">
         Limit and quality from Meta{checked ? `, checked ${fmtDate(checked, "d MMM, h:mm a")}` : ""}. Usage counts messages sent from this portal.
       </p>
     </Card>
@@ -523,12 +528,12 @@ export function BestTimeCard({ cells, days }: { cells: { d: number; b: number; n
           ) : undefined
         }
       />
-      <div className="p-4 sm:p-5">
+      <div className="p-3 sm:p-5">
         {max === 0 ? (
           <p className="text-sm text-muted">No replies yet. This fills in as customers write back.</p>
         ) : (
           <>
-            <p className="mb-4 text-sm text-ink-2">
+            <p className="mb-3 text-xs text-ink-2 sm:mb-4 sm:text-sm">
               Most replies on <b className="font-semibold text-ink">{DAYS[best!.d]}</b>, <b className="font-semibold text-ink">{BLOCKS[best!.b]}</b>.
             </p>
             <HeatGrid
@@ -570,7 +575,7 @@ export function TopProductsCard({ items, rangeLabel }: { items: ProductDemandRow
         }
       />
       {items.length ? (
-        <div className="p-4 sm:p-5">
+        <div className="p-3 sm:p-5">
           <StackedRows
             format="inr"
             label="Product demand: bought vs left in cart"
@@ -591,7 +596,7 @@ export function TopProductsCard({ items, rangeLabel }: { items: ProductDemandRow
           />
         </div>
       ) : (
-        <p className="p-5 text-sm text-muted">No orders or carts in this period yet.</p>
+        <p className="p-4 text-sm text-muted sm:p-5">No orders or carts in this period yet.</p>
       )}
     </Card>
   );

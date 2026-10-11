@@ -71,7 +71,9 @@ export function FilterBar({
 
   const btn = cn(
     "inline-flex shrink-0 items-center gap-1.5 rounded-full font-semibold transition",
-    compact ? "min-h-9 bg-sunken px-3 text-xs text-ink hover:bg-line/60" : "min-h-10 border border-line bg-panel px-3.5 text-sm text-ink-2 shadow-xs hover:border-line-2 hover:text-ink",
+    compact
+      ? "min-h-8 bg-sunken px-2.5 text-xs text-ink hover:bg-line/60 sm:min-h-9 sm:px-3"
+      : "min-h-8 border border-line bg-panel px-2.5 text-xs text-ink-2 shadow-xs hover:border-line-2 hover:text-ink sm:min-h-10 sm:px-3.5 sm:text-sm",
     pending && "opacity-60",
   );
 
@@ -81,13 +83,13 @@ export function FilterBar({
         {has("period") && (
           <button type="button" onClick={openPanel} className={btn} aria-label={`Period: ${periodLabel}. Change`}>
             <CalendarDays aria-hidden className="size-3.5 text-brand" />
-            <span className={cn("max-w-[9rem] truncate", compact && "max-sm:sr-only")}>{periodLabel}</span>
+            <span className={cn("max-w-[8rem] truncate sm:max-w-[9rem]", compact && "max-sm:sr-only")}>{periodLabel}</span>
           </button>
         )}
         <button type="button" onClick={openPanel} className={btn} aria-label={`Filters${count ? `, ${count} on` : ""}`}>
           <SlidersHorizontal aria-hidden className="size-3.5" />
           <span className={cn(compact && "max-sm:sr-only")}>Filter</span>
-          {count > 0 && <span className="tabular grid min-w-5 place-items-center rounded-full bg-brand px-1 text-2xs font-bold text-white">{count}</span>}
+          {count > 0 && <span className="tabular grid min-w-4.5 place-items-center rounded-full bg-brand px-1 text-2xs font-bold text-white sm:min-w-5">{count}</span>}
         </button>
       </div>
 

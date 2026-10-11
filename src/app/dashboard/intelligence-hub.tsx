@@ -139,9 +139,9 @@ export function AllProductsIntelligenceCard({ data }: { data: AllProductsSummary
         }
       />
 
-      <div className="grid grid-cols-1 gap-6 p-4 sm:p-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 p-3 sm:gap-6 sm:p-5 lg:grid-cols-2">
         <div>
-          <h4 className="mb-3 text-sm font-semibold text-ink">Products by status</h4>
+          <h4 className="mb-2 text-xs font-semibold text-ink sm:mb-3 sm:text-sm">Products by status</h4>
           <DonutPanel
             slices={statusSlices}
             centerLabel="products"
@@ -155,22 +155,22 @@ export function AllProductsIntelligenceCard({ data }: { data: AllProductsSummary
           />
         </div>
         <div>
-          <h4 className="mb-3 text-sm font-semibold text-ink">Where the money is</h4>
+          <h4 className="mb-2 text-xs font-semibold text-ink sm:mb-3 sm:text-sm">Where the money is</h4>
           <DonutPanel slices={moneySlices} format="inr" centerLabel="sold + in carts + dropped" label="Sales value by stage" size={156} />
         </div>
       </div>
 
       {zeroSale > 0 && (
-        <div className="px-4 pb-4 sm:px-5">
+        <div className="px-3 pb-3 sm:px-5 sm:pb-4">
           <ActionLine href="/dashboard/campaigns/new" cta="Promote them">
             <b className="text-ink">{plural(zeroSale, "product")}</b> had no sales this period. Pair them as a small add-on with your best seller.
           </ActionLine>
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 border-t border-line p-4 sm:p-5 xl:grid-cols-12">
+      <div className="grid grid-cols-1 gap-4 border-t border-line p-3 sm:gap-6 sm:p-5 xl:grid-cols-12">
         <div className="xl:col-span-4">
-          <h4 className="mb-3 text-sm font-semibold text-ink">By category</h4>
+          <h4 className="mb-2 text-xs font-semibold text-ink sm:mb-3 sm:text-sm">By category</h4>
           <StackedRows
             format="inr"
             legend={[
@@ -192,8 +192,8 @@ export function AllProductsIntelligenceCard({ data }: { data: AllProductsSummary
         </div>
 
         <div className="xl:col-span-8">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h4 className="text-sm font-semibold text-ink">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 sm:mb-3">
+            <h4 className="text-xs font-semibold text-ink sm:text-sm">
               {group ? GROUPS[group].label : "Every product"} <span className="tabular font-normal text-muted">· {list.length}</span>
             </h4>
             {group && (
@@ -202,7 +202,7 @@ export function AllProductsIntelligenceCard({ data }: { data: AllProductsSummary
               </button>
             )}
           </div>
-          <div className="thin-scroll max-h-[440px] overflow-y-auto pr-1">
+          <div className="thin-scroll max-h-[380px] overflow-y-auto pr-1 sm:max-h-[440px]">
             <StackedRows
               format="inr"
               activeKey={open}
@@ -223,7 +223,7 @@ export function AllProductsIntelligenceCard({ data }: { data: AllProductsSummary
           {openItem ? (
             <ProductDetail p={openItem} />
           ) : (
-            <p className="mt-3 text-2xs text-muted">Tap a product to see why and what to do next.</p>
+            <p className="mt-2.5 text-2xs text-muted sm:mt-3">Tap a product to see why and what to do next.</p>
           )}
         </div>
       </div>
@@ -235,9 +235,9 @@ const plural = (n: number, one: string, many = `${one}s`) => `${fmtNumber(n)} ${
 
 function ProductDetail({ p }: { p: AllProductAnalyticsItem }) {
   return (
-    <div className="mt-3 rounded-control border border-line bg-subtle/60 p-3.5">
+    <div className="mt-3 rounded-control border border-line bg-subtle/60 p-3 sm:p-3.5">
       <div className="flex flex-wrap items-center gap-1.5">
-        <Link href={`/dashboard/customers?tag=${encodeURIComponent(`product:${p.name}`)}`} className="text-sm font-semibold text-ink hover:underline">
+        <Link href={`/dashboard/customers?tag=${encodeURIComponent(`product:${p.name}`)}`} className="text-xs font-semibold text-ink hover:underline sm:text-sm">
           {p.name}
         </Link>
         <Badge tone={p.statusTone}>{p.statusLabel}</Badge>
@@ -245,7 +245,7 @@ function ProductDetail({ p }: { p: AllProductAnalyticsItem }) {
         {p.anchorKeptCount > 0 && <Badge tone="green">Kept {p.anchorKeptCount}×</Badge>}
         {p.priceAmount > 0 && <span className="tabular text-xs text-muted">{formatValue(p.priceAmount, "inr")}</span>}
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="mt-2.5 grid grid-cols-2 gap-1.5 sm:mt-3 sm:grid-cols-4 sm:gap-2">
         <StatChip label="Sold" value={`${fmtNumber(p.soldQty)} · ${formatValue(p.soldRevenue, "inr")}`} tone={p.soldQty ? "good" : "ink"} />
         <StatChip label="In unpaid cart" value={`${fmtNumber(p.cartQty)} · ${formatValue(p.cartValue, "inr")}`} tone={p.cartQty ? "warn" : "ink"} />
         <StatChip label="Dropped" value={`${fmtNumber(p.droppedQty)} · ${formatValue(p.droppedValue, "inr")}`} tone={p.droppedQty ? "bad" : "ink"} />
@@ -256,7 +256,7 @@ function ProductDetail({ p }: { p: AllProductAnalyticsItem }) {
           Last 30 days: messaged {fmtNumber(p.campaignSent)} buyers · {pct(p.campaignRead, p.campaignSent)}% read · {plural(p.campaignReplies, "reply", "replies")}
         </p>
       )}
-      <p className="mt-2.5 text-xs text-ink-2">
+      <p className="mt-2 text-xs text-ink-2 sm:mt-2.5">
         <b className="text-ink">Why:</b> {p.diagnosis}
       </p>
       <p className="mt-1 text-xs text-ink-2">
@@ -370,8 +370,8 @@ export function CustomerGrowthPlaybookCard({ data }: { data: CustomerWinbackPlay
         action={data.recoverableRevenuePool > 0 ? <Badge tone="amber">Recoverable: {formatValue(data.recoverableRevenuePool, "inr")}</Badge> : undefined}
       />
 
-      <div className="grid grid-cols-1 gap-6 p-4 sm:p-5 xl:grid-cols-12">
-        <div className="space-y-5 xl:col-span-5">
+      <div className="grid grid-cols-1 gap-4 p-3 sm:gap-6 sm:p-5 xl:grid-cols-12">
+        <div className="space-y-4 sm:space-y-5 xl:col-span-5">
           <DonutPanel slices={slices} centerLabel="customers" label="Customers by lifecycle stage" size={160} selected={selectedId} onSelect={(k) => setSelectedId(k as PlaybookScenario["id"])} />
           <ProgressRings
             label="Customer health"
@@ -395,27 +395,27 @@ export function CustomerGrowthPlaybookCard({ data }: { data: CustomerWinbackPlay
                 aria-selected={s.id === active.id}
                 onClick={() => setSelectedId(s.id)}
                 className={cn(
-                  "inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition",
+                  "inline-flex min-h-8 items-center gap-1 rounded-full border px-2.5 text-[11px] font-medium transition sm:min-h-9 sm:gap-1.5 sm:px-3 sm:text-xs",
                   s.id === active.id ? "border-ink bg-ink text-panel" : "border-line bg-panel text-ink-2 hover:border-line-2 hover:text-ink",
                 )}
               >
-                <span aria-hidden className="size-2 rounded-full" style={{ background: cssColor(s.color) }} />
-                {s.shortTitle}
+                <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: cssColor(s.color) }} />
+                <span className="truncate">{s.shortTitle}</span>
                 <span className="tabular opacity-70">{fmtNumber(s.customersCount)}</span>
               </button>
             ))}
           </div>
 
-          <div className="mt-4 rounded-card border border-line p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="mt-3 rounded-card border border-line p-3 sm:mt-4 sm:p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2.5 sm:gap-3">
               <div className="min-w-0">
                 <Badge tone={active.badgeTone}>{active.badge}</Badge>
-                <h3 className="mt-1.5 text-base font-semibold text-ink">{active.title}</h3>
+                <h3 className="mt-1.5 text-sm font-semibold text-ink sm:text-base">{active.title}</h3>
                 <p className="tabular mt-0.5 text-xs text-muted">
                   {plural(active.customersCount, "customer")} · {active.revenueLabel}
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5 sm:gap-2">
                 <Link href={active.primaryCtaHref} className={buttonClass("primary", "sm")}>
                   {active.primaryCtaLabel}
                 </Link>
@@ -427,7 +427,7 @@ export function CustomerGrowthPlaybookCard({ data }: { data: CustomerWinbackPlay
               </div>
             </div>
 
-            <div className="mt-4 rounded-control bg-brand-soft p-3">
+            <div className="mt-3 rounded-control bg-brand-soft p-2.5 sm:mt-4 sm:p-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-2xs font-semibold uppercase tracking-wide text-brand-deep">Message to send</span>
                 <button type="button" onClick={copy} className="inline-flex items-center gap-1 text-xs font-semibold text-brand-deep hover:underline">
@@ -435,10 +435,10 @@ export function CustomerGrowthPlaybookCard({ data }: { data: CustomerWinbackPlay
                   {copied ? "Copied" : "Copy"}
                 </button>
               </div>
-              <p className="mt-1.5 rounded-[10px] rounded-tl-none bg-panel px-3 py-2 text-sm leading-relaxed text-ink shadow-2xs">{active.suggestedWhatsappCopy}</p>
+              <p className="mt-1.5 rounded-[10px] rounded-tl-none bg-panel px-2.5 py-2 text-xs leading-relaxed text-ink shadow-2xs sm:px-3 sm:text-sm">{active.suggestedWhatsappCopy}</p>
             </div>
 
-            <details className="group/s mt-3">
+            <details className="group/s mt-2.5 sm:mt-3">
               <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs font-semibold text-ink-2 hover:text-ink [&::-webkit-details-marker]:hidden">
                 <Zap aria-hidden className="size-3.5 text-gold" /> Why it happens & {active.howToGetThemBack.length} steps
               </summary>
@@ -451,8 +451,8 @@ export function CustomerGrowthPlaybookCard({ data }: { data: CustomerWinbackPlay
             </details>
 
             {active.leads.length > 0 && (
-              <div className="mt-4 border-t border-line pt-3">
-                <p className="mb-2 text-2xs font-semibold uppercase tracking-wide text-muted">Customers in this group</p>
+              <div className="mt-3 border-t border-line pt-2.5 sm:mt-4 sm:pt-3">
+                <p className="mb-1.5 text-2xs font-semibold uppercase tracking-wide text-muted sm:mb-2">Customers in this group</p>
                 <ul className="flex flex-wrap gap-1.5">
                   {active.leads.map((l) => (
                     <li key={l.id}>
@@ -466,8 +466,8 @@ export function CustomerGrowthPlaybookCard({ data }: { data: CustomerWinbackPlay
             )}
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
-            <span className="flex flex-wrap gap-3">
+          <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-xs text-muted sm:mt-3">
+            <span className="flex flex-wrap gap-2.5 sm:gap-3">
               <span>
                 Refill reminder <b className={data.refillConfigured ? "text-success" : "text-warning"}>{data.refillConfigured ? "on" : "off"}</b>
               </span>
@@ -515,7 +515,7 @@ export function ProductCampaignGraphCard({ rows }: { rows: ProductCampaignRow[] 
         description="Last 30 days · how far messages got with each catalogue product's buyers"
         action={best ? <Badge tone="green">Best read: {best.tag}</Badge> : undefined}
       />
-      <div className="p-4 sm:p-5">
+      <div className="p-3 sm:p-5">
         <StackedRows
           legend={[
             { label: "Read", color: "violet" },

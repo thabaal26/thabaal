@@ -212,24 +212,24 @@ export function DeliveryDonut({ read, delivered, sent, failed }: { read: number;
     { key: "failed", label: "Failed to deliver", value: failed, color: "red" },
   ];
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center gap-3 sm:gap-4">
       <Donut
         slices={slices}
-        size={208}
-        thickness={22}
+        size={176}
+        thickness={20}
         centerValue={`${deliveredPct}%`}
         centerLabel="delivered"
         active={active}
         onActive={setActive}
         label={`${deliveredPct}% of ${total} messages delivered: ${read} read, ${delivered} delivered unread, ${sent} sending, ${failed} failed`}
       />
-      <div className="flex w-full items-center justify-between gap-2 rounded-control border border-line bg-subtle px-3.5 py-2 text-xs">
+      <div className="flex w-full items-center justify-between gap-2 rounded-control border border-line bg-subtle px-3 py-1.5 text-xs sm:px-3.5 sm:py-2">
         <span className="text-ink-2">
           <b className="tabular font-semibold text-ink">{reached.toLocaleString("en-IN")}</b> of <b className="tabular font-semibold text-ink">{total.toLocaleString("en-IN")}</b> delivered
         </span>
         <span className="tabular rounded-full bg-accent-bg px-2 py-0.5 text-[11px] font-semibold text-accent">{readPct}% read</span>
       </div>
-      <ul className="grid w-full grid-cols-1 gap-2 min-[400px]:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+      <ul className="grid w-full grid-cols-2 gap-1.5 sm:gap-2 xl:grid-cols-1 2xl:grid-cols-2">
         {slices.map((s) => {
           const pctShare = total > 0 ? Math.round((s.value / total) * 1000) / 10 : 0;
           return (
@@ -237,20 +237,20 @@ export function DeliveryDonut({ read, delivered, sent, failed }: { read: number;
               key={s.key}
               onMouseEnter={() => setActive(s.key)}
               onMouseLeave={() => setActive(null)}
-              className={cn("rounded-control border px-3 py-2.5 transition", active === s.key ? "border-line-2 bg-subtle" : "border-line bg-panel")}
+              className={cn("rounded-control border px-2.5 py-2 transition sm:px-3 sm:py-2.5", active === s.key ? "border-line-2 bg-subtle" : "border-line bg-panel")}
             >
-              <div className="flex items-center justify-between gap-2">
-                <span className="flex min-w-0 items-center gap-2">
-                  <span aria-hidden className="size-2.5 shrink-0 rounded-[3px]" style={{ background: cssColor(s.color) }} />
-                  <span className="truncate text-xs font-medium text-ink-2">{s.label}</span>
+              <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+                <span className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+                  <span aria-hidden className="size-2 shrink-0 rounded-[3px] sm:size-2.5" style={{ background: cssColor(s.color) }} />
+                  <span className="truncate text-[11px] font-medium text-ink-2 sm:text-xs">{s.label}</span>
                 </span>
-                <span className="tabular shrink-0 text-sm font-semibold text-ink">{s.value.toLocaleString("en-IN")}</span>
+                <span className="tabular shrink-0 text-xs font-semibold text-ink sm:text-sm">{s.value.toLocaleString("en-IN")}</span>
               </div>
-              <div className="mt-2 flex items-center gap-2">
+              <div className="mt-1.5 flex items-center gap-1.5 sm:mt-2 sm:gap-2">
                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-track">
                   <div className="h-full rounded-full transition-[width] duration-700 ease-out" style={{ width: `${s.value > 0 ? Math.max(pctShare, 3) : 0}%`, background: cssColor(s.color) }} />
                 </div>
-                <span className="tabular w-10 shrink-0 text-right text-[11px] font-medium text-muted">{pctShare}%</span>
+                <span className="tabular w-9 shrink-0 text-right text-[10px] font-medium text-muted sm:w-10 sm:text-[11px]">{pctShare}%</span>
               </div>
             </li>
           );
@@ -341,13 +341,34 @@ export function HeatGrid({
   const data = useStable({ rows, cols, cells });
   const max = Math.max(1, ...data.cells.map((c) => c[2]));
   const option = useCallback(
-    (t: ChartTheme) => {
+    (t: ChartTheme, size: { width: number }) => {
       const c = t.color("emerald");
+      const narrow = size.width > 0 && size.width < 440;
       return {
         ...motion(t, 6),
-        grid: { left: 4, right: 4, top: 4, bottom: 4, containLabel: true },
-        xAxis: { type: "category", data: data.cols, position: "top", axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: t.muted, fontSize: 10, interval: 0 }, splitArea: { show: false } },
-        yAxis: { type: "category", data: data.rows, inverse: true, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: t.muted, fontSize: 11 } },
+        grid: { left: 2, right: 2, top: 4, bottom: 2, containLabel: true },
+        xAxis: {
+          type: "category",
+          data: data.cols,
+          position: "top",
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: {
+            color: t.muted,
+            fontSize: narrow ? 9 : 10,
+            interval: 0,
+            formatter: (v: string) => (narrow ? v.replace(/–\d+([ap])$/, "$1") : v),
+          },
+          splitArea: { show: false },
+        },
+        yAxis: {
+          type: "category",
+          data: data.rows,
+          inverse: true,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: { color: t.muted, fontSize: narrow ? 10 : 11 },
+        },
         visualMap: { show: false, min: 0, max, inRange: { color: [alpha(c, t.dark ? 0.14 : 0.08), c] } },
         tooltip: {
           ...tooltipBase(t),
@@ -359,10 +380,10 @@ export function HeatGrid({
             type: "heatmap",
             data: data.cells.map(([x, y, v]) => ({
               value: [x, y, v],
-              label: { show: v > 0, color: v / max > 0.55 ? "#ffffff" : t.ink2, fontSize: 11, fontWeight: 600, fontFamily: t.font },
+              label: { show: v > 0, color: v / max > 0.55 ? "#ffffff" : t.ink2, fontSize: narrow ? 9.5 : 11, fontWeight: 600, fontFamily: t.font },
               itemStyle: v > 0 ? undefined : { color: t.track },
             })),
-            itemStyle: { borderColor: t.surface, borderWidth: 3, borderRadius: 6 },
+            itemStyle: { borderColor: t.surface, borderWidth: narrow ? 1.5 : 3, borderRadius: narrow ? 4 : 6 },
             emphasis: { itemStyle: { borderColor: t.ink, borderWidth: 1 } },
           },
         ],
@@ -371,10 +392,8 @@ export function HeatGrid({
     [data, max, unit],
   );
   return (
-    <div className="thin-scroll overflow-x-auto">
-      <div className="min-w-[30rem]">
-        <EChart option={option} height={data.rows.length * 36 + 30} label={label} />
-      </div>
+    <div className="w-full">
+      <EChart option={option} height={data.rows.length * 32 + 28} label={label} />
     </div>
   );
 }

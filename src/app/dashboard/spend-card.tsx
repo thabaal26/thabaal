@@ -115,18 +115,18 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
         }
       />
       <dl className="grid grid-cols-2 divide-x divide-line border-b border-line bg-subtle/30">
-        <div className="px-4 py-4 sm:px-5">
-          <dt className="text-xs text-muted">{s.monthLabel} so far (ex-GST)</dt>
-          <dd className="tabular mt-1 text-xl font-semibold leading-tight text-ink">{rupees(s.totalMonthSpent)}</dd>
+        <div className="px-3.5 py-3 sm:px-5 sm:py-4">
+          <dt className="text-[11px] text-muted sm:text-xs">{s.monthLabel} so far (ex-GST)</dt>
+          <dd className="tabular mt-0.5 text-lg font-semibold leading-tight text-ink sm:mt-1 sm:text-xl">{rupees(s.totalMonthSpent)}</dd>
           {s.totalMonthSpent > 0 && (
             <dd className="tabular mt-0.5 text-2xs text-muted">
               {rupees(s.totalMonthSpentWithGst)} incl. 18% GST
             </dd>
           )}
         </div>
-        <div className="px-4 py-4 sm:px-5">
-          <dt className="text-xs text-muted">{s.lastMonthLabel}</dt>
-          <dd className="tabular mt-1 text-xl font-semibold leading-tight text-ink">{rupees(total(s.previous))}</dd>
+        <div className="px-3.5 py-3 sm:px-5 sm:py-4">
+          <dt className="text-[11px] text-muted sm:text-xs">{s.lastMonthLabel}</dt>
+          <dd className="tabular mt-0.5 text-lg font-semibold leading-tight text-ink sm:mt-1 sm:text-xl">{rupees(total(s.previous))}</dd>
           {s.metaTotalDelivered > 0 && (
             <dd className="tabular mt-0.5 text-2xs text-muted">
               {fmtNumber(s.metaTotalDelivered)} delivered on Meta
@@ -135,8 +135,8 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
         </div>
       </dl>
 
-      <div className="space-y-4 p-4 sm:p-5">
-        <div className={cn("rounded-control border p-3.5", low ? "border-warning-border bg-warning-bg" : "border-line bg-subtle")}>
+      <div className="space-y-3 p-3 sm:space-y-4 sm:p-5">
+        <div className={cn("rounded-control border p-3 sm:p-3.5", low ? "border-warning-border bg-warning-bg" : "border-line bg-subtle")}>
           {recorded ? (
             <>
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -151,10 +151,10 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
                   <Badge tone="green">~{fmtNumber(estMarketingRunway)} mktg msgs left</Badge>
                 )}
               </div>
-              <p className="tabular mt-1 text-2xl font-semibold leading-tight text-ink">{rupees(s.remainingBalance)}</p>
+              <p className="tabular mt-1 text-xl font-semibold leading-tight text-ink sm:text-2xl">{rupees(s.remainingBalance)}</p>
 
               {/* Visual Balance Runway Meter */}
-              <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-track">
+              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-track sm:mt-2.5">
                 <div className={cn("bar h-full rounded-full", low ? "bg-chart-gold" : "bg-chart-emerald")} style={{ width: `${runwayPct}%` }} />
               </div>
 
@@ -165,10 +165,10 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
           ) : (
             <>
               <p className="text-xs font-medium text-ink-2">Prepaid balance</p>
-              <p className="mt-1 text-sm text-muted">No balance is recorded for this WhatsApp account yet. Sync it below or see Meta&apos;s Billing Hub.</p>
+              <p className="mt-1 text-xs text-muted sm:text-sm">No balance is recorded for this WhatsApp account yet. Sync it below or see Meta&apos;s Billing Hub.</p>
             </>
           )}
-          <a href={acc.billingUrl} target="_blank" rel="noopener noreferrer" className={cn(buttonClass(low ? "primary" : "secondary", "sm"), "mt-3 w-full")}>
+          <a href={acc.billingUrl} target="_blank" rel="noopener noreferrer" className={cn(buttonClass(low ? "primary" : "secondary", "sm"), "mt-2.5 w-full sm:mt-3")}>
             Recharge on Meta <ExternalLink aria-hidden className="size-3.5" />
             <span className="sr-only">(opens Meta Business Suite)</span>
           </a>
@@ -180,7 +180,7 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
         </div>
 
         {freeServiceCount > 0 && (
-          <div className="rounded-control border border-brand/25 bg-brand-soft/35 p-3 text-xs text-ink-2">
+          <div className="rounded-control border border-brand/25 bg-brand-soft/35 p-2.5 text-xs text-ink-2 sm:p-3">
             <p className="flex items-center gap-1.5 font-semibold text-brand-deep">
               <Lightbulb aria-hidden className="size-3.5 shrink-0" /> Meta spend optimization insight
             </p>

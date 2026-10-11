@@ -48,15 +48,15 @@ export function CustomerScenariosCard({ data }: { data: CustomerScenariosData })
   return (
     <Card id="customer-scenarios" className="card-3d scroll-mt-24">
       <CardHeader tone="brand" icon={<Target3D />} title="Customer journey" description={`Where each customer got to, ${data.periodLabel}`} />
-      <div className="grid grid-cols-1 gap-5 p-4 sm:p-5 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-4 p-3 sm:gap-5 sm:p-5 lg:grid-cols-12">
         <div className="lg:col-span-8">
           {reached ? (
             <DonutPanel slices={slices} centerLabel="customers engaged" label="Customers by furthest step reached" />
           ) : (
-            <p className="py-8 text-center text-sm text-muted">No customer activity in this period yet.</p>
+            <p className="py-6 text-center text-sm text-muted sm:py-8">No customer activity in this period yet.</p>
           )}
         </div>
-        <div className="flex flex-col justify-center gap-4 border-line lg:col-span-4 lg:border-l lg:pl-5">
+        <div className="flex flex-col justify-center gap-3 border-t border-line pt-3 sm:gap-4 sm:pt-4 lg:col-span-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
           <ProgressRings
             label="Conversion rates"
             title="Conversion rates"
@@ -76,15 +76,15 @@ export function CustomerScenariosCard({ data }: { data: CustomerScenariosData })
       </div>
       {named.length > 0 && (
         <Disclosure summary={<>Who is in each group</>}>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3.5 sm:gap-4 md:grid-cols-2">
             {named.map((g) => (
               <div key={g.key}>
-                <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-ink sm:text-sm">
                   <span aria-hidden className="size-2.5 rounded-[3px]" style={{ background: g.color }} />
                   {g.label}
                   <span className="tabular font-normal text-muted">· {fmtNumber(g.value)}</span>
                 </p>
-                <p className="mb-2 mt-0.5 text-2xs text-muted">{g.tip}</p>
+                <p className="mb-1.5 mt-0.5 text-2xs text-muted sm:mb-2">{g.tip}</p>
                 <LeadChips leads={g.leads} />
               </div>
             ))}
@@ -147,20 +147,20 @@ export function CartMentalityCard({ data }: { data: CartMentalitySummaryData }) 
           </Link>
         }
       />
-      <div className="grid grid-cols-2 gap-2.5 border-b border-line bg-subtle/50 p-4 sm:grid-cols-4 sm:p-5">
+      <div className="grid grid-cols-2 gap-2 border-b border-line bg-subtle/50 p-3 sm:grid-cols-4 sm:gap-2.5 sm:p-5">
         <StatChip label="Customers revising" value={fmtNumber(data.totalRevisers)} />
         <StatChip label="Carts replaced" value={fmtNumber(data.totalSupersededCarts)} />
         <StatChip label="Budget trimmed" value={data.downsizedValueLost ? `−${formatValue(data.downsizedValueLost, "inr")}` : "₹0"} tone={data.downsizedValueLost ? "bad" : "ink"} />
         <StatChip label="Added on revision" value={data.upsizedValueGained ? `+${formatValue(data.upsizedValueGained, "inr")}` : "₹0"} tone={data.upsizedValueGained ? "good" : "ink"} />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 p-4 sm:p-5 xl:grid-cols-12">
+      <div className="grid grid-cols-1 gap-4 p-3 sm:gap-6 sm:p-5 xl:grid-cols-12">
         <div className="xl:col-span-5">
-          <h4 className="mb-3 text-sm font-semibold text-ink">What they did</h4>
+          <h4 className="mb-2 text-xs font-semibold text-ink sm:mb-3 sm:text-sm">What they did</h4>
           <DonutPanel slices={slices} centerLabel="revised carts" label="Cart revisions by behaviour" size={156} />
         </div>
         <div className="xl:col-span-7">
-          <h4 className="mb-3 text-sm font-semibold text-ink">First cart → latest cart</h4>
+          <h4 className="mb-2 text-xs font-semibold text-ink sm:mb-3 sm:text-sm">First cart → latest cart</h4>
           {data.journeys.length ? (
             <ChangeDumbbells
               fromLabel="First cart"
@@ -181,10 +181,10 @@ export function CartMentalityCard({ data }: { data: CartMentalitySummaryData }) 
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 border-t border-line p-4 sm:p-5 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 border-t border-line p-3 sm:gap-6 sm:p-5 md:grid-cols-2">
         <div>
-          <h4 className="text-sm font-semibold text-ink">Dropped from carts</h4>
-          <p className="mb-3 text-2xs text-muted">Wanted, then removed: price or pack-size hesitation</p>
+          <h4 className="text-xs font-semibold text-ink sm:text-sm">Dropped from carts</h4>
+          <p className="mb-2 text-2xs text-muted sm:mb-3">Wanted, then removed: price or pack-size hesitation</p>
           <BarList
             format="inr"
             color="red"
@@ -199,8 +199,8 @@ export function CartMentalityCard({ data }: { data: CartMentalitySummaryData }) 
           />
         </div>
         <div>
-          <h4 className="text-sm font-semibold text-ink">Always kept</h4>
-          <p className="mb-3 text-2xs text-muted">Never removed, even when the budget was cut</p>
+          <h4 className="text-xs font-semibold text-ink sm:text-sm">Always kept</h4>
+          <p className="mb-2 text-2xs text-muted sm:mb-3">Never removed, even when the budget was cut</p>
           <BarList
             color="emerald"
             empty="No anchor products yet."
@@ -217,7 +217,7 @@ export function CartMentalityCard({ data }: { data: CartMentalitySummaryData }) 
       </div>
 
       {topDropped && (
-        <div className="px-4 pb-4 sm:px-5 sm:pb-5">
+        <div className="px-3 pb-3 sm:px-5 sm:pb-5">
           <ActionLine href="/dashboard/campaigns/new" cta="Create offer">
             <b className="text-ink">{topDropped.name}</b> is dropped most. Try a smaller pack or a combo with a kept item{data.anchorProducts[0] ? ` like ${data.anchorProducts[0].name}` : ""}.
           </ActionLine>
@@ -228,9 +228,9 @@ export function CartMentalityCard({ data }: { data: CartMentalitySummaryData }) 
         <Disclosure summary="Cart-by-cart changes">
           <ul className="divide-y divide-line">
             {data.journeys.map((j) => (
-              <li key={j.latestOrderId} className="py-3 first:pt-0 last:pb-0">
+              <li key={j.latestOrderId} className="py-2.5 first:pt-0 last:pb-0 sm:py-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Link href={`/dashboard/customers/${j.customerId}`} className="text-sm font-semibold text-ink hover:underline">
+                  <Link href={`/dashboard/customers/${j.customerId}`} className="text-xs font-semibold text-ink hover:underline sm:text-sm">
                     {j.customerName}
                   </Link>
                   <span className="tabular text-2xs text-muted">
@@ -245,7 +245,7 @@ export function CartMentalityCard({ data }: { data: CartMentalitySummaryData }) 
               </li>
             ))}
           </ul>
-          <p className="mt-3 flex flex-wrap gap-3 text-2xs text-muted">
+          <p className="mt-2.5 flex flex-wrap gap-3 text-2xs text-muted sm:mt-3">
             <span><Badge tone="red">red</Badge> dropped</span>
             <span><Badge tone="green">green</Badge> added</span>
             <span><Badge tone="brand">teal</Badge> kept</span>
@@ -273,7 +273,7 @@ export function CustomerProductsCard({ items }: { items: { tag: string; label: s
   return (
     <Card className="card-3d h-full">
       <CardHeader tone="gold" icon={<ShoppingBag3D />} title="What customers buy" description="Customers per catalogue product · tap to open them" />
-      <div className="p-4 sm:p-5">
+      <div className="p-3 sm:p-5">
         <DonutPanel slices={slices} centerLabel="product buyers" label="Customers by catalogue product" size={160} />
       </div>
     </Card>
@@ -288,7 +288,7 @@ export function CustomerAreasCard({ regions, children }: { regions: { key: strin
   return (
     <Card className="card-3d h-full">
       <CardHeader tone="info" icon={<MapPin3D />} title="Customers by area" description="From the order sheets · tap to open" />
-      <div className="space-y-5 p-4 sm:p-5">
+      <div className="space-y-4 p-3 sm:space-y-5 sm:p-5">
         <DonutPanel slices={slices} centerLabel="customers" label="Customers by region" size={160} />
         {children}
       </div>

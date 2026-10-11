@@ -76,7 +76,7 @@ export function BrandHero({
   return (
     <section
       aria-labelledby="hero-title"
-      className="card-3d relative mb-4 overflow-hidden rounded-card border bg-panel sm:mb-5"
+      className="card-3d relative mb-3.5 overflow-hidden rounded-card border bg-panel sm:mb-5"
       style={{ background: `radial-gradient(80% 120% at 0% 0%, ${tone === "danger" ? "rgb(201 54 54 / 0.07)" : "rgb(22 125 99 / 0.07)"}, transparent 60%), linear-gradient(180deg, var(--color-panel) 0%, var(--color-panel-2) 100%)` }}
     >
       <span aria-hidden className="absolute inset-x-0 top-0 z-10 h-[3px]" style={{ background: accent }} />
@@ -94,14 +94,14 @@ export function BrandHero({
         </div>
       )}
 
-      <div className="relative flex flex-col gap-3.5 p-4 sm:p-5 md:max-w-[68%] lg:p-6">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-medium text-muted">
+      <div className="relative flex flex-col gap-2.5 p-3.5 sm:gap-3.5 sm:p-5 md:max-w-[68%] lg:p-6">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          <p className="text-xs font-medium text-muted sm:text-sm">
             <span lang="ta">வணக்கம்</span> · {greeting()}, <span className="font-semibold text-ink-2">{name}</span>
           </p>
           <span
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-2xs font-semibold ring-1 ring-inset",
+              "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-2xs font-semibold ring-1 ring-inset sm:px-2.5",
               issues === 0 ? "bg-success-bg text-success ring-success-border" : "bg-danger-bg text-danger ring-danger-border",
             )}
           >
@@ -112,27 +112,27 @@ export function BrandHero({
           <details className="group/m relative">
             <summary
               aria-label="Business details"
-              className="grid size-7 cursor-pointer list-none place-items-center rounded-full text-muted transition hover:bg-subtle hover:text-ink [&::-webkit-details-marker]:hidden"
+              className="grid size-6 cursor-pointer list-none place-items-center rounded-full text-muted transition hover:bg-subtle hover:text-ink sm:size-7 [&::-webkit-details-marker]:hidden"
             >
-              <MoreHorizontal className="size-4" />
+              <MoreHorizontal className="size-3.5 sm:size-4" />
             </summary>
-            <div className="absolute left-0 top-9 z-30 w-60 rounded-card border border-line bg-panel p-1.5 shadow-lg">
-              <Link href="/dashboard/customers" className="flex items-center gap-2.5 rounded-control px-2.5 py-2 text-sm text-ink-2 hover:bg-subtle hover:text-ink">
+            <div className="absolute left-0 top-8 z-30 w-56 rounded-card border border-line bg-panel p-1.5 shadow-lg sm:top-9 sm:w-60">
+              <Link href="/dashboard/customers" className="flex items-center gap-2.5 rounded-control px-2.5 py-2 text-xs text-ink-2 hover:bg-subtle hover:text-ink sm:text-sm">
                 <Users aria-hidden className="size-4 text-brand" /> <b className="tabular text-ink">{fmtNumber(customers)}</b> customers
               </Link>
-              <Link href="/dashboard/orders" className="flex items-center gap-2.5 rounded-control px-2.5 py-2 text-sm text-ink-2 hover:bg-subtle hover:text-ink">
+              <Link href="/dashboard/orders" className="flex items-center gap-2.5 rounded-control px-2.5 py-2 text-xs text-ink-2 hover:bg-subtle hover:text-ink sm:text-sm">
                 <ShoppingBag aria-hidden className="size-4 text-gold-deep" /> Orders
               </Link>
-              <Link href="/dashboard/catalogue" className="flex items-center gap-2.5 rounded-control px-2.5 py-2 text-sm text-ink-2 hover:bg-subtle hover:text-ink">
+              <Link href="/dashboard/catalogue" className="flex items-center gap-2.5 rounded-control px-2.5 py-2 text-xs text-ink-2 hover:bg-subtle hover:text-ink sm:text-sm">
                 <Store aria-hidden className="size-4 text-info" /> Catalogue
               </Link>
               {client?.website && (
-                <a href={client.website} target="_blank" rel="noreferrer" className="flex items-center gap-2.5 rounded-control px-2.5 py-2 text-sm text-ink-2 hover:bg-subtle hover:text-ink">
+                <a href={client.website} target="_blank" rel="noreferrer" className="flex items-center gap-2.5 rounded-control px-2.5 py-2 text-xs text-ink-2 hover:bg-subtle hover:text-ink sm:text-sm">
                   <Globe aria-hidden className="size-4 text-muted" /> <span className="truncate">{host(client.website)}</span>
                 </a>
               )}
               {client?.supportPhone && (
-                <a href={`tel:${client.supportPhone.replace(/\s/g, "")}`} className="flex items-center gap-2.5 rounded-control px-2.5 py-2 text-sm text-ink-2 hover:bg-subtle hover:text-ink">
+                <a href={`tel:${client.supportPhone.replace(/\s/g, "")}`} className="flex items-center gap-2.5 rounded-control px-2.5 py-2 text-xs text-ink-2 hover:bg-subtle hover:text-ink sm:text-sm">
                   <Phone aria-hidden className="size-4 text-muted" /> <span className="tabular">{client.supportPhone}</span>
                 </a>
               )}
@@ -140,10 +140,10 @@ export function BrandHero({
           </details>
         </div>
 
-        <h1 id="hero-title" className="text-[1.5rem] font-semibold leading-[1.15] tracking-tight text-ink sm:text-[1.875rem]">
+        <h1 id="hero-title" className="text-[1.25rem] font-semibold leading-[1.18] tracking-tight text-ink sm:text-[1.875rem] sm:leading-[1.15]">
           {tone === "danger" ? (
             <>
-              <CircleAlert aria-hidden className="mr-2 inline size-6 -translate-y-0.5 text-danger-solid sm:size-7" />
+              <CircleAlert aria-hidden className="mr-1.5 inline size-5 -translate-y-0.5 text-danger-solid sm:mr-2 sm:size-7" />
               {issues} thing{issues === 1 ? " needs" : "s need"} <span className="text-danger">your attention.</span>
             </>
           ) : tone === "work" ? (
@@ -152,26 +152,26 @@ export function BrandHero({
             </>
           ) : (
             <>
-              <CircleCheck aria-hidden className="mr-2 inline size-6 -translate-y-0.5 text-success-solid sm:size-7" />
+              <CircleCheck aria-hidden className="mr-1.5 inline size-5 -translate-y-0.5 text-success-solid sm:mr-2 sm:size-7" />
               All clear <span className="text-brand">today.</span>
             </>
           )}
         </h1>
 
         {todos.length > 0 && (
-          <ul className="thin-scroll -mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5 sm:flex-wrap sm:overflow-visible">
+          <ul className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
             {todos.map((t) => {
               const Icon = t.icon;
               return (
-                <li key={t.key} className="shrink-0">
+                <li key={t.key} className="min-w-0 sm:shrink-0">
                   <Link
                     href={t.href}
-                    className="group inline-flex min-h-9 items-center gap-2 rounded-full border border-line bg-panel/90 py-1 pl-1 pr-3.5 text-sm text-ink-2 shadow-xs backdrop-blur-sm transition hover:-translate-y-px hover:border-line-2 hover:text-ink hover:shadow-sm"
+                    className="group flex min-h-8 w-full min-w-0 items-center gap-1.5 rounded-control border border-line bg-panel/90 px-2 py-1 text-xs text-ink-2 shadow-xs backdrop-blur-sm transition hover:-translate-y-px hover:border-line-2 hover:text-ink hover:shadow-sm sm:inline-flex sm:min-h-9 sm:w-auto sm:gap-2 sm:rounded-full sm:py-1 sm:pl-1 sm:pr-3.5 sm:text-sm"
                   >
-                    <span aria-hidden className="grid size-7 place-items-center rounded-full text-white" style={{ background: t.color }}>
-                      <Icon className="size-3.5" />
+                    <span aria-hidden className="grid size-5 shrink-0 place-items-center rounded-full text-white sm:size-7" style={{ background: t.color }}>
+                      <Icon className="size-3 sm:size-3.5" />
                     </span>
-                    <span className="tabular whitespace-nowrap [&_b]:font-semibold [&_b]:text-ink">{t.text}</span>
+                    <span className="tabular min-w-0 truncate [&_b]:font-semibold [&_b]:text-ink">{t.text}</span>
                   </Link>
                 </li>
               );
@@ -179,7 +179,7 @@ export function BrandHero({
           </ul>
         )}
 
-        {actions && <div className="flex flex-wrap gap-2 max-sm:*:flex-1">{actions}</div>}
+        {actions && <div className="flex flex-wrap gap-1.5 sm:gap-2 max-sm:*:flex-1">{actions}</div>}
       </div>
     </section>
   );
