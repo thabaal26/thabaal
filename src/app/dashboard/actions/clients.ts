@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { CLIENT_SECTIONS, sanitizeDisabledSections } from "@/lib/client-sections";
-import { ICON_PACKS, isIconPack } from "@/lib/icon-pack";
+import { ICON_LOOKS, ICON_PACKS, isIconLook, isIconPack } from "@/lib/icon-pack";
 import { CLIENT_COOKIE, requireAdmin } from "@/lib/session";
 import { HEX } from "@/lib/theme";
 import { enableMetaCalling, listPhoneNumbers, syncMetaBusinessProfile, waConfig } from "@/lib/whatsapp";
@@ -65,17 +65,18 @@ export async function saveClientSections(clientId: string, disabledSections: str
   };
 }
 
-/** Which icon pack this client's portal shows (Hugeicons or Classic). */
-export async function saveClientIconPack(clientId: string, pack: string): Promise<ActionResult> {
+/** The icon set (Hugeicons or Lucide) and tile look (3D or 2D) this client's portal shows. */
+export async function saveClientIconStyle(clientId: string, pack: string, look: string): Promise<ActionResult> {
   const s = await requireAdmin();
   if ("denied" in s) return { ok: false, message: s.denied };
-  if (!isIconPack(pack)) return { ok: false, message: "Pick an icon style." };
+  if (!isIconPack(pack) || !isIconLook(look)) return { ok: false, message: "Pick an icon set and a look." };
   const client = await db.client.findUnique({ where: { id: clientId }, select: { name: true } });
   if (!client) return { ok: false, message: "Client not found." };
-  await db.client.update({ where: { id: clientId }, data: { iconPack: pack } });
+  await db.client.update({ where: { id: clientId }, data: { iconPack: pack, iconLook: look } });
   refresh();
-  const label = ICON_PACKS.find((p) => p.id === pack)!.label;
-  return { ok: true, message: `${client.name} now uses ${label} icons.` };
+  const p = ICON_PACKS.find((x) => x.id === pack)!.label;
+  const l = ICON_LOOKS.find((x) => x.id === look)!.label;
+  return { ok: true, message: `${client.name} now uses ${p} icons on ${l} tiles.` };
 }
 
 /** The access token the client's numbers share. Blank keeps the saved one, so the form never shows it. */

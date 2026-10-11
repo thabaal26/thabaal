@@ -9,7 +9,7 @@ import { db } from "@/lib/db";
 import { numberHealth } from "@/lib/limits";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { getScope } from "@/lib/session";
-import { iconPackOf } from "@/lib/icon-pack";
+import { iconLookOf, iconPackOf } from "@/lib/icon-pack";
 import { deleteClientUser } from "../actions/clients";
 import { AccessSelect, AddLoginForm, AddNumberForm, BrandingForm, ClientSectionsForm, IconPackForm, NewClientForm, NumberActions, RefreshNumbersButton, ResetPasswordButton, SendingRulesForm, TokenForm } from "./client-forms";
 
@@ -197,8 +197,8 @@ export default async function ClientsPage() {
 
                   <section className="border-t border-line pt-5 xl:col-span-2">
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Icon style</h3>
-                    <p className="mb-3 mt-1 text-xs text-muted">The icon set this client&apos;s portal uses, if they prefer the original look.</p>
-                    <IconPackForm clientId={c.id} initial={iconPackOf(c.iconPack)} />
+                    <p className="mb-3 mt-1 text-xs text-muted">The icon set and tile look this client&apos;s portal uses. Mix any set with either look.</p>
+                    <IconPackForm clientId={c.id} initial={{ pack: iconPackOf(c.iconPack), look: iconLookOf(c.iconLook) }} />
                   </section>
 
                   <section className="border-t border-line pt-5 xl:col-span-2">

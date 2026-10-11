@@ -16,7 +16,7 @@ import {
   type ClientSectionId,
 } from "@/lib/client-sections";
 import { HEX, themeStyle } from "@/lib/theme";
-import { ICON_PACKS, type IconPack } from "@/lib/icon-pack";
+import { ICON_LOOKS, ICON_PACKS, type IconLook, type IconPack } from "@/lib/icon-pack";
 import { Dashboard3D, Bell3D, ShoppingBag3D, Users3D } from "@/components/icons-3d";
 import { Search, Send, Truck } from "@/components/icons";
 import { cn } from "@/lib/cn";
@@ -32,7 +32,7 @@ import {
   resetUserPassword,
   setUserAccess,
   saveClientBranding,
-  saveClientIconPack,
+  saveClientIconStyle,
   saveClientSections,
   saveClientToken,
   saveSendingRules,
@@ -632,61 +632,77 @@ const PREVIEW_TILES = [
   { Icon: Dashboard3D, bg: "from-[#34d399] via-[#10b981] to-[#059669]" },
   { Icon: Bell3D, bg: "from-[#fbbf24] via-[#f59e0b] to-[#d97706]" },
   { Icon: ShoppingBag3D, bg: "from-[#38bdf8] via-[#0ea5e9] to-[#0284c7]" },
-  { Icon: Users3D, bg: "from-[#38bdf8] via-[#0284c7] to-[#0369a1]" },
+  { Icon: Users3D, bg: "from-[#c084fc] via-[#9333ea] to-[#7e22ce]" },
 ];
 
-/** Admin picks the icon pack a client's portal shows. Each card previews its pack in place. */
-export function IconPackForm({ clientId, initial }: { clientId: string; initial: IconPack }) {
-  const [pack, setPack] = useState<IconPack>(initial);
-  const { pending, submit } = useSubmit();
+function ChoiceGroup<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: readonly { id: T; label: string; hint: string }[]; onChange: (v: T) => void }) {
   return (
-    <form
-      className="space-y-3"
-      onSubmit={(e) => {
-        e.preventDefault();
-        submit(() => saveClientIconPack(clientId, pack));
-      }}
-    >
-      <div role="radiogroup" aria-label="Icon style" className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {ICON_PACKS.map((p) => {
-          const on = pack === p.id;
+    <div>
+      <p className="mb-1.5 text-xs font-medium text-ink-2">{label}</p>
+      <div role="radiogroup" aria-label={label} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {options.map((o) => {
+          const on = value === o.id;
           return (
             <button
-              key={p.id}
+              key={o.id}
               type="button"
               role="radio"
               aria-checked={on}
-              onClick={() => setPack(p.id)}
+              onClick={() => onChange(o.id)}
               className={cn(
-                "flex flex-col gap-2.5 rounded-card border p-3 text-left transition active:scale-[0.99]",
+                "flex flex-col gap-0.5 rounded-control border px-3 py-2.5 text-left transition active:scale-[0.99]",
                 on ? "border-brand bg-brand-soft/60 ring-1 ring-brand/30" : "border-line bg-panel hover:border-line-strong hover:bg-subtle",
               )}
             >
-              <span className="flex w-full items-center justify-between gap-2">
-                <span className="text-sm font-semibold text-ink">{p.label}</span>
-                {initial === p.id && <Badge tone="green">In use</Badge>}
-              </span>
-              {/* Preview drawn in this pack, whatever pack the admin's own portal shows. */}
-              <span data-icons={p.id} className="icon-preview flex items-center gap-2">
-                {PREVIEW_TILES.map(({ Icon, bg }, i) => (
-                  <span key={i} aria-hidden className={cn("icon-cube-3d grid size-8 place-items-center rounded-[9px] bg-gradient-to-br text-white ring-1 ring-inset ring-white/35", bg)}>
-                    <Icon className="size-[18px]" />
-                  </span>
-                ))}
-                <span aria-hidden className="ml-1 flex items-center gap-2 text-muted">
-                  <Search className="size-4" />
-                  <Send className="size-4" />
-                  <Truck className="size-4" />
-                </span>
-              </span>
-              <span className="text-xs text-muted">{p.hint}</span>
+              <span className="text-sm font-semibold text-ink">{o.label}</span>
+              <span className="text-xs text-muted">{o.hint}</span>
             </button>
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** Admin picks the icon set and tile look a client's portal shows, with a live preview. */
+export function IconPackForm({ clientId, initial }: { clientId: string; initial: { pack: IconPack; look: IconLook } }) {
+  const [pack, setPack] = useState<IconPack>(initial.pack);
+  const [look, setLook] = useState<IconLook>(initial.look);
+  const { pending, submit } = useSubmit();
+  const changed = pack !== initial.pack || look !== initial.look;
+  return (
+    <form
+      className="space-y-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit(() => saveClientIconStyle(clientId, pack, look));
+      }}
+    >
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1fr_auto]">
+        <ChoiceGroup label="Icon set" value={pack} options={ICON_PACKS} onChange={setPack} />
+        <ChoiceGroup label="Tile look" value={look} options={ICON_LOOKS} onChange={setLook} />
+        <div>
+          <p className="mb-1.5 text-xs font-medium text-ink-2">Preview</p>
+          {/* Drawn in the picked set and look, whatever this page itself shows. */}
+          <div data-icons={pack} data-look={look} className="icon-preview flex items-center gap-2 rounded-control border border-line bg-sunken/40 px-3 py-3">
+            {PREVIEW_TILES.map(({ Icon, bg }, i) => (
+              <span key={i} aria-hidden className={cn("icon-cube-3d grid size-9 place-items-center rounded-[10px] bg-gradient-to-br text-white ring-1 ring-inset ring-white/35", bg)}>
+                <Icon className="size-5" />
+              </span>
+            ))}
+            <span aria-hidden className="ml-1 flex items-center gap-2 text-muted">
+              <Search className="size-4" />
+              <Send className="size-4" />
+              <Truck className="size-4" />
+            </span>
+          </div>
+        </div>
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-muted">Changes this client&apos;s whole portal on their next page load.</p>
-        <Button type="submit" loading={pending} size="sm" disabled={pack === initial} className="max-sm:w-full">
+        <p className="text-xs text-muted">
+          In use: <span className="font-medium text-ink">{ICON_PACKS.find((p) => p.id === initial.pack)?.label} · {ICON_LOOKS.find((l) => l.id === initial.look)?.label}</span>. Changes this client&apos;s whole portal on their next page load.
+        </p>
+        <Button type="submit" loading={pending} size="sm" disabled={!changed} className="max-sm:w-full">
           Save icon style
         </Button>
       </div>

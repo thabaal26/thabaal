@@ -369,6 +369,8 @@ tbody > tr {
 .icon-cube-3d {
   position: relative;
   overflow: hidden;
+  /* Brighter, more vivid tile colours (the white glyph stays white). */
+  filter: saturate(1.35) brightness(1.06);
   contain: layout paint style;
   backface-visibility: hidden;
   box-shadow:
@@ -554,12 +556,26 @@ input:-webkit-autofill:active {
 .dark img:not([data-keep]) { filter: brightness(0.94); }
 /* Smooth swap between light and dark (not on first paint). */
 html.theme-anim, html.theme-anim * { transition: background-color 0.25s ease, border-color 0.25s ease, color 0.2s ease !important; }
-/* Icon packs: every icon ships in both sets (components/icons.tsx); the portal shows the
-   client's choice, set on <html data-icons> by the dashboard layout. Hugeicons is the default. */
-:root:not([data-icons="classic"]) .ip-classic,
-:root[data-icons="classic"] .ip-huge { display: none !important; }
-/* Admin's icon-style picker previews each pack whatever pack the page itself shows. */
-.icon-preview[data-icons="classic"] .ip-huge,
-.icon-preview[data-icons="hugeicons"] .ip-classic { display: none !important; }
-.icon-preview[data-icons="classic"] .ip-classic,
-.icon-preview[data-icons="hugeicons"] .ip-huge { display: block !important; }
+
+/* ── Icon set & tile look (lib/icon-pack.ts), set per client on <html data-icons data-look>. ──
+   Line icons ship as .ip-huge + .ip-lucide; tile glyphs as .ipt-huge, .ipt-drawn (glossy 3D
+   drawings) and .ipt-lucide. Hugeicons and 3D are the defaults. */
+:root:not([data-icons="lucide"]) :is(.ip-lucide, .ipt-drawn, .ipt-lucide),
+:root[data-icons="lucide"] :is(.ip-huge, .ipt-huge),
+:root[data-icons="lucide"]:not([data-look="2d"]) .ipt-lucide,
+:root[data-icons="lucide"][data-look="2d"] .ipt-drawn { display: none !important; }
+
+/* 2D look: the same bright tiles, flat (no shine, ledge or shadow). */
+:root[data-look="2d"] .icon-cube-3d:not(.icon-preview[data-look="3d"] .icon-cube-3d),
+.icon-preview[data-look="2d"] .icon-cube-3d { box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.22) !important; }
+:root[data-look="2d"] .icon-cube-3d:not(.icon-preview[data-look="3d"] .icon-cube-3d)::after,
+.icon-preview[data-look="2d"] .icon-cube-3d::after { display: none; }
+:root[data-look="2d"] .icon-cube-3d:not(.icon-preview[data-look="3d"] .icon-cube-3d) > svg,
+.icon-preview[data-look="2d"] .icon-cube-3d > svg { filter: none !important; }
+
+/* Admin's icon-style picker previews its own selection, whatever the page itself shows. */
+.icon-preview :is(.ip-huge, .ip-lucide, .ipt-huge, .ipt-drawn, .ipt-lucide) { display: none !important; }
+.icon-preview[data-icons="hugeicons"] :is(.ip-huge, .ipt-huge),
+.icon-preview[data-icons="lucide"] .ip-lucide,
+.icon-preview[data-icons="lucide"][data-look="3d"] .ipt-drawn,
+.icon-preview[data-icons="lucide"][data-look="2d"] .ipt-lucide { display: block !important; }

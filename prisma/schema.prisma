@@ -66,8 +66,10 @@ model Client {
   paymentConfig       String?
   /// Portal sections disabled for this client by the portal owner (e.g. ["orders", "catalogue", "calls"]). Empty means all sections enabled.
   disabledSections    String[]          @default([])
-  /// Icon style for this client's portal: "hugeicons" (default) or "classic" (Lucide + the original 3D tiles).
+  /// Icon set for this client's portal: "hugeicons" (default) or "lucide".
   iconPack            String            @default("hugeicons")
+  /// Look of the coloured icon tiles: "3d" (glossy, default) or "2d" (flat).
+  iconLook            String            @default("3d")
   audiences           Audience[]
   topUps              TopUp[]
   createdAt           DateTime          @default(now())

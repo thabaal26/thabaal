@@ -14,7 +14,7 @@ import { BottomNav, SettingsLink, SideNav, TopbarTrail, type NavRole } from "./n
 import { NotificationBell, NotificationProvider } from "@/components/notification-center";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { IconPackSync } from "@/components/icon-pack-sync";
-import { iconPackOf } from "@/lib/icon-pack";
+import { iconLookOf, iconPackOf } from "@/lib/icon-pack";
 
 /** The client whose look the dashboard wears: a client login's own, or the one an admin picked. */
 async function brandedClient() {
@@ -93,6 +93,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
   const unreadNotifications = openReplies + newOrders;
 
   const iconPack = iconPackOf(client?.iconPack);
+  const iconLook = iconLookOf(client?.iconLook);
   const name = client?.name ?? "Thabaal";
   const subtitle = client?.tagline || (scope.isAdmin ? (client ? "Admin view" : "Admin · all clients") : "A message with momentum");
   const via = settings.provider === "LOCAL" ? "Local session" : "Meta Cloud API";
@@ -118,9 +119,9 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
     <NotificationProvider initialUnreadCount={unreadNotifications}>
       <div style={themeStyle(client)} className="min-h-dvh w-full overflow-x-clip bg-canvas lg:pl-64 print:bg-white print:pl-0 lg:print:pl-0">
         {client && themeCss(client) && <style>{themeCss(client)}</style>}
-        {/* Set the icon pack before anything paints, so the other pack never flashes. */}
-        <script dangerouslySetInnerHTML={{ __html: `document.documentElement.dataset.icons=${JSON.stringify(iconPack)}` }} />
-        <IconPackSync pack={iconPack} />
+        {/* Set the icon set and tile look before anything paints, so the other variant never flashes. */}
+        <script dangerouslySetInnerHTML={{ __html: `document.documentElement.dataset.icons=${JSON.stringify(iconPack)};document.documentElement.dataset.look=${JSON.stringify(iconLook)}` }} />
+        <IconPackSync pack={iconPack} look={iconLook} />
         <a href="#main" className="sr-only z-[70] rounded-control bg-panel px-4 py-2 text-sm font-medium text-ink shadow-pop focus:not-sr-only focus:fixed focus:left-4 focus:top-4">
           Skip to content
         </a>

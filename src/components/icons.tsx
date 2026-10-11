@@ -2,8 +2,8 @@
 // directly, so the look, the default stroke and accessibility stay the same everywhere.
 //
 // Two packs ship side by side and each client's portal shows the one picked for it on the
-// admin Clients page (lib/icon-pack.ts): Hugeicons (default, free MIT set) and Classic
-// (Lucide, ISC). Each icon draws both; CSS hides the pack that isn't chosen.
+// admin Clients page (lib/icon-pack.ts): Hugeicons (default, free MIT set) and Lucide
+// (ISC). Each icon draws both; CSS hides the pack that isn't chosen.
 // To add an icon: pick it at https://hugeicons.com/icons (free set) and https://lucide.dev,
 // import both below and export it under one short name.
 
@@ -278,7 +278,7 @@ function icon(svg: IconSvgElement, Classic: LucideIcon, name: string): IconCompo
     return (
       <>
         <HugeiconsIcon icon={svg} size={size} strokeWidth={strokeWidth ?? STROKE} aria-hidden={hidden} focusable="false" {...rest} className={cn("ip-huge", className)} />
-        <Classic size={size} strokeWidth={strokeWidth ?? 2} aria-hidden={hidden} focusable="false" {...rest} className={cn("ip-classic", className)} />
+        <Classic size={size} strokeWidth={strokeWidth ?? 2} aria-hidden={hidden} focusable="false" {...rest} className={cn("ip-lucide", className)} />
       </>
     );
   };
