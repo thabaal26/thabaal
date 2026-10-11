@@ -23,7 +23,7 @@ import { isHrefEnabled } from "@/lib/client-sections";
 import { cn } from "@/lib/cn";
 
 export const NAV = [
-  { href: "/dashboard", label: "Overview", short: "Home", icon: Dashboard3D, group: "Daily work", cube: "from-[#34d399] via-[#10b981] to-[#059669]" },
+  { href: "/dashboard", label: "Dashboard", short: "Dashboard", icon: Dashboard3D, group: "Daily work", cube: "from-[#34d399] via-[#10b981] to-[#059669]" },
   { href: "/dashboard/notifications", label: "Notifications", short: "Alerts", icon: Bell3D, group: "Daily work", cube: "from-[#fbbf24] via-[#f59e0b] to-[#d97706]" },
   { href: "/dashboard/orders", label: "Orders", short: "Orders", icon: ShoppingBag3D, group: "Daily work", cube: "from-[#38bdf8] via-[#0ea5e9] to-[#0284c7]" },
   { href: "/dashboard/catalogue", label: "Catalogue", short: "Menu", icon: Store3D, group: "Daily work", cube: "from-[#2dd4bf] via-[#14b8a6] to-[#0d9488]" },

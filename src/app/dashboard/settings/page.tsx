@@ -119,7 +119,7 @@ export default async function SettingsPage() {
               <Copyable label="Cron URL" value={`${origin}/api/cron?key=•••CRON_SECRET•••`} />
               <p className="text-xs text-muted">
                 {process.env.CRON_SECRET ? "CRON_SECRET is set." : "Set CRON_SECRET first."} On Vercel Pro, add a cron to <code>vercel.json</code>. On the free Hobby plan, use a free service
-                such as cron-job.org with the URL above. The scheduler can also be run from the Overview page.
+                such as cron-job.org with the URL above. The scheduler can also be run from the Dashboard page.
               </p>
             </div>
           </Card>

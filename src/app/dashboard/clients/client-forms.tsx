@@ -444,7 +444,7 @@ export function BrandingForm({ clientId, name, initial }: { clientId: string; na
           <div className="space-y-1 bg-night px-3 pb-3">
             <p className="relative rounded-control bg-night-2 px-2.5 py-1.5 font-medium text-white">
               <span aria-hidden className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-glow" />
-              Overview
+              Dashboard
             </p>
             <p className="px-2.5 py-1.5 text-white/70">Campaigns</p>
           </div>
@@ -614,7 +614,7 @@ export function ClientSectionsForm({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted">
-          <span className="font-semibold text-ink">{enabledCount}</span> of {CLIENT_SECTIONS.length} sections enabled · Overview &amp; Settings stay on automatically.
+          <span className="font-semibold text-ink">{enabledCount}</span> of {CLIENT_SECTIONS.length} sections enabled · Dashboard &amp; Settings stay on automatically.
         </p>
         <Button type="submit" loading={pending} size="sm" className="max-sm:w-full">
           Save sections

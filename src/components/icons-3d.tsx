@@ -371,3 +371,88 @@ export function Alert3D(props: Icon3DProps) {
     </Base3D>
   );
 }
+
+/** 3D Radiant AI Sparkles / Growth Intelligence Emblem */
+export function Sparkles3D(props: Icon3DProps) {
+  return (
+    <Base3D {...props}>
+      {/* Secondary gold star */}
+      <path d="m18 2.5 1.1 2.9 2.9 1.1-2.9 1.1L18 10.5l-1.1-2.9-2.9-1.1 2.9-1.1L18 2.5Z" fill="#fde047" />
+      {/* Primary sculpted diamond star */}
+      <path d="m10 3.5 2.1 5.4 5.4 2.1-5.4 2.1L10 18.5l-2.1-5.4-5.4-2.1 5.4-2.1L10 3.5Z" fill="#ffffff" />
+      {/* Inner core facet */}
+      <circle cx="10" cy="11" r="2" fill="#f59e0b" />
+      {/* Bottom accent star */}
+      <path d="m17.5 14.5.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z" fill="#fde047" />
+    </Base3D>
+  );
+}
+
+/** 3D Sculpted Meta Wallet with Gold Card */
+export function Wallet3D(props: Icon3DProps) {
+  return (
+    <Base3D {...props}>
+      {/* Protruding gold credit/prepaid card */}
+      <rect x="4.5" y="2.8" width="14" height="8" rx="2" fill="#fde047" transform="rotate(-6 11.5 6.8)" />
+      {/* Main wallet body */}
+      <rect x="2.2" y="6.5" width="19.6" height="14.5" rx="3" fill="#ffffff" />
+      {/* Top crease */}
+      <path d="M2.2 9.5h19.6" stroke="#0f172a" strokeOpacity="0.18" strokeWidth="1.5" />
+      {/* 3D Clasp strap */}
+      <rect x="14.5" y="11.2" width="7.3" height="5.2" rx="1.8" fill="#0f172a" fillOpacity="0.78" />
+      <circle cx="17.2" cy="13.8" r="1.3" fill="#fde047" />
+    </Base3D>
+  );
+}
+
+/** 3D Precision Target Bullseye with Dart */
+export function Target3D(props: Icon3DProps) {
+  return (
+    <Base3D {...props}>
+      <circle cx="11.5" cy="12.5" r="8.8" fill="#ffffff" />
+      <circle cx="11.5" cy="12.5" r="5.8" fill="#fb7185" />
+      <circle cx="11.5" cy="12.5" r="2.8" fill="#fde047" />
+      <path d="m12 12 7.8-7.8M16.5 3.5h4v4" stroke="#0f172a" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
+    </Base3D>
+  );
+}
+
+/** 3D Chrono Clock Face */
+export function Clock3D(props: Icon3DProps) {
+  return (
+    <Base3D {...props}>
+      <circle cx="12" cy="12.5" r="9" fill="#ffffff" />
+      <circle cx="12" cy="12.5" r="7" stroke="#0f172a" strokeOpacity="0.18" strokeWidth="1.4" />
+      <path d="M9.5 2.2h5" stroke="#fde047" strokeWidth="2.4" strokeLinecap="round" />
+      <path d="M12 8v4.8l3.4 2" stroke="#0f172a" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="12.8" r="1.5" fill="#f59e0b" />
+    </Base3D>
+  );
+}
+
+/** 3D Rising Analytics Columns with Trend Line */
+export function ChartBar3D(props: Icon3DProps) {
+  return (
+    <Base3D {...props}>
+      <rect x="3" y="13" width="4.2" height="8" rx="1.3" fill="#ffffff" fillOpacity="0.78" />
+      <rect x="9.8" y="8.8" width="4.2" height="12.2" rx="1.3" fill="#ffffff" />
+      <rect x="16.6" y="4.5" width="4.2" height="16.5" rx="1.3" fill="#fde047" />
+      <path d="m4.5 9.5 5.2-3.5 4.2 1.2 4.8-4.2" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </Base3D>
+  );
+}
+
+/** 3D Location Pin with Pulse Ring */
+export function MapPin3D(props: Icon3DProps) {
+  return (
+    <Base3D {...props}>
+      <ellipse cx="12" cy="19.8" rx="6.5" ry="2.2" fill="#fde047" fillOpacity="0.85" />
+      <path
+        d="M12 2.5a6.8 6.8 0 0 0-6.8 6.8c0 4.8 6.8 10.2 6.8 10.2s6.8-5.4 6.8-10.2A6.8 6.8 0 0 0 12 2.5Z"
+        fill="#ffffff"
+      />
+      <circle cx="12" cy="9.3" r="2.7" fill="#0ea5e9" />
+    </Base3D>
+  );
+}
+

@@ -1,8 +1,9 @@
-import { ExternalLink, Trash2, Wallet } from "lucide-react";
+import { ExternalLink, Lightbulb, Trash2 } from "lucide-react";
 import { ActionButton } from "@/components/action-button";
+import { Wallet3D } from "@/components/icons-3d";
 import { Badge, buttonClass, Card, CardHeader } from "@/components/ui";
 import { cn } from "@/lib/cn";
-import { fmtDate, fmtNumber } from "@/lib/format";
+import { fmtDate, fmtNumber, pct } from "@/lib/format";
 import { senderFor } from "@/lib/senders";
 import { CATEGORY_LABEL, RATES, spendSummary, total, type SpendRow } from "@/lib/spend";
 import { deleteTopUp } from "./actions/spend";
@@ -10,26 +11,67 @@ import { TopUpForm } from "./top-up-form";
 
 const rupees = (n: number) => `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+const CAT_COLORS: Record<string, string> = {
+  marketing: "#f59e0b",
+  utility: "#0ea5e9",
+  authentication: "#6366f1",
+  service: "#10b981",
+};
+
 function SpendRows({ rows }: { rows: SpendRow[] }) {
   if (!rows.length) return <p className="py-2 text-sm text-muted">No charged messages yet.</p>;
+  const maxCost = Math.max(1, ...rows.map((r) => r.cost), 1);
+  const totalCost = rows.reduce((acc, r) => acc + r.cost, 0);
+
   return (
-    <table className="w-full text-sm">
-      <caption className="sr-only">Spend by message category</caption>
-      <tbody className="divide-y divide-line">
-        {rows.map((r) => (
-          <tr key={r.category}>
-            <th scope="row" className="py-2 pr-3 text-left align-top font-normal text-ink">
-              {CATEGORY_LABEL[r.category] ?? r.category}
-              <span className="block text-xs text-muted">
-                {fmtNumber(r.charged)} charged{r.free ? ` · ${fmtNumber(r.free)} free` : ""}
-                {RATES[r.category] ? ` · ₹${RATES[r.category]} each` : ""}
-              </span>
-            </th>
-            <td className="tabular py-2 text-right align-top font-medium text-ink">{r.cost ? rupees(r.cost) : "Free"}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="mt-2 space-y-2.5">
+      {/* Stacked Category Distribution Bar */}
+      {totalCost > 0 && (
+        <div className="track-3d flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full p-0.5">
+          {rows
+            .filter((r) => r.cost > 0)
+            .map((r) => (
+              <div
+                key={r.category}
+                className="bar-3d h-full first:rounded-l-full last:rounded-r-full"
+                style={{
+                  width: `${Math.max(6, pct(r.cost, totalCost))}%`,
+                  background: CAT_COLORS[r.category] ?? "#64748b",
+                }}
+                title={`${CATEGORY_LABEL[r.category] ?? r.category}: ${rupees(r.cost)}`}
+              />
+            ))}
+        </div>
+      )}
+
+      <ul className="space-y-2">
+        {rows.map((r) => {
+          const color = CAT_COLORS[r.category] ?? "#64748b";
+          const barW = r.cost > 0 ? Math.max(6, pct(r.cost, maxCost)) : r.free > 0 ? 100 : 0;
+          return (
+            <li key={r.category} className="rounded-control border border-line bg-subtle/40 px-3 py-2 text-xs">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="flex items-center gap-1.5 font-semibold text-ink">
+                  <span className="size-2.5 rounded-full" style={{ background: color }} />
+                  {CATEGORY_LABEL[r.category] ?? r.category}
+                </span>
+                <span className="tabular font-semibold text-ink">{r.cost ? rupees(r.cost) : "₹0.00 (Free)"}</span>
+              </div>
+              <div className="track-3d mt-1.5 h-1.5 w-full overflow-hidden rounded-full">
+                <div
+                  className="bar-3d h-full rounded-full"
+                  style={{ width: `${barW}%`, background: color }}
+                />
+              </div>
+              <p className="mt-1 text-2xs text-muted">
+                {fmtNumber(r.charged)} charged{r.free ? ` · ${fmtNumber(r.free)} free in 24h window` : ""}
+                {RATES[r.category] ? ` · ₹${RATES[r.category]}/msg` : ""}
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
@@ -45,13 +87,20 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
   const recorded = Boolean((number?.businessAccountId && acc.wabaId === number.businessAccountId) || s.topUps.length > 0 || new Date(s.lastSyncedAt).getTime() > 0);
   const low = recorded && s.remainingBalance < 50;
 
+  // Estimate how many more marketing messages (incl. 18% GST) the current balance can fund
+  const mktRateWithGst = RATES.marketing * 1.18;
+  const estMarketingRunway = recorded && mktRateWithGst > 0 ? Math.max(0, Math.floor(s.remainingBalance / mktRateWithGst)) : 0;
+  const freeServiceCount = s.current.reduce((acc, r) => acc + r.free, 0);
+  const estSavedByFreeWindow = freeServiceCount * RATES.marketing;
+  const runwayPct = Math.min(100, Math.max(4, Math.round((s.remainingBalance / 500) * 100)));
+
   return (
     <Card className={cn("card-3d", className)}>
       <CardHeader
         tone="gold"
-        icon={<Wallet />}
-        title="WhatsApp spend"
-        description={s.liveSyncedFromMeta ? "Live from Meta pricing_analytics API" : "Estimated at Meta's India rates"}
+        icon={<Wallet3D />}
+        title="Meta WhatsApp spend & wallet telemetry"
+        description={s.liveSyncedFromMeta ? "Live from Meta pricing_analytics Graph API" : "Estimated at Meta's India conversation rates"}
         action={
           <div className="flex items-center gap-2">
             {s.liveSyncedFromMeta && (
@@ -66,7 +115,7 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
           </div>
         }
       />
-      <dl className="grid grid-cols-2 divide-x divide-line border-b border-line">
+      <dl className="grid grid-cols-2 divide-x divide-line border-b border-line bg-subtle/30">
         <div className="px-4 py-4 sm:px-5">
           <dt className="text-xs text-muted">{s.monthLabel} so far (ex-GST)</dt>
           <dd className="tabular mt-1 text-xl font-semibold leading-tight text-ink">{rupees(s.totalMonthSpent)}</dd>
@@ -93,17 +142,31 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
             <>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs font-medium text-ink-2">
-                  Prepaid balance · {new Date(s.lastSyncedAt).getTime() > 0 ? `synced ${fmtDate(new Date(s.lastSyncedAt), "d MMM, h:mm a")}` : "last recorded"}
+                  Prepaid wallet · {new Date(s.lastSyncedAt).getTime() > 0 ? `synced ${fmtDate(new Date(s.lastSyncedAt), "d MMM, h:mm a")}` : "last recorded"}
                 </p>
-                {low && (
+                {low ? (
                   <Badge tone="amber" dot>
-                    Low balance
+                    Low balance · Top up soon
                   </Badge>
+                ) : (
+                  <Badge tone="green">~{fmtNumber(estMarketingRunway)} mktg msgs left</Badge>
                 )}
               </div>
               <p className="tabular mt-1 text-2xl font-semibold leading-tight text-ink">{rupees(s.remainingBalance)}</p>
-              <p className="mt-1 text-xs text-muted">
-                {acc.accountName} · Meta deducts live spend after your synced balance snapshot.
+
+              {/* Visual Balance Runway Meter */}
+              <div className="track-3d mt-2.5 h-2 w-full overflow-hidden rounded-full">
+                <div
+                  className="bar-3d h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${runwayPct}%`,
+                    background: low ? "linear-gradient(90deg, #f59e0b, #dc2626)" : "linear-gradient(90deg, #10b981, #059669)",
+                  }}
+                />
+              </div>
+
+              <p className="mt-1.5 text-xs text-muted">
+                {acc.accountName} · Enough for ~<b>{fmtNumber(estMarketingRunway)}</b> marketing messages (incl. GST).
               </p>
             </>
           ) : (
@@ -119,9 +182,20 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
         </div>
 
         <div>
-          <p className="text-xs font-medium text-muted">{s.monthLabel} by category</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted">{s.monthLabel} spend by category</p>
           <SpendRows rows={s.current} />
         </div>
+
+        {freeServiceCount > 0 && (
+          <div className="rounded-control border border-brand/25 bg-brand-soft/35 p-3 text-xs text-ink-2">
+            <p className="flex items-center gap-1.5 font-semibold text-brand-deep">
+              <Lightbulb aria-hidden className="size-3.5 shrink-0" /> Meta spend optimization insight
+            </p>
+            <p className="mt-0.5 leading-relaxed">
+              You sent <b>{fmtNumber(freeServiceCount)} free service messages</b> inside the 24-hour customer reply window, saving ~<b>{rupees(estSavedByFreeWindow)}</b> in marketing charges. Always send catalogues & price lists right after a customer replies!
+            </p>
+          </div>
+        )}
 
         {s.byPhone.length > 0 && (
           <div className="border-t border-line pt-3">

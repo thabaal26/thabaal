@@ -27,7 +27,7 @@ export default function DashboardError({ error, retry }: { error: Error & { dige
             <RotateCcw aria-hidden className="size-4" /> Try again
           </Button>
           <Link href="/dashboard" className={buttonClass("secondary")}>
-            Go to Overview
+            Go to Dashboard
           </Link>
         </div>
       </div>

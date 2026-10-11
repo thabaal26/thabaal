@@ -112,7 +112,7 @@ export const CLIENT_PLAN_PRESETS: readonly ClientPlanPreset[] = [
     id: "templates_only",
     label: "Templates Only (Minimal)",
     badge: "Templates plan",
-    description: "Only Overview, Templates, Customers & Message Log. Ideal for simple template or utility senders.",
+    description: "Only Dashboard, Templates, Customers & Message Log. Ideal for simple template or utility senders.",
     disabledSections: ["orders", "catalogue", "calls", "campaigns", "replies"],
   },
   {
