@@ -444,7 +444,7 @@ function NotificationDrawer() {
                 className={cn(
                   "min-h-11 rounded-full border px-3 text-xs font-medium transition sm:min-h-7",
                   filter === t.id
-                    ? "border-ink bg-ink text-white"
+                    ? "border-ink bg-ink text-panel"
                     : "border-line-2 bg-panel text-ink-2 hover:border-line-strong hover:text-ink"
                 )}
               >

@@ -118,6 +118,11 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
               </span>
             </a>
             {scope.canOperate && <CallButton customerId={c.id} name={c.name} primary={callAllowed} />}
+            <Link href={`/dashboard?cust=${c.id}&range=all`} className={buttonClass("secondary")}>
+              <span>
+                <span className="max-sm:sr-only">Their </span>insights
+              </span>
+            </Link>
             {more.length > 0 && (
               <OverflowMenu title={c.name} label={`More actions for ${c.name}`}>
                 {more}

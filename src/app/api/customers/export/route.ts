@@ -2,6 +2,8 @@ import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { customerFilters, customerWhere } from "@/lib/customer-query";
 import { db } from "@/lib/db";
+import { customerSegmentIds } from "@/lib/filter-scope";
+import { readFilters, resolvePeriod } from "@/lib/filters";
 import { fmtDate } from "@/lib/format";
 import { getScope, readSessionUserId, SESSION_COOKIE } from "@/lib/session";
 
@@ -15,7 +17,16 @@ export async function GET(req: NextRequest) {
   const scope = await getScope();
   if (!scope.canManage) return new NextResponse("Only managers can export customers.", { status: 403 });
 
-  const where = customerWhere(scope, customerFilters(Object.fromEntries(req.nextUrl.searchParams)));
+  const params: Record<string, string | string[]> = {};
+  for (const [k, v] of req.nextUrl.searchParams) params[k] = k in params ? [...[params[k]].flat(), v] : v;
+  const filters = readFilters(params, "all");
+  const period = resolvePeriod(filters);
+  const stage = typeof params.stage === "string" ? params.stage : "";
+  const act = typeof params.act === "string" ? params.act : "";
+  const segment = scope.clientId
+    ? await customerSegmentIds(scope.clientId, filters, { stage, act, ...(filters.range !== "all" && { start: period.start, end: period.end }) })
+    : null;
+  const where = { ...customerWhere(scope, customerFilters(params)), ...(segment && { id: { in: segment } }) };
   const customers = await db.customer.findMany({
     where,
     include: {

@@ -12,7 +12,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { formatValue, type ValueFormat } from "@/lib/chart-math";
 import { cn } from "@/lib/cn";
 
-const TRACK = "#eef1f5";
+const TRACK = "var(--color-track)";
 
 function useDrawn() {
   const [drawn, setDrawn] = useState(false);
@@ -74,7 +74,7 @@ export function Donut({
   return (
     <div role="img" aria-label={label} className="relative grid shrink-0 place-items-center" style={{ width: size, height: size }}>
       <svg viewBox="0 0 100 100" className="absolute inset-0 size-full -rotate-90 overflow-visible">
-        <circle cx="50" cy="50" r={r} fill="none" stroke={TRACK} strokeWidth={sw} />
+        <circle cx="50" cy="50" r={r} fill="none" strokeWidth={sw} style={{ stroke: TRACK }} />
         {drawnSlices.map((s, i) => {
           const len = (s.value / total) * 100;
           const dash = Math.max(0.4, len - gap);
@@ -193,7 +193,7 @@ export function RateRing({ value, color, label, sub, size = 84 }: { value: numbe
     <div className="flex min-w-0 flex-col items-center text-center">
       <div role="img" aria-label={`${label}: ${Math.round(v)}%`} className="relative grid place-items-center" style={{ width: size, height: size }}>
         <svg viewBox="0 0 100 100" className="absolute inset-0 size-full -rotate-90">
-          <circle cx="50" cy="50" r="42" fill="none" stroke={TRACK} strokeWidth="10" />
+          <circle cx="50" cy="50" r="42" fill="none" strokeWidth="10" style={{ stroke: TRACK }} />
           {v > 0 && (
             <circle
               cx="50"

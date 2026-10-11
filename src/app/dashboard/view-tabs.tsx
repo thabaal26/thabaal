@@ -1,32 +1,37 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
-import { dashHref, RANGES, VIEWS, type Range, type View } from "./overview-cards";
-
-const RANGE_KEYS = Object.keys(RANGES) as Range[];
-const SHORT: Record<Range, string> = { today: "Today", "7d": "7d", "30d": "30d" };
+import { VIEWS, type View } from "./overview-cards";
 
 /**
  * One floating control bar for the dashboard: which section (a highlight slides to it and the new
- * view slides in from that side, see .animate-view-in) and which period. Centred and sticky.
+ * view slides in from that side, see .animate-view-in) plus the period and filter buttons. Centred, sticky.
  */
-export function ViewTabs({ view, range, views, badges }: { view: View; range: Range; views: View[]; badges?: Partial<Record<View, number>> }) {
-  const router = useRouter();
+export function ViewTabs({
+  view,
+  views,
+  badges,
+  query,
+  trailing,
+}: {
+  view: View;
+  views: View[];
+  badges?: Partial<Record<View, number>>;
+  /** The current filters as a query string, kept when switching sections. */
+  query: string;
+  trailing?: ReactNode;
+}) {
   const [active, setActive] = useState<View>(view);
-  const [period, setPeriod] = useState<Range>(range);
   const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
   const refs = useRef<Partial<Record<View, HTMLAnchorElement | null>>>({});
 
   // Follow the server once the new page has loaded (also covers back/forward).
-  const [seen, setSeen] = useState(`${view}|${range}`);
-  if (seen !== `${view}|${range}`) {
-    setSeen(`${view}|${range}`);
+  const [seen, setSeen] = useState(view);
+  if (seen !== view) {
+    setSeen(view);
     setActive(view);
-    setPeriod(range);
   }
 
   useLayoutEffect(() => {
@@ -45,9 +50,11 @@ export function ViewTabs({ view, range, views, badges }: { view: View; range: Ra
     document.documentElement.style.setProperty("--view-dx", `${dir * 28}px`);
     setActive(v);
   };
-  const pickPeriod = (r: Range) => {
-    document.documentElement.style.setProperty("--view-dx", "0px");
-    setPeriod(r);
+  const href = (v: View) => {
+    const q = new URLSearchParams(query);
+    if (v !== "overview") q.set("view", v);
+    const s = q.toString();
+    return s ? `/dashboard?${s}` : "/dashboard";
   };
 
   return (
@@ -70,7 +77,7 @@ export function ViewTabs({ view, range, views, badges }: { view: View; range: Ra
                 ref={(el) => {
                   refs.current[v] = el;
                 }}
-                href={dashHref(v, range)}
+                href={href(v)}
                 scroll={false}
                 title={VIEWS[v].hint}
                 aria-current={v === view ? "page" : undefined}
@@ -92,46 +99,12 @@ export function ViewTabs({ view, range, views, badges }: { view: View; range: Ra
             );
           })}
         </nav>
-
-        <span aria-hidden className="mx-0.5 h-6 w-px shrink-0 bg-line sm:mx-1" />
-
-        {/* Period: segmented on wider screens, a compact menu on phones. */}
-        <nav aria-label="Period" className="hidden shrink-0 gap-0.5 rounded-full bg-sunken p-0.5 sm:flex">
-          {RANGE_KEYS.map((r) => (
-            <Link
-              key={r}
-              href={dashHref(view, r)}
-              scroll={false}
-              aria-current={r === range ? "page" : undefined}
-              onClick={() => pickPeriod(r)}
-              className={cn(
-                "inline-flex min-h-9 items-center rounded-full px-3 text-xs font-semibold transition",
-                r === period ? "bg-panel text-ink shadow-xs ring-1 ring-line" : "text-muted hover:text-ink",
-              )}
-            >
-              {RANGES[r].label}
-            </Link>
-          ))}
-        </nav>
-        <label className="relative shrink-0 sm:hidden">
-          <span className="sr-only">Period</span>
-          <select
-            value={period}
-            onChange={(e) => {
-              const r = e.target.value as Range;
-              pickPeriod(r);
-              router.push(dashHref(view, r), { scroll: false });
-            }}
-            className="min-h-10 appearance-none rounded-full bg-sunken py-1 pl-3 pr-7 text-xs font-semibold text-ink outline-none"
-          >
-            {RANGE_KEYS.map((r) => (
-              <option key={r} value={r}>
-                {SHORT[r]}
-              </option>
-            ))}
-          </select>
-          <ChevronDown aria-hidden className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-muted" />
-        </label>
+        {trailing && (
+          <>
+            <span aria-hidden className="mx-0.5 h-6 w-px shrink-0 bg-line sm:mx-1" />
+            {trailing}
+          </>
+        )}
       </div>
     </div>
   );

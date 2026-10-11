@@ -1,6 +1,5 @@
 import { CheckCheck, Clock, Send, TriangleAlert } from "lucide-react";
 import Link from "next/link";
-import { addDays } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { ActionButton } from "@/components/action-button";
 import { Calendar3D, Eye3D, Messages3D, Rupee3D, Send3D, Template3D } from "@/components/icons-3d";
@@ -41,7 +40,6 @@ import {
   FunnelCard,
   KpiTile,
   NumberLimitsCard,
-  RANGES,
   TodayCard,
   TopProductsCard,
   type AnchorProductInsight,
@@ -50,10 +48,12 @@ import {
   type CustomerScenariosData,
   type DroppedProductInsight,
   type ProductDemandRow,
-  type Range,
   type View,
 } from "./overview-cards";
 import { ViewTabs } from "./view-tabs";
+import { ActiveFilters, FilterBar } from "@/components/filter-bar";
+import { activeCount, filterQuery, narrowOrders, periodKeys, readFilters, resolvePeriod, weekKey } from "@/lib/filters";
+import { filterOptions, scopedCustomerIds } from "@/lib/filter-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -66,32 +66,39 @@ const hourLabel = (h: number) => `${h % 12 || 12} ${h < 12 ? "am" : "pm"}`;
 
 export default async function Overview({ searchParams }: PageProps<"/dashboard">) {
   const sp = await searchParams;
-  const range: Range = sp.range === "today" || sp.range === "30d" ? sp.range : "7d";
-  const { days, prev: prevLabel } = RANGES[range];
-  const hourly = range === "today";
+  const filters = readFilters(sp);
 
   const scope = await getScope();
-  const mine = owned(scope);
-  const myMessages = ownedMessages(scope);
   const cid = scope.clientId;
-
-  // The period, and the same stretch of time just before it (today so far vs yesterday up to now).
   const now = new Date();
-  const start = dayStart(daysAgo(days - 1));
-  const span = days * 86_400_000;
-  const prevStart = new Date(start.getTime() - span);
-  const prevEnd = new Date(now.getTime() - span);
+  const firstOrder = filters.range === "all" && cid ? await db.order.findFirst({ where: { clientId: cid }, orderBy: { createdAt: "asc" }, select: { createdAt: true } }) : null;
+  // The period (any preset or custom dates) and the same stretch of time just before it.
+  const period = resolvePeriod(filters, now, firstOrder?.createdAt);
+  const { start, end, prevStart, prevEnd, prevLabel } = period;
+  const hourly = period.bucket === "hour";
+  const weekly = period.bucket === "week";
+
+  // Who and what the figures cover: customers picked directly, by group, area, product or campaign.
+  const allowed = cid ? await scopedCustomerIds(cid, filters) : null;
+  const ids = allowed;
+  const mine = owned(scope);
+  const mineOrders = allowed ? { ...mine, customerId: { in: allowed } } : mine;
+  const mineCustomers = allowed ? { ...mine, id: { in: allowed } } : mine;
+  const myMessages = allowed ? { customer: { ...(cid ? { clientId: cid } : {}), id: { in: allowed } } } : ownedMessages(scope);
+  const filterOpts = cid ? await filterOptions(cid) : null;
+  const filtered = activeCount(filters) > 0;
+
   const todayStart = dayStart(now);
   const monthAgo = daysAgo(30);
 
-  // Buckets for the charts: hours of today, or calendar days of the period.
+  // Buckets for the charts: hours of one day, calendar days, or weeks for long periods.
   const bucketSql = hourly ? "HH24" : "YYYY-MM-DD";
-  const keys = hourly
-    ? Array.from({ length: Number(formatInTimeZone(now, APP_TZ, "H")) + 1 }, (_, h) => String(h).padStart(2, "0"))
-    : Array.from({ length: days }, (_, i) => formatInTimeZone(addDays(start, i), APP_TZ, "yyyy-MM-dd"));
-  const labelFor = (k: string) => (hourly ? hourLabel(Number(k)) : formatInTimeZone(new Date(`${k}T12:00:00Z`), "UTC", days > 7 ? "d MMM" : "EEE d"));
-  const tipFor = (k: string) => (hourly ? `${hourLabel(Number(k))} – ${hourLabel((Number(k) + 1) % 24)}` : formatInTimeZone(new Date(`${k}T12:00:00Z`), "UTC", "EEE d MMM"));
-  const keyOf = (d: Date) => formatInTimeZone(d, APP_TZ, hourly ? "HH" : "yyyy-MM-dd");
+  const keys = periodKeys(period, now);
+  const bucketOf = (k: string) => (weekly ? weekKey(k) : k);
+  const labelFor = (k: string) => (hourly ? hourLabel(Number(k)) : formatInTimeZone(new Date(`${k}T12:00:00Z`), "UTC", keys.length > 7 ? "d MMM" : "EEE d"));
+  const tipFor = (k: string) =>
+    hourly ? `${hourLabel(Number(k))} – ${hourLabel((Number(k) + 1) % 24)}` : weekly ? `Week of ${formatInTimeZone(new Date(`${k}T12:00:00Z`), "UTC", "d MMM")}` : formatInTimeZone(new Date(`${k}T12:00:00Z`), "UTC", "EEE d MMM");
+  const keyOf = (d: Date) => bucketOf(formatInTimeZone(d, APP_TZ, hourly ? "HH" : "yyyy-MM-dd"));
 
   const [client, segments, results, repliesByTag, health, blocked, areaRows] = await Promise.all([
     cid ? db.client.findUnique({ where: { id: cid } }) : null,
@@ -99,7 +106,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       ? db.$queryRaw<{ tag: string; n: bigint }[]>`
           SELECT t.tag, count(*) AS n
           FROM "Customer" c CROSS JOIN LATERAL unnest(c.tags) AS t(tag)
-          WHERE c."clientId" = ${cid} AND c."optedOut" = false
+          WHERE c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[])) AND c."optedOut" = false
             AND lower(t.tag) NOT IN ('customer','customers','vip','test','manual-order','lapsed','whatsapp','qr','sheet','no-item-info','thenan-oils','cup-n-saucer','new','pending','imported','lead','admin','staff','friend','family')
           GROUP BY 1 ORDER BY 2 DESC, 1`
       : [],
@@ -129,7 +136,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
               ) raw_prods
               WHERE prod IS NOT NULL AND prod <> ''
             ) p
-            WHERE c."clientId" = ${cid}
+            WHERE c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[]))
           )
           SELECT cp.tag,
             count(*) AS sent,
@@ -167,7 +174,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
               ) raw_prods
               WHERE prod IS NOT NULL AND prod <> ''
             ) p
-            WHERE c."clientId" = ${cid}
+            WHERE c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[]))
           )
           SELECT cp.tag, count(DISTINCT r."customerId") AS n
           FROM "Reply" r
@@ -181,18 +188,18 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       where: { ...mine, active: true, template: { status: { in: ["PAUSED", "DISABLED", "REJECTED"] } } },
       select: { id: true, name: true, template: { select: { name: true, status: true, statusReason: true } } },
     }),
-    cid ? db.customer.groupBy({ by: ["region", "location"], where: { clientId: cid, optedOut: false }, _count: true }) : [],
+    cid ? db.customer.groupBy({ by: ["region", "location"], where: { clientId: cid, optedOut: false, ...(allowed && { id: { in: allowed } }) }, _count: true }) : [],
   ]);
 
-  const [customers, optedOut, prevStatus, msgSeries, activeRuns, upcoming, recentRaw, failures, settings, orders, replySeries, repliers, prevReplies, funnelRows, heat, todayMsgs, todayReplies] =
+  const [customers, optedOut, prevStatus, msgSeries, activeRuns, upcoming, recentRaw, failures, settings, ordersRaw, replySeries, repliers, prevReplies, funnelRows, heat, todayMsgs, todayReplies] =
     await Promise.all([
-      db.customer.count({ where: { ...mine, optedOut: false } }),
-      db.customer.count({ where: { ...mine, optedOut: true } }),
+      db.customer.count({ where: { ...mineCustomers, optedOut: false } }),
+      db.customer.count({ where: { ...mineCustomers, optedOut: true } }),
       db.message.groupBy({ by: ["status"], where: { ...myMessages, createdAt: { gte: prevStart, lt: prevEnd }, status: { notIn: ["QUEUED", "SKIPPED"] } }, _count: true }),
       db.$queryRaw<{ k: string; status: string; n: bigint }[]>`
         SELECT to_char((m."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${APP_TZ}, ${bucketSql}) AS k, m.status::text AS status, count(*) AS n
         FROM "Message" m JOIN "Customer" c ON c.id = m."customerId"
-        WHERE m."createdAt" >= ${start} AND m.status NOT IN ('QUEUED', 'SKIPPED') AND (${cid}::text IS NULL OR c."clientId" = ${cid})
+        WHERE m."createdAt" >= ${start} AND m."createdAt" < ${end} AND m.status NOT IN ('QUEUED', 'SKIPPED') AND (${cid}::text IS NULL OR c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[])))
         GROUP BY 1, 2`,
       db.campaignRun.findMany({
         where: { campaign: mine, status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"] } },
@@ -218,7 +225,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       // All orders of this period and the comparison stretch (including NEW unpaid carts and CANCELLED carts for cart-abandonment analytics).
       db.order
         .findMany({
-          where: { ...mine, createdAt: { gte: prevStart } },
+          where: { ...mineOrders, createdAt: { gte: prevStart, lt: end } },
           select: {
             id: true,
             number: true,
@@ -238,9 +245,9 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       db.$queryRaw<{ k: string; n: bigint }[]>`
         SELECT to_char((r."receivedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${APP_TZ}, ${bucketSql}) AS k, count(*) AS n
         FROM "Reply" r JOIN "Customer" c ON c.id = r."customerId"
-        WHERE r."receivedAt" >= ${start} AND (${cid}::text IS NULL OR c."clientId" = ${cid})
+        WHERE r."receivedAt" >= ${start} AND r."receivedAt" < ${end} AND (${cid}::text IS NULL OR c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[])))
         GROUP BY 1`,
-      db.reply.groupBy({ by: ["customerId"], where: { ...myMessages, receivedAt: { gte: start } }, _count: true }),
+      db.reply.groupBy({ by: ["customerId"], where: { ...myMessages, receivedAt: { gte: start, lt: end } }, _count: true }),
       db.reply.count({ where: { ...myMessages, receivedAt: { gte: prevStart, lt: prevEnd } } }),
       // People messaged in the period and how far each got: received, read, replied, browsed catalogue, added to cart, and bought within 7 days.
       db.$queryRaw<{
@@ -257,7 +264,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
           SELECT m."customerId" AS cid, min(m."createdAt") AS first_at,
             bool_or(m.status IN ('DELIVERED', 'READ')) AS delivered, bool_or(m.status = 'READ') AS read
           FROM "Message" m JOIN "Customer" c ON c.id = m."customerId"
-          WHERE m."createdAt" >= ${start} AND m.status NOT IN ('QUEUED', 'SKIPPED') AND (${cid}::text IS NULL OR c."clientId" = ${cid})
+          WHERE m."createdAt" >= ${start} AND m."createdAt" < ${end} AND m.status NOT IN ('QUEUED', 'SKIPPED') AND (${cid}::text IS NULL OR c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[])))
           GROUP BY 1
         ), carts AS (
           SELECT DISTINCT o.id, o.total, o.status, o."paidAt", o."customerId" FROM "Order" o JOIN sent s ON s.cid = o."customerId"
@@ -283,17 +290,17 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         SELECT extract(dow FROM (r."receivedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${APP_TZ})::int AS d,
           (extract(hour FROM (r."receivedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${APP_TZ})::int / 3) AS b, count(*) AS n
         FROM "Reply" r JOIN "Customer" c ON c.id = r."customerId"
-        WHERE r."receivedAt" >= ${daysAgo(90)} AND (${cid}::text IS NULL OR c."clientId" = ${cid})
+        WHERE r."receivedAt" >= ${daysAgo(90)} AND (${cid}::text IS NULL OR c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[])))
         GROUP BY 1, 2`,
       db.$queryRaw<{ k: string; n: bigint }[]>`
         SELECT to_char((m."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${APP_TZ}, 'HH24') AS k, count(*) AS n
         FROM "Message" m JOIN "Customer" c ON c.id = m."customerId"
-        WHERE m."createdAt" >= ${todayStart} AND m.status NOT IN ('QUEUED', 'SKIPPED') AND (${cid}::text IS NULL OR c."clientId" = ${cid})
+        WHERE m."createdAt" >= ${todayStart} AND m.status NOT IN ('QUEUED', 'SKIPPED') AND (${cid}::text IS NULL OR c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[])))
         GROUP BY 1`,
       db.$queryRaw<{ k: string; n: bigint }[]>`
         SELECT to_char((r."receivedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${APP_TZ}, 'HH24') AS k, count(*) AS n
         FROM "Reply" r JOIN "Customer" c ON c.id = r."customerId"
-        WHERE r."receivedAt" >= ${todayStart} AND (${cid}::text IS NULL OR c."clientId" = ${cid})
+        WHERE r."receivedAt" >= ${todayStart} AND (${cid}::text IS NULL OR c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[])))
         GROUP BY 1`,
     ]);
 
@@ -301,20 +308,20 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
   const [catalogueMsgs, periodReplies, unhandledGroup, toDispatchCount, catalogRes, allTimeProdRows, customerLifecycleRows] = await Promise.all([
     db.message
       .findMany({
-        where: { ...myMessages, createdAt: { gte: start }, templateName: { in: ["Catalogue", "Price list"] } },
+        where: { ...myMessages, createdAt: { gte: start, lt: end }, templateName: { in: ["Catalogue", "Price list"] } },
         select: { customerId: true, templateName: true, status: true, createdAt: true, customer: { select: { name: true, phone: true } } },
         orderBy: { createdAt: "desc" },
       })
       .catch(() => []),
     db.reply
       .findMany({
-        where: { ...myMessages, receivedAt: { gte: start } },
+        where: { ...myMessages, receivedAt: { gte: start, lt: end } },
         select: { customerId: true, text: true, kind: true, handled: true, receivedAt: true, customer: { select: { name: true, phone: true } } },
         orderBy: { receivedAt: "desc" },
       })
       .catch(() => []),
     db.reply.groupBy({ by: ["customerId"], where: { ...myMessages, handled: false }, _count: true }).catch(() => []),
-    db.order.count({ where: { ...mine, status: { in: ["CONFIRMED", "PAID"] } } }).catch(() => 0),
+    db.order.count({ where: { ...mineOrders, status: { in: ["CONFIRMED", "PAID"] } } }).catch(() => 0),
     cid ? getCatalogWithProducts(cid).catch(() => null) : Promise.resolve(null),
     cid
       ? db
@@ -324,7 +331,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
               FROM "Order" o
               JOIN "Customer" c ON c.id = o."customerId"
               CROSS JOIN LATERAL jsonb_array_elements(o.items) AS elem
-              WHERE c."clientId" = ${cid}
+              WHERE c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[]))
                 AND (o.status IN ('CONFIRMED', 'PAID', 'DISPATCHED', 'DELIVERED') OR o."paidAt" IS NOT NULL)
                 AND trim(coalesce(elem->>'name', '')) <> ''
                 AND trim(elem->>'name') !~* '^manual-[0-9]+$'
@@ -332,7 +339,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
               SELECT c.id AS cid, trim(part) AS prod, 1 AS qty
               FROM "Customer" c
               CROSS JOIN LATERAL regexp_split_to_table(coalesce(c.purchases, ''), '[,/;&]+') AS part
-              WHERE c."clientId" = ${cid}
+              WHERE c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[]))
                 AND trim(part) <> ''
                 AND NOT EXISTS (SELECT 1 FROM "Order" o2 WHERE o2."customerId" = c.id)
             )
@@ -365,7 +372,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
               (SELECT max(r."receivedAt") FROM "Reply" r WHERE r."customerId" = c.id) AS last_reply_at
             FROM "Customer" c
             LEFT JOIN "Order" o ON o."customerId" = c.id
-            WHERE c."clientId" = ${cid} AND c."optedOut" = false
+            WHERE c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[])) AND c."optedOut" = false
             GROUP BY c.id`
           .catch(() => [])
       : Promise.resolve([]),
@@ -389,6 +396,14 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     ? await db.message.groupBy({ by: ["runId", "status"], where: { runId: { in: activeRuns.map((r) => r.id) } }, _count: true })
     : [];
 
+  // A product filter narrows every order to the picked products' lines (and drops the rest).
+  const orders = narrowOrders(ordersRaw, filters.products);
+  // Weekly charts: fold the daily series into weeks.
+  if (weekly) {
+    for (const r of msgSeries) r.k = weekKey(r.k);
+    for (const r of replySeries) r.k = weekKey(r.k);
+  }
+
   /* ── Period figures ── */
   const at = (k: string, s?: string) => msgSeries.filter((r) => r.k === k && (!s || r.status === s)).reduce((n, r) => n + Number(r.n), 0);
   const tally = (s: string) => msgSeries.filter((r) => r.status === s).reduce((n, r) => n + Number(r.n), 0);
@@ -409,7 +424,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
   const isUnpaidCart = (o: (typeof orders)[number]) =>
     (o.status === "NEW" || o.status === "CONFIRMED") && o.paidAt === null;
 
-  const curAllOrders = orders.filter((o) => o.createdAt >= start);
+  const curAllOrders = orders.filter((o) => o.createdAt >= start && o.createdAt < end);
   const curOrders = curAllOrders.filter(isBought);
   const curUnpaidCarts = curAllOrders.filter(isUnpaidCart);
   const curCancelledCarts = curAllOrders.filter((o) => o.status === "CANCELLED");
@@ -542,7 +557,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
   };
 
   const scenariosData: CustomerScenariosData = {
-    periodLabel: hourly ? "today so far" : `the last ${days} days`,
+    periodLabel: period.phrase,
     addedToCartUnpaid: {
       customers: unpaidCartCustomerIds.size,
       carts: curUnpaidCarts.length,
@@ -758,7 +773,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     .slice(0, 5);
 
   const cartMentalityData: CartMentalitySummaryData = {
-    periodLabel: hourly ? "today so far" : `the last ${days} days`,
+    periodLabel: period.phrase,
     totalRevisers: reviserCustomerIds.size,
     totalSupersededCarts,
     downsizedCount,
@@ -828,8 +843,8 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     .filter((r) => r.tag !== clientTag || results.length === 1)
     .map((r) => ({ tag: r.tag, sent: Number(r.sent), delivered: Number(r.delivered), read: Number(r.read), failed: Number(r.failed), replies: Number(repliesByTag.find((x) => x.tag === r.tag)?.n ?? 0) }));
 
-  const every = hourly ? 3 : days > 7 ? 5 : 1;
-  const periodText = hourly ? "today so far" : `the last ${days} days`;
+  const every = hourly ? 3 : keys.length > 16 ? Math.ceil(keys.length / 7) : 1;
+  const periodText = period.phrase;
 
   /* ── Full All-Products Analytics (Including 0-Sales / Non-Selling SKUs) ── */
   const normKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -1540,7 +1555,25 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         </div>
       )}
 
-      <ViewTabs view={view} range={range} views={views} badges={viewBadges} />
+      <ViewTabs
+        view={view}
+        views={views}
+        badges={viewBadges}
+        query={filterQuery(filters)}
+        trailing={
+          filterOpts ? (
+            <FilterBar compact value={filters} options={filterOpts} basePath="/dashboard" extra={{ view: view === "overview" ? undefined : view }} periodLabel={period.label} />
+          ) : undefined
+        }
+      />
+      <div className="-mt-3 mb-5 flex flex-col items-center gap-2 text-center sm:-mt-4">
+        <p className="text-xs text-muted">
+          <span className="font-semibold text-ink-2">{period.label}</span>
+          {period.prevLabel !== "before" && <> · compared with {prevLabel}</>}
+          {filtered && allowed && <> · {fmtNumber(allowed.length)} customer{allowed.length === 1 ? "" : "s"} in this filter</>}
+        </p>
+        {filterOpts && <ActiveFilters value={filters} options={filterOpts} basePath="/dashboard" extra={{ view: view === "overview" ? undefined : view }} />}
+      </div>
 
       <div key={view} className="animate-view-in">
 
@@ -1665,7 +1698,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         <div className="min-w-0 xl:col-span-8">
           <ActivityCard
             title="Message activity"
-            description={hourly ? "By hour, today so far" : `By day, the last ${days} days`}
+            description={`${hourly ? "By hour" : weekly ? "By week" : "By day"}, ${period.phrase}`}
             labels={keys.map(labelFor)}
             tooltipLabels={keys.map(tipFor)}
             every={every}
@@ -1823,7 +1856,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         <div className="space-y-4 sm:space-y-5">
           <AllProductsIntelligenceCard data={allProductsData} />
           <div className="grid grid-cols-1 gap-4 sm:gap-5 xl:grid-cols-2">
-            <TopProductsCard items={topProducts} rangeLabel={hourly ? "Today" : `Last ${days} days`} />
+            <TopProductsCard items={topProducts} rangeLabel={period.label} />
             {byProduct.length > 0 && <ProductCampaignGraphCard rows={byProduct} />}
           </div>
         </div>

@@ -69,7 +69,7 @@ export function BrandHero({
     <section
       aria-labelledby="hero-title"
       className="card-3d relative mb-4 overflow-hidden rounded-card border bg-panel sm:mb-5"
-      style={{ background: `radial-gradient(80% 120% at 0% 0%, ${tone === "danger" ? "rgb(201 54 54 / 0.07)" : "rgb(22 125 99 / 0.07)"}, transparent 60%), linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%)` }}
+      style={{ background: `radial-gradient(80% 120% at 0% 0%, ${tone === "danger" ? "rgb(201 54 54 / 0.07)" : "rgb(22 125 99 / 0.07)"}, transparent 60%), linear-gradient(180deg, var(--color-panel) 0%, var(--color-panel-2) 100%)` }}
     >
       <span aria-hidden className="absolute inset-x-0 top-0 z-10 h-[3px]" style={{ background: accent }} />
 

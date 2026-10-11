@@ -3,6 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { fmtDate } from "@/lib/format";
 import { messageWhere } from "@/lib/queries";
+import { messageScope } from "@/lib/filter-scope";
+import { readFilters, resolvePeriod } from "@/lib/filters";
 import { getScope, ownedMessages, readSessionUserId, SESSION_COOKIE } from "@/lib/session";
 
 export async function GET(req: NextRequest) {
@@ -10,8 +12,13 @@ export async function GET(req: NextRequest) {
   if (!userId) return new NextResponse("Unauthorized", { status: 401 });
   const scope = await getScope();
 
+  const params: Record<string, string | string[]> = {};
+  for (const [k, v] of req.nextUrl.searchParams) params[k] = k in params ? [...[params[k]].flat(), v] : v;
+  const filters = readFilters(params, "all");
+  const scoped = await messageScope(scope.clientId, filters, resolvePeriod(filters));
+  const first = Object.fromEntries(req.nextUrl.searchParams);
   const rows = await db.message.findMany({
-    where: { ...messageWhere(Object.fromEntries(req.nextUrl.searchParams)), ...ownedMessages(scope) },
+    where: { ...messageWhere({ ...first, range: first.range === "1d" ? "1d" : undefined }), ...ownedMessages(scope), ...scoped },
     include: { customer: true, run: { include: { campaign: true } } },
     orderBy: { createdAt: "desc" },
     take: 50_000,

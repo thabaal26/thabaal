@@ -478,7 +478,7 @@ export function FilterChips({ label, items, className }: { label: string; items:
               className={cn(
                 "flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition active:scale-[0.97] sm:h-8 sm:px-3.5 sm:text-[0.8125rem] sm:pointer-coarse:h-10",
                 t.active
-                  ? "border-ink bg-ink text-white shadow-xs"
+                  ? "border-ink bg-ink text-panel shadow-xs"
                   : "border-line-2 bg-panel text-ink-2 shadow-2xs hover:border-line-strong hover:bg-subtle hover:text-ink",
               )}
             >
@@ -487,7 +487,7 @@ export function FilterChips({ label, items, className }: { label: string; items:
                 <span
                   className={cn(
                     "tabular rounded-full px-1.5 py-px text-2xs font-semibold leading-4",
-                    t.active ? "bg-white/20 text-white" : "bg-sunken text-muted",
+                    t.active ? "bg-panel/20 text-panel" : "bg-sunken text-muted",
                   )}
                 >
                   {t.count}
@@ -696,7 +696,7 @@ export function Stat({
   meter?: number;
 }) {
   const t = STAT_TONES[tone] ?? STAT_TONES.brand;
-  const surface = { background: `linear-gradient(180deg, ${t.color}12 0%, #ffffff 48%, #fbfcfe 100%)` };
+  const surface = { background: `linear-gradient(180deg, ${t.color}12 0%, var(--color-panel) 48%, var(--color-panel-2) 100%)` };
   const body = (
     <>
       <span aria-hidden className="absolute inset-x-0 top-0 h-[3px]" style={{ background: t.color }} />

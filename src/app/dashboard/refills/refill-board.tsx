@@ -90,7 +90,7 @@ export function RefillBoard({ rows, today, canSend, templateName }: { rows: Refi
                     <span
                       aria-hidden
                       className="w-full max-w-7 rounded-t-[4px] transition-[height] duration-500 ease-out"
-                      style={{ height: h, background: t.n ? t.color : "#e2e6ec", opacity: pick && !on ? 0.4 : 1 }}
+                      style={{ height: h, background: t.n ? t.color : "var(--color-line)", opacity: pick && !on ? 0.4 : 1 }}
                     />
                     <span className={cn("mt-1.5 text-2xs font-medium", t.key === "d0" ? "text-ink" : "text-ink-2")}>{t.label}</span>
                     <span className="text-[10px] text-muted">{t.sub}</span>

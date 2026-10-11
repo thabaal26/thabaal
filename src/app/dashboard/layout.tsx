@@ -12,6 +12,7 @@ import { logout } from "../login/actions";
 import { ClientSwitcher, HeaderClientSwitcher } from "./client-switcher";
 import { BottomNav, SettingsLink, SideNav, TopbarTrail, type NavRole } from "./nav";
 import { NotificationBell, NotificationProvider } from "@/components/notification-center";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 /** The client whose look the dashboard wears: a client login's own, or the one an admin picked. */
 async function brandedClient() {
@@ -188,6 +189,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
                 <span className="tabular">{openReplies}</span> open repl{openReplies === 1 ? "y" : "ies"}
               </Link>
             )}
+            <ThemeToggle />
             {notificationsOn && <NotificationBell />}
             <span aria-hidden className="mx-1 h-6 w-px bg-line" />
             <Link
@@ -220,6 +222,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
                 <div className="text-2xs leading-tight">{status ?? <span className="block truncate text-white/70">{subtitle}</span>}</div>
               </div>
             )}
+            <ThemeToggle onDark />
             {notificationsOn && <NotificationBell dark />}
             <SettingsLink />
           </div>

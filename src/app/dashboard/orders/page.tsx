@@ -5,6 +5,9 @@ import Link from "next/link";
 import { Rupee3D, ShoppingBag3D } from "@/components/icons-3d";
 import { Picker } from "@/components/picker";
 import { buttonClass, Callout, Card, DistributionBar, EmptyState, FilterChips, PageHeader, Section, Stat } from "@/components/ui";
+import { ActiveFilters, FilterBar } from "@/components/filter-bar";
+import { activeCount as filterCount, filterQuery, readFilters, resolvePeriod } from "@/lib/filters";
+import { filterOptions, orderScope } from "@/lib/filter-scope";
 import { parseAddressText } from "@/lib/address";
 import { getCatalogWithProducts } from "@/lib/catalog";
 import { cn } from "@/lib/cn";
@@ -45,13 +48,6 @@ const TABS = [
   { key: "all", label: "All", where: {} },
 ] as const;
 
-const DATE_RANGES = [
-  { value: "", label: "All time" },
-  { value: "today", label: "Today" },
-  { value: "yesterday", label: "Yesterday" },
-  { value: "7d", label: "Last 7 days" },
-  { value: "month", label: "This month" },
-];
 
 const SORT_OPTIONS = [
   { value: "new", label: "Newest first" },
@@ -92,7 +88,12 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
   const scope = await getScope();
   const tab = TABS.find((t) => t.key === show) ?? TABS[0];
   const mine = owned(scope);
-  const dateWhere = getDateWhere(date);
+  // Shared filters: any period (presets or custom dates), products, customers, groups, area, campaign.
+  const filters = readFilters(sp, "all");
+  const period = resolvePeriod(filters);
+  const dateWhere = filters.range !== "all" ? { createdAt: { gte: period.start, lt: period.end } } : getDateWhere(date);
+  const extraWhere = await orderScope(scope.clientId, filters);
+  const filterOpts = scope.clientId ? await filterOptions(scope.clientId) : null;
 
   const cleanPhone = q.replace(/\D/g, "");
   const orderNumMatch = q.match(/(?:rg-?)?(\d+)/i);
@@ -118,7 +119,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         ? [{ total: "desc" as const }]
         : [{ createdAt: "desc" as const }];
 
-  const baseWhere = { ...mine, ...(tab.where as object), ...dateWhere, ...searchWhere };
+  const baseWhere = { ...mine, ...(tab.where as object), ...dateWhere, ...extraWhere, ...searchWhere };
 
   const [
     orders,
@@ -170,15 +171,15 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
       orderBy,
       take: 200,
     }),
-    db.order.count({ where: { ...mine, ...dateWhere, status: { in: ["NEW", "CONFIRMED", "PAID", "DISPATCHED"] } } }),
-    db.order.count({ where: { ...mine, ...dateWhere, status: "NEW" } }),
-    db.order.count({ where: { ...mine, ...dateWhere, status: "CONFIRMED" } }),
-    db.order.count({ where: { ...mine, ...dateWhere, OR: [{ status: "PAID" }, { paidAt: { not: null } }] } }),
-    db.order.count({ where: { ...mine, ...dateWhere, status: { in: ["NEW", "CONFIRMED", "DISPATCHED"] }, paidAt: null } }),
-    db.order.count({ where: { ...mine, ...dateWhere, status: "DISPATCHED" } }),
-    db.order.count({ where: { ...mine, ...dateWhere, status: "DELIVERED" } }),
-    db.order.count({ where: { ...mine, ...dateWhere, status: "CANCELLED" } }),
-    db.order.count({ where: { ...mine, ...dateWhere } }),
+    db.order.count({ where: { ...mine, ...dateWhere, ...extraWhere, status: { in: ["NEW", "CONFIRMED", "PAID", "DISPATCHED"] } } }),
+    db.order.count({ where: { ...mine, ...dateWhere, ...extraWhere, status: "NEW" } }),
+    db.order.count({ where: { ...mine, ...dateWhere, ...extraWhere, status: "CONFIRMED" } }),
+    db.order.count({ where: { ...mine, ...dateWhere, ...extraWhere, OR: [{ status: "PAID" }, { paidAt: { not: null } }] } }),
+    db.order.count({ where: { ...mine, ...dateWhere, ...extraWhere, status: { in: ["NEW", "CONFIRMED", "DISPATCHED"] }, paidAt: null } }),
+    db.order.count({ where: { ...mine, ...dateWhere, ...extraWhere, status: "DISPATCHED" } }),
+    db.order.count({ where: { ...mine, ...dateWhere, ...extraWhere, status: "DELIVERED" } }),
+    db.order.count({ where: { ...mine, ...dateWhere, ...extraWhere, status: "CANCELLED" } }),
+    db.order.count({ where: { ...mine, ...dateWhere, ...extraWhere } }),
     scope.clientId ? db.template.findMany({ where: { clientId: scope.clientId, name: { in: [...ORDER_TEMPLATES, ...ORDER_TEMPLATES.map((n) => `thenan_${n}`)] } }, select: { name: true, status: true } }) : [],
     scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { refillDays: true, refillTemplateId: true, lapsedDays: true, winbackTemplateId: true, paymentConfig: true } }) : null,
     scope.clientId && scope.canManage
@@ -251,7 +252,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
   // Client staff pack and dispatch their own orders, so they get the order buttons too.
   const canEdit = scope.canOperate && (scope.canManage || !!scope.clientId);
 
-  const filtered = Boolean(q || date || (sort && sort !== "new"));
+  const filtered = Boolean(q || date || (sort && sort !== "new") || filterCount(filters) || filters.range !== "all");
 
   const qs = (patch: Record<string, string | undefined>) => {
     const next = {
@@ -261,8 +262,8 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
       q: q || undefined,
       ...patch,
     };
-    const s = new URLSearchParams(Object.entries(next).filter(([, v]) => v) as [string, string][]);
-    return `/dashboard/orders${s.size ? `?${s}` : ""}`;
+    const s = filterQuery(filters, next, "all");
+    return `/dashboard/orders${s ? `?${s}` : ""}`;
   };
 
   return (
@@ -348,6 +349,9 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         <Card className="card-3d">
           <form role="search" aria-label="Filter orders" className="grid gap-2 p-3 sm:flex sm:flex-wrap sm:items-center sm:p-4">
             {tab.key && <input type="hidden" name="show" value={tab.key} />}
+            {[...new URLSearchParams(filterQuery(filters, {}, "all"))].map(([k, v], i) => (
+              <input key={`${k}-${i}`} type="hidden" name={k} value={v} />
+            ))}
             <div className="relative min-w-0 sm:min-w-56 sm:flex-1">
               <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
               <input
@@ -361,14 +365,16 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
               />
             </div>
             <div className="grid grid-cols-2 gap-2 sm:contents">
-              <Picker
-                name="date"
-                autoSubmit
-                title="Time range"
-                defaultValue={date}
-                className="sm:w-40"
-                options={DATE_RANGES}
-              />
+              {filterOpts && (
+                <FilterBar
+                  value={filters}
+                  options={filterOpts}
+                  basePath="/dashboard/orders"
+                  extra={{ show: tab.key || undefined, q: q || undefined, sort: sort !== "new" ? sort : undefined }}
+                  defaultRange="all"
+                  periodLabel={filters.range === "all" ? "Any date" : period.label}
+                />
+              )}
               <Picker
                 name="sort"
                 autoSubmit
@@ -388,6 +394,11 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
               </Link>
             )}
           </form>
+          {filterOpts && filterCount(filters) > 0 && (
+            <div className="border-t border-line px-3 py-2.5 sm:px-4">
+              <ActiveFilters value={filters} options={filterOpts} basePath="/dashboard/orders" extra={{ show: tab.key || undefined, q: q || undefined, sort: sort !== "new" ? sort : undefined }} defaultRange="all" />
+            </div>
+          )}
           {allCount > 0 && (
             <div className="border-t border-line px-3 py-3 sm:px-4">
               <DistributionBar

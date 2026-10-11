@@ -75,7 +75,7 @@ export function PhoneFrame({ children, name = "Your Business" }: { children: Rea
           </div>
         </div>
         <div className="chat-wall min-h-[420px] p-3">
-          <p className="mx-auto mb-3 w-fit rounded-md bg-white/90 px-2 py-0.5 text-2xs text-muted">TODAY</p>
+          <p className="mx-auto mb-3 w-fit rounded-md bg-white/90 px-2 dark:bg-white/10 py-0.5 text-2xs text-muted">TODAY</p>
           {children}
         </div>
       </div>

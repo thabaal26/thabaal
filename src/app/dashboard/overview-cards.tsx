@@ -48,40 +48,6 @@ function brightCubeGradient(color: string) {
 
 /* ───────────────────────── Period switch ───────────────────────── */
 
-export const RANGES = { today: { days: 1, label: "Today", prev: "yesterday" }, "7d": { days: 7, label: "7 days", prev: "the 7 days before" }, "30d": { days: 30, label: "30 days", prev: "the 30 days before" } } as const;
-export type Range = keyof typeof RANGES;
-
-/** The dashboard URL for a view and period, leaving out the defaults. */
-export function dashHref(view: string, range: Range) {
-  const q = new URLSearchParams();
-  if (view !== "overview") q.set("view", view);
-  if (range !== "7d") q.set("range", range);
-  const qs = q.toString();
-  return qs ? `/dashboard?${qs}` : "/dashboard";
-}
-
-/** Today / 7 days / 30 days, kept in the URL so the view can be shared and reloaded. */
-export function RangeTabs({ range, view = "overview" }: { range: Range; view?: string }) {
-  return (
-    <nav aria-label="Period" className="inline-flex rounded-control bg-sunken p-1">
-      {(Object.keys(RANGES) as Range[]).map((r) => (
-        <Link
-          key={r}
-          href={dashHref(view, r)}
-          scroll={false}
-          aria-current={r === range ? "page" : undefined}
-          className={cn(
-            "inline-flex min-h-10 items-center rounded-[calc(var(--radius-control)-3px)] px-3.5 text-sm font-medium transition sm:min-h-8",
-            r === range ? "bg-panel text-ink shadow-xs ring-1 ring-line" : "text-muted hover:text-ink",
-          )}
-        >
-          {RANGES[r].label}
-        </Link>
-      ))}
-    </nav>
-  );
-}
-
 /** Dashboard sections: one focused view at a time instead of one very long page. */
 export const VIEWS = {
   overview: { label: "Overview", hint: "Today's work and headline figures" },
@@ -169,7 +135,7 @@ export function KpiTile({
     </>
   );
   // A faint wash of the tile's own colour from the top, over the raised 3D surface.
-  const surface = { background: `linear-gradient(180deg, ${color}14 0%, #ffffff 46%, #fbfcfe 100%)` };
+  const surface = { background: `linear-gradient(180deg, ${color}14 0%, var(--color-panel) 46%, var(--color-panel-2) 100%)` };
   return href ? (
     <Link href={href} className="card-3d relative flex h-full min-w-0 flex-col overflow-hidden rounded-card border" style={surface}>
       {body}
@@ -585,7 +551,7 @@ export function BestTimeCard({ cells, days }: { cells: { d: number; b: number; n
                           <td key={b} className="track-3d h-8 rounded-[6px] p-0 text-center" title={`${DAYS[d]} ${b}: ${v} replies`}>
                             <span
                               className={cn("grid size-full min-h-8 place-items-center rounded-[6px] font-semibold", v > 0 && "tile-3d")}
-                              style={{ background: v ? `linear-gradient(180deg, rgb(255 255 255 / 0.18), rgb(255 255 255 / 0)), rgb(22 125 99 / ${a})` : undefined, color: a > 0.55 ? "#fff" : "#344054" }}
+                              style={{ background: v ? `linear-gradient(180deg, rgb(255 255 255 / 0.18), rgb(255 255 255 / 0)), rgb(22 125 99 / ${a})` : undefined, color: a > 0.55 ? "#fff" : "var(--color-ink-2)" }}
                             >
                               {v || ""}
                               <span className="sr-only">{v ? "" : "0"}</span>

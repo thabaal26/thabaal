@@ -285,7 +285,7 @@ export function CatalogueManager({
   const chip = (on: boolean) =>
     cn(
       "inline-flex h-9 items-center whitespace-nowrap rounded-full border px-3 text-xs font-medium transition active:scale-[0.97] sm:h-8 sm:text-[0.8125rem]",
-      on ? "border-ink bg-ink text-white" : "border-line-2 bg-panel text-ink-2 hover:border-line-strong hover:bg-subtle hover:text-ink",
+      on ? "border-ink bg-ink text-panel" : "border-line-2 bg-panel text-ink-2 hover:border-line-strong hover:bg-subtle hover:text-ink",
     );
 
   const canAdd = canManage && isLive;

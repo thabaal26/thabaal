@@ -4,6 +4,7 @@ import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { db } from "./db";
 import { APP_TZ } from "./format";
 import type { OrderItem } from "./orders";
+import { narrowOrders, weekKey } from "./filters";
 import { INDIA_GST_RATE, RATES } from "./spend";
 
 // Read-only reports behind the campaign comparison, revenue, combo and weekly-report pages.
@@ -105,30 +106,49 @@ export type RevenueReport = {
 
 const COD_RE = /\b(cod|cash on delivery|cash)\b/i;
 
-export async function revenueReport(clientId: string, days = 30, now = new Date()): Promise<RevenueReport> {
-  const start = dayStart(new Date(now.getTime() - (days - 1) * DAY));
-  const [orders, open, billable] = await Promise.all([
+/**
+ * Money for a period: paid sales per day (or week, for long periods), what's still to collect and what
+ * WhatsApp cost. `customers` limits it to those people; `products` counts only those products' lines.
+ */
+export async function revenueReport(
+  clientId: string,
+  opts: { start: Date; end: Date; customers?: string[] | null; products?: string[] },
+  now = new Date(),
+): Promise<RevenueReport> {
+  const { start, end } = opts;
+  const ids = opts.customers ?? null;
+  const days = Math.max(1, Math.round((dayStart(new Date(end.getTime() - 1)).getTime() - dayStart(start).getTime()) / DAY) + 1);
+  const weekly = days > 92;
+  const who = ids ? { customerId: { in: ids } } : {};
+  const [ordersRaw, openRaw, billable] = await Promise.all([
     db.order.findMany({
-      where: { clientId, createdAt: { gte: start }, status: { not: "CANCELLED" } },
-      select: { createdAt: true, paidAt: true, status: true, total: true, paymentTxnId: true },
+      where: { clientId, ...who, createdAt: { gte: start, lt: end }, status: { not: "CANCELLED" } },
+      select: { createdAt: true, paidAt: true, status: true, total: true, paymentTxnId: true, items: true },
     }),
     db.order.findMany({
-      where: { clientId, paidAt: null, status: { in: ["NEW", "CONFIRMED", "DISPATCHED", "DELIVERED"] }, createdAt: { gte: new Date(now.getTime() - 60 * DAY) } },
-      select: { id: true, number: true, customerId: true, total: true, createdAt: true, status: true, internalNote: true, paymentRequestedAt: true, customer: { select: { name: true } } },
+      where: { clientId, ...who, paidAt: null, status: { in: ["NEW", "CONFIRMED", "DISPATCHED", "DELIVERED"] }, createdAt: { gte: new Date(now.getTime() - 60 * DAY) } },
+      select: { id: true, number: true, customerId: true, total: true, items: true, createdAt: true, status: true, internalNote: true, paymentRequestedAt: true, customer: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
     }),
     db.$queryRaw<{ k: string; cat: string; n: bigint }[]>`
       SELECT to_char((m."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${APP_TZ}, 'YYYY-MM-DD') AS k, m."pricingCategory" AS cat, count(*) AS n
       FROM "Message" m JOIN "Customer" c ON c.id = m."customerId"
-      WHERE c."clientId" = ${clientId} AND m.billable = true AND m."pricingCategory" IS NOT NULL AND m."createdAt" >= ${start}
+      WHERE c."clientId" = ${clientId} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[])) AND m.billable = true AND m."pricingCategory" IS NOT NULL
+        AND m."createdAt" >= ${start} AND m."createdAt" < ${end}
       GROUP BY 1, 2`,
   ]);
+  const orders = narrowOrders(ordersRaw, opts.products ?? []);
+  const open = narrowOrders(openRaw, opts.products ?? []);
 
-  const keyOf = (d: Date) => formatInTimeZone(d, APP_TZ, "yyyy-MM-dd");
-  const dayList: RevenueDay[] = Array.from({ length: days }, (_, i) => {
+  const dayKey = (d: Date) => formatInTimeZone(d, APP_TZ, "yyyy-MM-dd");
+  const keyOf = (d: Date) => (weekly ? weekKey(dayKey(d)) : dayKey(d));
+  const dayList: RevenueDay[] = [];
+  for (let i = 0; i < days; i++) {
     const d = addDays(start, i);
-    return { key: keyOf(d), label: formatInTimeZone(d, APP_TZ, days > 14 ? "d" : "EEE"), sub: formatInTimeZone(d, APP_TZ, days > 14 ? "MMM" : "d MMM"), upi: 0, other: 0, spend: 0 };
-  });
+    const key = keyOf(d);
+    if (dayList.some((x) => x.key === key)) continue;
+    dayList.push({ key, label: formatInTimeZone(d, APP_TZ, days > 14 ? "d" : "EEE"), sub: formatInTimeZone(d, APP_TZ, days > 14 ? "MMM" : "d MMM"), upi: 0, other: 0, spend: 0 });
+  }
   const byKey = new Map(dayList.map((d) => [d.key, d]));
   let paid = 0;
   let paidOrders = 0;
@@ -147,7 +167,7 @@ export async function revenueReport(clientId: string, days = 30, now = new Date(
   let spend = 0;
   for (const b of billable) {
     const cost = Number(b.n) * (RATES[b.cat] ?? 0) * (1 + INDIA_GST_RATE);
-    const d = byKey.get(b.k);
+    const d = byKey.get(weekly ? weekKey(b.k) : b.k);
     if (d) d.spend += cost;
     spend += cost;
   }

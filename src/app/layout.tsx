@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Noto_Sans_Tamil, Nunito } from "next/font/google";
 import { ConfirmHost } from "@/components/confirm";
 import { ServiceWorkerRegister } from "@/components/sw-register";
 import { Toaster } from "@/components/toast";
+import { THEME_SCRIPT } from "@/lib/theme-script";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"], display: "swap" });
@@ -38,7 +39,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${tamil.variable} ${nunito.variable} h-full antialiased`}>
+    <html lang="en" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} ${tamil.variable} ${nunito.variable} h-full antialiased`}>
+      <head>
+        {/* Sets light or dark before the first paint, from the saved choice or the device setting. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="min-h-full font-sans">
         {children}
         <Toaster />

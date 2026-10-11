@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Dark mode follows the .dark class on <html> (set before paint from the saved choice or the system setting). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   /* Geist for Latin; Noto Sans Tamil fills in Tamil characters (it only downloads when a page has some). */
   --font-sans: var(--font-geist-sans), var(--font-tamil), ui-sans-serif, system-ui, sans-serif;
@@ -27,6 +30,8 @@
   --color-surface: #ffffff;
   --color-subtle: #f8fafc; /* secondary surface: table heads, quiet panels */
   --color-sunken: #f1f4f8; /* inset areas inside a card: item lists, read-only values, segmented tracks */
+  --color-panel-2: #fbfcfe; /* lower end of raised card gradients */
+  --color-track: #eef1f5; /* empty part of bars, rings and chart tracks */
 
   /* Primary action */
   --color-brand: #167d63; /* white text on it: 5.1:1 */
@@ -314,7 +319,7 @@ tbody > tr {
  */
 .card-3d {
   contain: layout style;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+  background: linear-gradient(180deg, var(--color-panel) 0%, var(--color-panel-2) 100%);
   border-color: rgb(16 24 40 / 0.08);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255),
@@ -435,3 +440,89 @@ input:-webkit-autofill:active {
   transition: background-color 9999s ease-in-out 0s;
   box-shadow: inset 0 0 0 1000px #f8fafc !important;
 }
+
+/* ───────────────────────── Dark mode ─────────────────────────
+ * Same token names, night values. Text colours keep 4.5:1 on panel and canvas; status and brand
+ * text lighten so they read on dark surfaces, while filled buttons keep their light-mode fills.
+ */
+.dark {
+  color-scheme: dark;
+  --color-ink: #e8ebf1;
+  --color-ink-2: #c4cad5;
+  --color-muted: #939cac;
+  --color-faint: #5d6676;
+  --color-line: #262d38;
+  --color-line-2: #333b48;
+  --color-line-strong: #5f6b7d;
+  --color-canvas: #0b0f15;
+  --color-panel: #131922;
+  --color-surface: #131922;
+  --color-subtle: #171e28;
+  --color-sunken: #0f141b;
+  --color-panel-2: #10161e;
+  --color-track: #222a35;
+
+  --color-brand: #178a6c;
+  --color-brand-deep: #5fd7ac;
+  --color-brand-soft: #0f2a22;
+
+  --color-night: #0e1218;
+  --color-night-2: #1d2430;
+  --color-gold-soft: #2a2410;
+  --color-gold-deep: #f2d27a;
+
+  --color-success: #62d39d;
+  --color-success-solid: #1f9d6a;
+  --color-success-bg: #0f261c;
+  --color-success-border: #1f4a36;
+  --color-warning: #f2c46d;
+  --color-warning-solid: #d4912a;
+  --color-warning-bg: #2a200f;
+  --color-warning-border: #5a4318;
+  --color-danger: #f49b9b;
+  --color-danger-solid: #d64545;
+  --color-danger-bg: #2c1416;
+  --color-danger-border: #5c2629;
+  --color-info: #86bdf3;
+  --color-info-bg: #0f1d30;
+  --color-info-border: #20395a;
+  --color-accent: #bba8f7;
+  --color-accent-bg: #1c1730;
+  --color-accent-border: #3a2f63;
+  --color-neutral: #b4bcc8;
+  --color-neutral-bg: #1a2029;
+  --color-neutral-border: #2b323d;
+
+  --color-chat: #0b141a;
+  --color-bubble: #1f2c34;
+  --color-bubble-out: #005c4b;
+
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.35), 0 1px 3px rgb(0 0 0 / 0.25);
+  --shadow-pop: 0 16px 40px -12px rgb(0 0 0 / 0.65), 0 4px 10px -4px rgb(0 0 0 / 0.4);
+  --shadow-bar: 0 -1px 0 rgb(255 255 255 / 0.05), 0 -8px 24px -16px rgb(0 0 0 / 0.6);
+}
+.dark .card-3d {
+  border-color: rgb(255 255 255 / 0.07);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    0 1px 2px rgb(0 0 0 / 0.4),
+    0 8px 20px -6px rgb(0 0 0 / 0.55);
+}
+.dark .card-3d:hover { border-color: rgb(255 255 255 / 0.12); }
+.dark .track-3d { box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.5); }
+.dark .chat-wall { background-image: radial-gradient(rgb(255 255 255 / 0.035) 1px, transparent 1px); }
+.dark select.field {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23939cac' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+}
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--color-ink) !important;
+  box-shadow: inset 0 0 0 1000px var(--color-subtle) !important;
+}
+/* Pictures and logos keep their colours; only very bright photos are toned down a touch. */
+.dark img:not([data-keep]) { filter: brightness(0.94); }
+/* Smooth swap between light and dark (not on first paint). */
+html.theme-anim, html.theme-anim * { transition: background-color 0.25s ease, border-color 0.25s ease, color 0.2s ease !important; }

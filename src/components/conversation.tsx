@@ -92,7 +92,7 @@ export function Conversation({ entries, className }: { entries: ConversationEntr
                             href={mediaUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="mb-1.5 flex items-center gap-2 rounded-control border border-black/10 bg-white/70 px-3 py-2 text-xs font-medium text-brand-deep hover:underline"
+                            className="mb-1.5 flex items-center gap-2 rounded-control border border-black/10 bg-white/70 dark:border-white/10 dark:bg-white/10 px-3 py-2 text-xs font-medium text-brand-deep hover:underline"
                           >
                             <FileText aria-hidden className="size-4 shrink-0" />
                             <span className="truncate">Open PDF attachment</span>

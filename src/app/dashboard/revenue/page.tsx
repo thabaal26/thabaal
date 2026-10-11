@@ -8,15 +8,16 @@ import { Card, CardHeader, PageHeader, PickClientNotice, Stat } from "@/componen
 import { ColumnChart } from "@/components/viz";
 import { revenueReport, type CashItem } from "@/lib/business-reports";
 import { formatValue } from "@/lib/chart-math";
-import { cn } from "@/lib/cn";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { getScope } from "@/lib/session";
+import { ActiveFilters, FilterBar } from "@/components/filter-bar";
+import { readFilters, resolvePeriod } from "@/lib/filters";
+import { filterOptions, scopedCustomerIds } from "@/lib/filter-scope";
 import { requestPayment } from "../actions/orders";
 
 export const metadata: Metadata = { title: "Revenue & cash" };
 export const dynamic = "force-dynamic";
 
-const PERIODS = [7, 30, 90] as const;
 const UPI = "#059669";
 const OTHER = "#0ea5e9";
 
@@ -53,27 +54,21 @@ function CashList({ title, hint, items, icon, tone, action }: { title: string; h
 export default async function RevenuePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams;
   const scope = await getScope();
-  const days = PERIODS.includes(Number(sp.days) as (typeof PERIODS)[number]) ? Number(sp.days) : 30;
+  // Shared filters: any period (default 30 days), products, customers, groups, area, campaign.
+  const filters = readFilters(sp, "30d");
+  const period = resolvePeriod(filters);
+  const filterOpts = scope.clientId ? await filterOptions(scope.clientId) : null;
   const header = (
     <PageHeader
       title="Revenue & cash"
       description="Money in, money still to collect, and what WhatsApp cost to get it."
       tabs={
-        <nav aria-label="Period" className="inline-flex rounded-control bg-sunken p-1">
-          {PERIODS.map((d) => (
-            <Link
-              key={d}
-              href={d === 30 ? "/dashboard/revenue" : `/dashboard/revenue?days=${d}`}
-              aria-current={d === days ? "page" : undefined}
-              className={cn(
-                "inline-flex min-h-10 items-center rounded-[calc(var(--radius-control)-3px)] px-3.5 text-sm font-medium transition sm:min-h-8",
-                d === days ? "bg-panel text-ink shadow-xs ring-1 ring-line" : "text-muted hover:text-ink",
-              )}
-            >
-              {d} days
-            </Link>
-          ))}
-        </nav>
+        filterOpts ? (
+          <div className="flex flex-col gap-2">
+            <FilterBar value={filters} options={filterOpts} basePath="/dashboard/revenue" defaultRange="30d" periodLabel={period.label} />
+            <ActiveFilters value={filters} options={filterOpts} basePath="/dashboard/revenue" defaultRange="30d" />
+          </div>
+        ) : undefined
       }
     />
   );
@@ -85,7 +80,9 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
       </>
     );
 
-  const r = await revenueReport(scope.clientId, days);
+  const customers = await scopedCustomerIds(scope.clientId, { ...filters, products: [] });
+  const r = await revenueReport(scope.clientId, { start: period.start, end: period.end, customers, products: filters.products });
+  const weekly = r.days.length < period.days;
   const toCollect = [...r.awaitingPayment, ...r.codToCollect].reduce((n, o) => n + o.total, 0);
   const roi = r.spend > 0 ? r.paid / r.spend : null;
 
@@ -100,12 +97,12 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
       </div>
 
       <Card className="card-3d">
-        <CardHeader tone="brand" icon={<Rupee3D />} title="Paid sales per day" description={`Last ${days} days · by the day the payment came in`} />
+        <CardHeader tone="brand" icon={<Rupee3D />} title={weekly ? "Paid sales per week" : "Paid sales per day"} description={`${period.label} · by the day the payment came in`} />
         <div className="p-4 sm:p-5">
           <ColumnChart
             format="inr"
-            label={`Paid sales per day for the last ${days} days`}
-            minWidth={days > 30 ? 1100 : 560}
+            label={`Paid sales, ${period.phrase}`}
+            minWidth={r.days.length > 31 ? r.days.length * 30 : 560}
             legend={[
               { label: "Paid by UPI on WhatsApp", color: UPI },
               { label: "Confirmed or paid another way", color: OTHER },
@@ -113,7 +110,7 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
             columns={r.days.map((d, i) => ({
               key: d.key,
               label: d.label,
-              sub: days > 14 ? (i === 0 || d.label === "1" ? d.sub : undefined) : d.sub,
+              sub: r.days.length > 14 ? (i === 0 || d.label === "1" || weekly ? d.sub : undefined) : d.sub,
               highlight: i === r.days.length - 1,
               parts: [
                 { key: "upi", label: "UPI", value: d.upi, color: UPI },

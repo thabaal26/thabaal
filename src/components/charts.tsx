@@ -106,7 +106,7 @@ export function TrendChart({
   const x = (i: number) => pad.l + (n <= 1 ? iw / 2 : (iw * i) / (n - 1));
   const y = (v: number) => pad.t + ih * (1 - v / max);
   const ticks = [max, max / 2, 0];
-  const grid = dark ? "rgba(255,255,255,0.1)" : "#e2e6ec"; // --color-line (SVG attributes can't read CSS variables)
+  const grid = dark ? "rgba(255,255,255,0.1)" : "currentColor"; // currentColor = text-line on the element
   const axisText = dark ? "fill-white/55" : "fill-muted";
 
   const first = series[0];
@@ -133,7 +133,7 @@ export function TrendChart({
           </defs>
           {ticks.map((t) => (
             <g key={t}>
-              <line x1={pad.l} x2={w - pad.r} y1={y(t)} y2={y(t)} stroke={grid} strokeWidth={1} />
+              <line x1={pad.l} x2={w - pad.r} y1={y(t)} y2={y(t)} stroke={grid} strokeWidth={1} className="text-line" />
               <text x={pad.l - 8} y={y(t)} dy="0.32em" textAnchor="end" className={cn("text-[10px]", axisText)}>
                 {formatValue(t, format === "percent" ? "percent" : "count")}
               </text>
@@ -177,9 +177,9 @@ export function TrendChart({
           })}
           {showPeak && hover === null && (
             <g className="chart-fade">
-              <circle cx={x(peakIdx)} cy={y(first.values[peakIdx])} r={4.5} fill={first.color} stroke={dark ? "#171b24" : "#ffffff"} strokeWidth={2} />
+              <circle cx={x(peakIdx)} cy={y(first.values[peakIdx])} r={4.5} fill={first.color} strokeWidth={2} style={{ stroke: dark ? "#171b24" : "var(--color-panel)" }} />
               <foreignObject x={Math.min(Math.max(x(peakIdx) - 44, pad.l), w - pad.r - 88)} y={Math.max(0, y(first.values[peakIdx]) - 30)} width={88} height={22}>
-                <div className={cn("mx-auto w-fit whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold shadow-xs", dark ? "bg-glow text-night" : "bg-ink text-white")}>
+                <div className={cn("mx-auto w-fit whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold shadow-xs", dark ? "bg-glow text-night" : "bg-night text-white")}>
                   Peak {formatValue(first.values[peakIdx], format)}
                 </div>
               </foreignObject>
@@ -189,7 +189,7 @@ export function TrendChart({
             <g>
               <line x1={x(hover)} x2={x(hover)} y1={pad.t} y2={y(0)} stroke={dark ? "rgba(255,255,255,0.3)" : "#d0d5dd"} strokeDasharray="3 3" />
               {series.map((s) => (
-                <circle key={s.key} cx={x(hover)} cy={y(s.values[hover] ?? 0)} r={4.5} fill={s.color} stroke={dark ? "#171b24" : "#ffffff"} strokeWidth={2} />
+                <circle key={s.key} cx={x(hover)} cy={y(s.values[hover] ?? 0)} r={4.5} fill={s.color} strokeWidth={2} style={{ stroke: dark ? "#171b24" : "var(--color-panel)" }} />
               ))}
             </g>
           )}
@@ -197,7 +197,7 @@ export function TrendChart({
       )}
       {hover !== null && w > 0 && (
         <div
-          className="pointer-events-none absolute top-0 z-10 min-w-36 rounded-control bg-ink px-3 py-2 text-xs text-white shadow-pop"
+          className="pointer-events-none absolute top-0 z-10 min-w-36 rounded-control bg-night px-3 py-2 text-xs text-white shadow-pop ring-1 ring-white/10"
           style={{ left: Math.min(Math.max(x(hover) + 12, 0), w - 160) }}
         >
           <p className="font-semibold">{(tooltipLabels ?? labels)[hover]}</p>
@@ -428,8 +428,8 @@ export function DeliveryChronoDonut({
                 ? blend(activeSeg.from, activeSeg.to, i / Math.max(1, litTicks - 1))
                 : blend("#6941c6", "#16a37a", i / Math.max(1, tickCount - 1))
               : isMajor
-                ? "#cbd5e1"
-                : "#e2e8f0";
+                ? "var(--color-line-2)"
+                : "var(--color-track)";
             return (
               <line
                 key={i}
@@ -437,10 +437,10 @@ export function DeliveryChronoDonut({
                 y1={120 + r1 * Math.sin(a)}
                 x2={120 + r2 * Math.cos(a)}
                 y2={120 + r2 * Math.sin(a)}
-                stroke={tickColor}
                 strokeWidth={isMajor ? 2.4 : 1.75}
                 strokeLinecap="round"
                 style={{
+                  stroke: tickColor,
                   opacity: lit && !drawn ? 0 : 1,
                   transition: `opacity 0.25s ease ${(i / tickCount) * 0.45}s, stroke 0.25s ease`,
                 }}
@@ -463,16 +463,16 @@ export function DeliveryChronoDonut({
                 cy={jewelPos.y}
                 r={3.2}
                 fill={activeSeg ? activeSeg.to : "#16a37a"}
-                stroke="#ffffff"
                 strokeWidth={1.5}
+                style={{ stroke: "var(--color-panel)" }}
               />
             </g>
           )}
 
           {/* 3D Recessed Groove Track for the Main Donut Ring (r = 81) */}
-          <circle cx="120" cy="120" r="89.5" fill="none" stroke="#e2e8f0" strokeWidth="1" />
-          <circle cx="120" cy="120" r="81" fill="none" stroke="#eef2f6" strokeWidth="16" />
-          <circle cx="120" cy="120" r="72.5" fill="none" stroke="#ffffff" strokeWidth="1.2" />
+          <circle cx="120" cy="120" r="89.5" fill="none" stroke="currentColor" className="text-line" strokeWidth="1" />
+          <circle cx="120" cy="120" r="81" fill="none" stroke="currentColor" className="text-track" strokeWidth="16" />
+          <circle cx="120" cy="120" r="72.5" fill="none" stroke="currentColor" className="text-panel" strokeWidth="1.2" />
 
           {/* Main Proportional 3D Bevelled Donut Segments (r = 81) */}
           {arcs.map((arc, idx) => {
@@ -555,7 +555,8 @@ export function DeliveryChronoDonut({
                   cx={innerTipPos.x}
                   cy={innerTipPos.y}
                   r={2.8}
-                  fill="#ffffff"
+                  fill="currentColor"
+                  className="text-panel"
                   stroke="#6941c6"
                   strokeWidth={1.6}
                 />
@@ -573,7 +574,7 @@ export function DeliveryChronoDonut({
             stroke="#e4e8f0"
             strokeWidth="1.2"
           />
-          <circle cx="120" cy="120" r="47.5" fill="none" stroke="#ffffff" strokeWidth="1.5" />
+          <circle cx="120" cy="120" r="47.5" fill="none" stroke="currentColor" className="text-panel" strokeWidth="1.5" />
         </svg>
 
         {/* Center Interactive Readout */}
@@ -620,7 +621,7 @@ export function DeliveryChronoDonut({
       </div>
 
       {/* 3D Reached Summary Pill */}
-      <div className="flex w-full items-center justify-between gap-2 rounded-control border border-line bg-subtle/75 px-3.5 py-2 text-xs shadow-[inset_0_1px_0_#fff]">
+      <div className="flex w-full items-center justify-between gap-2 rounded-control border border-line bg-subtle/75 px-3.5 py-2 text-xs shadow-[inset_0_1px_0_rgb(255_255_255/0.6)] dark:shadow-none">
         <span className="text-ink-2">
           <b className="tabular font-semibold text-ink">{reached.toLocaleString("en-IN")}</b> of{" "}
           <b className="tabular font-semibold text-ink">{total.toLocaleString("en-IN")}</b> messages delivered
@@ -645,12 +646,12 @@ export function DeliveryChronoDonut({
                 "group cursor-pointer rounded-control border px-3 py-2.5 transition-all duration-200",
                 isHovered
                   ? "-translate-y-0.5 shadow-md"
-                  : "border-line bg-gradient-to-b from-white to-subtle/50 shadow-[inset_0_1px_0_#fff,0_1px_2px_rgba(16,24,40,0.04)] hover:-translate-y-0.5",
+                  : "border-line bg-gradient-to-b from-panel to-subtle/50 shadow-[inset_0_1px_0_rgb(255_255_255/0.6),0_1px_2px_rgba(16,24,40,0.04)] dark:shadow-none hover:-translate-y-0.5",
               )}
               style={
                 isHovered
                   ? {
-                      background: `linear-gradient(180deg, #ffffff 0%, ${s.tintBg} 100%)`,
+                      background: `linear-gradient(180deg, var(--color-panel) 0%, ${s.tintBg} 100%)`,
                       borderColor: s.tintBorder,
                     }
                   : undefined
@@ -739,7 +740,8 @@ export function RadialRings({
                 y1={100 + r1 * Math.sin(a)}
                 x2={100 + r2 * Math.cos(a)}
                 y2={100 + r2 * Math.sin(a)}
-                stroke={lit ? blend(ticks.from, ticks.to, i / Math.max(1, n - 1)) : "#e2e6ec"}
+                stroke={lit ? blend(ticks.from, ticks.to, i / Math.max(1, n - 1)) : "currentColor"}
+                className="text-track"
                 strokeWidth={2.2}
                 strokeLinecap="round"
                 style={{ opacity: lit && !drawn ? 0 : 1, transition: `opacity 0.3s ease ${(i / n) * 0.7}s` }}
@@ -824,7 +826,8 @@ export function TickRing({
               y1={50 + 40 * Math.sin(a)}
               x2={50 + (isMajor ? 47.5 : 45.5) * Math.cos(a)}
               y2={50 + (isMajor ? 47.5 : 45.5) * Math.sin(a)}
-              stroke={lit ? blend(from, to, i / Math.max(1, count - 1)) : "#e2e6ec"}
+              stroke={lit ? blend(from, to, i / Math.max(1, count - 1)) : "currentColor"}
+              className="text-track"
               strokeWidth={isMajor ? 2.6 : 2}
               strokeLinecap="round"
               style={{ opacity: lit && !drawn ? 0.15 : 1, transition: `opacity 0.3s ease ${(i / count) * 0.6}s` }}
@@ -832,7 +835,7 @@ export function TickRing({
           );
         })}
         {/* Inner 3D Recessed Track & Bevelled Ring */}
-        <circle cx="50" cy="50" r="33" fill="none" stroke="#eef2f6" strokeWidth="5.5" />
+        <circle cx="50" cy="50" r="33" fill="none" stroke="currentColor" className="text-track" strokeWidth="5.5" />
         {arcDeg > 0 && (
           <path
             d={describeArc(50, 50, 33, 0, drawn ? arcDeg : 0.1)}
@@ -843,7 +846,7 @@ export function TickRing({
           />
         )}
         {/* Center 3D Glass Medallion */}
-        <circle cx="50" cy="50" r="25.5" fill="#fbfcfe" stroke="#e4e8f0" strokeWidth="1" />
+        <circle cx="50" cy="50" r="25.5" strokeWidth="1" style={{ fill: "var(--color-panel-2)", stroke: "var(--color-line)" }} />
       </svg>
       {children && <div className="relative z-10 flex flex-col items-center text-center">{children}</div>}
     </div>

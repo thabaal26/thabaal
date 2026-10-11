@@ -9,6 +9,9 @@ import { db } from "@/lib/db";
 import { fmtDate, fmtNumber, pct } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { MESSAGE_STATUSES, messageWhere } from "@/lib/queries";
+import { ActiveFilters, FilterBar } from "@/components/filter-bar";
+import { activeCount as filterCount, filterQuery, readFilters, resolvePeriod, type FilterState } from "@/lib/filters";
+import { filterOptions, messageScope } from "@/lib/filter-scope";
 import { getScope, owned, ownedMessages } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Message log" };
@@ -17,10 +20,9 @@ export const dynamic = "force-dynamic";
 const PAGE_SIZE = 50;
 type Params = { q?: string; status?: string; campaign?: string; range?: string; page?: string; view?: string };
 
-function href(p: Params, patch: Partial<Params>) {
-  const next = { ...p, ...patch };
-  const qs = new URLSearchParams(Object.entries(next).filter(([, v]) => v) as [string, string][]);
-  return `/dashboard/messages${qs.size ? `?${qs}` : ""}`;
+function linkTo(filters: FilterState, p: Params, patch: Partial<Params>) {
+  const qs = filterQuery(filters, { ...p, ...patch, range: undefined }, "all");
+  return `/dashboard/messages${qs ? `?${qs}` : ""}`;
 }
 
 export default async function MessagesPage({ searchParams }: PageProps<"/dashboard/messages">) {
@@ -29,7 +31,14 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
   const page = Math.max(1, Number(p.page) || 1);
   const groupByCustomer = p.view !== "all";
   const scope = await getScope();
-  const where = { ...messageWhere(p), ...ownedMessages(scope) };
+  // Shared filters: any period, products, single customers, groups, area. (Campaign stays its own picker.)
+  const filters = readFilters(raw, "all");
+  const href = (pp: Params, patch: Partial<Params>) => linkTo(filters, pp, patch);
+  const period = resolvePeriod(filters);
+  const scoped = await messageScope(scope.clientId, filters, period);
+  const filterOpts = scope.clientId ? await filterOptions(scope.clientId) : null;
+  const legacy = { ...p, range: p.range === "1d" ? "1d" : undefined };
+  const where = { ...messageWhere(legacy), ...ownedMessages(scope), ...scoped };
 
   const [rawRows, customerCounts, total, byStatus, campaigns] = await Promise.all([
     db.message.findMany({
@@ -44,7 +53,7 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
       ? db.message.groupBy({ by: ["customerId"], where, _count: true })
       : Promise.resolve([]),
     db.message.count({ where }),
-    db.message.groupBy({ by: ["status"], where: { ...messageWhere({ ...p, status: undefined }), ...ownedMessages(scope) }, _count: true }),
+    db.message.groupBy({ by: ["status"], where: { ...messageWhere({ ...legacy, status: undefined }), ...ownedMessages(scope), ...scoped }, _count: true }),
     db.campaign.findMany({ where: owned(scope), select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
   const countMap = new Map(customerCounts.map((c) => [c.customerId, c._count]));
@@ -60,9 +69,9 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
   const queuedCount = statusCount("QUEUED");
   const deliveredTotal = readCount + deliveredOnlyCount;
   const sentTotal = deliveredTotal + sentOnlyCount + failedCount;
-  const exportQs = new URLSearchParams(Object.entries({ ...p, page: undefined, view: undefined }).filter(([, v]) => v) as [string, string][]);
+  const exportQs = filterQuery(filters, { q: p.q, status: p.status, campaign: p.campaign, range: p.range === "1d" ? "1d" : undefined }, "all");
 
-  const filtered = Boolean(p.q || p.status || p.campaign || p.range);
+  const filtered = Boolean(p.q || p.status || p.campaign || p.range || filterCount(filters) || filters.range !== "all");
 
   return (
     <>
@@ -153,6 +162,9 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
         <form role="search" aria-label="Filter messages" className="grid gap-2 border-b border-line p-3 sm:flex sm:flex-wrap">
           {p.status && <input type="hidden" name="status" value={p.status} />}
           {p.view && <input type="hidden" name="view" value={p.view} />}
+          {[...new URLSearchParams(filterQuery({ ...filters, campaign: "" }, {}, "all"))].map(([k, v], i) => (
+            <input key={`${k}-${i}`} type="hidden" name={k} value={v} />
+          ))}
           <div className="relative min-w-0 sm:min-w-56 sm:flex-1">
             <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
             <input name="q" type="search" enterKeyHint="search" defaultValue={p.q} placeholder="Search name, phone or template" aria-label="Search name, phone or template" className="field pl-10" />
@@ -166,19 +178,17 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
               className="sm:w-52"
               options={[{ value: "", label: "All campaigns" }, { value: "test", label: "Test sends" }, ...campaigns.map((c) => ({ value: c.id, label: c.name }))]}
             />
-            <Picker
-              name="range"
-              autoSubmit
-              title="Time range"
-              defaultValue={p.range ?? ""}
-              className="sm:w-44"
-              options={[
-                { value: "", label: "All time" },
-                { value: "1d", label: "Last 24 hours" },
-                { value: "7d", label: "Last 7 days" },
-                { value: "30d", label: "Last 30 days" },
-              ]}
-            />
+            {filterOpts && (
+              <FilterBar
+                value={filters}
+                options={filterOpts}
+                basePath="/dashboard/messages"
+                extra={{ q: p.q, status: p.status, campaign: p.campaign, view: p.view }}
+                defaultRange="all"
+                sections={["period", "products", "customers", "tags", "area"]}
+                periodLabel={filters.range === "all" ? "Any date" : period.label}
+              />
+            )}
           </div>
           <button className={cn(buttonClass("secondary"), "max-sm:hidden")}>Filter</button>
           {filtered && (
@@ -187,6 +197,11 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
             </Link>
           )}
         </form>
+        {filterOpts && filterCount({ ...filters, campaign: "" }) > 0 && (
+          <div className="border-b border-line px-3 py-2.5">
+            <ActiveFilters value={{ ...filters, campaign: "" }} options={filterOpts} basePath="/dashboard/messages" extra={{ q: p.q, status: p.status, campaign: p.campaign, view: p.view }} defaultRange="all" />
+          </div>
+        )}
 
         {rows.length ? (
           <>

@@ -260,9 +260,14 @@ function ProductDetail({ p }: { p: AllProductAnalyticsItem }) {
       <p className="mt-1 text-xs text-ink-2">
         <b className="text-ink">Do next:</b> {p.solution}
       </p>
-      <Link href={p.nextActionHref} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand-deep hover:underline">
-        {p.nextActionLabel} <ArrowRight aria-hidden className="size-3.5" />
-      </Link>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+        <Link href={p.nextActionHref} className="inline-flex items-center gap-1 text-xs font-semibold text-brand-deep hover:underline">
+          {p.nextActionLabel} <ArrowRight aria-hidden className="size-3.5" />
+        </Link>
+        <Link href={`/dashboard?product=${encodeURIComponent(p.name)}&range=90d`} className="inline-flex items-center gap-1 text-xs font-semibold text-brand-deep hover:underline">
+          Dashboard for this product <ArrowRight aria-hidden className="size-3.5" />
+        </Link>
+      </div>
     </div>
   );
 }
@@ -388,7 +393,7 @@ export function CustomerGrowthPlaybookCard({ data }: { data: CustomerWinbackPlay
                 onClick={() => setSelectedId(s.id)}
                 className={cn(
                   "inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition",
-                  s.id === active.id ? "border-ink bg-ink text-white" : "border-line bg-panel text-ink-2 hover:border-line-2 hover:text-ink",
+                  s.id === active.id ? "border-ink bg-ink text-panel" : "border-line bg-panel text-ink-2 hover:border-line-2 hover:text-ink",
                 )}
               >
                 <span aria-hidden className="size-2 rounded-full" style={{ background: s.color }} />
@@ -419,7 +424,7 @@ export function CustomerGrowthPlaybookCard({ data }: { data: CustomerWinbackPlay
               </div>
             </div>
 
-            <div className="mt-4 rounded-control bg-[#e7f6ee] p-3">
+            <div className="mt-4 rounded-control bg-brand-soft p-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-2xs font-semibold uppercase tracking-wide text-brand-deep">Message to send</span>
                 <button type="button" onClick={copy} className="inline-flex items-center gap-1 text-xs font-semibold text-brand-deep hover:underline">
