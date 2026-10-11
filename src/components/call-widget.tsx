@@ -1,6 +1,6 @@
 "use client";
 
-import { Mic, MicOff, Phone, PhoneOff } from "lucide-react";
+import { Mic, MicOff, Phone, PhoneOff } from "@/components/icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { answerCall, hangUp, rejectCall, startCall } from "@/app/dashboard/actions/calls";
 import { cn } from "@/lib/cn";

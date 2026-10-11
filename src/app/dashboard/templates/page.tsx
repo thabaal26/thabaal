@@ -1,4 +1,4 @@
-import { CheckCircle2, Clock, Megaphone, Plus, RefreshCw } from "lucide-react";
+import { CheckCircle2, Clock, Megaphone, Plus, RefreshCw } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ActionButton } from "@/components/action-button";

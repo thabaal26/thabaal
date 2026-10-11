@@ -1,6 +1,6 @@
 "use client"; // Error boundaries must be Client Components
 
-import { RotateCcw, TriangleAlert } from "lucide-react";
+import { RotateCcw, TriangleAlert } from "@/components/icons";
 import Link from "next/link";
 import { useEffect } from "react";
 import { Button, buttonClass, Card } from "@/components/ui";

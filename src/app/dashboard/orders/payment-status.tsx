@@ -1,4 +1,4 @@
-import { AlertTriangle, Banknote, CheckCircle2, Clock, Hourglass, ReceiptText, Undo2 } from "lucide-react";
+import { AlertTriangle, Banknote, CheckCircle2, Clock, Hourglass, ReceiptText, Undo2 } from "@/components/icons";
 import { Badge } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { fmtDate } from "@/lib/format";

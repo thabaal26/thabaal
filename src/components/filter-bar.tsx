@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, Megaphone, MapPin, Package, SlidersHorizontal, Tags, User, X } from "lucide-react";
+import { CalendarDays, Megaphone, MapPin, Package, SlidersHorizontal, Tags, User, X } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
 import { cn } from "@/lib/cn";

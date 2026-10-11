@@ -1,6 +1,6 @@
 "use client";
 
-import { ImagePlus, MessageSquareText, Send, X } from "lucide-react";
+import { ImagePlus, MessageSquareText, Send, X } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { confirmAction } from "@/components/confirm";

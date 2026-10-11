@@ -1,4 +1,4 @@
-import { CheckCircle2, CloudOff, ExternalLink, ShoppingBag, XCircle } from "lucide-react";
+import { CheckCircle2, CloudOff, ExternalLink, ShoppingBag, XCircle } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ShoppingBag3D, Store3D } from "@/components/icons-3d";

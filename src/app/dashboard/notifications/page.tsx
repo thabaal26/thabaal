@@ -1,4 +1,4 @@
-import { ChevronRight } from "lucide-react";
+import { ChevronRight } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Alert3D, Bell3D, Inbox3D, Phone3D, ShoppingBag3D } from "@/components/icons-3d";

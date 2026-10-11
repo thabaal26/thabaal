@@ -1,4 +1,4 @@
-import { History, MapPin, Sparkles, Truck } from "lucide-react";
+import { History, MapPin, Sparkles, Truck } from "@/components/icons";
 import Link from "next/link";
 import { Avatar, Badge, Card, OrderStatusBadge, OrderStepper } from "@/components/ui";
 import { analyzeCartMentality } from "@/lib/cart-mentality";

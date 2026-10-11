@@ -1,4 +1,4 @@
-import { Check, CheckCheck, CircleAlert, Clock, FileText } from "lucide-react";
+import { Check, CheckCheck, CircleAlert, Clock, FileText } from "@/components/icons";
 import { ReplyMedia } from "@/components/reply-media";
 import { cn } from "@/lib/cn";
 import { fmtDate } from "@/lib/format";

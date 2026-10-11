@@ -12,7 +12,7 @@
  */
 
 import type { ECharts } from "echarts/core";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown } from "@/components/icons";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";

@@ -1,4 +1,4 @@
-import { LogOut } from "lucide-react";
+import { LogOut } from "@/components/icons";
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { CallWidget } from "@/components/call-widget";

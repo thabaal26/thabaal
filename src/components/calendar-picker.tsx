@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Sparkles } from "@/components/icons";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
 

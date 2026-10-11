@@ -1,4 +1,4 @@
-import { ChevronRight, FlaskConical, Pause, Play, Send, Trash2 } from "lucide-react";
+import { ChevronRight, FlaskConical, Pause, Play, Send, Trash2 } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";

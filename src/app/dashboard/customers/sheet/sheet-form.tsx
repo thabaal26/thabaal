@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronUp, Link as LinkIcon, RefreshCw, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronUp, Link as LinkIcon, RefreshCw, Sparkles } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toastResult } from "@/components/toast";

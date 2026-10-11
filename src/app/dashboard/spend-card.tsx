@@ -1,4 +1,4 @@
-import { ExternalLink, Lightbulb, Trash2 } from "lucide-react";
+import { ExternalLink, Lightbulb, Trash2 } from "@/components/icons";
 import { ActionButton } from "@/components/action-button";
 import { Wallet3D } from "@/components/icons-3d";
 import { Badge, buttonClass, Card, CardHeader } from "@/components/ui";

@@ -1,4 +1,4 @@
-import { Lightbulb, Snail } from "lucide-react";
+import { Lightbulb, Snail } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ShoppingBag3D, Sparkles3D, Trophy3D } from "@/components/icons-3d";

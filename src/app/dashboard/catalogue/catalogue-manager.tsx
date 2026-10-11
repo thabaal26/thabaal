@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CheckCircle2, Copy, Eye, EyeOff, Image as ImageIcon, Loader2, Package, PencilLine, Plus, Search, Trash2, Upload, X, XCircle } from "lucide-react";
+import { Check, CheckCircle2, Copy, Eye, EyeOff, Image as ImageIcon, Loader2, Package, PencilLine, Plus, Search, Trash2, Upload, X, XCircle } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { confirmAction } from "@/components/confirm";

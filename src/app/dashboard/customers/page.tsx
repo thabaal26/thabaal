@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronLeft, ChevronRight, MapPin, Search, UserX } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, MapPin, Search, UserX } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Users3D } from "@/components/icons-3d";

@@ -1,4 +1,4 @@
-import { PhoneCall, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing } from "lucide-react";
+import { PhoneCall, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Phone3D } from "@/components/icons-3d";

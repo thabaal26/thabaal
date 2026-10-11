@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, Printer } from "lucide-react";
+import { Check, Copy, Printer } from "@/components/icons";
 import { useState } from "react";
 import { Button } from "@/components/ui";
 

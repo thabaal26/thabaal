@@ -1,6 +1,6 @@
 "use client";
 
-import { Bold, Braces, Eye, ImageIcon, Italic, Plus, Send, Strikethrough, Trash2, TriangleAlert, Upload } from "lucide-react";
+import { Bold, Braces, Eye, ImageIcon, Italic, Plus, Send, Strikethrough, Trash2, TriangleAlert, Upload } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { MobileActionBar } from "@/components/mobile-action-bar";

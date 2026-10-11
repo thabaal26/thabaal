@@ -1,4 +1,4 @@
-import { BookOpen, CircleAlert, CircleCheck, Globe, MessageCircle, MoreHorizontal, PackageCheck, Phone, RotateCw, ShoppingBag, ShoppingCart, Store, Undo2, Users, Wallet } from "lucide-react";
+import { BookOpen, CircleAlert, CircleCheck, Globe, MessageCircle, MoreHorizontal, PackageCheck, Phone, RotateCw, ShoppingBag, ShoppingCart, Store, Undo2, Users, Wallet } from "@/components/icons";
 import { formatInTimeZone } from "date-fns-tz";
 import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";

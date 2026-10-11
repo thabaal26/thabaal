@@ -1,4 +1,4 @@
-import { CheckCheck, Clock, Send, TriangleAlert } from "lucide-react";
+import { CheckCheck, Clock, Send, TriangleAlert } from "@/components/icons";
 import Link from "next/link";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { ActionButton } from "@/components/action-button";

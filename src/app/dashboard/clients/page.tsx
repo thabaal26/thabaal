@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle } from "lucide-react";
+import { CheckCircle2, Circle } from "@/components/icons";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ActionButton } from "@/components/action-button";

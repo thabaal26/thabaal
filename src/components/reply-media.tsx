@@ -1,6 +1,6 @@
 "use client";
 
-import { ImageOff } from "lucide-react";
+import { ImageOff } from "@/components/icons";
 import { useState } from "react";
 
 /**

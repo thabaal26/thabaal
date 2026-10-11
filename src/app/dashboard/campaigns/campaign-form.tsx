@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar as CalendarIcon, CalendarDays, CalendarRange, Clock, Gauge, Repeat, Users, X } from "lucide-react";
+import { Calendar as CalendarIcon, CalendarDays, CalendarRange, Clock, Gauge, Repeat, Users, X } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { CalendarPicker, getTodayStr } from "@/components/calendar-picker";

@@ -1,6 +1,6 @@
 "use client";
 
-import { Info } from "lucide-react";
+import { Info } from "@/components/icons";
 import { useId, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 

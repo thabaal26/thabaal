@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Loader2, MapPin, MessageSquareQuote, PencilLine, Plus, Sparkles } from "lucide-react";
+import { Check, Loader2, MapPin, MessageSquareQuote, PencilLine, Plus, Sparkles } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Sheet } from "@/components/sheet";

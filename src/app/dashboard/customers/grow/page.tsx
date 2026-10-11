@@ -1,4 +1,4 @@
-import { Download, QrCode } from "lucide-react";
+import { Download, QrCode } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "next/link";
 import QR from "qrcode";

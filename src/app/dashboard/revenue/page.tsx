@@ -1,4 +1,4 @@
-import { Banknote, CreditCard, Hourglass, ReceiptText, ShoppingCart, Undo2, Wallet } from "lucide-react";
+import { Banknote, CreditCard, Hourglass, ReceiptText, ShoppingCart, Undo2, Wallet } from "@/components/icons";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";

@@ -1,6 +1,6 @@
 "use client";
 
-import { PencilLine, Plus, Store, Trash2 } from "lucide-react";
+import { PencilLine, Plus, Store, Trash2 } from "@/components/icons";
 import { useState } from "react";
 import { Badge, Button } from "@/components/ui";
 import { cn } from "@/lib/cn";

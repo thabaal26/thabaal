@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, X, XCircle } from "lucide-react";
+import { CheckCircle2, X, XCircle } from "@/components/icons";
 import { useCallback, useEffect, useState } from "react";
 
 type Toast = { id: number; ok: boolean; text: string; details?: string[] };

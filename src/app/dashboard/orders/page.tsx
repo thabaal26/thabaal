@@ -1,4 +1,4 @@
-import { PackageCheck, PackageOpen, Search, Store, Truck, Wallet } from "lucide-react";
+import { PackageCheck, PackageOpen, Search, Store, Truck, Wallet } from "@/components/icons";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";

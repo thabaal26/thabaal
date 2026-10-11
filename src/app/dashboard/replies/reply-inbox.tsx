@@ -1,4 +1,4 @@
-import { CheckCheck, CheckCircle2, ChevronRight, MessageCircle, RotateCcw, ShoppingBag, UserRound } from "lucide-react";
+import { CheckCheck, CheckCircle2, ChevronRight, MessageCircle, RotateCcw, ShoppingBag, UserRound } from "@/components/icons";
 import Link from "next/link";
 import { ActionButton } from "@/components/action-button";
 import { Conversation, type ConversationEntry } from "@/components/conversation";

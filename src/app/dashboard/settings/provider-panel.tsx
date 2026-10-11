@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Cloud, LogOut, QrCode, RefreshCw, Smartphone, TriangleAlert } from "lucide-react";
+import { CheckCircle2, Cloud, LogOut, QrCode, RefreshCw, Smartphone, TriangleAlert } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { confirmAction } from "@/components/confirm";

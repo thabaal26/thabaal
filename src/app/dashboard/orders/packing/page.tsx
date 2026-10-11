@@ -1,4 +1,4 @@
-import { PackageOpen } from "lucide-react";
+import { PackageOpen } from "@/components/icons";
 import type { Metadata } from "next";
 import { Badge, Card, CardHeader, EmptyState, FilterChips, PageHeader, PickClientNotice } from "@/components/ui";
 import { parseAddressText } from "@/lib/address";

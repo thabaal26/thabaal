@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal } from "@/components/icons";
 import { useState, type ReactNode } from "react";
 import { Sheet } from "./sheet";
 import { Button } from "./ui";

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { ExternalLink, CheckCircle2, AlertCircle, HelpCircle, ShieldCheck, Landmark, Sparkles } from "lucide-react";
+import { ExternalLink, CheckCircle2, AlertCircle, HelpCircle, ShieldCheck, Landmark, Sparkles } from "@/components/icons";
 import { toastResult } from "@/components/toast";
 import { Badge, Button, Card, CardHeader, Field } from "@/components/ui";
 import { createPaymentTemplate, savePaymentConfig } from "../actions/orders";

@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCheck, ImagePlus, Send, X } from "lucide-react";
+import { CheckCheck, ImagePlus, Send, X } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toastResult } from "@/components/toast";

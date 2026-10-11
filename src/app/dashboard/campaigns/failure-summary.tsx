@@ -1,4 +1,4 @@
-import { RotateCcw } from "lucide-react";
+import { RotateCcw } from "@/components/icons";
 import Link from "next/link";
 import { ActionButton } from "@/components/action-button";
 import { Badge, Card, CardHeader, type Tone } from "@/components/ui";

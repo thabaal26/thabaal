@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Check, Copy, Zap } from "lucide-react";
+import { ArrowRight, Check, Copy, Zap } from "@/components/icons";
 import Link from "next/link";
 import { useState } from "react";
 import { ChartBar3D, Sparkles3D, Trophy3D } from "@/components/icons-3d";

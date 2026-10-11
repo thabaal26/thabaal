@@ -1,4 +1,4 @@
-import { CheckCheck, ChevronDown, ChevronLeft, ChevronRight, Download, Search } from "lucide-react";
+import { CheckCheck, ChevronDown, ChevronLeft, ChevronRight, Download, Search } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Alert3D, Eye3D, Messages3D } from "@/components/icons-3d";

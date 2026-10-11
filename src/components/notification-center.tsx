@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Bell, CheckCheck, ExternalLink, Inbox, Phone, ShoppingBag, TriangleAlert, X } from "lucide-react";
+import { Bell, CheckCheck, ExternalLink, Inbox, Phone, ShoppingBag, TriangleAlert, X } from "@/components/icons";
 import { Sheet } from "@/components/sheet";
 import { cn } from "@/lib/cn";
 import type { NotificationItem } from "@/app/api/notifications/route";

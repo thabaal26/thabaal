@@ -1,6 +1,6 @@
 "use client";
 
-import { ImageIcon, Upload } from "lucide-react";
+import { ImageIcon, Upload } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toastResult } from "@/components/toast";

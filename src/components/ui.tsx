@@ -1,4 +1,4 @@
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "@/components/icons";
 import Link from "next/link";
 import { Children, cloneElement, isValidElement, type ComponentProps, type ReactElement, type ReactNode } from "react";
 import { cssColor, type ChartColor } from "@/lib/chart-theme";

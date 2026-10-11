@@ -1,4 +1,4 @@
-import { Radio, Send } from "lucide-react";
+import { Radio, Send } from "@/components/icons";
 import type { Metadata } from "next";
 import { ActionButton } from "@/components/action-button";
 import { Badge, Callout, Card, CardHeader, PageHeader, PickClientNotice } from "@/components/ui";

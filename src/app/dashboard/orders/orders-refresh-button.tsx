@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw } from "@/components/icons";
 import { buttonClass } from "@/components/ui";
 import { cn } from "@/lib/cn";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, Search } from "lucide-react";
+import { Check, ChevronDown, Search } from "@/components/icons";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
 import { Sheet } from "./sheet";
@@ -86,7 +86,7 @@ export function MultiPicker({
                   )}
                 >
                   <span aria-hidden className={cn("grid size-5 shrink-0 place-items-center rounded border", on ? "border-brand bg-brand text-white" : "border-line-strong bg-panel")}>
-                    {on && <Check className="size-3.5" strokeWidth={3} />}
+                    {on && <Check className="size-3.5" strokeWidth={2.5} />}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block [overflow-wrap:anywhere]">{o.label}</span>

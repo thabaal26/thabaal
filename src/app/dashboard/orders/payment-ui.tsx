@@ -1,6 +1,6 @@
 "use client";
 
-import { Banknote, CalendarClock, CreditCard, Landmark, QrCode, Smartphone, Truck, Undo2, type LucideIcon } from "lucide-react";
+import { Banknote, CalendarClock, CreditCard, Landmark, QrCode, Smartphone, Truck, Undo2, type IconComponent } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Sheet } from "@/components/sheet";
@@ -22,7 +22,7 @@ function Choices<T extends string>({
   label: string;
   value: T;
   onChange: (v: T) => void;
-  options: { value: T; label: string; hint?: string; icon: LucideIcon; disabled?: boolean }[];
+  options: { value: T; label: string; hint?: string; icon: IconComponent; disabled?: boolean }[];
   cols?: 2 | 3;
 }) {
   return (

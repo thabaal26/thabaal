@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, FileSpreadsheet, FileText, Image as ImageIcon, Loader2, Printer } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Image as ImageIcon, Loader2, Printer } from "@/components/icons";
 import { useState } from "react";
 import { Button } from "@/components/ui";
 import { getOrderPricing } from "@/lib/order-pricing";

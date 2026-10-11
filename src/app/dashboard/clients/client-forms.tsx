@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRound, Plus } from "lucide-react";
+import { KeyRound, Plus } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Picker } from "@/components/picker";

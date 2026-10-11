@@ -1,4 +1,4 @@
-import { UsersRound } from "lucide-react";
+import { UsersRound } from "@/components/icons";
 import type { Metadata } from "next";
 import { ActionButton } from "@/components/action-button";
 import { Card, CardHeader, EmptyState, PageHeader, PickClientNotice } from "@/components/ui";

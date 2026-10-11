@@ -1,4 +1,4 @@
-import { BellRing, CalendarClock, Repeat, TriangleAlert } from "lucide-react";
+import { BellRing, CalendarClock, Repeat, TriangleAlert } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Callout, PageHeader, PickClientNotice, Stat, buttonClass } from "@/components/ui";

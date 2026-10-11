@@ -1,4 +1,4 @@
-import { CheckCheck, Copy, CreditCard, ExternalLink, ImageIcon, Phone, Reply, ShoppingBag } from "lucide-react";
+import { CheckCheck, Copy, CreditCard, ExternalLink, ImageIcon, Phone, Reply, ShoppingBag } from "@/components/icons";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import type { TemplateButton } from "@/lib/template";

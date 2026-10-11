@@ -1,4 +1,4 @@
-import { CheckCheck } from "lucide-react";
+import { CheckCheck } from "@/components/icons";
 import type { Metadata } from "next";
 import { ActionButton } from "@/components/action-button";
 import type { ConversationEntry } from "@/components/conversation";

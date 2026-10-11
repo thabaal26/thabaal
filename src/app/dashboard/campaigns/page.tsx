@@ -1,4 +1,4 @@
-import { PauseCircle, Plus, Sparkles } from "lucide-react";
+import { PauseCircle, Plus, Sparkles } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ActionButton } from "@/components/action-button";

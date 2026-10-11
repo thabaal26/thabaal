@@ -5,7 +5,7 @@ import {
   CheckCheck,
   ShieldAlert,
   ShoppingCart,
-} from "lucide-react";
+} from "@/components/icons";
 import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
 import { CountUp, DeliveryDonut, HeatGrid, Sparkline, TrendChart, UsageGauge, type Series } from "@/components/charts";

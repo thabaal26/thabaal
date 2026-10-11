@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreHorizontal, PencilLine } from "lucide-react";
+import { MoreHorizontal, PencilLine } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { confirmAction } from "@/components/confirm";

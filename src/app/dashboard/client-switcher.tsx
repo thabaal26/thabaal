@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, ChevronDown } from "lucide-react";
+import { Building2, ChevronDown } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useTransition, type ReactNode } from "react";
 import { Picker } from "@/components/picker";

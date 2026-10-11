@@ -1,6 +1,6 @@
 "use client";
 
-import { Phone } from "lucide-react";
+import { Phone } from "@/components/icons";
 import { placeCall } from "@/components/call-widget";
 import { Button } from "@/components/ui";
 

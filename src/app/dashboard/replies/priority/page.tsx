@@ -1,4 +1,4 @@
-import { CreditCard, MessageCircle, Store } from "lucide-react";
+import { CreditCard, MessageCircle, Store } from "@/components/icons";
 import { cssColor, type ChartColor } from "@/lib/chart-theme";
 import type { Metadata } from "next";
 import Link from "next/link";

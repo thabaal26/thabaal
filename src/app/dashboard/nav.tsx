@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Menu } from "lucide-react";
+import { ChevronRight, Menu } from "@/components/icons";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -209,7 +209,7 @@ export function BottomNav({
         <li className="min-w-0">
           <button type="button" onClick={() => setOpenedOn(path)} aria-haspopup="dialog" aria-expanded={moreOpen} className={cn(tabClass(moreActive), "w-full")}>
             <span className={iconWrap(moreActive, "from-[#818cf8] via-[#6366f1] to-[#4f46e5]")}>
-              <Menu aria-hidden className="size-5" strokeWidth={2.3} />
+              <Menu className="size-5" strokeWidth={2} />
               <CountBadge n={hiddenCount} label="to handle" className={badge} />
             </span>
             More
