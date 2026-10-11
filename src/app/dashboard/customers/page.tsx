@@ -40,7 +40,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
   const segment = scope.clientId
     ? await customerSegmentIds(scope.clientId, filters, { stage, act, ...(filters.range !== "all" && { start: period.start, end: period.end }) })
     : null;
-  const where = { ...customerWhere(scope, { q, tag, area }), ...(segment && { id: { in: segment } }) };
+  const where = { ...(await customerWhere(scope, { q, tag, area })), ...(segment && { id: { in: segment } }) };
   const listQs = filterQuery(filters, { q: q || undefined, tag: specialTag, stage: stage || undefined, act: act || undefined }, "all");
   const exportHref = `/api/customers/export${listQs ? `?${listQs}` : ""}`;
   const filterOpts = scope.clientId ? await filterOptions(scope.clientId) : null;

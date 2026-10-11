@@ -261,20 +261,20 @@ export function CartMentalityCard({ data }: { data: CartMentalitySummaryData }) 
 /** Fixed palette order; past six groups the rest fold into "Other". */
 const MIX_COLORS = ["emerald", "blue", "gold", "violet", "coral", "cyan"] as const;
 
-/** What customers buy, as a donut whose slices open that product's customers. */
+/** What customers buy (catalogue products only), as a donut whose slices open that product's buyers. */
 export function CustomerProductsCard({ items }: { items: { tag: string; label: string; n: number }[] }) {
   if (!items.length) return null;
   const top = items.slice(0, 6);
   const rest = items.slice(6).reduce((n, t) => n + t.n, 0);
   const slices: Slice[] = [
     ...top.map((t, i) => ({ key: t.tag, label: t.label, value: t.n, color: MIX_COLORS[i], href: `/dashboard/customers?tag=${encodeURIComponent(t.tag)}` })),
-    ...(rest ? [{ key: "_other", label: "Other groups", value: rest, color: "neutral", href: "/dashboard/customers" }] : []),
+    ...(rest ? [{ key: "_other", label: "Other products", value: rest, color: "neutral", href: "/dashboard/customers" }] : []),
   ];
   return (
     <Card className="card-3d h-full">
-      <CardHeader tone="gold" icon={<ShoppingBag3D />} title="What customers buy" description="Customers per product group · tap to open them" />
+      <CardHeader tone="gold" icon={<ShoppingBag3D />} title="What customers buy" description="Customers per catalogue product · tap to open them" />
       <div className="p-4 sm:p-5">
-        <DonutPanel slices={slices} centerLabel="customer tags" label="Customers by product group" size={160} />
+        <DonutPanel slices={slices} centerLabel="product buyers" label="Customers by catalogue product" size={160} />
       </div>
     </Card>
   );

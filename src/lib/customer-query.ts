@@ -1,6 +1,7 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { owned, type Scope } from "./session";
+import { customersWithProducts } from "./product-scope";
 
 export type CustomerFilters = { q?: string; tag?: string; area?: string };
 
@@ -16,22 +17,18 @@ export function customerFilters(sp: Record<string, string | string[] | undefined
  *  tag: a tag, or "__optout" for opted-out customers
  *  area: "region:Madurai city", "loc:Sellur" or "none" (no location noted)
  *  q: part of a name, or digits of a phone number
+ *  tag "product:<catalogue name>": customers who ordered or noted buying that catalogue product
  */
-export function customerWhere(scope: Scope, { q = "", tag = "", area = "" }: CustomerFilters): Prisma.CustomerWhereInput {
+export async function customerWhere(scope: Scope, { q = "", tag = "", area = "" }: CustomerFilters): Promise<Prisma.CustomerWhereInput> {
   const productFilter = tag.startsWith("product:") ? tag.slice(8).trim() : "";
-  const productSlug = productFilter ? productFilter.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") : "";
+  const buyers = productFilter && scope.clientId ? await customersWithProducts(scope.clientId, [productFilter]) : [];
   const digits = q.replace(/\D/g, "");
   return {
     ...owned(scope),
     ...(tag === "__optout"
       ? { optedOut: true }
       : productFilter
-        ? {
-            OR: [
-              { purchases: { contains: productFilter, mode: "insensitive" } },
-              ...(productSlug ? [{ tags: { has: productSlug } }] : []),
-            ],
-          }
+        ? { id: { in: buyers } }
         : tag
           ? { tags: { has: tag } }
           : {}),

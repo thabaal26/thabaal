@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { db } from "./db";
 import type { FilterState } from "./filters";
+import { catalogFor, catalogOrders, customerProducts, customersWithProducts, ordersWithProducts } from "./product-scope";
 
 // Server side of the shared filters: which customers a filter covers, and the choices to offer.
 
@@ -28,20 +29,7 @@ export async function scopedCustomerIds(clientId: string, f: FilterState): Promi
     const rows = await db.customer.findMany({ where: { clientId, ...where }, select: { id: true } });
     sets.push(new Set(rows.map((r) => r.id)));
   }
-  if (f.products.length) {
-    const names = f.products.map((p) => p.toLowerCase());
-    const [byOrder, bySheet] = await Promise.all([
-      db.$queryRaw<{ id: string }[]>`
-        SELECT DISTINCT o."customerId" AS id
-        FROM "Order" o CROSS JOIN LATERAL jsonb_array_elements(o.items) AS elem
-        WHERE o."clientId" = ${clientId} AND lower(trim(coalesce(elem->>'name', elem->>'id', ''))) = ANY(${names}::text[])`,
-      db.customer.findMany({
-        where: { clientId, OR: f.products.map((p) => ({ purchases: { contains: p, mode: "insensitive" as const } })) },
-        select: { id: true },
-      }),
-    ]);
-    sets.push(new Set([...byOrder.map((r) => r.id), ...bySheet.map((r) => r.id)]));
-  }
+  if (f.products.length) sets.push(new Set(await customersWithProducts(clientId, f.products)));
   if (f.campaign) {
     const rows = await db.$queryRaw<{ id: string }[]>`
       SELECT DISTINCT m."customerId" AS id FROM "Message" m JOIN "CampaignRun" r ON r.id = m."runId"
@@ -70,13 +58,7 @@ export const filterOptions = cache(async (clientId: string): Promise<FilterOptio
   const plain = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, "");
   const clientTag = client ? plain(client.name) : "";
   const [products, customers, tags, regions, locations, campaigns] = await Promise.all([
-    db.$queryRaw<{ name: string; n: bigint }[]>`
-      SELECT name, sum(n)::bigint AS n FROM (
-        SELECT trim(coalesce(elem->>'name', '')) AS name, count(*) AS n
-        FROM "Order" o CROSS JOIN LATERAL jsonb_array_elements(o.items) AS elem
-        WHERE o."clientId" = ${clientId} AND trim(coalesce(elem->>'name', '')) <> '' AND trim(elem->>'name') !~* '^manual-[0-9]+$'
-        GROUP BY 1
-      ) s GROUP BY name ORDER BY 2 DESC, 1 LIMIT 300`.catch(() => []),
+    productChoices(clientId),
     db.customer.findMany({ where: { clientId }, select: { id: true, name: true, phone: true }, orderBy: { name: "asc" }, take: 3000 }),
     db.$queryRaw<{ tag: string; n: bigint }[]>`
       SELECT t.tag, count(*) AS n FROM "Customer" c CROSS JOIN LATERAL unnest(c.tags) AS t(tag)
@@ -86,7 +68,7 @@ export const filterOptions = cache(async (clientId: string): Promise<FilterOptio
     db.campaign.findMany({ where: { clientId }, select: { id: true, name: true }, orderBy: { updatedAt: "desc" }, take: 100 }),
   ]);
   return {
-    products: products.map((p) => ({ value: p.name, label: p.name, hint: `${Number(p.n)} order lines` })),
+    products,
     customers: customers.map((c) => ({ value: c.id, label: c.name, hint: c.phone })),
     tags: tags.filter((t) => !NOISE_TAGS.has(t.tag.toLowerCase()) && plain(t.tag) !== clientTag).map((t) => ({ value: t.tag, label: t.tag.replace(/-/g, " "), hint: `${Number(t.n)} customers` })),
     areas: [
@@ -101,11 +83,24 @@ export const filterOptions = cache(async (clientId: string): Promise<FilterOptio
 /** Orders with at least one line of the picked products (null when no product filter). */
 export async function orderIdsWithProducts(clientId: string, products: string[]): Promise<string[] | null> {
   if (!products.length) return null;
-  const names = products.map((p) => p.toLowerCase());
-  const rows = await db.$queryRaw<{ id: string }[]>`
-    SELECT DISTINCT o.id FROM "Order" o CROSS JOIN LATERAL jsonb_array_elements(o.items) AS elem
-    WHERE o."clientId" = ${clientId} AND lower(trim(coalesce(elem->>'name', elem->>'id', ''))) = ANY(${names}::text[])`;
-  return rows.map((r) => r.id);
+  return ordersWithProducts(clientId, products);
+}
+
+/** Product filter choices: every catalogue item, the ones customers buy most first. */
+async function productChoices(clientId: string): Promise<FilterOption[]> {
+  const [m, orders, byCustomer] = await Promise.all([catalogFor(clientId), catalogOrders(clientId), customerProducts(clientId)]);
+  const buyers = new Map<string, number>();
+  for (const set of byCustomer.values()) for (const sku of set) buyers.set(sku, (buyers.get(sku) ?? 0) + 1);
+  const lines = new Map<string, number>();
+  for (const o of orders) if (o.status !== "CANCELLED") for (const l of o.lines) lines.set(l.ref.retailerId, (lines.get(l.ref.retailerId) ?? 0) + 1);
+  return m.products
+    .map((p) => ({ p, n: buyers.get(p.retailerId) ?? 0 }))
+    .sort((a, b) => b.n - a.n || a.p.name.localeCompare(b.p.name))
+    .map(({ p, n }) => ({
+      value: p.name,
+      label: p.name,
+      hint: n ? `${n} customer${n === 1 ? "" : "s"}${lines.get(p.retailerId) ? ` · ${lines.get(p.retailerId)} order lines` : ""}` : `${p.retailerId} · no buyers yet`,
+    }));
 }
 
 /** Customers and orders a filter covers, as Prisma conditions for Order queries. */

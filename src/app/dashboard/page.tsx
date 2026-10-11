@@ -57,11 +57,12 @@ import { ViewTabs } from "./view-tabs";
 import { ActiveFilters, FilterBar } from "@/components/filter-bar";
 import { activeCount, filterQuery, keepFilters, narrowOrders, periodKeys, readFilters, resolvePeriod, weekKey } from "@/lib/filters";
 import { filterOptions, scopedCustomerIds } from "@/lib/filter-scope";
+import { catalogFor, catalogOrders, customerProducts } from "@/lib/product-scope";
+import { catalogMatcher } from "@/lib/catalog-match";
 
 export const dynamic = "force-dynamic";
 
 
-const tagLabel = (tag: string) => (tag === "no-item-info" ? "No item recorded" : tag.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase()));
 
 /** Midnight of the given moment's day, in the app's time zone. */
 const dayStart = (d: Date) => fromZonedTime(`${formatInTimeZone(d, APP_TZ, "yyyy-MM-dd")}T00:00:00`, APP_TZ);
@@ -92,6 +93,11 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
   const myMessages = allowed ? { customer: { ...(cid ? { clientId: cid } : {}), id: { in: allowed } } } : ownedMessages(scope);
   const filterOpts = cid ? await filterOptions(cid) : null;
   const filtered = activeCount(filters) > 0;
+  // Products are catalogue items only (live from Meta): order lines and sheet notes are matched to
+  // them, and anything else (customer tags, typed names that aren't catalogue items) is left out.
+  const [catalog, custProds, catOrders] = cid ? await Promise.all([catalogFor(cid), customerProducts(cid), catalogOrders(cid)]) : [catalogMatcher([]), new Map<string, Set<string>>(), []];
+  const inScope = (customerId: string) => !allowed || allowedSet.has(customerId);
+  const allowedSet = new Set(allowed ?? []);
 
   const todayStart = dayStart(now);
   const monthAgo = daysAgo(30);
@@ -105,87 +111,27 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     hourly ? `${hourLabel(Number(k))} – ${hourLabel((Number(k) + 1) % 24)}` : weekly ? `Week of ${formatInTimeZone(new Date(`${k}T12:00:00Z`), "UTC", "d MMM")}` : formatInTimeZone(new Date(`${k}T12:00:00Z`), "UTC", "EEE d MMM");
   const keyOf = (d: Date) => bucketOf(formatInTimeZone(d, APP_TZ, hourly ? "HH" : "yyyy-MM-dd"));
 
-  const [client, segments, results, repliesByTag, health, blocked, areaRows] = await Promise.all([
+  const [client, reachable, msgByCustomer, repliersMonth, health, blocked, areaRows] = await Promise.all([
     cid ? db.client.findUnique({ where: { id: cid } }) : null,
     cid
-      ? db.$queryRaw<{ tag: string; n: bigint }[]>`
-          SELECT t.tag, count(*) AS n
-          FROM "Customer" c CROSS JOIN LATERAL unnest(c.tags) AS t(tag)
-          WHERE c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[])) AND c."optedOut" = false
-            AND lower(t.tag) NOT IN ('customer','customers','vip','test','manual-order','lapsed','whatsapp','qr','sheet','no-item-info','thenan-oils','cup-n-saucer','new','pending','imported','lead','admin','staff','friend','family')
-          GROUP BY 1 ORDER BY 2 DESC, 1`
+      ? db.customer.findMany({ where: { clientId: cid, optedOut: false, ...(ids && { id: { in: ids } }) }, select: { id: true } })
       : [],
     cid
-      ? db.$queryRaw<{ tag: string; sent: bigint; delivered: bigint; read: bigint; failed: bigint }[]>`
-          WITH cust_prods AS (
-            SELECT c.id AS cid, p.product AS tag
-            FROM "Customer" c
-            CROSS JOIN LATERAL (
-              SELECT DISTINCT prod AS product FROM (
-                SELECT trim(elem->>'name') AS prod
-                FROM "Order" o, jsonb_array_elements(o.items) AS elem
-                WHERE o."customerId" = c.id
-                  AND trim(coalesce(elem->>'name', '')) <> ''
-                  AND trim(elem->>'name') !~* '^manual-[0-9]+$'
-                UNION
-                SELECT trim(part) AS prod
-                FROM regexp_split_to_table(coalesce(c.purchases, ''), '[,/;&]+') AS part
-                WHERE trim(part) <> ''
-                  AND NOT EXISTS (SELECT 1 FROM "Order" o2 WHERE o2."customerId" = c.id)
-                UNION
-                SELECT initcap(replace(t, '-', ' ')) AS prod
-                FROM unnest(c.tags) AS t
-                WHERE lower(t) NOT IN ('customer','customers','vip','test','manual-order','lapsed','whatsapp','qr','sheet','no-item-info','thenan-oils','cup-n-saucer','new','pending','imported','lead','admin','staff','friend','family')
-                  AND coalesce(trim(c.purchases), '') = ''
-                  AND NOT EXISTS (SELECT 1 FROM "Order" o3 WHERE o3."customerId" = c.id)
-              ) raw_prods
-              WHERE prod IS NOT NULL AND prod <> ''
-            ) p
-            WHERE c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[]))
-          )
-          SELECT cp.tag,
+      ? db.$queryRaw<{ cid: string; sent: bigint; delivered: bigint; read: bigint; failed: bigint }[]>`
+          SELECT m."customerId" AS cid,
             count(*) AS sent,
             count(*) FILTER (WHERE m.status IN ('DELIVERED', 'READ')) AS delivered,
             count(*) FILTER (WHERE m.status = 'READ') AS read,
             count(*) FILTER (WHERE m.status = 'FAILED') AS failed
-          FROM "Message" m
-          JOIN cust_prods cp ON cp.cid = m."customerId"
-          WHERE m."createdAt" >= ${monthAgo} AND m.status NOT IN ('QUEUED', 'SKIPPED')
-          GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 12`
+          FROM "Message" m JOIN "Customer" c ON c.id = m."customerId"
+          WHERE c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[]))
+            AND m."createdAt" >= ${monthAgo} AND m.status NOT IN ('QUEUED', 'SKIPPED')
+          GROUP BY 1`
       : [],
     cid
-      ? db.$queryRaw<{ tag: string; n: bigint }[]>`
-          WITH cust_prods AS (
-            SELECT c.id AS cid, p.product AS tag
-            FROM "Customer" c
-            CROSS JOIN LATERAL (
-              SELECT DISTINCT prod AS product FROM (
-                SELECT trim(elem->>'name') AS prod
-                FROM "Order" o, jsonb_array_elements(o.items) AS elem
-                WHERE o."customerId" = c.id
-                  AND trim(coalesce(elem->>'name', '')) <> ''
-                  AND trim(elem->>'name') !~* '^manual-[0-9]+$'
-                UNION
-                SELECT trim(part) AS prod
-                FROM regexp_split_to_table(coalesce(c.purchases, ''), '[,/;&]+') AS part
-                WHERE trim(part) <> ''
-                  AND NOT EXISTS (SELECT 1 FROM "Order" o2 WHERE o2."customerId" = c.id)
-                UNION
-                SELECT initcap(replace(t, '-', ' ')) AS prod
-                FROM unnest(c.tags) AS t
-                WHERE lower(t) NOT IN ('customer','customers','vip','test','manual-order','lapsed','whatsapp','qr','sheet','no-item-info','thenan-oils','cup-n-saucer','new','pending','imported','lead','admin','staff','friend','family')
-                  AND coalesce(trim(c.purchases), '') = ''
-                  AND NOT EXISTS (SELECT 1 FROM "Order" o3 WHERE o3."customerId" = c.id)
-              ) raw_prods
-              WHERE prod IS NOT NULL AND prod <> ''
-            ) p
-            WHERE c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[]))
-          )
-          SELECT cp.tag, count(DISTINCT r."customerId") AS n
-          FROM "Reply" r
-          JOIN cust_prods cp ON cp.cid = r."customerId"
-          WHERE r."receivedAt" >= ${monthAgo}
-          GROUP BY 1`
+      ? db.$queryRaw<{ cid: string }[]>`
+          SELECT DISTINCT r."customerId" AS cid FROM "Reply" r JOIN "Customer" c ON c.id = r."customerId"
+          WHERE c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[])) AND r."receivedAt" >= ${monthAgo}`
       : [],
     cid ? numberHealth(cid) : [],
     // Active campaigns whose template Meta paused, disabled or rejected can't send.
@@ -315,7 +261,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     db.order.count({ where: { ...mineOrders, paidAt: null, paymentClaimedAt: { not: null }, status: { not: "CANCELLED" } } }).catch(() => 0),
     db.order.count({ where: { ...mineOrders, status: "CANCELLED", refundedAt: null, OR: [{ paidAt: { not: null } }, { paidAmount: { gt: 0 } }] } }).catch(() => 0),
   ]);
-  const [catalogueMsgs, periodReplies, unhandledGroup, toDispatchCount, catalogRes, allTimeProdRows, customerLifecycleRows] = await Promise.all([
+  const [catalogueMsgs, periodReplies, unhandledGroup, toDispatchCount, catalogRes, customerLifecycleRows] = await Promise.all([
     db.message
       .findMany({
         where: { ...myMessages, createdAt: { gte: start, lt: end }, templateName: { in: ["Catalogue", "Price list"] } },
@@ -333,32 +279,6 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     db.reply.groupBy({ by: ["customerId"], where: { ...myMessages, handled: false }, _count: true }).catch(() => []),
     db.order.count({ where: { ...mineOrders, status: { in: ["CONFIRMED", "PAID"] } } }).catch(() => 0),
     cid ? getCatalogWithProducts(cid).catch(() => null) : Promise.resolve(null),
-    cid
-      ? db
-          .$queryRaw<{ prod: string; buyers: bigint; units: bigint }[]>`
-            WITH raw_items AS (
-              SELECT o."customerId" AS cid, trim(elem->>'name') AS prod, coalesce((elem->>'quantity')::int, 1) AS qty
-              FROM "Order" o
-              JOIN "Customer" c ON c.id = o."customerId"
-              CROSS JOIN LATERAL jsonb_array_elements(o.items) AS elem
-              WHERE c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[]))
-                AND (o.status IN ('CONFIRMED', 'PAID', 'DISPATCHED', 'DELIVERED') OR o."paidAt" IS NOT NULL)
-                AND trim(coalesce(elem->>'name', '')) <> ''
-                AND trim(elem->>'name') !~* '^manual-[0-9]+$'
-              UNION ALL
-              SELECT c.id AS cid, trim(part) AS prod, 1 AS qty
-              FROM "Customer" c
-              CROSS JOIN LATERAL regexp_split_to_table(coalesce(c.purchases, ''), '[,/;&]+') AS part
-              WHERE c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[]))
-                AND trim(part) <> ''
-                AND NOT EXISTS (SELECT 1 FROM "Order" o2 WHERE o2."customerId" = c.id)
-            )
-            SELECT prod, count(DISTINCT cid) AS buyers, coalesce(sum(qty), 0) AS units
-            FROM raw_items
-            WHERE prod IS NOT NULL AND prod <> ''
-            GROUP BY 1`
-          .catch(() => [])
-      : Promise.resolve([]),
     cid
       ? db
           .$queryRaw<{
@@ -407,7 +327,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     : [];
 
   // A product filter narrows every order to the picked products' lines (and drops the rest).
-  const orders = narrowOrders(ordersRaw, filters.products);
+  const orders = narrowOrders(ordersRaw, filters.products, catalog);
   // Weekly charts: fold the daily series into weeks.
   if (weekly) {
     for (const r of msgSeries) r.k = weekKey(r.k);
@@ -467,7 +387,8 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
   for (const o of curAllOrders) {
     const bought = isBought(o);
     for (const it of (o.items as OrderItem[] | null) ?? []) {
-      const name = it.name ?? it.id;
+      const name = catalog.item(it)?.name;
+      if (!name) continue; // not a catalogue product
       const qty = Number(it.quantity) || 0;
       const val = (Number(it.price) || 0) * qty;
       const row = productMap.get(name) ?? { name, qty: 0, revenue: 0, cartOnlyQty: 0, cartOnlyValue: 0 };
@@ -718,8 +639,10 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       });
 
       for (const d of m.droppedItems) {
-        const key = d.name.toLowerCase();
-        const row = droppedMap.get(key) ?? { name: d.name, count: 0, qty: 0, value: 0, customers: new Set<string>() };
+        const ref = catalog.item(d);
+        if (!ref) continue;
+        const key = ref.name.toLowerCase();
+        const row = droppedMap.get(key) ?? { name: ref.name, count: 0, qty: 0, value: 0, customers: new Set<string>() };
         row.count += 1;
         row.qty += d.quantity;
         row.value += (d.price || 0) * d.quantity;
@@ -728,8 +651,10 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       }
 
       for (const k of m.keptItems) {
-        const key = k.name.toLowerCase();
-        const row = anchorMap.get(key) ?? { name: k.name, count: 0, qty: 0, customers: new Set<string>() };
+        const ref = catalog.item(k);
+        if (!ref) continue;
+        const key = ref.name.toLowerCase();
+        const row = anchorMap.get(key) ?? { name: ref.name, count: 0, qty: 0, customers: new Set<string>() };
         row.count += 1;
         row.qty += k.quantity;
         row.customers.add(o.customer.name);
@@ -744,10 +669,10 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     const custActiveItems = new Set(
       (ordersByCust.get(co.customerId) ?? [])
         .filter((x) => x.status !== "CANCELLED")
-        .flatMap((x) => ((x.items as OrderItem[] | null) ?? []).map((it) => (it.name ?? it.id).toLowerCase())),
+        .flatMap((x) => ((x.items as OrderItem[] | null) ?? []).map((it) => catalog.item(it)?.name.toLowerCase() ?? "")),
     );
     for (const it of (co.items as OrderItem[] | null) ?? []) {
-      const name = (it.name ?? it.id).trim();
+      const name = catalog.item(it)?.name ?? "";
       const key = name.toLowerCase();
       if (!name || custActiveItems.has(key)) continue;
       const qty = Number(it.quantity) || 1;
@@ -834,9 +759,14 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
   }
   const recent = [...recentByCustomer.values()].slice(0, 6);
 
-  // Product and segment tags, largest first; the client-wide tag (e.g. thenan-oils) says nothing on its own.
-  const clientTag = client?.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-  const shown = segments.map((t) => ({ tag: t.tag, n: Number(t.n) })).filter((t) => t.tag !== clientTag || segments.length === 1).slice(0, 8);
+  // Catalogue products, by how many reachable customers (in the filter) bought or noted them.
+  const reachableIds = reachable.map((r) => r.id);
+  const buyersOf = new Map<string, string[]>();
+  for (const id of reachableIds) for (const sku of custProds.get(id) ?? []) (buyersOf.get(sku) ?? buyersOf.set(sku, []).get(sku)!).push(id);
+  const shown = catalog.products
+    .map((p) => ({ name: p.name, n: buyersOf.get(p.retailerId)?.length ?? 0 }))
+    .filter((p) => p.n > 0)
+    .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
   // Location view: city vs outside, plus the busiest areas.
   const REGIONS = ["Madurai city", "Outside Madurai", "Not sure"];
   const byRegion = [
@@ -849,9 +779,20 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     .map((a) => ({ location: a.location as string, _count: a._count }));
   const topAreas = sortedAreas.slice(0, 10);
   const otherAreas = sortedAreas.slice(10);
-  const byProduct = results
-    .filter((r) => r.tag !== clientTag || results.length === 1)
-    .map((r) => ({ tag: r.tag, sent: Number(r.sent), delivered: Number(r.delivered), read: Number(r.read), failed: Number(r.failed), replies: Number(repliesByTag.find((x) => x.tag === r.tag)?.n ?? 0) }));
+  // Last 30 days of messages and replies, per catalogue product's buyers.
+  const msgOf = new Map(msgByCustomer.map((r) => [r.cid, r]));
+  const repliedSet = new Set(repliersMonth.map((r) => r.cid));
+  const allBuyers = new Map<string, string[]>();
+  for (const [id, set] of custProds) if (inScope(id)) for (const sku of set) (allBuyers.get(sku) ?? allBuyers.set(sku, []).get(sku)!).push(id);
+  const byProduct = catalog.products
+    .map((p) => {
+      const who = allBuyers.get(p.retailerId) ?? [];
+      const sum = (f: "sent" | "delivered" | "read" | "failed") => who.reduce((n, id) => n + Number(msgOf.get(id)?.[f] ?? 0), 0);
+      return { tag: p.name, sent: sum("sent"), delivered: sum("delivered"), read: sum("read"), failed: sum("failed"), replies: who.filter((id) => repliedSet.has(id)).length };
+    })
+    .filter((r) => r.sent > 0)
+    .sort((a, b) => b.sent - a.sent || a.tag.localeCompare(b.tag))
+    .slice(0, 12);
 
   const every = hourly ? 3 : keys.length > 16 ? Math.ceil(keys.length / 7) : 1;
   const periodText = period.phrase;
@@ -886,8 +827,8 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     if (o.status === "CANCELLED") continue;
     const bought = isBought(o);
     for (const it of (o.items as OrderItem[] | null) ?? []) {
-      const rawName = (it.name ?? it.id ?? "").trim();
-      if (!rawName || /^manual-\d+$/i.test(rawName)) continue;
+      const rawName = catalog.item(it)?.name ?? "";
+      if (!rawName) continue; // not a catalogue product
       const k = normKey(rawName);
       const qty = Number(it.quantity) || 1;
       const price = Number(it.price) || 0;
@@ -916,17 +857,19 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     }
   }
 
-  // All-time buyer & unit map
+  // All-time buyers & units per catalogue product (bought orders + sheet purchase notes), in the filter.
   const allTimeMap = new Map<string, { rawName: string; buyers: number; units: number }>();
-  for (const r of allTimeProdRows) {
-    const k = normKey(r.prod);
-    if (!k) continue;
-    const prev = allTimeMap.get(k);
-    allTimeMap.set(k, {
-      rawName: prev?.rawName ?? r.prod,
-      buyers: (prev?.buyers ?? 0) + Number(r.buyers),
-      units: (prev?.units ?? 0) + Number(r.units),
-    });
+  {
+    const units = new Map<string, number>();
+    for (const o of catOrders) {
+      if (!inScope(o.customerId) || !(o.paidAt || ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"].includes(o.status))) continue;
+      for (const l of o.lines) units.set(l.ref.retailerId, (units.get(l.ref.retailerId) ?? 0) + l.qty);
+    }
+    for (const p of catalog.products) {
+      const buyers = allBuyers.get(p.retailerId)?.length ?? 0;
+      if (!buyers && !units.get(p.retailerId)) continue;
+      allTimeMap.set(normKey(p.name), { rawName: p.name, buyers, units: units.get(p.retailerId) ?? buyers });
+    }
   }
 
   // Campaign 30d reach map
@@ -962,39 +905,10 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     });
   }
 
-  // Also include any ordered, dropped, or historical product not already matched by exact normalized name
-  let extraIdx = 1;
-  const ensureProductInMap = (rawName: string, unitPrice = 0) => {
-    const k = normKey(rawName);
-    if (!k || combinedProdMap.has(k)) return;
-    // Check if a catalogue item partially matches (e.g. "Cold Pressed Groundnut Oil" vs "Groundnut Oil 1L")
-    for (const [ck] of combinedProdMap) {
-      if (ck.includes(k) || k.includes(ck)) return;
-    }
-    combinedProdMap.set(k, {
-      id: `hist-${extraIdx}`,
-      retailerId: `SKU-${100 + extraIdx}`,
-      name: rawName,
-      category: inferCat(rawName),
-      priceAmount: unitPrice,
-      inStock: true,
-    });
-    extraIdx += 1;
-  };
+  // Only catalogue products are listed: order lines that don't match a catalogue item are left out.
 
-  for (const [, st] of periodProdStats) ensureProductInMap(st.displayName, st.unitPrice);
-  for (const [, dr] of droppedMap) ensureProductInMap(dr.name, dr.qty > 0 ? Math.round(dr.value / dr.qty) : 0);
-  for (const [, atSt] of allTimeMap) ensureProductInMap(atSt.rawName, 0);
-
-  // Helper to look up stats by exact normalized key or fuzzy substring match
-  const findStat = <T,>(m: Map<string, T>, key: string): T | undefined => {
-    const exact = m.get(key);
-    if (exact) return exact;
-    for (const [mk, val] of m) {
-      if (mk.length >= 5 && key.length >= 5 && (mk.includes(key) || key.includes(mk))) return val;
-    }
-    return undefined;
-  };
+  // Every map is keyed by the catalogue name, so lookups are exact (no borrowing another size's figures).
+  const findStat = <T,>(m: Map<string, T>, key: string): T | undefined => m.get(key);
 
   const heroTopSellerName = topProducts[0]?.name ?? catalogList[0]?.name ?? "your #1 bestseller";
 
@@ -1882,7 +1796,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
           {ordersOn && <CustomerScenariosCard data={scenariosData} />}
           <CustomerGrowthPlaybookCard data={winbackPlaybookData} />
           <div className="grid grid-cols-1 gap-4 sm:gap-5 xl:grid-cols-2">
-            <CustomerProductsCard items={shown.map((t) => ({ tag: t.tag, label: tagLabel(t.tag), n: t.n }))} />
+            <CustomerProductsCard items={shown.map((p) => ({ tag: `product:${p.name}`, label: p.name, n: p.n }))} />
             <CustomerAreasCard regions={byRegion}>
               <AreaChips topAreas={topAreas} otherAreas={otherAreas} />
             </CustomerAreasCard>

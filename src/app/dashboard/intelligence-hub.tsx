@@ -511,8 +511,8 @@ export function ProductCampaignGraphCard({ rows }: { rows: ProductCampaignRow[] 
       <CardHeader
         tone="brand"
         icon={<ChartBar3D />}
-        title="Campaigns by product group"
-        description="Last 30 days · how far messages got with each buyer group"
+        title="Campaigns by product"
+        description="Last 30 days · how far messages got with each catalogue product's buyers"
         action={best ? <Badge tone="green">Best read: {best.tag}</Badge> : undefined}
       />
       <div className="p-4 sm:p-5">

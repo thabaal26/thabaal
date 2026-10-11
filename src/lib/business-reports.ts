@@ -5,6 +5,8 @@ import { db } from "./db";
 import { APP_TZ } from "./format";
 import type { OrderItem } from "./orders";
 import { narrowOrders, weekKey } from "./filters";
+import { catalogFor } from "./product-scope";
+import { catalogProducts } from "./catalog";
 import { dueOf, methodOf, paymentState, receivedOf, type PayFields } from "./payment-state";
 import { INDIA_GST_RATE, RATES } from "./spend";
 
@@ -14,8 +16,6 @@ const DAY = 86_400_000;
 const BOUGHT_SQL = `(o."paidAt" IS NOT NULL OR o.status IN ('CONFIRMED','PAID','DISPATCHED','DELIVERED'))`;
 export const dayStart = (d: Date) => fromZonedTime(`${formatInTimeZone(d, APP_TZ, "yyyy-MM-dd")}T00:00:00`, APP_TZ);
 const isBought = (o: { paidAt: Date | null; status: string }) => Boolean(o.paidAt) || ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"].includes(o.status);
-const itemName = (i: OrderItem) => (i.name ?? i.id ?? "").trim();
-const realItem = (n: string) => n.length > 0 && !/^manual-\d+$/i.test(n);
 
 /* ───────────────────────── Campaign results ───────────────────────── */
 
@@ -171,8 +171,9 @@ export async function revenueReport(
         AND m."createdAt" >= ${start} AND m."createdAt" < ${end}
       GROUP BY 1, 2`,
   ]);
-  const orders = narrowOrders(ordersRaw, opts.products ?? []);
-  const open = narrowOrders(openRaw, opts.products ?? []);
+  const catalog = await catalogFor(clientId);
+  const orders = narrowOrders(ordersRaw, opts.products ?? [], catalog);
+  const open = narrowOrders(openRaw, opts.products ?? [], catalog);
 
   const dayKey = (d: Date) => formatInTimeZone(d, APP_TZ, "yyyy-MM-dd");
   const keyOf = (d: Date) => (weekly ? weekKey(dayKey(d)) : dayKey(d));
@@ -233,7 +234,7 @@ export async function revenueReport(
     codToCollect: open.filter((o) => state(o) === "cod_due" && o.status !== "NEW").map((o) => item(o)),
     owed: open.filter((o) => ["unpaid", "part_paid"].includes(state(o)) && o.status !== "NEW").map((o) => item(o)),
     unpaidCarts: open.filter((o) => o.status === "NEW" && state(o) === "unpaid").map((o) => item(o)),
-    refundsDue: narrowOrders(dueRefundRaw, []).map((o) => item(o, Math.max(0, receivedOf(o) - (o.refundAmount ?? 0)))),
+    refundsDue: dueRefundRaw.map((o) => item(o, Math.max(0, receivedOf(o) - (o.refundAmount ?? 0)))),
   };
 }
 
@@ -249,14 +250,16 @@ export async function comboReport(clientId: string, days = 365): Promise<ComboRe
     where: { clientId, createdAt: { gte: since }, status: { not: "CANCELLED" } },
     select: { items: true, paidAt: true, status: true, createdAt: true },
   });
+  const catalog = await catalogFor(clientId);
   const bought = orders.filter(isBought);
   const single = new Map<string, { orders: number; units: number; price: number; last: Date }>();
   const pair = new Map<string, number>();
   for (const o of bought) {
-    const items = ((o.items as OrderItem[] | null) ?? []).filter((i) => realItem(itemName(i)));
-    const names = [...new Set(items.map(itemName))].sort();
-    for (const i of items) {
-      const n = itemName(i);
+    // Only catalogue products: lines that aren't catalogue items are left out.
+    const items = ((o.items as OrderItem[] | null) ?? []).map((i) => ({ i, ref: catalog.item(i) })).filter((x) => x.ref !== null);
+    const names = [...new Set(items.map((x) => x.ref!.name))].sort();
+    for (const { i, ref } of items) {
+      const n = ref!.name;
       const s = single.get(n) ?? { orders: 0, units: 0, price: 0, last: o.createdAt };
       s.units += Number(i.quantity) || 1;
       if (Number(i.price) > 0) s.price = Number(i.price);
@@ -278,18 +281,12 @@ export async function comboReport(clientId: string, days = 365): Promise<ComboRe
     .sort((p, q) => q.together - p.together || q.lift - p.lift)
     .slice(0, 12);
 
-  const catalogue = await db.$queryRaw<{ name: string; price: number | null }[]>`
-    SELECT DISTINCT ON (name) name, price FROM (
-      SELECT trim(elem->>'name') AS name, (elem->>'price')::float AS price
-      FROM "Order" o, jsonb_array_elements(o.items) AS elem
-      WHERE o."clientId" = ${clientId} AND trim(coalesce(elem->>'name', '')) <> ''
-    ) s ORDER BY name`.catch(() => []);
+  const catalogue = await catalogProducts(clientId).catch(() => []);
   const slowCut = new Date(Date.now() - 45 * DAY);
   const slow: SlowMover[] = catalogue
-    .filter((p) => realItem(p.name))
     .map((p) => {
       const s = single.get(p.name);
-      return { name: p.name, price: s?.price || Number(p.price) || 0, lastSold: s?.last ?? null, units: s?.units ?? 0 };
+      return { name: p.name, price: s?.price || p.priceAmount || 0, lastSold: s?.last ?? null, units: s?.units ?? 0 };
     })
     .filter((p) => !p.lastSold || p.lastSold < slowCut)
     .sort((a, b) => (a.lastSold?.getTime() ?? 0) - (b.lastSold?.getTime() ?? 0))
@@ -367,14 +364,15 @@ export async function weeklyReport(clientId: string, now = new Date()): Promise<
     const d = addDays(from, i);
     return { key: formatInTimeZone(d, APP_TZ, "yyyy-MM-dd"), label: formatInTimeZone(d, APP_TZ, "EEE"), revenue: 0 };
   });
+  const catalog = await catalogFor(clientId);
   const prods = new Map<string, { units: number; revenue: number }>();
   for (const o of orders) {
     if (!isBought(o)) continue;
     const day = daily.find((d) => d.key === formatInTimeZone(o.createdAt, APP_TZ, "yyyy-MM-dd"));
     if (day) day.revenue += o.total;
     for (const i of (o.items as OrderItem[] | null) ?? []) {
-      const nme = itemName(i);
-      if (!realItem(nme)) continue;
+      const nme = catalog.item(i)?.name;
+      if (!nme) continue;
       const p = prods.get(nme) ?? { units: 0, revenue: 0 };
       p.units += Number(i.quantity) || 1;
       p.revenue += (Number(i.price) || 0) * (Number(i.quantity) || 1);

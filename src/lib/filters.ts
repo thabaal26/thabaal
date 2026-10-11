@@ -4,6 +4,7 @@
 
 import { addDays, addMonths } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
+import type { CatalogMatcher } from "./catalog-match";
 
 export const APP_TZ = "Asia/Kolkata";
 const DAY = 86_400_000;
@@ -240,24 +241,21 @@ export function periodKeys(p: Period, now = new Date()): string[] {
 
 /* ───────────────────────── Product filter on orders ───────────────────────── */
 
-const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9஀-௿]+/g, " ").trim();
-
-/** Does this item name match one of the picked products? Exact (normalised) names. */
-export function productMatcher(products: string[]) {
-  const set = new Set(products.map(norm));
-  return (name: string | null | undefined) => set.size === 0 || set.has(norm(name ?? ""));
-}
-
 /**
  * With a product filter, an order only counts for the matching lines: other items are dropped and
  * the total becomes the value of the matching lines. Orders with no matching line disappear.
+ * Lines are matched to the picked catalogue products by SKU or name (lib/catalog-match.ts).
  */
-export function narrowOrders<T extends { items: unknown; total: number }>(orders: T[], products: string[]): T[] {
+export function narrowOrders<T extends { items: unknown; total: number }>(orders: T[], products: readonly string[], catalog: CatalogMatcher): T[] {
   if (!products.length) return orders;
-  const match = productMatcher(products);
+  const picked = new Set(products.map((p) => (catalog.named(p) ?? catalog.item({ name: p }))?.retailerId).filter(Boolean));
+  const match = (i: { id?: string; name?: string }) => {
+    const ref = catalog.item(i);
+    return ref !== null && picked.has(ref.retailerId);
+  };
   const out: T[] = [];
   for (const o of orders) {
-    const items = ((o.items as { name?: string; id?: string; quantity?: number | string; price?: number | string }[] | null) ?? []).filter((i) => match(i.name ?? i.id));
+    const items = ((o.items as { name?: string; id?: string; quantity?: number | string; price?: number | string }[] | null) ?? []).filter(match);
     if (!items.length) continue;
     const total = items.reduce((n, i) => n + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0);
     out.push({ ...o, items, total: total || o.total });

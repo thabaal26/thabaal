@@ -2,6 +2,8 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import { AUDIENCE_PREFIX, decodeTags } from "./audience-tags";
 import { db } from "./db";
+import { catalogFor, customersWithProducts } from "./product-scope";
+import { normKey } from "./catalog-match";
 
 // Saved audiences: a named filter over a client's customers that campaigns can send to.
 // Campaigns store it as audienceTag "aud:<id>"; tags work too (see src/lib/audience-tags.ts).
@@ -50,10 +52,13 @@ export async function audienceWhere(clientId: string, raw: AudienceFilter, now =
   if (f.region) and.push({ region: { equals: f.region, mode: "insensitive" } });
   if (f.area) and.push({ location: { contains: f.area, mode: "insensitive" } });
   if (f.bought) {
-    // Order items are JSON; search their text so "ghee" finds "Ghee 500 ml".
-    const rows = await db.$queryRaw<{ customerId: string }[]>`
-      SELECT DISTINCT "customerId" FROM "Order" WHERE "clientId" = ${clientId} AND status <> 'CANCELLED' AND items::text ILIKE ${`%${f.bought}%`}`;
-    and.push({ OR: [{ purchases: { contains: f.bought, mode: "insensitive" } }, { id: { in: rows.map((r) => r.customerId) } }] });
+    // Catalogue products whose name has the words typed ("ghee" finds "Ghee 100ml"), and who bought them.
+    const catalog = await catalogFor(clientId);
+    const want = normKey(f.bought);
+    const names = catalog.products.filter((p) => normKey(p.name).includes(want)).map((p) => p.name);
+    const exact = catalog.item({ name: f.bought });
+    if (exact) names.push(exact.name);
+    and.push({ id: { in: names.length ? await customersWithProducts(clientId, names) : [] } });
   }
   const live = { status: { not: "CANCELLED" as const } };
   if (f.orderedWithinDays) and.push({ orders: { some: { ...live, createdAt: { gte: new Date(now.getTime() - f.orderedWithinDays * DAY) } } } });

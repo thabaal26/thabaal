@@ -294,6 +294,18 @@ async function runBatch(cfg: WaConfig, catalogId: string, request: { method: "CR
 const publicImage = (url: string | null | undefined) => (url && /^https:\/\//i.test(url) ? url : null);
 
 /** Fetches full catalog products with stock, price, category and descriptions for the client. */
+/* Catalogue snapshot for product lists, filters and charts: live from Meta, reused for a minute so
+   every page doesn't wait on Meta. A full catalogue read refreshes it; portal edits clear it. */
+const SNAP_MS = 60_000;
+const snaps = new Map<string, { at: number; products: CatalogProductDetail[] }>();
+
+/** The client's catalogue products (live, at most a minute old). The only list of products. */
+export async function catalogProducts(clientId: string): Promise<CatalogProductDetail[]> {
+  const hit = snaps.get(clientId);
+  if (hit && Date.now() - hit.at < SNAP_MS) return hit.products;
+  return (await getCatalogWithProducts(clientId)).products;
+}
+
 export async function getCatalogWithProducts(clientId: string): Promise<{
   catalogId: string | null;
   products: CatalogProductDetail[];
@@ -302,7 +314,10 @@ export async function getCatalogWithProducts(clientId: string): Promise<{
 }> {
   const { cfg } = await senderFor(clientId);
   const fallback = { catalogId: null, products: demoProducts(clientId), commerceManagerUrl: "https://business.facebook.com/commerce_manager", isLive: false };
-  if (!cfg.live) return fallback;
+  if (!cfg.live) {
+    snaps.set(clientId, { at: Date.now(), products: fallback.products });
+    return fallback;
+  }
 
   try {
     const catalogId = await catalogIdFor(cfg);
@@ -317,6 +332,7 @@ export async function getCatalogWithProducts(clientId: string): Promise<{
       path = page.paging?.next ? page.paging.next.replace(/^https:\/\/graph\.facebook\.com\/v[\d.]+\//, "") : null;
     }
     out.sort((a, b) => a.retailerId.localeCompare(b.retailerId, undefined, { numeric: true }));
+    snaps.set(clientId, { at: Date.now(), products: out });
     return { catalogId, products: out, commerceManagerUrl: `https://business.facebook.com/commerce_manager/${catalogId}/products`, isLive: true };
   } catch (e) {
     console.warn("Could not fetch Meta catalog, showing the demo list:", e);
@@ -339,6 +355,7 @@ export async function updateCatalogProductItem(
     imageUrl?: string | null;
   }
 ): Promise<Result> {
+  snaps.delete(clientId);
   const { cfg } = await senderFor(clientId);
 
   // Demo mode (no WhatsApp Cloud API): edits are kept locally so the screens can be tried.
@@ -394,6 +411,7 @@ export async function createCatalogProductItem(
   clientId: string,
   p: { retailerId: string; name: string; priceAmount: number; inStock: boolean; description: string; imageUrl: string | null; brand: string; link: string },
 ): Promise<Result> {
+  snaps.delete(clientId);
   const { cfg } = await senderFor(clientId);
   if (!cfg.live) return { ok: false, metaUpdated: false, message: "Adding products needs the WhatsApp Cloud API connected." };
   const retailerId = p.retailerId.trim();
@@ -431,6 +449,7 @@ export async function createCatalogProductItem(
 
 /** Removes a product (by SKU) from the live catalogue. Past orders keep their item names. */
 export async function deleteCatalogProductItem(clientId: string, retailerId: string): Promise<Result> {
+  snaps.delete(clientId);
   const { cfg } = await senderFor(clientId);
   if (!cfg.live) return { ok: false, metaUpdated: false, message: "Deleting products needs the WhatsApp Cloud API connected." };
   try {

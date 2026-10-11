@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   const segment = scope.clientId
     ? await customerSegmentIds(scope.clientId, filters, { stage, act, ...(filters.range !== "all" && { start: period.start, end: period.end }) })
     : null;
-  const where = { ...customerWhere(scope, customerFilters(params)), ...(segment && { id: { in: segment } }) };
+  const where = { ...(await customerWhere(scope, customerFilters(params))), ...(segment && { id: { in: segment } }) };
   const customers = await db.customer.findMany({
     where,
     include: {
