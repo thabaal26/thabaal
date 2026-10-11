@@ -1,10 +1,24 @@
-import { Activity, ArrowDownRight, ArrowUpRight, CheckCheck, Clock3, ShieldAlert, TrendingUp } from "lucide-react";
+import {
+  Activity,
+  ArrowDownRight,
+  ArrowUpRight,
+  BookOpen,
+  CheckCheck,
+  Clock3,
+  PackageCheck,
+  ShieldAlert,
+  ShoppingCart,
+  Sparkles,
+  TrendingUp,
+  UserCheck,
+  XCircle,
+} from "lucide-react";
 import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
 import { CountUp, DeliveryChronoDonut, Sparkline, TickRing, TrendChart, type Series } from "@/components/charts";
 import { Eye3D, Gauge3D, Messages3D, Send3D, ShoppingBag3D, Trophy3D } from "@/components/icons-3d";
 import { formatValue, type ValueFormat } from "@/lib/chart-math";
-import { Card, CardHeader, QualityBadge, buttonClass } from "@/components/ui";
+import { Badge, Card, CardHeader, QualityBadge, buttonClass } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { fmtDate, fmtNumber, pct } from "@/lib/format";
 import type { numberHealth } from "@/lib/limits";
@@ -219,67 +233,102 @@ export function DeliveryCard({ read, delivered, sent, failed }: { read: number; 
 
 /* ───────────────────────── Message → order funnel ───────────────────────── */
 
-const FUNNEL: { key: "messaged" | "delivered" | "read" | "replied" | "ordered"; label: string; icon: ComponentType<{ className?: string }>; color: string }[] = [
+const FUNNEL: {
+  key: "messaged" | "delivered" | "read" | "replied" | "browsed" | "addedToCart" | "ordered";
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+  color: string;
+}[] = [
   { key: "messaged", label: "Messaged", icon: Send3D, color: C.brand },
   { key: "delivered", label: "Received it", icon: CheckCheck, color: C.brand },
   { key: "read", label: "Read it", icon: Eye3D, color: C.read },
-  { key: "replied", label: "Replied", icon: Messages3D, color: C.info },
-  { key: "ordered", label: "Ordered within 7 days", icon: ShoppingBag3D, color: C.gold },
+  { key: "replied", label: "Replied / tapped button", icon: Messages3D, color: C.info },
+  { key: "browsed", label: "Viewed catalogue / price list", icon: BookOpen, color: "#0284c7" },
+  { key: "addedToCart", label: "Added to cart (sent cart)", icon: ShoppingCart, color: "#d97706" },
+  { key: "ordered", label: "Bought (paid / confirmed)", icon: ShoppingBag3D, color: C.gold },
 ];
 
 /** People, not messages: each step is a share of everyone messaged in the period. */
 export function FunnelCard({
   f,
   revenue,
+  unpaidCartRevenue = 0,
+  unpaidCartCount = 0,
   showOrders = true,
   showReplies = true,
 }: {
-  f: Record<(typeof FUNNEL)[number]["key"], number>;
+  f: {
+    messaged: number;
+    delivered: number;
+    read: number;
+    replied: number;
+    browsed?: number;
+    addedToCart?: number;
+    ordered: number;
+  };
   revenue: number;
+  unpaidCartRevenue?: number;
+  unpaidCartCount?: number;
   showOrders?: boolean;
   showReplies?: boolean;
 }) {
   const base = f.messaged;
-  const steps = FUNNEL.filter((s) => (s.key !== "ordered" || showOrders) && (s.key !== "replied" || showReplies));
+  const steps = FUNNEL.filter(
+    (s) =>
+      ((s.key !== "ordered" && s.key !== "addedToCart" && s.key !== "browsed") || showOrders) &&
+      (s.key !== "replied" || showReplies),
+  );
   return (
     <Card className="card-3d h-full">
       <CardHeader
         tone="gold"
         icon={<TrendingUp />}
-        title={showOrders ? "From message to order" : "Customer engagement funnel"}
-        description="Customers messaged this period, and how far they went"
+        title={showOrders ? "From message to cart & purchase" : "Customer engagement funnel"}
+        description="Customers messaged this period, where they engaged, and where they dropped off"
       />
       {base ? (
         <ul className="space-y-1 p-3 sm:p-4">
           {steps.map((s) => {
-            const share = pct(f[s.key], base);
+            const val = f[s.key] ?? 0;
+            const share = pct(val, base);
             return (
-              <li key={s.key} className="group flex items-center gap-3 rounded-control px-2 py-2">
+              <li key={s.key} className="group flex items-center gap-3 rounded-control px-2 py-1.5">
                 <span
                   aria-hidden
-                  className="icon-cube-3d grid size-9 shrink-0 place-items-center rounded-[11px] text-white ring-1 ring-inset ring-white/40"
+                  className="icon-cube-3d grid size-8 shrink-0 place-items-center rounded-[10px] text-white ring-1 ring-inset ring-white/40"
                   style={{ background: brightCubeGradient(s.color), boxShadow: `inset 0 1.5px 0 rgb(255 255 255 / 0.65), inset 0 -2px 0 rgb(0 0 0 / 0.2), 0 4px 10px -3px ${s.color}88` }}
                 >
-                  <s.icon className="size-[18px]" />
+                  <s.icon className="size-4" />
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline justify-between gap-2 text-sm">
                     <span className="truncate font-medium text-ink">{s.label}</span>
                     <span className="tabular shrink-0 text-ink-2">
-                      <b className="font-semibold text-ink">{fmtNumber(f[s.key])}</b> <span className="text-xs text-muted">· {share}%</span>
+                      <b className="font-semibold text-ink">{fmtNumber(val)}</b> <span className="text-xs text-muted">· {share}%</span>
                     </span>
                   </div>
-                  <div className="track-3d mt-1.5 h-2 overflow-hidden rounded-full" role="meter" aria-label={`${s.label}: ${share}%`} aria-valuenow={share} aria-valuemin={0} aria-valuemax={100}>
-                    <div className="bar bar-3d h-full rounded-full" style={{ width: `${Math.max(share, f[s.key] ? 2 : 0)}%`, backgroundColor: s.color }} />
+                  <div className="track-3d mt-1 h-2 overflow-hidden rounded-full" role="meter" aria-label={`${s.label}: ${share}%`} aria-valuenow={share} aria-valuemin={0} aria-valuemax={100}>
+                    <div className="bar bar-3d h-full rounded-full" style={{ width: `${Math.max(share, val ? 2 : 0)}%`, backgroundColor: s.color }} />
                   </div>
                 </div>
               </li>
             );
           })}
           {showOrders && (
-            <li className="mx-2 mt-2 flex items-center justify-between rounded-control bg-gold-soft px-3 py-2.5 text-sm">
-              <span className="text-gold-deep">Sales from those orders</span>
-              <span className="tabular font-semibold text-gold-deep">{formatValue(revenue, "inr")}</span>
+            <li className="mx-2 mt-2 space-y-1.5">
+              <div className="flex items-center justify-between rounded-control bg-gold-soft px-3 py-2 text-sm">
+                <span className="text-gold-deep">Confirmed sales from those buyers</span>
+                <span className="tabular font-semibold text-gold-deep">{formatValue(revenue, "inr")}</span>
+              </div>
+              {unpaidCartCount > 0 && (
+                <Link
+                  href="/dashboard/orders?status=NEW"
+                  className="flex items-center justify-between rounded-control border border-warning-border bg-warning-bg px-3 py-2 text-xs font-medium text-warning transition hover:opacity-90"
+                >
+                  <span>Added to cart, not paid yet ({fmtNumber(unpaidCartCount)} cart{unpaidCartCount === 1 ? "" : "s"})</span>
+                  <span className="tabular font-semibold">{formatValue(unpaidCartRevenue, "inr")} waiting →</span>
+                </Link>
+              )}
             </li>
           )}
         </ul>
@@ -289,6 +338,7 @@ export function FunnelCard({
     </Card>
   );
 }
+
 
 /* ───────────────────────── Today, live ───────────────────────── */
 
@@ -534,17 +584,25 @@ export function BestTimeCard({ cells, days }: { cells: { d: number; b: number; n
   );
 }
 
-/* ───────────────────────── Top products ───────────────────────── */
+/* ───────────────────────── Top products (Bought vs. Added to Cart) ───────────────────────── */
 
-export function TopProductsCard({ items, rangeLabel }: { items: { name: string; qty: number; revenue: number }[]; rangeLabel: string }) {
-  const max = Math.max(1, ...items.map((i) => i.revenue));
+export type ProductDemandRow = {
+  name: string;
+  qty: number;
+  revenue: number;
+  cartOnlyQty?: number;
+  cartOnlyValue?: number;
+};
+
+export function TopProductsCard({ items, rangeLabel }: { items: ProductDemandRow[]; rangeLabel: string }) {
+  const max = Math.max(1, ...items.map((i) => i.revenue + (i.cartOnlyValue ?? 0)));
   return (
     <Card className="card-3d h-full">
       <CardHeader
         tone="gold"
         icon={<Trophy3D />}
-        title="Best sellers"
-        description={`From orders, ${rangeLabel.toLowerCase()}`}
+        title="Product demand: bought vs. left in cart"
+        description={`Paid/confirmed sales vs. items added to cart & unpaid (${rangeLabel.toLowerCase()})`}
         action={
           <Link href="/dashboard/orders?show=all" className={buttonClass("ghost", "sm")}>
             Orders
@@ -553,32 +611,431 @@ export function TopProductsCard({ items, rangeLabel }: { items: { name: string; 
       />
       {items.length ? (
         <ol className="space-y-3 p-4 sm:p-5">
-          {items.map((it, i) => (
-            <li key={it.name} className="flex items-center gap-3">
-              <span
-                className={cn("tabular tile-3d grid size-7 shrink-0 place-items-center rounded-full text-xs font-semibold", i === 0 ? "text-white" : "bg-sunken text-ink-2")}
-                style={i === 0 ? { background: "linear-gradient(145deg, #f5d55c, #b98a05)" } : undefined}
-              >
-                {i + 1}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline justify-between gap-2 text-sm">
-                  <span className="truncate font-medium text-ink">{it.name}</span>
-                  <span className="tabular shrink-0 font-semibold text-ink">{formatValue(it.revenue, "inr")}</span>
-                </div>
-                <div className="mt-1 flex items-center gap-2">
-                  <div className="track-3d h-2 flex-1 overflow-hidden rounded-full">
-                    <div className="bar bar-3d h-full rounded-full" style={{ width: `${pct(it.revenue, max)}%`, backgroundColor: C.gold }} />
+          {items.map((it, i) => {
+            const cartQty = it.cartOnlyQty ?? 0;
+            const cartVal = it.cartOnlyValue ?? 0;
+            const boughtShare = pct(it.revenue, max);
+            const cartShare = pct(cartVal, max);
+            return (
+              <li key={it.name} className="flex items-start gap-3">
+                <span
+                  className={cn(
+                    "tabular tile-3d mt-0.5 grid size-7 shrink-0 place-items-center rounded-full text-xs font-semibold",
+                    i === 0 ? "text-white" : "bg-sunken text-ink-2",
+                  )}
+                  style={i === 0 ? { background: "linear-gradient(145deg, #f5d55c, #b98a05)" } : undefined}
+                >
+                  {i + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-2 text-sm">
+                    <span className="truncate font-medium text-ink">{it.name}</span>
+                    <span className="tabular shrink-0 font-semibold text-ink">
+                      {formatValue(it.revenue, "inr")}
+                      {cartVal > 0 && (
+                        <span className="ml-1.5 text-xs font-normal text-warning">
+                          (+{formatValue(cartVal, "inr")} in cart)
+                        </span>
+                      )}
+                    </span>
                   </div>
-                  <span className="tabular w-14 shrink-0 text-right text-xs text-muted">{fmtNumber(it.qty)} sold</span>
+                  <div className="mt-1 flex items-center gap-2">
+                    <div className="track-3d flex h-2 flex-1 overflow-hidden rounded-full">
+                      {it.revenue > 0 && (
+                        <div
+                          className="bar bar-3d h-full"
+                          style={{ width: `${Math.max(4, boughtShare)}%`, backgroundColor: C.gold }}
+                          title={`Bought: ${it.qty} (${formatValue(it.revenue, "inr")})`}
+                        />
+                      )}
+                      {cartVal > 0 && (
+                        <div
+                          className="bar h-full opacity-75"
+                          style={{ width: `${Math.max(4, cartShare)}%`, backgroundColor: "#f59e0b" }}
+                          title={`Added to cart, not paid: ${cartQty} (${formatValue(cartVal, "inr")})`}
+                        />
+                      )}
+                    </div>
+                    <span className="tabular shrink-0 text-right text-xs text-muted">
+                      {fmtNumber(it.qty)} sold
+                      {cartQty > 0 ? ` · ${fmtNumber(cartQty)} in cart` : ""}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ol>
       ) : (
-        <p className="p-5 text-sm text-muted">No orders in this period yet.</p>
+        <p className="p-5 text-sm text-muted">No orders or carts in this period yet.</p>
       )}
     </Card>
   );
 }
+
+/* ───────────────────────── Business Priority Strip (Top of Overview) ───────────────────────── */
+
+export type BusinessPriorityProps = {
+  unpaidCartsCount: number;
+  unpaidCartsValue: number;
+  unpaidCustomersCount: number;
+  browsedNoCartCount: number;
+  toDispatchCount: number;
+  unhandledRepliesCount: number;
+  showOrders: boolean;
+  showReplies: boolean;
+};
+
+/**
+ * High-priority business action bar at the top of the Overview page.
+ * Surfaces revenue sitting in unpaid WhatsApp carts, warm catalogue browsers who haven't added to cart,
+ * confirmed orders waiting to be packed, and unanswered customer replies.
+ */
+export function BusinessPriorityStrip({
+  unpaidCartsCount,
+  unpaidCartsValue,
+  unpaidCustomersCount,
+  browsedNoCartCount,
+  toDispatchCount,
+  unhandledRepliesCount,
+  showOrders,
+  showReplies,
+}: BusinessPriorityProps) {
+  const cards: {
+    key: string;
+    title: string;
+    metric: string;
+    sub: string;
+    href: string;
+    cta: string;
+    tone: "amber" | "info" | "brand" | "violet";
+    icon: ComponentType<{ className?: string }>;
+  }[] = [];
+
+  if (showOrders && unpaidCartsCount > 0) {
+    cards.push({
+      key: "unpaid-carts",
+      title: "Added to cart · Not bought yet",
+      metric: `${formatValue(unpaidCartsValue, "inr")} in ${fmtNumber(unpaidCartsCount)} cart${unpaidCartsCount === 1 ? "" : "s"}`,
+      sub: `${fmtNumber(unpaidCustomersCount)} customer${unpaidCustomersCount === 1 ? "" : "s"} sent a WhatsApp cart & haven't paid yet`,
+      href: "/dashboard/orders?status=NEW",
+      cta: "Follow up & close sale →",
+      tone: "amber",
+      icon: ShoppingCart,
+    });
+  }
+
+  if (showOrders && browsedNoCartCount > 0) {
+    cards.push({
+      key: "browsed-no-cart",
+      title: "Viewed catalogue · Didn't add to cart",
+      metric: `${fmtNumber(browsedNoCartCount)} warm lead${browsedNoCartCount === 1 ? "" : "s"}`,
+      sub: "Asked for prices or catalogue, read it, but didn't submit a cart",
+      href: "#customer-scenarios",
+      cta: "See who browsed →",
+      tone: "info",
+      icon: BookOpen,
+    });
+  }
+
+  if (showOrders && toDispatchCount > 0) {
+    cards.push({
+      key: "to-dispatch",
+      title: "Paid / confirmed · Ready to pack",
+      metric: `${fmtNumber(toDispatchCount)} order${toDispatchCount === 1 ? "" : "s"} to ship`,
+      sub: "Payment or confirmation received — ready for packing & dispatch",
+      href: "/dashboard/orders/packing",
+      cta: "Open packing list →",
+      tone: "brand",
+      icon: PackageCheck,
+    });
+  }
+
+  if (showReplies && unhandledRepliesCount > 0) {
+    cards.push({
+      key: "unhandled-replies",
+      title: "Waiting for your reply",
+      metric: `${fmtNumber(unhandledRepliesCount)} open chat${unhandledRepliesCount === 1 ? "" : "s"}`,
+      sub: "Reply within 24 hours for free service messaging on WhatsApp",
+      href: "/dashboard/replies",
+      cta: "Reply in inbox →",
+      tone: "violet",
+      icon: Messages3D,
+    });
+  }
+
+  if (!cards.length) return null;
+
+  const toneStyles: Record<(typeof cards)[number]["tone"], string> = {
+    amber: "border-warning-border bg-warning-bg/70 hover:bg-warning-bg",
+    info: "border-info-border bg-info-bg/70 hover:bg-info-bg",
+    brand: "border-brand/30 bg-brand-soft/60 hover:bg-brand-soft",
+    violet: "border-line bg-subtle hover:bg-sunken",
+  };
+
+  return (
+    <section aria-label="Business priorities needing attention" className="mb-4 sm:mb-5">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-2">
+          <Sparkles aria-hidden className="size-3.5 text-gold" /> Business priorities & revenue recovery
+        </p>
+        <span className="text-xs text-muted">Live action items from WhatsApp activity</span>
+      </div>
+      <div className={cn("grid grid-cols-1 gap-3 sm:grid-cols-2", cards.length >= 4 ? "xl:grid-cols-4" : cards.length === 3 ? "xl:grid-cols-3" : "xl:grid-cols-2")}>
+        {cards.map((c) => {
+          const Icon = c.icon;
+          return (
+            <Link
+              key={c.key}
+              href={c.href}
+              className={cn("card-3d flex flex-col justify-between rounded-card border p-3.5 transition sm:p-4", toneStyles[c.tone])}
+            >
+              <div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-ink-2">{c.title}</span>
+                  <Icon aria-hidden className="size-4 shrink-0 text-ink-2" />
+                </div>
+                <p className="tabular mt-1.5 text-lg font-semibold leading-tight text-ink sm:text-xl">{c.metric}</p>
+                <p className="mt-1 text-xs text-muted">{c.sub}</p>
+              </div>
+              <p className="mt-2.5 text-xs font-semibold text-brand-deep">{c.cta}</p>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+/* ───────────────────────── Customer Behaviour & Cart Scenarios Card ───────────────────────── */
+
+export type ScenarioLead = {
+  customerId: string;
+  name: string;
+  phone: string;
+  detail: string;
+  amount?: number;
+  at: Date;
+  href: string;
+};
+
+export type CustomerScenariosData = {
+  periodLabel: string;
+  /** Scenario 1: Added to cart (sent cart on WhatsApp), unpaid (`status = NEW`, `paidAt = null`) */
+  addedToCartUnpaid: {
+    customers: number;
+    carts: number;
+    value: number;
+    leads: ScenarioLead[];
+  };
+  /** Scenario 2: Viewed catalogue or price list (or tapped Order now / Send price list), never sent a cart */
+  browsedNoCart: {
+    customers: number;
+    leads: ScenarioLead[];
+  };
+  /** Scenario 3: Added to cart, then cancelled (`status = CANCELLED`) */
+  cancelledCarts: {
+    customers: number;
+    carts: number;
+    value: number;
+    leads: ScenarioLead[];
+  };
+  /** Scenario 4: Added to cart & bought (`PAID`, `CONFIRMED`, `DISPATCHED`, `DELIVERED`) */
+  convertedBuyers: {
+    customers: number;
+    orders: number;
+    revenue: number;
+    repeatBuyers: number;
+    leads: ScenarioLead[];
+  };
+  /** Scenario 5: Replied / chatted / allowed call, but hasn't browsed catalogue or ordered yet */
+  repliedInquiryOnly: {
+    customers: number;
+    leads: ScenarioLead[];
+  };
+  /** Scenario 6: Read campaign message, took no action */
+  readNoAction: {
+    customers: number;
+  };
+  /** Overall conversion benchmarks */
+  catalogueToCartPct: number;
+  cartToBuyPct: number;
+};
+
+export function CustomerScenariosCard({ data }: { data: CustomerScenariosData }) {
+  const scenarios = [
+    {
+      key: "cart-unpaid",
+      badge: "High priority · Recoverable revenue",
+      badgeTone: "amber" as const,
+      title: "1. Added to cart, didn't buy yet (Unpaid cart)",
+      explain: "Selected items in the WhatsApp catalogue & sent the cart, received the payment request, and stopped before paying.",
+      stat: `${fmtNumber(data.addedToCartUnpaid.customers)} customer${data.addedToCartUnpaid.customers === 1 ? "" : "s"} · ${fmtNumber(data.addedToCartUnpaid.carts)} cart${data.addedToCartUnpaid.carts === 1 ? "" : "s"}`,
+      money: data.addedToCartUnpaid.value > 0 ? `${formatValue(data.addedToCartUnpaid.value, "inr")} in cart` : null,
+      tip: "Call or message them while intent is warm — common reasons are UPI hesitation, wanting COD, or shipping fee questions.",
+      leads: data.addedToCartUnpaid.leads,
+      icon: ShoppingCart,
+      color: "#d97706",
+      actionHref: "/dashboard/orders?status=NEW",
+      actionLabel: "View unpaid carts",
+    },
+    {
+      key: "browsed-no-cart",
+      badge: "Warm intent · Browsed only",
+      badgeTone: "blue" as const,
+      title: "2. Viewed catalogue / price list, didn't add to cart",
+      explain: "Tapped 'Order now' or 'Send price list' (or greeted & received the catalogue), read it, but never added items to cart.",
+      stat: `${fmtNumber(data.browsedNoCart.customers)} customer${data.browsedNoCart.customers === 1 ? "" : "s"}`,
+      money: data.catalogueToCartPct > 0 ? `${data.catalogueToCartPct}% catalogue → cart rate` : null,
+      tip: "Send a quick personal recommendation or offer to take their order directly in chat before the 24h free window closes.",
+      leads: data.browsedNoCart.leads,
+      icon: BookOpen,
+      color: "#0284c7",
+      actionHref: "/dashboard/replies",
+      actionLabel: "Open replies inbox",
+    },
+    {
+      key: "cart-cancelled",
+      badge: "Dropped at checkout",
+      badgeTone: "red" as const,
+      title: "3. Added to cart, then cancelled or replaced",
+      explain: "Sent a WhatsApp cart that was later cancelled or abandoned.",
+      stat: `${fmtNumber(data.cancelledCarts.customers)} customer${data.cancelledCarts.customers === 1 ? "" : "s"} · ${fmtNumber(data.cancelledCarts.carts)} cancelled`,
+      money: data.cancelledCarts.value > 0 ? `${formatValue(data.cancelledCarts.value, "inr")} dropped` : null,
+      tip: "Check if they placed a newer order or if a specific item/pack size caused them to cancel.",
+      leads: data.cancelledCarts.leads,
+      icon: XCircle,
+      color: C.failed,
+      actionHref: "/dashboard/orders?status=CANCELLED",
+      actionLabel: "See cancelled",
+    },
+    {
+      key: "converted-buyers",
+      badge: "Completed purchase",
+      badgeTone: "green" as const,
+      title: "4. Added to cart & bought (Paid / Confirmed)",
+      explain: "Completed payment or order confirmation after adding to cart.",
+      stat: `${fmtNumber(data.convertedBuyers.customers)} buyer${data.convertedBuyers.customers === 1 ? "" : "s"} (${fmtNumber(data.convertedBuyers.orders)} order${data.convertedBuyers.orders === 1 ? "" : "s"})${data.convertedBuyers.repeatBuyers > 0 ? ` · ${fmtNumber(data.convertedBuyers.repeatBuyers)} repeat` : ""}`,
+      money: `${formatValue(data.convertedBuyers.revenue, "inr")} sales · ${data.cartToBuyPct}% cart → buy`,
+      tip: "Send dispatch updates promptly and schedule automatic refill reminders so they reorder effortlessly.",
+      leads: data.convertedBuyers.leads,
+      icon: UserCheck,
+      color: C.brand,
+      actionHref: "/dashboard/orders?show=all",
+      actionLabel: "View orders",
+    },
+    {
+      key: "inquiry-only",
+      badge: "Chatting · No cart yet",
+      badgeTone: "gray" as const,
+      title: "5. Replied or asked a question, no catalogue/cart yet",
+      explain: "Replied by text, photo, or call permission without browsing the catalogue or sending a cart.",
+      stat: `${fmtNumber(data.repliedInquiryOnly.customers)} customer${data.repliedInquiryOnly.customers === 1 ? "" : "s"}`,
+      money: null,
+      tip: "Use the 'Send catalogue' button in their chat so they can tap and add items to cart in one step.",
+      leads: data.repliedInquiryOnly.leads,
+      icon: Messages3D,
+      color: C.info,
+      actionHref: "/dashboard/replies?show=all",
+      actionLabel: "Open chats",
+    },
+    {
+      key: "read-no-action",
+      badge: "Read only · Silent",
+      badgeTone: "gray" as const,
+      title: "6. Read campaign message, took no action yet",
+      explain: "Opened and read your WhatsApp template message in this period, but didn't tap a button or reply.",
+      stat: `${fmtNumber(data.readNoAction.customers)} customer${data.readNoAction.customers === 1 ? "" : "s"} read without replying`,
+      money: null,
+      tip: "Test stronger quick-reply buttons (e.g., 'View Price List', 'Order Now') or a regional Tamil/English template on the next campaign.",
+      leads: [],
+      icon: Eye3D,
+      color: C.read,
+      actionHref: "/dashboard/messages?status=READ",
+      actionLabel: "See read log",
+    },
+  ];
+
+  return (
+    <Card id="customer-scenarios" className="card-3d mt-4 sm:mt-5">
+      <CardHeader
+        tone="brand"
+        icon={<ShoppingCart />}
+        title="Customer behaviour & cart drop-off analytics"
+        description={`How customers acted across ${data.periodLabel} — from reading a message to browsing the catalogue, adding to cart, and buying`}
+        action={
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <Badge tone="blue">Catalogue → Cart: {data.catalogueToCartPct}%</Badge>
+            <Badge tone="green">Cart → Purchase: {data.cartToBuyPct}%</Badge>
+          </div>
+        }
+      />
+      <div className="grid grid-cols-1 divide-y divide-line lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+        {scenarios.map((s, idx) => {
+          const Icon = s.icon;
+          return (
+            <div
+              key={s.key}
+              className={cn(
+                "flex flex-col justify-between p-4 sm:p-5",
+                idx >= 2 && "lg:border-t lg:border-line",
+              )}
+            >
+              <div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Badge tone={s.badgeTone}>{s.badge}</Badge>
+                  {s.money && <span className="tabular text-xs font-semibold text-ink">{s.money}</span>}
+                </div>
+                <div className="mt-2.5 flex items-start gap-3">
+                  <span
+                    aria-hidden
+                    className="icon-cube-3d mt-0.5 grid size-8 shrink-0 place-items-center rounded-[10px] text-white ring-1 ring-inset ring-white/40"
+                    style={{ background: brightCubeGradient(s.color) }}
+                  >
+                    <Icon className="size-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-sm font-semibold text-ink">{s.title}</h4>
+                    <p className="mt-0.5 text-xs text-muted">{s.explain}</p>
+                    <p className="tabular mt-1.5 text-sm font-semibold text-ink-2">{s.stat}</p>
+                  </div>
+                </div>
+
+                {s.leads.length > 0 && (
+                  <ul className="mt-3 divide-y divide-line rounded-control border border-line bg-subtle px-3 py-1 text-xs">
+                    {s.leads.map((lead) => (
+                      <li key={`${s.key}-${lead.customerId}-${lead.at.toISOString()}`} className="flex items-center justify-between gap-2 py-2">
+                        <div className="min-w-0 flex-1">
+                          <Link href={lead.href} className="font-semibold text-ink hover:underline">
+                            {lead.name}
+                          </Link>
+                          <span className="ml-1.5 text-muted">· {lead.detail}</span>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {lead.amount !== undefined && lead.amount > 0 && (
+                            <span className="tabular font-semibold text-ink">{formatValue(lead.amount, "inr")}</span>
+                          )}
+                          <span className="tabular text-2xs text-muted">{fmtDate(lead.at, "d MMM, h:mm a")}</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-2.5 text-xs">
+                <p className="text-muted">
+                  <b className="font-medium text-ink-2">Action tip:</b> {s.tip}
+                </p>
+                <Link href={s.actionHref} className="shrink-0 font-semibold text-brand-deep hover:underline">
+                  {s.actionLabel} →
+                </Link>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+

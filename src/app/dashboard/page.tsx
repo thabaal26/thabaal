@@ -23,7 +23,9 @@ import { SpendCard } from "./spend-card";
 import {
   ActivityCard,
   BestTimeCard,
+  BusinessPriorityStrip,
   C,
+  CustomerScenariosCard,
   DeliveryCard,
   FunnelCard,
   KpiTile,
@@ -32,6 +34,8 @@ import {
   RangeTabs,
   TodayCard,
   TopProductsCard,
+  type CustomerScenariosData,
+  type ProductDemandRow,
   type Range,
 } from "./overview-cards";
 
@@ -139,8 +143,25 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         take: 3,
       }),
       getSettings(),
-      // Orders of this period and the comparison stretch (cancelled ones aren't sales).
-      db.order.findMany({ where: { ...mine, status: { not: "CANCELLED" }, createdAt: { gte: prevStart } }, select: { createdAt: true, total: true, items: true } }).catch(() => []),
+      // All orders of this period and the comparison stretch (including NEW unpaid carts and CANCELLED carts for cart-abandonment analytics).
+      db.order
+        .findMany({
+          where: { ...mine, createdAt: { gte: prevStart } },
+          select: {
+            id: true,
+            number: true,
+            customerId: true,
+            status: true,
+            paidAt: true,
+            paymentRequestedAt: true,
+            createdAt: true,
+            total: true,
+            items: true,
+            customer: { select: { name: true, phone: true } },
+          },
+          orderBy: { createdAt: "desc" },
+        })
+        .catch(() => []),
       db.$queryRaw<{ k: string; n: bigint }[]>`
         SELECT to_char((r."receivedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${APP_TZ}, ${bucketSql}) AS k, count(*) AS n
         FROM "Reply" r JOIN "Customer" c ON c.id = r."customerId"
@@ -148,24 +169,41 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         GROUP BY 1`,
       db.reply.groupBy({ by: ["customerId"], where: { ...myMessages, receivedAt: { gte: start } }, _count: true }),
       db.reply.count({ where: { ...myMessages, receivedAt: { gte: prevStart, lt: prevEnd } } }),
-      // People messaged in the period and how far each got: received, read, replied, ordered within 7 days.
-      db.$queryRaw<{ messaged: bigint; delivered: bigint; read: bigint; replied: bigint; ordered: bigint; revenue: number }[]>`
+      // People messaged in the period and how far each got: received, read, replied, browsed catalogue, added to cart, and bought within 7 days.
+      db.$queryRaw<{
+        messaged: bigint;
+        delivered: bigint;
+        read: bigint;
+        replied: bigint;
+        browsed: bigint;
+        added_to_cart: bigint;
+        ordered: bigint;
+        revenue: number;
+      }[]>`
         WITH sent AS (
           SELECT m."customerId" AS cid, min(m."createdAt") AS first_at,
             bool_or(m.status IN ('DELIVERED', 'READ')) AS delivered, bool_or(m.status = 'READ') AS read
           FROM "Message" m JOIN "Customer" c ON c.id = m."customerId"
           WHERE m."createdAt" >= ${start} AND m.status NOT IN ('QUEUED', 'SKIPPED') AND (${cid}::text IS NULL OR c."clientId" = ${cid})
           GROUP BY 1
-        ), ord AS (
-          SELECT DISTINCT o.id, o.total, o."customerId" FROM "Order" o JOIN sent s ON s.cid = o."customerId"
-          WHERE o.status <> 'CANCELLED' AND o."createdAt" >= s.first_at AND o."createdAt" < s.first_at + interval '7 days'
+        ), carts AS (
+          SELECT DISTINCT o.id, o.total, o.status, o."paidAt", o."customerId" FROM "Order" o JOIN sent s ON s.cid = o."customerId"
+          WHERE o."createdAt" >= s.first_at AND o."createdAt" < s.first_at + interval '7 days'
+        ), bought AS (
+          SELECT * FROM carts WHERE status IN ('CONFIRMED', 'PAID', 'DISPATCHED', 'DELIVERED') OR "paidAt" IS NOT NULL
         )
         SELECT count(*) AS messaged,
           count(*) FILTER (WHERE delivered) AS delivered,
           count(*) FILTER (WHERE read) AS read,
           count(*) FILTER (WHERE EXISTS (SELECT 1 FROM "Reply" r WHERE r."customerId" = sent.cid AND r."receivedAt" >= sent.first_at)) AS replied,
-          (SELECT count(DISTINCT "customerId") FROM ord) AS ordered,
-          (SELECT coalesce(sum(total), 0)::float FROM ord) AS revenue
+          count(*) FILTER (WHERE EXISTS (
+            SELECT 1 FROM "Message" m2 WHERE m2."customerId" = sent.cid AND m2."createdAt" >= sent.first_at AND m2."templateName" IN ('Catalogue', 'Price list')
+          ) OR EXISTS (
+            SELECT 1 FROM "Reply" r2 WHERE r2."customerId" = sent.cid AND r2."receivedAt" >= sent.first_at AND r2.text ~* '(price|rate|catalog|order now|view price)'
+          )) AS browsed,
+          (SELECT count(DISTINCT "customerId") FROM carts WHERE status <> 'CANCELLED') AS added_to_cart,
+          (SELECT count(DISTINCT "customerId") FROM bought) AS ordered,
+          (SELECT coalesce(sum(total), 0)::float FROM bought) AS revenue
         FROM sent`.catch(() => []),
       // Replies by weekday and 3-hour block over 90 days: when customers actually answer.
       db.$queryRaw<{ d: number; b: number; n: bigint }[]>`
@@ -185,6 +223,26 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         WHERE r."receivedAt" >= ${todayStart} AND (${cid}::text IS NULL OR c."clientId" = ${cid})
         GROUP BY 1`,
     ]);
+
+  // Extra business-scenario queries: catalogue/price-list sends, period replies with customer info, and unhandled chats.
+  const [catalogueMsgs, periodReplies, unhandledGroup, toDispatchCount] = await Promise.all([
+    db.message
+      .findMany({
+        where: { ...myMessages, createdAt: { gte: start }, templateName: { in: ["Catalogue", "Price list"] } },
+        select: { customerId: true, templateName: true, status: true, createdAt: true, customer: { select: { name: true, phone: true } } },
+        orderBy: { createdAt: "desc" },
+      })
+      .catch(() => []),
+    db.reply
+      .findMany({
+        where: { ...myMessages, receivedAt: { gte: start } },
+        select: { customerId: true, text: true, kind: true, handled: true, receivedAt: true, customer: { select: { name: true, phone: true } } },
+        orderBy: { receivedAt: "desc" },
+      })
+      .catch(() => []),
+    db.reply.groupBy({ by: ["customerId"], where: { ...myMessages, handled: false }, _count: true }).catch(() => []),
+    db.order.count({ where: { ...mine, status: { in: ["CONFIRMED", "PAID"] } } }).catch(() => 0),
+  ]);
 
   // Messages Meta held back (too much marketing to that person) are retried automatically and not
   // charged: worth knowing, but nothing to fix, so they don't count as something needing attention.
@@ -218,10 +276,21 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
   const prevDelivered = prevCount("DELIVERED") + prevRead;
   const prevTotal = prevDelivered + prevCount("SENT") + prevCount("FAILED");
 
-  const curOrders = orders.filter((o) => o.createdAt >= start);
-  const prevOrders = orders.filter((o) => o.createdAt >= prevStart && o.createdAt < prevEnd);
+  // Distinguish actual bought/confirmed orders from unpaid WhatsApp carts ("NEW" with paidAt == null) and cancelled carts.
+  const isBought = (o: (typeof orders)[number]) =>
+    o.status === "CONFIRMED" || o.status === "PAID" || o.status === "DISPATCHED" || o.status === "DELIVERED" || o.paidAt !== null;
+  const isUnpaidCart = (o: (typeof orders)[number]) => o.status === "NEW" && o.paidAt === null;
+
+  const curAllOrders = orders.filter((o) => o.createdAt >= start);
+  const curOrders = curAllOrders.filter(isBought);
+  const curUnpaidCarts = curAllOrders.filter(isUnpaidCart);
+  const curCancelledCarts = curAllOrders.filter((o) => o.status === "CANCELLED");
+
+  const prevBoughtOrders = orders.filter((o) => o.createdAt >= prevStart && o.createdAt < prevEnd && isBought(o));
   const revenue = curOrders.reduce((n, o) => n + o.total, 0);
-  const prevRevenue = prevOrders.reduce((n, o) => n + o.total, 0);
+  const unpaidCartRevenue = curUnpaidCarts.reduce((n, o) => n + o.total, 0);
+  const cancelledCartRevenue = curCancelledCarts.reduce((n, o) => n + o.total, 0);
+  const prevRevenue = prevBoughtOrders.reduce((n, o) => n + o.total, 0);
   const replies = replySeries.reduce((n, r) => n + Number(r.n), 0);
 
   const sentSpark = keys.map((k) => at(k));
@@ -240,20 +309,176 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
   const campaignsOn = isSectionEnabled(disabledSections, "campaigns");
   const templatesOn = isSectionEnabled(disabledSections, "templates");
 
-  // Best sellers from this period's order lines.
-  const productMap = new Map<string, { name: string; qty: number; revenue: number }>();
-  for (const o of curOrders)
+  // Product demand: separate bought items vs. items added to cart & left unpaid/cancelled.
+  const productMap = new Map<string, ProductDemandRow>();
+  for (const o of curAllOrders) {
+    const bought = isBought(o);
     for (const it of (o.items as OrderItem[] | null) ?? []) {
       const name = it.name ?? it.id;
-      const row = productMap.get(name) ?? { name, qty: 0, revenue: 0 };
-      row.qty += Number(it.quantity) || 0;
-      row.revenue += (Number(it.price) || 0) * (Number(it.quantity) || 0);
+      const qty = Number(it.quantity) || 0;
+      const val = (Number(it.price) || 0) * qty;
+      const row = productMap.get(name) ?? { name, qty: 0, revenue: 0, cartOnlyQty: 0, cartOnlyValue: 0 };
+      if (bought) {
+        row.qty += qty;
+        row.revenue += val;
+      } else {
+        row.cartOnlyQty = (row.cartOnlyQty ?? 0) + qty;
+        row.cartOnlyValue = (row.cartOnlyValue ?? 0) + val;
+      }
       productMap.set(name, row);
     }
-  const topProducts = [...productMap.values()].sort((a, b) => b.revenue - a.revenue || b.qty - a.qty).slice(0, 6);
+  }
+  const topProducts = [...productMap.values()]
+    .sort((a, b) => b.revenue + (b.cartOnlyValue ?? 0) - (a.revenue + (a.cartOnlyValue ?? 0)) || b.qty - a.qty)
+    .slice(0, 6);
+
+  // Customer behaviour & cart scenario analysis across the period.
+  const cartCustomerIds = new Set(curAllOrders.map((o) => o.customerId));
+  const boughtCustomerIds = new Set(curOrders.map((o) => o.customerId));
+  const unpaidCartCustomerIds = new Set(curUnpaidCarts.map((o) => o.customerId));
+  const cancelledCustomerIds = new Set(curCancelledCarts.map((o) => o.customerId));
+
+  // Customers who browsed catalogue / price list (either received Catalogue/Price list message or tapped Order now / Price list button)
+  const browsedCustomerMap = new Map<string, { name: string; phone: string; detail: string; at: Date }>();
+  for (const m of catalogueMsgs) {
+    if (!browsedCustomerMap.has(m.customerId)) {
+      browsedCustomerMap.set(m.customerId, {
+        name: m.customer.name,
+        phone: m.customer.phone,
+        detail: `${m.templateName} (${m.status.toLowerCase()})`,
+        at: m.createdAt,
+      });
+    }
+  }
+  for (const r of periodReplies) {
+    if (/(price|rate|catalog|order now|view price)/i.test(r.text) && !browsedCustomerMap.has(r.customerId)) {
+      browsedCustomerMap.set(r.customerId, {
+        name: r.customer.name,
+        phone: r.customer.phone,
+        detail: `Tapped "${r.text.slice(0, 28)}"`,
+        at: r.receivedAt,
+      });
+    }
+  }
+
+  const browsedNoCartLeads = [...browsedCustomerMap.entries()]
+    .filter(([cidKey]) => !cartCustomerIds.has(cidKey))
+    .map(([cidKey, info]) => ({
+      customerId: cidKey,
+      name: info.name,
+      phone: info.phone,
+      detail: info.detail,
+      at: info.at,
+      href: `/dashboard/customers/${cidKey}`,
+    }));
+
+  const inquiryOnlyMap = new Map<string, { name: string; phone: string; detail: string; at: Date }>();
+  for (const r of periodReplies) {
+    if (r.kind === "order") continue;
+    if (cartCustomerIds.has(r.customerId) || browsedCustomerMap.has(r.customerId)) continue;
+    if (!inquiryOnlyMap.has(r.customerId)) {
+      inquiryOnlyMap.set(r.customerId, {
+        name: r.customer.name,
+        phone: r.customer.phone,
+        detail: r.text.slice(0, 36),
+        at: r.receivedAt,
+      });
+    }
+  }
+
+  const formatCartItems = (items: unknown) => {
+    const arr = (items as OrderItem[] | null) ?? [];
+    if (!arr.length) return "Cart";
+    return arr
+      .slice(0, 2)
+      .map((i) => `${i.quantity}× ${i.name ?? i.id}`)
+      .join(", ") + (arr.length > 2 ? ` +${arr.length - 2} more` : "");
+  };
+
+  const buyerOrderCounts = new Map<string, number>();
+  for (const o of curOrders) buyerOrderCounts.set(o.customerId, (buyerOrderCounts.get(o.customerId) ?? 0) + 1);
+  const repeatBuyersCount = [...buyerOrderCounts.values()].filter((c) => c > 1).length;
+
+  const totalBrowsersOrCarts = new Set([...browsedCustomerMap.keys(), ...cartCustomerIds]).size;
+  const nonCancelledCartCustomers = new Set(curAllOrders.filter((o) => o.status !== "CANCELLED").map((o) => o.customerId)).size;
 
   const f = funnelRows[0];
-  const funnel = { messaged: Number(f?.messaged ?? 0), delivered: Number(f?.delivered ?? 0), read: Number(f?.read ?? 0), replied: Number(f?.replied ?? 0), ordered: Number(f?.ordered ?? 0) };
+  const funnel = {
+    messaged: Number(f?.messaged ?? 0),
+    delivered: Number(f?.delivered ?? 0),
+    read: Number(f?.read ?? 0),
+    replied: Number(f?.replied ?? 0),
+    browsed: Math.max(Number(f?.browsed ?? 0), totalBrowsersOrCarts),
+    addedToCart: Math.max(Number(f?.added_to_cart ?? 0), nonCancelledCartCustomers),
+    ordered: Number(f?.ordered ?? 0),
+  };
+
+  const scenariosData: CustomerScenariosData = {
+    periodLabel: hourly ? "today so far" : `the last ${days} days`,
+    addedToCartUnpaid: {
+      customers: unpaidCartCustomerIds.size,
+      carts: curUnpaidCarts.length,
+      value: unpaidCartRevenue,
+      leads: curUnpaidCarts.slice(0, 4).map((o) => ({
+        customerId: o.customerId,
+        name: o.customer.name,
+        phone: o.customer.phone,
+        detail: `RG-${1000 + o.number} · ${formatCartItems(o.items)}`,
+        amount: o.total,
+        at: o.createdAt,
+        href: `/dashboard/customers/${o.customerId}`,
+      })),
+    },
+    browsedNoCart: {
+      customers: browsedNoCartLeads.length,
+      leads: browsedNoCartLeads.slice(0, 4),
+    },
+    cancelledCarts: {
+      customers: cancelledCustomerIds.size,
+      carts: curCancelledCarts.length,
+      value: cancelledCartRevenue,
+      leads: curCancelledCarts.slice(0, 3).map((o) => ({
+        customerId: o.customerId,
+        name: o.customer.name,
+        phone: o.customer.phone,
+        detail: `RG-${1000 + o.number} · ${formatCartItems(o.items)}`,
+        amount: o.total,
+        at: o.createdAt,
+        href: `/dashboard/customers/${o.customerId}`,
+      })),
+    },
+    convertedBuyers: {
+      customers: boughtCustomerIds.size,
+      orders: curOrders.length,
+      revenue,
+      repeatBuyers: repeatBuyersCount,
+      leads: curOrders.slice(0, 4).map((o) => ({
+        customerId: o.customerId,
+        name: o.customer.name,
+        phone: o.customer.phone,
+        detail: `RG-${1000 + o.number} (${o.status.toLowerCase()}) · ${formatCartItems(o.items)}`,
+        amount: o.total,
+        at: o.createdAt,
+        href: `/dashboard/customers/${o.customerId}`,
+      })),
+    },
+    repliedInquiryOnly: {
+      customers: inquiryOnlyMap.size,
+      leads: [...inquiryOnlyMap.entries()].slice(0, 4).map(([cidKey, info]) => ({
+        customerId: cidKey,
+        name: info.name,
+        phone: info.phone,
+        detail: info.detail,
+        at: info.at,
+        href: `/dashboard/customers/${cidKey}`,
+      })),
+    },
+    readNoAction: {
+      customers: Math.max(0, funnel.read - funnel.replied),
+    },
+    catalogueToCartPct: totalBrowsersOrCarts > 0 ? pct(cartCustomerIds.size, totalBrowsersOrCarts) : 0,
+    cartToBuyPct: curAllOrders.length > 0 ? pct(curOrders.length, curAllOrders.length) : 0,
+  };
 
   const nowHour = Number(formatInTimeZone(now, APP_TZ, "H"));
   const todayHours = Array.from({ length: nowHour + 1 }, (_, h) => {
@@ -378,6 +603,17 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         </div>
       )}
 
+      <BusinessPriorityStrip
+        unpaidCartsCount={curUnpaidCarts.length}
+        unpaidCartsValue={unpaidCartRevenue}
+        unpaidCustomersCount={unpaidCartCustomerIds.size}
+        browsedNoCartCount={browsedNoCartLeads.length}
+        toDispatchCount={toDispatchCount}
+        unhandledRepliesCount={unhandledGroup.length}
+        showOrders={ordersOn}
+        showReplies={repliesOn}
+      />
+
       {/* Headline figures for the period, each with its real change against the stretch before. */}
       <div
         role="group"
@@ -386,10 +622,15 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       >
         {ordersOn ? (
           <KpiTile
-            label="Sales"
+            label="Confirmed sales"
             value={revenue}
             format="inr"
-            sub={`${fmtNumber(curOrders.length)} order${curOrders.length === 1 ? "" : "s"}${curOrders.length ? ` · avg ₹${Math.round(revenue / curOrders.length).toLocaleString("en-IN")}` : ""}`}
+            sub={
+              <>
+                {fmtNumber(curOrders.length)} bought
+                {curUnpaidCarts.length > 0 ? ` · +₹${Math.round(unpaidCartRevenue).toLocaleString("en-IN")} in ${curUnpaidCarts.length} unpaid cart${curUnpaidCarts.length === 1 ? "" : "s"}` : curOrders.length ? ` · avg ₹${Math.round(revenue / curOrders.length).toLocaleString("en-IN")}` : ""}
+              </>
+            }
             icon={Rupee3D}
             color={C.gold}
             spark={revenueSpark}
@@ -439,7 +680,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
             label="Customer replies"
             value={replies}
             format="count"
-            sub={`from ${fmtNumber(repliers.length)} customer${repliers.length === 1 ? "" : "s"}`}
+            sub={`from ${fmtNumber(repliers.length)} customer${repliers.length === 1 ? "" : "s"}${browsedNoCartLeads.length ? ` · ${browsedNoCartLeads.length} browsed only` : ""}`}
             icon={Messages3D}
             color={C.info}
             spark={replySpark}
@@ -510,7 +751,14 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       {/* Outcomes, live status and sending limits. */}
       <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-5 sm:gap-5 md:grid-cols-2 xl:grid-cols-12">
         <div className="min-w-0 md:col-span-2 xl:col-span-5">
-          <FunnelCard f={funnel} revenue={Number(f?.revenue ?? 0)} showOrders={ordersOn} showReplies={repliesOn} />
+          <FunnelCard
+            f={funnel}
+            revenue={revenue || Number(f?.revenue ?? 0)}
+            unpaidCartRevenue={unpaidCartRevenue}
+            unpaidCartCount={curUnpaidCarts.length}
+            showOrders={ordersOn}
+            showReplies={repliesOn}
+          />
         </div>
         <div className="min-w-0 xl:col-span-4">
           <TodayCard
@@ -525,6 +773,10 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
           <NumberLimitsCard numbers={health} />
         </div>
       </div>
+
+      {/* Deep Customer Behaviour & Cart Drop-Off Scenarios */}
+      {ordersOn && <CustomerScenariosCard data={scenariosData} />}
+
 
       {/* When to send, and what sells. */}
       {(repliesOn || ordersOn) && (

@@ -44,18 +44,20 @@ export async function syncMetaAccountBalanceAction(wabaId: string, balance: numb
   };
 }
 
-/** Verifies live Meta Cloud API connectivity and health for sending numbers. */
+/** Verifies live Meta Cloud API connectivity, health for all sending numbers, and live pricing analytics. */
 export async function refreshMetaLiveStatusAction(clientId: string): Promise<ActionResult> {
   const s = await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
   const status = await fetchMetaLiveStatus(clientId);
   revalidatePath("/dashboard");
   if (status.liveConnected) {
+    const costNote = typeof status.liveCost30d === "number" ? ` · 30d Meta spend: ₹${status.liveCost30d.toFixed(2)}` : "";
     return {
       ok: true,
-      message: `Meta Cloud API connected: ${status.wabaName} (${status.displayPhone}) · Quality: ${status.qualityRating}`,
+      message: `Meta Cloud API synced (${status.numbersSynced ?? 1} number${(status.numbersSynced ?? 1) === 1 ? "" : "s"}): ${status.wabaName} · Quality: ${status.qualityRating}${costNote}`,
     };
   }
   return { ok: false, message: status.reason ?? "Could not reach Meta Cloud API. Check API credentials." };
 }
+
 

@@ -34,9 +34,8 @@ function SpendRows({ rows }: { rows: SpendRow[] }) {
 }
 
 /**
- * Message spend worked out from the messages this portal sent, at Meta's published rates, and the
- * prepaid balance last recorded for the client's WhatsApp account. Neither is read live from Meta,
- * so the card says so and links to Meta's Billing Hub for the authoritative figures.
+ * Message spend synced live from Meta's `pricing_analytics` Graph API (with local DB fallback when offline),
+ * alongside the prepaid balance recorded for the client's WhatsApp account.
  */
 export async function SpendCard({ clientId, canManage, className }: { clientId: string; canManage: boolean; className?: string }) {
   const [s, { number }] = await Promise.all([spendSummary(clientId), senderFor(clientId)]);
@@ -52,22 +51,39 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
         tone="gold"
         icon={<Wallet />}
         title="WhatsApp spend"
-        description="Estimated at Meta's India rates"
+        description={s.liveSyncedFromMeta ? "Live from Meta pricing_analytics API" : "Estimated at Meta's India rates"}
         action={
-          <a href={acc.billingUrl} target="_blank" rel="noopener noreferrer" className={buttonClass("ghost", "sm")}>
-            Billing Hub <ExternalLink aria-hidden className="size-3.5" />
-            <span className="sr-only">(opens Meta Business Suite)</span>
-          </a>
+          <div className="flex items-center gap-2">
+            {s.liveSyncedFromMeta && (
+              <Badge tone="green" dot>
+                Live Meta sync
+              </Badge>
+            )}
+            <a href={acc.billingUrl} target="_blank" rel="noopener noreferrer" className={buttonClass("ghost", "sm")}>
+              Billing Hub <ExternalLink aria-hidden className="size-3.5" />
+              <span className="sr-only">(opens Meta Business Suite)</span>
+            </a>
+          </div>
         }
       />
       <dl className="grid grid-cols-2 divide-x divide-line border-b border-line">
         <div className="px-4 py-4 sm:px-5">
-          <dt className="text-xs text-muted">{s.monthLabel} so far</dt>
+          <dt className="text-xs text-muted">{s.monthLabel} so far (ex-GST)</dt>
           <dd className="tabular mt-1 text-xl font-semibold leading-tight text-ink">{rupees(s.totalMonthSpent)}</dd>
+          {s.totalMonthSpent > 0 && (
+            <dd className="tabular mt-0.5 text-2xs text-muted">
+              {rupees(s.totalMonthSpentWithGst)} incl. 18% GST
+            </dd>
+          )}
         </div>
         <div className="px-4 py-4 sm:px-5">
           <dt className="text-xs text-muted">{s.lastMonthLabel}</dt>
           <dd className="tabular mt-1 text-xl font-semibold leading-tight text-ink">{rupees(total(s.previous))}</dd>
+          {s.metaTotalDelivered > 0 && (
+            <dd className="tabular mt-0.5 text-2xs text-muted">
+              {fmtNumber(s.metaTotalDelivered)} delivered on Meta
+            </dd>
+          )}
         </div>
       </dl>
 
@@ -76,7 +92,9 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
           {recorded ? (
             <>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-medium text-ink-2">Prepaid balance · last recorded</p>
+                <p className="text-xs font-medium text-ink-2">
+                  Prepaid balance · {new Date(s.lastSyncedAt).getTime() > 0 ? `synced ${fmtDate(new Date(s.lastSyncedAt), "d MMM, h:mm a")}` : "last recorded"}
+                </p>
                 {low && (
                   <Badge tone="amber" dot>
                     Low balance
@@ -85,7 +103,7 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
               </div>
               <p className="tabular mt-1 text-2xl font-semibold leading-tight text-ink">{rupees(s.remainingBalance)}</p>
               <p className="mt-1 text-xs text-muted">
-                {acc.accountName} · check Meta&apos;s Billing Hub before a large campaign, or sync/top up below.
+                {acc.accountName} · Meta deducts live spend after your synced balance snapshot.
               </p>
             </>
           ) : (
@@ -104,6 +122,22 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
           <p className="text-xs font-medium text-muted">{s.monthLabel} by category</p>
           <SpendRows rows={s.current} />
         </div>
+
+        {s.byPhone.length > 0 && (
+          <div className="border-t border-line pt-3">
+            <p className="mb-1.5 text-xs font-medium text-muted">{s.monthLabel} by WhatsApp number</p>
+            <ul className="divide-y divide-line text-xs">
+              {s.byPhone.map((p) => (
+                <li key={p.phone} className="flex items-center justify-between gap-2 py-1.5">
+                  <span className="tabular font-medium text-ink">+{p.phone}</span>
+                  <span className="tabular text-muted">
+                    {fmtNumber(p.charged)} paid{p.free ? ` · ${fmtNumber(p.free)} free` : ""} · <b className="font-semibold text-ink">{rupees(p.cost)}</b>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {s.topUps.length > 0 && (
           <div className="border-t border-line pt-3">
@@ -131,11 +165,12 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
         {canManage && <TopUpForm clientId={clientId} wabaId={wabaId} />}
 
         <p className="border-t border-line pt-3 text-xs text-muted">
-          All-time estimate <span className="tabular font-medium text-ink-2">{rupees(s.allTimeSpent)}</span> · Marketing ₹{RATES.marketing}, utility ₹{RATES.utility} per
-          message. Service replies within 24 hours are free.
+          All-time spend <span className="tabular font-medium text-ink-2">{rupees(s.allTimeSpent)}</span> · Marketing ₹{RATES.marketing}, utility ₹{RATES.utility} per
+          message (+18% GST). Service replies within 24 hours are free.
         </p>
       </div>
     </Card>
   );
 }
+
 

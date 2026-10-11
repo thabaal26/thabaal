@@ -46,14 +46,22 @@ async function applyStatus(s: StatusUpdate) {
       status: true,
       customerId: true,
       templateName: true,
+      pricingCategory: true,
+      template: { select: { category: true } },
       customer: { select: { phone: true, name: true, client: { select: { name: true } } } },
     },
   });
   if (!msg) return;
   const clientName = msg.customer?.client?.name || "Thabaal";
   // Every status carries Meta's pricing; keep it for cost reporting even when the status itself is stale.
-  if (s.pricing?.category)
+  if (s.pricing?.category) {
     await db.message.update({ where: { id: msg.id }, data: { pricingCategory: s.pricing.category.toLowerCase(), billable: s.pricing.billable ?? null } });
+  } else if (!msg.pricingCategory && (s.status.toUpperCase() === "DELIVERED" || s.status.toUpperCase() === "READ")) {
+    const inferred = msg.template?.category?.toLowerCase() ?? (["Catalogue", "Price list", "Payment request", "Freeform reply", "Auto reply"].includes(msg.templateName) ? "service" : null);
+    if (inferred) {
+      await db.message.update({ where: { id: msg.id }, data: { pricingCategory: inferred, billable: inferred !== "service" } });
+    }
+  }
   const at = new Date(Number(s.timestamp) * 1000);
   const next = s.status.toUpperCase();
   if (next === "FAILED") {

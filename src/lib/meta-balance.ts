@@ -262,13 +262,146 @@ export async function setMetaAccountBalance(
       .catch(() => null);
   }
 
+  pricingCache.delete(wabaId);
   return updated;
 }
 
+export type MetaPricingPoint = {
+  start: number;
+  end: number;
+  phoneNumber: string;
+  category: "marketing" | "utility" | "authentication" | "service";
+  billable: boolean;
+  volume: number;
+  cost: number;
+};
+
+export type MetaLiveAnalyticsResult = {
+  live: boolean;
+  wabaId: string | null;
+  wabaName: string | null;
+  currency: string;
+  points: MetaPricingPoint[];
+  totalSent: number;
+  totalDelivered: number;
+  checkedAt: string;
+};
+
+const pricingCache = new Map<string, { expiresAt: number; data: MetaLiveAnalyticsResult }>();
+
 /**
- * Checks live Meta Graph API connection status for the client's WABA and phone numbers.
- * Fetches verified name, quality rating, messaging tier, and account status in real-time,
- * and updates the stored WhatsAppNumber record when connected.
+ * Fetches authoritative live message volume and INR cost directly from Meta's `pricing_analytics`
+ * and `analytics` Graph API endpoints for the client's WhatsApp Business Account.
+ */
+export async function fetchMetaLivePricing(
+  clientId: string,
+  startUnix: number,
+  endUnix: number,
+  forceRefresh = false,
+): Promise<MetaLiveAnalyticsResult> {
+  const empty: MetaLiveAnalyticsResult = {
+    live: false,
+    wabaId: null,
+    wabaName: null,
+    currency: "INR",
+    points: [],
+    totalSent: 0,
+    totalDelivered: 0,
+    checkedAt: new Date().toISOString(),
+  };
+
+  try {
+    const [client, number] = await Promise.all([
+      db.client.findUnique({
+        where: { id: clientId },
+        select: { name: true, waToken: true, waBusinessAccountId: true },
+      }),
+      db.whatsAppNumber.findFirst({
+        where: { clientId },
+        orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+      }),
+    ]);
+
+    const token = number?.token || client?.waToken || process.env.WHATSAPP_TOKEN;
+    const wabaId = number?.businessAccountId || client?.waBusinessAccountId || process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+    if (!token || !wabaId) return empty;
+
+    const cacheKey = `${wabaId}:${Math.floor(startUnix / 3600)}`;
+    const cached = !forceRefresh ? pricingCache.get(cacheKey) : undefined;
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data;
+    }
+
+    const fields = [
+      "id",
+      "name",
+      "currency",
+      `pricing_analytics.start(${startUnix}).end(${endUnix}).granularity(DAILY).dimensions(["PRICING_CATEGORY","PRICING_TYPE","TIER","COUNTRY","PHONE"])`,
+      `analytics.start(${startUnix}).end(${endUnix}).granularity(DAY)`,
+    ].join(",");
+
+    const res = await fetch(`https://graph.facebook.com/${VERSION}/${wabaId}?fields=${encodeURIComponent(fields)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    })
+      .then((r) => r.json())
+      .catch(() => null);
+
+    if (!res || res.error || !res.id) return empty;
+
+    const rawPoints: {
+      start?: number;
+      end?: number;
+      phone_number?: string;
+      pricing_type?: string;
+      pricing_category?: string;
+      volume?: number;
+      cost?: number;
+    }[] = res.pricing_analytics?.data?.[0]?.data_points ?? [];
+
+    const points: MetaPricingPoint[] = rawPoints.map((p) => {
+      const rawCat = String(p.pricing_category ?? "SERVICE").toLowerCase();
+      const category: MetaPricingPoint["category"] =
+        rawCat === "marketing" || rawCat === "utility" || rawCat === "authentication" ? rawCat : "service";
+      const cost = Number(p.cost ?? 0);
+      const billable = cost > 0 || (p.pricing_type === "REGULAR" && category !== "service");
+      return {
+        start: Number(p.start ?? 0),
+        end: Number(p.end ?? 0),
+        phoneNumber: String(p.phone_number ?? ""),
+        category,
+        billable,
+        volume: Number(p.volume ?? 0),
+        cost,
+      };
+    });
+
+    const delivPoints: { sent?: number; delivered?: number }[] = res.analytics?.data_points ?? [];
+    const totalSent = delivPoints.reduce((s, d) => s + Number(d.sent ?? 0), 0);
+    const totalDelivered = delivPoints.reduce((s, d) => s + Number(d.delivered ?? 0), 0);
+
+    const out: MetaLiveAnalyticsResult = {
+      live: true,
+      wabaId: String(res.id),
+      wabaName: res.name || client?.name || "WhatsApp Business Account",
+      currency: res.currency || "INR",
+      points,
+      totalSent,
+      totalDelivered,
+      checkedAt: new Date().toISOString(),
+    };
+
+    pricingCache.set(cacheKey, { expiresAt: Date.now() + 45_000, data: out });
+    return out;
+  } catch {
+    return empty;
+  }
+}
+
+/**
+ * Checks live Meta Graph API connection status for the client's WABA and all phone numbers.
+ * Fetches verified name, quality rating, messaging tier, account status, and live pricing analytics in real-time,
+ * and updates all stored WhatsAppNumber records when connected.
  */
 export async function fetchMetaLiveStatus(clientId: string) {
   try {
@@ -276,10 +409,11 @@ export async function fetchMetaLiveStatus(clientId: string) {
       where: { id: clientId },
       select: { name: true, waToken: true, waBusinessAccountId: true, waPhoneNumberId: true },
     });
-    const number = await db.whatsAppNumber.findFirst({
+    const numbers = await db.whatsAppNumber.findMany({
       where: { clientId },
       orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
     });
+    const number = numbers[0];
 
     const token = number?.token || client?.waToken || process.env.WHATSAPP_TOKEN;
     const wabaId = number?.businessAccountId || client?.waBusinessAccountId || process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
@@ -292,29 +426,42 @@ export async function fetchMetaLiveStatus(clientId: string) {
       };
     }
 
-    const [wabaRes, phoneRes] = await Promise.all([
+    pricingCache.clear();
+    const nowSec = Math.floor(Date.now() / 1000);
+    const monthStartSec = nowSec - 30 * 86400;
+
+    const [wabaRes, phonesRes, livePricing] = await Promise.all([
       fetch(`https://graph.facebook.com/${VERSION}/${wabaId}?fields=id,name,currency,timezone_id,account_review_status`, {
         headers: { Authorization: `Bearer ${token}` },
         cache: "no-store",
       })
         .then((r) => r.json())
         .catch(() => null),
-      fetch(`https://graph.facebook.com/${VERSION}/${phoneId}?fields=id,verified_name,display_phone_number,quality_rating,messaging_limit_tier`, {
+      fetch(`https://graph.facebook.com/${VERSION}/${wabaId}/phone_numbers?fields=id,verified_name,display_phone_number,quality_rating,messaging_limit_tier`, {
         headers: { Authorization: `Bearer ${token}` },
         cache: "no-store",
       })
         .then((r) => r.json())
         .catch(() => null),
+      fetchMetaLivePricing(clientId, monthStartSec, nowSec, true),
     ]);
 
-    if (wabaRes?.error && phoneRes?.error) {
+    if (wabaRes?.error && phonesRes?.error) {
       return {
         liveConnected: false,
-        reason: phoneRes.error.message || wabaRes.error.message || "Meta Graph API rejected the request.",
+        reason: phonesRes.error.message || wabaRes.error.message || "Meta Graph API rejected the request.",
       };
     }
 
-    const liveConnected = Boolean((wabaRes?.id && !wabaRes?.error) || (phoneRes?.id && !phoneRes?.error));
+    const remotePhones: {
+      id: string;
+      verified_name?: string;
+      display_phone_number?: string;
+      quality_rating?: string;
+      messaging_limit_tier?: string;
+    }[] = phonesRes?.data ?? [];
+
+    const liveConnected = Boolean((wabaRes?.id && !wabaRes?.error) || remotePhones.length > 0);
     if (!liveConnected) {
       return {
         liveConnected: false,
@@ -322,30 +469,38 @@ export async function fetchMetaLiveStatus(clientId: string) {
       };
     }
 
-    if (number && phoneRes?.id && !phoneRes?.error) {
-      await db.whatsAppNumber
-        .update({
-          where: { id: number.id },
-          data: {
-            qualityRating: phoneRes.quality_rating ?? number.qualityRating,
-            messagingTier: phoneRes.messaging_limit_tier ?? number.messagingTier,
-            ...(phoneRes.display_phone_number && { displayPhone: phoneRes.display_phone_number }),
-            ...(phoneRes.verified_name && { verifiedName: phoneRes.verified_name }),
-            statusCheckedAt: new Date(),
-          },
-        })
-        .catch(() => null);
+    for (const localNum of numbers) {
+      const remote = remotePhones.find((p) => p.id === localNum.phoneNumberId);
+      if (remote) {
+        await db.whatsAppNumber
+          .update({
+            where: { id: localNum.id },
+            data: {
+              qualityRating: remote.quality_rating ?? localNum.qualityRating,
+              messagingTier: remote.messaging_limit_tier ?? localNum.messagingTier,
+              ...(remote.display_phone_number && { displayPhone: remote.display_phone_number }),
+              ...(remote.verified_name && { verifiedName: remote.verified_name }),
+              statusCheckedAt: new Date(),
+            },
+          })
+          .catch(() => null);
+      }
     }
+
+    const primaryRemote = remotePhones.find((p) => p.id === phoneId) ?? remotePhones[0];
+    const totalLiveCost = livePricing.points.reduce((s, p) => s + p.cost, 0);
 
     return {
       liveConnected: true,
       wabaId: wabaRes?.id || wabaId,
       wabaName: wabaRes?.name || client?.name || "WhatsApp Business Account",
       currency: wabaRes?.currency || "INR",
-      phoneNumberId: phoneRes?.id || phoneId,
-      verifiedName: phoneRes?.verified_name || number?.verifiedName || client?.name || "Verified Business",
-      displayPhone: phoneRes?.display_phone_number || number?.displayPhone || phoneId,
-      qualityRating: phoneRes?.quality_rating || number?.qualityRating || "GREEN",
+      phoneNumberId: primaryRemote?.id || phoneId,
+      verifiedName: primaryRemote?.verified_name || number?.verifiedName || client?.name || "Verified Business",
+      displayPhone: primaryRemote?.display_phone_number || number?.displayPhone || phoneId,
+      qualityRating: primaryRemote?.quality_rating || number?.qualityRating || "GREEN",
+      numbersSynced: remotePhones.length || 1,
+      liveCost30d: Math.round(totalLiveCost * 100) / 100,
     };
   } catch (e: unknown) {
     return {
@@ -354,4 +509,5 @@ export async function fetchMetaLiveStatus(clientId: string) {
     };
   }
 }
+
 
