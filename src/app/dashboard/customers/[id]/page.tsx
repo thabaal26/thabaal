@@ -179,27 +179,72 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
             }
           />
           <div className="space-y-4 p-4 sm:p-5">
-            {c.orders.length > 0 && (
-              <div>
-                <p className="mb-1.5 flex items-center justify-between text-xs font-medium text-muted">
-                  <span>Orders ({c.orders.length})</span>
-                  <span className="tabular">Spent {money(c.orders.filter((o) => o.status !== "CANCELLED").reduce((sum, o) => sum + o.total, 0))}</span>
-                </p>
-                <ul className="divide-y divide-line rounded-control bg-sunken px-3 text-sm">
-                  {c.orders.map((o) => (
-                    <li key={o.id} className="py-2">
-                      <div className="flex justify-between gap-2 text-xs text-muted">
-                        <span>
-                          {fmtDate(o.createdAt, "d MMM yyyy")} · {o.status.toLowerCase()}
-                        </span>
-                        <span className="tabular">{money(o.total, o.currency)}</span>
-                      </div>
-                      <p className="mt-0.5 line-clamp-2">{itemsText(o.items as OrderItem[])}</p>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            {c.orders.length > 0 && (() => {
+              const activeOrders = c.orders.filter((o) => o.status !== "CANCELLED");
+              const replacedCarts = c.orders.filter((o) => o.status === "CANCELLED");
+              const boughtItemSet = new Set(
+                activeOrders.flatMap((o) => ((o.items as OrderItem[] | null) ?? []).map((i) => (i.name ?? i.id).toLowerCase())),
+              );
+              const consideredOnly = [
+                ...new Set(
+                  replacedCarts
+                    .flatMap((o) => ((o.items as OrderItem[] | null) ?? []).map((i) => (i.name ?? i.id).trim()))
+                    .filter((n) => n && !boughtItemSet.has(n.toLowerCase())),
+                ),
+              ];
+              return (
+                <div className="space-y-3">
+                  {activeOrders.length > 0 && (
+                    <div>
+                      <p className="mb-1.5 flex items-center justify-between text-xs font-medium text-muted">
+                        <span>Current &amp; past orders ({activeOrders.length})</span>
+                        <span className="tabular">Spent {money(activeOrders.reduce((sum, o) => sum + o.total, 0))}</span>
+                      </p>
+                      <ul className="divide-y divide-line rounded-control bg-sunken px-3 text-sm">
+                        {activeOrders.map((o) => (
+                          <li key={o.id} className="py-2">
+                            <div className="flex justify-between gap-2 text-xs text-muted">
+                              <span>
+                                <strong className="font-mono text-ink-2">RG-{1000 + o.number}</strong> · {fmtDate(o.createdAt, "d MMM yyyy")} · {o.status.toLowerCase()}
+                              </span>
+                              <span className="tabular font-semibold text-ink">{money(o.total, o.currency)}</span>
+                            </div>
+                            <p className="mt-0.5 line-clamp-2">{itemsText(o.items as OrderItem[])}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {replacedCarts.length > 0 && (
+                    <div className="rounded-control border border-warning-border/60 bg-warning-bg/35 p-2.5 text-xs">
+                      <p className="flex items-center justify-between font-semibold text-ink-2">
+                        <span>Cart mentality · Earlier / replaced carts ({replacedCarts.length})</span>
+                      </p>
+                      {consideredOnly.length > 0 && (
+                        <p className="mt-1 text-ink-2">
+                          <span className="font-semibold text-danger">Considered &amp; dropped: </span>
+                          {consideredOnly.join(", ")}
+                        </p>
+                      )}
+                      <ul className="mt-1.5 divide-y divide-warning-border/40 text-muted">
+                        {replacedCarts.slice(0, 4).map((o) => (
+                          <li key={o.id} className="py-1.5">
+                            <div className="flex justify-between gap-2">
+                              <span>
+                                <strong className="font-mono text-ink-2">RG-{1000 + o.number}</strong> · {fmtDate(o.createdAt, "d MMM, h:mm a")}
+                                {o.internalNote && /superseded by/i.test(o.internalNote) ? " · replaced" : " · cancelled"}
+                              </span>
+                              <span className="tabular">{money(o.total, o.currency)}</span>
+                            </div>
+                            <p className="mt-0.5 line-clamp-1 text-ink-2">{itemsText(o.items as OrderItem[])}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             {c.purchases ? (
               <p className="flex gap-2 text-sm">
                 <ShoppingBag aria-hidden className="mt-0.5 size-4 shrink-0 text-brand-deep" />

@@ -1,9 +1,10 @@
-import { CheckCircle2, Clock, MapPin, Truck } from "lucide-react";
+import { CheckCircle2, Clock, History, MapPin, Sparkles, Truck } from "lucide-react";
 import Link from "next/link";
 import { Avatar, Badge, Card, OrderStatusBadge, OrderStepper } from "@/components/ui";
+import { analyzeCartMentality } from "@/lib/cart-mentality";
 import { fmtDate } from "@/lib/format";
 import { getOrderPricing } from "@/lib/order-pricing";
-import { money, orderRef, type OrderItem } from "@/lib/orders";
+import { itemsText, money, orderRef, type OrderItem } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { OrderActions } from "./order-actions";
 import { OrderAddressControl } from "./order-address-sheet";
@@ -28,6 +29,17 @@ export type OrderCardData = {
     location: string | null;
     locationRaw?: string | null;
     client: { name: string };
+    orders?: {
+      id: string;
+      number: number;
+      total: number;
+      currency: string;
+      status: string;
+      items: unknown;
+      internalNote: string | null;
+      createdAt: Date;
+      paidAt: Date | null;
+    }[];
   };
   client: { paymentConfig: string | null };
 };
@@ -41,7 +53,7 @@ const STATUS_ACCENT: Record<OrderCardData["status"], string> = {
   CANCELLED: "#8b95a5",
 };
 
-/** One order: who, what, the total, where it stands, delivery address, and the buttons that move it along. */
+/** One order: who, what, the total, where it stands, delivery address, customer cart mentality, and the buttons that move it along. */
 export function OrderCard({
   order: o,
   items,
@@ -61,6 +73,18 @@ export function OrderCard({
   const accent = STATUS_ACCENT[o.status] ?? "#167d63";
   const refText = orderRef(o);
   const pricing = getOrderPricing(items, o.total, { applyDefaultWhenEqual: true });
+  const isSuperseded = o.status === "CANCELLED" && Boolean(o.internalNote && /superseded by/i.test(o.internalNote));
+
+  const mentality =
+    o.status !== "CANCELLED"
+      ? analyzeCartMentality(
+          { id: o.id, number: o.number, total: pricing.total, currency: o.currency, items, createdAt: o.createdAt },
+          (o.customer.orders ?? []).map((po) => ({
+            ...po,
+            items: ((po.items as OrderItem[] | null) ?? []),
+          })),
+        )
+      : null;
 
   return (
     <Card className="card-3d relative flex h-full flex-col gap-3.5 overflow-hidden p-4 sm:p-5">
@@ -77,6 +101,12 @@ export function OrderCard({
               <span className="rounded-control bg-sunken px-1.5 py-0.5 font-mono text-2xs font-semibold text-ink-2 ring-1 ring-inset ring-line">
                 {refText}
               </span>
+              {mentality && mentality.attemptCount > 1 && (
+                <Badge tone={mentality.behavior === "downsized" ? "amber" : mentality.behavior === "upsized" ? "green" : "blue"}>
+                  Cart #{mentality.attemptCount}
+                </Badge>
+              )}
+              {isSuperseded && <Badge tone="gray">Replaced by newer cart</Badge>}
             </div>
             <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
               <span className="tabular">{formatPhone(o.customer.phone)}</span>
@@ -133,6 +163,54 @@ export function OrderCard({
           </div>
         </div>
       </div>
+
+      {/* Customer Mentality & Earlier Unpaid Cart History */}
+      {mentality && mentality.attemptCount > 1 && (
+        <div className="rounded-control border border-warning-border/70 bg-warning-bg/45 px-3.5 py-2.5 text-xs">
+          <div className="flex items-center justify-between gap-2">
+            <p className="inline-flex items-center gap-1.5 font-semibold text-ink">
+              <Sparkles aria-hidden className="size-3.5 text-warning" />
+              Customer mentality: {mentality.headline}
+            </p>
+            <span className="tabular shrink-0 text-2xs font-medium text-muted">
+              {mentality.previousCarts.length} earlier cart{mentality.previousCarts.length === 1 ? "" : "s"}
+            </span>
+          </div>
+          <div className="mt-1.5 space-y-1 text-ink-2">
+            {mentality.droppedItems.length > 0 && (
+              <p>
+                <span className="font-semibold text-danger">Dropped from earlier cart: </span>
+                {mentality.droppedItems.map((d) => `${d.name}${d.price > 0 ? ` (${money(d.price * d.quantity, o.currency)})` : ""}`).join(", ")}
+              </p>
+            )}
+            {mentality.addedItems.length > 0 && (
+              <p>
+                <span className="font-semibold text-success">Switched / Added now: </span>
+                {mentality.addedItems.map((a) => `${a.name}${a.price > 0 ? ` (${money(a.price * a.quantity, o.currency)})` : ""}`).join(", ")}
+              </p>
+            )}
+            {mentality.keptItems.length > 0 && (
+              <p>
+                <span className="font-semibold text-brand-deep">Kept (high conviction): </span>
+                {mentality.keptItems.map((k) => k.name).join(", ")}
+              </p>
+            )}
+            <div className="mt-1.5 border-t border-warning-border/50 pt-1.5 text-2xs text-muted">
+              {mentality.previousCarts.slice(0, 2).map((pc) => (
+                <p key={pc.id} className="flex items-center justify-between gap-2">
+                  <span className="truncate">
+                    <History aria-hidden className="mr-1 inline size-3 align-[-1px]" />
+                    Earlier {orderRef(pc)}: {itemsText(pc.items)}
+                  </span>
+                  <span className="tabular shrink-0">
+                    {money(pc.total, pc.currency)} · {fmtDate(pc.createdAt, "d MMM, h:mm a")}
+                  </span>
+                </p>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delivery Address & Area with Add / Update + WhatsApp Chat Auto-Detect */}
       <OrderAddressControl

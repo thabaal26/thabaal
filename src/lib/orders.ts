@@ -47,6 +47,14 @@ export async function recordOrder(customer: { id: string; clientId: string }, wa
   const items = o.items.map((i) => ({ ...i, name: known.get(i.id) }));
   if (waMessageId && (await db.order.findUnique({ where: { waMessageId }, select: { id: true } }))) return null;
 
+  // Check if this customer already has any unpaid active carts (NEW or CONFIRMED with paidAt = null).
+  // We keep all earlier carts in the DB for customer mentality analytics, but mark them superseded so only the latest cart is active.
+  const priorUnpaid = await db.order.findMany({
+    where: { customerId: customer.id, paidAt: null, status: { in: ["NEW", "CONFIRMED"] } },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, number: true, total: true, currency: true, items: true, internalNote: true },
+  });
+
   // Resolve address: if order note has an address and customer has none, save to customer;
   // if order has no note, check customer's saved address or recent WhatsApp chat replies.
   let orderNote = o.note;
@@ -86,35 +94,88 @@ export async function recordOrder(customer: { id: string; clientId: string }, wa
               data: {
                 locationRaw: fromChat.fullAddress.slice(0, 500),
                 ...(fromChat.area && !cust.location ? { location: fromChat.area } : {}),
-                ...(fromChat.region !== "Not sure" && (!cust.region || cust.region === "Not sure") ? { region: fromChat.region } : {}),
+                ...(fromChat.region !== "Not sure" && (!cust.region || cust.region === "Not sure") ? { region: parsedRegion(fromChat.region) } : {}),
               },
             });
           }
         }
       }
-      await syncCustomerOrderedProducts(customer.id, items);
     }
   } catch (e) {
     console.error("Could not sync order address with customer", e);
   }
 
-  return db.order.create({
-    data: { clientId: customer.clientId, customerId: customer.id, waMessageId, catalogId: o.catalogId, note: orderNote, items, total: o.total, currency: o.currency },
+  let internalNote: string | null = null;
+  if (priorUnpaid.length > 0) {
+    const prev = priorUnpaid[0];
+    const prevItems = ((prev.items as OrderItem[] | null) ?? []).map((i) => i.name ?? i.id);
+    const curItemSet = new Set(items.map((i) => (i.name ?? i.id).toLowerCase()));
+    const dropped = prevItems.filter((n) => !curItemSet.has(n.toLowerCase()));
+    const parts = [`Replaced unpaid cart ${orderRef(prev)} (${money(prev.total, prev.currency)})`];
+    if (dropped.length > 0) parts.push(`Dropped: ${dropped.join(", ")}`);
+    internalNote = parts.join(" · ").slice(0, 1000);
+  }
+
+  const created = await db.order.create({
+    data: {
+      clientId: customer.clientId,
+      customerId: customer.id,
+      waMessageId,
+      catalogId: o.catalogId,
+      note: orderNote,
+      internalNote,
+      items,
+      total: o.total,
+      currency: o.currency,
+    },
   });
+
+  if (priorUnpaid.length > 0) {
+    const newRef = orderRef(created);
+    const newTotal = money(created.total, created.currency);
+    for (const oldOrder of priorUnpaid) {
+      const supersedeTag = `Superseded by ${newRef} (${newTotal}) · Customer sent a newer cart`;
+      const mergedNote = [oldOrder.internalNote, supersedeTag].filter(Boolean).join(" | ").slice(0, 1000);
+      await db.order.update({
+        where: { id: oldOrder.id },
+        data: { status: "CANCELLED", internalNote: mergedNote },
+      });
+    }
+  }
+
+  await syncCustomerOrderedProducts(customer.id, items).catch((e) =>
+    console.error("Could not sync customer ordered products", e),
+  );
+
+  return created;
 }
 
-/** Merges product names from an order's items into Customer.purchases so every customer profile tracks what they bought. */
-export async function syncCustomerOrderedProducts(customerId: string, items: { name?: string }[]) {
-  const newNames = items
-    .map((i) => i.name?.trim())
-    .filter((n): n is string => Boolean(n && !/^manual-\d+$/i.test(n)));
-  if (!newNames.length) return;
+function parsedRegion(r: string) {
+  return r;
+}
+
+/** Merges product names from a customer's active/completed orders into Customer.purchases so every customer profile tracks what they buy. */
+export async function syncCustomerOrderedProducts(customerId: string, fallbackItems: { name?: string }[] = []) {
+  const activeOrders = await db.order.findMany({
+    where: { customerId, status: { not: "CANCELLED" } },
+    orderBy: { createdAt: "desc" },
+    select: { items: true },
+  });
+  const orderProductNames: string[] = [];
+  for (const o of activeOrders) {
+    for (const it of (o.items as OrderItem[] | null) ?? []) {
+      const n = it.name?.trim();
+      if (n && !/^manual-\d+$/i.test(n)) orderProductNames.push(n);
+    }
+  }
+  for (const it of fallbackItems) {
+    const n = it.name?.trim();
+    if (n && !/^manual-\d+$/i.test(n)) orderProductNames.push(n);
+  }
+  const unique = [...new Set(orderProductNames)];
+  if (!unique.length) return;
   const cust = await db.customer.findUnique({ where: { id: customerId }, select: { purchases: true } });
-  const existingNames = (cust?.purchases ?? "")
-    .split(/[,/]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const merged = [...new Set([...existingNames, ...newNames])].join(", ").slice(0, 500);
+  const merged = unique.join(", ").slice(0, 500);
   if (merged && merged !== (cust?.purchases ?? "")) {
     await db.customer.update({ where: { id: customerId }, data: { purchases: merged } });
   }

@@ -212,6 +212,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
             status: true,
             paidAt: true,
             paymentRequestedAt: true,
+            internalNote: true,
             createdAt: true,
             total: true,
             items: true,
@@ -259,7 +260,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
           ) OR EXISTS (
             SELECT 1 FROM "Reply" r2 WHERE r2."customerId" = sent.cid AND r2."receivedAt" >= sent.first_at AND r2.text ~* '(price|rate|catalog|order now|view price)'
           )) AS browsed,
-          (SELECT count(DISTINCT "customerId") FROM carts WHERE status <> 'CANCELLED') AS added_to_cart,
+          (SELECT count(DISTINCT "customerId") FROM carts) AS added_to_cart,
           (SELECT count(DISTINCT "customerId") FROM bought) AS ordered,
           (SELECT coalesce(sum(total), 0)::float FROM bought) AS revenue
         FROM sent`.catch(() => []),
@@ -334,10 +335,11 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
   const prevDelivered = prevCount("DELIVERED") + prevRead;
   const prevTotal = prevDelivered + prevCount("SENT") + prevCount("FAILED");
 
-  // Distinguish actual bought/confirmed orders from unpaid WhatsApp carts ("NEW" with paidAt == null) and cancelled carts.
+  // Distinguish actual bought/confirmed orders from unpaid active WhatsApp carts ("NEW" or "CONFIRMED" with paidAt == null) and replaced/cancelled carts.
   const isBought = (o: (typeof orders)[number]) =>
-    o.status === "CONFIRMED" || o.status === "PAID" || o.status === "DISPATCHED" || o.status === "DELIVERED" || o.paidAt !== null;
-  const isUnpaidCart = (o: (typeof orders)[number]) => o.status === "NEW" && o.paidAt === null;
+    o.status === "PAID" || o.status === "DISPATCHED" || o.status === "DELIVERED" || o.paidAt !== null;
+  const isUnpaidCart = (o: (typeof orders)[number]) =>
+    (o.status === "NEW" || o.status === "CONFIRMED") && o.paidAt === null;
 
   const curAllOrders = orders.filter((o) => o.createdAt >= start);
   const curOrders = curAllOrders.filter(isBought);
@@ -458,7 +460,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
   const repeatBuyersCount = [...buyerOrderCounts.values()].filter((c) => c > 1).length;
 
   const totalBrowsersOrCarts = new Set([...browsedCustomerMap.keys(), ...cartCustomerIds]).size;
-  const nonCancelledCartCustomers = new Set(curAllOrders.filter((o) => o.status !== "CANCELLED").map((o) => o.customerId)).size;
+  const nonCancelledCartCustomers = new Set(curAllOrders.map((o) => o.customerId)).size;
 
   const f = funnelRows[0];
   const funnel = {
@@ -477,15 +479,18 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       customers: unpaidCartCustomerIds.size,
       carts: curUnpaidCarts.length,
       value: unpaidCartRevenue,
-      leads: curUnpaidCarts.slice(0, 4).map((o) => ({
-        customerId: o.customerId,
-        name: o.customer.name,
-        phone: o.customer.phone,
-        detail: `RG-${1000 + o.number} · ${formatCartItems(o.items)}`,
-        amount: o.total,
-        at: o.createdAt,
-        href: `/dashboard/customers/${o.customerId}`,
-      })),
+      leads: curUnpaidCarts.slice(0, 4).map((o) => {
+        const replacedNote = o.internalNote && /replaced unpaid cart/i.test(o.internalNote) ? ` (${o.internalNote})` : "";
+        return {
+          customerId: o.customerId,
+          name: o.customer.name,
+          phone: o.customer.phone,
+          detail: `RG-${1000 + o.number} · ${formatCartItems(o.items)}${replacedNote}`,
+          amount: o.total,
+          at: o.createdAt,
+          href: `/dashboard/customers/${o.customerId}`,
+        };
+      }),
     },
     browsedNoCart: {
       customers: browsedNoCartLeads.length,
@@ -495,15 +500,19 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       customers: cancelledCustomerIds.size,
       carts: curCancelledCarts.length,
       value: cancelledCartRevenue,
-      leads: curCancelledCarts.slice(0, 3).map((o) => ({
-        customerId: o.customerId,
-        name: o.customer.name,
-        phone: o.customer.phone,
-        detail: `RG-${1000 + o.number} · ${formatCartItems(o.items)}`,
-        amount: o.total,
-        at: o.createdAt,
-        href: `/dashboard/customers/${o.customerId}`,
-      })),
+      leads: curCancelledCarts.slice(0, 4).map((o) => {
+        const supersedeMatch = /Superseded by (RG-\d+)/i.exec(o.internalNote ?? "");
+        const tag = supersedeMatch ? `Replaced by ${supersedeMatch[1]}` : "Cancelled";
+        return {
+          customerId: o.customerId,
+          name: o.customer.name,
+          phone: o.customer.phone,
+          detail: `RG-${1000 + o.number} (${tag}) · ${formatCartItems(o.items)}`,
+          amount: o.total,
+          at: o.createdAt,
+          href: `/dashboard/customers/${o.customerId}`,
+        };
+      }),
     },
     convertedBuyers: {
       customers: boughtCustomerIds.size,
