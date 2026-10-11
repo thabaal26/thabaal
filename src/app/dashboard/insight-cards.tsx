@@ -1,110 +1,13 @@
-import { BookOpen, MessageCircle, PackageCheck, RotateCw, ShoppingCart } from "lucide-react";
 import Link from "next/link";
-import type { ComponentType, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { MapPin3D, ShoppingBag3D, Sparkles3D, Target3D } from "@/components/icons-3d";
 import { Badge, Card, CardHeader } from "@/components/ui";
 import { ActionLine, BarList, ChangeDumbbells, Disclosure, DonutPanel, RateRing, StatChip, type Slice } from "@/components/viz";
 import { formatValue } from "@/lib/chart-math";
-import { cn } from "@/lib/cn";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import type { CartMentalitySummaryData, CustomerScenariosData, ScenarioLead } from "./overview-cards";
 
 const plural = (n: number, one: string, many = `${one}s`) => `${fmtNumber(n)} ${n === 1 ? one : many}`;
-
-/* ───────────────────────── Priority strip ───────────────────────── */
-
-export type BusinessPriorityProps = {
-  unpaidCartsCount: number;
-  unpaidCartsValue: number;
-  unpaidCustomersCount: number;
-  browsedNoCartCount: number;
-  toDispatchCount: number;
-  unhandledRepliesCount: number;
-  refillsDueCount?: number;
-  refillsDueValue?: number;
-  showOrders: boolean;
-  showReplies: boolean;
-};
-
-/** Four things to do today, each one figure and one tap. */
-export function BusinessPriorityStrip(p: BusinessPriorityProps) {
-  const tiles: { key: string; label: string; value: string; sub: string; href: string; color: string; icon: ComponentType<{ className?: string }> }[] = [];
-  if (p.showOrders && p.unpaidCartsCount > 0)
-    tiles.push({
-      key: "unpaid",
-      label: "Unpaid carts",
-      value: formatValue(p.unpaidCartsValue, "inr"),
-      sub: `${plural(p.unpaidCartsCount, "cart")} · ${plural(p.unpaidCustomersCount, "customer")}`,
-      href: "/dashboard/orders?show=unpaid",
-      color: "#d97706",
-      icon: ShoppingCart,
-    });
-  if (p.showOrders && p.browsedNoCartCount > 0)
-    tiles.push({
-      key: "browsed",
-      label: "Browsed, no cart",
-      value: fmtNumber(p.browsedNoCartCount),
-      sub: "warm leads to nudge",
-      href: "/dashboard?view=customers#customer-scenarios",
-      color: "#0284c7",
-      icon: BookOpen,
-    });
-  if (p.showOrders && p.toDispatchCount > 0)
-    tiles.push({
-      key: "pack",
-      label: "Ready to pack",
-      value: fmtNumber(p.toDispatchCount),
-      sub: "paid or confirmed",
-      href: "/dashboard/orders/packing",
-      color: "#167d63",
-      icon: PackageCheck,
-    });
-  if (p.showReplies && p.unhandledRepliesCount > 0)
-    tiles.push({
-      key: "replies",
-      label: "Chats to answer",
-      value: fmtNumber(p.unhandledRepliesCount),
-      sub: "free within 24 hours",
-      href: "/dashboard/replies/priority",
-      color: "#6941c6",
-      icon: MessageCircle,
-    });
-  if (p.showOrders && p.refillsDueCount)
-    tiles.push({
-      key: "refills",
-      label: "Refills due",
-      value: fmtNumber(p.refillsDueCount),
-      sub: `this week · ~${formatValue(p.refillsDueValue ?? 0, "inr")}`,
-      href: "/dashboard/refills",
-      color: "#15803d",
-      icon: RotateCw,
-    });
-  if (!tiles.length) return null;
-  return (
-    <section aria-label="To do today" className="mb-4 sm:mb-5">
-      <div className={cn("grid grid-cols-1 gap-2.5 min-[480px]:grid-cols-2 sm:gap-3", tiles.length >= 5 ? "xl:grid-cols-5" : tiles.length === 4 ? "xl:grid-cols-4" : tiles.length === 3 ? "sm:grid-cols-3" : "")}>
-        {tiles.map((t) => {
-          const Icon = t.icon;
-          return (
-            <Link key={t.key} href={t.href} className="card-3d group flex items-center gap-3 rounded-card border bg-panel p-3 transition sm:p-3.5">
-              <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-[12px] text-white" style={{ background: t.color }}>
-                <Icon className="size-5" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-2xs font-semibold uppercase tracking-wide text-muted">{t.label}</span>
-                <span className="tabular block truncate text-lg font-semibold leading-tight text-ink">{t.value}</span>
-                <span className="block truncate text-2xs text-muted">{t.sub}</span>
-              </span>
-              <span aria-hidden className="text-muted transition group-hover:translate-x-0.5 group-hover:text-ink">
-                →
-              </span>
-            </Link>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
 
 /* ───────────────────────── Customer journey ───────────────────────── */
 

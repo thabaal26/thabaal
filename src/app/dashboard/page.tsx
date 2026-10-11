@@ -32,7 +32,7 @@ import {
   type CustomerWinbackPlaybookData,
   type PlaybookScenario,
 } from "./intelligence-hub";
-import { BusinessPriorityStrip, CartMentalityCard, CustomerAreasCard, CustomerProductsCard, CustomerScenariosCard } from "./insight-cards";
+import { CartMentalityCard, CustomerAreasCard, CustomerProductsCard, CustomerScenariosCard } from "./insight-cards";
 import {
   ActivityCard,
   BestTimeCard,
@@ -42,7 +42,6 @@ import {
   KpiTile,
   NumberLimitsCard,
   RANGES,
-  RangeTabs,
   TodayCard,
   TopProductsCard,
   type AnchorProductInsight,
@@ -1449,7 +1448,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     scenarios: playbookScenarios,
   };
 
-  const refillsWeek = ordersOn && cid && !sp.view ? (await refillForecast(cid, now).catch(() => null))?.due.filter((d) => d.daysLeft <= 7) ?? [] : [];
+  const refillsWeek = ordersOn && cid ? (await refillForecast(cid, now).catch(() => null))?.due.filter((d) => d.daysLeft <= 7) ?? [] : [];
 
   const views: View[] = ordersOn ? ["overview", "customers", "products", "carts"] : ["overview", "customers"];
   const view: View = views.includes(sp.view as View) ? (sp.view as View) : "overview";
@@ -1466,7 +1465,16 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         customers={customers}
         issues={issues}
         actions={adminActions}
-        period={<RangeTabs range={range} view={view} />}
+        work={{
+          unpaidCartsCount: curUnpaidCarts.length,
+          unpaidCartsValue: unpaidCartRevenue,
+          browsedNoCartCount: browsedNoCartLeads.length,
+          toDispatchCount,
+          unhandledRepliesCount: unhandledGroup.length,
+          refillsDueCount: refillsWeek.length,
+          showOrders: ordersOn,
+          showReplies: repliesOn,
+        }}
       />
 
       {heldToday > 0 && (
@@ -1538,18 +1546,6 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
 
       {view === "overview" && (
         <>
-          <BusinessPriorityStrip
-            unpaidCartsCount={curUnpaidCarts.length}
-            unpaidCartsValue={unpaidCartRevenue}
-            unpaidCustomersCount={unpaidCartCustomerIds.size}
-            browsedNoCartCount={browsedNoCartLeads.length}
-            toDispatchCount={toDispatchCount}
-            unhandledRepliesCount={unhandledGroup.length}
-            refillsDueCount={refillsWeek.length}
-            refillsDueValue={refillsWeek.reduce((n, d) => n + d.avgOrder, 0)}
-            showOrders={ordersOn}
-            showReplies={repliesOn}
-          />
 
       {/* Headline figures for the period, each with its real change against the stretch before. */}
       <div
