@@ -4,15 +4,15 @@ import { CalendarDays, Megaphone, MapPin, Package, SlidersHorizontal, Tags, User
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
-import { activeCount, filterQuery, PRESETS, withQuery, type FilterState, type RangeKey } from "@/lib/filters";
+import { activeCount, ALL_SECTIONS, filterQuery, PRESETS, withQuery, type FilterSection, type FilterState, type RangeKey } from "@/lib/filters";
 import type { FilterOptions } from "@/lib/filter-scope";
 import { MultiPicker } from "./multi-picker";
 import { Picker } from "./picker";
 import { Sheet } from "./sheet";
 import { Button } from "./ui";
 
-type Section = "period" | "products" | "customers" | "tags" | "area" | "campaign";
-const ALL: Section[] = ["period", "products", "customers", "tags", "area", "campaign"];
+type Section = FilterSection;
+const ALL = ALL_SECTIONS;
 
 const todayStr = () => new Date(Date.now() + 5.5 * 3_600_000).toISOString().slice(0, 10);
 
@@ -31,6 +31,7 @@ export function FilterBar({
   periodLabel,
   compact,
   className,
+  note,
 }: {
   value: FilterState;
   options: FilterOptions;
@@ -44,6 +45,8 @@ export function FilterBar({
   /** Pill buttons sized for the dashboard's floating bar. */
   compact?: boolean;
   className?: string;
+  /** What these filters change on this page, shown at the top of the panel. */
+  note?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -92,7 +95,7 @@ export function FilterBar({
         open={open}
         onClose={() => setOpen(false)}
         title="Filter"
-        description="Pick a period and narrow to products, customers, groups or an area. Within one filter any match counts; different filters must all match."
+        description={`${note ?? "Pick a period and narrow to products, customers, groups or an area."} Within one filter any match counts; different filters must all match.`}
         footer={
           <div className="flex items-center justify-between gap-2">
             <Button

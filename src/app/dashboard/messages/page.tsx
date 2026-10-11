@@ -10,10 +10,12 @@ import { fmtDate, fmtNumber, pct } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { MESSAGE_STATUSES, messageWhere } from "@/lib/queries";
 import { ActiveFilters, FilterBar } from "@/components/filter-bar";
-import { activeCount as filterCount, filterQuery, readFilters, resolvePeriod, type FilterState } from "@/lib/filters";
+import { activeCount as filterCount, filterQuery, keepFilters, readFilters, resolvePeriod, type FilterSection, type FilterState } from "@/lib/filters";
 import { filterOptions, messageScope } from "@/lib/filter-scope";
 import { getScope, owned, ownedMessages } from "@/lib/session";
 
+
+const MESSAGE_FILTERS: FilterSection[] = ["period", "products", "customers", "tags", "area"];
 export const metadata: Metadata = { title: "Message log" };
 export const dynamic = "force-dynamic";
 
@@ -32,7 +34,8 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
   const groupByCustomer = p.view !== "all";
   const scope = await getScope();
   // Shared filters: any period, products, single customers, groups, area. (Campaign stays its own picker.)
-  const filters = readFilters(raw, "all");
+  // The campaign has its own picker on this page (messages of that campaign), so the shared filter skips it.
+  const filters = keepFilters(readFilters(raw, "all"), MESSAGE_FILTERS);
   const href = (pp: Params, patch: Partial<Params>) => linkTo(filters, pp, patch);
   const period = resolvePeriod(filters);
   const scoped = await messageScope(scope.clientId, filters, period);
@@ -185,7 +188,7 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
                 basePath="/dashboard/messages"
                 extra={{ q: p.q, status: p.status, campaign: p.campaign, view: p.view }}
                 defaultRange="all"
-                sections={["period", "products", "customers", "tags", "area"]}
+                sections={MESSAGE_FILTERS}
                 periodLabel={filters.range === "all" ? "Any date" : period.label}
               />
             )}

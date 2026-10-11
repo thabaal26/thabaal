@@ -14,13 +14,13 @@ export function ViewTabs({
   view,
   views,
   badges,
-  query,
+  queries,
 }: {
   view: View;
   views: View[];
   badges?: Partial<Record<View, number>>;
-  /** The current filters as a query string, kept when switching sections. */
-  query: string;
+  /** Each section's link: the current filters it uses, as a query string. */
+  queries: Partial<Record<View, string>>;
 }) {
   const [active, setActive] = useState<View>(view);
   const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
@@ -50,7 +50,7 @@ export function ViewTabs({
     setActive(v);
   };
   const href = (v: View) => {
-    const q = new URLSearchParams(query);
+    const q = new URLSearchParams(queries[v] ?? "");
     if (v !== "overview") q.set("view", v);
     const s = q.toString();
     return s ? `/dashboard?${s}` : "/dashboard";

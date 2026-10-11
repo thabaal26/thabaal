@@ -26,6 +26,7 @@ import { formatValue, type ValueFormat } from "@/lib/chart-math";
 import { Card, CardHeader, QualityBadge, buttonClass } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { fmtDate, fmtNumber, pct } from "@/lib/format";
+import type { FilterSection } from "@/lib/filters";
 import type { numberHealth } from "@/lib/limits";
 
 /** Chart colours (SVG attributes can't read CSS variables): the design tokens' values. */
@@ -58,6 +59,26 @@ export const VIEWS = {
   carts: { label: "Carts", hint: "Revisions and hesitation" },
 } as const;
 export type View = keyof typeof VIEWS;
+
+/**
+ * The filters each section offers: only the ones that change its figures. Customers compares groups
+ * of people and Products compares products, so picking single people is left to Overview and Carts
+ * (and the customer's own page); carts aren't tied to a campaign.
+ */
+export const VIEW_FILTERS: Record<View, FilterSection[]> = {
+  overview: ["period", "products", "customers", "tags", "area", "campaign"],
+  customers: ["period", "products", "tags", "area", "campaign"],
+  products: ["period", "products", "tags", "area", "campaign"],
+  carts: ["period", "products", "customers", "tags", "area"],
+};
+
+/** What the filters change in each section, shown in the filter panel. */
+export const VIEW_FILTER_NOTE: Record<View, string> = {
+  overview: "Filters every figure and chart on Overview. Today always shows today, whatever the period; the sending limit and WhatsApp spend are for the whole business.",
+  customers: "The period applies to the customer journey; lifecycle, product groups and areas are as of today, and best time covers the last 90 days. Products, groups, area and campaign narrow every card to those customers.",
+  products: "The period applies to product performance and demand; campaigns by product group covers the last 30 days. Picking products shows just those products.",
+  carts: "Cart revisions in the period, for the products, people, groups or area you pick.",
+};
 
 /* ───────────────────────── KPI tile ───────────────────────── */
 

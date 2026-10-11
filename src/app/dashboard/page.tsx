@@ -42,6 +42,8 @@ import {
   NumberLimitsCard,
   TodayCard,
   TopProductsCard,
+  VIEW_FILTER_NOTE,
+  VIEW_FILTERS,
   VIEWS,
   type AnchorProductInsight,
   type CartMentalitySummaryData,
@@ -53,7 +55,7 @@ import {
 } from "./overview-cards";
 import { ViewTabs } from "./view-tabs";
 import { ActiveFilters, FilterBar } from "@/components/filter-bar";
-import { activeCount, filterQuery, narrowOrders, periodKeys, readFilters, resolvePeriod, weekKey } from "@/lib/filters";
+import { activeCount, filterQuery, keepFilters, narrowOrders, periodKeys, readFilters, resolvePeriod, weekKey } from "@/lib/filters";
 import { filterOptions, scopedCustomerIds } from "@/lib/filter-scope";
 
 export const dynamic = "force-dynamic";
@@ -67,7 +69,9 @@ const hourLabel = (h: number) => `${h % 12 || 12} ${h < 12 ? "am" : "pm"}`;
 
 export default async function Overview({ searchParams }: PageProps<"/dashboard">) {
   const sp = await searchParams;
-  const filters = readFilters(sp);
+  // Each section offers (and uses) only the filters that change its figures; others in the link are dropped.
+  const askedView = (typeof sp.view === "string" && sp.view in VIEW_FILTERS ? sp.view : "overview") as View;
+  const filters = keepFilters(readFilters(sp), VIEW_FILTERS[askedView]);
 
   const scope = await getScope();
   const cid = scope.clientId;
@@ -1138,6 +1142,15 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         nextActionHref: "/dashboard/catalogue",
       };
     })
+    // A product filter shows just the picked products (names can differ slightly between catalogue and carts).
+    .filter((p) => {
+      if (!filters.products.length) return true;
+      const k = normKey(p.name);
+      return filters.products.some((f) => {
+        const fk = normKey(f);
+        return fk === k || k.includes(fk) || fk.includes(k);
+      });
+    })
     .sort((a, b) => {
       // Order: stuck_in_cart / dropped_hesitation first when filtering hesitation, otherwise sort by total activity then not_selling visibility
       const score = (x: AllProductAnalyticsItem) =>
@@ -1563,7 +1576,12 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         </div>
       )}
 
-      <ViewTabs view={view} views={views} badges={viewBadges} query={filterQuery(filters)} />
+      <ViewTabs
+        view={view}
+        views={views}
+        badges={viewBadges}
+        queries={Object.fromEntries(views.map((v) => [v, filterQuery(keepFilters(filters, VIEW_FILTERS[v]))]))}
+      />
 
       <div key={view} className="animate-view-in">
 
@@ -1589,6 +1607,8 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
               basePath="/dashboard"
               extra={{ view: view === "overview" ? undefined : view }}
               periodLabel={period.label}
+              sections={VIEW_FILTERS[view]}
+              note={VIEW_FILTER_NOTE[view]}
               className="shrink-0"
             />
           )}
