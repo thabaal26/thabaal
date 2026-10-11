@@ -53,7 +53,7 @@ export function ViewTabs({ view, range, views, badges }: { view: View; range: Ra
   return (
     <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top)+0.5rem)] z-20 mb-5 flex justify-center px-1 lg:top-[4.5rem] sm:mb-6 print:hidden">
       <div className="flex max-w-full items-center gap-1 rounded-full border border-line/80 bg-panel/85 p-1 shadow-[0_8px_24px_-8px_rgb(16_24_40/0.18),0_2px_6px_-2px_rgb(16_24_40/0.08)] backdrop-blur-md sm:p-1.5">
-        <nav aria-label="Dashboard sections" className="thin-scroll relative flex min-w-0 gap-0.5 overflow-x-auto sm:gap-1">
+        <nav aria-label="Dashboard sections" className="no-scrollbar relative flex min-w-0 gap-0.5 overflow-x-auto sm:min-w-max sm:gap-1 sm:overflow-visible">
           {pill && (
             <span
               aria-hidden
