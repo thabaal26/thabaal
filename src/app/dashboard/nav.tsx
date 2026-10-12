@@ -29,7 +29,7 @@ export const NAV = [
   { href: "/dashboard", label: "Dashboard", short: "Dashboard", icon: Dashboard3D, group: "Daily work", cube: "from-[#34d399] via-[#10b981] to-[#059669]" },
   { href: "/dashboard/notifications", label: "Notifications", short: "Alerts", icon: Bell3D, group: "Daily work", cube: "from-[#fbbf24] via-[#f59e0b] to-[#d97706]" },
   { href: "/dashboard/orders", label: "Orders", short: "Orders", icon: ShoppingBag3D, group: "Daily work", cube: "from-[#38bdf8] via-[#0ea5e9] to-[#0284c7]" },
-  { href: "/dashboard/refills", label: "Refills", short: "Refills", icon: Clock3D, group: "Daily work", cube: "from-[#86efac] via-[#22c55e] to-[#15803d]" },
+  { href: "/dashboard/refills", label: "Reorders", short: "Reorders", icon: Clock3D, group: "Daily work", cube: "from-[#86efac] via-[#22c55e] to-[#15803d]" },
   { href: "/dashboard/revenue", label: "Revenue & cash", short: "Revenue", icon: Rupee3D, group: "Daily work", cube: "from-[#fde68a] via-[#f59e0b] to-[#b45309]" },
   { href: "/dashboard/catalogue", label: "Catalogue", short: "Menu", icon: Store3D, group: "Daily work", cube: "from-[#2dd4bf] via-[#14b8a6] to-[#0d9488]" },
   { href: "/dashboard/replies", label: "Replies", short: "Replies", icon: Inbox3D, group: "Daily work", cube: "from-[#c084fc] via-[#9333ea] to-[#7e22ce]" },

@@ -473,7 +473,7 @@ export type CustomerWinbackPlaybookData = {
 
 const COHORTS: { key: string; label: string; color: ChartColor; scenario: PlaybookScenario["id"]; field: keyof CustomerWinbackPlaybookData }[] = [
   { key: "active", label: "Active (≤30 days)", color: "emerald", scenario: "vip_repeat", field: "activeBuyers30d" },
-  { key: "refill", label: "Refill due (31–60 days)", color: "blue", scenario: "refill_due", field: "refillDue31to60d" },
+  { key: "refill", label: "Reorder due (31–60 days)", color: "blue", scenario: "refill_due", field: "refillDue31to60d" },
   { key: "lapsed", label: "Lapsed (60+ days)", color: "red", scenario: "winback_lapsed", field: "lapsedOver60d" },
   { key: "unpaid", label: "Unpaid cart now", color: "gold", scenario: "unpaid_cart_recovery", field: "unpaidCartCustomers" },
   { key: "warm", label: "Warm, not bought", color: "violet", scenario: "warm_browsers", field: "warmNonBuyers" },
@@ -609,7 +609,7 @@ export function CustomerGrowthPlaybookCard({ data }: { data: CustomerWinbackPlay
           <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-xs text-muted sm:mt-3">
             <span className="flex flex-wrap gap-2.5 sm:gap-3">
               <span>
-                Refill reminder <b className={data.refillConfigured ? "text-success" : "text-warning"}>{data.refillConfigured ? "on" : "off"}</b>
+                Reorder reminder <b className={data.refillConfigured ? "text-success" : "text-warning"}>{data.refillConfigured ? "on" : "off"}</b>
               </span>
               <span>
                 Win-back <b className={data.winbackConfigured ? "text-success" : "text-warning"}>{data.winbackConfigured ? "on" : "off"}</b>
@@ -620,7 +620,7 @@ export function CustomerGrowthPlaybookCard({ data }: { data: CustomerWinbackPlay
                 </span>
               )}
             </span>
-            <Link href="/dashboard/clients" className="font-semibold text-brand-deep hover:underline">
+            <Link href="/dashboard/campaigns" className="font-semibold text-brand-deep hover:underline">
               Automations →
             </Link>
           </div>

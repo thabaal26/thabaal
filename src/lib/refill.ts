@@ -67,11 +67,11 @@ export async function sendRefillReminders(now = new Date()) {
         // later run sends it, and stop this client's reminders for now instead of failing them all.
         if (kind && TRY_LATER_KINDS.includes(kind)) {
           await db.order.update({ where: { id: o.id }, data: { reminderSentAt: null } });
-          console.error(`Refill reminders paused for client ${client.id}: ${explainError(code, e instanceof Error ? e.message : String(e))}`);
+          console.error(`Reorder reminders paused for client ${client.id}: ${explainError(code, e instanceof Error ? e.message : String(e))}`);
           break;
         }
         await db.message.create({
-          data: { customerId: o.customerId, templateId: template.id, templateName: template.name, status: "FAILED", provider: settings.provider, errorCode: code, error: `Refill reminder: ${explainError(code, e instanceof Error ? e.message : String(e))}`, failedAt: new Date() },
+          data: { customerId: o.customerId, templateId: template.id, templateName: template.name, status: "FAILED", provider: settings.provider, errorCode: code, error: `Reorder reminder: ${explainError(code, e instanceof Error ? e.message : String(e))}`, failedAt: new Date() },
         });
         await applyFailure(o.customerId, code);
       }

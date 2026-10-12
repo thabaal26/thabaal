@@ -11,6 +11,7 @@ import { quietUntil } from "@/lib/rules";
 import { DAYS, effectiveInterval, estimateDuration, formatMinutes, timeUntil } from "@/lib/schedule";
 import { getScope, owned } from "@/lib/session";
 import { toggleCampaign } from "../actions/campaigns";
+import { RefillForm } from "../orders/refill-form";
 import { WinbackForm } from "./winback-form";
 
 export const metadata: Metadata = { title: "Campaigns" };
@@ -39,7 +40,7 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
     scope.clientId && scope.canManage
       ? db.client.findUnique({
           where: { id: scope.clientId },
-          select: { lapsedDays: true, winbackTemplateId: true },
+          select: { refillDays: true, refillTemplateId: true, lapsedDays: true, winbackTemplateId: true },
         })
       : null,
     scope.clientId && scope.canManage
@@ -261,7 +262,12 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
       )}
 
       {clientData && (
-        <div className="mt-6 sm:mt-8">
+        <div className="mt-6 grid items-start gap-4 sm:mt-8 xl:grid-cols-2">
+          <RefillForm
+            days={clientData.refillDays}
+            templateId={clientData.refillTemplateId}
+            templates={templates}
+          />
           <WinbackForm
             days={clientData.lapsedDays}
             templateId={clientData.winbackTemplateId}

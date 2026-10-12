@@ -8,7 +8,7 @@
 If you need to inspect any earlier conversation step or code diff from the previous account's session, the raw JSONL transcripts are stored locally on this machine at:
 - **Main Session Compact Transcript**: `C:\Users\step1\.gemini\antigravity\brain\322fbc6e-ce65-4054-bda4-c917d739f683\.system_generated\logs\transcript.jsonl`
 - **Main Session Full Transcript**: `C:\Users\step1\.gemini\antigravity\brain\322fbc6e-ce65-4054-bda4-c917d739f683\.system_generated\logs\transcript_full.jsonl`
-- **Meta Integration Auditor Subagent Transcript**: `C:\Users\step1\.gemini\antigravity\brain\42d50663-5eaa-4d77-805e-9ea59292e49a\.system_generated/logs\transcript.jsonl`
+- **Meta Integration Auditor Subagent Transcript**: `C:\Users\step1\.gemini\antigravity\brain\42d50663-5eaa-4d77-805e-9ea59292e49a\.system_generated\logs\transcript.jsonl`
 
 ---
 
@@ -58,13 +58,13 @@ If you need to inspect any earlier conversation step or code diff from the previ
 - **Meta Spend, 1,000 Free Service Quota & Pricing (`src/lib/spend.ts`, `src/lib/meta-balance.ts`)**:
   - Tracks monthly service conversations (first 1,000 service conversations/month telemetry + 24h free customer service window tracking), category-wise spend (`marketing`, `utility`, `authentication`, `service`), and Apache ECharts spend visualizations (`src/app/dashboard/spend-card.tsx`, `src/app/dashboard/spend-charts.tsx`).
 - **Cart Mentality & Purchase Behavior (`src/lib/cart-mentality.ts`)**:
-  - Diffs consecutive WhatsApp carts sent by the same customer within a shopping session to detect **hesitation / dropped items / replaced items** vs. abandoned carts vs. completed orders.
+  - Diffs consecutive WhatsApp carts sent by the same customer within a shopping session to detect **hesitation / dropped items / replaced items** (e.g., customer added 1L Gingelly Oil, then replaced it with 500ml before paying) vs. abandoned carts vs. completed orders.
 - **Loyalty Points, Tiers & RFM Ratio Engine (`src/lib/loyalty.ts`)**:
   - **Auto-Earned Points**: `1 pt` per `₹10` spent on paid/active WhatsApp orders + `+50 pts` per repeat order + `+35 pts` per historical sheet item.
   - **Manual Point Adjustments**: Stored as tags (`loyalty-adj:<delta>:<timestamp>:<reason>`) on `Customer.tags` via `adjustCustomerLoyaltyPoints` in `src/app/dashboard/actions/customers.ts` (`+50`, `+100`, `+200`, or `-100 Redeem` = `₹10` discount).
   - **Tiers**: `Bronze` (`0–199 pts`, 2% perk), `Silver` (`200–499 pts`, 5% perk), `Gold` (`500–999 pts`, 8% perk), `Platinum` (`1000+ pts`, 12% VIP perk + free delivery).
   - **RFM Score (`R·F·M`)**: Scores every customer `1–5` on **Recency (R)**, **Frequency (F)**, and **Monetary (M)** + composite score (`3–15` / `0–100%`) + segment (`Champion`, `Loyal Regular`, `High-Spend Buyer`, `Promising`, `Cooling Down`, `At Risk`, `New / Prospect`).
-  - **Smart Offer Engine**: Generates 1-click personalized `wa.me` offer links based on tier, RFM segment, cart drops, or refill due status.
+  - **Smart Offer Engine**: Generates 1-click personalized `wa.me` offer links based on tier, RFM segment, cart drops, or reorder due status.
 - **Payments & Order Lifecycle (`src/lib/payments.ts`, `src/lib/payment-state.ts`, `src/app/dashboard/actions/orders.ts`)**:
   - **Native Checkout (`order_details`)**: `autoRequestPayment` automatically sends Meta's native "Review and Pay" card when a customer submits a catalogue cart.
   - **24h Window Smart Routing**: Sends interactive `order_details` (free) if the 24h customer reply window is open; falls back to `ORDER_DETAILS` utility template (`payment_request`) if closed.
@@ -74,10 +74,15 @@ If you need to inspect any earlier conversation step or code diff from the previ
   - **6-Hour Unpaid Cart Reminder**: `sendDuePaymentReminders` nudges unpaid carts after 6 hours (`REMIND_AFTER_MS`).
 - **Filter System (`src/lib/filters.ts`, `src/lib/filter-scope.ts`, `src/components/filter-bar.tsx`)**:
   - Clean, simplified per-page filter scoping (`dateRange`, `area`, `product`, etc.) without history/sheet popstate collisions.
+- **Reorder Reminders & Forecast (`src/lib/refill.ts`, `src/lib/refill-forecast.ts`, `src/app/dashboard/refills/*`, `src/app/dashboard/orders/refill-form.tsx`)**:
+  - User-facing wording across the entire portal uses **Reorder / Reorders** (while preserving DB column names `refillDays`, `refillTemplateId` and Meta template identifiers `thenan_refill_reminder*`).
+  - The **Reorder reminders** configuration card (`RefillForm`) lives in `/dashboard/campaigns` right beside `WinbackForm`.
 
 ---
 
 ## 5. Recent Git Commits (All Pushed to `origin/main`)
+- **Latest**: Moved **Reorder reminders** (`RefillForm`) from `/dashboard/orders` to `/dashboard/campaigns` (alongside `WinbackForm`) and renamed all user-facing `"Refill"` / `"Refills"` strings to `"Reorder"` / `"Reorders"` across the portal.
+- `478c7ee`: **Simplified & Decluttered Orders Page (`/dashboard/orders`)** — Replaced congested 7-stat strip with a clean 4-KPI summary bar, consolidated 11 filter pills into 6 core tabs + secondary dropdown, redesigned `OrderCard` with a 4-step progress stepper (`Confirmed → Paid → Dispatched → Delivered`) and single primary CTA + `More` menu (`src/app/dashboard/orders/*`).
 - `446a833` / `2e2f021` / `0e4a6fd`: Animated Thabaal sign-in page with interactive bird mascot (`src/app/login/*`).
 - `a66bf55`: **PWA Rebrand to Thabaal** — Updated `src/app/manifest.ts`, `src/app/api/manifest/[clientId]/route.ts`, `src/app/dashboard/layout.tsx`, `public/offline.html`, and `public/sw.js` (`thabaal-v3`) so Chrome PWA install always shows **Thabaal** instead of client name (*Thenan Oils*).
 - `b2cd66c`: **Customer/Product Intelligence, RFM Ratio, Loyalty Wallet & Smart Offer Engine** (`src/lib/loyalty.ts`, `src/app/dashboard/intelligence-hub.tsx`, `src/app/dashboard/customers/[id]/purchase-journey.tsx`, `src/app/dashboard/page.tsx`, `src/app/dashboard/customers/page.tsx`).
@@ -88,8 +93,11 @@ If you need to inspect any earlier conversation step or code diff from the previ
 ---
 
 ## 6. Where We Left Off & Next Potential Tasks
-In our last turn, we completed a full comparison of **WhatsApp Business Payments & Commerce** (Thabaal vs. AiSensy, Interakt, Wati, Zoko, BiteSpeed) and identified **4 optional high-impact payment/order features** ready to implement next if requested:
-1. **COD-to-Prepaid Instant Discount Nudge**: Auto-send an interactive WhatsApp offer (`₹20–₹50 OFF` or `+100 Bonus Loyalty Points`) when an order is marked `cod_due` to convert COD orders into instant UPI prepaid.
-2. **1-Click COD Order Confirmation Button**: Auto-send *"Confirm COD Order"* / *"Cancel Order"* interactive buttons before shipping `cod_due` orders to prevent fake COD orders / RTO.
-3. **Auto-Generated PDF Receipt / GST Bill in Chat**: Automatically generate and send a branded PDF receipt in WhatsApp (with items, amount paid, and updated **Loyalty Points balance**) when `paymentStatus` becomes `paid`.
-4. **Shipping Tracking Link (`Shiprocket` / `Delhivery` / `India Post` / Custom AWB)**: Allow staff to attach a courier tracking number/link when marking an order `DISPATCHED`, embedding it inside the native WhatsApp `order_status` card.
+In our recent turns, we:
+1. Simplified and decluttered the **Orders page** (`/dashboard/orders`) with a clean 4-KPI header, streamlined filter bar, and compact `OrderCard` with a 4-step status progress bar and `More` popover.
+2. Moved the **Reorder reminders** settings card (`RefillForm`) out of `/dashboard/orders` into `/dashboard/campaigns` (alongside `WinbackForm`), and updated all user-facing terminology from **Refill** to **Reorder** across the project.
+3. Identified **4 optional high-impact payment/order features** ready to implement next if requested:
+   - **COD-to-Prepaid Instant Discount Nudge**: Auto-send an interactive WhatsApp offer (`₹20–₹50 OFF` or `+100 Bonus Loyalty Points`) when an order is marked `cod_due` to convert COD orders into instant UPI prepaid.
+   - **1-Click COD Order Confirmation Button**: Auto-send *"Confirm COD Order"* / *"Cancel Order"* interactive buttons before dispatch to prevent fake COD orders / RTO.
+   - **Auto-Generated PDF Receipt / GST Bill in Chat**: Automatically generate and send a branded PDF receipt in WhatsApp (with items, amount paid, and updated **Loyalty Points balance**) when `paymentStatus` becomes `paid`.
+   - **Shipping Tracking Link (`Shiprocket` / `Delhivery` / `India Post` / Custom AWB)**: Allow staff to attach a courier tracking number/link when marking an order `DISPATCHED`, embedding it inside the native WhatsApp `order_status` card.

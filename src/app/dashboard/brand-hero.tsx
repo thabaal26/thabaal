@@ -43,7 +43,7 @@ function todosOf(w: HeroWork): Todo[] {
   if (w.showReplies && w.unhandledRepliesCount)
     t.push({ key: "chats", href: "/dashboard/replies/priority", color: "#6941c6", icon: MessageCircle, text: <><b>{fmtNumber(w.unhandledRepliesCount)}</b> chat{w.unhandledRepliesCount === 1 ? "" : "s"} to answer</> });
   if (w.showOrders && w.refillsDueCount)
-    t.push({ key: "refills", href: "/dashboard/refills", color: "#15803d", icon: RotateCw, text: <><b>{fmtNumber(w.refillsDueCount)}</b> refill{w.refillsDueCount === 1 ? "" : "s"} due</> });
+    t.push({ key: "refills", href: "/dashboard/refills", color: "#15803d", icon: RotateCw, text: <><b>{fmtNumber(w.refillsDueCount)}</b> reorder{w.refillsDueCount === 1 ? "" : "s"} due</> });
   if (w.showOrders && w.browsedNoCartCount)
     t.push({ key: "browsed", href: "/dashboard?view=customers#customer-scenarios", color: "#0284c7", icon: BookOpen, text: <><b>{fmtNumber(w.browsedNoCartCount)}</b> browsed, no cart</> });
   return t;

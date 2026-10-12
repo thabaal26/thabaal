@@ -141,7 +141,7 @@ export default async function SheetPage() {
             </ol>
             <div className="space-y-1 border-t border-line p-4 text-xs text-muted sm:p-5">
               <p>• The sheet adds and updates; it never deletes customers or changes an order already here (track those in Orders).</p>
-              <p>• Orders older than 2 days arrive as delivered (history for refill reminders); recent ones arrive as new, ready to confirm and dispatch.</p>
+              <p>• Orders older than 2 days arrive as delivered (history for reorder reminders); recent ones arrive as new, ready to confirm and dispatch.</p>
               <p>• &quot;Opted out: yes&quot; stops messages; the sheet can&apos;t opt someone back in.</p>
             </div>
           </Card>

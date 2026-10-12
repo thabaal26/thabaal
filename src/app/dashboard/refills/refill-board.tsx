@@ -56,10 +56,10 @@ export function RefillBoard({ rows, today, canSend, templateName }: { rows: Refi
   return (
     <>
       <Card className="card-3d">
-        <CardHeader tone="brand" icon={<Calendar3D />} title="Who runs out when" description="Customers due for a refill per day · tap a day to see them" />
+        <CardHeader tone="brand" icon={<Calendar3D />} title="Who runs out when" description="Customers due for a reorder per day · tap a day to see them" />
         <div className="p-4 sm:p-5">
           <ColumnChart
-            label="Customers due for a refill per day"
+            label="Customers due for a reorder per day"
             minWidth={640}
             height={150}
             legend={[
@@ -75,7 +75,7 @@ export function RefillBoard({ rows, today, canSend, templateName }: { rows: Refi
               label: t.label,
               sub: t.sub,
               highlight: t.key === "d0",
-              tip: t.n ? `About ${formatValue(t.value, "inr")} in refills` : undefined,
+              tip: t.n ? `About ${formatValue(t.value, "inr")} in reorders` : undefined,
               parts: [{ key: "n", label: "Customers", value: t.n, color: t.color }],
             }))}
           />
@@ -171,7 +171,7 @@ function RefillRow({ r, canSend, templateName }: { r: RefillDue; canSend: boolea
             variant={reminded || r.openCart ? "secondary" : "primary"}
             loading={pending}
             disabled={!templateName}
-            title={templateName ? `Sends “${templateName}”` : "Choose a refill template on the Orders page first"}
+            title={templateName ? `Sends “${templateName}”` : "Choose a reorder template on the Campaigns page first"}
             onClick={send}
           >
             {reminded ? <Check aria-hidden className="size-3.5" /> : <BellRing aria-hidden className="size-3.5" />}

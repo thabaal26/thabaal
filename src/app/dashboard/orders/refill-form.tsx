@@ -16,7 +16,7 @@ export function RefillForm({ days, templateId, templates }: { days: number | nul
   return (
     <Card>
       <CardHeader
-        title="Refill reminders"
+        title="Reorder reminders"
         description="Customers get a reminder this many days after an order, once, unless they've ordered again. Only orders from the last week before turning this on are included."
       />
       <form
@@ -29,7 +29,7 @@ export function RefillForm({ days, templateId, templates }: { days: number | nul
           });
         }}
       >
-        <CheckRow label="Send refill reminders" checked={on} onChange={(e) => setOn(e.target.checked)} />
+        <CheckRow label="Send reorder reminders" checked={on} onChange={(e) => setOn(e.target.checked)} />
         <div className="grid gap-4 sm:grid-cols-[8rem_1fr]">
           <Field id="refill-days" label="Days after order">
             <input type="number" min={1} max={365} inputMode="numeric" className="field tabular" disabled={!on} value={n || ""} onChange={(e) => setN(Number(e.target.value))} />

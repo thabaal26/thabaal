@@ -111,7 +111,7 @@ export const STAGES = [
   { value: "frequent", label: "Frequent buyer (3+ orders)" },
   { value: "repeat", label: "Repeat buyer (2+ orders)" },
   { value: "active", label: "Active buyer (≤30 days)" },
-  { value: "refill", label: "Refill window (31–60 days)" },
+  { value: "refill", label: "Reorder window (31–60 days)" },
   { value: "lapsed", label: "Lapsed (60+ days)" },
   { value: "unpaid", label: "Unpaid cart now" },
   { value: "never", label: "Never ordered" },

@@ -18,8 +18,6 @@ import { money, orderRef, type OrderItem } from "@/lib/orders";
 import { slipPay } from "@/lib/payment-state";
 import { formatPhone } from "@/lib/phone";
 import { getScope, owned } from "@/lib/session";
-import { sendableTemplates } from "@/lib/senders";
-import { META_SAMPLES } from "@/lib/template";
 import { ActionButton } from "@/components/action-button";
 import { PAYMENT_TEMPLATE, paymentTemplateFor } from "@/lib/payments";
 import { createOrderTemplates } from "../actions/orders";
@@ -28,7 +26,6 @@ import { OrderCard } from "./order-card";
 import type { CatalogProductOption } from "./order-items-editor";
 import { PrintButton, type ExportableOrderRow } from "./packing/print-button";
 import { PaymentForm } from "./payment-form";
-import { RefillForm } from "./refill-form";
 import { OrdersRefreshButton } from "./orders-refresh-button";
 
 /** The utility templates that let order updates go out after the customer's 24-hour window. */
@@ -170,7 +167,6 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     refundCount,
     orderTemplates,
     client,
-    approved,
     ownPaymentTemplate,
     paymentTemplate,
     catalogData,
@@ -220,10 +216,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     db.order.count({ where: { ...scoped, ...COD_WHERE } as object }),
     db.order.count({ where: { ...scoped, ...REFUND_WHERE } as object }),
     scope.clientId ? db.template.findMany({ where: { clientId: scope.clientId, name: { in: [...ORDER_TEMPLATES, ...ORDER_TEMPLATES.map((n) => `thenan_${n}`)] } }, select: { name: true, status: true } }) : [],
-    scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { refillDays: true, refillTemplateId: true, lapsedDays: true, winbackTemplateId: true, paymentConfig: true } }) : null,
-    scope.clientId && scope.canManage
-      ? db.template.findMany({ where: { clientId: scope.clientId, status: "APPROVED", category: { not: "AUTHENTICATION" }, name: { notIn: [...ORDER_TEMPLATES, ...META_SAMPLES] }, ...(await sendableTemplates(scope.clientId)) }, select: { id: true, name: true }, orderBy: { name: "asc" } })
-      : [],
+    scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { paymentConfig: true } }) : null,
     scope.clientId ? db.template.findFirst({ where: { clientId: scope.clientId, name: PAYMENT_TEMPLATE }, select: { status: true } }) : null,
     scope.clientId ? paymentTemplateFor(scope.clientId) : null,
     scope.clientId ? getCatalogWithProducts(scope.clientId) : null,
@@ -531,7 +524,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
             <div>
               <h2 className="text-sm font-semibold text-ink">Order &amp; Payment Settings</h2>
               <p className="text-xs text-muted">
-                WhatsApp native payment config, order header picture, and refill reminders
+                WhatsApp native payment configuration and order header picture
               </p>
             </div>
             <span className="rounded-control bg-sunken px-2.5 py-1 text-xs font-semibold text-ink-2 ring-1 ring-line transition group-hover:bg-subtle">
@@ -558,10 +551,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
               </div>
             </Card>
             {client && (
-              <div className="grid items-start gap-4 xl:grid-cols-2">
-                <PaymentForm config={client.paymentConfig} own={{ name: PAYMENT_TEMPLATE, status: ownPaymentTemplate?.status ?? null }} using={paymentTemplate?.name ?? null} />
-                <RefillForm days={client.refillDays} templateId={client.refillTemplateId} templates={approved} />
-              </div>
+              <PaymentForm config={client.paymentConfig} own={{ name: PAYMENT_TEMPLATE, status: ownPaymentTemplate?.status ?? null }} using={paymentTemplate?.name ?? null} />
             )}
           </div>
         </details>

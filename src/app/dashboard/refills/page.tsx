@@ -8,14 +8,14 @@ import { refillForecast } from "@/lib/refill-forecast";
 import { getScope } from "@/lib/session";
 import { RefillBoard } from "./refill-board";
 
-export const metadata: Metadata = { title: "Refills" };
+export const metadata: Metadata = { title: "Reorders" };
 export const dynamic = "force-dynamic";
 
 export default async function RefillsPage() {
   const scope = await getScope();
   const header = (
     <PageHeader
-      title="Refill calendar"
+      title="Reorder calendar"
       description="When each buyer is likely to run out, from how often they reorder. Remind them a day or two before."
       actions={
         <Link href="/dashboard/customers?tag=lapsed" className={buttonClass("secondary")}>
@@ -28,7 +28,7 @@ export default async function RefillsPage() {
     return (
       <>
         {header}
-        <PickClientNotice what="refill calendar" />
+        <PickClientNotice what="reorder calendar" />
       </>
     );
   }
@@ -45,16 +45,16 @@ export default async function RefillsPage() {
       {header}
 
       {!f.refillAutoOn && scope.canManage && (
-        <Callout tone="info" icon={<BellRing />} className="mb-5" title="Automatic refill reminders are off">
-          Pick a reminder template and the number of days in <Link href="/dashboard/orders">Orders → Order settings</Link>. Until then you can remind
+        <Callout tone="info" icon={<BellRing />} className="mb-5" title="Automatic reorder reminders are off">
+          Pick a reminder template and the number of days in <Link href="/dashboard/campaigns">Campaigns → Reorder reminders</Link>. Until then you can remind
           customers one by one from this page{f.refillTemplateName ? "" : " once a template is chosen"}.
         </Callout>
       )}
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:mb-5 sm:gap-4 xl:grid-cols-4">
-        <Stat label="Due this week" value={fmtNumber(week.length)} sub={`about ${formatValue(week.reduce((n, d) => n + d.avgOrder, 0), "inr")} in refills`} icon={<CalendarClock />} tone="brand" />
+        <Stat label="Due this week" value={fmtNumber(week.length)} sub={`about ${formatValue(week.reduce((n, d) => n + d.avgOrder, 0), "inr")} in reorders`} icon={<CalendarClock />} tone="brand" />
         <Stat label="Overdue" value={fmtNumber(overdue.length)} sub={`about ${formatValue(overdue.reduce((n, d) => n + d.avgOrder, 0), "inr")} not yet reordered`} icon={<TriangleAlert />} tone="amber" />
-        <Stat label="Typical refill" value={`${typical} days`} sub={own.length ? `from ${fmtNumber(own.length)} repeat buyers` : `default setting`} icon={<Repeat />} tone="info" />
+        <Stat label="Typical reorder" value={`${typical} days`} sub={own.length ? `from ${fmtNumber(own.length)} repeat buyers` : `default setting`} icon={<Repeat />} tone="info" />
         <Stat
           label="Lapsed"
           value={fmtNumber(f.lapsedCount)}
@@ -68,7 +68,7 @@ export default async function RefillsPage() {
       {f.due.length ? (
         <RefillBoard rows={f.due} today={now} canSend={scope.canManage} templateName={f.refillTemplateName} />
       ) : (
-        <Callout tone="info" icon={<CalendarClock />} title="No refills to forecast yet">
+        <Callout tone="info" icon={<CalendarClock />} title="No reorders to forecast yet">
           Once customers have paid orders, they show up here on the day they&apos;re likely to need more.
         </Callout>
       )}

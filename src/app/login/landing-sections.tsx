@@ -60,7 +60,7 @@ const JOURNEY: { title: T; text: T }[] = [
   {
     title: { en: "Deliver", ta: "டெலிவரி" },
     text: {
-      en: "Mark it delivered and collect cash. A refill reminder goes out when they are likely to run low.",
+      en: "Mark it delivered and collect cash. A reorder reminder goes out when they are likely to run low.",
       ta: "டெலிவரி செய்ததாகக் குறித்து பணம் பெறுங்கள். பொருள் தீரும் நேரத்தில் மீண்டும் வாங்க நினைவூட்டல் போகும்.",
     },
   },
@@ -71,7 +71,7 @@ const MORE: { Icon: typeof Inbox; title: T; text: T }[] = [
   { Icon: Phone, title: { en: "WhatsApp calls", ta: "WhatsApp அழைப்புகள்" }, text: { en: "Take and place calls from the portal, with missed calls to follow up.", ta: "போர்ட்டலிலிருந்தே அழைக்கலாம், தவறிய அழைப்புகளைப் பின்தொடரலாம்." } },
   { Icon: Sheet, title: { en: "Google Sheets", ta: "Google Sheets" }, text: { en: "Bring in customers from your sheets and keep orders flowing back.", ta: "ஷீட்டிலிருந்து வாடிக்கையாளர்கள் உள்ளே, ஆர்டர்கள் மீண்டும் ஷீட்டுக்கு." } },
   { Icon: Users, title: { en: "Audiences", ta: "குழுக்கள்" }, text: { en: "Save groups like ghee buyers in Sellur and send in one tap.", ta: "‘செல்லூர் நெய் வாங்குபவர்கள்’ போன்ற குழுக்களுக்கு ஒரே தட்டலில்." } },
-  { Icon: Repeat, title: { en: "Refill reminders", ta: "மீண்டும் வாங்க நினைவூட்டல்" }, text: { en: "A nudge when a customer's last bottle is likely running out.", ta: "கடைசி பாட்டில் தீரும் நேரத்தில் ஒரு நினைவூட்டல்." } },
+  { Icon: Repeat, title: { en: "Reorder reminders", ta: "மீண்டும் வாங்க நினைவூட்டல்" }, text: { en: "A nudge when a customer's last bottle is likely running out.", ta: "கடைசி பாட்டில் தீரும் நேரத்தில் ஒரு நினைவூட்டல்." } },
   { Icon: Globe, title: { en: "Two languages", ta: "இரு மொழிகள்" }, text: { en: "Work in தமிழ் or English, switch any time.", ta: "தமிழ் அல்லது ஆங்கிலம், எப்போது வேண்டுமானாலும் மாற்றலாம்." } },
   { Icon: Smartphone, title: { en: "Works on your phone", ta: "மொபைலில் இயங்கும்" }, text: { en: "Install it like an app; every screen fits one hand.", ta: "ஆப் போல நிறுவலாம்; ஒரு கையில் பயன்படுத்தலாம்." } },
   { Icon: ShieldCheck, title: { en: "Your team, your data", ta: "உங்கள் குழு, உங்கள் தரவு" }, text: { en: "Logins for owners, managers and staff, each seeing what they need.", ta: "உரிமையாளர், மேலாளர், ஊழியர்களுக்கு தனி லாகின்." } },
@@ -286,7 +286,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
               <p>
                 {ta
                   ? "விற்பனை vs கையில் வந்த பணம், எந்தப் பொருட்கள் விற்கின்றன, எவை கார்ட்டிலிருந்து நீக்கப்படுகின்றன, யாருக்கு மீண்டும் வாங்கும் நேரம் — அனைத்தும் உங்கள் கேட்டலாக் பொருட்களின் அடிப்படையில்."
-                  : "See sales against cash received, which products people buy and which they drop from their carts, and who is due for a refill. Products come straight from your catalogue, so the numbers match what you sell."}
+                  : "See sales against cash received, which products people buy and which they drop from their carts, and who is due for a reorder. Products come straight from your catalogue, so the numbers match what you sell."}
               </p>
             </div>
             <div className="tl-card tl-stats" aria-hidden>
@@ -294,7 +294,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
                 [ta ? "இந்த வார விற்பனை" : "Sales this week", "₹2,073"],
                 [ta ? "படித்த விகிதம்" : "Read rate", "79%"],
                 [ta ? "மீட்க வேண்டிய கார்ட்" : "Carts to recover", "₹1,390"],
-                [ta ? "மீண்டும் வாங்க" : "Refills due", "12"],
+                [ta ? "மீண்டும் வாங்க" : "Reorders due", "12"],
               ].map(([k, v]) => (
                 <div key={k}>
                   <small>{k}</small>

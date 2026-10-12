@@ -824,7 +824,7 @@ export async function createPaymentTemplate(): Promise<SendResult> {
   return { ok: true, message: 'Submitted "payment_request" (with Review and pay button) to Meta for approval.' };
 }
 
-/** Refill reminders: send `templateId` this many days after each order; 0 days turns them off. */
+/** Reorder reminders: send `templateId` this many days after each order; 0 days turns them off. */
 export async function saveRefillRule(days: number, templateId: string): Promise<SendResult> {
   const s = await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
@@ -835,8 +835,10 @@ export async function saveRefillRule(days: number, templateId: string): Promise<
     if (!t) return { ok: false, message: "Choose a template." };
   }
   await db.client.update({ where: { id: s.clientId }, data: { refillDays: n || null, refillTemplateId: n ? templateId : null } });
+  revalidatePath("/dashboard/campaigns");
   revalidatePath("/dashboard/orders");
-  return { ok: true, message: n ? `Refill reminders on: ${n} days after each order.` : "Refill reminders turned off." };
+  revalidatePath("/dashboard/refills");
+  return { ok: true, message: n ? `Reorder reminders on: ${n} days after each order.` : "Reorder reminders turned off." };
 }
 
 /** Win-back: customers tagged lapsed (no order for `days`) get `templateId` once; no template turns it off. */

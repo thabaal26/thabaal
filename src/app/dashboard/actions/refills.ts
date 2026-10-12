@@ -18,7 +18,7 @@ export async function sendRefillNudge(customerId: string, force = false): Promis
     select: { id: true, client: { select: { refillTemplateId: true } } },
   });
   if (!c) return { ok: false, message: "Customer not found." };
-  if (!c.client.refillTemplateId) return { ok: false, message: "Pick a refill reminder template first (Orders → Refill reminders)." };
+  if (!c.client.refillTemplateId) return { ok: false, message: "Pick a reorder reminder template first (Campaigns → Reorder reminders)." };
 
   const r = await sendToCustomer(c.id, c.client.refillTemplateId, null, force);
   if (r.ok) {

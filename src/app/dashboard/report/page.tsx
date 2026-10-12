@@ -51,8 +51,8 @@ export default async function ReportPage() {
   const overdue = refills.due.filter((d) => d.daysLeft < 0);
 
   const todo = [
-    overdue.length && `Remind ${fmtNumber(overdue.length)} overdue refill customer${overdue.length === 1 ? "" : "s"}`,
-    dueNext.length && `${fmtNumber(dueNext.length)} refill${dueNext.length === 1 ? "" : "s"} due this week (~${formatValue(dueNext.reduce((n, d) => n + d.avgOrder, 0), "inr")})`,
+    overdue.length && `Remind ${fmtNumber(overdue.length)} overdue reorder customer${overdue.length === 1 ? "" : "s"}`,
+    dueNext.length && `${fmtNumber(dueNext.length)} reorder${dueNext.length === 1 ? "" : "s"} due this week (~${formatValue(dueNext.reduce((n, d) => n + d.avgOrder, 0), "inr")})`,
     r.cur.abandoned && `Follow up ${fmtNumber(r.cur.abandoned)} unpaid cart${r.cur.abandoned === 1 ? "" : "s"}`,
     topCampaign && topCampaign.revenue > 0 && `Repeat “${topCampaign.name}”, it brought ${formatValue(topCampaign.revenue, "inr")}`,
   ].filter(Boolean) as string[];
@@ -139,7 +139,7 @@ export default async function ReportPage() {
               )}
               <div className="flex flex-wrap gap-3 border-t border-line px-4 py-3 text-xs font-semibold sm:px-5">
                 <Link href="/dashboard/refills" className="text-brand-deep hover:underline">
-                  Refills →
+                  Reorders →
                 </Link>
                 <Link href="/dashboard/orders?show=unpaid" className="text-brand-deep hover:underline">
                   Unpaid carts →

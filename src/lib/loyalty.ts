@@ -8,7 +8,7 @@ export type RfmSegment =
   | "Big Spender · At Risk"
   | "Promising Repeat"
   | "New First-Timer"
-  | "Refill Window"
+  | "Reorder Window"
   | "Hibernating Past Buyer"
   | "Warm Cart Lead"
   | "Cold Prospect";
@@ -193,7 +193,7 @@ export function computeCustomerLoyalty(input: {
     rfmSegment = "Promising Repeat";
     rfmTone = "green";
   } else if (rScore === 3 && fScore >= 2) {
-    rfmSegment = "Refill Window";
+    rfmSegment = "Reorder Window";
     rfmTone = "blue";
   } else if (rScore >= 4 && fScore === 2) {
     rfmSegment = "New First-Timer";
@@ -278,10 +278,10 @@ export function computeCustomerLoyalty(input: {
     offerReason = `Top frequent buyer (${paidOrders} paid orders · ₹${Math.round(spent).toLocaleString("en-IN")} spent · RFM ${rfmCode}). VIP perks lock in retention and help introduce new catalogue items.`;
     whatsappOfferCopy = `Vanakkam ${firstName}! Thank you for being a ${tierLabel} customer at ${brand} (${totalPoints} loyalty pts earned!). Enjoy ₹${vipCredit} off + a complimentary trial pack on your next order of ${fav}.`;
   } else if (isFrequentBuyer && days !== null && days >= 25) {
-    offerBadge = `Refill Due · ₹${redeemableRupees} off + 2× pts`;
-    offerHeadline = `Due for refill (${days}d since last order) — offer ₹${redeemableRupees} loyalty credit on ${fav}`;
+    offerBadge = `Reorder Due · ₹${redeemableRupees} off + 2× pts`;
+    offerHeadline = `Due for reorder (${days}d since last order) — offer ₹${redeemableRupees} loyalty credit on ${fav}`;
     offerReason = `Repeat buyer whose usual reorder window (~${input.avgGapDays ?? 30}d) is open now. Reaching out with their earned points prevents switching to local stores.`;
-    whatsappOfferCopy = `Hi ${firstName}, running low on ${fav}? You have ${totalPoints} loyalty points (worth ₹${rewardRupees}) waiting at ${brand}! Order your refill this week to redeem ₹${redeemableRupees} off + earn 2× bonus points.`;
+    whatsappOfferCopy = `Hi ${firstName}, running low on ${fav}? You have ${totalPoints} loyalty points (worth ₹${rewardRupees}) waiting at ${brand}! Place your reorder this week to redeem ₹${redeemableRupees} off + earn 2× bonus points.`;
   } else if (paidOrders >= 1 || sheetItemsCount >= 1) {
     const voucher = Math.max(40, redeemableRupees);
     offerBadge = `Repeat Booster · ₹${voucher} off`;
