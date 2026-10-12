@@ -3,26 +3,29 @@
 /* overflow-x: clip lets the big bird come in from beyond the right edge without a sideways scroll. */
 .thabaal-page { position: relative; overflow-x: clip; }
 
-/* ── Mascot layers: position › pose (pitch/bank) › idle (hover bob) › watch (turn to form) › face (flip/tilt/squash) ── */
+/* ── Mascot bird sitting on the last letter of the wordmark ── */
 .tm-mascot {
-  --tm-w: 110px;
   position: absolute;
-  left: 0;
-  top: 0;
-  z-index: 30;
-  width: var(--tm-w);
+  left: 96.55%;
+  top: 23%;
+  transform: translate(-74%, -80%);
+  width: 35%;
   aspect-ratio: 640 / 354;
   pointer-events: none;
-  visibility: hidden;
-  will-change: transform;
-  transform-origin: 74% 80%; /* the belly: grows and shrinks in place */
+  z-index: 20;
+  transform-origin: 74% 80%;
 }
-.tm-mascot.tm-on { visibility: visible; }
+
+[data-lang="ta"] .tm-mascot {
+  left: 26.22%;
+  top: 23.4%;
+}
+
 .tm-pose, .tm-idle, .tm-watchwrap, .tm-face { position: absolute; inset: 0; }
 .tm-pose, .tm-idle { transform-origin: 74% 80%; }
-.tm-face { transform-origin: 74% 55%; } /* turns round over its feet */
+.tm-face { transform-origin: 74% 55%; }
 .tm-watchwrap { transition: transform .35s cubic-bezier(.34, 1.56, .64, 1); }
-.tm-face img, .tm-face .bf { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.tm-face img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .tm-wing { transform-origin: 54.4% 30.5%; }
 [data-theme="night"] .tm-face { filter: drop-shadow(0 0 1px rgb(255 255 255 / .9)) drop-shadow(0 0 10px rgb(253 185 19 / .35)); }
 

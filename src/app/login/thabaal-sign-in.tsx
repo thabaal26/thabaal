@@ -6,6 +6,7 @@ import { LoginForm } from "./login-form";
 import { LoginIllustration } from "./login-illustration";
 import { LandingSections } from "./landing-sections";
 import { MascotIntro } from "./mascot-intro";
+import { ScrollDownPrompt } from "./scroll-prompt";
 import "./thabaal-login.css";
 
 function getThemeSnapshot(): "day" | "night" {
@@ -150,28 +151,13 @@ export function ThabaalSignIn() {
                 height={90}
                 priority
               />
+              {/* Mascot bird sitting directly on top of the wordmark's last letter */}
+              <MascotIntro lang={lang} />
             </div>
           </div>
 
           {/* Credential Form */}
           <LoginForm lang={lang} />
-
-          <a href="#explore" className="thabaal-explore">
-            {lang === "ta"
-              ? "தபால் என்ன செய்யும் என்று பாருங்கள்"
-              : "See what Thabaal does"}
-            <svg
-              viewBox="0 0 16 16"
-              aria-hidden
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M4 6l4 4 4-4" />
-            </svg>
-          </a>
         </section>
 
         {/* RIGHT COLUMN: ANIMATED SKY WITH BIRD & TOGGLE */}
@@ -180,10 +166,10 @@ export function ThabaalSignIn() {
           onToggleTheme={toggleTheme}
           lang={lang}
         />
-
-        {/* The little bird character: entrance, letter hops, and hovering on the split. */}
-        <MascotIntro lang={lang} />
       </div>
+
+      {/* Floating Attention "Scroll down to view" prompt with pulsing circle bar */}
+      <ScrollDownPrompt lang={lang} />
 
       {/* What Thabaal does: features, the order journey, pricing and questions, below the sign-in. */}
       <LandingSections lang={lang} />
