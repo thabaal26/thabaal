@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { Bell, CheckCheck, ExternalLink, Inbox, Phone, ShoppingBag, TriangleAlert, X } from "@/components/icons";
 import { Sheet } from "@/components/sheet";
 import { cn } from "@/lib/cn";
@@ -198,10 +198,16 @@ export function NotificationProvider({
       }
     };
 
-    tick();
-    const interval = setInterval(tick, 12000);
+    // The badge already has the server's count, so the first check waits until the page has loaded
+    // instead of competing with it; then every 12 s.
+    let interval = 0;
+    const first = window.setTimeout(() => {
+      tick();
+      interval = window.setInterval(tick, 12000);
+    }, 2000);
     return () => {
       stop = true;
+      clearTimeout(first);
       clearInterval(interval);
     };
   }, []);
@@ -287,7 +293,11 @@ export function NotificationProvider({
         notifications,
         unreadCount,
         openSheet,
-        setOpenSheet,
+        // Opening the list always fetches the latest.
+        setOpenSheet: (open: boolean) => {
+          setOpenSheet(open);
+          if (open) void refresh();
+        },
         markAllRead,
         refresh,
       }}

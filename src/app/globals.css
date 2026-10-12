@@ -328,8 +328,10 @@ tbody > tr {
 .stagger > .grid > :nth-child(n + 3) { animation-delay: 90ms; }
 
 /* Progress and share bars fill in from the left; chart columns grow from the axis. */
-.bar { transform-origin: left; animation: grow 0.55s var(--ease-snappy) 0.08s both; will-change: transform; }
-.bar-y { transform-origin: bottom; animation: grow-y 0.45s var(--ease-snappy) both; will-change: transform; }
+/* No will-change: the browser promotes them while they animate, and dozens of bars kept as permanent
+   layers afterwards cost memory and compositing on every scroll frame. */
+.bar { transform-origin: left; animation: grow 0.55s var(--ease-snappy) 0.08s both; }
+.bar-y { transform-origin: bottom; animation: grow-y 0.45s var(--ease-snappy) both; }
 
 /*
  * Raised "3D" cards: top-lit surface, bright top edge, GPU-friendly shadows, and layout/style

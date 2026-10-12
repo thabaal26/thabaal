@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { CalendarClock, Clock, Globe, Inbox, Megaphone, Phone, Printer, QrCode, Repeat, Sheet, ShieldCheck, Smartphone, Users, Wallet } from "@/components/icons";
 import "./landing.css";
 
@@ -380,8 +381,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
       <section className="tl-close">
         <div className="tl-close-sky" aria-hidden />
         <div className="tl-wrap tl-close-inner">
-          {/* eslint-disable-next-line @next/next/no-img-element -- static brand mark */}
-          <img src="/brands/thabaal/mark.png" alt="" width={150} height={83} className="tl-close-bird" />
+          <Image src="/brands/thabaal/mark.png" alt="" width={150} height={83} className="tl-close-bird" />
           <h2>{ta ? "உங்கள் வாடிக்கையாளர்கள் ஏற்கனவே WhatsApp-இல் உள்ளனர். அங்கேயே ஆர்டர் செய்யட்டும்." : "Your customers are already on WhatsApp. Let them order there."}</h2>
           <div className="tl-actions">
             <Talk lang={lang} />

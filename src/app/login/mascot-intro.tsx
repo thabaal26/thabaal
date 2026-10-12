@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef } from "react";
 import { BirdFace } from "./bird-face";
 import "./mascot.css";
@@ -1090,10 +1091,9 @@ export function MascotIntro({ lang }: { lang: Lang }) {
         <div className="tm-idle">
           <div className="tm-watchwrap">
             <div className="tm-face">
-              {/* eslint-disable-next-line @next/next/no-img-element -- same brand art as the sky bird, already cached */}
-              <img src="/brands/thabaal/wing.png" className="tm-wing" alt="" width={640} height={354} />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/brands/thabaal/body.png" className="tm-body" alt="" width={640} height={354} />
+              {/* The same optimised images as the sky bird (same props, so the same, already loaded files). */}
+              <Image src="/brands/thabaal/wing.png" className="tm-wing" alt="" width={640} height={354} loading="eager" />
+              <Image src="/brands/thabaal/body.png" className="tm-body" alt="" width={640} height={354} loading="eager" />
               <BirdFace />
             </div>
           </div>

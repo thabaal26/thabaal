@@ -15,6 +15,53 @@ type EchartsModule = typeof import("echarts/core");
 let loading: Promise<EchartsModule> | null = null;
 const loadEcharts = () => (loading ??= import("@/lib/echarts-core").then((m) => m.default as unknown as EchartsModule));
 
+/*
+ * Drawing a chart is heavy (text measuring, building the SVG, the entry animation): on a phone it takes
+ * longer than a frame. Charts that appear while nothing is scrolling (the ones on screen when a page
+ * opens) draw straight away; charts that scroll into view are drawn one at a time, a few frames apart,
+ * once scrolling pauses, so they never compete with the scroll itself.
+ */
+const SCROLL_QUIET_MS = 160;
+const GAP_MS = 48;
+let lastScroll = 0;
+let listening = false;
+let pumping = false;
+const queue: (() => void)[] = [];
+
+function pump() {
+  const wait = SCROLL_QUIET_MS - (performance.now() - lastScroll);
+  if (wait > 0) {
+    window.setTimeout(pump, wait);
+    return;
+  }
+  const next = queue.shift();
+  if (next) next();
+  if (queue.length) window.setTimeout(pump, GAP_MS);
+  else pumping = false;
+}
+
+/** Runs `fn` now if nothing is scrolling, else when it's this chart's turn and scrolling has paused; returns a cancel function. */
+function drawSoon(fn: () => void) {
+  if (!listening) {
+    listening = true;
+    // Capture also hears scrolling panes (scroll events don't bubble).
+    window.addEventListener("scroll", () => (lastScroll = performance.now()), { passive: true, capture: true });
+  }
+  if (!pumping && (!lastScroll || performance.now() - lastScroll > 1000)) {
+    fn();
+    return () => {};
+  }
+  queue.push(fn);
+  if (!pumping) {
+    pumping = true;
+    pump();
+  }
+  return () => {
+    const i = queue.indexOf(fn);
+    if (i >= 0) queue.splice(i, 1);
+  };
+}
+
 /**
  * The one way the portal draws a chart: Apache ECharts (SVG), themed from the live design tokens.
  * It loads the library when the chart nears the screen, redraws on resize and when light/dark
@@ -66,17 +113,21 @@ export function EChart({
       queueMicrotask(() => setVisible(true));
       return;
     }
+    let cancel = () => {};
     const io = new IntersectionObserver(
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) {
-          setVisible(true);
           io.disconnect();
+          cancel = drawSoon(() => setVisible(true));
         }
       },
       { rootMargin: "240px" },
     );
     io.observe(node);
-    return () => io.disconnect();
+    return () => {
+      io.disconnect();
+      cancel();
+    };
   }, []);
 
   useEffect(() => {
