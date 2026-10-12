@@ -176,9 +176,9 @@ export function MascotIntro({ lang }: { lang: Lang }) {
       const L = LETTERS[l][i];
       return { x: r.left + (L.x / 900) * r.width, y: r.top + (L.y / 252) * r.height + 1 };
     };
-    /* Its home in the end: standing on the wordmark's last letter (the "l" or "ல்"). */
-    const lastLetter = () => LETTERS[langRef.current].length - 1;
-    const perchPoint = (): P => letterPoint(lastLetter(), langRef.current);
+    /* Target perch letter: first letter (த) for Tamil, last letter (l) for English */
+    const perchIndex = (l: Lang) => (l === "ta" ? 0 : LETTERS[l].length - 1);
+    const perchPoint = (): P => letterPoint(perchIndex(langRef.current), langRef.current);
 
     /* ── Wings ── */
     let wingAnim: Animation | null = null;
@@ -267,7 +267,7 @@ export function MascotIntro({ lang }: { lang: Lang }) {
     let joinId = 0;
     const bump = (depth: number) => {
       splitLetters(langRef.current);
-      squash(lastLetter(), depth);
+      squash(perchIndex(langRef.current), depth);
       window.clearTimeout(joinId);
       timers.delete(joinId);
       joinId = window.setTimeout(() => {
@@ -493,11 +493,12 @@ export function MascotIntro({ lang }: { lang: Lang }) {
       settle();
     };
 
-    /* ── The sequence: comes out from left screen, jumps letter to letter, sits on last letter ── */
+    /* ── The sequence: comes out from left screen; sits on first letter for Tamil, L for English ── */
     const play = async () => {
       const l = langRef.current;
       sizeBird();
       const letters = LETTERS[l];
+      const targetIdx = perchIndex(l);
       const first = letterPoint(0, l);
 
       // 1. Comes out from left screen onto the first letter
@@ -520,40 +521,51 @@ export function MascotIntro({ lang }: { lang: Lang }) {
       await wait(140);
       alive();
 
-      // 2. Jumps from one letter to letter; trampoline bounce on tall letter; lands on last letter
-      for (let i = 1; i < letters.length; i++) {
+      if (targetIdx === 0) {
+        // Tamil: sits proudly on the first letter (த) with a happy bounce!
+        setFace("joy");
+        squash(0, 0.12);
+        await hop(first, h() * 0.85, 380);
         alive();
-        const isLast = i === letters.length - 1;
-        const to = letterPoint(i, l);
-        const dist = Math.abs(to.x - pos.x);
-        squash(i - 1, 0.03);
-        setFace(i % 2 ? "joy" : "open");
-        await hop(
-          to,
-          clamp(dist * 0.55 + 16, 24, 64) + Math.max(0, pos.y - to.y) * 0.4,
-          clamp(260 + dist * 1.5, 300, 460)
-        );
+        squash(0, 0.09);
+        await wait(120);
         alive();
-        squash(i, isLast ? 0.09 : 0.06);
-        setFace("open");
-        if (i === BOUNCY[l]) {
-          // Boing, boing, with a spin on the tall letter!
-          await wait(60);
+      } else {
+        // English: Jumps from letter to letter; trampoline bounce on tall letter (b); sits on L
+        for (let i = 1; i < letters.length; i++) {
           alive();
-          setFace("joy");
-          squash(i, 0.12);
-          await hop(to, h() * 0.9, 400);
+          const isLast = i === letters.length - 1;
+          const to = letterPoint(i, l);
+          const dist = Math.abs(to.x - pos.x);
+          squash(i - 1, 0.03);
+          setFace(i % 2 ? "joy" : "open");
+          await hop(
+            to,
+            clamp(dist * 0.55 + 16, 24, 64) + Math.max(0, pos.y - to.y) * 0.4,
+            clamp(260 + dist * 1.5, 300, 460)
+          );
           alive();
-          squash(i, 0.12);
-          await hop(to, h() * 1.3, 540, 1);
-          alive();
-          squash(i, 0.08);
+          squash(i, isLast ? 0.09 : 0.06);
           setFace("open");
+          if (i === BOUNCY[l]) {
+            // Boing, boing, with a spin on the tall letter!
+            await wait(60);
+            alive();
+            setFace("joy");
+            squash(i, 0.12);
+            await hop(to, h() * 0.9, 400);
+            alive();
+            squash(i, 0.12);
+            await hop(to, h() * 1.3, 540, 1);
+            alive();
+            squash(i, 0.08);
+            setFace("open");
+          }
+          await wait(isLast ? 200 : 90);
         }
-        await wait(isLast ? 200 : 90);
       }
 
-      // 3. Last sits on L letter — that's the whole animation!
+      // Sits on target letter
       alive();
       joinLetters();
       setFace("joy");

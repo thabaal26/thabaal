@@ -377,10 +377,17 @@
   position: relative;
   overflow: hidden;
   container-type: inline-size;
-  min-height: 100vh;
+  min-height: calc(100vh - 32px);
+  margin: 16px;
+  border-radius: 32px;
   contain: layout paint style;
   transform: translateZ(0);
   backface-visibility: hidden;
+  box-shadow: 0 20px 48px -12px rgba(6, 37, 72, .14), 0 0 0 1px rgba(6, 37, 72, .06);
+}
+
+[data-theme="night"] .thabaal-right {
+  box-shadow: 0 20px 50px -10px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .08);
 }
 
 .thabaal-sky {
@@ -873,6 +880,8 @@
     order: -1;
     min-height: 0;
     height: 230px;
+    margin: 12px 12px 0;
+    border-radius: 24px;
   }
   .thabaal-left {
     padding: 24px 20px 40px;
