@@ -6,7 +6,7 @@ import {
   ShieldAlert,
   ShoppingCart,
 } from "@/components/icons";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import type { ComponentType, ReactNode } from "react";
 import { CountUp, DeliveryDonut, HeatGrid, Sparkline, TrendChart, UsageGauge, type Series } from "@/components/charts";
 import { BarList, StackedRows } from "@/components/viz";

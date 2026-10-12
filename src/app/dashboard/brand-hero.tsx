@@ -1,6 +1,6 @@
 import { BookOpen, CircleAlert, CircleCheck, Globe, MessageCircle, MoreHorizontal, PackageCheck, Phone, RotateCw, ShoppingBag, ShoppingCart, Store, Undo2, Users, Wallet } from "@/components/icons";
 import { formatInTimeZone } from "date-fns-tz";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import type { ComponentType, ReactNode } from "react";
 import { formatValue } from "@/lib/chart-math";
 import { cn } from "@/lib/cn";

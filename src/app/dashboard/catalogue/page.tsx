@@ -1,6 +1,6 @@
 import { CheckCircle2, CloudOff, ExternalLink, ShoppingBag, XCircle } from "@/components/icons";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { ShoppingBag3D, Store3D } from "@/components/icons-3d";
 import { Badge, buttonClass, Callout, PageHeader, PickClientNotice, Stat } from "@/components/ui";
 import { getCatalogWithProducts } from "@/lib/catalog";
@@ -23,12 +23,13 @@ export default async function CataloguePage() {
     );
   }
 
-  const client = await db.client.findUnique({
-    where: { id: scope.clientId },
-    select: { id: true, name: true },
-  });
-
-  const { catalogId, products, commerceManagerUrl, isLive } = await getCatalogWithProducts(scope.clientId);
+  const [client, { catalogId, products, commerceManagerUrl, isLive }] = await Promise.all([
+    db.client.findUnique({
+      where: { id: scope.clientId },
+      select: { id: true, name: true },
+    }),
+    getCatalogWithProducts(scope.clientId),
+  ]);
 
   const total = products.length;
   const inStock = products.filter((p) => p.inStock).length;

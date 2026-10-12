@@ -1,7 +1,7 @@
 import { Banknote, CreditCard, Hourglass, ReceiptText, ShoppingCart, Undo2, Wallet } from "@/components/icons";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { ActionButton } from "@/components/action-button";
 import { Rupee3D } from "@/components/icons-3d";
 import { Card, CardHeader, DistributionBar, PageHeader, PickClientNotice, Stat } from "@/components/ui";
@@ -63,7 +63,11 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
   // Shared filters: period (default 30 days), catalogue products, and delivery area.
   const filters = keepFilters(readFilters(sp, "30d"), REVENUE_FILTERS);
   const period = resolvePeriod(filters);
-  const filterOpts = scope.clientId ? await filterOptions(scope.clientId) : null;
+  // The filter choices and the customers the filters cover are read together.
+  const [filterOpts, customers] = await Promise.all([
+    scope.clientId ? filterOptions(scope.clientId) : null,
+    scope.clientId ? scopedCustomerIds(scope.clientId, { ...filters, products: [] }) : null,
+  ]);
   const header = (
     <PageHeader
       title="Revenue & cash"
@@ -94,7 +98,6 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
       </>
     );
 
-  const customers = await scopedCustomerIds(scope.clientId, { ...filters, products: [] });
   const r = await revenueReport(scope.clientId, { start: period.start, end: period.end, customers, products: filters.products });
   const weekly = r.days.length < period.days;
   const toCollect = [...r.awaitingPayment, ...r.codToCollect, ...r.owed, ...r.toVerify].reduce((n, o) => n + o.total, 0);

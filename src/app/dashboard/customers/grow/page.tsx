@@ -1,6 +1,6 @@
 import { Download, QrCode } from "@/components/icons";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import QR from "qrcode";
 import { Card, CardHeader, EmptyState, PageHeader, PickClientNotice, buttonClass } from "@/components/ui";
 import { cn } from "@/lib/cn";

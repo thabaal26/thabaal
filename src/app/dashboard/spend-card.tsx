@@ -1,7 +1,8 @@
 import { ExternalLink, Trash2 } from "@/components/icons";
+import { cache, Suspense } from "react";
 import { ActionButton } from "@/components/action-button";
 import { Wallet3D } from "@/components/icons-3d";
-import { Badge, buttonClass, Card, CardHeader } from "@/components/ui";
+import { Badge, buttonClass, Card, CardHeader, Skeleton } from "@/components/ui";
 import { Disclosure } from "@/components/viz";
 import { cn } from "@/lib/cn";
 import { fmtDate, fmtNumber } from "@/lib/format";
@@ -13,12 +14,84 @@ import { TopUpForm } from "./top-up-form";
 
 const rupees = (n: number) => `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+/** Read once per request: the card's header and body both use it. */
+const loadSpend = cache(async (clientId: string) => {
+  const [s, { number }] = await Promise.all([spendSummary(clientId), senderFor(clientId)]);
+  return { s, number };
+});
+
 /**
  * Message spend synced live from Meta's `pricing_analytics` Graph API (with local DB fallback when offline),
  * alongside the prepaid balance recorded for the client's WhatsApp account — visualized with Apache ECharts.
+ *
+ * The card frame and title show with the rest of the Overview; what comes from Meta (spend, balance,
+ * the live badge) streams in when it arrives, so the page never waits on Meta.
  */
-export async function SpendCard({ clientId, canManage, className }: { clientId: string; canManage: boolean; className?: string }) {
-  const [s, { number }] = await Promise.all([spendSummary(clientId), senderFor(clientId)]);
+export function SpendCard({ clientId, canManage, className }: { clientId: string; canManage: boolean; className?: string }) {
+  return (
+    <Card className={cn("card-3d", className)}>
+      <CardHeader
+        tone="gold"
+        icon={<Wallet3D />}
+        title="Meta WhatsApp spend & wallet telemetry"
+        description={
+          <Suspense fallback="Loading spend from Meta…">
+            <SpendDescription clientId={clientId} />
+          </Suspense>
+        }
+        action={
+          <Suspense fallback={null}>
+            <SpendActions clientId={clientId} />
+          </Suspense>
+        }
+      />
+      <Suspense fallback={<SpendBodySkeleton />}>
+        <SpendBody clientId={clientId} canManage={canManage} />
+      </Suspense>
+    </Card>
+  );
+}
+
+async function SpendDescription({ clientId }: { clientId: string }) {
+  const { s } = await loadSpend(clientId);
+  return <>{s.liveSyncedFromMeta ? "Live from Meta pricing_analytics Graph API · Apache ECharts spend & volume analysis" : "Estimated at Meta's India conversation rates · Apache ECharts spend & volume analysis"}</>;
+}
+
+async function SpendActions({ clientId }: { clientId: string }) {
+  const { s } = await loadSpend(clientId);
+  const acc = s.metaAccount;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+      {s.liveSyncedFromMeta && (
+        <Badge tone="green" dot>
+          Live Meta sync
+        </Badge>
+      )}
+      <a href={acc.billingUrl} target="_blank" rel="noopener noreferrer" className={buttonClass("ghost", "sm")}>
+        Billing Hub <ExternalLink aria-hidden className="size-3.5" />
+        <span className="sr-only">(opens Meta Business Suite)</span>
+      </a>
+    </div>
+  );
+}
+
+function SpendBodySkeleton() {
+  return (
+    <div aria-busy="true">
+      <div className="grid grid-cols-2 gap-3 border-b border-line p-3 sm:grid-cols-4 sm:p-5">
+        {[0, 1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-12" />
+        ))}
+      </div>
+      <div className="p-3 sm:p-5">
+        <Skeleton className="h-40 w-full" />
+      </div>
+    </div>
+  );
+}
+
+async function SpendBody({ clientId, canManage }: { clientId: string; canManage: boolean }) {
+  const { s, number } = await loadSpend(clientId);
   const acc = s.metaAccount;
   const wabaId = number?.businessAccountId || acc.wabaId;
   // Show balance when the WABA matches or when top-ups/syncs have been recorded for this client.
@@ -34,27 +107,7 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
   const lastSyncedLabel = new Date(s.lastSyncedAt).getTime() > 0 ? `synced ${fmtDate(new Date(s.lastSyncedAt), "d MMM, h:mm a")}` : "last recorded";
 
   return (
-    <Card className={cn("card-3d", className)}>
-      <CardHeader
-        tone="gold"
-        icon={<Wallet3D />}
-        title="Meta WhatsApp spend & wallet telemetry"
-        description={s.liveSyncedFromMeta ? "Live from Meta pricing_analytics Graph API · Apache ECharts spend & volume analysis" : "Estimated at Meta's India conversation rates · Apache ECharts spend & volume analysis"}
-        action={
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-            {s.liveSyncedFromMeta && (
-              <Badge tone="green" dot>
-                Live Meta sync
-              </Badge>
-            )}
-            <a href={acc.billingUrl} target="_blank" rel="noopener noreferrer" className={buttonClass("ghost", "sm")}>
-              Billing Hub <ExternalLink aria-hidden className="size-3.5" />
-              <span className="sr-only">(opens Meta Business Suite)</span>
-            </a>
-          </div>
-        }
-      />
-
+    <>
       {/* Top 4-KPI Summary Strip */}
       <dl className="grid grid-cols-2 divide-x divide-y divide-line border-b border-line bg-subtle/30 sm:grid-cols-4 sm:divide-y-0">
         <div className="px-3 py-2.5 sm:px-5 sm:py-3.5">
@@ -181,6 +234,6 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
           </div>
         </Disclosure>
       )}
-    </Card>
+    </>
   );
 }

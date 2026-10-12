@@ -1,7 +1,8 @@
 import { ChevronRight, FlaskConical, Pause, Play, Send, Trash2 } from "@/components/icons";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { ActionButton } from "@/components/action-button";
 import { Calendar3D, Rupee3D, Send3D, ShoppingBag3D, Users3D } from "@/components/icons-3d";
 import { OverflowMenu } from "@/components/overflow-menu";
@@ -315,7 +316,10 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
         )}
       </Card>
 
-      <FailureSummary campaignId={c.id} runIds={runIds} canManage={scope.canManage} />
+      {/* Failure details stream in after the rest of the campaign. */}
+      <Suspense fallback={null}>
+        <FailureSummary campaignId={c.id} runIds={runIds} canManage={scope.canManage} />
+      </Suspense>
     </>
   );
 }

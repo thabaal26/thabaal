@@ -1,6 +1,6 @@
 import { BellRing, CalendarClock, Repeat, TriangleAlert } from "@/components/icons";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { Callout, PageHeader, PickClientNotice, Stat, buttonClass } from "@/components/ui";
 import { formatValue } from "@/lib/chart-math";
 import { fmtNumber } from "@/lib/format";

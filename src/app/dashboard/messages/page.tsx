@@ -1,6 +1,6 @@
 import { CheckCheck, ChevronDown, ChevronLeft, ChevronRight, Download, Search } from "@/components/icons";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { Alert3D, Eye3D, Messages3D } from "@/components/icons-3d";
 import { Picker } from "@/components/picker";
 import { Avatar, Badge, buttonClass, Card, DistributionBar, EmptyState, FilterChips, PageHeader, rowClass, Stat, StatusBadge, Table, Td, Th } from "@/components/ui";
@@ -37,8 +37,7 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
   const filters = keepFilters(readFilters(raw, "all"), MESSAGE_FILTERS);
   const href = (pp: Params, patch: Partial<Params>) => linkTo(filters, pp, patch);
   const period = resolvePeriod(filters);
-  const scoped = await messageScope(scope.clientId, filters, period);
-  const filterOpts = scope.clientId ? await filterOptions(scope.clientId) : null;
+  const [scoped, filterOpts] = await Promise.all([messageScope(scope.clientId, filters, period), scope.clientId ? filterOptions(scope.clientId) : null]);
   const legacy = { ...p, range: p.range === "1d" ? "1d" : undefined };
   const where = { ...messageWhere(legacy), ...ownedMessages(scope), ...scoped };
 

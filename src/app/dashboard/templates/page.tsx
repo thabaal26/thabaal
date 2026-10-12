@@ -1,6 +1,6 @@
 import { CheckCircle2, Clock, Megaphone, Plus, RefreshCw } from "@/components/icons";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { ActionButton } from "@/components/action-button";
 import { Template3D } from "@/components/icons-3d";
 import { Badge, buttonClass, Card, EmptyState, FilterChips, PageHeader, Stat, StatusBadge } from "@/components/ui";
@@ -20,19 +20,19 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
   const active = (Object.keys(CATEGORY_INFO) as Category[]).find((c) => c === category);
   const scope = await getScope();
   const canCreate = scope.canManage && scope.clientId;
-  const [templates, counts] = await Promise.all([
+  const [templates, counts, brand] = await Promise.all([
     db.template.findMany({
       where: { ...owned(scope), ...(active ? { category: active } : {}) },
       include: { _count: { select: { campaigns: true } }, client: { select: { name: true, defaultImageUrl: true, bannerUrl: true } } },
       orderBy: { updatedAt: "desc" },
     }),
     db.template.groupBy({ by: ["category"], where: owned(scope), _count: true }),
+    scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { defaultImageUrl: true, bannerUrl: true } }) : null,
   ]);
   const total = counts.reduce((a, c) => a + c._count, 0);
   const approvedCount = templates.filter((t) => t.status === "APPROVED").length;
   const pendingCount = templates.filter((t) => t.status === "PENDING" || t.status === "DRAFT").length;
   const marketingCount = counts.find((c) => c.category === "MARKETING")?._count ?? 0;
-  const brand = scope.clientId ? await db.client.findUnique({ where: { id: scope.clientId }, select: { defaultImageUrl: true, bannerUrl: true } }) : null;
   // What an image template without its own picture will send.
   const fallbackFor = (c: { defaultImageUrl: string | null; bannerUrl: string | null }) => c.defaultImageUrl ?? c.bannerUrl;
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronRight, Menu } from "@/components/icons";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {

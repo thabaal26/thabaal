@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { VIEWS, type View } from "./overview-cards";

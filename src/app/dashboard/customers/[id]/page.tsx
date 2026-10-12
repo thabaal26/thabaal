@@ -1,6 +1,6 @@
 import { MapPin, MessageCircle, ShoppingBag } from "@/components/icons";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
 import { Conversation, type ConversationEntry } from "@/components/conversation";
@@ -44,7 +44,9 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
   if (!c) notFound();
 
   const [templates, numbers, paused] = await Promise.all([
-    db.template.findMany({ where: { clientId: c.clientId, status: "APPROVED", name: { notIn: META_SAMPLES }, ...(await sendableTemplates(c.clientId)) }, orderBy: { name: "asc" } }),
+    sendableTemplates(c.clientId).then((sendable) =>
+      db.template.findMany({ where: { clientId: c.clientId, status: "APPROVED", name: { notIn: META_SAMPLES }, ...sendable }, orderBy: { name: "asc" } }),
+    ),
     db.whatsAppNumber.findMany({ where: { clientId: c.clientId }, orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }], select: { id: true, label: true, businessAccountId: true } }),
     marketingPaused([c.id]),
   ]);

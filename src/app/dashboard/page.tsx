@@ -1,5 +1,5 @@
 import { CheckCheck, Clock, Send, TriangleAlert } from "@/components/icons";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { ActionButton } from "@/components/action-button";
 import { Calendar3D, Eye3D, Messages3D, Rupee3D, Send3D, Template3D } from "@/components/icons-3d";
@@ -85,7 +85,16 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
   const scope = await getScope();
   const cid = scope.clientId;
   const now = new Date();
-  const firstOrder = filters.range === "all" && cid ? await db.order.findFirst({ where: { clientId: cid }, orderBy: { createdAt: "asc" }, select: { createdAt: true } }) : null;
+  // Everything that only needs the filters is read at once: the first order (for "all time"), the
+  // customers the filters cover, the filter choices, and the live catalogue with what customers bought.
+  // Products are catalogue items only (live from Meta): order lines and sheet notes are matched to
+  // them, and anything else (customer tags, typed names that aren't catalogue items) is left out.
+  const [firstOrder, allowed, filterOpts, [catalog, custProds, catOrders]] = await Promise.all([
+    filters.range === "all" && cid ? db.order.findFirst({ where: { clientId: cid }, orderBy: { createdAt: "asc" }, select: { createdAt: true } }) : null,
+    cid ? scopedCustomerIds(cid, filters) : null,
+    cid ? filterOptions(cid) : null,
+    (async () => (cid ? await Promise.all([catalogFor(cid), customerProducts(cid), catalogOrders(cid)]) : ([catalogMatcher([]), new Map<string, Set<string>>(), []] as const)))(),
+  ]);
   // The period (any preset or custom dates) and the same stretch of time just before it.
   const period = resolvePeriod(filters, now, firstOrder?.createdAt);
   const { start, end, prevStart, prevEnd, prevLabel } = period;
@@ -93,17 +102,12 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
   const weekly = period.bucket === "week";
 
   // Who and what the figures cover: customers picked directly, by group, area, product or campaign.
-  const allowed = cid ? await scopedCustomerIds(cid, filters) : null;
   const ids = allowed;
   const mine = owned(scope);
   const mineOrders = allowed ? { ...mine, customerId: { in: allowed } } : mine;
   const mineCustomers = allowed ? { ...mine, id: { in: allowed } } : mine;
   const myMessages = allowed ? { customer: { ...(cid ? { clientId: cid } : {}), id: { in: allowed } } } : ownedMessages(scope);
-  const filterOpts = cid ? await filterOptions(cid) : null;
   const filtered = activeCount(filters) > 0;
-  // Products are catalogue items only (live from Meta): order lines and sheet notes are matched to
-  // them, and anything else (customer tags, typed names that aren't catalogue items) is left out.
-  const [catalog, custProds, catOrders] = cid ? await Promise.all([catalogFor(cid), customerProducts(cid), catalogOrders(cid)]) : [catalogMatcher([]), new Map<string, Set<string>>(), []];
   const inScope = (customerId: string) => !allowed || allowedSet.has(customerId);
   const allowedSet = new Set(allowed ?? []);
 
@@ -119,7 +123,18 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     hourly ? `${hourLabel(Number(k))} – ${hourLabel((Number(k) + 1) % 24)}` : weekly ? `Week of ${formatInTimeZone(new Date(`${k}T12:00:00Z`), "UTC", "d MMM")}` : formatInTimeZone(new Date(`${k}T12:00:00Z`), "UTC", "EEE d MMM");
   const keyOf = (d: Date) => bucketOf(formatInTimeZone(d, APP_TZ, hourly ? "HH" : "yyyy-MM-dd"));
 
-  const [client, reachable, msgByCustomer, repliersMonth, health, blocked, areaRows] = await Promise.all([
+  // One round for every independent read (several sequential rounds before).
+  const [
+    [client, reachable, msgByCustomer, repliersMonth, health, blocked, areaRows],
+    [customers, optedOut, prevStatus, msgSeries, activeRuns, upcoming, recentRaw, failures, settings, ordersRaw, replySeries, repliers, prevReplies, funnelRows, heat, todayMsgs, todayReplies],
+    [paymentsToCheckCount, refundsDueCount],
+    [catalogueMsgs, periodReplies, unhandledGroup, toDispatchCount, catalogRes, customerLifecycleRows],
+    heldToday,
+    paused,
+    runProgress,
+    refillForecastRes,
+  ] = await Promise.all([
+    Promise.all([
     cid ? db.client.findUnique({ where: { id: cid } }) : null,
     cid
       ? db.customer.findMany({ where: { clientId: cid, optedOut: false, ...(ids && { id: { in: ids } }) }, select: { id: true } })
@@ -148,10 +163,8 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       select: { id: true, name: true, template: { select: { name: true, status: true, statusReason: true } } },
     }),
     cid ? db.customer.groupBy({ by: ["region", "location"], where: { clientId: cid, optedOut: false, ...(allowed && { id: { in: allowed } }) }, _count: true }) : [],
-  ]);
-
-  const [customers, optedOut, prevStatus, msgSeries, activeRuns, upcoming, recentRaw, failures, settings, ordersRaw, replySeries, repliers, prevReplies, funnelRows, heat, todayMsgs, todayReplies] =
-    await Promise.all([
+    ]),
+    Promise.all([
       db.customer.count({ where: { ...mineCustomers, optedOut: false } }),
       db.customer.count({ where: { ...mineCustomers, optedOut: true } }),
       db.message.groupBy({ by: ["status"], where: { ...myMessages, createdAt: { gte: prevStart, lt: prevEnd }, status: { notIn: ["QUEUED", "SKIPPED"] } }, _count: true }),
@@ -261,15 +274,14 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         FROM "Reply" r JOIN "Customer" c ON c.id = r."customerId"
         WHERE r."receivedAt" >= ${todayStart} AND (${cid}::text IS NULL OR c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[])))
         GROUP BY 1`,
-    ]);
-
-  // Extra business-scenario queries: catalogue/price-list sends, period replies with customer info, unhandled chats, full product catalog, all-time product buyers, and customer lifecycle cohorts.
-  // Payments that need a person: a customer says they paid, or a cancelled order still owes a refund.
-  const [paymentsToCheckCount, refundsDueCount] = await Promise.all([
+    ]),
+    // Payments that need a person: a customer says they paid, or a cancelled order still owes a refund.
+    Promise.all([
     db.order.count({ where: { ...mineOrders, paidAt: null, paymentClaimedAt: { not: null }, status: { not: "CANCELLED" } } }).catch(() => 0),
     db.order.count({ where: { ...mineOrders, status: "CANCELLED", refundedAt: null, OR: [{ paidAt: { not: null } }, { paidAmount: { gt: 0 } }] } }).catch(() => 0),
-  ]);
-  const [catalogueMsgs, periodReplies, unhandledGroup, toDispatchCount, catalogRes, customerLifecycleRows] = await Promise.all([
+    ]),
+    // Extra business-scenario queries: catalogue/price-list sends, period replies with customer info, unhandled chats, full product catalog, all-time product buyers, and customer lifecycle cohorts.
+    Promise.all([
     db.message
       .findMany({
         where: { ...myMessages, createdAt: { gte: start, lt: end }, templateName: { in: ["Catalogue", "Price list"] } },
@@ -316,25 +328,31 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
             GROUP BY c.id`
           .catch(() => [])
       : Promise.resolve([]),
+    ]),
+    // Messages Meta held back (too much marketing to that person) are retried automatically and not
+    // charged: worth knowing, but nothing to fix, so they don't count as something needing attention.
+    db.message.count({ where: { ...myMessages, status: "FAILED", failedAt: { gte: daysAgo(1) }, errorCode: { in: HELD_CODES } } }),
+    // A campaign paused because the token, app permissions or Meta account stopped every send.
+    db.message.findFirst({
+      where: { ...myMessages, status: "QUEUED", OR: [{ errorCode: { in: codesOf(PAUSING_KINDS) } }, { errorCode: { gte: 200, lte: 299 } }] },
+      orderBy: { createdAt: "desc" },
+      select: { error: true, run: { select: { campaign: { select: { id: true, name: true } } } } },
+    }),
+    // Progress of the campaigns sending right now (same runs as activeRuns above).
+    db.message.groupBy({
+      by: ["runId", "status"],
+      where: { run: { campaign: mine, status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"] } } },
+      _count: true,
+    }),
+    // Reorders due this week (shown only when the Orders section is on).
+    cid ? refillForecast(cid, now).catch(() => null) : null,
   ]);
 
-  // Messages Meta held back (too much marketing to that person) are retried automatically and not
-  // charged: worth knowing, but nothing to fix, so they don't count as something needing attention.
-  const heldToday = await db.message.count({ where: { ...myMessages, status: "FAILED", failedAt: { gte: daysAgo(1) }, errorCode: { in: HELD_CODES } } });
   const failedToday = failures.reduce((n, f) => n + f._count, 0);
-  // A campaign paused because the token, app permissions or Meta account stopped every send.
-  const paused = await db.message.findFirst({
-    where: { ...myMessages, status: "QUEUED", OR: [{ errorCode: { in: codesOf(PAUSING_KINDS) } }, { errorCode: { gte: 200, lte: 299 } }] },
-    orderBy: { createdAt: "desc" },
-    select: { error: true, run: { select: { campaign: { select: { id: true, name: true } } } } },
-  });
   // GitHub runs the scheduler every 5 minutes, sometimes late; 20 minutes of silence means it stopped.
   const schedulerQuiet = scope.isAdmin && (!settings.lastDispatchAt || settings.lastDispatchAt < daysAgo(20 / (24 * 60)));
   const issues = [paused, schedulerQuiet, failedToday > 0, blocked.length > 0].filter(Boolean).length;
 
-  const runProgress = activeRuns.length
-    ? await db.message.groupBy({ by: ["runId", "status"], where: { runId: { in: activeRuns.map((r) => r.id) } }, _count: true })
-    : [];
 
   // A product filter narrows every order to the picked products' lines (and drops the rest).
   const orders = narrowOrders(ordersRaw, filters.products, catalog);
@@ -1584,7 +1602,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     customers: rankedCustomersList,
   };
 
-  const refillsWeek = ordersOn && cid ? (await refillForecast(cid, now).catch(() => null))?.due.filter((d) => d.daysLeft <= 7) ?? [] : [];
+  const refillsWeek = ordersOn && cid ? refillForecastRes?.due.filter((d) => d.daysLeft <= 7) ?? [] : [];
 
   const views: View[] = ordersOn ? ["overview", "customers", "products", "carts"] : ["overview", "customers"];
   const view: View = views.includes(sp.view as View) ? (sp.view as View) : "overview";
@@ -1835,6 +1853,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       )}
 
       {/* Meta WhatsApp spend & wallet telemetry — prominent in top-middle section with Apache ECharts analysis */}
+      {/* Its Meta figures stream in on their own (see spend-card.tsx): the rest of the page doesn't wait. */}
       {cid && <SpendCard clientId={cid} canManage={scope.canManage} className="mt-3.5 sm:mt-5" />}
 
       {/* Zoho Zia-style Free AI Business Copilot & Daily Executive Brief */}

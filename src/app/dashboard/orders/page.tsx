@@ -1,7 +1,7 @@
 import { PackageCheck, PackageOpen, Search, Store, Truck, Wallet } from "@/components/icons";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { Rupee3D, ShoppingBag3D } from "@/components/icons-3d";
 import { Picker } from "@/components/picker";
 import { buttonClass, Callout, Card, EmptyState, FilterChips, PageHeader, Stat } from "@/components/ui";
@@ -110,8 +110,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
   const filters = keepFilters(readFilters(sp, "all"), ORDER_FILTERS);
   const period = resolvePeriod(filters);
   const dateWhere = filters.range !== "all" ? { createdAt: { gte: period.start, lt: period.end } } : getDateWhere(date);
-  const extraWhere = await orderScope(scope.clientId, filters);
-  const filterOpts = scope.clientId ? await filterOptions(scope.clientId) : null;
+  const [extraWhere, filterOpts] = await Promise.all([orderScope(scope.clientId, filters), scope.clientId ? filterOptions(scope.clientId) : null]);
 
   const cleanPhone = q.replace(/\D/g, "");
   const orderNumMatch = q.match(/(?:rg-?)?(\d+)/i);

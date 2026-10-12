@@ -28,11 +28,14 @@ type Item = { id?: string; name?: string; quantity?: number | string; price?: nu
 
 /** Every order of the client with its lines matched to the catalogue. */
 export const catalogOrders = cache(async (clientId: string) => {
-  const m = await catalogFor(clientId);
-  const rows = await db.order.findMany({
-    where: { clientId },
-    select: { id: true, customerId: true, items: true, status: true, paidAt: true, createdAt: true },
-  });
+  // The orders don't depend on the catalogue: read both at once.
+  const [m, rows] = await Promise.all([
+    catalogFor(clientId),
+    db.order.findMany({
+      where: { clientId },
+      select: { id: true, customerId: true, items: true, status: true, paidAt: true, createdAt: true },
+    }),
+  ]);
   return rows.map((o) => ({
     ...o,
     lines: ((o.items as Item[] | null) ?? [])

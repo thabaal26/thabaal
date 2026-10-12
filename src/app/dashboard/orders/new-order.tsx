@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Loader2, MapPin, MessageSquareQuote, Plus, Sparkles, UserCheck, UserPlus } from "@/components/icons";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { Sheet } from "@/components/sheet";

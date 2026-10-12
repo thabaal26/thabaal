@@ -1,7 +1,7 @@
 "use client";
 
 import { BellRing, Check, MessageCircle, ShoppingCart } from "@/components/icons";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { confirmAction } from "@/components/confirm";

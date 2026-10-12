@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { cn } from "@/lib/cn";
 
 /** Switch between the conversation inbox and the priority board. */

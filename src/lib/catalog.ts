@@ -3,6 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { explainSendError } from "@/app/dashboard/actions/send-helpers";
 import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
+import { revalidateTag, unstable_cache } from "next/cache";
+import { cache } from "react";
 import { db } from "./db";
 import { APP_TZ } from "./format";
 import { getSettings } from "./provider";
@@ -293,52 +295,62 @@ async function runBatch(cfg: WaConfig, catalogId: string, request: { method: "CR
 /** Meta downloads product photos itself, so only a public https link can be sent. */
 const publicImage = (url: string | null | undefined) => (url && /^https:\/\//i.test(url) ? url : null);
 
-/** Fetches full catalog products with stock, price, category and descriptions for the client. */
-/* Catalogue snapshot for product lists, filters and charts: live from Meta, reused for a minute so
-   every page doesn't wait on Meta. A full catalogue read refreshes it; portal edits clear it. */
-const SNAP_MS = 60_000;
-const snaps = new Map<string, { at: number; products: CatalogProductDetail[] }>();
+/* Catalogue snapshot for product lists, filters and charts: live from Meta, kept in Next's shared data
+   cache for a minute (every page and every server instance reuses it instead of waiting on Meta), and
+   dropped as soon as the portal edits the catalogue. Failed reads are never cached. */
+const CATALOG_TTL_S = 60;
+const catalogTag = (clientId: string) => `catalog:${clientId}`;
+
+/** Forgets the cached catalogue so the next page shows Meta's latest. */
+function forgetCatalog(clientId: string) {
+  try {
+    revalidateTag(catalogTag(clientId), { expire: 0 });
+  } catch {
+    // Outside a request (scripts): nothing cached to forget.
+  }
+}
+
+/** The live catalogue from Meta: null in demo mode, a null catalogId when no catalogue is connected. Throws on Meta errors. */
+async function readLiveCatalog(clientId: string): Promise<{ catalogId: string | null; products: CatalogProductDetail[] } | null> {
+  const { cfg } = await senderFor(clientId);
+  if (!cfg.live) return null;
+  const catalogId = await catalogIdFor(cfg);
+  if (!catalogId) return { catalogId: null, products: [] };
+  const out: CatalogProductDetail[] = [];
+  let path: string | null = `${catalogId}/products?fields=id,retailer_id,name,price,availability,description,image_url&limit=100`;
+  while (path) {
+    const page: { data: MetaProduct[]; paging?: { next?: string } } = await metaGet(cfg, path);
+    for (const p of page.data ?? []) out.push(toDetail(p));
+    path = page.paging?.next ? page.paging.next.replace(/^https:\/\/graph\.facebook\.com\/v[\d.]+\//, "") : null;
+  }
+  out.sort((a, b) => a.retailerId.localeCompare(b.retailerId, undefined, { numeric: true }));
+  return { catalogId, products: out };
+}
+
+const cachedLiveCatalog = (clientId: string) =>
+  unstable_cache(() => readLiveCatalog(clientId), ["catalog-live", clientId], { revalidate: CATALOG_TTL_S, tags: [catalogTag(clientId)] })();
 
 /** The client's catalogue products (live, at most a minute old). The only list of products. */
 export async function catalogProducts(clientId: string): Promise<CatalogProductDetail[]> {
-  const hit = snaps.get(clientId);
-  if (hit && Date.now() - hit.at < SNAP_MS) return hit.products;
   return (await getCatalogWithProducts(clientId)).products;
 }
 
-export async function getCatalogWithProducts(clientId: string): Promise<{
+/** Full catalogue products with stock, price, category and descriptions for the client (once per request). */
+export const getCatalogWithProducts = cache(async (clientId: string): Promise<{
   catalogId: string | null;
   products: CatalogProductDetail[];
   commerceManagerUrl: string | null;
   isLive: boolean;
-}> {
-  const { cfg } = await senderFor(clientId);
-  const fallback = { catalogId: null, products: demoProducts(clientId), commerceManagerUrl: "https://business.facebook.com/commerce_manager", isLive: false };
-  if (!cfg.live) {
-    snaps.set(clientId, { at: Date.now(), products: fallback.products });
-    return fallback;
-  }
-
+}> => {
   try {
-    const catalogId = await catalogIdFor(cfg);
-    if (!catalogId) return fallback;
-
+    const live = await cachedLiveCatalog(clientId);
     // Live: Meta is the only source of truth. Local demo edits are never layered on top.
-    const out: CatalogProductDetail[] = [];
-    let path: string | null = `${catalogId}/products?fields=id,retailer_id,name,price,availability,description,image_url&limit=100`;
-    while (path) {
-      const page: { data: MetaProduct[]; paging?: { next?: string } } = await metaGet(cfg, path);
-      for (const p of page.data ?? []) out.push(toDetail(p));
-      path = page.paging?.next ? page.paging.next.replace(/^https:\/\/graph\.facebook\.com\/v[\d.]+\//, "") : null;
-    }
-    out.sort((a, b) => a.retailerId.localeCompare(b.retailerId, undefined, { numeric: true }));
-    snaps.set(clientId, { at: Date.now(), products: out });
-    return { catalogId, products: out, commerceManagerUrl: `https://business.facebook.com/commerce_manager/${catalogId}/products`, isLive: true };
+    if (live?.catalogId) return { catalogId: live.catalogId, products: live.products, commerceManagerUrl: `https://business.facebook.com/commerce_manager/${live.catalogId}/products`, isLive: true };
   } catch (e) {
     console.warn("Could not fetch Meta catalog, showing the demo list:", e);
-    return fallback;
   }
-}
+  return { catalogId: null, products: demoProducts(clientId), commerceManagerUrl: "https://business.facebook.com/commerce_manager", isLive: false };
+});
 
 type Result = { ok: boolean; message: string; metaUpdated: boolean };
 
@@ -355,7 +367,7 @@ export async function updateCatalogProductItem(
     imageUrl?: string | null;
   }
 ): Promise<Result> {
-  snaps.delete(clientId);
+  forgetCatalog(clientId);
   const { cfg } = await senderFor(clientId);
 
   // Demo mode (no WhatsApp Cloud API): edits are kept locally so the screens can be tried.
@@ -391,6 +403,7 @@ export async function updateCatalogProductItem(
 
     const r = await runBatch(cfg, catalogId, { method: "UPDATE", data });
     if (!r.ok) return { ok: false, metaUpdated: false, message: r.message };
+    forgetCatalog(clientId);
     const photoNote = !changedImage || image
       ? ""
       : params.imageUrl
@@ -411,7 +424,7 @@ export async function createCatalogProductItem(
   clientId: string,
   p: { retailerId: string; name: string; priceAmount: number; inStock: boolean; description: string; imageUrl: string | null; brand: string; link: string },
 ): Promise<Result> {
-  snaps.delete(clientId);
+  forgetCatalog(clientId);
   const { cfg } = await senderFor(clientId);
   if (!cfg.live) return { ok: false, metaUpdated: false, message: "Adding products needs the WhatsApp Cloud API connected." };
   const retailerId = p.retailerId.trim();
@@ -441,6 +454,7 @@ export async function createCatalogProductItem(
       },
     });
     if (!r.ok) return { ok: false, metaUpdated: false, message: r.message };
+    forgetCatalog(clientId);
     return { ok: true, metaUpdated: true, message: r.pending ? "Sent to Meta. The new product can take a minute to appear." : "Product added to your WhatsApp catalogue." };
   } catch (e) {
     return { ok: false, metaUpdated: false, message: `Couldn't add the product: ${e instanceof Error ? e.message : "Meta API error"}` };
@@ -449,7 +463,7 @@ export async function createCatalogProductItem(
 
 /** Removes a product (by SKU) from the live catalogue. Past orders keep their item names. */
 export async function deleteCatalogProductItem(clientId: string, retailerId: string): Promise<Result> {
-  snaps.delete(clientId);
+  forgetCatalog(clientId);
   const { cfg } = await senderFor(clientId);
   if (!cfg.live) return { ok: false, metaUpdated: false, message: "Deleting products needs the WhatsApp Cloud API connected." };
   try {
@@ -458,6 +472,7 @@ export async function deleteCatalogProductItem(clientId: string, retailerId: str
     if (!(await findByRetailerId(cfg, catalogId, retailerId))) return { ok: false, metaUpdated: false, message: `${retailerId} is not in the catalogue any more. Refresh the page.` };
     const r = await runBatch(cfg, catalogId, { method: "DELETE", data: { id: retailerId } });
     if (!r.ok) return { ok: false, metaUpdated: false, message: r.message };
+    forgetCatalog(clientId);
     return { ok: true, metaUpdated: true, message: r.pending ? "Sent to Meta. It can take a minute to disappear from WhatsApp." : "Product deleted from your WhatsApp catalogue." };
   } catch (e) {
     return { ok: false, metaUpdated: false, message: `Couldn't delete the product: ${e instanceof Error ? e.message : "Meta API error"}` };

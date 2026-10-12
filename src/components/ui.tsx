@@ -1,5 +1,5 @@
 import { ArrowLeft, Loader2 } from "@/components/icons";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { Children, cloneElement, isValidElement, type ComponentProps, type ReactElement, type ReactNode } from "react";
 import { cssColor, type ChartColor } from "@/lib/chart-theme";
 import { cn } from "@/lib/cn";
@@ -174,7 +174,8 @@ export function CardHeader({
     >
       <div className="flex min-w-0 flex-1 basis-36 items-start gap-2.5 sm:basis-40 sm:gap-3">
         {t && icon && <IconCube tone={tone} size="md">{icon}</IconCube>}
-        <div className="min-w-0">
+        {/* flex-1: the title's box doesn't change size when a description streams in later. */}
+        <div className="min-w-0 flex-1">
           <H className="text-[0.875rem] font-semibold leading-5 text-ink sm:text-[0.9375rem] sm:leading-6">{title}</H>
           {description && <p className="mt-0.5 text-[11.5px] leading-snug text-muted sm:text-sm sm:leading-relaxed">{description}</p>}
         </div>

@@ -1,6 +1,6 @@
 import { PauseCircle, Plus, Sparkles } from "@/components/icons";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { ActionButton } from "@/components/action-button";
 import { Calendar3D, Users3D } from "@/components/icons-3d";
 import { Badge, buttonClass, Card, EmptyState, FilterChips, PageHeader, Stat, StatusBadge } from "@/components/ui";

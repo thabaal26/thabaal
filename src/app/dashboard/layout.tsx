@@ -1,6 +1,7 @@
 import { LogOut } from "@/components/icons";
 import type { Metadata, Viewport } from "next";
-import Link from "next/link";
+import Link from "@/components/intent-link";
+import { cache } from "react";
 import { CallWidget } from "@/components/call-widget";
 import { isSectionEnabled } from "@/lib/client-sections";
 import { db } from "@/lib/db";
@@ -16,11 +17,12 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { IconPackSync } from "@/components/icon-pack-sync";
 import { iconLookOf, iconPackOf } from "@/lib/icon-pack";
 
-/** The client whose look the dashboard wears: a client login's own, or the one an admin picked. */
-async function brandedClient() {
+/** The client whose look the dashboard wears: a client login's own, or the one an admin picked.
+    Read once per request (the metadata and the layout both need it). */
+const brandedClient = cache(async () => {
   const scope = await getScope();
   return scope.clientId ? db.client.findUnique({ where: { id: scope.clientId } }) : null;
-}
+});
 
 export async function generateMetadata(): Promise<Metadata> {
   const client = await brandedClient();
@@ -61,8 +63,9 @@ function BrandMark({ logoUrl, name, size }: { logoUrl?: string | null; name: str
     return <img src={logoUrl} alt={`${name} logo`} className={`${box} shrink-0 rounded-control object-cover ring-1 ring-white/15`} />;
   }
   return (
+    // A 144 × 48 copy of the logo: it shows at about 36 px wide here (the full one is 146 KB).
     // eslint-disable-next-line @next/next/no-img-element
-    <img src="/brands/thabaal/thabaal-logo-en.png" alt="Thabaal" className={`${box} shrink-0 rounded-control bg-white object-contain p-0.5 ring-1 ring-white/15`} />
+    <img src="/brands/thabaal/thabaal-logo-en-sm.png" alt="Thabaal" width={144} height={48} className={`${box} shrink-0 rounded-control bg-white object-contain p-0.5 ring-1 ring-white/15`} />
   );
 }
 
@@ -77,9 +80,10 @@ const initials = (name: string) =>
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
   const user = await requireUser();
   const scope = await getScope();
-  const [settings, client, clients, rawOpenReplies, rawNewOrders] = await Promise.all([
+  const [settings, client, sender, clients, rawOpenReplies, rawNewOrders] = await Promise.all([
     getSettings(),
     brandedClient(),
+    scope.clientId ? senderFor(scope.clientId) : null,
     scope.isAdmin ? db.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }) : [],
     db.reply.groupBy({ by: ["customerId"], where: { handled: false, ...ownedMessages(scope) } }).then((g) => g.length),
     db.order.count({ where: { status: { in: ["NEW", "PAID"] }, ...owned(scope) } }).catch(() => 0),
@@ -100,7 +104,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
   const name = client?.name ?? "Thabaal";
   const subtitle = client?.tagline || (scope.isAdmin ? (client ? "Admin view" : "Admin · all clients") : "A message with momentum");
   const via = settings.provider === "LOCAL" ? "Local session" : "Meta Cloud API";
-  const live = !isSimulated(settings, client ? (await senderFor(client.id)).cfg : undefined);
+  const live = !isSimulated(settings, client && sender ? sender.cfg : undefined);
 
   const role: NavRole = !scope.isAdmin && scope.canOperate && !scope.canManage ? "staff" : "manager";
 

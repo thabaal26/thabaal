@@ -1,6 +1,6 @@
 import { ChevronRight } from "@/components/icons";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { Alert3D, Bell3D, Inbox3D, Phone3D, ShoppingBag3D } from "@/components/icons-3d";
 import { Badge, Card, EmptyState, FilterChips, type HeaderTone, IconCube, PageHeader, Stat } from "@/components/ui";
 import { cn } from "@/lib/cn";

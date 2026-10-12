@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertCircle, Ban, Check, ChevronRight, Download, FileUp, MoreHorizontal, Pencil, QrCode, Sheet as SheetIcon, Trash2, UserCheck, UserPlus, UsersRound, X } from "@/components/icons";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { confirmAction } from "@/components/confirm";

@@ -1,6 +1,6 @@
 import { PhoneCall, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing } from "@/components/icons";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { Phone3D } from "@/components/icons-3d";
 import { Badge, Card, CardHeader, EmptyState, IconCube, PageHeader, Stat } from "@/components/ui";
 import { cn } from "@/lib/cn";

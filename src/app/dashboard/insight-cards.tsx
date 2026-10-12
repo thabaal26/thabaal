@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import type { ReactNode } from "react";
 import { MapPin3D, ShoppingBag3D, Sparkles3D, Target3D } from "@/components/icons-3d";
 import { Badge, Card, CardHeader } from "@/components/ui";

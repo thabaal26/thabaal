@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { ChevronDown, ChevronUp } from "@/components/icons";
 
 type AreaItem = {

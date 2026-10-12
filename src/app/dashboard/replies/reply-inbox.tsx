@@ -1,5 +1,5 @@
 import { CheckCheck, CheckCircle2, ChevronRight, MessageCircle, RotateCcw, ShoppingBag, UserRound } from "@/components/icons";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { ActionButton } from "@/components/action-button";
 import { Conversation, type ConversationEntry } from "@/components/conversation";
 import { Avatar, Badge, Card, buttonClass } from "@/components/ui";

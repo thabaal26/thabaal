@@ -1,7 +1,7 @@
 import { Building2, CheckCircle2, Circle, LogOut, SquarePen } from "@/components/icons";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { Badge, buttonClass, Card, CardHeader, PageHeader } from "@/components/ui";
 import { requireUser } from "@/lib/session";
 import { logout } from "../../login/actions";

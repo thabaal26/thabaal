@@ -63,18 +63,15 @@ export function dayDiff(from: Date, to: Date) {
 }
 
 export async function refillForecast(clientId: string, now = new Date()): Promise<RefillForecast> {
-  const client = await db.client.findUnique({
+  // The client's settings (and their reminder template) are read alongside the orders, not before them.
+  const clientRead = db.client.findUnique({
     where: { id: clientId },
     select: { refillDays: true, refillTemplateId: true, lapsedDays: true },
   });
-  const defaultCycle = client?.refillDays && client.refillDays > 0 ? client.refillDays : 30;
-  const lapsedDays = client?.lapsedDays ?? 60;
-  const template = client?.refillTemplateId
-    ? await db.template.findUnique({ where: { id: client.refillTemplateId }, select: { name: true } })
-    : null;
+  const templateRead = clientRead.then((c) => (c?.refillTemplateId ? db.template.findUnique({ where: { id: c.refillTemplateId }, select: { name: true } }) : null));
 
   const since = new Date(now.getTime() - 400 * DAY);
-  const [orders, carts, recentReplies] = await Promise.all([
+  const [client, template, [orders, carts, recentReplies]] = await Promise.all([clientRead, templateRead, Promise.all([
     db.order.findMany({
       where: {
         clientId,
@@ -104,7 +101,9 @@ export async function refillForecast(clientId: string, now = new Date()): Promis
       where: { customer: { clientId }, receivedAt: { gte: new Date(now.getTime() - DAY) } },
       _count: true,
     }),
-  ]);
+  ])]);
+  const defaultCycle = client?.refillDays && client.refillDays > 0 ? client.refillDays : 30;
+  const lapsedDays = client?.lapsedDays ?? 60;
 
   const byCustomer = new Map<string, typeof orders>();
   for (const o of orders) {

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { ChartBar3D, Trophy3D } from "@/components/icons-3d";
 import { Card, CardHeader, PageHeader, PickClientNotice } from "@/components/ui";
 import { BarList, ColumnChart } from "@/components/viz";

@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowUpRight, Sparkles } from "@/components/icons";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { useState, useTransition } from "react";
 import { Badge, Button, buttonClass, Card, CardHeader } from "@/components/ui";
 import { cn } from "@/lib/cn";

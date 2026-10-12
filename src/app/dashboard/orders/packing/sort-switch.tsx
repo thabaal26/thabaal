@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { cn } from "@/lib/cn";
 
 /** Newest or oldest orders first; a link pair so the choice lives in the URL like the filters. */

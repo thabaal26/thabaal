@@ -1,5 +1,5 @@
 import { RotateCcw } from "@/components/icons";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { ActionButton } from "@/components/action-button";
 import { Badge, Card, CardHeader, type Tone } from "@/components/ui";
 import { db } from "@/lib/db";

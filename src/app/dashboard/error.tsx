@@ -1,7 +1,7 @@
 "use client"; // Error boundaries must be Client Components
 
 import { RotateCcw, TriangleAlert } from "@/components/icons";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { useEffect } from "react";
 import { Button, buttonClass, Card } from "@/components/ui";
 

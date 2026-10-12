@@ -1,5 +1,5 @@
 import { History, MapPin, Sparkles, Truck } from "@/components/icons";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { Avatar, Badge, Card, OrderStatusBadge, OrderStepper } from "@/components/ui";
 import { analyzeCartMentality } from "@/lib/cart-mentality";
 import { fmtDate } from "@/lib/format";

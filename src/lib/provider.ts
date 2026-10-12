@@ -8,8 +8,9 @@ import { sendTemplateMessage, waConfig, type WaConfig } from "./whatsapp";
 
 export type ProviderName = "META" | "LOCAL";
 
+/** The single settings row. A plain read (pages ask for it on every load); created on first use. */
 export async function getSettings(): Promise<Setting> {
-  return db.setting.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
+  return (await db.setting.findUnique({ where: { id: 1 } })) ?? db.setting.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
 }
 
 export function wahaConfig(s: Setting): WahaConfig | null {

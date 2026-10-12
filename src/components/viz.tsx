@@ -13,7 +13,7 @@
 
 import type { ECharts } from "echarts/core";
 import { ChevronDown } from "@/components/icons";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { EChart, type ChartEvent } from "@/components/echart";

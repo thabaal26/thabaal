@@ -1,6 +1,6 @@
 import { Lightbulb, Snail } from "@/components/icons";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { ShoppingBag3D, Sparkles3D, Trophy3D } from "@/components/icons-3d";
 import { buttonClass, Callout, Card, CardHeader, EmptyState, PageHeader, PickClientNotice } from "@/components/ui";
 import { BarList } from "@/components/viz";

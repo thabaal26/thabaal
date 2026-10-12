@@ -76,7 +76,12 @@ export type Scope = {
  * admins see the client picked in the switcher, or everything.
  */
 export const getScope = cache(async (): Promise<Scope> => {
-  const user = await requireUser();
+  // An admin's picked client is looked up alongside the user rather than after it (client logins ignore it).
+  const picked = (await cookies()).get(CLIENT_COOKIE)?.value;
+  const [user, pickedClient] = await Promise.all([
+    requireUser(),
+    picked ? db.client.findUnique({ where: { id: picked }, select: { id: true, name: true } }) : null,
+  ]);
   if (user.role === "CLIENT")
     return {
       isAdmin: false,
@@ -85,9 +90,7 @@ export const getScope = cache(async (): Promise<Scope> => {
       clientId: user.clientId,
       clientName: user.client?.name ?? null,
     };
-  const picked = (await cookies()).get(CLIENT_COOKIE)?.value;
-  const client = picked ? await db.client.findUnique({ where: { id: picked }, select: { id: true, name: true } }) : null;
-  return { isAdmin: true, canManage: true, canOperate: true, clientId: client?.id ?? null, clientName: client?.name ?? null };
+  return { isAdmin: true, canManage: true, canOperate: true, clientId: pickedClient?.id ?? null, clientName: pickedClient?.name ?? null };
 });
 
 /** Prisma filter for models that carry clientId (Customer, Template, Campaign, PendingCustomer). */

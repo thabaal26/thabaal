@@ -1,7 +1,7 @@
 import { CreditCard, MessageCircle, Store } from "@/components/icons";
 import { cssColor, type ChartColor } from "@/lib/chart-theme";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { ActionButton } from "@/components/action-button";
 import { Inbox3D } from "@/components/icons-3d";
 import { Badge, buttonClass, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";

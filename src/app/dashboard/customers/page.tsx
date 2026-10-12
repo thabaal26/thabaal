@@ -1,6 +1,6 @@
 import { CheckCircle2, ChevronLeft, ChevronRight, MapPin, Search, UserX } from "@/components/icons";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { Users3D } from "@/components/icons-3d";
 import { Picker } from "@/components/picker";
 import { ActionButton } from "@/components/action-button";
@@ -44,14 +44,34 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
     stage: stage || undefined,
     act: act || undefined,
   };
-  const segment = scope.clientId
-    ? await customerSegmentIds(scope.clientId, filters, { stage, act, ...(filters.range !== "all" && { start: period.start, end: period.end }) })
-    : null;
-  const where = { ...(await customerWhere(scope, { q, tag, area })), ...(segment && { id: { in: segment } }) };
   const listQs = filterQuery(filters, baseExtra, "all");
   const exportHref = `/api/customers/export${listQs ? `?${listQs}` : ""}`;
-  const filterOpts = scope.clientId ? await filterOptions(scope.clientId) : null;
-  const [rows, total, tags, areas, totalAll, optedOutCount, pendingRows] = await Promise.all([
+  // First round: who the filters cover, the filter choices, and the figures that don't depend on them.
+  const [segment, baseWhere, filterOpts, [tags, areas, totalAll, optedOutCount, pendingRows]] = await Promise.all([
+    scope.clientId
+      ? customerSegmentIds(scope.clientId, filters, { stage, act, ...(filters.range !== "all" && { start: period.start, end: period.end }) })
+      : null,
+    customerWhere(scope, { q, tag, area }),
+    scope.clientId ? filterOptions(scope.clientId) : null,
+    Promise.all([
+      db.$queryRaw<{ tag: string; n: bigint }[]>`
+        SELECT unnest(tags) AS tag, count(*) AS n FROM "Customer"
+        WHERE ${scope.clientId}::text IS NULL OR "clientId" = ${scope.clientId} GROUP BY 1 ORDER BY 2 DESC, 1`,
+      db.customer.groupBy({ by: ["region", "location"], where: owned(scope), _count: true }),
+      db.customer.count({ where: owned(scope) }),
+      db.customer.count({ where: { ...owned(scope), OR: [{ optedOut: true }, { unreachable: true }] } }),
+      scope.canManage
+        ? db.pendingCustomer.findMany({
+            where: owned(scope),
+            orderBy: { createdAt: "desc" },
+            select: { id: true, name: true, rawPhone: true, location: true, payment: true, items: true, notes: true, page: true },
+          })
+        : Promise.resolve([]),
+    ]),
+  ]);
+  const where = { ...baseWhere, ...(segment && { id: { in: segment } }) };
+  // Then the page of customers itself.
+  const [rows, total] = await Promise.all([
     db.customer.findMany({
       where,
       include: {
@@ -64,19 +84,6 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
       take: PAGE_SIZE,
     }),
     db.customer.count({ where }),
-    db.$queryRaw<{ tag: string; n: bigint }[]>`
-      SELECT unnest(tags) AS tag, count(*) AS n FROM "Customer"
-      WHERE ${scope.clientId}::text IS NULL OR "clientId" = ${scope.clientId} GROUP BY 1 ORDER BY 2 DESC, 1`,
-    db.customer.groupBy({ by: ["region", "location"], where: owned(scope), _count: true }),
-    db.customer.count({ where: owned(scope) }),
-    db.customer.count({ where: { ...owned(scope), OR: [{ optedOut: true }, { unreachable: true }] } }),
-    scope.canManage
-      ? db.pendingCustomer.findMany({
-          where: owned(scope),
-          orderBy: { createdAt: "desc" },
-          select: { id: true, name: true, rawPhone: true, location: true, payment: true, items: true, notes: true, page: true },
-        })
-      : Promise.resolve([]),
   ]);
   // Customers Meta is currently holding marketing back from (their campaign messages wait).
   const paused = await marketingPaused(rows.map((c) => c.id));

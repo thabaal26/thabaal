@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowRight, Check, Copy, MessageCircle, Search, Sparkles, Zap } from "@/components/icons";
-import Link from "next/link";
+import Link from "@/components/intent-link";
 import { useState } from "react";
 import { ActionButton } from "@/components/action-button";
 import { ChartBar3D, Sparkles3D, Trophy3D } from "@/components/icons-3d";
