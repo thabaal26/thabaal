@@ -16,6 +16,7 @@ import { numberHealth } from "@/lib/limits";
 import { codesOf, PAUSING_KINDS } from "@/lib/meta-errors";
 import { HELD_CODES } from "@/lib/held";
 import { analyzeCartMentality } from "@/lib/cart-mentality";
+import { computeCustomerLoyalty } from "@/lib/loyalty";
 import { refillForecast } from "@/lib/refill-forecast";
 import type { OrderItem } from "@/lib/orders";
 import { cancelRun, runDispatcherNow } from "./actions/campaigns";
@@ -27,10 +28,16 @@ import {
   AllProductsIntelligenceCard,
   CustomerGrowthPlaybookCard,
   ProductCampaignGraphCard,
+  TopFrequentCustomersCard,
   type AllProductAnalyticsItem,
   type AllProductsSummaryData,
   type CustomerWinbackPlaybookData,
   type PlaybookScenario,
+  type ProductBuyerSummary,
+  type ProductPairInsight,
+  type ProductUnpaidHolder,
+  type TopCustomerLoyaltyItem,
+  type TopFrequentCustomersData,
 } from "./intelligence-hub";
 import { CartMentalityCard, CustomerAreasCard, CustomerProductsCard, CustomerScenariosCard } from "./insight-cards";
 import {
@@ -286,6 +293,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
             id: string;
             name: string;
             phone: string;
+            location: string | null;
             purchases: string | null;
             tags: string[];
             paid_orders: bigint;
@@ -296,6 +304,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
               c.id,
               c.name,
               c.phone,
+              c.location,
               c.purchases,
               c.tags,
               count(o.id) FILTER (WHERE o.status IN ('CONFIRMED', 'PAID', 'DISPATCHED', 'DELIVERED') OR o."paidAt" IS NOT NULL) AS paid_orders,
@@ -810,7 +819,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     return "General Catalogue";
   };
 
-  // Period order & cart breakdown by normalized product name
+  // Period order & cart breakdown by normalized product name (plus top buyers, unpaid cart holders, and bundle partners)
   const periodProdStats = new Map<
     string,
     {
@@ -822,12 +831,23 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       cartValue: number;
       cartOrders: Set<string>;
       unitPrice: number;
+      buyers: Map<string, ProductBuyerSummary>;
+      unpaidHolders: ProductUnpaidHolder[];
+      paired: Map<string, { name: string; count: number }>;
     }
   >();
   for (const o of curAllOrders) {
     if (o.status === "CANCELLED") continue;
     const bought = isBought(o);
-    for (const it of (o.items as OrderItem[] | null) ?? []) {
+    const orderItems = (o.items as OrderItem[] | null) ?? [];
+    const orderCatalogNames = [
+      ...new Set(
+        orderItems
+          .map((it) => catalog.item(it)?.name ?? "")
+          .filter(Boolean),
+      ),
+    ];
+    for (const it of orderItems) {
       const rawName = catalog.item(it)?.name ?? "";
       if (!rawName) continue; // not a catalogue product
       const k = normKey(rawName);
@@ -843,16 +863,47 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         cartValue: 0,
         cartOrders: new Set<string>(),
         unitPrice: price,
+        buyers: new Map<string, ProductBuyerSummary>(),
+        unpaidHolders: [],
+        paired: new Map<string, { name: string; count: number }>(),
       };
       if (price > 0 && entry.unitPrice === 0) entry.unitPrice = price;
       if (bought) {
         entry.soldQty += qty;
         entry.soldRevenue += val;
         entry.soldOrders.add(o.id);
+        const existingBuyer = entry.buyers.get(o.customerId) ?? {
+          customerId: o.customerId,
+          name: o.customer.name,
+          phone: o.customer.phone,
+          qty: 0,
+          spent: 0,
+          ordersCount: 0,
+        };
+        existingBuyer.qty += qty;
+        existingBuyer.spent += val;
+        existingBuyer.ordersCount += 1;
+        entry.buyers.set(o.customerId, existingBuyer);
+
+        for (const otherName of orderCatalogNames) {
+          const ok = normKey(otherName);
+          if (ok === k) continue;
+          const pairRow = entry.paired.get(ok) ?? { name: otherName, count: 0 };
+          pairRow.count += 1;
+          entry.paired.set(ok, pairRow);
+        }
       } else {
         entry.cartQty += qty;
         entry.cartValue += val;
         entry.cartOrders.add(o.id);
+        entry.unpaidHolders.push({
+          customerId: o.customerId,
+          name: o.customer.name,
+          phone: o.customer.phone,
+          orderRef: `RG-${1000 + o.number}`,
+          qty,
+          value: val,
+        });
       }
       periodProdStats.set(k, entry);
     }
@@ -938,6 +989,13 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     const campaignRead = cStat?.read ?? 0;
     const campaignReplies = cStat?.replies ?? 0;
     const priceAmount = base.priceAmount || pStat?.unitPrice || 0;
+    const topBuyers: ProductBuyerSummary[] = pStat
+      ? [...pStat.buyers.values()].sort((a, b) => b.qty - a.qty || b.spent - a.spent).slice(0, 6)
+      : [];
+    const unpaidHolders: ProductUnpaidHolder[] = pStat ? pStat.unpaidHolders.slice(0, 5) : [];
+    const pairedProducts: ProductPairInsight[] = pStat
+      ? [...pStat.paired.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)).slice(0, 5)
+      : [];
 
     return {
       ...base,
@@ -958,6 +1016,9 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       campaignSent,
       campaignRead,
       campaignReplies,
+      topBuyers,
+      unpaidHolders,
+      pairedProducts,
     };
   });
 
@@ -1397,6 +1458,132 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     scenarios: playbookScenarios,
   };
 
+  /* ── Frequent Buyers, Top Customers, RFM Ratio & Loyalty Rewards Engine ── */
+  const rankedCustomersList: TopCustomerLoyaltyItem[] = [];
+  let totalLtvSum = 0;
+  let totalBuyersWithSpend = 0;
+  let totalLoyaltyPool = 0;
+  let totalRewardRupeesPool = 0;
+
+  for (const c of customerLifecycleRows) {
+    const custOrders = [...(ordersByCust.get(c.id) ?? [])].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    const paidCustOrders = custOrders.filter(isBought);
+    const unpaidCustOrders = custOrders.filter(isUnpaidCart);
+    const cancelledCustOrders = custOrders.filter((o) => o.status === "CANCELLED");
+
+    const custSpent = paidCustOrders.reduce((s, o) => s + o.total, 0);
+    const custUnpaidVal = unpaidCustOrders.reduce((s, o) => s + o.total, 0);
+    const paidOrdersCount = Math.max(Number(c.paid_orders ?? 0), paidCustOrders.length);
+    const custAov = paidCustOrders.length > 0 ? Math.round(custSpent / paidCustOrders.length) : 0;
+
+    const gaps = paidCustOrders
+      .slice(1)
+      .map((o, i) => (o.createdAt.getTime() - paidCustOrders[i].createdAt.getTime()) / 86_400_000)
+      .filter((g) => g >= 4);
+    const avgGapDays = gaps.length ? Math.round(gaps.reduce((n, g) => n + g, 0) / gaps.length) : null;
+    const lastPaidAt = paidCustOrders[paidCustOrders.length - 1]?.createdAt ?? (c.last_order_at ? new Date(c.last_order_at) : null);
+    const daysSinceLastOrder = lastPaidAt ? Math.max(0, Math.round((now.getTime() - lastPaidAt.getTime()) / 86_400_000)) : null;
+
+    const boughtItemMap = new Map<string, { name: string; qty: number; spent: number }>();
+    for (const po of paidCustOrders) {
+      for (const it of (po.items as OrderItem[] | null) ?? []) {
+        const rawName = (catalog.item(it)?.name ?? it.name ?? it.id ?? "").trim();
+        if (!rawName) continue;
+        const k = rawName.toLowerCase();
+        const qty = Number(it.quantity) || 1;
+        const price = Number(it.price) || 0;
+        const row = boughtItemMap.get(k) ?? { name: rawName, qty: 0, spent: 0 };
+        row.qty += qty;
+        row.spent += price * qty;
+        boughtItemMap.set(k, row);
+      }
+    }
+    const mostlyBought = [...boughtItemMap.values()].sort((a, b) => b.qty - a.qty || b.spent - a.spent);
+
+    const droppedItemMap = new Map<string, { name: string; qty: number; value: number }>();
+    for (const co of cancelledCustOrders) {
+      for (const it of (co.items as OrderItem[] | null) ?? []) {
+        const rawName = (catalog.item(it)?.name ?? it.name ?? it.id ?? "").trim();
+        if (!rawName) continue;
+        const k = rawName.toLowerCase();
+        const qty = Number(it.quantity) || 1;
+        const price = Number(it.price) || 0;
+        const row = droppedItemMap.get(k) ?? { name: rawName, qty: 0, value: 0 };
+        row.qty += qty;
+        row.value += price * qty;
+        droppedItemMap.set(k, row);
+      }
+    }
+    const mostlyDropped = [...droppedItemMap.values()].sort((a, b) => b.qty - a.qty || b.value - a.value);
+
+    const loyalty = computeCustomerLoyalty({
+      name: c.name,
+      brandName: client?.name,
+      paidOrdersCount,
+      totalSpent: custSpent,
+      sheetPurchases: c.purchases,
+      tags: c.tags,
+      favoriteProduct: mostlyBought[0]?.name ?? null,
+      droppedProduct: mostlyDropped[0]?.name ?? null,
+      unpaidCartValue: custUnpaidVal,
+      daysSinceLastOrder,
+      avgGapDays,
+    });
+
+    if (custSpent > 0) {
+      totalLtvSum += custSpent;
+      totalBuyersWithSpend += 1;
+    }
+    totalLoyaltyPool += loyalty.totalPoints;
+    totalRewardRupeesPool += loyalty.rewardRupees;
+
+    if (
+      paidOrdersCount > 0 ||
+      custSpent > 0 ||
+      mostlyDropped.length > 0 ||
+      custUnpaidVal > 0 ||
+      Boolean(c.purchases && c.purchases.trim().length > 0) ||
+      loyalty.manualPoints !== 0
+    ) {
+      rankedCustomersList.push({
+        id: c.id,
+        name: c.name,
+        phone: c.phone,
+        location: c.location,
+        paidOrdersCount,
+        totalSpent: custSpent,
+        aov: custAov,
+        avgGapDays,
+        daysSinceLastOrder,
+        lastOrderLabel: lastPaidAt ? fmtDate(lastPaidAt, "d MMM yyyy") : null,
+        mostlyBought,
+        mostlyDropped,
+        unpaidCartValue: custUnpaidVal,
+        sheetPurchases: c.purchases,
+        loyalty,
+      });
+    }
+  }
+
+  rankedCustomersList.sort(
+    (a, b) =>
+      b.totalSpent - a.totalSpent ||
+      b.paidOrdersCount - a.paidOrdersCount ||
+      b.loyalty.totalPoints - a.loyalty.totalPoints,
+  );
+
+  const topFrequentCustomersData: TopFrequentCustomersData = {
+    canManage: scope.canManage,
+    totalBuyersCount: Math.max(totalEverBuyers, totalBuyersWithSpend),
+    frequentBuyersCount: rankedCustomersList.filter((c) => c.loyalty.isFrequentBuyer).length,
+    topSpendersCount: rankedCustomersList.filter((c) => c.loyalty.isTopCustomer).length,
+    repeatPurchaseRatioPct: retentionRatePct,
+    avgCustomerLtv: totalBuyersWithSpend > 0 ? Math.round(totalLtvSum / totalBuyersWithSpend) : avgOrderVal,
+    totalLoyaltyPointsPool: totalLoyaltyPool,
+    totalRewardRupeesPool,
+    customers: rankedCustomersList,
+  };
+
   const refillsWeek = ordersOn && cid ? (await refillForecast(cid, now).catch(() => null))?.due.filter((d) => d.daysLeft <= 7) ?? [] : [];
 
   const views: View[] = ordersOn ? ["overview", "customers", "products", "carts"] : ["overview", "customers"];
@@ -1806,6 +1993,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
 
       {view === "customers" && (
         <div className="space-y-3.5 sm:space-y-5">
+          <TopFrequentCustomersCard data={topFrequentCustomersData} />
           {ordersOn && <CustomerScenariosCard data={scenariosData} />}
           <CustomerGrowthPlaybookCard data={winbackPlaybookData} />
           <div className="grid grid-cols-1 gap-3.5 sm:gap-5 xl:grid-cols-2">

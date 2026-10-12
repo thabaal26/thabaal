@@ -107,11 +107,13 @@ export async function orderScope(clientId: string | null, f: import("./filters")
 
 export const STAGES = [
   { value: "", label: "Any stage" },
+  { value: "top", label: "Top spender (₹1,200+ / VIP)" },
+  { value: "frequent", label: "Frequent buyer (3+ orders)" },
+  { value: "repeat", label: "Repeat buyer (2+ orders)" },
   { value: "active", label: "Active buyer (≤30 days)" },
   { value: "refill", label: "Refill window (31–60 days)" },
   { value: "lapsed", label: "Lapsed (60+ days)" },
   { value: "unpaid", label: "Unpaid cart now" },
-  { value: "repeat", label: "Repeat buyer (2+ orders)" },
   { value: "never", label: "Never ordered" },
 ] as const;
 
@@ -139,9 +141,10 @@ export async function customerSegmentIds(
   if (base) sets.push(new Set(base));
 
   if (opts.stage) {
-    const rows = await db.$queryRaw<{ id: string; paid: bigint; last_paid: Date | null; open_cart: boolean }[]>`
+    const rows = await db.$queryRaw<{ id: string; paid: bigint; spent: number; last_paid: Date | null; open_cart: boolean }[]>`
       SELECT c.id,
         count(o.id) FILTER (WHERE o.status IN ('CONFIRMED','PAID','DISPATCHED','DELIVERED') OR o."paidAt" IS NOT NULL) AS paid,
+        coalesce(sum(o.total) FILTER (WHERE o.status IN ('CONFIRMED','PAID','DISPATCHED','DELIVERED') OR o."paidAt" IS NOT NULL), 0)::float8 AS spent,
         max(o."createdAt") FILTER (WHERE o.status IN ('CONFIRMED','PAID','DISPATCHED','DELIVERED') OR o."paidAt" IS NOT NULL) AS last_paid,
         bool_or(o.status = 'NEW' AND o."paidAt" IS NULL) AS open_cart
       FROM "Customer" c LEFT JOIN "Order" o ON o."customerId" = c.id AND o.status <> 'CANCELLED'
@@ -151,13 +154,16 @@ export async function customerSegmentIds(
     const age = (d: Date | null) => (d ? (Date.now() - d.getTime()) / day : Infinity);
     const hit = rows.filter((r) => {
       const n = Number(r.paid);
+      const spent = Number(r.spent ?? 0);
       const a = age(r.last_paid);
       switch (opts.stage) {
+        case "top": return spent >= 1200 || n >= 3;
+        case "frequent": return n >= 3;
+        case "repeat": return n >= 2;
         case "active": return n > 0 && a <= 30;
         case "refill": return n > 0 && a > 30 && a <= 60;
         case "lapsed": return n > 0 && a > 60;
         case "unpaid": return Boolean(r.open_cart);
-        case "repeat": return n >= 2;
         case "never": return n === 0;
         default: return true;
       }

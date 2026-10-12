@@ -14,6 +14,7 @@ import { customerFilters, customerWhere } from "@/lib/customer-query";
 import { ActiveFilters, FilterBar } from "@/components/filter-bar";
 import { activeCount as filterCount, filterQuery, keepFilters, readFilters, resolvePeriod, type FilterSection } from "@/lib/filters";
 import { ACTIVITY, customerSegmentIds, filterOptions, STAGES } from "@/lib/filter-scope";
+import { computeCustomerLoyalty, isInternalLoyaltyTag } from "@/lib/loyalty";
 import { getScope, owned } from "@/lib/session";
 import { deleteCustomer, setOptOut } from "../actions/customers";
 import { CustomerActions, CustomerMenu, PendingCustomersBanner } from "./customer-tools";
@@ -55,6 +56,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
       where,
       include: {
         messages: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true, status: true } },
+        orders: { where: { status: { not: "CANCELLED" } }, select: { total: true, status: true, paidAt: true } },
         client: { select: { name: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -95,7 +97,8 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
   // however it was spelled ("thenan-oils", "Thenan Oils", "thenan_oils").
   const plain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
   const clientTag = scope.clientName ? plain(scope.clientName) : undefined;
-  const rowTags = (tags: string[], clientName?: string) => tags.filter((t) => plain(t) !== (clientName ? plain(clientName) : clientTag));
+  const rowTags = (tags: string[], clientName?: string) =>
+    tags.filter((t) => !isInternalLoyaltyTag(t) && plain(t) !== (clientName ? plain(clientName) : clientTag));
   const tagLabel = (t: string) =>
     t.startsWith("product:")
       ? t.slice(8)
@@ -108,13 +111,37 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
   };
   const filtered = Boolean(tag || q || area || stage || act || filterCount(filters) || filters.range !== "all");
 
-  const flags = (c: (typeof rows)[number]) => (
-    <>
-      {c.optedOut && <Badge tone="red">Opted out</Badge>}
-      {c.unreachable && <Badge tone="amber">Can&apos;t receive</Badge>}
-      {paused.has(c.id) && <Badge tone="amber">Offers paused till {fmtDate(paused.get(c.id)!, "d MMM")}</Badge>}
-    </>
-  );
+  const loyaltyFor = (c: (typeof rows)[number]) => {
+    const paidOrders = c.orders.filter((o) => Boolean(o.paidAt) || ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"].includes(o.status));
+    const spent = paidOrders.reduce((s, o) => s + o.total, 0);
+    return {
+      paidCount: paidOrders.length,
+      spent,
+      summary: computeCustomerLoyalty({
+        name: c.name,
+        paidOrdersCount: paidOrders.length,
+        totalSpent: spent,
+        sheetPurchases: c.purchases,
+        tags: c.tags,
+      }),
+    };
+  };
+
+  const flags = (c: (typeof rows)[number]) => {
+    const { summary } = loyaltyFor(c);
+    return (
+      <>
+        {summary.totalPoints > 0 && (
+          <Badge tone={summary.tierTone}>
+            {summary.tierLabel} · {fmtNumber(summary.totalPoints)} pts
+          </Badge>
+        )}
+        {c.optedOut && <Badge tone="red">Opted out</Badge>}
+        {c.unreachable && <Badge tone="amber">Can&apos;t receive</Badge>}
+        {paused.has(c.id) && <Badge tone="amber">Offers paused till {fmtDate(paused.get(c.id)!, "d MMM")}</Badge>}
+      </>
+    );
+  };
   const lastMessage = (c: (typeof rows)[number]) => (c.messages[0] ? `${fmtDate(c.messages[0].createdAt, "d MMM")} · ${c.messages[0].status.toLowerCase()}` : null);
 
   return (
@@ -183,7 +210,9 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
               options={[
                 { value: "", label: "All groups & tags" },
                 { value: "__optout", label: "Opted out" },
-                ...tags.filter((t) => plain(t.tag) !== clientTag).map((t) => ({ value: t.tag, label: tagLabel(t.tag), hint: `${fmtNumber(Number(t.n))} customers` })),
+                ...tags
+                  .filter((t) => !isInternalLoyaltyTag(t.tag) && plain(t.tag) !== clientTag)
+                  .map((t) => ({ value: t.tag, label: tagLabel(t.tag), hint: `${fmtNumber(Number(t.n))} customers` })),
               ]}
             />
             {areaOptions.length > 1 && <Picker name="area" autoSubmit title="Delivery area" aria-label="Filter by area" defaultValue={area} className="sm:w-48" options={areaOptions} />}
@@ -240,12 +269,10 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
                       {lastMessage(c) && ` · ${lastMessage(c)}`}
                     </p>
                     {c.purchases && <p className="mt-0.5 line-clamp-2 text-xs text-ink-2">{c.purchases}</p>}
-                    {(c.optedOut || c.unreachable || paused.has(c.id) || rowTags(c.tags, c.client?.name).length > 0) && (
-                      <div className="mt-1.5 flex flex-wrap gap-1">
-                        {flags(c)}
-                        {rowTags(c.tags, c.client?.name).map((t) => <Badge key={t}>{t}</Badge>)}
-                      </div>
-                    )}
+                    <div className="mt-1.5 flex flex-wrap gap-1 empty:hidden">
+                      {flags(c)}
+                      {rowTags(c.tags, c.client?.name).map((t) => <Badge key={t}>{t}</Badge>)}
+                    </div>
                   </div>
                   {scope.canManage && (
                     <div className="relative z-10 -my-1 -mr-2">

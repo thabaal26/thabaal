@@ -46,10 +46,11 @@ export async function saveCustomer(id: string | null, input: CustomerInput): Pro
       : undefined;
   const purchases = input.purchases !== undefined ? (input.purchases.trim() || null) : undefined;
 
+  const existingLoyaltyTags = (existing?.tags ?? []).filter((t) => t.trim().toLowerCase().startsWith("loyalty-bonus:"));
   const data = {
     name: input.name.trim(),
     phone,
-    tags: parseTags(input.tags),
+    tags: [...new Set([...parseTags(input.tags), ...existingLoyaltyTags])],
     ...(location !== undefined && { location }),
     ...(locationRaw !== undefined && { locationRaw }),
     ...(region !== undefined && { region }),
@@ -195,6 +196,8 @@ export async function importCustomers(csv: string, extraTags: string, optInSourc
   };
 }
 
+import { applyManualLoyaltyDelta, parseManualLoyaltyPoints } from "@/lib/loyalty";
+
 export async function setOptOut(id: string, optedOut: boolean): Promise<ActionResult> {
   const s = await requireManager();
   if ("denied" in s) return { ok: false, message: s.denied };
@@ -212,3 +215,31 @@ export async function deleteCustomer(id: string): Promise<ActionResult> {
   revalidatePath("/dashboard/customers");
   return { ok: true, message: "Customer and their message history deleted." };
 }
+
+/** Awards bonus loyalty points (positive delta) or redeems loyalty points (negative delta) for a specific customer. */
+export async function adjustLoyaltyPoints(id: string, delta: number): Promise<ActionResult> {
+  const s = await requireManager();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  if (!Number.isFinite(delta) || delta === 0) return { ok: false, message: "Enter a valid points change." };
+
+  const c = await db.customer.findFirst({ where: { id, ...owned(s) }, select: { id: true, name: true, tags: true } });
+  if (!c) return { ok: false, message: "Customer not found." };
+
+  const nextTags = applyManualLoyaltyDelta(c.tags, delta);
+  const manualAfter = parseManualLoyaltyPoints(nextTags);
+  await db.customer.update({ where: { id: c.id }, data: { tags: nextTags } });
+
+  revalidatePath(`/dashboard/customers/${c.id}`);
+  revalidatePath("/dashboard/customers");
+  revalidatePath("/dashboard");
+
+  const sign = delta > 0 ? `+${Math.round(delta)}` : `${Math.round(delta)}`;
+  return {
+    ok: true,
+    message:
+      delta > 0
+        ? `Added ${sign} bonus loyalty points to ${c.name} (manual adjustment: ${manualAfter >= 0 ? `+${manualAfter}` : manualAfter} pts).`
+        : `Redeemed ${Math.abs(Math.round(delta))} loyalty points (₹${Math.round(Math.abs(delta) * 0.5)} discount) for ${c.name}.`,
+  };
+}
+

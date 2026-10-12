@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, Check, ChevronDown, MapPin, Package, Search, SlidersHorizontal, X } from "@/components/icons";
+import { CalendarDays, Check, ChevronDown, MapPin, Package, Search, SlidersHorizontal, User, X } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
@@ -413,6 +413,12 @@ export function ActiveFilters({
   const name = (list: { value: string; label: string }[], v: string) => list.find((o) => o.value === v)?.label ?? v;
   const go = (f: FilterState) => start(() => router.push(withQuery(basePath, filterQuery(f, extra, defaultRange)), { scroll: false }));
   const chips: { key: string; icon: ReactNode; text: string; drop: () => FilterState }[] = [
+    ...value.customers.map((c) => ({
+      key: `c:${c}`,
+      icon: <User className="size-3" />,
+      text: name(options.customers, c),
+      drop: () => ({ ...value, customers: value.customers.filter((x) => x !== c) }),
+    })),
     ...value.products.map((p) => ({
       key: `p:${p}`,
       icon: <Package className="size-3" />,

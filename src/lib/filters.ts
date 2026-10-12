@@ -95,7 +95,7 @@ export function keepFilters(f: FilterState, sections: FilterSection[]): FilterSt
   return {
     ...f,
     products: has("products") ? f.products : [],
-    customers: has("customers") ? f.customers : [],
+    customers: has("customers") || f.customers.length > 0 ? f.customers : [],
     tags: has("tags") ? f.tags : [],
     area: has("area") ? f.area : "",
     campaign: has("campaign") ? f.campaign : "",

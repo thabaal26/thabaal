@@ -38,7 +38,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
       client: { select: { name: true } },
       messages: { include: { run: { select: { campaign: { select: { name: true } } } }, sender: { select: { label: true } } }, orderBy: { createdAt: "desc" }, take: 100 },
       replies: { include: { sender: { select: { label: true } } }, orderBy: { receivedAt: "desc" }, take: 100 },
-      orders: { orderBy: { createdAt: "desc" }, take: 20 },
+      orders: { orderBy: { createdAt: "desc" }, take: 100 },
     },
   });
   if (!c) notFound();
@@ -68,7 +68,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
 
   // Every customer carries the client-wide tag (e.g. thenan-oils), so it says nothing here.
   const plain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
-  const productTags = c.tags.filter((t) => plain(t) !== plain(c.client.name));
+  const productTags = c.tags.filter((t) => plain(t) !== plain(c.client.name) && !t.trim().toLowerCase().startsWith("loyalty-bonus:"));
 
   const meta = [
     formatPhone(c.phone),
@@ -150,7 +150,15 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
             blocked={c.optedOut ? "This customer opted out of messages. Opt them back in to send." : c.unreachable ? "WhatsApp says this number can't receive messages." : null}
           />
 
-          <PurchaseJourney orders={c.orders} />
+          <PurchaseJourney
+            customer={{ id: c.id, name: c.name, phone: c.phone, tags: c.tags }}
+            brandName={c.client.name}
+            canManage={scope.canManage}
+            orders={c.orders}
+            replies={c.replies}
+            readDates={c.messages.map((m) => m.readAt).filter((d): d is Date => d !== null)}
+            sheetPurchases={c.purchases}
+          />
 
           <Card className="card-3d overflow-hidden">
             <CardHeader tone="brand" icon={<Messages3D />} title="Conversation" description="Messages sent to this customer and what they wrote back. The newest is at the bottom." />
