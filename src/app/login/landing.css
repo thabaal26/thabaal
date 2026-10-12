@@ -1,0 +1,231 @@
+/* Sections under the sign-in hero. Same tokens as thabaal-login.css (navy, mail yellow, beak coral,
+   tick green, day/night), same rounded Nunito; the postal motifs (stamps, envelopes) come from the bird. */
+
+.tl {
+  --card: #ffffff;
+  --soft: #f3f7fc;
+  --shadow: 0 1px 2px rgb(6 37 72 / .06), 0 10px 30px -12px rgb(6 37 72 / .18);
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-nunito), "Nunito", var(--font-tamil), ui-rounded, system-ui, sans-serif;
+  transition: background 1s var(--ease), color 1s var(--ease);
+}
+[data-theme="night"] .tl {
+  --card: #0d1f3d;
+  --soft: #0a1a34;
+  --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 12px 32px -14px rgb(0 0 0 / .6);
+}
+[data-lang="ta"] .tl { line-height: 1.6; }
+
+.tl-wrap { width: min(1120px, 100% - 40px); margin-inline: auto; }
+.tl-section { padding: clamp(56px, 9vw, 104px) 0; }
+.tl h2 {
+  font-size: clamp(26px, 3.6vw, 40px);
+  font-weight: 800;
+  letter-spacing: -.02em;
+  line-height: 1.12;
+  max-width: 22ch;
+  text-wrap: balance;
+}
+[data-lang="ta"] .tl h2 { letter-spacing: 0; line-height: 1.3; font-size: clamp(22px, 3vw, 34px); max-width: 28ch; }
+.tl h3 { font-size: 18px; font-weight: 800; }
+.tl p { color: var(--muted); }
+.tl-lede, .tl-sub { font-size: clamp(16px, 1.6vw, 18px); line-height: 1.6; max-width: 62ch; margin-top: 14px; }
+
+/* Buttons: the sign-in button's pill, in yellow for "talk to us". */
+.tl-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 48px; padding: 0 26px; border-radius: 999px;
+  font-weight: 800; font-size: 15px; text-decoration: none;
+  transition: background .2s, color .2s, transform .2s var(--ease);
+}
+.tl-btn:active { transform: scale(.98); }
+.tl-btn:focus-visible, .tl summary:focus-visible, .thabaal-explore:focus-visible { outline: 3px solid var(--yellow); outline-offset: 3px; }
+.tl-btn-main { background: var(--btn-bg); color: var(--btn-fg); margin-top: 24px; }
+.tl-btn-main:hover { background: var(--btn-hover-bg); color: var(--btn-hover-fg); }
+.tl-btn-ghost { border: 2px solid currentColor; color: inherit; margin-top: 24px; }
+.tl-btn-ghost:hover { background: rgb(255 255 255 / .2); }
+
+/* ── Intro and postage stamps ── */
+.tl-intro { text-align: center; }
+.tl-intro h2, .tl-intro .tl-lede { margin-inline: auto; }
+.tl-stamps { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: 44px; padding: 0; }
+.tl-stamp {
+  /* Perforated edge: holes along the border, solid inside. */
+  --notch: radial-gradient(circle at 6px 6px, transparent 4px, #000 4.5px) -6px -6px / 12px 12px round,
+    linear-gradient(#000 0 0) 6px 6px / calc(100% - 12px) calc(100% - 12px) no-repeat;
+  position: relative;
+  background: var(--yellow);
+  color: var(--navy);
+  padding: 26px 22px 24px;
+  display: flex; flex-direction: column; gap: 6px;
+  /* Perforated stamp edge. */
+  -webkit-mask: var(--notch); mask: var(--notch);
+  transform: rotate(var(--r, -1.5deg));
+  text-align: left;
+}
+.tl-stamp:nth-child(2) { --r: 1.2deg; background: #fff3cc; }
+.tl-stamp:nth-child(3) { --r: -.6deg; }
+.tl-stamp b { font-size: 18px; font-weight: 800; }
+.tl-stamp span { font-size: 14.5px; line-height: 1.5; color: #24456b; }
+.tl-stamp::after {
+  content: ""; position: absolute; inset: 12px; border: 1.5px dashed rgb(6 37 72 / .28); border-radius: 4px; pointer-events: none;
+}
+
+/* ── Journey: five envelopes along the bird's flight path ── */
+.tl-journey-sec { background: var(--soft); transition: background 1s var(--ease); }
+.tl-journey { list-style: none; padding: 0; margin-top: 48px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; position: relative; }
+.tl-journey::before {
+  content: ""; position: absolute; left: 6%; right: 6%; top: 27px;
+  border-top: 2.5px dashed color-mix(in srgb, var(--fg) 30%, transparent);
+}
+.tl-journey li { position: relative; display: flex; flex-direction: column; gap: 8px; }
+.tl-env { position: relative; width: 64px; height: 56px; display: grid; place-items: center; background: var(--soft); transition: background 1s var(--ease); }
+.tl-env svg { width: 52px; height: 38px; fill: var(--yellow); stroke: var(--navy); stroke-width: 2.4; stroke-linejoin: round; }
+.tl-env svg path { fill: none; }
+.tl-env i {
+  position: absolute; top: 0; right: -2px; width: 24px; height: 24px; border-radius: 999px;
+  background: var(--coral); color: #fff; font-style: normal; font-weight: 800; font-size: 13px;
+  display: grid; place-items: center; box-shadow: 0 0 0 3px var(--soft);
+}
+.tl-journey p { font-size: 15px; line-height: 1.55; }
+
+/* ── Feature rows ── */
+.tl-row { display: grid; grid-template-columns: 1.05fr .95fr; gap: clamp(28px, 6vw, 80px); align-items: center; }
+.tl-row + .tl-row { margin-top: clamp(64px, 9vw, 112px); }
+.tl-flip .tl-row-copy { order: 2; }
+.tl-row-copy p { font-size: 17px; line-height: 1.65; margin-top: 14px; max-width: 54ch; }
+.tl-points { list-style: none; padding: 0; margin-top: 22px; display: grid; gap: 12px; }
+.tl-points li { display: flex; gap: 12px; align-items: flex-start; font-size: 15.5px; font-weight: 600; color: var(--fg); }
+.tl-points svg { width: 22px; height: 22px; flex: none; color: var(--navy); background: var(--yellow); border-radius: 8px; padding: 3px; box-sizing: content-box; }
+
+.tl-card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 26px; box-shadow: var(--shadow);
+  transition: background 1s var(--ease), border-color 1s var(--ease);
+}
+.tl-card-title { font-size: 18px; font-weight: 800; color: var(--fg) !important; }
+.tl-card-meta { font-size: 14px; margin: 2px 0 18px; }
+.tl-card-note { font-size: 12px; margin-top: 14px; }
+.tl-bar { display: grid; grid-template-columns: 84px 1fr 44px; align-items: center; gap: 10px; margin-top: 10px; font-size: 14px; }
+.tl-bar span { color: var(--muted); }
+.tl-bar i { height: 12px; border-radius: 999px; background: linear-gradient(90deg, var(--yellow), #ffd45e); }
+.tl-bar:nth-of-type(n+3) i { background: linear-gradient(90deg, var(--green), #34d27a); }
+.tl-bar b { text-align: right; font-weight: 800; }
+.tl-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.tl-stats div { background: var(--soft); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 4px; }
+.tl-stats div:first-child { background: var(--navy); color: #fff; }
+.tl-stats div:first-child small { color: #b9c8de; }
+.tl-stats small { font-size: 13px; color: var(--muted); }
+.tl-stats b { font-size: clamp(24px, 3vw, 30px); font-weight: 800; }
+.tl-stats .tl-card-note { grid-column: 1 / -1; margin-top: 0; }
+
+/* Example chat, in WhatsApp's own colours so it reads as a chat. */
+.tl-chat {
+  margin: 0; border-radius: 26px; overflow: hidden; border: 1px solid var(--line); box-shadow: var(--shadow);
+  background: #efe7dd; max-width: 400px; justify-self: center; width: 100%;
+}
+[data-theme="night"] .tl-chat { background: #0b141a; }
+.tl-chat-top { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #075e54; color: #fff; }
+.tl-chat-top span { width: 32px; height: 32px; border-radius: 999px; background: var(--yellow); color: var(--navy); display: grid; place-items: center; font-weight: 800; font-size: 13px; }
+.tl-chat ol { list-style: none; margin: 0; padding: 16px 14px 18px; display: flex; flex-direction: column; gap: 10px; font-family: system-ui, var(--font-tamil), sans-serif; }
+.tl-msg { max-width: 82%; padding: 8px 10px 6px; border-radius: 12px; font-size: 14px; line-height: 1.45; color: #111b21; display: flex; flex-direction: column; gap: 4px; box-shadow: 0 1px .5px rgb(0 0 0 / .13); }
+.tl-in { align-self: flex-start; background: #fff; border-top-left-radius: 4px; }
+.tl-out { align-self: flex-end; background: #d9fdd3; border-top-right-radius: 4px; }
+[data-theme="night"] .tl-in { background: #202c33; color: #e9edef; }
+[data-theme="night"] .tl-out { background: #005c4b; color: #e9edef; }
+.tl-msg time { align-self: flex-end; font-size: 11px; color: #667781; display: inline-flex; gap: 3px; align-items: center; }
+[data-theme="night"] .tl-msg time { color: #8696a0; }
+.tl-ticks { width: 16px; height: 10px; color: #53bdeb; }
+.tl-cart { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 8px; background: rgb(0 0 0 / .05); }
+.tl-msg-btn { border-top: 1px solid rgb(0 0 0 / .08); padding-top: 6px; text-align: center; color: #027eb5; font-weight: 600; }
+[data-theme="night"] .tl-msg-btn { color: #53bdeb; border-color: rgb(255 255 255 / .1); }
+.tl-paid { font-weight: 700; }
+
+/* Everything else */
+.tl-more { list-style: none; padding: 0; margin-top: clamp(72px, 10vw, 120px); display: grid; grid-template-columns: repeat(4, 1fr); gap: 34px 28px; }
+.tl-more li { display: flex; flex-direction: column; gap: 6px; }
+.tl-more-icon { width: 46px; height: 46px; border-radius: 14px 14px 14px 4px; background: var(--yellow); color: var(--navy); display: grid; place-items: center; margin-bottom: 6px; }
+.tl-more-icon svg { width: 24px; height: 24px; }
+.tl-more p { font-size: 14.5px; line-height: 1.55; }
+
+/* ── Pricing ── */
+.tl-pricing { background: var(--navy); color: #fff; }
+.tl-pricing .tl-sub { color: #b9c8de; }
+.tl-pricing .tl-btn-main { background: var(--yellow); color: var(--navy); }
+.tl-pricing .tl-btn-main:hover { background: #fff; }
+.tl-pricing-grid { display: grid; grid-template-columns: 1fr 1.1fr; gap: clamp(28px, 6vw, 72px); align-items: center; }
+.tl-table-wrap { overflow-x: auto; }
+.tl-rates { width: 100%; border-collapse: separate; border-spacing: 0; background: rgb(255 255 255 / .06); border-radius: 18px; overflow: hidden; font-size: 15px; }
+.tl-rates caption { caption-side: bottom; text-align: left; font-size: 12.5px; color: #9fb2cd; padding-top: 10px; }
+.tl-rates th, .tl-rates td { padding: 14px 16px; text-align: left; border-bottom: 1px solid rgb(255 255 255 / .1); }
+.tl-rates thead th { font-size: 13px; color: #9fb2cd; font-weight: 700; }
+.tl-rates tbody th { font-weight: 800; }
+.tl-rates td:last-child { font-weight: 800; color: var(--yellow); white-space: nowrap; }
+.tl-rates tbody tr:last-child > * { border-bottom: 0; }
+
+/* ── FAQ ── */
+.tl-faq { max-width: 780px; }
+.tl-faq h2 { margin-bottom: 24px; }
+.tl-faq details { border-bottom: 1px solid var(--line); }
+.tl-faq summary {
+  list-style: none; cursor: pointer; padding: 20px 40px 20px 0; position: relative;
+  font-size: 18px; font-weight: 800; color: var(--fg);
+}
+.tl-faq summary::-webkit-details-marker { display: none; }
+.tl-faq summary::after {
+  content: ""; position: absolute; right: 6px; top: 50%; width: 22px; height: 22px; margin-top: -11px; border-radius: 999px;
+  background: var(--yellow) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Cpath d='M11 6v10M6 11h10' stroke='%23062548' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E") center / 100%;
+  transition: transform .25s var(--ease);
+}
+.tl-faq details[open] summary::after { transform: rotate(45deg); }
+.tl-faq details p { padding: 0 0 22px; font-size: 16px; line-height: 1.65; max-width: 66ch; }
+
+/* ── Closing: the sign-in sky again ── */
+.tl-close { position: relative; overflow: hidden; padding: clamp(72px, 10vw, 120px) 0; text-align: center; color: var(--navy); }
+.tl-close-sky { position: absolute; inset: 0; background: linear-gradient(180deg, #76bff8 0%, #a9d8ff 45%, #ffe0c2 85%, #ffcba3 100%); transition: background 1s var(--ease); }
+[data-theme="night"] .tl-close { color: #fff; }
+[data-theme="night"] .tl-close-sky { background: linear-gradient(180deg, #040a1d 0%, #0c1844 55%, #2b2e72 100%); }
+.tl-close-inner { position: relative; display: flex; flex-direction: column; align-items: center; }
+.tl-close h2 { margin-inline: auto; }
+.tl-close-bird { width: 132px; height: auto; margin-bottom: 18px; animation: tl-bob 4s ease-in-out infinite; }
+[data-theme="night"] .tl-close-bird { filter: drop-shadow(0 0 1.5px rgb(255 255 255 / .9)) drop-shadow(0 0 16px rgb(253 185 19 / .4)); }
+.tl-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+.tl-close .tl-btn-main { background: var(--navy); color: #fff; }
+.tl-close .tl-btn-main:hover { background: var(--yellow); color: var(--navy); }
+[data-theme="night"] .tl-close .tl-btn-main { background: var(--yellow); color: var(--navy); }
+@keyframes tl-bob { 50% { transform: translateY(-8px) rotate(-2deg); } }
+
+.tl-footer { background: var(--bg); border-top: 1px solid var(--line); padding: 22px 0 calc(22px + env(safe-area-inset-bottom)); font-size: 13px; color: var(--muted); }
+.tl-footer-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; }
+
+/* "Explore" link at the foot of the sign-in column. */
+.thabaal-explore {
+  margin-top: 4px; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700;
+  color: var(--muted); text-decoration: none; border-radius: 999px; padding: 6px 12px;
+}
+.thabaal-explore:hover { color: var(--fg); }
+.thabaal-explore svg { width: 16px; height: 16px; animation: tl-nudge 2.4s ease-in-out infinite; }
+@keyframes tl-nudge { 50% { transform: translateY(3px); } }
+
+@media (max-width: 900px) {
+  .tl-stamps { grid-template-columns: 1fr; max-width: 420px; margin-inline: auto; }
+  .tl-journey { grid-template-columns: 1fr; gap: 26px; }
+  .tl-journey::before { left: 31px; right: auto; top: 30px; bottom: 30px; border-top: 0; border-left: 2.5px dashed color-mix(in srgb, var(--fg) 30%, transparent); }
+  .tl-journey li { display: grid; grid-template-columns: 64px 1fr; column-gap: 16px; }
+  .tl-journey li .tl-env { grid-row: span 2; }
+  .tl-row, .tl-pricing-grid { grid-template-columns: 1fr; }
+  .tl-flip .tl-row-copy { order: 0; }
+  .tl-more { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 520px) {
+  .tl-more { grid-template-columns: 1fr; }
+  .tl-bar { grid-template-columns: 74px 1fr 38px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tl-close-bird, .thabaal-explore svg { animation: none; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.thabaal-site) { scroll-behavior: smooth; }
+}
+.tl#explore { scroll-margin-top: -5rem; }
