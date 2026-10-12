@@ -53,7 +53,12 @@ export function niceMax(n: number) {
 export type ValueFormat = "count" | "inr" | "percent";
 
 export function formatValue(v: number, f: ValueFormat = "count") {
-  if (f === "inr") return `₹${Math.round(v).toLocaleString("en-IN")}`;
+  if (f === "inr") {
+    const hasPaise = Math.abs(v) > 0 && Math.abs(v) < 100 && Math.round(v * 100) % 100 !== 0;
+    return hasPaise
+      ? `₹${v.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : `₹${Math.round(v).toLocaleString("en-IN")}`;
+  }
   if (f === "percent") return `${Math.round(v * 10) / 10}%`;
   return Math.round(v).toLocaleString("en-IN");
 }
@@ -67,5 +72,8 @@ export function formatCompact(v: number, f: ValueFormat = "count") {
   if (a >= 1e7) return `${pre}${trim(v / 1e7)}Cr`;
   if (a >= 1e5) return `${pre}${trim(v / 1e5)}L`;
   if (a >= 1e3) return `${pre}${trim(v / 1e3)}k`;
+  if (f === "inr" && a > 0 && a < 10 && Math.round(v * 100) % 100 !== 0) {
+    return `${pre}${v.toFixed(1).replace(/\.0$/, "")}`;
+  }
   return `${pre}${Math.round(v)}`;
 }

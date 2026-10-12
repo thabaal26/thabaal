@@ -1,82 +1,21 @@
-import { ExternalLink, Lightbulb, Trash2 } from "@/components/icons";
+import { ExternalLink, Trash2 } from "@/components/icons";
 import { ActionButton } from "@/components/action-button";
 import { Wallet3D } from "@/components/icons-3d";
 import { Badge, buttonClass, Card, CardHeader } from "@/components/ui";
-import { cssColor, type ChartColor } from "@/lib/chart-theme";
+import { Disclosure } from "@/components/viz";
 import { cn } from "@/lib/cn";
-import { fmtDate, fmtNumber, pct } from "@/lib/format";
+import { fmtDate, fmtNumber } from "@/lib/format";
 import { senderFor } from "@/lib/senders";
-import { CATEGORY_LABEL, RATES, spendSummary, total, type SpendRow } from "@/lib/spend";
+import { CATEGORY_LABEL, RATES, spendSummary, total } from "@/lib/spend";
 import { deleteTopUp } from "./actions/spend";
+import { SpendAnalyticsCharts } from "./spend-charts";
 import { TopUpForm } from "./top-up-form";
 
 const rupees = (n: number) => `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const CAT_COLORS: Record<string, ChartColor> = {
-  marketing: "gold",
-  utility: "blue",
-  authentication: "violet",
-  service: "emerald",
-};
-const catColor = (c: string) => cssColor(CAT_COLORS[c] ?? "neutral");
-
-function SpendRows({ rows }: { rows: SpendRow[] }) {
-  if (!rows.length) return <p className="py-2 text-sm text-muted">No charged messages yet.</p>;
-  const maxCost = Math.max(1, ...rows.map((r) => r.cost), 1);
-  const totalCost = rows.reduce((acc, r) => acc + r.cost, 0);
-
-  return (
-    <div className="mt-2 space-y-2.5">
-      {/* Stacked Category Distribution Bar */}
-      {totalCost > 0 && (
-        <div className="flex h-2.5 w-full gap-[2px] overflow-hidden rounded-full">
-          {rows
-            .filter((r) => r.cost > 0)
-            .map((r) => (
-              <div
-                key={r.category}
-                className="bar h-full min-w-1.5 first:rounded-l-full last:rounded-r-full"
-                style={{ flexGrow: r.cost, flexBasis: 0, background: catColor(r.category) }}
-                title={`${CATEGORY_LABEL[r.category] ?? r.category}: ${rupees(r.cost)}`}
-              />
-            ))}
-        </div>
-      )}
-
-      <ul className="space-y-2">
-        {rows.map((r) => {
-          const color = catColor(r.category);
-          const barW = r.cost > 0 ? Math.max(6, pct(r.cost, maxCost)) : r.free > 0 ? 100 : 0;
-          return (
-            <li key={r.category} className="rounded-control border border-line bg-subtle/40 px-3 py-2 text-xs">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="flex items-center gap-1.5 font-semibold text-ink">
-                  <span className="size-2.5 rounded-full" style={{ background: color }} />
-                  {CATEGORY_LABEL[r.category] ?? r.category}
-                </span>
-                <span className="tabular font-semibold text-ink">{r.cost ? rupees(r.cost) : "₹0.00 (Free)"}</span>
-              </div>
-              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-track">
-                <div
-                  className="bar h-full rounded-full"
-                  style={{ width: `${barW}%`, background: color }}
-                />
-              </div>
-              <p className="mt-1 text-2xs text-muted">
-                {fmtNumber(r.charged)} charged{r.free ? ` · ${fmtNumber(r.free)} free in 24h window` : ""}
-                {RATES[r.category] ? ` · ₹${RATES[r.category]}/msg` : ""}
-              </p>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
 /**
  * Message spend synced live from Meta's `pricing_analytics` Graph API (with local DB fallback when offline),
- * alongside the prepaid balance recorded for the client's WhatsApp account.
+ * alongside the prepaid balance recorded for the client's WhatsApp account — visualized with Apache ECharts.
  */
 export async function SpendCard({ clientId, canManage, className }: { clientId: string; canManage: boolean; className?: string }) {
   const [s, { number }] = await Promise.all([spendSummary(clientId), senderFor(clientId)]);
@@ -86,12 +25,14 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
   const recorded = Boolean((number?.businessAccountId && acc.wabaId === number.businessAccountId) || s.topUps.length > 0 || new Date(s.lastSyncedAt).getTime() > 0);
   const low = recorded && s.remainingBalance < 50;
 
-  // Estimate how many more marketing messages (incl. 18% GST) the current balance can fund
+  // Estimate how many more marketing and utility messages (incl. 18% GST) the current balance can fund
   const mktRateWithGst = RATES.marketing * 1.18;
+  const utilRateWithGst = RATES.utility * 1.18;
   const estMarketingRunway = recorded && mktRateWithGst > 0 ? Math.max(0, Math.floor(s.remainingBalance / mktRateWithGst)) : 0;
-  const freeServiceCount = s.current.reduce((acc, r) => acc + r.free, 0);
-  const estSavedByFreeWindow = freeServiceCount * RATES.marketing;
-  const runwayPct = Math.min(100, Math.max(4, Math.round((s.remainingBalance / 500) * 100)));
+  const estUtilityRunway = recorded && utilRateWithGst > 0 ? Math.max(0, Math.floor(s.remainingBalance / utilRateWithGst)) : 0;
+  const totalLastMonthSpent = total(s.previous);
+  const totalChargedThisMonth = s.current.reduce((acc, r) => acc + r.charged, 0);
+  const lastSyncedLabel = new Date(s.lastSyncedAt).getTime() > 0 ? `synced ${fmtDate(new Date(s.lastSyncedAt), "d MMM, h:mm a")}` : "last recorded";
 
   return (
     <Card className={cn("card-3d", className)}>
@@ -99,9 +40,9 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
         tone="gold"
         icon={<Wallet3D />}
         title="Meta WhatsApp spend & wallet telemetry"
-        description={s.liveSyncedFromMeta ? "Live from Meta pricing_analytics Graph API" : "Estimated at Meta's India conversation rates"}
+        description={s.liveSyncedFromMeta ? "Live from Meta pricing_analytics Graph API · Apache ECharts spend & volume analysis" : "Estimated at Meta's India conversation rates · Apache ECharts spend & volume analysis"}
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             {s.liveSyncedFromMeta && (
               <Badge tone="green" dot>
                 Live Meta sync
@@ -114,130 +55,130 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
           </div>
         }
       />
-      <dl className="grid grid-cols-2 divide-x divide-line border-b border-line bg-subtle/30">
-        <div className="px-3.5 py-3 sm:px-5 sm:py-4">
+
+      {/* Top 4-KPI Summary Strip */}
+      <dl className="grid grid-cols-2 divide-x divide-y divide-line border-b border-line bg-subtle/30 sm:grid-cols-4 sm:divide-y-0">
+        <div className="px-3 py-2.5 sm:px-5 sm:py-3.5">
           <dt className="text-[11px] text-muted sm:text-xs">{s.monthLabel} so far (ex-GST)</dt>
-          <dd className="tabular mt-0.5 text-lg font-semibold leading-tight text-ink sm:mt-1 sm:text-xl">{rupees(s.totalMonthSpent)}</dd>
-          {s.totalMonthSpent > 0 && (
-            <dd className="tabular mt-0.5 text-2xs text-muted">
-              {rupees(s.totalMonthSpentWithGst)} incl. 18% GST
-            </dd>
-          )}
+          <dd className="tabular mt-0.5 text-base font-semibold leading-tight text-ink sm:mt-1 sm:text-xl">{rupees(s.totalMonthSpent)}</dd>
+          <dd className="tabular mt-0.5 text-[10px] text-muted sm:text-2xs">
+            {s.totalMonthSpent > 0 ? `${rupees(s.totalMonthSpentWithGst)} incl. 18% GST` : "No charges yet"}
+          </dd>
         </div>
-        <div className="px-3.5 py-3 sm:px-5 sm:py-4">
+
+        <div className="px-3 py-2.5 sm:px-5 sm:py-3.5">
           <dt className="text-[11px] text-muted sm:text-xs">{s.lastMonthLabel}</dt>
-          <dd className="tabular mt-0.5 text-lg font-semibold leading-tight text-ink sm:mt-1 sm:text-xl">{rupees(total(s.previous))}</dd>
-          {s.metaTotalDelivered > 0 && (
-            <dd className="tabular mt-0.5 text-2xs text-muted">
-              {fmtNumber(s.metaTotalDelivered)} delivered on Meta
-            </dd>
-          )}
+          <dd className="tabular mt-0.5 text-base font-semibold leading-tight text-ink sm:mt-1 sm:text-xl">{rupees(totalLastMonthSpent)}</dd>
+          <dd className="tabular mt-0.5 text-[10px] text-muted sm:text-2xs">
+            {s.metaTotalDelivered > 0 ? `${fmtNumber(s.metaTotalDelivered)} delivered on Meta` : `${fmtNumber(s.previous.reduce((a, r) => a + r.charged, 0))} charged`}
+          </dd>
+        </div>
+
+        <div className="px-3 py-2.5 sm:px-5 sm:py-3.5">
+          <dt className="text-[11px] text-muted sm:text-xs">Prepaid wallet</dt>
+          <dd className={cn("tabular mt-0.5 text-base font-semibold leading-tight sm:mt-1 sm:text-xl", low ? "text-warning" : "text-ink")}>
+            {recorded ? rupees(s.remainingBalance) : "—"}
+          </dd>
+          <dd className="tabular mt-0.5 text-[10px] text-muted sm:text-2xs">
+            {recorded ? `~${fmtNumber(estMarketingRunway)} mktg · ~${fmtNumber(estUtilityRunway)} util msgs` : "Not synced yet"}
+          </dd>
+        </div>
+
+        <div className="px-3 py-2.5 sm:px-5 sm:py-3.5">
+          <dt className="text-[11px] text-muted sm:text-xs">All-time Meta spend</dt>
+          <dd className="tabular mt-0.5 text-base font-semibold leading-tight text-ink sm:mt-1 sm:text-xl">{rupees(s.allTimeSpent)}</dd>
+          <dd className="tabular mt-0.5 text-[10px] text-muted sm:text-2xs">
+            {fmtNumber(totalChargedThisMonth)} paid this month · 24h replies ₹0
+          </dd>
         </div>
       </dl>
 
-      <div className="space-y-3 p-3 sm:space-y-4 sm:p-5">
-        <div className={cn("rounded-control border p-3 sm:p-3.5", low ? "border-warning-border bg-warning-bg" : "border-line bg-subtle")}>
-          {recorded ? (
-            <>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-medium text-ink-2">
-                  Prepaid wallet · {new Date(s.lastSyncedAt).getTime() > 0 ? `synced ${fmtDate(new Date(s.lastSyncedAt), "d MMM, h:mm a")}` : "last recorded"}
-                </p>
-                {low ? (
-                  <Badge tone="amber" dot>
-                    Low balance · Top up soon
-                  </Badge>
-                ) : (
-                  <Badge tone="green">~{fmtNumber(estMarketingRunway)} mktg msgs left</Badge>
-                )}
+      {/* Main Apache ECharts Analytics Grid (Wallet Gauge + Category Donut + 14-Day Spend/Volume ColumnChart) */}
+      <SpendAnalyticsCharts
+        monthLabel={s.monthLabel}
+        lastMonthLabel={s.lastMonthLabel}
+        totalMonthSpent={s.totalMonthSpent}
+        totalMonthSpentWithGst={s.totalMonthSpentWithGst}
+        totalLastMonthSpent={totalLastMonthSpent}
+        remainingBalance={s.remainingBalance}
+        recorded={recorded}
+        low={low}
+        accountName={acc.accountName}
+        billingUrl={acc.billingUrl}
+        lastSyncedLabel={lastSyncedLabel}
+        estMarketingRunway={estMarketingRunway}
+        estUtilityRunway={estUtilityRunway}
+        current={s.current}
+        previous={s.previous}
+        daily={s.daily}
+        rates={RATES}
+        categoryLabels={CATEGORY_LABEL}
+        monthOrdersCount={s.monthOrdersCount}
+        monthOrderRevenue={s.monthOrderRevenue}
+      />
+
+      {/* Collapsible Details: Per-Phone Spend, Recent Top-Ups & Admin Wallet Sync */}
+      {(s.byPhone.length > 0 || s.topUps.length > 0 || canManage) && (
+        <Disclosure
+          summary={
+            <span className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+              <span>Wallet sync, top-ups &amp; per-number breakdown</span>
+              <span className="text-[11px] font-normal text-muted">
+                · Mktg ₹{RATES.marketing}, Util ₹{RATES.utility} (+18% GST)
+              </span>
+            </span>
+          }
+        >
+          <div className="grid grid-cols-1 gap-4 pt-1 lg:grid-cols-2">
+            <div className="space-y-3">
+              {s.byPhone.length > 0 && (
+                <div>
+                  <p className="mb-1.5 text-xs font-medium text-muted">{s.monthLabel} by WhatsApp number</p>
+                  <ul className="divide-y divide-line rounded-control border border-line bg-subtle/30 px-3 text-xs">
+                    {s.byPhone.map((p) => (
+                      <li key={p.phone} className="flex items-center justify-between gap-2 py-2">
+                        <span className="tabular font-medium text-ink">+{p.phone}</span>
+                        <span className="tabular text-muted">
+                          {fmtNumber(p.charged)} paid{p.free ? ` · ${fmtNumber(p.free)} free` : ""} · <b className="font-semibold text-ink">{rupees(p.cost)}</b>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {s.topUps.length > 0 && (
+                <div>
+                  <p className="mb-1.5 text-xs font-medium text-muted">Recent top-ups</p>
+                  <ul className="divide-y divide-line rounded-control border border-line bg-subtle/30 px-3 text-xs">
+                    {s.topUps.map((t) => (
+                      <li key={t.id} className="flex items-center justify-between gap-2 py-2">
+                        <div className="min-w-0">
+                          <span className="tabular font-medium text-ink">{rupees(t.amount)}</span>
+                          {t.note && <span className="text-muted"> · {t.note}</span>}
+                          <span className="block text-2xs text-muted">{fmtDate(t.createdAt, "d MMM yyyy")}</span>
+                        </div>
+                        {canManage && (
+                          <ActionButton action={deleteTopUp.bind(null, t.id)} variant="ghost" size="sm" confirm="Remove this top-up record?" title="Remove top-up">
+                            <Trash2 aria-hidden className="size-3.5 text-muted hover:text-danger" />
+                            <span className="sr-only">Remove top-up</span>
+                          </ActionButton>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {canManage && (
+              <div>
+                <TopUpForm clientId={clientId} wabaId={wabaId} />
               </div>
-              <p className="tabular mt-1 text-xl font-semibold leading-tight text-ink sm:text-2xl">{rupees(s.remainingBalance)}</p>
-
-              {/* Visual Balance Runway Meter */}
-              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-track sm:mt-2.5">
-                <div className={cn("bar h-full rounded-full", low ? "bg-chart-gold" : "bg-chart-emerald")} style={{ width: `${runwayPct}%` }} />
-              </div>
-
-              <p className="mt-1.5 text-xs text-muted">
-                {acc.accountName} · Enough for ~<b>{fmtNumber(estMarketingRunway)}</b> marketing messages (incl. GST).
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="text-xs font-medium text-ink-2">Prepaid balance</p>
-              <p className="mt-1 text-xs text-muted sm:text-sm">No balance is recorded for this WhatsApp account yet. Sync it below or see Meta&apos;s Billing Hub.</p>
-            </>
-          )}
-          <a href={acc.billingUrl} target="_blank" rel="noopener noreferrer" className={cn(buttonClass(low ? "primary" : "secondary", "sm"), "mt-2.5 w-full sm:mt-3")}>
-            Recharge on Meta <ExternalLink aria-hidden className="size-3.5" />
-            <span className="sr-only">(opens Meta Business Suite)</span>
-          </a>
-        </div>
-
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted">{s.monthLabel} spend by category</p>
-          <SpendRows rows={s.current} />
-        </div>
-
-        {freeServiceCount > 0 && (
-          <div className="rounded-control border border-brand/25 bg-brand-soft/35 p-2.5 text-xs text-ink-2 sm:p-3">
-            <p className="flex items-center gap-1.5 font-semibold text-brand-deep">
-              <Lightbulb aria-hidden className="size-3.5 shrink-0" /> Meta spend optimization insight
-            </p>
-            <p className="mt-0.5 leading-relaxed">
-              You sent <b>{fmtNumber(freeServiceCount)} free service messages</b> inside the 24-hour customer reply window, saving ~<b>{rupees(estSavedByFreeWindow)}</b> in marketing charges. Always send catalogues & price lists right after a customer replies!
-            </p>
+            )}
           </div>
-        )}
-
-        {s.byPhone.length > 0 && (
-          <div className="border-t border-line pt-3">
-            <p className="mb-1.5 text-xs font-medium text-muted">{s.monthLabel} by WhatsApp number</p>
-            <ul className="divide-y divide-line text-xs">
-              {s.byPhone.map((p) => (
-                <li key={p.phone} className="flex items-center justify-between gap-2 py-1.5">
-                  <span className="tabular font-medium text-ink">+{p.phone}</span>
-                  <span className="tabular text-muted">
-                    {fmtNumber(p.charged)} paid{p.free ? ` · ${fmtNumber(p.free)} free` : ""} · <b className="font-semibold text-ink">{rupees(p.cost)}</b>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {s.topUps.length > 0 && (
-          <div className="border-t border-line pt-3">
-            <p className="mb-1.5 text-xs font-medium text-muted">Recent top-ups</p>
-            <ul className="divide-y divide-line text-xs">
-              {s.topUps.map((t) => (
-                <li key={t.id} className="flex items-center justify-between gap-2 py-1.5">
-                  <div className="min-w-0">
-                    <span className="tabular font-medium text-ink">{rupees(t.amount)}</span>
-                    {t.note && <span className="text-muted"> · {t.note}</span>}
-                    <span className="block text-2xs text-muted">{fmtDate(t.createdAt, "d MMM yyyy")}</span>
-                  </div>
-                  {canManage && (
-                    <ActionButton action={deleteTopUp.bind(null, t.id)} variant="ghost" size="sm" confirm="Remove this top-up record?" title="Remove top-up">
-                      <Trash2 aria-hidden className="size-3.5 text-muted hover:text-danger" />
-                      <span className="sr-only">Remove top-up</span>
-                    </ActionButton>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {canManage && <TopUpForm clientId={clientId} wabaId={wabaId} />}
-
-        <p className="border-t border-line pt-3 text-xs text-muted">
-          All-time spend <span className="tabular font-medium text-ink-2">{rupees(s.allTimeSpent)}</span> · Marketing ₹{RATES.marketing}, utility ₹{RATES.utility} per
-          message (+18% GST). Service replies within 24 hours are free.
-        </p>
-      </div>
+        </Disclosure>
+      )}
     </Card>
   );
 }
-
-

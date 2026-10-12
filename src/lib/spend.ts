@@ -27,6 +27,17 @@ export const CATEGORY_LABEL: Record<string, string> = {
 
 export type SpendRow = { category: string; charged: number; free: number; cost: number };
 export type PhoneSpendRow = { phone: string; charged: number; free: number; cost: number };
+export type DailySpendPoint = {
+  key: string;
+  label: string;
+  sub: string;
+  marketingCost: number;
+  utilityCost: number;
+  authCost: number;
+  totalCost: number;
+  chargedVolume: number;
+  freeVolume: number;
+};
 
 /** Start of this month and last month in the app's time zone. */
 function monthStarts(now = new Date()) {
@@ -91,6 +102,69 @@ function spendByPhoneFromMetaPoints(points: MetaPricingPoint[], fromSec: number)
   return [...byPhone.values()].sort((a, b) => b.cost - a.cost || b.charged - a.charged);
 }
 
+/** Builds a 14-day daily spend & volume timeline for Apache ECharts. */
+function buildDailySeries(
+  now: Date,
+  useLiveMeta: boolean,
+  points: MetaPricingPoint[],
+  localMsgs: { createdAt: Date; pricingCategory: string | null; billable: boolean | null }[],
+): DailySpendPoint[] {
+  const days = 14;
+  const map = new Map<string, DailySpendPoint>();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 86400_000);
+    const key = formatInTimeZone(d, APP_TZ, "yyyy-MM-dd");
+    const noon = new Date(`${key}T12:00:00Z`);
+    map.set(key, {
+      key,
+      label: formatInTimeZone(noon, "UTC", "d MMM"),
+      sub: formatInTimeZone(noon, "UTC", "EEE"),
+      marketingCost: 0,
+      utilityCost: 0,
+      authCost: 0,
+      totalCost: 0,
+      chargedVolume: 0,
+      freeVolume: 0,
+    });
+  }
+
+  if (useLiveMeta) {
+    for (const p of points) {
+      const key = formatInTimeZone(new Date((p.start + 12 * 3600) * 1000), APP_TZ, "yyyy-MM-dd");
+      const entry = map.get(key);
+      if (!entry) continue;
+      if (p.billable) {
+        entry.chargedVolume += p.volume;
+        entry.totalCost = Math.round((entry.totalCost + p.cost) * 100) / 100;
+        if (p.category === "marketing") entry.marketingCost = Math.round((entry.marketingCost + p.cost) * 100) / 100;
+        else if (p.category === "utility") entry.utilityCost = Math.round((entry.utilityCost + p.cost) * 100) / 100;
+        else if (p.category === "authentication") entry.authCost = Math.round((entry.authCost + p.cost) * 100) / 100;
+      } else {
+        entry.freeVolume += p.volume;
+      }
+    }
+  } else {
+    for (const m of localMsgs) {
+      if (!m.pricingCategory) continue;
+      const key = formatInTimeZone(m.createdAt, APP_TZ, "yyyy-MM-dd");
+      const entry = map.get(key);
+      if (!entry) continue;
+      const rate = RATES[m.pricingCategory] ?? 0;
+      if (m.billable) {
+        entry.chargedVolume += 1;
+        entry.totalCost = Math.round((entry.totalCost + rate) * 100) / 100;
+        if (m.pricingCategory === "marketing") entry.marketingCost = Math.round((entry.marketingCost + rate) * 100) / 100;
+        else if (m.pricingCategory === "utility") entry.utilityCost = Math.round((entry.utilityCost + rate) * 100) / 100;
+        else if (m.pricingCategory === "authentication") entry.authCost = Math.round((entry.authCost + rate) * 100) / 100;
+      } else {
+        entry.freeVolume += 1;
+      }
+    }
+  }
+
+  return [...map.values()];
+}
+
 export const total = (rows: SpendRow[]) => rows.reduce((sum, r) => sum + r.cost, 0);
 
 /** This month's and last month's spend synced live from Meta `pricing_analytics`, plus prepaid balance and top-ups. */
@@ -100,8 +174,9 @@ export async function spendSummary(clientId: string) {
   const thisMonthSec = Math.floor(thisMonth.getTime() / 1000);
   const lastMonthSec = Math.floor(lastMonth.getTime() / 1000);
   const nowSec = Math.floor(now.getTime() / 1000) + 86400;
+  const fourteenDaysAgo = new Date(now.getTime() - 15 * 86400_000);
 
-  const [localCurrent, localPrevious, allTimeGroups, clientNumber, allTopUps, liveMeta] = await Promise.all([
+  const [localCurrent, localPrevious, allTimeGroups, clientNumber, allTopUps, liveMeta, localRecentMsgs, monthOrders] = await Promise.all([
     spendBetweenLocal(clientId, thisMonth),
     spendBetweenLocal(clientId, lastMonth, thisMonth),
     db.message.groupBy({
@@ -121,6 +196,22 @@ export async function spendSummary(clientId: string) {
       })
       .catch(() => []),
     fetchMetaLivePricing(clientId, lastMonthSec, nowSec),
+    db.message
+      .findMany({
+        where: { customer: { clientId }, pricingCategory: { not: null }, createdAt: { gte: fourteenDaysAgo } },
+        select: { createdAt: true, pricingCategory: true, billable: true },
+      })
+      .catch(() => []),
+    db.order
+      .findMany({
+        where: {
+          customer: { clientId },
+          createdAt: { gte: thisMonth },
+          OR: [{ status: { in: ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"] } }, { paidAt: { not: null } }],
+        },
+        select: { total: true },
+      })
+      .catch(() => []),
   ]);
 
   // Use Meta's live pricing_analytics when connected and non-empty; otherwise fall back to local DB.
@@ -129,6 +220,10 @@ export async function spendSummary(clientId: string) {
   const current = useLiveMeta ? spendFromMetaPoints(liveMeta.points, thisMonthSec - 12 * 3600) : localCurrent;
   const previous = useLiveMeta ? spendFromMetaPoints(liveMeta.points, lastMonthSec - 12 * 3600, thisMonthSec - 12 * 3600) : localPrevious;
   const byPhone = useLiveMeta ? spendByPhoneFromMetaPoints(liveMeta.points, thisMonthSec - 12 * 3600) : [];
+  const daily = buildDailySeries(now, useLiveMeta, liveMeta.points, localRecentMsgs);
+
+  const monthOrdersCount = monthOrders.length;
+  const monthOrderRevenue = Math.round(monthOrders.reduce((s, o) => s + o.total, 0));
 
   let localAllTimeSpent = 0;
   for (const g of allTimeGroups) {
@@ -163,6 +258,9 @@ export async function spendSummary(clientId: string) {
     current,
     previous,
     byPhone,
+    daily,
+    monthOrdersCount,
+    monthOrderRevenue,
     liveSyncedFromMeta: useLiveMeta,
     metaTotalSent: liveMeta.totalSent,
     metaTotalDelivered: liveMeta.totalDelivered,

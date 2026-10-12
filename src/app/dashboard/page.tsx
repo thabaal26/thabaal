@@ -1646,6 +1646,9 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         </Card>
       )}
 
+      {/* Meta WhatsApp spend & wallet telemetry — prominent in top-middle section with Apache ECharts analysis */}
+      {cid && <SpendCard clientId={cid} canManage={scope.canManage} className="mt-3.5 sm:mt-5" />}
+
       {/* Activity and delivery. */}
       <div className="mt-3.5 grid grid-cols-1 gap-3.5 sm:mt-5 sm:gap-5 xl:grid-cols-12">
         <div className="min-w-0 xl:col-span-8">
@@ -1784,8 +1787,6 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
               )}
             </Card>
           )}
-
-              {cid && <SpendCard clientId={cid} canManage={scope.canManage} />}
             </div>
           </div>
         </>
