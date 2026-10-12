@@ -35,13 +35,16 @@ export async function generateMetadata(): Promise<Metadata> {
   if (!client) {
     return {
       title: { default: "Thabaal · Customer Messaging", template: "%s · Thabaal" },
+      applicationName: "Thabaal",
+      manifest: "/manifest.webmanifest",
       icons: defaultIcons,
       appleWebApp: { capable: true, title: "Thabaal", statusBarStyle: "black-translucent" },
     };
   }
   return {
     title: { default: `Thabaal · ${client.name}`, template: `%s · ${client.name} · Thabaal` },
-    manifest: `/api/manifest/${client.id}`,
+    applicationName: "Thabaal",
+    manifest: "/manifest.webmanifest",
     icons: defaultIcons,
     appleWebApp: { capable: true, title: "Thabaal", statusBarStyle: "black-translucent" },
   };

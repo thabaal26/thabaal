@@ -4,7 +4,7 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "Thabaal · Customer Messaging",
+    name: "Thabaal",
     short_name: "Thabaal",
     description: "Thabaal (தபால்) — A message with momentum. Warm, quick, and dependable identity for customer messaging, campaigns, and orders.",
     start_url: "/login", // signed-in users are forwarded to the dashboard
