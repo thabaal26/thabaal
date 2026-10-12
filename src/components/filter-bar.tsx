@@ -1,13 +1,11 @@
 "use client";
 
-import { CalendarDays, Megaphone, MapPin, Package, SlidersHorizontal, Tags, User, X } from "@/components/icons";
+import { CalendarDays, Check, ChevronDown, MapPin, Package, Search, SlidersHorizontal, X } from "@/components/icons";
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type ReactNode } from "react";
+import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
-import { activeCount, ALL_SECTIONS, filterQuery, PRESETS, withQuery, type FilterSection, type FilterState, type RangeKey } from "@/lib/filters";
+import { ALL_SECTIONS, filterQuery, PRESETS, withQuery, type FilterSection, type FilterState, type RangeKey } from "@/lib/filters";
 import type { FilterOptions } from "@/lib/filter-scope";
-import { MultiPicker } from "./multi-picker";
-import { Picker } from "./picker";
 import { Sheet } from "./sheet";
 import { Button } from "./ui";
 
@@ -17,9 +15,11 @@ const ALL = ALL_SECTIONS;
 const todayStr = () => new Date(Date.now() + 5.5 * 3_600_000).toISOString().slice(0, 10);
 
 /**
- * The portal's filter control: the period (presets or any from–to dates) and who/what to look at
- * (products, single customers, customer groups, area, campaign). Opens one panel; applying updates
- * the URL so the page re-renders with the new figures. Active filters show as removable chips.
+ * Simplified, high-clarity filter control:
+ * - Period (quick presets or custom From–To dates)
+ * - Catalogue Products (inline multi-select, no nested sheet)
+ * - Delivery Area (inline single-select pills/list, no nested sheet)
+ * Unwanted/confusing filters (single customers, raw sheet tags, campaign recipients) are removed.
  */
 export function FilterBar({
   value,
@@ -42,7 +42,7 @@ export function FilterBar({
   sections?: Section[];
   /** What the period button says, e.g. "Last 7 days" or "3 – 9 Oct". */
   periodLabel: string;
-  /** Pill buttons sized for the dashboard's floating bar. */
+  /** Pill buttons sized for compact toolbars. */
   compact?: boolean;
   className?: string;
   /** What these filters change on this page, shown at the top of the panel. */
@@ -51,29 +51,80 @@ export function FilterBar({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<FilterState>(value);
+  const [prodQuery, setProdQuery] = useState("");
+  const [areaQuery, setAreaQuery] = useState("");
   const [pending, start] = useTransition();
+
   const has = (s: Section) => sections.includes(s);
-  const count = activeCount(value);
+  const hasProducts = has("products") && options.products.length > 0;
+  const hasArea = has("area") && options.areas.length > 1;
+  const periodOnly = !hasProducts && !hasArea;
+  const count = (hasProducts ? value.products.length : 0) + (hasArea && value.area ? 1 : 0);
 
   const go = (f: FilterState) => {
     document.documentElement.style.setProperty("--view-dx", "0px");
     start(() => router.push(withQuery(basePath, filterQuery(f, extra, defaultRange)), { scroll: false }));
   };
+
   const openPanel = () => {
     setDraft(value);
+    setProdQuery("");
+    setAreaQuery("");
     setOpen(true);
   };
+
   const apply = () => {
     setOpen(false);
     go(draft);
   };
+
+  const clearAll = () => {
+    const cleared: FilterState = {
+      ...value,
+      range: defaultRange,
+      from: "",
+      to: "",
+      products: [],
+      customers: [],
+      tags: [],
+      area: "",
+      campaign: "",
+    };
+    setDraft(cleared);
+    setOpen(false);
+    go(cleared);
+  };
+
   const set = (p: Partial<FilterState>) => setDraft((d) => ({ ...d, ...p }));
+
+  const toggleProduct = (prodName: string) => {
+    setDraft((d) => ({
+      ...d,
+      products: d.products.includes(prodName)
+        ? d.products.filter((x) => x !== prodName)
+        : [...d.products, prodName],
+    }));
+  };
+
+  const filteredProducts = useMemo(() => {
+    const q = prodQuery.trim().toLowerCase();
+    return q
+      ? options.products.filter((p) => `${p.label} ${p.hint ?? ""}`.toLowerCase().includes(q))
+      : options.products;
+  }, [options.products, prodQuery]);
+
+  const filteredAreas = useMemo(() => {
+    const q = areaQuery.trim().toLowerCase();
+    return q
+      ? options.areas.filter((a) => `${a.label} ${a.hint ?? ""}`.toLowerCase().includes(q))
+      : options.areas;
+  }, [options.areas, areaQuery]);
 
   const btn = cn(
     "inline-flex shrink-0 items-center gap-1.5 rounded-full font-semibold transition",
     compact
       ? "min-h-8 bg-sunken px-2.5 text-xs text-ink hover:bg-line/60 sm:min-h-9 sm:px-3"
-      : "min-h-8 border border-line bg-panel px-2.5 text-xs text-ink-2 shadow-xs hover:border-line-2 hover:text-ink sm:min-h-10 sm:px-3.5 sm:text-sm",
+      : "min-h-9 border border-line bg-panel px-3 text-xs text-ink-2 shadow-xs hover:border-line-2 hover:text-ink sm:min-h-10 sm:px-3.5 sm:text-sm",
     pending && "opacity-60",
   );
 
@@ -82,125 +133,262 @@ export function FilterBar({
       <div className={cn("flex items-center gap-1.5", className)}>
         {has("period") && (
           <button type="button" onClick={openPanel} className={btn} aria-label={`Period: ${periodLabel}. Change`}>
-            <CalendarDays aria-hidden className="size-3.5 text-brand" />
-            <span className={cn("max-w-[8rem] truncate sm:max-w-[9rem]", compact && "max-sm:sr-only")}>{periodLabel}</span>
+            <CalendarDays aria-hidden className="size-3.5 shrink-0 text-brand" />
+            <span className="max-w-[9rem] truncate">{periodLabel}</span>
+            {periodOnly && <ChevronDown aria-hidden className="size-3.5 shrink-0 text-muted" />}
           </button>
         )}
-        <button type="button" onClick={openPanel} className={btn} aria-label={`Filters${count ? `, ${count} on` : ""}`}>
-          <SlidersHorizontal aria-hidden className="size-3.5" />
-          <span className={cn(compact && "max-sm:sr-only")}>Filter</span>
-          {count > 0 && <span className="tabular grid min-w-4.5 place-items-center rounded-full bg-brand px-1 text-2xs font-bold text-white sm:min-w-5">{count}</span>}
-        </button>
+        {!periodOnly && (
+          <button
+            type="button"
+            onClick={openPanel}
+            className={cn(btn, count > 0 && "border-brand/40 bg-brand-soft/60 text-brand-deep")}
+            aria-label={`Filters${count ? `, ${count} active` : ""}`}
+          >
+            <SlidersHorizontal aria-hidden className="size-3.5 shrink-0" />
+            <span>Filter</span>
+            {count > 0 && (
+              <span className="tabular grid min-w-4.5 place-items-center rounded-full bg-brand px-1 text-2xs font-bold text-white sm:min-w-5">
+                {count}
+              </span>
+            )}
+          </button>
+        )}
       </div>
 
       <Sheet
         open={open}
         onClose={() => setOpen(false)}
-        title="Filter"
-        description={`${note ?? "Pick a period and narrow to products, customers, groups or an area."} Within one filter any match counts; different filters must all match.`}
+        title={periodOnly ? "Date period" : "Filter"}
+        description={
+          note ??
+          (periodOnly
+            ? "Choose a preset period or pick exact From and To dates."
+            : "Choose a date period and narrow results by product or delivery area.")
+        }
         footer={
           <div className="flex items-center justify-between gap-2">
-            <Button
-              variant="ghost"
-              onClick={() => setDraft({ ...value, range: defaultRange, from: "", to: "", products: [], customers: [], tags: [], area: "", campaign: "" })}
-            >
-              Clear all
+            <Button variant="ghost" onClick={clearAll}>
+              Reset to default
             </Button>
             <Button onClick={apply} loading={pending}>
-              Show results
+              {periodOnly ? "Apply dates" : "Show results"}
             </Button>
           </div>
         }
       >
-        <div className="space-y-6">
+        <div className="space-y-5">
           {has("period") && (
             <section aria-labelledby="f-period">
-              <h3 id="f-period" className="mb-2 flex items-center gap-2 text-sm font-semibold text-ink">
-                <CalendarDays aria-hidden className="size-4 text-brand" /> Period
-              </h3>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h3 id="f-period" className="flex items-center gap-2 text-sm font-semibold text-ink">
+                  <CalendarDays aria-hidden className="size-4 text-brand" /> Date period
+                </h3>
+                {periodOnly && <span className="text-[11px] text-muted">Tap a preset to apply</span>}
+              </div>
               <div className="flex flex-wrap gap-1.5">
-                {PRESETS.map((p) => (
-                  <button
-                    key={p.key}
-                    type="button"
-                    onClick={() => set({ range: p.key, from: "", to: "" })}
-                    aria-pressed={draft.range === p.key}
-                    className={cn(
-                      "min-h-9 rounded-full border px-3 text-xs font-semibold transition",
-                      draft.range === p.key ? "border-brand bg-brand text-white" : "border-line bg-panel text-ink-2 hover:border-line-2",
-                    )}
-                  >
-                    {p.label}
-                  </button>
-                ))}
+                {PRESETS.map((p) => {
+                  const isSelected = draft.range === p.key;
+                  return (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={() => {
+                        const next = { ...draft, range: p.key, from: "", to: "" };
+                        setDraft(next);
+                        if (periodOnly) {
+                          setOpen(false);
+                          go(next);
+                        }
+                      }}
+                      aria-pressed={isSelected}
+                      className={cn(
+                        "min-h-8 rounded-full border px-3 text-xs font-semibold transition sm:min-h-9",
+                        isSelected
+                          ? "border-brand bg-brand text-white shadow-2xs"
+                          : "border-line bg-panel text-ink-2 hover:border-line-2 hover:text-ink",
+                      )}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2.5">
                 <label className="text-xs font-medium text-muted">
-                  From
+                  From date
                   <input
                     type="date"
                     max={todayStr()}
                     value={draft.from}
                     onChange={(e) => set({ range: "custom", from: e.target.value, to: draft.to || e.target.value })}
-                    className="mt-1 block min-h-10 w-full rounded-control border border-line-strong bg-panel px-3 text-sm text-ink"
+                    className="mt-1 block min-h-9 w-full rounded-control border border-line-strong bg-panel px-2.5 text-xs text-ink sm:min-h-10 sm:px-3 sm:text-sm"
                   />
                 </label>
                 <label className="text-xs font-medium text-muted">
-                  To
+                  To date
                   <input
                     type="date"
                     max={todayStr()}
                     min={draft.from || undefined}
                     value={draft.to}
                     onChange={(e) => set({ range: "custom", to: e.target.value, from: draft.from || e.target.value })}
-                    className="mt-1 block min-h-10 w-full rounded-control border border-line-strong bg-panel px-3 text-sm text-ink"
+                    className="mt-1 block min-h-9 w-full rounded-control border border-line-strong bg-panel px-2.5 text-xs text-ink sm:min-h-10 sm:px-3 sm:text-sm"
                   />
                 </label>
               </div>
             </section>
           )}
 
-          {has("products") && options.products.length > 0 && (
-            <Field icon={<Package className="size-4 text-gold-deep" />} label="Products" hint="Only these products: sales, carts and the people who bought them">
-              <MultiPicker title="Products" options={options.products} value={draft.products} onChange={(v) => set({ products: v })} placeholder="All products" />
-            </Field>
+          {hasArea && (
+            <section aria-labelledby="f-area" className="border-t border-line pt-4">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h3 id="f-area" className="flex items-center gap-2 text-sm font-semibold text-ink">
+                  <MapPin aria-hidden className="size-4 text-brand" /> Delivery area
+                </h3>
+                {draft.area && (
+                  <button
+                    type="button"
+                    onClick={() => set({ area: "" })}
+                    className="text-xs font-semibold text-brand-deep hover:underline"
+                  >
+                    Clear area
+                  </button>
+                )}
+              </div>
+              {options.areas.length > 8 && (
+                <div className="relative mb-2">
+                  <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted" />
+                  <input
+                    type="search"
+                    value={areaQuery}
+                    onChange={(e) => setAreaQuery(e.target.value)}
+                    placeholder="Search area or locality…"
+                    className="field min-h-9 pl-8 text-xs"
+                  />
+                </div>
+              )}
+              <div className="max-h-44 overflow-y-auto rounded-control border border-line bg-canvas/50 p-1.5">
+                <div className="flex flex-wrap gap-1.5">
+                  {!areaQuery.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => set({ area: "" })}
+                      className={cn(
+                        "inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition",
+                        !draft.area
+                          ? "border-brand bg-brand text-white"
+                          : "border-line bg-panel text-ink-2 hover:border-line-2",
+                      )}
+                    >
+                      All areas
+                    </button>
+                  )}
+                  {filteredAreas.map((a) => {
+                    const active = draft.area === a.value;
+                    return (
+                      <button
+                        key={a.value}
+                        type="button"
+                        onClick={() => set({ area: active ? "" : a.value })}
+                        className={cn(
+                          "inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition",
+                          active
+                            ? "border-brand bg-brand text-white"
+                            : "border-line bg-panel text-ink-2 hover:border-line-2 hover:text-ink",
+                        )}
+                      >
+                        <span className="truncate">{a.label}</span>
+                        {a.hint && (
+                          <span className={cn("text-[10px]", active ? "text-white/80" : "text-muted")}>
+                            ({a.hint.replace(/ customers.*/, "")})
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                  {!filteredAreas.length && (
+                    <p className="w-full py-3 text-center text-xs text-muted">No matching area</p>
+                  )}
+                </div>
+              </div>
+            </section>
           )}
-          {has("customers") && (
-            <Field icon={<User className="size-4 text-info" />} label="Customers" hint="One or a few people: everything about just them">
-              <MultiPicker title="Customers" options={options.customers} value={draft.customers} onChange={(v) => set({ customers: v })} placeholder="All customers" />
-            </Field>
-          )}
-          {has("tags") && options.tags.length > 0 && (
-            <Field icon={<Tags className="size-4 text-accent" />} label="Customer groups" hint="Tags from the sheets and your own groups">
-              <MultiPicker title="Customer groups" options={options.tags} value={draft.tags} onChange={(v) => set({ tags: v })} placeholder="All groups" />
-            </Field>
-          )}
-          {has("area") && options.areas.length > 1 && (
-            <Field icon={<MapPin className="size-4 text-brand" />} label="Area">
-              <Picker title="Area" options={[{ value: "", label: "Any area" }, ...options.areas]} value={draft.area} onChange={(v) => set({ area: v })} placeholder="Any area" />
-            </Field>
-          )}
-          {has("campaign") && options.campaigns.length > 0 && (
-            <Field icon={<Megaphone className="size-4 text-danger" />} label="Campaign" hint="Only the people this campaign messaged">
-              <Picker title="Campaign" options={[{ value: "", label: "Any campaign" }, ...options.campaigns]} value={draft.campaign} onChange={(v) => set({ campaign: v })} placeholder="Any campaign" />
-            </Field>
+
+          {hasProducts && (
+            <section aria-labelledby="f-products" className="border-t border-line pt-4">
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <h3 id="f-products" className="flex items-center gap-2 text-sm font-semibold text-ink">
+                  <Package aria-hidden className="size-4 text-gold-deep" /> Catalogue products
+                </h3>
+                {draft.products.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => set({ products: [] })}
+                    className="text-xs font-semibold text-brand-deep hover:underline"
+                  >
+                    {draft.products.length} selected · Clear
+                  </button>
+                )}
+              </div>
+              <p className="mb-2 text-xs text-muted">
+                Filter to specific catalogue items ({options.products.length} available)
+              </p>
+              {options.products.length > 6 && (
+                <div className="relative mb-2">
+                  <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted" />
+                  <input
+                    type="search"
+                    value={prodQuery}
+                    onChange={(e) => setProdQuery(e.target.value)}
+                    placeholder="Search catalogue product…"
+                    className="field min-h-9 pl-8 text-xs"
+                  />
+                </div>
+              )}
+              <ul className="max-h-48 space-y-1 overflow-y-auto rounded-control border border-line bg-canvas/50 p-1.5">
+                {filteredProducts.map((p) => {
+                  const active = draft.products.includes(p.value);
+                  return (
+                    <li key={p.value}>
+                      <button
+                        type="button"
+                        onClick={() => toggleProduct(p.value)}
+                        className={cn(
+                          "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs transition",
+                          active
+                            ? "bg-brand-soft font-semibold text-brand-deep"
+                            : "text-ink hover:bg-panel",
+                        )}
+                      >
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "grid size-4 shrink-0 place-items-center rounded border transition",
+                            active ? "border-brand bg-brand text-white" : "border-line-strong bg-panel",
+                          )}
+                        >
+                          {active && <Check className="size-3" />}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate">{p.label}</span>
+                        {p.hint && (
+                          <span className={cn("shrink-0 text-[11px]", active ? "text-brand-deep/80" : "text-muted")}>
+                            {p.hint}
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+                {!filteredProducts.length && (
+                  <li className="py-4 text-center text-xs text-muted">No matching product</li>
+                )}
+              </ul>
+            </section>
           )}
         </div>
       </Sheet>
     </>
-  );
-}
-
-function Field({ icon, label, hint, children }: { icon: ReactNode; label: string; hint?: string; children: ReactNode }) {
-  return (
-    <section>
-      <h3 className="flex items-center gap-2 text-sm font-semibold text-ink">
-        <span aria-hidden>{icon}</span>
-        {label}
-      </h3>
-      {hint && <p className="mb-2 mt-0.5 text-xs text-muted">{hint}</p>}
-      {children}
-    </section>
   );
 }
 
@@ -225,11 +413,22 @@ export function ActiveFilters({
   const name = (list: { value: string; label: string }[], v: string) => list.find((o) => o.value === v)?.label ?? v;
   const go = (f: FilterState) => start(() => router.push(withQuery(basePath, filterQuery(f, extra, defaultRange)), { scroll: false }));
   const chips: { key: string; icon: ReactNode; text: string; drop: () => FilterState }[] = [
-    ...value.products.map((p) => ({ key: `p:${p}`, icon: <Package className="size-3" />, text: p, drop: () => ({ ...value, products: value.products.filter((x) => x !== p) }) })),
-    ...value.customers.map((c) => ({ key: `c:${c}`, icon: <User className="size-3" />, text: name(options.customers, c), drop: () => ({ ...value, customers: value.customers.filter((x) => x !== c) }) })),
-    ...value.tags.map((t) => ({ key: `t:${t}`, icon: <Tags className="size-3" />, text: name(options.tags, t), drop: () => ({ ...value, tags: value.tags.filter((x) => x !== t) }) })),
-    ...(value.area ? [{ key: "area", icon: <MapPin className="size-3" />, text: name(options.areas, value.area), drop: () => ({ ...value, area: "" }) }] : []),
-    ...(value.campaign ? [{ key: "camp", icon: <Megaphone className="size-3" />, text: name(options.campaigns, value.campaign), drop: () => ({ ...value, campaign: "" }) }] : []),
+    ...value.products.map((p) => ({
+      key: `p:${p}`,
+      icon: <Package className="size-3" />,
+      text: p,
+      drop: () => ({ ...value, products: value.products.filter((x) => x !== p) }),
+    })),
+    ...(value.area
+      ? [
+          {
+            key: "area",
+            icon: <MapPin className="size-3" />,
+            text: name(options.areas, value.area),
+            drop: () => ({ ...value, area: "" }),
+          },
+        ]
+      : []),
   ];
   if (!chips.length) return null;
   return (
@@ -252,7 +451,7 @@ export function ActiveFilters({
         onClick={() => go({ ...value, products: [], customers: [], tags: [], area: "", campaign: "" })}
         className="px-1.5 text-xs font-semibold text-muted hover:text-ink"
       >
-        Clear
+        Clear all
       </button>
     </div>
   );

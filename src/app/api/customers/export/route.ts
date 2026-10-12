@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { customerFilters, customerWhere } from "@/lib/customer-query";
 import { db } from "@/lib/db";
 import { customerSegmentIds } from "@/lib/filter-scope";
-import { readFilters, resolvePeriod } from "@/lib/filters";
+import { keepFilters, readFilters, resolvePeriod } from "@/lib/filters";
 import { fmtDate } from "@/lib/format";
 import { getScope, readSessionUserId, SESSION_COOKIE } from "@/lib/session";
 
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
   const params: Record<string, string | string[]> = {};
   for (const [k, v] of req.nextUrl.searchParams) params[k] = k in params ? [...[params[k]].flat(), v] : v;
-  const filters = readFilters(params, "all");
+  const filters = keepFilters(readFilters(params, "all"), ["period", "products"]);
   const period = resolvePeriod(filters);
   const stage = typeof params.stage === "string" ? params.stage : "";
   const act = typeof params.act === "string" ? params.act : "";

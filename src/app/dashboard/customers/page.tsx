@@ -12,7 +12,7 @@ import { formatPhone } from "@/lib/phone";
 import { marketingPaused } from "@/lib/held";
 import { customerFilters, customerWhere } from "@/lib/customer-query";
 import { ActiveFilters, FilterBar } from "@/components/filter-bar";
-import { activeCount as filterCount, filterQuery, readFilters, resolvePeriod } from "@/lib/filters";
+import { activeCount as filterCount, filterQuery, keepFilters, readFilters, resolvePeriod, type FilterSection } from "@/lib/filters";
 import { ACTIVITY, customerSegmentIds, filterOptions, STAGES } from "@/lib/filter-scope";
 import { getScope, owned } from "@/lib/session";
 import { deleteCustomer, setOptOut } from "../actions/customers";
@@ -22,6 +22,7 @@ export const metadata: Metadata = { title: "Customers" };
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 50;
+const CUSTOMER_FILTERS: FilterSection[] = ["period", "products"];
 
 export default async function CustomersPage({ searchParams }: PageProps<"/dashboard/customers">) {
   const sp = await searchParams;
@@ -30,18 +31,23 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
   const page = Math.max(1, Number(sp.page) || 1);
   const scope = await getScope();
 
-  // Shared filters (period, products, single customers, groups, area, campaign) plus lifecycle stage and
-  // what they did in the period. Shared with the CSV export, so a download always matches the list.
-  const filters = readFilters(sp, "all");
+  // Period and catalogue product filters live in FilterBar; tag, area, stage, and activity have dedicated toolbar pickers.
+  const filters = keepFilters(readFilters(sp, "all"), CUSTOMER_FILTERS);
   const period = resolvePeriod(filters);
   const stage = typeof sp.stage === "string" ? sp.stage : "";
   const act = typeof sp.act === "string" ? sp.act : "";
-  const specialTag = tag === "__optout" || tag.startsWith("product:") ? tag : undefined;
+  const baseExtra: Record<string, string | undefined> = {
+    q: q || undefined,
+    tag: tag || undefined,
+    area: area || undefined,
+    stage: stage || undefined,
+    act: act || undefined,
+  };
   const segment = scope.clientId
     ? await customerSegmentIds(scope.clientId, filters, { stage, act, ...(filters.range !== "all" && { start: period.start, end: period.end }) })
     : null;
   const where = { ...(await customerWhere(scope, { q, tag, area })), ...(segment && { id: { in: segment } }) };
-  const listQs = filterQuery(filters, { q: q || undefined, tag: specialTag, stage: stage || undefined, act: act || undefined }, "all");
+  const listQs = filterQuery(filters, baseExtra, "all");
   const exportHref = `/api/customers/export${listQs ? `?${listQs}` : ""}`;
   const filterOpts = scope.clientId ? await filterOptions(scope.clientId) : null;
   const [rows, total, tags, areas, totalAll, optedOutCount, pendingRows] = await Promise.all([
@@ -97,11 +103,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
         ? "No item recorded"
         : t.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase());
   const qs = (patch: Record<string, string | undefined>) => {
-    const f = { ...filters, area: "area" in patch ? (patch.area ?? "") : filters.area, tags: "tag" in patch ? [] : filters.tags };
-    const { area: _area, ...rest } = patch;
-    void _area;
-    const extra: Record<string, string | undefined> = { q: q || undefined, tag: specialTag, stage: stage || undefined, act: act || undefined, ...rest };
-    const s = filterQuery(f, extra, "all");
+    const s = filterQuery(filters, { ...baseExtra, ...patch }, "all");
     return `/dashboard/customers${s ? `?${s}` : ""}`;
   };
   const filtered = Boolean(tag || q || area || stage || act || filterCount(filters) || filters.range !== "all");
@@ -168,29 +170,29 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
         <form role="search" aria-label="Find customers" className="grid gap-2 border-b border-line bg-subtle/40 p-3 sm:flex sm:flex-wrap">
           <div className="relative min-w-0 sm:min-w-56 sm:flex-1">
             <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
-            <input name="q" type="search" enterKeyHint="search" defaultValue={q} placeholder="Search by name or phone number" aria-label="Search by name or phone number" className="field pl-10" />
+            <input key={q} name="q" type="search" enterKeyHint="search" defaultValue={q} placeholder="Search by name or phone number" aria-label="Search by name or phone number" className="field pl-10" />
           </div>
           <div className={cn("grid gap-2 sm:contents", areaOptions.length > 1 && "grid-cols-2")}>
             <Picker
               name="tag"
               autoSubmit
-              title="Show customers"
-              aria-label="Filter by product"
+              title="Customer group / tag"
+              aria-label="Filter by group or tag"
               defaultValue={tag}
               className="sm:w-52"
               options={[
-                { value: "", label: "All customers" },
+                { value: "", label: "All groups & tags" },
                 { value: "__optout", label: "Opted out" },
                 ...tags.filter((t) => plain(t.tag) !== clientTag).map((t) => ({ value: t.tag, label: tagLabel(t.tag), hint: `${fmtNumber(Number(t.n))} customers` })),
               ]}
             />
-            {areaOptions.length > 1 && <Picker name="area" autoSubmit title="Area" aria-label="Filter by area" defaultValue={area} className="sm:w-48" options={areaOptions} />}
+            {areaOptions.length > 1 && <Picker name="area" autoSubmit title="Delivery area" aria-label="Filter by area" defaultValue={area} className="sm:w-48" options={areaOptions} />}
           </div>
           <div className="grid grid-cols-2 gap-2 sm:contents">
             <Picker name="stage" autoSubmit title="Customer stage" aria-label="Filter by stage" defaultValue={stage} className="sm:w-52" options={[...STAGES]} />
             <Picker name="act" autoSubmit title="Activity in the period" aria-label="Filter by activity" defaultValue={act} className="sm:w-52" options={[...ACTIVITY]} />
           </div>
-          {[...new URLSearchParams(filterQuery({ ...filters, tags: [], area: "" }, {}, "all"))].map(([k, v], i) => (
+          {[...new URLSearchParams(filterQuery(filters, {}, "all"))].map(([k, v], i) => (
             <input key={`${k}-${i}`} type="hidden" name={k} value={v} />
           ))}
           {filterOpts && (
@@ -198,9 +200,10 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
               value={filters}
               options={filterOpts}
               basePath="/dashboard/customers"
-              extra={{ q: q || undefined, tag: specialTag, stage: stage || undefined, act: act || undefined }}
+              extra={baseExtra}
               defaultRange="all"
-              sections={["period", "products", "customers", "tags", "area", "campaign"]}
+              sections={CUSTOMER_FILTERS}
+              note="Pick a date period (for customer activity) or filter by catalogue products bought."
               periodLabel={filters.range === "all" ? "Any date" : period.label}
             />
           )}
@@ -213,7 +216,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
         </form>
         {filterOpts && filterCount(filters) > 0 && (
           <div className="border-b border-line px-3 py-2.5">
-            <ActiveFilters value={filters} options={filterOpts} basePath="/dashboard/customers" extra={{ q: q || undefined, tag: specialTag, stage: stage || undefined, act: act || undefined }} defaultRange="all" />
+            <ActiveFilters value={filters} options={filterOpts} basePath="/dashboard/customers" extra={baseExtra} defaultRange="all" />
           </div>
         )}
         {act && filters.range === "all" && (

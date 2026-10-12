@@ -15,7 +15,7 @@ import { filterOptions, messageScope } from "@/lib/filter-scope";
 import { getScope, owned, ownedMessages } from "@/lib/session";
 
 
-const MESSAGE_FILTERS: FilterSection[] = ["period", "products", "customers", "tags", "area"];
+const MESSAGE_FILTERS: FilterSection[] = ["period"];
 export const metadata: Metadata = { title: "Message log" };
 export const dynamic = "force-dynamic";
 
@@ -33,8 +33,7 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
   const page = Math.max(1, Number(p.page) || 1);
   const groupByCustomer = p.view !== "all";
   const scope = await getScope();
-  // Shared filters: any period, products, single customers, groups, area. (Campaign stays its own picker.)
-  // The campaign has its own picker on this page (messages of that campaign), so the shared filter skips it.
+  // Period filter lives in FilterBar; status tabs, search, and campaign have dedicated controls on this page.
   const filters = keepFilters(readFilters(raw, "all"), MESSAGE_FILTERS);
   const href = (pp: Params, patch: Partial<Params>) => linkTo(filters, pp, patch);
   const period = resolvePeriod(filters);
@@ -170,7 +169,7 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
           ))}
           <div className="relative min-w-0 sm:min-w-56 sm:flex-1">
             <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
-            <input name="q" type="search" enterKeyHint="search" defaultValue={p.q} placeholder="Search name, phone or template" aria-label="Search name, phone or template" className="field pl-10" />
+            <input key={p.q ?? ""} name="q" type="search" enterKeyHint="search" defaultValue={p.q} placeholder="Search name, phone or template" aria-label="Search name, phone or template" className="field pl-10" />
           </div>
           <div className="grid grid-cols-2 gap-2 sm:contents">
             <Picker
@@ -189,6 +188,7 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
                 extra={{ q: p.q, status: p.status, campaign: p.campaign, view: p.view }}
                 defaultRange="all"
                 sections={MESSAGE_FILTERS}
+                note="Filter the WhatsApp message log by the date messages were sent."
                 periodLabel={filters.range === "all" ? "Any date" : period.label}
               />
             )}

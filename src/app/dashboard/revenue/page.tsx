@@ -11,12 +11,14 @@ import { formatValue } from "@/lib/chart-math";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { getScope } from "@/lib/session";
 import { ActiveFilters, FilterBar } from "@/components/filter-bar";
-import { readFilters, resolvePeriod } from "@/lib/filters";
+import { keepFilters, readFilters, resolvePeriod, type FilterSection } from "@/lib/filters";
 import { filterOptions, scopedCustomerIds } from "@/lib/filter-scope";
 import { requestPayment } from "../actions/orders";
 
 export const metadata: Metadata = { title: "Revenue & cash" };
 export const dynamic = "force-dynamic";
+
+const REVENUE_FILTERS: FilterSection[] = ["period", "products", "area"];
 
 // Paid by UPI = emerald, cash / COD = violet, other ways = blue, not received yet = neutral.
 const UPI = "emerald";
@@ -58,8 +60,8 @@ function CashList({ title, hint, items, icon, tone, action }: { title: string; h
 export default async function RevenuePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams;
   const scope = await getScope();
-  // Shared filters: any period (default 30 days), products, customers, groups, area, campaign.
-  const filters = readFilters(sp, "30d");
+  // Shared filters: period (default 30 days), catalogue products, and delivery area.
+  const filters = keepFilters(readFilters(sp, "30d"), REVENUE_FILTERS);
   const period = resolvePeriod(filters);
   const filterOpts = scope.clientId ? await filterOptions(scope.clientId) : null;
   const header = (
@@ -69,7 +71,15 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
       tabs={
         filterOpts ? (
           <div className="flex flex-col gap-2">
-            <FilterBar value={filters} options={filterOpts} basePath="/dashboard/revenue" defaultRange="30d" periodLabel={period.label} />
+            <FilterBar
+              value={filters}
+              options={filterOpts}
+              basePath="/dashboard/revenue"
+              defaultRange="30d"
+              sections={REVENUE_FILTERS}
+              note="Filter revenue, payment collections, and outstanding balances by date period, product, or delivery area."
+              periodLabel={period.label}
+            />
             <ActiveFilters value={filters} options={filterOpts} basePath="/dashboard/revenue" defaultRange="30d" />
           </div>
         ) : undefined

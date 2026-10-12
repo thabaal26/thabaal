@@ -1,7 +1,8 @@
 "use client";
 
 import { Check, ChevronDown, Search } from "@/components/icons";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { Sheet } from "./sheet";
 
@@ -43,12 +44,18 @@ export function Picker({
   trigger?: (selected: PickerOption | undefined) => ReactNode;
   "aria-label"?: string;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [inner, setInner] = useState(defaultValue);
+  const [prevDefault, setPrevDefault] = useState(defaultValue);
+  if (defaultValue !== prevDefault) {
+    setPrevDefault(defaultValue);
+    setInner(defaultValue);
+  }
   const current = value ?? inner;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const hidden = useRef<HTMLInputElement>(null);
-  const submitNext = useRef(false);
   const selected = options.find((o) => o.value === current);
 
   const shown = useMemo(() => {
@@ -56,21 +63,27 @@ export function Picker({
     return q ? options.filter((o) => `${o.label} ${o.hint ?? ""}`.toLowerCase().includes(q)) : options;
   }, [options, query]);
 
-  // Submit after React has written the new value into the hidden input.
-  useEffect(() => {
-    if (submitNext.current) {
-      submitNext.current = false;
-      hidden.current?.form?.requestSubmit();
-    }
-  }, [current]);
-
   function pick(v: string) {
     setOpen(false);
     setQuery("");
     if (v === current) return;
     if (value === undefined) setInner(v);
     onChange?.(v);
-    if (autoSubmit) submitNext.current = true;
+    if (autoSubmit) {
+      const form = hidden.current?.form;
+      if (form) {
+        const fd = new FormData(form);
+        if (name) fd.set(name, v);
+        const params = new URLSearchParams();
+        for (const [k, val] of fd.entries()) {
+          if (typeof val === "string" && val.trim() !== "") {
+            params.append(k, val.trim());
+          }
+        }
+        const qs = params.toString();
+        router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+      }
+    }
   }
 
   return (

@@ -61,23 +61,25 @@ export const VIEWS = {
 export type View = keyof typeof VIEWS;
 
 /**
- * The filters each section offers: only the ones that change its figures. Customers compares groups
- * of people and Products compares products, so picking single people is left to Overview and Carts
- * (and the customer's own page); carts aren't tied to a campaign.
+ * The filters each section offers: only the high-clarity filters that directly apply to that view.
+ * - Overview: Date period only (keeps executive metrics clean and unambiguous)
+ * - Customers: Date period + Delivery area
+ * - Products: Date period + Catalogue products
+ * - Carts: Date period + Catalogue products + Delivery area
  */
 export const VIEW_FILTERS: Record<View, FilterSection[]> = {
-  overview: ["period", "products", "customers", "tags", "area", "campaign"],
-  customers: ["period", "products", "tags", "area", "campaign"],
-  products: ["period", "products", "tags", "area", "campaign"],
-  carts: ["period", "products", "customers", "tags", "area"],
+  overview: ["period"],
+  customers: ["period", "area"],
+  products: ["period", "products"],
+  carts: ["period", "products", "area"],
 };
 
 /** What the filters change in each section, shown in the filter panel. */
 export const VIEW_FILTER_NOTE: Record<View, string> = {
-  overview: "Filters every figure and chart on Overview. Today always shows today, whatever the period; the sending limit and WhatsApp spend are for the whole business.",
-  customers: "The period applies to the customer journey; lifecycle, product groups and areas are as of today, and best time covers the last 90 days. Products, groups, area and campaign narrow every card to those customers.",
-  products: "The period applies to product performance and demand; campaigns by product covers the last 30 days. Picking products shows just those products.",
-  carts: "Cart revisions in the period, for the products, people, groups or area you pick.",
+  overview: "Pick a date period for your headline sales, replies, and WhatsApp activity. Today's action queue always shows live items.",
+  customers: "Filter customer journey and conversion analytics by date period and delivery area.",
+  products: "Filter product sales, cart demand, and SKU performance by date period and catalogue products.",
+  carts: "Filter cart revisions, dropped items, and checkout hesitation by date period, product, or delivery area.",
 };
 
 /* ───────────────────────── KPI tile ───────────────────────── */

@@ -87,7 +87,7 @@ export const withQuery = (path: string, qs: string) => (qs ? `${path}?${qs}` : p
 
 /** The parts of the filter a page or tab can offer. The period is always there. */
 export type FilterSection = "period" | "products" | "customers" | "tags" | "area" | "campaign";
-export const ALL_SECTIONS: FilterSection[] = ["period", "products", "customers", "tags", "area", "campaign"];
+export const ALL_SECTIONS: FilterSection[] = ["period", "products", "area"];
 
 /** Drops filters a page or tab doesn't use, so a filter carried over from elsewhere can't change figures silently. */
 export function keepFilters(f: FilterState, sections: FilterSection[]): FilterState {

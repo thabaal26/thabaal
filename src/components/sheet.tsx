@@ -61,21 +61,6 @@ export function Sheet({
       body.style.overflow = "hidden";
     }
 
-    // Phones: the back button closes the sheet instead of leaving the page.
-    // (Skipped when React re-runs this effect in development and the entry is already there.)
-    // When one sheet hands over to another (e.g. order actions → dispatch), the new sheet takes
-    // over the closing sheet's entry instead of stacking a second one, so one back press closes it.
-    const current = window.history.state?.__sheet;
-    if (current !== id) {
-      const entry = { ...window.history.state, __sheet: id };
-      if (current && !stack.includes(current)) window.history.replaceState(entry, "");
-      else window.history.pushState(entry, "");
-    }
-    const onPop = () => {
-      if (window.history.state?.__sheet !== id && stack.includes(id)) close();
-    };
-    window.addEventListener("popstate", onPop);
-
     const onKey = (e: KeyboardEvent) => {
       if (!isTop(id)) return;
       if (e.key === "Escape") {
@@ -106,13 +91,7 @@ export function Sheet({
     return () => {
       stack.splice(stack.indexOf(id), 1);
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener("popstate", onPop);
       if (stack.length === 0) body.style.overflow = body.dataset.prevOverflow ?? "";
-      // Closed by a button or Esc: drop the history entry this sheet added (not after a navigation,
-      // and not when React is only re-running the effect, which puts the id back on the stack).
-      setTimeout(() => {
-        if (!stack.includes(id) && window.history.state?.__sheet === id) window.history.back();
-      });
       if (opener && document.contains(opener)) opener.focus({ preventScroll: true });
     };
   }, [open, id, close]);

@@ -6,8 +6,6 @@ import { catalogFor, catalogOrders, customerProducts, customersWithProducts, ord
 
 // Server side of the shared filters: which customers a filter covers, and the choices to offer.
 
-const NOISE_TAGS = new Set(["customer", "customers", "test", "manual-order", "whatsapp", "qr", "sheet", "no-item-info", "imported", "new", "pending", "lead"]);
-
 /**
  * The customers these filters cover, or null when nothing narrows them (all customers).
  * Within a filter any match counts (product A or B); across filters all must hold (bought A and in Sellur).
@@ -53,30 +51,21 @@ export type FilterOptions = {
 
 /** The choices the filter panel offers for this client, most used first. */
 export const filterOptions = cache(async (clientId: string): Promise<FilterOptions> => {
-  const client = await db.client.findUnique({ where: { id: clientId }, select: { name: true } });
-  // Every customer carries the client's own tag (e.g. "thenan-oils"); it narrows nothing, so it isn't offered.
-  const plain = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, "");
-  const clientTag = client ? plain(client.name) : "";
-  const [products, customers, tags, regions, locations, campaigns] = await Promise.all([
+  const [products, regions, locations] = await Promise.all([
     productChoices(clientId),
-    db.customer.findMany({ where: { clientId }, select: { id: true, name: true, phone: true }, orderBy: { name: "asc" }, take: 3000 }),
-    db.$queryRaw<{ tag: string; n: bigint }[]>`
-      SELECT t.tag, count(*) AS n FROM "Customer" c CROSS JOIN LATERAL unnest(c.tags) AS t(tag)
-      WHERE c."clientId" = ${clientId} GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 200`,
     db.customer.groupBy({ by: ["region"], where: { clientId, region: { not: null } }, _count: true }),
     db.customer.groupBy({ by: ["location"], where: { clientId, location: { not: null } }, _count: true, orderBy: { _count: { location: "desc" } }, take: 60 }),
-    db.campaign.findMany({ where: { clientId }, select: { id: true, name: true }, orderBy: { updatedAt: "desc" }, take: 100 }),
   ]);
   return {
     products,
-    customers: customers.map((c) => ({ value: c.id, label: c.name, hint: c.phone })),
-    tags: tags.filter((t) => !NOISE_TAGS.has(t.tag.toLowerCase()) && plain(t.tag) !== clientTag).map((t) => ({ value: t.tag, label: t.tag.replace(/-/g, " "), hint: `${Number(t.n)} customers` })),
+    customers: [],
+    tags: [],
     areas: [
       ...regions.map((r) => ({ value: `region:${r.region}`, label: r.region!, hint: `${r._count} customers · region` })),
       ...locations.map((l) => ({ value: `loc:${l.location}`, label: l.location!, hint: `${l._count} customers` })),
       { value: "none", label: "No location noted" },
     ],
-    campaigns: campaigns.map((c) => ({ value: c.id, label: c.name })),
+    campaigns: [],
   };
 });
 

@@ -6,7 +6,7 @@ import { Rupee3D, ShoppingBag3D } from "@/components/icons-3d";
 import { Picker } from "@/components/picker";
 import { buttonClass, Callout, Card, DistributionBar, EmptyState, FilterChips, PageHeader, Section, Stat } from "@/components/ui";
 import { ActiveFilters, FilterBar } from "@/components/filter-bar";
-import { activeCount as filterCount, filterQuery, readFilters, resolvePeriod } from "@/lib/filters";
+import { activeCount as filterCount, filterQuery, keepFilters, readFilters, resolvePeriod, type FilterSection } from "@/lib/filters";
 import { filterOptions, orderScope } from "@/lib/filter-scope";
 import { parseAddressText } from "@/lib/address";
 import { getCatalogWithProducts } from "@/lib/catalog";
@@ -33,6 +33,7 @@ import { OrdersRefreshButton } from "./orders-refresh-button";
 
 /** The utility templates that let order updates go out after the customer's 24-hour window. */
 const ORDER_TEMPLATES = ["order_confirmation", "order_dispatched", "order_delivered", "order_cancelled"];
+const ORDER_FILTERS: FilterSection[] = ["period", "products", "area"];
 
 export const metadata: Metadata = { title: "Orders" };
 export const dynamic = "force-dynamic";
@@ -107,8 +108,8 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
   const scope = await getScope();
   const tab = TABS.find((t) => t.key === show) ?? TABS[0];
   const mine = owned(scope);
-  // Shared filters: any period (presets or custom dates), products, customers, groups, area, campaign.
-  const filters = readFilters(sp, "all");
+  // Shared filters: period (presets or custom dates), catalogue products, and delivery area.
+  const filters = keepFilters(readFilters(sp, "all"), ORDER_FILTERS);
   const period = resolvePeriod(filters);
   const dateWhere = filters.range !== "all" ? { createdAt: { gte: period.start, lt: period.end } } : getDateWhere(date);
   const extraWhere = await orderScope(scope.clientId, filters);
@@ -117,6 +118,15 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
   const cleanPhone = q.replace(/\D/g, "");
   const orderNumMatch = q.match(/(?:rg-?)?(\d+)/i);
   const orderNum = orderNumMatch ? parseInt(orderNumMatch[1], 10) : null;
+  const itemSearchIds =
+    q && scope.clientId
+      ? (
+          await db.$queryRaw<{ id: string }[]>`
+            SELECT id FROM "Order"
+            WHERE "clientId" = ${scope.clientId} AND items::text ILIKE ${`%${q}%`}
+          `
+        ).map((r) => r.id)
+      : [];
   const searchWhere = q
     ? {
         OR: [
@@ -127,6 +137,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
           { note: { contains: q, mode: "insensitive" as const } },
           ...(cleanPhone.length >= 3 ? [{ customer: { phone: { contains: cleanPhone } } }] : []),
           ...(orderNum && !isNaN(orderNum) ? [{ number: orderNum }] : []),
+          ...(itemSearchIds.length > 0 ? [{ id: { in: itemSearchIds } }] : []),
         ],
       }
     : {};
@@ -387,6 +398,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
             <div className="relative min-w-0 sm:min-w-56 sm:flex-1">
               <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
               <input
+                key={q}
                 name="q"
                 type="search"
                 enterKeyHint="search"
@@ -404,6 +416,8 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
                   basePath="/dashboard/orders"
                   extra={{ show: tab.key || undefined, q: q || undefined, sort: sort !== "new" ? sort : undefined }}
                   defaultRange="all"
+                  sections={ORDER_FILTERS}
+                  note="Filter orders by date period, catalogue product, or delivery area."
                   periodLabel={filters.range === "all" ? "Any date" : period.label}
                 />
               )}

@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { fmtDate } from "@/lib/format";
 import { messageWhere } from "@/lib/queries";
 import { messageScope } from "@/lib/filter-scope";
-import { readFilters, resolvePeriod } from "@/lib/filters";
+import { keepFilters, readFilters, resolvePeriod } from "@/lib/filters";
 import { getScope, ownedMessages, readSessionUserId, SESSION_COOKIE } from "@/lib/session";
 
 export async function GET(req: NextRequest) {
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
   const params: Record<string, string | string[]> = {};
   for (const [k, v] of req.nextUrl.searchParams) params[k] = k in params ? [...[params[k]].flat(), v] : v;
-  const filters = readFilters(params, "all");
+  const filters = keepFilters(readFilters(params, "all"), ["period"]);
   const scoped = await messageScope(scope.clientId, filters, resolvePeriod(filters));
   const first = Object.fromEntries(req.nextUrl.searchParams);
   const rows = await db.message.findMany({
