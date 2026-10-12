@@ -54,7 +54,7 @@
   transition: background 1s var(--ease);
   justify-content: center;
   align-items: center;
-  gap: clamp(20px, 4vh, 36px);
+  gap: clamp(28px, 4.5vh, 42px);
   position: relative;
   z-index: 10;
   contain: layout style;
@@ -141,7 +141,7 @@
 .thabaal-form .sub {
   font-size: 13.5px;
   color: var(--muted);
-  margin-top: 8px;
+  margin-top: 10px;
   text-align: center;
   transition: color 1s var(--ease);
 }
@@ -193,7 +193,7 @@
 }
 
 .thabaal-field:first-of-type {
-  margin-top: 24px;
+  margin-top: 32px;
 }
 
 .thabaal-field svg.ic {
@@ -921,13 +921,14 @@
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
   }
   .thabaal-left {
-    padding: clamp(16px, 3vh, 28px) 20px clamp(72px, 10vh, 92px);
-    gap: clamp(18px, 2.8vh, 26px);
+    padding: clamp(24px, 4vh, 42px) 20px clamp(60px, 8vh, 80px);
+    gap: clamp(22px, 3.5vh, 32px);
     justify-content: center;
     align-items: center;
   }
   .thabaal-brand {
     gap: 6px;
+    margin-top: clamp(14px, 2.8vh, 28px);
   }
   .thabaal-brand .words {
     width: clamp(210px, 58vw, 260px);
@@ -942,50 +943,56 @@
   }
   .thabaal-form .sub {
     font-size: 13px;
-    margin-top: 6px;
+    margin-top: 10px;
     margin-bottom: 0;
   }
   .thabaal-field {
     margin-top: 14px;
   }
   .thabaal-field:first-of-type {
-    margin-top: 20px;
+    margin-top: 28px;
   }
   .thabaal-field input {
     height: 46px;
     font-size: 14.5px;
   }
   .thabaal-row {
-    margin-top: 10px;
+    margin-top: 12px;
   }
   .thabaal-login-btn {
     height: 46px;
-    margin-top: 20px;
+    margin-top: 22px;
     font-size: 15px;
   }
   .thabaal-signup {
-    margin-top: 15px;
+    margin-top: 16px;
     font-size: 13px;
   }
 }
 
 @media (max-width: 900px) and (max-height: 680px) {
   .thabaal-right {
-    height: clamp(115px, 16vh, 135px);
+    height: clamp(110px, 15vh, 125px);
   }
   .thabaal-left {
     padding-top: 12px;
-    padding-bottom: 70px;
-    gap: 14px;
+    padding-bottom: 65px;
+    gap: 16px;
+  }
+  .thabaal-brand {
+    margin-top: 6px;
+  }
+  .thabaal-form .sub {
+    margin-top: 8px;
   }
   .thabaal-field:first-of-type {
-    margin-top: 14px;
+    margin-top: 20px;
   }
   .thabaal-field {
     margin-top: 10px;
   }
   .thabaal-login-btn {
-    margin-top: 15px;
+    margin-top: 16px;
   }
   .thabaal-signup {
     margin-top: 10px;
