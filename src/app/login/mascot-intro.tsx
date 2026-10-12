@@ -55,7 +55,7 @@ const BOUNCY: Record<Lang, number> = { en: 3, ta: 1 };
 
 const ART_RATIO = 354 / 640;
 const BELLY = { x: 0.74, y: 0.8 }; // where it stands, as a fraction of the 640 × 354 art
-const SEEN_KEY = "thabaal-intro-v3";
+const SEEN_KEY = "thabaal-intro-v4";
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
@@ -281,31 +281,245 @@ export function MascotIntro({ lang }: { lang: Lang }) {
     const squish = (sx: number, sy: number, ms = 240, extra = "") =>
       anim(face, [{ transform: `scale(${facing}, 1)${extra}` }, { transform: `scale(${facing * sx}, ${sy})${extra}`, offset: 0.35 }, { transform: `scale(${facing}, 1)${extra}` }], { duration: ms, easing: "ease-out" });
 
-    /* One hop with anticipation, wings tucked in the air, and a squashy landing. */
-    const hop = async (to: P, peak: number, ms: number, spin = 0) => {
-      const from = pos;
-      squish(1.1, 0.86, 130);
-      wingTo(-12, 90);
-      await wait(95);
+    /* ── Realistic Physics In-Place Jump On A Letter ──
+     * Authentic physical jump mechanics:
+     * 1. Anticipation: deep crouch (coiling spring), letter pre-compresses, wings tuck.
+     * 2. Takeoff thrust: vertical stretch along line of action, wings snap upward.
+     * 3. Gravity ballistic parabola: true parabolic deceleration to apex hang-time, acceleration down.
+     * 4. Landing impact: instantaneous ground reaction compression (squash) + letter spring oscillation.
+     * 5. Elastic recoil: body rebounds back to neutral.
+     */
+    const hopOnLetter = async (
+      letterIdx: number,
+      peak: number,
+      ms: number,
+      opts: {
+        faceName?: Face;
+        endFace?: Face;
+        spin?: number;
+        tilt?: number;
+        crazyShake?: boolean;
+        letterSquash?: number;
+      } = {}
+    ) => {
       alive();
-      wingTo(16, 140);
+      const {
+        faceName = "open",
+        endFace = "open",
+        spin = 0,
+        tilt = 0,
+        crazyShake = false,
+        letterSquash = 0.08,
+      } = opts;
+
+      // 1. Anticipation: Snappy physical crouch
+      const crouchMs = Math.max(50, Math.round(ms * 0.24));
+      squash(letterIdx, 0.03);
+      wingTo(-16, crouchMs);
+      await done(
+        anim(
+          face,
+          [
+            { transform: `scale(${facing}, 1)` },
+            { transform: `scale(${facing * 1.20}, 0.76)` },
+          ],
+          { duration: crouchMs, easing: "ease-out" }
+        )
+      );
+      alive();
+
+      // Set expression for the jump
+      setFace(faceName);
+
+      // 2. Flight: True Newtonian ballistic parabola with synchronized squash & stretch
+      const flightMs = Math.max(140, Math.round(ms * 0.76));
+      wingTo(24, Math.round(flightMs * 0.3));
       const N = 26;
       const moves: Keyframe[] = [];
+      const stretches: Keyframe[] = [];
+      const tilts: Keyframe[] = [];
+
       for (let i = 0; i <= N; i++) {
         const t = i / N;
-        const x = from.x + (to.x - from.x) * easeInOutSine(t);
+        // Parabolic vertical arc: v_y starts fast upward, slows at apex (t=0.5), accelerates downward
+        const arc = 4 * peak * t * (1 - t);
+        moves.push({
+          offset: t,
+          transform: at({ x: pos.x, y: pos.y - arc }),
+        });
+
+        // Physical squash & stretch timeline:
+        // Launch: vertical stretch -> Apex: weightless neutral -> Fall: stretch -> Touchdown: deep squash
+        let sx = 1;
+        let sy = 1;
+        if (t < 0.22) {
+          // Launch thrust: elastic release stretches body upward
+          const k = t / 0.22;
+          sx = 1.20 + (0.86 - 1.20) * k;
+          sy = 0.76 + (1.22 - 0.76) * k;
+        } else if (t < 0.58) {
+          // Apex: vertical speed reaches zero, relaxed weightlessness
+          const k = (t - 0.22) / 0.36;
+          sx = 0.86 + (1.0 - 0.86) * k;
+          sy = 1.22 + (1.0 - 1.22) * k;
+        } else if (t < 0.86) {
+          // Downward gravity acceleration: slight elongation in fall
+          const k = (t - 0.58) / 0.28;
+          sx = 1.0 + (0.92 - 1.0) * k;
+          sy = 1.0 + (1.10 - 1.0) * k;
+        } else {
+          // Touchdown compression impact
+          const k = (t - 0.86) / 0.14;
+          sx = 0.92 + (1.28 - 0.92) * k;
+          sy = 1.10 + (0.70 - 1.10) * k;
+        }
+        stretches.push({
+          offset: t,
+          transform: `scale(${facing * sx}, ${sy})`,
+        });
+
+        // Mid-air pitch, comical wobble, or 360° spin
+        let rot = 0;
+        if (spin) {
+          rot = -360 * spin * t;
+        } else if (crazyShake) {
+          rot = Math.sin(t * Math.PI * 4) * (tilt || 12);
+        } else if (tilt) {
+          rot = Math.sin(t * Math.PI) * tilt;
+        }
+        tilts.push({
+          offset: t,
+          transform: `rotate(${rot.toFixed(1)}deg)`,
+        });
+      }
+
+      const aPos = anim(mascot, moves, { duration: flightMs, easing: "linear" });
+      const aFace = anim(face, stretches, { duration: flightMs, easing: "linear" });
+      const aPose = anim(pose, tilts, { duration: flightMs, easing: "linear" });
+
+      await done(aPos, aFace, aPose);
+      alive();
+
+      // 3. Ground reaction impact: letter compresses deeply under foot impact
+      squash(letterIdx, letterSquash);
+      wingTo(16, 100);
+
+      // 4. Elastic rebound: body springs back from squash impact to neutral
+      const recoilMs = 110;
+      await done(
+        anim(
+          face,
+          [
+            { transform: `scale(${facing * 1.28}, 0.70)` },
+            { transform: `scale(${facing * 0.96}, 1.06)`, offset: 0.5 },
+            { transform: `scale(${facing}, 1)` },
+          ],
+          { duration: recoilMs, easing: "ease-out" }
+        ),
+        anim(pose, [{ transform: "rotate(0deg)" }], { duration: recoilMs })
+      );
+      alive();
+
+      setFace(endFace);
+    };
+
+    /* ── Ballistic Leap Between Letters ──
+     * Physics of a forward jump:
+     * - Horizontal velocity vx is constant (inertia / momentum).
+     * - Vertical motion vy is parabolic gravity arc.
+     * - Body leans forward into the trajectory on takeoff, levels at apex, tilts on descent.
+     * - Synchronized takeoff stretch and touchdown landing squash on target letter.
+     */
+    const leapToLetter = async (fromIdx: number, toIdx: number, l: Lang) => {
+      alive();
+      const from = pos;
+      const to = letterPoint(toIdx, l);
+      const dist = Math.abs(to.x - from.x);
+      const dir = Math.sign(to.x - from.x) || facing;
+      const peak = clamp(dist * 0.50 + 16, 24, 62) + Math.max(0, from.y - to.y) * 0.4;
+      const ms = clamp(240 + dist * 1.1, 260, 390);
+
+      // Anticipation crouch on launch pad letter
+      squash(fromIdx, 0.03);
+      wingTo(-16, 80);
+      await done(
+        anim(
+          face,
+          [
+            { transform: `scale(${facing}, 1)` },
+            { transform: `scale(${facing * 1.18}, 0.78)` },
+          ],
+          { duration: 80, easing: "ease-out" }
+        )
+      );
+      alive();
+
+      wingTo(22, 120);
+      setFace("joy");
+
+      const N = 26;
+      const moves: Keyframe[] = [];
+      const stretches: Keyframe[] = [];
+      const tilts: Keyframe[] = [];
+
+      for (let i = 0; i <= N; i++) {
+        const t = i / N;
+        // Constant horizontal velocity: x(t) = from.x + (to.x - from.x) * t
+        const x = from.x + (to.x - from.x) * t;
+        // Parabolic vertical trajectory: y(t) = baseline - 4 * peak * t * (1 - t)
         const y = from.y + (to.y - from.y) * t - 4 * peak * t * (1 - t);
         moves.push({ offset: t, transform: at({ x, y }) });
+
+        // Squash & stretch in flight
+        let sx = 1;
+        let sy = 1;
+        if (t < 0.22) {
+          sx = 0.86; sy = 1.20;
+        } else if (t < 0.65) {
+          sx = 1.0; sy = 1.0;
+        } else if (t < 0.88) {
+          sx = 0.94; sy = 1.08;
+        } else {
+          sx = 1.24; sy = 0.74;
+        }
+        stretches.push({ offset: t, transform: `scale(${facing * sx}, ${sy})` });
+
+        // Line-of-action body tilt: leans into direction of travel
+        const lean = (Math.sin(t * Math.PI) * 14 - (t > 0.6 ? 7 : 0)) * dir;
+        tilts.push({ offset: t, transform: `rotate(${lean.toFixed(1)}deg)` });
       }
-      const dir = Math.sign(to.x - from.x) || facing;
-      const a1 = anim(mascot, moves, { duration: ms });
-      const a2 = spin
-        ? anim(pose, [{ transform: "rotate(0deg)" }, { transform: `rotate(${-360 * spin}deg)` }], { duration: ms, easing: "cubic-bezier(.4,0,.3,1)" })
-        : anim(pose, [{ transform: `rotate(${-9 * dir}deg)` }, { transform: `rotate(${7 * dir}deg)`, offset: 0.75 }, { transform: "rotate(0deg)" }], { duration: ms, easing: "ease-in-out" });
+
       pos = to;
-      await done(a1, a2);
+      const aPos = anim(mascot, moves, { duration: ms, easing: "linear" });
+      const aFace = anim(face, stretches, { duration: ms, easing: "linear" });
+      const aPose = anim(pose, tilts, { duration: ms, easing: "linear" });
+
+      await done(aPos, aFace, aPose);
       alive();
-      squish(1.12, 0.82, 240);
+
+      // Touchdown impact on landing letter
+      squash(toIdx, 0.08);
+      wingTo(16, 100);
+      await done(
+        anim(
+          face,
+          [
+            { transform: `scale(${facing * 1.24}, 0.74)` },
+            { transform: `scale(${facing * 0.97}, 1.04)`, offset: 0.5 },
+            { transform: `scale(${facing}, 1)` },
+          ],
+          { duration: 100, easing: "ease-out" }
+        ),
+        anim(pose, [{ transform: "rotate(0deg)" }], { duration: 100 })
+      );
+      alive();
+      setFace("open");
+    };
+
+    /* Backward compatibility helper for idle tricks */
+    const hop = async (to: P, peak: number, ms: number, spin = 0) => {
+      pos = to;
+      await hopOnLetter(perchIndex(langRef.current), peak, ms, { spin });
     };
 
     const turn = async (to: 1 | -1) => {
@@ -493,6 +707,157 @@ export function MascotIntro({ lang }: { lang: Lang }) {
       settle();
     };
 
+    /* ── Double Jumps On Every Letter: Hop 1 Realistic Physics + Hop 2 Crazy & Funny ── */
+    const playLetterHops = async (i: number, l: Lang) => {
+      alive();
+      const isBouncy = i === BOUNCY[l];
+      const isPerch = i === perchIndex(l);
+
+      if (isBouncy) {
+        // Tall trampoline letter (letter 'b' in English):
+        // Hop 1: High springy trampoline bounce
+        await hopOnLetter(i, h() * 0.85, 290, {
+          faceName: "joy",
+          letterSquash: 0.13,
+        });
+        alive();
+        await wait(40);
+        alive();
+
+        // Hop 2: CRAZY super-high 360° backflip with spinning dizzy eyes!
+        await hopOnLetter(i, h() * 1.40, 500, {
+          faceName: "joy",
+          spin: 1,
+          letterSquash: 0.16,
+        });
+        alive();
+
+        // Comical dizzy reaction
+        setFace("dizzy");
+        await wait(180);
+        alive();
+        // Shake off the dizziness
+        await done(
+          anim(
+            pose,
+            [
+              { transform: "rotate(0deg)" },
+              { transform: "rotate(-8deg)", offset: 0.25 },
+              { transform: "rotate(8deg)", offset: 0.75 },
+              { transform: "rotate(0deg)" },
+            ],
+            { duration: 200, easing: "ease-in-out" }
+          )
+        );
+        alive();
+        setFace("open");
+        return;
+      }
+
+      // Personality styles for Hop 2 on each letter:
+      type LetterHopStyle = {
+        h1Peak: number;
+        h1Ms: number;
+        h2Peak: number;
+        h2Ms: number;
+        h2Face: Face;
+        h2Tilt?: number;
+        crazyShake?: boolean;
+        lookDy?: number;
+      };
+
+      const STYLES: Record<number, LetterHopStyle> = {
+        0: { // Letter 't' (en) / 'த' (ta): cheeky wink with tongue out!
+          h1Peak: h() * 0.44,
+          h1Ms: 220,
+          h2Peak: h() * 0.72,
+          h2Ms: 260,
+          h2Face: "wink",
+          h2Tilt: 14,
+          crazyShake: true,
+        },
+        1: { // Letter 'h': bug-eyed shock 'o' looking down!
+          h1Peak: h() * 0.42,
+          h1Ms: 210,
+          h2Peak: h() * 0.74,
+          h2Ms: 270,
+          h2Face: "o",
+          h2Tilt: -12,
+          lookDy: 6,
+        },
+        2: { // Letter 'a': joyous laughing wiggle!
+          h1Peak: h() * 0.42,
+          h1Ms: 210,
+          h2Peak: h() * 0.68,
+          h2Ms: 250,
+          h2Face: "joy",
+          h2Tilt: 12,
+          crazyShake: true,
+        },
+        4: { // Letter 'a' (after 'b'): cheeky wink bounce!
+          h1Peak: h() * 0.42,
+          h1Ms: 210,
+          h2Peak: h() * 0.70,
+          h2Ms: 260,
+          h2Face: "wink",
+          h2Tilt: -12,
+          crazyShake: true,
+        },
+        5: { // Letter 'a' (before 'l'): bug-eyed 'o' spring!
+          h1Peak: h() * 0.42,
+          h1Ms: 210,
+          h2Peak: h() * 0.72,
+          h2Ms: 260,
+          h2Face: "o",
+          h2Tilt: 10,
+          lookDy: 6,
+        },
+        6: { // Letter 'l' (en perch): celebratory victory bounce!
+          h1Peak: h() * 0.46,
+          h1Ms: 230,
+          h2Peak: h() * 0.86,
+          h2Ms: 310,
+          h2Face: "joy",
+          h2Tilt: 8,
+          crazyShake: true,
+        },
+      };
+
+      const style = STYLES[i] ?? {
+        h1Peak: h() * 0.42,
+        h1Ms: 210,
+        h2Peak: h() * 0.70,
+        h2Ms: 250,
+        h2Face: "joy",
+        h2Tilt: 10,
+      };
+
+      // Hop 1: Realistic physical spring jump on the letter
+      await hopOnLetter(i, style.h1Peak, style.h1Ms, {
+        faceName: "open",
+        endFace: "open",
+        letterSquash: 0.06,
+      });
+      alive();
+
+      await wait(35);
+      alive();
+
+      if (style.lookDy) lookTo(0, style.lookDy, 130);
+
+      // Hop 2: Crazy and funny in-place bounce!
+      await hopOnLetter(i, style.h2Peak, style.h2Ms, {
+        faceName: style.h2Face,
+        endFace: isPerch ? "joy" : "open",
+        tilt: style.h2Tilt,
+        crazyShake: style.crazyShake,
+        letterSquash: isPerch ? 0.11 : 0.08,
+      });
+      alive();
+
+      if (style.lookDy) lookTo(0, 0, 130);
+    };
+
     /* ── The sequence: comes out from left screen; sits on first letter for Tamil, L for English ── */
     const play = async () => {
       const l = langRef.current;
@@ -518,54 +883,30 @@ export function MascotIntro({ lang }: { lang: Lang }) {
       splitLetters(l);
       squash(0, 0.08);
       squish(1.14, 0.82, 220);
-      await wait(140);
+      await wait(120);
       alive();
 
       if (targetIdx === 0) {
-        // Tamil: sits proudly on the first letter (த) with a happy bounce!
-        setFace("joy");
-        squash(0, 0.12);
-        await hop(first, h() * 0.85, 380);
-        alive();
-        squash(0, 0.09);
-        await wait(120);
+        // Tamil: executes double jumps on first letter (த), then perches proudly!
+        await playLetterHops(0, l);
         alive();
       } else {
-        // English: Jumps from letter to letter; trampoline bounce on tall letter (b); sits on L
+        // English: jumps on letter 0 twice, then leaps letter to letter with double jumps on each!
+        await playLetterHops(0, l);
+        alive();
+
         for (let i = 1; i < letters.length; i++) {
           alive();
-          const isLast = i === letters.length - 1;
-          const to = letterPoint(i, l);
-          const dist = Math.abs(to.x - pos.x);
-          squash(i - 1, 0.03);
-          setFace(i % 2 ? "joy" : "open");
-          await hop(
-            to,
-            clamp(dist * 0.55 + 16, 24, 64) + Math.max(0, pos.y - to.y) * 0.4,
-            clamp(260 + dist * 1.5, 300, 460)
-          );
+          await leapToLetter(i - 1, i, l);
           alive();
-          squash(i, isLast ? 0.09 : 0.06);
-          setFace("open");
-          if (i === BOUNCY[l]) {
-            // Boing, boing, with a spin on the tall letter!
-            await wait(60);
-            alive();
-            setFace("joy");
-            squash(i, 0.12);
-            await hop(to, h() * 0.9, 400);
-            alive();
-            squash(i, 0.12);
-            await hop(to, h() * 1.3, 540, 1);
-            alive();
-            squash(i, 0.08);
-            setFace("open");
-          }
-          await wait(isLast ? 200 : 90);
+          await playLetterHops(i, l);
+          alive();
+          await wait(40);
+          alive();
         }
       }
 
-      // Sits on target letter
+      // Sits proudly on target letter with a giggle
       alive();
       joinLetters();
       setFace("joy");
