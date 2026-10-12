@@ -1,0 +1,140 @@
+// The portal's icon set. Every screen imports icons from here, never from an icon package
+// directly, so the look, the default stroke and accessibility stay the same everywhere.
+//
+// Two packs ship side by side and each client's portal shows the one picked for it on the
+// admin Clients page (lib/icon-pack.ts): Hugeicons (default, free MIT set) and Lucide
+// (ISC). Each icon draws both; CSS hides the pack that isn't chosen.
+//
+// One file per icon, and this folder's package.json says the files have no side effects, so a
+// page's JavaScript carries only the icons it imports (one module held all 125 before: ~44 KB
+// compressed on every page).
+// To add an icon: pick it at https://hugeicons.com/icons (free set) and https://lucide.dev,
+// add a file like the others and export it below under one short name.
+
+export type { IconComponent, IconProps } from "./make";
+export { AlertCircle } from "./alert-circle";
+export { AlertTriangle } from "./alert-triangle";
+export { ArrowDownRight } from "./arrow-down-right";
+export { ArrowLeft } from "./arrow-left";
+export { ArrowRight } from "./arrow-right";
+export { ArrowUpRight } from "./arrow-up-right";
+export { Ban } from "./ban";
+export { Banknote } from "./banknote";
+export { Bell } from "./bell";
+export { BellRing } from "./bell-ring";
+export { Bold } from "./bold";
+export { BookOpen } from "./book-open";
+export { Braces } from "./braces";
+export { Building2 } from "./building2";
+export { Calendar } from "./calendar";
+export { CalendarClock } from "./calendar-clock";
+export { CalendarDays } from "./calendar-days";
+export { CalendarRange } from "./calendar-range";
+export { Check } from "./check";
+export { CheckCheck } from "./check-check";
+export { CheckCircle2 } from "./check-circle2";
+export { ChevronDown } from "./chevron-down";
+export { ChevronLeft } from "./chevron-left";
+export { ChevronRight } from "./chevron-right";
+export { ChevronUp } from "./chevron-up";
+export { Circle } from "./circle";
+export { CircleAlert } from "./circle-alert";
+export { CircleCheck } from "./circle-check";
+export { Clock } from "./clock";
+export { Cloud } from "./cloud";
+export { CloudOff } from "./cloud-off";
+export { Copy } from "./copy";
+export { CreditCard } from "./credit-card";
+export { Download } from "./download";
+export { ExternalLink } from "./external-link";
+export { Eye } from "./eye";
+export { EyeOff } from "./eye-off";
+export { FileSpreadsheet } from "./file-spreadsheet";
+export { FileText } from "./file-text";
+export { FileUp } from "./file-up";
+export { FlaskConical } from "./flask-conical";
+export { Gauge } from "./gauge";
+export { Globe } from "./globe";
+export { HelpCircle } from "./help-circle";
+export { History } from "./history";
+export { Hourglass } from "./hourglass";
+export { Image } from "./image";
+export { ImageOff } from "./image-off";
+export { ImagePlus } from "./image-plus";
+export { Inbox } from "./inbox";
+export { Info } from "./info";
+export { Italic } from "./italic";
+export { KeyRound } from "./key-round";
+export { Landmark } from "./landmark";
+export { Lightbulb } from "./lightbulb";
+export { Link } from "./link";
+export { Loader2 } from "./loader2";
+export { LogOut } from "./log-out";
+export { MapPin } from "./map-pin";
+export { Megaphone } from "./megaphone";
+export { Menu } from "./menu";
+export { MessageCircle } from "./message-circle";
+export { MessageSquareQuote } from "./message-square-quote";
+export { MessageSquareText } from "./message-square-text";
+export { Mic } from "./mic";
+export { MicOff } from "./mic-off";
+export { Monitor } from "./monitor";
+export { Moon } from "./moon";
+export { MoreHorizontal } from "./more-horizontal";
+export { Package } from "./package";
+export { PackageCheck } from "./package-check";
+export { PackageOpen } from "./package-open";
+export { Pause } from "./pause";
+export { PauseCircle } from "./pause-circle";
+export { Pencil } from "./pencil";
+export { PencilLine } from "./pencil-line";
+export { Phone } from "./phone";
+export { PhoneCall } from "./phone-call";
+export { PhoneIncoming } from "./phone-incoming";
+export { PhoneMissed } from "./phone-missed";
+export { PhoneOff } from "./phone-off";
+export { PhoneOutgoing } from "./phone-outgoing";
+export { Play } from "./play";
+export { Plus } from "./plus";
+export { Printer } from "./printer";
+export { QrCode } from "./qr-code";
+export { Radio } from "./radio";
+export { ReceiptText } from "./receipt-text";
+export { RefreshCw } from "./refresh-cw";
+export { Repeat } from "./repeat";
+export { Reply } from "./reply";
+export { RotateCcw } from "./rotate-ccw";
+export { RotateCw } from "./rotate-cw";
+export { Search } from "./search";
+export { Send } from "./send";
+export { Sheet } from "./sheet";
+export { ShieldAlert } from "./shield-alert";
+export { ShieldCheck } from "./shield-check";
+export { ShoppingBag } from "./shopping-bag";
+export { ShoppingCart } from "./shopping-cart";
+export { SlidersHorizontal } from "./sliders-horizontal";
+export { Smartphone } from "./smartphone";
+export { Snail } from "./snail";
+export { Sparkles } from "./sparkles";
+export { SquarePen } from "./square-pen";
+export { Store } from "./store";
+export { Strikethrough } from "./strikethrough";
+export { Sun } from "./sun";
+export { Tags } from "./tags";
+export { Trash2 } from "./trash2";
+export { TriangleAlert } from "./triangle-alert";
+export { Truck } from "./truck";
+export { Undo2 } from "./undo2";
+export { Upload } from "./upload";
+export { User } from "./user";
+export { UserCheck } from "./user-check";
+export { UserPlus } from "./user-plus";
+export { UserRound } from "./user-round";
+export { UserX } from "./user-x";
+export { Users } from "./users";
+export { UsersRound } from "./users-round";
+export { Wallet } from "./wallet";
+export { X } from "./x";
+export { XCircle } from "./xcircle";
+export { Zap } from "./zap";
+export { Image as ImageIcon } from "./image";
