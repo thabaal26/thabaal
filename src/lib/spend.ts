@@ -13,20 +13,44 @@ import {
 /**
  * Meta's per-message rates for India, in rupees, before 18% GST:
  * https://developers.facebook.com/docs/whatsapp/pricing
- * Service replies (within 24 hours of the customer writing) are free.
+ *
+ * Official Meta India Pricing Rules (Oct 2026):
+ * - Marketing templates: ₹0.8631 per delivered message
+ * - Utility templates: ₹0.1150 per delivered message (volume tiers available; charged in & out of 24h window)
+ * - Authentication templates: ₹0.1150 per delivered message (volume tiers available)
+ * - Service messages (free-form 24h window replies): First 1,000 delivered service messages per month
+ *   per business phone number are FREE (₹0.00). Above 1,000/month/number, charged at ₹0.1150/msg.
+ * - Free Entry Point Window (Click-to-WhatsApp Ads & FB Page CTA): 72 hours free when replied within 24h.
+ * - Billing trigger: Charged ONLY when a message is delivered (DELIVERED or READ), never on SENT or FAILED.
  */
-export const RATES: Record<string, number> = { marketing: 0.8631, utility: 0.115, authentication: 0.115 };
+export const RATES: Record<string, number> = {
+  marketing: 0.8631,
+  utility: 0.115,
+  authentication: 0.115,
+  service: 0.115,
+};
 export const INDIA_GST_RATE = 0.18;
+export const FREE_SERVICE_QUOTA_PER_NUMBER = 1000;
 
 export const CATEGORY_LABEL: Record<string, string> = {
   marketing: "Marketing (campaigns, win-back)",
   utility: "Utility (order updates, payments)",
-  authentication: "Authentication",
-  service: "Service (replies within 24h)",
+  authentication: "Authentication (OTP)",
+  service: "Service (24h customer replies · 1,000 free/mo)",
 };
 
 export type SpendRow = { category: string; charged: number; free: number; cost: number };
 export type PhoneSpendRow = { phone: string; charged: number; free: number; cost: number };
+export type ServiceQuotaInfo = {
+  limitPerNumber: number;
+  phoneCount: number;
+  totalFreeLimit: number;
+  usedTotal: number;
+  freeUsed: number;
+  freeRemaining: number;
+  overQuotaCharged: number;
+  rateAfterQuota: number;
+};
 export type DailySpendPoint = {
   key: string;
   label: string;
@@ -34,6 +58,7 @@ export type DailySpendPoint = {
   marketingCost: number;
   utilityCost: number;
   authCost: number;
+  serviceCost: number;
   totalCost: number;
   chargedVolume: number;
   freeVolume: number;
@@ -47,22 +72,45 @@ function monthStarts(now = new Date()) {
   return { thisMonth: fromZonedTime(`${ym}-01T00:00:00`, APP_TZ), lastMonth: fromZonedTime(`${prev}-01T00:00:00`, APP_TZ) };
 }
 
-/** Charged and free messages per Meta pricing category from local DB (fallback when Meta API is unreachable). */
-async function spendBetweenLocal(clientId: string, from: Date, to?: Date): Promise<SpendRow[]> {
+/**
+ * Charged and free messages per Meta pricing category from local DB (fallback when Meta API is unreachable).
+ * Enforces Meta's delivery-only billing (excludes FAILED/QUEUED/SKIPPED) and the 1,000 free service messages/month quota per number.
+ */
+async function spendBetweenLocal(clientId: string, from: Date, to?: Date, phoneCount = 1): Promise<SpendRow[]> {
   const groups = await db.message.groupBy({
     by: ["pricingCategory", "billable"],
-    where: { customer: { clientId }, pricingCategory: { not: null }, createdAt: { gte: from, ...(to && { lt: to }) } },
+    where: {
+      customer: { clientId },
+      pricingCategory: { not: null },
+      status: { notIn: ["QUEUED", "FAILED", "SKIPPED"] },
+      createdAt: { gte: from, ...(to && { lt: to }) },
+    },
     _count: true,
   });
   const rows = new Map<string, SpendRow>();
   for (const g of groups) {
     const category = g.pricingCategory!;
     const row = rows.get(category) ?? { category, charged: 0, free: 0, cost: 0 };
-    if (g.billable) {
+    if (category === "service") {
+      // Service messages use the monthly 1,000 free allowance per phone number first
+      row.free += g._count;
+    } else if (g.billable) {
       row.charged += g._count;
       row.cost += g._count * (RATES[category] ?? 0);
-    } else row.free += g._count;
+    } else {
+      row.free += g._count;
+    }
     rows.set(category, row);
+  }
+  const srv = rows.get("service");
+  if (srv) {
+    const freeLimit = Math.max(1, phoneCount) * FREE_SERVICE_QUOTA_PER_NUMBER;
+    const totalSrv = srv.free + srv.charged;
+    const freeUsed = Math.min(totalSrv, freeLimit);
+    const overQuota = Math.max(0, totalSrv - freeLimit);
+    srv.free = freeUsed;
+    srv.charged = overQuota;
+    srv.cost = overQuota * RATES.service;
   }
   return [...rows.values()].sort((a, b) => b.cost - a.cost || b.charged - a.charged);
 }
@@ -122,6 +170,7 @@ function buildDailySeries(
       marketingCost: 0,
       utilityCost: 0,
       authCost: 0,
+      serviceCost: 0,
       totalCost: 0,
       chargedVolume: 0,
       freeVolume: 0,
@@ -139,6 +188,7 @@ function buildDailySeries(
         if (p.category === "marketing") entry.marketingCost = Math.round((entry.marketingCost + p.cost) * 100) / 100;
         else if (p.category === "utility") entry.utilityCost = Math.round((entry.utilityCost + p.cost) * 100) / 100;
         else if (p.category === "authentication") entry.authCost = Math.round((entry.authCost + p.cost) * 100) / 100;
+        else if (p.category === "service") entry.serviceCost = Math.round((entry.serviceCost + p.cost) * 100) / 100;
       } else {
         entry.freeVolume += p.volume;
       }
@@ -150,7 +200,7 @@ function buildDailySeries(
       const entry = map.get(key);
       if (!entry) continue;
       const rate = RATES[m.pricingCategory] ?? 0;
-      if (m.billable) {
+      if (m.billable && m.pricingCategory !== "service") {
         entry.chargedVolume += 1;
         entry.totalCost = Math.round((entry.totalCost + rate) * 100) / 100;
         if (m.pricingCategory === "marketing") entry.marketingCost = Math.round((entry.marketingCost + rate) * 100) / 100;
@@ -167,7 +217,7 @@ function buildDailySeries(
 
 export const total = (rows: SpendRow[]) => rows.reduce((sum, r) => sum + r.cost, 0);
 
-/** This month's and last month's spend synced live from Meta `pricing_analytics`, plus prepaid balance and top-ups. */
+/** This month's and last month's spend synced live from Meta `pricing_analytics`, plus prepaid balance, 1,000 free service quota, and top-ups. */
 export async function spendSummary(clientId: string) {
   const now = new Date();
   const { thisMonth, lastMonth } = monthStarts(now);
@@ -176,17 +226,22 @@ export async function spendSummary(clientId: string) {
   const nowSec = Math.floor(now.getTime() / 1000) + 86400;
   const fourteenDaysAgo = new Date(now.getTime() - 15 * 86400_000);
 
-  const [localCurrent, localPrevious, allTimeGroups, clientNumber, allTopUps, liveMeta, localRecentMsgs, monthOrders] = await Promise.all([
-    spendBetweenLocal(clientId, thisMonth),
-    spendBetweenLocal(clientId, lastMonth, thisMonth),
-    db.message.groupBy({
-      by: ["pricingCategory"],
-      where: { customer: { clientId }, billable: true, pricingCategory: { not: null } },
-      _count: true,
-    }),
-    db.whatsAppNumber.findFirst({
+  const clientNumbers = await db.whatsAppNumber
+    .findMany({
       where: { clientId },
       orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+    })
+    .catch(() => []);
+  const clientNumber = clientNumbers[0] ?? null;
+  const phoneCount = Math.max(1, clientNumbers.length);
+
+  const [localCurrent, localPrevious, allTimeGroups, allTopUps, liveMeta, localRecentMsgs, monthOrders, localServiceRepliesCount] = await Promise.all([
+    spendBetweenLocal(clientId, thisMonth, undefined, phoneCount),
+    spendBetweenLocal(clientId, lastMonth, thisMonth, phoneCount),
+    db.message.groupBy({
+      by: ["pricingCategory"],
+      where: { customer: { clientId }, billable: true, status: { notIn: ["QUEUED", "FAILED", "SKIPPED"] }, pricingCategory: { not: null } },
+      _count: true,
     }),
     db.topUp
       .findMany({
@@ -198,7 +253,7 @@ export async function spendSummary(clientId: string) {
     fetchMetaLivePricing(clientId, lastMonthSec, nowSec),
     db.message
       .findMany({
-        where: { customer: { clientId }, pricingCategory: { not: null }, createdAt: { gte: fourteenDaysAgo } },
+        where: { customer: { clientId }, pricingCategory: { not: null }, status: { notIn: ["QUEUED", "FAILED", "SKIPPED"] }, createdAt: { gte: fourteenDaysAgo } },
         select: { createdAt: true, pricingCategory: true, billable: true },
       })
       .catch(() => []),
@@ -212,6 +267,17 @@ export async function spendSummary(clientId: string) {
         select: { total: true },
       })
       .catch(() => []),
+    // Count all free-form 24h window replies ("Typed reply" / "Media reply" or pricingCategory="service") sent this month
+    db.message
+      .count({
+        where: {
+          customer: { clientId },
+          createdAt: { gte: thisMonth },
+          status: { notIn: ["QUEUED", "FAILED", "SKIPPED"] },
+          OR: [{ pricingCategory: "service" }, { templateId: null, templateName: { in: ["Typed reply", "Media reply", "AI auto-reply"] } }],
+        },
+      })
+      .catch(() => 0),
   ]);
 
   // Use Meta's live pricing_analytics when connected and non-empty; otherwise fall back to local DB.
@@ -221,6 +287,39 @@ export async function spendSummary(clientId: string) {
   const previous = useLiveMeta ? spendFromMetaPoints(liveMeta.points, lastMonthSec - 12 * 3600, thisMonthSec - 12 * 3600) : localPrevious;
   const byPhone = useLiveMeta ? spendByPhoneFromMetaPoints(liveMeta.points, thisMonthSec - 12 * 3600) : [];
   const daily = buildDailySeries(now, useLiveMeta, liveMeta.points, localRecentMsgs);
+
+  // Compute 1,000 Free Service Messages / Month Quota per phone number
+  const srvRow = current.find((r) => r.category === "service");
+  const metaServiceFree = srvRow?.free ?? 0;
+  const metaServiceCharged = srvRow?.charged ?? 0;
+  const totalServiceUsed = Math.max(metaServiceFree + metaServiceCharged, localServiceRepliesCount);
+  const totalFreeLimit = phoneCount * FREE_SERVICE_QUOTA_PER_NUMBER;
+  const freeUsed = Math.min(totalServiceUsed, totalFreeLimit);
+  const overQuotaCharged = metaServiceCharged > 0 ? metaServiceCharged : Math.max(0, totalServiceUsed - totalFreeLimit);
+  const freeRemaining = Math.max(0, totalFreeLimit - freeUsed);
+
+  // Ensure `service` row in `current` reflects local 24h service replies even if Meta's pricing_analytics only returned billable template points
+  if (!srvRow && totalServiceUsed > 0) {
+    current.push({
+      category: "service",
+      free: freeUsed,
+      charged: overQuotaCharged,
+      cost: overQuotaCharged * RATES.service,
+    });
+  } else if (srvRow && srvRow.free === 0 && freeUsed > 0) {
+    srvRow.free = freeUsed;
+  }
+
+  const serviceQuota: ServiceQuotaInfo = {
+    limitPerNumber: FREE_SERVICE_QUOTA_PER_NUMBER,
+    phoneCount,
+    totalFreeLimit,
+    usedTotal: totalServiceUsed,
+    freeUsed,
+    freeRemaining,
+    overQuotaCharged,
+    rateAfterQuota: RATES.service,
+  };
 
   const monthOrdersCount = monthOrders.length;
   const monthOrderRevenue = Math.round(monthOrders.reduce((s, o) => s + o.total, 0));
@@ -242,7 +341,7 @@ export async function spendSummary(clientId: string) {
   const spentSinceSync = hasExplicitSync
     ? useLiveMeta
       ? total(spendFromMetaPoints(liveMeta.points, Math.floor(syncDate.getTime() / 1000)))
-      : total(await spendBetweenLocal(clientId, syncDate))
+      : total(await spendBetweenLocal(clientId, syncDate, undefined, phoneCount))
     : 0;
 
   // Manual top-ups (excluding internal [META_SYNC] snapshots) added after the balance snapshot
@@ -259,6 +358,7 @@ export async function spendSummary(clientId: string) {
     previous,
     byPhone,
     daily,
+    serviceQuota,
     monthOrdersCount,
     monthOrderRevenue,
     liveSyncedFromMeta: useLiveMeta,

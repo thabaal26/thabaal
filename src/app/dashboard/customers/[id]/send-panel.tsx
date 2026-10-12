@@ -1,12 +1,13 @@
 "use client";
 
-import { ImagePlus, MessageSquareText, Send, X } from "@/components/icons";
+import { ImagePlus, MessageSquareText, Send, Sparkles, X } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { confirmAction } from "@/components/confirm";
 import { toastResult } from "@/components/toast";
 import { Button, Callout, Card, CardHeader, Field } from "@/components/ui";
 import { renderFor, type TemplateButton, type VarMap } from "@/lib/template";
+import { generateCustomerFollowUpAction } from "../../actions/ai";
 import { uploadProductImage } from "../../actions/catalog";
 import { replyToCustomer, sendToCustomer } from "../../actions/send";
 
@@ -53,9 +54,21 @@ export function SendPanel({
   const [text, setText] = useState("");
   const [mediaUrl, setMediaUrl] = useState("");
   const [showMediaInput, setShowMediaInput] = useState(false);
+  const [aiDrafting, startAiDraft] = useTransition();
   const [uploading, startUpload] = useTransition();
   const [sending, startSend] = useTransition();
   const [replying, startReply] = useTransition();
+
+  const draftWithAi = (goal: "winback" | "payment_followup" | "vip_new_arrival") => {
+    startAiDraft(async () => {
+      const res = await generateCustomerFollowUpAction(customer.id, goal);
+      if (res.ok && res.text) {
+        setText(res.text);
+      } else {
+        toastResult({ ok: false, message: res.message ?? "Could not generate AI follow-up." });
+      }
+    });
+  };
 
   const t = templates.find((x) => x.id === templateId);
   // Meta only sends a template from numbers in the account that approved it.
@@ -152,7 +165,36 @@ export function SendPanel({
           </div>
           {windowOpen ? (
             <>
-              <Field id="reply-text" label={`Reply to ${customer.name}`} help={`They wrote to you recently, so you can reply freely until ${windowEndsAt}.`}>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-deep">
+                  <Sparkles aria-hidden className="size-3.5" /> Free AI Draft:
+                </span>
+                <button
+                  type="button"
+                  disabled={aiDrafting}
+                  onClick={() => draftWithAi("winback")}
+                  className="rounded-full border border-line bg-subtle px-2.5 py-0.5 text-[11px] font-medium text-ink transition hover:border-brand hover:text-brand-deep disabled:opacity-50"
+                >
+                  ✨ Restock / Win-Back
+                </button>
+                <button
+                  type="button"
+                  disabled={aiDrafting}
+                  onClick={() => draftWithAi("payment_followup")}
+                  className="rounded-full border border-line bg-subtle px-2.5 py-0.5 text-[11px] font-medium text-ink transition hover:border-brand hover:text-brand-deep disabled:opacity-50"
+                >
+                  💳 Payment Reminder
+                </button>
+                <button
+                  type="button"
+                  disabled={aiDrafting}
+                  onClick={() => draftWithAi("vip_new_arrival")}
+                  className="rounded-full border border-line bg-subtle px-2.5 py-0.5 text-[11px] font-medium text-ink transition hover:border-brand hover:text-brand-deep disabled:opacity-50"
+                >
+                  🌟 VIP New Arrival
+                </button>
+              </div>
+              <Field id="reply-text" label={`Reply to ${customer.name}`} help={`They wrote to you recently, so you can reply freely until ${windowEndsAt} (1,000 free/mo per number).`}>
                 <textarea className="field min-h-28" maxLength={4000} placeholder={`Reply to ${customer.name}…`} value={text} onChange={(e) => setText(e.target.value)} />
               </Field>
               {(showMediaInput || mediaUrl) && (

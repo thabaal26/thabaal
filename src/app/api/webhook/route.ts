@@ -57,7 +57,7 @@ async function applyStatus(s: StatusUpdate) {
   if (s.pricing?.category) {
     await db.message.update({ where: { id: msg.id }, data: { pricingCategory: s.pricing.category.toLowerCase(), billable: s.pricing.billable ?? null } });
   } else if (!msg.pricingCategory && (s.status.toUpperCase() === "DELIVERED" || s.status.toUpperCase() === "READ")) {
-    const inferred = msg.template?.category?.toLowerCase() ?? (["Catalogue", "Price list", "Payment request", "Freeform reply", "Auto reply"].includes(msg.templateName) ? "service" : null);
+    const inferred = msg.template?.category?.toLowerCase() ?? (["Catalogue", "Price list", "Payment request", "Freeform reply", "Auto reply", "Typed reply", "Media reply"].includes(msg.templateName) ? "service" : null);
     if (inferred) {
       await db.message.update({ where: { id: msg.id }, data: { pricingCategory: inferred, billable: inferred !== "service" } });
     }
@@ -69,7 +69,7 @@ async function applyStatus(s: StatusUpdate) {
     const code = err?.code ?? null;
     await db.message.update({
       where: { id: msg.id },
-      data: { status: "FAILED", failedAt: at, errorCode: code, error: explainError(code, err?.error_data?.details || err?.message || err?.title || "Delivery failed") },
+      data: { status: "FAILED", failedAt: at, billable: false, errorCode: code, error: explainError(code, err?.error_data?.details || err?.message || err?.title || "Delivery failed") },
     });
     await applyFailure(msg.customerId, code);
     pushToGoogleSheet("CAMPAIGN_STATUS", {

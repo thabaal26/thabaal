@@ -7,7 +7,7 @@ import { Badge, buttonClass } from "@/components/ui";
 import { ColumnChart, DonutPanel, StackedRows, type Column, type Slice, type StackRow } from "@/components/viz";
 import { cn } from "@/lib/cn";
 import { fmtNumber } from "@/lib/format";
-import type { DailySpendPoint, SpendRow } from "@/lib/spend";
+import type { DailySpendPoint, ServiceQuotaInfo, SpendRow } from "@/lib/spend";
 
 const rupees = (n: number) => `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -30,6 +30,7 @@ export type SpendChartsProps = {
   current: SpendRow[];
   previous: SpendRow[];
   daily: DailySpendPoint[];
+  serviceQuota: ServiceQuotaInfo;
   rates: Record<string, number>;
   categoryLabels: Record<string, string>;
   monthOrdersCount: number;
@@ -52,6 +53,7 @@ export function SpendAnalyticsCharts({
   current,
   previous,
   daily,
+  serviceQuota,
   rates,
   categoryLabels,
   monthOrdersCount,
@@ -74,14 +76,19 @@ export function SpendAnalyticsCharts({
     const charged = row?.charged ?? 0;
     const free = row?.free ?? 0;
     const cost = Math.round((row?.cost ?? 0) * 100) / 100;
-    const keep = cost > 0 || charged > 0 || free > 0 || cat === "marketing" || cat === "utility";
+    const keep = cost > 0 || charged > 0 || free > 0 || cat === "marketing" || cat === "utility" || cat === "service";
     if (!keep) return [];
     const rate = rates[cat];
     const subParts: string[] = [];
-    if (charged > 0) subParts.push(`${fmtNumber(charged)} charged`);
-    if (free > 0) subParts.push(`${fmtNumber(free)} free (24h)`);
-    if (rate) subParts.push(`₹${rate}/msg`);
-    else if (cat === "service") subParts.push("₹0/msg");
+    if (cat === "service") {
+      subParts.push(`${fmtNumber(serviceQuota.freeUsed)}/${fmtNumber(serviceQuota.totalFreeLimit)} free`);
+      if (charged > 0) subParts.push(`${fmtNumber(charged)} overage @ ₹${rate}`);
+      else subParts.push("1,000/mo free");
+    } else {
+      if (charged > 0) subParts.push(`${fmtNumber(charged)} charged`);
+      if (free > 0) subParts.push(`${fmtNumber(free)} free (72h CTWA)`);
+      if (rate) subParts.push(`₹${rate}/msg`);
+    }
     return [
       {
         key: cat,
@@ -104,6 +111,7 @@ export function SpendAnalyticsCharts({
       { key: "marketing", label: "Marketing", value: d.marketingCost, color: "gold" },
       { key: "utility", label: "Utility", value: d.utilityCost, color: "blue" },
       ...(d.authCost > 0 ? [{ key: "auth", label: "Authentication", value: d.authCost, color: "violet" as const }] : []),
+      ...(d.serviceCost > 0 ? [{ key: "service", label: "Service (>1k quota)", value: d.serviceCost, color: "emerald" as const }] : []),
     ],
   }));
 
@@ -230,6 +238,36 @@ export function SpendAnalyticsCharts({
             label={`${monthLabel} spend by category: total ${rupees(totalMonthSpent)}`}
           />
         </div>
+
+        {/* Meta 1,000 Free Service Messages / Month Quota Tracker */}
+        <div className="rounded-control border border-emerald-500/25 bg-emerald-500/[0.06] p-2.5 sm:p-3">
+          <div className="flex flex-wrap items-center justify-between gap-1.5">
+            <span className="text-[11px] font-semibold text-ink sm:text-xs">
+              Free Service Quota (1,000/mo per number)
+            </span>
+            <Badge tone={serviceQuota.freeRemaining > 150 ? "green" : "amber"}>
+              {fmtNumber(serviceQuota.freeRemaining)} free left
+            </Badge>
+          </div>
+          <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-line/70">
+            <div
+              className="h-full rounded-full bg-emerald-500 transition-all"
+              style={{
+                width: `${Math.min(100, Math.round((serviceQuota.freeUsed / Math.max(1, serviceQuota.totalFreeLimit)) * 100))}%`,
+              }}
+            />
+          </div>
+          <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1 text-[10px] text-muted sm:text-[11px]">
+            <span className="tabular">
+              <b className="text-ink">{fmtNumber(serviceQuota.freeUsed)}</b> / {fmtNumber(serviceQuota.totalFreeLimit)} free 24h replies used ({serviceQuota.phoneCount} {serviceQuota.phoneCount === 1 ? "number" : "numbers"})
+            </span>
+            <span className="tabular">
+              {serviceQuota.overQuotaCharged > 0
+                ? `${fmtNumber(serviceQuota.overQuotaCharged)} overage (${rupees(serviceQuota.overQuotaCharged * serviceQuota.rateAfterQuota)})`
+                : `Then ₹${serviceQuota.rateAfterQuota}/msg`}
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Right Column: Interactive Apache ECharts Time-Series & Category Analysis */}
@@ -248,7 +286,7 @@ export function SpendAnalyticsCharts({
                 {tab === "spend"
                   ? "Marketing (₹0.8631) vs Utility (₹0.115) daily cost · tap any bar to inspect"
                   : tab === "volume"
-                    ? "Charged templates vs free service replies sent within 24 hours"
+                    ? "Charged templates vs free service replies (1,000/mo free per number)"
                     : "Category spend comparison across current and previous month"}
               </p>
             </div>
@@ -304,7 +342,7 @@ export function SpendAnalyticsCharts({
                 onColumnClick={(k) => setActiveDay((prev) => (prev === k ? null : k))}
                 legend={[
                   { label: "Charged messages", color: "gold" },
-                  { label: "Free 24h service window (₹0)", color: "emerald" },
+                  { label: "Free 24h service / 72h CTWA (₹0)", color: "emerald" },
                 ]}
                 label="Daily charged vs free WhatsApp messages over the last 14 days"
               />
@@ -354,7 +392,7 @@ export function SpendAnalyticsCharts({
               <p className="tabular mt-0.5 text-xs font-semibold text-ink sm:text-sm">
                 {totalMsgs > 0 ? rupees(effectiveCostPerMsg) : `₹${rates.marketing ?? 0.86}`}
               </p>
-              <p className="truncate text-[10px] text-muted">per msg ({fmtNumber(totalMsgs)} total)</p>
+              <p className="truncate text-[10px] text-muted">per msg ({fmtNumber(totalMsgs)} delivered)</p>
             </div>
 
             <div className="rounded-control border border-line bg-subtle/35 px-2.5 py-2">
@@ -372,15 +410,10 @@ export function SpendAnalyticsCharts({
 
           <div className="rounded-control border border-brand/25 bg-brand-soft/35 p-2.5 text-xs text-ink-2 sm:p-3">
             <p className="flex items-center gap-1.5 font-semibold text-brand-deep">
-              <Lightbulb aria-hidden className="size-3.5 shrink-0" /> Meta cost & conversion tip
+              <Lightbulb aria-hidden className="size-3.5 shrink-0" /> Meta India Oct 2026 billing rules &amp; cost saver
             </p>
             <p className="mt-0.5 text-[11px] leading-relaxed sm:text-xs">
-              {totalFree > 0 ? (
-                <>
-                  You sent <b>{fmtNumber(totalFree)} free service messages</b> inside the 24-hour customer reply window, saving ~<b>{rupees(savedByFreeWindow)}</b>.{" "}
-                </>
-              ) : null}
-              Utility templates (order &amp; payment updates) cost <b>₹{rates.utility}/msg</b> — <b>7.5× cheaper</b> than marketing broadcasts (<b>₹{rates.marketing}/msg</b>). Send catalogues &amp; payment links as soon as a customer replies so the 24-hour service window stays free!
+              Each number gets <b>1,000 FREE service replies/month</b> inside the 24h customer window (then <b>₹{rates.service ?? 0.115}/msg</b>). Utility templates cost <b>₹{rates.utility}/msg</b> (7.5× cheaper than Marketing at <b>₹{rates.marketing}/msg</b>). Click-to-WhatsApp Ad &amp; FB Page CTA replies unlock a <b>72-hour FREE window</b> across all categories, and Meta charges <b>only on DELIVERED</b> messages (never on failed/held).
             </p>
           </div>
         </div>

@@ -14,6 +14,7 @@ import {
   lookupOrderCustomer,
   type ChatAddressCandidate,
 } from "../actions/orders";
+import { parseOrderFromChatAction } from "../actions/ai";
 import {
   blankOrderLine,
   OrderItemsEditor,
@@ -53,6 +54,9 @@ export function NewOrder({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
+  const [aiParsing, startAiParse] = useTransition();
+  const [showAiPaste, setShowAiPaste] = useState(false);
+  const [rawWhatsAppText, setRawWhatsAppText] = useState("");
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
@@ -69,6 +73,49 @@ export function NewOrder({
   ]);
   const pricing = getOrderPricing(lines, null, { customShippingFee: shippingFee });
   const total = pricing.total;
+
+  const handleAiExtract = () => {
+    if (!rawWhatsAppText.trim()) return;
+    startAiParse(async () => {
+      const res = await parseOrderFromChatAction(rawWhatsAppText);
+      if (!res.ok || !res.data) {
+        toastResult({ ok: false, message: res.message ?? "Could not parse WhatsApp message." });
+        return;
+      }
+      const d = res.data;
+      if (d.recipientPhone) setPhone(d.recipientPhone);
+      if (d.recipientName) setName(d.recipientName);
+      const addrParts = [
+        d.addressLine1,
+        d.addressLine2,
+        d.landmark ? `Near ${d.landmark}` : "",
+        d.city,
+        d.state,
+        d.pincode ? `- ${d.pincode}` : "",
+      ].filter(Boolean);
+      if (addrParts.length > 0) {
+        setAddress(addrParts.join(", "));
+        setAddressSource("chat");
+      }
+      if (d.city || d.addressLine2) {
+        setArea(d.city || d.addressLine2);
+      }
+      if (d.itemsSummary || d.amountRupees) {
+        setLines([
+          {
+            ...blankOrderLine(),
+            custom: true,
+            name: d.itemsSummary || "WhatsApp Order Item",
+            quantity: 1,
+            price: d.amountRupees ?? 0,
+          },
+        ]);
+      }
+      if (d.notes) setNote(d.notes);
+      setShowAiPaste(false);
+      toastResult({ ok: true, message: "AI extracted customer, items & courier address!" });
+    });
+  };
 
   // Look the phone up as it's typed (after a short pause), so the form can say whether the
   // order is for an existing customer or will add a new one, and auto-fill their saved or chat address.
@@ -180,6 +227,47 @@ export function NewOrder({
             });
           }}
         >
+          {/* Free AI WhatsApp Chat-to-Order & Shipping Address Parser */}
+          <div className="rounded-card border border-brand/30 bg-brand-soft/20 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="flex items-center gap-1.5 text-xs font-semibold text-brand-deep">
+                <Sparkles aria-hidden className="size-3.5" />
+                <span>AI WhatsApp Text-to-Order &amp; Address Parser</span>
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowAiPaste((v) => !v)}
+                className="text-xs font-semibold text-brand-deep underline-offset-2 hover:underline"
+              >
+                {showAiPaste ? "Hide" : "Paste WhatsApp message →"}
+              </button>
+            </div>
+            {showAiPaste ? (
+              <div className="mt-2.5 space-y-2">
+                <textarea
+                  rows={3}
+                  value={rawWhatsAppText}
+                  onChange={(e) => setRawWhatsAppText(e.target.value)}
+                  placeholder="Paste unstructured WhatsApp text (e.g. Priya Sharma, 9876543210, 2 Silk Sarees Rs 2400, Door No 12, Anna Nagar near Bus Stand, Madurai 625020)…"
+                  className="field text-xs"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  loading={aiParsing}
+                  disabled={!rawWhatsAppText.trim()}
+                  onClick={handleAiExtract}
+                >
+                  <Sparkles aria-hidden className="size-3.5" /> Auto-Fill Customer, Items &amp; Pincode
+                </Button>
+              </div>
+            ) : (
+              <p className="mt-0.5 text-[11px] text-muted">
+                Paste any unstructured WhatsApp message to auto-extract name, phone, items, price, landmark, city &amp; 6-digit pincode.
+              </p>
+            )}
+          </div>
+
           <div className="space-y-2">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field id="no-phone" label="Customer phone" required>

@@ -22,6 +22,7 @@ import { cancelRun, runDispatcherNow } from "./actions/campaigns";
 import { BrandHero } from "./brand-hero";
 import { AreaChips } from "./area-chips";
 import { SpendCard } from "./spend-card";
+import { AiBusinessCopilot } from "./ai-copilot";
 import {
   AllProductsIntelligenceCard,
   CustomerGrowthPlaybookCard,
@@ -1648,6 +1649,17 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
 
       {/* Meta WhatsApp spend & wallet telemetry — prominent in top-middle section with Apache ECharts analysis */}
       {cid && <SpendCard clientId={cid} canManage={scope.canManage} className="mt-3.5 sm:mt-5" />}
+
+      {/* Zoho Zia-style Free AI Business Copilot & Daily Executive Brief */}
+      <div className="mt-3.5 sm:mt-5">
+        <AiBusinessCopilot
+          initialBrief={`${client?.name ?? "Your store"} has ${fmtNumber(curOrders.length)} confirmed orders (₹${Math.round(revenue).toLocaleString("en-IN")}) in ${period.label}${curUnpaidCarts.length > 0 ? ` plus ${curUnpaidCarts.length} unpaid WhatsApp cart${curUnpaidCarts.length === 1 ? "" : "s"} worth ₹${Math.round(unpaidCartRevenue).toLocaleString("en-IN")}` : ""}. You have ${unhandledGroup.length} unhandled customer ${unhandledGroup.length === 1 ? "reply" : "replies"} waiting—reply inside the 24-hour service window to use your 1,000 FREE monthly service messages per number (₹0.00 cost), and use Utility templates (₹0.115/msg vs ₹0.8631/msg Marketing) for all order & tracking updates!`}
+          freeServiceRemaining={Math.max(0, Math.max(1, health.length) * 1000)}
+          freeServiceLimit={Math.max(1, health.length) * 1000}
+          openWindowCount={unhandledGroup.length}
+          unhandledCount={unhandledGroup.length}
+        />
+      </div>
 
       {/* Activity and delivery. */}
       <div className="mt-3.5 grid grid-cols-1 gap-3.5 sm:mt-5 sm:gap-5 xl:grid-cols-12">

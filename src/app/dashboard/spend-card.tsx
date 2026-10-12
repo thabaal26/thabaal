@@ -31,7 +31,6 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
   const estMarketingRunway = recorded && mktRateWithGst > 0 ? Math.max(0, Math.floor(s.remainingBalance / mktRateWithGst)) : 0;
   const estUtilityRunway = recorded && utilRateWithGst > 0 ? Math.max(0, Math.floor(s.remainingBalance / utilRateWithGst)) : 0;
   const totalLastMonthSpent = total(s.previous);
-  const totalChargedThisMonth = s.current.reduce((acc, r) => acc + r.charged, 0);
   const lastSyncedLabel = new Date(s.lastSyncedAt).getTime() > 0 ? `synced ${fmtDate(new Date(s.lastSyncedAt), "d MMM, h:mm a")}` : "last recorded";
 
   return (
@@ -85,10 +84,12 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
         </div>
 
         <div className="px-3 py-2.5 sm:px-5 sm:py-3.5">
-          <dt className="text-[11px] text-muted sm:text-xs">All-time Meta spend</dt>
-          <dd className="tabular mt-0.5 text-base font-semibold leading-tight text-ink sm:mt-1 sm:text-xl">{rupees(s.allTimeSpent)}</dd>
+          <dt className="text-[11px] text-muted sm:text-xs">Free 24h Service Quota</dt>
+          <dd className="tabular mt-0.5 text-base font-semibold leading-tight text-success sm:mt-1 sm:text-xl">
+            {fmtNumber(s.serviceQuota.freeRemaining)} <span className="text-xs font-medium text-muted">/ {fmtNumber(s.serviceQuota.totalFreeLimit)} left</span>
+          </dd>
           <dd className="tabular mt-0.5 text-[10px] text-muted sm:text-2xs">
-            {fmtNumber(totalChargedThisMonth)} paid this month · 24h replies ₹0
+            1,000 free/mo per number · {fmtNumber(s.serviceQuota.freeUsed)} used
           </dd>
         </div>
       </dl>
@@ -111,6 +112,7 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
         current={s.current}
         previous={s.previous}
         daily={s.daily}
+        serviceQuota={s.serviceQuota}
         rates={RATES}
         categoryLabels={CATEGORY_LABEL}
         monthOrdersCount={s.monthOrdersCount}
@@ -124,7 +126,7 @@ export async function SpendCard({ clientId, canManage, className }: { clientId: 
             <span className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
               <span>Wallet sync, top-ups &amp; per-number breakdown</span>
               <span className="text-[11px] font-normal text-muted">
-                · Mktg ₹{RATES.marketing}, Util ₹{RATES.utility} (+18% GST)
+                · Mktg ₹{RATES.marketing}, Util ₹{RATES.utility}, Service 1,000 free/mo then ₹{RATES.service} (+18% GST)
               </span>
             </span>
           }

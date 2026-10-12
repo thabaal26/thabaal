@@ -1,10 +1,12 @@
 "use client";
 
+import { Sparkles } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { toastResult } from "@/components/toast";
 import { Button, Card, CardHeader, Field, Spinner } from "@/components/ui";
 import type { AudienceFilter } from "@/lib/audiences";
+import { generateAudienceFilterAction } from "../../actions/ai";
 import { countAudience, saveAudience } from "../../actions/audiences";
 
 const split = (s: string) => s.split(",").map((t) => t.trim()).filter(Boolean);
@@ -19,6 +21,9 @@ const PRESETS: { label: string; name: string; f: AudienceFilter }[] = [
 export function AudienceBuilder({ regions }: { regions: string[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const [aiLoading, startAi] = useTransition();
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiExplanation, setAiExplanation] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [tags, setTags] = useState("");
   const [exclude, setExclude] = useState("");
@@ -61,6 +66,25 @@ export function AudienceBuilder({ regions }: { regions: string[] }) {
     setDays(p.f.orderedWithinDays ?? p.f.noOrderForDays ?? 30);
   };
 
+  const applyAiFilter = () => {
+    if (!aiPrompt.trim()) return;
+    startAi(async () => {
+      const res = await generateAudienceFilterAction(aiPrompt);
+      if (res.ok && res.data) {
+        const d = res.data;
+        if (d.suggestedName) setName(d.suggestedName);
+        if (d.location) setArea(d.location);
+        if (d.search) setBought(d.search);
+        if (d.tag) setTags(d.tag);
+        if (d.purchased === "no") setOrders("never");
+        else if (d.purchased === "yes") setOrders("within");
+        setAiExplanation(d.explanation);
+      } else {
+        toastResult({ ok: false, message: res.message ?? "Could not build audience from prompt." });
+      }
+    });
+  };
+
   return (
     <Card>
       <CardHeader title="New audience" description="Customers must match every condition. Opted-out and unreachable customers are always left out." />
@@ -75,6 +99,32 @@ export function AudienceBuilder({ regions }: { regions: string[] }) {
           });
         }}
       >
+        {/* Free AI Natural-Language Audience Builder */}
+        <div className="rounded-control border border-brand/30 bg-brand-soft/20 p-3">
+          <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-brand-deep">
+            <Sparkles aria-hidden className="size-3.5" />
+            <span>Describe your target audience in plain English (Free AI)</span>
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              className="field flex-1 text-xs sm:text-sm"
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  applyAiFilter();
+                }
+              }}
+              placeholder="e.g. Customers in Madurai who bought silk sarees, or Leads in Chennai who never ordered…"
+            />
+            <Button type="button" size="sm" loading={aiLoading} disabled={!aiPrompt.trim()} onClick={applyAiFilter}>
+              <Sparkles aria-hidden className="size-3.5" /> Build Filter
+            </Button>
+          </div>
+          {aiExplanation && <p className="mt-1.5 text-xs text-ink-2">{aiExplanation}</p>}
+        </div>
+
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Start from a preset">
           <span className="text-sm text-muted">Start from:</span>
           {PRESETS.map((p) => (

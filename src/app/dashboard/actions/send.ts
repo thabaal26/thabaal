@@ -66,6 +66,8 @@ export async function sendToCustomer(
         customerId: customer.id, templateId: t.id, templateName: t.name, body: res.text, status: "SENT",
         waMessageId: res.id, simulated: res.simulated, provider: res.provider, sentAt: new Date(),
         senderId: res.provider === "META" ? (number?.id ?? null) : null,
+        pricingCategory: t.category.toLowerCase(),
+        billable: true,
       },
     });
     pushToGoogleSheet("CAMPAIGN_STATUS", {
@@ -81,7 +83,7 @@ export async function sendToCustomer(
   } catch (e) {
     const { code, error } = explainSendError(e);
     await db.message.create({
-      data: { customerId: customer.id, templateId: t.id, templateName: t.name, status: "FAILED", provider: settings.provider, errorCode: code, error, failedAt: new Date() },
+      data: { customerId: customer.id, templateId: t.id, templateName: t.name, status: "FAILED", provider: settings.provider, errorCode: code, error, failedAt: new Date(), pricingCategory: t.category.toLowerCase(), billable: false },
     });
     await applyFailure(customer.id, code);
     pushToGoogleSheet("CAMPAIGN_STATUS", {
@@ -154,6 +156,8 @@ export async function replyToCustomer(
         provider: settings.provider,
         sentAt: new Date(),
         senderId: !local ? (number?.id ?? null) : null,
+        pricingCategory: "service",
+        billable: false,
       },
     });
     revalidatePath(`/dashboard/customers/${customer.id}`);

@@ -1,6 +1,6 @@
 "use client";
 
-import { Bold, Braces, Eye, ImageIcon, Italic, Plus, Send, Strikethrough, Trash2, TriangleAlert, Upload } from "@/components/icons";
+import { Bold, Braces, Eye, ImageIcon, Italic, Plus, Send, Sparkles, Strikethrough, Trash2, TriangleAlert, Upload } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { MobileActionBar } from "@/components/mobile-action-bar";
@@ -22,6 +22,7 @@ import {
   type VarSource,
 } from "@/lib/template";
 import { Picker } from "@/components/picker";
+import { generateAiTemplateAction } from "../actions/ai";
 import { saveTemplate, sendTestMessage } from "../actions/templates";
 
 const SOURCES: { value: VarSource["source"]; label: string }[] = [
@@ -73,12 +74,47 @@ export function TemplateEditor({
   const [testPhone, setTestPhone] = useState("");
   const [testing, startTest] = useTransition();
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiTip, setAiTip] = useState<string | null>(null);
+  const [aiScore, setAiScore] = useState<number | null>(null);
+  const [aiGenerating, startAi] = useTransition();
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
   const locked = Boolean(id);
   const auth = t.category === "AUTHENTICATION";
 
   const set = (patch: Partial<TemplateDraft>) => setT((s) => ({ ...s, ...patch }));
+
+  function runAiTemplate(mode: "generate" | "optimize_utility" | "translate_tamil") {
+    startAi(async () => {
+      const res = await generateAiTemplateAction({
+        prompt: aiPrompt.trim() || t.body || "New festive collection launch",
+        category: t.category === "UTILITY" ? "UTILITY" : "MARKETING",
+        language: mode === "translate_tamil" ? "ta" : t.language,
+        businessName,
+        currentBody: t.body,
+        mode,
+      });
+      if (res.ok && res.data) {
+        const d = res.data;
+        set({
+          ...(locked ? {} : { name: d.name || t.name, category: d.category }),
+          ...(locked ? {} : mode === "translate_tamil" ? { language: "ta" } : {}),
+          headerType: t.headerType === "IMAGE" ? "IMAGE" : d.headerType,
+          headerText: d.headerText ?? "",
+          body: d.body,
+          footer: d.footer ?? "",
+          buttons: d.buttons?.length ? d.buttons : t.buttons,
+          variables: d.variables ?? t.variables,
+        });
+        setAiTip(d.costTip);
+        setAiScore(d.approvalScore);
+        toastResult({ ok: true, message: "AI template applied! Review the preview on the right." });
+      } else {
+        toastResult({ ok: false, message: res.message ?? "AI generation failed." });
+      }
+    });
+  }
 
   // Header image goes straight from the browser to Vercel Blob; its public link fills the field.
   const [uploading, setUploading] = useState(false);
@@ -259,6 +295,68 @@ export function TemplateEditor({
           </Card>
         ) : (
           <>
+            <Card className="border-brand/30 bg-brand-soft/15">
+              <CardHeader
+                tone="brand"
+                icon={<Sparkles className="size-4 text-brand-deep" />}
+                title="Free AI Template Writer & Meta Cost Optimizer"
+                description="Generate a high-converting template, translate to Tamil, or rewrite into a ₹0.115 Utility template (7.5× cheaper than ₹0.8631 Marketing)."
+                action={
+                  aiScore ? (
+                    <Badge tone="green" dot>
+                      {aiScore}% Meta approval score
+                    </Badge>
+                  ) : (
+                    <Badge tone="gray">Free AI · ₹0/mo</Badge>
+                  )
+                }
+              />
+              <div className="space-y-3 p-3.5 sm:p-5">
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <input
+                    className="field flex-1 text-sm"
+                    placeholder="Describe your message (e.g., Diwali silk saree 20% off, or ST Courier dispatch update)…"
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        runAiTemplate("generate");
+                      }
+                    }}
+                  />
+                  <Button type="button" size="md" loading={aiGenerating} onClick={() => runAiTemplate("generate")}>
+                    <Sparkles aria-hidden className="size-4" /> Generate Draft
+                  </Button>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={aiGenerating}
+                    onClick={() => runAiTemplate("optimize_utility")}
+                    className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-line bg-panel px-2.5 py-1 text-xs font-medium text-ink transition hover:border-brand hover:text-brand-deep disabled:opacity-50"
+                  >
+                    💡 Convert to ₹0.115 Utility (Save 86%)
+                  </button>
+                  <button
+                    type="button"
+                    disabled={aiGenerating}
+                    onClick={() => runAiTemplate("translate_tamil")}
+                    className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-line bg-panel px-2.5 py-1 text-xs font-medium text-ink transition hover:border-brand hover:text-brand-deep disabled:opacity-50"
+                  >
+                    🇮🇳 Translate to Tamil (தமிழ்)
+                  </button>
+                </div>
+
+                {aiTip && (
+                  <p className="rounded-control border border-brand/25 bg-panel/90 px-3 py-2 text-xs text-ink-2">
+                    <b className="font-semibold text-brand-deep">AI Meta Compliance &amp; Cost Tip:</b> {aiTip}
+                  </p>
+                )}
+              </div>
+            </Card>
+
             <Card>
               <CardHeader title="Content" />
               <div className="space-y-5 p-4 sm:p-5">
