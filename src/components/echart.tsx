@@ -7,6 +7,10 @@ export type ChartOption = Record<string, unknown>;
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { readChartTheme, type ChartTheme } from "@/lib/chart-theme";
+import { AltChart, type AltEngine } from "./chart-engines/alt-chart";
+
+type Lib = "echarts" | AltEngine;
+const libOf = (v: string | undefined): Lib => (v === "recharts" || v === "chartjs" ? v : "echarts");
 
 export type ChartSize = { width: number; height: number };
 export type ChartEvent = { name?: string; dataIndex?: number; seriesIndex?: number; seriesName?: string; data?: unknown; componentType?: string };
@@ -63,9 +67,13 @@ function drawSoon(fn: () => void) {
 }
 
 /**
- * The one way the portal draws a chart: Apache ECharts (SVG), themed from the live design tokens.
- * It loads the library when the chart nears the screen, redraws on resize and when light/dark
- * changes, and animates once. `option` builds the chart from the theme and current size.
+ * The one way the portal draws a chart, themed from the live design tokens. It loads the library
+ * when the chart nears the screen, redraws on resize and when light/dark changes, and animates once.
+ * `option` builds the chart (an ECharts option) from the theme and current size.
+ *
+ * The library is the portal's choice (Appearance → Chart library, read from the nearest
+ * [data-chart]): Apache ECharts draws the option itself; Recharts or Chart.js draw it through the
+ * neutral model in chart-engines/, and charts only ECharts can draw well stay on ECharts.
  */
 export function EChart({
   option,
@@ -89,6 +97,8 @@ export function EChart({
   style?: React.CSSProperties;
 }) {
   const el = useRef<HTMLDivElement>(null);
+  /** ECharts' own box inside the chart, so another library can take over without touching its DOM. */
+  const ecEl = useRef<HTMLDivElement>(null);
   const chart = useRef<ECharts | null>(null);
   const optionRef = useRef(option);
   /** The option last drawn, so the data effect doesn't redraw what init just drew. */
@@ -97,12 +107,28 @@ export function EChart({
   const readyRef = useRef(onReady);
   const [visible, setVisible] = useState(false);
   const [ready, setReady] = useState(false);
+  const [lib, setLib] = useState<Lib | null>(null);
+  /** This chart needs ECharts whatever the portal picked (a gauge, a heat map…). */
+  const [needsEcharts, setNeedsEcharts] = useState(false);
+  const engine: Lib | null = !visible || !lib ? null : needsEcharts ? "echarts" : lib;
 
   useEffect(() => {
     optionRef.current = option;
     eventRef.current = onEvent;
     readyRef.current = onReady;
   });
+
+  // Which library: the nearest [data-chart] (the dashboard, or an Appearance preview box), live.
+  useEffect(() => {
+    const node = el.current;
+    if (!node) return;
+    const host = (node.closest("[data-chart]") as HTMLElement | null) ?? document.documentElement;
+    const read = () => setLib(libOf(host.dataset.chart ?? document.documentElement.dataset.chart));
+    queueMicrotask(read);
+    const mo = new MutationObserver(read);
+    mo.observe(host, { attributes: true, attributeFilter: ["data-chart"] });
+    return () => mo.disconnect();
+  }, []);
 
   // Start loading when it is about to be seen.
   useEffect(() => {
@@ -130,14 +156,15 @@ export function EChart({
     };
   }, []);
 
+  const onEcharts = engine === "echarts";
   useEffect(() => {
-    if (!visible) return;
+    if (!onEcharts) return;
     let alive = true;
     let ro: ResizeObserver | null = null;
     let mo: MutationObserver | null = null;
     const draw = (animate: boolean) => {
       const c = chart.current;
-      const node = el.current;
+      const node = ecEl.current;
       if (!c || !node) return;
       const theme = readChartTheme(dark);
       drawnWith.current = optionRef.current;
@@ -145,7 +172,7 @@ export function EChart({
       c.setOption({ textStyle: { fontFamily: theme.font }, ...opt, ...(animate && theme.animate ? {} : { animation: false }) } as EChartsCoreOption, { notMerge: true });
     };
     loadEcharts().then((echarts) => {
-      const node = el.current;
+      const node = ecEl.current;
       if (!alive || !node) return;
       const c = echarts.init(node, null, { renderer: "svg" });
       chart.current = c;
@@ -174,12 +201,12 @@ export function EChart({
       chart.current?.dispose();
       chart.current = null;
     };
-  }, [visible, dark]);
+  }, [onEcharts, dark]);
 
   // New data: redraw, animating from the old values.
   useEffect(() => {
     const c = chart.current;
-    const node = el.current;
+    const node = ecEl.current;
     if (!c || !node || !ready || drawnWith.current === option) return;
     drawnWith.current = option;
     const theme = readChartTheme(dark);
@@ -193,6 +220,21 @@ export function EChart({
       aria-label={label}
       className={cn("echart relative w-full", !ready && "animate-pulse rounded-control bg-sunken/60", className)}
       style={{ height, ...style }}
-    />
+    >
+      <div ref={ecEl} className="absolute inset-0" />
+      {engine && engine !== "echarts" && (
+        <AltChart
+          engine={engine}
+          option={option}
+          dark={dark}
+          onEvent={onEvent}
+          onDrawn={() => {
+            setReady(true);
+            readyRef.current?.(null);
+          }}
+          onUnsupported={() => setNeedsEcharts(true)}
+        />
+      )}
+    </div>
   );
 }

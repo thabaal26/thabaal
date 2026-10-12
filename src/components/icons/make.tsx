@@ -1,29 +1,33 @@
-// The factory behind every portal icon (see index.ts). Each icon draws both packs; CSS hides the one the
-// client didn't pick (lib/icon-pack.ts).
+// The factory behind every portal icon (see index.ts). An icon is an empty <svg> that CSS paints:
+// a mask of the drawing over currentColor. The drawing comes from the icon set the portal uses
+// (lib/appearance.ts): the dashboard links that set's stylesheet, which defines --pi-<id>.
+// So a page's JavaScript carries no icon drawings, and switching sets needs no rebuild.
 
-import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
-import type { LucideIcon } from "lucide-react";
 import type { SVGProps } from "react";
 import { cn } from "@/lib/cn";
 
 export type IconProps = Omit<SVGProps<SVGSVGElement>, "ref" | "children" | "strokeWidth"> & {
   /** Pixel size; usually left alone and set with a Tailwind size-* class instead. */
   size?: number | string;
-  strokeWidth?: number;
+  /** Ignored: the stroke weight is a portal setting (Appearance → Weight). Kept so old calls still type-check. */
+  strokeWidth?: number | string;
 };
 export type IconComponent = ((props: IconProps) => React.JSX.Element) & { displayName?: string };
 
-/** Slightly heavier than the 1.5 Hugeicons draws at, so 16px icons stay crisp next to text. */
-const STROKE = 1.75;
-
-export function icon(svg: IconSvgElement, Classic: LucideIcon, name: string): IconComponent {
+export function icon(id: string, name: string): IconComponent {
   const Icon = ({ size = 24, strokeWidth, className, ...rest }: IconProps) => {
-    const hidden = rest["aria-label"] || rest.role ? undefined : true;
+    void strokeWidth;
+    const labelled = Boolean(rest["aria-label"]);
     return (
-      <>
-        <HugeiconsIcon icon={svg} size={size} strokeWidth={strokeWidth ?? STROKE} aria-hidden={hidden} focusable="false" {...rest} className={cn("ip-huge", className)} />
-        <Classic size={size} strokeWidth={strokeWidth ?? 2} aria-hidden={hidden} focusable="false" {...rest} className={cn("ip-lucide", className)} />
-      </>
+      <svg
+        width={size}
+        height={size}
+        aria-hidden={labelled || rest.role ? undefined : true}
+        role={labelled ? "img" : undefined}
+        focusable="false"
+        {...rest}
+        className={cn("pi", `pi-${id}`, className)}
+      />
     );
   };
   Icon.displayName = name;

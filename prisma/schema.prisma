@@ -22,6 +22,8 @@ model Setting {
   wahaSession    String    @default("default")
   /// When the scheduler last ran, so the dashboard can warn if it stopped.
   lastDispatchAt DateTime?
+  /// The portal-wide default look (lib/appearance.ts): icon set, tiles, cards, UI style, chart library.
+  appearance     Json?
   updatedAt      DateTime  @updatedAt
 }
 
@@ -70,6 +72,8 @@ model Client {
   iconPack            String            @default("hugeicons")
   /// Look of the coloured icon tiles: "3d" (glossy, default) or "2d" (flat).
   iconLook            String            @default("3d")
+  /// This client's own look, overriding the portal default key by key (lib/appearance.ts).
+  appearance          Json?
   audiences           Audience[]
   topUps              TopUp[]
   createdAt           DateTime          @default(now())

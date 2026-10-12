@@ -99,7 +99,7 @@ export function Section({
 }
 
 export function Card({ className, ...p }: ComponentProps<"div">) {
-  return <div className={cn("min-w-0 rounded-card border border-line bg-panel shadow-card print:shadow-none", className)} {...p} />;
+  return <div className={cn("ui-card min-w-0 rounded-card border border-line bg-panel shadow-card print:shadow-none", className)} {...p} />;
 }
 
 /** Padding inside a card body; compact on mobile, roomy on desktop. */
@@ -206,7 +206,7 @@ export type ButtonSize = "sm" | "md";
  */
 export function buttonClass(variant: ButtonVariant = "primary", size: ButtonSize = "md", icon = false) {
   return cn(
-    "relative inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-control font-medium transition active:scale-[0.98] sm:gap-2 [&_svg]:shrink-0 [&_svg:not([class*=size-])]:size-4",
+    "ui-btn relative inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-control font-medium transition active:scale-[0.98] sm:gap-2 [&_svg]:shrink-0 [&_svg:not([class*=size-])]:size-4",
     "disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 aria-disabled:pointer-events-none aria-disabled:opacity-50",
     icon
       ? size === "sm"

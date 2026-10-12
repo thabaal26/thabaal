@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { useSyncExternalStore } from "react";
-import { BirdFace } from "./bird-face";
 
 interface LoginIllustrationProps {
   isNight?: boolean;
@@ -156,7 +155,6 @@ export function LoginIllustration({ isNight = false, onToggleTheme, lang = "en" 
               height={354}
               priority
             />
-            <BirdFace />
           </div>
         </div>
       </div>

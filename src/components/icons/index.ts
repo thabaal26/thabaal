@@ -1,15 +1,12 @@
 // The portal's icon set. Every screen imports icons from here, never from an icon package
-// directly, so the look, the default stroke and accessibility stay the same everywhere.
+// directly, so the look and accessibility stay the same everywhere.
 //
-// Two packs ship side by side and each client's portal shows the one picked for it on the
-// admin Clients page (lib/icon-pack.ts): Hugeicons (default, free MIT set) and Lucide
-// (ISC). Each icon draws both; CSS hides the pack that isn't chosen.
+// Icons are painted by CSS from the icon set the portal uses (lib/appearance.ts): Hugeicons,
+// Lucide, Tabler, Phosphor, Remix or Material Symbols, each in a light, regular or bold weight.
+// The drawings live in one cached stylesheet per set and weight, built by scripts/icons/build.mjs.
 //
-// One file per icon, and this folder's package.json says the files have no side effects, so a
-// page's JavaScript carries only the icons it imports (one module held all 125 before: ~44 KB
-// compressed on every page).
-// To add an icon: pick it at https://hugeicons.com/icons (free set) and https://lucide.dev,
-// add a file like the others and export it below under one short name.
+// To add an icon: add a line to scripts/icons/map.txt naming it in each set, run
+// `node scripts/icons/build.mjs`, then add a file like the others and export it below.
 
 export type { IconComponent, IconProps } from "./make";
 export { AlertCircle } from "./alert-circle";

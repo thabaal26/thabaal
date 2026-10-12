@@ -1,5 +1,5 @@
-// The original glossy 3D tile drawings, shown when a client's portal uses the Classic icon pack.
-// Screens import from icons-3d.tsx, which picks between these and the Hugeicons glyphs.
+// The illustrated tile drawings (Appearance → Tile artwork → Illustrated). Not imported by the app:
+// scripts/icons/build.mjs renders each one to an SVG file in public/icons/art/illustrated.
 
 import type { SVGProps } from "react";
 import { cn } from "@/lib/cn";

@@ -6,23 +6,12 @@ import { BirdFace } from "./bird-face";
 import "./mascot.css";
 
 /*
- * The sign-in page's bird: a cheeky, playful little character. Played once per browser session:
- *   A  bursts in from the left, throws a loop-the-loop out of pure joy, lands a bit dizzy on the "t"
- *   B  hops letter to letter (each letter squashes under it), bounces twice on the tall "b" like a
- *      trampoline with a spin, overshoots the "l" and teeters, saves itself and laughs
- *   C  turns to the big sky bird and pulls a face (wink, tongue out). The big bird startles ("!"),
- *      glances back, winds up and flies off the right edge; the little bird giggles
- *   D  takes off with a barrel roll, glides to the split between the columns (the seam under the sky
- *      on phones), flares to a stop, turns to the visitor, beams and winks
- *   E  eyes the empty sky, flies into the big bird's spot, puffs up and bursts out big: it is the sky
- *      bird now (handed over to the real one in the sky: same art, same pose, same spot)
- *   F  the old big bird swoops back from the right, bursts down small with a dizzy spin, flutters down
- *      and lands on the "l"; the two wink at each other
- *   G  lives on the "l": breathing, wing flutters, blinks, little hops that squash the letter, faces,
- *      winks with the sky bird. Both watch you type your email and cover their eyes for the password
- *      (peeking now and then).
- * Transforms and opacity only, via the Web Animations API (no library). The form is never moved or
- * covered and sign-in never waits on it; reduced-motion visitors get the still page.
+ * The sign-in page's mascot bird:
+ *   1. Bursts in from the left screen directly onto the first letter.
+ *   2. Jumps letter to letter (each letter squashes playfully; tall letter has a bouncy trampoline spin).
+ *   3. Lands squarely and sits proudly on the last letter ("l" in English, "ல்" in Tamil, with proper spacing).
+ *   4. Right sky carrier bird maintains its constant, peaceful flight undisturbed.
+ *   5. Mascot stays perched on the last letter: breathing, wing flutters, blinks, and reacts to email/password typing.
  */
 
 type P = { x: number; y: number };
@@ -30,32 +19,43 @@ type Lang = "en" | "ta";
 type Face = "open" | "joy" | "wink" | "o" | "dizzy" | "shut" | "peek";
 
 /* Letter slices of the 900 × 252 wordmark images and the point on top of each letter to stand on. */
-const LETTERS: Record<Lang, { s: number; e: number; x: number; y: number }[]> = {
+const LETTERS: Record<Lang, { s: number; e: number; x: number; y: number; clip?: string }[]> = {
   en: [
     { s: 0, e: 117, x: 58, y: 75 }, // t
     { s: 117, e: 273, x: 150, y: 57 }, // h
     { s: 273, e: 415, x: 344, y: 109 }, // a
-    { s: 415, e: 571, x: 455, y: 27 }, // b
-    { s: 571, e: 707, x: 639, y: 109 }, // a
+    // b: encompasses the full green sparks symbol radiating up to x=583 at y<=100 without slicing it
+    {
+      s: 415,
+      e: 583,
+      x: 455,
+      y: 27,
+      clip: "polygon(46.11% -30%, 64.78% -30%, 64.78% 39.7%, 63.44% 39.7%, 63.44% 130%, 46.11% 130%)",
+    },
+    // a: starts after b's body at x=571 (below y=100) and x=583 (above y=100)
+    {
+      s: 571,
+      e: 707,
+      x: 639,
+      y: 109,
+      clip: "polygon(64.78% -30%, 78.56% -30%, 78.56% 130%, 63.44% 130%, 63.44% 39.7%, 64.78% 39.7%)",
+    },
     { s: 707, e: 838, x: 772, y: 108 }, // a
     { s: 838, e: 900, x: 869, y: 58 }, // l
   ],
   ta: [
-    { s: 120, e: 320, x: 225, y: 59 }, // த
-    { s: 320, e: 455, x: 336, y: 62 }, // ப
-    { s: 455, e: 780, x: 600, y: 69 }, // ால்
+    { s: 120, e: 320, x: 236, y: 59 }, // த
+    { s: 320, e: 455, x: 386, y: 60 }, // ப
+    { s: 455, e: 580, x: 515, y: 60 }, // ா
+    { s: 580, e: 760, x: 710, y: 56 }, // ல் - sits cleanly on the top arch of the final letter with proper spacing!
   ],
 };
 /* The tall letter it bounces on like a trampoline. */
-const BOUNCY: Record<Lang, number> = { en: 3, ta: 2 };
+const BOUNCY: Record<Lang, number> = { en: 3, ta: 1 };
 
 const ART_RATIO = 354 / 640;
 const BELLY = { x: 0.74, y: 0.8 }; // where it stands, as a fraction of the 640 × 354 art
 const SEEN_KEY = "thabaal-intro-v3";
-/* The sky bird's float (birdFloat in thabaal-login.css) at 0%: the pose the hand-over happens in. */
-const FLOAT_Y = -10;
-const FLOAT_TILT = -2.2;
-const BURST_COLORS = ["#FDB913", "#ff6b45", "#ffffff", "#5ec8ff"];
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
@@ -76,7 +76,7 @@ export function MascotIntro({ lang }: { lang: Lang }) {
   const langRef = useRef(lang);
   const skipRef = useRef<() => void>(() => {});
 
-  // A language switch mid-sequence would swap the wordmark under the hopping bird: jump to the end.
+  // A language switch mid-sequence swaps the wordmark under the hopping bird: jump to the end.
   // Afterwards it re-perches on the new wordmark's last letter.
   useEffect(() => {
     if (langRef.current === lang) return;
@@ -101,12 +101,8 @@ export function MascotIntro({ lang }: { lang: Lang }) {
     const svg = mascot.querySelector<SVGSVGElement>(".bf")!;
     const words = page.querySelector<HTMLElement>(".thabaal-brand .words");
     const mark = page.querySelector<HTMLElement>(".thabaal-brand .mark");
-    const sky = page.querySelector<HTMLElement>(".thabaal-right");
-    const bigBird = page.querySelector<HTMLElement>(".thabaal-birdpos");
-    const bigFace = bigBird?.querySelector<SVGSVGElement>(".bf") ?? null;
-    const bigFloat = bigBird?.querySelector<HTMLElement>(".thabaal-birdfloat") ?? null;
     const form = page.querySelector<HTMLElement>(".thabaal-form");
-    if (!words || !mark || !sky || !bigBird || !bigFloat) return;
+    if (!words || !mark) return;
 
     let dead = false;
     let introDone = false;
@@ -126,14 +122,6 @@ export function MascotIntro({ lang }: { lang: Lang }) {
     };
     const anim = (el: Element, k: Keyframe[], o: KeyframeAnimationOptions) => track(el.animate(k, { fill: "forwards", ...o }));
     const done = (...as: Animation[]) => Promise.all(as.map((a) => a.finished));
-    /* Bake an element's finished, filling animations into its style so later style changes apply. */
-    const commit = (el: HTMLElement) =>
-      el.getAnimations().forEach((a) => {
-        try {
-          a.commitStyles();
-        } catch {}
-        a.cancel();
-      });
     const later = (fn: () => void, ms: number) => {
       const id = window.setTimeout(() => {
         timers.delete(id);
@@ -155,14 +143,14 @@ export function MascotIntro({ lang }: { lang: Lang }) {
     };
 
     /* ── Faces ── */
-    const setFace = (f: Face, el: SVGSVGElement | null = svg) => el?.setAttribute("data-face", f);
-    const eyes = (el: SVGSVGElement | null = svg) => el?.querySelectorAll<SVGGElement>(".bf-l, .bf-r") ?? [];
-    const blink = (el: SVGSVGElement | null = svg) =>
-      eyes(el).forEach((e) =>
+    const setFace = (f: Face) => svg?.setAttribute("data-face", f);
+    const eyes = () => svg?.querySelectorAll<SVGGElement>(".bf-l, .bf-r") ?? [];
+    const blink = () =>
+      eyes().forEach((e) =>
         e.animate([{ transform: "scaleY(1)" }, { transform: "scaleY(.08)", offset: 0.45 }, { transform: "scaleY(1)" }], { duration: 170, easing: "ease-in-out" }),
       );
-    const lookTo = (dx: number, dy: number, ms = 220, el: SVGSVGElement | null = svg) => {
-      const g = el?.querySelector(".bf-eyes");
+    const lookTo = (dx: number, dy: number, ms = 220) => {
+      const g = svg?.querySelector(".bf-eyes");
       if (g) anim(g, [{ transform: `translate(${dx}px, ${dy}px)` }], { duration: ms, easing: "cubic-bezier(.3,1.4,.6,1)" });
     };
 
@@ -188,52 +176,9 @@ export function MascotIntro({ lang }: { lang: Lang }) {
       const L = LETTERS[l][i];
       return { x: r.left + (L.x / 900) * r.width, y: r.top + (L.y / 252) * r.height + 1 };
     };
-    /* The split: on the column split, level with the brand (desktop); on the seam under the sky, at
-       the right (stacked layouts). Kept above the form. */
-    const splitPoint = (): P => {
-      const s = rel(sky.getBoundingClientRect());
-      if (stacked()) return { x: page.clientWidth - 14 - w * (1 - BELLY.x), y: s.top + s.height - 8 };
-      const m = rel(mark.getBoundingClientRect());
-      let y = m.top + m.height * 0.7;
-      if (form) y = Math.min(y, rel(form.getBoundingClientRect()).top - h() * 0.5);
-      return { x: s.left + w * (BELLY.x - 0.5), y: Math.max(y, h() + 80) };
-    };
-    /* Its home in the end: standing on the wordmark's last letter (the "l"). */
+    /* Its home in the end: standing on the wordmark's last letter (the "l" or "ல்"). */
     const lastLetter = () => LETTERS[langRef.current].length - 1;
     const perchPoint = (): P => letterPoint(lastLetter(), langRef.current);
-    /* The middle of the bird's art box, from where its belly is. */
-    const centreOf = (p: P, bw: number): P => ({ x: p.x - facing * (BELLY.x - 0.5) * bw, y: p.y - (BELLY.y - 0.5) * bw * ART_RATIO });
-
-    /* ── The sky bird: its CSS loops, and its spot at the start of its float ── */
-    const skyLoops = () => [...bigFloat.getAnimations(), ...(bigBird.querySelector(".wing")?.getAnimations() ?? [])];
-    const skyHome = () => {
-      bigBird.getAnimations().forEach((a) => a.cancel());
-      bigBird.querySelector(".tm-bang")?.remove();
-      // Hold its float and wingbeat at 0% while it is away, so the little bird can grow into exactly that pose.
-      skyLoops().forEach((a) => {
-        a.pause();
-        a.currentTime = 0;
-      });
-      const W = bigFloat.offsetWidth;
-      const H = W * ART_RATIO;
-      const r = rel(bigBird.getBoundingClientRect());
-      const th = (FLOAT_TILT * Math.PI) / 180;
-      const dx = (BELLY.x - 0.5) * W;
-      const dy = (BELLY.y - 0.5) * H;
-      return {
-        p: { x: r.left + r.width / 2 + dx * Math.cos(th) - dy * Math.sin(th), y: r.top + r.height / 2 + FLOAT_Y + dx * Math.sin(th) + dy * Math.cos(th) },
-        w: W,
-      };
-    };
-    const skyBack = () => {
-      bigBird.getAnimations().forEach((a) => a.cancel());
-      bigBird.querySelector(".tm-bang")?.remove();
-      bigBird.classList.remove("tm-gone");
-      skyLoops().forEach((a) => {
-        a.updatePlaybackRate(1);
-        a.play();
-      });
-    };
 
     /* ── Wings ── */
     let wingAnim: Animation | null = null;
@@ -276,26 +221,10 @@ export function MascotIntro({ lang }: { lang: Lang }) {
         moves.push({ offset: k, transform: at({ x: p.x, y: p.y + lift }) });
         let ang = (Math.atan2(q.y - r.y, Math.abs(q.x - r.x) + 0.001) * 180) / Math.PI;
         ang = clamp(ang * 0.55, -bank, bank) * facing;
-        // Flare: nose up as it brakes, then level.
         if (flare && k > 0.8) ang += flare * facing * Math.sin(((k - 0.8) / 0.2) * Math.PI);
         tilts.push({ offset: k, transform: `rotate(${ang.toFixed(2)}deg)` });
       }
       pos = path[3];
-      return [anim(mascot, moves, { duration: ms }), anim(pose, tilts, { duration: ms })] as const;
-    };
-
-    /* A forward loop-the-loop of radius r, starting and ending at the current point. */
-    const loop = (r: number, ms: number) => {
-      const c = { x: pos.x, y: pos.y - r };
-      const N = 36;
-      const moves: Keyframe[] = [];
-      const tilts: Keyframe[] = [];
-      for (let i = 0; i <= N; i++) {
-        const k = i / N;
-        const a = easeInOutSine(k) * Math.PI * 2;
-        moves.push({ offset: k, transform: at({ x: c.x + r * Math.sin(a) * 1.1, y: c.y + r * Math.cos(a) }) });
-        tilts.push({ offset: k, transform: `rotate(${(-a * 180) / Math.PI}deg)` });
-      }
       return [anim(mascot, moves, { duration: ms }), anim(pose, tilts, { duration: ms })] as const;
     };
 
@@ -307,7 +236,11 @@ export function MascotIntro({ lang }: { lang: Lang }) {
       letterLayer.setAttribute("aria-hidden", "true");
       for (const L of LETTERS[l]) {
         const span = document.createElement("span");
-        span.style.clipPath = `inset(-30% ${(100 - (L.e / 900) * 100).toFixed(2)}% -30% ${((L.s / 900) * 100).toFixed(2)}%)`;
+        if (L.clip) {
+          span.style.clipPath = L.clip;
+        } else {
+          span.style.clipPath = `inset(-30% ${(100 - (L.e / 900) * 100).toFixed(2)}% -30% ${((L.s / 900) * 100).toFixed(2)}%)`;
+        }
         letterLayer.appendChild(span);
       }
       words.appendChild(letterLayer);
@@ -391,7 +324,7 @@ export function MascotIntro({ lang }: { lang: Lang }) {
       await done(anim(face, k, { duration: ms, easing: "linear" }));
     };
 
-    /* ── Perched on the "l": breathing, a wing flutter now and then (with a little lift), blinking ── */
+    /* ── Perched on the last letter: breathing, wing flutter now and then, blinking ── */
     let idleAnims: Animation[] = [];
     const startPerch = () => {
       idleAnims.forEach((a) => a.cancel());
@@ -436,19 +369,6 @@ export function MascotIntro({ lang }: { lang: Lang }) {
       }
       later(blinkLoop, rand(2400, 5200));
     };
-    /* The sky bird: blinks, and a grin now and then. */
-    const bigLoop = () => {
-      if (mode === "free" && bigFace?.getAttribute("data-face") === "open") {
-        if (Math.random() < 0.2) {
-          setFace("joy", bigFace);
-          later(() => mode === "free" && setFace("open", bigFace), 1200);
-        } else {
-          blink(bigFace);
-          if (Math.random() < 0.25) later(() => blink(bigFace), 220);
-        }
-      }
-      later(bigLoop, rand(2800, 5600));
-    };
 
     /* A hop in place on the letter (optionally with a spin), squashing the letter on take-off and landing. */
     const perchHop = async (peak: number, ms: number, spin = 0) => {
@@ -489,34 +409,25 @@ export function MascotIntro({ lang }: { lang: Lang }) {
         lookTo(0, 0); setFace("joy"); await wait(500); alive();
         setFace("open");
       }],
-      [2, async () => { // winks with the sky bird
-        lookTo(6, -4, 300); setFace("wink");
-        await wait(350); alive();
-        lookTo(-6, 3, 300, bigFace); setFace("wink", bigFace);
-        await wait(800); alive();
-        setFace("joy", bigFace);
-        await giggle(600); alive();
-        setFace("open"); setFace("open", bigFace);
-        lookTo(0, 0); lookTo(0, 0, 300, bigFace);
+      [2, async () => { // beam & wink at visitor
+        lookTo(-3, 4, 300);
+        setFace("wink");
+        await done(anim(pose, [{ transform: "rotate(0)" }, { transform: "rotate(-6deg)" }, { transform: "rotate(0)" }], { duration: 700, easing: "ease-in-out" }));
+        alive();
+        await wait(500);
+        alive();
+        setFace("joy");
+        await giggle(450);
+        alive();
+        setFace("open");
+        lookTo(0, 0);
       }],
-      [1, async () => { // trampoline spin on the "l", dizzy after
+      [1, async () => { // trampoline spin on the letter, dizzy after
         setFace("joy");
         await perchHop(h() * 0.6, 380); alive();
         await perchHop(h() * 1.1, 560, 1); alive();
         setFace("dizzy"); await wait(700); alive();
         setFace("open");
-      }],
-      [1, async () => { // loop-the-loop when there's room above, a bit dizzy after
-        const r = (pos.y - h() * 0.8 - 10) / 2;
-        if (r < 26) return;
-        idleAnims.forEach((a) => a.pause());
-        flap(160); setFace("joy");
-        await done(...loop(Math.min(r, w * 0.5), 950)); alive();
-        wingTo(16, 140); bump(0.07); squish(1.12, 0.84, 240);
-        setFace("dizzy"); await giggle(500); alive();
-        await wait(400); alive();
-        setFace("open"); pose.getAnimations().forEach((a) => a.cancel());
-        startPerch();
       }],
     ];
     const trickLoop = () => {
@@ -533,7 +444,7 @@ export function MascotIntro({ lang }: { lang: Lang }) {
           }
           busy = false;
           if (!dead) {
-            // Wings back to perching if a trick took them over; back on the letter, wherever it is now.
+            // Wings back to perching if a trick took them over; back on the letter
             if (wingAnim !== idleAnims[0] || idleAnims.some((a) => a.playState === "paused")) startPerch();
             place();
           }
@@ -542,7 +453,7 @@ export function MascotIntro({ lang }: { lang: Lang }) {
       }, rand(4200, 7800));
     };
 
-    /* ── End state: the sky bird back in the sky, the little one perched on the "l" ── */
+    /* ── End state: the little bird perched on the last letter ── */
     const place = () => {
       mascot.getAnimations().forEach((a) => a.cancel());
       sizeBird();
@@ -552,10 +463,8 @@ export function MascotIntro({ lang }: { lang: Lang }) {
     const goIdle = () => {
       introDone = true;
       setFace("open");
-      setFace("open", bigFace);
       startPerch();
       blinkLoop();
-      bigLoop();
       trickLoop();
       try {
         sessionStorage.setItem(SEEN_KEY, "1");
@@ -566,11 +475,9 @@ export function MascotIntro({ lang }: { lang: Lang }) {
       mascot.getAnimations().forEach((a) => a.cancel());
       live.clear();
       wingAnim = null;
-      page.querySelectorAll(".tm-burst").forEach((b) => b.remove());
       joinLetters();
       facing = 1;
       place();
-      skyBack();
       site.classList.add("tm-away");
       mascot.classList.add("tm-on");
       if (!introDone) goIdle();
@@ -586,396 +493,73 @@ export function MascotIntro({ lang }: { lang: Lang }) {
       settle();
     };
 
-    /* ── Burst: a flash, a ring, cloud puffs and sparkles, for the big ⇄ small swaps ── */
-    const burst = (c: P, size: number) => {
-      const b = document.createElement("div");
-      b.className = "tm-burst";
-      b.setAttribute("aria-hidden", "true");
-      b.style.transform = `translate3d(${c.x.toFixed(1)}px, ${c.y.toFixed(1)}px, 0)`;
-      const piece = (cls: string, d: number, color?: string) => {
-        const i = document.createElement("i");
-        i.className = cls;
-        i.style.width = i.style.height = `${d.toFixed(1)}px`;
-        if (color) i.style.background = color;
-        b.appendChild(i);
-        return i;
-      };
-      page.appendChild(b);
-      anim(piece("tm-flash", size), [{ transform: "scale(.2)", opacity: 1 }, { transform: "scale(1.1)", opacity: 0.9, offset: 0.35 }, { transform: "scale(1.3)", opacity: 0 }], { duration: 480, easing: "ease-out" });
-      anim(piece("tm-ring", size * 0.8), [{ transform: "scale(.15)", opacity: 1 }, { transform: "scale(1.55)", opacity: 0 }], { duration: 560, easing: "cubic-bezier(.1,.7,.3,1)" });
-      const puffs = 10;
-      for (let i = 0; i < puffs; i++) {
-        const a = (i / puffs) * Math.PI * 2 + rand(-0.2, 0.2);
-        const cx = Math.cos(a);
-        const cy = Math.sin(a) * 0.62;
-        const r0 = size * 0.16;
-        const r1 = size * rand(0.4, 0.52);
-        anim(piece("tm-puff", size * rand(0.13, 0.2)), [
-          { transform: `translate(${cx * r0}px, ${cy * r0}px) scale(.3)`, opacity: 0.95 },
-          { transform: `translate(${cx * r1}px, ${cy * r1}px) scale(1.1)`, opacity: 0.9, offset: 0.5 },
-          { transform: `translate(${cx * r1 * 1.08}px, ${cy * r1 * 1.08 - 8}px) scale(1.3)`, opacity: 0 },
-        ], { duration: rand(560, 720), easing: "cubic-bezier(.15,.8,.3,1)" });
-      }
-      const k = clamp(size / 220, 0.8, 1.7);
-      const sparks = 18;
-      for (let i = 0; i < sparks; i++) {
-        const a = (i / sparks) * Math.PI * 2 + rand(-0.15, 0.15);
-        const r = size * rand(0.5, 0.85);
-        const dx = Math.cos(a) * r;
-        const dy = Math.sin(a) * r * 0.75;
-        const spin = rand(-260, 260);
-        const star = i % 3 === 0;
-        anim(piece(star ? "tm-star" : "tm-spark", rand(6, 12) * k * (star ? 1.8 : 1), BURST_COLORS[i % BURST_COLORS.length]), [
-          { transform: "translate(0, 0) rotate(0deg) scale(.4)", opacity: 1 },
-          { transform: `translate(${dx}px, ${dy}px) rotate(${spin}deg) scale(1)`, opacity: 1, offset: 0.6 },
-          { transform: `translate(${dx * 1.12}px, ${dy * 1.12 + 16}px) rotate(${spin * 1.4}deg) scale(0)`, opacity: 0 },
-        ], { duration: rand(640, 860), easing: "cubic-bezier(.12,.75,.3,1)" });
-      }
-      later(() => b.remove(), 1000);
-    };
-
-    /* ── The sequence ── */
+    /* ── The sequence: comes out from left screen, jumps letter to letter, sits on last letter ── */
     const play = async () => {
       const l = langRef.current;
       sizeBird();
       const letters = LETTERS[l];
       const first = letterPoint(0, l);
-      const brand = rel(words.getBoundingClientRect());
 
-      // A: burst in from the left, loop-the-loop for joy, land a bit dizzy.
-      pos = { x: -w * 1.3, y: first.y - 150 };
+      // 1. Comes out from left screen onto the first letter
+      pos = { x: -w * 1.4, y: first.y - 80 };
       mascot.style.transform = at(pos);
       mascot.classList.add("tm-on");
       setFace("joy");
-      flap(210);
-      const loopR = clamp(w * 0.5, 40, 70);
-      // Keep the whole loop on screen.
-      const loopAt: P = { x: Math.max(brand.left - w * 0.2, w * 1.1), y: Math.max(first.y - 130, loopR * 2 + h() * 0.8 + 16) };
-      const [a1] = fly([pos, { x: pos.x + 60, y: pos.y - 40 }, { x: loopAt.x - 80, y: loopAt.y + 10 }, loopAt], 950, { ease: (t) => t, bank: 12, bob: 4, beats: 3 });
+      flap(200);
+      const [a1] = fly(
+        [pos, { x: pos.x + 80, y: pos.y - 30 }, { x: first.x - w * 0.7, y: first.y - 80 }, first],
+        850,
+        { ease: easeOutCubic, bank: 14, bob: 4, beats: 3, flare: -16 }
+      );
       await done(a1);
       alive();
-      flap(170);
-      await done(...loop(loopR, 900));
-      alive();
-      setFace("open");
-      flap(240);
-      const [a2] = fly([pos, { x: pos.x + 60, y: pos.y - 30 }, { x: first.x - w * 0.8, y: first.y - 90 }, first], 1100, { ease: easeOutCubic, bank: 14, bob: 4, beats: 4, flare: -18 });
-      later(() => flap(150, -30, 6), 750);
-      await done(a2);
-      alive();
-      wingTo(16, 150);
+      wingTo(16, 140);
       splitLetters(l);
-      squash(0, 0.07);
-      squish(1.14, 0.8, 260);
-      setFace("dizzy");
-      await wait(450);
+      squash(0, 0.08);
+      squish(1.14, 0.82, 220);
+      await wait(140);
       alive();
-      // Shake it off.
-      await done(anim(face, [0, -12, 12, -8, 6, 0].map((d) => ({ transform: `scale(1, 1) rotate(${d}deg)` })), { duration: 450, easing: "ease-in-out" }));
-      alive();
-      setFace("open");
-      await wait(150);
 
-      // B: hop the letters; trampoline on the tall one; teeter on the last.
+      // 2. Jumps from one letter to letter; trampoline bounce on tall letter; lands on last letter
       for (let i = 1; i < letters.length; i++) {
         alive();
-        const last = i === letters.length - 1;
-        let to = letterPoint(i, l);
-        if (last) to = { x: to.x + w * 0.16, y: to.y }; // a touch too far…
+        const isLast = i === letters.length - 1;
+        const to = letterPoint(i, l);
         const dist = Math.abs(to.x - pos.x);
         squash(i - 1, 0.03);
         setFace(i % 2 ? "joy" : "open");
-        await hop(to, clamp(dist * 0.55 + 16, 24, 64) + Math.max(0, pos.y - to.y) * 0.4, clamp(260 + dist * 1.5, 300, 460));
+        await hop(
+          to,
+          clamp(dist * 0.55 + 16, 24, 64) + Math.max(0, pos.y - to.y) * 0.4,
+          clamp(260 + dist * 1.5, 300, 460)
+        );
         alive();
-        squash(i, 0.06);
+        squash(i, isLast ? 0.09 : 0.06);
         setFace("open");
         if (i === BOUNCY[l]) {
-          // Boing, boing, with a spin on the second one.
+          // Boing, boing, with a spin on the tall letter!
           await wait(60);
           alive();
           setFace("joy");
           squash(i, 0.12);
-          await hop(to, h() * 0.9, 420);
+          await hop(to, h() * 0.9, 400);
           alive();
           squash(i, 0.12);
-          await hop(to, h() * 1.35, 560, 1);
+          await hop(to, h() * 1.3, 540, 1);
           alive();
           squash(i, 0.08);
           setFace("open");
         }
-        if (last) {
-          // Wobble on the edge, flapping like mad, then catch the balance.
-          setFace("o");
-          flap(110, -34, 14);
-          await done(anim(pose, [0, 16, -10, 13, -6, 4, 0].map((d) => ({ transform: `rotate(${d}deg)` })), { duration: 1000, easing: "ease-in-out" }));
-          alive();
-          wingTo(16, 140);
-          const fix = letterPoint(i, l);
-          await hop(fix, 10, 220);
-          alive();
-          squash(i, 0.05);
-          await giggle(600);
-          alive();
-        }
-        await wait(90);
+        await wait(isLast ? 200 : 90);
       }
-      setFace("open");
+
+      // 3. Last sits on L letter — that's the whole animation!
+      alive();
       joinLetters();
-
-      // C: pull a face at the big bird; it startles and flies off; giggles.
-      await wait(250);
-      alive();
-      setFace("wink");
-      await done(anim(pose, [0, -8, 7, -6, 0].map((d) => ({ transform: `rotate(${d}deg)` })), { duration: 700, easing: "ease-in-out" }));
-      alive();
-      const skyR = rel(sky.getBoundingClientRect());
-      const bigWing = bigBird.querySelector(".wing")?.getAnimations()[0];
-      setFace("o", bigFace);
-      const bang = document.createElement("span");
-      bang.className = "tm-bang";
-      bang.textContent = "!";
-      bigFloat?.appendChild(bang);
-      anim(bang, [{ opacity: 0, transform: "scale(.3) rotate(-20deg)" }, { opacity: 1, transform: "scale(1.15) rotate(6deg)", offset: 0.6 }, { opacity: 1, transform: "scale(1) rotate(0deg)" }], { duration: 260, easing: "ease-out" });
-      const startle = anim(bigBird, [
-        { transform: "translate3d(0,0,0) rotate(0deg)" },
-        { transform: "translate3d(0,-22px,0) rotate(3deg) scale(1.03)", offset: 0.35, easing: "ease-in" },
-        { transform: "translate3d(-8px,2px,0) rotate(-4deg)" },
-      ], { duration: 520, easing: "ease-out" });
       setFace("joy");
-      await done(startle);
-      alive();
-      await wait(380);
-      alive();
-      anim(bang, [{ opacity: 1 }, { opacity: 0, transform: "scale(.6)" }], { duration: 200 });
-      setFace("open", bigFace);
-      blink(bigFace);
-      bigWing?.updatePlaybackRate(1.7);
-      const windUp = anim(bigBird, [{ transform: "translate3d(-8px,2px,0) rotate(-4deg)" }, { transform: "translate3d(-28px,12px,0) rotate(4deg)" }], { duration: 380, easing: "cubic-bezier(.4,0,.2,1)" });
-      await done(windUp);
-      alive();
-      bigWing?.updatePlaybackRate(2.4);
-      const exit = anim(bigBird, [
-        { transform: "translate3d(-28px,12px,0) rotate(4deg) scale(1)", easing: "cubic-bezier(.5,0,.9,.55)" },
-        { transform: `translate3d(${skyR.width * 0.35}px, ${-skyR.height * 0.12}px, 0) rotate(-10deg) scale(.92)`, offset: 0.55, easing: "cubic-bezier(.3,0,.8,.6)" },
-        { transform: `translate3d(${skyR.width * 1.08}px, ${-skyR.height * 0.3}px, 0) rotate(-14deg) scale(.82)` },
-      ], { duration: 1600 });
-      lookTo(6, -3, 400);
-      // Hops with glee and giggles while it goes.
-      const glee = (async () => {
-        await wait(150);
-        alive();
-        await hop(pos, 18, 300);
-        alive();
-        await hop(pos, 24, 330);
-        alive();
-        await giggle(700);
-      })().catch(() => {});
-      await done(exit);
-      await glee;
-      alive();
-      bang.remove();
-      bigBird.classList.add("tm-gone");
-      bigWing?.updatePlaybackRate(1);
-      lookTo(0, 0);
-      await wait(450);
-
-      // D: barrel-roll off to the split, flare to a stop.
-      alive();
-      site.classList.add("tm-away");
-      setFace("joy");
-      const rest = splitPoint();
-      squish(1.08, 0.86, 160);
-      await wait(110);
-      alive();
-      flap(200);
-      const span = rest.x - pos.x;
-      const dur = clamp(1300 + Math.hypot(span, rest.y - pos.y) * 1.1, 1500, 2300);
-      const [d1] = fly([pos, { x: pos.x + span * 0.25, y: Math.min(pos.y, rest.y) - 120 }, { x: rest.x - span * 0.22, y: rest.y - 70 }, rest], dur, { bank: 15, bob: 4, beats: 6, flare: -18 });
-      // Barrel roll in the middle of the glide.
-      anim(face, [
-        { transform: "scale(1, 1)", offset: 0 },
-        { transform: "scale(1, 1)", offset: 0.3 },
-        { transform: "scale(1, -1)", offset: 0.45 },
-        { transform: "scale(1, 1)", offset: 0.6 },
-        { transform: "scale(1, 1)" },
-      ], { duration: dur, easing: "ease-in-out" });
-      later(() => wingAnim?.updatePlaybackRate(0.8), dur * 0.5);
-      later(() => flap(150, -30, 8), dur * 0.8);
-      await done(d1);
-      alive();
-      flap(300);
-      setFace("open");
-
-      // Turn to the visitor, beam, tilt, wink.
-      later(() => setFace("joy"), 500);
-      later(() => setFace("wink"), 1300);
-      later(() => setFace("open"), 2000);
-      await done(anim(face, [
-        { transform: "perspective(500px) rotateY(0deg) rotate(0deg)" },
-        { transform: "perspective(500px) rotateY(-30deg) rotate(0deg)", offset: 0.25, easing: "ease-out" },
-        { transform: "perspective(500px) rotateY(-30deg) rotate(-9deg)", offset: 0.45, easing: "ease-in-out" },
-        { transform: "perspective(500px) rotateY(-30deg) rotate(-9deg)", offset: 0.85 },
-        { transform: "perspective(500px) rotateY(0deg) rotate(0deg)" },
-      ], { duration: 2400, easing: "ease-in-out" }));
-      alive();
-      face.getAnimations().forEach((a) => a.cancel());
-      pose.getAnimations().forEach((a) => a.cancel());
-      commit(mascot);
-
-      // E: eyes the empty sky… an idea. Flies into the big bird's spot, puffs up and bursts out big.
-      await wait(250);
-      alive();
-      lookTo(5, -6, 300);
-      setFace("o");
-      await wait(650);
-      alive();
       await giggle(500);
       alive();
-      face.getAnimations().forEach((a) => a.cancel());
-      lookTo(0, 0);
-      const home = skyHome();
-      squish(1.08, 0.86, 160);
-      await wait(110);
-      alive();
-      flap(190);
-      const gx = home.p.x - pos.x;
-      const gms = clamp(900 + Math.hypot(gx, home.p.y - pos.y) * 1.5, 1100, 1900);
-      const [g1] = fly([pos, { x: pos.x + gx * 0.3, y: Math.min(pos.y, home.p.y) - 90 }, { x: home.p.x - gx * 0.3, y: home.p.y - 50 }, home.p], gms, { bank: 14, bob: 3, beats: 5, flare: -16 });
-      later(() => flap(140, -30, 8), gms * 0.75);
-      await done(g1);
-      alive();
-      // Puff up…
-      setFace("o");
-      flap(100, -34, 14);
-      await done(anim(face, [{ transform: "scale(1, 1)" }, { transform: "scale(1.2, .8)", offset: 0.55 }, { transform: "scale(.88, 1.14)" }], { duration: 320, easing: "ease-in" }));
-      alive();
-      // …and burst out big.
-      face.getAnimations().forEach((a) => a.cancel());
-      pose.getAnimations().forEach((a) => a.cancel());
-      const S = home.w / w;
-      burst(centreOf(home.p, home.w), home.w);
-      setFace("joy");
-      wingTo(8, 360);
-      const grow = anim(mascot, [
-        { transform: `${at(home.p)} scale(.85)` },
-        { transform: `${at(home.p)} scale(${(S * 1.14).toFixed(3)})`, offset: 0.42 },
-        { transform: `${at(home.p)} scale(${(S * 0.95).toFixed(3)})`, offset: 0.72 },
-        { transform: `${at(home.p)} scale(${S.toFixed(3)})` },
-      ], { duration: 640, easing: "cubic-bezier(.2,.9,.3,1)" });
-      anim(pose, [{ transform: "rotate(8deg)" }, { transform: `rotate(${FLOAT_TILT}deg)` }], { duration: 640, easing: "cubic-bezier(.3,1.5,.5,1)" });
-      await done(grow);
-      alive();
-      // It is the sky bird now: hand over to the real one (same art, same pose, same spot).
-      await wait(160);
-      alive();
-      skyBack();
-      setFace("joy", bigFace);
-      mascot.classList.remove("tm-on");
-      for (const el of [mascot, pose, face, wing]) el.getAnimations().forEach((a) => a.cancel());
-      wingAnim = null;
-
-      // F: the old big bird swoops back from the right, bursts down small and lands on the "l".
-      await wait(450);
-      alive();
-      setFace("open", bigFace);
-      blink(bigFace);
-      await wait(350);
-      alive();
-      lookTo(7, -3, 300, bigFace); // something's coming…
-      const small = smallW();
-      setW(home.w);
-      facing = -1;
-      anim(face, [{ transform: "scale(-1, 1)" }, { transform: "scale(-1, 1)" }], { duration: 1 });
-      setFace("o");
-      const sr = rel(sky.getBoundingClientRect());
-      const lp = perchPoint();
-      const bh = h();
-      const from: P = { x: page.clientWidth + w * 0.3, y: sr.top + Math.max(sr.height * 0.2, bh * 0.85 + 12) }; // all of it on screen
-      // Where it bursts: just above and right of the "l", with all of the (left-facing) big bird on screen.
-      const bp: P = { x: Math.min(lp.x + small * 0.5, page.clientWidth - w * BELLY.x - 6), y: Math.max(lp.y - small * 0.9, bh * 0.8 + 8) };
-      pos = from;
-      mascot.style.transform = at(pos);
-      mascot.classList.add("tm-on");
-      flap(260, -26, 10);
-      const fx = bp.x - from.x;
-      const fms = clamp(1000 + Math.abs(fx) * 1.1, 1300, 2000);
-      const [f1] = fly([from, { x: from.x + fx * 0.3, y: from.y - 20 }, { x: bp.x - fx * 0.25, y: bp.y - 40 }, bp], fms, { bank: 12, bob: 5, beats: 4, flare: -14 });
-      later(() => {
-        lookTo(0, -4, 300, bigFace);
-        setFace("wink", bigFace);
-      }, fms * 0.3);
-      later(() => setFace("joy"), fms * 0.4);
-      later(() => {
-        lookTo(-7, 2, 300, bigFace);
-        setFace("joy", bigFace);
-      }, fms * 0.65);
-      later(() => flap(150, -30, 8), fms * 0.75);
-      await done(f1);
-      alive();
-      // Puff… and burst down small, with a dizzy spin.
-      setFace("o");
-      flap(100, -34, 14);
-      await done(anim(face, [{ transform: "scale(-1, 1)" }, { transform: "scale(-1.2, .8)", offset: 0.55 }, { transform: "scale(-.88, 1.14)" }], { duration: 300, easing: "ease-in" }));
-      alive();
-      face.getAnimations().forEach((a) => a.cancel());
-      anim(face, [{ transform: "scale(-1, 1)" }, { transform: "scale(-1, 1)" }], { duration: 1 });
-      pose.getAnimations().forEach((a) => a.cancel());
-      const sc = small / w;
-      burst(centreOf(bp, w), w);
-      setFace("dizzy");
-      wingTo(-10, 200);
-      const shrink = anim(mascot, [
-        { transform: `${at(bp)} scale(1.06)` },
-        { transform: `${at(bp)} scale(${(sc * 0.8).toFixed(3)})`, offset: 0.45 },
-        { transform: `${at(bp)} scale(${(sc * 1.12).toFixed(3)})`, offset: 0.75 },
-        { transform: `${at(bp)} scale(${sc.toFixed(3)})` },
-      ], { duration: 660, easing: "cubic-bezier(.3,.8,.3,1)" });
-      anim(pose, [{ transform: "rotate(0deg)" }, { transform: "rotate(360deg)" }], { duration: 660, easing: "cubic-bezier(.3,.6,.3,1)" });
-      await done(shrink);
-      alive();
-      // Small again: same spot, at its own size now.
-      mascot.getAnimations().forEach((a) => a.cancel());
-      pose.getAnimations().forEach((a) => a.cancel());
-      setW(small);
-      pos = bp;
-      mascot.style.transform = at(pos);
-      flap(180);
-      await done(anim(face, [0, -12, 12, -8, 6, 0].map((d) => ({ transform: `scale(-1, 1) rotate(${d}deg)` })), { duration: 450, easing: "ease-in-out" }));
-      alive();
-      await giggle(450);
-      alive();
-      // Flutter down onto the "l".
-      flap(170);
-      const [f2] = fly([pos, { x: pos.x - 10, y: pos.y - 30 }, { x: lp.x + w * 0.5, y: lp.y - 45 }, lp], 760, { ease: easeOutCubic, bank: 14, bob: 3, beats: 2, flare: -18 });
-      later(() => flap(130, -30, 6), 500);
-      await done(f2);
-      alive();
-      wingTo(16, 150);
-      bump(0.08);
-      squish(1.14, 0.8, 260);
-      await wait(300);
-      alive();
-      // Turns to the sky bird: a wink, a wink back, a laugh.
-      await turn(1);
-      alive();
-      lookTo(6, -4, 300);
-      setFace("wink");
-      await wait(350);
-      alive();
-      lookTo(-7, 3, 300, bigFace);
-      setFace("wink", bigFace);
-      await wait(800);
-      alive();
-      setFace("joy", bigFace);
-      await giggle(600);
-      alive();
-      lookTo(0, 0);
-      lookTo(0, 0, 300, bigFace);
-      face.getAnimations().forEach((a) => a.cancel());
-      pose.getAnimations().forEach((a) => a.cancel());
-      commit(mascot);
-
-      // G: lives on the "l".
+      setFace("open");
       goIdle();
     };
 
@@ -999,12 +583,11 @@ export function MascotIntro({ lang }: { lang: Lang }) {
     let lastW = page.clientWidth;
     const ro = new ResizeObserver(() => {
       if (!introDone) {
-        // A scrollbar appearing nudges the width a little; only a real resize ends the intro early.
         if (Math.abs(page.clientWidth - lastW) > 60) skipRef.current();
         return;
       }
       lastW = page.clientWidth;
-      if (!busy) place(); // mid-trick, the trick's end places it
+      if (!busy) place();
     });
     ro.observe(page);
 
@@ -1018,24 +601,18 @@ export function MascotIntro({ lang }: { lang: Lang }) {
       const isPw = e.target.type === "password" || e.target.name.toLowerCase().includes("password");
       mode = isPw ? "password" : "email";
       if (isPw) {
-        // Both cover their eyes… and peek, naughtily, now and then.
+        // Covers eyes… and peeks naughtily now and then.
         setFace("shut");
-        setFace("shut", bigFace);
         lookTo(0, 0);
-        lookTo(0, 0, 220, bigFace);
         peekTimer = window.setInterval(() => {
           if (dead || mode !== "password") return;
-          const who = Math.random() < 0.6 ? svg : bigFace;
-          setFace("peek", who);
-          window.setTimeout(() => mode === "password" && setFace("shut", who), 650);
+          setFace("peek");
+          window.setTimeout(() => mode === "password" && setFace("shut"), 650);
         }, 2200);
       } else {
-        // Both watch the form: below the little one; left of (or below) the sky bird.
+        // Watches the form below.
         setFace("open");
-        setFace("open", bigFace);
         lookTo(-3, 7);
-        if (stacked()) lookTo(-2, 7, 300, bigFace);
-        else lookTo(-8, 3, 300, bigFace);
       }
     };
     const onBlur = () => {
@@ -1043,9 +620,7 @@ export function MascotIntro({ lang }: { lang: Lang }) {
         clearInterval(peekTimer);
         mode = "free";
         setFace("open");
-        setFace("open", bigFace);
         lookTo(0, 0);
-        lookTo(0, 0, 220, bigFace);
       }, 350);
     };
     const onType = () => {
@@ -1056,7 +631,6 @@ export function MascotIntro({ lang }: { lang: Lang }) {
       clearInterval(peekTimer);
       mode = "free";
       setFace("joy");
-      setFace("joy", bigFace);
       squish(1.1, 0.88, 300);
     };
     form?.addEventListener("focusin", onFocus);
@@ -1077,11 +651,6 @@ export function MascotIntro({ lang }: { lang: Lang }) {
       for (const a of [...live]) a.cancel();
       joinLetters();
       site.classList.remove("tm-intro", "tm-away");
-      bigBird.classList.remove("tm-gone");
-      bigBird.getAnimations().forEach((a) => a.cancel());
-      bigBird.querySelector(".tm-bang")?.remove();
-      page.querySelectorAll(".tm-burst").forEach((b) => b.remove());
-      skyLoops().forEach((a) => a.play());
     };
   }, []);
 
@@ -1091,7 +660,6 @@ export function MascotIntro({ lang }: { lang: Lang }) {
         <div className="tm-idle">
           <div className="tm-watchwrap">
             <div className="tm-face">
-              {/* The same optimised images as the sky bird (same props, so the same, already loaded files). */}
               <Image src="/brands/thabaal/wing.png" className="tm-wing" alt="" width={640} height={354} loading="eager" />
               <Image src="/brands/thabaal/body.png" className="tm-body" alt="" width={640} height={354} loading="eager" />
               <BirdFace />

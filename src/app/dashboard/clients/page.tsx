@@ -9,9 +9,11 @@ import { db } from "@/lib/db";
 import { numberHealth } from "@/lib/limits";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { getScope } from "@/lib/session";
-import { iconLookOf, iconPackOf } from "@/lib/icon-pack";
+import { cleanOverrides, legacyOverrides, portalDefault } from "@/lib/appearance";
+import { getSettings } from "@/lib/provider";
+import { AppearanceEditor } from "../appearance-editor";
 import { deleteClientUser } from "../actions/clients";
-import { AccessSelect, AddLoginForm, AddNumberForm, BrandingForm, ClientSectionsForm, IconPackForm, NewClientForm, NumberActions, RefreshNumbersButton, ResetPasswordButton, SendingRulesForm, TokenForm } from "./client-forms";
+import { AccessSelect, AddLoginForm, AddNumberForm, BrandingForm, ClientSectionsForm, NewClientForm, NumberActions, RefreshNumbersButton, ResetPasswordButton, SendingRulesForm, TokenForm } from "./client-forms";
 
 export const metadata: Metadata = { title: "Clients" };
 export const dynamic = "force-dynamic";
@@ -20,14 +22,18 @@ export default async function ClientsPage() {
   const scope = await getScope();
   if (!scope.isAdmin) redirect("/dashboard");
 
-  const clients = await db.client.findMany({
+  const [clients, settings] = await Promise.all([
+    db.client.findMany({
     include: {
       users: { select: { id: true, name: true, email: true, access: true, createdAt: true }, orderBy: { createdAt: "asc" } },
       numbers: { orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }], include: { _count: { select: { campaigns: true } } } },
       _count: { select: { customers: true, campaigns: true, templates: true, pending: true } },
     },
     orderBy: { name: "asc" },
-  });
+    }),
+    getSettings(),
+  ]);
+  const portalLook = portalDefault(settings.appearance);
   const health = new Map((await Promise.all(clients.map((c) => numberHealth(c.id)))).flat().map((h) => [h.id, h]));
   const totalCustomers = clients.reduce((sum, c) => sum + c._count.customers, 0);
   const totalCampaigns = clients.reduce((sum, c) => sum + c._count.campaigns, 0);
@@ -196,9 +202,11 @@ export default async function ClientsPage() {
                   </section>
 
                   <section className="border-t border-line pt-5 xl:col-span-2">
-                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Icon style</h3>
-                    <p className="mb-3 mt-1 text-xs text-muted">The icon set and tile look this client&apos;s portal uses. Mix any set with either look.</p>
-                    <IconPackForm clientId={c.id} initial={{ pack: iconPackOf(c.iconPack), look: iconLookOf(c.iconLook) }} />
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Appearance</h3>
+                    <p className="mb-3 mt-1 text-xs text-muted">
+                      This client&apos;s look. Anything left on <span className="font-medium text-ink-2">Default</span> follows the portal default (Settings → Appearance).
+                    </p>
+                    <AppearanceEditor mode="client" clientId={c.id} clientName={c.name} initial={{ ...legacyOverrides(c), ...cleanOverrides(c.appearance) }} portal={portalLook} />
                   </section>
 
                   <section className="border-t border-line pt-5 xl:col-span-2">

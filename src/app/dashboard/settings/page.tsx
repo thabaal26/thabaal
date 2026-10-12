@@ -10,6 +10,8 @@ import { getSettings, wahaConfig } from "@/lib/provider";
 import { waConfig } from "@/lib/whatsapp";
 import { LocalSessionPanel, ProviderSwitch } from "./provider-panel";
 import { PasswordForm } from "./password-form";
+import { AppearanceEditor } from "../appearance-editor";
+import { portalDefault } from "@/lib/appearance";
 
 export const metadata: Metadata = { title: "Settings" };
 export const dynamic = "force-dynamic";
@@ -126,6 +128,17 @@ export default async function SettingsPage() {
           {account}
         </div>
       </div>
+      <Card id="appearance" className="card-3d mt-4 scroll-mt-20 sm:mt-6">
+        <CardHeader
+          tone="violet"
+          title="Appearance"
+          description="The portal's default look: icons, tiles, cards, buttons and charts. Each client can have its own look on the Clients page."
+          action={<Link href="/dashboard/clients" className={buttonClass("secondary", "sm")}>Per client</Link>}
+        />
+        <div className="p-3.5 sm:p-5">
+          <AppearanceEditor mode="portal" initial={portalDefault(settings.appearance)} />
+        </div>
+      </Card>
     </>
   );
 }
