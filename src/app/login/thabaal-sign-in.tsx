@@ -75,44 +75,36 @@ export function ThabaalSignIn() {
       lang={lang}
     >
       <div className="thabaal-page" id="top">
+        {/* Language Switcher Pill (Top-Left of Screen / Sky on mobile) */}
+        <div
+          className="thabaal-lang-pill"
+          role="group"
+          aria-label={lang === "ta" ? "மொழி" : "Language"}
+        >
+          <button
+            type="button"
+            onClick={() => setLang("en")}
+            className={lang === "en" ? "active" : ""}
+            aria-pressed={lang === "en"}
+            lang="en"
+          >
+            EN
+          </button>
+          <button
+            type="button"
+            onClick={() => setLang("ta")}
+            className={lang === "ta" ? "active" : ""}
+            aria-pressed={lang === "ta"}
+            lang="ta"
+          >
+            தமிழ்
+          </button>
+        </div>
+
         {/* LEFT COLUMN: SIGN IN FORM */}
         <section className="thabaal-left">
-          {/* Language Switcher Pill */}
-          <div
-            className="thabaal-lang-pill"
-            role="group"
-            aria-label={lang === "ta" ? "மொழி" : "Language"}
-          >
-            <button
-              type="button"
-              onClick={() => setLang("en")}
-              className={lang === "en" ? "active" : ""}
-              aria-pressed={lang === "en"}
-              lang="en"
-            >
-              EN
-            </button>
-            <button
-              type="button"
-              onClick={() => setLang("ta")}
-              className={lang === "ta" ? "active" : ""}
-              aria-pressed={lang === "ta"}
-              lang="ta"
-            >
-              தமிழ்
-            </button>
-          </div>
-
-          {/* Brand Bird Mark & Adaptive Day/Night Wordmark */}
+          {/* Brand Wordmark with Mascot Bird Perched on Top */}
           <div className="thabaal-brand">
-            <Image
-              src="/brands/thabaal/mark.png"
-              className="mark"
-              alt="Thabaal Bird"
-              width={180}
-              height={100}
-              priority
-            />
             {/* English and Tamil wordmarks, each in a day and a night colour; CSS shows the right one. */}
             <div
               className="words"

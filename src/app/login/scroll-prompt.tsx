@@ -16,17 +16,27 @@ export function ScrollDownPrompt({ lang }: { lang: "en" | "ta" }) {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
+    let rafId = 0;
+    let isHidden = false;
+
     const onScroll = () => {
-      // Hide once user scrolls past 70px
-      if (window.scrollY > 70) {
-        setScrolled(true);
-      } else {
-        setScrolled(false);
-      }
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = 0;
+        // Hide once user scrolls past 45px
+        const past = window.scrollY > 45;
+        if (past !== isHidden) {
+          isHidden = past;
+          setScrolled(past);
+        }
+      });
     };
 
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
   }, []);
 
   const handleClick = (e: React.MouseEvent) => {

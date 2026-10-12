@@ -35,12 +35,14 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   min-height: 100vh;
+  min-height: 100dvh;
   width: 100%;
   font-family: var(--font-nunito), "Nunito", var(--font-tamil), ui-rounded, system-ui, -apple-system, sans-serif;
   background: var(--bg);
   color: var(--fg);
   transition: background 1s var(--ease), color 1s var(--ease);
   -webkit-font-smoothing: antialiased;
+  position: relative;
 }
 
 /* ============ LEFT: SIGN IN ============ */
@@ -347,6 +349,7 @@
   position: absolute;
   top: 24px;
   left: 24px;
+  z-index: 35;
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
@@ -874,31 +877,110 @@
 @media (max-width: 900px) {
   .thabaal-page {
     grid-template-columns: 1fr;
-    grid-template-rows: 230px auto;
+    grid-template-rows: auto 1fr;
+    min-height: 100dvh;
   }
   .thabaal-right {
     order: -1;
     min-height: 0;
-    height: 230px;
-    margin: 12px 12px 0;
-    border-radius: 24px;
-  }
-  .thabaal-left {
-    padding: 24px 20px 40px;
+    height: clamp(135px, 18vh, 160px);
+    margin: 10px 10px 0;
+    border-radius: 20px;
   }
   .thabaal-birdfloat {
-    width: min(52cqw, 230px);
+    width: min(44cqw, 160px);
   }
   .thabaal-sun, .thabaal-moon {
-    top: 18%;
+    top: 14%;
+    right: 14%;
+    width: 48px;
+    height: 48px;
   }
   .thabaal-togglewrap {
-    top: 16px;
-    right: 16px;
+    top: 12px;
+    right: 14px;
     gap: 0;
   }
   .thabaal-tgbox {
-    transform: scale(.6);
+    transform: scale(.62);
     transform-origin: top right;
+  }
+  .thabaal-lang-pill {
+    top: 20px;
+    left: 20px;
+    z-index: 35;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-color: rgba(253, 185, 19, 0.45);
+    box-shadow: 0 2px 10px rgba(6, 37, 72, 0.1);
+  }
+  [data-theme="night"] .thabaal-lang-pill {
+    background: rgba(6, 37, 72, 0.85);
+    border-color: rgba(253, 185, 19, 0.5);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  }
+  .thabaal-left {
+    padding: 14px 20px clamp(60px, 9vh, 80px);
+    gap: 12px;
+    justify-content: flex-start;
+  }
+  .thabaal-brand {
+    gap: 4px;
+  }
+  .thabaal-brand .words {
+    width: clamp(200px, 58vw, 250px);
+  }
+  .thabaal-form {
+    max-width: 360px;
+  }
+  .thabaal-form h1 {
+    font-size: 23px;
+    margin-top: 2px;
+  }
+  .thabaal-form .sub {
+    font-size: 12.5px;
+    margin-top: 3px;
+  }
+  .thabaal-field {
+    margin-top: 10px;
+  }
+  .thabaal-field input {
+    height: 44px;
+    font-size: 14px;
+  }
+  .thabaal-row {
+    margin-top: 6px;
+  }
+  .thabaal-login-btn {
+    height: 44px;
+    margin-top: 14px;
+    font-size: 14.5px;
+  }
+  .thabaal-signup {
+    margin-top: 8px;
+    font-size: 12.5px;
+  }
+}
+
+@media (max-width: 480px) {
+  .thabaal-left {
+    padding-inline: 16px;
+  }
+  .thabaal-right {
+    margin: 8px 8px 0;
+    border-radius: 18px;
+    height: clamp(125px, 17vh, 145px);
+  }
+  .thabaal-lang-pill {
+    top: 16px;
+    left: 16px;
+  }
+  .thabaal-togglewrap {
+    top: 10px;
+    right: 12px;
+  }
+  .thabaal-birdfloat {
+    width: min(46cqw, 145px);
   }
 }

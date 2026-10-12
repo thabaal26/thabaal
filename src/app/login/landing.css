@@ -18,7 +18,11 @@
 [data-lang="ta"] .tl { line-height: 1.6; }
 
 .tl-wrap { width: min(1120px, 100% - 40px); margin-inline: auto; }
-.tl-section { padding: clamp(56px, 9vw, 104px) 0; }
+.tl-section {
+  padding: clamp(56px, 9vw, 104px) 0;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 600px;
+}
 .tl h2 {
   font-size: clamp(26px, 3.6vw, 40px);
   font-weight: 800;
@@ -61,7 +65,8 @@
   display: flex; flex-direction: column; gap: 6px;
   /* Perforated stamp edge. */
   -webkit-mask: var(--notch); mask: var(--notch);
-  transform: rotate(var(--r, -1.5deg));
+  will-change: transform;
+  transform: rotate(var(--r, -1.5deg)) translateZ(0);
   text-align: left;
 }
 .tl-stamp:nth-child(2) { --r: 1.2deg; background: #fff3cc; }
@@ -73,7 +78,12 @@
 }
 
 /* ── Journey: five envelopes along the bird's flight path ── */
-.tl-journey-sec { background: var(--soft); transition: background 1s var(--ease); }
+.tl-journey-sec {
+  background: var(--soft);
+  transition: background 1s var(--ease);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 550px;
+}
 .tl-journey { list-style: none; padding: 0; margin-top: 48px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; position: relative; }
 .tl-journey::before {
   content: ""; position: absolute; left: 6%; right: 6%; top: 27px;
@@ -181,13 +191,21 @@
 .tl-faq details p { padding: 0 0 22px; font-size: 16px; line-height: 1.65; max-width: 66ch; }
 
 /* ── Closing: the sign-in sky again ── */
-.tl-close { position: relative; overflow: hidden; padding: clamp(72px, 10vw, 120px) 0; text-align: center; color: var(--navy); }
+.tl-close {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(72px, 10vw, 120px) 0;
+  text-align: center;
+  color: var(--navy);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 600px;
+}
 .tl-close-sky { position: absolute; inset: 0; background: linear-gradient(180deg, #76bff8 0%, #a9d8ff 45%, #ffe0c2 85%, #ffcba3 100%); transition: background 1s var(--ease); }
 [data-theme="night"] .tl-close { color: #fff; }
 [data-theme="night"] .tl-close-sky { background: linear-gradient(180deg, #040a1d 0%, #0c1844 55%, #2b2e72 100%); }
 .tl-close-inner { position: relative; display: flex; flex-direction: column; align-items: center; }
 .tl-close h2 { margin-inline: auto; }
-.tl-close-bird { width: 132px; height: auto; margin-bottom: 18px; animation: tl-bob 4s ease-in-out infinite; }
+.tl-close-bird { width: 132px; height: auto; margin-bottom: 18px; animation: tl-bob 4s ease-in-out infinite; will-change: transform; }
 [data-theme="night"] .tl-close-bird { filter: drop-shadow(0 0 1.5px rgb(255 255 255 / .9)) drop-shadow(0 0 16px rgb(253 185 19 / .4)); }
 .tl-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
 .tl-close .tl-btn-main { background: var(--navy); color: #fff; }
@@ -226,6 +244,6 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  html:has(.thabaal-site) { scroll-behavior: smooth; }
+  html:has(.thabaal-site), html:has(.thabaal-scope) { scroll-behavior: smooth; }
 }
 .tl#explore { scroll-margin-top: -5rem; }
