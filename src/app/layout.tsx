@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Noto_Sans_Tamil, Nunito } from "next/font/google";
+import { Geist, Geist_Mono, Inter, Noto_Sans_Tamil, Nunito, Poppins } from "next/font/google";
 import { ConfirmHost } from "@/components/confirm";
 import { ServiceWorkerRegister } from "@/components/sw-register";
 import { Toaster } from "@/components/toast";
@@ -8,6 +8,10 @@ import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"], display: "swap" });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"], display: "swap", preload: false });
+// Fonts a portal can pick (Settings → Appearance). Not preloaded: a browser only downloads one
+// when the page actually uses it.
+const inter = Inter({ variable: "--font-inter", subsets: ["latin"], display: "swap", preload: false });
+const poppins = Poppins({ variable: "--font-poppins", subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap", preload: false });
 const nunito = Nunito({ variable: "--font-nunito", subsets: ["latin"], weight: ["400", "600", "700", "800"], display: "swap" });
 // Campaign text, replies and the catalogue are often Tamil. The font's unicode-range means
 // browsers only fetch it on pages that actually contain Tamil, so it isn't preloaded.
@@ -39,7 +43,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} ${tamil.variable} ${nunito.variable} h-full antialiased`}>
+    <html lang="en" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} ${tamil.variable} ${nunito.variable} ${inter.variable} ${poppins.variable} h-full antialiased`}>
       <head>
         {/* Sets light or dark before the first paint, from the saved choice or the device setting. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />

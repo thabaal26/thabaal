@@ -518,7 +518,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
 
       {/* Collapsible Order & Payment Settings drawer so the daily order board stays uncluttered */}
       {scope.canManage && scope.clientId && (
-        <details className="group mt-6 rounded-card border border-line bg-panel shadow-xs">
+        <details className="ui-card group mt-6 rounded-card border border-line bg-panel shadow-xs">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
             <div>
               <h2 className="text-sm font-semibold text-ink">Order &amp; Payment Settings</h2>

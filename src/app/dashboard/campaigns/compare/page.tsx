@@ -201,7 +201,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
 
         {/* Desktop table */}
         <div className="thin-scroll hidden overflow-x-auto sm:block">
-          <table className="w-full min-w-[720px] text-sm">
+          <table className="ui-table w-full min-w-[720px] text-sm">
             <thead>
               <tr className="border-b border-line text-left text-2xs uppercase tracking-wide text-muted">
                 <th className="px-4 py-2.5 font-medium sm:px-5">Campaign</th>

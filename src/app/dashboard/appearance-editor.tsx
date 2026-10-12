@@ -5,10 +5,10 @@ import { useState, useTransition, type ReactNode } from "react";
 import { Bell, Check, ChevronDown, Package, Search, Send, ShoppingCart, Sparkles, Truck, Users } from "@/components/icons";
 import { Bell3D, Dashboard3D, Rupee3D, ShoppingBag3D, Trophy3D, Users3D } from "@/components/icons-3d";
 import { IconSetLink } from "@/components/icon-set-link";
-import { TrendChart } from "@/components/charts";
-import { ColumnChart } from "@/components/viz";
+import { TrendChart, UsageGauge } from "@/components/charts";
+import { BarList, ColumnChart } from "@/components/viz";
 import { toastResult } from "@/components/toast";
-import { Badge, Button, Card, CardHeader, IconCube, type HeaderTone } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, IconCube, rowClass, Table, Td, Th, type HeaderTone } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import {
   APPEARANCE_KEYS,
@@ -31,8 +31,9 @@ const GROUPS: { title: string; note?: string; keys: AppearanceKey[] }[] = [
   { title: "Icons", note: "The line icons on every screen.", keys: ["iconPack", "iconWeight"] },
   { title: "Icon tiles", note: "The coloured squares in the menu, on KPI cards and in empty states.", keys: ["tileLook", "tileTone", "tileArt"] },
   { title: "Cards", keys: ["cardStyle"] },
-  { title: "Buttons and corners", keys: ["uiStyle"] },
-  { title: "Charts", note: "Gauges, heat maps and range charts always draw with ECharts.", keys: ["chartLib"] },
+  { title: "Buttons, corners and text", keys: ["uiStyle", "font", "density"] },
+  { title: "Forms and tables", keys: ["inputStyle", "tableStyle"] },
+  { title: "Charts", note: "Every chart (lines, columns, donuts, gauges, heat maps, bar lists) follows these.", keys: ["chartLib", "chartPalette", "chartCurve", "chartFill", "chartGrid", "chartBars", "chartMotion"] },
 ];
 
 const LABEL: Record<AppearanceKey, string> = {
@@ -44,6 +45,16 @@ const LABEL: Record<AppearanceKey, string> = {
   cardStyle: "Card style",
   uiStyle: "UI style",
   chartLib: "Chart library",
+  chartPalette: "Colours",
+  chartCurve: "Lines",
+  chartFill: "Fill under lines",
+  chartGrid: "Gridlines",
+  chartBars: "Bar ends",
+  chartMotion: "Motion",
+  font: "Font",
+  density: "Spacing",
+  inputStyle: "Input fields",
+  tableStyle: "Tables",
 };
 
 const optionLabel = <K extends AppearanceKey>(key: K, id: Appearance[K]) => OPTIONS[key].find((o) => o.id === id)?.label ?? id;
@@ -284,6 +295,40 @@ function Swatch({ k, id, look }: { k: AppearanceKey; id: string; look: Appearanc
       </span>
     );
   }
+  if (k === "font") {
+    return (
+      <span {...appearanceAttrs(with_)} aria-hidden className="contents">
+        <span className="ui-font text-base font-semibold leading-none text-ink">Aa</span>
+      </span>
+    );
+  }
+  if (k === "inputStyle") {
+    return (
+      <span {...appearanceAttrs(with_)} aria-hidden className="contents">
+        <span className="field pointer-events-none !min-h-0 !w-8 !px-0 !py-0 block h-4" />
+      </span>
+    );
+  }
+  if (k === "tableStyle") {
+    return (
+      <span {...appearanceAttrs(with_)} aria-hidden className="contents">
+        <span className="ui-table block w-7 overflow-hidden rounded-[3px] ring-1 ring-line">
+          {[0, 1, 2].map((i) => (
+            <span key={i} className="ui-row block h-1.5 border-b border-line last:border-0" />
+          ))}
+        </span>
+      </span>
+    );
+  }
+  if (k === "chartPalette") {
+    return (
+      <span {...appearanceAttrs(with_)} aria-hidden className="flex gap-0.5">
+        {["emerald", "blue", "gold", "violet"].map((c) => (
+          <span key={c} className="size-2.5 rounded-full" style={{ background: `var(--color-chart-${c})` }} />
+        ))}
+      </span>
+    );
+  }
   if (k === "uiStyle") {
     return (
       <span {...appearanceAttrs(with_)} aria-hidden className="contents">
@@ -349,6 +394,45 @@ function Preview({ look }: { look: Appearance }) {
           </Card>
         ))}
       </div>
+
+      <Card className="flex items-center gap-3 p-3">
+        <UsageGauge value={62} max={100} size={84} label="Daily sending limit: 62% used">
+          <span className="text-sm font-semibold text-ink">62%</span>
+        </UsageGauge>
+        <BarList
+          className="min-w-0 flex-1"
+          label="Top products"
+          items={[
+            { key: "a", label: "Groundnut oil", value: 42 },
+            { key: "b", label: "Sesame oil", value: 27, color: "gold" },
+            { key: "c", label: "Coconut oil", value: 15, color: "blue" },
+          ]}
+        />
+      </Card>
+
+      <Card className="space-y-2.5 p-3">
+        <input className="field" placeholder="Search customers" readOnly aria-label="Sample field" />
+        <Table>
+          <thead>
+            <tr>
+              <Th>Customer</Th>
+              <Th numeric>Orders</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              ["Meena", 12],
+              ["Arjun", 7],
+              ["Fathima", 4],
+            ].map(([n, o]) => (
+              <tr key={n} className={rowClass}>
+                <Td>{n}</Td>
+                <Td numeric>{o}</Td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </Card>
 
       <Card className="p-3">
         <ColumnChart columns={COLUMNS} height={110} label="Sales by day" />

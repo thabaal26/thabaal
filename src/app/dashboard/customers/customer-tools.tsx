@@ -281,7 +281,7 @@ function PendingRowItem({ row }: { row: PendingCustomerRow }) {
   const [busy, start] = useTransition();
 
   return (
-    <li className="space-y-2.5 rounded-card border border-line bg-panel p-3 text-xs">
+    <li className="ui-card space-y-2.5 rounded-card border border-line bg-panel p-3 text-xs">
       <div className="flex flex-wrap items-center justify-between gap-1.5">
         <span className="font-semibold text-ink">{row.name || "(name unclear)"}</span>
         <div className="flex flex-wrap gap-1">

@@ -58,7 +58,7 @@ export function ViewTabs({
 
   return (
     <div className="sticky top-[calc(3rem+env(safe-area-inset-top)+0.375rem)] z-20 mb-3.5 flex justify-center sm:top-[calc(3.5rem+env(safe-area-inset-top)+0.5rem)] sm:mb-6 sm:px-1 lg:top-[4.5rem] print:hidden">
-      <div className="flex w-full max-w-full items-center rounded-full border border-line/80 bg-panel/90 p-1 shadow-[0_6px_18px_-6px_rgb(16_24_40/0.15),0_2px_5px_-2px_rgb(16_24_40/0.07)] backdrop-blur-md sm:w-auto sm:gap-1 sm:p-1.5">
+      <div className="ui-card flex w-full max-w-full items-center rounded-full border border-line/80 bg-panel/90 p-1 shadow-[0_6px_18px_-6px_rgb(16_24_40/0.15),0_2px_5px_-2px_rgb(16_24_40/0.07)] backdrop-blur-md sm:w-auto sm:gap-1 sm:p-1.5">
         <nav aria-label="Dashboard sections" className="relative flex w-full min-w-0 items-center justify-between gap-0.5 sm:w-auto sm:min-w-max sm:justify-start sm:gap-1">
           {pill && (
             <span

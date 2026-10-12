@@ -35,7 +35,7 @@ const ORDER_COLUMNS = [
 function Columns({ rows }: { rows: string[][] }) {
   return (
     <div>
-      <table className="w-full text-xs">
+      <table className="ui-table w-full text-xs">
         <thead className="sr-only">
           <tr>
             <th scope="col">Column heading</th>

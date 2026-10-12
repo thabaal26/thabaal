@@ -61,6 +61,56 @@ export const CHART_LIBS = [
   { id: "chartjs", label: "Chart.js", hint: "Fast canvas charts, light on memory." },
 ] as const;
 
+export const CHART_PALETTES = [
+  { id: "thabaal", label: "Thabaal", hint: "Calm, readable brand colours. The default." },
+  { id: "vivid", label: "Vivid", hint: "Saturated, punchy colours." },
+  { id: "pastel", label: "Pastel", hint: "Soft, light colours." },
+  { id: "mono", label: "Mono", hint: "Shades of one green; alerts stay red." },
+] as const;
+export const CHART_CURVES = [
+  { id: "smooth", label: "Smooth", hint: "Gently curved lines." },
+  { id: "straight", label: "Straight", hint: "Point-to-point lines." },
+] as const;
+export const CHART_FILLS = [
+  { id: "gradient", label: "Gradient", hint: "A wash that fades towards the axis." },
+  { id: "flat", label: "Flat", hint: "One even tint under lines." },
+  { id: "none", label: "None", hint: "Lines only." },
+] as const;
+export const CHART_GRIDS = [
+  { id: "on", label: "Gridlines", hint: "Light guide lines behind charts." },
+  { id: "off", label: "No gridlines", hint: "A cleaner, airier chart." },
+] as const;
+export const CHART_BARS = [
+  { id: "round", label: "Rounded bars", hint: "Soft bar ends." },
+  { id: "square", label: "Square bars", hint: "Crisp bar ends." },
+] as const;
+export const CHART_MOTIONS = [
+  { id: "on", label: "Animated", hint: "Charts grow in once." },
+  { id: "off", label: "Still", hint: "Charts appear instantly." },
+] as const;
+
+export const FONTS = [
+  { id: "geist", label: "Geist", hint: "Modern and compact. The default." },
+  { id: "inter", label: "Inter", hint: "Neutral and very readable." },
+  { id: "poppins", label: "Poppins", hint: "Round and friendly." },
+  { id: "nunito", label: "Nunito", hint: "Soft, rounded letters." },
+] as const;
+export const DENSITIES = [
+  { id: "compact", label: "Compact", hint: "More on screen." },
+  { id: "normal", label: "Normal", hint: "The standard spacing." },
+  { id: "roomy", label: "Roomy", hint: "More breathing space." },
+] as const;
+export const INPUT_STYLES = [
+  { id: "outlined", label: "Outlined", hint: "A border all round. The default." },
+  { id: "filled", label: "Filled", hint: "A soft grey fill, no border." },
+  { id: "underlined", label: "Underlined", hint: "Just a line beneath." },
+] as const;
+export const TABLE_STYLES = [
+  { id: "lined", label: "Lined", hint: "A divider between rows. The default." },
+  { id: "striped", label: "Striped", hint: "Every other row tinted." },
+  { id: "plain", label: "Plain", hint: "No dividers." },
+] as const;
+
 type Ids<T extends readonly { id: string }[]> = T[number]["id"];
 export type IconPack = Ids<typeof ICON_PACKS>;
 export type IconWeight = Ids<typeof ICON_WEIGHTS>;
@@ -70,6 +120,16 @@ export type TileArt = Ids<typeof TILE_ARTS>;
 export type CardStyle = Ids<typeof CARD_STYLES>;
 export type UiStyle = Ids<typeof UI_STYLES>;
 export type ChartLib = Ids<typeof CHART_LIBS>;
+export type ChartPalette = Ids<typeof CHART_PALETTES>;
+export type ChartCurve = Ids<typeof CHART_CURVES>;
+export type ChartFill = Ids<typeof CHART_FILLS>;
+export type ChartGrid = Ids<typeof CHART_GRIDS>;
+export type ChartBars = Ids<typeof CHART_BARS>;
+export type ChartMotion = Ids<typeof CHART_MOTIONS>;
+export type FontChoice = Ids<typeof FONTS>;
+export type Density = Ids<typeof DENSITIES>;
+export type InputStyle = Ids<typeof INPUT_STYLES>;
+export type TableStyle = Ids<typeof TABLE_STYLES>;
 
 export type Appearance = {
   iconPack: IconPack;
@@ -80,6 +140,16 @@ export type Appearance = {
   cardStyle: CardStyle;
   uiStyle: UiStyle;
   chartLib: ChartLib;
+  chartPalette: ChartPalette;
+  chartCurve: ChartCurve;
+  chartFill: ChartFill;
+  chartGrid: ChartGrid;
+  chartBars: ChartBars;
+  chartMotion: ChartMotion;
+  font: FontChoice;
+  density: Density;
+  inputStyle: InputStyle;
+  tableStyle: TableStyle;
 };
 export type AppearanceKey = keyof Appearance;
 /** A client's overrides: only the keys that differ from the portal default are stored. */
@@ -94,6 +164,16 @@ export const OPTIONS: { [K in AppearanceKey]: readonly { id: Appearance[K]; labe
   cardStyle: CARD_STYLES,
   uiStyle: UI_STYLES,
   chartLib: CHART_LIBS,
+  chartPalette: CHART_PALETTES,
+  chartCurve: CHART_CURVES,
+  chartFill: CHART_FILLS,
+  chartGrid: CHART_GRIDS,
+  chartBars: CHART_BARS,
+  chartMotion: CHART_MOTIONS,
+  font: FONTS,
+  density: DENSITIES,
+  inputStyle: INPUT_STYLES,
+  tableStyle: TABLE_STYLES,
 };
 
 export const APPEARANCE_KEYS = Object.keys(OPTIONS) as AppearanceKey[];
@@ -107,6 +187,16 @@ export const BUILT_IN: Appearance = {
   cardStyle: "3d",
   uiStyle: "thabaal",
   chartLib: "echarts",
+  chartPalette: "thabaal",
+  chartCurve: "smooth",
+  chartFill: "gradient",
+  chartGrid: "on",
+  chartBars: "round",
+  chartMotion: "on",
+  font: "geist",
+  density: "normal",
+  inputStyle: "outlined",
+  tableStyle: "lined",
 };
 
 const valid = <K extends AppearanceKey>(key: K, v: unknown): v is Appearance[K] => OPTIONS[key].some((o) => o.id === v);
@@ -157,13 +247,32 @@ export function iconSetId(a: Pick<Appearance, "iconPack" | "iconWeight">): strin
 
 /** The dataset that carries the look (on <html>, the dashboard shell and preview boxes). */
 export function appearanceDataset(a: Appearance) {
-  return { iconset: iconSetId(a), look: a.tileLook, tone: a.tileTone, art: a.tileArt, card: a.cardStyle, ui: a.uiStyle, chart: a.chartLib };
+  return {
+    iconset: iconSetId(a),
+    look: a.tileLook,
+    tone: a.tileTone,
+    art: a.tileArt,
+    card: a.cardStyle,
+    ui: a.uiStyle,
+    chart: a.chartLib,
+    chartPalette: a.chartPalette,
+    chartCurve: a.chartCurve,
+    chartFill: a.chartFill,
+    chartGrid: a.chartGrid,
+    chartBars: a.chartBars,
+    chartMotion: a.chartMotion,
+    font: a.font,
+    density: a.density,
+    input: a.inputStyle,
+    table: a.tableStyle,
+  };
 }
 export type AppearanceDataset = ReturnType<typeof appearanceDataset>;
 
 /** The same as data-* attributes, to spread on an element. */
 export function appearanceAttrs(a: Appearance): Record<`data-${string}`, string> {
-  return Object.fromEntries(Object.entries(appearanceDataset(a)).map(([k, v]) => [`data-${k}`, v]));
+  // camelCase dataset keys become kebab-case attributes (chartPalette → data-chart-palette).
+  return Object.fromEntries(Object.entries(appearanceDataset(a)).map(([k, v]) => [`data-${k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`, v]));
 }
 
 /** The inline script that sets the look on <html> before anything paints. */

@@ -75,7 +75,7 @@ export default async function ReportPage() {
       <div className="grid grid-cols-1 gap-4 sm:gap-5 xl:grid-cols-12">
         <Card className="card-3d xl:col-span-5">
           <CardHeader tone="brand" icon={<ChartBar3D />} title="The week in numbers" description="vs the week before" />
-          <table className="w-full text-sm">
+          <table className="ui-table w-full text-sm">
             <tbody>
               {ROWS.map((row) => {
                 const c = row.of(r.cur);

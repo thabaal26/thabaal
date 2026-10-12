@@ -567,7 +567,7 @@ export function Avatar({ name, className }: { name: string; className?: string }
 export function Table({ className, children, ...p }: ComponentProps<"table">) {
   return (
     <div className="thin-scroll max-lg:overflow-x-auto">
-      <table className={cn("w-full text-sm", className)} {...p}>
+      <table className={cn("ui-table w-full text-sm", className)} {...p}>
         {children}
       </table>
     </div>

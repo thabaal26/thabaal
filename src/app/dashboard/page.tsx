@@ -1708,7 +1708,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       {/* Each section carries its own filters: the period and who/what it covers, right above its figures. */}
       <section
         aria-label={`${VIEWS[view].label} filters`}
-        className="mb-3.5 rounded-card border border-line bg-panel px-3 py-2.5 shadow-xs sm:mb-5 sm:px-4 sm:py-3"
+        className="ui-card mb-3.5 rounded-card border border-line bg-panel px-3 py-2.5 shadow-xs sm:mb-5 sm:px-4 sm:py-3"
       >
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <div className="min-w-0">

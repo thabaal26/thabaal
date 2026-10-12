@@ -6,8 +6,9 @@ import type { ECharts, EChartsCoreOption } from "echarts/core";
 export type ChartOption = Record<string, unknown>;
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
-import { readChartTheme, type ChartTheme } from "@/lib/chart-theme";
+import type { ChartTheme } from "@/lib/chart-theme";
 import { AltChart, type AltEngine } from "./chart-engines/alt-chart";
+import { CHART_ATTRS, drawOption } from "./chart-engines/style";
 
 type Lib = "echarts" | AltEngine;
 const libOf = (v: string | undefined): Lib => (v === "recharts" || v === "chartjs" ? v : "echarts");
@@ -103,6 +104,7 @@ export function EChart({
   const optionRef = useRef(option);
   /** The option last drawn, so the data effect doesn't redraw what init just drew. */
   const drawnWith = useRef<typeof option | null>(null);
+  const redraw = useRef<() => void>(() => {});
   const eventRef = useRef(onEvent);
   const readyRef = useRef(onReady);
   const [visible, setVisible] = useState(false);
@@ -110,6 +112,8 @@ export function EChart({
   const [lib, setLib] = useState<Lib | null>(null);
   /** This chart needs ECharts whatever the portal picked (a gauge, a heat map…). */
   const [needsEcharts, setNeedsEcharts] = useState(false);
+  /** Bumped when the chart style, colours or font change around the chart, to redraw it. */
+  const [styleTick, setStyleTick] = useState(0);
   const engine: Lib | null = !visible || !lib ? null : needsEcharts ? "echarts" : lib;
 
   useEffect(() => {
@@ -125,8 +129,11 @@ export function EChart({
     const host = (node.closest("[data-chart]") as HTMLElement | null) ?? document.documentElement;
     const read = () => setLib(libOf(host.dataset.chart ?? document.documentElement.dataset.chart));
     queueMicrotask(read);
-    const mo = new MutationObserver(read);
-    mo.observe(host, { attributes: true, attributeFilter: ["data-chart"] });
+    const mo = new MutationObserver(() => {
+      read();
+      setStyleTick((n) => n + 1);
+    });
+    mo.observe(host, { attributes: true, attributeFilter: CHART_ATTRS });
     return () => mo.disconnect();
   }, []);
 
@@ -166,11 +173,10 @@ export function EChart({
       const c = chart.current;
       const node = ecEl.current;
       if (!c || !node) return;
-      const theme = readChartTheme(dark);
       drawnWith.current = optionRef.current;
-      const opt = optionRef.current(animate ? theme : { ...theme, animate: false }, { width: node.clientWidth, height: node.clientHeight });
-      c.setOption({ textStyle: { fontFamily: theme.font }, ...opt, ...(animate && theme.animate ? {} : { animation: false }) } as EChartsCoreOption, { notMerge: true });
+      c.setOption(drawOption(optionRef.current, node, dark, animate) as EChartsCoreOption, { notMerge: true });
     };
+    redraw.current = () => draw(true);
     loadEcharts().then((echarts) => {
       const node = ecEl.current;
       if (!alive || !node) return;
@@ -209,9 +215,13 @@ export function EChart({
     const node = ecEl.current;
     if (!c || !node || !ready || drawnWith.current === option) return;
     drawnWith.current = option;
-    const theme = readChartTheme(dark);
-    c.setOption({ textStyle: { fontFamily: theme.font }, ...option(theme, { width: node.clientWidth, height: node.clientHeight }) } as EChartsCoreOption, { notMerge: true });
+    c.setOption(drawOption(option, node, dark, true) as EChartsCoreOption, { notMerge: true });
   }, [option, ready, dark]);
+
+  // A new chart style or palette around the chart (the portal's, or a preview's): draw it again.
+  useEffect(() => {
+    if (styleTick) redraw.current();
+  }, [styleTick]);
 
   return (
     <div
@@ -233,6 +243,7 @@ export function EChart({
             readyRef.current?.(null);
           }}
           onUnsupported={() => setNeedsEcharts(true)}
+          styleTick={styleTick}
         />
       )}
     </div>

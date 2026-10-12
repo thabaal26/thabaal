@@ -136,3 +136,81 @@
 [data-ui="material"] { --radius-control: 0.75rem; --radius-card: 1rem; --radius-sheet: 1.75rem; }
 [data-ui="material"] .ui-btn:not([data-ui="material"] [data-ui]:not([data-ui="material"]) *) { border-radius: 999px; letter-spacing: 0.01em; }
 [data-ui="material"] .icon-cube-3d:not([data-ui="material"] [data-ui]:not([data-ui="material"]) *) { border-radius: 0.875rem !important; }
+
+/* ── Chart colours (data-chart-palette): the --color-chart-* tokens every chart reads. ── */
+[data-chart-palette="vivid"] {
+  --color-chart-emerald: #10b981; --color-chart-blue: #3b82f6; --color-chart-gold: #f59e0b; --color-chart-violet: #8b5cf6;
+  --color-chart-coral: #f97316; --color-chart-cyan: #06b6d4; --color-chart-red: #ef4444;
+}
+[data-chart-palette="pastel"] {
+  --color-chart-emerald: #5fc4a3; --color-chart-blue: #7fa9e8; --color-chart-gold: #ecc25a; --color-chart-violet: #ad9bef;
+  --color-chart-coral: #f19d80; --color-chart-cyan: #6cc8d6; --color-chart-red: #ec8a8a;
+}
+[data-chart-palette="mono"] {
+  --color-chart-emerald: #11634f; --color-chart-blue: #2f8f74; --color-chart-gold: #5fb59a; --color-chart-violet: #93d0bb;
+  --color-chart-coral: #0b4436; --color-chart-cyan: #bde5d6;
+}
+.dark[data-chart-palette="vivid"], .dark [data-chart-palette="vivid"] {
+  --color-chart-emerald: #34d399; --color-chart-blue: #60a5fa; --color-chart-gold: #fbbf24; --color-chart-violet: #a78bfa;
+  --color-chart-coral: #fb923c; --color-chart-cyan: #22d3ee; --color-chart-red: #f87171;
+}
+.dark[data-chart-palette="pastel"], .dark [data-chart-palette="pastel"] {
+  --color-chart-emerald: #7fd4b6; --color-chart-blue: #9cbdf0; --color-chart-gold: #f0d080; --color-chart-violet: #bfb0f5;
+  --color-chart-coral: #f4b39b; --color-chart-cyan: #8ad6e2; --color-chart-red: #f0a0a0;
+}
+.dark[data-chart-palette="mono"], .dark [data-chart-palette="mono"] {
+  --color-chart-emerald: #1fa47c; --color-chart-blue: #47c09a; --color-chart-gold: #7dd4b6; --color-chart-violet: #b3e6d3;
+  --color-chart-coral: #157a5e; --color-chart-cyan: #d3f1e6;
+}
+/* Back to the standard colours inside a box that asks for them (an Appearance preview). */
+[data-chart-palette="thabaal"]:not(:root) {
+  --color-chart-emerald: #12936e; --color-chart-blue: #2a78d6; --color-chart-gold: #e3a008; --color-chart-violet: #7a5af0;
+  --color-chart-coral: #e5603b; --color-chart-cyan: #0f9fb5; --color-chart-red: #d03b3b;
+}
+.dark [data-chart-palette="thabaal"] {
+  --color-chart-emerald: #1fa47c; --color-chart-blue: #4189e2; --color-chart-gold: #b88a12; --color-chart-violet: #8670e6;
+  --color-chart-coral: #da6640; --color-chart-cyan: #169aae; --color-chart-red: #e05656;
+}
+
+/* ── Font (data-font). Inter and Poppins only download when a portal uses them. ── */
+:root[data-font="geist"] body, [data-font="geist"]:not(:root) { font-family: var(--font-geist-sans), var(--font-tamil), ui-sans-serif, system-ui, sans-serif; }
+:root[data-font="inter"] body, [data-font="inter"]:not(:root) { font-family: var(--font-inter), var(--font-tamil), ui-sans-serif, system-ui, sans-serif; }
+:root[data-font="poppins"] body, [data-font="poppins"]:not(:root) { font-family: var(--font-poppins), var(--font-tamil), ui-sans-serif, system-ui, sans-serif; }
+:root[data-font="nunito"] body, [data-font="nunito"]:not(:root) { font-family: var(--font-nunito), var(--font-tamil), ui-sans-serif, system-ui, sans-serif; }
+
+/* ── Spacing (data-density): Tailwind's spacing unit, so every padding, gap and size scales together. ── */
+[data-density="compact"] { --spacing: 0.225rem; }
+[data-density="normal"]:not(:root) { --spacing: 0.25rem; }
+[data-density="roomy"] { --spacing: 0.28rem; }
+
+/* ── Input fields (data-input). Outlined is the base .field in globals.css. ── */
+[data-input="filled"] .field:not([data-input="filled"] [data-input]:not([data-input="filled"]) *) {
+  background-color: var(--color-sunken);
+  border-color: transparent;
+  box-shadow: none;
+}
+[data-input="filled"] .field:not([data-input="filled"] [data-input]:not([data-input="filled"]) *):hover { border-color: var(--color-line-2); }
+[data-input="filled"] .field:not([data-input="filled"] [data-input]:not([data-input="filled"]) *):focus-visible {
+  background-color: var(--color-panel);
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 20%, transparent);
+}
+[data-input="underlined"] .field:not([data-input="underlined"] [data-input]:not([data-input="underlined"]) *) {
+  background-color: transparent;
+  border-width: 0 0 1.5px;
+  border-radius: 0;
+  box-shadow: none;
+  padding-left: 0.125rem;
+}
+[data-input="underlined"] textarea.field:not([data-input="underlined"] [data-input]:not([data-input="underlined"]) *) { border-width: 0 0 0 2px; padding-left: 0.625rem; }
+[data-input="underlined"] .field:not([data-input="underlined"] [data-input]:not([data-input="underlined"]) *):focus-visible {
+  border-color: var(--color-brand);
+  box-shadow: 0 1.5px 0 0 var(--color-brand);
+}
+
+/* ── Tables (data-table). Lined is the base row style (ui.tsx rowClass). ── */
+[data-table="striped"] .ui-table:not([data-table="striped"] [data-table]:not([data-table="striped"]) *) :is(tbody > tr, .ui-row) { border-color: transparent; }
+[data-table="striped"] .ui-table:not([data-table="striped"] [data-table]:not([data-table="striped"]) *) :is(tbody > tr, .ui-row):nth-child(odd) {
+  background-color: color-mix(in srgb, var(--color-sunken) 85%, transparent);
+}
+[data-table="plain"] .ui-table:not([data-table="plain"] [data-table]:not([data-table="plain"]) *) :is(tbody > tr, .ui-row) { border-color: transparent; }

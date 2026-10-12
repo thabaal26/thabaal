@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, type ComponentType } from "react";
-import { readChartTheme, type ChartTheme } from "@/lib/chart-theme";
+import type { ChartTheme } from "@/lib/chart-theme";
 import { toModel, type ChartModel } from "./model";
+import { drawOption } from "./style";
 import type { EngineEvent, EngineProps } from "./types";
 
 export type AltEngine = "recharts" | "chartjs";
@@ -22,6 +23,7 @@ export function AltChart({
   onEvent,
   onDrawn,
   onUnsupported,
+  styleTick,
 }: {
   engine: AltEngine;
   option: (t: ChartTheme, size: { width: number; height: number }) => Record<string, unknown>;
@@ -29,6 +31,8 @@ export function AltChart({
   onEvent?: (type: "click" | "mouseover" | "mouseout" | "globalout", e: EngineEvent) => void;
   onDrawn: () => void;
   onUnsupported: () => void;
+  /** Changes when the portal's chart style or colours change, to redraw. */
+  styleTick: number;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [Engine, setEngine] = useState<ComponentType<EngineProps> | null>(null);
@@ -53,10 +57,9 @@ export function AltChart({
     let first = true;
     let w = -1;
     const build = () => {
-      const theme = readChartTheme(dark);
-      const opt = option(first ? theme : { ...theme, animate: false }, { width: node.clientWidth, height: node.clientHeight });
+      const opt = drawOption(option, node, dark, first);
       first = false;
-      const m = toModel({ textStyle: { fontFamily: theme.font }, ...opt });
+      const m = toModel(opt, { width: node.clientWidth, height: node.clientHeight });
       if (!m) unsupported.current();
       else setModel(m);
     };
@@ -72,7 +75,7 @@ export function AltChart({
       ro.disconnect();
       mo.disconnect();
     };
-  }, [option, dark]);
+  }, [option, dark, styleTick]);
 
   return <div ref={box} className="absolute inset-0">{Engine && model && <Engine model={model} onEvent={onEvent} onDrawn={onDrawn} />}</div>;
 }

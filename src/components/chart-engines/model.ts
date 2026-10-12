@@ -3,9 +3,10 @@
 /*
  * One chart description, many libraries. Every portal chart is written once as an ECharts option
  * (components/charts.tsx, viz.tsx). When a portal picks Recharts or Chart.js (lib/appearance.ts),
- * the option is read into this small neutral model, which those libraries draw. Charts the model
- * can't describe faithfully (gauges, heat maps, bars with labels placed above them, scatter) return
- * null and stay on ECharts, so nothing is ever drawn wrong.
+ * the option is read into this small neutral model, which those libraries draw: lines, columns and
+ * donuts; gauges and rings; heat maps; and the portal's row charts (bar lists, stacked rows and
+ * dumbbells, recognised by their label rows). Anything else returns null and stays on ECharts, so
+ * nothing is ever drawn wrong.
  */
 
 export type Tip = {
@@ -93,7 +94,74 @@ export type PieModel = {
   font: string;
 };
 
-export type ChartModel = Cartesian | PieModel;
+export type GaugeModel = {
+  kind: "gauge";
+  /** 0–100. */
+  value: number;
+  /** ECharts angles: degrees anticlockwise from 3 o'clock; the arc runs clockwise from start to end. */
+  start: number;
+  end: number;
+  /** Outer radius as a percent of half the box. */
+  radius: number;
+  width: number;
+  color: string;
+  track: string;
+  roundCap: boolean;
+  w: number;
+  h: number;
+  animate: boolean;
+  font: string;
+};
+
+export type HeatCell = { x: number; y: number; v: number; color?: string; label?: { color: string; size: number; weight: number } };
+export type HeatModel = {
+  kind: "heatmap";
+  xCats: string[];
+  yCats: string[];
+  xLabels: string[];
+  /** The first row sits at the top (ECharts' inverse y axis). */
+  yInverse: boolean;
+  cells: HeatCell[];
+  min: number;
+  max: number;
+  low: string;
+  high: string;
+  gap: number;
+  radius: number;
+  surface: string;
+  axisColor: string;
+  xSize: number;
+  ySize: number;
+  grid: { top: number; right: number; bottom: number; left: number };
+  tip: Tip | null;
+  w: number;
+  h: number;
+  animate: boolean;
+  font: string;
+};
+
+export type RowLabel = { name: string; tag?: string; dot?: string; right: string; sub?: string };
+export type RowsModel = {
+  kind: "rows";
+  rows: RowLabel[];
+  max: number;
+  track: string;
+  trackWidth: number;
+  text: { name: string; tag: string; right: string; sub: string; nameSize: number; tagSize: number; rightSize: number; rightWeight: number };
+  /** Stacked parts (bar lists have one). */
+  bars?: { name: string; width: number; data: { value: number; color: string; opacity: number; radius: number | number[] }[] }[];
+  /** First and latest value per row, joined by a bar. */
+  dumbbell?: { from: number[]; to: number[]; fromColor: string; toColors: string[]; joins: string[]; width: number };
+  grid: { top: number; bottom: number };
+  tip: Tip | null;
+  clickable: boolean;
+  w: number;
+  h: number;
+  animate: boolean;
+  font: string;
+};
+
+export type ChartModel = Cartesian | PieModel | GaugeModel | HeatModel | RowsModel;
 
 const first = (x: any) => (Array.isArray(x) ? x[0] : x);
 const num = (x: any, d = 0) => (typeof x === "number" && Number.isFinite(x) ? x : d);
@@ -131,10 +199,164 @@ function tipOf(o: any): Tip | null {
 
 const SUPPORTED = new Set(["line", "bar", "pie"]);
 
+function gaugeModel(o: any, s: any, size: { width: number; height: number }): GaugeModel {
+  const track = Array.isArray(s.axisLine?.lineStyle?.color) ? s.axisLine.lineStyle.color[0]?.[1] : s.axisLine?.lineStyle?.color;
+  const d = Array.isArray(s.data) ? s.data[0] : undefined;
+  const v = num(typeof d === "object" ? d?.value : d);
+  return {
+    kind: "gauge",
+    value: s.progress?.show === false ? 0 : Math.max(0, Math.min(100, ((v - num(s.min, 0)) / Math.max(1e-9, num(s.max, 100) - num(s.min, 0))) * 100)),
+    start: num(s.startAngle, 225),
+    end: num(s.endAngle, -45),
+    radius: pct(s.radius, 75),
+    width: num(s.progress?.width, 10),
+    color: solid(s.progress?.itemStyle?.color, "#2a78d6"),
+    track: solid(track, "#eef1f5"),
+    roundCap: !!s.progress?.roundCap,
+    w: size.width,
+    h: size.height,
+    animate: o.animation !== false,
+    font: o.textStyle?.fontFamily ?? "inherit",
+  };
+}
+
+function heatModel(o: any, s: any, size: { width: number; height: number }): HeatModel | null {
+  const xa = first(o.xAxis) ?? {};
+  const ya = first(o.yAxis) ?? {};
+  if (xa.type !== "category" || ya.type !== "category") return null;
+  const xCats = (xa.data ?? []).map(String);
+  const yCats = (ya.data ?? []).map(String);
+  const vm = first(o.visualMap) ?? {};
+  const range = vm.inRange?.color ?? [];
+  const xf = xa.axisLabel?.formatter;
+  const g = o.grid ?? {};
+  return {
+    kind: "heatmap",
+    xCats,
+    yCats,
+    xLabels: xCats.map((c: string, i: number) => String(plain(typeof xf === "function" ? xf(c, i) : c))),
+    yInverse: !!ya.inverse,
+    cells: (s.data ?? []).map((d: any) => {
+      const val = Array.isArray(d) ? d : d.value;
+      const lab = d?.label;
+      return {
+        x: num(val[0]),
+        y: num(val[1]),
+        v: num(val[2]),
+        color: typeof d?.itemStyle?.color === "string" ? d.itemStyle.color : undefined,
+        label: lab?.show ? { color: lab.color ?? "#344054", size: num(lab.fontSize, 11), weight: num(lab.fontWeight, 600) } : undefined,
+      };
+    }),
+    min: num(vm.min, 0),
+    max: num(vm.max, 1),
+    low: solid(range[0], "#eef1f5"),
+    high: solid(range[range.length - 1], "#12936e"),
+    gap: num(s.itemStyle?.borderWidth, 2),
+    radius: num(s.itemStyle?.borderRadius, 4),
+    surface: solid(s.itemStyle?.borderColor, "#ffffff"),
+    axisColor: solid(xa.axisLabel?.color ?? ya.axisLabel?.color, "#667085"),
+    xSize: num(xa.axisLabel?.fontSize, 10),
+    ySize: num(ya.axisLabel?.fontSize, 11),
+    grid: { top: px(g.top, 4), right: px(g.right, 2), bottom: px(g.bottom, 2), left: px(g.left, 2) },
+    tip: tipOf(o),
+    w: size.width,
+    h: size.height,
+    animate: o.animation !== false,
+    font: o.textStyle?.fontFamily ?? "inherit",
+  };
+}
+
+const rich = (f: unknown, key: string) => {
+  const m = String(f ?? "").match(new RegExp(`\\{${key}\\|([^}]*)\\}`));
+  return m ? m[1] : undefined;
+};
+
+/** The portal's row charts (viz.tsx rowLabels): a label row of names, a row of figures, then the bars. */
+function rowsModel(o: any, series: any[], size: { width: number; height: number }): RowsModel | null {
+  const [names, rights, ...rest] = series;
+  if (!names || !rights || !Array.isArray(names.data)) return null;
+  const n0 = names.data[0]?.label ?? {};
+  const r0 = rights.data?.[0]?.label ?? {};
+  const rows: RowLabel[] = names.data.map((d: any, i: number) => {
+    const f = d?.label?.formatter;
+    return {
+      name: rich(f, "n") ?? String(plain(f)),
+      tag: rich(f, "t"),
+      dot: rich(f, "d") ? d.label.rich?.d?.color : undefined,
+      right: String(rights.data?.[i]?.label?.formatter ?? ""),
+    };
+  });
+  const xa = first(o.xAxis) ?? {};
+  const g = o.grid ?? {};
+  const base = {
+    kind: "rows" as const,
+    rows,
+    max: num(xa.max, 1),
+    track: solid(names.itemStyle?.color, "#eef1f5"),
+    trackWidth: num(names.barWidth, 8),
+    text: {
+      name: solid(n0.rich?.n?.color, "#344054"),
+      tag: solid(n0.rich?.t?.color, "#667085"),
+      right: solid(r0.color, "#111827"),
+      sub: "#667085",
+      nameSize: num(n0.rich?.n?.fontSize, 13),
+      tagSize: num(n0.rich?.t?.fontSize, 11),
+      rightSize: num(r0.fontSize, 12.5),
+      rightWeight: num(r0.fontWeight, 600),
+    },
+    grid: { top: px(g.top, 22), bottom: px(g.bottom, 6) },
+    tip: tipOf(o),
+    clickable: names.cursor === "pointer",
+    w: size.width,
+    h: size.height,
+    animate: o.animation !== false,
+    font: o.textStyle?.fontFamily ?? "inherit",
+  };
+  const scatters = rest.filter((s) => s.type === "scatter");
+  const bars = rest.filter((s) => s.type === "bar");
+  if (scatters.length === 2) {
+    const join = bars.find((b) => b.itemStyle?.color !== "transparent") ?? bars[bars.length - 1];
+    return {
+      ...base,
+      dumbbell: {
+        from: (scatters[0].data ?? []).map((d: any) => num(Array.isArray(d) ? d[0] : d?.value?.[0])),
+        to: (scatters[1].data ?? []).map((d: any) => num(Array.isArray(d) ? d[0] : d?.value?.[0])),
+        fromColor: solid(scatters[0].itemStyle?.color, "#98a2b3"),
+        toColors: (scatters[1].data ?? []).map((d: any) => solid(d?.itemStyle?.color ?? scatters[1].itemStyle?.color, "#12936e")),
+        joins: (join?.data ?? []).map((d: any) => solid(d?.itemStyle?.color ?? join?.itemStyle?.color, "#98a2b3")),
+        width: num(join?.barWidth, 4),
+      },
+    };
+  }
+  if (!bars.length || scatters.length) return null;
+  const subs = bars[0].data?.map((d: any) => (d?.label?.show && typeof d.label.formatter === "string" ? d.label.formatter : undefined)) ?? [];
+  if (subs.some(Boolean)) {
+    base.rows = rows.map((r, i) => ({ ...r, sub: subs[i] }));
+    base.text.sub = solid(bars[0].data.find((d: any) => d?.label?.show)?.label?.color, "#667085");
+  }
+  return {
+    ...base,
+    bars: bars.map((b) => ({
+      name: String(b.name ?? ""),
+      width: num(b.barWidth, 8),
+      data: (b.data ?? []).map((d: any) => {
+        const obj = d !== null && typeof d === "object" ? d : null;
+        const st = { ...(b.itemStyle ?? {}), ...(obj?.itemStyle ?? {}) };
+        return { value: num(obj ? obj.value : d), color: solid(st.color, "#12936e"), opacity: num(st.opacity, 1), radius: Array.isArray(st.borderRadius) ? st.borderRadius : num(st.borderRadius, 0) };
+      }),
+    })),
+  };
+}
+
 /** The neutral model of an ECharts option, or null when only ECharts can draw it well. */
-export function toModel(o: any): ChartModel | null {
+export function toModel(o: any, size: { width: number; height: number } = { width: 300, height: 200 }): ChartModel | null {
   if (!o || typeof o !== "object") return null;
   const series: any[] = Array.isArray(o.series) ? o.series : o.series ? [o.series] : [];
+  if (series.length === 1 && series[0]?.type === "gauge") return gaugeModel(o, series[0], size);
+  if (series.length === 1 && series[0]?.type === "heatmap") return heatModel(o, series[0], size);
+  if (first(o.yAxis)?.type === "category" && series[0]?.type === "bar" && series[0]?.barGap === "-100%" && Array.isArray(series[0]?.data?.[0]?.label?.position)) {
+    return rowsModel(o, series, size);
+  }
   if (!series.length || series.some((s) => !SUPPORTED.has(s?.type))) return null;
   if (o.polar || o.radar || o.visualMap || o.geo || o.parallel) return null;
   const font = o.textStyle?.fontFamily ?? "inherit";
@@ -282,7 +504,18 @@ export const marker = (color: string) =>
 
 /** The tooltip HTML for the hovered point(s), using the chart's own formatter when it has one. */
 export function tipHTML(m: ChartModel, index: number, seriesIndex?: number): string {
-  if (!m.tip) return "";
+  if (m.kind === "gauge" || !m.tip) return "";
+  if (m.kind === "heatmap") {
+    const c = m.cells[index];
+    if (!c) return "";
+    const p = { dataIndex: index, value: [c.x, c.y, c.v], data: c, color: heatColor(m, c) };
+    return m.tip.formatter ? m.tip.formatter(p) : `${esc(m.yCats[c.y] ?? "")} · ${esc(m.xCats[c.x] ?? "")}: <b>${c.v}</b>`;
+  }
+  if (m.kind === "rows") {
+    const r = m.rows[index];
+    if (!r) return "";
+    return m.tip.formatter ? m.tip.formatter({ dataIndex: index, name: r.name }) : `${esc(r.name)}: <b>${esc(r.right)}</b>`;
+  }
   if (m.kind === "pie") {
     const s = m.slices[index];
     if (!s || !s.tip) return "";
@@ -360,3 +593,31 @@ export function floatingTip() {
     },
   };
 }
+
+/** A colour as [r, g, b, a] (hex, rgb or rgba). */
+function rgba(c: string): [number, number, number, number] {
+  if (c.startsWith("#")) {
+    const h = c.length === 4 ? c.replace(/^#(.)(.)(.)$/, "#$1$1$2$2$3$3") : c;
+    const n = parseInt(h.slice(1, 7), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255, 1];
+  }
+  const m = c.match(/rgba?\(([^)]+)\)/);
+  if (m) {
+    const [r, g, b, a] = m[1].split(/[ ,/]+/).map(Number);
+    return [r, g, b, Number.isFinite(a) ? a : 1];
+  }
+  return [0, 0, 0, 1];
+}
+
+/** A heat-map cell's colour: its own (empty cells), else between the low and high colours. */
+export function heatColor(m: HeatModel, c: HeatCell): string {
+  if (c.color) return c.color;
+  const t = Math.max(0, Math.min(1, (c.v - m.min) / Math.max(1e-9, m.max - m.min)));
+  const a = rgba(m.low);
+  const b = rgba(m.high);
+  const mix = a.map((x, i) => x + (b[i] - x) * t);
+  return `rgba(${Math.round(mix[0])},${Math.round(mix[1])},${Math.round(mix[2])},${mix[3].toFixed(3)})`;
+}
+
+/** ECharts' gauge angles (anticlockwise from 3 o'clock) as the arc's sweep in degrees. */
+export const sweep = (g: GaugeModel) => ((g.start - g.end) % 360 + 360) % 360 || 360;

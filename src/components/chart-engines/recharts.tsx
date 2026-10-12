@@ -281,7 +281,7 @@ function HeatView({ m, onEvent }: { m: HeatModel; onEvent: EngineProps["onEvent"
     <ResponsiveContainer width="100%" height="100%">
       <ScatterChart margin={{ top: m.grid.top, right: m.grid.right, bottom: m.grid.bottom, left: m.grid.left }} onMouseLeave={() => onEvent?.("globalout", {})}>
         <XAxis type="number" dataKey="x" orientation="top" domain={[-0.5, m.xCats.length - 0.5]} ticks={m.xCats.map((_, i) => i)} tickFormatter={(v: number) => m.xLabels[v] ?? ""} interval={0} axisLine={false} tickLine={false} tick={tick(m.xSize)} height={m.xSize + 8} />
-        <YAxis type="number" dataKey="y" reversed domain={[-0.5, m.yCats.length - 0.5]} ticks={m.yCats.map((_, i) => i)} tickFormatter={(v: number) => m.yCats[v] ?? ""} interval={0} axisLine={false} tickLine={false} tick={tick(m.ySize)} width={yLabelW} />
+        <YAxis type="number" dataKey="y" reversed={m.yInverse} domain={[-0.5, m.yCats.length - 0.5]} ticks={m.yCats.map((_, i) => i)} tickFormatter={(v: number) => m.yCats[v] ?? ""} interval={0} axisLine={false} tickLine={false} tick={tick(m.ySize)} width={yLabelW} />
         {m.tip && (
           <Tooltip
             cursor={false}
@@ -328,7 +328,9 @@ function RowsView({ m, onEvent }: { m: RowsModel; onEvent: EngineProps["onEvent"
     ...(db ? { range: [Math.min(db.from[i], db.to[i]), Math.max(db.from[i], db.to[i])] } : {}),
   }));
   const t = m.text;
-  const RowText = (p: any) => {
+  // Typed loosely by Recharts (cartesian or polar boxes); these labels only ever sit on bars.
+  const RowText = (props: unknown) => {
+    const p = props as { viewBox?: Box; parentViewBox?: Box; value?: unknown };
     const r = m.rows[Number(p.value)];
     if (!r) return null;
     const left = Number(p.parentViewBox?.x ?? 0);

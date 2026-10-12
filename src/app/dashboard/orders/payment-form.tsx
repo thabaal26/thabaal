@@ -64,7 +64,7 @@ export function PaymentForm({
         </div>
 
         {/* Bank & UPI linking guide */}
-        <div className="rounded-card border border-line-strong/40 bg-panel p-3.5 space-y-3">
+        <div className="ui-card rounded-card border border-line-strong/40 bg-panel p-3.5 space-y-3">
           <div className="flex items-center justify-between gap-2">
             <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted">
               <Landmark className="size-3.5 text-brand" /> Bank Account & UPI Setup

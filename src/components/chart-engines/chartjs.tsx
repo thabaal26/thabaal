@@ -19,11 +19,12 @@ import {
   type ChartConfiguration,
   type Plugin,
 } from "chart.js";
+import { MatrixController, MatrixElement } from "chartjs-chart-matrix";
 import { useEffect, useRef } from "react";
-import { floatingTip, tipHTML, withAlpha, type Cartesian, type ChartModel, type PieModel } from "./model";
+import { floatingTip, heatColor, sweep, tipHTML, withAlpha, type Cartesian, type ChartModel, type GaugeModel, type HeatModel, type PieModel, type RowsModel } from "./model";
 import type { EngineProps } from "./types";
 
-Chart.register(ArcElement, BarController, BarElement, CategoryScale, DoughnutController, Filler, LinearScale, LineController, LineElement, PointElement, Tooltip);
+Chart.register(ArcElement, BarController, BarElement, CategoryScale, DoughnutController, Filler, LinearScale, LineController, LineElement, PointElement, Tooltip, MatrixController, MatrixElement);
 
 const corners = (r: number | number[]) =>
   Array.isArray(r) ? { topLeft: r[0] ?? 0, topRight: r[1] ?? 0, bottomRight: r[2] ?? 0, bottomLeft: r[3] ?? 0 } : r;
@@ -219,6 +220,191 @@ function pieConfig(m: PieModel): ChartConfiguration {
   } as ChartConfiguration;
 }
 
+/** A gauge or progress ring: the value arc and the rest of the track, over the gauge's sweep. */
+function gaugeConfig(m: GaugeModel): ChartConfiguration {
+  const outer = (Math.min(m.w, m.h) / 2) * (m.radius / 100);
+  return {
+    type: "doughnut",
+    data: {
+      labels: ["value", "rest"],
+      datasets: [
+        {
+          data: [m.value, Math.max(0, 100 - m.value)],
+          backgroundColor: [m.color, m.track],
+          borderWidth: 0,
+          borderRadius: m.roundCap ? m.width / 2 : 0,
+          hoverOffset: 0,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      events: [],
+      radius: `${m.radius}%`,
+      cutout: Math.max(0, outer - m.width),
+      rotation: 90 - m.start,
+      circumference: sweep(m),
+      animation: m.animate ? { duration: 900, easing: "easeOutCubic", animateRotate: true } : false,
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+    },
+  } as ChartConfiguration;
+}
+
+/** A heat map: one rounded cell per value (chartjs-chart-matrix), its count printed inside. */
+function heatConfig(m: HeatModel): ChartConfiguration {
+  const font = (size: number) => ({ size, family: m.font });
+  return {
+    type: "matrix",
+    data: {
+      datasets: [
+        {
+          data: m.cells.map((c) => ({ x: m.xCats[c.x], y: m.yCats[c.y], v: c.v })),
+          backgroundColor: m.cells.map((c) => heatColor(m, c)),
+          borderWidth: 0,
+          borderRadius: m.radius,
+          width: ({ chart }: { chart: Chart }) => Math.max(1, (chart.chartArea?.width ?? 0) / Math.max(1, m.xCats.length) - m.gap),
+          height: ({ chart }: { chart: Chart }) => Math.max(1, (chart.chartArea?.height ?? 0) / Math.max(1, m.yCats.length) - m.gap),
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: m.animate ? { duration: 500 } : false,
+      layout: { padding: m.grid },
+      scales: {
+        x: { type: "category", labels: m.xCats, position: "top", offset: true, grid: { display: false }, border: { display: false }, ticks: { color: m.axisColor, font: font(m.xSize), maxRotation: 0, autoSkip: false, callback: (_: unknown, i: number) => m.xLabels[i] ?? "" } },
+        y: { type: "category", labels: m.yCats, reverse: m.yInverse, offset: true, grid: { display: false }, border: { display: false }, ticks: { color: m.axisColor, font: font(m.ySize) } },
+      },
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+    },
+  } as unknown as ChartConfiguration;
+}
+
+/** Counts inside heat-map cells. */
+const heatLabels = (get: () => ChartModel): Plugin => ({
+  id: "heatLabels",
+  afterDatasetsDraw(chart) {
+    const m = get();
+    if (m.kind !== "heatmap") return;
+    const meta = chart.getDatasetMeta(0);
+    const { ctx } = chart;
+    m.cells.forEach((c, i) => {
+      const el = meta.data[i] as unknown as { x: number; y: number; width: number; height: number } | undefined;
+      if (!el || !c.label) return;
+      ctx.save();
+      ctx.fillStyle = c.label.color;
+      ctx.font = `${c.label.weight} ${c.label.size}px ${m.font}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(c.v), el.x + el.width / 2, el.y + el.height / 2);
+      ctx.restore();
+    });
+  },
+});
+
+/** Row charts: a track per row, then stacked parts or a dumbbell, names above and figures at the right. */
+function rowsConfig(m: RowsModel): ChartConfiguration {
+  const labels = m.rows.map((_, i) => String(i));
+  const datasets: Record<string, unknown>[] = [
+    { type: "bar", data: m.rows.map(() => m.max), backgroundColor: m.track, hoverBackgroundColor: m.track, borderRadius: m.trackWidth / 2, borderSkipped: false, barThickness: m.trackWidth, grouped: false, stack: "track", order: 3 },
+  ];
+  for (const b of m.bars ?? []) {
+    datasets.push({
+      type: "bar",
+      label: b.name,
+      data: b.data.map((d) => d.value),
+      backgroundColor: b.data.map((d) => withAlpha(d.color, d.opacity)),
+      borderRadius: b.data.map((d) => corners(d.radius)),
+      borderSkipped: false,
+      barThickness: b.width,
+      grouped: false,
+      stack: "parts",
+      order: 2,
+    });
+  }
+  const db = m.dumbbell;
+  if (db) {
+    datasets.push({ type: "bar", data: db.from.map((f, i) => [Math.min(f, db.to[i]), Math.max(f, db.to[i])]), backgroundColor: db.joins, borderRadius: db.width / 2, borderSkipped: false, barThickness: db.width, grouped: false, order: 2 });
+    datasets.push({ type: "line", data: db.from, showLine: false, pointRadius: 4.5, pointHoverRadius: 5.5, pointBackgroundColor: db.fromColor, pointBorderColor: "#fff", pointBorderWidth: 2, order: 1 });
+    datasets.push({ type: "line", data: db.to, showLine: false, pointRadius: 6, pointHoverRadius: 7, pointBackgroundColor: db.toColors, pointBorderColor: "#fff", pointBorderWidth: 2, order: 0 });
+  }
+  return {
+    type: "bar",
+    data: { labels, datasets },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: m.animate ? { duration: 650, easing: "easeOutCubic" } : false,
+      layout: { padding: { top: m.grid.top, bottom: m.grid.bottom, left: 0, right: 0 } },
+      interaction: { mode: "index", intersect: false, axis: "y" },
+      scales: {
+        x: { type: "linear", min: 0, max: m.max, display: false, stacked: !!m.bars },
+        y: { type: "category", display: false, offset: true, stacked: !!m.bars },
+      },
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+    },
+  } as unknown as ChartConfiguration;
+}
+
+/** Row names above each bar, figures at the right end, small notes under the bar. */
+const rowLabels = (get: () => ChartModel): Plugin => ({
+  id: "rowLabels",
+  afterDatasetsDraw(chart) {
+    const m = get();
+    if (m.kind !== "rows") return;
+    const meta = chart.getDatasetMeta(0);
+    const { ctx, chartArea } = chart;
+    const t = m.text;
+    m.rows.forEach((r, i) => {
+      const el = meta.data[i] as unknown as { y: number } | undefined;
+      if (!el) return;
+      const y = el.y - m.trackWidth / 2 - 6;
+      ctx.save();
+      ctx.textBaseline = "alphabetic";
+      ctx.font = `${t.rightWeight} ${t.rightSize}px ${m.font}`;
+      ctx.fillStyle = t.right;
+      ctx.textAlign = "right";
+      ctx.fillText(r.right, chartArea.right, y);
+      const rightW = ctx.measureText(r.right).width;
+      ctx.textAlign = "left";
+      let x = chartArea.left;
+      if (r.dot) {
+        ctx.fillStyle = r.dot;
+        ctx.beginPath();
+        ctx.arc(x + 4, y - 4, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        x += 13;
+      }
+      ctx.font = `${t.nameSize}px ${m.font}`;
+      ctx.fillStyle = t.name;
+      const room = chartArea.right - rightW - 12 - x;
+      let name = r.name;
+      while (name.length > 1 && ctx.measureText(name).width > room) name = name.slice(0, -2);
+      if (name !== r.name) name = `${name.trimEnd()}…`;
+      ctx.fillText(name, x, y);
+      if (r.tag) {
+        const nx = x + ctx.measureText(name).width + 10;
+        ctx.font = `${t.tagSize}px ${m.font}`;
+        ctx.fillStyle = t.tag;
+        if (nx < chartArea.right - rightW - 30) ctx.fillText(r.tag, nx, y);
+      }
+      if (r.sub) {
+        ctx.font = `11px ${m.font}`;
+        ctx.fillStyle = t.sub;
+        ctx.textBaseline = "top";
+        ctx.fillText(r.sub, chartArea.left, el.y + m.trackWidth / 2 + 4);
+      }
+      ctx.restore();
+    });
+  },
+});
+
+const configFor = (m: ChartModel): ChartConfiguration =>
+  m.kind === "pie" ? pieConfig(m) : m.kind === "gauge" ? gaugeConfig(m) : m.kind === "heatmap" ? heatConfig(m) : m.kind === "rows" ? rowsConfig(m) : cartesianConfig(m);
+
 export default function ChartJsChart({ model, onEvent, onDrawn }: EngineProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const chart = useRef<Chart | null>(null);
@@ -232,21 +418,27 @@ export default function ChartJsChart({ model, onEvent, onDrawn }: EngineProps) {
   });
 
   // Built once per chart shape; new data updates it in place so values animate from the old ones.
-  const shape = `${model.kind}:${model.kind === "cartesian" ? `${model.horizontal}:${model.series.map((s) => s.type).join(",")}` : ""}`;
+  const shape = `${model.kind}:${
+    model.kind === "cartesian" ? `${model.horizontal}:${model.series.map((s) => s.type).join(",")}` : model.kind === "rows" ? `${!!model.dumbbell}:${model.bars?.length ?? 0}` : ""
+  }`;
   useEffect(() => {
     const node = canvas.current;
     if (!node) return;
     const m = modelRef.current;
-    const cfg = m.kind === "pie" ? pieConfig(m) : cartesianConfig(m);
+    const cfg = configFor(m);
     // The plugins read the latest model, so new data never needs them rebuilt.
-    if (m.kind === "cartesian") cfg.plugins = [barLabels(() => modelRef.current), pointer(() => modelRef.current)];
+    const latest = () => modelRef.current;
+    if (m.kind === "cartesian") cfg.plugins = [barLabels(latest), pointer(latest)];
+    if (m.kind === "heatmap") cfg.plugins = [heatLabels(latest)];
+    if (m.kind === "rows") cfg.plugins = [rowLabels(latest)];
     let hovered: string | null = null;
     const describe = (els: ActiveElement[]) => {
       const e = els[0];
       if (!e) return null;
       const mm = modelRef.current;
       const seriesName = mm.kind === "cartesian" ? mm.series[e.datasetIndex]?.name : undefined;
-      const name = mm.kind === "pie" ? mm.slices[e.index]?.name : mm.categories[e.index];
+      const name =
+        mm.kind === "pie" ? mm.slices[e.index]?.name : mm.kind === "cartesian" ? mm.categories[e.index] : mm.kind === "rows" ? mm.rows[e.index]?.name : mm.kind === "heatmap" ? mm.xCats[mm.cells[e.index]?.x ?? -1] : undefined;
       return { dataIndex: e.index, seriesIndex: e.datasetIndex, seriesName, name, componentType: "series" };
     };
     cfg.options = {
@@ -260,10 +452,11 @@ export default function ChartJsChart({ model, onEvent, onDrawn }: EngineProps) {
           hovered = key;
         }
         const mm = modelRef.current;
-        const clickable = mm.kind === "pie" ? mm.clickable : mm.series[d?.seriesIndex ?? -1]?.clickable;
+        const clickable = mm.kind === "pie" || mm.kind === "rows" ? mm.clickable : mm.kind === "cartesian" ? mm.series[d?.seriesIndex ?? -1]?.clickable : false;
         node.style.cursor = d && clickable ? "pointer" : "default";
         const ne = evt.native as MouseEvent | null;
-        if (d && mm.tip && ne) tip.current.show(tipHTML(mm, d.dataIndex, d.seriesIndex), mm.tip, ne.clientX, ne.clientY);
+        const tipBase = mm.kind === "gauge" ? null : mm.tip;
+        if (d && tipBase && ne) tip.current.show(tipHTML(mm, d.dataIndex, d.seriesIndex), tipBase, ne.clientX, ne.clientY);
         else tip.current.hide();
       },
       onClick: (_evt, els) => {
@@ -294,7 +487,7 @@ export default function ChartJsChart({ model, onEvent, onDrawn }: EngineProps) {
   useEffect(() => {
     const c = chart.current;
     if (!c) return;
-    const fresh = model.kind === "pie" ? pieConfig(model) : cartesianConfig(model);
+    const fresh = configFor(model);
     c.data = fresh.data;
     Object.assign(c.options, { scales: fresh.options?.scales, layout: fresh.options?.layout, animation: fresh.options?.animation });
     c.update();

@@ -62,12 +62,15 @@ const FALLBACK: Record<ChartColorKey, [string, string]> = {
   neutral: ["#b8c1cc", "#4a5465"],
 };
 
-/** Reads the live tokens. `forceDark` is for charts that always sit on the dark brand card. */
-export function readChartTheme(forceDark = false): ChartTheme {
+/** Reads the live tokens. `forceDark` is for charts that always sit on the dark brand card. `el` is
+ *  the chart's own element: the tokens are read there, so a box with its own palette or font (an
+ *  Appearance preview) draws in it. */
+export function readChartTheme(forceDark = false, el?: Element | null): ChartTheme {
   const root = typeof document !== "undefined" ? document.documentElement : null;
   const pageDark = Boolean(root?.classList.contains("dark"));
   const dark = forceDark || pageDark;
-  const css = root ? getComputedStyle(root) : null;
+  const from = el ?? root;
+  const css = from ? getComputedStyle(from) : null;
   const v = (name: string, fallback: string) => (css?.getPropertyValue(name).trim() || fallback);
   // A dark card on a light page can't use the page's tokens: it gets the dark steps directly.
   const useTokens = dark === pageDark;

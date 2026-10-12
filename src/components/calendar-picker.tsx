@@ -175,7 +175,7 @@ export function CalendarPicker({
   }, [value, todayStr]);
 
   return (
-    <div className={cn("space-y-3 rounded-card border border-line bg-panel p-3.5 sm:p-4 shadow-xs", className)}>
+    <div className={cn("ui-card space-y-3 rounded-card border border-line bg-panel p-3.5 sm:p-4 shadow-xs", className)}>
       {/* Quick presets pills */}
       <div className="space-y-1.5">
         <div className="flex items-center gap-1.5 text-xs font-medium text-ink-2">
