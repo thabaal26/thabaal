@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, Lightbulb } from "@/components/icons";
+import { Lightbulb } from "@/components/icons";
 import { UsageGauge } from "@/components/charts";
-import { Badge, buttonClass } from "@/components/ui";
+import { Badge } from "@/components/ui";
 import { ColumnChart, DonutPanel, StackedRows, type Column, type Slice, type StackRow } from "@/components/viz";
 import { cn } from "@/lib/cn";
+import { MetaRecharge } from "@/components/meta-recharge";
 import { fmtNumber } from "@/lib/format";
 import type { DailySpendPoint, ServiceQuotaInfo, SpendRow } from "@/lib/spend";
 
@@ -217,10 +218,7 @@ export function SpendAnalyticsCharts({
               <p className="mt-1 text-xs text-muted">No balance is recorded for this WhatsApp account yet. Sync it below or open Meta&apos;s Billing Hub.</p>
             </>
           )}
-          <a href={billingUrl} target="_blank" rel="noopener noreferrer" className={cn(buttonClass(low ? "primary" : "secondary", "sm"), "mt-2.5 w-full sm:mt-3")}>
-            Recharge on Meta <ExternalLink aria-hidden className="size-3.5" />
-            <span className="sr-only">(opens Meta Business Suite)</span>
-          </a>
+          <MetaRecharge billingUrl={billingUrl} primary={low} />
         </div>
 
         {/* Apache ECharts DonutPanel: Month Spend Breakdown by Category */}
