@@ -14,8 +14,6 @@ function getThemeSnapshot(): "day" | "night" {
   try {
     const saved = localStorage.getItem("thabaal-theme");
     if (saved === "night" || saved === "day") return saved;
-    if (window.matchMedia("(prefers-color-scheme: dark)").matches)
-      return "night";
   } catch {}
   return "day";
 }

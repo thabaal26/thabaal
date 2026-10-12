@@ -3,8 +3,28 @@
 /* Draws a chart model (model.ts) with Recharts (SVG). Loaded only on portals that pick Recharts. */
 
 import { useEffect, useId, useMemo } from "react";
-import { Area, Bar, CartesianGrid, Cell, ComposedChart, LabelList, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { tipHTML, withAlpha, type Cartesian, type ChartModel, type PieModel, type Tip } from "./model";
+import {
+  Area,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ComposedChart,
+  LabelList,
+  Line,
+  Pie,
+  PieChart,
+  PolarAngleAxis,
+  RadialBar,
+  RadialBarChart,
+  ResponsiveContainer,
+  Scatter,
+  ScatterChart,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { heatColor, tipHTML, withAlpha, type Cartesian, type ChartModel, type GaugeModel, type HeatModel, type PieModel, type RowsModel, type Tip } from "./model";
 import type { EngineProps } from "./types";
 
 type TipProps = { active?: boolean; label?: unknown; payload?: readonly { dataKey?: unknown; payload?: { i?: number } }[] };
@@ -236,10 +256,189 @@ function PieView({ m, onEvent }: { m: PieModel; onEvent: EngineProps["onEvent"] 
   );
 }
 
+/** A gauge or progress ring: a radial bar over its track, across the gauge's sweep. */
+function GaugeView({ m }: { m: GaugeModel }) {
+  const outer = (Math.min(m.w, m.h) / 2) * (m.radius / 100);
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <RadialBarChart data={[{ v: m.value }]} innerRadius={Math.max(0, outer - m.width)} outerRadius={outer} startAngle={m.start} endAngle={m.end} barSize={m.width}>
+        <PolarAngleAxis type="number" domain={[0, 100]} tick={false} axisLine={false} />
+        <RadialBar dataKey="v" fill={m.color} background={{ fill: m.track }} cornerRadius={m.roundCap ? m.width / 2 : 0} isAnimationActive={m.animate} animationDuration={900} />
+      </RadialBarChart>
+    </ResponsiveContainer>
+  );
+}
+
+/** A heat map: a scatter of rounded cells on index axes, each with its count. */
+function HeatView({ m, onEvent }: { m: HeatModel; onEvent: EngineProps["onEvent"] }) {
+  const yLabelW = Math.min(64, Math.max(...m.yCats.map((c) => c.length), 1) * (m.ySize * 0.62) + 10);
+  const top = m.grid.top + m.xSize + 8;
+  const cw = Math.max(1, (m.w - m.grid.left - yLabelW - m.grid.right) / Math.max(1, m.xCats.length));
+  const ch = Math.max(1, (m.h - top - m.grid.bottom) / Math.max(1, m.yCats.length));
+  const data = m.cells.map((c, i) => ({ x: c.x, y: c.y, i }));
+  const tick = (size: number) => ({ fill: m.axisColor, fontSize: size, fontFamily: m.font });
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <ScatterChart margin={{ top: m.grid.top, right: m.grid.right, bottom: m.grid.bottom, left: m.grid.left }} onMouseLeave={() => onEvent?.("globalout", {})}>
+        <XAxis type="number" dataKey="x" orientation="top" domain={[-0.5, m.xCats.length - 0.5]} ticks={m.xCats.map((_, i) => i)} tickFormatter={(v: number) => m.xLabels[v] ?? ""} interval={0} axisLine={false} tickLine={false} tick={tick(m.xSize)} height={m.xSize + 8} />
+        <YAxis type="number" dataKey="y" reversed domain={[-0.5, m.yCats.length - 0.5]} ticks={m.yCats.map((_, i) => i)} tickFormatter={(v: number) => m.yCats[v] ?? ""} interval={0} axisLine={false} tickLine={false} tick={tick(m.ySize)} width={yLabelW} />
+        {m.tip && (
+          <Tooltip
+            cursor={false}
+            isAnimationActive={false}
+            wrapperStyle={{ zIndex: 30, outline: "none" }}
+            content={(p: TipProps) => (p.active && p.payload?.length ? <TipBox html={tipHTML(m, p.payload[0]?.payload?.i ?? -1)} tip={m.tip!} /> : null)}
+          />
+        )}
+        <Scatter
+          data={data}
+          isAnimationActive={m.animate}
+          animationDuration={500}
+          onMouseEnter={(d: { payload?: { i?: number } }) => onEvent?.("mouseover", { dataIndex: d?.payload?.i, seriesIndex: 0 })}
+          shape={(p: { cx?: number; cy?: number; payload?: { i?: number } }) => {
+            const c = m.cells[p.payload?.i ?? -1];
+            if (!c || p.cx === undefined || p.cy === undefined) return <g />;
+            return (
+              <g>
+                <rect x={p.cx - cw / 2 + m.gap / 2} y={p.cy - ch / 2 + m.gap / 2} width={Math.max(1, cw - m.gap)} height={Math.max(1, ch - m.gap)} rx={m.radius} fill={heatColor(m, c)} />
+                {c.label && (
+                  <text x={p.cx} y={p.cy} textAnchor="middle" dominantBaseline="central" fill={c.label.color} fontSize={c.label.size} fontWeight={c.label.weight} fontFamily={m.font}>
+                    {c.v}
+                  </text>
+                )}
+              </g>
+            );
+          }}
+        />
+      </ScatterChart>
+    </ResponsiveContainer>
+  );
+}
+
+type Box = { x?: number | string; y?: number | string; width?: number | string; height?: number | string };
+
+/** Row charts: names above each bar and the figure at its right end, over a full-width track. */
+function RowsView({ m, onEvent }: { m: RowsModel; onEvent: EngineProps["onEvent"] }) {
+  const db = m.dumbbell;
+  const tiny = m.max * 1e-6;
+  const rows = m.rows.map((r, i) => ({
+    i,
+    carrier: tiny,
+    ...Object.fromEntries((m.bars ?? []).map((b, bi) => [`p${bi}`, b.data[i]?.value ?? 0])),
+    ...(db ? { range: [Math.min(db.from[i], db.to[i]), Math.max(db.from[i], db.to[i])] } : {}),
+  }));
+  const t = m.text;
+  const RowText = (p: any) => {
+    const r = m.rows[Number(p.value)];
+    if (!r) return null;
+    const left = Number(p.parentViewBox?.x ?? 0);
+    const right = left + Number(p.parentViewBox?.width ?? m.w);
+    const y = Number(p.viewBox?.y ?? 0) - 6;
+    const h = Number(p.viewBox?.height ?? m.trackWidth);
+    return (
+      <g style={{ fontFamily: m.font }} pointerEvents="none">
+        {r.dot && <circle cx={left + 4} cy={y - 4} r={3.5} fill={r.dot} />}
+        <text x={left + (r.dot ? 13 : 0)} y={y} fill={t.name} fontSize={t.nameSize}>
+          {r.name.length > 42 ? `${r.name.slice(0, 41)}…` : r.name}
+          {r.tag && (
+            <tspan fill={t.tag} fontSize={t.tagSize} dx={10}>
+              {r.tag}
+            </tspan>
+          )}
+        </text>
+        <text x={right} y={y} fill={t.right} fontSize={t.rightSize} fontWeight={t.rightWeight} textAnchor="end">
+          {r.right}
+        </text>
+        {r.sub && (
+          <text x={left} y={y + 6 + h + 4} fill={t.sub} fontSize={11} dominantBaseline="hanging">
+            {r.sub}
+          </text>
+        )}
+      </g>
+    );
+  };
+  const click = (d: { payload?: { i?: number } }) => {
+    const i = d?.payload?.i;
+    if (i !== undefined) onEvent?.("click", { dataIndex: i, seriesIndex: 0, name: m.rows[i]?.name });
+  };
+  const labels = <LabelList valueAccessor={(e: { payload?: { i?: number } }) => e.payload?.i ?? -1} content={RowText} />;
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart layout="vertical" data={rows} margin={{ top: m.grid.top, bottom: m.grid.bottom, left: 0, right: 0 }} barCategoryGap={0} onMouseLeave={() => onEvent?.("globalout", {})}>
+        <XAxis type="number" domain={[0, m.max]} hide allowDataOverflow />
+        <YAxis type="category" dataKey="i" hide />
+        {m.tip && (
+          <Tooltip
+            cursor={false}
+            isAnimationActive={false}
+            wrapperStyle={{ zIndex: 30, outline: "none" }}
+            content={(p: TipProps) => (p.active && p.payload?.length ? <TipBox html={tipHTML(m, p.payload[0]?.payload?.i ?? -1)} tip={m.tip!} /> : null)}
+          />
+        )}
+        {db ? (
+          <Bar
+            dataKey="range"
+            barSize={db.width}
+            background={{ fill: m.track, radius: db.width / 2 }}
+            isAnimationActive={m.animate}
+            animationDuration={650}
+            cursor={m.clickable ? "pointer" : "default"}
+            onClick={click}
+            shape={(p: Box & { payload?: { i?: number } }) => {
+              const i = p.payload?.i ?? -1;
+              const x = Number(p.x ?? 0);
+              const w = Number(p.width ?? 0);
+              const y = Number(p.y ?? 0);
+              const h = Number(p.height ?? 0);
+              const fromLeft = db.from[i] <= db.to[i];
+              const cy = y + h / 2;
+              return (
+                <g>
+                  <rect x={x} y={y} width={Math.max(0, w)} height={h} rx={h / 2} fill={db.joins[i]} />
+                  <circle cx={fromLeft ? x : x + w} cy={cy} r={4.5} fill={db.fromColor} stroke="#fff" strokeWidth={2} />
+                  <circle cx={fromLeft ? x + w : x} cy={cy} r={6} fill={db.toColors[i]} stroke="#fff" strokeWidth={2} />
+                </g>
+              );
+            }}
+          >
+            {labels}
+          </Bar>
+        ) : (
+          <Bar dataKey="carrier" stackId="p" barSize={m.bars?.[0]?.width ?? m.trackWidth} fill="transparent" background={{ fill: m.track, radius: m.trackWidth / 2 }} isAnimationActive={false} onClick={click}>
+            {labels}
+          </Bar>
+        )}
+        {!db &&
+          (m.bars ?? []).map((b, bi) => (
+            <Bar
+              key={bi}
+              dataKey={`p${bi}`}
+              name={b.name}
+              stackId="p"
+              barSize={b.width}
+              isAnimationActive={m.animate}
+              animationDuration={650}
+              cursor={m.clickable ? "pointer" : "default"}
+              onClick={click}
+            >
+              {b.data.map((d, i) => (
+                <Cell key={i} fill={withAlpha(d.color, d.opacity)} radius={(Array.isArray(d.radius) ? [d.radius[0] ?? 0, d.radius[1] ?? 0, d.radius[2] ?? 0, d.radius[3] ?? 0] : [d.radius, d.radius, d.radius, d.radius]) as never} />
+              ))}
+            </Bar>
+          ))}
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
 export default function RechartsChart({ model, onEvent, onDrawn }: EngineProps) {
   useEffect(() => {
     onDrawn?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when first drawn
   }, []);
-  return model.kind === "pie" ? <PieView m={model} onEvent={onEvent} /> : <CartesianChart m={model as ChartModel & Cartesian} onEvent={onEvent} />;
+  if (model.kind === "pie") return <PieView m={model} onEvent={onEvent} />;
+  if (model.kind === "gauge") return <GaugeView m={model} />;
+  if (model.kind === "heatmap") return <HeatView m={model} onEvent={onEvent} />;
+  if (model.kind === "rows") return <RowsView m={model} onEvent={onEvent} />;
+  return <CartesianChart m={model as ChartModel & Cartesian} onEvent={onEvent} />;
 }
