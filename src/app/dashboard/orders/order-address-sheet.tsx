@@ -95,46 +95,33 @@ export function OrderAddressControl({
     <>
       <div
         className={cn(
-          "flex items-start justify-between gap-2 rounded-control border px-3 py-2 text-xs",
+          "flex items-center justify-between gap-2 rounded-control border px-2.5 py-1.5 text-xs",
           effectiveAddress
-            ? "border-line/90 bg-subtle/70 text-ink"
-            : "border-warning/30 bg-warning-soft/50 text-ink",
-          compact && "px-2.5 py-1.5",
+            ? "border-line/80 bg-subtle/50 text-ink"
+            : "border-warning/30 bg-warning-soft/40 text-ink",
+          compact && "px-2 py-1",
         )}
       >
-        <div className="flex min-w-0 flex-1 items-start gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <MapPin
             aria-hidden
             className={cn(
-              "mt-0.5 size-3.5 shrink-0",
+              "size-3.5 shrink-0",
               effectiveAddress ? "text-brand-deep" : "text-warning",
             )}
           />
-          <div className="min-w-0 flex-1">
-            {effectiveAddress ? (
-              <>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="font-semibold text-ink-2">Delivery address</span>
-                  {effectiveArea && (
-                    <span className="rounded bg-panel px-1.5 py-0.5 text-2xs font-semibold text-brand-deep ring-1 ring-line">
-                      {effectiveArea}
-                    </span>
-                  )}
-                  {!currentOrderNote?.trim() && customerHasSavedAddress && (
-                    <span className="text-2xs text-muted">(from customer profile)</span>
-                  )}
-                </div>
-                <p className="mt-0.5 break-words text-xs text-ink">{effectiveAddress}</p>
-              </>
-            ) : (
-              <div>
-                <p className="font-semibold text-warning">No delivery address added yet</p>
-                <p className="text-2xs text-muted">
-                  Add manually or auto-detect from {customerName}&apos;s WhatsApp chat messages.
-                </p>
-              </div>
-            )}
-          </div>
+          {effectiveAddress ? (
+            <p className="min-w-0 flex-1 truncate text-xs text-ink" title={effectiveAddress}>
+              {effectiveArea && (
+                <span className="mr-1.5 inline-block rounded bg-panel px-1.5 py-0.5 text-2xs font-semibold text-brand-deep ring-1 ring-line">
+                  {effectiveArea}
+                </span>
+              )}
+              <span>{effectiveAddress}</span>
+            </p>
+          ) : (
+            <p className="truncate font-medium text-warning">No delivery address added</p>
+          )}
         </div>
 
         {canEdit && (
@@ -142,7 +129,7 @@ export function OrderAddressControl({
             type="button"
             onClick={openSheet}
             className={cn(
-              "print:hidden inline-flex shrink-0 items-center gap-1 rounded-control px-2.5 py-1 text-xs font-semibold transition",
+              "print:hidden inline-flex shrink-0 items-center gap-1 rounded-control px-2 py-0.5 text-2xs font-semibold transition",
               effectiveAddress
                 ? "bg-panel text-ink-2 ring-1 ring-line hover:bg-sunken hover:text-ink"
                 : "bg-brand text-white shadow-xs hover:bg-brand-deep",
@@ -151,11 +138,11 @@ export function OrderAddressControl({
             {effectiveAddress ? (
               <>
                 <PencilLine aria-hidden className="size-3" />
-                <span>Update address</span>
+                <span>Edit</span>
               </>
             ) : (
               <>
-                <Plus aria-hidden className="size-3.5" />
+                <Plus aria-hidden className="size-3" />
                 <span>Add address</span>
               </>
             )}

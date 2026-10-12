@@ -321,37 +321,59 @@ export function OrderActions({
       run: () => run("reopen", () => setOrderStatus(id, "NEW")),
     });
 
-  // The main next step (a primary one) leads, which is also the big button on phones.
+  // The main next step (a primary one) leads, followed by at most one secondary action on desktop.
   steps.sort((a, b) => Number(b.variant === "primary") - Number(a.variant === "primary"));
   const [main, ...rest] = steps;
-  const phoneMain = main && main.key !== "cancel" ? main : undefined;
-  const phoneRest = phoneMain ? rest : steps;
+  const primaryStep = main && main.key !== "cancel" ? main : undefined;
+  const restSteps = primaryStep ? rest : steps;
+  const secondaryStep = restSteps.find((s) => s.key !== "cancel" && s.key !== "edit");
   const noteChanged = text.trim() !== (note ?? "");
   const saveNote = () => run("note", () => saveOrderNote(id, text));
 
   return (
-    <div className="mt-auto space-y-3 border-t border-line pt-3">
-      {/* Phones: one big next step, quick customize button if needed, and the rest in a sheet. */}
+    <div className="mt-auto space-y-2 border-t border-line pt-2.5">
       {note && (
-        <p className="text-sm sm:hidden">
-          <span className="text-muted">Team note: </span>
-          {note}
-        </p>
+        <button
+          type="button"
+          onClick={() => setMoreOpen(true)}
+          className="flex w-full items-center justify-between gap-2 rounded-control bg-subtle/60 px-2.5 py-1 text-left text-xs text-ink-2 transition hover:bg-sunken"
+          title="Click to edit team note"
+        >
+          <span className="truncate">
+            <span className="font-semibold text-muted">Note: </span>
+            {note}
+          </span>
+          <PencilLine aria-hidden className="size-3 shrink-0 text-muted" />
+        </button>
       )}
-      <div className="flex gap-2 sm:hidden">
-        {phoneMain && (
+      <div className="flex items-center gap-2">
+        {primaryStep && (
           <Button
+            size="sm"
             className="min-w-0 flex-1"
-            variant={phoneMain.variant}
+            variant={primaryStep.variant}
             disabled={pending}
-            loading={busy === phoneMain.key}
-            onClick={phoneMain.run}
+            loading={busy === primaryStep.key}
+            onClick={primaryStep.run}
           >
-            <span className="truncate">{phoneMain.label}</span>
+            <span className="truncate">{primaryStep.label}</span>
           </Button>
         )}
-        {!done && phoneMain?.key !== "edit" && (
+        {secondaryStep && (
           <Button
+            size="sm"
+            className="hidden shrink-0 sm:inline-flex"
+            variant={secondaryStep.variant}
+            disabled={pending}
+            loading={busy === secondaryStep.key}
+            onClick={secondaryStep.run}
+          >
+            <span>{secondaryStep.label}</span>
+          </Button>
+        )}
+        {!done && primaryStep?.key !== "edit" && (
+          <Button
+            size="sm"
             variant="secondary"
             icon
             className="shrink-0"
@@ -363,58 +385,24 @@ export function OrderActions({
           </Button>
         )}
         <Button
-          variant="secondary"
-          icon={!!phoneMain}
-          className={phoneMain ? "shrink-0" : "flex-1"}
-          aria-label={phoneMain ? `More actions for ${who}'s order` : undefined}
-          onClick={() => setMoreOpen(true)}
-        >
-          <MoreHorizontal aria-hidden className="size-5" />
-          {!phoneMain && "Order actions and note"}
-        </Button>
-      </div>
-
-      {/* Larger screens: every action in a row, then the note. */}
-      <div className="hidden flex-wrap gap-2 sm:flex">
-        {steps.map((s) => (
-          <Button
-            key={s.key}
-            size="sm"
-            variant={s.variant}
-            disabled={pending}
-            loading={busy === s.key}
-            onClick={s.run}
-          >
-            {s.label}
-          </Button>
-        ))}
-      </div>
-      <div className="hidden gap-2 sm:flex">
-        <input
-          className="field flex-1"
-          aria-label={`Team note for ${who}'s order`}
-          placeholder="Note: payment mode, address, delivery slot…"
-          value={text}
-          maxLength={1000}
-          onChange={(e) => setText(e.target.value)}
-        />
-        <Button
           size="sm"
           variant="secondary"
-          className="self-center"
-          disabled={pending || !noteChanged}
-          loading={busy === "note"}
-          onClick={saveNote}
+          icon={!!primaryStep}
+          className={primaryStep ? "shrink-0" : "flex-1"}
+          aria-label={primaryStep ? `More actions and team note for ${who}'s order` : undefined}
+          title="More actions & team note"
+          onClick={() => setMoreOpen(true)}
         >
-          Save
+          <MoreHorizontal aria-hidden className="size-4" />
+          {!primaryStep && "Order actions & note"}
         </Button>
       </div>
 
       <Sheet open={moreOpen} onClose={() => setMoreOpen(false)} title={`Order for ${who}`}>
         <div className="space-y-5">
-          {phoneRest.length > 0 && (
+          {restSteps.length > 0 && (
             <div className="grid gap-2">
-              {phoneRest.map((s) => (
+              {restSteps.map((s) => (
                 <Button
                   key={s.key}
                   variant={s.variant}

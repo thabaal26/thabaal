@@ -103,15 +103,15 @@ export function OrderCard({
       : null;
 
   return (
-    <Card className="card-3d relative flex h-full flex-col gap-2.5 overflow-hidden p-3.5 sm:gap-3.5 sm:p-5">
+    <Card className="card-3d relative flex h-full flex-col gap-2.5 overflow-hidden p-3.5 sm:p-4">
       <span aria-hidden className="absolute inset-x-0 top-0 h-[3px]" style={{ background: accent }} />
 
-      <div className="flex items-start justify-between gap-2.5 sm:gap-3">
-        <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
-          <Avatar name={o.customer.name} className="size-8 shrink-0 sm:size-10" />
+      <div className="flex items-start justify-between gap-2.5">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Avatar name={o.customer.name} className="size-9 shrink-0" />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1.5">
-              <Link href={`/dashboard/customers/${o.customer.id}`} className="truncate text-sm font-semibold text-ink hover:underline sm:text-base">
+              <Link href={`/dashboard/customers/${o.customer.id}`} className="truncate text-sm font-semibold text-ink hover:underline sm:text-[15px]">
                 {o.customer.name}
               </Link>
               <span className="rounded-control bg-sunken px-1.5 py-0.5 font-mono text-2xs font-semibold text-ink-2 ring-1 ring-inset ring-line">
@@ -122,7 +122,7 @@ export function OrderCard({
                   Cart #{mentality.attemptCount}
                 </Badge>
               )}
-              {isSuperseded && <Badge tone="gray">Replaced by newer cart</Badge>}
+              {isSuperseded && <Badge tone="gray">Replaced</Badge>}
             </div>
             <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
               <span className="tabular">{formatPhone(o.customer.phone)}</span>
@@ -131,6 +131,7 @@ export function OrderCard({
                   · <MapPin aria-hidden className="size-3 text-muted" /> {o.customer.location}
                 </span>
               )}
+              <span className="tabular text-muted">· {fmtDate(o.createdAt, "d MMM, h:mm a")}</span>
             </p>
           </div>
         </div>
@@ -142,12 +143,12 @@ export function OrderCard({
 
       <OrderStepper status={o.status} isPaid={isPaid && payState !== "part_paid"} unpaidLabel={payState === "cod_due" ? "COD" : payState === "part_paid" ? "Part paid" : "Not paid"} />
 
-      <div className="rounded-control border border-line/80 bg-sunken/70 px-3 py-1 text-xs shadow-[inset_0_1px_2px_rgb(16_24_40/0.04)] sm:px-3.5 sm:text-sm">
-        <ul className="divide-y divide-line/80">
+      <div className="rounded-control border border-line/80 bg-sunken/60 px-3 py-1 text-xs sm:text-sm">
+        <ul className="divide-y divide-line/70">
           {items.map((i, k) => (
-            <li key={k} className="flex items-baseline justify-between gap-2.5 py-1.5 sm:gap-3 sm:py-2">
-              <span className="min-w-0 text-ink">
-                <span className="tabular mr-1.5 inline-block rounded bg-panel px-1.5 py-0.5 text-2xs font-semibold text-ink-2 ring-1 ring-line sm:text-xs">
+            <li key={k} className="flex items-baseline justify-between gap-2.5 py-1.5">
+              <span className="min-w-0 truncate text-ink">
+                <span className="tabular mr-1.5 inline-block rounded bg-panel px-1.5 py-0.5 text-2xs font-semibold text-ink-2 ring-1 ring-line">
                   {i.quantity}×
                 </span>
                 {i.name ?? i.id}
@@ -158,60 +159,54 @@ export function OrderCard({
             </li>
           ))}
         </ul>
-        <div className="space-y-1 border-t border-line py-2 sm:py-2.5">
-          {pricing.subtotal > 0 && (
-            <>
-              <div className="flex items-center justify-between gap-3 text-xs text-muted">
-                <span>Items subtotal</span>
-                <span className="tabular font-medium text-ink-2">{money(pricing.subtotal, o.currency)}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3 text-xs text-muted">
-                <span className="inline-flex items-center gap-1">
-                  <Truck aria-hidden className="size-3 text-brand-deep" /> Shipping charge
-                </span>
-                <span className="tabular font-medium text-ink-2">+ {money(pricing.shipping, o.currency)}</span>
-              </div>
-            </>
-          )}
-          <div className="flex items-center justify-between gap-3 pt-1 font-semibold text-ink">
-            <span className="text-2xs uppercase tracking-wider text-muted sm:text-xs">Final Total</span>
-            <span className="tabular text-sm sm:text-base">{money(pricing.total, o.currency)}</span>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line py-2">
+          <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
+            <span className="font-semibold uppercase tracking-wider text-ink-2">Total</span>
+            {pricing.subtotal > 0 && pricing.shipping > 0 && (
+              <span className="tabular text-2xs text-muted">
+                ({money(pricing.subtotal, o.currency)} + <Truck aria-hidden className="inline size-3 text-brand-deep" /> {money(pricing.shipping, o.currency)})
+              </span>
+            )}
           </div>
+          <span className="tabular text-sm font-bold text-ink sm:text-base">{money(pricing.total, o.currency)}</span>
         </div>
       </div>
 
-      {/* Customer Mentality & Earlier Unpaid Cart History */}
+      {/* Collapsible Customer Cart Mentality */}
       {mentality && mentality.attemptCount > 1 && (
-        <div className="rounded-control border border-warning-border/70 bg-warning-bg/45 px-3 py-2 text-xs sm:px-3.5 sm:py-2.5">
-          <div className="flex items-center justify-between gap-2">
-            <p className="inline-flex items-center gap-1.5 font-semibold text-ink">
-              <Sparkles aria-hidden className="size-3.5 text-warning" />
-              Customer mentality: {mentality.headline}
-            </p>
-            <span className="tabular shrink-0 text-2xs font-medium text-muted">
-              {mentality.previousCarts.length} earlier cart{mentality.previousCarts.length === 1 ? "" : "s"}
+        <details className="group rounded-control border border-warning-border/70 bg-warning-bg/35 px-2.5 py-1.5 text-xs">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 font-medium text-ink">
+            <span className="inline-flex min-w-0 items-center gap-1.5 truncate">
+              <Sparkles aria-hidden className="size-3.5 shrink-0 text-warning" />
+              <span className="truncate">{mentality.headline}</span>
             </span>
-          </div>
-          <div className="mt-1.5 space-y-1 text-ink-2">
+            <span className="shrink-0 text-2xs font-semibold text-brand-deep group-open:hidden">
+              View changes
+            </span>
+            <span className="hidden shrink-0 text-2xs font-semibold text-muted group-open:inline">
+              Hide
+            </span>
+          </summary>
+          <div className="mt-2 space-y-1 border-t border-warning-border/50 pt-2 text-ink-2">
             {mentality.droppedItems.length > 0 && (
               <p>
-                <span className="font-semibold text-danger">Dropped from earlier cart: </span>
+                <span className="font-semibold text-danger">Dropped: </span>
                 {mentality.droppedItems.map((d) => `${d.name}${d.price > 0 ? ` (${money(d.price * d.quantity, o.currency)})` : ""}`).join(", ")}
               </p>
             )}
             {mentality.addedItems.length > 0 && (
               <p>
-                <span className="font-semibold text-success">Switched / Added now: </span>
+                <span className="font-semibold text-success">Added now: </span>
                 {mentality.addedItems.map((a) => `${a.name}${a.price > 0 ? ` (${money(a.price * a.quantity, o.currency)})` : ""}`).join(", ")}
               </p>
             )}
             {mentality.keptItems.length > 0 && (
               <p>
-                <span className="font-semibold text-brand-deep">Kept (high conviction): </span>
+                <span className="font-semibold text-brand-deep">Kept: </span>
                 {mentality.keptItems.map((k) => k.name).join(", ")}
               </p>
             )}
-            <div className="mt-1.5 border-t border-warning-border/50 pt-1.5 text-2xs text-muted">
+            <div className="mt-1.5 border-t border-warning-border/40 pt-1.5 text-2xs text-muted">
               {mentality.previousCarts.slice(0, 2).map((pc) => (
                 <p key={pc.id} className="flex items-center justify-between gap-2">
                   <span className="truncate">
@@ -225,25 +220,22 @@ export function OrderCard({
               ))}
             </div>
           </div>
-        </div>
+        </details>
       )}
 
-      {/* Delivery Address & Area with Add / Update + WhatsApp Chat Auto-Detect */}
-      <OrderAddressControl
-        orderId={o.id}
-        orderRefText={refText}
-        customerId={o.customer.id}
-        customerName={o.customer.name}
-        currentOrderNote={o.note}
-        customerLocation={o.customer.location}
-        customerLocationRaw={o.customer.locationRaw}
-        canEdit={canEdit}
-      />
-
-      <div className="space-y-1.5 text-xs text-muted">
-        <p className="tabular flex items-center justify-between gap-2">
-          <span>Placed {fmtDate(o.createdAt, "EEE d MMM, h:mm a")}</span>
-        </p>
+      {/* Compact Delivery Address & Payment Status */}
+      <div className="space-y-1.5">
+        <OrderAddressControl
+          orderId={o.id}
+          orderRefText={refText}
+          customerId={o.customer.id}
+          customerName={o.customer.name}
+          currentOrderNote={o.note}
+          customerLocation={o.customer.location}
+          customerLocationRaw={o.customer.locationRaw}
+          canEdit={canEdit}
+          compact
+        />
         <PaymentSummary o={o} />
       </div>
 

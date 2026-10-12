@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { Rupee3D, ShoppingBag3D } from "@/components/icons-3d";
 import { Picker } from "@/components/picker";
-import { buttonClass, Callout, Card, DistributionBar, EmptyState, FilterChips, PageHeader, Section, Stat } from "@/components/ui";
+import { buttonClass, Callout, Card, EmptyState, FilterChips, PageHeader, Stat } from "@/components/ui";
 import { ActiveFilters, FilterBar } from "@/components/filter-bar";
 import { activeCount as filterCount, filterQuery, keepFilters, readFilters, resolvePeriod, type FilterSection } from "@/lib/filters";
 import { filterOptions, orderScope } from "@/lib/filter-scope";
@@ -50,8 +50,9 @@ const COD_WHERE = {
 };
 const VERIFY_WHERE = { paidAt: null, paymentClaimedAt: { not: null }, status: { not: "CANCELLED" } };
 const REFUND_WHERE = { status: "CANCELLED", refundedAt: null, OR: [{ paidAt: { not: null } }, { paidAmount: { gt: 0 } }] };
-/** Shown only while they have orders (or are open), so the usual tabs stay short. */
+/** Shown only while they have orders (or are open), so the usual tabs stay short and uncluttered. */
 const PAYMENT_TABS = new Set(["cod", "verify", "refund"]);
+const QUIET_WHEN_EMPTY_TABS = new Set(["cod", "verify", "refund", "confirmed", "dispatched"]);
 
 const TABS = [
   { key: "", label: "Active", where: { status: { in: ["NEW", "CONFIRMED", "PAID", "DISPATCHED"] } } },
@@ -313,7 +314,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     <>
       <PageHeader
         title="Orders"
-        description="WhatsApp catalogue carts and orders you add by hand. Confirm, dispatch and deliver them here; the customer gets a WhatsApp update at each step."
+        description="Manage WhatsApp catalogue carts and manual orders."
         actions={
           <div className="flex items-center gap-2">
             <OrdersRefreshButton className="max-sm:w-11 max-sm:px-0" />
@@ -339,7 +340,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         tabs={
           <FilterChips
             label="Order status"
-            items={TABS.filter((t) => !PAYMENT_TABS.has(t.key) || tabCount[t.key] > 0 || tab.key === t.key).map((t) => ({
+            items={TABS.filter((t) => !QUIET_WHEN_EMPTY_TABS.has(t.key) || tabCount[t.key] > 0 || tab.key === t.key).map((t) => ({
               href: qs({ show: t.key || undefined }),
               label: t.label,
               count: fmtNumber(tabCount[t.key]),
@@ -349,7 +350,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         }
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <div className="mb-3 grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
         <Stat
           label="Active pipeline"
           value={fmtNumber(activeCount)}
@@ -388,87 +389,71 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         />
       </div>
 
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3.5">
         <Card className="card-3d">
-          <form role="search" aria-label="Filter orders" className="grid gap-2 p-3 sm:flex sm:flex-wrap sm:items-center sm:p-4">
-            {tab.key && <input type="hidden" name="show" value={tab.key} />}
-            {[...new URLSearchParams(filterQuery(filters, {}, "all"))].map(([k, v], i) => (
-              <input key={`${k}-${i}`} type="hidden" name={k} value={v} />
-            ))}
-            <div className="relative min-w-0 sm:min-w-56 sm:flex-1">
-              <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
-              <input
-                key={q}
-                name="q"
-                type="search"
-                enterKeyHint="search"
-                defaultValue={q}
-                placeholder="Search customer, phone, RG-1001, item…"
-                aria-label="Search customer, phone, order number or item"
-                className="field pl-10"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:contents">
-              {filterOpts && (
-                <FilterBar
-                  value={filters}
-                  options={filterOpts}
-                  basePath="/dashboard/orders"
-                  extra={{ show: tab.key || undefined, q: q || undefined, sort: sort !== "new" ? sort : undefined }}
-                  defaultRange="all"
-                  sections={ORDER_FILTERS}
-                  note="Filter orders by date period, catalogue product, or delivery area."
-                  periodLabel={filters.range === "all" ? "Any date" : period.label}
+          <div className="flex flex-col gap-2 p-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:p-3">
+            <form role="search" aria-label="Filter orders" className="grid flex-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
+              {tab.key && <input type="hidden" name="show" value={tab.key} />}
+              {[...new URLSearchParams(filterQuery(filters, {}, "all"))].map(([k, v], i) => (
+                <input key={`${k}-${i}`} type="hidden" name={k} value={v} />
+              ))}
+              <div className="relative min-w-0 sm:min-w-56 sm:flex-1">
+                <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
+                <input
+                  key={q}
+                  name="q"
+                  type="search"
+                  enterKeyHint="search"
+                  defaultValue={q}
+                  placeholder="Search customer, phone, RG-1001, item…"
+                  aria-label="Search customer, phone, order number or item"
+                  className="field pl-10"
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:contents">
+                {filterOpts && (
+                  <FilterBar
+                    value={filters}
+                    options={filterOpts}
+                    basePath="/dashboard/orders"
+                    extra={{ show: tab.key || undefined, q: q || undefined, sort: sort !== "new" ? sort : undefined }}
+                    defaultRange="all"
+                    sections={ORDER_FILTERS}
+                    note="Filter orders by date period, catalogue product, or delivery area."
+                    periodLabel={filters.range === "all" ? "Any date" : period.label}
+                  />
+                )}
+                <Picker
+                  name="sort"
+                  autoSubmit
+                  title="Sort orders"
+                  defaultValue={sort}
+                  className="sm:w-44"
+                  options={SORT_OPTIONS}
+                />
+              </div>
+              {filtered && (
+                <Link
+                  href={tab.key ? `/dashboard/orders?show=${tab.key}` : "/dashboard/orders"}
+                  className={cn(buttonClass("ghost"), "max-sm:h-9 max-sm:justify-self-start max-sm:px-1 max-sm:text-sm")}
+                >
+                  Reset
+                </Link>
               )}
-              <Picker
-                name="sort"
-                autoSubmit
-                title="Sort orders"
-                defaultValue={sort}
-                className="sm:w-48"
-                options={SORT_OPTIONS}
-              />
-            </div>
-            <button className={cn(buttonClass("secondary"), "max-sm:hidden")}>Filter</button>
-            {filtered && (
-              <Link
-                href={tab.key ? `/dashboard/orders?show=${tab.key}` : "/dashboard/orders"}
-                className={cn(buttonClass("ghost"), "max-sm:h-9 max-sm:justify-self-start max-sm:px-1 max-sm:text-sm")}
-              >
-                Clear filters
-              </Link>
-            )}
-          </form>
-          {filterOpts && filterCount(filters) > 0 && (
-            <div className="border-t border-line px-3 py-2.5 sm:px-4">
-              <ActiveFilters value={filters} options={filterOpts} basePath="/dashboard/orders" extra={{ show: tab.key || undefined, q: q || undefined, sort: sort !== "new" ? sort : undefined }} defaultRange="all" />
-            </div>
-          )}
-          {allCount > 0 && (
-            <div className="border-t border-line px-3 py-3 sm:px-4">
-              <DistributionBar
-                segments={[
-                  { key: "new", label: "New", value: newCount, color: "gold", href: qs({ show: "new" }) },
-                  { key: "confirmed", label: "Confirmed", value: confirmedCount, color: "blue", href: qs({ show: "confirmed" }) },
-                  { key: "dispatched", label: "Dispatched", value: dispatchedCount, color: "violet", href: qs({ show: "dispatched" }) },
-                  { key: "done", label: "Delivered", value: deliveredCount, color: "emerald", href: qs({ show: "done" }) },
-                  { key: "cancelled", label: "Cancelled", value: cancelledCount, color: "neutral", href: qs({ show: "cancelled" }) },
-                ]}
-              />
-            </div>
-          )}
-          {exportOrders.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line bg-subtle/40 px-3 py-2.5 sm:px-4">
-              <span className="text-xs font-medium text-muted">
-                Export or print {exportOrders.length} shown order{exportOrders.length === 1 ? "" : "s"} ({tab.label}):
-              </span>
+            </form>
+            {exportOrders.length > 0 && (
               <PrintButton
                 orders={exportOrders}
                 picks={[]}
                 title={`Orders · ${tab.label}`}
                 filenamePrefix={`orders-${tab.key || "active"}`}
+                compact
               />
+            )}
+          </div>
+          {filterOpts && filterCount(filters) > 0 && (
+            <div className="border-t border-line px-3 py-2 sm:px-3.5">
+              <ActiveFilters value={filters} options={filterOpts} basePath="/dashboard/orders" extra={{ show: tab.key || undefined, q: q || undefined, sort: sort !== "new" ? sort : undefined }} defaultRange="all" />
             </div>
           )}
         </Card>
@@ -514,7 +499,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         )}
 
         {orders.length ? (
-          <ul className="grid gap-3 sm:gap-4 xl:grid-cols-2">
+          <ul className="grid gap-3 sm:gap-3.5 xl:grid-cols-2">
             {orders.map((o) => (
               <li key={o.id} className="min-w-0">
                 <OrderCard
@@ -539,33 +524,47 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         )}
       </div>
 
-      {/* Settings below the orders, so staff on a phone see today's orders first. */}
+      {/* Collapsible Order & Payment Settings drawer so the daily order board stays uncluttered */}
       {scope.canManage && scope.clientId && (
-        <Section title="Order settings" description="Order message pictures, WhatsApp payments, refill reminders and win-back messages.">
-          <Card className="card-3d">
-            <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:p-5">
-              {/* eslint-disable-next-line @next/next/no-img-element -- our own public image */}
-              <img src="/thenan-order-header.jpg" alt="Order message picture" width={64} height={64} className="size-16 shrink-0 rounded-control object-cover ring-1 ring-line" />
-              <div className="min-w-0 flex-1 text-sm">
-                <p className="font-medium">Order messages with your picture</p>
-                <p className="mt-0.5 text-xs text-muted">
-                  {pictureStatus.map((p) => `${p.name.replace("thenan_order_", "")}: ${p.status ? p.status.toLowerCase() : "not created"}`).join(" · ")}. Used automatically once approved; the plain versions cover the wait.
-                </p>
+        <details className="group mt-6 rounded-card border border-line bg-panel shadow-xs">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
+            <div>
+              <h2 className="text-sm font-semibold text-ink">Order &amp; Payment Settings</h2>
+              <p className="text-xs text-muted">
+                WhatsApp native payment config, order header picture, and refill reminders
+              </p>
+            </div>
+            <span className="rounded-control bg-sunken px-2.5 py-1 text-xs font-semibold text-ink-2 ring-1 ring-line transition group-hover:bg-subtle">
+              <span className="group-open:hidden">Configure</span>
+              <span className="hidden group-open:inline">Hide</span>
+            </span>
+          </summary>
+          <div className="space-y-4 border-t border-line p-4 sm:p-5">
+            <Card className="card-3d">
+              <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:p-5">
+                {/* eslint-disable-next-line @next/next/no-img-element -- our own public image */}
+                <img src="/thenan-order-header.jpg" alt="Order message picture" width={64} height={64} className="size-16 shrink-0 rounded-control object-cover ring-1 ring-line" />
+                <div className="min-w-0 flex-1 text-sm">
+                  <p className="font-medium">Order messages with your picture</p>
+                  <p className="mt-0.5 text-xs text-muted">
+                    {pictureStatus.map((p) => `${p.name.replace("thenan_order_", "")}: ${p.status ? p.status.toLowerCase() : "not created"}`).join(" · ")}. Used automatically once approved; the plain versions cover the wait.
+                  </p>
+                </div>
+                {pictureStatus.some((p) => !p.status) && (
+                  <ActionButton action={createOrderTemplates.bind(null, headerImage)} confirm="Create the picture versions of the order templates and submit them to Meta?">
+                    Create with picture
+                  </ActionButton>
+                )}
               </div>
-              {pictureStatus.some((p) => !p.status) && (
-                <ActionButton action={createOrderTemplates.bind(null, headerImage)} confirm="Create the picture versions of the order templates and submit them to Meta?">
-                  Create with picture
-                </ActionButton>
-              )}
-            </div>
-          </Card>
-          {client && (
-            <div className="grid items-start gap-4 xl:grid-cols-2">
-              <PaymentForm config={client.paymentConfig} own={{ name: PAYMENT_TEMPLATE, status: ownPaymentTemplate?.status ?? null }} using={paymentTemplate?.name ?? null} />
-              <RefillForm days={client.refillDays} templateId={client.refillTemplateId} templates={approved} />
-            </div>
-          )}
-        </Section>
+            </Card>
+            {client && (
+              <div className="grid items-start gap-4 xl:grid-cols-2">
+                <PaymentForm config={client.paymentConfig} own={{ name: PAYMENT_TEMPLATE, status: ownPaymentTemplate?.status ?? null }} using={paymentTemplate?.name ?? null} />
+                <RefillForm days={client.refillDays} templateId={client.refillTemplateId} templates={approved} />
+              </div>
+            )}
+          </div>
+        </details>
       )}
     </>
   );

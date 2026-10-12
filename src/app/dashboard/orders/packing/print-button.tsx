@@ -579,15 +579,19 @@ export function PrintButton({
   picks = [],
   title = "Packing & Delivery List",
   filenamePrefix = "packing-list",
+  compact = false,
 }: {
   orders?: ExportableOrderRow[];
   picks?: ExportablePickItem[];
   title?: string;
   filenamePrefix?: string;
+  compact?: boolean;
 }) {
   const [busy, setBusy] = useState<"pdf" | "img" | "xls" | "csv" | null>(null);
+  const [openMenu, setOpenMenu] = useState(false);
 
   const handlePdf = () => {
+    setOpenMenu(false);
     setBusy("pdf");
     try {
       if (orders.length > 0) {
@@ -602,6 +606,7 @@ export function PrintButton({
 
   const handleImage = () => {
     if (!orders.length) return;
+    setOpenMenu(false);
     setBusy("img");
     try {
       downloadOrdersImage(orders, picks, title, filenamePrefix);
@@ -612,6 +617,7 @@ export function PrintButton({
 
   const handleExcel = () => {
     if (!orders.length) return;
+    setOpenMenu(false);
     setBusy("xls");
     try {
       downloadOrdersExcel(orders, picks, filenamePrefix);
@@ -622,6 +628,7 @@ export function PrintButton({
 
   const handleCsv = () => {
     if (!orders.length) return;
+    setOpenMenu(false);
     setBusy("csv");
     try {
       downloadOrdersCsv(orders, filenamePrefix);
@@ -629,6 +636,66 @@ export function PrintButton({
       setTimeout(() => setBusy(null), 300);
     }
   };
+
+  if (compact) {
+    return (
+      <div className="relative print:hidden">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => setOpenMenu((v) => !v)}
+          disabled={busy !== null}
+          title="Export or print shown orders"
+        >
+          {busy ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+          <span>Export</span>
+        </Button>
+        {openMenu && (
+          <>
+            <div className="fixed inset-0 z-30" onClick={() => setOpenMenu(false)} />
+            <div className="absolute right-0 top-full z-40 mt-1.5 w-48 rounded-card border border-line bg-panel p-1.5 shadow-lg">
+              <button
+                type="button"
+                onClick={handlePdf}
+                className="flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left text-xs font-medium text-ink transition hover:bg-sunken"
+              >
+                <Printer className="size-4 text-brand-deep" />
+                <span>Print / Save PDF</span>
+              </button>
+              {orders.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleImage}
+                    className="flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left text-xs font-medium text-ink transition hover:bg-sunken"
+                  >
+                    <ImageIcon className="size-4 text-ink-2" />
+                    <span>Image (PNG)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExcel}
+                    className="flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left text-xs font-medium text-ink transition hover:bg-sunken"
+                  >
+                    <FileSpreadsheet className="size-4 text-ink-2" />
+                    <span>Excel (.xls)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCsv}
+                    className="flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left text-xs font-medium text-ink transition hover:bg-sunken"
+                  >
+                    <Download className="size-4 text-ink-2" />
+                    <span>CSV Spreadsheet</span>
+                  </button>
+                </>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 print:hidden">
