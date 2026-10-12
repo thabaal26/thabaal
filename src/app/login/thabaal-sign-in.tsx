@@ -5,6 +5,7 @@ import Image from "next/image";
 import { LoginForm } from "./login-form";
 import { LoginIllustration } from "./login-illustration";
 import { LandingSections } from "./landing-sections";
+import { MascotIntro } from "./mascot-intro";
 import "./thabaal-login.css";
 
 function getThemeSnapshot(): "day" | "night" {
@@ -179,6 +180,9 @@ export function ThabaalSignIn() {
           onToggleTheme={toggleTheme}
           lang={lang}
         />
+
+        {/* The little bird character: entrance, letter hops, and hovering on the split. */}
+        <MascotIntro lang={lang} />
       </div>
 
       {/* What Thabaal does: features, the order journey, pricing and questions, below the sign-in. */}
