@@ -1,6 +1,7 @@
 /* The sign-in bird character (mascot-intro.tsx) and its face (bird-face.tsx). */
 
-.thabaal-page { position: relative; }
+/* overflow-x: clip lets the big bird come in from beyond the right edge without a sideways scroll. */
+.thabaal-page { position: relative; overflow-x: clip; }
 
 /* ── Mascot layers: position › pose (pitch/bank) › idle (hover bob) › watch (turn to form) › face (flip/tilt/squash) ── */
 .tm-mascot {
@@ -14,11 +15,12 @@
   pointer-events: none;
   visibility: hidden;
   will-change: transform;
+  transform-origin: 74% 80%; /* the belly: grows and shrinks in place */
 }
 .tm-mascot.tm-on { visibility: visible; }
 .tm-pose, .tm-idle, .tm-watchwrap, .tm-face { position: absolute; inset: 0; }
-.tm-pose { transform-origin: 74% 80%; }
-.tm-face { transform-origin: 62% 55%; }
+.tm-pose, .tm-idle { transform-origin: 74% 80%; }
+.tm-face { transform-origin: 74% 55%; } /* turns round over its feet */
 .tm-watchwrap { transition: transform .35s cubic-bezier(.34, 1.56, .64, 1); }
 .tm-face img, .tm-face .bf { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .tm-wing { transform-origin: 54.4% 30.5%; }
@@ -48,6 +50,16 @@
   font: 900 clamp(14px, 3.4cqw, 30px) / 1 var(--font-nunito), system-ui, sans-serif;
   opacity: 0; transform: scale(.3) rotate(-20deg); transform-origin: 0 100%;
 }
+
+/* Burst for the big ⇄ small swaps: flash, ring, cloud puffs, sparkles. */
+.tm-burst { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 31; pointer-events: none; }
+.tm-burst i { position: absolute; left: 0; top: 0; translate: -50% -50%; border-radius: 50%; opacity: 0; will-change: transform, opacity; }
+.tm-burst .tm-flash { background: radial-gradient(circle, rgb(255 255 255 / .95) 0 16%, rgb(255 228 150 / .7) 38%, rgb(253 185 19 / 0) 70%); }
+.tm-burst .tm-ring { border: 4px solid #FDB913; box-shadow: 0 0 0 2px rgb(255 255 255 / .7), inset 0 0 0 2px rgb(255 255 255 / .7); }
+.tm-burst .tm-puff { background: #fff; box-shadow: inset -3px -4px 0 rgb(6 37 72 / .1), 0 0 0 1.5px rgb(6 37 72 / .08); }
+[data-theme="night"] .tm-burst .tm-puff { background: #e3ebff; }
+.tm-burst .tm-spark { box-shadow: 0 0 0 1px rgb(6 37 72 / .12); }
+.tm-burst .tm-star { border-radius: 0; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
 
 /* ── Face expressions ── */
 .bf path { fill: none; stroke: #062548; stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; }
