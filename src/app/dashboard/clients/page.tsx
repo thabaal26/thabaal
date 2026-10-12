@@ -11,7 +11,7 @@ import { fmtDate, fmtNumber } from "@/lib/format";
 import { getScope } from "@/lib/session";
 import { cleanOverrides, legacyOverrides, portalDefault } from "@/lib/appearance";
 import { getSettings } from "@/lib/provider";
-import { AppearanceEditor } from "../appearance-editor";
+import { ClientAppearance } from "../appearance-editor";
 import { deleteClientUser } from "../actions/clients";
 import { AccessSelect, AddLoginForm, AddNumberForm, BrandingForm, ClientSectionsForm, NewClientForm, NumberActions, RefreshNumbersButton, ResetPasswordButton, SendingRulesForm, TokenForm } from "./client-forms";
 
@@ -206,7 +206,7 @@ export default async function ClientsPage() {
                     <p className="mb-3 mt-1 text-xs text-muted">
                       This client&apos;s look. Anything left on <span className="font-medium text-ink-2">Default</span> follows the portal default (Settings → Appearance).
                     </p>
-                    <AppearanceEditor mode="client" clientId={c.id} clientName={c.name} initial={{ ...legacyOverrides(c), ...cleanOverrides(c.appearance) }} portal={portalLook} />
+                    <ClientAppearance clientId={c.id} clientName={c.name} initial={{ ...legacyOverrides(c), ...cleanOverrides(c.appearance) }} portal={portalLook} />
                   </section>
 
                   <section className="border-t border-line pt-5 xl:col-span-2">

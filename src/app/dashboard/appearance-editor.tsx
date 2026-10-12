@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
-import { Bell, Check, Package, Search, Send, ShoppingCart, Sparkles, Truck, Users } from "@/components/icons";
+import { Bell, Check, ChevronDown, Package, Search, Send, ShoppingCart, Sparkles, Truck, Users } from "@/components/icons";
 import { Bell3D, Dashboard3D, Rupee3D, ShoppingBag3D, Trophy3D, Users3D } from "@/components/icons-3d";
 import { IconSetLink } from "@/components/icon-set-link";
 import { TrendChart } from "@/components/charts";
@@ -135,6 +135,43 @@ export function AppearanceEditor(props: Props) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** A client's look on the Clients page: a one-line summary that opens into the editor (the editor
+ *  and its preview only mount when opened, so a long client list stays light). */
+export function ClientAppearance(props: { clientId: string; clientName: string; initial: AppearanceOverrides; portal: Appearance }) {
+  const [open, setOpen] = useState(false);
+  const look: Appearance = { ...props.portal, ...props.initial };
+  const own = Object.keys(props.initial).length;
+  const summary = [
+    `${optionLabel("iconPack", look.iconPack)} icons`,
+    `${optionLabel("tileLook", look.tileLook)} ${optionLabel("tileTone", look.tileTone).toLowerCase()} tiles`,
+    `${optionLabel("cardStyle", look.cardStyle)} cards`,
+    `${optionLabel("uiStyle", look.uiStyle)} UI`,
+    `${optionLabel("chartLib", look.chartLib)} charts`,
+  ].join(" · ");
+  return (
+    <div className="rounded-card border border-line bg-panel">
+      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between gap-3 rounded-card px-3.5 py-3 text-left hover:bg-subtle">
+        <span className="min-w-0">
+          <span className="flex items-center gap-2 text-sm font-medium text-ink">
+            {own ? "Own look" : "Portal default look"}
+            {own > 0 && <Badge tone="violet">{own} custom</Badge>}
+          </span>
+          <span className="mt-0.5 block truncate text-xs text-muted">{summary}</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-brand-deep">
+          {open ? "Close" : "Customise"}
+          <ChevronDown aria-hidden className={cn("size-4 transition-transform", open && "rotate-180")} />
+        </span>
+      </button>
+      {open && (
+        <div className="border-t border-line p-3.5 sm:p-4">
+          <AppearanceEditor mode="client" {...props} />
+        </div>
+      )}
     </div>
   );
 }

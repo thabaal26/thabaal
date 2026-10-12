@@ -166,16 +166,17 @@ function CartesianChart({ m, onEvent }: { m: Cartesian; onEvent: EngineProps["on
               isAnimationActive={m.animate}
               animationDuration={650}
               cursor={s.clickable ? "pointer" : "default"}
-              onClick={(_: unknown, i: number) => event("click", si, i)}
-              onMouseEnter={(_: unknown, i: number) => event("mouseover", si, i)}
-              onMouseLeave={(_: unknown, i: number) => event("mouseout", si, i)}
+              onClick={(d: { payload?: { i?: number } }, i: number) => event("click", si, d?.payload?.i ?? i)}
+              onMouseEnter={(d: { payload?: { i?: number } }, i: number) => event("mouseover", si, d?.payload?.i ?? i)}
+              onMouseLeave={(d: { payload?: { i?: number } }, i: number) => event("mouseout", si, d?.payload?.i ?? i)}
             >
               {s.data.map((d, i) => (
                 <Cell key={i} fill={withAlpha(d.color, d.opacity)} stroke={d.borderWidth ? d.borderColor : undefined} strokeWidth={d.borderWidth} radius={corners(d.radius) as never} />
               ))}
               {s.data.some((d) => d.label) && (
                 <LabelList
-                  valueAccessor={(_: unknown, i: number) => s.data[i]?.label?.text ?? ""}
+                  // Entries skip empty bars, so find the point by its row, not the entry's position.
+                  valueAccessor={(entry: { payload?: { i?: number } }) => s.data[entry.payload?.i ?? -1]?.label?.text ?? ""}
                   position={m.horizontal ? "right" : "top"}
                   offset={4}
                   fill={s.data.find((d) => d.label)?.label?.color}
