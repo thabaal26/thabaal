@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { CalendarClock, Clock, Globe, Inbox, Megaphone, Phone, Printer, QrCode, Repeat, Sheet, ShieldCheck, Smartphone, Users, Wallet } from "@/components/icons";
+import { BellRing, CalendarClock, Clock, Globe, Inbox, Megaphone, Phone, QrCode, Repeat, Sheet, ShieldCheck, Smartphone, Users, Wallet } from "@/components/icons";
 import "./landing.css";
 
 type Lang = "en" | "ta";
@@ -52,10 +52,10 @@ const JOURNEY: { title: T; text: T }[] = [
     },
   },
   {
-    title: { en: "Pack", ta: "பேக்" },
+    title: { en: "Ship", ta: "ஷிப்பிங்" },
     text: {
-      en: "Paid orders queue for packing. Print slips that say what to collect, and the customer gets a dispatch update.",
-      ta: "பணம் செலுத்திய ஆர்டர்கள் பேக்கிங்கிற்கு வரிசையில். வசூலிக்க வேண்டியதுடன் சீட்டு அச்சிடுங்கள்; வாடிக்கையாளருக்கு அனுப்பிய தகவல் போகும்.",
+      en: "Paid orders are ready to ship, and the customer gets a dispatch update on WhatsApp automatically.",
+      ta: "பணம் செலுத்திய ஆர்டர்கள் அனுப்பத் தயார்; வாடிக்கையாளருக்கு WhatsApp-இல் தானாகவே அனுப்பிய தகவல் போகும்.",
     },
   },
   {
@@ -71,8 +71,8 @@ const MORE: { Icon: typeof Inbox; title: T; text: T }[] = [
   { Icon: Inbox, title: { en: "Replies inbox", ta: "பதில்கள்" }, text: { en: "Chats sorted by who is waiting longest and who has a cart open.", ta: "நீண்ட நேரம் காத்திருப்பவர், கார்ட் வைத்திருப்பவர் முதலில்." } },
   { Icon: Phone, title: { en: "WhatsApp calls", ta: "WhatsApp அழைப்புகள்" }, text: { en: "Take and place calls from the portal, with missed calls to follow up.", ta: "போர்ட்டலிலிருந்தே அழைக்கலாம், தவறிய அழைப்புகளைப் பின்தொடரலாம்." } },
   { Icon: Sheet, title: { en: "Google Sheets", ta: "Google Sheets" }, text: { en: "Bring in customers from your sheets and keep orders flowing back.", ta: "ஷீட்டிலிருந்து வாடிக்கையாளர்கள் உள்ளே, ஆர்டர்கள் மீண்டும் ஷீட்டுக்கு." } },
-  { Icon: Users, title: { en: "Audiences", ta: "குழுக்கள்" }, text: { en: "Save groups like ghee buyers in Sellur and send in one tap.", ta: "‘செல்லூர் நெய் வாங்குபவர்கள்’ போன்ற குழுக்களுக்கு ஒரே தட்டலில்." } },
-  { Icon: Repeat, title: { en: "Reorder reminders", ta: "மீண்டும் வாங்க நினைவூட்டல்" }, text: { en: "A nudge when a customer's last bottle is likely running out.", ta: "கடைசி பாட்டில் தீரும் நேரத்தில் ஒரு நினைவூட்டல்." } },
+  { Icon: Users, title: { en: "Audiences", ta: "குழுக்கள்" }, text: { en: "Save groups like repeat buyers in your area and send in one tap.", ta: "‘உங்கள் பகுதியில் மீண்டும் வாங்குபவர்கள்’ போன்ற குழுக்களுக்கு ஒரே தட்டலில்." } },
+  { Icon: Repeat, title: { en: "Reorder reminders", ta: "மீண்டும் வாங்க நினைவூட்டல்" }, text: { en: "A nudge when a customer is likely to need more.", ta: "வாடிக்கையாளருக்கு மீண்டும் தேவைப்படும் நேரத்தில் ஒரு நினைவூட்டல்." } },
   { Icon: Globe, title: { en: "Two languages", ta: "இரு மொழிகள்" }, text: { en: "Work in தமிழ் or English, switch any time.", ta: "தமிழ் அல்லது ஆங்கிலம், எப்போது வேண்டுமானாலும் மாற்றலாம்." } },
   { Icon: Smartphone, title: { en: "Works on your phone", ta: "மொபைலில் இயங்கும்" }, text: { en: "Install it like an app; every screen fits one hand.", ta: "ஆப் போல நிறுவலாம்; ஒரு கையில் பயன்படுத்தலாம்." } },
   { Icon: ShieldCheck, title: { en: "Your team, your data", ta: "உங்கள் குழு, உங்கள் தரவு" }, text: { en: "Logins for owners, managers and staff, each seeing what they need.", ta: "உரிமையாளர், மேலாளர், ஊழியர்களுக்கு தனி லாகின்." } },
@@ -110,8 +110,8 @@ const FAQ: { q: T; a: T }[] = [
   {
     q: { en: "How long does setup take?", ta: "தொடங்க எவ்வளவு நாள் ஆகும்?" },
     a: {
-      en: "Most shops are sending within a few days. Meta's business verification is usually the slowest step, and we walk you through it.",
-      ta: "பெரும்பாலான கடைகள் சில நாட்களில் அனுப்பத் தொடங்குகின்றன. Meta வணிகச் சரிபார்ப்பே அதிக நேரம் எடுக்கும்; அதிலும் உதவுவோம்.",
+      en: "Most businesses are sending within a few days. Meta's business verification is usually the slowest step, and we walk you through it.",
+      ta: "பெரும்பாலான வணிகங்கள் சில நாட்களில் அனுப்பத் தொடங்குகின்றன. Meta வணிகச் சரிபார்ப்பே அதிக நேரம் எடுக்கும்; அதிலும் உதவுவோம்.",
     },
   },
 ];
@@ -151,8 +151,8 @@ export function LandingSections({ lang }: { lang: Lang }) {
           <h2>{ta ? "முதல் வணக்கம் முதல் பணம் செலுத்திய ஆர்டர் வரை, ஒரே WhatsApp சாட்டில்." : "From the first hello to a paid order, in one WhatsApp chat."}</h2>
           <p className="tl-lede">
             {ta
-              ? "சலுகைகள், கேட்டலாக், கார்ட், UPI மற்றும் டெலிவரியில் பணம், பேக்கிங், பதில்கள் — அனைத்தையும் தபால் கவனிக்கும். ஒவ்வொரு செய்தியும் எவ்வளவு வருமானம் தந்தது என்றும் காட்டும்."
-              : "Thabaal runs your offers, catalogue, carts, UPI and cash-on-delivery payments, packing and replies, and shows you what each message earned."}
+              ? "சலுகைகள், கேட்டலாக், கார்ட், UPI மற்றும் டெலிவரியில் பணம், டெலிவரி தகவல்கள், பதில்கள் — அனைத்தையும் தபால் கவனிக்கும். ஒவ்வொரு செய்தியும் எவ்வளவு வருமானம் தந்தது என்றும் காட்டும்."
+              : "Thabaal runs your offers, catalogue, carts, UPI and cash-on-delivery payments, delivery updates and replies, and shows you what each message earned."}
           </p>
           <ul className="tl-stamps">
             {STAMPS.map((s) => (
@@ -235,46 +235,55 @@ export function LandingSections({ lang }: { lang: Lang }) {
               <h2>{ta ? "வாடிக்கையாளருக்குப் பிடித்த வழியில் பணம்" : "Get paid the way your customers like to pay"}</h2>
               <p>
                 {ta
-                  ? "சாட்டிலேயே UPI கோரிக்கை, டெலிவரியில் பணம், அல்லது கடையில் பெற்றதைப் பதிவு செய்யுங்கள். UTR எண் அல்லது ஸ்கிரீன்ஷாட் வந்தால் நீங்கள் சரிபார்க்கக் காத்திருக்கும்."
-                  : "Send a UPI request inside the chat, take cash on delivery, or record a payment made at the shop. When a customer sends a UTR number or screenshot, it waits for you to verify, so the cash in hand matches your orders."}
+                  ? "சாட்டிலேயே UPI கோரிக்கை, டெலிவரியில் பணம், அல்லது நேரில் பெற்றதைப் பதிவு செய்யுங்கள். UTR எண் அல்லது ஸ்கிரீன்ஷாட் வந்தால் நீங்கள் சரிபார்க்கக் காத்திருக்கும்."
+                  : "Send a UPI request inside the chat, take cash on delivery, or record a payment made in person. When a customer sends a UTR number or screenshot, it waits for you to verify, so the cash in hand matches your orders."}
               </p>
               <ul className="tl-points">
                 <li>
-                  <QrCode /> {ta ? "WhatsApp UPI, கடை QR, ரொக்கம், டெலிவரியில் பணம்" : "UPI on WhatsApp, shop QR, cash or cash on delivery"}
+                  <QrCode /> {ta ? "WhatsApp UPI, உங்கள் QR, ரொக்கம், டெலிவரியில் பணம்" : "UPI on WhatsApp, your QR code, cash or cash on delivery"}
                 </li>
                 <li>
                   <Wallet /> {ta ? "சரிபார்க்க வேண்டியவை, திருப்பித் தர வேண்டியவை, நிலுவை" : "Payments to check, refunds due and money still owed"}
                 </li>
                 <li>
-                  <Printer /> {ta ? "வசூலிக்க வேண்டியதைக் காட்டும் பேக்கிங் சீட்டு" : "Packing slips that say what to collect at the door"}
+                  <BellRing /> {ta ? "பணம் நிலுவையில் இருந்தால் தானாக நினைவூட்டல்" : "An automatic reminder when a payment is still pending"}
                 </li>
               </ul>
             </div>
-            {/* An example chat: offer, cart, payment and dispatch. */}
+            {/* An example chat with a made-up store: cart, payment and dispatch. */}
             <figure className="tl-chat" aria-label={ta ? "உதாரண WhatsApp சாட்" : "Example WhatsApp chat: a cart, a UPI payment and a dispatch update"}>
               <div className="tl-chat-top">
-                <span aria-hidden>TO</span>
-                <b>Thenan Oils</b>
+                <span aria-hidden>FM</span>
+                <div className="tl-chat-name">
+                  <b>
+                    Fresh Mart
+                    <svg viewBox="0 0 24 24" className="tl-verified" role="img" aria-label={ta ? "சரிபார்க்கப்பட்ட வணிகம்" : "Verified business"}>
+                      <path d="M12 1.5l2.4 1.8 3-.2 1 2.8 2.6 1.6-.8 2.9 1.3 2.7-2.2 2 .1 3-2.9.7-1.5 2.6-2.9-.9-2.6 1.4L10 20.3l-3 .2-1-2.8-2.6-1.6.8-2.9L2.9 10.6l2.2-2-.1-3 2.9-.7 1.5-2.6 2.9.9z" fill="#1d9bf0" />
+                      <path d="M7.6 12.2l3 3 5.8-6.2" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </b>
+                  <small>{ta ? "வணிகக் கணக்கு" : "Business account"}</small>
+                </div>
               </div>
               <ol>
                 <li className="tl-msg tl-out">
                   <span className="tl-cart">
                     <b>{ta ? "கார்ட் · 3 பொருட்கள்" : "Cart · 3 items"}</b>
-                    Gingelly oil 1L, Moringa oil 100ml, Ghee 100ml
+                    Basmati rice 5kg, Toor dal 1kg, Coffee powder 500g
                   </span>
                   <time>10:06 {ticks}</time>
                 </li>
                 <li className="tl-msg tl-in">
-                  {ta ? "ஆர்டர் RG-1024 தயார். மொத்தம் ₹1,010." : "Order RG-1024 is ready. Total ₹1,010 with delivery."}
+                  {ta ? "ஆர்டர் #1024 தயார். டெலிவரியுடன் மொத்தம் ₹1,050." : "Order #1024 is ready. Total ₹1,050 with delivery."}
                   <span className="tl-msg-btn">{ta ? "பார்த்து செலுத்துக" : "Review and pay"}</span>
                   <time>10:06</time>
                 </li>
                 <li className="tl-msg tl-out tl-paid">
-                  {ta ? "UPI மூலம் ₹1,010 செலுத்தப்பட்டது" : "Paid ₹1,010 by UPI"}
+                  {ta ? "UPI மூலம் ₹1,050 செலுத்தப்பட்டது" : "Paid ₹1,050 by UPI"}
                   <time>10:07 {ticks}</time>
                 </li>
                 <li className="tl-msg tl-in">
-                  {ta ? "பேக் செய்து அனுப்பப்பட்டது. மாலைக்குள் வரும்." : "Packed and on its way. Expect it by evening."}
+                  {ta ? "பணம் கிடைத்தது, நன்றி! உங்கள் ஆர்டர் அனுப்பப்பட்டது; மாலைக்குள் வரும்." : "Payment received, thank you! Your order is on its way and will arrive by evening."}
                   <time>16:40</time>
                 </li>
               </ol>
@@ -327,8 +336,8 @@ export function LandingSections({ lang }: { lang: Lang }) {
             <h2>{ta ? "ஒவ்வொரு செய்திக்கும் Meta கட்டணம் மட்டுமே" : "Pay Meta's rate for every message, nothing added"}</h2>
             <p className="tl-sub">
               {ta
-                ? "பல WhatsApp கருவிகள் Meta கட்டணத்திற்கு மேல் 10–26% சேர்க்கின்றன. தபால் சேர்ப்பதில்லை. உங்கள் கடைக்கு ஏற்ற திட்டத்தைச் சொல்வோம்."
-                : "Many WhatsApp tools add 10–26% on top of Meta's per-message charge. Thabaal doesn't. Tell us about your shop and we'll quote a plan that fits."}
+                ? "பல WhatsApp கருவிகள் Meta கட்டணத்திற்கு மேல் 10–26% சேர்க்கின்றன. தபால் சேர்ப்பதில்லை. உங்கள் வணிகத்திற்கு ஏற்ற திட்டத்தைச் சொல்வோம்."
+                : "Many WhatsApp tools add 10–26% on top of Meta's per-message charge. Thabaal doesn't. Tell us about your business and we'll quote a plan that fits."}
             </p>
             <Talk lang={lang} />
           </div>
@@ -345,7 +354,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
               <tbody>
                 <tr>
                   <th scope="row">{ta ? "மார்க்கெட்டிங்" : "Marketing"}</th>
-                  <td>{ta ? "சலுகைகள், புதிய சரக்கு, விலைப் பட்டியல்" : "Offers, new batches, price lists"}</td>
+                  <td>{ta ? "சலுகைகள், புதிய வரவுகள், விலைப் பட்டியல்" : "Offers, new arrivals, price lists"}</td>
                   <td>₹0.8631</td>
                 </tr>
                 <tr>
@@ -367,7 +376,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
       {/* ── FAQ ── */}
       <section className="tl-section" id="faq">
         <div className="tl-wrap tl-faq">
-          <h2>{ta ? "கடை உரிமையாளர்கள் கேட்கும் கேள்விகள்" : "Questions shop owners ask"}</h2>
+          <h2>{ta ? "வணிக உரிமையாளர்கள் கேட்கும் கேள்விகள்" : "Questions business owners ask"}</h2>
           {FAQ.map((f) => (
             <details key={f.q.en}>
               <summary>{t(f.q)}</summary>

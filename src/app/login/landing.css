@@ -136,6 +136,10 @@
 }
 [data-theme="night"] .tl-chat { background: #0b141a; }
 .tl-chat-top { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #075e54; color: #fff; }
+.tl-chat-name { display: flex; flex-direction: column; line-height: 1.2; }
+.tl-chat-name b { display: inline-flex; align-items: center; gap: 5px; }
+.tl-chat-name small { font-size: 12px; opacity: .8; font-weight: 400; }
+.tl-verified { width: 17px; height: 17px; flex: none; }
 .tl-chat-top span { width: 32px; height: 32px; border-radius: 999px; background: var(--yellow); color: var(--navy); display: grid; place-items: center; font-weight: 800; font-size: 13px; }
 .tl-chat ol { list-style: none; margin: 0; padding: 16px 14px 18px; display: flex; flex-direction: column; gap: 10px; font-family: system-ui, var(--font-tamil), sans-serif; }
 .tl-msg { max-width: 82%; padding: 8px 10px 6px; border-radius: 12px; font-size: 14px; line-height: 1.45; color: #111b21; display: flex; flex-direction: column; gap: 4px; box-shadow: 0 1px .5px rgb(0 0 0 / .13); }
