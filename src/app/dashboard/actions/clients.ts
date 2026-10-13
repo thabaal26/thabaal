@@ -350,3 +350,41 @@ export async function setUserAccess(userId: string, access: Access): Promise<Act
   refresh();
   return { ok: true, message: `${u.email} is now ${access.toLowerCase()}. It applies on their next page load.` };
 }
+
+/** Tests if the client's saved Meta access token is valid and active with Meta Graph API. */
+export async function verifyClientToken(clientId: string): Promise<ActionResult & { live?: boolean }> {
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const client = await db.client.findUnique({
+    where: { id: clientId },
+    include: { numbers: { take: 1, select: { phoneNumberId: true } } },
+  });
+  if (!client) return { ok: false, message: "Client not found." };
+  const token = client.waToken?.trim();
+  if (!token) return { ok: false, message: "No Meta access token saved for this client yet." };
+
+  try {
+    const phoneId = client.numbers[0]?.phoneNumberId || client.waPhoneNumberId;
+    const url = phoneId
+      ? `https://graph.facebook.com/v23.0/${phoneId}?fields=id,verified_name,quality_rating`
+      : `https://graph.facebook.com/v23.0/debug_token?input_token=${token}`;
+
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.error) {
+      const code = json.error?.code;
+      const msg = json.error?.message || "Token check failed";
+      if (code === 190) {
+        return { ok: false, message: "⚠️ Meta Access Token has EXPIRED or been revoked. Please generate a new permanent System User token." };
+      }
+      return { ok: false, message: `Meta reported an issue: ${msg} (code ${code ?? res.status})` };
+    }
+    return { ok: true, live: true, message: "✅ Meta Access Token is active, verified, and healthy!" };
+  } catch (e) {
+    return { ok: false, message: `Could not reach Meta Graph API: ${e instanceof Error ? e.message : "network error"}` };
+  }
+}
+

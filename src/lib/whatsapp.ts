@@ -399,6 +399,47 @@ export async function sendCatalogMessage(cfg: WaConfig, to: string, body: string
   return { id: res.messages[0].id, simulated: false };
 }
 
+export type InteractiveReplyButton = { id: string; title: string };
+
+/**
+ * Sends interactive reply buttons (up to 3 buttons) inside the customer's 24-hour service window.
+ * E.g. "Confirm COD" vs "Cancel Order".
+ */
+export async function sendInteractiveButtons(
+  cfg: WaConfig,
+  to: string,
+  body: string,
+  buttons: InteractiveReplyButton[],
+  opts: { header?: string; footer?: string } = {}
+): Promise<{ id: string; simulated: boolean }> {
+  if (!cfg.live) return { id: `demo.${crypto.randomUUID()}`, simulated: true };
+  const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "interactive",
+      interactive: {
+        type: "button",
+        ...(opts.header ? { header: { type: "text", text: opts.header.slice(0, 60) } } : {}),
+        body: { text: body.slice(0, 1024) },
+        ...(opts.footer ? { footer: { text: opts.footer.slice(0, 60) } } : {}),
+        action: {
+          buttons: buttons.slice(0, 3).map((b) => ({
+            type: "reply",
+            reply: {
+              id: b.id.slice(0, 256),
+              title: b.title.slice(0, 20),
+            },
+          })),
+        },
+      },
+    }),
+  });
+  return { id: res.messages[0].id, simulated: false };
+}
+
 export type MetaTemplate = {
   id: string;
   name: string;

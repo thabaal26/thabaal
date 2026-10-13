@@ -9,7 +9,7 @@ import { getSettings } from "./provider";
 import { replyWindowEnd } from "./replies";
 import { senderFor } from "./senders";
 import { renderFor, type TemplateButton, type VarMap } from "./template";
-import { MetaError, sendOrderStatus, sendPaymentRequest, sendPaymentTemplate, sendTextMessage } from "./whatsapp";
+import { MetaError, sendInteractiveButtons, sendOrderStatus, sendPaymentRequest, sendPaymentTemplate, sendTextMessage } from "./whatsapp";
 
 // WhatsApp payments for orders: the "Review and pay" request, reminders, confirmation and the order card
 // in the customer's chat. Shared by the webhook, the Orders page and the scheduler.
@@ -279,3 +279,45 @@ export async function remindUnpaidOrders(now = new Date(), limit = 20) {
     }
   }
 }
+
+/**
+ * Sends a 1-click interactive confirmation prompt for Cash on Delivery orders
+ * with "Confirm Order" and "Cancel Order" buttons.
+ */
+export async function sendCodConfirmationPrompt(orderId: string): Promise<{ ok: boolean; message: string }> {
+  const order = await db.order.findUnique({
+    where: { id: orderId },
+    include: { customer: true, client: { select: { name: true } } },
+  });
+  if (!order) return { ok: false, message: "Order not found." };
+  if (order.status === "CANCELLED") return { ok: false, message: "Order is cancelled." };
+  if (order.status === "CONFIRMED" && order.paymentMethod === "cod") return { ok: false, message: "Already confirmed." };
+  const c = order.customer;
+  if (c.optedOut) return { ok: false, message: "Customer opted out." };
+  if ((await getSettings()).provider !== "META") return { ok: false, message: "Needs Meta Cloud API." };
+
+  const { open, number, cfg } = await replyContext(c);
+  if (!open) return { ok: false, message: "Customer 24h window closed." };
+
+  const ref = orderRef(order);
+  const totalFormatted = money(order.total, order.currency);
+  const body = `Hello ${firstName(c.name)}, your Cash on Delivery request for ${order.client.name} order ${ref} (${totalFormatted}) is received.\n\nPlease confirm your order below so we can pack and dispatch it for you:`;
+
+  try {
+    const res = await sendInteractiveButtons(
+      cfg,
+      c.phone,
+      body,
+      [
+        { id: `cod_confirm:${order.id}`, title: "✅ Confirm COD" },
+        { id: `cod_cancel:${order.id}`, title: "❌ Cancel Order" },
+      ],
+      { header: "Order Confirmation", footer: "Tap a button to proceed" }
+    );
+    await logMessage(c.id, "COD Confirmation Prompt", body, res, number?.id ?? null);
+    return { ok: true, message: `COD confirmation buttons sent to ${c.name}.` };
+  } catch (e) {
+    return { ok: false, message: explainSendError(e).error };
+  }
+}
+

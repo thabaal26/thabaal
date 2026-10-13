@@ -8,7 +8,8 @@ import { explainError } from "@/lib/meta-errors";
 import { applyFailure } from "@/lib/rules";
 import { money, orderRef, orderWhereRef, recordOrder } from "@/lib/orders";
 import { metaReplyContent, receivingNumber, recordReply } from "@/lib/replies";
-import { autoRequestPayment, confirmPayment, recordPaymentClaim, recordPaymentFailure } from "@/lib/payments";
+import { autoRequestPayment, confirmPayment, recordPaymentClaim, recordPaymentFailure, sendCodConfirmationPrompt, textInWindow, updateOrderCard } from "@/lib/payments";
+import { parseAddressText } from "@/lib/address";
 import { autoReplyToButton, autoSendCatalogue, catalogueTrigger, firstMessageToday } from "@/lib/catalog";
 import { mapMetaStatus } from "@/lib/whatsapp";
 import { JOIN_RE, joinFromWhatsApp } from "@/lib/optin";
@@ -25,7 +26,7 @@ export function GET(req: NextRequest) {
 }
 
 const RANK = { QUEUED: 0, SENT: 1, DELIVERED: 2, READ: 3, FAILED: 4, SKIPPED: 4 } as const;
-const OPT_OUT = /^\s*(stop|unsubscribe|opt[\s-]?out|cancel)\s*$/i;
+const OPT_OUT = /^\s*(stop|unsubscribe|opt[\s-]?out|cancel|dont\s*send|don't\s*send|no\s*more|நிறுத்து|வேண்டாம்|बंद\s*करो)\s*$/i;
 
 type StatusUpdate = { id: string; status: string; timestamp: string; pricing?: { category?: string; billable?: boolean }; errors?: { code?: number; title?: string; message?: string; error_data?: { details?: string } }[] };
 
@@ -231,10 +232,11 @@ async function detectAndApplyUpiPayment(
     return { text: `Possible UPI payment for ${ref} (${totalFormatted}) · check and verify`, kind: "order", media: base.media, handledAsPayment: true };
   }
 
-  // The customer asks to pay cash on delivery: set it on the order (staff can switch it back to online).
+  // The customer asks to pay cash on delivery: set it on the order and send 1-click confirmation prompt.
   if (m.type === "text" && COD_ASK_RE.test(base.text) && !NO_COD_RE.test(base.text)) {
     await db.order.updateMany({ where: { id: targetOrder.id, paymentMethod: null }, data: { paymentMethod: "cod" } });
-    return { text: `${base.text} · Asked for cash on delivery on ${ref}`, kind: base.kind, media: base.media, handledAsPayment: false };
+    await sendCodConfirmationPrompt(targetOrder.id).catch(() => {});
+    return { text: `${base.text} · Asked for cash on delivery on ${ref} (confirmation prompt sent)`, kind: base.kind, media: base.media, handledAsPayment: false };
   }
 
   // Path B: Customer paid via external UPI app (GPay / PhonePe / Paytm / BHIM) and sent UTR or explicit payment confirmation text.
@@ -245,6 +247,32 @@ async function detectAndApplyUpiPayment(
       // Anyone can type "paid" or 12 digits, so nothing here marks the order paid: staff check the UPI app or
       // bank (the reference makes that quick) and confirm with one tap, and the order isn't packed until then.
       if (utrMatch) {
+        const dupOrder = await db.order.findFirst({
+          where: {
+            OR: [
+              { paymentTxnId: { contains: utrMatch[1] } },
+              { paymentClaimNote: { contains: utrMatch[1] } },
+            ],
+            id: { not: targetOrder.id },
+          },
+          select: { id: true, number: true, customer: { select: { name: true } } },
+        });
+
+        if (dupOrder) {
+          const dupRef = orderRef(dupOrder);
+          await recordPaymentClaim(
+            targetOrder.id,
+            `⚠️ DUPLICATE UTR ALERT: ${utrMatch[1]} was already claimed for ${dupRef} (${dupOrder.customer.name})! Check bank carefully.`,
+            `DUP-${utrMatch[1]}`,
+          ).catch(() => {});
+          return {
+            text: `${base.text} · ⚠️ DUPLICATE UPI ref ${utrMatch[1]} (already used on ${dupRef}) · inspect`,
+            kind: "order",
+            media: base.media,
+            handledAsPayment: true,
+          };
+        }
+
         await recordPaymentClaim(targetOrder.id, `UPI reference ${utrMatch[1]} sent by the customer`, `UTR-${utrMatch[1]}`).catch(() => {});
         return { text: `${base.text} · Says paid ${ref} (${totalFormatted}), UPI ref ${utrMatch[1]} · check`, kind: "order", media: base.media, handledAsPayment: true };
       }
@@ -259,13 +287,38 @@ async function detectAndApplyUpiPayment(
     // A caption saying "paid" or carrying a 12-digit UTR: flag it with the reference for staff to check.
     if (caption && !NEGATIVE_PAY_RE.test(caption) && (POSITIVE_PAY_RE.test(caption) || UTR_RE.test(caption))) {
       const utrMatch = UTR_RE.exec(caption);
+      let isDup = false;
+      let dupRefStr = "";
+      if (utrMatch) {
+        const dupOrder = await db.order.findFirst({
+          where: {
+            OR: [
+              { paymentTxnId: { contains: utrMatch[1] } },
+              { paymentClaimNote: { contains: utrMatch[1] } },
+            ],
+            id: { not: targetOrder.id },
+          },
+          select: { id: true, number: true, customer: { select: { name: true } } },
+        });
+        if (dupOrder) {
+          isDup = true;
+          dupRefStr = orderRef(dupOrder);
+        }
+      }
+
       await recordPaymentClaim(
         targetOrder.id,
-        utrMatch ? `Payment screenshot with UPI reference ${utrMatch[1]}` : `Payment screenshot: "${caption.slice(0, 200)}"`,
-        utrMatch ? `UTR-${utrMatch[1]}` : null,
+        isDup
+          ? `⚠️ DUPLICATE UTR ALERT: Screenshot shows ${utrMatch![1]} already used on ${dupRefStr}! Check bank.`
+          : utrMatch
+            ? `Payment screenshot with UPI reference ${utrMatch[1]}`
+            : `Payment screenshot: "${caption.slice(0, 200)}"`,
+        utrMatch ? (isDup ? `DUP-${utrMatch[1]}` : `UTR-${utrMatch[1]}`) : null,
       ).catch(() => {});
       return {
-        text: `UPI payment screenshot (${totalFormatted} for ${ref}): ${caption}`,
+        text: isDup
+          ? `⚠️ DUPLICATE UPI screenshot (${totalFormatted} for ${ref}, ref ${utrMatch![1]} used on ${dupRefStr})`
+          : `UPI payment screenshot (${totalFormatted} for ${ref}): ${caption}`,
         kind: "media",
         media: base.media,
         handledAsPayment: true,
@@ -393,6 +446,40 @@ export async function POST(req: NextRequest) {
               actionValue: actionVal,
               client: clientName,
             });
+
+            // 1-Click COD Confirmation Flow
+            if (typeof actionVal === "string" && (actionVal.startsWith("cod_confirm:") || actionVal.startsWith("cod_cancel:"))) {
+              const isConfirm = actionVal.startsWith("cod_confirm:");
+              const orderId = actionVal.slice(isConfirm ? 12 : 11);
+              const order = await db.order.findUnique({
+                where: { id: orderId },
+                include: { customer: { include: { client: true } } },
+              });
+              if (order && order.status !== "CANCELLED") {
+                const ref = orderRef(order);
+                if (isConfirm) {
+                  await db.order.update({
+                    where: { id: order.id },
+                    data: { status: "CONFIRMED", paymentMethod: "cod" },
+                  });
+                  pushOrderToSheet(order.id, "ORDER_UPDATE", "Customer confirmed COD");
+                  const hasAddr = Boolean(order.customer.locationRaw?.trim() || order.customer.location?.trim() || order.note?.trim());
+                  const replyMsg = hasAddr
+                    ? `🎉 Thank you! Your Cash on Delivery order ${ref} (${money(order.total, order.currency)}) is confirmed.\n\nWe will pack and dispatch it to your delivery address:\n📍 ${order.customer.locationRaw || order.customer.location || order.note}`
+                    : `🎉 Thank you! Your Cash on Delivery order ${ref} (${money(order.total, order.currency)}) is confirmed.\n\n📍 Please reply with your full delivery address (Door No, Street, Landmark, City & Pincode) so our delivery partner can reach you smoothly.`;
+                  await textInWindow(order.customer, replyMsg, "COD Confirmed").catch(() => {});
+                  await updateOrderCard(order, "processing", "COD order confirmed - packing now").catch(() => {});
+                } else {
+                  await db.order.update({
+                    where: { id: order.id },
+                    data: { status: "CANCELLED" },
+                  });
+                  pushOrderToSheet(order.id, "ORDER_UPDATE", "Customer cancelled COD");
+                  await textInWindow(order.customer, `Your order ${ref} has been cancelled as requested. If you need any assistance or want to order later, feel free to message us anytime!`, "COD Cancelled").catch(() => {});
+                  await updateOrderCard(order, "canceled", "Order cancelled").catch(() => {});
+                }
+              }
+            }
           } else if (m.type !== "order") {
             const contactName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name;
             pushToGoogleSheet("NEW_CHAT", {
@@ -402,6 +489,23 @@ export async function POST(req: NextRequest) {
               source: join ? `Opt-in (${join[1]})` : handledAsPayment ? "UPI Payment" : "Inbound WhatsApp",
               client: clientName,
             });
+
+            // Recycled Number / Wrong Number auto-detection
+            const WRONG_NUMBER_RE = /\b(wrong\s*number|not\s*me|who\s*(is\s*this|are\s*you)|wrong\s*person|thappana\s*number|thappa\s*vandhirukku|yaar\s*idhu)\b/i;
+            if (customer && m.type === "text" && WRONG_NUMBER_RE.test(text)) {
+              const tags = customer.tags ?? [];
+              if (!tags.includes("possible-wrong-number")) {
+                await db.customer.update({
+                  where: { id: customer.id },
+                  data: { tags: { push: "possible-wrong-number" } },
+                });
+                await textInWindow(
+                  customer,
+                  "Apologies for any inconvenience! We have marked this number to stop updates. If you ever wish to browse our products, feel free to reply 'Catalogue'.",
+                  "Wrong Number Notice",
+                ).catch(() => {});
+              }
+            }
           }
 
           // Said hi, asked about products or prices (e.g. tapped "Send price list"), or wrote for the first time
@@ -419,6 +523,16 @@ export async function POST(req: NextRequest) {
             if (order) {
               await autoRequestPayment(order).catch((e) => console.error("Automatic payment request failed", e));
               pushOrderToSheet(order.id, "NEW_ORDER");
+
+              // If customer has no saved delivery address, prompt them in chat:
+              const hasAddress = Boolean(customer.locationRaw?.trim() || customer.location?.trim() || order.note?.trim());
+              if (!hasAddress) {
+                await textInWindow(
+                  customer,
+                  "📍 Please reply with your delivery address (Door/Flat No, Street, City & Pincode) so we can pack and deliver your order promptly.",
+                  "Address Prompt",
+                ).catch(() => {});
+              }
             }
           }
         }

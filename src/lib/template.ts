@@ -117,9 +117,9 @@ export function renderFor(t: Renderable, c: CustomerLike, otp = "482913") {
     return { header: "", body, footer, bodyParams: [otp], headerParams: [] as string[] };
   }
   const nums = placeholders(t.body);
-  const bodyParams = nums.map((n) => resolveVar(t.variables[String(n)], c));
+  const bodyParams = nums.map((n) => resolveVar(t.variables[String(n)], c).trim() || "there");
   const headerParams =
-    t.headerType === "TEXT" && placeholders(t.headerText).length ? [resolveVar(t.variables.h1, c)] : [];
+    t.headerType === "TEXT" && placeholders(t.headerText).length ? [resolveVar(t.variables.h1, c).trim() || "Customer"] : [];
   return {
     header: t.headerType === "TEXT" ? fill(t.headerText, () => headerParams[0] ?? "") : "",
     body: fill(t.body, (n) => bodyParams[nums.indexOf(n)] ?? ""),

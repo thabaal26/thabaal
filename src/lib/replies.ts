@@ -138,7 +138,7 @@ export async function recordReply(r: IncomingReply) {
 
   return db.customer.findUnique({
     where: { id: customer.id },
-    select: { id: true, clientId: true, phone: true, name: true, location: true, locationRaw: true, region: true, client: { select: { name: true } } },
+    select: { id: true, clientId: true, phone: true, name: true, optedOut: true, tags: true, location: true, locationRaw: true, region: true, client: { select: { name: true } } },
   });
 }
 

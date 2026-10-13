@@ -18,6 +18,7 @@ import { remindUnpaidOrders } from "./payments";
 import { senderFor } from "./senders";
 import { WahaError } from "./waha";
 import { MetaError } from "./whatsapp";
+import { normalizePhone } from "./phone";
 
 const TIME_BUDGET_MS = 50_000; // stay under Vercel's function limit
 const CONCURRENCY = 10;
@@ -170,6 +171,11 @@ async function processRun(runId: string, now: Date, deadline: number) {
     if (throttled || restricted || setupProblem) return false;
     if (m.customer.optedOut || m.customer.unreachable) {
       await db.message.update({ where: { id: m.id }, data: { status: "SKIPPED", error: m.customer.optedOut ? "Customer opted out" : "Number can't receive WhatsApp messages" } });
+      return;
+    }
+    const senderDigits = number?.displayPhone ? normalizePhone(number.displayPhone) : null;
+    if (senderDigits && senderDigits === m.customer.phone) {
+      await db.message.update({ where: { id: m.id }, data: { status: "SKIPPED", error: "Recipient is the sending WhatsApp number itself" } });
       return;
     }
     const until = paused.get(m.customerId);
