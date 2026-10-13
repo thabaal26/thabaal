@@ -393,9 +393,14 @@ export default function PrivacyPage() {
       <footer className="border-t border-line bg-panel">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs text-muted sm:px-6">
           <span>© {new Date().getFullYear()} Thabaal · A message with momentum</span>
-          <Link href="/login" className="hover:text-ink">
-            thabaal.in
-          </Link>
+          <span className="flex gap-4">
+            <Link href="/terms" className="hover:text-ink">
+              Terms
+            </Link>
+            <Link href="/login" className="hover:text-ink">
+              thabaal.in
+            </Link>
+          </span>
         </div>
       </footer>
     </div>
