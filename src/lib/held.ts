@@ -1,6 +1,7 @@
 import "server-only";
 import { Prisma } from "@prisma/client";
 import { db } from "./db";
+import { affordableMessages } from "./wallet";
 import { allowance } from "./limits";
 import { explainError, metaError, PAUSING_KINDS } from "./meta-errors";
 import { deliver, getSettings, readiness, templateSendable } from "./provider";
@@ -89,6 +90,8 @@ export async function retryHeldBack({ now = new Date(), deadline = Date.now() + 
     });
     if (!campaign) continue;
     const t = campaign.template;
+    // Thabaal-wallet clients with no balance left: retries wait for a recharge.
+    if ((await affordableMessages(campaign.clientId, t.category)) <= 0) continue;
     const { number, cfg } = await senderFor(campaign.clientId, campaign.senderId);
     const wrongAccount = settings.provider === "META" && t.businessAccountId && number && t.businessAccountId !== number.businessAccountId;
     if (!templateSendable(settings, t) || wrongAccount) {

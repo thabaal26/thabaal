@@ -14,6 +14,7 @@ import { formatPhone } from "@/lib/phone";
 import { replyWindowEnd } from "@/lib/replies";
 import { marketingPaused } from "@/lib/held";
 import { homeCityOf, regionsFor } from "@/lib/regions";
+import { readFields, readValues, showValue } from "@/lib/custom-fields";
 import { getScope, owned } from "@/lib/session";
 import { sendableTemplates } from "@/lib/senders";
 import { META_SAMPLES } from "@/lib/template";
@@ -36,7 +37,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
   const c = await db.customer.findFirst({
     where: { id, ...owned(scope) },
     include: {
-      client: { select: { name: true, homeCity: true } },
+      client: { select: { name: true, homeCity: true, customFields: true } },
       messages: { include: { run: { select: { campaign: { select: { name: true } } } }, sender: { select: { label: true } } }, orderBy: { createdAt: "desc" }, take: 100 },
       replies: { include: { sender: { select: { label: true } } }, orderBy: { receivedAt: "desc" }, take: 100 },
       orders: { orderBy: { createdAt: "desc" }, take: 100 },
@@ -192,8 +193,10 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                     locationRaw: c.locationRaw ?? "",
                     region: c.region ?? regionsFor(homeCityOf(c.client))[0],
                     purchases: c.purchases ?? "",
+                    extra: readValues(c.extra),
                   }}
                   regions={regionsFor(homeCityOf(c.client))}
+                  fields={readFields(c.client.customFields, "customer")}
                 />
               )
             }
@@ -287,6 +290,20 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                 </div>
               </div>
             )}
+            {(() => {
+              const values = readValues(c.extra);
+              const shown = readFields(c.client.customFields, "customer").filter((f) => values[f.key]);
+              return shown.length ? (
+                <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
+                  {shown.map((f) => (
+                    <div key={f.key} className="min-w-0">
+                      <dt className="text-xs text-muted">{f.label}</dt>
+                      <dd className="truncate text-ink">{showValue(f, values[f.key])}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : null;
+            })()}
             {pausedUntil && <PausedOffersNote until={pausedUntil} />}
             <div className="rounded-control bg-sunken px-3 py-2 text-xs">
               <p className="font-medium text-ink-2">Agreed to WhatsApp messages</p>

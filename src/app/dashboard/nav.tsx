@@ -20,6 +20,7 @@ import {
   Store3D,
   Template3D,
   Users3D,
+  Wallet3D,
 } from "@/components/icons-3d";
 import { Sheet } from "@/components/sheet";
 import { isHrefEnabled } from "@/lib/client-sections";
@@ -43,6 +44,9 @@ export const NAV = [
 ];
 
 const ADMIN_NAV = [{ href: "/dashboard/clients", label: "Clients", short: "Clients", icon: Building3D, group: "Account", cube: "from-[#fde047] via-[#eab308] to-[#ca8a04]" }];
+
+/** Thabaal wallet: admins, and clients billed through the wallet. */
+const WALLET_NAV = [{ href: "/dashboard/wallet", label: "Wallet", short: "Wallet", icon: Wallet3D, group: "Account", cube: "from-[#6ee7b7] via-[#10b981] to-[#047857]" }];
 
 /**
  * Phone tabs: what each role opens most. Staff pack orders and answer customers all day;
@@ -82,15 +86,16 @@ const countFor = (href: string, c: Counts) =>
 
 export function SideNav({
   isAdmin,
+  showWallet = false,
   disabledSections,
   openReplies,
   newOrders,
   unreadNotifications,
-}: { isAdmin: boolean; disabledSections?: readonly string[] } & Counts) {
+}: { isAdmin: boolean; showWallet?: boolean; disabledSections?: readonly string[] } & Counts) {
   const path = usePathname();
   const router = useRouter();
   const enabledNav = NAV.filter((n) => isHrefEnabled(n.href, disabledSections));
-  const items = [...enabledNav, ...(isAdmin ? ADMIN_NAV : [])];
+  const items = [...enabledNav, ...(isAdmin || showWallet ? WALLET_NAV : []), ...(isAdmin ? ADMIN_NAV : [])];
   const groups = [...new Set(items.map((n) => n.group))];
 
   useEffect(() => {
@@ -149,18 +154,19 @@ export function SideNav({
 /** Phone tab bar, pinned to the bottom edge, above the home indicator. */
 export function BottomNav({
   isAdmin,
+  showWallet = false,
   role,
   disabledSections,
   openReplies,
   newOrders,
   unreadNotifications,
-}: { isAdmin: boolean; role: NavRole; disabledSections?: readonly string[] } & Counts) {
+}: { isAdmin: boolean; showWallet?: boolean; role: NavRole; disabledSections?: readonly string[] } & Counts) {
   const path = usePathname();
   // Remembers the page "More" was opened on, so the sheet closes by itself once a tapped page opens.
   const [openedOn, setOpenedOn] = useState<string | null>(null);
   const moreOpen = openedOn === path;
   const enabledNav = NAV.filter((n) => isHrefEnabled(n.href, disabledSections));
-  const all = [...enabledNav, ...(isAdmin ? ADMIN_NAV : [])];
+  const all = [...enabledNav, ...(isAdmin || showWallet ? WALLET_NAV : []), ...(isAdmin ? ADMIN_NAV : [])];
 
   // Pick up to 4 primary phone tabs from preferred role tabs first, filling from remaining enabled sections if some are disabled.
   const preferredHrefs = PHONE_TABS[role].filter((href) => all.some((n) => n.href === href));
@@ -264,6 +270,7 @@ const SUBPAGES: Record<string, string> = {
   audiences: "Audiences",
   grow: "Grow your list",
   sheet: "Google Sheet",
+  fields: "Custom fields",
 };
 
 /**
@@ -272,7 +279,7 @@ const SUBPAGES: Record<string, string> = {
  */
 export function TopbarTrail({ workspace }: { workspace: string }) {
   const path = usePathname();
-  const all = [...NAV, ...ADMIN_NAV];
+  const all = [...NAV, ...WALLET_NAV, ...ADMIN_NAV];
   const section = all.filter((n) => isActive(path, n.href)).sort((a, b) => b.href.length - a.href.length)[0];
   const rest = section ? path.slice(section.href.length).split("/").filter(Boolean) : [];
   const sub = rest.length ? SUBPAGES[rest[0]] ?? "Details" : null;

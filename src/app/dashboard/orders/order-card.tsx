@@ -10,6 +10,8 @@ import { formatPhone } from "@/lib/phone";
 import { OrderActions } from "./order-actions";
 import { OrderAddressControl } from "./order-address-sheet";
 import { PaymentSummary } from "./payment-status";
+import { OrderExtra } from "./order-extra";
+import { readValues, type CustomField } from "@/lib/custom-fields";
 import type { CatalogProductOption } from "./order-items-editor";
 
 export type OrderCardData = {
@@ -56,6 +58,8 @@ export type OrderCardData = {
     }[];
   };
   client: { paymentConfig: string | null };
+  /** Values of the client's custom order fields. */
+  extra?: unknown;
 };
 
 const STATUS_ACCENT: Record<OrderCardData["status"], string> = {
@@ -75,7 +79,10 @@ export function OrderCard({
   canEdit,
   catalogProducts = [],
   isLiveCatalog = false,
+  orderFields = [],
 }: {
+  /** The client's custom order fields (lib/custom-fields.ts). */
+  orderFields?: CustomField[];
   order: OrderCardData;
   items: OrderItem[];
   showClient: boolean;
@@ -237,6 +244,7 @@ export function OrderCard({
           compact
         />
         <PaymentSummary o={o} />
+        <OrderExtra orderId={o.id} fields={orderFields} values={readValues(o.extra)} canEdit={canEdit} />
       </div>
 
       <OrderActions

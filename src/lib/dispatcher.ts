@@ -19,6 +19,7 @@ import { senderFor } from "./senders";
 import { WahaError } from "./waha";
 import { MetaError } from "./whatsapp";
 import { normalizePhone } from "./phone";
+import { affordableMessages } from "./wallet";
 
 const TIME_BUDGET_MS = 50_000; // stay under Vercel's function limit
 const CONCURRENCY = 10;
@@ -97,7 +98,7 @@ async function processRun(runId: string, now: Date, deadline: number) {
   });
   if (!claimed.count) return { sent: 0, failed: 0 };
 
-  type Wait = "WAITING_TEMPLATE" | "WAITING_CONNECTION" | "WAITING_LIMIT" | "WAITING_QUALITY" | "WAITING_QUIET";
+  type Wait = "WAITING_TEMPLATE" | "WAITING_CONNECTION" | "WAITING_LIMIT" | "WAITING_QUALITY" | "WAITING_QUIET" | "WAITING_FUNDS";
   const pauseUntil = (status: Wait, at: Date) => db.campaignRun.update({ where: { id: run.id }, data: { status, nextBatchAt: at } });
   const pause = (status: Wait, minutes: number) => pauseUntil(status, new Date(Date.now() + minutes * 60_000));
 
@@ -139,6 +140,13 @@ async function processRun(runId: string, now: Date, deadline: number) {
       take = Math.min(take, a.left);
     }
   }
+  // Thabaal-wallet clients: send only what their balance can pay for; wait for a recharge otherwise.
+  const affordable = await affordableMessages(campaign.clientId, t.category);
+  if (affordable <= 0) {
+    await pause("WAITING_FUNDS", 30);
+    return { sent: 0, failed: 0 };
+  }
+  take = Math.min(take, affordable);
   if (run.status !== "RUNNING") await db.campaignRun.update({ where: { id: run.id }, data: { status: "RUNNING" } });
 
   const batch = await db.message.findMany({
@@ -284,7 +292,7 @@ export async function dispatch() {
   const campaignsStarted = await startDueCampaigns(now);
   await refreshStaleNumbers().catch((e) => console.error("Could not refresh number status", e));
   const runs = await db.campaignRun.findMany({
-    where: { status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"] }, nextBatchAt: { lte: now } },
+    where: { status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET", "WAITING_FUNDS"] }, nextBatchAt: { lte: now } },
     select: { id: true },
     orderBy: { nextBatchAt: "asc" },
     take: 20,

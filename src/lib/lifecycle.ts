@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "./db";
+import { affordableMessages } from "./wallet";
 import { deliver, getSettings, templateSendable } from "./provider";
 import { applyFailure, quietUntil } from "./rules";
 import { senderFor } from "./senders";
@@ -59,6 +60,8 @@ export async function sendWinbacks(now = new Date()) {
     const template = await db.template.findUnique({ where: { id: client.winbackTemplateId! } });
     if (!template || !templateSendable(settings, template)) continue;
     if (template.category === "MARKETING" && quietUntil(client, now)) continue;
+    // Thabaal-wallet clients with no balance left: win-backs wait for a recharge.
+    if ((await affordableMessages(client.id, template.category)) <= 0) continue;
     const today = await db.customer.count({ where: { clientId: client.id, winbackSentAt: { gte: new Date(now.getTime() - 86_400_000) } } });
     const room = Math.min(PER_TICK, PER_DAY - today);
     if (room <= 0) continue;

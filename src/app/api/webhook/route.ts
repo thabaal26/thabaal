@@ -13,6 +13,7 @@ import { parseAddressText } from "@/lib/address";
 import { autoReplyToButton, autoSendCatalogue, catalogueTrigger, firstMessageToday } from "@/lib/catalog";
 import { mapMetaStatus } from "@/lib/whatsapp";
 import { JOIN_RE, joinFromWhatsApp } from "@/lib/optin";
+import { chargeMessage } from "@/lib/wallet";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,10 @@ async function applyStatus(s: StatusUpdate) {
   // Every status carries Meta's pricing; keep it for cost reporting even when the status itself is stale.
   if (s.pricing?.category) {
     await db.message.update({ where: { id: msg.id }, data: { pricingCategory: s.pricing.category.toLowerCase(), billable: s.pricing.billable ?? null } });
+    // Thabaal-wallet clients pay for what Meta charges: delivered messages Meta marks billable (charged once).
+    if (s.pricing.billable === true && ["DELIVERED", "READ"].includes(s.status.toUpperCase())) {
+      await chargeMessage(msg.id, s.pricing.category.toLowerCase()).catch((e) => console.error("[wallet] charge failed", msg.id, e));
+    }
   } else if (!msg.pricingCategory && (s.status.toUpperCase() === "DELIVERED" || s.status.toUpperCase() === "READ")) {
     const inferred = msg.template?.category?.toLowerCase() ?? (["Catalogue", "Price list", "Payment request", "Freeform reply", "Auto reply", "Typed reply", "Media reply"].includes(msg.templateName) ? "service" : null);
     if (inferred) {

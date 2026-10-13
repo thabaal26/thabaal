@@ -9,12 +9,15 @@ import { toastResult } from "@/components/toast";
 import { Sheet } from "@/components/sheet";
 import { Badge, Button, buttonClass, Field } from "@/components/ui";
 import { cn } from "@/lib/cn";
+import { CustomFieldInputs } from "@/components/custom-field-inputs";
+import type { CustomField } from "@/lib/custom-fields";
 import { deletePendingCustomer, importCustomers, promotePendingCustomer, saveCustomer } from "../actions/customers";
 
 const LINKS = [
   { href: "/dashboard/customers/grow", label: "Get more customers", icon: QrCode, manager: false },
   { href: "/dashboard/customers/sheet", label: "Google Sheet", icon: SheetIcon, manager: false },
   { href: "/dashboard/customers/audiences", label: "Audiences", icon: UsersRound, manager: true },
+  { href: "/dashboard/customers/fields", label: "Custom fields", icon: Pencil, manager: true },
 ];
 
 /**
@@ -28,9 +31,12 @@ export function CustomerActions({
   exportHref = null,
   exportCount = 0,
   regions,
+  fields = [],
 }: {
   canManage: boolean;
   hasClient?: boolean;
+  /** The client's custom customer fields, for the Add form. */
+  fields?: CustomField[];
   /** The client's delivery regions, home city first. */
   regions: string[];
   /** CSV download of the customers currently listed (managers and admins only). */
@@ -98,7 +104,7 @@ export function CustomerActions({
         </ul>
       </Sheet>
       <Sheet open={open === "add" || open === "import"} onClose={() => setOpen(null)} title={open === "add" ? "Add customer" : "Import customers"}>
-        {open === "add" ? <CustomerForm id={null} regions={regions} done={() => setOpen(null)} /> : <ImportForm done={() => setOpen(null)} />}
+        {open === "add" ? <CustomerForm id={null} regions={regions} fields={fields} done={() => setOpen(null)} /> : <ImportForm done={() => setOpen(null)} />}
       </Sheet>
     </>
   );
@@ -128,18 +134,23 @@ export type EditableCustomer = {
   locationRaw: string;
   region: string;
   purchases: string;
+  /** Custom field values by key. */
+  extra?: Record<string, string>;
 };
 
 function CustomerForm({
   id,
   initial,
   regions,
+  fields = [],
   done,
 }: {
   id: string | null;
   initial?: Omit<EditableCustomer, "id">;
   /** The client's regions, home city first ("Madurai city", "Outside Madurai", "Not sure"). */
   regions: string[];
+  /** The client's custom customer fields. */
+  fields?: CustomField[];
   done: () => void;
 }) {
   const [v, setV] = useState({
@@ -151,6 +162,7 @@ function CustomerForm({
     region: initial?.region || regions[0],
     purchases: initial?.purchases ?? "",
     optInSource: CONSENT[0],
+    extra: initial?.extra ?? {},
   });
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -195,6 +207,7 @@ function CustomerForm({
       <Field id="purch" label="What they bought" hint="optional">
         <input className="field" placeholder="Basmati rice (5kg), Coffee powder (500g)" value={v.purchases} onChange={(e) => setV({ ...v, purchases: e.target.value })} />
       </Field>
+      <CustomFieldInputs fields={fields} values={v.extra} onChange={(extra) => setV({ ...v, extra })} idPrefix={id ? `cf-${id}` : "cf-new"} />
       <Field id="t" label="Tags" hint="comma separated, optional">
         <input className="field" placeholder="vip, wholesale" value={v.tags} onChange={(e) => setV({ ...v, tags: e.target.value })} />
       </Field>
@@ -212,7 +225,7 @@ function CustomerForm({
 }
 
 /** Button + sheet to edit an existing customer's profile, address, region, purchases and tags. */
-export function EditCustomerButton({ customer, regions }: { customer: EditableCustomer; regions: string[] }) {
+export function EditCustomerButton({ customer, regions, fields = [] }: { customer: EditableCustomer; regions: string[]; fields?: CustomField[] }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -220,7 +233,7 @@ export function EditCustomerButton({ customer, regions }: { customer: EditableCu
         <Pencil aria-hidden className="size-3.5" /> Edit details
       </Button>
       <Sheet open={open} onClose={() => setOpen(false)} title={`Edit ${customer.name}`}>
-        <CustomerForm id={customer.id} initial={customer} regions={regions} done={() => setOpen(false)} />
+        <CustomerForm id={customer.id} initial={customer} regions={regions} fields={fields} done={() => setOpen(false)} />
       </Sheet>
     </>
   );

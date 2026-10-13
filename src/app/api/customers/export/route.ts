@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { readFields, readValues } from "@/lib/custom-fields";
 import { NextResponse, type NextRequest } from "next/server";
 import { customerFilters, customerWhere } from "@/lib/customer-query";
 import { db } from "@/lib/db";
@@ -53,9 +54,14 @@ export async function GET(req: NextRequest) {
   const phone = (digits: string) => (digits.startsWith("91") && digits.length === 12 ? `91 ${digits.slice(2, 7)} ${digits.slice(7)}` : digits.replace(/^(\d{1,3})(\d+)$/, "$1 $2"));
   const date = (d: Date | null | undefined) => (d ? fmtDate(d, "d MMM yyyy") : "");
 
+  // The client's custom customer fields become extra columns (one client picked only).
+  const fields = scope.clientId
+    ? readFields((await db.client.findUnique({ where: { id: scope.clientId }, select: { customFields: true } }))?.customFields, "customer")
+    : [];
   const header = [
     "Name", "Phone", ...(scope.clientId ? [] : ["Client"]), "Area", "Region", "Tags", "Bought", "Orders", "Spent (₹)", "Last order",
     "Last message", "Last message status", "Opted out", "Can't receive WhatsApp", "Agreed to messages", "Agreed on", "Added on",
+    ...fields.map((f) => f.label),
   ];
   const lines = [
     header.map(cell).join(","),
@@ -67,6 +73,7 @@ export async function GET(req: NextRequest) {
         o?._count ?? 0, o?._sum.total != null ? Math.round(o._sum.total * 100) / 100 : 0, date(o?._max.createdAt),
         date(last?.createdAt), last?.status.toLowerCase(), c.optedOut ? "yes" : "no", c.unreachable ? "yes" : "no",
         c.optInSource, date(c.optInAt), date(c.createdAt),
+        ...fields.map((f) => readValues(c.extra)[f.key] ?? ""),
       ].map(cell).join(",");
     }),
   ];

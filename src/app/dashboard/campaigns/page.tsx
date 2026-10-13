@@ -233,7 +233,7 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
                     )}
                   </span>
                   <div className="flex shrink-0 items-center justify-end gap-2">
-                    {last && ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"].includes(last.status) && <StatusBadge status={last.status} />}
+                    {last && ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET", "WAITING_FUNDS"].includes(last.status) && <StatusBadge status={last.status} />}
                     {scope.canManage && (
                       <ActionButton className="relative z-10" action={toggleCampaign.bind(null, c.id, !c.active)} aria-label={`${c.active ? "Pause" : "Resume"} ${c.name}`}>
                         {c.active ? "Pause" : "Resume"}

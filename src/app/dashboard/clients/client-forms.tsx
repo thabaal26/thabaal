@@ -17,6 +17,7 @@ import {
 } from "@/lib/client-sections";
 import { HEX, themeStyle } from "@/lib/theme";
 import { cn } from "@/lib/cn";
+import { BUSINESS_TYPES } from "@/lib/business-types";
 import {
   addClientNumber,
   createClient,
@@ -62,6 +63,7 @@ export function NewClientForm() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
+  const [typeId, setTypeId] = useState<string>("");
   const [presetId, setPresetId] = useState<string>("full");
   const { pending, submit } = useSubmit();
   const selectedPreset = CLIENT_PLAN_PRESETS.find((p) => p.id === presetId) ?? CLIENT_PLAN_PRESETS[0];
@@ -76,10 +78,11 @@ export function NewClientForm() {
           onSubmit={(e) => {
             e.preventDefault();
             submit(
-              () => createClient(name, selectedPreset.disabledSections, city),
+              () => createClient(name, selectedPreset.disabledSections, city, typeId),
               () => {
                 setName("");
                 setCity("");
+                setTypeId("");
                 setPresetId("full");
                 setOpen(false);
               },
@@ -92,6 +95,32 @@ export function NewClientForm() {
           <Field id="client-city" label="Home city" required help="Where they deliver from. Customers are grouped as in this city, outside it, or not sure.">
             <input className="field" autoCapitalize="words" autoComplete="off" value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Chennai" />
           </Field>
+          <Field id="client-type" label="Business type" help="Sets suggested sections below and starter custom fields; both can be changed later.">
+            <select
+              className="field"
+              value={typeId}
+              onChange={(e) => {
+                setTypeId(e.target.value);
+                const t = BUSINESS_TYPES.find((b) => b.id === e.target.value);
+                if (t) setPresetId(t.preset);
+              }}
+            >
+              <option value="">Choose…</option>
+              {BUSINESS_TYPES.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          {BUSINESS_TYPES.find((b) => b.id === typeId) && (
+            <p className="-mt-2 text-xs text-muted">
+              {BUSINESS_TYPES.find((b) => b.id === typeId)!.description}
+              {BUSINESS_TYPES.find((b) => b.id === typeId)!.starterFields.length
+                ? ` Starter fields: ${BUSINESS_TYPES.find((b) => b.id === typeId)!.starterFields.map((f) => f.label).join(", ")}.`
+                : ""}
+            </p>
+          )}
           <fieldset className="space-y-2">
             <legend className="text-sm font-medium text-ink-2">Portal plan & sections</legend>
             <p className="text-xs text-muted">Choose which sections this client needs. You can also toggle individual sections anytime after adding them.</p>
@@ -419,6 +448,16 @@ export function BrandingForm({ clientId, name, initial }: { clientId: string; na
               </div>
             ))}
           </div>
+          <Field id={`businessType-${clientId}`} label="Business type" hint="label only; sections and fields stay as they are">
+            <select id={`businessType-${clientId}`} className="field" value={v.businessType} onChange={(e) => setV({ ...v, businessType: e.target.value })}>
+              <option value="">Not set</option>
+              {BUSINESS_TYPES.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.label}
+                </option>
+              ))}
+            </select>
+          </Field>
           {BRAND_FIELDS.map((f) => (
             <Field key={f.key} id={`${f.key}-${clientId}`} label={f.label} hint={f.hint}>
               <input

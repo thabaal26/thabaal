@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { normalizePhone } from "@/lib/phone";
 import { defaultRegion, homeCityOf, regionsFor } from "@/lib/regions";
+import { cleanValues, readFields, readValues } from "@/lib/custom-fields";
 import { owned, requireManager } from "@/lib/session";
 import type { ActionResult } from "./templates";
 
@@ -18,6 +19,8 @@ export type CustomerInput = {
   locationRaw?: string;
   region?: string;
   purchases?: string;
+  /** Custom field values by key (lib/custom-fields.ts). */
+  extra?: Record<string, string>;
 };
 
 /** The region to save: one of the client's three, or the default when an area was typed without one. */
@@ -45,6 +48,16 @@ export async function saveCustomer(id: string | null, input: CustomerInput): Pro
   const region = input.region !== undefined ? await regionToSave(clientId, input.region, location) : undefined;
   const purchases = input.purchases !== undefined ? (input.purchases.trim() || null) : undefined;
 
+  // Custom fields: check the typed values; values of fields no longer shown are kept.
+  let extra: Record<string, string> | undefined;
+  if (input.extra !== undefined) {
+    const fields = readFields((await db.client.findUnique({ where: { id: clientId }, select: { customFields: true } }))?.customFields, "customer");
+    const checked = cleanValues(fields, input.extra);
+    if ("error" in checked) return { ok: false, message: checked.error };
+    const kept = Object.fromEntries(Object.entries(readValues(existing?.extra)).filter(([k]) => !fields.some((f) => f.key === k)));
+    extra = { ...kept, ...checked.values };
+  }
+
   const existingLoyaltyTags = (existing?.tags ?? []).filter((t) => t.trim().toLowerCase().startsWith("loyalty-bonus:"));
   const data = {
     name: input.name.trim(),
@@ -54,6 +67,7 @@ export async function saveCustomer(id: string | null, input: CustomerInput): Pro
     ...(locationRaw !== undefined && { locationRaw }),
     ...(region !== undefined && { region }),
     ...(purchases !== undefined && { purchases }),
+    ...(extra !== undefined && { extra }),
   };
 
   if (id) {
@@ -156,32 +170,47 @@ export async function importCustomers(csv: string, extraTags: string, optInSourc
   const tagIdx = hasHeader ? head.findIndex((h) => /tag|group|segment/.test(h)) : 2;
   if (phoneIdx < 0) return { ok: false, message: "Couldn't find a phone column. Name it 'phone'." };
 
+  // Columns named like one of the client's custom fields (e.g. "Birthday") fill that field.
+  const fieldDefs = readFields((await db.client.findUnique({ where: { id: s.clientId }, select: { customFields: true } }))?.customFields, "customer");
+  const fieldCols = hasHeader ? fieldDefs.map((f) => ({ f, i: head.indexOf(f.label.toLowerCase()) })).filter((x) => x.i >= 0) : [];
+
   const extra = parseTags(extraTags);
-  const rows = new Map<string, { name: string; tags: string[] }>();
+  const rows = new Map<string, { name: string; tags: string[]; fields: Record<string, string> }>();
   let invalid = 0;
   for (const line of lines.slice(hasHeader ? 1 : 0)) {
     const cells = splitCsv(line);
     const phone = normalizePhone(cells[phoneIdx] ?? "");
     if (!phone) { invalid++; continue; }
+    const fields: Record<string, string> = {};
+    for (const { f, i } of fieldCols) {
+      const checked = cleanValues([f], { [f.key]: cells[i] ?? "" });
+      if ("values" in checked && checked.values[f.key]) fields[f.key] = checked.values[f.key];
+    }
     rows.set(phone, {
       name: (nameIdx >= 0 && cells[nameIdx]) || "Customer",
       tags: [...new Set([...parseTags(tagIdx >= 0 ? cells[tagIdx] ?? "" : ""), ...extra])],
+      fields,
     });
   }
   if (rows.size > 20_000) return { ok: false, message: "Import up to 20,000 customers at a time." };
 
   const clientId = s.clientId;
-  const existing = await db.customer.findMany({ where: { clientId, phone: { in: [...rows.keys()] } }, select: { phone: true, tags: true } });
+  const existing = await db.customer.findMany({ where: { clientId, phone: { in: [...rows.keys()] } }, select: { phone: true, tags: true, extra: true } });
   const known = new Map(existing.map((c) => [c.phone, c.tags]));
+  const knownExtra = new Map(existing.map((c) => [c.phone, readValues(c.extra)]));
   const fresh = [...rows].filter(([p]) => !known.has(p));
   const optInAt = new Date();
   await db.customer.createMany({
-    data: fresh.map(([phone, r]) => ({ clientId, phone, name: r.name, tags: r.tags, optInSource: optInSource.trim(), optInAt })),
+    data: fresh.map(([phone, r]) => ({ clientId, phone, name: r.name, tags: r.tags, optInSource: optInSource.trim(), optInAt, ...(Object.keys(r.fields).length && { extra: r.fields }) })),
     skipDuplicates: true,
   });
   for (const [phone, r] of rows) {
     const tags = known.get(phone);
-    if (tags) await db.customer.update({ where: { clientId_phone: { clientId, phone } }, data: { name: r.name, tags: [...new Set([...tags, ...r.tags])] } });
+    if (tags)
+      await db.customer.update({
+        where: { clientId_phone: { clientId, phone } },
+        data: { name: r.name, tags: [...new Set([...tags, ...r.tags])], ...(Object.keys(r.fields).length && { extra: { ...knownExtra.get(phone), ...r.fields } }) },
+      });
   }
   revalidatePath("/dashboard", "layout");
   return {

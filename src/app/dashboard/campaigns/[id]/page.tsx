@@ -68,7 +68,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
   const stat = (runId: string, ...s: string[]) =>
     stats.filter((x) => x.runId === runId && s.includes(x.status)).reduce((a, x) => a + x._count, 0);
 
-  const running = (status: string) => ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"].includes(status);
+  const running = (status: string) => ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET", "WAITING_FUNDS"].includes(status);
 
   return (
     <>

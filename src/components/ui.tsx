@@ -380,6 +380,7 @@ const STATUS: Record<string, { tone: Tone; label: string }> = {
   WAITING_LIMIT: { tone: "amber", label: "Daily limit reached" },
   WAITING_QUALITY: { tone: "red", label: "Paused: low quality" },
   WAITING_QUIET: { tone: "gray", label: "Waiting: quiet hours" },
+  WAITING_FUNDS: { tone: "amber", label: "Waiting: wallet top-up" },
   META: { tone: "blue", label: "Meta API" },
   LOCAL: { tone: "violet", label: "Local session" },
   COMPLETED: { tone: "green", label: "Completed" },

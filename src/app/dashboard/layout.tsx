@@ -12,6 +12,7 @@ import { nightColor, themeCss, themeStyle } from "@/lib/theme";
 import { logout } from "../login/actions";
 import { ClientSwitcher, HeaderClientSwitcher } from "./client-switcher";
 import { BottomNav, SettingsLink, SideNav, TopbarTrail, type NavRole } from "./nav";
+import { WalletBanner } from "./wallet/wallet-banner";
 import { NotificationBell, NotificationProvider } from "@/components/notification-center";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AppearanceSync } from "@/components/appearance-sync";
@@ -153,6 +154,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           <div className="thin-scroll relative min-h-0 flex-1 overflow-y-auto px-3 py-3 [scrollbar-color:rgb(255_255_255/0.15)_transparent]">
             <SideNav
               isAdmin={scope.isAdmin}
+              showWallet={client?.billingMode === "wallet"}
               disabledSections={disabledSections}
               openReplies={openReplies}
               newOrders={newOrders}
@@ -246,11 +248,13 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
         </header>
 
         <main id="main" className="stagger relative mx-auto w-full max-w-page px-3 pb-[calc(4.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pt-6 lg:px-8 lg:pb-12 lg:pt-7 print:p-0">
+          {client?.billingMode === "wallet" && <WalletBanner clientId={client.id} lowAlert={client.walletLowAlert} />}
           {children}
         </main>
         {callsOn && scope.canOperate && <CallWidget />}
         <BottomNav
           isAdmin={scope.isAdmin}
+          showWallet={client?.billingMode === "wallet"}
           role={role}
           disabledSections={disabledSections}
           openReplies={openReplies}

@@ -13,6 +13,7 @@ import { replyWindowEnd } from "@/lib/replies";
 import { headerImageFor } from "@/lib/media";
 import { normalizePhone } from "@/lib/phone";
 import { isTemplatePicture, orderTemplateNames, picturePrefixFor } from "@/lib/order-templates";
+import { cleanValues, readFields, readValues } from "@/lib/custom-fields";
 import { senderFor } from "@/lib/senders";
 import { requireManager, requireOrderAccess } from "@/lib/session";
 import { sendText } from "@/lib/waha";
@@ -869,3 +870,18 @@ export async function saveWinbackRule(days: number, templateId: string): Promise
   return { ok: true, message: templateId ? `Win-back on: customers with no order for ${n} days get one message (up to 200 a day).` : `Win-back off. Customers are still tagged "lapsed" after ${n} days.` };
 }
 
+/** Saves the client's custom order fields (PO number, order type…) on one order. */
+export async function updateOrderExtra(id: string, values: Record<string, string>): Promise<SendResult> {
+  const s = await requireOrderAccess();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const order = await db.order.findFirst({ where: { id, ...(s.clientId ? { clientId: s.clientId } : {}) }, select: { id: true, extra: true, client: { select: { customFields: true } } } });
+  if (!order) return { ok: false, message: "Order not found." };
+  const fields = readFields(order.client.customFields, "order");
+  const checked = cleanValues(fields, values);
+  if ("error" in checked) return { ok: false, message: checked.error };
+  // Values of fields no longer shown are kept.
+  const kept = Object.fromEntries(Object.entries(readValues(order.extra)).filter(([k]) => !fields.some((f) => f.key === k)));
+  await db.order.update({ where: { id: order.id }, data: { extra: { ...kept, ...checked.values } } });
+  revalidatePath("/dashboard/orders");
+  return { ok: true, message: "Order details saved." };
+}

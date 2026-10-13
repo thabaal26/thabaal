@@ -16,6 +16,7 @@ import { activeCount as filterCount, filterQuery, keepFilters, readFilters, reso
 import { ACTIVITY, customerSegmentIds, filterOptions, STAGES } from "@/lib/filter-scope";
 import { computeCustomerLoyalty, isInternalLoyaltyTag } from "@/lib/loyalty";
 import { homeCityOf, regionsFor } from "@/lib/regions";
+import { readFields } from "@/lib/custom-fields";
 import { getScope, owned } from "@/lib/session";
 import { deleteCustomer, setOptOut } from "../actions/customers";
 import { CustomerActions, CustomerMenu, PendingCustomersBanner } from "./customer-tools";
@@ -59,7 +60,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
         SELECT unnest(tags) AS tag, count(*) AS n FROM "Customer"
         WHERE ${scope.clientId}::text IS NULL OR "clientId" = ${scope.clientId} GROUP BY 1 ORDER BY 2 DESC, 1`,
       db.customer.groupBy({ by: ["region", "location"], where: owned(scope), _count: true }),
-      scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { homeCity: true } }) : null,
+      scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { homeCity: true, customFields: true } }) : null,
       db.customer.count({ where: owned(scope) }),
       db.customer.count({ where: { ...owned(scope), OR: [{ optedOut: true }, { unreachable: true }] } }),
       scope.canManage
@@ -168,7 +169,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
         }
         description="Customers who reply STOP are opted out automatically."
         inlineActions
-        actions={scope.clientId || scope.isAdmin ? <CustomerActions canManage={scope.canManage} hasClient={!!scope.clientId} regions={regions} exportHref={scope.canManage && total > 0 ? exportHref : null} exportCount={total} /> : undefined}
+        actions={scope.clientId || scope.isAdmin ? <CustomerActions canManage={scope.canManage} hasClient={!!scope.clientId} regions={regions} fields={readFields(homeClient?.customFields, "customer")} exportHref={scope.canManage && total > 0 ? exportHref : null} exportCount={total} /> : undefined}
       />
 
       {scope.canManage && pendingRows.length > 0 && <PendingCustomersBanner rows={pendingRows} />}

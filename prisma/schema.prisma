@@ -24,6 +24,12 @@ model Setting {
   lastDispatchAt DateTime?
   /// The portal-wide default look (lib/appearance.ts): icon set, tiles, cards, UI style, chart library.
   appearance     Json?
+  /// Wallet recharges: the UPI ID and name shown on the recharge QR (lib/wallet.ts).
+  walletUpiId    String?
+  walletPayee    String?
+  /// GST on wallet receipts: off until Thabaal is registered; gstin is printed when on.
+  gstEnabled     Boolean   @default(false)
+  gstin          String?
   updatedAt      DateTime  @updatedAt
 }
 
@@ -46,6 +52,17 @@ model Client {
   defaultImageUrl     String?
   /// City the business delivers from; customer regions are "<city> city" / "Outside <city>". Null means Madurai (clients set up before this).
   homeCity            String?
+  /// Kind of business (lib/business-types.ts): retail, restaurant, service, wholesale or other. Null = not chosen yet.
+  businessType        String?
+  /// Extra fields this client keeps on customers and orders: [{ key, label, type, options?, on }] (lib/custom-fields.ts).
+  customFields        Json?
+  /// Who pays Meta for this client's messages: "direct" (their own Meta billing, the default) or "wallet" (Thabaal wallet).
+  billingMode         String            @default("direct")
+  /// Wallet rates per delivered message before GST, by category; missing ones use Meta's rate (lib/wallet.ts).
+  walletRates         Json?
+  /// Warn the client when their wallet falls below this many rupees.
+  walletLowAlert      Float             @default(200)
+  walletEntries       WalletEntry[]
   tagline             String?
   website             String?
   supportPhone        String?
@@ -166,6 +183,8 @@ model Customer {
   /// WhatsApp calling: when we last asked to call them, and until when they allowed it (null = not allowed).
   callAskedAt      DateTime?
   callAllowedUntil DateTime?
+  /// Values of the client's custom fields, by key (lib/custom-fields.ts).
+  extra            Json?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   messages         Message[]
@@ -291,6 +310,7 @@ enum RunStatus {
   WAITING_LIMIT // the number used up its 24-hour messaging limit
   WAITING_QUALITY // Meta rated the number red; paused to protect it
   WAITING_QUIET // inside the client's quiet hours
+  WAITING_FUNDS // the client's Thabaal wallet is too low; resumes after a recharge
   COMPLETED
   CANCELLED
 }
@@ -403,6 +423,8 @@ model Order {
   status             OrderStatus @default(NEW)
   /// Our own notes: payment mode, delivery slot, address.
   internalNote       String?
+  /// Values of the client's custom order fields, by key (lib/custom-fields.ts).
+  extra              Json?
   /// When the refill reminder for this order went out, so it's sent once.
   reminderSentAt     DateTime?
   /// Where the order came from outside WhatsApp, e.g. a Google Sheet row; keeps a sync from adding it twice.
@@ -508,4 +530,31 @@ model TopUp {
   createdAt DateTime @default(now())
 
   @@index([clientId, createdAt])
+}
+
+/// The Thabaal wallet ledger (lib/wallet.ts). Balance = sum of DONE amounts. Credits are positive,
+/// message charges negative. One MESSAGE entry per charged message (messageId is unique).
+model WalletEntry {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  /// RECHARGE | MESSAGE | ADJUSTMENT | REFUND
+  kind      String
+  /// Rupees, GST included: + adds to the balance, - takes from it.
+  amount    Float
+  /// PENDING (recharge waiting for approval) | DONE | REJECTED
+  status    String   @default("DONE")
+  messageId String?  @unique
+  /// For MESSAGE entries: marketing | utility | authentication | service.
+  category  String?
+  /// UPI transaction reference the client entered for a recharge.
+  utr       String?
+  note      String?
+  createdBy String?
+  decidedBy String?
+  decidedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([clientId, status, createdAt])
+  @@index([utr])
 }

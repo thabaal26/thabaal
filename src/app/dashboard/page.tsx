@@ -175,7 +175,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         WHERE m."createdAt" >= ${start} AND m."createdAt" < ${end} AND m.status NOT IN ('QUEUED', 'SKIPPED') AND (${cid}::text IS NULL OR c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[])))
         GROUP BY 1, 2`,
       db.campaignRun.findMany({
-        where: { campaign: mine, status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"] } },
+        where: { campaign: mine, status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET", "WAITING_FUNDS"] } },
         include: { campaign: true },
         orderBy: { startedAt: "desc" },
       }),
@@ -342,7 +342,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     // Progress of the campaigns sending right now (same runs as activeRuns above).
     db.message.groupBy({
       by: ["runId", "status"],
-      where: { run: { campaign: mine, status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET"] } } },
+      where: { run: { campaign: mine, status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET", "WAITING_FUNDS"] } } },
       _count: true,
     }),
     // Reorders due this week (shown only when the Orders section is on).

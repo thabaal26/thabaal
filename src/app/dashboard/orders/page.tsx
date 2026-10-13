@@ -14,6 +14,7 @@ import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { getOrderPricing } from "@/lib/order-pricing";
+import { readFields } from "@/lib/custom-fields";
 import { isPictureVersion, isTemplatePicture, ORDER_TEMPLATE_NAMES, orderTemplateNames } from "@/lib/order-templates";
 import { money, orderRef, type OrderItem } from "@/lib/orders";
 import { slipPay } from "@/lib/payment-state";
@@ -215,7 +216,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     db.order.count({ where: { ...scoped, ...COD_WHERE } as object }),
     db.order.count({ where: { ...scoped, ...REFUND_WHERE } as object }),
     scope.clientId ? db.template.findMany({ where: { clientId: scope.clientId, name: { in: ORDER_TEMPLATE_NAMES.flatMap(orderTemplateNames) } }, select: { name: true, status: true, headerMediaUrl: true } }) : [],
-    scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { paymentConfig: true, defaultImageUrl: true, bannerUrl: true } }) : null,
+    scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { paymentConfig: true, defaultImageUrl: true, bannerUrl: true, customFields: true } }) : null,
     scope.clientId ? db.template.findFirst({ where: { clientId: scope.clientId, name: PAYMENT_TEMPLATE }, select: { status: true } }) : null,
     scope.clientId ? paymentTemplateFor(scope.clientId) : null,
     scope.clientId ? getCatalogWithProducts(scope.clientId) : null,
@@ -290,6 +291,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     [fullUrl(client?.defaultImageUrl), fullUrl(client?.bannerUrl)].find(isTemplatePicture) ??
     null;
   const missing = ORDER_TEMPLATE_NAMES.filter((name) => !orderTemplates.some((t) => t.name === name));
+  const orderFields = readFields(client?.customFields, "order");
   // Client staff pack and dispatch their own orders, so they get the order buttons too.
   const canEdit = scope.canOperate && (scope.canManage || !!scope.clientId);
 
@@ -506,6 +508,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
                   canEdit={canEdit}
                   catalogProducts={catalogProducts}
                   isLiveCatalog={isLiveCatalog}
+                  orderFields={orderFields}
                 />
               </li>
             ))}

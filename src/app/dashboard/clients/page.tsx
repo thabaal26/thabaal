@@ -242,6 +242,7 @@ export default async function ClientsPage() {
                         supportPhone: c.supportPhone ?? "",
                         defaultImageUrl: c.defaultImageUrl ?? "",
                         homeCity: c.homeCity ?? "",
+                        businessType: c.businessType ?? "",
                       }}
                     />
                   </section>

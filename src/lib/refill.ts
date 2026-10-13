@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "./db";
+import { affordableMessages } from "./wallet";
 import { deliver, getSettings, templateSendable } from "./provider";
 import { applyFailure, quietUntil } from "./rules";
 import { senderFor } from "./senders";
@@ -27,6 +28,8 @@ export async function sendRefillReminders(now = new Date()) {
     const template = await db.template.findUnique({ where: { id: client.refillTemplateId! } });
     if (!template || !templateSendable(settings, template)) continue;
     if (template.category === "MARKETING" && quietUntil(client, now)) continue;
+    // Thabaal-wallet clients with no balance left: reminders wait for a recharge.
+    if ((await affordableMessages(client.id, template.category)) <= 0) continue;
 
     const due = new Date(now.getTime() - client.refillDays! * DAY);
     const orders = await db.order.findMany({
