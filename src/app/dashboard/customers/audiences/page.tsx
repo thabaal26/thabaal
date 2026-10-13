@@ -29,7 +29,7 @@ export default async function AudiencesPage() {
       <PageHeader
         title="Audiences"
         back={back}
-        description="Saved groups of customers, like ghee buyers with no order for 30 days. Pick one under Send to in a campaign; it's counted again every time the campaign runs."
+        description="Saved groups of customers, like repeat buyers with no order for 30 days. Pick one under Send to in a campaign; it's counted again every time the campaign runs."
       />
       <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <AudienceBuilder regions={regionRows.map((r) => r.region!).sort()} />

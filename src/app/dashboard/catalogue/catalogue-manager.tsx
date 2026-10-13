@@ -13,7 +13,7 @@ import { createProduct, deleteProduct, updateProduct, uploadProductImage } from 
 
 type StockFilter = "ALL" | "IN_STOCK" | "OUT_OF_STOCK";
 
-/** The next free SKU in the catalogue's own pattern, e.g. THN-021 → THN-022. */
+/** The next free SKU in the catalogue's own pattern, e.g. SKU-021 → SKU-022. */
 function nextSku(products: CatalogProductDetail[]) {
   let best: { prefix: string; n: number; width: number } | null = null;
   for (const p of products) {
@@ -510,7 +510,7 @@ export function CatalogueManager({
           <form id="add-product" onSubmit={handleCreate} className="space-y-4">
             <PhotoField value={addImageUrl} onChange={setAddImageUrl} removable />
             <Field id="newName" label="Product name" required>
-              <input name="newName" maxLength={100} className="field" placeholder="E.g. Gingelly oil 500ml" />
+              <input name="newName" maxLength={100} className="field" placeholder="E.g. Basmati rice 5kg" />
             </Field>
             <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
               <Field id="sku" label="SKU" hint="unique code" required>

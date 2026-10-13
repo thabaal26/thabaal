@@ -525,7 +525,7 @@ export function TemplateEditor({
                       ) : b.type === "PHONE_NUMBER" ? (
                         <input className="field max-sm:col-span-2" type="tel" inputMode="tel" placeholder="+91 98765 43210" aria-label={`Button ${i + 1} phone number`} value={b.phone ?? ""} onChange={(e) => setButton(i, { phone: e.target.value })} />
                       ) : b.type === "CATALOG" ? (
-                        <input className="field max-sm:col-span-2 font-mono text-xs" placeholder="Thumbnail SKU (optional, e.g. THN-006)" aria-label="Catalogue thumbnail product SKU" value={b.thumbnailProductId ?? ""} onChange={(e) => setButton(i, { thumbnailProductId: e.target.value })} />
+                        <input className="field max-sm:col-span-2 font-mono text-xs" placeholder="Thumbnail SKU (optional, e.g. SKU-006)" aria-label="Catalogue thumbnail product SKU" value={b.thumbnailProductId ?? ""} onChange={(e) => setButton(i, { thumbnailProductId: e.target.value })} />
                       ) : (
                         <span className="max-sm:hidden" />
                       )}

@@ -1306,7 +1306,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       revenueAtStake: refill31to60List.length * avgOrderVal,
       revenueLabel: `~₹${Math.round(refill31to60List.length * avgOrderVal).toLocaleString("en-IN")} repeat cycle potential`,
       whyItHappens:
-        "Household consumables (cooking oils, ghee, soaps, hair oils) typically run out between day 30 and day 45. Reaching out right before their bottle is empty catches them at peak need before they buy elsewhere.",
+        "Everyday products such as groceries, personal care and household items usually run out between day 30 and day 45. Reaching out just before they run low catches them at peak need, before they buy elsewhere.",
       howToGetThemBack: [
         `Turn on the Automated Reorder Reminder (${client?.refillDays ?? 30} days after order) on the Campaigns page so every buyer gets a timely nudge without manual effort.`,
         "Send a 1-tap 'Reorder your usual' message with the WhatsApp Catalogue attached so they can reorder in 15 seconds.",
@@ -1374,7 +1374,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       howToGetThemBack: [
         "Reply inside the 24-hour free service window with a simple 2-item starter recommendation instead of making them scroll through all 16+ items.",
         "Use the 'New manual order' button in Orders to create their cart for them on the spot and send a 1-tap UPI payment request.",
-        "Share a quick trust proof (wood-pressed purity / lab-tested / Madurai doorstep delivery) to overcome first-order hesitation.",
+        "Share a quick trust proof (genuine products, quality checks, fast doorstep delivery or happy-customer reviews) to overcome first-order hesitation.",
       ],
       suggestedWhatsappCopy: `Hi {{name}}! If you're ordering for the first time, our most loved starter pair is ${heroTopSellerName}. Just reply with the quantity you need and we'll set up your order & payment link right away!`,
       primaryCtaLabel: "Reply to warm leads",

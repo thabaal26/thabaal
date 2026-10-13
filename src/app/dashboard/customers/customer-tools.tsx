@@ -171,7 +171,7 @@ function CustomerForm({
         <input type="tel" inputMode="tel" autoComplete="tel" className="field" placeholder="+91 98765 43210" value={v.phone} onChange={(e) => setV({ ...v, phone: e.target.value })} />
       </Field>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Field id="loc" label="Area / locality" hint="e.g. Anna Nagar, Sellur">
+        <Field id="loc" label="Area / locality" hint="e.g. Anna Nagar, T. Nagar">
           <input className="field" placeholder="Anna Nagar" value={v.location} onChange={(e) => setV({ ...v, location: e.target.value })} />
         </Field>
         <Field id="reg" label="Delivery region">
@@ -188,7 +188,7 @@ function CustomerForm({
         <input className="field" placeholder="Door no, street, landmark…" value={v.locationRaw} onChange={(e) => setV({ ...v, locationRaw: e.target.value })} />
       </Field>
       <Field id="purch" label="What they bought" hint="optional">
-        <input className="field" placeholder="Coconut oil (1 ltr), Gingelly oil (500ml)" value={v.purchases} onChange={(e) => setV({ ...v, purchases: e.target.value })} />
+        <input className="field" placeholder="Basmati rice (5kg), Coffee powder (500g)" value={v.purchases} onChange={(e) => setV({ ...v, purchases: e.target.value })} />
       </Field>
       <Field id="t" label="Tags" hint="comma separated, optional">
         <input className="field" placeholder="vip, coconut-oil" value={v.tags} onChange={(e) => setV({ ...v, tags: e.target.value })} />

@@ -172,24 +172,30 @@ export function detectCategory(name: string): string {
   return "General";
 }
 
+/** The demo catalogue for portals not yet connected to Meta (sends are simulated). Made-up products. */
 const DEFAULT_PRODUCTS: CatalogProductDetail[] = [
-  { id: "28533919819570391", retailerId: "THN-006", name: "Gingelly oil", price: "₹ 460.00", priceAmount: 460, currency: "INR", inStock: true, description: "With pure karupatti, No filter", imageUrl: "https://thenanoils.com/wp-content/uploads/2020/07/gingelly-tb1.jpg", category: "Oils" },
-  { id: "28961811863435175", retailerId: "THN-004", name: "Groundnut oil 1l", price: "₹ 360.00", priceAmount: 360, currency: "INR", inStock: true, description: "With Farm fresh Sun-dried Groundnut", imageUrl: "https://thenanoils.com/wp-content/uploads/2020/07/groundt-tb1.jpg", category: "Oils" },
-  { id: "29177042811888422", retailerId: "THN-003", name: "Sulphur free Coconut oil", price: "₹ 510.00", priceAmount: 510, currency: "INR", inStock: true, description: "Sulphur free Coconut oil", imageUrl: "https://thenanoils.com/wp-content/uploads/2020/07/coconut-tb1.jpg", category: "Oils" },
-  { id: "29237072485885455", retailerId: "THN-013", name: "Moringa oil 100ml", price: "₹ 450.00", priceAmount: 450, currency: "INR", inStock: true, description: "Cold pressed Moringa oil", imageUrl: null, category: "Oils" },
-  { id: "28740068018961461", retailerId: "THN-002", name: "Almond oil", price: "₹ 320.00", priceAmount: 320, currency: "INR", inStock: true, description: "100% pure Almonds are cold pressed", imageUrl: null, category: "Oils" },
-  { id: "28751526634532891", retailerId: "THN-001", name: "Black Cumin oil 50ml", price: "₹ 130.00", priceAmount: 130, currency: "INR", inStock: true, description: "100% Black cumin is cold pressed", imageUrl: null, category: "Oils" },
-  { id: "28984058941281149", retailerId: "THN-014", name: "Cold pressed Castor oil 100ml", price: "₹ 150.00", priceAmount: 150, currency: "INR", inStock: true, description: "100% pure castor seeds are cold pressed", imageUrl: null, category: "Oils" },
-  { id: "28978223988477530", retailerId: "THN-005", name: "Flax seed oil 100ml", price: "₹ 130.00", priceAmount: 130, currency: "INR", inStock: true, description: "100% pure Flaxseeds are cold pressed", imageUrl: null, category: "Oils" },
-  { id: "28475377258789174", retailerId: "THN-020", name: "Neem oil 100ml", price: "₹ 120.00", priceAmount: 120, currency: "INR", inStock: true, description: "100% Pure cold pressed Neem oil", imageUrl: null, category: "Oils" },
-  { id: "29017221287967440", retailerId: "THN-008", name: "Turmeric Powder 100g", price: "₹ 60.00", priceAmount: 60, currency: "INR", inStock: true, description: "100% Pure. Sun-dried turmeric", imageUrl: "https://thenanoils.com/wp-content/uploads/2021/02/turmericpowder.jpg", category: "Masala Powders" },
-  { id: "28940097145615164", retailerId: "THN-018", name: "Karupatti", price: "₹ 550.00", priceAmount: 550, currency: "INR", inStock: true, description: "Farm fresh, try it for the purity", imageUrl: "https://thenanoils.com/wp-content/uploads/2021/02/karupetti.jpg", category: "Ghee & Sweeteners" },
-  { id: "28543900408594949", retailerId: "THN-021", name: "Corn Flour 1kg", price: "₹ 90.00", priceAmount: 90, currency: "INR", inStock: true, description: "Corn Flour", imageUrl: null, category: "Flours & Millets" },
-  { id: "THN-007-item", retailerId: "THN-007", name: "Coriander powder", price: "₹ 40.00", priceAmount: 40, currency: "INR", inStock: true, description: "Pure ground coriander seeds", imageUrl: null, category: "Masala Powders" },
-  { id: "THN-010-item", retailerId: "THN-010", name: "Chilli powder 100g", price: "₹ 55.00", priceAmount: 55, currency: "INR", inStock: true, description: "Pure sun-dried red chilli powder", imageUrl: null, category: "Masala Powders" },
-  { id: "THN-011-item", retailerId: "THN-011", name: "Ghee 100ml", price: "₹ 150.00", priceAmount: 150, currency: "INR", inStock: true, description: "Pure traditional cow ghee", imageUrl: null, category: "Ghee & Sweeteners" },
-  { id: "THN-012-item", retailerId: "THN-012", name: "Wheat atta 1kg", price: "₹ 80.00", priceAmount: 80, currency: "INR", inStock: true, description: "Stone ground whole wheat atta", imageUrl: null, category: "Flours & Millets" },
-];
+  ["001", "Basmati rice 5kg", 520, "Long-grain aged basmati rice", "Groceries"],
+  ["002", "Toor dal 1kg", 160, "Unpolished toor dal", "Groceries"],
+  ["003", "Wheat atta 5kg", 260, "Whole wheat chakki atta", "Groceries"],
+  ["004", "Sunflower oil 1L", 150, "Refined sunflower oil", "Groceries"],
+  ["005", "Coffee powder 500g", 310, "Filter coffee blend", "Groceries"],
+  ["006", "Tea powder 250g", 140, "Strong CTC tea", "Groceries"],
+  ["007", "Turmeric powder 100g", 45, "Sun-dried turmeric powder", "Groceries"],
+  ["008", "Steel water bottle 1L", 449, "Leak-proof stainless steel bottle", "Home & Kitchen"],
+  ["009", "Cotton bath towel", 299, "Soft, quick-dry cotton towel", "Home & Kitchen"],
+  ["010", "Handwash refill 750ml", 120, "Gentle handwash, refill pack", "Personal Care"],
+].map(([n, name, price, description, category]) => ({
+  id: `DEMO-${n}-item`,
+  retailerId: `SKU-${n}`,
+  name: name as string,
+  price: `₹ ${Number(price).toFixed(2)}`,
+  priceAmount: price as number,
+  currency: "INR",
+  inStock: true,
+  description: description as string,
+  imageUrl: null,
+  category: category as string,
+}));
 
 function getOverrides(clientId: string): Record<string, Partial<CatalogProductDetail>> {
   try {
@@ -341,13 +347,19 @@ export const getCatalogWithProducts = cache(async (clientId: string): Promise<{
   products: CatalogProductDetail[];
   commerceManagerUrl: string | null;
   isLive: boolean;
+  /** Meta couldn't be read just now (the list is empty for this request). */
+  readError?: boolean;
 }> => {
   try {
     const live = await cachedLiveCatalog(clientId);
     // Live: Meta is the only source of truth. Local demo edits are never layered on top.
     if (live?.catalogId) return { catalogId: live.catalogId, products: live.products, commerceManagerUrl: `https://business.facebook.com/commerce_manager/${live.catalogId}/products`, isLive: true };
+    // A live account with no catalogue connected has no products; the demo list is only for demo mode.
+    if (live) return { catalogId: null, products: [], commerceManagerUrl: "https://business.facebook.com/commerce_manager", isLive: false };
   } catch (e) {
-    console.warn("Could not fetch Meta catalog, showing the demo list:", e);
+    // Only live accounts read Meta, so never fall back to the demo products here.
+    console.warn("Could not fetch Meta catalog:", e);
+    return { catalogId: null, products: [], commerceManagerUrl: "https://business.facebook.com/commerce_manager", isLive: false, readError: true };
   }
   return { catalogId: null, products: demoProducts(clientId), commerceManagerUrl: "https://business.facebook.com/commerce_manager", isLive: false };
 });
@@ -484,7 +496,7 @@ export async function listCatalogProducts(cfg: WaConfig): Promise<CatalogProduct
   if (!cfg.live) return DEFAULT_PRODUCTS.map((p) => ({ retailerId: p.retailerId, name: p.name, price: p.price, inStock: p.inStock }));
   const catalogs = await metaGet<{ data: { id: string }[] }>(cfg, `${cfg.wabaId}/product_catalogs?fields=id`).catch(() => ({ data: [] }));
   const catalogId = catalogs.data?.[0]?.id;
-  if (!catalogId) return DEFAULT_PRODUCTS.map((p) => ({ retailerId: p.retailerId, name: p.name, price: p.price, inStock: p.inStock }));
+  if (!catalogId) return []; // a live account without a catalogue has no products (never the demo list)
   const out: CatalogProduct[] = [];
   let path: string | null = `${catalogId}/products?fields=retailer_id,name,price,availability&limit=100`;
   while (path) {
@@ -492,7 +504,7 @@ export async function listCatalogProducts(cfg: WaConfig): Promise<CatalogProduct
     for (const p of page.data ?? []) if (p.name?.trim()) out.push({ retailerId: p.retailer_id, name: p.name, price: p.price ?? null, inStock: p.availability !== "out of stock" });
     path = page.paging?.next ? page.paging.next.replace(/^https:\/\/graph\.facebook\.com\/v[\d.]+\//, "") : null;
   }
-  return out.length ? out : DEFAULT_PRODUCTS.map((p) => ({ retailerId: p.retailerId, name: p.name, price: p.price, inStock: p.inStock }));
+  return out;
 }
 
 const GROUPS: { title: string; match: RegExp }[] = [
@@ -510,10 +522,11 @@ export function formatPriceList(business: string, products: CatalogProduct[]) {
   const items = products.filter((p) => p.inStock && p.price);
   const used = new Set<CatalogProduct>();
   const sections: string[] = [];
-  for (const g of [...GROUPS, { title: "🧀 *More*", match: /./ }]) {
+  for (const g of [...GROUPS, { title: "🛍️ *More products*", match: /./ }]) {
     const rows = items.filter((p) => !used.has(p) && g.match.test(p.name)).sort((a, b) => a.name.localeCompare(b.name));
     rows.forEach((p) => used.add(p));
-    if (rows.length) sections.push(`${g.title}\n${rows.map((p) => `• ${p.name} – ${shortPrice(p.price)}`).join("\n")}`);
+    const title = g.match.source === "." && !sections.length ? "🛍️ *Products*" : g.title;
+    if (rows.length) sections.push(`${title}\n${rows.map((p) => `• ${p.name} – ${shortPrice(p.price)}`).join("\n")}`);
   }
   return `🛒 *${business} – Price List*\nவிலைப் பட்டியல்\n\n${sections.join("\n\n")}\n\nTap *View catalog* below to order 👇`;
 }

@@ -14,7 +14,7 @@ const PRESETS: { label: string; name: string; f: AudienceFilter }[] = [
   { label: "Lapsed buyers", name: "Lapsed buyers", f: { noOrderForDays: 60 } },
   { label: "Recent buyers", name: "Bought in last 30 days", f: { orderedWithinDays: 30 } },
   { label: "Never ordered", name: "Never ordered", f: { neverOrdered: true } },
-  { label: "Ghee buyers", name: "Ghee buyers", f: { bought: "ghee" } },
+  { label: "No order in 30 days", name: "No order in 30 days", f: { noOrderForDays: 30 } },
 ];
 
 /** Build a filter, see how many customers it reaches, save it for campaigns. */
@@ -140,7 +140,7 @@ export function AudienceBuilder({ regions }: { regions: string[] }) {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field id="a-tags" label="Has tags" hint="comma-separated">
-            <input className="field" value={tags} placeholder="ghee, vip" onChange={(e) => setTags(e.target.value)} />
+            <input className="field" value={tags} placeholder="vip, wholesale" onChange={(e) => setTags(e.target.value)} />
           </Field>
           <Field id="a-ex" label="Without tags" hint="comma-separated">
             <input className="field" value={exclude} placeholder="test" onChange={(e) => setExclude(e.target.value)} />
@@ -154,10 +154,10 @@ export function AudienceBuilder({ regions }: { regions: string[] }) {
             </select>
           </Field>
           <Field id="a-area" label="Area contains">
-            <input className="field" value={area} placeholder="Sellur" onChange={(e) => setArea(e.target.value)} />
+            <input className="field" value={area} placeholder="Anna Nagar" onChange={(e) => setArea(e.target.value)} />
           </Field>
           <Field id="a-bought" label="Bought">
-            <input className="field" value={bought} placeholder="ghee, groundnut, coconut…" onChange={(e) => setBought(e.target.value)} />
+            <input className="field" value={bought} placeholder="rice, coffee, saree…" onChange={(e) => setBought(e.target.value)} />
           </Field>
           <div>
             <label htmlFor="a-orders" className="mb-1.5 block text-sm font-medium text-ink-2">Orders</label>
@@ -176,7 +176,7 @@ export function AudienceBuilder({ regions }: { regions: string[] }) {
         </div>
         <div className="flex flex-col gap-3 rounded-card bg-sunken p-3 sm:flex-row sm:items-end">
           <Field id="a-name" label="Audience name" required className="flex-1">
-            <input className="field" value={name} placeholder="Ghee buyers in Madurai" onChange={(e) => setName(e.target.value)} />
+            <input className="field" value={name} placeholder="Repeat buyers in Chennai" onChange={(e) => setName(e.target.value)} />
           </Field>
           <p className="tabular flex min-h-10 items-center gap-1 text-sm sm:pb-0" aria-live="polite">
             {count === null ? <Spinner className="text-muted" /> : <b className="text-ink">{count.toLocaleString("en-IN")}</b>} customers now

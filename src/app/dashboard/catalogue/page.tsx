@@ -23,7 +23,7 @@ export default async function CataloguePage() {
     );
   }
 
-  const [client, { catalogId, products, commerceManagerUrl, isLive }] = await Promise.all([
+  const [client, { catalogId, products, commerceManagerUrl, isLive, readError }] = await Promise.all([
     db.client.findUnique({
       where: { id: scope.clientId },
       select: { id: true, name: true },
@@ -59,7 +59,18 @@ export default async function CataloguePage() {
         }
       />
 
-      {!isLive && (
+      {readError && (
+        <Callout tone="warning" icon={<CloudOff />} title="Couldn't reach Meta's catalogue" className="mb-4">
+          Meta didn&apos;t answer just now, so products can&apos;t be shown. Refresh the page in a minute.
+        </Callout>
+      )}
+      {!isLive && !readError && products.length === 0 && (
+        <Callout tone="info" icon={<CloudOff />} title="No catalogue connected yet" className="mb-4">
+          Create a catalogue in Meta Commerce Manager and connect it to this WhatsApp account. Its products will show here, and customers can order from them
+          in WhatsApp.
+        </Callout>
+      )}
+      {!isLive && products.length > 0 && (
         <Callout tone="info" icon={<CloudOff />} title="Showing the portal's saved product list" className="mb-4">
           Meta&apos;s live catalogue couldn&apos;t be read for this WhatsApp account, so prices and stock here may differ from what customers see in WhatsApp.
         </Callout>

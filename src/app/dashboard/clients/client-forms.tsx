@@ -85,7 +85,7 @@ export function NewClientForm() {
           }}
         >
           <Field id="client-name" label="Business name" required help="Next, add their login and WhatsApp details on this page, then pick them in the sidebar to import customers.">
-            <input className="field" autoCapitalize="words" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Thenan Oils" />
+            <input className="field" autoCapitalize="words" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Fresh Mart" />
           </Field>
           <fieldset className="space-y-2">
             <legend className="text-sm font-medium text-ink-2">Portal plan & sections</legend>

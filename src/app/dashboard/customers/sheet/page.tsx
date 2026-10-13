@@ -15,8 +15,8 @@ export const dynamic = "force-dynamic";
 const CUSTOMER_COLUMNS = [
   ["Name", "Priya Sharma"],
   ["Phone", "98765 43210 (required)"],
-  ["Area", "Sellur"],
-  ["Tags", "ghee, vip (comma-separated)"],
+  ["Area", "Anna Nagar"],
+  ["Tags", "vip, wholesale (comma-separated)"],
   ["Buys", "Groundnut oil 1 L"],
   ["Opted out", "yes, to stop messages"],
 ];
@@ -28,7 +28,7 @@ const ORDER_COLUMNS = [
   ["Item", "Groundnut oil 1 L (required)"],
   ["Qty", "2"],
   ["Price", "280 (each), or Amount for the line total"],
-  ["Address", "12, North St, Sellur"],
+  ["Address", "12, North St, Anna Nagar"],
   ["Status", "new / dispatched / delivered (optional)"],
 ];
 
