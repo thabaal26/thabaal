@@ -34,6 +34,9 @@ export default async function CataloguePage() {
   const total = products.length;
   const inStock = products.filter((p) => p.inStock).length;
   const outOfStock = total - inStock;
+  const approved = products.filter((p) => p.whatsappStatus === "APPROVED").length;
+  const pending = products.filter((p) => p.whatsappStatus === "PENDING" || p.whatsappStatus === "OUTDATED").length;
+  const rejected = products.filter((p) => p.whatsappStatus === "REJECTED").length;
 
   return (
     <>
@@ -75,6 +78,16 @@ export default async function CataloguePage() {
           Meta&apos;s live catalogue couldn&apos;t be read for this WhatsApp account, so prices and stock here may differ from what customers see in WhatsApp.
         </Callout>
       )}
+      {isLive && pending > 0 && (
+        <Callout tone="warning" title={`${pending} product${pending > 1 ? "s" : ""} in Meta review`} className="mb-4">
+          Meta is currently reviewing {pending > 1 ? "these products" : "this product"}. Once approved, {pending > 1 ? "they" : "it"} will automatically show in your WhatsApp catalogue.
+        </Callout>
+      )}
+      {isLive && rejected > 0 && (
+        <Callout tone="danger" title={`${rejected} product${rejected > 1 ? "s" : ""} rejected by Meta`} className="mb-4">
+          {rejected > 1 ? "These products were" : "This product was"} rejected under Meta Commerce policy and cannot be ordered in WhatsApp. Update details or photo in Meta Commerce Manager.
+        </Callout>
+      )}
 
       <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Stat label="Products" value={fmtNumber(total)} sub="In the catalogue" icon={<Store3D />} tone="info" />
@@ -94,15 +107,29 @@ export default async function CataloguePage() {
           tone={outOfStock > 0 ? "amber" : "gold"}
         />
         <Stat
-          label="Meta catalogue"
-          tone="violet"
+          label="WhatsApp status"
+          tone={isLive ? (rejected > 0 ? "amber" : pending > 0 ? "amber" : "brand") : "violet"}
           icon={<ShoppingBag3D />}
           value={
-            <Badge tone={isLive ? "green" : "gray"} dot className="text-sm">
-              {isLive ? "Live sync" : "Saved copy"}
+            <Badge
+              tone={isLive ? (rejected > 0 ? "red" : pending > 0 ? "amber" : "green") : "gray"}
+              dot
+              className="text-sm"
+            >
+              {isLive ? `${approved} / ${total} Approved` : "Saved copy"}
             </Badge>
           }
-          sub={catalogId ? <span className="font-mono">ID {catalogId}</span> : "No catalogue linked"}
+          sub={
+            isLive
+              ? pending > 0
+                ? `${pending} pending review`
+                : rejected > 0
+                  ? `${rejected} rejected`
+                  : "All 25 live on WhatsApp"
+              : catalogId
+                ? <span className="font-mono">ID {catalogId}</span>
+                : "No catalogue linked"
+          }
         />
       </div>
 

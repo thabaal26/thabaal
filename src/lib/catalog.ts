@@ -162,6 +162,7 @@ export type CatalogProductDetail = {
   description: string | null;
   imageUrl: string | null;
   category: string;
+  whatsappStatus?: "APPROVED" | "PENDING" | "REJECTED" | "OUTDATED" | null;
 };
 
 export function detectCategory(name: string): string {
@@ -241,11 +242,27 @@ async function catalogIdFor(cfg: WaConfig): Promise<string | null> {
   return catalogs.data?.[0]?.id ?? null;
 }
 
-type MetaProduct = { id: string; retailer_id: string; name?: string; price?: string; availability?: string; description?: string; image_url?: string };
+type MetaProduct = {
+  id: string;
+  retailer_id: string;
+  name?: string;
+  price?: string;
+  availability?: string;
+  description?: string;
+  image_url?: string;
+  capability_to_review_status?: { key: string; value: string }[];
+};
 
 function toDetail(p: MetaProduct): CatalogProductDetail {
   // Items created without a title (e.g. by a bad upsert) have no name; show their SKU instead of crashing.
   const name = p.name?.trim() || p.retailer_id;
+  const waReview = p.capability_to_review_status?.find((c) => c.key === "WHATSAPP")?.value as
+    | "APPROVED"
+    | "PENDING"
+    | "REJECTED"
+    | "OUTDATED"
+    | undefined;
+
   return {
     id: p.id,
     retailerId: p.retailer_id,
@@ -257,6 +274,7 @@ function toDetail(p: MetaProduct): CatalogProductDetail {
     description: p.description ?? null,
     imageUrl: p.image_url ?? null,
     category: detectCategory(name),
+    whatsappStatus: waReview ?? null,
   };
 }
 
@@ -323,7 +341,7 @@ async function readLiveCatalog(clientId: string): Promise<{ catalogId: string | 
   const catalogId = await catalogIdFor(cfg);
   if (!catalogId) return { catalogId: null, products: [] };
   const out: CatalogProductDetail[] = [];
-  let path: string | null = `${catalogId}/products?fields=id,retailer_id,name,price,availability,description,image_url&limit=100`;
+  let path: string | null = `${catalogId}/products?fields=id,retailer_id,name,price,availability,description,image_url,capability_to_review_status&limit=100`;
   while (path) {
     const page: { data: MetaProduct[]; paging?: { next?: string } } = await metaGet(cfg, path);
     for (const p of page.data ?? []) out.push(toDetail(p));

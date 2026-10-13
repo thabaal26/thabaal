@@ -12,6 +12,7 @@ import type { CatalogProductDetail } from "@/lib/catalog";
 import { createProduct, deleteProduct, updateProduct, uploadProductImage } from "../actions/catalog";
 
 type StockFilter = "ALL" | "IN_STOCK" | "OUT_OF_STOCK";
+type StatusFilter = "ALL" | "APPROVED" | "REVIEW" | "REJECTED";
 
 /** The next free SKU in the catalogue's own pattern, e.g. SKU-021 → SKU-022. */
 function nextSku(products: CatalogProductDetail[]) {
@@ -120,6 +121,7 @@ export function CatalogueManager({
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string>("ALL");
   const [stockFilter, setStockFilter] = useState<StockFilter>("ALL");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [editing, setEditing] = useState<CatalogProductDetail | null>(null);
   const [adding, setAdding] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -145,6 +147,9 @@ export function CatalogueManager({
       if (category !== "ALL" && p.category !== category) return false;
       if (stockFilter === "IN_STOCK" && !p.inStock) return false;
       if (stockFilter === "OUT_OF_STOCK" && p.inStock) return false;
+      if (statusFilter === "APPROVED" && p.whatsappStatus !== "APPROVED") return false;
+      if (statusFilter === "REVIEW" && p.whatsappStatus !== "PENDING" && p.whatsappStatus !== "OUTDATED") return false;
+      if (statusFilter === "REJECTED" && p.whatsappStatus !== "REJECTED") return false;
       if (search.trim()) {
         const q = search.toLowerCase();
         const matchName = p.name.toLowerCase().includes(q);
@@ -154,7 +159,7 @@ export function CatalogueManager({
       }
       return true;
     });
-  }, [products, category, stockFilter, search]);
+  }, [products, category, stockFilter, statusFilter, search]);
 
   // Live WhatsApp price list text preview
   const priceListText = useMemo(() => {
@@ -343,12 +348,67 @@ export function CatalogueManager({
           </div>
         </div>
         {categories.length > 2 && (
-          <div role="group" aria-label="Category" className="flex flex-wrap gap-1.5 border-t border-line pt-3">
-            {categories.map((c) => (
-              <button key={c} type="button" aria-pressed={category === c} onClick={() => setCategory(c)} className={chip(category === c)}>
-                {c === "ALL" ? "All categories" : c}
-              </button>
-            ))}
+          <div role="group" aria-label="Filters" className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {categories.map((c) => (
+                <button key={c} type="button" aria-pressed={category === c} onClick={() => setCategory(c)} className={chip(category === c)}>
+                  {c === "ALL" ? "All categories" : c}
+                </button>
+              ))}
+            </div>
+            {isLive && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-1 sm:pt-0">
+                <span className="text-xs text-muted">WhatsApp:</span>
+                <button
+                  type="button"
+                  aria-pressed={statusFilter === "ALL"}
+                  onClick={() => setStatusFilter("ALL")}
+                  className={chip(statusFilter === "ALL")}
+                >
+                  All ({products.length})
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={statusFilter === "APPROVED"}
+                  onClick={() => setStatusFilter("APPROVED")}
+                  className={cn(
+                    chip(statusFilter === "APPROVED"),
+                    statusFilter === "APPROVED" && "border-success-border bg-success-bg text-success",
+                  )}
+                >
+                  <span className="mr-1 inline-block size-1.5 rounded-full bg-emerald-500" />
+                  Live ({products.filter((p) => p.whatsappStatus === "APPROVED").length})
+                </button>
+                {products.some((p) => p.whatsappStatus === "PENDING" || p.whatsappStatus === "OUTDATED") && (
+                  <button
+                    type="button"
+                    aria-pressed={statusFilter === "REVIEW"}
+                    onClick={() => setStatusFilter("REVIEW")}
+                    className={cn(
+                      chip(statusFilter === "REVIEW"),
+                      statusFilter === "REVIEW" && "border-warning-border bg-warning-bg text-warning",
+                    )}
+                  >
+                    <span className="mr-1 inline-block size-1.5 rounded-full bg-amber-500" />
+                    Review ({products.filter((p) => p.whatsappStatus === "PENDING" || p.whatsappStatus === "OUTDATED").length})
+                  </button>
+                )}
+                {products.some((p) => p.whatsappStatus === "REJECTED") && (
+                  <button
+                    type="button"
+                    aria-pressed={statusFilter === "REJECTED"}
+                    onClick={() => setStatusFilter("REJECTED")}
+                    className={cn(
+                      chip(statusFilter === "REJECTED"),
+                      statusFilter === "REJECTED" && "border-danger-border bg-danger-bg text-danger",
+                    )}
+                  >
+                    <span className="mr-1 inline-block size-1.5 rounded-full bg-rose-500" />
+                    Rejected ({products.filter((p) => p.whatsappStatus === "REJECTED").length})
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </Card>
@@ -391,7 +451,19 @@ export function CatalogueManager({
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4">
           {filtered.map((item) => (
             <li key={item.id} className="card-3d relative flex flex-col overflow-hidden rounded-card border border-line bg-panel">
-              <span aria-hidden className={cn("absolute inset-x-0 top-0 h-[3px]", item.inStock ? "bg-brand" : "bg-warning-solid")} />
+              <span
+                aria-hidden
+                className={cn(
+                  "absolute inset-x-0 top-0 h-[3px]",
+                  item.whatsappStatus === "REJECTED"
+                    ? "bg-danger-solid"
+                    : item.whatsappStatus === "PENDING" || item.whatsappStatus === "OUTDATED"
+                    ? "bg-warning-solid"
+                    : item.inStock
+                    ? "bg-brand"
+                    : "bg-warning-solid",
+                )}
+              />
               <div className="flex gap-3 p-4">
                 <div className={cn("relative size-16 shrink-0 overflow-hidden rounded-control bg-subtle shadow-2xs ring-1 ring-line", !item.inStock && "opacity-60 grayscale")}>
                   {item.imageUrl ? (
@@ -408,15 +480,43 @@ export function CatalogueManager({
                   <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
                     <Badge tone="brand" className="text-2xs">{item.category || "General"}</Badge>
                     <span className="rounded bg-sunken px-1.5 py-0.5 font-mono text-2xs font-medium text-ink-2 ring-1 ring-line">{item.retailerId}</span>
+                    {item.whatsappStatus === "APPROVED" ? (
+                      <Badge tone="green" dot className="text-2xs font-medium">
+                        Live
+                      </Badge>
+                    ) : item.whatsappStatus === "REJECTED" ? (
+                      <Badge tone="red" dot className="text-2xs font-medium">
+                        Rejected
+                      </Badge>
+                    ) : item.whatsappStatus ? (
+                      <Badge tone="amber" dot className="text-2xs font-medium">
+                        In review
+                      </Badge>
+                    ) : null}
                   </div>
                 </div>
               </div>
               <p className="line-clamp-2 min-h-[2lh] px-4 text-xs leading-relaxed text-muted">{item.description}</p>
               <div className="mt-auto flex items-center justify-between gap-2 px-4 pb-3 pt-3">
                 <span className="tabular text-xl font-bold tracking-tight text-ink">₹{item.priceAmount.toLocaleString("en-IN")}</span>
-                <Badge tone={item.inStock ? "green" : "amber"} dot>
-                  {item.inStock ? "In stock" : "Out of stock"}
-                </Badge>
+                <div className="flex flex-wrap items-center justify-end gap-1.5">
+                  {item.whatsappStatus === "APPROVED" ? (
+                    <Badge tone="green" dot className="text-xs">
+                      Live on WhatsApp
+                    </Badge>
+                  ) : item.whatsappStatus === "REJECTED" ? (
+                    <Badge tone="red" dot className="text-xs">
+                      Meta Rejected
+                    </Badge>
+                  ) : item.whatsappStatus ? (
+                    <Badge tone="amber" dot className="text-xs">
+                      Meta Reviewing
+                    </Badge>
+                  ) : null}
+                  <Badge tone={item.inStock ? "green" : "amber"} dot>
+                    {item.inStock ? "In stock" : "Out of stock"}
+                  </Badge>
+                </div>
               </div>
               <div className="flex gap-2 border-t border-line bg-subtle/50 p-3">
                 <Button variant="secondary" size="sm" onClick={() => handleToggleStock(item)} loading={togglingId === item.id} disabled={togglingId !== null} className="flex-1">
@@ -457,6 +557,24 @@ export function CatalogueManager({
       >
         {editing && (
           <form id="edit-product" onSubmit={handleSaveEdit} className="space-y-4">
+            {isLive && editing.whatsappStatus && (
+              <div className="flex items-center justify-between rounded-control border border-line bg-subtle p-3 text-xs">
+                <span className="font-medium text-ink">Meta WhatsApp Review:</span>
+                {editing.whatsappStatus === "APPROVED" ? (
+                  <Badge tone="green" dot>
+                    Approved & Live on WhatsApp
+                  </Badge>
+                ) : editing.whatsappStatus === "REJECTED" ? (
+                  <Badge tone="red" dot>
+                    Rejected by Meta Policy
+                  </Badge>
+                ) : (
+                  <Badge tone="amber" dot>
+                    Under Review by Meta
+                  </Badge>
+                )}
+              </div>
+            )}
             <PhotoField value={editImageUrl} onChange={setEditImageUrl} removable={!isLive} />
 
             <Field id="productName" label="Product name" required>
