@@ -265,6 +265,13 @@ export async function sendTestMessage(id: string, rawPhone: string): Promise<Act
   const ready = await readiness(settings, cfg);
   if (!ready.ok) return { ok: false, message: ready.reason };
 
+  if (number?.displayPhone && normalizePhone(number.displayPhone) === phone) {
+    return {
+      ok: false,
+      message: `Meta doesn't allow sending a message to the sending number itself (${number.displayPhone}). Please enter another phone number to test.`,
+    };
+  }
+
   const customer =
     (await db.customer.findUnique({ where: { clientId_phone: { clientId: t.clientId, phone } } })) ??
     (await db.customer.create({ data: { clientId: t.clientId, phone, name: "Test recipient", tags: ["test"] } }));

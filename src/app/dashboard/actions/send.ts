@@ -11,6 +11,7 @@ import { senderFor } from "@/lib/senders";
 import { getScope, owned, requireManager } from "@/lib/session";
 import { sendImage, sendText, WahaError } from "@/lib/waha";
 import { sendMediaMessage, sendTextMessage } from "@/lib/whatsapp";
+import { normalizePhone } from "@/lib/phone";
 import { explainSendError, type SendResult } from "./send-helpers";
 
 const WINDOW_MS = 24 * 3_600_000;
@@ -45,6 +46,10 @@ export async function sendToCustomer(
     return { ok: false, message: "That template belongs to a different WhatsApp account. Pick a number from the same account." };
   const ready = await readiness(settings, cfg);
   if (!ready.ok) return { ok: false, message: ready.reason ?? "The WhatsApp connection is not ready." };
+
+  if (number?.displayPhone && normalizePhone(number.displayPhone) === customer.phone) {
+    return { ok: false, message: `Meta doesn't allow sending a message to the sending number itself (${number.displayPhone}). Please choose another recipient.` };
+  }
 
   if (settings.provider === "META" && number && cfg.live) {
     if (number.qualityRating === "RED") return { ok: false, message: "This number's quality rating is red, so sending is paused to protect it." };
