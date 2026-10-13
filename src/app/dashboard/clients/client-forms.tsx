@@ -61,6 +61,7 @@ function useSubmit() {
 export function NewClientForm() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
+  const [city, setCity] = useState("");
   const [presetId, setPresetId] = useState<string>("full");
   const { pending, submit } = useSubmit();
   const selectedPreset = CLIENT_PLAN_PRESETS.find((p) => p.id === presetId) ?? CLIENT_PLAN_PRESETS[0];
@@ -75,9 +76,10 @@ export function NewClientForm() {
           onSubmit={(e) => {
             e.preventDefault();
             submit(
-              () => createClient(name, selectedPreset.disabledSections),
+              () => createClient(name, selectedPreset.disabledSections, city),
               () => {
                 setName("");
+                setCity("");
                 setPresetId("full");
                 setOpen(false);
               },
@@ -86,6 +88,9 @@ export function NewClientForm() {
         >
           <Field id="client-name" label="Business name" required help="Next, add their login and WhatsApp details on this page, then pick them in the sidebar to import customers.">
             <input className="field" autoCapitalize="words" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Fresh Mart" />
+          </Field>
+          <Field id="client-city" label="Home city" required help="Where they deliver from. Customers are grouped as in this city, outside it, or not sure.">
+            <input className="field" autoCapitalize="words" autoComplete="off" value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Chennai" />
           </Field>
           <fieldset className="space-y-2">
             <legend className="text-sm font-medium text-ink-2">Portal plan & sections</legend>
@@ -375,9 +380,11 @@ Leave empty to follow Meta's limit.`,
 const BRAND_FIELDS: { key: keyof BrandingInput; label: string; hint?: string; placeholder: string }[] = [
   { key: "logoUrl", label: "Logo", hint: "square image", placeholder: "/brands/acme/mark.png or https://…" },
   { key: "bannerUrl", label: "Welcome banner", hint: "wide, about 1200×628", placeholder: "/brands/acme/banner.jpg or https://…" },
-  { key: "tagline", label: "Tagline", hint: "under the name", placeholder: "Cold pressed oils since 2018" },
+  { key: "defaultImageUrl", label: "Message picture", hint: "JPG or PNG, about 1200×628; order updates and picture templates", placeholder: "/brands/acme/order.jpg or https://…" },
+  { key: "tagline", label: "Tagline", hint: "under the name", placeholder: "Fresh groceries, delivered daily" },
   { key: "website", label: "Website", placeholder: "https://example.com" },
-  { key: "supportPhone", label: "Contact number", placeholder: "+91 89253 90439" },
+  { key: "supportPhone", label: "Contact number", placeholder: "+91 98765 43210" },
+  { key: "homeCity", label: "Home city", hint: "for delivery regions; blank means Madurai", placeholder: "e.g. Chennai" },
 ];
 
 export function BrandingForm({ clientId, name, initial }: { clientId: string; name: string; initial: BrandingInput }) {
@@ -417,7 +424,7 @@ export function BrandingForm({ clientId, name, initial }: { clientId: string; na
               <input
                 className="field"
                 type={f.key === "supportPhone" ? "tel" : "text"}
-                inputMode={f.key === "supportPhone" ? "tel" : f.key === "website" || f.key === "logoUrl" || f.key === "bannerUrl" ? "url" : undefined}
+                inputMode={f.key === "supportPhone" ? "tel" : f.key === "website" || f.key === "logoUrl" || f.key === "bannerUrl" || f.key === "defaultImageUrl" ? "url" : undefined}
                 value={v[f.key]}
                 onChange={(e) => setV({ ...v, [f.key]: e.target.value })}
                 placeholder={f.placeholder}

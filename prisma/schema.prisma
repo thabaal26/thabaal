@@ -42,8 +42,10 @@ model Client {
   brandAccent         String?
   logoUrl             String?
   bannerUrl           String?
-  /// Image used by image-header templates that have none of their own.
+  /// Image used by image-header templates that have none of their own, including the picture order updates.
   defaultImageUrl     String?
+  /// City the business delivers from; customer regions are "<city> city" / "Outside <city>". Null means Madurai (clients set up before this).
+  homeCity            String?
   tagline             String?
   website             String?
   supportPhone        String?

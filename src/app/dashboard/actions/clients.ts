@@ -27,14 +27,20 @@ export async function setActiveClient(clientId: string): Promise<ActionResult> {
   return { ok: true };
 }
 
-export async function createClient(name: string, disabledSections?: string[]): Promise<ActionResult> {
+/** A city name: letters, spaces, dots, apostrophes and hyphens (e.g. "Chennai", "Tiruchirappalli"). */
+const CITY = /^[\p{L}][\p{L} .'-]{1,39}$/u;
+
+export async function createClient(name: string, disabledSections?: string[], homeCity?: string): Promise<ActionResult> {
   const s = await requireAdmin();
   if ("denied" in s) return { ok: false, message: s.denied };
   const clean = name.trim();
   if (!clean) return { ok: false, message: "Enter the client's business name." };
+  const city = homeCity?.trim().replace(/\s+/g, " ") ?? "";
+  if (!city) return { ok: false, message: "Enter the city they deliver from, e.g. Chennai." };
+  if (!CITY.test(city)) return { ok: false, message: "Enter just the city name, e.g. Chennai." };
   if (await db.client.findUnique({ where: { name: clean } })) return { ok: false, message: `${clean} already exists.` };
   const sanitized = sanitizeDisabledSections(disabledSections);
-  const c = await db.client.create({ data: { name: clean, disabledSections: sanitized } });
+  const c = await db.client.create({ data: { name: clean, disabledSections: sanitized, homeCity: city } });
   refresh();
   return { ok: true, id: c.id, message: `${clean} added.` };
 }
@@ -255,6 +261,10 @@ export type BrandingInput = {
   tagline: string;
   website: string;
   supportPhone: string;
+  /** Picture for order updates and picture templates that have none of their own (public JPG or PNG). */
+  defaultImageUrl: string;
+  /** City they deliver from; blank keeps Madurai for clients set up before cities could be chosen. */
+  homeCity: string;
 };
 
 /** Looks the client's login sees. Blank fields fall back to the default portal look. */
@@ -264,7 +274,10 @@ export async function saveClientBranding(clientId: string, input: BrandingInput)
   const v = Object.fromEntries(Object.entries(input).map(([k, x]) => [k, x.trim() || null])) as Record<keyof BrandingInput, string | null>;
   const errors: string[] = [];
   for (const k of ["brandPrimary", "brandAccent"] as const) if (v[k] && !HEX.test(v[k]!)) errors.push("Colours must look like #f5c400.");
-  for (const k of ["logoUrl", "bannerUrl"] as const) if (v[k] && !/^(https:\/\/|\/)\S+$/.test(v[k]!)) errors.push("Images need a full https:// link or a path starting with /.");
+  for (const k of ["logoUrl", "bannerUrl", "defaultImageUrl"] as const) if (v[k] && !/^(https:\/\/|\/)\S+$/.test(v[k]!)) errors.push("Images need a full https:// link or a path starting with /.");
+  if (v.defaultImageUrl && !/\.(jpe?g|png)(\?\S*)?$/i.test(v.defaultImageUrl)) errors.push("The message picture must be a JPG or PNG; WhatsApp accepts only those.");
+  if (v.homeCity) v.homeCity = v.homeCity.replace(/\s+/g, " ");
+  if (v.homeCity && !CITY.test(v.homeCity)) errors.push("Home city: enter just the city name, e.g. Chennai.");
   if (v.website && !/^https?:\/\/\S+\.\S+/.test(v.website)) errors.push("Website should start with https://");
   if (v.tagline && v.tagline.length > 80) errors.push("Keep the tagline under 80 characters.");
   if (errors.length) return { ok: false, errors: [...new Set(errors)] };

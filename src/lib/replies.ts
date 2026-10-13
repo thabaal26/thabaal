@@ -84,7 +84,7 @@ export async function recordReply(r: IncomingReply) {
   // and sync to the customer profile (if missing) and any active open order without an address.
   if (r.kind === "text" || (r.kind === "media" && /^Location:/i.test(r.text))) {
     try {
-      const parsed = parseAddressText(r.text);
+      let parsed = parseAddressText(r.text);
       const currentCust = await db.customer.findUnique({
         where: { id: customer.id },
         select: {
@@ -92,6 +92,7 @@ export async function recordReply(r: IncomingReply) {
           location: true,
           locationRaw: true,
           region: true,
+          client: { select: { homeCity: true } },
           orders: {
             where: { status: { in: ["NEW", "CONFIRMED", "PAID"] } },
             orderBy: { createdAt: "desc" },
@@ -101,6 +102,8 @@ export async function recordReply(r: IncomingReply) {
         },
       });
       if (currentCust) {
+        // Regions are relative to the client's home city; Madurai clients (no city set) keep the first read.
+        if (currentCust.client.homeCity) parsed = parseAddressText(r.text, currentCust.client.homeCity);
         const activeOrder = currentCust.orders[0];
         const hasOpenOrderWithoutNote = Boolean(activeOrder && !activeOrder.note?.trim());
         const shouldUseAsAddress =

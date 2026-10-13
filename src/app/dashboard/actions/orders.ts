@@ -12,12 +12,19 @@ import { getSettings, wahaConfig } from "@/lib/provider";
 import { replyWindowEnd } from "@/lib/replies";
 import { headerImageFor } from "@/lib/media";
 import { normalizePhone } from "@/lib/phone";
+import { isTemplatePicture, orderTemplateNames, picturePrefixFor } from "@/lib/order-templates";
 import { senderFor } from "@/lib/senders";
 import { requireManager, requireOrderAccess } from "@/lib/session";
 import { sendText } from "@/lib/waha";
 import { sendTemplateMessage, sendTextMessage } from "@/lib/whatsapp";
 import { explainSendError, type SendResult } from "./send-helpers";
 import { saveTemplate } from "./templates";
+
+/** The client's home city as set (null = Madurai), for reading regions out of addresses. */
+async function homeCityFor(clientId: string | null | undefined) {
+  if (!clientId) return null;
+  return (await db.client.findUnique({ where: { id: clientId }, select: { homeCity: true } }))?.homeCity ?? null;
+}
 
 const STATUSES: OrderStatus[] = ["NEW", "CONFIRMED", "PAID", "DISPATCHED", "DELIVERED", "CANCELLED"];
 
@@ -42,7 +49,7 @@ async function tellCancelled(order: Parameters<typeof updateOrderCard>[0] & { cu
   if (replyWindowEnd(last?.receivedAt)) {
     res = await sendTextMessage(cfg, order.customer.phone, text);
   } else {
-    const options = await db.template.findMany({ where: { clientId: order.customer.clientId, name: { in: [CANCEL_TEMPLATE, `thenan_${CANCEL_TEMPLATE}`] }, status: "APPROVED" } });
+    const options = await db.template.findMany({ where: { clientId: order.customer.clientId, name: { in: orderTemplateNames(CANCEL_TEMPLATE) }, status: "APPROVED" } });
     const t = options.find((x) => x.headerType === "IMAGE") ?? options.find((x) => x.headerType === "NONE") ?? null;
     if (!t) return false;
     res = await sendTemplateMessage(cfg, {
@@ -95,9 +102,9 @@ export async function saveOrderNote(id: string, note: string): Promise<SendResul
 }
 
 const TEMPLATE_NAMES = {
-  confirm: ["order_confirmation", "thenan_order_confirmation"],
-  dispatch: ["order_dispatched", "thenan_order_dispatched"],
-  deliver: ["order_delivered", "thenan_order_delivered"],
+  confirm: orderTemplateNames("order_confirmation"),
+  dispatch: orderTemplateNames("order_dispatched"),
+  deliver: orderTemplateNames("order_delivered"),
 };
 
 /** Who is bringing the order and how to follow it; all optional. */
@@ -269,7 +276,7 @@ export type ChatAddressCandidate = {
   text: string;
   fullAddress: string;
   area: string | null;
-  region: "Madurai city" | "Outside Madurai" | "Not sure";
+  region: string;
   pincode: string | null;
   receivedAt: string;
 };
@@ -325,7 +332,7 @@ export async function lookupOrderCustomer(rawPhone: string): Promise<
       .filter((o) => o.note?.trim())
       .map((o) => ({ text: o.note!, receivedAt: o.createdAt })),
   ];
-  const detected = findAddressesInReplies(combinedMessages).slice(0, 4).map((c) => ({
+  const detected = findAddressesInReplies(combinedMessages, await homeCityFor(s.clientId)).slice(0, 4).map((c) => ({
     text: c.text,
     fullAddress: c.fullAddress,
     area: c.area,
@@ -364,6 +371,7 @@ export async function getCustomerAddressSuggestions(customerId: string): Promise
   const cust = await db.customer.findFirst({
     where: { id: customerId, ...(s.clientId ? { clientId: s.clientId } : {}) },
     select: {
+      clientId: true,
       location: true,
       locationRaw: true,
       region: true,
@@ -390,7 +398,7 @@ export async function getCustomerAddressSuggestions(customerId: string): Promise
       .filter((o) => o.note?.trim())
       .map((o) => ({ text: o.note!, receivedAt: o.createdAt })),
   ];
-  const chatAddresses = findAddressesInReplies(combined)
+  const chatAddresses = findAddressesInReplies(combined, await homeCityFor(cust.clientId))
     .slice(0, 5)
     .map((c) => ({
       text: c.text,
@@ -445,7 +453,7 @@ export async function saveOrderAddress(
   if (!order) return { ok: false, message: "Order not found." };
 
   const cleanAddr = input.address.trim().slice(0, 500);
-  const parsed = parseAddressText(cleanAddr);
+  const parsed = parseAddressText(cleanAddr, await homeCityFor(order.clientId));
   const resolvedArea =
     input.area?.trim().slice(0, 120) ||
     parsed.area ||
@@ -539,7 +547,7 @@ export async function createOrder(input: {
 
   // Parse delivery address and area
   const rawAddr = (input.address?.trim() || input.note?.trim() || "").slice(0, 500);
-  const parsedAddr = parseAddressText(rawAddr);
+  const parsedAddr = parseAddressText(rawAddr, await homeCityFor(s.clientId));
   const resolvedArea = input.area?.trim().slice(0, 120) || parsedAddr.area || null;
   const resolvedRegion = parsedAddr.region !== "Not sure" ? parsedAddr.region : null;
   const combinedOrderNote = [input.address?.trim(), input.note?.trim()]
@@ -662,6 +670,7 @@ export async function updateOrderItems(
     where: { id, ...(s.clientId ? { clientId: s.clientId } : {}) },
     select: {
       id: true,
+      clientId: true,
       number: true,
       catalogId: true,
       total: true,
@@ -710,7 +719,7 @@ export async function updateOrderItems(
   // Also sync address to customer profile if note/area was provided
   if (input.note !== undefined || input.area !== undefined) {
     const cleanNote = input.note?.trim() || "";
-    const parsed = parseAddressText(cleanNote);
+    const parsed = parseAddressText(cleanNote, await homeCityFor(order.clientId));
     const resolvedArea = input.area?.trim() || parsed.area || null;
     const customerHasNoAddress = !order.customer.location?.trim() && !order.customer.locationRaw?.trim();
     const shouldSync =
@@ -773,8 +782,11 @@ export async function createOrderTemplates(imageUrl?: string): Promise<SendResul
   if ("denied" in s) return { ok: false, message: s.denied };
   // The picture versions get their own names, so the plain ones keep working while Meta reviews them.
   const image = imageUrl?.trim();
-  if (image && !/^https:\/\/\S+\.(jpe?g|png)(\?\S*)?$/i.test(image)) return { ok: false, message: "Use a public https link to a JPG or PNG image." };
-  const named = ORDER_TEMPLATES.map((t) => ({ ...t, name: image ? `thenan_${t.name}` : t.name }));
+  if (image && !isTemplatePicture(image)) return { ok: false, message: "Use a public https link to a JPG or PNG image." };
+  // New clients' picture versions are pic_…; a client that already has thenan_… ones keeps that name.
+  const own = await db.template.findMany({ where: { clientId: s.clientId }, select: { name: true } });
+  const prefix = picturePrefixFor(own.map((t) => t.name));
+  const named = ORDER_TEMPLATES.map((t) => ({ ...t, name: image ? `${prefix}${t.name}` : t.name }));
   const existing = await db.template.findMany({ where: { clientId: s.clientId, name: { in: named.map((t) => t.name) } }, select: { name: true } });
   const missing = named.filter((t) => !existing.some((e) => e.name === t.name));
   if (!missing.length) return { ok: true, message: `All ${image ? "picture " : ""}order templates already exist.` };

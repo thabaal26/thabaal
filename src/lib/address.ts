@@ -1,10 +1,12 @@
+import { regionInCity, usesMaduraiRules } from "./regions";
+
 export type ParsedAddress = {
   /** Cleaned full street/delivery address. */
   fullAddress: string;
   /** Detected locality / area name (e.g. "Anna Nagar", "KK Nagar", "Sellur", "Chennai"). */
   area: string | null;
-  /** Region bucket used by Customer filters ("Madurai city" | "Outside Madurai" | "Not sure"). */
-  region: "Madurai city" | "Outside Madurai" | "Not sure";
+  /** Region bucket used by Customer filters, relative to the client's home city ("Madurai city" | "Outside Madurai" | "Not sure"). */
+  region: string;
   /** 6-digit Indian pincode if present. */
   pincode: string | null;
   /** Whether this text looks like a real delivery address rather than a casual chat message. */
@@ -149,7 +151,7 @@ const NON_ADDRESS_PATTERNS = [
  * - pincode (6 digits if present)
  * - isLikelyAddress & confidence score
  */
-export function parseAddressText(rawText: string): ParsedAddress {
+export function parseAddressText(rawText: string, homeCity?: string | null): ParsedAddress {
   const raw = rawText.trim();
   if (!raw) {
     return { fullAddress: "", area: null, region: "Not sure", pincode: null, isLikelyAddress: false, confidence: 0 };
@@ -178,7 +180,7 @@ export function parseAddressText(rawText: string): ParsedAddress {
 
   // Match known Madurai city localities first
   let area: string | null = null;
-  let region: ParsedAddress["region"] = "Not sure";
+  let region = "Not sure";
 
   for (const loc of MADURAI_AREAS) {
     if (loc.pattern.test(cleaned)) {
@@ -263,6 +265,9 @@ export function parseAddressText(rawText: string): ParsedAddress {
     Boolean(pincode && cleaned.length >= 12) ||
     Boolean(area && keywordHits >= 1 && cleaned.length >= 12);
 
+  // Clients outside Madurai: the Madurai locality and pincode rules don't apply, so use the simple city rule.
+  if (!usesMaduraiRules(homeCity)) region = regionInCity(cleaned, homeCity!.trim());
+
   return {
     fullAddress: cleaned,
     area,
@@ -279,11 +284,12 @@ export function parseAddressText(rawText: string): ParsedAddress {
  */
 export function findAddressesInReplies(
   replies: { id?: string; text: string; receivedAt: Date }[],
+  homeCity?: string | null,
 ): {
   text: string;
   fullAddress: string;
   area: string | null;
-  region: "Madurai city" | "Outside Madurai" | "Not sure";
+  region: string;
   pincode: string | null;
   confidence: number;
   receivedAt: Date;
@@ -293,14 +299,14 @@ export function findAddressesInReplies(
     text: string;
     fullAddress: string;
     area: string | null;
-    region: "Madurai city" | "Outside Madurai" | "Not sure";
+    region: string;
     pincode: string | null;
     confidence: number;
     receivedAt: Date;
   }[] = [];
 
   for (const r of replies) {
-    const parsed = parseAddressText(r.text);
+    const parsed = parseAddressText(r.text, homeCity);
     if (!parsed.isLikelyAddress) continue;
     const key = parsed.fullAddress.toLowerCase().replace(/[^a-z0-9]/g, "");
     if (!key || seen.has(key)) continue;

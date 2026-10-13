@@ -13,6 +13,7 @@ import { itemsText, money, type OrderItem } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { replyWindowEnd } from "@/lib/replies";
 import { marketingPaused } from "@/lib/held";
+import { homeCityOf, regionsFor } from "@/lib/regions";
 import { getScope, owned } from "@/lib/session";
 import { sendableTemplates } from "@/lib/senders";
 import { META_SAMPLES } from "@/lib/template";
@@ -35,7 +36,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
   const c = await db.customer.findFirst({
     where: { id, ...owned(scope) },
     include: {
-      client: { select: { name: true } },
+      client: { select: { name: true, homeCity: true } },
       messages: { include: { run: { select: { campaign: { select: { name: true } } } }, sender: { select: { label: true } } }, orderBy: { createdAt: "desc" }, take: 100 },
       replies: { include: { sender: { select: { label: true } } }, orderBy: { receivedAt: "desc" }, take: 100 },
       orders: { orderBy: { createdAt: "desc" }, take: 100 },
@@ -189,9 +190,10 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                     tags: productTags.join(", "),
                     location: c.location ?? "",
                     locationRaw: c.locationRaw ?? "",
-                    region: c.region ?? "Madurai city",
+                    region: c.region ?? regionsFor(homeCityOf(c.client))[0],
                     purchases: c.purchases ?? "",
                   }}
+                  regions={regionsFor(homeCityOf(c.client))}
                 />
               )
             }

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { normalizePhone } from "@/lib/phone";
+import { defaultRegion, homeCityOf, regionsFor } from "@/lib/regions";
 import { owned, requireManager } from "@/lib/session";
 import type { ActionResult } from "./templates";
 
@@ -19,7 +20,12 @@ export type CustomerInput = {
   purchases?: string;
 };
 
-const VALID_REGIONS = ["Madurai city", "Outside Madurai", "Not sure"] as const;
+/** The region to save: one of the client's three, or the default when an area was typed without one. */
+async function regionToSave(clientId: string, picked: string | undefined, location: string | null | undefined) {
+  const city = homeCityOf(await db.client.findUnique({ where: { id: clientId }, select: { homeCity: true } }));
+  if (picked && regionsFor(city).includes(picked)) return picked;
+  return location ? defaultRegion(city) : null;
+}
 
 export async function saveCustomer(id: string | null, input: CustomerInput): Promise<ActionResult> {
   const s = id ? await requireManager() : await requireManager(true);
@@ -36,14 +42,7 @@ export async function saveCustomer(id: string | null, input: CustomerInput): Pro
 
   const location = input.location !== undefined ? (input.location.trim() || null) : undefined;
   const locationRaw = input.locationRaw !== undefined ? (input.locationRaw.trim() || null) : undefined;
-  const region =
-    input.region !== undefined
-      ? VALID_REGIONS.includes(input.region as (typeof VALID_REGIONS)[number])
-        ? input.region
-        : location
-          ? "Madurai city"
-          : null
-      : undefined;
+  const region = input.region !== undefined ? await regionToSave(clientId, input.region, location) : undefined;
   const purchases = input.purchases !== undefined ? (input.purchases.trim() || null) : undefined;
 
   const existingLoyaltyTags = (existing?.tags ?? []).filter((t) => t.trim().toLowerCase().startsWith("loyalty-bonus:"));
@@ -85,12 +84,7 @@ export async function promotePendingCustomer(
   if (!phone) return { ok: false, message: "Enter a valid 10-digit mobile number (or number with country code)." };
 
   const location = input.location?.trim() || row.location || null;
-  const region =
-    input.region && VALID_REGIONS.includes(input.region as (typeof VALID_REGIONS)[number])
-      ? input.region
-      : location
-        ? "Madurai city"
-        : null;
+  const region = await regionToSave(row.clientId, input.region, location);
   const purchases = input.purchases?.trim() || row.items || null;
   const optInSource = input.optInSource?.trim() || "Bought from us and gave their number";
 

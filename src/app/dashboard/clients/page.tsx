@@ -240,6 +240,8 @@ export default async function ClientsPage() {
                         tagline: c.tagline ?? "",
                         website: c.website ?? "",
                         supportPhone: c.supportPhone ?? "",
+                        defaultImageUrl: c.defaultImageUrl ?? "",
+                        homeCity: c.homeCity ?? "",
                       }}
                     />
                   </section>

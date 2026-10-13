@@ -27,9 +27,12 @@ export function CustomerActions({
   hasClient = true,
   exportHref = null,
   exportCount = 0,
+  regions,
 }: {
   canManage: boolean;
   hasClient?: boolean;
+  /** The client's delivery regions, home city first. */
+  regions: string[];
   /** CSV download of the customers currently listed (managers and admins only). */
   exportHref?: string | null;
   exportCount?: number;
@@ -95,14 +98,13 @@ export function CustomerActions({
         </ul>
       </Sheet>
       <Sheet open={open === "add" || open === "import"} onClose={() => setOpen(null)} title={open === "add" ? "Add customer" : "Import customers"}>
-        {open === "add" ? <CustomerForm id={null} done={() => setOpen(null)} /> : <ImportForm done={() => setOpen(null)} />}
+        {open === "add" ? <CustomerForm id={null} regions={regions} done={() => setOpen(null)} /> : <ImportForm done={() => setOpen(null)} />}
       </Sheet>
     </>
   );
 }
 
 const CONSENT = ["Bought from us and gave their number", "Signed up at the shop or stall", "Messaged us on WhatsApp first", "Website or online form", "Asked to join over the phone"];
-const REGIONS = ["Madurai city", "Outside Madurai", "Not sure"] as const;
 
 /** Meta requires customers to have agreed to WhatsApp messages; this records how. */
 function ConsentField({ id, value, onChange }: { id: string; value: string; onChange: (v: string) => void }) {
@@ -131,10 +133,13 @@ export type EditableCustomer = {
 function CustomerForm({
   id,
   initial,
+  regions,
   done,
 }: {
   id: string | null;
   initial?: Omit<EditableCustomer, "id">;
+  /** The client's regions, home city first ("Madurai city", "Outside Madurai", "Not sure"). */
+  regions: string[];
   done: () => void;
 }) {
   const [v, setV] = useState({
@@ -143,7 +148,7 @@ function CustomerForm({
     tags: initial?.tags ?? "",
     location: initial?.location ?? "",
     locationRaw: initial?.locationRaw ?? "",
-    region: initial?.region || "Madurai city",
+    region: initial?.region || regions[0],
     purchases: initial?.purchases ?? "",
     optInSource: CONSENT[0],
   });
@@ -176,7 +181,7 @@ function CustomerForm({
         </Field>
         <Field id="reg" label="Delivery region">
           <select className="field" value={v.region} onChange={(e) => setV({ ...v, region: e.target.value })}>
-            {REGIONS.map((r) => (
+            {(initial?.region && !regions.includes(initial.region) ? [...regions, initial.region] : regions).map((r) => (
               <option key={r} value={r}>
                 {r}
               </option>
@@ -191,7 +196,7 @@ function CustomerForm({
         <input className="field" placeholder="Basmati rice (5kg), Coffee powder (500g)" value={v.purchases} onChange={(e) => setV({ ...v, purchases: e.target.value })} />
       </Field>
       <Field id="t" label="Tags" hint="comma separated, optional">
-        <input className="field" placeholder="vip, coconut-oil" value={v.tags} onChange={(e) => setV({ ...v, tags: e.target.value })} />
+        <input className="field" placeholder="vip, wholesale" value={v.tags} onChange={(e) => setV({ ...v, tags: e.target.value })} />
       </Field>
       {!id && (
         <>
@@ -207,7 +212,7 @@ function CustomerForm({
 }
 
 /** Button + sheet to edit an existing customer's profile, address, region, purchases and tags. */
-export function EditCustomerButton({ customer }: { customer: EditableCustomer }) {
+export function EditCustomerButton({ customer, regions }: { customer: EditableCustomer; regions: string[] }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -215,7 +220,7 @@ export function EditCustomerButton({ customer }: { customer: EditableCustomer })
         <Pencil aria-hidden className="size-3.5" /> Edit details
       </Button>
       <Sheet open={open} onClose={() => setOpen(false)} title={`Edit ${customer.name}`}>
-        <CustomerForm id={customer.id} initial={customer} done={() => setOpen(false)} />
+        <CustomerForm id={customer.id} initial={customer} regions={regions} done={() => setOpen(false)} />
       </Sheet>
     </>
   );

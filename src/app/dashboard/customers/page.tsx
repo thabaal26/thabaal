@@ -15,6 +15,7 @@ import { ActiveFilters, FilterBar } from "@/components/filter-bar";
 import { activeCount as filterCount, filterQuery, keepFilters, readFilters, resolvePeriod, type FilterSection } from "@/lib/filters";
 import { ACTIVITY, customerSegmentIds, filterOptions, STAGES } from "@/lib/filter-scope";
 import { computeCustomerLoyalty, isInternalLoyaltyTag } from "@/lib/loyalty";
+import { homeCityOf, regionsFor } from "@/lib/regions";
 import { getScope, owned } from "@/lib/session";
 import { deleteCustomer, setOptOut } from "../actions/customers";
 import { CustomerActions, CustomerMenu, PendingCustomersBanner } from "./customer-tools";
@@ -27,7 +28,7 @@ const CUSTOMER_FILTERS: FilterSection[] = ["period", "products"];
 
 export default async function CustomersPage({ searchParams }: PageProps<"/dashboard/customers">) {
   const sp = await searchParams;
-  // Area filter: "region:Madurai city", "loc:Sellur" or "none" (no location noted).
+  // Area filter: "region:Madurai city", "loc:Anna Nagar" or "none" (no location noted).
   const { q, tag, area } = customerFilters(sp);
   const page = Math.max(1, Number(sp.page) || 1);
   const scope = await getScope();
@@ -47,7 +48,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
   const listQs = filterQuery(filters, baseExtra, "all");
   const exportHref = `/api/customers/export${listQs ? `?${listQs}` : ""}`;
   // First round: who the filters cover, the filter choices, and the figures that don't depend on them.
-  const [segment, baseWhere, filterOpts, [tags, areas, totalAll, optedOutCount, pendingRows]] = await Promise.all([
+  const [segment, baseWhere, filterOpts, [tags, areas, homeClient, totalAll, optedOutCount, pendingRows]] = await Promise.all([
     scope.clientId
       ? customerSegmentIds(scope.clientId, filters, { stage, act, ...(filters.range !== "all" && { start: period.start, end: period.end }) })
       : null,
@@ -58,6 +59,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
         SELECT unnest(tags) AS tag, count(*) AS n FROM "Customer"
         WHERE ${scope.clientId}::text IS NULL OR "clientId" = ${scope.clientId} GROUP BY 1 ORDER BY 2 DESC, 1`,
       db.customer.groupBy({ by: ["region", "location"], where: owned(scope), _count: true }),
+      scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { homeCity: true } }) : null,
       db.customer.count({ where: owned(scope) }),
       db.customer.count({ where: { ...owned(scope), OR: [{ optedOut: true }, { unreachable: true }] } }),
       scope.canManage
@@ -90,10 +92,13 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
   const regionCount = (r: string | null) => areas.filter((a) => a.region === r).reduce((n, a) => n + a._count, 0);
   const noLocation = areas.filter((a) => !a.location).reduce((n, a) => n + a._count, 0);
   const reachableAll = Math.max(0, totalAll - optedOutCount);
-  const maduraiCount = regionCount("Madurai city");
+  // Regions are relative to the client's home city; any other saved region names still get a choice.
+  const regions = regionsFor(homeCityOf(homeClient));
+  const regionChoices = [...regions, ...new Set(areas.map((a) => a.region).filter((r): r is string => !!r && !regions.includes(r)))];
+  const homeCount = regionCount(regions[0]);
   const areaOptions = [
     { value: "", label: "All areas" },
-    ...["Madurai city", "Outside Madurai", "Not sure"].filter((r) => regionCount(r)).map((r) => ({ value: `region:${r}`, label: r, hint: `${fmtNumber(regionCount(r))} customers` })),
+    ...regionChoices.filter((r) => regionCount(r)).map((r) => ({ value: `region:${r}`, label: r, hint: `${fmtNumber(regionCount(r))} customers` })),
     ...(noLocation ? [{ value: "none", label: "No location noted", hint: `${fmtNumber(noLocation)} customers` }] : []),
     ...areas
       .filter((a) => a.location)
@@ -163,7 +168,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
         }
         description="Customers who reply STOP are opted out automatically."
         inlineActions
-        actions={scope.clientId || scope.isAdmin ? <CustomerActions canManage={scope.canManage} hasClient={!!scope.clientId} exportHref={scope.canManage && total > 0 ? exportHref : null} exportCount={total} /> : undefined}
+        actions={scope.clientId || scope.isAdmin ? <CustomerActions canManage={scope.canManage} hasClient={!!scope.clientId} regions={regions} exportHref={scope.canManage && total > 0 ? exportHref : null} exportCount={total} /> : undefined}
       />
 
       {scope.canManage && pendingRows.length > 0 && <PendingCustomersBanner rows={pendingRows} />}
@@ -185,8 +190,8 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
           meter={pct(reachableAll, totalAll)}
         />
         <Stat
-          label="Madurai city"
-          value={fmtNumber(maduraiCount)}
+          label={regions[0]}
+          value={fmtNumber(homeCount)}
           sub={noLocation > 0 ? `${fmtNumber(noLocation)} without area` : "Local delivery zone"}
           icon={<MapPin className="size-4" />}
           tone="violet"

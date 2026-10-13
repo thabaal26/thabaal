@@ -65,12 +65,13 @@ export async function recordOrder(customer: { id: string; clientId: string }, wa
         location: true,
         locationRaw: true,
         region: true,
+        client: { select: { homeCity: true } },
         replies: { orderBy: { receivedAt: "desc" }, take: 15, select: { text: true, receivedAt: true } },
       },
     });
     if (cust) {
       if (orderNote) {
-        const parsed = parseAddressText(orderNote);
+        const parsed = parseAddressText(orderNote, cust.client.homeCity);
         if ((parsed.isLikelyAddress || parsed.area) && !cust.locationRaw?.trim()) {
           await db.customer.update({
             where: { id: customer.id },
@@ -86,7 +87,7 @@ export async function recordOrder(customer: { id: string; clientId: string }, wa
         if (savedAddr) {
           orderNote = savedAddr;
         } else {
-          const fromChat = findAddressesInReplies(cust.replies)[0];
+          const fromChat = findAddressesInReplies(cust.replies, cust.client.homeCity)[0];
           if (fromChat) {
             orderNote = fromChat.fullAddress;
             await db.customer.update({

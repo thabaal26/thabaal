@@ -11,6 +11,7 @@ import { APP_TZ, daysAgo, fmtDate, fmtNumber, pct } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { getSettings } from "@/lib/provider";
 import { estimateDuration, formatMinutes } from "@/lib/schedule";
+import { homeCityOf, regionsFor } from "@/lib/regions";
 import { getScope, owned, ownedMessages } from "@/lib/session";
 import { numberHealth } from "@/lib/limits";
 import { codesOf, PAUSING_KINDS } from "@/lib/meta-errors";
@@ -796,7 +797,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     .filter((p) => p.n > 0)
     .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
   // Location view: city vs outside, plus the busiest areas.
-  const REGIONS = ["Madurai city", "Outside Madurai", "Not sure"];
+  const REGIONS = regionsFor(homeCityOf(client));
   const byRegion = [
     ...REGIONS.map((r) => ({ key: r, label: r, n: areaRows.filter((a) => a.region === r).reduce((t, a) => t + a._count, 0), href: `region:${r}` })),
     { key: "none", label: "No location noted", n: areaRows.filter((a) => !a.location).reduce((t, a) => t + a._count, 0), href: "none" },
@@ -829,7 +830,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
   const normKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   const inferCat = (name: string) => {
     const l = name.toLowerCase();
-    if (/(soap|wash|bath|bar)/i.test(l)) return "Handmade Soaps";
+    if (/(soap|wash|bath)/i.test(l)) return "Handmade Soaps";
     if (/(hair|shikakai|hibiscus|bhringraj|neeli|dandruff)/i.test(l)) return "Hair Care";
     if (/(ghee|honey|jaggery|spice|pod|masala|pickle)/i.test(l)) return "Pantry & Traditionals";
     if (/(oil|chekku|gingelly|groundnut|coconut|castor|mustard|sesame)/i.test(l)) return "Cold-Pressed Oils";

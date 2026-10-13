@@ -14,6 +14,7 @@ import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { getOrderPricing } from "@/lib/order-pricing";
+import { isPictureVersion, isTemplatePicture, ORDER_TEMPLATE_NAMES, orderTemplateNames } from "@/lib/order-templates";
 import { money, orderRef, type OrderItem } from "@/lib/orders";
 import { slipPay } from "@/lib/payment-state";
 import { formatPhone } from "@/lib/phone";
@@ -29,7 +30,6 @@ import { PaymentForm } from "./payment-form";
 import { OrdersRefreshButton } from "./orders-refresh-button";
 
 /** The utility templates that let order updates go out after the customer's 24-hour window. */
-const ORDER_TEMPLATES = ["order_confirmation", "order_dispatched", "order_delivered", "order_cancelled"];
 const ORDER_FILTERS: FilterSection[] = ["period", "products", "area"];
 
 export const metadata: Metadata = { title: "Orders" };
@@ -214,8 +214,8 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     db.order.count({ where: { ...scoped, ...VERIFY_WHERE } as object }),
     db.order.count({ where: { ...scoped, ...COD_WHERE } as object }),
     db.order.count({ where: { ...scoped, ...REFUND_WHERE } as object }),
-    scope.clientId ? db.template.findMany({ where: { clientId: scope.clientId, name: { in: [...ORDER_TEMPLATES, ...ORDER_TEMPLATES.map((n) => `thenan_${n}`)] } }, select: { name: true, status: true } }) : [],
-    scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { paymentConfig: true } }) : null,
+    scope.clientId ? db.template.findMany({ where: { clientId: scope.clientId, name: { in: ORDER_TEMPLATE_NAMES.flatMap(orderTemplateNames) } }, select: { name: true, status: true, headerMediaUrl: true } }) : [],
+    scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { paymentConfig: true, defaultImageUrl: true, bannerUrl: true } }) : null,
     scope.clientId ? db.template.findFirst({ where: { clientId: scope.clientId, name: PAYMENT_TEMPLATE }, select: { status: true } }) : null,
     scope.clientId ? paymentTemplateFor(scope.clientId) : null,
     scope.clientId ? getCatalogWithProducts(scope.clientId) : null,
@@ -280,11 +280,16 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
   };
 
   // An order update is covered when either the plain or the picture version is approved.
-  const notReady = ORDER_TEMPLATES.filter((name) => !orderTemplates.some((t) => (t.name === name || t.name === `thenan_${name}`) && t.status === "APPROVED"));
-  const pictureStatus = ORDER_TEMPLATES.map((name) => ({ name: `thenan_${name}`, status: orderTemplates.find((t) => t.name === `thenan_${name}`)?.status ?? null }));
+  const notReady = ORDER_TEMPLATE_NAMES.filter((name) => !orderTemplates.some((t) => (t.name === name || isPictureVersion(t.name, name)) && t.status === "APPROVED"));
+  const pictureStatus = ORDER_TEMPLATE_NAMES.map((name) => ({ name, status: orderTemplates.find((t) => isPictureVersion(t.name, name))?.status ?? null }));
+  // The order picture: the one their picture templates already use, else this client's message picture or banner.
   const h = await headers();
-  const headerImage = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}/thenan-order-header.jpg`;
-  const missing = ORDER_TEMPLATES.filter((name) => !orderTemplates.some((t) => t.name === name));
+  const fullUrl = (u: string | null | undefined) => (u?.startsWith("/") ? `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}${u}` : u?.trim() || null);
+  const headerImage =
+    orderTemplates.map((t) => t.headerMediaUrl).find(isTemplatePicture) ??
+    [fullUrl(client?.defaultImageUrl), fullUrl(client?.bannerUrl)].find(isTemplatePicture) ??
+    null;
+  const missing = ORDER_TEMPLATE_NAMES.filter((name) => !orderTemplates.some((t) => t.name === name));
   // Client staff pack and dispatch their own orders, so they get the order buttons too.
   const canEdit = scope.canOperate && (scope.canManage || !!scope.clientId);
 
@@ -534,15 +539,24 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
           <div className="space-y-4 border-t border-line p-4 sm:p-5">
             <Card className="card-3d">
               <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:p-5">
-                {/* eslint-disable-next-line @next/next/no-img-element -- our own public image */}
-                <img src="/thenan-order-header.jpg" alt="Order message picture" width={64} height={64} className="size-16 shrink-0 rounded-control object-cover ring-1 ring-line" />
+                {headerImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- the client's own picture
+                  <img src={headerImage} alt="Order message picture" width={64} height={64} className="size-16 shrink-0 rounded-control object-cover ring-1 ring-line" />
+                ) : (
+                  <span aria-hidden className="grid size-16 shrink-0 place-items-center rounded-control bg-sunken text-2xs text-muted ring-1 ring-line">No picture</span>
+                )}
                 <div className="min-w-0 flex-1 text-sm">
                   <p className="font-medium">Order messages with your picture</p>
                   <p className="mt-0.5 text-xs text-muted">
-                    {pictureStatus.map((p) => `${p.name.replace("thenan_order_", "")}: ${p.status ? p.status.toLowerCase() : "not created"}`).join(" · ")}. Used automatically once approved; the plain versions cover the wait.
+                    {pictureStatus.map((p) => `${p.name.replace("order_", "")}: ${p.status ? p.status.toLowerCase() : "not created"}`).join(" · ")}. Used automatically once approved; the plain versions cover the wait.
                   </p>
+                  {!headerImage && (
+                    <p className="mt-1 text-xs text-muted">
+                      Add a message picture (a public JPG or PNG link) under Clients → Edit branding to create these.
+                    </p>
+                  )}
                 </div>
-                {pictureStatus.some((p) => !p.status) && (
+                {headerImage && pictureStatus.some((p) => !p.status) && (
                   <ActionButton action={createOrderTemplates.bind(null, headerImage)} confirm="Create the picture versions of the order templates and submit them to Meta?">
                     Create with picture
                   </ActionButton>
