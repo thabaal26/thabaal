@@ -1,5 +1,4 @@
-import { PauseCircle, Plus, Sparkles } from "@/components/icons";
-import { Calendar, Users } from "lucide-react";
+import { Calendar, PauseCircle, Plus, Sparkles, Users } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
 import { ActionButton } from "@/components/action-button";
@@ -13,6 +12,7 @@ import { getScope, owned } from "@/lib/session";
 import { toggleCampaign } from "../actions/campaigns";
 import { RefillForm } from "../orders/refill-form";
 import { WinbackForm } from "./winback-form";
+import { templateLabel } from "@/lib/plain-error";
 
 export const metadata: Metadata = { title: "Campaigns" };
 export const dynamic = "force-dynamic";
@@ -99,25 +99,25 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
             <nav aria-label="Campaign sub-views" className="inline-flex rounded-xl border border-line bg-card p-1 shadow-2xs">
               <Link
                 href="/dashboard/campaigns"
-                className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold bg-[#10283B] text-[#FFF9F0] dark:bg-[#FFF9F0] dark:text-[#10283B] shadow-xs"
+                className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold bg-ink text-canvas shadow-xs"
               >
                 Campaigns
               </Link>
               <Link
                 href="/dashboard/templates"
-                className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink dark:hover:text-[#FFF9F0] transition"
+                className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink transition"
               >
                 Message templates
               </Link>
               <a
                 href="#reorder-settings"
-                className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink dark:hover:text-[#FFF9F0] transition"
+                className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink transition"
               >
                 Automatic messages
               </a>
               <Link
                 href="/dashboard/messages"
-                className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink dark:hover:text-[#FFF9F0] transition"
+                className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink transition"
               >
                 Message log
               </Link>
@@ -183,9 +183,9 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
                     <Link href={`/dashboard/campaigns/${c.id}`} className="block truncate text-base font-semibold text-ink outline-none after:absolute after:inset-0 after:rounded-card hover:underline focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-[var(--color-brand-deep)]">
                       {c.name}
                     </Link>
-                    <p className="mt-0.5 truncate font-mono text-xs text-muted">
+                    <p className="mt-0.5 truncate text-xs text-muted">
                       {!scope.clientId && <span className="font-sans font-medium text-ink-2">{c.client.name} · </span>}
-                      {c.template.name}
+                      {templateLabel(c.template.name)}
                     </p>
                   </div>
                   {c.active ? <Badge tone="green" dot>Active</Badge> : <Badge dot>Paused</Badge>}
@@ -217,7 +217,7 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
                           aria-hidden
                           className={cn(
                             "grid h-7 place-items-center rounded-[6px] text-2xs font-medium",
-                            c.daysOfWeek.includes(i) ? "tile-3d bg-brand font-semibold text-white" : "bg-sunken text-muted",
+                            c.daysOfWeek.includes(i) ? "tile-3d bg-brand font-semibold text-on-brand" : "bg-sunken text-muted",
                           )}
                         >
                           {d}

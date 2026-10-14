@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { daysAgo, fmtDate, fmtNumber } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { getScope, owned, ownedMessages } from "@/lib/session";
+import { plainError } from "@/lib/plain-error";
 
 export const metadata: Metadata = { title: "Notifications" };
 export const dynamic = "force-dynamic";
@@ -138,7 +139,7 @@ export default async function NotificationsPage({
   if (failures.length > 0) {
     const errorCounts = new Map<string, number>();
     for (const f of failures) {
-      const err = f.error || "Delivery failed";
+      const err = plainError(f.error) || "Delivery failed";
       errorCounts.set(err, (errorCounts.get(err) || 0) + 1);
     }
     const errSummary = Array.from(errorCounts.entries())
@@ -163,7 +164,7 @@ export default async function NotificationsPage({
       type: "alert",
       title: `Message delivery failed to ${f.customer.name}`,
       customerName: f.customer.name,
-      description: f.error || "Message send failed",
+      description: plainError(f.error) || "Message send failed",
       date: f.failedAt ?? f.createdAt,
       href: "/dashboard/messages?status=FAILED",
       unread: true,

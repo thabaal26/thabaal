@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { toastResult } from "@/components/toast";
 import { Button, Card, CardHeader, CheckRow, Field } from "@/components/ui";
 import { saveRefillRule } from "../actions/orders";
+import { templateLabel } from "@/lib/plain-error";
 
 /** Admin setting: remind customers to reorder a set number of days after they bought. */
 export function RefillForm({ days, templateId, templates }: { days: number | null; templateId: string | null; templates: { id: string; name: string }[] }) {
@@ -36,7 +37,7 @@ export function RefillForm({ days, templateId, templates }: { days: number | nul
           </Field>
           <Field id="refill-template" label="Template" help={on && !templates.length ? "No approved templates yet, so reminders can't be switched on." : undefined}>
             <select className="field" disabled={!on || !templates.length} value={tid} onChange={(e) => setTid(e.target.value)}>
-              {templates.length ? templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>) : <option>No approved templates yet</option>}
+              {templates.length ? templates.map((t) => <option key={t.id} value={t.id}>{templateLabel(t.name)}</option>) : <option>No approved templates yet</option>}
             </select>
           </Field>
         </div>

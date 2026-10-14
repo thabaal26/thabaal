@@ -108,6 +108,14 @@ store | Store | Store01Icon | Store | building-store | storefront | store-2 | st
 strikethrough | Strikethrough | TextStrikethroughIcon | Strikethrough | strikethrough | text-strikethrough | strikethrough | format-strikethrough
 sun | Sun | Sun03Icon | Sun | sun | sun | sun | light-mode
 tags | Tags | Tag01Icon | Tags | tags | tag | price-tag-3 | sell
+tag | Tag | Tag01Icon | Tag | tag | tag | price-tag-3 | sell
+home | Home | Home01Icon | House | home | house | home-5 | home
+indian-rupee | IndianRupee | IndianRupeeIcon | IndianRupee | currency-rupee | currency-inr | money-rupee-circle | currency-rupee
+bar-chart | BarChart3 | ChartHistogramIcon | ChartColumn | chart-bar | chart-bar | bar-chart-2 | bar-chart
+settings | Settings | Settings01Icon | Settings | settings | gear | settings-3 | settings
+package-x | PackageX | PackageRemoveIcon | PackageX | package-off | package | archive-2 | remove-shopping-cart
+check-square | CheckSquare | CheckmarkSquare02Icon | SquareCheck | square-check | check-square | checkbox | check-box
+trophy | Trophy | ChampionIcon | Trophy | trophy | trophy | trophy | trophy
 trash2 | Trash2 | Delete02Icon | Trash2 | trash | trash | delete-bin | delete
 triangle-alert | TriangleAlert | Alert02Icon | TriangleAlert | alert-triangle | warning | alert | warning
 truck | Truck | DeliveryTruck01Icon | Truck | truck | truck | truck | local-shipping

@@ -51,13 +51,13 @@ export function InlineReplyBox({
         <div className="flex items-center gap-2">
           <Link
             href={`/dashboard/customers/${customerId}#reply`}
-            className="inline-flex min-h-[32px] items-center gap-1.5 rounded-xl bg-brand px-3.5 py-1 text-xs font-bold text-[#10283B] shadow-xs hover:brightness-105"
+            className="inline-flex min-h-[32px] items-center gap-1.5 rounded-xl bg-brand px-3.5 py-1 text-xs font-bold text-on-brand shadow-xs hover:brightness-105"
           >
             <MessageCircle className="size-3.5" /> Send template
           </Link>
           <Link
             href={`/dashboard/customers/${customerId}`}
-            className="inline-flex min-h-[32px] items-center gap-1 rounded-xl border border-line bg-card px-3 py-1 text-xs font-semibold text-ink hover:bg-subtle dark:bg-[#132A3B] dark:text-white"
+            className="inline-flex min-h-[32px] items-center gap-1 rounded-xl border border-line bg-card px-3 py-1 text-xs font-semibold text-ink hover:bg-subtle dark:bg-[#132A3B]"
           >
             Profile
           </Link>
@@ -214,7 +214,7 @@ export function InlineReplyBox({
           }
         }}
         placeholder="Type a reply"
-        className="w-full resize-none rounded-xl border border-line bg-panel p-3 text-[14px] text-ink placeholder:text-muted/70 transition focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand dark:bg-[#132A3B] dark:text-[#FFF9F0]"
+        className="w-full resize-none rounded-xl border border-line bg-panel p-3 text-[14px] text-ink placeholder:text-muted/70 transition focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand dark:bg-[#132A3B]"
       />
 
       {/* Composer Action Toolbar */}
@@ -225,7 +225,7 @@ export function InlineReplyBox({
             <select
               value={selectedLang}
               onChange={(e) => handleLangChange(e.target.value as "EN" | "Tanglish" | "Tamil")}
-              className="appearance-none rounded-lg border border-line bg-card py-1.5 pl-3 pr-7 text-xs font-semibold text-ink shadow-2xs hover:bg-subtle focus:border-brand focus:outline-none dark:bg-[#132A3B] dark:text-white"
+              className="appearance-none rounded-lg border border-line bg-card py-1.5 pl-3 pr-7 text-xs font-semibold text-ink shadow-2xs hover:bg-subtle focus:border-brand focus:outline-none dark:bg-[#132A3B]"
             >
               <option value="EN">English</option>
               <option value="Tanglish">Tanglish</option>
@@ -238,7 +238,7 @@ export function InlineReplyBox({
             type="button"
             disabled={aiLoading}
             onClick={runAiSuggest}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs transition hover:border-brand hover:bg-brand-soft/40 disabled:opacity-60 dark:bg-[#132A3B] dark:text-white"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs transition hover:border-brand hover:bg-brand-soft/40 disabled:opacity-60 dark:bg-[#132A3B]"
           >
             <Sparkles className="size-3.5 text-amber-500 shrink-0" />
             <span>{aiLoading ? "Thinking…" : "Suggest a reply"}</span>
@@ -269,7 +269,7 @@ export function InlineReplyBox({
             type="button"
             disabled={!text.trim() && !mediaUrl.trim()}
             onClick={() => submit(false)}
-            className="inline-flex min-h-[34px] items-center gap-1.5 rounded-xl bg-[#FFC329] px-4 py-1.5 text-xs font-bold text-[#10283B] shadow-xs transition hover:brightness-105 active:scale-[0.98] disabled:opacity-50"
+            className="inline-flex min-h-[34px] items-center gap-1.5 rounded-xl bg-brand px-4 py-1.5 text-xs font-bold text-on-brand shadow-xs transition hover:brightness-105 active:scale-[0.98] disabled:opacity-50"
           >
             <Send className="size-3.5" />
             <span>{sending ? "Sending…" : "Send"}</span>
@@ -280,7 +280,7 @@ export function InlineReplyBox({
               type="button"
               disabled={!text.trim() && !mediaUrl.trim()}
               onClick={() => submit(true)}
-              className="inline-flex min-h-[34px] items-center gap-1.5 rounded-xl border border-line bg-card px-3.5 py-1.5 text-xs font-semibold text-ink shadow-2xs transition hover:bg-subtle active:scale-[0.98] disabled:opacity-50 dark:bg-[#132A3B] dark:text-white"
+              className="inline-flex min-h-[34px] items-center gap-1.5 rounded-xl border border-line bg-card px-3.5 py-1.5 text-xs font-semibold text-ink shadow-2xs transition hover:bg-subtle active:scale-[0.98] disabled:opacity-50 dark:bg-[#132A3B]"
             >
               <CheckCheck className="size-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>Send and close</span>
@@ -291,7 +291,7 @@ export function InlineReplyBox({
             <button
               type="button"
               onClick={() => setShowMore((v) => !v)}
-              className="inline-flex min-h-[34px] items-center gap-1 rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-muted transition hover:text-ink dark:bg-[#132A3B] dark:hover:text-white"
+              className="inline-flex min-h-[34px] items-center gap-1 rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-muted transition hover:text-ink dark:bg-[#132A3B]"
             >
               <span>More +</span>
             </button>

@@ -4,6 +4,7 @@ import { cn } from "@/lib/cn";
 import { fmtDate } from "@/lib/format";
 import { money } from "@/lib/orders";
 import { dueOf, methodLabel, methodOf, paymentState, receivedOf, SOURCE_LABEL, STATE_LABEL, STATE_TONE, type PayFields } from "@/lib/payment-state";
+import { paymentRef } from "@/lib/plain-error";
 
 export type PaymentView = PayFields & {
   currency: string;
@@ -30,7 +31,7 @@ export function PaymentSummary({ o, className }: { o: PaymentView; className?: s
 
   let detail: string | null = null;
   if (state === "paid") {
-    detail = [method && methodLabel(method, true), o.paymentSource && SOURCE_LABEL[o.paymentSource], o.paymentTxnId && `Ref ${o.paymentTxnId}`, o.collectedBy && `by ${o.collectedBy}`, o.paidAt && when(o.paidAt)]
+    detail = [method && methodLabel(method, true), o.paymentSource && SOURCE_LABEL[o.paymentSource], paymentRef(o.paymentTxnId) && `Ref ${paymentRef(o.paymentTxnId)}`, o.collectedBy && `by ${o.collectedBy}`, o.paidAt && when(o.paidAt)]
       .filter(Boolean)
       .join(" · ");
   } else if (state === "part_paid") detail = `${money(got, o.currency)} received · ${money(due, o.currency)} still due`;

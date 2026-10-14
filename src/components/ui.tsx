@@ -4,6 +4,7 @@ import { Children, cloneElement, isValidElement, type ComponentProps, type React
 import { cssColor, type ChartColor } from "@/lib/chart-theme";
 import { cn } from "@/lib/cn";
 import { PageInfo } from "./page-info";
+import { PageTools } from "./shell-tools";
 
 /* ───────────────────────── Page structure ───────────────────────── */
 
@@ -64,6 +65,7 @@ export function PageHeader({
               {actions}
             </div>
           ))}
+        <PageTools />
       </div>
       {tabs && <div className="mt-3 sm:mt-5">{tabs}</div>}
     </header>
@@ -188,9 +190,9 @@ export function CardHeader({
 /* ───────────────────────── Buttons ───────────────────────── */
 
 const variants = {
-  primary: "bg-[#FFC329] text-[#10283B] font-semibold border-[1.5px] border-[#FFC329] hover:brightness-105 active:scale-[0.98]",
-  secondary: "border-[1.5px] border-[#EADFCB] dark:border-[#27465C] bg-white dark:bg-[#133248] text-ink font-semibold shadow-xs hover:border-[#10283B] dark:hover:border-[#FFF9F0] active:scale-[0.98]",
-  ghost: "text-[#5A6B7B] hover:text-[#10283B] dark:text-[#A8BACA] dark:hover:text-[#FFF9F0] hover:bg-black/5 dark:hover:bg-white/5",
+  primary: "bg-brand text-on-brand font-semibold border-[1.5px] border-brand hover:brightness-105 active:scale-[0.98]",
+  secondary: "border-[1.5px] border-line bg-panel text-ink font-semibold shadow-xs hover:border-ink active:scale-[0.98]",
+  ghost: "text-muted hover:text-ink hover:bg-black/5 dark:hover:bg-white/5",
   danger: "border-[1.5px] border-danger-border bg-panel text-danger font-semibold shadow-xs hover:bg-danger-bg active:bg-danger-bg",
   dangerSolid: "bg-danger-solid text-white font-semibold shadow-xs hover:brightness-95 active:brightness-90",
   /** Text-only action inside a sentence or card header. */
@@ -480,8 +482,8 @@ export function FilterChips({ label, items, className }: { label: string; items:
               className={cn(
                 "inline-flex min-h-[34px] items-center gap-1.5 whitespace-nowrap rounded-full border-[1.5px] px-3.5 text-[13.5px] font-semibold transition active:scale-[0.97]",
                 t.active
-                  ? "border-[#10283B] bg-[#10283B] text-[#FFF9F0] dark:bg-[#FFF9F0] dark:text-[#10283B] dark:border-[#FFF9F0]"
-                  : "border-[#EADFCB] bg-white text-[#5A6B7B] dark:bg-[#133248] dark:border-[#27465C] dark:text-[#A8BACA] hover:border-[#10283B] dark:hover:border-[#FFF9F0]",
+                  ? "border-ink bg-ink text-canvas"
+                  : "border-line bg-panel text-muted hover:border-ink",
               )}
             >
               <span>{t.label}</span>
@@ -489,7 +491,7 @@ export function FilterChips({ label, items, className }: { label: string; items:
                 <span
                   className={cn(
                     "tabular text-[12px] font-bold opacity-75",
-                    t.active ? "text-[#FFF9F0] dark:text-[#10283B]" : "text-[#5A6B7B] dark:text-[#A8BACA]",
+                    t.active ? "text-canvas" : "text-muted",
                   )}
                 >
                   {t.count}
@@ -700,23 +702,23 @@ export function Stat({
   const body = (
     <>
       <div className="flex items-center justify-between gap-2">
-        <span className="min-w-0 truncate text-[13.5px] font-medium text-[#5A6B7B] dark:text-[#A8BACA]">
+        <span className="min-w-0 truncate text-[13.5px] font-medium text-muted">
           {label}
         </span>
         {icon && (
-          <span aria-hidden className="shrink-0 text-[#5A6B7B] dark:text-[#A8BACA] [&_svg]:size-[18px] [&_svg]:stroke-2">
+          <span aria-hidden className="shrink-0 text-muted [&_svg]:size-[18px] [&_svg]:stroke-2">
             {icon}
           </span>
         )}
       </div>
-      <div className="tabular mt-1 font-display font-semibold text-2xl sm:text-[28px] leading-tight tracking-[-0.2px] text-ink dark:text-[#FFF9F0]">{value}</div>
+      <div className="tabular mt-1 font-display font-semibold text-2xl sm:text-[28px] leading-tight tracking-[-0.2px] text-ink">{value}</div>
       {meter !== undefined && <Meter raised value={meter} tone={tone === "amber" || tone === "rose" ? "warning" : "brand"} className="mt-2 sm:mt-2.5" />}
-      {sub && <div className="mt-1 text-[13px] font-semibold text-[#5A6B7B] dark:text-[#A8BACA] leading-snug">{sub}</div>}
+      {sub && <div className="mt-1 text-[13px] font-semibold text-muted leading-snug">{sub}</div>}
     </>
   );
-  const cardCls = "relative flex h-full min-w-0 flex-col justify-between rounded-[18px] border-[1.5px] border-[#EADFCB] dark:border-[#27465C] bg-white dark:bg-[#133248] p-4 sm:p-5 shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)] dark:shadow-[0_14px_30px_-22px_rgba(0,0,0,.7)] transition";
+  const cardCls = "relative flex h-full min-w-0 flex-col justify-between rounded-[18px] border-[1.5px] border-line bg-panel p-4 sm:p-5 shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)] dark:shadow-[0_14px_30px_-22px_rgba(0,0,0,.7)] transition";
   return href ? (
-    <Link href={href} className={cn(cardCls, "hover:border-[#10283B] dark:hover:border-[#FFF9F0] active:scale-[0.99]")}>
+    <Link href={href} className={cn(cardCls, "hover:border-ink active:scale-[0.99]")}>
       {body}
     </Link>
   ) : (
@@ -817,8 +819,8 @@ export function OrderStepper({
 }) {
   if (status === "CANCELLED") {
     return (
-      <div className="flex items-center gap-1.5 text-xs font-semibold text-[#C0412A] dark:text-[#FF9C86]">
-        <span aria-hidden className="size-2 rounded-full bg-[#C0412A]" />
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-danger">
+        <span aria-hidden className="size-2 rounded-full bg-danger-solid" />
         Cancelled
       </div>
     );
@@ -837,7 +839,7 @@ export function OrderStepper({
             : 0;
 
   return (
-    <div aria-label={`Order progress: ${ORDER_STEPS[activeIdx]?.label}`} className="flex flex-wrap items-center gap-1.5 text-xs text-[#5A6B7B] dark:text-[#A8BACA]">
+    <div aria-label={`Order progress: ${ORDER_STEPS[activeIdx]?.label}`} className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
       {ORDER_STEPS.map((step, idx) => {
         const done = idx <= activeIdx || (step.key === "PAID" && isPaid);
         const current = idx === activeIdx;
@@ -849,10 +851,10 @@ export function OrderStepper({
               className={cn(
                 "inline-flex items-center gap-1 font-semibold transition-colors",
                 owed
-                  ? "text-[#8A5A00] dark:text-[#FFD76A]"
+                  ? "text-brand-deep"
                   : done
-                    ? "text-[#10283B] dark:text-[#FFF9F0]"
-                    : "text-[#5A6B7B]/70 dark:text-[#A8BACA]/50",
+                    ? "text-ink"
+                    : "text-muted/70",
               )}
             >
               <span
@@ -860,16 +862,16 @@ export function OrderStepper({
                 className={cn(
                   "size-2.5 rounded-full transition-colors",
                   owed
-                    ? "bg-[#FFC329]"
+                    ? "bg-brand"
                     : done
-                      ? "bg-[#0E8A5B] dark:bg-[#5BE3AE]"
-                      : "bg-[#EADFCB] dark:bg-[#27465C]",
+                      ? "bg-success-solid"
+                      : "bg-line",
                 )}
               />
               {label}
             </span>
             {idx < ORDER_STEPS.length - 1 && (
-              <span aria-hidden className="text-[#5A6B7B]/40 dark:text-[#A8BACA]/40 select-none">
+              <span aria-hidden className="text-muted/40 select-none">
                 ›
               </span>
             )}

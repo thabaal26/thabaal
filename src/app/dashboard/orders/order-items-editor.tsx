@@ -133,7 +133,7 @@ export function OrderItemsEditor({
                   <span className="truncate max-w-40">{p.name}</span>
                   <span className="tabular text-muted">₹{p.priceAmount}</span>
                   {countInCart > 0 && (
-                    <span className="tabular rounded-full bg-brand px-1.5 py-0.2 text-2xs font-semibold text-white">
+                    <span className="tabular rounded-full bg-brand px-1.5 py-0.2 text-2xs font-semibold text-on-brand">
                       ×{countInCart}
                     </span>
                   )}

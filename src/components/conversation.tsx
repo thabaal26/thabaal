@@ -5,6 +5,7 @@ import { Check, CheckCheck, CircleAlert, Clock, FileText } from "@/components/ic
 import { ReplyMedia } from "@/components/reply-media";
 import { cn } from "@/lib/cn";
 import { fmtDate } from "@/lib/format";
+import { plainError, templateLabel } from "@/lib/plain-error";
 
 export type ConversationEntry =
   | { at: Date; type: "out"; id: string; template: string; campaign: string | null; status: string; body: string | null; readAt: Date | null; error: string | null; via: string | null }
@@ -95,7 +96,7 @@ export function Conversation({ entries, className }: { entries: ConversationEntr
             <li key={r.key} className="flex justify-end">
               <div className={cn("max-w-[min(82%,32rem)] rounded-[16px] rounded-tr-xs px-3.5 py-2 text-[14px] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]", r.entry.status === "FAILED" ? "bg-danger-bg ring-1 ring-danger-border text-ink" : "bg-[#D9FDD3] dark:bg-[#005C4B] text-[#111B21] dark:text-[#E9EDEF] border border-[#C5F3BC] dark:border-[#025142]")}>
                 <p className="mb-1 flex flex-wrap items-center gap-x-1.5 text-xs text-[#54656F] dark:text-[#8696A0]">
-                  <span className="font-mono">{r.entry.template}</span>
+                  <span>{templateLabel(r.entry.template)}</span>
                   {r.entry.campaign && <span>· {r.entry.campaign}</span>}
                 </p>
                 {(() => {
@@ -125,7 +126,7 @@ export function Conversation({ entries, className }: { entries: ConversationEntr
                     </>
                   );
                 })()}
-                {r.entry.error && <p className="mt-1 text-xs text-danger">{r.entry.error}</p>}
+                {r.entry.error && <p className="mt-1 text-xs text-danger">{plainError(r.entry.error)}</p>}
                 <p className="tabular mt-1 flex flex-wrap items-center justify-end gap-1.5 text-[11px] text-[#667781] dark:text-[#8696A0]">
                   {r.entry.via && <span>from {r.entry.via} ·</span>}
                   <time dateTime={r.entry.at.toISOString()}>{fmtDate(r.entry.at, "h:mm a")}</time>

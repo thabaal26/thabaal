@@ -68,7 +68,7 @@ export function ProviderSwitch({ provider, metaLive, localReady }: { provider: P
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-2.5 font-medium text-ink">
-                  <span aria-hidden className={cn("grid size-8 place-items-center rounded-control", active ? "bg-brand text-white" : "bg-sunken text-ink-2")}>
+                  <span aria-hidden className={cn("grid size-8 place-items-center rounded-control", active ? "bg-brand text-on-brand" : "bg-sunken text-ink-2")}>
                     <o.icon className="size-4" />
                   </span>
                   {o.title}

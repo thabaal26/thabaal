@@ -1,4 +1,4 @@
-import { CheckCircle2, CloudOff, ExternalLink, PackageCheck, PackageX, ShoppingBag, Tag } from "lucide-react";
+import { CheckCircle2, CloudOff, ExternalLink, PackageCheck, PackageX, ShoppingBag, Tag } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
 import { Badge, buttonClass, Callout, PageHeader, PickClientNotice, Stat } from "@/components/ui";
@@ -67,13 +67,13 @@ export default async function CataloguePage() {
           <nav aria-label="Product sub-views" className="inline-flex rounded-xl border border-line bg-card p-1 shadow-2xs">
             <a
               href="#catalogue-items"
-              className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold bg-[#10283B] text-[#FFF9F0] dark:bg-[#FFF9F0] dark:text-[#10283B] shadow-xs"
+              className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold bg-ink text-canvas shadow-xs"
             >
               Catalogue
             </a>
             <a
               href="#demand-leaderboard"
-              className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink dark:hover:text-[#FFF9F0] transition"
+              className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink transition"
             >
               How products sell
             </a>

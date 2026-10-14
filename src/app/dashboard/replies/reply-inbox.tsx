@@ -109,9 +109,9 @@ export function ReplyInbox({
   });
 
   return (
-    <div className="h-full min-h-0 w-full overflow-hidden rounded-[24px] border border-line bg-card shadow-[0_12px_36px_rgba(16,40,59,0.06)] dark:border-[#27465C] dark:bg-[#111B21] lg:grid lg:grid-cols-[minmax(19rem,23rem)_minmax(0,1fr)]">
+    <div className="h-full min-h-0 w-full overflow-hidden rounded-[24px] border border-line bg-card shadow-[0_12px_36px_rgba(16,40,59,0.06)] dark:bg-[#111B21] lg:grid lg:grid-cols-[minmax(19rem,23rem)_minmax(0,1fr)]">
       {/* LEFT COLUMN: Customer Conversations List with Client Search */}
-      <div className="flex h-full min-h-0 flex-col overflow-hidden border-r border-line dark:border-[#27465C]">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden border-r border-line">
         <ChatList items={chatListItems} selectedCustomerId={selected?.customer.id} />
       </div>
 
@@ -119,7 +119,8 @@ export function ReplyInbox({
       {selected ? (
         <section aria-label={`Conversation with ${selected.customer.name}`} className="flex h-full min-h-0 flex-col overflow-hidden bg-panel dark:bg-[#111B21]">
           {/* Header matching WhatsApp UI Mock */}
-          <header className="flex h-[64px] shrink-0 items-center justify-between border-b border-line bg-card px-5 backdrop-blur-md dark:border-[#27465C] dark:bg-[#111B21]">
+          {/* Two rows: who it is, then the actions (one scrollable line, never overlapping the name). */}
+          <header className="shrink-0 space-y-2.5 border-b border-line bg-panel px-4 py-3 dark:bg-[#111B21]">
             <div className="flex items-center gap-3 min-w-0">
               <Avatar name={selected.customer.name} className="size-10 shrink-0 text-sm font-semibold" />
               <div className="min-w-0">
@@ -162,7 +163,7 @@ export function ReplyInbox({
                   action={sendCatalogue.bind(null, selected.customer.id)}
                   size="sm"
                   title="Send interactive WhatsApp catalogue (free inside the 24-hour window)"
-                  className="inline-flex items-center gap-1 rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-subtle dark:bg-[#1A262D] dark:text-white dark:border-[#27465C]"
+                  className="inline-flex items-center gap-1 rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-subtle dark:bg-[#1A262D]"
                 >
                   <ShoppingBag className="size-3.5 text-brand-deep" />
                   <span className="max-sm:sr-only">Send catalogue</span>
@@ -172,7 +173,7 @@ export function ReplyInbox({
               {canOperate && (
                 <Link
                   href={`/dashboard/customers/${selected.customer.id}#reply`}
-                  className="inline-flex items-center gap-1 rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-subtle dark:bg-[#1A262D] dark:text-white dark:border-[#27465C]"
+                  className="inline-flex items-center gap-1 rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-subtle dark:bg-[#1A262D]"
                   title="Send an approved WhatsApp template"
                 >
                   <MessageCircle className="size-3.5 text-brand-deep" />
@@ -182,14 +183,14 @@ export function ReplyInbox({
 
               <Link
                 href={`/dashboard/customers/${selected.customer.id}`}
-                className="rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-subtle dark:bg-[#1A262D] dark:text-white dark:border-[#27465C]"
+                className="rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-subtle dark:bg-[#1A262D]"
               >
                 Profile
               </Link>
 
               <Link
                 href={`/dashboard/customers/${selected.customer.id}#call`}
-                className="inline-flex items-center gap-1 rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-subtle dark:bg-[#1A262D] dark:text-white dark:border-[#27465C]"
+                className="inline-flex items-center gap-1 rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-subtle dark:bg-[#1A262D]"
               >
                 <Phone className="size-3 text-emerald-600 dark:text-emerald-400" />
                 <span>Call</span>
@@ -199,7 +200,7 @@ export function ReplyInbox({
                 <ActionButton
                   action={setReplyHandled.bind(null, selected.id, !selected.handled)}
                   size="sm"
-                  className="rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-subtle dark:bg-[#1A262D] dark:text-white dark:border-[#27465C]"
+                  className="rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-subtle dark:bg-[#1A262D]"
                 >
                   {selected.handled ? <RotateCcw className="size-3.5" /> : <CheckCheck className="size-3.5" />}
                   <span>{selected.handled ? "Reopen" : "Done"}</span>
@@ -213,7 +214,7 @@ export function ReplyInbox({
 
           {/* Bottom WhatsApp Message Composer */}
           {canOperate && (
-            <div className="shrink-0 border-t border-line dark:border-[#27465C]">
+            <div className="shrink-0 border-t border-line">
               <InlineReplyBox
                 key={selected.customer.id}
                 customerId={selected.customer.id}

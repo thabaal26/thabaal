@@ -85,7 +85,7 @@ export function MultiPicker({
                     on ? "bg-brand-soft font-medium text-brand-deep" : "text-ink hover:bg-canvas",
                   )}
                 >
-                  <span aria-hidden className={cn("grid size-5 shrink-0 place-items-center rounded border", on ? "border-brand bg-brand text-white" : "border-line-strong bg-panel")}>
+                  <span aria-hidden className={cn("grid size-5 shrink-0 place-items-center rounded border", on ? "border-brand bg-brand text-on-brand" : "border-line-strong bg-panel")}>
                     {on && <Check className="size-3.5" strokeWidth={2.5} />}
                   </span>
                   <span className="min-w-0 flex-1">

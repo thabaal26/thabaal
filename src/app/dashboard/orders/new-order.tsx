@@ -45,14 +45,17 @@ export function NewOrder({
   catalogId = null,
   isLiveCatalog = false,
   hasPaymentConfig = false,
+  initialOpen = false,
 }: {
   catalogProducts?: CatalogProductOption[];
   catalogId?: string | null;
   isLiveCatalog?: boolean;
   hasPaymentConfig?: boolean;
+  /** Open the form straight away (Home's "New order" links to /dashboard/orders?new=1). */
+  initialOpen?: boolean;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   const [pending, start] = useTransition();
   const [aiParsing, startAiParse] = useTransition();
   const [showAiPaste, setShowAiPaste] = useState(false);

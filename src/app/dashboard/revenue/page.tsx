@@ -1,5 +1,4 @@
-import { Banknote, CreditCard, Hourglass, ReceiptText, ShoppingCart, Undo2, Wallet } from "@/components/icons";
-import { IndianRupee } from "lucide-react";
+import { Banknote, CreditCard, Hourglass, IndianRupee, ReceiptText, ShoppingCart, Undo2, Wallet } from "@/components/icons";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "@/components/intent-link";
@@ -14,6 +13,7 @@ import { ActiveFilters, FilterBar } from "@/components/filter-bar";
 import { keepFilters, readFilters, resolvePeriod, type FilterSection } from "@/lib/filters";
 import { filterOptions, scopedCustomerIds } from "@/lib/filter-scope";
 import { requestPayment } from "../actions/orders";
+import { SpendCard } from "../spend-card";
 
 export const metadata: Metadata = { title: "Revenue & cash" };
 export const dynamic = "force-dynamic";
@@ -60,6 +60,32 @@ function CashList({ title, hint, items, icon, tone, action }: { title: string; h
 export default async function RevenuePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams;
   const scope = await getScope();
+  const costs = sp.tab === "costs";
+  const moneyTabs = (
+    <nav aria-label="Money views" className="inline-flex rounded-control border-[1.5px] border-line bg-panel p-[3px]">
+      {[
+        { key: "cash", href: "/dashboard/revenue", label: "Cash in", on: !costs },
+        { key: "costs", href: "/dashboard/revenue?tab=costs", label: "WhatsApp costs", on: costs },
+      ].map((t) => (
+        <Link
+          key={t.key}
+          href={t.href}
+          aria-current={t.on ? "page" : undefined}
+          className={`inline-flex min-h-[34px] items-center whitespace-nowrap rounded-[9px] px-3 text-[13.5px] font-semibold transition ${t.on ? "bg-ink text-canvas" : "text-muted hover:text-ink"}`}
+        >
+          {t.label}
+        </Link>
+      ))}
+    </nav>
+  );
+  if (costs) {
+    return (
+      <>
+        <PageHeader title="Money" description="What WhatsApp costs you this month and last, live from Meta where it's connected." tabs={moneyTabs} />
+        {scope.clientId ? <SpendCard clientId={scope.clientId} canManage={scope.canManage} /> : <PickClientNotice what="WhatsApp costs" />}
+      </>
+    );
+  }
   // Shared filters: period (default 30 days), catalogue products, and delivery area.
   const filters = keepFilters(readFilters(sp, "30d"), REVENUE_FILTERS);
   const period = resolvePeriod(filters);
@@ -75,6 +101,7 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
       tabs={
         filterOpts ? (
           <div className="flex flex-col gap-2">
+            <div>{moneyTabs}</div>
             <FilterBar
               value={filters}
               options={filterOpts}

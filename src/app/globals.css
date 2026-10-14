@@ -77,6 +77,7 @@
   --color-line-strong: #C4B59B; /* borders that alone outline a control: fields, checkboxes (3:1) */
   --color-canvas: #FFF9F0; /* warm cream canvas */
   --color-panel: #FFFFFF; /* crisp white card surface */
+  --color-card: #FFFFFF; /* same as panel (some screens say bg-card) */
   --color-surface: #FFFFFF;
   --color-subtle: #FFF9F0; /* warm parchment sidebar and secondary surfaces */
   --color-sunken: #F5EDE0; /* inset areas inside a card: item lists, read-only values, segmented tracks */
@@ -85,12 +86,14 @@
 
   /* Primary action: Golden Amber / Mango #FFC329 */
   --color-brand: #FFC329;
-  --color-brand-deep: #B47800;
+  --color-on-brand: #10283B; /* text and icons on a mango fill (white fails contrast on it) */
+  --color-brand-deep: #8A5A00; /* mango as text on light surfaces: 5.4:1 on canvas */
   --color-brand-soft: #FFF3D6;
 
   /* Sidebar and brand highlights */
-  --color-night: #faf6ee;
-  --color-night-2: #f0ebd9; /* active row on the light sidebar */
+  /* Dark surfaces with white text: toasts, the call widget, previews, sheet backdrops, the "Today" card. */
+  --color-night: #10283B;
+  --color-night-2: #1B3B52;
   --color-glow: #ffc82c; /* brand yellow accents */
   --color-gold: #ffc82c; /* brand golden amber */
   --color-gold-soft: #fef3c7;
@@ -561,6 +564,7 @@ input:-webkit-autofill:active {
   --color-line-strong: #456D8C;
   --color-canvas: #0B1E2D;
   --color-panel: #133248;
+  --color-card: #133248;
   --color-surface: #133248;
   --color-subtle: #0B1E2D;
   --color-sunken: #0E2535;

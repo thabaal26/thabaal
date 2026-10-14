@@ -148,7 +148,7 @@ export function FilterBar({
             <SlidersHorizontal aria-hidden className="size-3.5 shrink-0" />
             <span>Filter</span>
             {count > 0 && (
-              <span className="tabular grid min-w-4.5 place-items-center rounded-full bg-brand px-1 text-2xs font-bold text-white sm:min-w-5">
+              <span className="tabular grid min-w-4.5 place-items-center rounded-full bg-brand px-1 text-2xs font-bold text-on-brand sm:min-w-5">
                 {count}
               </span>
             )}
@@ -205,7 +205,7 @@ export function FilterBar({
                       className={cn(
                         "min-h-8 rounded-full border px-3 text-xs font-semibold transition sm:min-h-9",
                         isSelected
-                          ? "border-brand bg-brand text-white shadow-2xs"
+                          ? "border-brand bg-brand text-on-brand shadow-2xs"
                           : "border-line bg-panel text-ink-2 hover:border-line-2 hover:text-ink",
                       )}
                     >
@@ -277,7 +277,7 @@ export function FilterBar({
                       className={cn(
                         "inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition",
                         !draft.area
-                          ? "border-brand bg-brand text-white"
+                          ? "border-brand bg-brand text-on-brand"
                           : "border-line bg-panel text-ink-2 hover:border-line-2",
                       )}
                     >
@@ -294,7 +294,7 @@ export function FilterBar({
                         className={cn(
                           "inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition",
                           active
-                            ? "border-brand bg-brand text-white"
+                            ? "border-brand bg-brand text-on-brand"
                             : "border-line bg-panel text-ink-2 hover:border-line-2 hover:text-ink",
                         )}
                       >
@@ -365,7 +365,7 @@ export function FilterBar({
                           aria-hidden
                           className={cn(
                             "grid size-4 shrink-0 place-items-center rounded border transition",
-                            active ? "border-brand bg-brand text-white" : "border-line-strong bg-panel",
+                            active ? "border-brand bg-brand text-on-brand" : "border-line-strong bg-panel",
                           )}
                         >
                           {active && <Check className="size-3" />}

@@ -112,7 +112,7 @@ export function OrderCard({
       : null;
 
   return (
-    <div className="relative flex h-full flex-col gap-3 rounded-[18px] border-[1.5px] border-[#EADFCB] dark:border-[#27465C] bg-white dark:bg-[#133248] p-4 sm:p-5 shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)] dark:shadow-[0_14px_30px_-22px_rgba(0,0,0,.7)] transition">
+    <div className="relative flex h-full flex-col gap-3 rounded-[18px] border-[1.5px] border-line bg-panel p-4 sm:p-5 shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)] dark:shadow-[0_14px_30px_-22px_rgba(0,0,0,.7)] transition">
 
       <div className="flex items-start justify-between gap-2.5">
         <div className="flex min-w-0 items-center gap-2.5">

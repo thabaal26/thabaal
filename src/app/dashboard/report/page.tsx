@@ -1,6 +1,6 @@
+import { BarChart3, Trophy } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
-import { BarChart3, CheckSquare, Trophy } from "lucide-react";
 import { Card, CardHeader, PageHeader, PickClientNotice } from "@/components/ui";
 import { BarList, ColumnChart } from "@/components/viz";
 import { campaignResults, weeklyReport, type WeekFigures } from "@/lib/business-reports";
@@ -9,6 +9,9 @@ import { cn } from "@/lib/cn";
 import { fmtDate, fmtNumber, pct } from "@/lib/format";
 import { refillForecast } from "@/lib/refill-forecast";
 import { getScope } from "@/lib/session";
+import { db } from "@/lib/db";
+import { isSectionEnabled } from "@/lib/client-sections";
+import { OverviewScreen } from "../overview-screen";
 import { ReportTools } from "./report-tools";
 
 export const metadata: Metadata = { title: "Reports" };
@@ -33,15 +36,67 @@ const ROWS: { key: string; label: string; of: (w: WeekFigures) => number; fmt: "
   { key: "new", label: "New customers", of: (w) => w.newCustomers, fmt: "count" },
 ];
 
-export default async function ReportPage() {
+const TABS = [
+  { key: "week", label: "This week", needsOrders: false },
+  { key: "funnel", label: "From message to sale", needsOrders: false },
+  { key: "carts", label: "Carts", needsOrders: true },
+  { key: "audience", label: "Who and when", needsOrders: false },
+  { key: "products", label: "Products", needsOrders: true },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
+
+const DESCRIPTIONS: Record<TabKey, string> = {
+  week: "The last seven days against the week before, ready to share.",
+  funnel: "From a message sent to an order paid: what was read, answered and bought.",
+  carts: "Carts customers filled on WhatsApp: what they kept, changed and left unpaid.",
+  audience: "Who buys, who is drifting away, where they are and when they answer.",
+  products: "What sells, what sits in carts, and which campaigns moved each product.",
+};
+
+export default async function ReportPage({ searchParams }: PageProps<"/dashboard/report">) {
+  const sp = await searchParams;
   const scope = await getScope();
   if (!scope.clientId)
     return (
       <>
-        <PageHeader title="Weekly report" />
-        <PickClientNotice what="weekly report" />
+        <PageHeader title="Reports" />
+        <PickClientNotice what="reports" />
       </>
     );
+
+  const client = await db.client.findUnique({ where: { id: scope.clientId }, select: { disabledSections: true } });
+  const ordersOn = isSectionEnabled(client?.disabledSections ?? [], "orders");
+  const tabs = TABS.filter((t) => ordersOn || !t.needsOrders);
+  const tab: TabKey = tabs.find((t) => t.key === sp.tab)?.key ?? "week";
+
+  const tabNav = (
+    <nav aria-label="Report views" className="no-scrollbar -mx-3 overflow-x-auto px-3 sm:mx-0 sm:px-0">
+      <div className="inline-flex rounded-control border-[1.5px] border-line bg-panel p-[3px]">
+        {tabs.map((t) => (
+          <Link
+            key={t.key}
+            href={t.key === "week" ? "/dashboard/report" : `/dashboard/report?tab=${t.key}`}
+            aria-current={t.key === tab ? "page" : undefined}
+            className={cn(
+              "inline-flex min-h-[34px] items-center whitespace-nowrap rounded-[9px] px-3 text-[13.5px] font-semibold transition",
+              t.key === tab ? "bg-ink text-canvas" : "text-muted hover:text-ink",
+            )}
+          >
+            {t.label}
+          </Link>
+        ))}
+      </div>
+    </nav>
+  );
+
+  if (tab !== "week") {
+    return (
+      <>
+        <PageHeader title="Reports" description={DESCRIPTIONS[tab]} tabs={tabNav} />
+        <OverviewScreen sp={sp} mode={tab} />
+      </>
+    );
+  }
 
   const now = new Date();
   const [r, campaigns, refills] = await Promise.all([weeklyReport(scope.clientId, now), campaignResults(scope.clientId, 7), refillForecast(scope.clientId, now)]);
@@ -72,36 +127,9 @@ export default async function ReportPage() {
     <>
       <PageHeader
         title="Reports"
-        description="See what is working, in four short views."
+        description={DESCRIPTIONS.week}
         actions={<ReportTools text={summary} />}
-        tabs={
-          <nav aria-label="Report sub-views" className="inline-flex rounded-xl border border-line bg-card p-1 shadow-2xs">
-            <Link
-              href="/dashboard/report"
-              className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold bg-[#10283B] text-[#FFF9F0] dark:bg-[#FFF9F0] dark:text-[#10283B] shadow-xs"
-            >
-              This week
-            </Link>
-            <Link
-              href="/dashboard/report?tab=funnel"
-              className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink dark:hover:text-[#FFF9F0] transition"
-            >
-              From message to sale
-            </Link>
-            <Link
-              href="/dashboard/report?tab=carts"
-              className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink dark:hover:text-[#FFF9F0] transition"
-            >
-              Carts
-            </Link>
-            <Link
-              href="/dashboard/report?tab=audience"
-              className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink dark:hover:text-[#FFF9F0] transition"
-            >
-              Who and when
-            </Link>
-          </nav>
-        }
+        tabs={tabNav}
       />
 
       <div className="grid grid-cols-1 gap-4 sm:gap-5 xl:grid-cols-12">

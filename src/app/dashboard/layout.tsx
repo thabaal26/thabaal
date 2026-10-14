@@ -7,11 +7,12 @@ import { db } from "@/lib/db";
 import { getScope, owned, ownedMessages, requireUser } from "@/lib/session";
 import { getSettings, isSimulated } from "@/lib/provider";
 import { senderFor } from "@/lib/senders";
-import { nightColor, themeCss, themeStyle } from "@/lib/theme";
+import { themeCss, themeStyle } from "@/lib/theme";
 import { ClientSwitcher, HeaderClientSwitcher } from "./client-switcher";
 import { BottomNav, SettingsLink, SideNav, type NavRole } from "./nav";
 import { WalletBanner } from "./wallet/wallet-banner";
 import { NotificationBell, NotificationProvider } from "@/components/notification-center";
+import { ShellProvider } from "@/components/shell-tools";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AppearanceSync } from "@/components/appearance-sync";
 import { IconSetLink } from "@/components/icon-set-link";
@@ -26,7 +27,7 @@ const brandedClient = cache(async () => {
 
 export async function generateMetadata(): Promise<Metadata> {
   const client = await brandedClient();
-  const defaultIcons = {
+  const icons = {
     icon: [
       { url: "/icon", type: "image/png", sizes: "512x512" },
       { url: "/brands/thabaal/mark.png", type: "image/png" },
@@ -34,59 +35,55 @@ export async function generateMetadata(): Promise<Metadata> {
     shortcut: "/icon",
     apple: [{ url: "/apple-icon", sizes: "180x180", type: "image/png" }],
   };
-  if (!client) {
-    return {
-      title: { default: "Thabaal · Customer Messaging", template: "%s · Thabaal" },
-      applicationName: "Thabaal",
-      manifest: "/manifest.webmanifest",
-      icons: defaultIcons,
-      appleWebApp: { capable: true, title: "Thabaal", statusBarStyle: "black-translucent" },
-    };
-  }
-  return {
-    title: { default: `Thabaal · ${client.name}`, template: `%s · ${client.name} · Thabaal` },
-    applicationName: "Thabaal",
-    manifest: "/manifest.webmanifest",
-    icons: defaultIcons,
-    appleWebApp: { capable: true, title: "Thabaal", statusBarStyle: "black-translucent" },
-  };
+  const common = { applicationName: "Thabaal", manifest: "/manifest.webmanifest", icons, appleWebApp: { capable: true, title: "Thabaal", statusBarStyle: "default" as const } };
+  return client
+    ? { ...common, title: { default: `Thabaal · ${client.name}`, template: `%s · ${client.name} · Thabaal` } }
+    : { ...common, title: { default: "Thabaal · Customer Messaging", template: "%s · Thabaal" } };
 }
 
 export async function generateViewport(): Promise<Viewport> {
-  return { themeColor: nightColor() };
+  // The cream top bar; the theme script switches it to the dark canvas when dark mode is on.
+  return { themeColor: "#FFF9F0" };
 }
 
-function BrandMark({ logoUrl, name, size }: { logoUrl?: string | null; name: string; size: "sm" | "md" }) {
-  const box = size === "md" ? "size-9" : "size-8";
-  if (logoUrl) {
-    // eslint-disable-next-line @next/next/no-img-element -- admin-supplied path or URL of any size
-    return <img src={logoUrl} alt={`${name} logo`} className={`${box} shrink-0 rounded-control object-cover ring-1 ring-white/15`} />;
-  }
+/** Thabaal's mark and name: the product's own brand, top left of every page. */
+function Logo({ size }: { size: "sm" | "md" }) {
   return (
-    // A 144 × 48 copy of the logo: it shows at about 36 px wide here (the full one is 146 KB).
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src="/brands/thabaal/thabaal-logo-en-sm.png" alt="Thabaal" width={144} height={48} className={`${box} shrink-0 rounded-control bg-white object-contain p-0.5 ring-1 ring-white/15`} />
+    <Link href="/dashboard" aria-label="Thabaal home" className="flex shrink-0 items-center gap-2 transition hover:opacity-90">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/brands/thabaal/artifact-logo.png" alt="" width={40} height={22} data-keep className={size === "md" ? "h-auto w-10" : "h-auto w-9"} />
+      <b className={`font-display font-semibold leading-none tracking-[-0.3px] text-ink ${size === "md" ? "text-[22px]" : "text-[20px]"}`}>thabaal</b>
+    </Link>
   );
 }
 
-const initials = (name: string) =>
-  name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase() || "?";
+/** The client's own logo (white-label), or its initials. */
+function ClientMark({ logoUrl, name }: { logoUrl?: string | null; name: string }) {
+  if (logoUrl) {
+    // eslint-disable-next-line @next/next/no-img-element -- admin-supplied path or URL of any size
+    return <img src={logoUrl} alt="" data-keep className="size-8 shrink-0 rounded-control object-cover ring-1 ring-line" />;
+  }
+  const initials =
+    name
+      .split(/\s+/)
+      .map((w) => w[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "?";
+  return <span className="grid size-8 shrink-0 place-items-center rounded-control bg-brand-soft text-xs font-bold text-ink ring-1 ring-line">{initials}</span>;
+}
 
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
-  const user = await requireUser();
+  await requireUser();
   const scope = await getScope();
-  const [settings, client, sender, clients, rawOpenReplies, rawNewOrders] = await Promise.all([
+  const [settings, client, sender, clients, rawOpenReplies, rawOrdersToHandle] = await Promise.all([
     getSettings(),
     brandedClient(),
     scope.clientId ? senderFor(scope.clientId) : null,
     scope.isAdmin ? db.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }) : [],
     db.reply.groupBy({ by: ["customerId"], where: { handled: false, ...ownedMessages(scope) } }).then((g) => g.length),
-    db.order.count({ where: { status: { in: ["NEW", "PAID"] }, ...owned(scope) } }).catch(() => 0),
+    // New orders to confirm plus confirmed or paid ones to pack: the same work Home and Orders count.
+    db.order.count({ where: { status: { in: ["NEW", "CONFIRMED", "PAID"] }, ...owned(scope) } }).catch(() => 0),
   ]);
 
   const disabledSections = client?.disabledSections ?? [];
@@ -96,13 +93,12 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
   const notificationsOn = isSectionEnabled(disabledSections, "notifications");
 
   const openReplies = repliesOn ? rawOpenReplies : 0;
-  const newOrders = ordersOn ? rawNewOrders : 0;
-  const unreadNotifications = openReplies + newOrders;
+  const ordersToHandle = ordersOn ? rawOrdersToHandle : 0;
+  const unreadNotifications = openReplies + ordersToHandle;
 
   const look = resolveAppearance(settings.appearance, client);
   const lookData = appearanceDataset(look);
-  const name = client?.name ?? "Thabaal";
-  const subtitle = client?.tagline || (scope.isAdmin ? (client ? "Admin view" : "Admin · all clients") : "A message with momentum");
+  const name = client?.name ?? (scope.isAdmin ? "All clients" : "Thabaal");
   const via = settings.provider === "LOCAL" ? "Local session" : "Meta Cloud API";
   const live = !isSimulated(settings, client && sender ? sender.cfg : undefined);
   // A client without its own number: say so plainly (to the client too), never "demo mode".
@@ -110,139 +106,107 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
 
   const role: NavRole = !scope.isAdmin && scope.canOperate && !scope.canManage ? "staff" : "manager";
 
-  // Clients only see a reassuring "connected" line; setup problems are the admin's to fix.
-  // "Live" means real sending credentials are configured (not demo mode); number health lives on the Overview.
-  const status = notConnected ? (
-    <span className="flex min-w-0 items-center gap-1.5 text-warning font-medium">
-      <span aria-hidden className="size-2 shrink-0 rounded-full bg-warning-solid" />
-      <span className="truncate">{scope.isAdmin ? "WhatsApp not connected: add this client's number" : "WhatsApp not connected yet"}</span>
+  // The real connection state, in plain words. Setup details are the admin's to fix.
+  const dotLine = (tone: "ok" | "warn", text: string) => (
+    <span className={`flex min-w-0 items-center gap-1.5 font-medium ${tone === "ok" ? "text-ink-2" : "text-warning"}`}>
+      <span aria-hidden className={`size-2 shrink-0 rounded-full ${tone === "ok" ? "bg-success-solid" : "bg-warning-solid"}`} />
+      <span className="truncate">{text}</span>
     </span>
-  ) : live ? (
-    <span className="flex min-w-0 items-center gap-1.5 text-ink-2 dark:text-white/75 font-medium">
-      <span aria-hidden className="size-2 shrink-0 rounded-full bg-emerald-500 animate-pulse" />
-      <span className="truncate">{scope.isAdmin ? `Sending via ${via}` : "WhatsApp connected"}</span>
-    </span>
-  ) : scope.isAdmin ? (
-    <span className="flex min-w-0 items-center gap-1.5 text-warning font-medium">
-      <span aria-hidden className="size-2 shrink-0 rounded-full bg-warning-solid" />
-      <span className="truncate">Demo mode · {via} not set up</span>
-    </span>
-  ) : null;
+  );
+  const status = notConnected
+    ? dotLine("warn", scope.isAdmin ? "WhatsApp not connected: add this client's number" : "WhatsApp not connected yet")
+    : live
+      ? dotLine("ok", scope.isAdmin && !client ? `Sending via ${via}` : "WhatsApp connected")
+      : scope.isAdmin
+        ? dotLine("warn", `Demo mode · ${via} not set up`)
+        : null;
 
   return (
     <NotificationProvider initialUnreadCount={unreadNotifications}>
-      <div {...appearanceAttrs(look)} style={themeStyle(client)} className="min-h-dvh w-full overflow-x-clip bg-canvas lg:h-dvh lg:overflow-hidden lg:p-3.5 lg:flex lg:gap-3.5 lg:bg-[#EDE3D2] dark:lg:bg-[#061421] print:h-auto print:overflow-visible print:bg-white print:p-0">
-        {client && themeCss(client) && <style>{themeCss(client)}</style>}
-        {/* The portal's look (Settings → Appearance, or this client's own): set on <html> before
-            anything paints, so sheets and dialogs wear it too. */}
-        <IconSetLink set={lookData.iconset} />
-        <script dangerouslySetInnerHTML={{ __html: appearanceScript(lookData) }} />
-        <AppearanceSync data={lookData} />
-        <a href="#main" className="sr-only z-[70] rounded-control bg-panel px-4 py-2 text-sm font-medium text-ink shadow-pop focus:not-sr-only focus:fixed focus:left-4 focus:top-4">
-          Skip to content
-        </a>
+      <ShellProvider notifications={notificationsOn}>
+        <div {...appearanceAttrs(look)} style={themeStyle(client)} className="min-h-dvh w-full overflow-x-clip bg-canvas lg:flex print:bg-white">
+          {client && themeCss(client) && <style>{themeCss(client)}</style>}
+          {/* The portal's look (Settings → Appearance, or this client's own): set on <html> before
+              anything paints, so sheets and dialogs wear it too. */}
+          <IconSetLink set={lookData.iconset} />
+          <script dangerouslySetInnerHTML={{ __html: appearanceScript(lookData) }} />
+          <AppearanceSync data={lookData} />
+          <a href="#main" className="sr-only z-[70] rounded-control bg-panel px-4 py-2 text-sm font-medium text-ink shadow-pop focus:not-sr-only focus:fixed focus:left-4 focus:top-4">
+            Skip to content
+          </a>
 
-        {/* Floating Left Navigation Bar */}
-        <aside className="hidden w-[244px] h-full shrink-0 transform-gpu flex-col overflow-hidden rounded-[24px] border border-[#E4D7C0] bg-[#FFFFFF]/95 shadow-[0_12px_36px_rgba(30,20,10,0.08)] backdrop-blur-xl dark:border-[#23455E] dark:bg-[#0E2638]/95 dark:shadow-[0_18px_48px_rgba(0,0,0,0.55)] dark:ring-1 dark:ring-white/[0.08] lg:flex print:!hidden">
-          <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_60%_at_0%_0%,rgb(255_200_44/0.08),transparent_55%)] dark:bg-[radial-gradient(120%_60%_at_0%_0%,rgb(22_125_99/0.22),transparent_55%),radial-gradient(90%_50%_at_100%_100%,rgb(234_191_38/0.1),transparent_60%)]" />
-          <div className="relative flex h-16 shrink-0 items-center px-4">
-            <Link href="/dashboard" className="logo flex items-center gap-2.5 px-2 text-decoration-none transition hover:opacity-90">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/brands/thabaal/artifact-logo.png"
-                alt="thabaal"
-                width={40}
-                height={22}
-                className="w-10 h-auto shrink-0 object-contain"
-              />
-              <b className="font-display font-semibold text-[22px] tracking-[-0.3px] text-ink dark:text-[#FFF9F0] leading-none">
-                thabaal
-              </b>
-            </Link>
-          </div>
-          {scope.isAdmin && (
-            <div className="relative shrink-0 px-3 pt-2.5 pb-1">
-              <ClientSwitcher clients={clients} current={scope.clientId} />
+          {/* Computers: the menu, pinned on the left while the page scrolls. */}
+          <aside className="sticky top-0 hidden h-dvh w-[248px] shrink-0 flex-col border-r border-line bg-panel lg:flex print:!hidden">
+            <div className="flex h-16 shrink-0 items-center px-5">
+              <Logo size="md" />
             </div>
-          )}
-          <div className="thin-scroll relative min-h-0 flex-1 overflow-y-auto px-3 py-3">
-            <SideNav
-              isAdmin={scope.isAdmin}
-              showWallet={client?.billingMode === "wallet"}
-              disabledSections={disabledSections}
-              openReplies={openReplies}
-              newOrders={newOrders}
-              unreadNotifications={unreadNotifications}
-            />
-          </div>
-          <div className="relative shrink-0 space-y-2 border-t border-[#E4D7C0]/80 dark:border-[#23455E]/80 bg-[#FAF3E8]/80 dark:bg-[#091C2B]/80 p-4 text-[13px]">
-            <div className="flex items-center gap-2 text-[#5A6B7B] dark:text-[#A8BACA] font-medium text-[12.5px]">
-              <span className="size-2 rounded-full bg-[#10B981] animate-pulse shrink-0" />
-              <span>{scope.isAdmin && notConnected ? "WhatsApp not connected" : "WhatsApp connected"}</span>
-            </div>
-            <div>
-              <Link href="/dashboard/guide" className="text-[#5A6B7B] hover:text-[#10283B] dark:text-[#A8BACA] dark:hover:text-[#FFF9F0] underline text-[12px]">
-                What changed in this menu
-              </Link>
-            </div>
-            <div className="text-[11.5px] text-[#8E9CAE] dark:text-white/40">
-              Preview · Sample data
-            </div>
-          </div>
-        </aside>
-
-        {/* Mobile Top Header (Hidden on Desktop) */}
-        <header className="sticky top-0 z-30 w-full border-b border-[#EADFCB] bg-[#FFF9F0]/95 backdrop-blur-md pt-[env(safe-area-inset-top)] text-ink dark:bg-[#0B1E2D]/95 dark:text-white dark:border-[#27465C] lg:hidden print:hidden">
-          <div className="flex h-12 items-center gap-2.5 pl-3 pr-1.5 sm:h-14 sm:gap-3 sm:pl-4 sm:pr-2">
-            <Link href="/dashboard" className="logo flex items-center gap-2 shrink-0 text-decoration-none transition hover:opacity-90">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/brands/thabaal/artifact-logo.png"
-                alt="thabaal"
-                width={36}
-                height={20}
-                className="w-9 h-auto shrink-0 object-contain"
-              />
-              <b className="font-display font-semibold text-[20px] tracking-[-0.3px] text-ink dark:text-[#FFF9F0] leading-none">
-                thabaal
-              </b>
-            </Link>
-            {scope.isAdmin ? (
-              <HeaderClientSwitcher clients={clients} current={scope.clientId} title={client ? name : "All clients"}>
-                <span className="block text-2xs leading-tight">{status}</span>
-              </HeaderClientSwitcher>
-            ) : (
-              <div className="min-w-0 flex-1 truncate text-right">
-                <p className="truncate text-xs font-semibold leading-tight text-ink dark:text-white">{name}</p>
-                <div className="text-2xs leading-tight">{status ?? <span className="block truncate text-muted dark:text-white/70">{subtitle}</span>}</div>
+            {scope.isAdmin && (
+              <div className="shrink-0 px-3 pb-1">
+                <ClientSwitcher clients={clients} current={scope.clientId} />
               </div>
             )}
-            <ThemeToggle />
-            {notificationsOn && <NotificationBell />}
-            <SettingsLink />
-          </div>
-        </header>
+            <div className="thin-scroll min-h-0 flex-1 overflow-y-auto px-3 py-2">
+              <SideNav
+                isAdmin={scope.isAdmin}
+                showWallet={client?.billingMode === "wallet"}
+                disabledSections={disabledSections}
+                openReplies={openReplies}
+                newOrders={ordersToHandle}
+                unreadNotifications={unreadNotifications}
+              />
+            </div>
+            <div className="shrink-0 border-t border-line p-3">
+              <Link href="/dashboard/settings" className="flex items-center gap-2.5 rounded-xl p-2 transition hover:bg-sunken">
+                <ClientMark logoUrl={client?.logoUrl} name={name} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13.5px] font-semibold text-ink">{name}</span>
+                  {status && <span className="block text-[12px]">{status}</span>}
+                </span>
+              </Link>
+            </div>
+          </aside>
 
-        {/* Floating Right Main Content Bar */}
-        <div className="flex-1 min-w-0 w-full lg:h-full lg:flex lg:flex-col lg:overflow-hidden lg:rounded-[24px] lg:border lg:border-[#E4D7C0] lg:bg-[#FFF9F0]/98 lg:shadow-[0_12px_36px_rgba(30,20,10,0.08)] lg:backdrop-blur-xl dark:lg:border-[#23455E] dark:lg:bg-[#0B1E2D]/98 dark:lg:shadow-[0_18px_48px_rgba(0,0,0,0.55)] dark:lg:ring-1 dark:lg:ring-white/[0.08]">
-          <div className="panel-scroll h-full w-full lg:overflow-y-auto overscroll-contain">
-            <main id="main" className="stagger relative mx-auto w-full max-w-page px-3 pb-[calc(4.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pt-6 lg:px-7 lg:pb-6 lg:pt-5 print:p-0">
+          {/* Phones and tablets: a slim top bar with the logo, the business and quick controls. */}
+          <header className="sticky top-0 z-30 w-full border-b border-line bg-canvas/95 pt-[env(safe-area-inset-top)] text-ink backdrop-blur-md lg:hidden print:hidden">
+            <div className="flex h-12 items-center gap-2 pl-3 pr-1.5 sm:h-14 sm:gap-3 sm:pl-4 sm:pr-2">
+              <Logo size="sm" />
+              {scope.isAdmin ? (
+                <HeaderClientSwitcher clients={clients} current={scope.clientId} title={client ? name : "All clients"}>
+                  <span className="block text-2xs leading-tight">{status}</span>
+                </HeaderClientSwitcher>
+              ) : (
+                <div className="min-w-0 flex-1 text-right">
+                  <p className="truncate text-xs font-semibold leading-tight text-ink">{name}</p>
+                  {status && <div className="flex justify-end text-2xs leading-tight">{status}</div>}
+                </div>
+              )}
+              <ThemeToggle />
+              {notificationsOn && <NotificationBell />}
+              <SettingsLink />
+            </div>
+          </header>
+
+          <div className="min-w-0 flex-1">
+            <main
+              id="main"
+              className="stagger relative mx-auto w-full max-w-page px-3 pb-[calc(4.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pt-6 lg:px-8 lg:pb-10 lg:pt-7 print:p-0"
+            >
               {client?.billingMode === "wallet" && <WalletBanner clientId={client.id} lowAlert={client.walletLowAlert} />}
               {children}
             </main>
           </div>
+          {callsOn && scope.canOperate && <CallWidget />}
+          <BottomNav
+            isAdmin={scope.isAdmin}
+            showWallet={client?.billingMode === "wallet"}
+            role={role}
+            disabledSections={disabledSections}
+            openReplies={openReplies}
+            newOrders={ordersToHandle}
+            unreadNotifications={unreadNotifications}
+          />
         </div>
-        {callsOn && scope.canOperate && <CallWidget />}
-        <BottomNav
-          isAdmin={scope.isAdmin}
-          showWallet={client?.billingMode === "wallet"}
-          role={role}
-          disabledSections={disabledSections}
-          openReplies={openReplies}
-          newOrders={newOrders}
-          unreadNotifications={unreadNotifications}
-        />
-      </div>
+      </ShellProvider>
     </NotificationProvider>
   );
 }

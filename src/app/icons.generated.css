@@ -108,6 +108,14 @@
 .pi-strikethrough{--pi:var(--pi-strikethrough)}
 .pi-sun{--pi:var(--pi-sun)}
 .pi-tags{--pi:var(--pi-tags)}
+.pi-tag{--pi:var(--pi-tag)}
+.pi-home{--pi:var(--pi-home)}
+.pi-indian-rupee{--pi:var(--pi-indian-rupee)}
+.pi-bar-chart{--pi:var(--pi-bar-chart)}
+.pi-settings{--pi:var(--pi-settings)}
+.pi-package-x{--pi:var(--pi-package-x)}
+.pi-check-square{--pi:var(--pi-check-square)}
+.pi-trophy{--pi:var(--pi-trophy)}
 .pi-trash2{--pi:var(--pi-trash2)}
 .pi-triangle-alert{--pi:var(--pi-triangle-alert)}
 .pi-truck{--pi:var(--pi-truck)}

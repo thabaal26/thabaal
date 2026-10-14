@@ -73,7 +73,7 @@ export default async function Home() {
             <Link href="/terms" className="hidden text-ink-2 hover:text-ink sm:inline">
               Terms
             </Link>
-            <Link href="/login" className="rounded-lg bg-brand px-3.5 py-2 font-medium text-white hover:opacity-90">
+            <Link href="/login" className="rounded-lg bg-brand px-3.5 py-2 font-medium text-on-brand hover:opacity-90">
               Sign in
             </Link>
           </nav>
@@ -91,7 +91,7 @@ export default async function Home() {
             reports. It works through Meta&apos;s official WhatsApp Business Platform, using each business&apos;s own WhatsApp number.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/login" className="rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90">
+            <Link href="/login" className="rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-on-brand hover:opacity-90">
               Sign in to Thabaal
             </Link>
             <a href="#google-data" className="rounded-lg border border-line bg-panel px-5 py-2.5 text-sm font-semibold text-ink hover:border-brand">

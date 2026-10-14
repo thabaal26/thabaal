@@ -346,11 +346,12 @@ export function OrderActions({
           <PencilLine aria-hidden className="size-3 shrink-0 text-muted" />
         </button>
       )}
-      <div className="flex items-center gap-2">
+      {/* Buttons wrap onto a second line instead of cutting their labels short. */}
+      <div className="flex flex-wrap items-center gap-2">
         {primaryStep && (
           <Button
             size="sm"
-            className="min-w-0 flex-1"
+            className="min-w-0 max-w-full flex-auto"
             variant={primaryStep.variant}
             disabled={pending}
             loading={busy === primaryStep.key}
@@ -362,7 +363,7 @@ export function OrderActions({
         {secondaryStep && (
           <Button
             size="sm"
-            className="hidden shrink-0 sm:inline-flex"
+            className="hidden flex-auto sm:inline-flex"
             variant={secondaryStep.variant}
             disabled={pending}
             loading={busy === secondaryStep.key}

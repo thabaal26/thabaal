@@ -1,16 +1,6 @@
+import { BarChart3, Home, IndianRupee, Megaphone, MessageCircle, Package, Settings, Tag, Users } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
-import {
-  BarChart3,
-  Home,
-  IndianRupee,
-  Megaphone,
-  MessageCircle,
-  Package,
-  Settings,
-  Tag,
-  Users,
-} from "lucide-react";
 
 export const metadata: Metadata = {
   title: "What changed in this menu · Thabaal",
@@ -178,17 +168,17 @@ export default function MenuGuidePage() {
     <div className="space-y-6 sm:space-y-8 max-w-5xl mx-auto">
       {/* Top Header */}
       <div>
-        <h1 className="font-display font-semibold text-2xl sm:text-3xl text-ink dark:text-[#FFF9F0]">
+        <h1 className="font-display font-semibold text-2xl sm:text-3xl text-ink">
           What changed
         </h1>
-        <p className="mt-1 text-sm text-[#5A6B7B] dark:text-[#A8BACA]">
+        <p className="mt-1 text-sm text-muted">
           A map from the old menu to the new pages.
         </p>
       </div>
 
       {/* 9 Pages Grid */}
       <section className="space-y-3">
-        <h2 className="font-display font-semibold text-lg text-ink dark:text-[#FFF9F0]">
+        <h2 className="font-display font-semibold text-lg text-ink">
           All pages
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
@@ -198,13 +188,13 @@ export default function MenuGuidePage() {
               <Link
                 key={p.href}
                 href={p.href}
-                className="flex flex-col items-start gap-2 p-4 rounded-2xl border-[1.5px] border-[#EADFCB] bg-white hover:border-[#10283B] transition dark:border-[#27465C] dark:bg-[#133248] dark:hover:border-[#FFF9F0]"
+                className="flex flex-col items-start gap-2 p-4 rounded-2xl border-[1.5px] border-line bg-panel hover:border-ink transition"
               >
-                <div className="flex items-center gap-2.5 font-display font-semibold text-[17px] text-[#10283B] dark:text-[#FFF9F0]">
-                  <Icon className="size-[19px] shrink-0 text-[#10283B] dark:text-[#FFC329]" strokeWidth={2} />
+                <div className="flex items-center gap-2.5 font-display font-semibold text-[17px] text-ink">
+                  <Icon className="size-[19px] shrink-0 text-ink dark:text-[#FFC329]" strokeWidth={2} />
                   <span>{p.title}</span>
                 </div>
-                <p className="text-[13px] text-[#5A6B7B] dark:text-[#A8BACA] leading-snug">
+                <p className="text-[13px] text-muted leading-snug">
                   {p.desc}
                 </p>
               </Link>
@@ -214,12 +204,12 @@ export default function MenuGuidePage() {
       </section>
 
       {/* Migration Table */}
-      <section className="rounded-[18px] border-[1.5px] border-[#EADFCB] bg-white p-5 shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)] dark:border-[#27465C] dark:bg-[#133248]">
+      <section className="rounded-[18px] border-[1.5px] border-line bg-panel p-5 shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)]">
         <div className="mb-4">
-          <h2 className="font-display font-semibold text-[19px] text-[#10283B] dark:text-[#FFF9F0]">
+          <h2 className="font-display font-semibold text-[19px] text-ink">
             Where did the old sections go?
           </h2>
-          <p className="text-[13.5px] text-[#5A6B7B] dark:text-[#A8BACA] mt-0.5">
+          <p className="text-[13.5px] text-muted mt-0.5">
             22 menu items became 9 pages. Nothing was removed.
           </p>
         </div>
@@ -227,22 +217,22 @@ export default function MenuGuidePage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-[14px] border-collapse">
             <thead>
-              <tr className="border-b-[1.5px] border-[#EADFCB] dark:border-[#27465C]">
-                <th className="py-2.5 px-3 text-[12px] font-bold uppercase tracking-wider text-[#5A6B7B] dark:text-[#A8BACA]">
+              <tr className="border-b-[1.5px] border-line">
+                <th className="py-2.5 px-3 text-[12px] font-bold uppercase tracking-wider text-muted">
                   Old place
                 </th>
-                <th className="py-2.5 px-3 text-[12px] font-bold uppercase tracking-wider text-[#5A6B7B] dark:text-[#A8BACA]">
+                <th className="py-2.5 px-3 text-[12px] font-bold uppercase tracking-wider text-muted">
                   Now
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#EADFCB] dark:divide-[#27465C]">
+            <tbody className="divide-y divide-line">
               {MAPPING.map((row) => (
                 <tr key={row.old} className="hover:bg-[#FFF9F0]/50 dark:hover:bg-white/[0.02]">
-                  <td className="py-3 px-3 font-semibold text-[#10283B] dark:text-[#FFF9F0] whitespace-nowrap align-top">
+                  <td className="py-3 px-3 font-semibold text-ink whitespace-nowrap align-top">
                     {row.old}
                   </td>
-                  <td className="py-3 px-3 text-[#5A6B7B] dark:text-[#A8BACA] leading-relaxed">
+                  <td className="py-3 px-3 text-muted leading-relaxed">
                     {row.now}
                   </td>
                 </tr>
@@ -253,14 +243,14 @@ export default function MenuGuidePage() {
       </section>
 
       {/* What Got Simpler */}
-      <section className="rounded-[18px] border-[1.5px] border-[#EADFCB] bg-white p-5 shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)] dark:border-[#27465C] dark:bg-[#133248]">
-        <h2 className="font-display font-semibold text-[19px] text-[#10283B] dark:text-[#FFF9F0] mb-3">
+      <section className="rounded-[18px] border-[1.5px] border-line bg-panel p-5 shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)]">
+        <h2 className="font-display font-semibold text-[19px] text-ink mb-3">
           What got simpler
         </h2>
-        <ul className="divide-y divide-[#EADFCB] dark:divide-[#27465C]">
+        <ul className="divide-y divide-line">
           {SIMPLIFIED.map((item) => (
-            <li key={item} className="py-2.5 text-[14px] text-[#10283B] dark:text-[#FFF9F0] font-medium flex items-center gap-2.5">
-              <span className="size-1.5 rounded-full bg-[#FFC329] shrink-0" />
+            <li key={item} className="py-2.5 text-[14px] text-ink font-medium flex items-center gap-2.5">
+              <span className="size-1.5 rounded-full bg-brand shrink-0" />
               <span>{item}</span>
             </li>
           ))}

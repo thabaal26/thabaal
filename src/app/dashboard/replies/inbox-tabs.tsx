@@ -19,8 +19,8 @@ export function InboxTabs({ active }: { active: "inbox" | "priority" | "calls" }
           className={cn(
             "inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold transition",
             t.key === active
-              ? "bg-[#10283B] text-[#FFF9F0] dark:bg-[#FFF9F0] dark:text-[#10283B] shadow-xs"
-              : "text-muted hover:text-ink dark:hover:text-[#FFF9F0]",
+              ? "bg-ink text-canvas shadow-xs"
+              : "text-muted hover:text-ink",
           )}
         >
           {t.label}

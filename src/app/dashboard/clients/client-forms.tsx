@@ -496,7 +496,7 @@ export function BrandingForm({ clientId, name, initial }: { clientId: string; na
             <p className="px-2.5 py-1.5 text-white/70">Campaigns</p>
           </div>
           <div className="space-y-2 p-3">
-            <span className="inline-flex rounded-control bg-brand px-3 py-1.5 font-medium text-white">Button</span>
+            <span className="inline-flex rounded-control bg-brand px-3 py-1.5 font-medium text-on-brand">Button</span>
             <p className="text-2xs text-muted">Pages, text and buttons keep the portal&apos;s neutral look; the brand colour marks the highlights.</p>
           </div>
         </div>

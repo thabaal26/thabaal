@@ -1,9 +1,9 @@
-import { CheckCheck, MessageCircle } from "lucide-react";
+import { CheckCheck, MessageCircle } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
 import { ActionButton } from "@/components/action-button";
 import type { ConversationEntry } from "@/components/conversation";
-import { Card, EmptyState } from "@/components/ui";
+import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { fmtNumber } from "@/lib/format";
@@ -149,16 +149,12 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
 
   return (
     <div className="flex flex-col gap-3.5">
-      {/* Header section with title and view tabs */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-ink dark:text-[#FFF9F0] sm:text-3xl">Chats</h1>
-          <p className="mt-0.5 text-xs text-muted sm:text-sm">
-            Answer customers first. Free replies are open for 24 hours after they write.
-          </p>
-        </div>
-        <InboxTabs active="inbox" />
-      </div>
+      <PageHeader
+        title="Chats"
+        description="Answer customers first. Free replies are open for 24 hours after they write."
+        actions={<InboxTabs active="inbox" />}
+        inlineActions
+      />
 
       {/* Filter pills and Mark All Handled action bar */}
       <div className="flex flex-wrap items-center justify-between gap-2.5">
@@ -173,7 +169,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold transition",
                   active
-                    ? "bg-[#10283B] text-[#FFF9F0] dark:bg-[#FFF9F0] dark:text-[#10283B] shadow-xs"
+                    ? "bg-ink text-canvas shadow-xs"
                     : "border border-line bg-card text-muted hover:border-line-strong hover:text-ink dark:hover:text-white",
                 )}
               >

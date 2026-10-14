@@ -10,6 +10,7 @@ import { renderFor, type TemplateButton, type VarMap } from "@/lib/template";
 import { generateCustomerFollowUpAction } from "../../actions/ai";
 import { uploadProductImage } from "../../actions/catalog";
 import { replyToCustomer, sendToCustomer } from "../../actions/send";
+import { templateLabel } from "@/lib/plain-error";
 
 export type PanelTemplate = {
   id: string;
@@ -103,7 +104,7 @@ export function SendPanel({
               <>
                 <Field id="tpl" label="Template">
                   <select className="field" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-                    {templates.map((x) => <option key={x.id} value={x.id}>{x.name} · {x.category.toLowerCase()}</option>)}
+                    {templates.map((x) => <option key={x.id} value={x.id}>{templateLabel(x.name)} · {x.category.toLowerCase()}</option>)}
                   </select>
                 </Field>
                 {numbers.length > 0 && (

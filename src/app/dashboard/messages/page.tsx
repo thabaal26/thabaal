@@ -13,6 +13,7 @@ import { ActiveFilters, FilterBar } from "@/components/filter-bar";
 import { activeCount as filterCount, filterQuery, keepFilters, readFilters, resolvePeriod, type FilterSection, type FilterState } from "@/lib/filters";
 import { filterOptions, messageScope } from "@/lib/filter-scope";
 import { getScope, owned, ownedMessages } from "@/lib/session";
+import { plainError, templateLabel } from "@/lib/plain-error";
 
 
 const MESSAGE_FILTERS: FilterSection[] = ["period"];
@@ -227,10 +228,10 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
                           <StatusBadge status={m.status} />
                         </div>
                         <p className="mt-0.5 flex items-center justify-between gap-2 text-xs text-muted">
-                          <span className="truncate font-mono">{m.templateName}</span>
+                          <span className="truncate">{templateLabel(m.templateName)}</span>
                           <span className="tabular shrink-0">{fmtDate(m.sentAt ?? m.failedAt ?? m.createdAt, "d MMM, h:mm a")}</span>
                         </p>
-                        {m.error && <p className="mt-1 line-clamp-2 text-xs text-danger">{m.error}</p>}
+                        {m.error && <p className="mt-1 line-clamp-2 text-xs text-danger">{plainError(m.error)}</p>}
                       </div>
                       <ChevronDown aria-hidden className="mt-1 size-4 shrink-0 text-muted transition group-open:rotate-180" />
                     </summary>
@@ -295,12 +296,12 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
                       <Td className="max-w-md">
                         <details className="group">
                           <summary className="cursor-pointer list-none rounded-control [&::-webkit-details-marker]:hidden">
-                            <span className="font-mono text-xs text-ink-2">{m.templateName}</span>
+                            <span className="text-xs text-ink-2">{templateLabel(m.templateName)}</span>
                             {m.body && <p className="line-clamp-1 text-xs text-muted group-open:hidden">{m.body}</p>}
                           </summary>
                           {m.body && <p className="mt-2 whitespace-pre-wrap rounded-control bg-chat p-3 text-xs text-ink">{m.body}</p>}
                         </details>
-                        {m.error && <p className="mt-1 text-xs text-danger">{m.error}</p>}
+                        {m.error && <p className="mt-1 text-xs text-danger">{plainError(m.error)}</p>}
                         <p className="mt-1 text-xs text-muted lg:hidden">{m.run?.campaign.name ?? "Test send"}</p>
                       </Td>
                       <Td className="text-xs text-ink-2 max-lg:hidden">

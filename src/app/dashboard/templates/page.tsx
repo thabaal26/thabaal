@@ -88,7 +88,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
           {templates.map((t) => {
             const r = renderFor({ ...t, headerText: t.headerText ?? "", footer: t.footer ?? "", variables: t.variables as VarMap }, SAMPLE_CUSTOMER);
             return (
-              <Card key={t.id} className="flex flex-col overflow-hidden rounded-[18px] border-[1.5px] border-[#EADFCB] dark:border-[#27465C] bg-white dark:bg-[#133248] shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)] dark:shadow-[0_14px_30px_-22px_rgba(0,0,0,.7)] transition hover:border-[#10283B] dark:hover:border-[#FFF9F0]">
+              <Card key={t.id} className="flex flex-col overflow-hidden rounded-[18px] border-[1.5px] border-line bg-panel shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)] dark:shadow-[0_14px_30px_-22px_rgba(0,0,0,.7)] transition hover:border-ink">
                 <div className="flex items-center justify-between bg-wa-bar px-3.5 py-2 text-2xs font-medium text-white/90">
                   <span className="truncate font-semibold">{t.client.name}</span>
                   <span className="font-mono text-white/70">{t.language}</span>
@@ -143,7 +143,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
           })}
         </div>
       ) : (
-        <Card className="rounded-[18px] border-[1.5px] border-[#EADFCB] dark:border-[#27465C] bg-white dark:bg-[#133248] shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)] dark:shadow-[0_14px_30px_-22px_rgba(0,0,0,.7)]">
+        <Card className="rounded-[18px] border-[1.5px] border-line bg-panel shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)] dark:shadow-[0_14px_30px_-22px_rgba(0,0,0,.7)]">
           <EmptyState
             icon={<FileText className="size-5" />}
             title={active ? `No ${CATEGORY_INFO[active].label.toLowerCase()} templates` : "No templates yet"}

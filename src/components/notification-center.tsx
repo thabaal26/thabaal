@@ -330,7 +330,7 @@ export function NotificationProvider({
                   <Link
                     href={toast.href}
                     onClick={() => dismissToast(toast.id)}
-                    className="inline-flex min-h-11 items-center gap-1 rounded-control bg-brand px-2.5 text-xs font-semibold text-white transition hover:bg-brand-deep active:scale-95 sm:min-h-7"
+                    className="inline-flex min-h-11 items-center gap-1 rounded-control bg-brand px-2.5 text-xs font-semibold text-on-brand transition hover:bg-brand-deep active:scale-95 sm:min-h-7"
                   >
                     <span>View</span>
                     <ExternalLink className="size-3" />

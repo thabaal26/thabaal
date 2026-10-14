@@ -357,7 +357,7 @@ export function CampaignForm({
                         onClick={() => set({ daysOfWeek: [i] })}
                         className={cn(
                           "flex h-11 min-w-0 items-center justify-center rounded-control border px-0.5 text-xs font-medium transition active:scale-95 sm:w-12 sm:flex-none pointer-coarse:min-h-11",
-                          on ? "border-brand bg-brand text-white shadow-xs font-semibold" : "border-line-strong/50 bg-panel text-ink-2 hover:border-line-strong",
+                          on ? "border-brand bg-brand text-on-brand shadow-xs font-semibold" : "border-line-strong/50 bg-panel text-ink-2 hover:border-line-strong",
                         )}
                       >
                         {d}
@@ -391,7 +391,7 @@ export function CampaignForm({
                         className={cn(
                           "min-h-8 rounded-full border px-2.5 py-1 text-xs font-medium transition active:scale-95 pointer-coarse:min-h-10 pointer-coarse:px-3",
                           activePair
-                            ? "border-brand bg-brand text-white shadow-xs"
+                            ? "border-brand bg-brand text-on-brand shadow-xs"
                             : "border-line bg-sunken/60 text-ink-2 hover:border-line-strong",
                         )}
                       >
@@ -421,7 +421,7 @@ export function CampaignForm({
                         }}
                         className={cn(
                           "flex h-11 min-w-0 items-center justify-center rounded-control border px-0.5 text-xs font-medium transition active:scale-95 sm:w-12 sm:flex-none pointer-coarse:min-h-11",
-                          on ? "border-brand bg-brand text-white shadow-xs font-semibold" : "border-line-strong/50 bg-panel text-ink-2 hover:border-line-strong",
+                          on ? "border-brand bg-brand text-on-brand shadow-xs font-semibold" : "border-line-strong/50 bg-panel text-ink-2 hover:border-line-strong",
                         )}
                       >
                         {d}
@@ -454,7 +454,7 @@ export function CampaignForm({
                         key={d}
                         className={cn(
                           "flex h-11 min-w-0 items-center justify-center rounded-control border px-0.5 text-xs font-medium sm:w-12 sm:flex-none",
-                          on ? "border-brand bg-brand text-white shadow-xs font-semibold" : "border-line bg-sunken text-muted/50 opacity-60",
+                          on ? "border-brand bg-brand text-on-brand shadow-xs font-semibold" : "border-line bg-sunken text-muted/50 opacity-60",
                         )}
                       >
                         {d}
@@ -477,7 +477,7 @@ export function CampaignForm({
                   {DAYS.map((d) => (
                     <div
                       key={d}
-                      className="flex h-11 min-w-0 items-center justify-center rounded-control border border-brand bg-brand text-white shadow-xs px-0.5 text-xs font-semibold sm:w-12 sm:flex-none"
+                      className="flex h-11 min-w-0 items-center justify-center rounded-control border border-brand bg-brand text-on-brand shadow-xs px-0.5 text-xs font-semibold sm:w-12 sm:flex-none"
                     >
                       {d}
                     </div>
@@ -505,7 +505,7 @@ export function CampaignForm({
                         onClick={() => set({ daysOfWeek: on ? c.daysOfWeek.filter((x) => x !== i) : [...c.daysOfWeek, i].sort() })}
                         className={cn(
                           "flex h-11 min-w-0 items-center justify-center rounded-control border px-0.5 text-xs font-medium transition active:scale-95 sm:w-12 sm:flex-none pointer-coarse:min-h-11",
-                          on ? "border-brand bg-brand text-white shadow-xs font-semibold" : "border-line-strong/50 bg-panel text-ink-2 hover:border-line-strong",
+                          on ? "border-brand bg-brand text-on-brand shadow-xs font-semibold" : "border-line-strong/50 bg-panel text-ink-2 hover:border-line-strong",
                         )}
                       >
                         {d}
@@ -539,7 +539,7 @@ export function CampaignForm({
                       className={cn(
                         "min-h-8 rounded-full border px-2.5 py-1 text-xs font-medium transition active:scale-95 pointer-coarse:min-h-10 pointer-coarse:px-3",
                         on
-                          ? "border-brand bg-brand text-white shadow-xs"
+                          ? "border-brand bg-brand text-on-brand shadow-xs"
                           : "border-line bg-sunken/60 text-ink-2 hover:border-line-strong",
                       )}
                     >

@@ -42,7 +42,7 @@ export function ChatList({
   return (
     <div className="flex h-full flex-col">
       {/* WhatsApp Search Bar */}
-      <div className="border-b border-line p-3 dark:border-[#27465C]">
+      <div className="border-b border-line p-3">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted" />
           <input
@@ -50,7 +50,7 @@ export function ChatList({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search or start new chat"
-            className="w-full rounded-xl border border-line bg-panel py-1.5 pl-9 pr-3 text-xs text-ink placeholder:text-muted focus:border-brand focus:outline-none dark:bg-[#1A262D] dark:text-white"
+            className="w-full rounded-xl border border-line bg-panel py-1.5 pl-9 pr-3 text-xs text-ink placeholder:text-muted focus:border-brand focus:outline-none dark:bg-[#1A262D]"
           />
         </div>
       </div>
@@ -67,7 +67,7 @@ export function ChatList({
                 className={cn(
                   "flex items-start gap-3 p-3 mx-2 my-1 rounded-xl transition-all",
                   current
-                    ? "bg-[#FFF3D6] text-[#10283B] dark:bg-[#1A384F] dark:text-[#FFF9F0] shadow-2xs font-medium"
+                    ? "bg-brand-soft text-ink dark:bg-[#1A384F] shadow-2xs font-medium"
                     : "hover:bg-[#F5F7FB]/70 dark:hover:bg-[#1A262D]/70 text-ink dark:text-[#E9EDEF]",
                 )}
               >
@@ -75,7 +75,7 @@ export function ChatList({
                 <div className="min-w-0 flex-1">
                   {/* Top: Name & Time */}
                   <div className="flex items-baseline justify-between gap-1">
-                    <p className={cn("truncate text-[14.5px]", current ? "font-bold text-[#10283B] dark:text-white" : "font-semibold")}>
+                    <p className={cn("truncate text-[14.5px]", current ? "font-bold text-ink" : "font-semibold")}>
                       {item.name}
                     </p>
                     <time className="tabular shrink-0 text-[11.5px] text-[#667781] dark:text-[#8696A0]">
@@ -84,7 +84,7 @@ export function ChatList({
                   </div>
 
                   {/* Middle: Last message preview */}
-                  <p className={cn("mt-0.5 truncate text-[13px]", current ? "text-[#5A6B7B] dark:text-[#A8BACA]" : "text-[#667781] dark:text-[#8696A0]")}>
+                  <p className={cn("mt-0.5 truncate text-[13px]", current ? "text-muted" : "text-[#667781] dark:text-[#8696A0]")}>
                     {item.isButton && <span className="font-medium text-emerald-600 dark:text-emerald-400">Tapped: </span>}
                     {item.previewText}
                   </p>

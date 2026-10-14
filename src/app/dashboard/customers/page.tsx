@@ -1,5 +1,4 @@
-import { CheckCircle2, ChevronLeft, ChevronRight, MapPin, Search, UserX } from "@/components/icons";
-import { Users } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, MapPin, Search, Users, UserX } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
 import { Picker } from "@/components/picker";
@@ -176,7 +175,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
               href="/dashboard/customers"
               className={cn(
                 "inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold transition",
-                !tag ? "bg-[#10283B] text-[#FFF9F0] dark:bg-[#FFF9F0] dark:text-[#10283B] shadow-xs" : "text-muted hover:text-ink dark:hover:text-[#FFF9F0]",
+                !tag ? "bg-ink text-canvas shadow-xs" : "text-muted hover:text-ink",
               )}
             >
               All customers
@@ -185,7 +184,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
               href="/dashboard/customers?tag=lapsed"
               className={cn(
                 "inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold transition",
-                tag === "lapsed" ? "bg-[#10283B] text-[#FFF9F0] dark:bg-[#FFF9F0] dark:text-[#10283B] shadow-xs" : "text-muted hover:text-ink dark:hover:text-[#FFF9F0]",
+                tag === "lapsed" ? "bg-ink text-canvas shadow-xs" : "text-muted hover:text-ink",
               )}
             >
               Groups to reach
@@ -194,14 +193,14 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
               href="/dashboard/customers?tag=loyalty"
               className={cn(
                 "inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold transition",
-                tag === "loyalty" ? "bg-[#10283B] text-[#FFF9F0] dark:bg-[#FFF9F0] dark:text-[#10283B] shadow-xs" : "text-muted hover:text-ink dark:hover:text-[#FFF9F0]",
+                tag === "loyalty" ? "bg-ink text-canvas shadow-xs" : "text-muted hover:text-ink",
               )}
             >
               Loyalty
             </Link>
             <Link
               href="/dashboard/refills"
-              className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink dark:hover:text-[#FFF9F0] transition"
+              className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink transition"
             >
               Refills
             </Link>

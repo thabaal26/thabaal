@@ -2,7 +2,11 @@ import { Building2, CheckCircle2, Circle, LogOut, SquarePen } from "@/components
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "@/components/intent-link";
-import { Badge, buttonClass, Callout, Card, CardHeader, PageHeader } from "@/components/ui";
+import { Badge, buttonClass, Callout, Card, CardHeader, PageHeader, QualityBadge } from "@/components/ui";
+import { ThemeChoice } from "@/components/theme-toggle";
+import { getCatalogWithProducts } from "@/lib/catalog";
+import { db } from "@/lib/db";
+import { numberHealth } from "@/lib/limits";
 import { fmtDate } from "@/lib/format";
 import { keyId } from "@/lib/secret-box";
 import { requireUser } from "@/lib/session";
@@ -55,15 +59,79 @@ export default async function SettingsPage() {
       </form>
     </Card>
   );
+  const look = (
+    <Card>
+      <CardHeader title="Look" description="Light, dark, or follow this phone or computer. Remembered on this device." action={<ThemeChoice />} />
+    </Card>
+  );
   if (user.role !== "ADMIN") {
+    const cid = user.clientId;
+    const [numbers, customers, products, ordersCount] = cid
+      ? await Promise.all([
+          numberHealth(cid).catch(() => []),
+          db.customer.count({ where: { clientId: cid, optedOut: false } }),
+          getCatalogWithProducts(cid)
+            .then((c) => c?.products.length ?? null)
+            .catch(() => null),
+          db.order.count({ where: { clientId: cid } }),
+        ])
+      : [[], 0, null, 0];
     return (
       <>
         <PageHeader
           title="Settings"
-          description={user.client ? `Your login for ${user.client.name}.` : "Your account."}
+          description={user.client ? `Your login, look and WhatsApp numbers for ${user.client.name}.` : "Your account."}
           actions={<Link href="/dashboard/templates" className={buttonClass("secondary") + " lg:hidden"}><SquarePen aria-hidden className="size-4" /> Templates</Link>}
         />
-        <div className="max-w-form">{account}</div>
+        <div className="grid max-w-5xl items-start gap-4 sm:gap-6 lg:grid-cols-2">
+          <div className="space-y-4 sm:space-y-6">
+            {look}
+            {cid && (
+              <Card>
+                <CardHeader title="WhatsApp numbers" description="Live from Meta: how healthy each number is and how many people it can message a day." />
+                {numbers.length ? (
+                  <ul className="divide-y divide-line">
+                    {numbers.map((n) => (
+                      <li key={n.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 sm:px-5">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-ink">
+                            {n.verifiedName || n.label}
+                            {n.isDefault && <span className="ml-1.5 text-xs font-medium text-muted">· main number</span>}
+                          </p>
+                          <p className="tabular text-xs text-muted">
+                            {n.displayPhone ?? "Number not shown yet"}
+                            {n.limit != null ? ` · up to ${n.limit.toLocaleString("en-IN")} customers a day` : ""}
+                          </p>
+                        </div>
+                        <QualityBadge rating={n.qualityRating} />
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="px-4 py-3 text-sm text-muted sm:px-5">No WhatsApp number connected yet. Your Thabaal admin adds it.</p>
+                )}
+              </Card>
+            )}
+            {cid && (
+              <Card>
+                <CardHeader title="Business details" description={user.client?.name} />
+                <dl className="grid grid-cols-3 divide-x divide-line">
+                  {[
+                    ["Customers", customers],
+                    ["Products", products],
+                    ["Orders", ordersCount],
+                  ].map(([label, v]) => (
+                    <div key={label as string} className="px-4 py-3 sm:px-5">
+                      <dt className="text-xs text-muted">{label}</dt>
+                      <dd className="tabular font-display text-xl font-semibold text-ink">{v == null ? "—" : Number(v).toLocaleString("en-IN")}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </Card>
+            )}
+          </div>
+          {account}
+        </div>
       </>
     );
   }
@@ -144,7 +212,10 @@ export default async function SettingsPage() {
               </p>
             </div>
           </Card>
-          {account}
+          <div className="space-y-4 sm:space-y-6">
+            {look}
+            {account}
+          </div>
         </div>
       </div>
       <Card id="appearance" className="mt-4 scroll-mt-20 sm:mt-6">

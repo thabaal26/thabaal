@@ -1,5 +1,4 @@
-import { Package, PackageCheck, PackageOpen, Search, Store, Truck, Wallet } from "@/components/icons";
-import { IndianRupee, ShoppingBag } from "lucide-react";
+import { IndianRupee, Package, PackageCheck, PackageOpen, Search, ShoppingBag, Store, Truck, Wallet } from "@/components/icons";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "@/components/intent-link";
@@ -173,6 +172,8 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     ownPaymentTemplate,
     paymentTemplate,
     catalogData,
+    paidToPackCount,
+    activeSum,
   ] = await Promise.all([
     db.order.findMany({
       where: baseWhere,
@@ -223,6 +224,10 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     scope.clientId ? db.template.findFirst({ where: { clientId: scope.clientId, name: PAYMENT_TEMPLATE }, select: { status: true } }) : null,
     scope.clientId ? paymentTemplateFor(scope.clientId) : null,
     scope.clientId ? getCatalogWithProducts(scope.clientId) : null,
+    // Paid and not sent yet: the paid half of "to pack" (the Paid tab also counts dispatched and delivered ones).
+    db.order.count({ where: { ...mine, ...dateWhere, ...extraWhere, status: "PAID" } }),
+    // What the active orders are worth (the list below may be a filtered or capped view).
+    db.order.findMany({ where: { ...mine, ...dateWhere, ...extraWhere, status: { in: ["NEW", "CONFIRMED", "PAID", "DISPATCHED"] } }, select: { items: true, total: true } }),
   ]);
 
   const catalogProducts: CatalogProductOption[] = (catalogData?.products ?? []).map((p) => ({
@@ -333,6 +338,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
                   catalogId={catalogId}
                   isLiveCatalog={isLiveCatalog}
                   hasPaymentConfig={Boolean(client?.paymentConfig)}
+                  initialOpen={sp.new === "1"}
                 />
               </>
             ) : null}
@@ -357,9 +363,9 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
           label="Active orders"
           value={fmtNumber(activeCount)}
           sub={
-            orders.filter((o) => o.status !== "CANCELLED").length > 0
-              ? `${money(orders.filter((o) => o.status !== "CANCELLED").reduce((sum, o) => sum + getOrderPricing(o.items as OrderItem[], o.total, { applyDefaultWhenEqual: true }).total, 0))} in progress`
-              : "0 in progress"
+            activeCount > 0
+              ? `${money(activeSum.reduce((sum, o) => sum + getOrderPricing(o.items as OrderItem[], o.total, { applyDefaultWhenEqual: true }).total, 0))} in progress`
+              : "Nothing in progress"
           }
           icon={<Package />}
           tone="brand"
@@ -375,8 +381,8 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         />
         <Stat
           label="To pack & dispatch"
-          value={fmtNumber(confirmedCount + paidCount)}
-          sub={`${fmtNumber(confirmedCount)} confirmed · ${fmtNumber(paidCount)} paid`}
+          value={fmtNumber(confirmedCount + paidToPackCount)}
+          sub={`${fmtNumber(confirmedCount)} confirmed · ${fmtNumber(paidToPackCount)} paid`}
           icon={<Truck />}
           tone="info"
           href="/dashboard/orders/packing"

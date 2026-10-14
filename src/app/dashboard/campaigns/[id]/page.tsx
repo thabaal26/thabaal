@@ -21,6 +21,7 @@ import { cancelRun, deleteCampaign, runCampaignNow, sendCampaignTest, toggleCamp
 import { CampaignForm } from "../campaign-form";
 import { FailureSummary } from "../failure-summary";
 import { campaignFormData } from "../form-data";
+import { templateLabel } from "@/lib/plain-error";
 
 export const metadata: Metadata = { title: "Campaign" };
 export const dynamic = "force-dynamic";
@@ -49,7 +50,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
   const tagPick = picked ? null : decodeTags(c.audienceTag);
   const audienceSize = !c.audienceTag ? audience.all : picked ? picked.n : await db.customer.count({ where: await campaignAudienceWhere(c.clientId, c.audienceTag) });
   const audienceName = picked?.label ?? (tagPick ? describeTags(tagPick) : c.audienceTag);
-  const sendConfirm = `Send "${c.template.name}" now to ${fmtNumber(audienceSize)} customer${audienceSize === 1 ? "" : "s"} (${c.audienceTag ? `"${audienceName}"` : "ALL customers, no tag"})?`;
+  const sendConfirm = `Send "${templateLabel(c.template.name)}" now to ${fmtNumber(audienceSize)} customer${audienceSize === 1 ? "" : "s"} (${c.audienceTag ? `"${audienceName}"` : "ALL customers, no tag"})?`;
   // Sales credited to a run: orders a recipient placed within 7 days of getting its message.
   const runIds = c.runs.map((r) => r.id);
   const sales = runIds.length
@@ -149,7 +150,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
           <dl className="grid gap-4 p-4 text-sm sm:grid-cols-2 sm:p-5 lg:grid-cols-3 xl:grid-cols-5">
             <div>
               <dt className="text-xs text-muted">Template</dt>
-              <dd className="mt-1 flex flex-wrap items-center gap-2 font-mono">{c.template.name} <StatusBadge status={c.template.status} /></dd>
+              <dd className="mt-1 flex flex-wrap items-center gap-2">{templateLabel(c.template.name)} <StatusBadge status={c.template.status} /></dd>
             </div>
             <div>
               <dt className="text-xs text-muted">Sent to</dt>

@@ -132,7 +132,7 @@ export function OrderAddressControl({
               "print:hidden inline-flex shrink-0 items-center gap-1 rounded-control px-2 py-0.5 text-2xs font-semibold transition",
               effectiveAddress
                 ? "bg-panel text-ink-2 ring-1 ring-line hover:bg-sunken hover:text-ink"
-                : "bg-brand text-white shadow-xs hover:bg-brand-deep",
+                : "bg-brand text-on-brand shadow-xs hover:bg-brand-deep",
             )}
           >
             {effectiveAddress ? (

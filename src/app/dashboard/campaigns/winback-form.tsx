@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { toastResult } from "@/components/toast";
 import { Button, Card, CardHeader, Field } from "@/components/ui";
 import { saveWinbackRule } from "../actions/orders";
+import { templateLabel } from "@/lib/plain-error";
 
 /** Admin setting: when a customer counts as lapsed, and the message that tries to bring them back. */
 export function WinbackForm({
@@ -62,7 +63,7 @@ export function WinbackForm({
               <option value="">Don&apos;t send (tag only)</option>
               {templates.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.name}
+                  {templateLabel(t.name)}
                 </option>
               ))}
             </select>
