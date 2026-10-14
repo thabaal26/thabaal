@@ -48,12 +48,14 @@ export async function storePublicImage(opts: {
           : "jpg";
   const safeName = (opts.filename ?? `header.${ext}`).replace(/[^\w.-]+/g, "-").slice(-80);
 
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
+  const blobToken = process.env.BLOB_READ_WRITE_TOKEN || process.env.NEW_BLOB_READ_WRITE_TOKEN;
+  if (blobToken) {
     try {
       const blob = await put(`templates/${safeName}`, buf, {
         access: "public",
         contentType,
         addRandomSuffix: true,
+        token: blobToken,
       });
       return blob.url;
     } catch (e) {
