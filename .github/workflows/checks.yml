@@ -40,7 +40,10 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Type check
-        run: npx tsc --noEmit
+        # Next.js writes the PageProps / LayoutProps route types first (they exist locally only after a build).
+        run: |
+          npx next typegen
+          npx tsc --noEmit
       - name: Lint
         # Older warnings are still being cleared; lint reports without blocking until then.
         continue-on-error: true
