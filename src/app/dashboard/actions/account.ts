@@ -2,7 +2,7 @@
 
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/session";
+import { createSession, requireUser, revokeSessions } from "@/lib/session";
 import type { ActionResult } from "./templates";
 
 export async function changePassword(current: string, next: string): Promise<ActionResult> {
@@ -11,5 +11,8 @@ export async function changePassword(current: string, next: string): Promise<Act
   if (!(await bcrypt.compare(current, user.passwordHash))) return { ok: false, message: "Current password is wrong." };
   if (next.length < 8) return { ok: false, message: "New password must be at least 8 characters." };
   await db.user.update({ where: { id: me.id }, data: { passwordHash: await bcrypt.hash(next, 12) } });
-  return { ok: true, message: "Password changed." };
+  // Log out every other device, then give this one a fresh login so the person changing it stays in.
+  await revokeSessions(me.id);
+  await createSession(me.id);
+  return { ok: true, message: "Password changed. Other devices signed in with this account are logged out." };
 }

@@ -24,8 +24,12 @@ export function LoginForm({ lang = "en" }: LoginFormProps) {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const err = params.get("error");
-    const emailParam = params.get("email");
     if (!err) return;
+    // The refused Google address comes in a short-lived cookie (not the URL); read it once, then drop it.
+    const emailParam = decodeURIComponent(document.cookie.match(/(?:^|;\s*)wp_oauth_email=([^;]*)/)?.[1] ?? "") || null;
+    if (emailParam) document.cookie = "wp_oauth_email=; Max-Age=0; path=/login";
+    // Clean the address bar so a refresh or shared link doesn't repeat the message.
+    window.history.replaceState(null, "", window.location.pathname);
 
     if (err === "google_not_configured") {
       setOauthError(
@@ -37,7 +41,13 @@ export function LoginForm({ lang = "en" }: LoginFormProps) {
       setOauthError(
         isTamil
           ? `இந்த Google கணக்கு (${emailParam || "மின்னஞ்சல்"}) பதிவு செய்யப்படவில்லை. உங்கள் நிர்வாகியைத் தொடர்பு கொள்ளவும்.`
-          : `The Google account (${emailParam || "email"}) is not registered with Thabaal. Please sign in with your authorized credentials.`
+          : `The Google account ${emailParam ? `(${emailParam}) ` : ""}isn't registered with Thabaal. Ask your business's manager to add this email, or sign in with the account they added.`
+      );
+    } else if (err === "google_unverified") {
+      setOauthError(
+        isTamil
+          ? "இந்த Google கணக்கின் மின்னஞ்சல் உறுதிப்படுத்தப்படவில்லை. உறுதிப்படுத்திய கணக்கில் உள்நுழையவும்."
+          : "Google hasn't confirmed this account's email address, so it can't be used to sign in. Use a verified Google account or your password."
       );
     } else if (err === "google_denied") {
       setOauthError(

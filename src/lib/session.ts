@@ -15,7 +15,9 @@ function secret() {
 }
 
 export async function createSession(userId: string) {
-  const token = await new SignJWT({ sub: userId })
+  // The user's session version rides in the token; raising it (password change) ends older logins.
+  const u = await db.user.findUnique({ where: { id: userId }, select: { sessionVersion: true } });
+  const token = await new SignJWT({ sub: userId, sv: u?.sessionVersion ?? 0 })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE}s`)
@@ -33,26 +35,40 @@ export async function destroySession() {
   (await cookies()).delete(COOKIE);
 }
 
-export async function readSessionUserId(token?: string) {
+/** The signed-in user's id and session version from the cookie, or null when missing, expired or forged. */
+async function readSession(token?: string): Promise<{ userId: string; version: number } | null> {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret());
-    return typeof payload.sub === "string" ? payload.sub : null;
+    if (typeof payload.sub !== "string") return null;
+    // Tokens made before session versions existed count as version 0, so nobody was logged out by the change.
+    return { userId: payload.sub, version: typeof payload.sv === "number" ? payload.sv : 0 };
   } catch {
     return null;
   }
 }
 
+export async function readSessionUserId(token?: string) {
+  return (await readSession(token))?.userId ?? null;
+}
+
+/** Ends every login of this user (all devices); call after the password changes. */
+export async function revokeSessions(userId: string) {
+  await db.user.update({ where: { id: userId }, data: { sessionVersion: { increment: 1 } } });
+}
+
 /** Returns the signed-in user or redirects to /login. Use in every page and action. */
 export const requireUser = cache(async () => {
-  const userId = await readSessionUserId((await cookies()).get(COOKIE)?.value);
-  const user = userId
+  const session = await readSession((await cookies()).get(COOKIE)?.value);
+  const found = session
     ? await db.user.findUnique({
-        where: { id: userId },
-        select: { id: true, email: true, name: true, role: true, access: true, clientId: true, client: { select: { name: true } } },
+        where: { id: session.userId },
+        select: { id: true, email: true, name: true, role: true, access: true, clientId: true, sessionVersion: true, client: { select: { name: true } } },
       })
     : null;
-  if (!user || (user.role === "CLIENT" && !user.clientId)) redirect(userId ? "/api/session/clear" : "/login");
+  if (!found || found.sessionVersion !== session?.version || (found.role === "CLIENT" && !found.clientId)) redirect(session ? "/api/session/clear" : "/login");
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- not needed by callers
+  const { sessionVersion, ...user } = found;
   return user;
 });
 

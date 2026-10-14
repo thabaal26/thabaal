@@ -22,6 +22,8 @@ model Setting {
   wahaSession    String    @default("default")
   /// When the scheduler last ran, so the dashboard can warn if it stopped.
   lastDispatchAt DateTime?
+  /// Last time the scheduler sent CRON_SECRET in the web address (?key=) instead of the Authorization header.
+  cronKeyInUrlAt  DateTime?
   /// The portal-wide default look (lib/appearance.ts): icon set, tiles, cards, UI style, chart library.
   appearance     Json?
   /// Wallet recharges: the UPI ID and name shown on the recharge QR (lib/wallet.ts).
@@ -156,6 +158,8 @@ model User {
   email        String       @unique
   name         String
   passwordHash String
+  /// Raised when the password changes, so logins made before it stop working on every device.
+  sessionVersion Int        @default(0)
   role         Role         @default(CLIENT)
   access       ClientAccess @default(STAFF)
   clientId     String?

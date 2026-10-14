@@ -71,7 +71,7 @@ export async function GET(request: Request) {
     const accessToken = tokenData.access_token;
 
     if (!accessToken) {
-      console.error("[Google OAuth] No access token in response:", tokenData);
+      console.error("[Google OAuth] No access token in response");
       return NextResponse.redirect(new URL("/login?error=google_auth_failed", origin));
     }
 
@@ -89,8 +89,14 @@ export async function GET(request: Request) {
     const email = (profile.email as string | undefined)?.toLowerCase().trim();
 
     if (!email) {
-      console.error("[Google OAuth] Profile missing email:", profile);
+      console.error("[Google OAuth] Profile missing email");
       return NextResponse.redirect(new URL("/login?error=google_auth_failed", origin));
+    }
+
+    // Only an address Google has confirmed belongs to this person may sign in as that user.
+    if (profile.email_verified !== true && profile.email_verified !== "true") {
+      console.warn("[Google OAuth] Unverified Google email refused");
+      return NextResponse.redirect(new URL("/login?error=google_unverified", origin));
     }
 
     // 3. Find registered user in portal database
@@ -100,11 +106,11 @@ export async function GET(request: Request) {
 
     if (!user) {
       // User is not authorized in this portal
-      console.warn(`[Google OAuth] Unauthorized email attempted login: ${email}`);
-      const loginUrl = new URL("/login", origin);
-      loginUrl.searchParams.set("error", "unauthorized_email");
-      loginUrl.searchParams.set("email", email);
-      return NextResponse.redirect(loginUrl);
+      console.warn(`[Google OAuth] Unregistered Google account tried to sign in: ${email}`);
+      // The address goes in a 2-minute cookie for the login page to show, never in the URL
+      // (URLs end up in browser history, logs and analytics).
+      cookieStore.set("wp_oauth_email", email, { httpOnly: false, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/login", maxAge: 120 });
+      return NextResponse.redirect(new URL("/login?error=unauthorized_email", origin));
     }
 
     // Update name from Google profile if user's name is currently blank

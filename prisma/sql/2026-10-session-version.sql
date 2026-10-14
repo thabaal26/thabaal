@@ -1,0 +1,2 @@
+-- Additive only: session version per user, raised on password change to end older logins.
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "sessionVersion" INTEGER NOT NULL DEFAULT 0;

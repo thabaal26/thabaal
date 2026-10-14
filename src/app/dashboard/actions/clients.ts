@@ -333,8 +333,8 @@ export async function resetUserPassword(userId: string, password: string): Promi
   if (password.length < 8) return { ok: false, message: "Password must be at least 8 characters." };
   const u = await db.user.findUnique({ where: { id: userId } });
   if (!u || u.role !== "CLIENT") return { ok: false, message: "Client login not found." };
-  await db.user.update({ where: { id: userId }, data: { passwordHash: await bcrypt.hash(password, 12) } });
-  return { ok: true, message: `Password reset for ${u.email}.` };
+  await db.user.update({ where: { id: userId }, data: { passwordHash: await bcrypt.hash(password, 12), sessionVersion: { increment: 1 } } });
+  return { ok: true, message: `Password reset for ${u.email}. They're logged out everywhere and must use the new password.` };
 }
 
 export async function deleteClientUser(userId: string): Promise<ActionResult> {

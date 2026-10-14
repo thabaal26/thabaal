@@ -32,7 +32,8 @@ npm run dev
    - Easiest: the included GitHub Action ([.github/workflows/scheduler.yml](.github/workflows/scheduler.yml)). In the
      GitHub repo add secrets `APP_URL` (your Vercel URL) and `CRON_SECRET` (same as in Vercel). GitHub may run it a few minutes late.
    - Vercel **Hobby** (free) only allows daily crons. Use [cron-job.org](https://cron-job.org) (free) to call
-     `https://YOUR-APP.vercel.app/api/cron?key=YOUR_CRON_SECRET` every 5 minutes.
+     `https://YOUR-APP.vercel.app/api/cron` every 5 minutes with the header `Authorization: Bearer YOUR_CRON_SECRET`
+     (job → Advanced → Headers). Don't put the secret in the URL: URLs are kept in logs.
    - Vercel **Pro**: add `vercel.json` with
      `{ "crons": [{ "path": "/api/cron", "schedule": "*/5 * * * *" }] }`. Vercel sends the `CRON_SECRET` automatically.
 

@@ -2,7 +2,9 @@ import { Building2, CheckCircle2, Circle, LogOut, SquarePen } from "@/components
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "@/components/intent-link";
-import { Badge, buttonClass, Card, CardHeader, PageHeader } from "@/components/ui";
+import { Badge, buttonClass, Callout, Card, CardHeader, PageHeader } from "@/components/ui";
+import { fmtDate } from "@/lib/format";
+import { keyId } from "@/lib/secret-box";
 import { requireUser } from "@/lib/session";
 import { logout } from "../../login/actions";
 import { cn } from "@/lib/cn";
@@ -12,6 +14,9 @@ import { LocalSessionPanel, ProviderSwitch } from "./provider-panel";
 import { PasswordForm } from "./password-form";
 import { AppearanceEditor } from "../appearance-editor";
 import { portalDefault } from "@/lib/appearance";
+
+/** Within the last two days (module scope keeps the clock read out of render). */
+const seenRecently = (d: Date | null) => Boolean(d && Date.now() - d.getTime() < 2 * 86_400_000);
 
 export const metadata: Metadata = { title: "Settings" };
 export const dynamic = "force-dynamic";
@@ -118,10 +123,24 @@ export default async function SettingsPage() {
           <Card className="card-3d">
             <CardHeader tone="info" title="Scheduler" description="Something must call this URL every 5 minutes (every minute with the local session) to start campaigns and send batches." />
             <div className="space-y-3 p-4 sm:p-5">
-              <Copyable label="Cron URL" value={`${origin}/api/cron?key=•••CRON_SECRET•••`} />
+              <Copyable label="Cron URL" value={`${origin}/api/cron`} />
+              <Copyable label="Header" value="Authorization: Bearer •••CRON_SECRET•••" />
+              {seenRecently(settings.cronKeyInUrlAt) && settings.cronKeyInUrlAt && (
+                <Callout tone="warning" title="Your scheduler puts the password in the web address">
+                  Last seen {fmtDate(settings.cronKeyInUrlAt, "d MMM, h:mm a")}. Web addresses are saved in logs. In cron-job.org, open the job → Advanced → Headers, add
+                  <code> Authorization</code> = <code>Bearer</code> followed by your CRON_SECRET, and remove <code>?key=…</code> from the URL.
+                </Callout>
+              )}
               <p className="text-xs text-muted">
-                {process.env.CRON_SECRET ? "CRON_SECRET is set." : "Set CRON_SECRET first."} On Vercel Pro, add a cron to <code>vercel.json</code>. On the free Hobby plan, use a free service
-                such as cron-job.org with the URL above. The scheduler can also be run from the Dashboard page.
+                {process.env.CRON_SECRET ? "CRON_SECRET is set." : "Set CRON_SECRET first."} Send it in the Authorization header, never in the URL. The included GitHub Action already does
+                this. On Vercel Pro, add a cron to <code>vercel.json</code>; Vercel sends the header itself. The scheduler can also be run from the Dashboard page.
+              </p>
+              <p className="text-xs text-muted">
+                {keyId() ? (
+                  <>Stored access tokens are encrypted (key <code>{keyId()}</code>).</>
+                ) : (
+                  <b className="text-warning">DATA_ENC_KEY isn&apos;t set: access tokens are stored without encryption.</b>
+                )}
               </p>
             </div>
           </Card>
