@@ -131,7 +131,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
 
   return (
     <NotificationProvider initialUnreadCount={unreadNotifications}>
-      <div {...appearanceAttrs(look)} style={themeStyle(client)} className="min-h-dvh w-full overflow-x-clip bg-canvas lg:pl-[236px] print:bg-white print:pl-0 lg:print:pl-0">
+      <div {...appearanceAttrs(look)} style={themeStyle(client)} className="min-h-dvh w-full overflow-x-clip bg-canvas lg:pl-[272px] print:bg-white print:pl-0 lg:print:pl-0">
         {client && themeCss(client) && <style>{themeCss(client)}</style>}
         {/* The portal's look (Settings → Appearance, or this client's own): set on <html> before
             anything paints, so sheets and dialogs wear it too. */}
@@ -142,7 +142,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           Skip to content
         </a>
 
-        <aside className="fixed inset-y-0 left-0 z-40 hidden w-[236px] transform-gpu flex-col overflow-hidden border-r border-[#EADFCB] bg-[#FFF9F0] dark:bg-[#0B1E2D] dark:border-[#27465C] lg:flex print:!hidden">
+        <aside className="fixed top-3.5 bottom-3.5 left-3.5 z-40 hidden w-[244px] transform-gpu flex-col overflow-hidden rounded-[24px] border border-[#E4D7C0] bg-[#FFFFFF]/95 shadow-[0_12px_36px_rgba(30,20,10,0.08)] backdrop-blur-xl dark:border-[#23455E] dark:bg-[#0E2638]/95 dark:shadow-[0_18px_48px_rgba(0,0,0,0.55)] dark:ring-1 dark:ring-white/[0.08] lg:flex print:!hidden">
           <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_60%_at_0%_0%,rgb(255_200_44/0.08),transparent_55%)] dark:bg-[radial-gradient(120%_60%_at_0%_0%,rgb(22_125_99/0.22),transparent_55%),radial-gradient(90%_50%_at_100%_100%,rgb(234_191_38/0.1),transparent_60%)]" />
           <div className="relative flex h-16 shrink-0 items-center px-4">
             <Link href="/dashboard" className="logo flex items-center gap-2.5 px-2 text-decoration-none transition hover:opacity-90">
@@ -174,7 +174,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
               unreadNotifications={unreadNotifications}
             />
           </div>
-          <div className="relative shrink-0 space-y-2 border-t border-[#EADFCB] dark:border-[#27465C] bg-[#FFF9F0] dark:bg-[#0B1E2D] p-4 text-[13px]">
+          <div className="relative shrink-0 space-y-2 border-t border-[#E4D7C0]/80 dark:border-[#23455E]/80 bg-[#FAF3E8]/80 dark:bg-[#091C2B]/80 p-4 text-[13px]">
             <div className="flex items-center gap-2 text-[#5A6B7B] dark:text-[#A8BACA] font-medium text-[12.5px]">
               <span className="size-2 rounded-full bg-[#10B981] animate-pulse shrink-0" />
               <span>{scope.isAdmin && notConnected ? "WhatsApp not connected" : "WhatsApp connected"}</span>
