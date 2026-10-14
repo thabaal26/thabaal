@@ -9,6 +9,7 @@ import { toast, toastResult } from "@/components/toast";
 import { Badge, Button, Card, EmptyState, Field, Segmented } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import type { CatalogProductDetail } from "@/lib/catalog";
+import type { ProductDemandStats } from "@/lib/catalog-demand";
 import { createProduct, deleteProduct, updateProduct, uploadProductImage } from "../actions/catalog";
 
 type StockFilter = "ALL" | "IN_STOCK" | "OUT_OF_STOCK";
@@ -102,6 +103,7 @@ export function CatalogueManager({
   clientName,
   isLive,
   canManage,
+  demandBySku = {},
 }: {
   products: CatalogProductDetail[];
   catalogId: string | null;
@@ -109,6 +111,7 @@ export function CatalogueManager({
   clientName: string;
   isLive: boolean;
   canManage: boolean;
+  demandBySku?: Record<string, ProductDemandStats>;
 }) {
   const router = useRouter();
   const [products, setProducts] = useState(initialProducts);
@@ -122,6 +125,7 @@ export function CatalogueManager({
   const [category, setCategory] = useState<string>("ALL");
   const [stockFilter, setStockFilter] = useState<StockFilter>("ALL");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [cartFilter, setCartFilter] = useState<"ALL" | "IN_CARTS">("ALL");
   const [editing, setEditing] = useState<CatalogProductDetail | null>(null);
   const [adding, setAdding] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -131,6 +135,12 @@ export function CatalogueManager({
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [saving, startSave] = useTransition();
   const [, startToggle] = useTransition();
+
+  // Number of products currently present in customer WhatsApp carts
+  const inCartsCount = useMemo(
+    () => products.filter((p) => (demandBySku[p.retailerId]?.cartCount ?? 0) > 0).length,
+    [products, demandBySku],
+  );
 
   // Categories list
   const categories = useMemo(() => {
@@ -150,6 +160,7 @@ export function CatalogueManager({
       if (statusFilter === "APPROVED" && p.whatsappStatus !== "APPROVED") return false;
       if (statusFilter === "REVIEW" && p.whatsappStatus !== "PENDING" && p.whatsappStatus !== "OUTDATED") return false;
       if (statusFilter === "REJECTED" && p.whatsappStatus !== "REJECTED") return false;
+      if (cartFilter === "IN_CARTS" && (!demandBySku[p.retailerId] || demandBySku[p.retailerId].cartCount === 0)) return false;
       if (search.trim()) {
         const q = search.toLowerCase();
         const matchName = p.name.toLowerCase().includes(q);
@@ -159,7 +170,7 @@ export function CatalogueManager({
       }
       return true;
     });
-  }, [products, category, stockFilter, statusFilter, search]);
+  }, [products, category, stockFilter, statusFilter, cartFilter, search, demandBySku]);
 
   // Live WhatsApp price list text preview
   const priceListText = useMemo(() => {
@@ -355,6 +366,22 @@ export function CatalogueManager({
                   {c === "ALL" ? "All categories" : c}
                 </button>
               ))}
+              {inCartsCount > 0 && (
+                <button
+                  type="button"
+                  aria-pressed={cartFilter === "IN_CARTS"}
+                  onClick={() => setCartFilter(cartFilter === "IN_CARTS" ? "ALL" : "IN_CARTS")}
+                  className={cn(
+                    chip(cartFilter === "IN_CARTS"),
+                    cartFilter === "IN_CARTS"
+                      ? "border-brand bg-brand text-panel font-semibold"
+                      : "border-brand/40 bg-brand/5 text-brand hover:border-brand hover:bg-brand/10",
+                  )}
+                >
+                  <span className="mr-1">🛒</span>
+                  In carts ({inCartsCount})
+                </button>
+              )}
             </div>
             {isLive && (
               <div className="flex flex-wrap items-center gap-1.5 pt-1 sm:pt-0">
@@ -449,57 +476,79 @@ export function CatalogueManager({
         </Card>
       ) : (
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4">
-          {filtered.map((item) => (
-            <li key={item.id} className="card-3d relative flex flex-col overflow-hidden rounded-card border border-line bg-panel">
-              <span
-                aria-hidden
-                className={cn(
-                  "absolute inset-x-0 top-0 h-[3px]",
-                  item.whatsappStatus === "REJECTED"
-                    ? "bg-danger-solid"
-                    : item.whatsappStatus === "PENDING" || item.whatsappStatus === "OUTDATED"
-                    ? "bg-warning-solid"
-                    : item.inStock
-                    ? "bg-brand"
-                    : "bg-warning-solid",
-                )}
-              />
-              <div className="flex gap-3 p-4">
-                <div className={cn("relative size-16 shrink-0 overflow-hidden rounded-control bg-subtle shadow-2xs ring-1 ring-line", !item.inStock && "opacity-60 grayscale")}>
-                  {item.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.imageUrl} alt="" className="size-full object-cover" />
-                  ) : (
-                    <div className="grid size-full place-items-center text-faint">
-                      <Package aria-hidden className="size-6" />
-                    </div>
+          {filtered.map((item) => {
+            const demand = demandBySku[item.retailerId];
+            return (
+              <li key={item.id} className="card-3d relative flex flex-col overflow-hidden rounded-card border border-line bg-panel">
+                <span
+                  aria-hidden
+                  className={cn(
+                    "absolute inset-x-0 top-0 h-[3px]",
+                    item.whatsappStatus === "REJECTED"
+                      ? "bg-danger-solid"
+                      : item.whatsappStatus === "PENDING" || item.whatsappStatus === "OUTDATED"
+                      ? "bg-warning-solid"
+                      : item.inStock
+                      ? "bg-brand"
+                      : "bg-warning-solid",
                   )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h4 className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-ink">{item.name}</h4>
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
-                    <Badge tone="brand" className="text-2xs">{item.category || "General"}</Badge>
-                    <span className="rounded bg-sunken px-1.5 py-0.5 font-mono text-2xs font-medium text-ink-2 ring-1 ring-line">{item.retailerId}</span>
-                    {item.whatsappStatus === "APPROVED" ? (
-                      <Badge tone="green" dot className="text-2xs font-medium">
-                        Live
-                      </Badge>
-                    ) : item.whatsappStatus === "REJECTED" ? (
-                      <Badge tone="red" dot className="text-2xs font-medium">
-                        Rejected
-                      </Badge>
-                    ) : item.whatsappStatus ? (
-                      <Badge tone="amber" dot className="text-2xs font-medium">
-                        In review
-                      </Badge>
-                    ) : null}
+                />
+                <div className="flex gap-3 p-4">
+                  <div className={cn("relative size-16 shrink-0 overflow-hidden rounded-control bg-subtle shadow-2xs ring-1 ring-line", !item.inStock && "opacity-60 grayscale")}>
+                    {item.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={item.imageUrl} alt="" className="size-full object-cover" />
+                    ) : (
+                      <div className="grid size-full place-items-center text-faint">
+                        <Package aria-hidden className="size-6" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-ink">{item.name}</h4>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+                      <Badge tone="brand" className="text-2xs">{item.category || "General"}</Badge>
+                      <span className="rounded bg-sunken px-1.5 py-0.5 font-mono text-2xs font-medium text-ink-2 ring-1 ring-line">{item.retailerId}</span>
+                      {item.whatsappStatus === "APPROVED" ? (
+                        <Badge tone="green" dot className="text-2xs font-medium">
+                          Live
+                        </Badge>
+                      ) : item.whatsappStatus === "REJECTED" ? (
+                        <Badge tone="red" dot className="text-2xs font-medium">
+                          Rejected
+                        </Badge>
+                      ) : item.whatsappStatus ? (
+                        <Badge tone="amber" dot className="text-2xs font-medium">
+                          In review
+                        </Badge>
+                      ) : null}
+                      {demand && demand.cartCount > 0 && (
+                        <Badge tone="brand" className="text-2xs font-semibold">
+                          🛒 {demand.cartCount} cart{demand.cartCount > 1 ? "s" : ""}
+                        </Badge>
+                      )}
+                      {demand && demand.conversionRate > 0 && (
+                        <Badge tone="green" className="text-2xs font-semibold">
+                          {demand.conversionRate}% conv
+                        </Badge>
+                      )}
+                      {demand && demand.cartCount >= 3 && demand.conversionRate === 0 && (
+                        <Badge tone="amber" className="text-2xs font-semibold">
+                          Cart drop
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <p className="line-clamp-2 min-h-[2lh] px-4 text-xs leading-relaxed text-muted">{item.description}</p>
-              <div className="mt-auto flex items-center justify-between gap-2 px-4 pb-3 pt-3">
-                <span className="tabular text-xl font-bold tracking-tight text-ink">₹{item.priceAmount.toLocaleString("en-IN")}</span>
-                <div className="flex flex-wrap items-center justify-end gap-1.5">
+                <p className="line-clamp-2 min-h-[2lh] px-4 text-xs leading-relaxed text-muted">{item.description}</p>
+                <div className="mt-auto flex items-center justify-between gap-2 px-4 pb-3 pt-3">
+                  <div className="flex flex-col">
+                    <span className="tabular text-xl font-bold tracking-tight text-ink">₹{item.priceAmount.toLocaleString("en-IN")}</span>
+                    {demand && demand.revenue > 0 && (
+                      <span className="text-2xs font-medium text-success">₹{demand.revenue.toLocaleString("en-IN")} sales</span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
                   {item.whatsappStatus === "APPROVED" ? (
                     <Badge tone="green" dot className="text-xs">
                       Live on WhatsApp
@@ -528,7 +577,8 @@ export function CatalogueManager({
                 </Button>
               </div>
             </li>
-          ))}
+          );
+        })}
         </ul>
       )}
 

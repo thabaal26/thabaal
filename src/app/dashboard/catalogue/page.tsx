@@ -4,10 +4,12 @@ import Link from "@/components/intent-link";
 import { ShoppingBag3D, Store3D } from "@/components/icons-3d";
 import { Badge, buttonClass, Callout, PageHeader, PickClientNotice, Stat } from "@/components/ui";
 import { getCatalogWithProducts } from "@/lib/catalog";
+import { getCatalogDemandSummary } from "@/lib/catalog-demand";
 import { db } from "@/lib/db";
 import { fmtNumber } from "@/lib/format";
 import { getScope } from "@/lib/session";
 import { CatalogueManager } from "./catalogue-manager";
+import { DemandLeaderboard } from "./demand-leaderboard";
 
 export const metadata: Metadata = { title: "Catalogue & Menu" };
 export const dynamic = "force-dynamic";
@@ -30,6 +32,8 @@ export default async function CataloguePage() {
     }),
     getCatalogWithProducts(scope.clientId),
   ]);
+
+  const demandSummary = await getCatalogDemandSummary(scope.clientId, products);
 
   const total = products.length;
   const inStock = products.filter((p) => p.inStock).length;
@@ -132,6 +136,8 @@ export default async function CataloguePage() {
           }
         />
       </div>
+ 
+      <DemandLeaderboard summary={demandSummary} commerceManagerUrl={commerceManagerUrl} />
 
       <CatalogueManager
         products={products}
@@ -140,6 +146,7 @@ export default async function CataloguePage() {
         clientName={client?.name ?? "Business"}
         isLive={isLive}
         canManage={scope.canManage}
+        demandBySku={demandSummary.demandBySku}
       />
     </>
   );
