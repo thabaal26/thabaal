@@ -1,19 +1,20 @@
 "use client";
 
-import { CheckCheck, ImagePlus, Send, Sparkles, X } from "@/components/icons";
+import { CheckCheck, ImagePlus, Send, Sparkles, X, ChevronDown } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toastResult } from "@/components/toast";
-import { Badge, Button } from "@/components/ui";
+import { Badge } from "@/components/ui";
 import type { ReplyAnalysisResult } from "@/lib/ai";
 import { getAiSmartRepliesAction } from "../actions/ai";
 import { uploadProductImage } from "../actions/catalog";
 import { setReplyHandled } from "../actions/replies";
 import { replyToCustomer } from "../actions/send";
+import { cn } from "@/lib/cn";
 
 /**
- * Inline quick-reply composer inside the desktop `/dashboard/replies` split-pane.
- * Includes Free AI Smart Reply suggestions (English / Tanglish / Tamil) + customer intent detection.
+ * WhatsApp-styled quick reply composer matching the clean chat mock.
+ * Includes language selector, AI Smart Replies, photo/PDF attachment, and Send actions.
  */
 export function InlineReplyBox({
   customerId,
@@ -32,15 +33,17 @@ export function InlineReplyBox({
   const [text, setText] = useState("");
   const [mediaUrl, setMediaUrl] = useState("");
   const [showMedia, setShowMedia] = useState(false);
+  const [selectedLang, setSelectedLang] = useState<"EN" | "Tanglish" | "Tamil">("EN");
   const [aiResult, setAiResult] = useState<ReplyAnalysisResult | null>(null);
+  const [showMore, setShowMore] = useState(false);
   const [aiLoading, startAi] = useTransition();
   const [uploading, startUpload] = useTransition();
   const [sending, startSend] = useTransition();
 
   if (!windowOpen) {
     return (
-      <div className="border-t border-line bg-sunken/60 px-4 py-2.5 text-xs text-muted sm:px-5">
-        24-hour free service reply window has closed for {customerName}. Open their profile to send an approved template (Utility ₹0.115 / Marketing ₹0.8631).
+      <div className="border-t border-line bg-sunken/60 px-5 py-3 text-xs text-muted">
+        24-hour free reply window has closed for {customerName}. Open their profile to send an approved WhatsApp template (Utility ₹0.115 / Marketing ₹0.8631).
       </div>
     );
   }
@@ -50,10 +53,24 @@ export function InlineReplyBox({
       const res = await getAiSmartRepliesAction(customerId);
       if (res.ok && res.data) {
         setAiResult(res.data);
+        const match = res.data.suggestions.find((s) => s.lang.toLowerCase() === selectedLang.toLowerCase());
+        if (match) {
+          setText(match.text);
+        } else if (res.data.suggestions[0]) {
+          setText(res.data.suggestions[0].text);
+        }
       } else {
         toastResult({ ok: false, message: res.message ?? "Could not generate AI suggestions." });
       }
     });
+  };
+
+  const handleLangChange = (lang: "EN" | "Tanglish" | "Tamil") => {
+    setSelectedLang(lang);
+    if (aiResult) {
+      const match = aiResult.suggestions.find((s) => s.lang.toLowerCase() === lang.toLowerCase());
+      if (match) setText(match.text);
+    }
   };
 
   const submit = (alsoMarkHandled: boolean) => {
@@ -75,65 +92,59 @@ export function InlineReplyBox({
   };
 
   return (
-    <div className="space-y-2 border-t border-line bg-subtle/40 px-3.5 py-2.5 sm:px-5 sm:py-3">
-      {/* Free AI Smart Reply Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-1.5">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <button
-            type="button"
-            disabled={aiLoading}
-            onClick={runAiSuggest}
-            className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-brand/30 bg-brand-soft/60 px-2.5 py-0.5 text-[11px] font-semibold text-brand-deep transition hover:bg-brand-soft disabled:opacity-60"
-          >
-            <Sparkles aria-hidden className="size-3.5" />
-            {aiLoading ? "Analyzing chat…" : aiResult ? "Refresh AI replies" : "AI Smart Reply (EN / Tanglish / தமிழ்)"}
-          </button>
-          <span className="text-[10px] text-muted">Free 24h window (1,000/mo free)</span>
-        </div>
-
+    <div className="space-y-3 border-t border-line bg-card/90 px-5 py-3.5 backdrop-blur-md">
+      {/* Label matching mock: "Your reply" */}
+      <div className="flex items-center justify-between">
+        <label htmlFor="reply-input" className="text-[12px] font-semibold uppercase tracking-wider text-muted">
+          Your reply
+        </label>
         {aiResult && (
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <Badge tone={aiResult.urgency === "HIGH" ? "amber" : "green"} dot>
               {aiResult.intentLabel}
             </Badge>
             <button
               type="button"
               onClick={() => setAiResult(null)}
-              className="text-[11px] text-muted hover:text-ink"
-              aria-label="Hide AI suggestions"
+              className="text-[11px] text-muted hover:text-ink underline"
             >
-              Hide
+              Clear AI
             </button>
           </div>
         )}
       </div>
 
+      {/* AI Suggestions Pill Bar */}
       {aiResult && (
-        <div className="space-y-1.5 rounded-control border border-brand/25 bg-panel/90 p-2.5 text-xs">
+        <div className="space-y-2 rounded-xl border border-brand/30 bg-[#FFFDF9] dark:bg-[#132A3B] p-2.5 text-xs">
           <p className="text-[11px] text-muted">{aiResult.summary}</p>
-          <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
+          <div className="flex flex-wrap gap-1.5">
             {aiResult.suggestions.map((s) => (
               <button
                 key={s.lang}
                 type="button"
                 onClick={() => setText(s.text)}
-                className="flex flex-col items-start rounded-control border border-line bg-subtle/50 p-2 text-left transition hover:border-brand hover:bg-brand-soft/30"
+                className={cn(
+                  "rounded-lg border px-2.5 py-1 text-left text-xs transition",
+                  text === s.text
+                    ? "border-brand bg-brand-soft font-semibold text-ink"
+                    : "border-line bg-card text-muted hover:border-brand hover:text-ink",
+                )}
               >
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-brand-deep">
-                  {s.lang} · {s.label}
-                </span>
-                <span className="mt-0.5 line-clamp-2 text-[11px] text-ink">{s.text}</span>
+                <span className="font-semibold text-brand-deep mr-1">[{s.lang}]</span>
+                <span>{s.label}</span>
               </button>
             ))}
           </div>
         </div>
       )}
 
+      {/* Media Attachment Bar */}
       {(showMedia || mediaUrl) && (
-        <div className="flex flex-wrap items-center gap-2 rounded-control border border-line bg-panel px-2.5 py-1.5 text-xs">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-panel px-3 py-2 text-xs">
           <input
             className="min-w-0 flex-1 bg-transparent text-xs text-ink outline-none placeholder:text-muted"
-            placeholder="Paste image/PDF https:// link or upload file →"
+            placeholder="Paste image or PDF link, or upload →"
             value={mediaUrl}
             onChange={(e) => setMediaUrl(e.target.value)}
           />
@@ -171,53 +182,109 @@ export function InlineReplyBox({
         </div>
       )}
 
-      <div className="flex flex-wrap items-end gap-2 sm:flex-nowrap">
-        <textarea
-          rows={2}
-          maxLength={4000}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault();
-              submit(false);
-            }
-          }}
-          placeholder={`Write a WhatsApp reply to ${customerName}… (Ctrl+Enter to send)`}
-          className="field min-h-11 w-full flex-1 resize-none py-2 text-sm"
-        />
-        <div className="flex items-center gap-1.5">
+      {/* Reply Textarea matching WhatsApp Mock */}
+      <textarea
+        id="reply-input"
+        rows={2}
+        maxLength={4000}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            submit(false);
+          }
+        }}
+        placeholder="Type a reply"
+        className="w-full resize-none rounded-xl border border-line bg-panel p-3 text-[14px] text-ink placeholder:text-muted/70 transition focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand dark:bg-[#132A3B] dark:text-[#FFF9F0]"
+      />
+
+      {/* Composer Action Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5">
+        {/* Left: Language Select + Suggest a reply */}
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <select
+              value={selectedLang}
+              onChange={(e) => handleLangChange(e.target.value as "EN" | "Tanglish" | "Tamil")}
+              className="appearance-none rounded-lg border border-line bg-card py-1.5 pl-3 pr-7 text-xs font-semibold text-ink shadow-2xs hover:bg-subtle focus:border-brand focus:outline-none dark:bg-[#132A3B] dark:text-white"
+            >
+              <option value="EN">English</option>
+              <option value="Tanglish">Tanglish</option>
+              <option value="Tamil">தமிழ்</option>
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2 top-2.5 size-3 text-muted" />
+          </div>
+
+          <button
+            type="button"
+            disabled={aiLoading}
+            onClick={runAiSuggest}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs transition hover:border-brand hover:bg-brand-soft/40 disabled:opacity-60 dark:bg-[#132A3B] dark:text-white"
+          >
+            <Sparkles className="size-3.5 text-amber-500 shrink-0" />
+            <span>{aiLoading ? "Thinking…" : "Suggest a reply"}</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setShowMedia((v) => !v)}
             title="Attach photo or PDF"
-            aria-label="Attach photo or PDF"
-            className="grid size-10 shrink-0 place-items-center rounded-control border border-line bg-panel text-muted transition hover:border-line-strong hover:text-brand-deep"
+            className="grid size-8 place-items-center rounded-lg border border-line bg-card text-muted transition hover:border-brand hover:text-ink dark:bg-[#132A3B]"
           >
-            <ImagePlus aria-hidden className="size-4" />
+            <ImagePlus className="size-4" />
           </button>
-          <Button
+        </div>
+
+        {/* Right: Send, Send & Close, More */}
+        <div className="flex items-center gap-2">
+          <button
             type="button"
-            size="md"
             disabled={!text.trim() && !mediaUrl.trim()}
-            loading={sending}
             onClick={() => submit(false)}
+            className="inline-flex min-h-[34px] items-center gap-1.5 rounded-xl bg-[#FFC329] px-4 py-1.5 text-xs font-bold text-[#10283B] shadow-xs transition hover:brightness-105 active:scale-[0.98] disabled:opacity-50"
           >
-            <Send aria-hidden className="size-4" /> Send
-          </Button>
+            <Send className="size-3.5" />
+            <span>{sending ? "Sending…" : "Send"}</span>
+          </button>
+
           {!replyHandled && (
-            <Button
+            <button
               type="button"
-              size="md"
-              variant="secondary"
               disabled={!text.trim() && !mediaUrl.trim()}
-              loading={sending}
               onClick={() => submit(true)}
-              title="Send reply and mark this message handled"
+              className="inline-flex min-h-[34px] items-center gap-1.5 rounded-xl border border-line bg-card px-3.5 py-1.5 text-xs font-semibold text-ink shadow-2xs transition hover:bg-subtle active:scale-[0.98] disabled:opacity-50 dark:bg-[#132A3B] dark:text-white"
             >
-              <CheckCheck aria-hidden className="size-4" /> Send &amp; close
-            </Button>
+              <CheckCheck className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Send and close</span>
+            </button>
           )}
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowMore((v) => !v)}
+              className="inline-flex min-h-[34px] items-center gap-1 rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-muted transition hover:text-ink dark:bg-[#132A3B] dark:hover:text-white"
+            >
+              <span>More +</span>
+            </button>
+            {showMore && (
+              <div className="absolute bottom-full right-0 mb-2 w-48 rounded-xl border border-line bg-card p-1.5 shadow-xl dark:bg-[#132A3B]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMedia(true);
+                    setShowMore(false);
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-ink hover:bg-subtle dark:text-white"
+                >
+                  <ImagePlus className="size-4 text-muted" /> Attach photo/PDF
+                </button>
+                <div className="my-1 border-t border-line" />
+                <p className="px-2.5 py-1 text-[11px] text-muted">Press Ctrl+Enter to send quickly</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

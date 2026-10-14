@@ -21,15 +21,15 @@ function Ticks({ status }: { status: string }) {
   const label = { QUEUED: "Queued", SENT: "Sent", DELIVERED: "Delivered", READ: "Read", FAILED: "Failed", SKIPPED: "Skipped" }[status] ?? status;
   const icon =
     status === "READ" ? (
-      <CheckCheck aria-hidden className="size-3.5 text-wa-tick" />
+      <CheckCheck aria-hidden className="size-3.5 text-[#53BDEB]" />
     ) : status === "DELIVERED" ? (
-      <CheckCheck aria-hidden className="size-3.5" />
+      <CheckCheck aria-hidden className="size-3.5 text-[#667781] dark:text-[#8696A0]" />
     ) : status === "SENT" ? (
-      <Check aria-hidden className="size-3.5" />
+      <Check aria-hidden className="size-3.5 text-[#667781] dark:text-[#8696A0]" />
     ) : status === "FAILED" ? (
       <CircleAlert aria-hidden className="size-3.5 text-danger" />
     ) : (
-      <Clock aria-hidden className="size-3" />
+      <Clock aria-hidden className="size-3 text-[#667781] dark:text-[#8696A0]" />
     );
   return (
     <span className={cn("inline-flex items-center gap-1", status === "FAILED" && "font-medium text-danger")}>
@@ -56,19 +56,19 @@ export function Conversation({ entries, className }: { entries: ConversationEntr
 
   return (
     <div className={cn("chat-wall flex flex-col-reverse overflow-y-auto overscroll-contain thin-scroll", className)} tabIndex={0} aria-label="Conversation">
-      <ol className="space-y-2 p-3 sm:p-4">
+      <ol className="space-y-2.5 p-3.5 sm:p-5">
         {rows.map((r) =>
           "divider" in r ? (
             <li key={r.key} className="flex justify-center py-1">
-              <span className="rounded-full bg-panel/90 px-2.5 py-0.5 text-2xs font-medium text-muted shadow-xs">{r.divider}</span>
+              <span className="rounded-lg bg-white/90 dark:bg-[#182229]/90 px-3 py-1 text-[11px] font-semibold text-[#54656F] dark:text-[#8696A0] shadow-2xs border border-black/[0.04] dark:border-white/[0.05]">{r.divider}</span>
             </li>
           ) : r.entry.type === "in" ? (
             <li key={r.key} className="flex">
-              <div className="max-w-[min(85%,34rem)] rounded-card rounded-tl-sm bg-bubble px-3 py-2 text-sm text-ink shadow-xs">
-                {r.entry.kind === "button" && <p className="mb-0.5 text-xs font-medium text-brand-deep">Tapped a button</p>}
-                {r.entry.text && <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{r.entry.text}</p>}
+              <div className="max-w-[min(82%,32rem)] rounded-[16px] rounded-tl-xs bg-white dark:bg-[#202C33] px-3.5 py-2 text-[14px] text-[#111B21] dark:text-[#E9EDEF] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] border border-black/[0.04] dark:border-white/[0.04]">
+                {r.entry.kind === "button" && <p className="mb-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">Tapped a button</p>}
+                {r.entry.text && <p className="whitespace-pre-wrap [overflow-wrap:anywhere] leading-relaxed">{r.entry.text}</p>}
                 {r.entry.mediaId && <ReplyMedia id={r.entry.id} type={r.entry.mediaType} />}
-                <p className="tabular mt-1 text-right text-2xs text-muted">
+                <p className="tabular mt-1 text-right text-[11px] text-[#667781] dark:text-[#8696A0]">
                   {r.entry.via && `to ${r.entry.via} · `}
                   <time dateTime={r.entry.at.toISOString()}>{fmtDate(r.entry.at, "h:mm a")}</time>
                 </p>
@@ -76,10 +76,10 @@ export function Conversation({ entries, className }: { entries: ConversationEntr
             </li>
           ) : (
             <li key={r.key} className="flex justify-end">
-              <div className={cn("max-w-[min(85%,34rem)] rounded-card rounded-tr-sm px-3 py-2 text-sm text-ink shadow-xs", r.entry.status === "FAILED" ? "bg-danger-bg ring-1 ring-danger-border" : "bg-bubble-out")}>
-                <p className="mb-1 flex flex-wrap items-center gap-x-1.5 text-xs text-ink-2">
+              <div className={cn("max-w-[min(82%,32rem)] rounded-[16px] rounded-tr-xs px-3.5 py-2 text-[14px] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]", r.entry.status === "FAILED" ? "bg-danger-bg ring-1 ring-danger-border text-ink" : "bg-[#D9FDD3] dark:bg-[#005C4B] text-[#111B21] dark:text-[#E9EDEF] border border-[#C5F3BC] dark:border-[#025142]")}>
+                <p className="mb-1 flex flex-wrap items-center gap-x-1.5 text-xs text-[#54656F] dark:text-[#8696A0]">
                   <span className="font-mono">{r.entry.template}</span>
-                  {r.entry.campaign && <span className="text-muted">· {r.entry.campaign}</span>}
+                  {r.entry.campaign && <span>· {r.entry.campaign}</span>}
                 </p>
                 {(() => {
                   const { text, mediaUrl } = parseOutboundBody(r.entry.body);
@@ -104,12 +104,12 @@ export function Conversation({ entries, className }: { entries: ConversationEntr
                           </a>
                         )
                       )}
-                      {text && <p className="line-clamp-6 whitespace-pre-wrap [overflow-wrap:anywhere]">{text}</p>}
+                      {text && <p className="line-clamp-6 whitespace-pre-wrap [overflow-wrap:anywhere] leading-relaxed">{text}</p>}
                     </>
                   );
                 })()}
                 {r.entry.error && <p className="mt-1 text-xs text-danger">{r.entry.error}</p>}
-                <p className="tabular mt-1 flex flex-wrap items-center justify-end gap-1.5 text-2xs text-muted">
+                <p className="tabular mt-1 flex flex-wrap items-center justify-end gap-1.5 text-[11px] text-[#667781] dark:text-[#8696A0]">
                   {r.entry.via && <span>from {r.entry.via} ·</span>}
                   <time dateTime={r.entry.at.toISOString()}>{fmtDate(r.entry.at, "h:mm a")}</time>
                   <Ticks status={r.entry.status} />

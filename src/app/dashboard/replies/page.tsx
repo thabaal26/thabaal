@@ -1,8 +1,10 @@
-import { CheckCheck, MessageCircle, MessageSquare, ShoppingBag } from "lucide-react";
+import { CheckCheck, MessageCircle } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "@/components/intent-link";
 import { ActionButton } from "@/components/action-button";
 import type { ConversationEntry } from "@/components/conversation";
-import { Card, EmptyState, FilterChips, PageHeader, Stat } from "@/components/ui";
+import { Card, EmptyState } from "@/components/ui";
+import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { fmtNumber } from "@/lib/format";
 import { getScope, ownedMessages } from "@/lib/session";
@@ -146,91 +148,81 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
   }
 
   return (
-    <>
-      <PageHeader
-        title="Chats"
-        description="Answer customers first. Free replies are open for 24 hours after they write."
-        inlineActions
-        actions={
-          scope.canOperate &&
-          openThreadsCount > 0 && (
-            <ActionButton action={handleAllReplies} size="md" confirm="Mark every open customer conversation as handled?" aria-label="Mark all handled">
-              <CheckCheck aria-hidden className="size-4" />
-              <span>
-                <span className="max-sm:hidden">Mark all</span>
-                <span className="sm:hidden">All</span> handled
-              </span>
-            </ActionButton>
-          )
-        }
-        tabs={
-          <div className="flex flex-wrap items-center gap-3">
-          <InboxTabs active="inbox" />
-          <FilterChips
-            label="Reply status"
-            items={TABS.map((t) => ({
-              href: t.key ? `/dashboard/replies?show=${t.key}` : "/dashboard/replies",
-              label: t.label,
-              count: fmtNumber(tabCount[t.key]),
-              active: show === t.key,
-            }))}
-          />
-          </div>
-        }
-      />
-
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <Stat
-          label="Open conversations"
-          value={fmtNumber(tabCount[""])}
-          sub={tabCount[""] > 0 ? "Customers waiting for reply" : "Inbox zero!"}
-          icon={<MessageCircle className="size-5 stroke-[2]" />}
-          tone={tabCount[""] > 0 ? "amber" : "brand"}
-          href="/dashboard/replies"
-        />
-        <Stat
-          label="Order & rate taps"
-          value={fmtNumber(orderInquiryCount)}
-          sub="Customers in current view"
-          icon={<ShoppingBag className="size-5 stroke-[2]" />}
-          tone="gold"
-        />
-        <Stat
-          label="Handled"
-          value={fmtNumber(tabCount.handled)}
-          sub="Answered & closed"
-          icon={<CheckCheck className="size-5 stroke-[2]" />}
-          tone="brand"
-          meter={tabCount.all > 0 ? Math.round((tabCount.handled / tabCount.all) * 100) : 0}
-          href="/dashboard/replies?show=handled"
-        />
-        <Stat
-          label="Customer threads"
-          value={fmtNumber(tabCount.all)}
-          sub={`${fmtNumber(rawReplies.length)} total messages`}
-          icon={<MessageSquare className="size-5 stroke-[2]" />}
-          tone="info"
-          href="/dashboard/replies?show=all"
-        />
+    <div className="flex flex-col gap-3.5">
+      {/* Header section with title and view tabs */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-ink dark:text-[#FFF9F0] sm:text-3xl">Chats</h1>
+          <p className="mt-0.5 text-xs text-muted sm:text-sm">
+            Answer customers first. Free replies are open for 24 hours after they write.
+          </p>
+        </div>
+        <InboxTabs active="inbox" />
       </div>
 
+      {/* Filter pills and Mark All Handled action bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex items-center gap-2">
+          {TABS.map((t) => {
+            const count = tabCount[t.key];
+            const active = show === t.key;
+            return (
+              <Link
+                key={t.key}
+                href={t.key ? `/dashboard/replies?show=${t.key}` : "/dashboard/replies"}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold transition",
+                  active
+                    ? "bg-[#10283B] text-[#FFF9F0] dark:bg-[#FFF9F0] dark:text-[#10283B] shadow-xs"
+                    : "border border-line bg-card text-muted hover:border-line-strong hover:text-ink dark:hover:text-white",
+                )}
+              >
+                <span>{t.label}</span>
+                <span className={cn("rounded-full px-1.5 py-0.2 text-[11px] font-bold", active ? "bg-white/20 dark:bg-black/20" : "bg-subtle text-muted")}>
+                  {fmtNumber(count)}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+
+        {scope.canOperate && openThreadsCount > 0 && (
+          <ActionButton
+            action={handleAllReplies}
+            size="sm"
+            confirm="Mark every open customer conversation as handled?"
+            aria-label="Mark all handled"
+            className="text-xs font-medium text-muted hover:text-ink hover:underline"
+          >
+            <CheckCheck aria-hidden className="size-4 text-emerald-600 dark:text-emerald-400" />
+            <span>Mark all handled</span>
+          </ActionButton>
+        )}
+      </div>
+
+      {/* WhatsApp 2-Column Chat Interface */}
       {replies.length ? (
-        <ReplyInbox
-          replies={replies}
-          selectedId={selected?.id}
-          thread={thread}
-          show={typeof show === "string" ? show : ""}
-          canOperate={scope.canOperate}
-          showClient={!scope.clientId}
-        />
+        <div className="h-[calc(100dvh-13.5rem)] min-h-[38rem] w-full">
+          <ReplyInbox
+            replies={replies}
+            selectedId={selected?.id}
+            thread={thread}
+            show={typeof show === "string" ? show : ""}
+            canOperate={scope.canOperate}
+            showClient={!scope.clientId}
+          />
+        </div>
       ) : (
-        <Card>
-          <EmptyState icon={<MessageCircle className="size-5 stroke-[2]" />} title={show === "handled" ? "Nothing handled yet" : show === "all" ? "No replies yet" : "You're all caught up"}>
+        <Card className="rounded-[24px] p-8">
+          <EmptyState
+            icon={<MessageCircle className="size-6 stroke-[2] text-brand" />}
+            title={show === "handled" ? "Nothing handled yet" : show === "all" ? "No replies yet" : "You're all caught up"}
+          >
             When customers tap &ldquo;Order now&rdquo; or write back after a campaign, each customer&apos;s conversation appears here.
           </EmptyState>
         </Card>
       )}
-    </>
+    </div>
   );
 }
 

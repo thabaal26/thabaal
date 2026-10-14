@@ -1,9 +1,8 @@
-import { CheckCheck, CheckCircle2, ChevronRight, MessageCircle, RotateCcw, ShoppingBag, UserRound } from "@/components/icons";
+import { CheckCheck, CheckCircle2, ChevronRight, MessageCircle, Phone, RotateCcw, ShoppingBag } from "@/components/icons";
 import Link from "@/components/intent-link";
 import { ActionButton } from "@/components/action-button";
 import { Conversation, type ConversationEntry } from "@/components/conversation";
-import { Avatar, Badge, Card, buttonClass } from "@/components/ui";
-import { cn } from "@/lib/cn";
+import { Avatar } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { money, orderRef } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
@@ -12,6 +11,7 @@ import { sendCatalogue } from "../actions/catalog";
 import { setOrderStatus } from "../actions/orders";
 import { setReplyHandled } from "../actions/replies";
 import { InlineReplyBox } from "./inline-reply-box";
+import { ChatList, type ChatListItem } from "./chat-list";
 
 const ORDER = /(order|buy|need|want|send|price|rate|available|venum|vendum)|வேண்டும்|ஆர்டர்/i;
 
@@ -38,16 +38,29 @@ export type InboxReply = {
   sender: { label: string } | null;
 };
 
-/** What a reply shows in the list when it has no text (media, stickers). */
+/** Formats preview text for message snippets in chat list. */
 const preview = (r: InboxReply) =>
   r.text ||
-  (r.mediaType === "image" ? "Photo" : r.mediaType === "audio" ? "Voice note" : r.mediaType === "video" ? "Video" : r.mediaType === "sticker" ? "Sticker" : r.mediaType ? "File" : "Message");
+  (r.mediaType === "image" ? "📷 Photo" : r.mediaType === "audio" ? "🎤 Voice note" : r.mediaType === "video" ? "📹 Video" : r.mediaType === "sticker" ? "Sticker" : r.mediaType ? "📄 File" : "Message");
 
-/**
- * The replies inbox — consolidated to 1 conversation thread per customer phone number.
- * Computers: the customer list scrolls on its own beside the picked customer's conversation.
- * Phones and tablets: a list whose rows open the customer's conversation and composer.
- */
+/** Formats window remaining hours and minutes for WhatsApp 24h pill. */
+function formatWindowPill(lastReplyAt: Date | undefined) {
+  const end = replyWindowEnd(lastReplyAt);
+  if (!end) return null;
+  const diffMs = end.getTime() - Date.now();
+  if (diffMs <= 0) return null;
+  const hours = Math.floor(diffMs / 3600000);
+  const mins = Math.floor((diffMs % 3600000) / 60000);
+  return hours > 0 ? `${hours}h ${mins}m left` : `${mins}m left`;
+}
+
+/** Formats purchase frequency (e.g., "bought 3 times"). */
+function formatPurchasesCount(p: string | null | undefined): string {
+  if (!p) return "New customer";
+  const count = (p.match(/,/g) || []).length + 1;
+  return `bought ${count} time${count === 1 ? "" : "s"}`;
+}
+
 export function ReplyInbox({
   replies,
   selectedId,
@@ -65,133 +78,105 @@ export function ReplyInbox({
 }) {
   const selected = replies.find((x) => x.id === selectedId || x.customer.id === selectedId) ?? replies[0];
   const latestInboundAt = thread.find((e) => e.type === "in")?.at ?? selected?.receivedAt;
-  const windowOpen = Boolean(replyWindowEnd(latestInboundAt));
+  const windowTimeRemaining = formatWindowPill(latestInboundAt);
+  const windowOpen = Boolean(windowTimeRemaining);
   const hrefFor = (customerId: string) => `/dashboard/replies?${new URLSearchParams({ ...(show && { show: String(show) }), r: customerId })}`;
-  const isOrder = (r: InboxReply) => Boolean(r.hasOrderInquiry) || r.kind === "button" || ORDER.test(r.text);
   const unpaidOrder = (r: InboxReply) => r.customer.orders?.[0] ?? null;
 
-  const tags = (r: InboxReply) => {
-    const uo = unpaidOrder(r);
-    return (
-      <>
-        {showClient && <Badge>{r.customer.client.name}</Badge>}
-        {(r.openCount ?? 0) > 0 && (
-          <Badge tone="green">
-            {r.openCount === 1 ? "1 open" : `${r.openCount} open`}
-          </Badge>
-        )}
-        {uo && (
-          <Badge tone="amber">
-            Unpaid {orderRef(uo)} · {money(uo.total, uo.currency)}
-          </Badge>
-        )}
-        {(r.totalCount ?? 1) > 1 && (
-          <Badge tone="gray">{r.totalCount} msgs</Badge>
-        )}
-        {isOrder(r) && !uo && (
-          <Badge tone="amber">
-            <ShoppingBag aria-hidden />
-            {r.hasButtonTap || r.kind === "button" ? "Tapped button" : "Order / inquiry"}
-          </Badge>
-        )}
-        {r.handled && <Badge tone="gray">Handled</Badge>}
-      </>
-    );
-  };
+  const currentUnpaid = selected ? unpaidOrder(selected) : null;
+  const currentPurchasesSubtitle = selected
+    ? currentUnpaid
+      ? `Unpaid ₹${Math.round(currentUnpaid.total).toLocaleString("en-IN")} · ${formatPurchasesCount(selected.customer.purchases)}`
+      : `${formatPhone(selected.customer.phone)} · ${formatPurchasesCount(selected.customer.purchases)}`
+    : "";
 
-  const handledButton = (r: InboxReply, size: "sm" | "md") => (
-    <ActionButton action={setReplyHandled.bind(null, r.id, !r.handled)} size={size}>
-      {r.handled ? <RotateCcw aria-hidden className="size-4" /> : <CheckCheck aria-hidden className="size-4" />}
-      {r.handled ? "Reopen" : (r.openCount ?? 1) > 1 ? `Mark handled (${r.openCount})` : "Mark handled"}
-    </ActionButton>
-  );
-
-  const markOrderPaidButton = (r: InboxReply, size: "sm" | "md") => {
+  // Prepare serializable list items for the client ChatList component
+  const chatListItems: ChatListItem[] = replies.map((r) => {
     const uo = unpaidOrder(r);
-    if (!uo) return null;
-    const ref = orderRef(uo);
-    return (
-      <ActionButton
-        action={setOrderStatus.bind(null, uo.id, "PAID")}
-        variant="primary"
-        size={size}
-        title={`Confirm UPI payment for ${ref} and send WhatsApp receipt`}
-      >
-        <CheckCircle2 aria-hidden className="size-4" />
-        Mark {ref} paid ({money(uo.total, uo.currency)})
-      </ActionButton>
-    );
-  };
+    return {
+      id: r.id,
+      customerId: r.customer.id,
+      name: r.customer.name,
+      phone: r.customer.phone,
+      timeStr: fmtDate(r.receivedAt, "h:mm a"),
+      previewText: preview(r),
+      isButton: r.kind === "button",
+      openCount: r.openCount ?? (r.handled ? 0 : 1),
+      handled: r.handled,
+      unpaidLabel: uo ? `Unpaid ${money(uo.total, uo.currency)}` : null,
+      href: hrefFor(r.customer.id),
+    };
+  });
 
   return (
-    <Card className="card-3d overflow-hidden lg:grid lg:h-[calc(100dvh-21rem)] lg:min-h-[34rem] lg:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]">
-      {/* The list: 1 thread row per customer phone number. */}
-      <ul aria-label="Customer conversations" className="thin-scroll divide-y divide-line lg:overflow-y-auto lg:border-r lg:border-line">
-        {replies.map((r) => {
-          const current = selected?.customer.id === r.customer.id;
-          return (
-            <li key={r.customer.id} className={cn("relative flex gap-3 px-4 py-3.5 transition-colors hover:bg-subtle", current && "lg:bg-brand-soft/60 lg:hover:bg-brand-soft/60")}>
-              {current && <span aria-hidden className="absolute inset-y-0 left-0 hidden w-[3px] bg-brand lg:block" />}
-              {!r.handled && !current && <span aria-hidden className="absolute inset-y-3 left-0 w-[3px] rounded-r-full bg-amber-500/70 lg:hidden" />}
-              {/* Phones: the row opens the customer's conversation. Computers: it opens it beside the list. */}
-              <Link href={`/dashboard/customers/${r.customer.id}#reply`} className="absolute inset-0 lg:hidden">
-                <span className="sr-only">Open conversation with {r.customer.name}</span>
-              </Link>
-              <Link href={hrefFor(r.customer.id)} scroll={false} aria-current={current ? "true" : undefined} className="absolute inset-0 hidden lg:block">
-                <span className="sr-only">Show conversation with {r.customer.name}</span>
-              </Link>
-              <Avatar name={r.customer.name} className="size-9 text-xs" />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline justify-between gap-2">
-                  <p className={cn("min-w-0 truncate text-sm text-ink", r.handled ? "font-medium" : "font-semibold")}>{r.customer.name}</p>
-                  <time className="tabular shrink-0 text-xs text-muted" dateTime={r.receivedAt.toISOString()}>
-                    {fmtDate(r.receivedAt, "d MMM, h:mm a")}
-                  </time>
-                </div>
-                <p className="tabular text-xs text-muted">{formatPhone(r.customer.phone)}</p>
-                <p className={cn("mt-0.5 line-clamp-2 text-sm [overflow-wrap:anywhere]", r.handled ? "text-muted" : "text-ink-2")}>
-                  {r.kind === "button" && <span className="text-muted">Tapped: </span>}
-                  {preview(r)}
-                </p>
-                <div className="mt-1.5 flex flex-wrap items-center gap-1 empty:hidden">{tags(r)}</div>
-                {canOperate && (
-                  <div className="relative z-[1] mt-2.5 flex flex-wrap gap-2 lg:hidden">
-                    {markOrderPaidButton(r, "sm")}
-                    {handledButton(r, "sm")}
-                    <span className="ml-auto inline-flex items-center gap-1 self-center text-xs font-medium text-brand-deep">
-                      Open <ChevronRight aria-hidden className="size-3.5" />
-                    </span>
-                  </div>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+    <div className="h-full w-full overflow-hidden rounded-[24px] border border-line bg-card shadow-[0_12px_36px_rgba(16,40,59,0.06)] dark:border-[#27465C] dark:bg-[#111B21] lg:grid lg:grid-cols-[minmax(19rem,23rem)_minmax(0,1fr)]">
+      {/* LEFT COLUMN: Customer Conversations List with Client Search */}
+      <div className="flex h-full flex-col border-r border-line dark:border-[#27465C]">
+        <ChatList items={chatListItems} selectedCustomerId={selected?.customer.id} />
+      </div>
 
-      {/* Computers: the picked customer's conversation. */}
-      {selected && (
-        <section aria-label={`Conversation with ${selected.customer.name}`} className="hidden min-h-0 flex-col lg:flex">
-          <header className="flex items-start gap-3 border-b border-line bg-gradient-to-r from-brand-soft/60 to-transparent px-5 py-3.5">
-            <Avatar name={selected.customer.name} className="size-10" />
-            <div className="min-w-0 flex-1">
-              <h2 className="truncate text-[0.9375rem] font-semibold text-ink">{selected.customer.name}</h2>
-              <p className="tabular text-sm text-muted">
-                {formatPhone(selected.customer.phone)}
-                {selected.sender && <> · wrote to {selected.sender.label}</>}
-              </p>
-              {selected.customer.purchases && (
-                <p className="mt-1 line-clamp-1 text-xs text-muted">
-                  <ShoppingBag aria-hidden className="mr-1 inline size-3 align-[-2px]" />
-                  Bought before: {selected.customer.purchases}
+      {/* RIGHT COLUMN: WhatsApp Active Chat Window */}
+      {selected ? (
+        <section aria-label={`Conversation with ${selected.customer.name}`} className="flex h-full flex-col bg-panel dark:bg-[#111B21]">
+          {/* Header matching WhatsApp UI Mock */}
+          <header className="flex h-[68px] shrink-0 items-center justify-between border-b border-line bg-card px-5 backdrop-blur-md dark:border-[#27465C] dark:bg-[#111B21]">
+            <div className="flex items-center gap-3 min-w-0">
+              <Avatar name={selected.customer.name} className="size-10 shrink-0 text-sm font-semibold" />
+              <div className="min-w-0">
+                <h2 className="truncate text-[15.5px] font-bold text-ink dark:text-white leading-tight">
+                  {selected.customer.name}
+                </h2>
+                <p className="truncate text-xs text-muted dark:text-[#8696A0] leading-normal">
+                  {currentPurchasesSubtitle}
                 </p>
+              </div>
+            </div>
+
+            {/* Header Action Badges & Buttons matching mock */}
+            <div className="flex items-center gap-2">
+              {windowTimeRemaining ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 px-3 py-1 text-xs font-semibold">
+                  <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Free replies · {windowTimeRemaining}
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 px-2.5 py-0.5 text-xs font-medium">
+                  Window closed
+                </span>
+              )}
+
+              <Link
+                href={`/dashboard/customers/${selected.customer.id}`}
+                className="rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-subtle dark:bg-[#1A262D] dark:text-white dark:border-[#27465C]"
+              >
+                Profile
+              </Link>
+
+              <Link
+                href={`/dashboard/customers/${selected.customer.id}#call`}
+                className="inline-flex items-center gap-1 rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-subtle dark:bg-[#1A262D] dark:text-white dark:border-[#27465C]"
+              >
+                <Phone className="size-3 text-emerald-600 dark:text-emerald-400" />
+                <span>Call</span>
+              </Link>
+
+              {canOperate && (
+                <ActionButton
+                  action={setReplyHandled.bind(null, selected.id, !selected.handled)}
+                  size="sm"
+                  className="rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-subtle dark:bg-[#1A262D] dark:text-white dark:border-[#27465C]"
+                >
+                  {selected.handled ? <RotateCcw className="size-3.5" /> : <CheckCheck className="size-3.5" />}
+                  <span>{selected.handled ? "Reopen" : "Done"}</span>
+                </ActionButton>
               )}
             </div>
-            <div className="flex shrink-0 flex-wrap justify-end gap-1">{tags(selected)}</div>
           </header>
 
+          {/* Conversation Chat Wallpaper & Bubbles */}
           <Conversation entries={thread} className="min-h-0 flex-1" />
 
+          {/* Bottom WhatsApp Message Composer */}
           {canOperate && (
             <InlineReplyBox
               key={selected.customer.id}
@@ -202,30 +187,12 @@ export function ReplyInbox({
               windowOpen={windowOpen}
             />
           )}
-
-          <footer className="flex flex-wrap items-center gap-2 border-t border-line bg-panel px-5 py-2.5">
-            {canOperate && markOrderPaidButton(selected, "sm")}
-            {canOperate && (
-              <Link href={`/dashboard/customers/${selected.customer.id}#reply`} className={buttonClass("secondary", "sm")}>
-                <MessageCircle aria-hidden className="size-4" /> Send template
-              </Link>
-            )}
-            {canOperate && windowOpen && (
-              <ActionButton
-                action={sendCatalogue.bind(null, selected.customer.id)}
-                size="sm"
-                title="Send interactive WhatsApp catalogue (free inside the 24-hour window)"
-              >
-                <ShoppingBag aria-hidden className="size-4" /> Send catalogue
-              </ActionButton>
-            )}
-            {canOperate && handledButton(selected, "sm")}
-            <Link href={`/dashboard/customers/${selected.customer.id}`} className={cn(buttonClass("ghost", "sm"), "ml-auto")}>
-              <UserRound aria-hidden className="size-4" /> <span className="max-xl:sr-only">Customer profile</span>
-            </Link>
-          </footer>
         </section>
+      ) : (
+        <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted">
+          Select a customer to open WhatsApp conversation
+        </div>
       )}
-    </Card>
+    </div>
   );
 }
