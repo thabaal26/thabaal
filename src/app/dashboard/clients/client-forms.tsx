@@ -414,6 +414,7 @@ const BRAND_FIELDS: { key: keyof BrandingInput; label: string; hint?: string; pl
   { key: "website", label: "Website", placeholder: "https://example.com" },
   { key: "supportPhone", label: "Contact number", placeholder: "+91 98765 43210" },
   { key: "homeCity", label: "Home city", hint: "for delivery regions; blank means Madurai", placeholder: "e.g. Chennai" },
+  { key: "orderPrefix", label: "Order number prefix", hint: "2 to 5 letters; orders show as FM-1001", placeholder: "e.g. FM" },
 ];
 
 export function BrandingForm({ clientId, name, initial }: { clientId: string; name: string; initial: BrandingInput }) {

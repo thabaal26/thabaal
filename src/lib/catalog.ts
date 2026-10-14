@@ -165,12 +165,25 @@ export type CatalogProductDetail = {
   whatsappStatus?: "APPROVED" | "PENDING" | "REJECTED" | "OUTDATED" | null;
 };
 
-export function detectCategory(name: string): string {
-  if (/oil/i.test(name)) return "Oils";
-  if (/ghee|karupatti|nattusakkarai|jaggery|sugar/i.test(name)) return "Ghee & Sweeteners";
-  if (/powder|masala|chilli|coriander|turmeric/i.test(name)) return "Masala Powders";
-  if (/flour|atta|millet|ragi|kambu|wheat|corn/i.test(name)) return "Flours & Millets";
-  return "General";
+/**
+ * A product's group for reports: the catalogue's own product type when the business set one in Meta's
+ * Commerce Manager, else a guess from common words across retail, food, beauty and services.
+ */
+export function detectCategory(name: string, productType?: string | null): string {
+  const own = productType?.split(">").pop()?.trim();
+  if (own) return own;
+  const rules: [RegExp, string][] = [
+    [/\b(combo|pack of|kit|gift|bundle|hamper)\b/i, "Combos & Gifts"],
+    [/\b(oil|ghee|butter)\b/i, "Oils & Ghee"],
+    [/(jaggery|sugar|honey|karupatti|sakkarai|sweet)/i, "Sweeteners"],
+    [/(powder|masala|chilli|coriander|turmeric|spice|pickle)/i, "Spices & Masalas"],
+    [/(rice|dal|flour|atta|millet|ragi|kambu|wheat|corn|grain|pulses)/i, "Grains & Flours"],
+    [/(soap|shampoo|wash|cream|lotion|hair|skin|face)/i, "Personal Care"],
+    [/(shirt|saree|kurti|dress|t-?shirt|jeans|top|wear|shoe|sandal)/i, "Clothing & Footwear"],
+    [/(biryani|meal|thali|pizza|burger|dosa|idli|juice|coffee|tea|cake|snack)/i, "Food & Drinks"],
+    [/(service|session|appointment|consult|class|haircut|spa|repair)/i, "Services"],
+  ];
+  return rules.find(([re]) => re.test(name))?.[1] ?? "Other";
 }
 
 /** The demo catalogue for portals not yet connected to Meta (sends are simulated). Made-up products. */
@@ -251,6 +264,7 @@ type MetaProduct = {
   description?: string;
   image_url?: string;
   capability_to_review_status?: { key: string; value: string }[];
+  product_type?: string;
 };
 
 function toDetail(p: MetaProduct): CatalogProductDetail {
@@ -273,7 +287,7 @@ function toDetail(p: MetaProduct): CatalogProductDetail {
     inStock: p.availability !== "out of stock",
     description: p.description ?? null,
     imageUrl: p.image_url ?? null,
-    category: detectCategory(name),
+    category: detectCategory(name, p.product_type),
     whatsappStatus: waReview ?? null,
   };
 }
@@ -341,7 +355,7 @@ async function readLiveCatalog(clientId: string): Promise<{ catalogId: string | 
   const catalogId = await catalogIdFor(cfg);
   if (!catalogId) return { catalogId: null, products: [] };
   const out: CatalogProductDetail[] = [];
-  let path: string | null = `${catalogId}/products?fields=id,retailer_id,name,price,availability,description,image_url,capability_to_review_status&limit=100`;
+  let path: string | null = `${catalogId}/products?fields=id,retailer_id,name,price,availability,description,image_url,capability_to_review_status,product_type&limit=100`;
   while (path) {
     const page: { data: MetaProduct[]; paging?: { next?: string } } = await metaGet(cfg, path);
     for (const p of page.data ?? []) out.push(toDetail(p));

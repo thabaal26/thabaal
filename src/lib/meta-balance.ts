@@ -1,5 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
 import { db } from "./db";
 
 const VERSION = process.env.META_GRAPH_VERSION ?? "v23.0";
@@ -15,11 +13,6 @@ export type MetaAccountRecord = {
   lastSyncedAt: string;
   syncedBy: string;
   billingUrl: string;
-};
-
-export type MetaBalanceStore = {
-  activeWabaId: string;
-  accounts: Record<string, MetaAccountRecord>;
 };
 
 export type MetaAccountAlert = {
@@ -109,161 +102,66 @@ export function getMetaAccountAlerts(clientId?: string | null): MetaAccountAlert
   return recentAccountAlerts.filter((a) => !a.clientId || a.clientId === clientId);
 }
 
-const DEFAULT_ACCOUNTS: Record<string, MetaAccountRecord> = {
-  "2326100124852715": {
-    accountName: "R.G. Food Products",
-    wabaId: "2326100124852715",
-    paymentAccountId: "2115188602426162",
-    businessId: "1707942536053094",
-    currency: "INR",
-    liveBalance: 18.89,
-    lastSyncedAt: new Date(0).toISOString(),
-    syncedBy: "Meta Business Suite Billing Hub",
-    billingUrl:
-      "https://business.facebook.com/latest/billing_hub/accounts/?payment_account_id=2115188602426162&asset_id=2326100124852715&business_id=1707942536053094",
-  },
-  "1124232406755071": {
-    accountName: "Test WhatsApp Business Account",
-    wabaId: "1124232406755071",
-    paymentAccountId: "2115188602426162",
-    businessId: "1707942536053094",
-    currency: "INR",
-    liveBalance: 39.99,
-    lastSyncedAt: new Date(0).toISOString(),
-    syncedBy: "Meta Business Suite Billing Hub",
-    billingUrl:
-      "https://business.facebook.com/latest/billing_hub/accounts/?payment_account_id=2115188602426162&asset_id=1124232406755071&business_id=1707942536053094",
-  },
-  "340280433875610": {
-    accountName: "R.G. Food Products (Thenan oils)",
-    wabaId: "340280433875610",
-    paymentAccountId: "2115188602426162",
-    businessId: "1707942536053094",
-    currency: "INR",
-    liveBalance: 50.0,
-    lastSyncedAt: new Date(0).toISOString(),
-    syncedBy: "Meta Business Suite Billing Hub",
-    billingUrl:
-      "https://business.facebook.com/latest/billing_hub/accounts/?payment_account_id=2115188602426162&asset_id=340280433875610&business_id=1707942536053094",
-  },
-};
-
-const STORE_PATH = path.join(process.cwd(), "prisma", "data", "meta-balance-sync.json");
-
-/** Reads stored Meta balance data from disk or initializes defaults. */
-export function getMetaBalanceStore(): MetaBalanceStore {
-  try {
-    if (fs.existsSync(STORE_PATH)) {
-      const raw = fs.readFileSync(STORE_PATH, "utf-8");
-      const parsed = JSON.parse(raw) as MetaBalanceStore;
-      if (parsed?.accounts) {
-        return {
-          activeWabaId: parsed.activeWabaId || "2326100124852715",
-          accounts: { ...DEFAULT_ACCOUNTS, ...parsed.accounts },
-        };
-      }
-    }
-  } catch {
-    // fallback if file read error
-  }
-  return {
-    activeWabaId: "2326100124852715",
-    accounts: { ...DEFAULT_ACCOUNTS },
-  };
+/** The WhatsApp Business Account a client sends from: its default number's, else the one saved on the client. */
+async function clientAccount(clientId: string | null | undefined, wabaId?: string | null) {
+  if (!clientId) return null;
+  const [client, number] = await Promise.all([
+    db.client.findUnique({ where: { id: clientId }, select: { name: true, waBusinessAccountId: true } }),
+    db.whatsAppNumber.findFirst({
+      where: { clientId, ...(wabaId && { businessAccountId: wabaId }) },
+      orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+      select: { businessAccountId: true, verifiedName: true },
+    }),
+  ]);
+  if (!client) return null;
+  return { name: number?.verifiedName || client.name, wabaId: number?.businessAccountId || client.waBusinessAccountId || null };
 }
 
-/** Saves Meta balance data to disk (best-effort for local dev; DB is primary in production). */
-export function saveMetaBalanceStore(store: MetaBalanceStore) {
-  try {
-    const dir = path.dirname(STORE_PATH);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2), "utf-8");
-  } catch {
-    // Serverless filesystems are read-only; DB persistence via TopUp handles production
-  }
-}
-
-/** Gets the active Meta account record for a given WABA ID or client, merging any DB balance sync. */
+/**
+ * This client's Meta account and the last balance someone copied in from Meta's Billing Hub (a [META_SYNC]
+ * top-up). Built only from the client's own records: nothing is hard-coded and nothing is shared between clients.
+ */
 export async function getMetaAccountInfo(wabaId?: string | null, clientId?: string | null): Promise<MetaAccountRecord> {
-  const store = getMetaBalanceStore();
-  const targetId = wabaId || store.activeWabaId;
-  const base: MetaAccountRecord = store.accounts[targetId]
-    ? { ...store.accounts[targetId] }
-    : {
-        ...(store.accounts[store.activeWabaId] || DEFAULT_ACCOUNTS["2326100124852715"]),
-        wabaId: targetId,
-      };
-
-  // Check if there is a newer balance snapshot saved in the database (TopUp with [META_SYNC] prefix)
-  const resolvedClientId =
-    clientId ??
-    (wabaId
-      ? (await db.whatsAppNumber.findFirst({ where: { businessAccountId: wabaId }, select: { clientId: true } }).catch(() => null))?.clientId
-      : null);
-
-  if (resolvedClientId) {
-    const latestSync = await db.topUp
-      .findFirst({
-        where: { clientId: resolvedClientId, note: { startsWith: SYNC_NOTE_PREFIX } },
-        orderBy: { createdAt: "desc" },
-      })
-      .catch(() => null);
-
-    if (latestSync && latestSync.createdAt.getTime() >= new Date(base.lastSyncedAt).getTime()) {
-      base.liveBalance = latestSync.amount;
-      base.lastSyncedAt = latestSync.createdAt.toISOString();
-      base.syncedBy = latestSync.addedBy || "Portal Manager";
-    }
+  const acc = await clientAccount(clientId, wabaId);
+  const id = acc?.wabaId ?? wabaId ?? "";
+  const base: MetaAccountRecord = {
+    accountName: acc?.name ?? "Not connected",
+    wabaId: id,
+    paymentAccountId: "",
+    businessId: "",
+    currency: "INR",
+    liveBalance: 0,
+    lastSyncedAt: new Date(0).toISOString(),
+    syncedBy: "",
+    billingUrl: id ? `https://business.facebook.com/latest/billing_hub/accounts/?asset_id=${id}` : "https://business.facebook.com/latest/billing_hub/accounts/",
+  };
+  if (!clientId) return base;
+  const latestSync = await db.topUp
+    .findFirst({ where: { clientId, note: { startsWith: SYNC_NOTE_PREFIX } }, orderBy: { createdAt: "desc" } })
+    .catch(() => null);
+  if (latestSync) {
+    base.liveBalance = latestSync.amount;
+    base.lastSyncedAt = latestSync.createdAt.toISOString();
+    base.syncedBy = latestSync.addedBy || "Portal Manager";
   }
-
   return base;
 }
 
-/** Updates the synced balance for a Meta WhatsApp Business Account in both DB and local store. */
+/** Records the balance shown in Meta's Billing Hub for this client's account (kept as a [META_SYNC] top-up). */
 export async function setMetaAccountBalance(
   wabaId: string,
   balance: number,
   updatedBy = "Portal User",
   clientId?: string | null,
 ): Promise<MetaAccountRecord> {
-  const store = getMetaBalanceStore();
-  const acc = store.accounts[wabaId] || {
-    ...DEFAULT_ACCOUNTS["2326100124852715"],
-    wabaId,
-  };
-
   const rounded = Math.round(Number(balance) * 100) / 100;
-  const nowIso = new Date().toISOString();
-
-  const updated: MetaAccountRecord = {
-    ...acc,
-    liveBalance: rounded,
-    lastSyncedAt: nowIso,
-    syncedBy: updatedBy,
-  };
-
-  store.accounts[wabaId] = updated;
-  saveMetaBalanceStore(store);
-
-  const resolvedClientId =
-    clientId ??
-    (await db.whatsAppNumber.findFirst({ where: { businessAccountId: wabaId }, select: { clientId: true } }).catch(() => null))?.clientId;
-
-  if (resolvedClientId) {
-    await db.topUp
-      .create({
-        data: {
-          clientId: resolvedClientId,
-          amount: rounded,
-          note: `${SYNC_NOTE_PREFIX} Balance synced for WABA ${wabaId}`,
-          addedBy: updatedBy,
-        },
-      })
-      .catch(() => null);
+  if (clientId) {
+    await db.topUp.create({
+      data: { clientId, amount: rounded, note: `${SYNC_NOTE_PREFIX} Balance synced for WABA ${wabaId}`, addedBy: updatedBy },
+    });
   }
-
-  pricingCache.delete(wabaId);
-  return updated;
+  pricingCache.clear();
+  return getMetaAccountInfo(wabaId, clientId);
 }
 
 export type MetaPricingPoint = {
@@ -322,8 +220,9 @@ export async function fetchMetaLivePricing(
       }),
     ]);
 
-    const token = number?.token || client?.waToken || process.env.WHATSAPP_TOKEN;
-    const wabaId = number?.businessAccountId || client?.waBusinessAccountId || process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+    // Only this client's own credentials: never the deployment's number, which belongs to another business.
+    const token = number?.token || client?.waToken;
+    const wabaId = number?.businessAccountId || client?.waBusinessAccountId;
     if (!token || !wabaId) return empty;
 
     const cacheKey = `${wabaId}:${Math.floor(startUnix / 3600)}`;
@@ -415,14 +314,14 @@ export async function fetchMetaLiveStatus(clientId: string) {
     });
     const number = numbers[0];
 
-    const token = number?.token || client?.waToken || process.env.WHATSAPP_TOKEN;
-    const wabaId = number?.businessAccountId || client?.waBusinessAccountId || process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
-    const phoneId = number?.phoneNumberId || client?.waPhoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID;
+    const token = number?.token || client?.waToken;
+    const wabaId = number?.businessAccountId || client?.waBusinessAccountId;
+    const phoneId = number?.phoneNumberId || client?.waPhoneNumberId;
 
     if (!token || !wabaId || !phoneId) {
       return {
         liveConnected: false,
-        reason: "Missing WhatsApp access token, WABA ID, or Phone Number ID.",
+        reason: "This business hasn't connected its own WhatsApp number and access token yet.",
       };
     }
 

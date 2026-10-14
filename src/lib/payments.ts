@@ -159,7 +159,7 @@ export async function confirmPayment(orderId: string, txnId?: string | null, rec
     const activeOrder = await db.order.findFirst({
       where: { customerId: order.customerId, paidAt: null, status: { in: ["NEW", "CONFIRMED"] } },
       orderBy: { createdAt: "desc" },
-      select: { id: true, number: true },
+      select: { id: true, number: true, ref: true },
     });
     if (activeOrder) {
       console.log(`Payment received for cancelled order ${orderRef(order)}, auto-routing to active order ${orderRef(activeOrder)}`);
@@ -271,7 +271,7 @@ export type CardStatus = keyof typeof CARD_LABEL;
  * so the caller can fall back to a plain message or template.
  */
 export async function updateOrderCard(
-  order: { id: string; number: number; paymentRequestedAt: Date | null; customer: { id: string; clientId: string; phone: string } },
+  order: { id: string; number: number; ref: string | null; paymentRequestedAt: Date | null; customer: { id: string; clientId: string; phone: string } },
   status: CardStatus,
   text: string,
   description: string = CARD_LABEL[status],
@@ -293,7 +293,7 @@ export async function updateOrderCard(
  */
 export async function cancelSupersededOrdersForCustomer(
   customerId: string,
-  newOrder: { id: string; number: number; total: number; currency: string },
+  newOrder: { id: string; number: number; ref: string | null; total: number; currency: string },
 ) {
   const newRef = orderRef(newOrder);
   const newTotal = money(newOrder.total, newOrder.currency);

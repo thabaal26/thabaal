@@ -1,10 +1,11 @@
+import { orderRef } from "@/lib/order-ref";
 import { CheckCheck, Clock, Send, TriangleAlert } from "@/components/icons";
 import Link from "@/components/intent-link";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { ActionButton } from "@/components/action-button";
 import { Calendar3D, Eye3D, Messages3D, Rupee3D, Send3D, Template3D } from "@/components/icons-3d";
 import { Avatar, Badge, buttonClass, Callout, Card, CardHeader, EmptyState, Meter, StatusBadge } from "@/components/ui";
-import { getCatalogWithProducts } from "@/lib/catalog";
+import { detectCategory, getCatalogWithProducts } from "@/lib/catalog";
 import { isSectionEnabled } from "@/lib/client-sections";
 import { db } from "@/lib/db";
 import { APP_TZ, daysAgo, fmtDate, fmtNumber, pct } from "@/lib/format";
@@ -201,7 +202,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
           where: { ...mineOrders, createdAt: { gte: prevStart, lt: end } },
           select: {
             id: true,
-            number: true,
+            number: true, ref: true,
             customerId: true,
             status: true,
             paidAt: true,
@@ -528,7 +529,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
           customerId: o.customerId,
           name: o.customer.name,
           phone: o.customer.phone,
-          detail: `RG-${1000 + o.number} · ${formatCartItems(o.items)}${replacedNote}`,
+          detail: `${orderRef(o)} · ${formatCartItems(o.items)}${replacedNote}`,
           amount: o.total,
           at: o.createdAt,
           href: `/dashboard/customers/${o.customerId}`,
@@ -544,13 +545,13 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       carts: curCancelledCarts.length,
       value: cancelledCartRevenue,
       leads: curCancelledCarts.slice(0, 4).map((o) => {
-        const supersedeMatch = /Superseded by (RG-\d+)/i.exec(o.internalNote ?? "");
+        const supersedeMatch = /Superseded by ([A-Z]{2,5}-\d+)/i.exec(o.internalNote ?? "");
         const tag = supersedeMatch ? `Replaced by ${supersedeMatch[1]}` : "Cancelled";
         return {
           customerId: o.customerId,
           name: o.customer.name,
           phone: o.customer.phone,
-          detail: `RG-${1000 + o.number} (${tag}) · ${formatCartItems(o.items)}`,
+          detail: `${orderRef(o)} (${tag}) · ${formatCartItems(o.items)}`,
           amount: o.total,
           at: o.createdAt,
           href: `/dashboard/customers/${o.customerId}`,
@@ -566,7 +567,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         customerId: o.customerId,
         name: o.customer.name,
         phone: o.customer.phone,
-        detail: `RG-${1000 + o.number} (${o.status.toLowerCase()}) · ${formatCartItems(o.items)}`,
+        detail: `${orderRef(o)} (${o.status.toLowerCase()}) · ${formatCartItems(o.items)}`,
         amount: o.total,
         at: o.createdAt,
         href: `/dashboard/customers/${o.customerId}`,
@@ -617,6 +618,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     const custHistory = (ordersByCust.get(o.customerId) ?? []).map((po) => ({
       id: po.id,
       number: po.number,
+      ref: po.ref,
       total: po.total,
       currency: "INR",
       status: po.status,
@@ -627,7 +629,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     }));
     const curItems = ((o.items as OrderItem[] | null) ?? []);
     const m = analyzeCartMentality(
-      { id: o.id, number: o.number, total: o.total, currency: "INR", items: curItems, createdAt: o.createdAt },
+      { id: o.id, number: o.number, ref: o.ref, total: o.total, currency: "INR", items: curItems, createdAt: o.createdAt },
       custHistory,
     );
     if (m.attemptCount > 1 && m.behavior !== "first_cart") {
@@ -651,11 +653,11 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         customerName: o.customer.name,
         customerPhone: o.customer.phone,
         latestOrderId: o.id,
-        latestOrderRef: `RG-${1000 + o.number}`,
+        latestOrderRef: orderRef(o),
         latestStatus: o.status,
         latestPaid: isBought(o),
         latestTotal: o.total,
-        firstCartRef: firstCart ? `RG-${1000 + firstCart.number}` : `RG-${1000 + o.number}`,
+        firstCartRef: firstCart ? orderRef(firstCart) : orderRef(o),
         firstCartTotal: firstCart ? firstCart.total : o.total,
         attemptCount: m.attemptCount,
         behavior: m.behavior,
@@ -828,15 +830,8 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
 
   /* ── Full All-Products Analytics (Including 0-Sales / Non-Selling SKUs) ── */
   const normKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  const inferCat = (name: string) => {
-    const l = name.toLowerCase();
-    if (/(soap|wash|bath)/i.test(l)) return "Handmade Soaps";
-    if (/(hair|shikakai|hibiscus|bhringraj|neeli|dandruff)/i.test(l)) return "Hair Care";
-    if (/(ghee|honey|jaggery|spice|pod|masala|pickle)/i.test(l)) return "Pantry & Traditionals";
-    if (/(oil|chekku|gingelly|groundnut|coconut|castor|mustard|sesame)/i.test(l)) return "Cold-Pressed Oils";
-    if (/(combo|pack|kit|gift|bundle)/i.test(l)) return "Value Combos";
-    return "General Catalogue";
-  };
+  // Product groups come from the catalogue (lib/catalog detectCategory), never a list made for one business.
+  const inferCat = (name: string) => detectCategory(name);
 
   // Period order & cart breakdown by normalized product name (plus top buyers, unpaid cart holders, and bundle partners)
   const periodProdStats = new Map<
@@ -919,7 +914,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
           customerId: o.customerId,
           name: o.customer.name,
           phone: o.customer.phone,
-          orderRef: `RG-${1000 + o.number}`,
+          orderRef: orderRef(o),
           qty,
           value: val,
         });
@@ -1256,7 +1251,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
         id: o.id,
         name: o.customer.name,
         phone: o.customer.phone,
-        note: `RG-${1000 + o.number} · ₹${Math.round(o.total).toLocaleString("en-IN")} · ${formatCartItems(o.items)}`,
+        note: `${orderRef(o)} · ₹${Math.round(o.total).toLocaleString("en-IN")} · ${formatCartItems(o.items)}`,
         href: `/dashboard/customers/${o.customerId}`,
       })),
     },

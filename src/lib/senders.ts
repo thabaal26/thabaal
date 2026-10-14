@@ -10,15 +10,15 @@ export function clientNumbers(clientId: string) {
   return db.whatsAppNumber.findMany({ where: { clientId }, orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }] });
 }
 
-/** Credentials for one number; its own token wins over the client's shared one. */
+/**
+ * Credentials for one number; its own token wins over the client's shared one. No number, or no token for it,
+ * means not connected: never the deployment's own number, which belongs to another business.
+ */
 export function numberConfig(n: Pick<WhatsAppNumber, "token" | "phoneNumberId" | "businessAccountId"> | null | undefined, clientToken: string | null) {
-  return n ? waConfig({ token: n.token ?? clientToken, phoneNumberId: n.phoneNumberId, businessAccountId: n.businessAccountId }) : waConfig();
+  return waConfig(n ? { token: n.token ?? clientToken, phoneNumberId: n.phoneNumberId, businessAccountId: n.businessAccountId } : null);
 }
 
-/**
- * The number to send from: the chosen one, else the client's default. Clients without
- * numbers fall back to the env-configured number (number is then null).
- */
+/** The number to send from: the chosen one, else the client's default. Without one the config is not connected. */
 export async function senderFor(clientId: string, senderId?: string | null) {
   const [client, numbers] = await Promise.all([
     db.client.findUnique({ where: { id: clientId }, select: { waToken: true } }),
@@ -30,10 +30,10 @@ export async function senderFor(clientId: string, senderId?: string | null) {
 
 /**
  * A number in the given WhatsApp Business Account (the default one when it's there), for
- * template work and test sends. A null account means the env-configured number.
+ * template work and test sends. No account means the client isn't connected yet.
  */
 export async function senderForAccount(clientId: string, businessAccountId: string | null) {
-  if (!businessAccountId) return { number: null, cfg: waConfig() };
+  if (!businessAccountId) return { number: null, cfg: waConfig(null) };
   const [client, number] = await Promise.all([
     db.client.findUnique({ where: { id: clientId }, select: { waToken: true } }),
     db.whatsAppNumber.findFirst({ where: { clientId, businessAccountId }, orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }] }),

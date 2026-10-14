@@ -1,5 +1,6 @@
 "use server";
 
+import { ensureOrderPrefix } from "@/lib/orders";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
@@ -46,8 +47,9 @@ export async function createClient(name: string, disabledSections?: string[], ho
   const c = await db.client.create({
     data: { name: clean, disabledSections: sanitized, homeCity: city, businessType: type?.id ?? null, ...(type?.starterFields.length && { customFields: type.starterFields }) },
   });
+  const prefix = await ensureOrderPrefix(c.id).catch(() => null);
   refresh();
-  return { ok: true, id: c.id, message: `${clean} added.` };
+  return { ok: true, id: c.id, message: `${clean} added.${prefix ? ` Its orders will be numbered ${prefix}-1001, ${prefix}-1002…` : ""}` };
 }
 
 /** Enables or disables portal sections for a specific client as configured by the portal owner. */
@@ -272,6 +274,8 @@ export type BrandingInput = {
   homeCity: string;
   /** Kind of business (lib/business-types.ts); blank = not chosen. */
   businessType: string;
+  /** Prefix of this client's order numbers (FM in FM-1001); blank keeps the current one. */
+  orderPrefix: string;
 };
 
 /** Looks the client's login sees. Blank fields fall back to the default portal look. */
@@ -288,10 +292,17 @@ export async function saveClientBranding(clientId: string, input: BrandingInput)
   if (v.businessType && !businessTypeOf(v.businessType)) errors.push("Pick a business type from the list.");
   if (v.website && !/^https?:\/\/\S+\.\S+/.test(v.website)) errors.push("Website should start with https://");
   if (v.tagline && v.tagline.length > 80) errors.push("Keep the tagline under 80 characters.");
+  // Order prefix: 2 to 5 letters, unique across clients; blank leaves the current one (and its numbering) alone.
+  const prefix = v.orderPrefix?.toUpperCase() ?? null;
+  const { orderPrefix: _p, ...rest } = v;
+  void _p;
+  if (prefix && !/^[A-Z]{2,5}$/.test(prefix)) errors.push("Order prefix: 2 to 5 letters, e.g. FM.");
+  if (prefix && (await db.client.findFirst({ where: { orderPrefix: prefix, id: { not: clientId } }, select: { name: true } })))
+    errors.push(`Order prefix ${prefix} is already used by another client.`);
   if (errors.length) return { ok: false, errors: [...new Set(errors)] };
   const client = await db.client.findUnique({ where: { id: clientId }, include: { numbers: true } });
   if (!client) return { ok: false, message: "Client not found." };
-  await db.client.update({ where: { id: clientId }, data: v });
+  await db.client.update({ where: { id: clientId }, data: { ...rest, ...(prefix && { orderPrefix: prefix }) } });
   if (v.tagline || v.website) {
     await Promise.all(
       client.numbers.map((n) => {

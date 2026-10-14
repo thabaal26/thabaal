@@ -7,13 +7,33 @@ import { catalogProductNames } from "./whatsapp";
 
 export { DEFAULT_SHIPPING_FEE, calcItemsSubtotal, getOrderPricing };
 
-/** The order number people see and quote, e.g. RG-1001. */
-export const orderRef = (o: { number: number }) => `RG-${1000 + o.number}`;
+import { orderRef, orderWhereRef, prefixFromName } from "./order-ref";
 
-/** Order lookup for a reference from orderRef, or an order id (payment requests sent before order numbers). */
-export function orderWhereRef(ref: string) {
-  const m = /^RG-(\d+)$/i.exec(ref.trim());
-  return m ? { number: Number(m[1]) - 1000 } : { id: ref };
+export { orderRef, orderWhereRef };
+
+/** Gives a client without an order prefix one from its name (FM, then FMA, FMB… if taken); returns the prefix. */
+export async function ensureOrderPrefix(clientId: string): Promise<string> {
+  let c = await db.client.findUnique({ where: { id: clientId }, select: { name: true, orderPrefix: true } });
+  if (!c) throw new Error("Client not found");
+  if (c.orderPrefix) return c.orderPrefix;
+  const base = prefixFromName(c.name);
+  for (let i = 0; i < 26; i++) {
+    const candidate = i ? `${base.slice(0, 3)}${String.fromCharCode(64 + i)}` : base;
+    await db.client.updateMany({ where: { id: clientId, orderPrefix: null }, data: { orderPrefix: candidate } }).catch(() => null);
+    c = await db.client.findUnique({ where: { id: clientId }, select: { name: true, orderPrefix: true } });
+    if (c?.orderPrefix) return c.orderPrefix;
+  }
+  throw new Error("Couldn't find a free order prefix; set one under Clients → Edit branding.");
+}
+
+/**
+ * The next order number for this client, e.g. FM-1001: its own prefix and running count, taken atomically so
+ * two orders at once never share a number.
+ */
+export async function nextOrderRef(clientId: string): Promise<string> {
+  await ensureOrderPrefix(clientId);
+  const next = await db.client.update({ where: { id: clientId }, data: { orderSeq: { increment: 1 } }, select: { orderPrefix: true, orderSeq: true } });
+  return `${next.orderPrefix}-${next.orderSeq}`;
 }
 
 export type OrderItem = { id: string; name?: string; quantity: number; price: number; currency: string };
@@ -52,7 +72,7 @@ export async function recordOrder(customer: { id: string; clientId: string }, wa
   const priorUnpaid = await db.order.findMany({
     where: { customerId: customer.id, paidAt: null, status: { in: ["NEW", "CONFIRMED"] } },
     orderBy: { createdAt: "desc" },
-    select: { id: true, number: true, total: true, currency: true, items: true, internalNote: true },
+    select: { id: true, number: true, ref: true, total: true, currency: true, items: true, internalNote: true },
   });
 
   // Resolve address: if order note has an address and customer has none, save to customer;
@@ -119,6 +139,7 @@ export async function recordOrder(customer: { id: string; clientId: string }, wa
 
   const created = await db.order.create({
     data: {
+      ref: await nextOrderRef(customer.clientId),
       clientId: customer.clientId,
       customerId: customer.id,
       waMessageId,

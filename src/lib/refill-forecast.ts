@@ -1,3 +1,4 @@
+import { orderRef } from "@/lib/order-ref";
 import "server-only";
 import { formatInTimeZone } from "date-fns-tz";
 import { db } from "./db";
@@ -81,7 +82,7 @@ export async function refillForecast(clientId: string, now = new Date()): Promis
       },
       select: {
         id: true,
-        number: true,
+        number: true, ref: true,
         customerId: true,
         createdAt: true,
         total: true,
@@ -93,7 +94,7 @@ export async function refillForecast(clientId: string, now = new Date()): Promis
     }),
     db.order.findMany({
       where: { clientId, paidAt: null, status: { in: ["NEW", "CONFIRMED"] }, createdAt: { gte: new Date(now.getTime() - 30 * DAY) } },
-      select: { id: true, number: true, customerId: true, total: true, createdAt: true },
+      select: { id: true, number: true, ref: true, customerId: true, total: true, createdAt: true },
       orderBy: { createdAt: "desc" },
     }),
     db.reply.groupBy({
@@ -149,7 +150,7 @@ export async function refillForecast(clientId: string, now = new Date()): Promis
       phone: last.customer.phone,
       area: last.customer.location,
       lastOrderId: last.id,
-      lastOrderRef: `RG-${1000 + last.number}`,
+      lastOrderRef: orderRef(last),
       lastOrderAt: last.createdAt,
       lastTotal: last.total,
       avgOrder: list.reduce((n, o) => n + o.total, 0) / list.length,
@@ -160,7 +161,7 @@ export async function refillForecast(clientId: string, now = new Date()): Promis
       dueAt,
       daysLeft: dayDiff(now, dueAt),
       reminderSentAt: last.reminderSentAt,
-      openCart: cart ? { id: cart.id, ref: `RG-${1000 + cart.number}`, total: cart.total } : null,
+      openCart: cart ? { id: cart.id, ref: orderRef(cart), total: cart.total } : null,
       windowOpen: replied.has(customerId),
     });
   }

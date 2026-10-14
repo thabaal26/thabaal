@@ -33,7 +33,7 @@ export type InboxReply = {
     phone: string;
     purchases: string | null;
     client: { name: string };
-    orders?: { id: string; number: number; total: number; currency: string }[];
+    orders?: { id: string; number: number; ref: string | null; total: number; currency: string }[];
   };
   sender: { label: string } | null;
 };

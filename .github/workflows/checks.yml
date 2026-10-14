@@ -1,0 +1,51 @@
+name: Checks
+
+# Runs on every push and pull request: type check, lint, build, then the automatic tests against a
+# throw-away Postgres (never the live database): sending guard, per-client order numbers, sheets,
+# encryption, Meta balance, and a full check that no business can see another business's data.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: thabaal_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:test@localhost:5432/thabaal_test
+      DATABASE_URL: postgresql://postgres:test@localhost:5432/thabaal_test
+      DATABASE_URL_UNPOOLED: postgresql://postgres:test@localhost:5432/thabaal_test
+      AUTH_SECRET: ci-auth-secret-0123456789abcdefghijklmnop
+      DATA_ENC_KEY: BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: Lint
+        # Older warnings are still being cleared; lint reports without blocking until then.
+        continue-on-error: true
+        run: npx eslint .
+      - name: Build
+        run: npx next build
+      - name: Automatic tests (test database only)
+        run: node tests/run.mjs --http

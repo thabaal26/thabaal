@@ -1,3 +1,4 @@
+import { orderRef } from "@/lib/order-ref";
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { db } from "./db";
@@ -47,7 +48,7 @@ export async function inboxPriority(where: Prisma.ReplyWhereInput, now = new Dat
           phone: true,
           orders: {
             where: { status: { not: "CANCELLED" } },
-            select: { id: true, number: true, total: true, status: true, paidAt: true, paymentRequestedAt: true, createdAt: true },
+            select: { id: true, number: true, ref: true, total: true, status: true, paidAt: true, paymentRequestedAt: true, createdAt: true },
             orderBy: { createdAt: "desc" },
             take: 50,
           },
@@ -85,7 +86,7 @@ export async function inboxPriority(where: Prisma.ReplyWhereInput, now = new Dat
       waitingSince: r.receivedAt,
       lastAt: r.receivedAt,
       windowLeftH: 0,
-      cart: cart ? { id: cart.id, ref: `RG-${1000 + cart.number}`, total: cart.total, paymentRequested: Boolean(cart.paymentRequestedAt) } : null,
+      cart: cart ? { id: cart.id, ref: orderRef(cart), total: cart.total, paymentRequested: Boolean(cart.paymentRequestedAt) } : null,
       paidOrders: bought.length,
       lifetimeValue: bought.reduce((n, o) => n + o.total, 0),
       buyingIntent: intent,

@@ -107,12 +107,19 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
   const subtitle = client?.tagline || (scope.isAdmin ? (client ? "Admin view" : "Admin · all clients") : "A message with momentum");
   const via = settings.provider === "LOCAL" ? "Local session" : "Meta Cloud API";
   const live = !isSimulated(settings, client && sender ? sender.cfg : undefined);
+  // A client without its own number: say so plainly (to the client too), never "demo mode".
+  const notConnected = settings.provider === "META" && Boolean(client) && Boolean(sender?.cfg.notConnected);
 
   const role: NavRole = !scope.isAdmin && scope.canOperate && !scope.canManage ? "staff" : "manager";
 
   // Clients only see a reassuring "connected" line; setup problems are the admin's to fix.
   // "Live" means real sending credentials are configured (not demo mode); number health lives on the Overview.
-  const status = live ? (
+  const status = notConnected ? (
+    <span className="flex min-w-0 items-center gap-1.5 text-warning-on-dark">
+      <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-warning-on-dark" />
+      <span className="truncate">{scope.isAdmin ? "WhatsApp not connected: add this client's number" : "WhatsApp not connected yet"}</span>
+    </span>
+  ) : live ? (
     <span className="flex min-w-0 items-center gap-1.5 text-white/75">
       <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-call-answer" />
       <span className="truncate">{scope.isAdmin ? `Sending via ${via}` : "WhatsApp connected"}</span>

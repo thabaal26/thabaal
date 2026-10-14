@@ -1,3 +1,4 @@
+import { orderRef } from "@/lib/order-ref";
 import type { Order } from "@prisma/client";
 import { MessageCircle, PackageCheck, ShoppingCart, Sparkles, TriangleAlert } from "@/components/icons";
 import { ShoppingBag3D, Trophy3D } from "@/components/icons-3d";
@@ -124,7 +125,7 @@ export function PurchaseJourney({
   // 3. Active Unpaid Cart Items right now
   const unpaidItems = openCarts.flatMap((o) =>
     ((o.items as OrderItem[] | null) ?? []).map((it) => ({
-      orderRef: `RG-${1000 + o.number}`,
+      orderRef: orderRef(o),
       name: (it.name ?? it.id ?? "Item").trim(),
       qty: Number(it.quantity) || 1,
       value: (Number(it.price) || 0) * (Number(it.quantity) || 1),
@@ -476,7 +477,7 @@ export function PurchaseJourney({
                   />
                   <p className="flex flex-wrap items-baseline justify-between gap-x-2 text-sm">
                     <span className={cn("font-medium", k === "dropped" ? "text-muted line-through" : "text-ink")}>
-                      RG-{1000 + o.number} · {formatValue(o.total, "inr")}
+                      {orderRef(o)} · {formatValue(o.total, "inr")}
                     </span>
                     <span className="tabular text-2xs text-muted">
                       {fmtDate(o.createdAt, "d MMM yyyy")}

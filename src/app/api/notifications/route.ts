@@ -1,3 +1,4 @@
+import { orderRef } from "@/lib/order-ref";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { isSectionEnabled } from "@/lib/client-sections";
@@ -123,10 +124,10 @@ export async function GET() {
     items.push({
       id: `order-${o.id}`,
       type: "order",
-      title: `Order #RG-${o.number} (${o.status.toLowerCase()}): ${o.customer.name}`,
+      title: `Order #${orderRef(o)} (${o.status.toLowerCase()}): ${o.customer.name}`,
       description: `₹${fmtNumber(o.total)} · ${o.customer.location || formatPhone(o.customer.phone)}`,
       timestamp: o.createdAt.toISOString(),
-      href: `/dashboard/orders?q=RG-${o.number}`,
+      href: `/dashboard/orders?q=${orderRef(o)}`,
       unread: isNew || isPaid || o.status === "CONFIRMED",
     });
   }

@@ -43,3 +43,6 @@ next-env.d.ts
 
 # customer PII for import
 /prisma/data/
+
+# Local test database (tests/run.mjs, scripts/test-db.mjs)
+/.testdb/

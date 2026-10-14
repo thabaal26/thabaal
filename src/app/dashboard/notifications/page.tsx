@@ -1,3 +1,4 @@
+import { orderRef } from "@/lib/order-ref";
 import { ChevronRight } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
@@ -104,12 +105,12 @@ export default async function NotificationsPage({
     items.push({
       id: `order-${o.id}`,
       type: "order",
-      title: `Order #RG-${o.number} (${o.status.toLowerCase()}): ${o.customer.name}`,
+      title: `Order #${orderRef(o)} (${o.status.toLowerCase()}): ${o.customer.name}`,
       customerName: o.customer.name,
       phone: o.customer.phone,
       description: `₹${fmtNumber(o.total)} · ${o.customer.location || formatPhone(o.customer.phone)}`,
       date: o.createdAt,
-      href: `/dashboard/orders?q=RG-${o.number}`,
+      href: `/dashboard/orders?q=${orderRef(o)}`,
       unread: isNew || isPaid || o.status === "CONFIRMED",
     });
   }

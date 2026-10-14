@@ -112,8 +112,10 @@ async function processRun(runId: string, now: Date, deadline: number) {
     await pause("WAITING_TEMPLATE", 5);
     return { sent: 0, failed: 0 };
   }
-  if (!(await readiness(settings, cfg)).ok) {
-    await pause("WAITING_CONNECTION", 2);
+  const ready = await readiness(settings, cfg);
+  if (!ready.ok) {
+    // A client that hasn't connected its own number waits longer: it needs an admin, not a retry.
+    await pause("WAITING_CONNECTION", ready.notConnected ? 30 : 2);
     return { sent: 0, failed: 0 };
   }
   // Offers at night get reported; hold marketing until quiet hours end.

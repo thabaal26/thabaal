@@ -17,6 +17,7 @@ import { getOrderPricing } from "@/lib/order-pricing";
 import { readFields } from "@/lib/custom-fields";
 import { isPictureVersion, isTemplatePicture, ORDER_TEMPLATE_NAMES, orderTemplateNames } from "@/lib/order-templates";
 import { money, orderRef, type OrderItem } from "@/lib/orders";
+import { ORDER_REF_RE, orderWhereRef } from "@/lib/order-ref";
 import { slipPay } from "@/lib/payment-state";
 import { formatPhone } from "@/lib/phone";
 import { getScope, owned } from "@/lib/session";
@@ -135,6 +136,8 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
           { note: { contains: q, mode: "insensitive" as const } },
           ...(cleanPhone.length >= 3 ? [{ customer: { phone: { contains: cleanPhone } } }] : []),
           ...(orderNum && !isNaN(orderNum) ? [{ number: orderNum }] : []),
+          // This client's own order numbers (FM-1001) and the older shared ones (RG-1023 → number 23).
+          ...(ORDER_REF_RE.test(q) ? [orderWhereRef(ORDER_REF_RE.exec(q)![1])] : []),
           ...(itemSearchIds.length > 0 ? [{ id: { in: itemSearchIds } }] : []),
         ],
       }
@@ -186,7 +189,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
               orderBy: { createdAt: "asc" },
               select: {
                 id: true,
-                number: true,
+                number: true, ref: true,
                 total: true,
                 currency: true,
                 status: true,
@@ -404,7 +407,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
                   type="search"
                   enterKeyHint="search"
                   defaultValue={q}
-                  placeholder="Search customer, phone, RG-1001, item…"
+                  placeholder="Search customer, phone, order no., item…"
                   aria-label="Search customer, phone, order number or item"
                   className="field pl-10"
                 />

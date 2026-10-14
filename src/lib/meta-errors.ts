@@ -22,6 +22,8 @@ export const PAUSING_KINDS: ErrorKind[] = ["setup", "account"];
 export const TRY_LATER_KINDS: ErrorKind[] = ["rate", "temporary", "setup", "account", "number-restricted"];
 
 const ERRORS: Record<number, { title: string; kind: ErrorKind }> = {
+  // Ours, not Meta's (lib/whatsapp NOT_CONNECTED_CODE): the client has no WhatsApp number of its own yet.
+  990001: { title: "This business hasn't connected its own WhatsApp number yet", kind: "setup" },
   // The customer
   131026: { title: "Can't receive WhatsApp messages: not on WhatsApp, an old app version, or they blocked the number", kind: "unreachable" },
   131021: { title: "Recipient is the sending number itself", kind: "unreachable" },

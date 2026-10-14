@@ -16,15 +16,28 @@ const MEDIA_TTL_MS = 12 * 60 * 60 * 1000;
 /** Credentials of one sending number: its token, phone number ID and WhatsApp Business Account. */
 export type WaSource = { token: string | null; phoneNumberId: string | null; businessAccountId: string | null };
 
-/** That number when all three are set, otherwise the env-configured number. */
+/** Shown wherever a client without its own WhatsApp number tries to send or manage templates. */
+export const NOT_CONNECTED =
+  "This business hasn't connected its own WhatsApp number yet. Add its number and access token under Clients first; nothing is sent from another business's number.";
+/** Our own code for that refusal (not a Meta code); meta-errors treats it as a setup problem, so campaigns wait. */
+export const NOT_CONNECTED_CODE = 990001;
+
+/**
+ * That number when all three are set. Called with no argument it is the deployment's own number (env), for
+ * platform-level checks only. A client's number that is missing or incomplete is NOT CONNECTED: it never falls
+ * back to the deployment's number, which belongs to another business.
+ */
 export function waConfig(src?: WaSource | null) {
   const own = Boolean(src?.token && src.phoneNumberId && src.businessAccountId);
-  const token = own ? src!.token! : process.env.WHATSAPP_TOKEN;
-  const phoneNumberId = own ? src!.phoneNumberId! : process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const wabaId = own ? src!.businessAccountId! : process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+  const platform = src === undefined;
+  const token = own ? src!.token! : platform ? process.env.WHATSAPP_TOKEN : undefined;
+  const phoneNumberId = own ? src!.phoneNumberId! : platform ? process.env.WHATSAPP_PHONE_NUMBER_ID : undefined;
+  const wabaId = own ? src!.businessAccountId! : platform ? process.env.WHATSAPP_BUSINESS_ACCOUNT_ID : undefined;
   return {
     live: Boolean(token && phoneNumberId && wabaId),
     own,
+    /** A client's number that isn't set up: sending must refuse, not simulate. */
+    notConnected: !own && !platform,
     token,
     phoneNumberId,
     wabaId,
@@ -39,6 +52,12 @@ export class MetaError extends Error {
   constructor(message: string, public code?: number) {
     super(message);
   }
+}
+
+/** No live credentials: demo mode simulates the send, but a client that isn't connected is refused outright. */
+function offline(cfg: WaConfig): { id: string; simulated: true } {
+  if (cfg.notConnected) throw new MetaError(NOT_CONNECTED, NOT_CONNECTED_CODE);
+  return { id: `demo.${crypto.randomUUID()}`, simulated: true };
 }
 
 async function graph<T>(cfg: WaConfig, path: string, init: RequestInit = {}): Promise<T> {
@@ -115,7 +134,7 @@ export type SendInput = {
 };
 
 export async function sendTemplateMessage(cfg: WaConfig, input: SendInput): Promise<{ id: string; simulated: boolean }> {
-  if (!cfg.live) return { id: `demo.${crypto.randomUUID()}`, simulated: true };
+  if (!cfg.live) return offline(cfg);
 
   const components: Record<string, unknown>[] = [];
   if (input.otpCode) {
@@ -176,7 +195,7 @@ export async function sendTemplateMessage(cfg: WaConfig, input: SendInput): Prom
 
 /** A plain text message. WhatsApp only allows it within 24 hours of the customer's last message. */
 export async function sendTextMessage(cfg: WaConfig, to: string, body: string): Promise<{ id: string; simulated: boolean }> {
-  if (!cfg.live) return { id: `demo.${crypto.randomUUID()}`, simulated: true };
+  if (!cfg.live) return offline(cfg);
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
     body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to, type: "text", text: { body, preview_url: false } }),
@@ -191,7 +210,7 @@ export async function sendMediaMessage(
   mediaUrl: string,
   caption?: string,
 ): Promise<{ id: string; simulated: boolean }> {
-  if (!cfg.live) return { id: `demo.${crypto.randomUUID()}`, simulated: true };
+  if (!cfg.live) return offline(cfg);
   const isPdf = /\.pdf(\?|$)/i.test(mediaUrl);
   const type = isPdf ? "document" : "image";
   const normalizedUrl = absoluteUrl(mediaUrl) ?? mediaUrl;
@@ -220,7 +239,10 @@ export type CallAction = "pre_accept" | "accept" | "reject" | "terminate";
 
 /** Answers, rejects or hangs up a WhatsApp voice call; accepting sends the browser's SDP answer. */
 export async function callAction(cfg: WaConfig, callId: string, action: CallAction, sdp?: string) {
-  if (!cfg.live) return;
+  if (!cfg.live) {
+    if (cfg.notConnected) throw new MetaError(NOT_CONNECTED, NOT_CONNECTED_CODE);
+    return;
+  }
   await graph(cfg, `${cfg.phoneNumberId}/calls`, {
     method: "POST",
     body: JSON.stringify({ messaging_product: "whatsapp", call_id: callId, action, ...(sdp && { session: { sdp_type: "answer", sdp } }) }),
@@ -244,7 +266,7 @@ export async function startMetaCall(cfg: WaConfig, to: string, sdp: string): Pro
  * within 24 hours of the customer's last message.
  */
 export async function sendCallPermissionRequest(cfg: WaConfig, to: string, body: string): Promise<{ id: string; simulated: boolean }> {
-  if (!cfg.live) return { id: `demo.${crypto.randomUUID()}`, simulated: true };
+  if (!cfg.live) return offline(cfg);
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
     body: JSON.stringify({
@@ -302,7 +324,7 @@ function orderDetails(p: PaymentRequest) {
 
 /** Within the 24-hour window: an interactive order_details message with the "Review and pay" button. */
 export async function sendPaymentRequest(cfg: WaConfig, to: string, body: string, p: PaymentRequest): Promise<{ id: string; simulated: boolean }> {
-  if (!cfg.live) return { id: `demo.${crypto.randomUUID()}`, simulated: true };
+  if (!cfg.live) return offline(cfg);
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
     body: JSON.stringify({
@@ -326,7 +348,7 @@ export async function sendPaymentTemplate(
   template: { name: string; language: string; bodyParams: string[]; headerParams: string[]; headerImage?: string | null },
   p: PaymentRequest,
 ): Promise<{ id: string; simulated: boolean }> {
-  if (!cfg.live) return { id: `demo.${crypto.randomUUID()}`, simulated: true };
+  if (!cfg.live) return offline(cfg);
   const mediaId = template.headerImage ? await uploadWhatsAppMedia(cfg, template.headerImage) : null;
   const fallbackLink = template.headerImage ? (absoluteUrl(template.headerImage) ?? template.headerImage) : null;
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
@@ -362,7 +384,7 @@ export async function sendPaymentTemplate(
  * once paid. Sent as a reply to their payment, inside the window it opens.
  */
 export async function sendOrderStatus(cfg: WaConfig, to: string, referenceId: string, status: "processing" | "partially-shipped" | "shipped" | "completed" | "canceled", body: string, description?: string) {
-  if (!cfg.live) return { id: `demo.${crypto.randomUUID()}`, simulated: true };
+  if (!cfg.live) return offline(cfg);
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
     body: JSON.stringify({
@@ -385,7 +407,7 @@ export async function sendOrderStatus(cfg: WaConfig, to: string, referenceId: st
  * customer's 24-hour window (a service message), unlike a catalogue template.
  */
 export async function sendCatalogMessage(cfg: WaConfig, to: string, body: string): Promise<{ id: string; simulated: boolean }> {
-  if (!cfg.live) return { id: `demo.${crypto.randomUUID()}`, simulated: true };
+  if (!cfg.live) return offline(cfg);
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
     body: JSON.stringify({
@@ -412,7 +434,7 @@ export async function sendInteractiveButtons(
   buttons: InteractiveReplyButton[],
   opts: { header?: string; footer?: string } = {}
 ): Promise<{ id: string; simulated: boolean }> {
-  if (!cfg.live) return { id: `demo.${crypto.randomUUID()}`, simulated: true };
+  if (!cfg.live) return offline(cfg);
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
     body: JSON.stringify({

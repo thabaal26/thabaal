@@ -39,7 +39,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
             where: { paidAt: null, status: { in: ["NEW", "CONFIRMED"] } },
             orderBy: [{ paymentRequestedAt: "desc" }, { createdAt: "desc" }],
             take: 1,
-            select: { id: true, number: true, total: true, currency: true },
+            select: { id: true, number: true, ref: true, total: true, currency: true },
           },
         },
       },

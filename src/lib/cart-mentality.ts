@@ -1,8 +1,10 @@
+import { orderRef } from "@/lib/order-ref";
 import type { OrderItem } from "./orders";
 
 export type PriorCartSnapshot = {
   id: string;
   number: number;
+  ref: string | null;
   total: number;
   currency: string;
   status: string;
@@ -45,6 +47,7 @@ export function analyzeCartMentality(
   current: {
     id: string;
     number: number;
+    ref: string | null;
     total: number;
     currency: string;
     items: OrderItem[];
@@ -148,20 +151,20 @@ export function analyzeCartMentality(
     Math.abs(deltaAmount) < 1;
 
   let behavior: CartMentalityAnalysis["behavior"] = "swapped";
-  let headline = `Revised cart (#${sessionPrior.length + 1}) · Replaced RG-${1000 + immediatelyPrevious.number}`;
+  let headline = `Revised cart (#${sessionPrior.length + 1}) · Replaced ${orderRef(immediatelyPrevious)}`;
 
   if (sameItems) {
     behavior = "duplicate_retry";
-    headline = `Retried same cart (#${sessionPrior.length + 1}) · Replaced RG-${1000 + immediatelyPrevious.number}`;
+    headline = `Retried same cart (#${sessionPrior.length + 1}) · Replaced ${orderRef(immediatelyPrevious)}`;
   } else if (deltaAmount < -10) {
     behavior = "downsized";
-    headline = `Downsized budget by ₹${Math.abs(deltaAmount)} (RG-${1000 + immediatelyPrevious.number} ₹${immediatelyPrevious.total} → ₹${current.total})`;
+    headline = `Downsized budget by ₹${Math.abs(deltaAmount)} (${orderRef(immediatelyPrevious)} ₹${immediatelyPrevious.total} → ₹${current.total})`;
   } else if (deltaAmount > 10) {
     behavior = "upsized";
-    headline = `Expanded cart by +₹${deltaAmount} (RG-${1000 + immediatelyPrevious.number} ₹${immediatelyPrevious.total} → ₹${current.total})`;
+    headline = `Expanded cart by +₹${deltaAmount} (${orderRef(immediatelyPrevious)} ₹${immediatelyPrevious.total} → ₹${current.total})`;
   } else {
     behavior = "swapped";
-    headline = `Swapped products (RG-${1000 + immediatelyPrevious.number} → RG-${1000 + current.number})`;
+    headline = `Swapped products (${orderRef(immediatelyPrevious)} → ${orderRef(current)})`;
   }
 
   return {

@@ -4,7 +4,7 @@ import type { Setting, Template } from "@prisma/client";
 import { db } from "./db";
 import { placeholders, renderFor, resolveVar, toPlainText, type TemplateButton, type VarMap } from "./template";
 import { getSession, sendImage, sendText, type WahaConfig } from "./waha";
-import { sendTemplateMessage, waConfig, type WaConfig } from "./whatsapp";
+import { NOT_CONNECTED, sendTemplateMessage, waConfig, type WaConfig } from "./whatsapp";
 
 export type ProviderName = "META" | "LOCAL";
 
@@ -23,7 +23,8 @@ export function isSimulated(s: Setting, cfg: WaConfig = waConfig()) {
 }
 
 /** Ready to send right now? Local sessions must be linked and online. */
-export async function readiness(s: Setting, cfg?: WaConfig): Promise<{ ok: boolean; reason?: string }> {
+export async function readiness(s: Setting, cfg?: WaConfig): Promise<{ ok: boolean; reason?: string; notConnected?: boolean }> {
+  if (s.provider === "META" && cfg?.notConnected) return { ok: false, reason: NOT_CONNECTED, notConnected: true };
   if (isSimulated(s, cfg) || s.provider === "META") return { ok: true };
   const session = await getSession(wahaConfig(s)!);
   if (session.status === "WORKING") return { ok: true };

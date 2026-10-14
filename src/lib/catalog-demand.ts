@@ -67,7 +67,7 @@ export async function getCatalogDemandSummary(
     where: { clientId },
     select: {
       id: true,
-      number: true,
+      number: true, ref: true,
       status: true,
       paidAt: true,
       total: true,

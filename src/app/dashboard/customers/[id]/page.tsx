@@ -1,3 +1,4 @@
+import { orderRef } from "@/lib/order-ref";
 import { MapPin, MessageCircle, ShoppingBag } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
@@ -228,7 +229,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                           <li key={o.id} className="py-2">
                             <div className="flex justify-between gap-2 text-xs text-muted">
                               <span>
-                                <strong className="font-mono text-ink-2">RG-{1000 + o.number}</strong> · {fmtDate(o.createdAt, "d MMM yyyy")} · {o.status.toLowerCase()}
+                                <strong className="font-mono text-ink-2">{orderRef(o)}</strong> · {fmtDate(o.createdAt, "d MMM yyyy")} · {o.status.toLowerCase()}
                               </span>
                               <span className="tabular font-semibold text-ink">{money(o.total, o.currency)}</span>
                             </div>
@@ -254,7 +255,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                           <li key={o.id} className="py-1.5">
                             <div className="flex justify-between gap-2">
                               <span>
-                                <strong className="font-mono text-ink-2">RG-{1000 + o.number}</strong> · {fmtDate(o.createdAt, "d MMM, h:mm a")}
+                                <strong className="font-mono text-ink-2">{orderRef(o)}</strong> · {fmtDate(o.createdAt, "d MMM, h:mm a")}
                                 {o.internalNote && /superseded by/i.test(o.internalNote) ? " · replaced" : " · cancelled"}
                               </span>
                               <span className="tabular">{money(o.total, o.currency)}</span>

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { fromZonedTime } from "date-fns-tz";
 import { db } from "./db";
 import { APP_TZ } from "./format";
-import type { OrderItem } from "./orders";
+import { nextOrderRef, type OrderItem } from "./orders";
 import { normalizePhone } from "./phone";
 
 // Google Sheet sync. Staff keep a "Customers" tab and an "Orders" tab in a sheet shared as
@@ -261,6 +261,7 @@ async function syncOrders(clientId: string, rows: string[][]) {
       (await db.customer.create({ data: { clientId, phone, name: c.get(first, "name") || `+${phone}`, tags: ["sheet-order"], optInSource: "Added from Google Sheet", optInAt: new Date() }, select: { id: true } }));
     await db.order.create({
       data: {
+        ref: await nextOrderRef(clientId),
         clientId, customerId: customer.id, externalRef, items, status,
         total: items.reduce((sum, i) => sum + i.price * i.quantity, 0),
         note: group.map((r) => c.get(r, "note")).find(Boolean) || null,

@@ -1,3 +1,4 @@
+import { orderRef } from "@/lib/order-ref";
 import "server-only";
 import { addDays } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
@@ -154,13 +155,13 @@ export async function revenueReport(
     }),
     db.order.findMany({
       where: { clientId, ...who, paidAt: null, status: { in: ["NEW", "CONFIRMED", "DISPATCHED", "DELIVERED"] }, createdAt: { gte: new Date(now.getTime() - 60 * DAY) } },
-      select: { ...paySelect, id: true, number: true, customerId: true, items: true, createdAt: true, customer: { select: { name: true } } },
+      select: { ...paySelect, id: true, number: true, ref: true, customerId: true, items: true, createdAt: true, customer: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
     }),
     db.order.aggregate({ where: { clientId, ...who, refundedAt: { gte: start, lt: end } }, _sum: { refundAmount: true } }),
     db.order.findMany({
       where: { clientId, ...who, status: "CANCELLED", refundedAt: null, OR: [{ paidAt: { not: null } }, { paidAmount: { gt: 0 } }] },
-      select: { ...paySelect, id: true, number: true, customerId: true, items: true, createdAt: true, customer: { select: { name: true } } },
+      select: { ...paySelect, id: true, number: true, ref: true, customerId: true, items: true, createdAt: true, customer: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
       take: 50,
     }),
@@ -215,7 +216,7 @@ export async function revenueReport(
   }
 
   type Row = (typeof open)[number];
-  const item = (o: Row, amount = dueOf(o) || o.total): CashItem => ({ id: o.id, ref: `RG-${1000 + o.number}`, customerId: o.customerId, name: o.customer.name, total: amount, at: o.createdAt, status: o.status, note: o.internalNote });
+  const item = (o: Row, amount = dueOf(o) || o.total): CashItem => ({ id: o.id, ref: orderRef(o), customerId: o.customerId, name: o.customer.name, total: amount, at: o.createdAt, status: o.status, note: o.internalNote });
   const state = (o: Row) => paymentState(o);
   const refunded = refundRows._sum.refundAmount ?? 0;
   const upiAmount = methods.get("upi")!.amount;

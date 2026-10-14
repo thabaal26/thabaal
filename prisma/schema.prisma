@@ -84,6 +84,10 @@ model Client {
   sheetSyncNote       String?
   /// This client's own live-log Apps Script web app (/exec link) and the shared secret it checks.
   /// Unset: no live updates, except the first client, which keeps the deployment-wide GOOGLE_SHEET_WEBHOOK_URL.
+  /// Prefix of this client's order numbers (FM in FM-1001), unique across clients; set from the name if blank.
+  orderPrefix         String?           @unique
+  /// Last order number used for this client; the next order takes orderSeq + 1.
+  orderSeq            Int               @default(1000)
   sheetHookUrl        String?
   sheetHookSecret     String?
   /// Win-back: customers whose last order is this many days old are tagged "lapsed" and sent winbackTemplate once.
@@ -416,6 +420,9 @@ model Order {
   id                 String      @id @default(cuid())
   /// Running number shown to people as RG-1001, RG-1002…; also the WhatsApp payment reference.
   number             Int         @unique @default(autoincrement())
+  /// What people see and quote: the client's own prefix and running number (FM-1001). Null on orders made
+  /// before per-client numbers, which show as RG-<1000 + number> (lib/order-ref.ts).
+  ref                String?     @unique
   clientId           String
   client             Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
   customerId         String

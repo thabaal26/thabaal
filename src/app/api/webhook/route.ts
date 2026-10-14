@@ -7,6 +7,7 @@ import { recordMetaAccountAlert } from "@/lib/meta-balance";
 import { explainError } from "@/lib/meta-errors";
 import { applyFailure } from "@/lib/rules";
 import { money, orderRef, orderWhereRef, recordOrder } from "@/lib/orders";
+import { ORDER_REF_RE } from "@/lib/order-ref";
 import { metaReplyContent, receivingNumber, recordReply } from "@/lib/replies";
 import { autoRequestPayment, cancelSupersededOrdersForCustomer, confirmPayment, recordPaymentClaim, recordPaymentFailure, sendCodConfirmationPrompt, textInWindow, updateOrderCard } from "@/lib/payments";
 import { parseAddressText } from "@/lib/address";
@@ -119,7 +120,7 @@ type PaymentUpdate = {
   errors?: { code?: number; title?: string; message?: string; error_data?: { details?: string } }[];
 };
 
-/** The customer paid (or failed to pay) through "Review and pay"; reference_id is our order number (RG-1001). */
+/** The customer paid (or failed to pay) through "Review and pay"; reference_id is our order number (e.g. FM-1001). */
 async function applyPayment(s: PaymentUpdate, phoneNumberId?: string) {
   const txn = s.payment?.transaction;
   const paid =
@@ -140,7 +141,7 @@ async function applyPayment(s: PaymentUpdate, phoneNumberId?: string) {
   let order = reference
     ? await db.order.findFirst({
         where: { ...orderWhereRef(reference), ...(receiver && { clientId: receiver.clientId }) },
-        select: { id: true, number: true, total: true, currency: true },
+        select: { id: true, number: true, ref: true, total: true, currency: true },
       })
     : null;
   if (!order && s.recipient_id) {
@@ -149,7 +150,7 @@ async function applyPayment(s: PaymentUpdate, phoneNumberId?: string) {
       order = await db.order.findFirst({
         where: { customerId: cust.id, paidAt: null, status: { in: ["NEW", "CONFIRMED"] }, paymentRequestedAt: { not: null } },
         orderBy: [{ paymentRequestedAt: "desc" }, { createdAt: "desc" }],
-        select: { id: true, number: true, total: true, currency: true },
+        select: { id: true, number: true, ref: true, total: true, currency: true },
       });
     }
   }
@@ -197,15 +198,15 @@ async function detectAndApplyUpiPayment(
         where: { paidAt: null, status: { in: ["NEW", "CONFIRMED"] } },
         orderBy: [{ paymentRequestedAt: "desc" }, { createdAt: "desc" }],
         take: 5,
-        select: { id: true, number: true, total: true, currency: true, paymentRequestedAt: true, createdAt: true },
+        select: { id: true, number: true, ref: true, total: true, currency: true, paymentRequestedAt: true, createdAt: true },
       },
     },
   });
   if (!cust || !cust.orders.length) return { ...base, handledAsPayment: false };
 
-  // 1. Try matching the exact order via payment.reference_id, context message ID, or RG-xxxx in text
+  // 1. Try matching the exact order via payment.reference_id, context message ID, or an order number in the text
   let targetOrder = cust.orders[0];
-  const explicitRef = m.payment?.reference_id ?? /\b(RG-\d{4,})\b/i.exec(base.text)?.[1];
+  const explicitRef = m.payment?.reference_id ?? ORDER_REF_RE.exec(base.text)?.[1];
   if (explicitRef) {
     const matched = cust.orders.find((o) => orderRef(o).toUpperCase() === String(explicitRef).toUpperCase());
     if (matched) {
@@ -213,7 +214,7 @@ async function detectAndApplyUpiPayment(
     } else {
       const oldCancelled = await db.order.findFirst({
         where: { customerId: cust.id, ...orderWhereRef(String(explicitRef)), status: "CANCELLED" },
-        select: { id: true, number: true },
+        select: { id: true, number: true, ref: true },
       });
       if (oldCancelled && cust.orders.length > 0) {
         console.log(`Payment referenced superseded cart ${orderRef(oldCancelled)}, auto-routing to active cart ${orderRef(cust.orders[0])}`);
@@ -222,7 +223,7 @@ async function detectAndApplyUpiPayment(
     }
   } else if (m.context?.id) {
     const ctxMsg = await db.message.findUnique({ where: { waMessageId: String(m.context.id) }, select: { body: true } });
-    const ctxRef = ctxMsg?.body ? /\b(RG-\d{4,})\b/i.exec(ctxMsg.body)?.[1] : null;
+    const ctxRef = ctxMsg?.body ? ORDER_REF_RE.exec(ctxMsg.body)?.[1] : null;
     if (ctxRef) {
       const matched = cust.orders.find((o) => orderRef(o).toUpperCase() === ctxRef.toUpperCase());
       if (matched) targetOrder = matched;
@@ -289,7 +290,7 @@ async function detectAndApplyUpiPayment(
             ],
             id: { not: targetOrder.id },
           },
-          select: { id: true, number: true, customer: { select: { name: true } } },
+          select: { id: true, number: true, ref: true, customer: { select: { name: true } } },
         });
 
         if (dupOrder) {
@@ -332,7 +333,7 @@ async function detectAndApplyUpiPayment(
             ],
             id: { not: targetOrder.id },
           },
-          select: { id: true, number: true, customer: { select: { name: true } } },
+          select: { id: true, number: true, ref: true, customer: { select: { name: true } } },
         });
         if (dupOrder) {
           isDup = true;

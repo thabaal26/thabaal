@@ -243,6 +243,7 @@ export default async function ClientsPage() {
                         defaultImageUrl: c.defaultImageUrl ?? "",
                         homeCity: c.homeCity ?? "",
                         businessType: c.businessType ?? "",
+                        orderPrefix: c.orderPrefix ?? "",
                       }}
                     />
                   </section>

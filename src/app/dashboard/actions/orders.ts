@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { findAddressesInReplies, parseAddressText } from "@/lib/address";
 import { db } from "@/lib/db";
 import { pushOrderToSheet } from "@/lib/google-sheets-live";
-import { DEFAULT_SHIPPING_FEE, getOrderPricing, itemsText, itemsWithNames, money, orderRef, syncCustomerOrderedProducts, type OrderItem } from "@/lib/orders";
+import { DEFAULT_SHIPPING_FEE, getOrderPricing, itemsText, itemsWithNames, money, nextOrderRef, orderRef, syncCustomerOrderedProducts, type OrderItem } from "@/lib/orders";
 import { confirmPayment, sendPaymentRequestFor, updateOrderCard } from "@/lib/payments";
 import { dueOf, methodOf, receivedOf } from "@/lib/payment-state";
 import { getSettings, wahaConfig } from "@/lib/provider";
@@ -616,6 +616,7 @@ export async function createOrder(input: {
 
   const order = await db.order.create({
     data: {
+      ref: await nextOrderRef(s.clientId),
       clientId: s.clientId,
       customerId: customer.id,
       catalogId: allFromCatalog ? input.catalogId : null,
@@ -672,7 +673,7 @@ export async function updateOrderItems(
     select: {
       id: true,
       clientId: true,
-      number: true,
+      number: true, ref: true,
       catalogId: true,
       total: true,
       status: true,
@@ -770,7 +771,7 @@ const ORDER_TEMPLATES: { name: string; body: string; samples: string[] }[] = [
   {
     name: "order_cancelled",
     body: "Hello {{1}}, your order {{2}} has been cancelled. If you have already paid, we will contact you about the refund. Reply to this message if you have any questions.",
-    samples: ["Priya", "#RG-1001"],
+    samples: ["Priya", "#FM-1001"],
   },
 ];
 

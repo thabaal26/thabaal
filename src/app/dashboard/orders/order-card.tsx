@@ -17,6 +17,7 @@ import type { CatalogProductOption } from "./order-items-editor";
 export type OrderCardData = {
   id: string;
   number: number;
+  ref: string | null;
   status: "NEW" | "CONFIRMED" | "PAID" | "DISPATCHED" | "DELIVERED" | "CANCELLED";
   total: number;
   currency: string;
@@ -48,6 +49,7 @@ export type OrderCardData = {
     orders?: {
       id: string;
       number: number;
+      ref: string | null;
       total: number;
       currency: string;
       status: string;
@@ -101,7 +103,7 @@ export function OrderCard({
   const mentality =
     o.status !== "CANCELLED"
       ? analyzeCartMentality(
-          { id: o.id, number: o.number, total: pricing.total, currency: o.currency, items, createdAt: o.createdAt },
+          { id: o.id, number: o.number, ref: o.ref, total: pricing.total, currency: o.currency, items, createdAt: o.createdAt },
           (o.customer.orders ?? []).map((po) => ({
             ...po,
             items: ((po.items as OrderItem[] | null) ?? []),
