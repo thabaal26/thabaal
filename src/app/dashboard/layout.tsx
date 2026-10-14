@@ -131,7 +131,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
 
   return (
     <NotificationProvider initialUnreadCount={unreadNotifications}>
-      <div {...appearanceAttrs(look)} style={themeStyle(client)} className="min-h-dvh w-full overflow-x-clip bg-canvas lg:pl-[272px] print:bg-white print:pl-0 lg:print:pl-0">
+      <div {...appearanceAttrs(look)} style={themeStyle(client)} className="min-h-dvh w-full overflow-x-clip bg-canvas lg:h-dvh lg:overflow-hidden lg:p-3.5 lg:flex lg:gap-3.5 lg:bg-[#EDE3D2] dark:lg:bg-[#061421] print:h-auto print:overflow-visible print:bg-white print:p-0">
         {client && themeCss(client) && <style>{themeCss(client)}</style>}
         {/* The portal's look (Settings → Appearance, or this client's own): set on <html> before
             anything paints, so sheets and dialogs wear it too. */}
@@ -142,7 +142,8 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           Skip to content
         </a>
 
-        <aside className="fixed top-3.5 bottom-3.5 left-3.5 z-40 hidden w-[244px] transform-gpu flex-col overflow-hidden rounded-[24px] border border-[#E4D7C0] bg-[#FFFFFF]/95 shadow-[0_12px_36px_rgba(30,20,10,0.08)] backdrop-blur-xl dark:border-[#23455E] dark:bg-[#0E2638]/95 dark:shadow-[0_18px_48px_rgba(0,0,0,0.55)] dark:ring-1 dark:ring-white/[0.08] lg:flex print:!hidden">
+        {/* Floating Left Navigation Bar */}
+        <aside className="hidden w-[244px] h-full shrink-0 transform-gpu flex-col overflow-hidden rounded-[24px] border border-[#E4D7C0] bg-[#FFFFFF]/95 shadow-[0_12px_36px_rgba(30,20,10,0.08)] backdrop-blur-xl dark:border-[#23455E] dark:bg-[#0E2638]/95 dark:shadow-[0_18px_48px_rgba(0,0,0,0.55)] dark:ring-1 dark:ring-white/[0.08] lg:flex print:!hidden">
           <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_60%_at_0%_0%,rgb(255_200_44/0.08),transparent_55%)] dark:bg-[radial-gradient(120%_60%_at_0%_0%,rgb(22_125_99/0.22),transparent_55%),radial-gradient(90%_50%_at_100%_100%,rgb(234_191_38/0.1),transparent_60%)]" />
           <div className="relative flex h-16 shrink-0 items-center px-4">
             <Link href="/dashboard" className="logo flex items-center gap-2.5 px-2 text-decoration-none transition hover:opacity-90">
@@ -190,6 +191,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           </div>
         </aside>
 
+        {/* Mobile Top Header (Hidden on Desktop) */}
         <header className="sticky top-0 z-30 w-full border-b border-[#EADFCB] bg-[#FFF9F0]/95 backdrop-blur-md pt-[env(safe-area-inset-top)] text-ink dark:bg-[#0B1E2D]/95 dark:text-white dark:border-[#27465C] lg:hidden print:hidden">
           <div className="flex h-12 items-center gap-2.5 pl-3 pr-1.5 sm:h-14 sm:gap-3 sm:pl-4 sm:pr-2">
             <Link href="/dashboard" className="logo flex items-center gap-2 shrink-0 text-decoration-none transition hover:opacity-90">
@@ -221,10 +223,15 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           </div>
         </header>
 
-        <main id="main" className="stagger relative mx-auto w-full max-w-page px-3 pb-[calc(4.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pt-6 lg:px-8 lg:pb-12 lg:pt-7 print:p-0">
-          {client?.billingMode === "wallet" && <WalletBanner clientId={client.id} lowAlert={client.walletLowAlert} />}
-          {children}
-        </main>
+        {/* Floating Right Main Content Bar */}
+        <div className="flex-1 min-w-0 w-full lg:h-full lg:flex lg:flex-col lg:overflow-hidden lg:rounded-[24px] lg:border lg:border-[#E4D7C0] lg:bg-[#FFF9F0]/98 lg:shadow-[0_12px_36px_rgba(30,20,10,0.08)] lg:backdrop-blur-xl dark:lg:border-[#23455E] dark:lg:bg-[#0B1E2D]/98 dark:lg:shadow-[0_18px_48px_rgba(0,0,0,0.55)] dark:lg:ring-1 dark:lg:ring-white/[0.08]">
+          <div className="panel-scroll h-full w-full lg:overflow-y-auto overscroll-contain">
+            <main id="main" className="stagger relative mx-auto w-full max-w-page px-3 pb-[calc(4.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pt-6 lg:px-8 lg:pb-12 lg:pt-7 print:p-0">
+              {client?.billingMode === "wallet" && <WalletBanner clientId={client.id} lowAlert={client.walletLowAlert} />}
+              {children}
+            </main>
+          </div>
+        </div>
         {callsOn && scope.canOperate && <CallWidget />}
         <BottomNav
           isAdmin={scope.isAdmin}

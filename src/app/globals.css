@@ -344,6 +344,31 @@ body {
   overscroll-behavior: contain;
 }
 
+/* Scrollable floating main panel on desktop: subtle, elegant pill scrollbar */
+.panel-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(16, 40, 59, 0.18) transparent !important;
+}
+.dark .panel-scroll {
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent !important;
+}
+.panel-scroll::-webkit-scrollbar {
+  display: block !important;
+  width: 6px !important;
+}
+.panel-scroll::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+.panel-scroll::-webkit-scrollbar-thumb {
+  background: rgba(16, 40, 59, 0.18) !important;
+  border-radius: 9999px !important;
+}
+.dark .panel-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18) !important;
+}
+
 /*
  * No visible scrollbars inside the portal: panes, tables, chart strips and the sidebar still scroll
  * with the wheel, trackpad, touch and keyboard, but don't draw a bar. Only the page itself keeps one.
