@@ -8,7 +8,7 @@ import { explainError } from "@/lib/meta-errors";
 import { applyFailure } from "@/lib/rules";
 import { money, orderRef, orderWhereRef, recordOrder } from "@/lib/orders";
 import { metaReplyContent, receivingNumber, recordReply } from "@/lib/replies";
-import { autoRequestPayment, confirmPayment, recordPaymentClaim, recordPaymentFailure, sendCodConfirmationPrompt, textInWindow, updateOrderCard } from "@/lib/payments";
+import { autoRequestPayment, cancelSupersededOrdersForCustomer, confirmPayment, recordPaymentClaim, recordPaymentFailure, sendCodConfirmationPrompt, textInWindow, updateOrderCard } from "@/lib/payments";
 import { parseAddressText } from "@/lib/address";
 import { autoReplyToButton, autoSendCatalogue, catalogueTrigger, firstMessageToday } from "@/lib/catalog";
 import { mapMetaStatus } from "@/lib/whatsapp";
@@ -33,7 +33,8 @@ type StatusUpdate = { id: string; status: string; timestamp: string; pricing?: {
 
 function validSignature(raw: string, header: string | null) {
   const secret = process.env.META_APP_SECRET;
-  if (!secret) return true; // signature check is optional until the secret is configured
+  // Without the secret nothing can be verified: refuse in production, allow only on a local copy.
+  if (!secret) return process.env.VERCEL_ENV !== "production" && process.env.NODE_ENV !== "production";
   if (!header?.startsWith("sha256=")) return false;
   const expected = Buffer.from(createHmac("sha256", secret).update(raw).digest("hex"));
   const given = Buffer.from(header.slice(7));
@@ -50,7 +51,7 @@ async function applyStatus(s: StatusUpdate) {
       templateName: true,
       pricingCategory: true,
       template: { select: { category: true } },
-      customer: { select: { phone: true, name: true, client: { select: { name: true } } } },
+      customer: { select: { phone: true, name: true, clientId: true, client: { select: { name: true } } } },
     },
   });
   if (!msg) return;
@@ -78,7 +79,7 @@ async function applyStatus(s: StatusUpdate) {
       data: { status: "FAILED", failedAt: at, billable: false, errorCode: code, error: explainError(code, err?.error_data?.details || err?.message || err?.title || "Delivery failed") },
     });
     await applyFailure(msg.customerId, code);
-    pushToGoogleSheet("CAMPAIGN_STATUS", {
+    pushToGoogleSheet(msg.customer?.clientId, "CAMPAIGN_STATUS", {
       campaign: msg.templateName || "Campaign Message",
       phone: msg.customer?.phone || "",
       status: "FAILED",
@@ -97,7 +98,7 @@ async function applyStatus(s: StatusUpdate) {
     },
   });
 
-  pushToGoogleSheet("CAMPAIGN_STATUS", {
+  pushToGoogleSheet(msg.customer?.clientId, "CAMPAIGN_STATUS", {
     campaign: msg.templateName || "Campaign Message",
     phone: msg.customer?.phone || "",
     status: next,
@@ -134,11 +135,15 @@ async function applyPayment(s: PaymentUpdate, phoneNumberId?: string) {
     return;
   }
   const reference = s.payment?.reference_id;
+  const { number: receiver, customers } = await receivingNumber(phoneNumberId);
+  // The order must belong to the business whose number received the payment.
   let order = reference
-    ? await db.order.findFirst({ where: orderWhereRef(reference), select: { id: true, number: true, total: true, currency: true } })
+    ? await db.order.findFirst({
+        where: { ...orderWhereRef(reference), ...(receiver && { clientId: receiver.clientId }) },
+        select: { id: true, number: true, total: true, currency: true },
+      })
     : null;
   if (!order && s.recipient_id) {
-    const { customers } = await receivingNumber(phoneNumberId);
     const cust = await db.customer.findFirst({ where: { phone: s.recipient_id, ...customers }, select: { id: true } });
     if (cust) {
       order = await db.order.findFirst({
@@ -157,6 +162,11 @@ async function applyPayment(s: PaymentUpdate, phoneNumberId?: string) {
   // Meta sends the amount in paise-like units: value / 10^offset.
   const amt = s.payment?.amount;
   const amount = amt?.value != null ? amt.value / 10 ** (amt.offset ?? 2) : null;
+  if (amount != null && !(amount > 0)) {
+    await recordPaymentClaim(order.id, "WhatsApp reported a payment of ₹0. Check your UPI app before packing.").catch(() => {});
+    return;
+  }
+  // confirmPayment keeps a smaller amount as a part payment, so the order is only "Paid" when the full total arrived.
   await confirmPayment(order.id, txn?.id ?? s.id ?? null, { method: "upi_whatsapp", source: "meta", amount });
 }
 
@@ -198,7 +208,18 @@ async function detectAndApplyUpiPayment(
   const explicitRef = m.payment?.reference_id ?? /\b(RG-\d{4,})\b/i.exec(base.text)?.[1];
   if (explicitRef) {
     const matched = cust.orders.find((o) => orderRef(o).toUpperCase() === String(explicitRef).toUpperCase());
-    if (matched) targetOrder = matched;
+    if (matched) {
+      targetOrder = matched;
+    } else {
+      const oldCancelled = await db.order.findFirst({
+        where: { customerId: cust.id, ...orderWhereRef(String(explicitRef)), status: "CANCELLED" },
+        select: { id: true, number: true },
+      });
+      if (oldCancelled && cust.orders.length > 0) {
+        console.log(`Payment referenced superseded cart ${orderRef(oldCancelled)}, auto-routing to active cart ${orderRef(cust.orders[0])}`);
+        targetOrder = cust.orders[0];
+      }
+    }
   } else if (m.context?.id) {
     const ctxMsg = await db.message.findUnique({ where: { waMessageId: String(m.context.id) }, select: { body: true } });
     const ctxRef = ctxMsg?.body ? /\b(RG-\d{4,})\b/i.exec(ctxMsg.body)?.[1] : null;
@@ -221,9 +242,17 @@ async function detectAndApplyUpiPayment(
 
   if (isNativePaymentBubble) {
     const txnId = m.payment?.transaction?.id ?? m.id ?? "WA-UPI";
-    await confirmPayment(targetOrder.id, String(txnId), { method: "upi_whatsapp", source: "meta" }).catch((e) => console.error("Auto confirmPayment on UPI bubble failed", e));
+    const amt = m.payment?.amount;
+    const amount = amt?.value != null ? Number(amt.value) / 10 ** (amt.offset ?? 2) : null;
+    // Only a bubble that says how much was paid is recorded straight away (a smaller amount stays part paid);
+    // without an amount, staff check the UPI app first, like any other "I paid".
+    if (!(amount != null && amount > 0)) {
+      await recordPaymentClaim(targetOrder.id, `WhatsApp showed a completed UPI payment without the amount. Check your UPI app for ${totalFormatted}.`, String(txnId)).catch(() => {});
+      return { text: `UPI payment on WhatsApp for ${ref} (${totalFormatted}) · check the amount`, kind: "order", media: base.media, handledAsPayment: true };
+    }
+    await confirmPayment(targetOrder.id, String(txnId), { method: "upi_whatsapp", source: "meta", amount }).catch((e) => console.error("Auto confirmPayment on UPI bubble failed", e));
     return {
-      text: `UPI payment completed on WhatsApp (${totalFormatted} for ${ref})`,
+      text: `UPI payment completed on WhatsApp (${money(amount, targetOrder.currency)} for ${ref})`,
       kind: "order",
       media: base.media,
       handledAsPayment: true,
@@ -443,7 +472,7 @@ export async function POST(req: NextRequest) {
           if (kind === "button") {
             const contactName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name;
             const actionVal = m.button?.payload ?? m.interactive?.button_reply?.id ?? m.interactive?.list_reply?.id ?? text;
-            pushToGoogleSheet("BUTTON_CLICK", {
+            pushToGoogleSheet(customer?.clientId, "BUTTON_CLICK", {
               phone: m.from,
               name: customer?.name || contactName || "",
               campaign: "WhatsApp Portal",
@@ -487,7 +516,7 @@ export async function POST(req: NextRequest) {
             }
           } else if (m.type !== "order") {
             const contactName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name;
-            pushToGoogleSheet("NEW_CHAT", {
+            pushToGoogleSheet(customer?.clientId, "NEW_CHAT", {
               phone: m.from,
               name: customer?.name || contactName || "",
               message: text,
@@ -524,8 +553,9 @@ export async function POST(req: NextRequest) {
           }
           if (customer && m.type === "order") {
             const order = await recordOrder(customer, m.id, m).catch((e) => (console.error("Could not save order", e), null));
-            // A new cart: send "Review and pay" right away while the customer is in the chat.
+            // A new cart: expire all previous unpaid carts & payment links, then send fresh "Review and pay"
             if (order) {
+              await cancelSupersededOrdersForCustomer(customer.id, order).catch((e) => console.error("Could not expire old carts", e));
               await autoRequestPayment(order).catch((e) => console.error("Automatic payment request failed", e));
               pushOrderToSheet(order.id, "NEW_ORDER");
 

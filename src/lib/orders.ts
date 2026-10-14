@@ -139,7 +139,7 @@ export async function recordOrder(customer: { id: string; clientId: string }, wa
       const mergedNote = [oldOrder.internalNote, supersedeTag].filter(Boolean).join(" | ").slice(0, 1000);
       await db.order.update({
         where: { id: oldOrder.id },
-        data: { status: "CANCELLED", internalNote: mergedNote },
+        data: { status: "CANCELLED", internalNote: mergedNote, paymentReminderAt: new Date() },
       });
     }
   }

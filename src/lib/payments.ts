@@ -94,9 +94,12 @@ export async function sendPaymentRequestFor(orderId: string, opts: { reminder?: 
     pricing.shipping > 0
       ? `Items: ${itemsText(items)} (${money(pricing.subtotal, order.currency)})\nShipping: ${money(pricing.shipping, order.currency)}\nTotal: ${money(pricing.total, order.currency)}`
       : `Items: ${itemsText(items)}\nTotal: ${money(pricing.total, order.currency)}`;
+  const isReplacement = Boolean(order.internalNote?.includes("Replaced unpaid cart"));
   const text = opts.reminder
     ? `Hello ${firstName(c.name)}, a reminder that your ${order.client.name} order ${ref} is waiting for payment.\n\n${breakdownLines}\n\nTap "Review and pay" to pay by UPI, and we will pack it right away.`
-    : `Hello ${firstName(c.name)}, here is your ${order.client.name} order ${ref}.\n\n${breakdownLines}\n\nTap "Review and pay" to pay by UPI.`;
+    : isReplacement
+      ? `Hello ${firstName(c.name)}, here is your updated ${order.client.name} order ${ref} (replacing your earlier cart).\n\n${breakdownLines}\n\nTap "Review and pay" to pay by UPI.`
+      : `Hello ${firstName(c.name)}, here is your ${order.client.name} order ${ref}.\n\n${breakdownLines}\n\nTap "Review and pay" to pay by UPI.`;
   const { open, number, cfg } = await replyContext(c);
 
   try {
@@ -149,9 +152,30 @@ export type PaymentRecord = {
  */
 export async function confirmPayment(orderId: string, txnId?: string | null, rec: PaymentRecord = {}) {
   const order = await db.order.findUnique({ where: { id: orderId }, include: { customer: true, client: { select: { name: true } } } });
+  if (!order) return false;
+
+  // If customer paid an old superseded/cancelled cart, automatically route the payment to their latest active order!
+  if (order.status === "CANCELLED") {
+    const activeOrder = await db.order.findFirst({
+      where: { customerId: order.customerId, paidAt: null, status: { in: ["NEW", "CONFIRMED"] } },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, number: true },
+    });
+    if (activeOrder) {
+      console.log(`Payment received for cancelled order ${orderRef(order)}, auto-routing to active order ${orderRef(activeOrder)}`);
+      await db.order.update({
+        where: { id: order.id },
+        data: {
+          internalNote: [order.internalNote, `Payment received via this cancelled link was routed to active order ${orderRef(activeOrder)}`].filter(Boolean).join(" | ").slice(0, 1000),
+        },
+      });
+      return confirmPayment(activeOrder.id, txnId, rec);
+    }
+  }
+
   // Meta may send the same payment twice; only the first one marks it paid and thanks the customer.
   // (A paid order whose items were later raised still takes the difference.)
-  if (!order || dueOf(order) <= 0) return false;
+  if (dueOf(order) <= 0) return false;
   const before = receivedOf(order);
   const due = dueOf(order);
   const amount = rec.amount != null && rec.amount > 0 ? rec.amount : due;
@@ -171,6 +195,12 @@ export async function confirmPayment(orderId: string, txnId?: string | null, rec
       paymentFailReason: null,
       ...(full && { paidAt: new Date() }),
       ...(full && (order.status === "NEW" || order.status === "CONFIRMED") && { status: "PAID" as const }),
+      ...(received > order.total + 0.5 && {
+        internalNote: [order.internalNote, `Paid ${money(received - order.total, order.currency)} more than the order total; check and refund if needed`]
+          .filter(Boolean)
+          .join("\n")
+          .slice(0, 1000),
+      }),
       ...(!full && {
         internalNote: [order.internalNote, `Part payment ${money(amount, order.currency)} received; ${money(order.total - received, order.currency)} still due`]
           .filter(Boolean)
@@ -252,6 +282,65 @@ export async function updateOrderCard(
   const res = await sendOrderStatus(cfg, order.customer.phone, orderRef(order), status, text, description);
   await logMessage(order.customer.id, CARD_LABEL[status], text, res, number?.id ?? null);
   return true;
+}
+
+/**
+ * When a customer submits a new cart or an order is updated, every previous unpaid cart
+ * and its active payment card must immediately expire.
+ * - Marks earlier unpaid orders CANCELLED in DB.
+ * - Updates the Meta WhatsApp in-chat order card to "canceled" so the old "Review and Pay" button is deactivated.
+ * - Sets paymentReminderAt to prevent background reminders for expired carts.
+ */
+export async function cancelSupersededOrdersForCustomer(
+  customerId: string,
+  newOrder: { id: string; number: number; total: number; currency: string },
+) {
+  const newRef = orderRef(newOrder);
+  const newTotal = money(newOrder.total, newOrder.currency);
+
+  const priorUnpaid = await db.order.findMany({
+    where: {
+      customerId,
+      id: { not: newOrder.id },
+      paidAt: null,
+      status: { in: ["NEW", "CONFIRMED"] },
+    },
+    include: {
+      customer: { select: { id: true, clientId: true, phone: true } },
+    },
+  });
+
+  if (!priorUnpaid.length) return [];
+
+  const cancelledIds: string[] = [];
+  for (const old of priorUnpaid) {
+    const oldRef = orderRef(old);
+    const supersedeNote = `Superseded by ${newRef} (${newTotal}) · Customer sent a newer cart`;
+    const mergedNote = [old.internalNote, supersedeNote].filter(Boolean).join(" | ").slice(0, 1000);
+
+    // 1. Mark cancelled in DB & neutralize reminder cron
+    await db.order.update({
+      where: { id: old.id },
+      data: {
+        status: "CANCELLED",
+        internalNote: mergedNote,
+        paymentReminderAt: new Date(),
+      },
+    });
+    cancelledIds.push(old.id);
+
+    // 2. If an interactive "Review and pay" card was sent for this old order, cancel it in WhatsApp
+    if (old.paymentRequestedAt) {
+      await updateOrderCard(
+        old,
+        "canceled",
+        `This cart was replaced by your updated cart ${newRef} (${newTotal}). Please use the new payment request below.`,
+        "Cart replaced by newer order",
+      ).catch((e) => console.warn(`Could not cancel WhatsApp card for old order ${oldRef}`, e));
+    }
+  }
+
+  return cancelledIds;
 }
 
 /** Scheduler: one reminder for payment requests still unpaid after a few hours. */
