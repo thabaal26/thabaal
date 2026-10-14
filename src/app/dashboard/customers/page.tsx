@@ -1,7 +1,7 @@
 import { CheckCircle2, ChevronLeft, ChevronRight, MapPin, Search, UserX } from "@/components/icons";
+import { Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
-import { Users3D } from "@/components/icons-3d";
 import { Picker } from "@/components/picker";
 import { ActionButton } from "@/components/action-button";
 import { Avatar, Badge, buttonClass, Card, EmptyState, PageHeader, rowClass, Stat, Table, Td, Th } from "@/components/ui";
@@ -167,9 +167,46 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
             {filtered ? " matching" : ""} customers{scope.clientName ? ` of ${scope.clientName}` : ""}
           </>
         }
-        description="Customers who reply STOP are opted out automatically."
+        description="Everyone you sell to, who to reach today, and how to reward them."
         inlineActions
         actions={scope.clientId || scope.isAdmin ? <CustomerActions canManage={scope.canManage} hasClient={!!scope.clientId} regions={regions} fields={readFields(homeClient?.customFields, "customer")} exportHref={scope.canManage && total > 0 ? exportHref : null} exportCount={total} /> : undefined}
+        tabs={
+          <nav aria-label="Customer sub-views" className="inline-flex rounded-xl border border-line bg-card p-1 shadow-2xs">
+            <Link
+              href="/dashboard/customers"
+              className={cn(
+                "inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold transition",
+                !tag ? "bg-[#10283B] text-[#FFF9F0] dark:bg-[#FFF9F0] dark:text-[#10283B] shadow-xs" : "text-muted hover:text-ink dark:hover:text-[#FFF9F0]",
+              )}
+            >
+              All customers
+            </Link>
+            <Link
+              href="/dashboard/customers?tag=lapsed"
+              className={cn(
+                "inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold transition",
+                tag === "lapsed" ? "bg-[#10283B] text-[#FFF9F0] dark:bg-[#FFF9F0] dark:text-[#10283B] shadow-xs" : "text-muted hover:text-ink dark:hover:text-[#FFF9F0]",
+              )}
+            >
+              Groups to reach
+            </Link>
+            <Link
+              href="/dashboard/customers?tag=loyalty"
+              className={cn(
+                "inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold transition",
+                tag === "loyalty" ? "bg-[#10283B] text-[#FFF9F0] dark:bg-[#FFF9F0] dark:text-[#10283B] shadow-xs" : "text-muted hover:text-ink dark:hover:text-[#FFF9F0]",
+              )}
+            >
+              Loyalty
+            </Link>
+            <Link
+              href="/dashboard/refills"
+              className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink dark:hover:text-[#FFF9F0] transition"
+            >
+              Refills
+            </Link>
+          </nav>
+        }
       />
 
       {scope.canManage && pendingRows.length > 0 && <PendingCustomersBanner rows={pendingRows} />}
@@ -179,14 +216,14 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
           label="Total directory"
           value={fmtNumber(totalAll)}
           sub={filtered ? `${fmtNumber(total)} matching filters` : "All saved contacts"}
-          icon={<Users3D />}
+          icon={<Users className="size-5 stroke-[2]" />}
           tone="brand"
         />
         <Stat
           label="Reachable on WhatsApp"
           value={fmtNumber(reachableAll)}
           sub={`${pct(reachableAll, totalAll)}% of directory`}
-          icon={<CheckCircle2 className="size-4" />}
+          icon={<CheckCircle2 className="size-5 stroke-[2]" />}
           tone="info"
           meter={pct(reachableAll, totalAll)}
         />
@@ -194,19 +231,19 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
           label={regions[0]}
           value={fmtNumber(homeCount)}
           sub={noLocation > 0 ? `${fmtNumber(noLocation)} without area` : "Local delivery zone"}
-          icon={<MapPin className="size-4" />}
+          icon={<MapPin className="size-5 stroke-[2]" />}
           tone="violet"
         />
         <Stat
           label="Opted out / Unreachable"
           value={fmtNumber(optedOutCount)}
           sub={optedOutCount > 0 ? "Skipped by campaigns" : "Everyone can receive"}
-          icon={<UserX className="size-4" />}
+          icon={<UserX className="size-5 stroke-[2]" />}
           tone={optedOutCount > 0 ? "amber" : "gold"}
         />
       </section>
 
-      <Card className="card-3d">
+      <Card>
         <form role="search" aria-label="Find customers" className="grid gap-2 border-b border-line bg-subtle/40 p-3 sm:flex sm:flex-wrap">
           <div className="relative min-w-0 sm:min-w-56 sm:flex-1">
             <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
@@ -378,7 +415,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
             </div>
           </>
         ) : (
-          <EmptyState icon={<Users3D className="size-5" />} title={filtered ? "No matching customers" : "No customers yet"}>
+          <EmptyState icon={<Users className="size-5 stroke-[2]" />} title={filtered ? "No matching customers" : "No customers yet"}>
             {filtered ? "Try a different search or filter." : scope.canManage ? "Import your customer list as a CSV to get started." : "Customers will appear here once they're added."}
           </EmptyState>
         )}

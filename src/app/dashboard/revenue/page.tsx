@@ -1,9 +1,9 @@
 import { Banknote, CreditCard, Hourglass, ReceiptText, ShoppingCart, Undo2, Wallet } from "@/components/icons";
+import { IndianRupee } from "lucide-react";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "@/components/intent-link";
 import { ActionButton } from "@/components/action-button";
-import { Rupee3D } from "@/components/icons-3d";
 import { Card, CardHeader, DistributionBar, PageHeader, PickClientNotice, Stat } from "@/components/ui";
 import { ColumnChart } from "@/components/viz";
 import { revenueReport, type CashItem } from "@/lib/business-reports";
@@ -70,8 +70,8 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
   ]);
   const header = (
     <PageHeader
-      title="Revenue & cash"
-      description="Money in, money still to collect, and what WhatsApp cost to get it."
+      title="Money"
+      description="What came in, what is still to collect, and what WhatsApp costs."
       tabs={
         filterOpts ? (
           <div className="flex flex-col gap-2">
@@ -123,11 +123,11 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
           href="/dashboard/orders?show=unpaid"
         />
         <Stat label="WhatsApp cost" value={formatValue(r.spend, "inr")} sub="charged messages, incl. GST (estimate)" icon={<CreditCard />} tone="violet" />
-        <Stat label="Return" value={roi === null ? "—" : `${roi.toFixed(roi >= 10 ? 0 : 1)}×`} sub={roi === null ? "no charged messages yet" : "paid sales per ₹1 of messaging"} icon={<Rupee3D />} tone="info" />
+        <Stat label="Return" value={roi === null ? "—" : `${roi.toFixed(roi >= 10 ? 0 : 1)}×`} sub={roi === null ? "no charged messages yet" : "paid sales per ₹1 of messaging"} icon={<IndianRupee />} tone="info" />
       </div>
 
       <Card className="card-3d">
-        <CardHeader tone="brand" icon={<Rupee3D />} title={weekly ? "Sales per week" : "Sales per day"} description={`${period.label} · by how they paid, on the day the payment came in`} />
+        <CardHeader tone="brand" icon={<IndianRupee />} title={weekly ? "Sales per week" : "Sales per day"} description={`${period.label} · by how they paid, on the day the payment came in`} />
         <div className="p-4 sm:p-5">
           <ColumnChart
             format="inr"

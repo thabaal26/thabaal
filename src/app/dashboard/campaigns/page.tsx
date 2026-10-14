@@ -1,8 +1,8 @@
 import { PauseCircle, Plus, Sparkles } from "@/components/icons";
+import { Calendar, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
 import { ActionButton } from "@/components/action-button";
-import { Calendar3D, Users3D } from "@/components/icons-3d";
 import { Badge, buttonClass, Card, EmptyState, FilterChips, PageHeader, Stat, StatusBadge } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
@@ -80,7 +80,7 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
     <>
       <PageHeader
         title="Campaigns"
-        description="Recurring or one-off sends. Each one delivers in batches at the pace you set."
+        description="Send offers, set up automatic messages and check what was delivered."
         actions={
           <>
             <Link href="/dashboard/campaigns/compare" className={buttonClass("secondary")}>
@@ -88,22 +88,50 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
             </Link>
             {canCreate && (
               <Link href="/dashboard/campaigns/new" className={buttonClass("primary")}>
-                <Plus aria-hidden className="size-4" /> <span>New<span className="max-sm:sr-only"> campaign</span></span>
+                <Plus aria-hidden className="size-4 stroke-[2]" /> <span>New<span className="max-sm:sr-only"> campaign</span></span>
               </Link>
             )}
           </>
         }
         inlineActions
         tabs={
-          <FilterChips
-            label="Campaign status"
-            items={TABS.map((t) => ({
-              href: t.key ? `/dashboard/campaigns?show=${t.key}` : "/dashboard/campaigns",
-              label: t.label,
-              count: fmtNumber(tabCounts[t.key]),
-              active: (show || "") === t.key,
-            }))}
-          />
+          <div className="flex flex-wrap items-center gap-3">
+            <nav aria-label="Campaign sub-views" className="inline-flex rounded-xl border border-line bg-card p-1 shadow-2xs">
+              <Link
+                href="/dashboard/campaigns"
+                className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold bg-[#10283B] text-[#FFF9F0] dark:bg-[#FFF9F0] dark:text-[#10283B] shadow-xs"
+              >
+                Campaigns
+              </Link>
+              <Link
+                href="/dashboard/templates"
+                className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink dark:hover:text-[#FFF9F0] transition"
+              >
+                Message templates
+              </Link>
+              <a
+                href="#reorder-settings"
+                className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink dark:hover:text-[#FFF9F0] transition"
+              >
+                Automatic messages
+              </a>
+              <Link
+                href="/dashboard/messages"
+                className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink dark:hover:text-[#FFF9F0] transition"
+              >
+                Message log
+              </Link>
+            </nav>
+            <FilterChips
+              label="Campaign status"
+              items={TABS.map((t) => ({
+                href: t.key ? `/dashboard/campaigns?show=${t.key}` : "/dashboard/campaigns",
+                label: t.label,
+                count: fmtNumber(tabCounts[t.key]),
+                active: (show || "") === t.key,
+              }))}
+            />
+          </div>
         }
       />
 
@@ -112,7 +140,7 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
           label="Active schedules"
           value={fmtNumber(activeCount)}
           sub={`of ${fmtNumber(campaigns.length)} total campaigns`}
-          icon={<Calendar3D />}
+          icon={<Calendar className="size-5 stroke-[2]" />}
           tone="brand"
           meter={campaigns.length > 0 ? Math.round((activeCount / campaigns.length) * 100) : 0}
           href="/dashboard/campaigns?show=active"
@@ -121,7 +149,7 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
           label="Paused"
           value={fmtNumber(pausedCount)}
           sub="Hold until resumed"
-          icon={<PauseCircle />}
+          icon={<PauseCircle className="size-5 stroke-[2]" />}
           tone="amber"
           href="/dashboard/campaigns?show=paused"
         />
@@ -129,7 +157,7 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
           label="Reachable customers"
           value={fmtNumber(totalReach)}
           sub="Opted-in recipients"
-          icon={<Users3D />}
+          icon={<Users className="size-5 stroke-[2]" />}
           tone="info"
           href="/dashboard/customers"
         />
@@ -137,7 +165,7 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
           label="Lapsed customers"
           value={fmtNumber(lapsed)}
           sub={clientData?.winbackTemplateId ? "Auto win-back enabled" : "Ready for win-back"}
-          icon={<Sparkles />}
+          icon={<Sparkles className="size-5 stroke-[2]" />}
           tone="gold"
           href="/dashboard/customers?tag=lapsed"
         />
@@ -148,7 +176,7 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
           {visible.map((c) => {
             const last = c.runs[0];
             return (
-              <Card key={c.id} className={cn("card-3d relative flex flex-col overflow-hidden p-4 active:bg-sunken sm:p-5", !c.active && "opacity-90")}>
+              <Card key={c.id} className={cn("relative flex flex-col overflow-hidden p-4 active:bg-sunken sm:p-5", !c.active && "opacity-90")}>
                 <span aria-hidden className={cn("absolute inset-x-0 top-0 h-[3px]", c.active ? "bg-brand" : "bg-line-strong")} />
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -246,11 +274,11 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
           })}
         </div>
       ) : (
-        <Card className="card-3d">
+        <Card>
           <EmptyState
-            icon={<Calendar3D className="size-5" />}
+            icon={<Calendar className="size-5 stroke-[2]" />}
             title="No campaigns yet"
-            action={canCreate && <Link href="/dashboard/campaigns/new" className={buttonClass("primary")}><Plus className="size-4" /> New campaign</Link>}
+            action={canCreate && <Link href="/dashboard/campaigns/new" className={buttonClass("primary")}><Plus className="size-4 stroke-[2]" /> New campaign</Link>}
           >
             {scope.canManage
               ? scope.clientId
@@ -262,7 +290,7 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
       )}
 
       {clientData && (
-        <div className="mt-6 grid items-start gap-4 sm:mt-8 xl:grid-cols-2">
+        <div id="reorder-settings" className="mt-6 grid items-start gap-4 sm:mt-8 xl:grid-cols-2">
           <RefillForm
             days={clientData.refillDays}
             templateId={clientData.refillTemplateId}

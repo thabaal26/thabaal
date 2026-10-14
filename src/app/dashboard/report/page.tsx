@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
-import { ChartBar3D, Trophy3D } from "@/components/icons-3d";
+import { BarChart3, CheckSquare, Trophy } from "lucide-react";
 import { Card, CardHeader, PageHeader, PickClientNotice } from "@/components/ui";
 import { BarList, ColumnChart } from "@/components/viz";
 import { campaignResults, weeklyReport, type WeekFigures } from "@/lib/business-reports";
@@ -11,7 +11,7 @@ import { refillForecast } from "@/lib/refill-forecast";
 import { getScope } from "@/lib/session";
 import { ReportTools } from "./report-tools";
 
-export const metadata: Metadata = { title: "Weekly report" };
+export const metadata: Metadata = { title: "Reports" };
 export const dynamic = "force-dynamic";
 
 function change(cur: number, prev: number) {
@@ -70,11 +70,43 @@ export default async function ReportPage() {
 
   return (
     <>
-      <PageHeader title="Weekly report" description={`Last 7 full days, ${range}, compared with the 7 days before.`} actions={<ReportTools text={summary} />} />
+      <PageHeader
+        title="Reports"
+        description="See what is working, in four short views."
+        actions={<ReportTools text={summary} />}
+        tabs={
+          <nav aria-label="Report sub-views" className="inline-flex rounded-xl border border-line bg-card p-1 shadow-2xs">
+            <Link
+              href="/dashboard/report"
+              className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold bg-[#10283B] text-[#FFF9F0] dark:bg-[#FFF9F0] dark:text-[#10283B] shadow-xs"
+            >
+              This week
+            </Link>
+            <Link
+              href="/dashboard/report?tab=funnel"
+              className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink dark:hover:text-[#FFF9F0] transition"
+            >
+              From message to sale
+            </Link>
+            <Link
+              href="/dashboard/report?tab=carts"
+              className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink dark:hover:text-[#FFF9F0] transition"
+            >
+              Carts
+            </Link>
+            <Link
+              href="/dashboard/report?tab=audience"
+              className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink dark:hover:text-[#FFF9F0] transition"
+            >
+              Who and when
+            </Link>
+          </nav>
+        }
+      />
 
       <div className="grid grid-cols-1 gap-4 sm:gap-5 xl:grid-cols-12">
-        <Card className="card-3d xl:col-span-5">
-          <CardHeader tone="brand" icon={<ChartBar3D />} title="The week in numbers" description="vs the week before" />
+        <Card className="xl:col-span-5">
+          <CardHeader tone="brand" icon={<BarChart3 className="size-5 stroke-[2]" />} title="The week in numbers" description="vs the week before" />
           <table className="ui-table w-full text-sm">
             <tbody>
               {ROWS.map((row) => {
@@ -103,8 +135,8 @@ export default async function ReportPage() {
         </Card>
 
         <div className="space-y-4 sm:space-y-5 xl:col-span-7">
-          <Card className="card-3d">
-            <CardHeader tone="gold" icon={<Trophy3D />} title="Paid sales per day" />
+          <Card>
+            <CardHeader tone="gold" icon={<Trophy className="size-5 stroke-[2]" />} title="Paid sales per day" />
             <div className="p-4 sm:p-5">
               <ColumnChart
                 format="inr"
@@ -117,14 +149,14 @@ export default async function ReportPage() {
           </Card>
 
           <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2">
-            <Card className="card-3d">
-              <CardHeader tone="brand" icon={<Trophy3D />} title="Top products" />
+            <Card>
+              <CardHeader tone="brand" icon={<Trophy className="size-5 stroke-[2]" />} title="Top products" />
               <div className="p-4 sm:p-5">
                 <BarList format="inr" empty="No paid orders last week." items={r.topProducts.map((p) => ({ key: p.name, label: p.name, value: p.revenue, sub: `${fmtNumber(p.units)} sold` }))} />
               </div>
             </Card>
-            <Card className="card-3d">
-              <CardHeader tone="violet" icon={<ChartBar3D />} title="To do this week" />
+            <Card>
+              <CardHeader tone="violet" icon={<BarChart3 className="size-5 stroke-[2]" />} title="To do this week" />
               {todo.length ? (
                 <ul className="space-y-2 p-4 text-sm text-ink-2 sm:p-5">
                   {todo.map((t) => (

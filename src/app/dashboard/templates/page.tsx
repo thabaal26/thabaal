@@ -1,8 +1,7 @@
-import { CheckCircle2, Clock, Megaphone, Plus, RefreshCw } from "@/components/icons";
+import { CheckCircle2, Clock, FileText, Megaphone, Plus, RefreshCw } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
 import { ActionButton } from "@/components/action-button";
-import { Template3D } from "@/components/icons-3d";
 import { Badge, buttonClass, Card, EmptyState, FilterChips, PageHeader, Stat, StatusBadge } from "@/components/ui";
 import { WhatsAppBubble } from "@/components/whatsapp-preview";
 import { DefaultImage } from "./default-image";
@@ -65,7 +64,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
       />
 
       <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <Stat label="Total templates" value={fmtNumber(total)} sub="Synced with Meta" icon={<Template3D />} tone="info" href="/dashboard/templates" />
+        <Stat label="Total templates" value={fmtNumber(total)} sub="Synced with Meta" icon={<FileText />} tone="info" href="/dashboard/templates" />
         <Stat
           label="Approved"
           value={fmtNumber(approvedCount)}
@@ -89,7 +88,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
           {templates.map((t) => {
             const r = renderFor({ ...t, headerText: t.headerText ?? "", footer: t.footer ?? "", variables: t.variables as VarMap }, SAMPLE_CUSTOMER);
             return (
-              <Card key={t.id} className="card-3d flex flex-col overflow-hidden">
+              <Card key={t.id} className="flex flex-col overflow-hidden rounded-[18px] border-[1.5px] border-[#EADFCB] dark:border-[#27465C] bg-white dark:bg-[#133248] shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)] dark:shadow-[0_14px_30px_-22px_rgba(0,0,0,.7)] transition hover:border-[#10283B] dark:hover:border-[#FFF9F0]">
                 <div className="flex items-center justify-between bg-wa-bar px-3.5 py-2 text-2xs font-medium text-white/90">
                   <span className="truncate font-semibold">{t.client.name}</span>
                   <span className="font-mono text-white/70">{t.language}</span>
@@ -144,9 +143,9 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
           })}
         </div>
       ) : (
-        <Card className="card-3d">
+        <Card className="rounded-[18px] border-[1.5px] border-[#EADFCB] dark:border-[#27465C] bg-white dark:bg-[#133248] shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)] dark:shadow-[0_14px_30px_-22px_rgba(0,0,0,.7)]">
           <EmptyState
-            icon={<Template3D className="size-5" />}
+            icon={<FileText className="size-5" />}
             title={active ? `No ${CATEGORY_INFO[active].label.toLowerCase()} templates` : "No templates yet"}
             action={canCreate && <Link href="/dashboard/templates/new" className={buttonClass("primary")}><Plus className="size-4" /> New template</Link>}
           >

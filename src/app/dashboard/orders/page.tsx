@@ -1,8 +1,8 @@
-import { PackageCheck, PackageOpen, Search, Store, Truck, Wallet } from "@/components/icons";
+import { Package, PackageCheck, PackageOpen, Search, Store, Truck, Wallet } from "@/components/icons";
+import { IndianRupee, ShoppingBag } from "lucide-react";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "@/components/intent-link";
-import { Rupee3D, ShoppingBag3D } from "@/components/icons-3d";
 import { Picker } from "@/components/picker";
 import { buttonClass, Callout, Card, EmptyState, FilterChips, PageHeader, Stat } from "@/components/ui";
 import { ActiveFilters, FilterBar } from "@/components/filter-bar";
@@ -316,7 +316,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     <>
       <PageHeader
         title="Orders"
-        description="Manage WhatsApp catalogue carts and manual orders."
+        description="Every order and where it stands. One button for the next step."
         actions={
           <div className="flex items-center gap-2">
             <OrdersRefreshButton className="max-sm:w-11 max-sm:px-0" />
@@ -354,15 +354,19 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
 
       <div className="mb-3 grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
         <Stat
-          label="Active pipeline"
+          label="Active orders"
           value={fmtNumber(activeCount)}
-          sub={`${fmtNumber(unpaidCount)} unpaid · ${fmtNumber(dispatchedCount)} in transit`}
-          icon={<ShoppingBag3D />}
+          sub={
+            orders.filter((o) => o.status !== "CANCELLED").length > 0
+              ? `${money(orders.filter((o) => o.status !== "CANCELLED").reduce((sum, o) => sum + getOrderPricing(o.items as OrderItem[], o.total, { applyDefaultWhenEqual: true }).total, 0))} in progress`
+              : "0 in progress"
+          }
+          icon={<Package />}
           tone="brand"
           href={qs({ show: undefined })}
         />
         <Stat
-          label="New · To confirm"
+          label="New, to confirm"
           value={fmtNumber(newCount)}
           sub={newCount > 0 ? "Waiting for confirmation" : "All caught up"}
           icon={<PackageOpen />}
@@ -378,16 +382,12 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
           href="/dashboard/orders/packing"
         />
         <Stat
-          label="Shown order value"
-          value={money(
-            orders
-              .filter((o) => o.status !== "CANCELLED")
-              .reduce((sum, o) => sum + getOrderPricing(o.items as OrderItem[], o.total, { applyDefaultWhenEqual: true }).total, 0),
-          )}
-          sub={`${fmtNumber(deliveredCount)} delivered · ${fmtNumber(allCount)} total`}
-          icon={<Rupee3D />}
+          label="Unpaid"
+          value={fmtNumber(unpaidCount)}
+          sub={unpaidCount > 0 ? `${fmtNumber(unpaidCount)} to collect` : "All paid"}
+          icon={<IndianRupee />}
           tone="gold"
-          href={qs({ show: "done" })}
+          href={qs({ show: "unpaid" })}
         />
       </div>
 
@@ -517,8 +517,8 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
             ))}
           </ul>
         ) : (
-          <Card className="card-3d">
-            <EmptyState icon={show === "done" ? <PackageCheck className="size-5" /> : <ShoppingBag3D className="size-5" />} title="No orders here yet">
+          <Card>
+            <EmptyState icon={show === "done" ? <PackageCheck className="size-5 stroke-[2]" /> : <ShoppingBag className="size-5 stroke-[2]" />} title="No orders here yet">
               {filtered
                 ? "No orders matched your active filters. Try picking another status, time range or clearing your search."
                 : "When a customer sends a cart from your WhatsApp catalogue, it appears here with items, total and a one-tap confirmation."}

@@ -188,13 +188,13 @@ export function CardHeader({
 /* ───────────────────────── Buttons ───────────────────────── */
 
 const variants = {
-  primary: "bg-brand text-[#111827] font-semibold shadow-xs hover:brightness-95 active:scale-[0.98]",
-  secondary: "border border-line-2 bg-panel text-ink-2 shadow-xs hover:bg-subtle hover:text-ink active:bg-sunken",
-  ghost: "text-ink-2 hover:bg-sunken hover:text-ink active:bg-sunken",
-  danger: "border border-danger-border bg-panel text-danger shadow-xs hover:bg-danger-bg active:bg-danger-bg",
-  dangerSolid: "bg-danger-solid text-white shadow-xs hover:brightness-95 active:brightness-90",
+  primary: "bg-[#FFC329] text-[#10283B] font-semibold border-[1.5px] border-[#FFC329] hover:brightness-105 active:scale-[0.98]",
+  secondary: "border-[1.5px] border-[#EADFCB] dark:border-[#27465C] bg-white dark:bg-[#133248] text-ink font-semibold shadow-xs hover:border-[#10283B] dark:hover:border-[#FFF9F0] active:scale-[0.98]",
+  ghost: "text-[#5A6B7B] hover:text-[#10283B] dark:text-[#A8BACA] dark:hover:text-[#FFF9F0] hover:bg-black/5 dark:hover:bg-white/5",
+  danger: "border-[1.5px] border-danger-border bg-panel text-danger font-semibold shadow-xs hover:bg-danger-bg active:bg-danger-bg",
+  dangerSolid: "bg-danger-solid text-white font-semibold shadow-xs hover:brightness-95 active:brightness-90",
   /** Text-only action inside a sentence or card header. */
-  link: "text-brand-deep underline-offset-4 hover:underline",
+  link: "text-brand-deep underline-offset-4 hover:underline font-semibold",
   /** For the dark sidebar and phone header. */
   onDark: "text-white/80 hover:bg-white/10 hover:text-white active:bg-white/15",
 };
@@ -206,15 +206,15 @@ export type ButtonSize = "sm" | "md";
  */
 export function buttonClass(variant: ButtonVariant = "primary", size: ButtonSize = "md", icon = false) {
   return cn(
-    "ui-btn relative inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-control font-medium transition active:scale-[0.98] sm:gap-2 [&_svg]:shrink-0 [&_svg:not([class*=size-])]:size-4",
+    "ui-btn relative inline-flex select-none items-center justify-center gap-2 whitespace-nowrap transition active:scale-[0.98] [&_svg]:shrink-0 [&_svg:not([class*=size-])]:size-4",
     "disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 aria-disabled:pointer-events-none aria-disabled:opacity-50",
     icon
       ? size === "sm"
-        ? "size-8 sm:size-8"
-        : "size-9 sm:size-10"
+        ? "size-8.5 rounded-[10px]"
+        : "size-10.5 rounded-[12px]"
       : size === "sm"
-        ? "h-8 px-2.5 text-xs sm:h-8 sm:px-3 sm:text-[0.8125rem]"
-        : "h-9 px-3 text-[0.8125rem] sm:h-10 sm:px-3.5 sm:text-sm",
+        ? "min-h-[34px] px-3 text-[13.5px] rounded-[10px]"
+        : "min-h-[42px] px-4 text-[14.5px] rounded-[12px]",
     variants[variant],
   );
 }
@@ -471,25 +471,25 @@ export function Callout({
 export function FilterChips({ label, items, className }: { label: string; items: { href: string; label: string; count?: number | string; active: boolean }[]; className?: string }) {
   return (
     <nav aria-label={label} className={cn("w-full", className)}>
-      <ul className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+      <ul className="flex flex-wrap items-center gap-2">
         {items.map((t) => (
           <li key={t.href}>
             <Link
               href={t.href}
               aria-current={t.active ? "page" : undefined}
               className={cn(
-                "flex h-8 items-center gap-1 whitespace-nowrap rounded-full border px-2.5 text-xs font-medium transition active:scale-[0.97] sm:h-8 sm:gap-1.5 sm:px-3.5 sm:text-[0.8125rem]",
+                "inline-flex min-h-[34px] items-center gap-1.5 whitespace-nowrap rounded-full border-[1.5px] px-3.5 text-[13.5px] font-semibold transition active:scale-[0.97]",
                 t.active
-                  ? "border-ink bg-ink text-panel shadow-xs"
-                  : "border-line-2 bg-panel text-ink-2 shadow-2xs hover:border-line-strong hover:bg-subtle hover:text-ink",
+                  ? "border-[#10283B] bg-[#10283B] text-[#FFF9F0] dark:bg-[#FFF9F0] dark:text-[#10283B] dark:border-[#FFF9F0]"
+                  : "border-[#EADFCB] bg-white text-[#5A6B7B] dark:bg-[#133248] dark:border-[#27465C] dark:text-[#A8BACA] hover:border-[#10283B] dark:hover:border-[#FFF9F0]",
               )}
             >
               <span>{t.label}</span>
               {t.count !== undefined && (
                 <span
                   className={cn(
-                    "tabular rounded-full px-1.5 py-px text-2xs font-semibold leading-4",
-                    t.active ? "bg-panel/20 text-panel" : "bg-sunken text-muted",
+                    "tabular text-[12px] font-bold opacity-75",
+                    t.active ? "text-[#FFF9F0] dark:text-[#10283B]" : "text-[#5A6B7B] dark:text-[#A8BACA]",
                   )}
                 >
                   {t.count}
@@ -697,30 +697,32 @@ export function Stat({
   tone?: HeaderTone;
   meter?: number;
 }) {
-  const t = STAT_TONES[tone] ?? STAT_TONES.brand;
-  const surface = { background: `linear-gradient(180deg, ${t.color}12 0%, var(--color-panel) 48%, var(--color-panel-2) 100%)` };
   const body = (
     <>
-      <span aria-hidden className="absolute inset-x-0 top-0 h-[3px]" style={{ background: t.color }} />
-      <div className="flex items-center justify-between gap-1.5 sm:gap-2">
-        <p className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-wide sm:text-xs" style={{ color: t.color }}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="min-w-0 truncate text-[13.5px] font-medium text-[#5A6B7B] dark:text-[#A8BACA]">
           {label}
-        </p>
-        {icon && <IconCube tone={tone} size="sm">{icon}</IconCube>}
+        </span>
+        {icon && (
+          <span aria-hidden className="shrink-0 text-[#5A6B7B] dark:text-[#A8BACA] [&_svg]:size-[18px] [&_svg]:stroke-2">
+            {icon}
+          </span>
+        )}
       </div>
-      <div className="tabular mt-1.5 text-lg font-semibold leading-tight tracking-tight text-ink sm:mt-2.5 sm:text-kpi">{value}</div>
+      <div className="tabular mt-1 font-display font-semibold text-2xl sm:text-[28px] leading-tight tracking-[-0.2px] text-ink dark:text-[#FFF9F0]">{value}</div>
       {meter !== undefined && <Meter raised value={meter} tone={tone === "amber" || tone === "rose" ? "warning" : "brand"} className="mt-2 sm:mt-2.5" />}
-      {sub && <p className="mt-1 text-[11px] leading-snug text-muted sm:mt-1.5 sm:text-xs">{sub}</p>}
+      {sub && <div className="mt-1 text-[13px] font-semibold text-[#5A6B7B] dark:text-[#A8BACA] leading-snug">{sub}</div>}
     </>
   );
+  const cardCls = "relative flex h-full min-w-0 flex-col justify-between rounded-[18px] border-[1.5px] border-[#EADFCB] dark:border-[#27465C] bg-white dark:bg-[#133248] p-4 sm:p-5 shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)] dark:shadow-[0_14px_30px_-22px_rgba(0,0,0,.7)] transition";
   return href ? (
-    <Link href={href} style={surface} className="card-3d relative flex h-full min-w-0 flex-col justify-between overflow-hidden rounded-card border p-3 active:bg-sunken sm:p-4">
+    <Link href={href} className={cn(cardCls, "hover:border-[#10283B] dark:hover:border-[#FFF9F0] active:scale-[0.99]")}>
       {body}
     </Link>
   ) : (
-    <Card style={surface} className="card-3d relative flex h-full flex-col justify-between overflow-hidden p-3 sm:p-4">
+    <div className={cardCls}>
       {body}
-    </Card>
+    </div>
   );
 }
 
@@ -803,7 +805,7 @@ const ORDER_STEPS = [
   { key: "DELIVERED", label: "Delivered" },
 ] as const;
 
-/** Visual 5-step order fulfilment tracker bar for OrderCard. */
+/** Visual 5-step order fulfilment tracker for OrderCard matching artifact .steps format. */
 export function OrderStepper({
   status,
   isPaid,
@@ -811,14 +813,13 @@ export function OrderStepper({
 }: {
   status: string;
   isPaid: boolean;
-  /** Set when the order moved past "Paid" without being paid (e.g. "COD", "Not paid"): that step shows amber with this label. */
   unpaidLabel?: string;
 }) {
   if (status === "CANCELLED") {
     return (
-      <div className="flex items-center gap-2 rounded-control border border-danger-border/60 bg-danger-bg/60 px-3 py-1.5 text-xs font-medium text-danger">
-        <span aria-hidden className="size-2 rounded-full bg-danger-solid" />
-        Order cancelled
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-[#C0412A] dark:text-[#FF9C86]">
+        <span aria-hidden className="size-2 rounded-full bg-[#C0412A]" />
+        Cancelled
       </div>
     );
   }
@@ -836,35 +837,45 @@ export function OrderStepper({
             : 0;
 
   return (
-    <div aria-label={`Order progress: ${ORDER_STEPS[activeIdx]?.label}`} className="space-y-1">
-      <div className="grid grid-cols-5 gap-1" aria-hidden>
-        {ORDER_STEPS.map((step, idx) => {
-          const done = idx <= activeIdx || (step.key === "PAID" && isPaid);
-          const current = idx === activeIdx;
-          const owed = unpaidLabel && step.key === "PAID" && !isPaid && idx < activeIdx;
-          return (
-            <div
-              key={step.key}
+    <div aria-label={`Order progress: ${ORDER_STEPS[activeIdx]?.label}`} className="flex flex-wrap items-center gap-1.5 text-xs text-[#5A6B7B] dark:text-[#A8BACA]">
+      {ORDER_STEPS.map((step, idx) => {
+        const done = idx <= activeIdx || (step.key === "PAID" && isPaid);
+        const current = idx === activeIdx;
+        const owed = unpaidLabel && step.key === "PAID" && !isPaid && idx < activeIdx;
+        const label = owed ? unpaidLabel : step.label;
+        return (
+          <span key={step.key} className="inline-flex items-center gap-1.5">
+            <span
               className={cn(
-                "h-1.5 rounded-full transition-colors",
-                owed ? "bg-chart-gold/70" : done ? (current ? "bg-chart-emerald" : "bg-chart-emerald/70") : "bg-track",
+                "inline-flex items-center gap-1 font-semibold transition-colors",
+                owed
+                  ? "text-[#8A5A00] dark:text-[#FFD76A]"
+                  : done
+                    ? "text-[#10283B] dark:text-[#FFF9F0]"
+                    : "text-[#5A6B7B]/70 dark:text-[#A8BACA]/50",
               )}
-            />
-          );
-        })}
-      </div>
-      <div className="flex justify-between text-[10px] font-medium text-muted" aria-hidden>
-        {ORDER_STEPS.map((step, idx) => {
-          const done = idx <= activeIdx || (step.key === "PAID" && isPaid);
-          const current = idx === activeIdx;
-          const owed = unpaidLabel && step.key === "PAID" && !isPaid && idx < activeIdx;
-          return (
-            <span key={step.key} className={cn(owed ? "font-semibold text-warning" : current ? "font-semibold text-brand-deep" : done ? "text-ink-2" : "text-muted/70")}>
-              {owed ? unpaidLabel : step.label}
+            >
+              <span
+                aria-hidden
+                className={cn(
+                  "size-2.5 rounded-full transition-colors",
+                  owed
+                    ? "bg-[#FFC329]"
+                    : done
+                      ? "bg-[#0E8A5B] dark:bg-[#5BE3AE]"
+                      : "bg-[#EADFCB] dark:bg-[#27465C]",
+                )}
+              />
+              {label}
             </span>
-          );
-        })}
-      </div>
+            {idx < ORDER_STEPS.length - 1 && (
+              <span aria-hidden className="text-[#5A6B7B]/40 dark:text-[#A8BACA]/40 select-none">
+                ›
+              </span>
+            )}
+          </span>
+        );
+      })}
     </div>
   );
 }

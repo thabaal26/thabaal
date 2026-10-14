@@ -1,4 +1,3 @@
-import { LogOut } from "@/components/icons";
 import type { Metadata, Viewport } from "next";
 import Link from "@/components/intent-link";
 import { cache } from "react";
@@ -9,9 +8,8 @@ import { getScope, owned, ownedMessages, requireUser } from "@/lib/session";
 import { getSettings, isSimulated } from "@/lib/provider";
 import { senderFor } from "@/lib/senders";
 import { nightColor, themeCss, themeStyle } from "@/lib/theme";
-import { logout } from "../login/actions";
 import { ClientSwitcher, HeaderClientSwitcher } from "./client-switcher";
-import { BottomNav, SettingsLink, SideNav, TopbarTrail, type NavRole } from "./nav";
+import { BottomNav, SettingsLink, SideNav, type NavRole } from "./nav";
 import { WalletBanner } from "./wallet/wallet-banner";
 import { NotificationBell, NotificationProvider } from "@/components/notification-center";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -133,7 +131,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
 
   return (
     <NotificationProvider initialUnreadCount={unreadNotifications}>
-      <div {...appearanceAttrs(look)} style={themeStyle(client)} className="min-h-dvh w-full overflow-x-clip bg-canvas lg:pl-64 print:bg-white print:pl-0 lg:print:pl-0">
+      <div {...appearanceAttrs(look)} style={themeStyle(client)} className="min-h-dvh w-full overflow-x-clip bg-canvas lg:pl-[236px] print:bg-white print:pl-0 lg:print:pl-0">
         {client && themeCss(client) && <style>{themeCss(client)}</style>}
         {/* The portal's look (Settings → Appearance, or this client's own): set on <html> before
             anything paints, so sheets and dialogs wear it too. */}
@@ -144,14 +142,22 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           Skip to content
         </a>
 
-        <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 transform-gpu flex-col overflow-hidden border-r border-line bg-subtle dark:bg-[#0E1E2E] dark:border-white/[0.08] lg:flex print:!hidden">
+        <aside className="fixed inset-y-0 left-0 z-40 hidden w-[236px] transform-gpu flex-col overflow-hidden border-r border-[#EADFCB] bg-[#FFF9F0] dark:bg-[#0B1E2D] dark:border-[#27465C] lg:flex print:!hidden">
           <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_60%_at_0%_0%,rgb(255_200_44/0.08),transparent_55%)] dark:bg-[radial-gradient(120%_60%_at_0%_0%,rgb(22_125_99/0.22),transparent_55%),radial-gradient(90%_50%_at_100%_100%,rgb(234_191_38/0.1),transparent_60%)]" />
-          <div className="relative flex h-16 shrink-0 items-center gap-3 border-b border-line dark:border-white/[0.06] px-4">
-            <BrandMark logoUrl={client?.logoUrl} name={name} size="md" />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-ink dark:text-white">{name}</p>
-              <p className="truncate text-xs text-muted dark:text-white/60">{subtitle}</p>
-            </div>
+          <div className="relative flex h-16 shrink-0 items-center px-4">
+            <Link href="/dashboard" className="logo flex items-center gap-2.5 px-2 text-decoration-none transition hover:opacity-90">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/brands/thabaal/artifact-logo.png"
+                alt="thabaal"
+                width={40}
+                height={22}
+                className="w-10 h-auto shrink-0 object-contain"
+              />
+              <b className="font-display font-semibold text-[22px] tracking-[-0.3px] text-ink dark:text-[#FFF9F0] leading-none">
+                thabaal
+              </b>
+            </Link>
           </div>
           {scope.isAdmin && (
             <div className="relative shrink-0 px-3 pt-2.5 pb-1">
@@ -168,88 +174,44 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
               unreadNotifications={unreadNotifications}
             />
           </div>
-          <div className="relative shrink-0 space-y-3 border-t border-line dark:border-white/[0.08] bg-panel/50 dark:bg-black/20 p-3">
-            {status && <div className="px-1 text-xs">{status}</div>}
-            <div className="flex items-center gap-2.5 rounded-xl bg-sunken/60 dark:bg-white/5 p-1.5 ring-1 ring-line/70 dark:ring-white/10">
-              <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full bg-brand text-xs font-bold text-[#111827] ring-1 ring-black/10">
-                {initials(user.name)}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-ink dark:text-white">{user.name}</p>
-                <p className="truncate text-xs text-muted dark:text-white/60">{user.email}</p>
-              </div>
-              <form action={logout}>
-                <button
-                  type="submit"
-                  aria-label="Sign out"
-                  title="Sign out"
-                  className="grid size-8 place-items-center rounded-lg text-muted hover:text-ink hover:bg-black/5 dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white transition active:scale-95"
-                >
-                  <LogOut aria-hidden className="size-4" />
-                </button>
-              </form>
+          <div className="relative shrink-0 space-y-2 border-t border-[#EADFCB] dark:border-[#27465C] bg-[#FFF9F0] dark:bg-[#0B1E2D] p-4 text-[13px]">
+            <div className="flex items-center gap-2 text-[#5A6B7B] dark:text-[#A8BACA] font-medium text-[12.5px]">
+              <span className="size-2 rounded-full bg-[#10B981] animate-pulse shrink-0" />
+              <span>{scope.isAdmin && notConnected ? "WhatsApp not connected" : "WhatsApp connected"}</span>
             </div>
-            {!scope.isAdmin && (
-              <div className="flex items-center justify-between px-1 text-2xs text-muted/70 dark:text-white/50">
-                <span>Powered by Thabaal (தபால்)</span>
-                <span className="inline-block size-1.5 rounded-full bg-emerald-500" title="System operational" />
-              </div>
-            )}
+            <div>
+              <Link href="/dashboard/guide" className="text-[#5A6B7B] hover:text-[#10283B] dark:text-[#A8BACA] dark:hover:text-[#FFF9F0] underline text-[12px]">
+                What changed in this menu
+              </Link>
+            </div>
+            <div className="text-[11.5px] text-[#8E9CAE] dark:text-white/40">
+              Preview · Sample data
+            </div>
           </div>
         </aside>
 
-        {/* Computers: where you are, and the account controls. Phones use the dark header below. */}
-        <header className="sticky top-0 z-30 hidden h-16 transform-gpu items-center gap-4 border-b border-line bg-panel px-6 lg:flex xl:px-8 print:!hidden">
-          <TopbarTrail workspace={client ? name : scope.isAdmin ? "All clients" : name} />
-          <div className="ml-auto flex items-center gap-2">
-            {ordersOn && newOrders > 0 && (
-              <Link
-                href="/dashboard/orders"
-                className="inline-flex h-8 items-center gap-1.5 rounded-full border border-warning-border bg-warning-bg px-3 text-xs font-semibold text-warning shadow-2xs transition hover:brightness-95"
-              >
-                <span aria-hidden className="size-1.5 rounded-full bg-warning-solid" />
-                <span className="tabular">{newOrders}</span> order{newOrders === 1 ? "" : "s"} to handle
-              </Link>
-            )}
-            {repliesOn && openReplies > 0 && (
-              <Link
-                href="/dashboard/replies"
-                className="inline-flex h-8 items-center gap-1.5 rounded-full border border-brand/25 bg-brand-soft px-3 text-xs font-semibold text-brand-deep shadow-2xs transition hover:brightness-95"
-              >
-                <span aria-hidden className="size-1.5 rounded-full bg-brand" />
-                <span className="tabular">{openReplies}</span> open repl{openReplies === 1 ? "y" : "ies"}
-              </Link>
-            )}
-            <ThemeToggle />
-            {notificationsOn && <NotificationBell />}
-            <span aria-hidden className="mx-1 h-6 w-px bg-line" />
-            <Link
-              href="/dashboard/settings"
-              title="Account settings"
-              className="flex min-w-0 items-center gap-2.5 rounded-control py-1 pl-1 pr-2 transition hover:bg-sunken"
-            >
-              <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-deep ring-1 ring-brand/20">
-                {initials(user.name)}
-              </span>
-              <span className="hidden min-w-0 text-left xl:block">
-                <span className="block max-w-40 truncate text-sm font-medium leading-tight text-ink">{user.name}</span>
-                <span className="block max-w-40 truncate text-xs leading-tight text-muted">{scope.isAdmin ? "Admin" : scope.canManage ? "Manager" : scope.canOperate ? "Staff" : "Viewer"}</span>
-              </span>
-              <span className="sr-only xl:hidden">{user.name}, account settings</span>
-            </Link>
-          </div>
-        </header>
-
-        <header className="sticky top-0 z-30 w-full border-b border-line bg-subtle/95 backdrop-blur-md pt-[env(safe-area-inset-top)] text-ink dark:bg-[#0E1E2E]/95 dark:text-white dark:border-white/10 lg:hidden print:hidden">
+        <header className="sticky top-0 z-30 w-full border-b border-[#EADFCB] bg-[#FFF9F0]/95 backdrop-blur-md pt-[env(safe-area-inset-top)] text-ink dark:bg-[#0B1E2D]/95 dark:text-white dark:border-[#27465C] lg:hidden print:hidden">
           <div className="flex h-12 items-center gap-2.5 pl-3 pr-1.5 sm:h-14 sm:gap-3 sm:pl-4 sm:pr-2">
-            <BrandMark logoUrl={client?.logoUrl} name={name} size="sm" />
+            <Link href="/dashboard" className="logo flex items-center gap-2 shrink-0 text-decoration-none transition hover:opacity-90">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/brands/thabaal/artifact-logo.png"
+                alt="thabaal"
+                width={36}
+                height={20}
+                className="w-9 h-auto shrink-0 object-contain"
+              />
+              <b className="font-display font-semibold text-[20px] tracking-[-0.3px] text-ink dark:text-[#FFF9F0] leading-none">
+                thabaal
+              </b>
+            </Link>
             {scope.isAdmin ? (
               <HeaderClientSwitcher clients={clients} current={scope.clientId} title={client ? name : "All clients"}>
                 <span className="block text-2xs leading-tight">{status}</span>
               </HeaderClientSwitcher>
             ) : (
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[0.8125rem] font-semibold leading-tight text-ink dark:text-white sm:text-sm">{name}</p>
+              <div className="min-w-0 flex-1 truncate text-right">
+                <p className="truncate text-xs font-semibold leading-tight text-ink dark:text-white">{name}</p>
                 <div className="text-2xs leading-tight">{status ?? <span className="block truncate text-muted dark:text-white/70">{subtitle}</span>}</div>
               </div>
             )}

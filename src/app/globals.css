@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fredoka:wght@500;600&display=swap");
 @import "tailwindcss";
 @import "./icons.generated.css";
 @import "./appearance.css";
@@ -6,9 +7,56 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
-  /* Geist for Latin; Noto Sans Tamil fills in Tamil characters (it only downloads when a page has some). */
-  --font-sans: var(--font-geist-sans), var(--font-tamil), ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fredoka", var(--font-tamil), ui-rounded, system-ui, sans-serif;
+  --font-ui: "DM Sans", var(--font-tamil), system-ui, -apple-system, sans-serif;
+  --font-sans: var(--font-ui), var(--font-geist-sans), var(--font-tamil), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+:root {
+  --display: "Fredoka", var(--font-tamil), ui-rounded, system-ui, sans-serif;
+  --ui: "DM Sans", var(--font-tamil), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --bg: #FFF9F0;
+  --card: #FFFFFF;
+  --fg: #10283B;
+  --muted: #5A6B7B;
+  --line: #EADFCB;
+  --soft: #FFF3D6;
+  --mango: #FFC329;
+  --ink: #10283B;
+  --ok: #0E8A5B;
+  --ok-bg: rgba(32, 201, 133, 0.16);
+  --warn: #8A5A00;
+  --warn-bg: rgba(255, 195, 41, 0.28);
+  --bad: #C0412A;
+  --bad-bg: rgba(244, 107, 78, 0.16);
+  --info: #2B5C86;
+  --info-bg: rgba(43, 92, 134, 0.12);
+  --bar: #10283B;
+  --bar2: #FFC329;
+  --bar3: #F46B4E;
+  --bar4: #20C985;
+  --shadow: 0 1px 0 rgba(16, 40, 59, 0.04), 0 14px 30px -22px rgba(16, 40, 59, 0.35);
+}
+
+.dark, :root[data-theme="dark"], [data-theme="night"] {
+  --bg: #0B1E2D;
+  --card: #133248;
+  --fg: #FFF9F0;
+  --muted: #A8BACA;
+  --line: #27465C;
+  --soft: #1B3B52;
+  --ink: #FFF9F0;
+  --ok: #5BE3AE;
+  --ok-bg: rgba(32, 201, 133, 0.18);
+  --warn: #FFD76A;
+  --warn-bg: rgba(255, 195, 41, 0.18);
+  --bad: #FF9C86;
+  --bad-bg: rgba(244, 107, 78, 0.2);
+  --info: #8EC3EE;
+  --info-bg: rgba(142, 195, 238, 0.15);
+  --bar: #FFF9F0;
+  --shadow: 0 14px 30px -22px rgba(0, 0, 0, 0.7);
 }
 
 /*
@@ -20,25 +68,25 @@
  */
 @theme {
   /* Surfaces and text */
-  --color-ink: #111827;
-  --color-ink-2: #374151; /* body copy and labels a step below headings */
-  --color-muted: #6b7280; /* secondary text: 4.6:1 on canvas */
-  --color-faint: #9ca3af; /* icons and decoration only, never text that must be read */
-  --color-line: #efebe4; /* warm tactile paper borders */
-  --color-line-2: #e2ddd4; /* outlines of buttons and chips, whose labels identify them */
-  --color-line-strong: #c8c2b7; /* borders that alone outline a control: fields, checkboxes (3:1) */
-  --color-canvas: #fffdf6; /* warm cream canvas */
-  --color-panel: #ffffff; /* crisp white card surface */
-  --color-surface: #ffffff;
-  --color-subtle: #faf6ee; /* warm parchment sidebar and secondary surfaces */
-  --color-sunken: #f4efe6; /* inset areas inside a card: item lists, read-only values, segmented tracks */
-  --color-panel-2: #fdfbf7; /* lower end of raised card gradients */
-  --color-track: #ede7dc; /* empty part of bars, rings and chart tracks */
+  --color-ink: #10283B;
+  --color-ink-2: #2B4255; /* body copy and labels a step below headings */
+  --color-muted: #5A6B7B; /* secondary text: 4.6:1 on canvas */
+  --color-faint: #8E9EA9; /* icons and decoration only, never text that must be read */
+  --color-line: #EADFCB; /* warm tactile cream borders */
+  --color-line-2: #E0D3BC; /* outlines of buttons and chips, whose labels identify them */
+  --color-line-strong: #C4B59B; /* borders that alone outline a control: fields, checkboxes (3:1) */
+  --color-canvas: #FFF9F0; /* warm cream canvas */
+  --color-panel: #FFFFFF; /* crisp white card surface */
+  --color-surface: #FFFFFF;
+  --color-subtle: #FFF9F0; /* warm parchment sidebar and secondary surfaces */
+  --color-sunken: #F5EDE0; /* inset areas inside a card: item lists, read-only values, segmented tracks */
+  --color-panel-2: #FAF4EB; /* lower end of raised card gradients */
+  --color-track: #EDE3D2; /* empty part of bars, rings and chart tracks */
 
-  /* Primary action: Golden Amber #FFC82C */
-  --color-brand: #ffc82c;
-  --color-brand-deep: #b47800;
-  --color-brand-soft: #fff4d2;
+  /* Primary action: Golden Amber / Mango #FFC329 */
+  --color-brand: #FFC329;
+  --color-brand-deep: #B47800;
+  --color-brand-soft: #FFF3D6;
 
   /* Sidebar and brand highlights */
   --color-night: #faf6ee;
@@ -104,10 +152,10 @@
   --text-kpi: 1.75rem;
   --text-kpi--line-height: 1.15;
 
-  /* Radius: controls, cards, sheets/dialogs (plus full for pills and avatars) */
-  --radius-control: 0.5rem;
-  --radius-card: 0.75rem;
-  --radius-sheet: 1rem;
+  /* Radius: controls (12px), cards (18px), sheets/dialogs (20px) */
+  --radius-control: 0.75rem;
+  --radius-card: 1.125rem;
+  --radius-sheet: 1.25rem;
 
   /* Elevation: cards at rest, anything floating above the page */
   --shadow-xs: 0 1px 2px rgb(16 24 40 / 0.05);
@@ -479,27 +527,27 @@ input:-webkit-autofill:active {
  */
 .dark {
   color-scheme: dark;
-  --color-ink: #f3f4f6;
-  --color-ink-2: #d1d5db;
-  --color-muted: #9ca3af;
-  --color-faint: #6b7280;
-  --color-line: rgba(255, 255, 255, 0.09);
-  --color-line-2: rgba(255, 255, 255, 0.14);
-  --color-line-strong: rgba(255, 255, 255, 0.25);
-  --color-canvas: #0b1724;
-  --color-panel: #14283c;
-  --color-surface: #14283c;
-  --color-subtle: #0e1e2e;
-  --color-sunken: #09131d;
-  --color-panel-2: #19334d;
-  --color-track: #1b354f;
+  --color-ink: #FFF9F0;
+  --color-ink-2: #E0E8F0;
+  --color-muted: #A8BACA;
+  --color-faint: #6A8296;
+  --color-line: #27465C;
+  --color-line-2: #345873;
+  --color-line-strong: #456D8C;
+  --color-canvas: #0B1E2D;
+  --color-panel: #133248;
+  --color-surface: #133248;
+  --color-subtle: #0B1E2D;
+  --color-sunken: #0E2535;
+  --color-panel-2: #163B54;
+  --color-track: #1C4461;
 
-  --color-brand: #ffc82c;
-  --color-brand-deep: #fde047;
-  --color-brand-soft: #382c0a;
+  --color-brand: #FFC329;
+  --color-brand-deep: #FFD76A;
+  --color-brand-soft: #1B3B52;
 
-  --color-night: #0e1e2e;
-  --color-night-2: #14283c;
+  --color-night: #0B1E2D;
+  --color-night-2: #133248;
   --color-gold-soft: #2e240a;
   --color-gold-deep: #fde047;
 
@@ -568,3 +616,120 @@ input:-webkit-autofill:active {
 .dark img:not([data-keep]) { filter: brightness(0.94); }
 /* Smooth swap between light and dark (not on first paint). */
 html.theme-anim, html.theme-anim * { transition: background-color 0.25s ease, border-color 0.25s ease, color 0.2s ease !important; }
+
+/* ───────────────────────── Artifact Design System Classes ───────────────────────── */
+.font-display { font-family: var(--display); }
+.font-ui { font-family: var(--ui); }
+
+.card-artifact {
+  background: var(--card);
+  border: 1.5px solid var(--line);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+  min-width: 0;
+}
+
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border: 1.5px solid var(--line);
+  border-radius: 16px;
+  text-decoration: none;
+  background: var(--card);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.todo-item:hover {
+  border-color: var(--fg);
+  transform: translateY(-1px);
+}
+.todo-item .big {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 26px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--fg);
+}
+.todo-item .go {
+  margin-left: auto;
+  white-space: nowrap;
+  font-weight: 700;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  font-size: 14px;
+}
+
+.btn-mango {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: var(--mango);
+  border: 1.5px solid var(--mango);
+  color: #10283B;
+  font-weight: 600;
+  font-size: 14.5px;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: filter 0.15s ease;
+}
+.btn-mango:hover {
+  filter: brightness(1.05);
+}
+
+.chip-btn {
+  border: 1.5px solid var(--line);
+  background: var(--card);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--muted);
+  transition: all 0.15s ease;
+}
+.chip-btn[aria-pressed="true"], .chip-btn.active {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+
+.seg-control {
+  display: inline-flex;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  padding: 3px;
+  background: var(--card);
+}
+.seg-control button, .seg-control a {
+  border: 0;
+  background: none;
+  padding: 6px 12px;
+  border-radius: 9px;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--muted);
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+.seg-control button[aria-pressed="true"], .seg-control a[aria-current="page"], .seg-control a.active, .seg-control button.active {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.stat-v {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: clamp(26px, 3vw, 34px);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}

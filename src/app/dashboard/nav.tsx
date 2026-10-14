@@ -1,64 +1,65 @@
 "use client";
 
-import { ChevronRight, Menu } from "@/components/icons";
+import {
+  BarChart3,
+  Bell,
+  Building2,
+  ChevronRight,
+  Clock,
+  FileText,
+  Home,
+  IndianRupee,
+  Megaphone,
+  Menu,
+  MessageCircle,
+  MessageSquareText,
+  Package,
+  Phone,
+  Settings,
+  Tag,
+  Users,
+  Wallet,
+} from "lucide-react";
 import Link from "@/components/intent-link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import {
-  Bell3D,
-  ChartBar3D,
-  Building3D,
-  Calendar3D,
-  Clock3D,
-  Dashboard3D,
-  Inbox3D,
-  Messages3D,
-  Phone3D,
-  Rupee3D,
-  Settings3D,
-  ShoppingBag3D,
-  Store3D,
-  Template3D,
-  Users3D,
-  Wallet3D,
-} from "@/components/icons-3d";
 import { Sheet } from "@/components/sheet";
 import { isHrefEnabled } from "@/lib/client-sections";
 import { cn } from "@/lib/cn";
 
 export const NAV = [
   // 1. TODAY
-  { href: "/dashboard", label: "Home", short: "Home", icon: Dashboard3D, group: "Today", cube: "from-[#fbbf24] via-[#f59e0b] to-[#d97706]" },
+  { href: "/dashboard", label: "Home", short: "Home", icon: Home, group: "Today" },
 
   // 2. DAILY WORK
-  { href: "/dashboard/replies", label: "Chats", short: "Chats", icon: Inbox3D, group: "Daily work", cube: "from-[#c084fc] via-[#9333ea] to-[#7e22ce]" },
-  { href: "/dashboard/orders", label: "Orders", short: "Orders", icon: ShoppingBag3D, group: "Daily work", cube: "from-[#38bdf8] via-[#0ea5e9] to-[#0284c7]" },
-  { href: "/dashboard/revenue", label: "Money", short: "Money", icon: Rupee3D, group: "Daily work", cube: "from-[#fde68a] via-[#f59e0b] to-[#b45309]" },
+  { href: "/dashboard/replies", label: "Chats", short: "Chats", icon: MessageCircle, group: "Daily work" },
+  { href: "/dashboard/orders", label: "Orders", short: "Orders", icon: Package, group: "Daily work" },
+  { href: "/dashboard/revenue", label: "Money", short: "Money", icon: IndianRupee, group: "Daily work" },
 
   // 3. GROW
-  { href: "/dashboard/customers", label: "Customers", short: "Customers", icon: Users3D, group: "Grow", cube: "from-[#38bdf8] via-[#0284c7] to-[#0369a1]" },
-  { href: "/dashboard/catalogue", label: "Products", short: "Products", icon: Store3D, group: "Grow", cube: "from-[#2dd4bf] via-[#14b8a6] to-[#0d9488]" },
-  { href: "/dashboard/campaigns", label: "Campaigns", short: "Campaigns", icon: Calendar3D, group: "Grow", cube: "from-[#fb7185] via-[#f43f5e] to-[#e11d48]" },
+  { href: "/dashboard/customers", label: "Customers", short: "Customers", icon: Users, group: "Grow" },
+  { href: "/dashboard/catalogue", label: "Products", short: "Products", icon: Tag, group: "Grow" },
+  { href: "/dashboard/campaigns", label: "Campaigns", short: "Campaigns", icon: Megaphone, group: "Grow" },
+  { href: "/dashboard/templates", label: "Templates", short: "Templates", icon: FileText, group: "Grow" },
 
   // 4. UNDERSTAND
-  { href: "/dashboard/report", label: "Reports", short: "Reports", icon: ChartBar3D, group: "Understand", cube: "from-[#5eead4] via-[#14b8a6] to-[#0f766e]" },
+  { href: "/dashboard/report", label: "Reports", short: "Reports", icon: BarChart3, group: "Understand" },
 
   // 5. ACCOUNT
-  { href: "/dashboard/settings", label: "Settings", short: "Settings", icon: Settings3D, group: "Account", cube: "from-[#fb923c] via-[#ea580c] to-[#c2410c]" },
+  { href: "/dashboard/settings", label: "Settings", short: "Settings", icon: Settings, group: "Account" },
 ];
 
 export const EXTRA_NAV = [
-  { href: "/dashboard/notifications", label: "Notifications", short: "Alerts", icon: Bell3D, group: "Today", cube: "from-[#fbbf24] via-[#f59e0b] to-[#d97706]" },
-  { href: "/dashboard/refills", label: "Reorders", short: "Reorders", icon: Clock3D, group: "Daily work", cube: "from-[#86efac] via-[#22c55e] to-[#15803d]" },
-  { href: "/dashboard/calls", label: "Calls", short: "Calls", icon: Phone3D, group: "Daily work", cube: "from-[#4ade80] via-[#16a34a] to-[#15803d]" },
-  { href: "/dashboard/templates", label: "Templates", short: "Templates", icon: Template3D, group: "Grow", cube: "from-[#818cf8] via-[#6366f1] to-[#4f46e5]" },
-  { href: "/dashboard/messages", label: "Message log", short: "Log", icon: Messages3D, group: "Grow", cube: "from-[#a78bfa] via-[#7c3aed] to-[#6d28d9]" },
+  { href: "/dashboard/notifications", label: "Notifications", short: "Alerts", icon: Bell, group: "Today" },
+  { href: "/dashboard/refills", label: "Reorders", short: "Reorders", icon: Clock, group: "Daily work" },
+  { href: "/dashboard/calls", label: "Calls", short: "Calls", icon: Phone, group: "Daily work" },
+  { href: "/dashboard/messages", label: "Message log", short: "Log", icon: MessageSquareText, group: "Grow" },
 ];
 
-const ADMIN_NAV = [{ href: "/dashboard/clients", label: "Clients", short: "Clients", icon: Building3D, group: "Account", cube: "from-[#fde047] via-[#eab308] to-[#ca8a04]" }];
+const ADMIN_NAV = [{ href: "/dashboard/clients", label: "Clients", short: "Clients", icon: Building2, group: "Account" }];
 
 /** Thabaal wallet: admins, and clients billed through the wallet. */
-const WALLET_NAV = [{ href: "/dashboard/wallet", label: "Wallet", short: "Wallet", icon: Wallet3D, group: "Account", cube: "from-[#6ee7b7] via-[#10b981] to-[#047857]" }];
+const WALLET_NAV = [{ href: "/dashboard/wallet", label: "Wallet", short: "Wallet", icon: Wallet, group: "Account" }];
 
 /**
  * Phone tabs: what each role opens most. Staff pack orders and answer customers all day;
@@ -76,7 +77,7 @@ type Counts = { openReplies?: number; newOrders?: number; unreadNotifications?: 
 function CountBadge({ n, label, className }: { n?: number; label: string; className?: string }) {
   if (!n) return null;
   return (
-    <span className={cn("tabular grid h-[18px] min-w-[18px] animate-pop place-items-center rounded-full px-1.5 text-2xs font-bold", className)}>
+    <span className={cn("tabular grid h-[18px] min-w-[20px] place-items-center rounded-full px-1.5 text-[11.5px] font-bold", className)}>
       {n > 99 ? "99+" : n}
       <span className="sr-only"> {label}</span>
     </span>
@@ -124,7 +125,7 @@ export function SideNav({
           <ul className="space-y-1">
             {items
               .filter((n) => n.group === g)
-              .map(({ href, label, icon: Icon, cube }) => {
+              .map(({ href, label, icon: Icon }) => {
                 const active = isActive(path, href);
                 const count = countFor(href, { openReplies, newOrders, unreadNotifications });
                 return (
@@ -133,30 +134,28 @@ export function SideNav({
                       href={href}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "group relative flex h-10 items-center gap-3 rounded-xl px-2.5 text-sm font-medium transition",
+                        "group relative flex h-10 items-center gap-2.5 rounded-xl px-2.5 text-[14.5px] transition",
                         active
-                          ? "bg-[#FFC82C] text-[#111827] font-semibold shadow-xs"
-                          : "text-ink-2 hover:bg-black/[0.04] hover:text-ink dark:text-white/85 dark:hover:bg-white/[0.08] dark:hover:text-white",
+                          ? "bg-[#FFC329] text-[#10283B] font-semibold"
+                          : "text-[#10283B] hover:bg-[#FFF3D6] dark:text-[#FFF9F0] dark:hover:bg-[#1B3B52] font-medium",
                       )}
                     >
-                      <span
-                        aria-hidden
+                      <Icon
+                        aria-hidden="true"
                         className={cn(
-                          "icon-cube-3d grid size-7 shrink-0 place-items-center rounded-[8px] bg-gradient-to-br text-white transition-transform duration-200 group-hover:scale-105",
-                          cube,
+                          "size-[19px] shrink-0 transition-colors",
                           active
-                            ? "ring-2 ring-black/20 shadow-xs"
-                            : "ring-1 ring-inset ring-white/35",
+                            ? "text-[#10283B]"
+                            : "text-[#5A6B7B] group-hover:text-[#10283B] dark:text-[#A8BACA] dark:group-hover:text-[#FFF9F0]",
                         )}
-                      >
-                        <Icon className="size-4" />
-                      </span>
+                        strokeWidth={2}
+                      />
                       <span className="flex-1 truncate">{label}</span>
                       {count && (
                         <CountBadge
                           n={count.n}
                           label={count.label}
-                          className={active ? "bg-[#111827] text-white" : "bg-[#EF4444] text-white shadow-xs"}
+                          className={active ? "bg-[#10283B] text-[#FFC329]" : "bg-[#C0412A] text-white shadow-xs"}
                         />
                       )}
                     </Link>
@@ -202,34 +201,38 @@ export function BottomNav({
 
   const tabClass = (active: boolean) =>
     cn(
-      "flex h-14 min-w-0 flex-col items-center justify-center gap-0.5 text-[10px] font-medium leading-tight transition active:scale-95 sm:h-16 sm:gap-1 sm:text-2xs",
-      active ? "text-ink font-bold dark:text-white" : "text-muted hover:text-ink dark:text-white/70",
+      "flex h-14 min-w-0 flex-col items-center justify-center gap-1 text-[10px] font-medium leading-tight transition active:scale-95 sm:h-16 sm:text-xs",
+      active ? "text-[#10283B] font-bold dark:text-[#FFC329]" : "text-[#5A6B7B] hover:text-[#10283B] dark:text-[#A8BACA] dark:hover:text-[#FFF9F0]",
     );
-  const iconWrap = (active: boolean, cube = "from-[#34d399] via-[#10b981] to-[#059669]") =>
-    cn(
-      "icon-cube-3d relative grid h-7 w-9 place-items-center rounded-[9px] bg-gradient-to-br text-white transition sm:h-8 sm:w-11 sm:rounded-[10px]",
-      cube,
-      active ? "ring-2 ring-brand ring-offset-1 scale-105" : "ring-1 ring-inset ring-white/35 opacity-90",
-    );
-  const badge = "absolute -right-1.5 -top-1.5 z-10 bg-danger-solid text-white ring-2 ring-panel";
 
   return (
-    <nav aria-label="Main" className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-line bg-subtle/95 backdrop-blur-md dark:bg-[#0E1E2E]/95 dark:border-white/10 lg:hidden print:hidden">
+    <nav aria-label="Main" className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-[#EADFCB] bg-[#FFF9F0]/95 backdrop-blur-md dark:bg-[#0B1E2D]/95 dark:border-[#27465C] lg:hidden print:hidden">
       <ul
         className="mx-auto grid max-w-lg"
         style={{ gridTemplateColumns: `repeat(${tabItems.length + 1}, minmax(0, 1fr))` }}
       >
-        {tabItems.map(({ href, short, icon: Icon, cube }) => {
+        {tabItems.map(({ href, short, icon: Icon }) => {
           const active = isActive(path, href);
           const count = countFor(href, { openReplies, newOrders, unreadNotifications });
           return (
             <li key={href} className="min-w-0">
               <Link href={href} aria-current={active ? "page" : undefined} className={tabClass(active)}>
                 <span className="relative">
-                  <span className={iconWrap(active, cube)}>
-                    <Icon aria-hidden className="size-4 sm:size-5" />
-                  </span>
-                  {count && <CountBadge n={count.n} label={count.label} className={badge} />}
+                  <Icon
+                    aria-hidden="true"
+                    className={cn(
+                      "size-5 transition-colors",
+                      active
+                        ? "text-[#10283B] dark:text-[#FFC329]"
+                        : "text-[#5A6B7B] dark:text-[#A8BACA]",
+                    )}
+                    strokeWidth={active ? 2.2 : 1.8}
+                  />
+                  {count && count.n !== undefined && count.n > 0 && (
+                    <span className="absolute -top-1.5 -right-2 grid h-4 min-w-4 place-items-center rounded-full bg-[#C0412A] px-1 text-[9px] font-bold text-white shadow-xs">
+                      {count.n > 99 ? "99+" : count.n}
+                    </span>
+                  )}
                 </span>
                 <span className="max-w-full truncate px-0.5">{short}</span>
               </Link>
@@ -239,18 +242,29 @@ export function BottomNav({
         <li className="min-w-0">
           <button type="button" onClick={() => setOpenedOn(path)} aria-haspopup="dialog" aria-expanded={moreOpen} className={cn(tabClass(moreActive), "w-full")}>
             <span className="relative">
-              <span className={iconWrap(moreActive, "from-[#818cf8] via-[#6366f1] to-[#4f46e5]")}>
-                <Menu className="size-4 sm:size-5" strokeWidth={2} />
-              </span>
-              <CountBadge n={hiddenCount} label="to handle" className={badge} />
+              <Menu
+                aria-hidden="true"
+                className={cn(
+                  "size-5 transition-colors",
+                  moreActive
+                    ? "text-[#10283B] dark:text-[#FFC329]"
+                    : "text-[#5A6B7B] dark:text-[#A8BACA]",
+                )}
+                strokeWidth={moreActive ? 2.2 : 1.8}
+              />
+              {hiddenCount > 0 && (
+                <span className="absolute -top-1.5 -right-2 grid h-4 min-w-4 place-items-center rounded-full bg-[#C0412A] px-1 text-[9px] font-bold text-white shadow-xs">
+                  {hiddenCount > 99 ? "99+" : hiddenCount}
+                </span>
+              )}
             </span>
-            More
+            <span>More</span>
           </button>
         </li>
       </ul>
       <Sheet open={moreOpen} onClose={() => setOpenedOn(null)} title="More">
         <ul className="grid grid-cols-2 gap-2">
-          {more.map(({ href, label, icon: Icon, cube }) => {
+          {more.map(({ href, label, icon: Icon }) => {
             const active = isActive(path, href);
             const count = countFor(href, { openReplies, newOrders, unreadNotifications });
             return (
@@ -260,18 +274,17 @@ export function BottomNav({
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     "flex h-12 items-center gap-2.5 rounded-xl border px-3 text-xs font-medium transition active:scale-[0.98] sm:h-14 sm:gap-3 sm:px-3.5 sm:text-sm",
-                    active ? "border-brand bg-brand-soft text-[#111827] font-semibold" : "border-line bg-panel text-ink active:bg-sunken",
+                    active ? "border-[#FFC329] bg-[#FFC329]/15 text-[#10283B] font-semibold dark:bg-[#FFC329]/20 dark:text-[#FFC329]" : "border-line bg-panel text-ink active:bg-sunken",
                   )}
                 >
-                  <span
-                    aria-hidden
+                  <Icon
+                    aria-hidden="true"
                     className={cn(
-                      "icon-cube-3d grid size-7 shrink-0 place-items-center rounded-[8px] bg-gradient-to-br text-white ring-1 ring-inset ring-white/40 sm:size-8 sm:rounded-[9px]",
-                      cube,
+                      "size-5 shrink-0 transition-colors",
+                      active ? "text-[#10283B] dark:text-[#FFC329]" : "text-muted",
                     )}
-                  >
-                    <Icon className="size-4 sm:size-[18px]" />
-                  </span>
+                    strokeWidth={active ? 2.2 : 1.8}
+                  />
                   <span className="min-w-0 flex-1 truncate">{label}</span>
                   {count && <CountBadge n={count.n} label={count.label} className="bg-danger-solid text-white" />}
                 </Link>
@@ -351,7 +364,7 @@ export function SettingsLink() {
         active ? "bg-sunken text-ink dark:bg-white/15 dark:text-white" : "text-muted hover:text-ink dark:text-white/80 dark:hover:bg-white/10",
       )}
     >
-      <Settings3D aria-hidden className="size-4 sm:size-5" />
+      <Settings aria-hidden="true" className="size-5" strokeWidth={1.8} />
     </Link>
   );
 }

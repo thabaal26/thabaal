@@ -1,8 +1,7 @@
-import { CheckCheck } from "@/components/icons";
+import { CheckCheck, MessageCircle, MessageSquare, ShoppingBag } from "lucide-react";
 import type { Metadata } from "next";
 import { ActionButton } from "@/components/action-button";
 import type { ConversationEntry } from "@/components/conversation";
-import { Inbox3D, Messages3D, ShoppingBag3D } from "@/components/icons-3d";
 import { Card, EmptyState, FilterChips, PageHeader, Stat } from "@/components/ui";
 import { db } from "@/lib/db";
 import { fmtNumber } from "@/lib/format";
@@ -11,7 +10,7 @@ import { handleAllReplies } from "../actions/replies";
 import { InboxTabs } from "./inbox-tabs";
 import { ReplyInbox } from "./reply-inbox";
 
-export const metadata: Metadata = { title: "Replies" };
+export const metadata: Metadata = { title: "Chats" };
 export const dynamic = "force-dynamic";
 
 const TABS = [
@@ -149,8 +148,8 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
   return (
     <>
       <PageHeader
-        title="Replies"
-        description="One conversation thread per customer phone number. Answer them inside the chat, then mark the customer handled."
+        title="Chats"
+        description="Answer customers first. Free replies are open for 24 hours after they write."
         inlineActions
         actions={
           scope.canOperate &&
@@ -185,7 +184,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
           label="Open conversations"
           value={fmtNumber(tabCount[""])}
           sub={tabCount[""] > 0 ? "Customers waiting for reply" : "Inbox zero!"}
-          icon={<Inbox3D />}
+          icon={<MessageCircle className="size-5 stroke-[2]" />}
           tone={tabCount[""] > 0 ? "amber" : "brand"}
           href="/dashboard/replies"
         />
@@ -193,14 +192,14 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
           label="Order & rate taps"
           value={fmtNumber(orderInquiryCount)}
           sub="Customers in current view"
-          icon={<ShoppingBag3D />}
+          icon={<ShoppingBag className="size-5 stroke-[2]" />}
           tone="gold"
         />
         <Stat
           label="Handled"
           value={fmtNumber(tabCount.handled)}
           sub="Answered & closed"
-          icon={<CheckCheck />}
+          icon={<CheckCheck className="size-5 stroke-[2]" />}
           tone="brand"
           meter={tabCount.all > 0 ? Math.round((tabCount.handled / tabCount.all) * 100) : 0}
           href="/dashboard/replies?show=handled"
@@ -209,7 +208,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
           label="Customer threads"
           value={fmtNumber(tabCount.all)}
           sub={`${fmtNumber(rawReplies.length)} total messages`}
-          icon={<Messages3D />}
+          icon={<MessageSquare className="size-5 stroke-[2]" />}
           tone="info"
           href="/dashboard/replies?show=all"
         />
@@ -225,8 +224,8 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
           showClient={!scope.clientId}
         />
       ) : (
-        <Card className="card-3d">
-          <EmptyState icon={<Inbox3D className="size-5" />} title={show === "handled" ? "Nothing handled yet" : show === "all" ? "No replies yet" : "You're all caught up"}>
+        <Card>
+          <EmptyState icon={<MessageCircle className="size-5 stroke-[2]" />} title={show === "handled" ? "Nothing handled yet" : show === "all" ? "No replies yet" : "You're all caught up"}>
             When customers tap &ldquo;Order now&rdquo; or write back after a campaign, each customer&apos;s conversation appears here.
           </EmptyState>
         </Card>

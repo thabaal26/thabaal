@@ -45,7 +45,7 @@ function Copyable({ label, value }: { label: string; value: string }) {
 export default async function SettingsPage() {
   const user = await requireUser();
   const account = (
-    <Card className="card-3d">
+    <Card>
       <CardHeader tone="violet" title="Your account" description={`Signed in as ${user.email}`} />
       <PasswordForm />
       <form action={logout} className="border-t border-line p-4 sm:p-5">
@@ -77,7 +77,7 @@ export default async function SettingsPage() {
     <>
       <PageHeader
         title="Settings"
-        description="WhatsApp connection, scheduler and your account."
+        description="Your login, look and WhatsApp numbers."
         actions={
           <>
             <Link href="/dashboard/templates" className={buttonClass("secondary") + " lg:hidden"}><SquarePen aria-hidden className="size-4" /> Templates</Link>
@@ -93,7 +93,7 @@ export default async function SettingsPage() {
           session={settings.wahaSession}
           active={settings.provider === "LOCAL"}
         />
-        <Card className="card-3d">
+        <Card>
           <CardHeader
             tone="brand"
             title="Meta Cloud API"
@@ -120,7 +120,7 @@ export default async function SettingsPage() {
         </Card>
 
         <div className="space-y-4 sm:space-y-6 lg:col-span-2 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
-          <Card className="card-3d">
+          <Card>
             <CardHeader tone="info" title="Scheduler" description="Something must call this URL every 5 minutes (every minute with the local session) to start campaigns and send batches." />
             <div className="space-y-3 p-4 sm:p-5">
               <Copyable label="Cron URL" value={`${origin}/api/cron`} />
@@ -147,7 +147,7 @@ export default async function SettingsPage() {
           {account}
         </div>
       </div>
-      <Card id="appearance" className="card-3d mt-4 scroll-mt-20 sm:mt-6">
+      <Card id="appearance" className="mt-4 scroll-mt-20 sm:mt-6">
         <CardHeader
           tone="violet"
           title="Appearance"
