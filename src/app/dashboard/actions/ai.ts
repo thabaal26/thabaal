@@ -194,7 +194,9 @@ export async function generateAudienceFilterAction(prompt: string): Promise<{
   message?: string;
   data?: AudienceAiFilter;
 }> {
+  const scope = await getScope();
+  if (!scope.canManage) return { ok: false, message: "Only managers can build audiences." };
   if (!prompt.trim()) return { ok: false, message: "Describe the audience you want to filter first." };
-  const data = await parseNaturalLanguageAudience(prompt);
+  const data = await parseNaturalLanguageAudience(prompt.slice(0, 500));
   return { ok: true, data };
 }

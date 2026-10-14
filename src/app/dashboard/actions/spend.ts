@@ -35,6 +35,12 @@ export async function syncMetaAccountBalanceAction(wabaId: string, balance: numb
   if (isNaN(val) || val < 0 || val > 10_000_000) {
     return { ok: false, message: "Please enter a valid prepaid balance amount in rupees." };
   }
+  // Only this client's own WhatsApp account: a wabaId from the browser is checked, never trusted.
+  const own = await db.client.findFirst({
+    where: { id: s.clientId, OR: [{ waBusinessAccountId: wabaId }, { numbers: { some: { businessAccountId: wabaId } } }] },
+    select: { id: true },
+  });
+  if (!own) return { ok: false, message: "That WhatsApp account isn't linked to this business." };
   const user = await requireUser();
   const updated = await setMetaAccountBalance(wabaId, val, user.name, s.clientId);
   revalidatePath("/dashboard");
@@ -45,10 +51,12 @@ export async function syncMetaAccountBalanceAction(wabaId: string, balance: numb
 }
 
 /** Verifies live Meta Cloud API connectivity, health for all sending numbers, and live pricing analytics. */
-export async function refreshMetaLiveStatusAction(clientId: string): Promise<ActionResult> {
+// The argument is ignored: the client always comes from the login (or the admin's picked client), never the browser.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept so existing callers still type-check
+export async function refreshMetaLiveStatusAction(_clientId?: string): Promise<ActionResult> {
   const s = await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
-  const status = await fetchMetaLiveStatus(clientId);
+  const status = await fetchMetaLiveStatus(s.clientId);
   revalidatePath("/dashboard");
   if (status.liveConnected) {
     const costNote = typeof status.liveCost30d === "number" ? ` · 30d Meta spend: ₹${status.liveCost30d.toFixed(2)}` : "";

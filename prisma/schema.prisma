@@ -80,6 +80,10 @@ model Client {
   sheetSyncedAt       DateTime?
   /// Result of the last sync, shown on the sheet page (e.g. "12 added, 3 updated").
   sheetSyncNote       String?
+  /// This client's own live-log Apps Script web app (/exec link) and the shared secret it checks.
+  /// Unset: no live updates, except the first client, which keeps the deployment-wide GOOGLE_SHEET_WEBHOOK_URL.
+  sheetHookUrl        String?
+  sheetHookSecret     String?
   /// Win-back: customers whose last order is this many days old are tagged "lapsed" and sent winbackTemplate once.
   lapsedDays          Int               @default(60)
   winbackTemplateId   String?
@@ -557,4 +561,14 @@ model WalletEntry {
 
   @@index([clientId, status, createdAt])
   @@index([utr])
+}
+
+/// Failed password logins, for slowing down guessing (lib/login-guard.ts). Old rows are pruned.
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  /// "email:<address>" or "ip:<address>"
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
 }

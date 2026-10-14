@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { fmtDate } from "@/lib/format";
 import { getScope } from "@/lib/session";
 import { SheetForm } from "./sheet-form";
+import { SheetHookForm } from "./sheet-hook-form";
 
 export const metadata: Metadata = { title: "Google Sheet sync" };
 export const dynamic = "force-dynamic";
@@ -63,9 +64,9 @@ const LIVE_TABS = [
   ["Campaign Messages", "each campaign message and its delivery status"],
 ];
 
-/** Portal → sheet: whether this deployment sends events, and a button that proves it end to end. */
-function LiveUpdatesCard() {
-  const s = sheetHookStatus();
+/** Portal → sheet: whether this business sends events to its own sheet, and a button that proves it end to end. */
+async function LiveUpdatesCard({ clientId, canManage, linked }: { clientId: string; canManage: boolean; linked: string }) {
+  const s = await sheetHookStatus(clientId);
   return (
     <Card className="card-3d">
       <CardHeader
@@ -77,10 +78,14 @@ function LiveUpdatesCard() {
       />
       <div className="space-y-4 p-4 sm:p-5">
         {s.state === "on" ? (
-          <p className="text-sm text-ink-2">{s.hint} Use the test to check the sheet answers.</p>
+          s.hasSecret ? (
+            <p className="text-sm text-ink-2">{s.hint} Use the test to check the sheet answers.</p>
+          ) : (
+            <Callout tone="warning" title="Add a secret to this sheet">{s.hint}</Callout>
+          )
         ) : (
-          <Callout tone="warning" title="Live updates are off in this deployment">
-            {s.hint} Add it in Vercel → Settings → Environment Variables (Production), then redeploy.
+          <Callout tone={s.state === "invalid" ? "danger" : "info"} title={s.state === "invalid" ? "The sheet link isn't right" : "Live updates are off"}>
+            {s.hint} {canManage ? "Paste the script's web app link below." : "Ask a manager to link the sheet."}
           </Callout>
         )}
         <ul className="space-y-1.5 text-sm">
@@ -91,9 +96,12 @@ function LiveUpdatesCard() {
             </li>
           ))}
         </ul>
-        <ActionButton action={testSheetConnection} size="md">
-          <Send aria-hidden className="size-4" /> Send test to the sheet
-        </ActionButton>
+        {canManage && <SheetHookForm linked={linked} source={s.source} hasSecret={s.hasSecret} />}
+        {s.state === "on" && (
+          <ActionButton action={testSheetConnection} size="md">
+            <Send aria-hidden className="size-4" /> Send test to the sheet
+          </ActionButton>
+        )}
       </div>
     </Card>
   );
@@ -105,7 +113,7 @@ export default async function SheetPage() {
   if (!scope.clientId) return <><PageHeader title="Google Sheet sync" back={back} /><PickClientNotice what="Google Sheet" /></>;
   const client = await db.client.findUnique({
     where: { id: scope.clientId },
-    select: { sheetCustomersUrl: true, sheetOrdersUrl: true, sheetSyncedAt: true, sheetSyncNote: true },
+    select: { sheetCustomersUrl: true, sheetOrdersUrl: true, sheetSyncedAt: true, sheetSyncNote: true, sheetHookUrl: true },
   });
 
   return (
@@ -130,7 +138,7 @@ export default async function SheetPage() {
             )}
             <SheetForm customersUrl={client?.sheetCustomersUrl ?? ""} ordersUrl={client?.sheetOrdersUrl ?? ""} />
           </Card>
-          <LiveUpdatesCard />
+          <LiveUpdatesCard clientId={scope.clientId} canManage={scope.canManage} linked={client?.sheetHookUrl ?? ""} />
           <Card className="card-3d">
             <CardHeader tone="info" title="How to set it up" />
             <ol className="list-decimal space-y-2 p-4 pl-9 text-sm text-ink-2 sm:p-5 sm:pl-10">

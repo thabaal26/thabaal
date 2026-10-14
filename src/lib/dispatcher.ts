@@ -220,7 +220,7 @@ async function processRun(runId: string, now: Date, deadline: number) {
         },
       });
       sent++;
-      pushToGoogleSheet("CAMPAIGN_STATUS", {
+      pushToGoogleSheet(campaign.clientId, "CAMPAIGN_STATUS", {
         campaign: t.name,
         phone: m.customer.phone,
         status: "SENT",
@@ -260,7 +260,7 @@ async function processRun(runId: string, now: Date, deadline: number) {
       });
       await applyFailure(m.customerId, code);
       failed++;
-      pushToGoogleSheet("CAMPAIGN_STATUS", {
+      pushToGoogleSheet(campaign.clientId, "CAMPAIGN_STATUS", {
         campaign: t.name,
         phone: m.customer.phone,
         status: "FAILED",

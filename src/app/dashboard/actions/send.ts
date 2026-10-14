@@ -75,7 +75,7 @@ export async function sendToCustomer(
         billable: true,
       },
     });
-    pushToGoogleSheet("CAMPAIGN_STATUS", {
+    pushToGoogleSheet(customer.clientId, "CAMPAIGN_STATUS", {
       campaign: t.name,
       phone: customer.phone,
       status: "SENT",
@@ -91,7 +91,7 @@ export async function sendToCustomer(
       data: { customerId: customer.id, templateId: t.id, templateName: t.name, status: "FAILED", provider: settings.provider, errorCode: code, error, failedAt: new Date(), pricingCategory: t.category.toLowerCase(), billable: false },
     });
     await applyFailure(customer.id, code);
-    pushToGoogleSheet("CAMPAIGN_STATUS", {
+    pushToGoogleSheet(customer.clientId, "CAMPAIGN_STATUS", {
       campaign: t.name,
       phone: customer.phone,
       status: "FAILED",
