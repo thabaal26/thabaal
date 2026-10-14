@@ -75,7 +75,7 @@ export async function storePublicImage(opts: {
     opts.origin?.replace(/\/$/, "") ||
     (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "") ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
-    "https://campaign-seven-ruddy.vercel.app";
+    "https://www.thabaal.in";
 
   return `${base}/api/upload/${id}`;
 }
