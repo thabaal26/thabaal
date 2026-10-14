@@ -21,32 +21,32 @@
 @theme {
   /* Surfaces and text */
   --color-ink: #111827;
-  --color-ink-2: #344054; /* body copy and labels a step below headings */
-  --color-muted: #667085; /* secondary text: 4.6:1 on canvas */
-  --color-faint: #98a2b3; /* icons and decoration only, never text that must be read */
-  --color-line: #e2e6ec; /* dividers between rows and cards (decorative) */
-  --color-line-2: #d0d5dd; /* outlines of buttons and chips, whose labels identify them */
-  --color-line-strong: #8b95a5; /* borders that alone outline a control: fields, checkboxes (3:1) */
-  --color-canvas: #f5f7fa;
-  --color-panel: #ffffff;
+  --color-ink-2: #374151; /* body copy and labels a step below headings */
+  --color-muted: #6b7280; /* secondary text: 4.6:1 on canvas */
+  --color-faint: #9ca3af; /* icons and decoration only, never text that must be read */
+  --color-line: #efebe4; /* warm tactile paper borders */
+  --color-line-2: #e2ddd4; /* outlines of buttons and chips, whose labels identify them */
+  --color-line-strong: #c8c2b7; /* borders that alone outline a control: fields, checkboxes (3:1) */
+  --color-canvas: #fffdf6; /* warm cream canvas */
+  --color-panel: #ffffff; /* crisp white card surface */
   --color-surface: #ffffff;
-  --color-subtle: #f8fafc; /* secondary surface: table heads, quiet panels */
-  --color-sunken: #f1f4f8; /* inset areas inside a card: item lists, read-only values, segmented tracks */
-  --color-panel-2: #fbfcfe; /* lower end of raised card gradients */
-  --color-track: #eef1f5; /* empty part of bars, rings and chart tracks */
+  --color-subtle: #faf6ee; /* warm parchment sidebar and secondary surfaces */
+  --color-sunken: #f4efe6; /* inset areas inside a card: item lists, read-only values, segmented tracks */
+  --color-panel-2: #fdfbf7; /* lower end of raised card gradients */
+  --color-track: #ede7dc; /* empty part of bars, rings and chart tracks */
 
-  /* Primary action */
-  --color-brand: #167d63; /* white text on it: 5.1:1 */
-  --color-brand-deep: #11634f;
-  --color-brand-soft: #e8f5f0; /* brand-deep on it: 6.4:1 */
+  /* Primary action: Golden Amber #FFC82C */
+  --color-brand: #ffc82c;
+  --color-brand-deep: #b47800;
+  --color-brand-soft: #fff4d2;
 
   /* Sidebar and brand highlights */
-  --color-night: #171b24;
-  --color-night-2: #252c38; /* active row on the sidebar */
-  --color-glow: #eabf26; /* brand yellow: accents on dark surfaces (9.8:1 on night) */
-  --color-gold: #eabf26; /* brand yellow on light surfaces: fills and marks only, never text */
-  --color-gold-soft: #fdf6dc;
-  --color-gold-deep: #7a5a00; /* text on gold-soft: 6.2:1 */
+  --color-night: #faf6ee;
+  --color-night-2: #f0ebd9; /* active row on the light sidebar */
+  --color-glow: #ffc82c; /* brand yellow accents */
+  --color-gold: #ffc82c; /* brand golden amber */
+  --color-gold-soft: #fef3c7;
+  --color-gold-deep: #78350f;
 
   /* Status: fg on bg passes 4.5:1; -solid is the pure hue for bars, dots and filled buttons */
   --color-success: #11704c;
@@ -479,29 +479,29 @@ input:-webkit-autofill:active {
  */
 .dark {
   color-scheme: dark;
-  --color-ink: #e8ebf1;
-  --color-ink-2: #c4cad5;
-  --color-muted: #939cac;
-  --color-faint: #5d6676;
-  --color-line: #262d38;
-  --color-line-2: #333b48;
-  --color-line-strong: #5f6b7d;
-  --color-canvas: #0b0f15;
-  --color-panel: #131922;
-  --color-surface: #131922;
-  --color-subtle: #171e28;
-  --color-sunken: #0f141b;
-  --color-panel-2: #10161e;
-  --color-track: #222a35;
+  --color-ink: #f3f4f6;
+  --color-ink-2: #d1d5db;
+  --color-muted: #9ca3af;
+  --color-faint: #6b7280;
+  --color-line: rgba(255, 255, 255, 0.09);
+  --color-line-2: rgba(255, 255, 255, 0.14);
+  --color-line-strong: rgba(255, 255, 255, 0.25);
+  --color-canvas: #0b1724;
+  --color-panel: #14283c;
+  --color-surface: #14283c;
+  --color-subtle: #0e1e2e;
+  --color-sunken: #09131d;
+  --color-panel-2: #19334d;
+  --color-track: #1b354f;
 
-  --color-brand: #178a6c;
-  --color-brand-deep: #5fd7ac;
-  --color-brand-soft: #0f2a22;
+  --color-brand: #ffc82c;
+  --color-brand-deep: #fde047;
+  --color-brand-soft: #382c0a;
 
-  --color-night: #0e1218;
-  --color-night-2: #1d2430;
-  --color-gold-soft: #2a2410;
-  --color-gold-deep: #f2d27a;
+  --color-night: #0e1e2e;
+  --color-night-2: #14283c;
+  --color-gold-soft: #2e240a;
+  --color-gold-deep: #fde047;
 
   --color-success: #62d39d;
   --color-success-solid: #1f9d6a;

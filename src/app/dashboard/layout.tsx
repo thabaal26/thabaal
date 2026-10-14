@@ -115,19 +115,19 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
   // Clients only see a reassuring "connected" line; setup problems are the admin's to fix.
   // "Live" means real sending credentials are configured (not demo mode); number health lives on the Overview.
   const status = notConnected ? (
-    <span className="flex min-w-0 items-center gap-1.5 text-warning-on-dark">
-      <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-warning-on-dark" />
+    <span className="flex min-w-0 items-center gap-1.5 text-warning font-medium">
+      <span aria-hidden className="size-2 shrink-0 rounded-full bg-warning-solid" />
       <span className="truncate">{scope.isAdmin ? "WhatsApp not connected: add this client's number" : "WhatsApp not connected yet"}</span>
     </span>
   ) : live ? (
-    <span className="flex min-w-0 items-center gap-1.5 text-white/75">
-      <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-call-answer" />
+    <span className="flex min-w-0 items-center gap-1.5 text-ink-2 dark:text-white/75 font-medium">
+      <span aria-hidden className="size-2 shrink-0 rounded-full bg-emerald-500 animate-pulse" />
       <span className="truncate">{scope.isAdmin ? `Sending via ${via}` : "WhatsApp connected"}</span>
     </span>
   ) : scope.isAdmin ? (
-    <span className="flex min-w-0 items-center gap-1.5 text-warning-on-dark">
-      <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-warning-on-dark" />
-      <span className="truncate">Demo mode · {via} not set up, sends are simulated</span>
+    <span className="flex min-w-0 items-center gap-1.5 text-warning font-medium">
+      <span aria-hidden className="size-2 shrink-0 rounded-full bg-warning-solid" />
+      <span className="truncate">Demo mode · {via} not set up</span>
     </span>
   ) : null;
 
@@ -144,21 +144,21 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           Skip to content
         </a>
 
-        <aside className="surface-dark fixed inset-y-0 left-0 z-40 hidden w-64 transform-gpu flex-col overflow-hidden border-r border-white/[0.08] bg-night lg:flex print:!hidden">
-          <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_60%_at_0%_0%,rgb(22_125_99/0.22),transparent_55%),radial-gradient(90%_50%_at_100%_100%,rgb(234_191_38/0.1),transparent_60%)]" />
-          <div className="relative flex h-16 shrink-0 items-center gap-3 border-b border-white/[0.06] px-4">
+        <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 transform-gpu flex-col overflow-hidden border-r border-line bg-subtle dark:bg-[#0E1E2E] dark:border-white/[0.08] lg:flex print:!hidden">
+          <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_60%_at_0%_0%,rgb(255_200_44/0.08),transparent_55%)] dark:bg-[radial-gradient(120%_60%_at_0%_0%,rgb(22_125_99/0.22),transparent_55%),radial-gradient(90%_50%_at_100%_100%,rgb(234_191_38/0.1),transparent_60%)]" />
+          <div className="relative flex h-16 shrink-0 items-center gap-3 border-b border-line dark:border-white/[0.06] px-4">
             <BrandMark logoUrl={client?.logoUrl} name={name} size="md" />
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-white">{name}</p>
-              <p className="truncate text-xs text-white/60">{subtitle}</p>
+              <p className="truncate text-sm font-semibold text-ink dark:text-white">{name}</p>
+              <p className="truncate text-xs text-muted dark:text-white/60">{subtitle}</p>
             </div>
           </div>
           {scope.isAdmin && (
             <div className="relative shrink-0 px-3 pt-2.5 pb-1">
-              <ClientSwitcher clients={clients} current={scope.clientId} dark />
+              <ClientSwitcher clients={clients} current={scope.clientId} />
             </div>
           )}
-          <div className="thin-scroll relative min-h-0 flex-1 overflow-y-auto px-3 py-3 [scrollbar-color:rgb(255_255_255/0.15)_transparent]">
+          <div className="thin-scroll relative min-h-0 flex-1 overflow-y-auto px-3 py-3">
             <SideNav
               isAdmin={scope.isAdmin}
               showWallet={client?.billingMode === "wallet"}
@@ -168,28 +168,33 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
               unreadNotifications={unreadNotifications}
             />
           </div>
-          <div className="relative shrink-0 space-y-3 border-t border-white/[0.08] bg-black/15 p-3">
+          <div className="relative shrink-0 space-y-3 border-t border-line dark:border-white/[0.08] bg-panel/50 dark:bg-black/20 p-3">
             {status && <div className="px-1 text-xs">{status}</div>}
-            <div className="flex items-center gap-2.5 rounded-control px-1">
-              <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full bg-night-2 text-xs font-semibold text-glow ring-1 ring-white/15">
+            <div className="flex items-center gap-2.5 rounded-xl bg-sunken/60 dark:bg-white/5 p-1.5 ring-1 ring-line/70 dark:ring-white/10">
+              <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full bg-brand text-xs font-bold text-[#111827] ring-1 ring-black/10">
                 {initials(user.name)}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-white">{user.name}</p>
-                <p className="truncate text-xs text-white/60">{user.email}</p>
+                <p className="truncate text-sm font-medium text-ink dark:text-white">{user.name}</p>
+                <p className="truncate text-xs text-muted dark:text-white/60">{user.email}</p>
               </div>
               <form action={logout}>
                 <button
                   type="submit"
                   aria-label="Sign out"
                   title="Sign out"
-                  className="grid size-9 place-items-center rounded-control text-white/70 transition hover:bg-white/10 hover:text-white active:scale-95"
+                  className="grid size-8 place-items-center rounded-lg text-muted hover:text-ink hover:bg-black/5 dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white transition active:scale-95"
                 >
                   <LogOut aria-hidden className="size-4" />
                 </button>
               </form>
             </div>
-            {!scope.isAdmin && <p className="px-1 text-2xs text-white/50">Powered by Thabaal (தபால்)</p>}
+            {!scope.isAdmin && (
+              <div className="flex items-center justify-between px-1 text-2xs text-muted/70 dark:text-white/50">
+                <span>Powered by Thabaal (தபால்)</span>
+                <span className="inline-block size-1.5 rounded-full bg-emerald-500" title="System operational" />
+              </div>
+            )}
           </div>
         </aside>
 
@@ -235,7 +240,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           </div>
         </header>
 
-        <header className="glass-nav surface-dark sticky top-0 z-30 w-full pt-[env(safe-area-inset-top)] lg:hidden print:hidden">
+        <header className="sticky top-0 z-30 w-full border-b border-line bg-subtle/95 backdrop-blur-md pt-[env(safe-area-inset-top)] text-ink dark:bg-[#0E1E2E]/95 dark:text-white dark:border-white/10 lg:hidden print:hidden">
           <div className="flex h-12 items-center gap-2.5 pl-3 pr-1.5 sm:h-14 sm:gap-3 sm:pl-4 sm:pr-2">
             <BrandMark logoUrl={client?.logoUrl} name={name} size="sm" />
             {scope.isAdmin ? (
@@ -244,12 +249,12 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
               </HeaderClientSwitcher>
             ) : (
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[0.8125rem] font-semibold leading-tight text-white sm:text-sm">{name}</p>
-                <div className="text-2xs leading-tight">{status ?? <span className="block truncate text-white/70">{subtitle}</span>}</div>
+                <p className="truncate text-[0.8125rem] font-semibold leading-tight text-ink dark:text-white sm:text-sm">{name}</p>
+                <div className="text-2xs leading-tight">{status ?? <span className="block truncate text-muted dark:text-white/70">{subtitle}</span>}</div>
               </div>
             )}
-            <ThemeToggle onDark />
-            {notificationsOn && <NotificationBell dark />}
+            <ThemeToggle />
+            {notificationsOn && <NotificationBell />}
             <SettingsLink />
           </div>
         </header>

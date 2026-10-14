@@ -23,6 +23,7 @@ import { refillForecast } from "@/lib/refill-forecast";
 import type { OrderItem } from "@/lib/orders";
 import { cancelRun, runDispatcherNow } from "./actions/campaigns";
 import { BrandHero } from "./brand-hero";
+import { HomeTiers } from "./home-tiers";
 import { AreaChips } from "./area-chips";
 import { SpendCard } from "./spend-card";
 import { AiBusinessCopilot } from "./ai-copilot";
@@ -1607,27 +1608,75 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
     carts: cartMentalityData.totalRevisers || undefined,
   };
 
+  const greetingText = nowHour < 12 ? "Good morning" : nowHour < 17 ? "Good afternoon" : "Good evening";
+  const todayDateText = formatInTimeZone(now, APP_TZ, "EEEE, d MMMM");
+  const clientName = client?.name ?? (scope.isAdmin ? "All clients" : "Thenan Oils");
+
+  const ordersCount = curOrders.length;
+  const prevOrdersCount = prevBoughtOrders.length;
+  const ordersSpark = keys.map((k) => curOrders.filter((o) => keyOf(o.createdAt) === k).length);
+  const aov = ordersCount > 0 ? revenue / ordersCount : 0;
+  const prevAov = prevOrdersCount > 0 ? prevRevenue / prevOrdersCount : 0;
+  const aovSpark = keys.map((k) => {
+    const oCount = curOrders.filter((o) => keyOf(o.createdAt) === k).length;
+    const oRev = curOrders.filter((o) => keyOf(o.createdAt) === k).reduce((n, o) => n + o.total, 0);
+    return oCount > 0 ? Math.round(oRev / oCount) : 0;
+  });
+
+  const custOrderCounts = new Map<string, number>();
+  for (const o of ordersRaw) {
+    if (isBought(o)) custOrderCounts.set(o.customerId, (custOrderCounts.get(o.customerId) ?? 0) + 1);
+  }
+  const repeatOrdersCount = curOrders.filter((o) => (custOrderCounts.get(o.customerId) ?? 0) >= 2).length;
+  const repeatRatePct = ordersCount > 0 ? Math.round((repeatOrdersCount / ordersCount) * 100) : 0;
+  const prevRepeatOrdersCount = prevBoughtOrders.filter((o) => (custOrderCounts.get(o.customerId) ?? 0) >= 2).length;
+  const prevRepeatRatePct = prevOrdersCount > 0 ? Math.round((prevRepeatOrdersCount / prevOrdersCount) * 100) : 0;
+  const repeatSpark = keys.map((k) => {
+    const dayOrders = curOrders.filter((o) => keyOf(o.createdAt) === k);
+    const dayRepeats = dayOrders.filter((o) => (custOrderCounts.get(o.customerId) ?? 0) >= 2).length;
+    return dayOrders.length > 0 ? Math.round((dayRepeats / dayOrders.length) * 100) : 0;
+  });
+
+  const defaultNumber = health[0] ?? null;
+  const metaQuality = defaultNumber?.qualityRating ?? "GREEN";
+  const messagingTier = defaultNumber?.messagingTier ?? "TIER_1K";
+
   return (
     <>
-      <BrandHero
-        client={client}
-        name={client?.name ?? (scope.isAdmin ? "all clients" : "there")}
-        customers={customers}
-        issues={issues}
-        actions={adminActions}
-        work={{
-          unpaidCartsCount: curUnpaidCarts.length,
-          unpaidCartsValue: unpaidCartRevenue,
-          browsedNoCartCount: browsedNoCartLeads.length,
-          toDispatchCount,
-          paymentsToCheckCount,
-          refundsDueCount,
-          unhandledRepliesCount: unhandledGroup.length,
-          refillsDueCount: refillsWeek.length,
-          showOrders: ordersOn,
-          showReplies: repliesOn,
-        }}
-      />
+      <div className="mb-6 sm:mb-8">
+        <HomeTiers
+          clientName={clientName}
+          greetingText={greetingText}
+          todayDateText={todayDateText}
+          unpaidCartsCount={curUnpaidCarts.length}
+          unpaidCartsValue={unpaidCartRevenue}
+          toDispatchCount={toDispatchCount}
+          unhandledRepliesCount={unhandledGroup.length}
+          periodLabel={period.label}
+          activeRange={filters.range}
+          totalRevenue={revenue}
+          prevRevenue={prevRevenue}
+          revenueSpark={revenueSpark}
+          ordersCount={ordersCount}
+          prevOrdersCount={prevOrdersCount}
+          ordersSpark={ordersSpark}
+          aov={aov}
+          prevAov={prevAov}
+          aovSpark={aovSpark}
+          repeatRatePct={repeatRatePct}
+          prevRepeatRatePct={prevRepeatRatePct}
+          repeatSpark={repeatSpark}
+          freeServiceRemaining={Math.max(0, Math.max(1, health.length) * 1000)}
+          freeServiceLimit={Math.max(1, health.length) * 1000}
+          metaQuality={metaQuality}
+          messagingTier={messagingTier}
+          nextCampaignName={upcoming[0]?.name}
+          nextCampaignAt={upcoming[0]?.nextRunAt}
+          refillsDueCount={refillsWeek.length}
+          aiInitialBrief={`${client?.name ?? "Your store"} has ${fmtNumber(curOrders.length)} confirmed orders (₹${Math.round(revenue).toLocaleString("en-IN")}) in ${period.label}${curUnpaidCarts.length > 0 ? ` plus ${curUnpaidCarts.length} unpaid WhatsApp cart${curUnpaidCarts.length === 1 ? "" : "s"} worth ₹${Math.round(unpaidCartRevenue).toLocaleString("en-IN")}` : ""}. You have ${unhandledGroup.length} unhandled customer ${unhandledGroup.length === 1 ? "reply" : "replies"} waiting—reply inside the 24-hour service window to use your 1,000 FREE monthly service messages per number (₹0.00 cost), and use Utility templates (₹0.115/msg vs ₹0.8631/msg Marketing) for all order & tracking updates!`}
+          openWindowCount={unhandledGroup.length}
+        />
+      </div>
 
       {heldToday > 0 && (
         <Callout tone="info" icon={<Clock />} className="mb-5" title={`Meta held back ${fmtNumber(heldToday)} marketing message${heldToday === 1 ? "" : "s"} in the last 24 hours. No action needed.`}>
@@ -1852,16 +1901,7 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
       {/* Its Meta figures stream in on their own (see spend-card.tsx): the rest of the page doesn't wait. */}
       {cid && <SpendCard clientId={cid} canManage={scope.canManage} className="mt-3.5 sm:mt-5" />}
 
-      {/* Zoho Zia-style Free AI Business Copilot & Daily Executive Brief */}
-      <div className="mt-3.5 sm:mt-5">
-        <AiBusinessCopilot
-          initialBrief={`${client?.name ?? "Your store"} has ${fmtNumber(curOrders.length)} confirmed orders (₹${Math.round(revenue).toLocaleString("en-IN")}) in ${period.label}${curUnpaidCarts.length > 0 ? ` plus ${curUnpaidCarts.length} unpaid WhatsApp cart${curUnpaidCarts.length === 1 ? "" : "s"} worth ₹${Math.round(unpaidCartRevenue).toLocaleString("en-IN")}` : ""}. You have ${unhandledGroup.length} unhandled customer ${unhandledGroup.length === 1 ? "reply" : "replies"} waiting—reply inside the 24-hour service window to use your 1,000 FREE monthly service messages per number (₹0.00 cost), and use Utility templates (₹0.115/msg vs ₹0.8631/msg Marketing) for all order & tracking updates!`}
-          freeServiceRemaining={Math.max(0, Math.max(1, health.length) * 1000)}
-          freeServiceLimit={Math.max(1, health.length) * 1000}
-          openWindowCount={unhandledGroup.length}
-          unhandledCount={unhandledGroup.length}
-        />
-      </div>
+
 
       {/* Activity and delivery. */}
       <div className="mt-3.5 grid grid-cols-1 gap-3.5 sm:mt-5 sm:gap-5 xl:grid-cols-12">

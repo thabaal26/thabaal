@@ -27,20 +27,32 @@ import { isHrefEnabled } from "@/lib/client-sections";
 import { cn } from "@/lib/cn";
 
 export const NAV = [
-  { href: "/dashboard", label: "Dashboard", short: "Dashboard", icon: Dashboard3D, group: "Daily work", cube: "from-[#34d399] via-[#10b981] to-[#059669]" },
-  { href: "/dashboard/notifications", label: "Notifications", short: "Alerts", icon: Bell3D, group: "Daily work", cube: "from-[#fbbf24] via-[#f59e0b] to-[#d97706]" },
+  // 1. TODAY
+  { href: "/dashboard", label: "Home", short: "Home", icon: Dashboard3D, group: "Today", cube: "from-[#fbbf24] via-[#f59e0b] to-[#d97706]" },
+
+  // 2. DAILY WORK
+  { href: "/dashboard/replies", label: "Chats", short: "Chats", icon: Inbox3D, group: "Daily work", cube: "from-[#c084fc] via-[#9333ea] to-[#7e22ce]" },
   { href: "/dashboard/orders", label: "Orders", short: "Orders", icon: ShoppingBag3D, group: "Daily work", cube: "from-[#38bdf8] via-[#0ea5e9] to-[#0284c7]" },
-  { href: "/dashboard/refills", label: "Reorders", short: "Reorders", icon: Clock3D, group: "Daily work", cube: "from-[#86efac] via-[#22c55e] to-[#15803d]" },
-  { href: "/dashboard/revenue", label: "Revenue & cash", short: "Revenue", icon: Rupee3D, group: "Daily work", cube: "from-[#fde68a] via-[#f59e0b] to-[#b45309]" },
-  { href: "/dashboard/catalogue", label: "Catalogue", short: "Menu", icon: Store3D, group: "Daily work", cube: "from-[#2dd4bf] via-[#14b8a6] to-[#0d9488]" },
-  { href: "/dashboard/replies", label: "Replies", short: "Replies", icon: Inbox3D, group: "Daily work", cube: "from-[#c084fc] via-[#9333ea] to-[#7e22ce]" },
-  { href: "/dashboard/calls", label: "Calls", short: "Calls", icon: Phone3D, group: "Daily work", cube: "from-[#4ade80] via-[#16a34a] to-[#15803d]" },
-  { href: "/dashboard/campaigns", label: "Campaigns", short: "Campaigns", icon: Calendar3D, group: "Marketing", cube: "from-[#fb7185] via-[#f43f5e] to-[#e11d48]" },
-  { href: "/dashboard/templates", label: "Templates", short: "Templates", icon: Template3D, group: "Marketing", cube: "from-[#818cf8] via-[#6366f1] to-[#4f46e5]" },
-  { href: "/dashboard/customers", label: "Customers", short: "Customers", icon: Users3D, group: "Marketing", cube: "from-[#38bdf8] via-[#0284c7] to-[#0369a1]" },
-  { href: "/dashboard/report", label: "Weekly report", short: "Report", icon: ChartBar3D, group: "Marketing", cube: "from-[#5eead4] via-[#14b8a6] to-[#0f766e]" },
-  { href: "/dashboard/messages", label: "Message log", short: "Log", icon: Messages3D, group: "Marketing", cube: "from-[#a78bfa] via-[#7c3aed] to-[#6d28d9]" },
+  { href: "/dashboard/revenue", label: "Money", short: "Money", icon: Rupee3D, group: "Daily work", cube: "from-[#fde68a] via-[#f59e0b] to-[#b45309]" },
+
+  // 3. GROW
+  { href: "/dashboard/customers", label: "Customers", short: "Customers", icon: Users3D, group: "Grow", cube: "from-[#38bdf8] via-[#0284c7] to-[#0369a1]" },
+  { href: "/dashboard/catalogue", label: "Products", short: "Products", icon: Store3D, group: "Grow", cube: "from-[#2dd4bf] via-[#14b8a6] to-[#0d9488]" },
+  { href: "/dashboard/campaigns", label: "Campaigns", short: "Campaigns", icon: Calendar3D, group: "Grow", cube: "from-[#fb7185] via-[#f43f5e] to-[#e11d48]" },
+
+  // 4. UNDERSTAND
+  { href: "/dashboard/report", label: "Reports", short: "Reports", icon: ChartBar3D, group: "Understand", cube: "from-[#5eead4] via-[#14b8a6] to-[#0f766e]" },
+
+  // 5. ACCOUNT
   { href: "/dashboard/settings", label: "Settings", short: "Settings", icon: Settings3D, group: "Account", cube: "from-[#fb923c] via-[#ea580c] to-[#c2410c]" },
+];
+
+export const EXTRA_NAV = [
+  { href: "/dashboard/notifications", label: "Notifications", short: "Alerts", icon: Bell3D, group: "Today", cube: "from-[#fbbf24] via-[#f59e0b] to-[#d97706]" },
+  { href: "/dashboard/refills", label: "Reorders", short: "Reorders", icon: Clock3D, group: "Daily work", cube: "from-[#86efac] via-[#22c55e] to-[#15803d]" },
+  { href: "/dashboard/calls", label: "Calls", short: "Calls", icon: Phone3D, group: "Daily work", cube: "from-[#4ade80] via-[#16a34a] to-[#15803d]" },
+  { href: "/dashboard/templates", label: "Templates", short: "Templates", icon: Template3D, group: "Grow", cube: "from-[#818cf8] via-[#6366f1] to-[#4f46e5]" },
+  { href: "/dashboard/messages", label: "Message log", short: "Log", icon: Messages3D, group: "Grow", cube: "from-[#a78bfa] via-[#7c3aed] to-[#6d28d9]" },
 ];
 
 const ADMIN_NAV = [{ href: "/dashboard/clients", label: "Clients", short: "Clients", icon: Building3D, group: "Account", cube: "from-[#fde047] via-[#eab308] to-[#ca8a04]" }];
@@ -54,8 +66,8 @@ const WALLET_NAV = [{ href: "/dashboard/wallet", label: "Wallet", short: "Wallet
  * This only changes which links come first, never what anyone can open.
  */
 const PHONE_TABS = {
-  staff: ["/dashboard/orders", "/dashboard/replies", "/dashboard/calls", "/dashboard/customers"],
-  manager: ["/dashboard", "/dashboard/orders", "/dashboard/replies", "/dashboard/customers"],
+  staff: ["/dashboard/orders", "/dashboard/replies", "/dashboard/customers"],
+  manager: ["/dashboard", "/dashboard/replies", "/dashboard/orders", "/dashboard/customers"],
 };
 
 export type NavRole = keyof typeof PHONE_TABS;
@@ -64,7 +76,7 @@ type Counts = { openReplies?: number; newOrders?: number; unreadNotifications?: 
 function CountBadge({ n, label, className }: { n?: number; label: string; className?: string }) {
   if (!n) return null;
   return (
-    <span className={cn("tabular grid h-[18px] min-w-[18px] animate-pop place-items-center rounded-full px-1 text-2xs font-bold", className)}>
+    <span className={cn("tabular grid h-[18px] min-w-[18px] animate-pop place-items-center rounded-full px-1.5 text-2xs font-bold", className)}>
       {n > 99 ? "99+" : n}
       <span className="sr-only"> {label}</span>
     </span>
@@ -105,10 +117,10 @@ export function SideNav({
   }, [path, disabledSections, router]);
 
   return (
-    <nav aria-label="Main" className="space-y-5">
+    <nav aria-label="Main" className="space-y-4">
       {groups.map((g) => (
         <div key={g} role="group" aria-labelledby={`nav-${g}`}>
-          <p id={`nav-${g}`} className="mb-1.5 px-3 text-2xs font-medium uppercase tracking-wider text-white/50">{g}</p>
+          <p id={`nav-${g}`} className="mb-1.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted/80 dark:text-white/40">{g}</p>
           <ul className="space-y-1">
             {items
               .filter((n) => n.group === g)
@@ -121,25 +133,32 @@ export function SideNav({
                       href={href}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "group relative flex h-10 items-center gap-3 rounded-control px-2.5 text-sm font-medium transition",
-                        active ? "bg-night-2 text-white shadow-xs ring-1 ring-white/15" : "text-white/85 hover:bg-white/[0.08] hover:text-white",
+                        "group relative flex h-10 items-center gap-3 rounded-xl px-2.5 text-sm font-medium transition",
+                        active
+                          ? "bg-[#FFC82C] text-[#111827] font-semibold shadow-xs"
+                          : "text-ink-2 hover:bg-black/[0.04] hover:text-ink dark:text-white/85 dark:hover:bg-white/[0.08] dark:hover:text-white",
                       )}
                     >
-                      {active && <span aria-hidden className="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-glow" />}
                       <span
                         aria-hidden
                         className={cn(
                           "icon-cube-3d grid size-7 shrink-0 place-items-center rounded-[8px] bg-gradient-to-br text-white transition-transform duration-200 group-hover:scale-105",
                           cube,
                           active
-                            ? "ring-2 ring-glow/80 shadow-[0_0_12px_rgb(250_204_21/0.4)]"
+                            ? "ring-2 ring-black/20 shadow-xs"
                             : "ring-1 ring-inset ring-white/35",
                         )}
                       >
                         <Icon className="size-4" />
                       </span>
                       <span className="flex-1 truncate">{label}</span>
-                      {count && <CountBadge n={count.n} label={count.label} className={active ? "bg-glow text-night" : "bg-white/15 text-white"} />}
+                      {count && (
+                        <CountBadge
+                          n={count.n}
+                          label={count.label}
+                          className={active ? "bg-[#111827] text-white" : "bg-[#EF4444] text-white shadow-xs"}
+                        />
+                      )}
                     </Link>
                   </li>
                 );
@@ -182,17 +201,20 @@ export function BottomNav({
   const hiddenCount = more.reduce((sum, n) => sum + (countFor(n.href, { openReplies, newOrders, unreadNotifications })?.n ?? 0), 0);
 
   const tabClass = (active: boolean) =>
-    cn("flex h-14 min-w-0 flex-col items-center justify-center gap-0.5 text-[10px] font-medium leading-tight transition active:scale-95 sm:h-16 sm:gap-1 sm:text-2xs", active ? "text-brand-deep font-semibold" : "text-ink-2/90");
+    cn(
+      "flex h-14 min-w-0 flex-col items-center justify-center gap-0.5 text-[10px] font-medium leading-tight transition active:scale-95 sm:h-16 sm:gap-1 sm:text-2xs",
+      active ? "text-ink font-bold dark:text-white" : "text-muted hover:text-ink dark:text-white/70",
+    );
   const iconWrap = (active: boolean, cube = "from-[#34d399] via-[#10b981] to-[#059669]") =>
     cn(
       "icon-cube-3d relative grid h-7 w-9 place-items-center rounded-[9px] bg-gradient-to-br text-white transition sm:h-8 sm:w-11 sm:rounded-[10px]",
       cube,
-      active ? "ring-2 ring-brand-deep/40 scale-105" : "ring-1 ring-inset ring-white/35 opacity-95",
+      active ? "ring-2 ring-brand ring-offset-1 scale-105" : "ring-1 ring-inset ring-white/35 opacity-90",
     );
   const badge = "absolute -right-1.5 -top-1.5 z-10 bg-danger-solid text-white ring-2 ring-panel";
 
   return (
-    <nav aria-label="Main" className="pb-safe glass-bar fixed inset-x-0 bottom-0 z-30 lg:hidden print:hidden">
+    <nav aria-label="Main" className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-line bg-subtle/95 backdrop-blur-md dark:bg-[#0E1E2E]/95 dark:border-white/10 lg:hidden print:hidden">
       <ul
         className="mx-auto grid max-w-lg"
         style={{ gridTemplateColumns: `repeat(${tabItems.length + 1}, minmax(0, 1fr))` }}
@@ -203,7 +225,6 @@ export function BottomNav({
           return (
             <li key={href} className="min-w-0">
               <Link href={href} aria-current={active ? "page" : undefined} className={tabClass(active)}>
-                {/* The badge sits outside the tile: the tile clips its contents for the gloss. */}
                 <span className="relative">
                   <span className={iconWrap(active, cube)}>
                     <Icon aria-hidden className="size-4 sm:size-5" />
@@ -238,8 +259,8 @@ export function BottomNav({
                   href={href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex h-12 items-center gap-2.5 rounded-control border px-3 text-xs font-medium transition active:scale-[0.98] sm:h-14 sm:gap-3 sm:px-3.5 sm:text-sm",
-                    active ? "border-brand/30 bg-brand-soft text-brand-deep" : "border-line bg-panel text-ink active:bg-sunken",
+                    "flex h-12 items-center gap-2.5 rounded-xl border px-3 text-xs font-medium transition active:scale-[0.98] sm:h-14 sm:gap-3 sm:px-3.5 sm:text-sm",
+                    active ? "border-brand bg-brand-soft text-[#111827] font-semibold" : "border-line bg-panel text-ink active:bg-sunken",
                   )}
                 >
                   <span
@@ -279,7 +300,7 @@ const SUBPAGES: Record<string, string> = {
  */
 export function TopbarTrail({ workspace }: { workspace: string }) {
   const path = usePathname();
-  const all = [...NAV, ...WALLET_NAV, ...ADMIN_NAV];
+  const all = [...NAV, ...EXTRA_NAV, ...WALLET_NAV, ...ADMIN_NAV];
   const section = all.filter((n) => isActive(path, n.href)).sort((a, b) => b.href.length - a.href.length)[0];
   const rest = section ? path.slice(section.href.length).split("/").filter(Boolean) : [];
   const sub = rest.length ? SUBPAGES[rest[0]] ?? "Details" : null;
@@ -325,7 +346,10 @@ export function SettingsLink() {
       href="/dashboard/settings"
       aria-label="Settings"
       aria-current={active ? "page" : undefined}
-      className={cn("grid size-9 shrink-0 place-items-center rounded-control transition active:scale-95 sm:size-11", active ? "bg-night-2 text-glow" : "text-white/80 hover:bg-white/10")}
+      className={cn(
+        "grid size-9 shrink-0 place-items-center rounded-xl transition active:scale-95 sm:size-11",
+        active ? "bg-sunken text-ink dark:bg-white/15 dark:text-white" : "text-muted hover:text-ink dark:text-white/80 dark:hover:bg-white/10",
+      )}
     >
       <Settings3D aria-hidden className="size-4 sm:size-5" />
     </Link>

@@ -20,24 +20,23 @@ function apply(mode: Mode, animate: boolean) {
   }
   root.classList.toggle("dark", dark);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", dark ? "#0e1218" : "#171b24");
+  if (meta) meta.setAttribute("content", dark ? "#0B1724" : "#FFFDF6");
 }
-
 
 /**
  * Light / dark / match-device switch. The choice is remembered on this device; "match device"
  * follows the phone or computer setting live.
  */
 export function ThemeToggle({ onDark, className }: { onDark?: boolean; className?: string }) {
-  const [mode, setMode] = useState<Mode>("system");
+  const [mode, setMode] = useState<Mode>("light");
 
   useEffect(() => {
-    let saved: Mode = "system";
+    let saved: Mode = "light";
     try {
       const v = localStorage.getItem(KEY);
-      if (v === "light" || v === "dark") saved = v;
+      if (v === "light" || v === "dark" || v === "system") saved = v;
     } catch {
-      /* storage blocked: follow the device */
+      /* storage blocked */
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the saved choice once after mount
     setMode(saved);

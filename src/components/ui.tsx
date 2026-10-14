@@ -188,7 +188,7 @@ export function CardHeader({
 /* ───────────────────────── Buttons ───────────────────────── */
 
 const variants = {
-  primary: "bg-brand text-white shadow-xs hover:bg-brand-deep active:bg-brand-deep",
+  primary: "bg-brand text-[#111827] font-semibold shadow-xs hover:brightness-95 active:scale-[0.98]",
   secondary: "border border-line-2 bg-panel text-ink-2 shadow-xs hover:bg-subtle hover:text-ink active:bg-sunken",
   ghost: "text-ink-2 hover:bg-sunken hover:text-ink active:bg-sunken",
   danger: "border border-danger-border bg-panel text-danger shadow-xs hover:bg-danger-bg active:bg-danger-bg",
