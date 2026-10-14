@@ -1728,20 +1728,6 @@ export default async function Overview({ searchParams }: PageProps<"/dashboard">
               Scheduled campaigns won&apos;t start until it does. Check the &quot;Campaign scheduler&quot; workflow in GitHub → Actions (it pauses after 60 days without commits).
             </Callout>
           )}
-          {failedToday > 0 && (
-            <Callout tone="danger" icon={<TriangleAlert />} title={`${fmtNumber(failedToday)} message${failedToday === 1 ? "" : "s"} failed in the last 24 hours.`}>
-              <ul className="mt-0.5 list-disc pl-5">
-                {failures.map((x) => (
-                  <li key={x.error ?? "unknown"}>
-                    {x.error ?? "Unknown error"} ({x._count})
-                  </li>
-                ))}
-              </ul>
-              <Link href="/dashboard/messages?status=FAILED" className="mt-1 inline-flex min-h-11 items-center sm:min-h-0">
-                See failed messages
-              </Link>
-            </Callout>
-          )}
           {blocked.length > 0 && (
             <Callout role="alert" tone="danger" icon={<TriangleAlert />} title={`${blocked.length === 1 ? "A campaign can't send" : `${blocked.length} campaigns can't send`}: Meta stopped the template`}>
               <ul className="space-y-1">

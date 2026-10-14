@@ -226,7 +226,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
         {/* Floating Right Main Content Bar */}
         <div className="flex-1 min-w-0 w-full lg:h-full lg:flex lg:flex-col lg:overflow-hidden lg:rounded-[24px] lg:border lg:border-[#E4D7C0] lg:bg-[#FFF9F0]/98 lg:shadow-[0_12px_36px_rgba(30,20,10,0.08)] lg:backdrop-blur-xl dark:lg:border-[#23455E] dark:lg:bg-[#0B1E2D]/98 dark:lg:shadow-[0_18px_48px_rgba(0,0,0,0.55)] dark:lg:ring-1 dark:lg:ring-white/[0.08]">
           <div className="panel-scroll h-full w-full lg:overflow-y-auto overscroll-contain">
-            <main id="main" className="stagger relative mx-auto w-full max-w-page px-3 pb-[calc(4.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pt-6 lg:px-8 lg:pb-12 lg:pt-7 print:p-0">
+            <main id="main" className="stagger relative mx-auto w-full max-w-page px-3 pb-[calc(4.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pt-6 lg:px-7 lg:pb-6 lg:pt-5 print:p-0">
               {client?.billingMode === "wallet" && <WalletBanner clientId={client.id} lowAlert={client.walletLowAlert} />}
               {children}
             </main>

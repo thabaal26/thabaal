@@ -1,6 +1,7 @@
 "use client";
 
-import { CheckCheck, ImagePlus, Send, Sparkles, X, ChevronDown } from "@/components/icons";
+import { CheckCheck, ImagePlus, Send, Sparkles, X, ChevronDown, MessageCircle } from "@/components/icons";
+import Link from "@/components/intent-link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toastResult } from "@/components/toast";
@@ -42,8 +43,25 @@ export function InlineReplyBox({
 
   if (!windowOpen) {
     return (
-      <div className="border-t border-line bg-sunken/60 px-5 py-3 text-xs text-muted">
-        24-hour free reply window has closed for {customerName}. Open their profile to send an approved WhatsApp template (Utility ₹0.115 / Marketing ₹0.8631).
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-sunken/60 px-5 py-3.5 text-xs">
+        <div className="text-muted">
+          <span className="font-semibold text-amber-700 dark:text-amber-400">24-hour free reply window has closed.</span>
+          <span className="ml-1">Send an approved WhatsApp template to restart the conversation.</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/dashboard/customers/${customerId}#reply`}
+            className="inline-flex min-h-[32px] items-center gap-1.5 rounded-xl bg-brand px-3.5 py-1 text-xs font-bold text-[#10283B] shadow-xs hover:brightness-105"
+          >
+            <MessageCircle className="size-3.5" /> Send template
+          </Link>
+          <Link
+            href={`/dashboard/customers/${customerId}`}
+            className="inline-flex min-h-[32px] items-center gap-1 rounded-xl border border-line bg-card px-3 py-1 text-xs font-semibold text-ink hover:bg-subtle dark:bg-[#132A3B] dark:text-white"
+          >
+            Profile
+          </Link>
+        </div>
       </div>
     );
   }
@@ -234,6 +252,15 @@ export function InlineReplyBox({
           >
             <ImagePlus className="size-4" />
           </button>
+
+          <Link
+            href={`/dashboard/customers/${customerId}#reply`}
+            title="Send an approved WhatsApp template"
+            className="inline-flex items-center gap-1 rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs font-semibold text-muted transition hover:border-brand hover:text-ink dark:bg-[#132A3B] dark:text-white"
+          >
+            <MessageCircle className="size-3.5 text-indigo-500" />
+            <span className="hidden sm:inline">Template</span>
+          </Link>
         </div>
 
         {/* Right: Send, Send & Close, More */}

@@ -202,7 +202,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
 
       {/* WhatsApp 2-Column Chat Interface */}
       {replies.length ? (
-        <div className="h-[calc(100dvh-13.5rem)] min-h-[38rem] w-full">
+        <div className="h-[calc(100dvh-15.5rem)] min-h-[440px] w-full">
           <ReplyInbox
             replies={replies}
             selectedId={selected?.id}

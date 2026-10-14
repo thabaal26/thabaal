@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useRef } from "react";
 import { Check, CheckCheck, CircleAlert, Clock, FileText } from "@/components/icons";
 import { ReplyMedia } from "@/components/reply-media";
 import { cn } from "@/lib/cn";
@@ -40,12 +43,13 @@ function Ticks({ status }: { status: string }) {
 }
 
 /**
- * A customer's messages and replies as a chat: oldest at the top, newest at the bottom, and the
- * scroll pane opens at the newest message (column-reverse) without any script.
- * `entries` come newest first, as the queries return them.
+ * A customer's messages and replies as a chat: oldest at the top, newest at the bottom,
+ * with native, smooth, responsive scrolling that auto-anchors to the latest message.
  */
 export function Conversation({ entries, className }: { entries: ConversationEntry[]; className?: string }) {
-  // Oldest → newest with day dividers; the reversed pane only anchors the scroll at the bottom.
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Oldest → newest with day dividers
   const ordered = [...entries].reverse();
   const dayOf = (e: ConversationEntry) => fmtDate(e.at, "yyyy-MM-dd");
   const rows = ordered.flatMap((e, i) => {
@@ -54,9 +58,22 @@ export function Conversation({ entries, className }: { entries: ConversationEntr
     return [...divider, { entry: e, key: e.id }];
   });
 
+  // Automatically scroll to the latest message at bottom on initial load and whenever entries update
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [entries.length, entries[0]?.id]);
+
   return (
-    <div className={cn("chat-wall flex flex-col-reverse overflow-y-auto overscroll-contain thin-scroll", className)} tabIndex={0} aria-label="Conversation">
-      <ol className="space-y-2.5 p-3.5 sm:p-5">
+    <div
+      ref={scrollRef}
+      className={cn("chat-wall panel-scroll flex-1 min-h-0 overflow-y-auto overscroll-contain", className)}
+      tabIndex={0}
+      aria-label="Conversation"
+    >
+      <ol className="min-h-full w-full space-y-2.5 p-3.5 sm:p-5 flex flex-col justify-end">
         {rows.map((r) =>
           "divider" in r ? (
             <li key={r.key} className="flex justify-center py-1">
