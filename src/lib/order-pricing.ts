@@ -6,9 +6,6 @@ export type PricedItem = {
   price: number;
 };
 
-/** Rupees off an order for the loyalty points used on it (100 points = ₹50). */
-export const pointsDiscount = (o: { pointsRedeemed?: number | null }) => Math.max(0, Math.round((o.pointsRedeemed ?? 0) * 0.5 * 100) / 100);
-
 /** Computes the items subtotal for a list of order items. */
 export function calcItemsSubtotal(items: PricedItem[]): number {
   return items.reduce(
@@ -17,44 +14,63 @@ export function calcItemsSubtotal(items: PricedItem[]): number {
   );
 }
 
-const r2 = (n: number) => Math.round(n * 100) / 100;
-
 /**
- * Computes the full pricing breakdown (items subtotal, shipping, points discount, final total) for an order.
+ * Computes the full pricing breakdown (itemsSubtotal, shippingFee, finalTotal) for an order.
  * - When creating/calculating a new order with priced items, adds `shippingFee` (default ₹60).
  * - When reading an existing stored order (`storedTotal`), derives the shipping fee from
- *   `storedTotal + discount - itemsSubtotal` when that is above zero, or defaults to ₹60 if
+ *   `storedTotal - itemsSubtotal` when `storedTotal > itemsSubtotal`, or defaults to ₹60 if
  *   `applyDefaultWhenEqual` is true.
- * - `discount` is the loyalty points discount already taken off the stored total (pointsDiscount(order)).
  */
 export function getOrderPricing(
   items: PricedItem[],
   storedTotal?: number | null,
-  options?: { customShippingFee?: number; applyDefaultWhenEqual?: boolean; discount?: number },
+  options?: { customShippingFee?: number; applyDefaultWhenEqual?: boolean },
 ): {
   subtotal: number;
   shipping: number;
-  discount: number;
   total: number;
 } {
-  const subtotal = r2(calcItemsSubtotal(items));
-  const discount = r2(Math.max(0, options?.discount ?? 0));
-  const out = (shipping: number, gross: number) => ({ subtotal, shipping, discount, total: r2(Math.max(0, gross - discount)) });
+  const subtotal = Math.round(calcItemsSubtotal(items) * 100) / 100;
 
   if (options?.customShippingFee !== undefined) {
-    const shipping = subtotal > 0 ? Math.max(0, r2(options.customShippingFee)) : 0;
-    return out(shipping, subtotal + shipping);
+    const shipping = subtotal > 0 ? Math.max(0, Math.round(options.customShippingFee * 100) / 100) : 0;
+    return {
+      subtotal,
+      shipping,
+      total: Math.round((subtotal + shipping) * 100) / 100,
+    };
   }
 
-  if (storedTotal !== undefined && storedTotal !== null && (storedTotal > 0 || discount > 0)) {
-    const gross = r2(storedTotal + discount);
-    const diff = r2(gross - subtotal);
-    if (diff > 0) return out(diff, gross);
-    if (options?.applyDefaultWhenEqual && subtotal > 0) return out(DEFAULT_SHIPPING_FEE, subtotal + DEFAULT_SHIPPING_FEE);
-    return out(0, gross);
+  if (storedTotal !== undefined && storedTotal !== null && storedTotal > 0) {
+    const diff = Math.round((storedTotal - subtotal) * 100) / 100;
+    if (diff > 0) {
+      return {
+        subtotal,
+        shipping: diff,
+        total: Math.round(storedTotal * 100) / 100,
+      };
+    }
+    if (options?.applyDefaultWhenEqual && subtotal > 0) {
+      return {
+        subtotal,
+        shipping: DEFAULT_SHIPPING_FEE,
+        total: Math.round((subtotal + DEFAULT_SHIPPING_FEE) * 100) / 100,
+      };
+    }
+    return {
+      subtotal,
+      shipping: 0,
+      total: Math.round(storedTotal * 100) / 100,
+    };
   }
 
-  if (subtotal > 0) return out(DEFAULT_SHIPPING_FEE, subtotal + DEFAULT_SHIPPING_FEE);
+  if (subtotal > 0) {
+    return {
+      subtotal,
+      shipping: DEFAULT_SHIPPING_FEE,
+      total: Math.round((subtotal + DEFAULT_SHIPPING_FEE) * 100) / 100,
+    };
+  }
 
-  return { subtotal: 0, shipping: 0, discount: 0, total: 0 };
+  return { subtotal: 0, shipping: 0, total: 0 };
 }

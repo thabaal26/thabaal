@@ -21,8 +21,6 @@ export type ExportableOrderRow = {
   address: string;
   items: { name: string; quantity: number; price: number }[];
   total: number;
-  /** Loyalty points discount already off `total`. */
-  discount?: number;
   currency: string;
   note: string;
 };
@@ -76,7 +74,7 @@ export function downloadOrdersExcel(
     .map((o) => {
       const itemsSummary = o.items.map((i) => `${i.quantity} x ${i.name}`).join(", ");
       const totalQty = o.items.reduce((s, i) => s + i.quantity, 0);
-      const pricing = getOrderPricing(o.items, o.total, { applyDefaultWhenEqual: true, discount: o.discount });
+      const pricing = getOrderPricing(o.items, o.total, { applyDefaultWhenEqual: true });
       return `<tr>
         <td style="font-family:monospace;font-weight:bold;">${escapeHtml(o.orderRef)}</td>
         <td>${escapeHtml(o.createdAt)}</td>
@@ -193,7 +191,7 @@ export function downloadOrdersCsv(
   const lines = orders.map((o) => {
     const itemsSummary = o.items.map((i) => `${i.quantity} x ${i.name}`).join(", ");
     const totalQty = o.items.reduce((s, i) => s + i.quantity, 0);
-    const pricing = getOrderPricing(o.items, o.total, { applyDefaultWhenEqual: true, discount: o.discount });
+    const pricing = getOrderPricing(o.items, o.total, { applyDefaultWhenEqual: true });
     return [
       q(o.orderRef),
       q(o.createdAt),
@@ -408,7 +406,7 @@ export function downloadOrdersImage(
     cy += itemLines.length * 22 + 12;
 
     // Footer line
-    const pricing = getOrderPricing(o.items, o.total, { applyDefaultWhenEqual: true, discount: o.discount });
+    const pricing = getOrderPricing(o.items, o.total, { applyDefaultWhenEqual: true });
     ctx.fillStyle = "#667085";
     ctx.font = "500 12px system-ui, -apple-system, sans-serif";
     ctx.fillText(`Placed: ${o.createdAt}`, pad + 18, cy + 14);
@@ -444,7 +442,7 @@ export function openPrintablePdfWindow(
   picks: ExportablePickItem[],
   title = "Packing & Delivery List",
 ) {
-  const toCollect = orders.reduce((s, o) => s + collectOf(o, getOrderPricing(o.items, o.total, { applyDefaultWhenEqual: true, discount: o.discount }).total), 0);
+  const toCollect = orders.reduce((s, o) => s + collectOf(o, getOrderPricing(o.items, o.total, { applyDefaultWhenEqual: true }).total), 0);
   const dateStr = new Date().toLocaleDateString("en-IN", {
     weekday: "short",
     day: "numeric",
@@ -470,7 +468,7 @@ export function openPrintablePdfWindow(
 
   const slipsHtml = orders
     .map((o) => {
-      const pricing = getOrderPricing(o.items, o.total, { applyDefaultWhenEqual: true, discount: o.discount });
+      const pricing = getOrderPricing(o.items, o.total, { applyDefaultWhenEqual: true });
       return `<div class="slip">
         <div class="slip-head">
           <div>

@@ -1,8 +1,7 @@
 // Loyalty points: how they're earned, what they're worth, and that offers never promise more than the balance.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { applyManualLoyaltyDelta, computeCustomerLoyalty, loyaltyFromOrders } from "../../src/lib/loyalty";
-import { getOrderPricing, pointsDiscount } from "../../src/lib/order-pricing";
+import { applyManualLoyaltyDelta, computeCustomerLoyalty } from "../../src/lib/loyalty";
 
 const base = { name: "Meena R", brandName: "Test Shop" };
 
@@ -45,32 +44,6 @@ describe("loyalty points", () => {
       assert.doesNotMatch(l.whatsappOfferCopy, /free (doorstep )?delivery|2×|double|sample|trial pack|priority/i, l.whatsappOfferCopy);
       if (l.redeemableRupees > 0) assert.ok(l.redeemableRupees <= l.rewardRupees);
     }
-  });
-
-  test("points used on orders come off the balance; a cancelled order gives them back", () => {
-    const orders = [
-      { id: "a", total: 3000, status: "DELIVERED", paidAt: new Date(), pointsRedeemed: 0 },
-      { id: "b", total: 2000, status: "CONFIRMED", paidAt: null, pointsRedeemed: 0 },
-      { id: "c", total: 640, status: "NEW", paidAt: null, pointsRedeemed: 100 },
-      { id: "d", total: 500, status: "CANCELLED", paidAt: null, pointsRedeemed: 50 },
-    ];
-    // Bought: a + b = ₹5,000 → 50 points + 50 repeat bonus = 100; minus 100 used on c (d was cancelled).
-    const l = loyaltyFromOrders({ name: "Meena R", orders });
-    assert.equal(l.totalPoints, 0);
-    // Re-pricing order c leaves its own 100 points out.
-    assert.equal(loyaltyFromOrders({ name: "Meena R", orders }, { exceptOrderId: "c" }).totalPoints, 100);
-    assert.equal(loyaltyFromOrders({ name: "Meena R", orders }, { exceptOrderId: "c" }).redeemableRupees, 50);
-  });
-
-  test("an order's total, shipping and points discount read back correctly", () => {
-    const items = [{ price: 690, quantity: 1 }];
-    // ₹690 items + ₹60 shipping − ₹50 points = ₹700 stored.
-    const p = getOrderPricing(items, 700, { applyDefaultWhenEqual: true, discount: pointsDiscount({ pointsRedeemed: 100 }) });
-    assert.deepEqual(p, { subtotal: 690, shipping: 60, discount: 50, total: 700 });
-    // Without the discount the same stored total would read as ₹10 shipping: why every caller passes it.
-    assert.equal(getOrderPricing(items, 700).shipping, 10);
-    // A new order priced with a discount.
-    assert.equal(getOrderPricing(items, null, { customShippingFee: 60, discount: 25 }).total, 725);
   });
 
   test("the vip tag is added once a customer reaches 250 points", () => {

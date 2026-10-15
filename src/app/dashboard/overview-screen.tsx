@@ -1546,7 +1546,6 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
       unpaidCartValue: custUnpaidVal,
       daysSinceLastOrder,
       avgGapDays,
-      redeemedPoints: custOrders.reduce((n, o) => n + (o.status !== "CANCELLED" ? ((o as { pointsRedeemed?: number | null }).pointsRedeemed ?? 0) : 0), 0),
     });
 
     if (custSpent > 0) {

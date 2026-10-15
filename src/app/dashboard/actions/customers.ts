@@ -219,7 +219,7 @@ export async function importCustomers(csv: string, extraTags: string, optInSourc
   };
 }
 
-import { applyManualLoyaltyDelta, loyaltyFromOrders, parseManualLoyaltyPoints } from "@/lib/loyalty";
+import { applyManualLoyaltyDelta, computeCustomerLoyalty, parseManualLoyaltyPoints } from "@/lib/loyalty";
 
 export async function setOptOut(id: string, optedOut: boolean): Promise<ActionResult> {
   const s = await requireManager();
@@ -252,14 +252,20 @@ export async function adjustLoyaltyPoints(id: string, delta: number): Promise<Ac
       name: true,
       tags: true,
       purchases: true,
-      // Every order: bought ones earn points, and points used on orders that still stand come off.
-      orders: { select: { id: true, total: true, status: true, paidAt: true, pointsRedeemed: true } },
+      // Bought orders: paid, or confirmed and beyond (the same rule the Customers page uses).
+      orders: { where: { OR: [{ paidAt: { not: null } }, { status: { in: ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"] } }] }, select: { total: true } },
     },
   });
   if (!c) return { ok: false, message: "Customer not found." };
 
   // The balance right now, worked out the same way as on screen.
-  const balance = loyaltyFromOrders(c).totalPoints;
+  const balance = computeCustomerLoyalty({
+    name: c.name,
+    paidOrdersCount: c.orders.length,
+    totalSpent: c.orders.reduce((n, o) => n + o.total, 0),
+    sheetPurchases: c.purchases,
+    tags: c.tags,
+  }).totalPoints;
   if (delta < 0 && -delta > balance) {
     return { ok: false, message: `${c.name} has only ${balance} points, so ${Math.abs(Math.round(delta))} can't be redeemed.` };
   }

@@ -156,8 +156,6 @@ export function PurchaseJourney({
     unpaidCartValue,
     daysSinceLastOrder,
     avgGapDays: avgGap,
-    // Points used on orders that still stand (a cancelled order gave its points back).
-    redeemedPoints: list.reduce((n, o) => n + (o.status !== "CANCELLED" ? (o.pointsRedeemed ?? 0) : 0), 0),
   });
 
   // Buyer Persona Badge

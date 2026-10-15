@@ -80,7 +80,6 @@ export function OrderActions({
   customerNote = null,
   items = [],
   total = 0,
-  discount = 0,
   canEdit,
   payment = null,
   pay = null,
@@ -95,8 +94,6 @@ export function OrderActions({
   customerNote?: string | null;
   items?: OrderItem[];
   total?: number;
-  /** Loyalty points discount already taken off `total`. */
-  discount?: number;
   canEdit: boolean;
   payment?: "first" | "again" | null;
   pay?: PayInfo | null;
@@ -117,7 +114,7 @@ export function OrderActions({
     toEditableLines(items, catalogProducts),
   );
   const [editShipping, setEditShipping] = useState<number>(() => {
-    const initial = getOrderPricing(items, total, { applyDefaultWhenEqual: true, discount });
+    const initial = getOrderPricing(items, total, { applyDefaultWhenEqual: true });
     return initial.shipping > 0 ? initial.shipping : DEFAULT_SHIPPING_FEE;
   });
   const [editCustNote, setEditCustNote] = useState(customerNote ?? "");
@@ -126,16 +123,14 @@ export function OrderActions({
 
   const openEditSheet = () => {
     setEditLines(toEditableLines(items, catalogProducts));
-    const initial = getOrderPricing(items, total, { applyDefaultWhenEqual: true, discount });
+    const initial = getOrderPricing(items, total, { applyDefaultWhenEqual: true });
     setEditShipping(initial.shipping > 0 ? initial.shipping : DEFAULT_SHIPPING_FEE);
     setEditCustNote(customerNote ?? "");
     setMoreOpen(false);
     setEditOpen(true);
   };
 
-  // The points discount stays on the order when items change (cut back if the items now cost less).
-  const editGross = getOrderPricing(editLines, null, { customShippingFee: editShipping });
-  const editPricing = getOrderPricing(editLines, null, { customShippingFee: editShipping, discount: Math.min(discount, Math.floor(editGross.subtotal / 25) * 25) });
+  const editPricing = getOrderPricing(editLines, null, { customShippingFee: editShipping });
   const editTotal = editPricing.total;
 
   const run = (key: string, fn: () => Promise<Result>, after?: (r: Result) => void) =>
@@ -523,12 +518,6 @@ export function OrderActions({
                 />
               </div>
             </div>
-            {editPricing.discount > 0 && (
-              <div className="flex items-center justify-between text-xs text-ink-2">
-                <span>Loyalty points used ({editPricing.discount * 2} pts)</span>
-                <span className="tabular font-medium text-success">−₹{editPricing.discount.toLocaleString("en-IN")}</span>
-              </div>
-            )}
             <div className="flex items-center justify-between border-t border-line pt-2 font-semibold text-ink">
               <span>Updated Final Total</span>
               <span className="tabular text-base">₹{editTotal.toLocaleString("en-IN")}</span>

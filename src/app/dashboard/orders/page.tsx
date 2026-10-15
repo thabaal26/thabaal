@@ -12,9 +12,7 @@ import { getCatalogWithProducts } from "@/lib/catalog";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { fmtDate, fmtNumber } from "@/lib/format";
-import { getOrderPricing, pointsDiscount } from "@/lib/order-pricing";
-import { maxPointsDiscount } from "@/lib/loyalty-redeem";
-import { LoyaltyRedeemSetting } from "./loyalty-points-ui";
+import { getOrderPricing } from "@/lib/order-pricing";
 import { readFields } from "@/lib/custom-fields";
 import { isPictureVersion, isTemplatePicture, ORDER_TEMPLATE_NAMES, orderTemplateNames } from "@/lib/order-templates";
 import { money, orderRef, type OrderItem } from "@/lib/orders";
@@ -187,8 +185,6 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
             phone: true,
             location: true,
             locationRaw: true,
-            tags: true,
-            purchases: true,
             client: { select: { name: true } },
             orders: {
               orderBy: { createdAt: "asc" },
@@ -202,7 +198,6 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
                 internalNote: true,
                 createdAt: true,
                 paidAt: true,
-                pointsRedeemed: true,
               },
             },
           },
@@ -225,19 +220,15 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     db.order.count({ where: { ...scoped, ...COD_WHERE } as object }),
     db.order.count({ where: { ...scoped, ...REFUND_WHERE } as object }),
     scope.clientId ? db.template.findMany({ where: { clientId: scope.clientId, name: { in: ORDER_TEMPLATE_NAMES.flatMap(orderTemplateNames) } }, select: { name: true, status: true, headerMediaUrl: true } }) : [],
-    scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { paymentConfig: true, defaultImageUrl: true, bannerUrl: true, customFields: true, loyaltyAutoRedeem: true } }) : null,
+    scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { paymentConfig: true, defaultImageUrl: true, bannerUrl: true, customFields: true } }) : null,
     scope.clientId ? db.template.findFirst({ where: { clientId: scope.clientId, name: PAYMENT_TEMPLATE }, select: { status: true } }) : null,
     scope.clientId ? paymentTemplateFor(scope.clientId) : null,
     scope.clientId ? getCatalogWithProducts(scope.clientId) : null,
     // Paid and not sent yet: the paid half of "to pack" (the Paid tab also counts dispatched and delivered ones).
     db.order.count({ where: { ...mine, ...dateWhere, ...extraWhere, status: "PAID" } }),
     // What the active orders are worth (the list below may be a filtered or capped view).
-    db.order.findMany({ where: { ...mine, ...dateWhere, ...extraWhere, status: { in: ["NEW", "CONFIRMED", "PAID", "DISPATCHED"] } }, select: { items: true, total: true, pointsRedeemed: true } }),
+    db.order.findMany({ where: { ...mine, ...dateWhere, ...extraWhere, status: { in: ["NEW", "CONFIRMED", "PAID", "DISPATCHED"] } }, select: { items: true, total: true } }),
   ]);
-
-  // Unpaid orders: what each customer could take off in loyalty points right now.
-  const pointsFor = (o: (typeof orders)[number]) =>
-    o.status === "CANCELLED" || o.paidAt || (o.paidAmount ?? 0) > 0 ? null : maxPointsDiscount(o);
 
   const catalogProducts: CatalogProductOption[] = (catalogData?.products ?? []).map((p) => ({
     id: p.id,
@@ -256,7 +247,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
       quantity: i.quantity,
       price: i.price,
     }));
-    const pricing = getOrderPricing(items, o.total, { applyDefaultWhenEqual: true, discount: pointsDiscount(o) });
+    const pricing = getOrderPricing(items, o.total, { applyDefaultWhenEqual: true });
     const fullAddress =
       o.note?.trim() || o.customer.locationRaw?.trim() || o.customer.location?.trim() || "";
     const area =
@@ -277,7 +268,6 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
       address: fullAddress,
       items,
       total: pricing.total,
-      discount: pricing.discount,
       currency: o.currency,
       note: [o.note, o.internalNote].filter(Boolean).join(" · "),
     };
@@ -374,7 +364,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
           value={fmtNumber(activeCount)}
           sub={
             activeCount > 0
-              ? `${money(activeSum.reduce((sum, o) => sum + getOrderPricing(o.items as OrderItem[], o.total, { applyDefaultWhenEqual: true, discount: pointsDiscount(o) }).total, 0))} in progress`
+              ? `${money(activeSum.reduce((sum, o) => sum + getOrderPricing(o.items as OrderItem[], o.total, { applyDefaultWhenEqual: true }).total, 0))} in progress`
               : "Nothing in progress"
           }
           icon={<Package />}
@@ -528,7 +518,6 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
                   catalogProducts={catalogProducts}
                   isLiveCatalog={isLiveCatalog}
                   orderFields={orderFields}
-                  points={pointsFor(o)}
                 />
               </li>
             ))}
@@ -551,7 +540,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
             <div>
               <h2 className="text-sm font-semibold text-ink">Order &amp; Payment Settings</h2>
               <p className="text-xs text-muted">
-                Loyalty points at checkout, WhatsApp payments and the order message picture
+                WhatsApp native payment configuration and order header picture
               </p>
             </div>
             <span className="rounded-control bg-sunken px-2.5 py-1 text-xs font-semibold text-ink-2 ring-1 ring-line transition group-hover:bg-subtle">
@@ -586,7 +575,6 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
                 )}
               </div>
             </Card>
-            {client && <LoyaltyRedeemSetting on={client.loyaltyAutoRedeem} />}
             {client && (
               <PaymentForm config={client.paymentConfig} own={{ name: PAYMENT_TEMPLATE, status: ownPaymentTemplate?.status ?? null }} using={paymentTemplate?.name ?? null} />
             )}

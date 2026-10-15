@@ -3,8 +3,7 @@ import Link from "@/components/intent-link";
 import { Avatar, Badge, Card, OrderStatusBadge, OrderStepper } from "@/components/ui";
 import { analyzeCartMentality } from "@/lib/cart-mentality";
 import { fmtDate } from "@/lib/format";
-import { getOrderPricing, pointsDiscount } from "@/lib/order-pricing";
-import { OrderPointsControl } from "./loyalty-points-ui";
+import { getOrderPricing } from "@/lib/order-pricing";
 import { itemsText, money, orderRef, type OrderItem } from "@/lib/orders";
 import { canUndoPayment, dueOf, holdBeforeDispatch, methodOf, paymentState, receivedOf } from "@/lib/payment-state";
 import { formatPhone } from "@/lib/phone";
@@ -40,8 +39,6 @@ export type OrderCardData = {
   refundedAt?: Date | null;
   refundAmount?: number | null;
   refundNote?: string | null;
-  /** Loyalty points used on this order (100 points = ₹50, already off the total). */
-  pointsRedeemed?: number;
   customer: {
     id: string;
     name: string;
@@ -85,12 +82,9 @@ export function OrderCard({
   catalogProducts = [],
   isLiveCatalog = false,
   orderFields = [],
-  points = null,
 }: {
   /** The client's custom order fields (lib/custom-fields.ts). */
   orderFields?: CustomField[];
-  /** What the customer could take off this order in points (₹, ₹25 steps) and their unused points. */
-  points?: { max: number; balance: number } | null;
   order: OrderCardData;
   items: OrderItem[];
   showClient: boolean;
@@ -103,8 +97,7 @@ export function OrderCard({
   const received = receivedOf(o);
   const accent = STATUS_ACCENT[o.status] ?? "#167d63";
   const refText = orderRef(o);
-  const pricing = getOrderPricing(items, o.total, { applyDefaultWhenEqual: true, discount: pointsDiscount(o) });
-  const pointsCanChange = canEdit && o.status !== "CANCELLED" && !o.paidAt && received <= 0;
+  const pricing = getOrderPricing(items, o.total, { applyDefaultWhenEqual: true });
   const isSuperseded = o.status === "CANCELLED" && Boolean(o.internalNote && /superseded by/i.test(o.internalNote));
 
   const mentality =
@@ -177,15 +170,9 @@ export function OrderCard({
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line py-2">
           <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
             <span className="font-semibold uppercase tracking-wider text-ink-2">Total</span>
-            {pricing.subtotal > 0 && (pricing.shipping > 0 || pricing.discount > 0) && (
+            {pricing.subtotal > 0 && pricing.shipping > 0 && (
               <span className="tabular text-2xs text-muted">
-                ({money(pricing.subtotal, o.currency)}
-                {pricing.shipping > 0 && (
-                  <>
-                    {" "}+ <Truck aria-hidden className="inline size-3 text-brand-deep" /> {money(pricing.shipping, o.currency)}
-                  </>
-                )}
-                {pricing.discount > 0 && <span className="text-success"> − points {money(pricing.discount, o.currency)}</span>})
+                ({money(pricing.subtotal, o.currency)} + <Truck aria-hidden className="inline size-3 text-brand-deep" /> {money(pricing.shipping, o.currency)})
               </span>
             )}
           </div>
@@ -257,14 +244,6 @@ export function OrderCard({
           canEdit={canEdit}
           compact
         />
-        <OrderPointsControl
-          orderId={o.id}
-          applied={pricing.discount}
-          max={points?.max ?? 0}
-          balance={points?.balance ?? 0}
-          canChange={pointsCanChange}
-          paymentSent={Boolean(o.paymentRequestedAt)}
-        />
         <PaymentSummary o={o} />
         <OrderExtra orderId={o.id} fields={orderFields} values={readValues(o.extra)} canEdit={canEdit} />
       </div>
@@ -278,7 +257,6 @@ export function OrderCard({
         customerNote={o.note}
         items={items}
         total={o.total}
-        discount={pricing.discount}
         canEdit={canEdit}
         payment={o.client.paymentConfig && o.total > 0 && !o.paidAt && received <= 0 && methodOf(o) !== "cod" ? (o.paymentRequestedAt ? "again" : "first") : null}
         pay={{

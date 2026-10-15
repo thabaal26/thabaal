@@ -78,7 +78,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
       where,
       include: {
         messages: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true, status: true } },
-        orders: { where: { status: { not: "CANCELLED" } }, select: { total: true, status: true, paidAt: true, pointsRedeemed: true } },
+        orders: { where: { status: { not: "CANCELLED" } }, select: { total: true, status: true, paidAt: true } },
         client: { select: { name: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -135,7 +135,6 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
         totalSpent: spent,
         sheetPurchases: c.purchases,
         tags: c.tags,
-        redeemedPoints: c.orders.reduce((n, o) => n + (o.pointsRedeemed ?? 0), 0),
       }),
     };
   };
