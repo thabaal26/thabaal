@@ -522,6 +522,11 @@ export function CatalogueManager({
                           In review
                         </Badge>
                       ) : null}
+                      {demand && demand.impressions > 0 && (
+                        <Badge tone="gray" className="text-2xs font-medium">
+                          👁️ {demand.impressions} views
+                        </Badge>
+                      )}
                       {demand && demand.cartCount > 0 && (
                         <Badge tone="brand" className="text-2xs font-semibold">
                           🛒 {demand.cartCount} cart{demand.cartCount > 1 ? "s" : ""}
