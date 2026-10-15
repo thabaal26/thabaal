@@ -1,6 +1,7 @@
 "use client";
 
 import { CheckCircle2, Cloud, LogOut, QrCode, RefreshCw, Smartphone, TriangleAlert } from "@/components/icons";
+import { Phone3D, Send3D } from "@/components/icons-3d";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { confirmAction } from "@/components/confirm";
@@ -37,8 +38,8 @@ export function ProviderSwitch({ provider, metaLive, localReady }: { provider: P
   const [pending, start] = useTransition();
   const router = useRouter();
   return (
-    <Card>
-      <CardHeader title="Sending provider" description="Choose how campaigns and test messages are sent. You can switch at any time; the next batch uses the new provider." />
+    <Card className="card-3d">
+      <CardHeader tone="brand" icon={<Send3D />} title="Sending provider" description="Choose how campaigns and test messages are sent. You can switch at any time; the next batch uses the new provider." />
       <div role="radiogroup" aria-label="Sending provider" className="grid gap-3 p-4 sm:p-5 md:grid-cols-2">
         {OPTIONS.map((o) => {
           const active = provider === o.value;
@@ -126,8 +127,10 @@ export function LocalSessionPanel({ url, hasKey, session, active }: { url: strin
   const s = state ? STATUS_TEXT[state.status] : null;
 
   return (
-    <Card>
+    <Card className="card-3d">
       <CardHeader
+        tone="info"
+        icon={<Phone3D />}
         title="Local session (WAHA)"
         description="A WAHA server on your VPS keeps a WhatsApp number linked, like WhatsApp Web."
         action={active ? <Badge tone="green" dot>Active</Badge> : undefined}

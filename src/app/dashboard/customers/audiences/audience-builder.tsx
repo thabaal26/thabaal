@@ -1,6 +1,7 @@
 "use client";
 
 import { Sparkles } from "@/components/icons";
+import { Users3D } from "@/components/icons-3d";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { toastResult } from "@/components/toast";
@@ -86,8 +87,8 @@ export function AudienceBuilder({ regions }: { regions: string[] }) {
   };
 
   return (
-    <Card>
-      <CardHeader title="New audience" description="Customers must match every condition. Opted-out and unreachable customers are always left out." />
+    <Card className="card-3d">
+      <CardHeader tone="brand" icon={<Users3D />} title="New audience" description="Customers must match every condition. Opted-out and unreachable customers are always left out." />
       <form
         className="space-y-4 p-4 sm:p-5"
         onSubmit={(e) => {

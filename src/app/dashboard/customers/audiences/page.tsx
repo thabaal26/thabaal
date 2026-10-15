@@ -1,4 +1,5 @@
 import { UsersRound } from "@/components/icons";
+import { Target3D } from "@/components/icons-3d";
 import type { Metadata } from "next";
 import { ActionButton } from "@/components/action-button";
 import { Card, CardHeader, EmptyState, PageHeader, PickClientNotice } from "@/components/ui";
@@ -34,7 +35,7 @@ export default async function AudiencesPage() {
       <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <AudienceBuilder regions={regionRows.map((r) => r.region!).sort()} />
         <Card className="card-3d lg:sticky lg:top-8">
-          <CardHeader tone="violet" title="Saved audiences" />
+          <CardHeader tone="violet" icon={<Target3D />} title="Saved audiences" />
           {saved.length ? (
             <ul className="divide-y divide-line">
               {saved.map((a, k) => (

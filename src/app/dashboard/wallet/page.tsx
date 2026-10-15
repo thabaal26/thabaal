@@ -1,6 +1,7 @@
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import type { Metadata } from "next";
 import { Wallet } from "@/components/icons";
+import { Calendar3D, Messages3D, Rupee3D, Settings3D, Users3D, Wallet3D } from "@/components/icons-3d";
 import { Badge, Callout, Card, CardHeader, EmptyState, PageHeader, Stat, Table, Td, Th } from "@/components/ui";
 import { db } from "@/lib/db";
 import { APP_TZ, fmtDate } from "@/lib/format";
@@ -43,9 +44,9 @@ async function AllWallets() {
   ]);
   const balances = await walletBalances(clients.map((c) => c.id));
   const total = [...balances.values()].reduce((a, b) => a + b, 0);
-  const spent = new Map(monthCharges.map((r) => [r.clientId, -(r._sum.amount ?? 0)]));
+  const spent = new Map(monthCharges.map((m) => [m.clientId, -(m._sum.amount ?? 0)]));
   const monthTotal = [...spent.values()].reduce((a, b) => a + b, 0);
-  const pendingTotal = pending.reduce((a, p) => a + p.amount, 0);
+  const pendingTotal = pending.reduce((a, b) => a + b.amount, 0);
 
   return (
     <>
@@ -58,8 +59,8 @@ async function AllWallets() {
         <Stat label="Keep Meta above" value={rupees(Math.max(0, total))} sub="Meta's prepaid balance must cover every wallet" tone="violet" />
       </div>
 
-      <Card className="mb-5">
-        <CardHeader title="Recharges to check" description="Approve only after the money shows in your bank or UPI app. Match the amount and transaction ID." />
+      <Card className="card-3d mb-5">
+        <CardHeader tone="amber" icon={<Wallet3D />} title="Recharges to check" description="Approve only after the money shows in your bank or UPI app. Match the amount and transaction ID." />
         {pending.length ? (
           <Table>
             <thead>
@@ -96,8 +97,8 @@ async function AllWallets() {
         )}
       </Card>
 
-      <Card className="mb-5">
-        <CardHeader title="Wallet clients" description="Pick a client in the sidebar to see their history, add money or change their rates." />
+      <Card className="card-3d mb-5">
+        <CardHeader tone="brand" icon={<Users3D />} title="Wallet clients" description="Pick a client in the sidebar to see their history, add money or change their rates." />
         {clients.length ? (
           <Table>
             <thead>
@@ -131,8 +132,8 @@ async function AllWallets() {
         )}
       </Card>
 
-      <Card>
-        <CardHeader title="Payment details" description="Where clients pay their recharges. GST stays off until Thabaal's GSTIN is active." />
+      <Card className="card-3d">
+        <CardHeader tone="violet" icon={<Rupee3D />} title="Payment details" description="Where clients pay their recharges. GST stays off until Thabaal's GSTIN is active." />
         <div className="p-4 sm:p-5">
           <PaymentSettingsForm initial={{ upiId: settings?.walletUpiId ?? "", payee: settings?.walletPayee ?? "", gstEnabled: settings?.gstEnabled ?? false, gstin: settings?.gstin ?? "" }} />
         </div>
@@ -147,8 +148,8 @@ async function ClientWallet({ clientId, isAdmin, canManage }: { clientId: string
   if (!client) return null;
   const rates = ratesFor(client.walletRates);
   const settingsForm = isAdmin ? (
-    <Card className="mt-5">
-      <CardHeader title="Billing for this client" description="Only Thabaal sees this." />
+    <Card className="card-3d mt-5">
+      <CardHeader tone="violet" icon={<Settings3D />} title="Billing for this client" description="Only Thabaal sees this." />
       <div className="p-4 sm:p-5">
         <WalletSettingsForm clientId={client.id} initial={{ billingMode: client.billingMode === "wallet" ? "wallet" : "direct", rates, lowAlert: client.walletLowAlert }} />
       </div>
@@ -205,8 +206,8 @@ async function ClientWallet({ clientId, isAdmin, canManage }: { clientId: string
       </div>
 
       {canManage && (
-        <Card className="mb-5">
-          <CardHeader title="Add money" description="Pay by UPI, then send the transaction ID. The money is added once Thabaal confirms it." />
+        <Card className="card-3d mb-5">
+          <CardHeader tone="brand" icon={<Rupee3D />} title="Add money" description="Pay by UPI, then send the transaction ID. The money is added once Thabaal confirms it." />
           <div className="p-4 sm:p-5">
             <RechargeForm upiId={settings?.walletUpiId ?? null} payee={settings?.walletPayee ?? null} clientName={client.name} />
           </div>
@@ -214,8 +215,8 @@ async function ClientWallet({ clientId, isAdmin, canManage }: { clientId: string
       )}
 
       {isAdmin && (
-        <Card className="mb-5">
-          <CardHeader title="Add, refund or correct" description="Money received another way (cash, bank transfer), a refund, or a correction. Every change is kept in the history." />
+        <Card className="card-3d mb-5">
+          <CardHeader tone="violet" icon={<Settings3D />} title="Add, refund or correct" description="Money received another way (cash, bank transfer), a refund, or a correction. Every change is kept in the history." />
           <div className="p-4 sm:p-5">
             <AdjustForm clientId={client.id} />
           </div>
@@ -223,8 +224,8 @@ async function ClientWallet({ clientId, isAdmin, canManage }: { clientId: string
       )}
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <Card>
-          <CardHeader title="Recharges and changes" />
+        <Card className="card-3d">
+          <CardHeader tone="brand" icon={<Calendar3D />} title="Recharges and changes" />
           {money.length ? (
             <Table>
               <thead>
@@ -259,8 +260,8 @@ async function ClientWallet({ clientId, isAdmin, canManage }: { clientId: string
           )}
         </Card>
 
-        <Card>
-          <CardHeader title="Message charges, last 30 days" description="Only messages Meta charged for: delivered, and not free." />
+        <Card className="card-3d">
+          <CardHeader tone="info" icon={<Messages3D />} title="Message charges, last 30 days" description="Only messages Meta charged for: delivered, and not free." />
           {daily.length ? (
             <Table>
               <thead>
@@ -288,8 +289,8 @@ async function ClientWallet({ clientId, isAdmin, canManage }: { clientId: string
         </Card>
       </div>
 
-      <Card className="mt-5">
-        <CardHeader title="Your rates" description="Per delivered message. Meta's free messages (most replies within 24 hours) cost nothing." />
+      <Card className="card-3d mt-5">
+        <CardHeader tone="violet" icon={<Rupee3D />} title="Your rates" description="Per delivered message. Meta's free messages (most replies within 24 hours) cost nothing." />
         <Table>
           <thead>
             <tr>

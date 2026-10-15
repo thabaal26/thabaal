@@ -1,6 +1,7 @@
 "use client";
 
 import { Bold, Braces, Eye, ImageIcon, Italic, Plus, Send, Sparkles, Strikethrough, Trash2, TriangleAlert, Upload } from "@/components/icons";
+import { Messages3D, Send3D, Sparkles3D, Target3D, Template3D, Users3D } from "@/components/icons-3d";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { MobileActionBar } from "@/components/mobile-action-bar";
@@ -205,8 +206,8 @@ export function TemplateEditor({
           </Callout>
         )}
 
-        <Card>
-          <CardHeader title="Basics" description={locked ? "Meta doesn't allow the name, language or category to change after submission." : "Meta reviews every template before it can be sent."} />
+        <Card className="card-3d">
+          <CardHeader tone="brand" icon={<Template3D />} title="Basics" description={locked ? "Meta doesn't allow the name, language or category to change after submission." : "Meta reviews every template before it can be sent."} />
           <div className="space-y-5 p-4 sm:p-5">
             <fieldset>
               <legend className="mb-1.5 text-sm font-medium text-ink-2">Category</legend>
@@ -278,8 +279,8 @@ export function TemplateEditor({
         </Card>
 
         {auth ? (
-          <Card>
-            <CardHeader title="Passcode message" description="Meta writes the text for authentication templates. You choose these options." />
+          <Card className="card-3d">
+            <CardHeader tone="info" icon={<Send3D />} title="Passcode message" description="Meta writes the text for authentication templates. You choose these options." />
             <div className="space-y-4 p-4 sm:p-5">
               <CheckRow label={<>Add &ldquo;For your security, do not share this code.&rdquo;</>} checked={t.securityNote} onChange={(e) => set({ securityNote: e.target.checked })} />
               <div className="grid gap-4 sm:grid-cols-2">
@@ -295,10 +296,10 @@ export function TemplateEditor({
           </Card>
         ) : (
           <>
-            <Card className="border-brand/30 bg-brand-soft/15">
+            <Card className="card-3d border-brand/30 bg-brand-soft/15">
               <CardHeader
                 tone="brand"
-                icon={<Sparkles className="size-4 text-brand-deep" />}
+                icon={<Sparkles3D />}
                 title="Free AI Template Writer & Meta Cost Optimizer"
                 description="Generate a high-converting template, translate to Tamil, or rewrite into a ₹0.115 Utility template (7.5× cheaper than ₹0.8631 Marketing)."
                 action={
@@ -357,8 +358,8 @@ export function TemplateEditor({
               </div>
             </Card>
 
-            <Card>
-              <CardHeader title="Content" />
+            <Card className="card-3d">
+              <CardHeader tone="brand" icon={<Messages3D />} title="Content" />
               <div className="space-y-5 p-4 sm:p-5">
                 <div>
                   <p id="header-label" className="mb-1.5 text-sm font-medium text-ink-2">Header</p>
@@ -447,8 +448,8 @@ export function TemplateEditor({
             </Card>
 
             {(bodyVars.length > 0 || headerVar) && (
-              <Card>
-                <CardHeader title="Personalisation" description="What each variable is filled with when the message is sent." />
+              <Card className="card-3d">
+                <CardHeader tone="gold" icon={<Users3D />} title="Personalisation" description="What each variable is filled with when the message is sent." />
                 <div className="divide-y divide-line">
                   {[...(headerVar ? ["h1"] : []), ...bodyVars.map(String)].map((key) => {
                     const v = t.variables[key] ?? { source: "name" };
@@ -473,8 +474,10 @@ export function TemplateEditor({
               </Card>
             )}
 
-            <Card>
+            <Card className="card-3d">
               <CardHeader
+                tone="brand"
+                icon={<Target3D />}
                 title="Buttons"
                 description="Optional. Up to 10: quick replies, 2 website links, 1 call button, or a single Catalogue / Review & pay button."
                 action={
@@ -582,7 +585,7 @@ export function TemplateEditor({
         </div>
 
         {id && (
-          <Card className="p-4">
+          <Card className="card-3d p-4">
             <Label htmlFor="test">{auth ? "Send a test OTP" : "Send a test"}</Label>
             <div className="flex gap-2">
               <input id="test" type="tel" inputMode="tel" autoComplete="tel" className="field" placeholder="+91 98765 43210" value={testPhone} onChange={(e) => setTestPhone(e.target.value)} />

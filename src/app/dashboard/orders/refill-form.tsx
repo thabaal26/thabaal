@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { Clock3D } from "@/components/icons-3d";
 import { toastResult } from "@/components/toast";
 import { Button, Card, CardHeader, CheckRow, Field } from "@/components/ui";
 import { saveRefillRule } from "../actions/orders";
@@ -15,8 +16,10 @@ export function RefillForm({ days, templateId, templates }: { days: number | nul
   const [n, setN] = useState(days ?? 30);
   const [tid, setTid] = useState(templateId ?? templates[0]?.id ?? "");
   return (
-    <Card>
+    <Card className="card-3d">
       <CardHeader
+        tone="brand"
+        icon={<Clock3D />}
         title="Reorder reminders"
         description="Customers get a reminder this many days after an order, once, unless they've ordered again. Only orders from the last week before turning this on are included."
       />

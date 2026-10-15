@@ -395,7 +395,7 @@ function Preview({ look }: { look: Appearance }) {
         ))}
       </div>
 
-      <Card className="flex items-center gap-3 p-3">
+      <Card className="card-3d flex items-center gap-3 p-3">
         <UsageGauge value={62} max={100} size={84} label="Daily sending limit: 62% used">
           <span className="text-sm font-semibold text-ink">62%</span>
         </UsageGauge>
@@ -410,7 +410,7 @@ function Preview({ look }: { look: Appearance }) {
         />
       </Card>
 
-      <Card className="space-y-2.5 p-3">
+      <Card className="card-3d space-y-2.5 p-3">
         <input className="field" placeholder="Search customers" readOnly aria-label="Sample field" />
         <Table>
           <thead>
@@ -434,7 +434,7 @@ function Preview({ look }: { look: Appearance }) {
         </Table>
       </Card>
 
-      <Card className="p-3">
+      <Card className="card-3d p-3">
         <ColumnChart columns={COLUMNS} height={110} label="Sales by day" />
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Button size="sm">

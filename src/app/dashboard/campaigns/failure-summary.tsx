@@ -1,4 +1,5 @@
 import { RotateCcw } from "@/components/icons";
+import { Alert3D } from "@/components/icons-3d";
 import Link from "@/components/intent-link";
 import { ActionButton } from "@/components/action-button";
 import { Badge, Card, CardHeader, type Tone } from "@/components/ui";
@@ -58,8 +59,10 @@ export function FailureSummaryView({
   if (!heldTotal && !groups.length) return null;
 
   return (
-    <Card className="mt-4 sm:mt-6">
+    <Card className="card-3d mt-4 sm:mt-6">
       <CardHeader
+        tone="rose"
+        icon={<Alert3D />}
         title="Why messages failed"
         description="Across the runs above. Failed messages aren't charged by Meta."
         action={

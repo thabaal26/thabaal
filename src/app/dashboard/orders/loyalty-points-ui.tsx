@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Trophy } from "@/components/icons";
+import { Sparkles3D } from "@/components/icons-3d";
 import { toastResult } from "@/components/toast";
 import { Badge, Button, Card, CardHeader } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -115,8 +116,10 @@ export function LoyaltyRedeemSetting({ on }: { on: boolean }) {
   };
 
   return (
-    <Card>
+    <Card className="card-3d">
       <CardHeader
+        tone="gold"
+        icon={<Sparkles3D />}
         title="Loyalty points at checkout"
         description="Choose whether customers' points come off their orders automatically or only when you use them."
         action={

@@ -152,7 +152,7 @@ export default async function PriorityInboxPage() {
               const lane = byLane(l);
               return (
                 <section key={l} id={`lane-${l}`} aria-labelledby={`lane-${l}-h`} className="scroll-mt-24">
-                  <Card className="h-full bg-subtle/60">
+                  <Card className="card-3d h-full bg-subtle/60">
                     <CardHeader
                       title={
                         <span id={`lane-${l}-h`} className="flex items-center gap-2">

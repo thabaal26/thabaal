@@ -188,7 +188,7 @@ export default function MenuGuidePage() {
               <Link
                 key={p.href}
                 href={p.href}
-                className="flex flex-col items-start gap-2 p-4 rounded-2xl border-[1.5px] border-line bg-panel hover:border-ink transition"
+                className="card-3d flex flex-col items-start gap-2 p-4 rounded-2xl border-[1.5px] border-line bg-panel hover:border-ink transition"
               >
                 <div className="flex items-center gap-2.5 font-display font-semibold text-[17px] text-ink">
                   <Icon className="size-[19px] shrink-0 text-ink dark:text-[#FFC329]" strokeWidth={2} />
@@ -204,7 +204,7 @@ export default function MenuGuidePage() {
       </section>
 
       {/* Migration Table */}
-      <section className="rounded-[18px] border-[1.5px] border-line bg-panel p-5 shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)]">
+      <section className="card-3d rounded-[18px] border-[1.5px] border-line bg-panel p-5">
         <div className="mb-4">
           <h2 className="font-display font-semibold text-[19px] text-ink">
             Where did the old sections go?
@@ -243,7 +243,7 @@ export default function MenuGuidePage() {
       </section>
 
       {/* What Got Simpler */}
-      <section className="rounded-[18px] border-[1.5px] border-line bg-panel p-5 shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)]">
+      <section className="card-3d rounded-[18px] border-[1.5px] border-line bg-panel p-5">
         <h2 className="font-display font-semibold text-[19px] text-ink mb-3">
           What got simpler
         </h2>

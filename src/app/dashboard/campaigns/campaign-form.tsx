@@ -1,6 +1,7 @@
 "use client";
 
 import { Calendar as CalendarIcon, CalendarDays, CalendarRange, Clock, Gauge, Repeat, Users, X } from "@/components/icons";
+import { Calendar3D, Gauge3D, Send3D } from "@/components/icons-3d";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { CalendarPicker, getTodayStr } from "@/components/calendar-picker";
@@ -157,8 +158,8 @@ export function CampaignForm({
   return (
     <div className="min-w-0 grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
       <div className="min-w-0 space-y-4 sm:space-y-6">
-        <Card>
-          <CardHeader title="Message" />
+        <Card className="card-3d">
+          <CardHeader tone="brand" icon={<Send3D />} title="Message" />
           <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 sm:p-5">
             <Field id="cname" label="Campaign name" className="sm:col-span-2">
               <input className="field" placeholder="Weekly offers" value={c.name} onChange={(e) => set({ name: e.target.value })} />
@@ -284,8 +285,8 @@ export function CampaignForm({
           </div>
         </Card>
 
-        <Card>
-          <CardHeader title="Schedule" description="Times are in India Standard Time." />
+        <Card className="card-3d">
+          <CardHeader tone="info" icon={<Calendar3D />} title="Schedule" description="Times are in India Standard Time." />
           <div className="space-y-5 p-4 sm:p-5">
             {/* Mode selection buttons */}
             <fieldset>
@@ -577,8 +578,8 @@ export function CampaignForm({
           </div>
         </Card>
 
-        <Card>
-          <CardHeader title="Pacing" description="Send in small batches so your number keeps a good quality rating with Meta." />
+        <Card className="card-3d">
+          <CardHeader tone="brand" icon={<Gauge3D />} title="Pacing" description="Send in small batches so your number keeps a good quality rating with Meta." />
           <div className="space-y-5 p-4 sm:p-5">
             <div role="group" aria-label="Pace presets" className="grid gap-2 min-[420px]:grid-cols-3 sm:flex sm:flex-wrap">
               {PRESETS.map((p) => {
@@ -620,7 +621,7 @@ export function CampaignForm({
       </div>
 
       <aside aria-label="Summary" className="min-w-0 space-y-4 lg:sticky lg:top-8">
-        <Card className="overflow-hidden">
+        <Card className="card-3d overflow-hidden">
           <div className="surface-dark bg-night p-5 text-white">
             <p className="text-xs font-semibold uppercase tracking-wider text-white/70">Each send</p>
             <p className="tabular mt-2 text-3xl font-semibold">
@@ -666,7 +667,7 @@ export function CampaignForm({
           </div>
         </Card>
 
-        <Card className="px-4 py-1">
+        <Card className="card-3d px-4 py-1">
           <CheckRow label="Campaign active" description="Paused campaigns keep their settings but don't send." checked={c.active} onChange={(e) => set({ active: e.target.checked })} />
         </Card>
 

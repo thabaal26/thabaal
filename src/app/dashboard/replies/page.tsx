@@ -218,7 +218,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
           />
         </div>
       ) : (
-        <Card className="rounded-[24px] p-8">
+        <Card className="card-3d rounded-[24px] p-8">
           <EmptyState
             icon={<MessageCircle className="size-6 stroke-[2] text-brand" />}
             title={show === "handled" ? "Nothing handled yet" : show === "all" ? "No replies yet" : "You're all caught up"}

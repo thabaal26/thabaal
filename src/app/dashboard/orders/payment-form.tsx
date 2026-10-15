@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { ExternalLink, CheckCircle2, AlertCircle, HelpCircle, ShieldCheck, Landmark, Sparkles } from "@/components/icons";
+import { Rupee3D } from "@/components/icons-3d";
 import { toastResult } from "@/components/toast";
 import { Badge, Button, Card, CardHeader, Field } from "@/components/ui";
 import { createPaymentTemplate, savePaymentConfig } from "../actions/orders";
@@ -26,8 +27,10 @@ export function PaymentForm({
   const isConfigured = Boolean(config && config.trim());
 
   return (
-    <Card>
+    <Card className="card-3d">
       <CardHeader
+        tone="violet"
+        icon={<Rupee3D />}
         title="WhatsApp payments & UPI"
         description="Enable customers to pay directly inside WhatsApp using UPI (GPay, PhonePe, Paytm, BHIM) with automated payment confirmation."
         action={

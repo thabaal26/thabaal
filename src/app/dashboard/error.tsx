@@ -12,7 +12,7 @@ export default function DashboardError({ error, retry }: { error: Error & { dige
   }, [error]);
 
   return (
-    <Card role="alert" className="mx-auto mt-6 max-w-lg">
+    <Card role="alert" className="card-3d mx-auto mt-6 max-w-lg">
       <div className="flex flex-col items-center px-6 py-10 text-center sm:py-14">
         <div aria-hidden className="mb-4 grid size-12 place-items-center rounded-full bg-danger-bg text-danger ring-8 ring-danger-bg/40">
           <TriangleAlert className="size-5" />

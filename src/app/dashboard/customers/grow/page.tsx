@@ -1,4 +1,5 @@
 import { Download, QrCode } from "@/components/icons";
+import { MapPin3D, Sparkles3D } from "@/components/icons-3d";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
 import QR from "qrcode";
@@ -41,7 +42,7 @@ export default async function GrowPage({ searchParams }: PageProps<"/dashboard/c
     return (
       <>
         <PageHeader title="Get more customers" back={back} />
-        <Card><EmptyState icon={<QrCode className="size-5" />} title="Add a WhatsApp number first">Opt-in codes open a chat with your number. Add one on the Clients page.</EmptyState></Card>
+        <Card className="card-3d"><EmptyState icon={<QrCode className="size-5" />} title="Add a WhatsApp number first">Opt-in codes open a chat with your number. Add one on the Clients page.</EmptyState></Card>
       </>
     );
   }
@@ -63,7 +64,7 @@ export default async function GrowPage({ searchParams }: PageProps<"/dashboard/c
 
       <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <Card className="card-3d">
-          <CardHeader tone="brand" title="1. Where will this code go?" description="Each place gets its own code, so you can see which one brings customers." />
+          <CardHeader tone="brand" icon={<MapPin3D />} title="1. Where will this code go?" description="Each place gets its own code, so you can see which one brings customers." />
           <nav aria-label="Where the code goes" className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-3 sm:p-5">
             {SOURCES.map((s) => (
               <Link
@@ -96,7 +97,7 @@ export default async function GrowPage({ searchParams }: PageProps<"/dashboard/c
         </Card>
 
         <Card className="card-3d lg:sticky lg:top-8">
-          <CardHeader tone="gold" title={`2. Your code: ${source}`} />
+          <CardHeader tone="gold" icon={<Sparkles3D />} title={`2. Your code: ${source}`} />
           <div className="space-y-4 p-4 sm:p-5">
             {/* Generated locally from our own link, so the markup is safe to inline. */}
             <div role="img" aria-label={`QR code that opens WhatsApp to join (${source})`} className="mx-auto aspect-square w-full max-w-64 rounded-card bg-white p-3 ring-1 ring-line" dangerouslySetInnerHTML={{ __html: svg }} />

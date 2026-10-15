@@ -32,7 +32,7 @@ export function DefaultImage({ url, fallback }: { url: string | null; fallback: 
   }
 
   return (
-    <Card>
+    <Card className="card-3d">
       <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:p-5">
         <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-control bg-sunken ring-1 ring-line">
           {/* eslint-disable-next-line @next/next/no-img-element -- any uploaded or branding image */}

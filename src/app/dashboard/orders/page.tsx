@@ -534,7 +534,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
             ))}
           </ul>
         ) : (
-          <Card>
+          <Card className="card-3d">
             <EmptyState icon={show === "done" ? <PackageCheck className="size-5 stroke-[2]" /> : <ShoppingBag className="size-5 stroke-[2]" />} title="No orders here yet">
               {filtered
                 ? "No orders matched your active filters. Try picking another status, time range or clearing your search."
@@ -546,7 +546,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
 
       {/* Collapsible Order & Payment Settings drawer so the daily order board stays uncluttered */}
       {scope.canManage && scope.clientId && (
-        <details className="ui-card group mt-6 rounded-card border border-line bg-panel shadow-xs">
+        <details className="ui-card card-3d group mt-6 rounded-card border border-line bg-panel">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
             <div>
               <h2 className="text-sm font-semibold text-ink">Order &amp; Payment Settings</h2>

@@ -176,7 +176,7 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
           {visible.map((c) => {
             const last = c.runs[0];
             return (
-              <Card key={c.id} className={cn("relative flex flex-col overflow-hidden p-4 active:bg-sunken sm:p-5", !c.active && "opacity-90")}>
+              <Card key={c.id} className={cn("card-3d relative flex flex-col overflow-hidden p-4 active:bg-sunken sm:p-5", !c.active && "opacity-90")}>
                 <span aria-hidden className={cn("absolute inset-x-0 top-0 h-[3px]", c.active ? "bg-brand" : "bg-line-strong")} />
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -274,7 +274,7 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
           })}
         </div>
       ) : (
-        <Card>
+        <Card className="card-3d">
           <EmptyState
             icon={<Calendar className="size-5 stroke-[2]" />}
             title="No campaigns yet"

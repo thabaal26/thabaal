@@ -243,7 +243,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
         />
       </section>
 
-      <Card>
+      <Card className="card-3d">
         <form role="search" aria-label="Find customers" className="grid gap-2 border-b border-line bg-subtle/40 p-3 sm:flex sm:flex-wrap">
           <div className="relative min-w-0 sm:min-w-56 sm:flex-1">
             <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />

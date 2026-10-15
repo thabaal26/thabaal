@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { Sparkles3D } from "@/components/icons-3d";
 import { toastResult } from "@/components/toast";
 import { Button, Card, CardHeader, Field } from "@/components/ui";
 import { saveWinbackRule } from "../actions/orders";
@@ -25,8 +26,10 @@ export function WinbackForm({
   const [tid, setTid] = useState(templateId ?? "");
 
   return (
-    <Card>
+    <Card className="card-3d">
       <CardHeader
+        tone="gold"
+        icon={<Sparkles3D />}
         title="Win back lapsed customers"
         description={`Customers with no order for this many days are tagged "lapsed" (${lapsed.toLocaleString(
           "en-IN"

@@ -1,4 +1,5 @@
 import { Building2, CheckCircle2, Circle, LogOut, SquarePen } from "@/components/icons";
+import { Building3D, Clock3D, Eye3D, Phone3D, Send3D, Sparkles3D, Users3D } from "@/components/icons-3d";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "@/components/intent-link";
@@ -49,8 +50,8 @@ function Copyable({ label, value }: { label: string; value: string }) {
 export default async function SettingsPage() {
   const user = await requireUser();
   const account = (
-    <Card>
-      <CardHeader tone="violet" title="Your account" description={`Signed in as ${user.email}`} />
+    <Card className="card-3d">
+      <CardHeader tone="violet" icon={<Users3D />} title="Your account" description={`Signed in as ${user.email}`} />
       <PasswordForm />
       <form action={logout} className="border-t border-line p-4 sm:p-5">
         <button className={buttonClass("secondary") + " w-full sm:w-auto"}>
@@ -60,8 +61,8 @@ export default async function SettingsPage() {
     </Card>
   );
   const look = (
-    <Card>
-      <CardHeader title="Look" description="Light, dark, or follow this phone or computer. Remembered on this device." action={<ThemeChoice />} />
+    <Card className="card-3d">
+      <CardHeader tone="amber" icon={<Eye3D />} title="Look" description="Light, dark, or follow this phone or computer. Remembered on this device." action={<ThemeChoice />} />
     </Card>
   );
   if (user.role !== "ADMIN") {
@@ -87,8 +88,8 @@ export default async function SettingsPage() {
           <div className="space-y-4 sm:space-y-6">
             {look}
             {cid && (
-              <Card>
-                <CardHeader title="WhatsApp numbers" description="Live from Meta: how healthy each number is and how many people it can message a day." />
+              <Card className="card-3d">
+                <CardHeader tone="brand" icon={<Phone3D />} title="WhatsApp numbers" description="Live from Meta: how healthy each number is and how many people it can message a day." />
                 {numbers.length ? (
                   <ul className="divide-y divide-line">
                     {numbers.map((n) => (
@@ -113,8 +114,8 @@ export default async function SettingsPage() {
               </Card>
             )}
             {cid && (
-              <Card>
-                <CardHeader title="Business details" description={user.client?.name} />
+              <Card className="card-3d">
+                <CardHeader tone="brand" icon={<Building3D />} title="Business details" description={user.client?.name} />
                 <dl className="grid grid-cols-3 divide-x divide-line">
                   {[
                     ["Customers", customers],
@@ -161,9 +162,10 @@ export default async function SettingsPage() {
           session={settings.wahaSession}
           active={settings.provider === "LOCAL"}
         />
-        <Card>
+        <Card className="card-3d">
           <CardHeader
             tone="brand"
+            icon={<Send3D />}
             title="Meta Cloud API"
             description={`Default number, used by clients without their own WhatsApp details on the Clients page. ${cfg.live ? "Configured in Vercel → Environment Variables." : "Not configured: add these in Vercel → Environment Variables, then redeploy."}`}
             action={settings.provider === "META" ? <Badge tone="green" dot>Active</Badge> : undefined}
@@ -188,8 +190,8 @@ export default async function SettingsPage() {
         </Card>
 
         <div className="space-y-4 sm:space-y-6 lg:col-span-2 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
-          <Card>
-            <CardHeader tone="info" title="Scheduler" description="Something must call this URL every 5 minutes (every minute with the local session) to start campaigns and send batches." />
+          <Card className="card-3d">
+            <CardHeader tone="info" icon={<Clock3D />} title="Scheduler" description="Something must call this URL every 5 minutes (every minute with the local session) to start campaigns and send batches." />
             <div className="space-y-3 p-4 sm:p-5">
               <Copyable label="Cron URL" value={`${origin}/api/cron`} />
               <Copyable label="Header" value="Authorization: Bearer •••CRON_SECRET•••" />
@@ -218,9 +220,10 @@ export default async function SettingsPage() {
           </div>
         </div>
       </div>
-      <Card id="appearance" className="mt-4 scroll-mt-20 sm:mt-6">
+      <Card id="appearance" className="card-3d mt-4 scroll-mt-20 sm:mt-6">
         <CardHeader
           tone="violet"
+          icon={<Sparkles3D />}
           title="Appearance"
           description="The portal's default look: icons, tiles, cards, buttons and charts. Each client can have its own look on the Clients page."
           action={<Link href="/dashboard/clients" className={buttonClass("secondary", "sm")}>Per client</Link>}
