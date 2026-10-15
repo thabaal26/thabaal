@@ -25,7 +25,7 @@ export default async function CataloguePage({ searchParams }: PageProps<"/dashbo
   }
 
   const sp = await searchParams;
-  const currentView = sp.view === "demand" ? "demand" : sp.view === "both" ? "both" : "catalogue";
+  const currentView = sp.view === "demand" ? "demand" : "catalogue";
 
   const [client, { catalogId, products, commerceManagerUrl, isLive, readError }] = await Promise.all([
     db.client.findUnique({
@@ -70,7 +70,7 @@ export default async function CataloguePage({ searchParams }: PageProps<"/dashbo
           <nav aria-label="Product sub-views" className="inline-flex rounded-xl border border-line bg-card p-1 shadow-2xs">
             <Link
               href="/dashboard/catalogue"
-              className={`inline-flex min-h-[32px] items-center gap-1.5 rounded-lg px-3 text-[13.5px] font-semibold transition active:scale-[0.97] ${
+              className={`inline-flex min-h-[32px] items-center gap-1.5 rounded-lg px-3.5 text-[13.5px] font-semibold transition active:scale-[0.97] ${
                 currentView === "catalogue"
                   ? "bg-ink text-canvas shadow-xs"
                   : "text-muted hover:text-ink hover:bg-subtle/60"
@@ -87,7 +87,7 @@ export default async function CataloguePage({ searchParams }: PageProps<"/dashbo
             </Link>
             <Link
               href="/dashboard/catalogue?view=demand"
-              className={`inline-flex min-h-[32px] items-center gap-1.5 rounded-lg px-3 text-[13.5px] font-semibold transition active:scale-[0.97] ${
+              className={`inline-flex min-h-[32px] items-center gap-1.5 rounded-lg px-3.5 text-[13.5px] font-semibold transition active:scale-[0.97] ${
                 currentView === "demand"
                   ? "bg-ink text-canvas shadow-xs"
                   : "text-muted hover:text-ink hover:bg-subtle/60"
@@ -101,17 +101,6 @@ export default async function CataloguePage({ searchParams }: PageProps<"/dashbo
               >
                 {demandSummary.totalCartsAnalyzed} carts
               </span>
-            </Link>
-            <Link
-              href="/dashboard/catalogue?view=both"
-              title="Show both demand leaderboard and product catalogue"
-              className={`inline-flex min-h-[32px] items-center rounded-lg px-2.5 text-xs font-medium transition active:scale-[0.97] ${
-                currentView === "both"
-                  ? "bg-ink text-canvas shadow-xs"
-                  : "text-muted hover:text-ink hover:bg-subtle/60"
-              }`}
-            >
-              View all
             </Link>
           </nav>
         }
@@ -188,13 +177,11 @@ export default async function CataloguePage({ searchParams }: PageProps<"/dashbo
         />
       </div>
 
-      {(currentView === "demand" || currentView === "both") && (
+      {currentView === "demand" ? (
         <div id="demand-leaderboard" className="mb-5">
           <DemandLeaderboard summary={demandSummary} commerceManagerUrl={commerceManagerUrl} />
         </div>
-      )}
-
-      {(currentView === "catalogue" || currentView === "both") && (
+      ) : (
         <div id="catalogue-items">
           <CatalogueManager
             products={products}
