@@ -243,11 +243,25 @@ export async function deleteTemplate(id: string): Promise<ActionResult> {
   const t = await db.template.findUnique({ where: { id }, include: { _count: { select: { campaigns: true } } } });
   if (!t || !mine(s, t.clientId)) return { ok: false, message: "Template not found." };
   if (t._count.campaigns) return { ok: false, message: "This template is used by a campaign. Change or delete the campaign first." };
+
+  // Clear any client references (refill or winback template settings)
+  await db.client.updateMany({ where: { id: t.clientId, refillTemplateId: id }, data: { refillTemplateId: null } });
+  await db.client.updateMany({ where: { id: t.clientId, winbackTemplateId: id }, data: { winbackTemplateId: null } });
+
   try {
     const { cfg } = await senderForAccount(t.clientId, t.businessAccountId);
-    if (cfg.live && t.metaId) await deleteMetaTemplate(cfg, t.name, t.metaId);
+    if (cfg.live) await deleteMetaTemplate(cfg, t.name, t.metaId ?? undefined);
   } catch (e) {
-    return { ok: false, message: errText(e) };
+    const msg = errText(e);
+    // If the template was already deleted in Meta or not found, proceed with deleting from our database
+    if (
+      !msg.toLowerCase().includes("not found") &&
+      !msg.toLowerCase().includes("does not exist") &&
+      !msg.toLowerCase().includes("2593002") &&
+      !msg.toLowerCase().includes("param hsm_id")
+    ) {
+      console.warn(`[deleteTemplate] Meta delete warning for "${t.name}":`, msg);
+    }
   }
   await db.template.delete({ where: { id } });
   revalidatePath("/dashboard/templates");

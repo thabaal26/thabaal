@@ -49,10 +49,23 @@ export async function generateViewport(): Promise<Viewport> {
 /** Thabaal's mark and name: the product's own brand, top left of every page. */
 function Logo({ size }: { size: "sm" | "md" }) {
   return (
-    <Link href="/dashboard" aria-label="Thabaal home" className="flex shrink-0 items-center gap-2 transition hover:opacity-90">
+    <Link
+      href="/dashboard"
+      aria-label="Thabaal home"
+      className={`flex shrink-0 items-center gap-2 transition hover:opacity-90 ${size === "md" ? "-translate-x-1.5" : ""}`}
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/brands/thabaal/artifact-logo.png" alt="" width={40} height={22} data-keep className={`h-auto dark:[filter:drop-shadow(0_0_0.6px_#fff)_drop-shadow(0_0_1.2px_rgb(255_255_255/0.55))] ${size === "md" ? "w-11" : "w-9"}`} />
-      <b className={`font-display font-semibold leading-none tracking-[-0.3px] text-ink ${size === "md" ? "text-[24px]" : "text-[20px]"}`}>thabaal</b>
+      <img
+        src="/brands/thabaal/artifact-logo.png"
+        alt=""
+        width={40}
+        height={22}
+        data-keep
+        className={`h-auto dark:[filter:drop-shadow(0_0_0.6px_#fff)_drop-shadow(0_0_1.2px_rgb(255_255_255/0.55))] ${size === "md" ? "w-11" : "w-9"}`}
+      />
+      <b className={`font-display font-semibold leading-none tracking-[-0.3px] text-ink ${size === "md" ? "text-[24px]" : "text-[20px]"}`}>
+        thabaal
+      </b>
     </Link>
   );
 }

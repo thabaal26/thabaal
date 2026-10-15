@@ -87,6 +87,37 @@ export function applyManualLoyaltyDelta(tags: string[], delta: number, totalAfte
   return cleaned;
 }
 
+type LoyaltyOrderRow = { id?: string; total: number; status: string; paidAt: Date | null; pointsRedeemed?: number | null };
+
+/** Bought = paid, or confirmed and beyond: the orders that earn points. */
+export const isBoughtOrder = (o: Pick<LoyaltyOrderRow, "status" | "paidAt">) =>
+  Boolean(o.paidAt) || ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"].includes(o.status);
+
+/** Points used on orders that still stand; a cancelled order gives its points back. */
+export const redeemedOnOrders = (orders: LoyaltyOrderRow[], exceptOrderId?: string) =>
+  orders.reduce((n, o) => n + (o.status !== "CANCELLED" && o.id !== exceptOrderId ? Math.max(0, o.pointsRedeemed ?? 0) : 0), 0);
+
+/**
+ * A customer's loyalty from their order rows (any status), sheet purchases and tags: the one way every screen
+ * and action works out the balance. `exceptOrderId` leaves that order's own points out, to re-price it.
+ */
+export function loyaltyFromOrders(
+  c: { name: string; purchases?: string | null; tags?: string[] | null; orders: LoyaltyOrderRow[] },
+  extra: Omit<Parameters<typeof computeCustomerLoyalty>[0], "name" | "paidOrdersCount" | "totalSpent" | "sheetPurchases" | "tags" | "redeemedPoints"> & { exceptOrderId?: string } = {},
+) {
+  const { exceptOrderId, ...rest } = extra;
+  const bought = c.orders.filter((o) => isBoughtOrder(o) && o.id !== exceptOrderId);
+  return computeCustomerLoyalty({
+    ...rest,
+    name: c.name,
+    paidOrdersCount: bought.length,
+    totalSpent: bought.reduce((n, o) => n + o.total, 0),
+    sheetPurchases: c.purchases,
+    tags: c.tags,
+    redeemedPoints: redeemedOnOrders(c.orders, exceptOrderId),
+  });
+}
+
 /** Strips internal loyalty-bonus tags from display tag lists so UI badges stay clean. */
 export function isInternalLoyaltyTag(tag: string): boolean {
   return tag.trim().toLowerCase().startsWith(BONUS_TAG_PREFIX);
@@ -109,6 +140,8 @@ export function computeCustomerLoyalty(input: {
   unpaidCartValue?: number;
   daysSinceLastOrder?: number | null;
   avgGapDays?: number | null;
+  /** Points already used on orders that aren't cancelled (Order.pointsRedeemed). */
+  redeemedPoints?: number;
 }): CustomerLoyaltySummary {
   const paidOrders = Math.max(0, Math.round(input.paidOrdersCount || 0));
   const spent = Math.max(0, Number(input.totalSpent) || 0);
@@ -123,11 +156,11 @@ export function computeCustomerLoyalty(input: {
   //    - 1 pt per ₹100 spent on confirmed WhatsApp orders (the client's rule)
   //    - +50 pts per repeat WhatsApp order (2nd order onwards)
   //    - +35 pts per historical sheet purchase item
-  //    - + manual bonus / minus redeemed points
+  //    - + manual bonus / minus points redeemed by hand (tags) and on orders (Order.pointsRedeemed)
   const spendPoints = Math.floor(spent / RUPEES_PER_POINT);
   const frequencyPoints = Math.max(0, paidOrders - 1) * 50;
   const sheetPoints = sheetItemsCount * 35;
-  const manualPoints = parseManualLoyaltyPoints(input.tags);
+  const manualPoints = parseManualLoyaltyPoints(input.tags) - Math.max(0, Math.round(input.redeemedPoints ?? 0));
   const totalPoints = Math.max(0, spendPoints + frequencyPoints + sheetPoints + manualPoints);
 
   // 2. Rupee conversion: 100 pts = ₹50 reward credit (1 pt = ₹0.50)

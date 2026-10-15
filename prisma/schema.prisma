@@ -95,6 +95,8 @@ model Client {
   winbackTemplateId   String?
   /// WhatsApp Manager → Payment configurations: the name of the active one (e.g. a UPI VPA). Null turns payment requests off.
   paymentConfig       String?
+  /// Use a customer's loyalty points automatically on each new order (cart or hand-entered), before payment is asked.
+  loyaltyAutoRedeem   Boolean           @default(false)
   /// Portal sections disabled for this client by the portal owner (e.g. ["orders", "catalogue", "calls"]). Empty means all sections enabled.
   disabledSections    String[]          @default([])
   /// Icon set for this client's portal: "hugeicons" (default) or "lucide".
@@ -470,6 +472,9 @@ model Order {
   refundedAt         DateTime?
   refundAmount       Float?
   refundNote         String?
+  /// Loyalty points used on this order; total is already reduced by their value (100 points = ₹50).
+  /// Points used on a cancelled order go back to the customer (lib/loyalty-redeem.ts).
+  pointsRedeemed     Int         @default(0)
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 

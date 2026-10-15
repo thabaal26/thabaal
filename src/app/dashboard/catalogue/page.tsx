@@ -13,7 +13,7 @@ import { DemandLeaderboard } from "./demand-leaderboard";
 export const metadata: Metadata = { title: "Products" };
 export const dynamic = "force-dynamic";
 
-export default async function CataloguePage() {
+export default async function CataloguePage({ searchParams }: PageProps<"/dashboard/catalogue">) {
   const scope = await getScope();
   if (!scope.clientId) {
     return (
@@ -23,6 +23,9 @@ export default async function CataloguePage() {
       </>
     );
   }
+
+  const sp = await searchParams;
+  const currentView = sp.view === "demand" ? "demand" : sp.view === "both" ? "both" : "catalogue";
 
   const [client, { catalogId, products, commerceManagerUrl, isLive, readError }] = await Promise.all([
     db.client.findUnique({
@@ -65,18 +68,51 @@ export default async function CataloguePage() {
         }
         tabs={
           <nav aria-label="Product sub-views" className="inline-flex rounded-xl border border-line bg-card p-1 shadow-2xs">
-            <a
-              href="#catalogue-items"
-              className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold bg-ink text-canvas shadow-xs"
+            <Link
+              href="/dashboard/catalogue"
+              className={`inline-flex min-h-[32px] items-center gap-1.5 rounded-lg px-3 text-[13.5px] font-semibold transition active:scale-[0.97] ${
+                currentView === "catalogue"
+                  ? "bg-ink text-canvas shadow-xs"
+                  : "text-muted hover:text-ink hover:bg-subtle/60"
+              }`}
             >
-              Catalogue
-            </a>
-            <a
-              href="#demand-leaderboard"
-              className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink transition"
+              <span>Catalogue</span>
+              <span
+                className={`rounded-full px-1.5 py-0.5 text-2xs font-bold ${
+                  currentView === "catalogue" ? "bg-white/20 text-white" : "bg-line/70 text-muted"
+                }`}
+              >
+                {total}
+              </span>
+            </Link>
+            <Link
+              href="/dashboard/catalogue?view=demand"
+              className={`inline-flex min-h-[32px] items-center gap-1.5 rounded-lg px-3 text-[13.5px] font-semibold transition active:scale-[0.97] ${
+                currentView === "demand"
+                  ? "bg-ink text-canvas shadow-xs"
+                  : "text-muted hover:text-ink hover:bg-subtle/60"
+              }`}
             >
-              How products sell
-            </a>
+              <span>How products sell</span>
+              <span
+                className={`rounded-full px-1.5 py-0.5 text-2xs font-bold ${
+                  currentView === "demand" ? "bg-white/20 text-white" : "bg-line/70 text-muted"
+                }`}
+              >
+                {demandSummary.totalCartsAnalyzed} carts
+              </span>
+            </Link>
+            <Link
+              href="/dashboard/catalogue?view=both"
+              title="Show both demand leaderboard and product catalogue"
+              className={`inline-flex min-h-[32px] items-center rounded-lg px-2.5 text-xs font-medium transition active:scale-[0.97] ${
+                currentView === "both"
+                  ? "bg-ink text-canvas shadow-xs"
+                  : "text-muted hover:text-ink hover:bg-subtle/60"
+              }`}
+            >
+              View all
+            </Link>
           </nav>
         }
       />
@@ -151,18 +187,26 @@ export default async function CataloguePage() {
           }
         />
       </div>
- 
-      <DemandLeaderboard summary={demandSummary} commerceManagerUrl={commerceManagerUrl} />
 
-      <CatalogueManager
-        products={products}
-        catalogId={catalogId}
-        commerceManagerUrl={commerceManagerUrl}
-        clientName={client?.name ?? "Business"}
-        isLive={isLive}
-        canManage={scope.canManage}
-        demandBySku={demandSummary.demandBySku}
-      />
+      {(currentView === "demand" || currentView === "both") && (
+        <div id="demand-leaderboard" className="mb-5">
+          <DemandLeaderboard summary={demandSummary} commerceManagerUrl={commerceManagerUrl} />
+        </div>
+      )}
+
+      {(currentView === "catalogue" || currentView === "both") && (
+        <div id="catalogue-items">
+          <CatalogueManager
+            products={products}
+            catalogId={catalogId}
+            commerceManagerUrl={commerceManagerUrl}
+            clientName={client?.name ?? "Business"}
+            isLive={isLive}
+            canManage={scope.canManage}
+            demandBySku={demandSummary.demandBySku}
+          />
+        </div>
+      )}
     </>
   );
 }

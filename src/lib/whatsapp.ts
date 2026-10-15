@@ -505,9 +505,9 @@ export async function editMetaTemplate(cfg: WaConfig, metaId: string, components
   return graph<{ success: boolean }>(cfg, metaId, { method: "POST", body: JSON.stringify({ components }) });
 }
 
-export async function deleteMetaTemplate(cfg: WaConfig, name: string, metaId: string) {
+export async function deleteMetaTemplate(cfg: WaConfig, name: string, _metaId?: string) {
   const { wabaId } = cfg;
-  return graph(cfg, `${wabaId}/message_templates?name=${encodeURIComponent(name)}&hsm_id=${metaId}`, { method: "DELETE" });
+  return graph(cfg, `${wabaId}/message_templates?name=${encodeURIComponent(name)}`, { method: "DELETE" });
 }
 
 /** Uploads an image through the Resumable Upload API and returns the handle Meta needs as an example. */

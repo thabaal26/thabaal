@@ -11,17 +11,31 @@ import { getScope, owned } from "@/lib/session";
 import { CATEGORY_INFO, renderFor, SAMPLE_CUSTOMER, type Category, type TemplateButton, type VarMap } from "@/lib/template";
 import { deleteTemplate, syncTemplates } from "../actions/templates";
 
+import { TemplateSearchInput } from "./template-search";
+
 export const metadata: Metadata = { title: "Templates" };
 export const dynamic = "force-dynamic";
 
 export default async function TemplatesPage({ searchParams }: PageProps<"/dashboard/templates">) {
-  const { category } = await searchParams;
+  const { category, q } = await searchParams;
   const active = (Object.keys(CATEGORY_INFO) as Category[]).find((c) => c === category);
+  const query = typeof q === "string" ? q.trim() : "";
   const scope = await getScope();
   const canCreate = scope.canManage && scope.clientId;
+
+  const qFilter = query
+    ? {
+        OR: [
+          { name: { contains: query, mode: "insensitive" as const } },
+          { body: { contains: query, mode: "insensitive" as const } },
+          { language: { contains: query, mode: "insensitive" as const } },
+        ],
+      }
+    : {};
+
   const [templates, counts, brand] = await Promise.all([
     db.template.findMany({
-      where: { ...owned(scope), ...(active ? { category: active } : {}) },
+      where: { ...owned(scope), ...(active ? { category: active } : {}), ...qFilter },
       include: { _count: { select: { campaigns: true } }, client: { select: { name: true, defaultImageUrl: true, bannerUrl: true } } },
       orderBy: { updatedAt: "desc" },
     }),
@@ -51,15 +65,20 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
           </>
         }
         tabs={
-          <FilterChips
-            label="Template category"
-            items={[{ key: "", label: "All", n: total }, ...(Object.keys(CATEGORY_INFO) as Category[]).map((c) => ({ key: c, label: CATEGORY_INFO[c].label, n: counts.find((x) => x.category === c)?._count ?? 0 }))].map((tab) => ({
-              href: tab.key ? `/dashboard/templates?category=${tab.key}` : "/dashboard/templates",
-              label: tab.label,
-              count: tab.n,
-              active: (active ?? "") === tab.key,
-            }))}
-          />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
+            <FilterChips
+              label="Template category"
+              items={[{ key: "", label: "All", n: total }, ...(Object.keys(CATEGORY_INFO) as Category[]).map((c) => ({ key: c, label: CATEGORY_INFO[c].label, n: counts.find((x) => x.category === c)?._count ?? 0 }))].map((tab) => ({
+                href: tab.key
+                  ? `/dashboard/templates?category=${tab.key}${query ? `&q=${encodeURIComponent(query)}` : ""}`
+                  : `/dashboard/templates${query ? `?q=${encodeURIComponent(query)}` : ""}`,
+                label: tab.label,
+                count: tab.n,
+                active: (active ?? "") === tab.key,
+              }))}
+            />
+            <TemplateSearchInput defaultValue={query} />
+          </div>
         }
       />
 
@@ -80,6 +99,20 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
       {scope.canManage && brand && (
         <div className="mb-4">
           <DefaultImage url={brand.defaultImageUrl} fallback={brand.bannerUrl} />
+        </div>
+      )}
+
+      {query && (
+        <div className="mb-4 flex items-center justify-between rounded-xl border border-line bg-panel px-4 py-2.5 text-xs shadow-2xs">
+          <span className="text-muted">
+            Found <strong className="text-ink font-semibold">{templates.length}</strong> template{templates.length === 1 ? "" : "s"} matching &ldquo;<span className="text-ink font-medium">{query}</span>&rdquo;
+          </span>
+          <Link
+            href={active ? `/dashboard/templates?category=${active}` : "/dashboard/templates"}
+            className="font-medium text-brand hover:underline"
+          >
+            Clear search
+          </Link>
         </div>
       )}
 
@@ -146,14 +179,37 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
         <Card className="rounded-[18px] border-[1.5px] border-line bg-panel shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)] dark:shadow-[0_14px_30px_-22px_rgba(0,0,0,.7)]">
           <EmptyState
             icon={<FileText className="size-5" />}
-            title={active ? `No ${CATEGORY_INFO[active].label.toLowerCase()} templates` : "No templates yet"}
-            action={canCreate && <Link href="/dashboard/templates/new" className={buttonClass("primary")}><Plus className="size-4" /> New template</Link>}
+            title={
+              query
+                ? `No templates matching "${query}"`
+                : active
+                  ? `No ${CATEGORY_INFO[active].label.toLowerCase()} templates`
+                  : "No templates yet"
+            }
+            action={
+              query ? (
+                <Link
+                  href={active ? `/dashboard/templates?category=${active}` : "/dashboard/templates"}
+                  className={buttonClass("secondary")}
+                >
+                  Clear search
+                </Link>
+              ) : (
+                canCreate && (
+                  <Link href="/dashboard/templates/new" className={buttonClass("primary")}>
+                    <Plus className="size-4" /> New template
+                  </Link>
+                )
+              )
+            }
           >
-            {canCreate
-              ? "Create one here, or sync the templates you already made in WhatsApp Manager."
-              : scope.canManage
-                ? "Pick a client in the sidebar to add or sync their templates."
-                : "Message templates approved for your WhatsApp number will appear here."}
+            {query
+              ? "Try searching for another template name, keyword, or language."
+              : canCreate
+                ? "Create one here, or sync the templates you already made in WhatsApp Manager."
+                : scope.canManage
+                  ? "Pick a client in the sidebar to add or sync their templates."
+                  : "Message templates approved for your WhatsApp number will appear here."}
           </EmptyState>
         </Card>
       )}
