@@ -32,8 +32,34 @@ function sealArgs(fields: readonly string[], operation: string, args: Record<str
   }
 }
 
+// Neon closes idle connections and wakes from sleep slowly; the first query after that fails with a
+// connection error even though the database is fine. Reads are retried (twice, briefly); writes never
+// are, so nothing can be applied twice.
+const READS = new Set(["findUnique", "findUniqueOrThrow", "findFirst", "findFirstOrThrow", "findMany", "count", "aggregate", "groupBy", "$queryRaw", "$queryRawUnsafe"]);
+const TRANSIENT = new Set(["P1001", "P1002", "P1008", "P1017", "P2024"]);
+const isTransient = (e: unknown) => {
+  const err = e as { code?: string; errorCode?: string; message?: string };
+  const code = err?.code ?? err?.errorCode;
+  return (code && TRANSIENT.has(code)) || /Server has closed the connection|Can't reach database server|Connection terminated|ECONNRESET/i.test(err?.message ?? "");
+};
+
 function makeClient() {
   return new PrismaClient()
+    .$extends({
+      query: {
+        async $allOperations({ operation, args, query }) {
+          if (!READS.has(operation)) return query(args);
+          for (let attempt = 0; ; attempt++) {
+            try {
+              return await query(args);
+            } catch (e) {
+              if (attempt >= 2 || !isTransient(e)) throw e;
+              await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+            }
+          }
+        },
+      },
+    })
     .$extends({
       query: {
         client: {
