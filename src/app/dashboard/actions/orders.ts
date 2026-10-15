@@ -8,6 +8,8 @@ import { pushOrderToSheet } from "@/lib/google-sheets-live";
 import { DEFAULT_SHIPPING_FEE, getOrderPricing, itemsText, itemsWithNames, money, nextOrderRef, orderRef, syncCustomerOrderedProducts, type OrderItem } from "@/lib/orders";
 import { confirmPayment, sendPaymentRequestFor, updateOrderCard } from "@/lib/payments";
 import { dueOf, methodOf, receivedOf } from "@/lib/payment-state";
+import { autoRedeemPoints, keptPointsDiscount, setOrderPoints } from "@/lib/loyalty-redeem";
+import { pointsDiscount } from "@/lib/order-pricing";
 import { getSettings, wahaConfig } from "@/lib/provider";
 import { replyWindowEnd } from "@/lib/replies";
 import { headerImageFor } from "@/lib/media";
@@ -137,16 +139,17 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
   if (c.optedOut) return { ok: false, message: "This customer opted out of messages." };
 
   const items = await itemsWithNames(order);
-  const pricing = getOrderPricing(items, order.total, { applyDefaultWhenEqual: true });
+  const pricing = getOrderPricing(items, order.total, { applyDefaultWhenEqual: true, discount: pointsDiscount(order) });
   const first = c.name.trim().split(/\s+/)[0] || "there";
   const ref = orderRef(order);
   const when = dispatchLine(details);
+  const pointsLine = pricing.discount > 0 ? `\nLoyalty points (${order.pointsRedeemed}): -${money(pricing.discount, order.currency)}` : "";
   const contact = [details.by?.trim() && `Delivery by: ${details.by.trim()}`, details.phone?.trim() && `Contact: ${details.phone.trim()}`, details.link?.trim() && `Track: ${details.link.trim()}`]
     .filter(Boolean)
     .join("\n");
   const confirmPricingText =
-    pricing.shipping > 0
-      ? `Items: ${itemsText(items)} (${money(pricing.subtotal, order.currency)})\nShipping: ${money(pricing.shipping, order.currency)}\nTotal: ${money(pricing.total, order.currency)}`
+    pricing.shipping > 0 || pricing.discount > 0
+      ? `Items: ${itemsText(items)} (${money(pricing.subtotal, order.currency)})${pricing.shipping > 0 ? `\nShipping: ${money(pricing.shipping, order.currency)}` : ""}${pointsLine}\nTotal: ${money(pricing.total, order.currency)}`
       : `Items: ${itemsText(items)}\nTotal: ${money(pricing.total, order.currency)}`;
   // Where the money stands, so the customer knows whether to pay, keep cash ready, or nothing at all.
   const due = dueOf(order);
@@ -260,6 +263,35 @@ export async function requestPayment(id: string): Promise<SendResult> {
   const r = await sendPaymentRequestFor(order.id);
   revalidatePath("/dashboard/orders");
   return r;
+}
+
+/** Uses the customer's loyalty points on this unpaid order: `rupees` off (₹25 steps), "max", or 0 to remove them. */
+export async function setOrderPointsAction(id: string, rupees: number | "max"): Promise<SendResult> {
+  const s = await requireOrderAccess();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const order = await db.order.findFirst({ where: { id, ...(s.clientId ? { clientId: s.clientId } : {}) }, select: { id: true } });
+  if (!order) return { ok: false, message: "Order not found." };
+  if (rupees !== "max" && (!Number.isFinite(rupees) || rupees < 0)) return { ok: false, message: "Pick an amount." };
+  const r = await setOrderPoints(order.id, rupees);
+  if (r.ok) {
+    pushOrderToSheet(order.id, "ORDER_UPDATE", rupees === 0 ? "Loyalty points removed" : "Loyalty points used");
+    revalidatePath("/dashboard", "layout");
+  }
+  return { ok: r.ok, message: r.message };
+}
+
+/** Order & Payment Settings: use customers' loyalty points automatically on new orders, or only by hand. */
+export async function saveLoyaltyAutoRedeem(on: boolean): Promise<SendResult> {
+  const s = await requireManager(true);
+  if ("denied" in s) return { ok: false, message: s.denied };
+  await db.client.update({ where: { id: s.clientId }, data: { loyaltyAutoRedeem: Boolean(on) } });
+  revalidatePath("/dashboard/orders");
+  return {
+    ok: true,
+    message: on
+      ? "Automatic points on: new orders use the customer's points before payment is asked."
+      : "Automatic points off: use points by hand on each order.",
+  };
 }
 
 /** The payment configuration name from WhatsApp Manager → Payment configurations; empty turns payment requests off. */
@@ -609,7 +641,7 @@ export async function createOrder(input: {
     currency: "INR",
   }));
   const shippingFee = input.shippingFee !== undefined ? Math.max(0, Number(input.shippingFee) || 0) : DEFAULT_SHIPPING_FEE;
-  const { total } = getOrderPricing(items, null, { customShippingFee: shippingFee });
+  const { total: grossTotal } = getOrderPricing(items, null, { customShippingFee: shippingFee });
 
   const finalOrderNote =
     combinedOrderNote || existing?.locationRaw?.trim() || existing?.location?.trim() || null;
@@ -621,7 +653,7 @@ export async function createOrder(input: {
       customerId: customer.id,
       catalogId: allFromCatalog ? input.catalogId : null,
       items,
-      total,
+      total: grossTotal,
       note: finalOrderNote,
       internalNote: "Entered by hand",
       ...(input.paymentMode === "cod" && { paymentMethod: "cod" }),
@@ -629,6 +661,9 @@ export async function createOrder(input: {
   });
 
   await syncCustomerOrderedProducts(customer.id, items).catch(() => {});
+  // Automatic points (Order & Payment Settings) come off before any payment is asked or recorded.
+  const pointsOff = await autoRedeemPoints(order.id).catch((e) => (console.error("Could not use loyalty points", e), 0));
+  const total = Math.round((grossTotal - pointsOff) * 100) / 100;
   pushOrderToSheet(order.id, "NEW_ORDER");
 
   const mode = input.paymentMode ?? (input.requestPaymentNow ? "request" : "later");
@@ -680,6 +715,7 @@ export async function updateOrderItems(
       paidAt: true,
       paidAmount: true,
       currency: true,
+      pointsRedeemed: true,
       customer: { select: { id: true, location: true, locationRaw: true, region: true } },
     },
   });
@@ -704,13 +740,17 @@ export async function updateOrderItems(
     currency: "INR",
   }));
   const shippingFee = input.shippingFee !== undefined ? Math.max(0, Number(input.shippingFee) || 0) : DEFAULT_SHIPPING_FEE;
-  const { total } = getOrderPricing(items, null, { customShippingFee: shippingFee });
+  // Points already used stay on the order (cut back if the items now cost less than the discount).
+  const before = getOrderPricing(items, null, { customShippingFee: shippingFee });
+  const keptPoints = keptPointsDiscount(order, before.subtotal);
+  const total = Math.round((before.total - keptPoints) * 100) / 100;
 
   await db.order.update({
     where: { id: order.id },
     data: {
       items,
       total,
+      pointsRedeemed: keptPoints * 2,
       catalogId: allFromCatalog ? (input.catalogId ?? order.catalogId) : null,
       ...(input.note !== undefined && { note: input.note?.trim() || null }),
     },

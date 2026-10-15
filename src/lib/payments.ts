@@ -4,6 +4,7 @@ import { db } from "./db";
 import { headerImageFor } from "./media";
 import { pushOrderToSheet } from "./google-sheets-live";
 import { getOrderPricing, itemsText, itemsWithNames, money, orderRef } from "./orders";
+import { pointsDiscount } from "./order-pricing";
 import { dueOf, receivedOf } from "./payment-state";
 import { getSettings } from "./provider";
 import { replyWindowEnd } from "./replies";
@@ -81,18 +82,24 @@ export async function sendPaymentRequestFor(orderId: string, opts: { reminder?: 
   if ((await getSettings()).provider !== "META") return { ok: false, message: "Payment requests need the WhatsApp Cloud API." };
 
   const items = await itemsWithNames(order);
-  const pricing = getOrderPricing(items, order.total, { applyDefaultWhenEqual: true });
+  const pricing = getOrderPricing(items, order.total, { applyDefaultWhenEqual: true, discount: pointsDiscount(order) });
   const ref = orderRef(order);
+  // With loyalty points used, WhatsApp's payment card shows the order as one line at the amount to pay (its items
+  // must add up to the total); the message text above it lists the items, shipping and the points discount.
   const payment = {
     referenceId: ref,
     configuration: order.client.paymentConfig,
-    items: items.map((i) => ({ id: i.id, name: i.name ?? i.id, quantity: i.quantity, price: i.price })),
+    items:
+      pricing.discount > 0
+        ? [{ id: "order", name: `Order ${ref} after loyalty points`, quantity: 1, price: pricing.total }]
+        : items.map((i) => ({ id: i.id, name: i.name ?? i.id, quantity: i.quantity, price: i.price })),
     total: pricing.total,
-    catalogId: order.catalogId,
+    catalogId: pricing.discount > 0 ? null : order.catalogId,
   };
+  const pointsLine = pricing.discount > 0 ? `\nLoyalty points (${order.pointsRedeemed}): -${money(pricing.discount, order.currency)}` : "";
   const breakdownLines =
-    pricing.shipping > 0
-      ? `Items: ${itemsText(items)} (${money(pricing.subtotal, order.currency)})\nShipping: ${money(pricing.shipping, order.currency)}\nTotal: ${money(pricing.total, order.currency)}`
+    pricing.shipping > 0 || pricing.discount > 0
+      ? `Items: ${itemsText(items)} (${money(pricing.subtotal, order.currency)})${pricing.shipping > 0 ? `\nShipping: ${money(pricing.shipping, order.currency)}` : ""}${pointsLine}\nTotal: ${money(pricing.total, order.currency)}`
       : `Items: ${itemsText(items)}\nTotal: ${money(pricing.total, order.currency)}`;
   const isReplacement = Boolean(order.internalNote?.includes("Replaced unpaid cart"));
   const text = opts.reminder

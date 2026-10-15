@@ -9,6 +9,7 @@ import { applyFailure } from "@/lib/rules";
 import { money, orderRef, orderWhereRef, recordOrder } from "@/lib/orders";
 import { ORDER_REF_RE } from "@/lib/order-ref";
 import { metaReplyContent, receivingNumber, recordReply } from "@/lib/replies";
+import { autoRedeemPoints } from "@/lib/loyalty-redeem";
 import { autoRequestPayment, cancelSupersededOrdersForCustomer, confirmPayment, recordPaymentClaim, recordPaymentFailure, sendCodConfirmationPrompt, textInWindow, updateOrderCard } from "@/lib/payments";
 import { parseAddressText } from "@/lib/address";
 import { autoReplyToButton, autoSendCatalogue, catalogueTrigger, firstMessageToday } from "@/lib/catalog";
@@ -557,6 +558,8 @@ export async function POST(req: NextRequest) {
             // A new cart: expire all previous unpaid carts & payment links, then send fresh "Review and pay"
             if (order) {
               await cancelSupersededOrdersForCustomer(customer.id, order).catch((e) => console.error("Could not expire old carts", e));
+              // Automatic loyalty points (Order & Payment Settings) come off before "Review and pay" goes out.
+              await autoRedeemPoints(order.id).catch((e) => console.error("Could not use loyalty points", e));
               await autoRequestPayment(order).catch((e) => console.error("Automatic payment request failed", e));
               pushOrderToSheet(order.id, "NEW_ORDER");
 

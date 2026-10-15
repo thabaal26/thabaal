@@ -4,7 +4,7 @@ import { Badge, Card, CardHeader, EmptyState, FilterChips, PageHeader, PickClien
 import { parseAddressText } from "@/lib/address";
 import { db } from "@/lib/db";
 import { fmtDate, fmtNumber } from "@/lib/format";
-import { getOrderPricing } from "@/lib/order-pricing";
+import { getOrderPricing, pointsDiscount } from "@/lib/order-pricing";
 import { money, orderRef, type OrderItem } from "@/lib/orders";
 import { methodOf, slipPay } from "@/lib/payment-state";
 import { formatPhone } from "@/lib/phone";
@@ -59,7 +59,7 @@ export default async function PackingPage({ searchParams }: PageProps<"/dashboar
   const isCod = (o: (typeof all)[number]) => !isPaid(o) && methodOf(o) === "cod";
   const count = { "": all.length, paid: paidCount, unpaid: all.length - paidCount, cod: all.filter(isCod).length };
   const orders = pay === "paid" ? all.filter(isPaid) : pay === "unpaid" ? all.filter((o) => !isPaid(o)) : pay === "cod" ? all.filter(isCod) : all;
-  const shownTotal = (o: (typeof all)[number]) => getOrderPricing(o.items as OrderItem[], o.total, { applyDefaultWhenEqual: true }).total;
+  const shownTotal = (o: (typeof all)[number]) => getOrderPricing(o.items as OrderItem[], o.total, { applyDefaultWhenEqual: true, discount: pointsDiscount(o) }).total;
   const toCollect = orders.reduce((sum, o) => sum + slipPay(o, shownTotal(o)).collect, 0);
   const qs = (patch: { pay?: string; sort?: string }) => {
     const q = new URLSearchParams(Object.entries({ pay, sort: sort === "old" ? "old" : "", ...patch }).filter(([, v]) => v) as [string, string][]);
@@ -101,7 +101,7 @@ export default async function PackingPage({ searchParams }: PageProps<"/dashboar
       quantity: i.quantity,
       price: i.price,
     }));
-    const pricing = getOrderPricing(items, o.total, { applyDefaultWhenEqual: true });
+    const pricing = getOrderPricing(items, o.total, { applyDefaultWhenEqual: true, discount: pointsDiscount(o) });
     const fullAddress =
       o.note?.trim() || o.customer.locationRaw?.trim() || o.customer.location?.trim() || "";
     return {
@@ -118,6 +118,7 @@ export default async function PackingPage({ searchParams }: PageProps<"/dashboar
       address: fullAddress,
       items,
       total: pricing.total,
+      discount: pricing.discount,
       currency: o.currency,
       note: [o.note, o.internalNote].filter(Boolean).join(" · "),
     };
@@ -178,7 +179,7 @@ export default async function PackingPage({ searchParams }: PageProps<"/dashboar
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 print:grid-cols-2">
                 {list.map((o) => {
                   const exportRow = toExportRow(o);
-                  const pricing = getOrderPricing(o.items as OrderItem[], o.total, { applyDefaultWhenEqual: true });
+                  const pricing = getOrderPricing(o.items as OrderItem[], o.total, { applyDefaultWhenEqual: true, discount: pointsDiscount(o) });
                   return (
                     <Card key={o.id} className="card-3d relative flex flex-col gap-2.5 overflow-hidden p-4 text-sm print:break-inside-avoid">
                       <span aria-hidden className="absolute inset-x-0 top-0 h-[3px] bg-brand print:hidden" />
