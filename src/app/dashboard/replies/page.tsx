@@ -103,7 +103,16 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
   const orderInquiryCount = replies.filter((r) => r.hasOrderInquiry).length;
 
   // Computers show the picked customer's conversation beside the list (the newest customer thread by default).
-  const selected = replies.find((x) => x.id === picked || x.customer.id === picked) ?? replies[0];
+  let selected = replies.find((x) => x.id === picked || x.customer.id === picked);
+  if (!selected && picked) {
+    selected = allThreads.find((x) => x.id === picked || x.customer.id === picked);
+    if (selected && !replies.some((r) => r.customer.id === selected!.customer.id)) {
+      replies.unshift(selected);
+    }
+  }
+  if (!selected) {
+    selected = replies[0];
+  }
   const thread: ConversationEntry[] = [];
   if (selected) {
     const [msgs, reps] = await Promise.all([

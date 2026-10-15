@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Check, CheckCheck, CircleAlert, Clock, FileText } from "@/components/icons";
+import { Check, CheckCheck, CheckCircle2, CircleAlert, Clock, FileText, ShoppingBag } from "@/components/icons";
 import { ReplyMedia } from "@/components/reply-media";
 import { cn } from "@/lib/cn";
 import { fmtDate } from "@/lib/format";
@@ -87,7 +87,18 @@ export function Conversation({ entries, className, plain }: { entries: Conversat
           ) : r.entry.type === "in" ? (
             <li key={r.key} className="flex">
               <div className="max-w-[min(85%,36rem)] rounded-[14px] bg-panel px-4 py-2.5 text-[15px] text-ink shadow-[0_1px_1px_rgba(16,40,59,0.06)]">
-                {r.entry.kind === "button" && <p className="mb-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">Tapped a button</p>}
+                {r.entry.kind === "button" && <p className="mb-1 flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">Tapped a button</p>}
+                {r.entry.kind === "order" && (
+                  r.entry.text.toLowerCase().includes("upi payment") || r.entry.text.toLowerCase().includes("payment completed") ? (
+                    <p className="mb-1 flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle2 className="size-3.5" /> WhatsApp UPI Payment
+                    </p>
+                  ) : (
+                    <p className="mb-1 flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400">
+                      <ShoppingBag className="size-3.5" /> Catalogue Order Cart
+                    </p>
+                  )
+                )}
                 {r.entry.text && <p className="whitespace-pre-wrap [overflow-wrap:anywhere] leading-relaxed">{r.entry.text}</p>}
                 {r.entry.mediaId && <ReplyMedia id={r.entry.id} type={r.entry.mediaType} />}
                 <p className="tabular mt-1 text-right text-[11px] text-[#667781] dark:text-[#8696A0]">
@@ -128,7 +139,7 @@ export function Conversation({ entries, className, plain }: { entries: Conversat
                           </a>
                         )
                       )}
-                      {text && <p className="line-clamp-6 whitespace-pre-wrap [overflow-wrap:anywhere] leading-relaxed">{text}</p>}
+                      {text && <p className="whitespace-pre-wrap [overflow-wrap:anywhere] leading-relaxed">{text}</p>}
                     </>
                   );
                 })()}

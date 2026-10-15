@@ -23,12 +23,14 @@ export function InlineReplyBox({
   replyId,
   replyHandled,
   windowOpen,
+  onTypingChange,
 }: {
   customerId: string;
   customerName: string;
   replyId: string;
   replyHandled: boolean;
   windowOpen: boolean;
+  onTypingChange?: (isTyping: boolean) => void;
 }) {
   const router = useRouter();
   const [text, setText] = useState("");
@@ -104,6 +106,7 @@ export function InlineReplyBox({
         setMediaUrl("");
         setShowMedia(false);
         setAiResult(null);
+        onTypingChange?.(false);
         router.refresh();
       }
     });
@@ -138,7 +141,10 @@ export function InlineReplyBox({
               <button
                 key={s.lang}
                 type="button"
-                onClick={() => setText(s.text)}
+                onClick={() => {
+                  setText(s.text);
+                  onTypingChange?.(true);
+                }}
                 className={cn(
                   "rounded-lg border px-2.5 py-1 text-left text-xs transition",
                   text === s.text ? "border-brand bg-brand-soft font-semibold text-ink" : "border-line bg-panel text-muted hover:border-brand hover:text-ink",
@@ -200,7 +206,10 @@ export function InlineReplyBox({
         rows={3}
         maxLength={4000}
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          setText(e.target.value);
+          onTypingChange?.(e.target.value.trim().length > 0);
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();

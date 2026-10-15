@@ -20,7 +20,15 @@ export type ChatListItem = {
 };
 
 /** The left card on Chats: one row per customer, newest first, the open one highlighted. */
-export function ChatList({ items, selectedCustomerId }: { items: ChatListItem[]; selectedCustomerId?: string }) {
+export function ChatList({
+  items,
+  selectedCustomerId,
+  onSelectCustomer,
+}: {
+  items: ChatListItem[];
+  selectedCustomerId?: string;
+  onSelectCustomer?: (customerId: string) => void;
+}) {
   const [search, setSearch] = useState("");
   const q = search.trim().toLowerCase();
   const filtered = q ? items.filter((i) => i.name.toLowerCase().includes(q) || i.phone.includes(q) || i.previewText.toLowerCase().includes(q)) : items;
@@ -51,6 +59,7 @@ export function ChatList({ items, selectedCustomerId }: { items: ChatListItem[];
               <Link
                 href={item.href}
                 scroll={false}
+                onClick={() => onSelectCustomer?.(item.customerId)}
                 aria-current={current ? "true" : undefined}
                 className={cn("block px-4 py-3.5 transition-colors", current ? "bg-brand-soft" : "hover:bg-sunken/60")}
               >
