@@ -43,7 +43,13 @@ async function loadOrder(orderId: string) {
  * The most this order can take off with points right now: the customer's balance (leaving this order's own
  * points and its own spend out) in ₹25 steps, at most ₹250, and never more than the items cost.
  */
-export function maxPointsDiscount(order: NonNullable<Awaited<ReturnType<typeof loadOrder>>>) {
+export function maxPointsDiscount(order: {
+  id: string;
+  items: unknown;
+  total: number;
+  pointsRedeemed?: number | null;
+  customer: Parameters<typeof loyaltyFromOrders>[0];
+}) {
   const items = (order.items as PricedLine[] | null) ?? [];
   const { subtotal } = getOrderPricing(items, order.total, { discount: pointsDiscount(order) });
   const loyalty = loyaltyFromOrders(order.customer, { exceptOrderId: order.id });
