@@ -1,8 +1,8 @@
-import { CheckCheck, CheckCircle2, ChevronRight, MessageCircle, Phone, RotateCcw, ShoppingBag } from "@/components/icons";
+import { CheckCheck, CheckCircle2, MessageCircle, MoreHorizontal, Phone, RotateCcw, ShoppingBag } from "@/components/icons";
 import Link from "@/components/intent-link";
 import { ActionButton } from "@/components/action-button";
 import { Conversation, type ConversationEntry } from "@/components/conversation";
-import { Avatar } from "@/components/ui";
+import { cn } from "@/lib/cn";
 import { fmtDate } from "@/lib/format";
 import { money, orderRef } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
@@ -12,8 +12,6 @@ import { setOrderStatus } from "../actions/orders";
 import { setReplyHandled } from "../actions/replies";
 import { InlineReplyBox } from "./inline-reply-box";
 import { ChatList, type ChatListItem } from "./chat-list";
-
-const ORDER = /(order|buy|need|want|send|price|rate|available|venum|vendum)|வேண்டும்|ஆர்டர்/i;
 
 export type InboxReply = {
   id: string;
@@ -108,113 +106,79 @@ export function ReplyInbox({
     };
   });
 
+  const card = "min-h-0 overflow-hidden rounded-[20px] border-[1.5px] border-line bg-panel shadow-card";
+  const headBtn = "inline-flex min-h-10 items-center gap-1.5 rounded-xl border-[1.5px] border-line bg-panel px-4 text-[14px] font-semibold text-ink transition hover:border-ink";
+  const menuItem = "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13.5px] font-medium text-ink transition hover:bg-sunken";
+
   return (
-    <div className="h-full min-h-0 w-full overflow-hidden rounded-[24px] border border-line bg-card shadow-[0_12px_36px_rgba(16,40,59,0.06)] dark:bg-[#111B21] lg:grid lg:grid-cols-[minmax(19rem,23rem)_minmax(0,1fr)]">
-      {/* LEFT COLUMN: Customer Conversations List with Client Search */}
-      <div className="flex h-full min-h-0 flex-col overflow-hidden border-r border-line">
+    // Two cards side by side on computers (the chats, then the open conversation); stacked on phones.
+    <div className="grid gap-4 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(18rem,25rem)_minmax(0,1fr)] lg:grid-rows-1">
+      <div className={cn(card, "max-h-[18rem] lg:max-h-none")}>
         <ChatList items={chatListItems} selectedCustomerId={selected?.customer.id} />
       </div>
 
-      {/* RIGHT COLUMN: WhatsApp Active Chat Window */}
       {selected ? (
-        <section aria-label={`Conversation with ${selected.customer.name}`} className="flex h-full min-h-0 flex-col overflow-hidden bg-panel dark:bg-[#111B21]">
-          {/* Header matching WhatsApp UI Mock */}
-          {/* Two rows: who it is, then the actions (one scrollable line, never overlapping the name). */}
-          <header className="shrink-0 space-y-2.5 border-b border-line bg-panel px-4 py-3 dark:bg-[#111B21]">
-            <div className="flex items-center gap-3 min-w-0">
-              <Avatar name={selected.customer.name} className="size-10 shrink-0 text-sm font-semibold" />
-              <div className="min-w-0">
-                <h2 className="truncate text-[15.5px] font-bold text-ink dark:text-white leading-tight">
-                  {selected.customer.name}
-                </h2>
-                <p className="truncate text-xs text-muted dark:text-[#8696A0] leading-normal">
-                  {currentPurchasesSubtitle}
-                </p>
-              </div>
+        <section aria-label={`Conversation with ${selected.customer.name}`} className={cn(card, "flex flex-col")}>
+          <header className="flex shrink-0 flex-wrap items-start justify-between gap-3 px-5 pb-4 pt-5">
+            <div className="min-w-0">
+              <h2 className="truncate font-display text-[21px] font-semibold leading-tight text-ink">{selected.customer.name}</h2>
+              <p className="mt-1 truncate text-[14.5px] text-muted">{currentPurchasesSubtitle}</p>
             </div>
-
-            {/* Header Action Badges & Buttons matching mock */}
             <div className="flex flex-wrap items-center gap-2">
               {windowTimeRemaining ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 px-3 py-1 text-xs font-semibold">
-                  <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Free replies · {windowTimeRemaining}
-                </span>
+                <span className="inline-flex items-center rounded-full bg-success-bg px-3 py-1 text-[13.5px] font-semibold text-success">Free replies · {windowTimeRemaining}</span>
               ) : (
-                <span className="inline-flex items-center rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 px-2.5 py-0.5 text-xs font-medium">
-                  Window closed
-                </span>
+                <span className="inline-flex items-center rounded-full bg-warning-bg px-3 py-1 text-[13.5px] font-semibold text-warning">Free replies closed</span>
               )}
-
-              {canOperate && currentUnpaid && (
-                <ActionButton
-                  action={setOrderStatus.bind(null, currentUnpaid.id, "PAID")}
-                  size="sm"
-                  confirm={`Mark order ${orderRef(currentUnpaid)} as paid (${money(currentUnpaid.total, currentUnpaid.currency)})?`}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
-                >
-                  <CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <span>Mark {orderRef(currentUnpaid)} paid</span>
-                </ActionButton>
-              )}
-
-              {canOperate && windowOpen && (
-                <ActionButton
-                  action={sendCatalogue.bind(null, selected.customer.id)}
-                  size="sm"
-                  title="Send interactive WhatsApp catalogue (free inside the 24-hour window)"
-                  className="inline-flex items-center gap-1 rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-subtle dark:bg-[#1A262D]"
-                >
-                  <ShoppingBag className="size-3.5 text-brand-deep" />
-                  <span className="max-sm:sr-only">Send catalogue</span>
-                </ActionButton>
-              )}
-
-              {canOperate && (
-                <Link
-                  href={`/dashboard/customers/${selected.customer.id}#reply`}
-                  className="inline-flex items-center gap-1 rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-subtle dark:bg-[#1A262D]"
-                  title="Send an approved WhatsApp template"
-                >
-                  <MessageCircle className="size-3.5 text-brand-deep" />
-                  <span className="max-sm:sr-only">Send template</span>
-                </Link>
-              )}
-
-              <Link
-                href={`/dashboard/customers/${selected.customer.id}`}
-                className="rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-subtle dark:bg-[#1A262D]"
-              >
+              <Link href={`/dashboard/customers/${selected.customer.id}`} className={headBtn}>
                 Profile
               </Link>
-
-              <Link
-                href={`/dashboard/customers/${selected.customer.id}#call`}
-                className="inline-flex items-center gap-1 rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-subtle dark:bg-[#1A262D]"
-              >
-                <Phone className="size-3 text-emerald-600 dark:text-emerald-400" />
-                <span>Call</span>
+              <Link href={`/dashboard/customers/${selected.customer.id}#call`} className={headBtn}>
+                <Phone aria-hidden className="size-4" /> Call
               </Link>
-
               {canOperate && (
-                <ActionButton
-                  action={setReplyHandled.bind(null, selected.id, !selected.handled)}
-                  size="sm"
-                  className="rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-subtle dark:bg-[#1A262D]"
-                >
-                  {selected.handled ? <RotateCcw className="size-3.5" /> : <CheckCheck className="size-3.5" />}
-                  <span>{selected.handled ? "Reopen" : "Done"}</span>
-                </ActionButton>
+                // Less frequent actions: one small menu instead of a row of buttons.
+                <details className="relative">
+                  <summary className={cn(headBtn, "cursor-pointer list-none px-3 [&::-webkit-details-marker]:hidden")} aria-label="More actions">
+                    <MoreHorizontal aria-hidden className="size-4" />
+                  </summary>
+                  <div className="absolute right-0 top-full z-20 mt-2 w-60 rounded-xl border border-line bg-panel p-1.5 shadow-pop">
+                    <ActionButton action={setReplyHandled.bind(null, selected.id, !selected.handled)} variant="ghost" size="sm" className={menuItem}>
+                      {selected.handled ? <RotateCcw aria-hidden className="size-4 text-muted" /> : <CheckCheck aria-hidden className="size-4 text-success" />}
+                      {selected.handled ? "Reopen chat" : "Mark as handled"}
+                    </ActionButton>
+                    {windowOpen && (
+                      <ActionButton action={sendCatalogue.bind(null, selected.customer.id)} variant="ghost" size="sm" className={menuItem}>
+                        <ShoppingBag aria-hidden className="size-4 text-brand-deep" /> Send catalogue
+                      </ActionButton>
+                    )}
+                    <Link href={`/dashboard/customers/${selected.customer.id}#reply`} className={menuItem}>
+                      <MessageCircle aria-hidden className="size-4 text-muted" /> Send a template
+                    </Link>
+                    {currentUnpaid && (
+                      <ActionButton
+                        action={setOrderStatus.bind(null, currentUnpaid.id, "PAID")}
+                        variant="ghost"
+                        size="sm"
+                        confirm={`Mark order ${orderRef(currentUnpaid)} as paid (${money(currentUnpaid.total, currentUnpaid.currency)})?`}
+                        className={menuItem}
+                      >
+                        <CheckCircle2 aria-hidden className="size-4 text-success" /> Mark {orderRef(currentUnpaid)} paid
+                      </ActionButton>
+                    )}
+                  </div>
+                </details>
               )}
             </div>
           </header>
 
-          {/* Conversation Chat Wallpaper & Bubbles */}
-          <Conversation entries={thread} className="min-h-0 flex-1 overflow-y-auto" />
+          {/* The messages sit in a soft beige panel inside the card. */}
+          <div className="mx-5 flex h-[55dvh] min-h-0 flex-col overflow-hidden rounded-2xl bg-track lg:h-auto lg:flex-1">
+            <Conversation entries={thread} plain className="min-h-0 flex-1" />
+          </div>
 
-          {/* Bottom WhatsApp Message Composer */}
-          {canOperate && (
-            <div className="shrink-0 border-t border-line">
+          {canOperate ? (
+            <div className="shrink-0">
               <InlineReplyBox
                 key={selected.customer.id}
                 customerId={selected.customer.id}
@@ -224,12 +188,12 @@ export function ReplyInbox({
                 windowOpen={windowOpen}
               />
             </div>
+          ) : (
+            <div className="h-5 shrink-0" />
           )}
         </section>
       ) : (
-        <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted">
-          Select a customer to open WhatsApp conversation
-        </div>
+        <div className={cn(card, "grid place-items-center p-8 text-center text-sm text-muted")}>Pick a chat on the left to open it.</div>
       )}
     </div>
   );

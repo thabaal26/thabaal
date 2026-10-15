@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCheck, ImagePlus, Send, Sparkles, X, ChevronDown, MessageCircle } from "@/components/icons";
+import { ChevronDown, ImagePlus, MessageCircle, Plus, Sparkles, X } from "@/components/icons";
 import Link from "@/components/intent-link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -43,10 +43,10 @@ export function InlineReplyBox({
 
   if (!windowOpen) {
     return (
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-sunken/60 px-5 py-3.5 text-xs">
+      <div className="m-5 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-warning-bg px-4 py-3 text-sm">
         <div className="text-muted">
-          <span className="font-semibold text-amber-700 dark:text-amber-400">24-hour free reply window has closed.</span>
-          <span className="ml-1">Send an approved WhatsApp template to restart the conversation.</span>
+          <span className="font-semibold text-warning">Free replies have closed for this chat.</span>
+          <span className="ml-1 text-ink-2">Send a template to start talking again.</span>
         </div>
         <div className="flex items-center gap-2">
           <Link
@@ -109,11 +109,12 @@ export function InlineReplyBox({
     });
   };
 
+  const ctl = "inline-flex min-h-11 items-center gap-1.5 rounded-xl border-[1.5px] border-line bg-panel px-4 text-[14.5px] font-semibold text-ink transition hover:border-ink disabled:opacity-50";
+
   return (
-    <div className="space-y-3 border-t border-line bg-card/90 px-5 py-3.5 backdrop-blur-md">
-      {/* Label matching mock: "Your reply" */}
-      <div className="flex items-center justify-between">
-        <label htmlFor="reply-input" className="text-[12px] font-semibold uppercase tracking-wider text-muted">
+    <div className="space-y-3 px-5 pb-5 pt-4">
+      <div className="flex items-center justify-between gap-2">
+        <label htmlFor="reply-input" className="text-[15px] font-semibold text-ink">
           Your reply
         </label>
         {aiResult && (
@@ -121,21 +122,17 @@ export function InlineReplyBox({
             <Badge tone={aiResult.urgency === "HIGH" ? "amber" : "green"} dot>
               {aiResult.intentLabel}
             </Badge>
-            <button
-              type="button"
-              onClick={() => setAiResult(null)}
-              className="text-[11px] text-muted hover:text-ink underline"
-            >
-              Clear AI
+            <button type="button" onClick={() => setAiResult(null)} className="text-[12px] text-muted underline hover:text-ink">
+              Clear
             </button>
           </div>
         )}
       </div>
 
-      {/* AI Suggestions Pill Bar */}
+      {/* Suggested replies, one per language. */}
       {aiResult && (
-        <div className="space-y-2 rounded-xl border border-brand/30 bg-[#FFFDF9] dark:bg-[#132A3B] p-2.5 text-xs">
-          <p className="text-[11px] text-muted">{aiResult.summary}</p>
+        <div className="space-y-2 rounded-xl border border-brand/40 bg-brand-soft/50 p-3 text-xs">
+          <p className="text-[12px] text-muted">{aiResult.summary}</p>
           <div className="flex flex-wrap gap-1.5">
             {aiResult.suggestions.map((s) => (
               <button
@@ -144,12 +141,10 @@ export function InlineReplyBox({
                 onClick={() => setText(s.text)}
                 className={cn(
                   "rounded-lg border px-2.5 py-1 text-left text-xs transition",
-                  text === s.text
-                    ? "border-brand bg-brand-soft font-semibold text-ink"
-                    : "border-line bg-card text-muted hover:border-brand hover:text-ink",
+                  text === s.text ? "border-brand bg-brand-soft font-semibold text-ink" : "border-line bg-panel text-muted hover:border-brand hover:text-ink",
                 )}
               >
-                <span className="font-semibold text-brand-deep mr-1">[{s.lang}]</span>
+                <span className="mr-1 font-semibold text-brand-deep">[{s.lang}]</span>
                 <span>{s.label}</span>
               </button>
             ))}
@@ -157,16 +152,16 @@ export function InlineReplyBox({
         </div>
       )}
 
-      {/* Media Attachment Bar */}
+      {/* Photo or PDF to send with the reply. */}
       {(showMedia || mediaUrl) && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-panel px-3 py-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border-[1.5px] border-line bg-panel px-3 py-2 text-xs">
           <input
-            className="min-w-0 flex-1 bg-transparent text-xs text-ink outline-none placeholder:text-muted"
-            placeholder="Paste image or PDF link, or upload →"
+            className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted"
+            placeholder="Paste an image or PDF link, or upload"
             value={mediaUrl}
             onChange={(e) => setMediaUrl(e.target.value)}
           />
-          <label className="cursor-pointer font-semibold text-brand-deep hover:underline">
+          <label className="cursor-pointer text-sm font-semibold text-brand-deep hover:underline">
             {uploading ? "Uploading…" : "Upload photo/PDF"}
             <input
               type="file"
@@ -188,22 +183,21 @@ export function InlineReplyBox({
           </label>
           <button
             type="button"
-            aria-label="Close attachment"
+            aria-label="Remove attachment"
             onClick={() => {
               setMediaUrl("");
               setShowMedia(false);
             }}
             className="rounded-control p-1 text-muted hover:text-ink"
           >
-            <X className="size-3.5" />
+            <X className="size-4" />
           </button>
         </div>
       )}
 
-      {/* Reply Textarea matching WhatsApp Mock */}
       <textarea
         id="reply-input"
-        rows={2}
+        rows={3}
         maxLength={4000}
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -214,104 +208,70 @@ export function InlineReplyBox({
           }
         }}
         placeholder="Type a reply"
-        className="w-full resize-none rounded-xl border border-line bg-panel p-3 text-[14px] text-ink placeholder:text-muted/70 transition focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand dark:bg-[#132A3B]"
+        className="min-h-24 w-full resize-y rounded-xl border-[1.5px] border-line bg-panel px-4 py-3 text-[15px] text-ink transition placeholder:text-muted focus:border-ink focus:outline-none"
       />
 
-      {/* Composer Action Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5">
-        {/* Left: Language Select + Suggest a reply */}
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <select
-              value={selectedLang}
-              onChange={(e) => handleLangChange(e.target.value as "EN" | "Tanglish" | "Tamil")}
-              className="appearance-none rounded-lg border border-line bg-card py-1.5 pl-3 pr-7 text-xs font-semibold text-ink shadow-2xs hover:bg-subtle focus:border-brand focus:outline-none dark:bg-[#132A3B]"
-            >
-              <option value="EN">English</option>
-              <option value="Tanglish">Tanglish</option>
-              <option value="Tamil">தமிழ்</option>
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2 top-2.5 size-3 text-muted" />
-          </div>
-
-          <button
-            type="button"
-            disabled={aiLoading}
-            onClick={runAiSuggest}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs transition hover:border-brand hover:bg-brand-soft/40 disabled:opacity-60 dark:bg-[#132A3B]"
+      {/* Language and the reply helper. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="relative">
+          <span className="sr-only">Reply language</span>
+          <select
+            value={selectedLang}
+            onChange={(e) => handleLangChange(e.target.value as "EN" | "Tanglish" | "Tamil")}
+            className={cn(ctl, "appearance-none pr-9")}
           >
-            <Sparkles className="size-3.5 text-amber-500 shrink-0" />
-            <span>{aiLoading ? "Thinking…" : "Suggest a reply"}</span>
+            <option value="EN">English</option>
+            <option value="Tanglish">Tanglish</option>
+            <option value="Tamil">தமிழ்</option>
+          </select>
+          <ChevronDown aria-hidden className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+        </label>
+        <button type="button" disabled={aiLoading} onClick={runAiSuggest} className={ctl}>
+          <Sparkles aria-hidden className="size-4 text-brand-deep" />
+          {aiLoading ? "Thinking…" : "Suggest a reply"}
+        </button>
+      </div>
+
+      {/* Send, send and close, and the rest under More. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={(!text.trim() && !mediaUrl.trim()) || sending}
+          onClick={() => submit(false)}
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-brand px-5 text-[14.5px] font-bold text-on-brand transition hover:brightness-105 active:scale-[0.98] disabled:opacity-50"
+        >
+          {sending ? "Sending…" : "Send"}
+        </button>
+        {!replyHandled && (
+          <button type="button" disabled={(!text.trim() && !mediaUrl.trim()) || sending} onClick={() => submit(true)} className={ctl}>
+            Send and close
           </button>
-
-          <button
-            type="button"
-            onClick={() => setShowMedia((v) => !v)}
-            title="Attach photo or PDF"
-            className="grid size-8 place-items-center rounded-lg border border-line bg-card text-muted transition hover:border-brand hover:text-ink dark:bg-[#132A3B]"
-          >
-            <ImagePlus className="size-4" />
+        )}
+        <div className="relative">
+          <button type="button" aria-expanded={showMore} onClick={() => setShowMore((v) => !v)} className={cn(ctl, "text-muted")}>
+            More <Plus aria-hidden className="size-4" />
           </button>
-
-          <Link
-            href={`/dashboard/customers/${customerId}#reply`}
-            title="Send an approved WhatsApp template"
-            className="inline-flex items-center gap-1 rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs font-semibold text-muted transition hover:border-brand hover:text-ink dark:bg-[#132A3B] dark:text-white"
-          >
-            <MessageCircle className="size-3.5 text-indigo-500" />
-            <span className="hidden sm:inline">Template</span>
-          </Link>
-        </div>
-
-        {/* Right: Send, Send & Close, More */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            disabled={!text.trim() && !mediaUrl.trim()}
-            onClick={() => submit(false)}
-            className="inline-flex min-h-[34px] items-center gap-1.5 rounded-xl bg-brand px-4 py-1.5 text-xs font-bold text-on-brand shadow-xs transition hover:brightness-105 active:scale-[0.98] disabled:opacity-50"
-          >
-            <Send className="size-3.5" />
-            <span>{sending ? "Sending…" : "Send"}</span>
-          </button>
-
-          {!replyHandled && (
-            <button
-              type="button"
-              disabled={!text.trim() && !mediaUrl.trim()}
-              onClick={() => submit(true)}
-              className="inline-flex min-h-[34px] items-center gap-1.5 rounded-xl border border-line bg-card px-3.5 py-1.5 text-xs font-semibold text-ink shadow-2xs transition hover:bg-subtle active:scale-[0.98] disabled:opacity-50 dark:bg-[#132A3B]"
-            >
-              <CheckCheck className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>Send and close</span>
-            </button>
+          {showMore && (
+            <div className="absolute bottom-full left-0 z-20 mb-2 w-56 rounded-xl border border-line bg-panel p-1.5 shadow-pop">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMedia(true);
+                  setShowMore(false);
+                }}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13.5px] font-medium text-ink hover:bg-sunken"
+              >
+                <ImagePlus aria-hidden className="size-4 text-muted" /> Attach photo or PDF
+              </button>
+              <Link
+                href={`/dashboard/customers/${customerId}#reply`}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[13.5px] font-medium text-ink hover:bg-sunken"
+              >
+                <MessageCircle aria-hidden className="size-4 text-muted" /> Send a template
+              </Link>
+              <p className="border-t border-line px-3 pb-1 pt-2 text-[11.5px] text-muted">Ctrl + Enter sends.</p>
+            </div>
           )}
-
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowMore((v) => !v)}
-              className="inline-flex min-h-[34px] items-center gap-1 rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-muted transition hover:text-ink dark:bg-[#132A3B]"
-            >
-              <span>More +</span>
-            </button>
-            {showMore && (
-              <div className="absolute bottom-full right-0 mb-2 w-48 rounded-xl border border-line bg-card p-1.5 shadow-xl dark:bg-[#132A3B]">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowMedia(true);
-                    setShowMore(false);
-                  }}
-                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-ink hover:bg-subtle dark:text-white"
-                >
-                  <ImagePlus className="size-4 text-muted" /> Attach photo/PDF
-                </button>
-                <div className="my-1 border-t border-line" />
-                <p className="px-2.5 py-1 text-[11px] text-muted">Press Ctrl+Enter to send quickly</p>
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>

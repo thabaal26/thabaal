@@ -11,6 +11,9 @@ export type ConversationEntry =
   | { at: Date; type: "out"; id: string; template: string; campaign: string | null; status: string; body: string | null; readAt: Date | null; error: string | null; via: string | null }
   | { at: Date; type: "in"; id: string; text: string; kind: string; mediaId: string | null; mediaType: string | null; via: string | null };
 
+/** Sent from the chat box, not a template: no label needed above the message. */
+const TYPED = new Set(["Typed reply", "Media reply", "AI auto-reply"]);
+
 /** Extracts an optional `[Media: https://...]` attachment tag from an outbound message body. */
 function parseOutboundBody(body: string | null): { text: string; mediaUrl: string | null } {
   if (!body) return { text: "", mediaUrl: null };
@@ -47,7 +50,7 @@ function Ticks({ status }: { status: string }) {
  * A customer's messages and replies as a chat: oldest at the top, newest at the bottom,
  * with native, smooth, responsive scrolling that auto-anchors to the latest message.
  */
-export function Conversation({ entries, className }: { entries: ConversationEntry[]; className?: string }) {
+export function Conversation({ entries, className, plain }: { entries: ConversationEntry[]; className?: string; /** No wallpaper: the parent gives the background (Chats). */ plain?: boolean }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Oldest → newest with day dividers
@@ -70,11 +73,12 @@ export function Conversation({ entries, className }: { entries: ConversationEntr
   return (
     <div
       ref={scrollRef}
-      className={cn("chat-wall panel-scroll flex-1 min-h-0 overflow-y-auto overscroll-contain", className)}
+      // Paint containment keeps a long history from stretching the page itself (the list scrolls inside).
+      className={cn(!plain && "chat-wall", "panel-scroll flex-1 min-h-0 overflow-y-auto overscroll-contain [contain:layout_paint]", className)}
       tabIndex={0}
       aria-label="Conversation"
     >
-      <ol className="min-h-full w-full space-y-2.5 p-3.5 sm:p-5 flex flex-col justify-end">
+      <ol className="flex min-h-full w-full flex-col justify-end space-y-3 p-3.5 sm:p-4">
         {rows.map((r) =>
           "divider" in r ? (
             <li key={r.key} className="flex justify-center py-1">
@@ -82,7 +86,7 @@ export function Conversation({ entries, className }: { entries: ConversationEntr
             </li>
           ) : r.entry.type === "in" ? (
             <li key={r.key} className="flex">
-              <div className="max-w-[min(82%,32rem)] rounded-[16px] rounded-tl-xs bg-white dark:bg-[#202C33] px-3.5 py-2 text-[14px] text-[#111B21] dark:text-[#E9EDEF] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] border border-black/[0.04] dark:border-white/[0.04]">
+              <div className="max-w-[min(85%,36rem)] rounded-[14px] bg-panel px-4 py-2.5 text-[15px] text-ink shadow-[0_1px_1px_rgba(16,40,59,0.06)]">
                 {r.entry.kind === "button" && <p className="mb-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">Tapped a button</p>}
                 {r.entry.text && <p className="whitespace-pre-wrap [overflow-wrap:anywhere] leading-relaxed">{r.entry.text}</p>}
                 {r.entry.mediaId && <ReplyMedia id={r.entry.id} type={r.entry.mediaType} />}
@@ -94,11 +98,13 @@ export function Conversation({ entries, className }: { entries: ConversationEntr
             </li>
           ) : (
             <li key={r.key} className="flex justify-end">
-              <div className={cn("max-w-[min(82%,32rem)] rounded-[16px] rounded-tr-xs px-3.5 py-2 text-[14px] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]", r.entry.status === "FAILED" ? "bg-danger-bg ring-1 ring-danger-border text-ink" : "bg-[#D9FDD3] dark:bg-[#005C4B] text-[#111B21] dark:text-[#E9EDEF] border border-[#C5F3BC] dark:border-[#025142]")}>
-                <p className="mb-1 flex flex-wrap items-center gap-x-1.5 text-xs text-[#54656F] dark:text-[#8696A0]">
-                  <span>{templateLabel(r.entry.template)}</span>
-                  {r.entry.campaign && <span>· {r.entry.campaign}</span>}
-                </p>
+              <div className={cn("max-w-[min(85%,36rem)] rounded-[14px] px-4 py-2.5 text-[15px] shadow-[0_1px_1px_rgba(16,40,59,0.06)]", r.entry.status === "FAILED" ? "bg-danger-bg ring-1 ring-danger-border text-ink" : "bg-[#D9FDD3] text-[#111B21] dark:bg-[#005C4B] dark:text-[#E9EDEF]")}>
+                {(!TYPED.has(r.entry.template) || r.entry.campaign) && (
+                  <p className="mb-1 flex flex-wrap items-center gap-x-1.5 text-xs text-[#54656F] dark:text-[#8696A0]">
+                    {!TYPED.has(r.entry.template) && <span>{templateLabel(r.entry.template)}</span>}
+                    {r.entry.campaign && <span>· {r.entry.campaign}</span>}
+                  </p>
+                )}
                 {(() => {
                   const { text, mediaUrl } = parseOutboundBody(r.entry.body);
                   const isPdf = mediaUrl ? /\.pdf(\?|$)/i.test(mediaUrl) : false;
