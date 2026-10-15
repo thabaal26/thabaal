@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Card, PageHeader, StatusBadge } from "@/components/ui";
 import { WhatsAppBubble } from "@/components/whatsapp-preview";
 import { db } from "@/lib/db";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, templateDateLabel } from "@/lib/format";
 import { getScope, owned } from "@/lib/session";
 import { renderFor, SAMPLE_CUSTOMER, type TemplateButton, type VarMap } from "@/lib/template";
 import { TemplateEditor } from "../template-editor";
@@ -28,7 +28,7 @@ export default async function EditTemplatePage({ params }: PageProps<"/dashboard
           back={back}
           meta={
             <span className="flex flex-wrap items-center gap-2">
-              <StatusBadge status={t.status} /> {t.language} · last changed {fmtDate(t.updatedAt)}
+              <StatusBadge status={t.status} /> {t.language} · {templateDateLabel(t.createdAt, t.updatedAt)}
             </span>
           }
         />
@@ -50,7 +50,7 @@ export default async function EditTemplatePage({ params }: PageProps<"/dashboard
       <PageHeader
         title={t.name}
         back={back}
-        meta={`${t.client.name} · last changed ${fmtDate(t.updatedAt)}${t.lastSyncedAt ? ` · synced with Meta ${fmtDate(t.lastSyncedAt)}` : ""}`}
+        meta={`${t.client.name} · ${templateDateLabel(t.createdAt, t.updatedAt)}${t.lastSyncedAt ? ` · synced with Meta ${fmtDate(t.lastSyncedAt)}` : ""}`}
       />
       <TemplateEditor
         id={t.id}

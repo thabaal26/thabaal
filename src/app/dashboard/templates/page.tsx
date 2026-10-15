@@ -6,18 +6,21 @@ import { Badge, buttonClass, Card, EmptyState, FilterChips, PageHeader, Stat, St
 import { WhatsAppBubble } from "@/components/whatsapp-preview";
 import { DefaultImage } from "./default-image";
 import { db } from "@/lib/db";
-import { fmtDate, fmtNumber } from "@/lib/format";
+import { fmtDate, fmtNumber, templateDateLabel } from "@/lib/format";
 import { getScope, owned } from "@/lib/session";
 import { CATEGORY_INFO, renderFor, SAMPLE_CUSTOMER, type Category, type TemplateButton, type VarMap } from "@/lib/template";
 import { deleteTemplate, syncTemplates } from "../actions/templates";
 
 import { TemplateSearchInput } from "./template-search";
+import { TemplateSortSelect } from "./template-sort";
 
 export const metadata: Metadata = { title: "Templates" };
 export const dynamic = "force-dynamic";
 
 export default async function TemplatesPage({ searchParams }: PageProps<"/dashboard/templates">) {
-  const { category, q } = await searchParams;
+  const sp = await searchParams;
+  const { category, q } = sp;
+  const sort = typeof sp.sort === "string" ? sp.sort : "latest";
   const active = (Object.keys(CATEGORY_INFO) as Category[]).find((c) => c === category);
   const query = typeof q === "string" ? q.trim() : "";
   const scope = await getScope();
@@ -33,11 +36,18 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
       }
     : {};
 
+  const orderBy =
+    sort === "name"
+      ? [{ name: "asc" as const }]
+      : sort === "updated"
+      ? [{ updatedAt: "desc" as const }, { createdAt: "desc" as const }]
+      : [{ createdAt: "desc" as const }, { id: "desc" as const }];
+
   const [templates, counts, brand] = await Promise.all([
     db.template.findMany({
       where: { ...owned(scope), ...(active ? { category: active } : {}), ...qFilter },
       include: { _count: { select: { campaigns: true } }, client: { select: { name: true, defaultImageUrl: true, bannerUrl: true } } },
-      orderBy: { updatedAt: "desc" },
+      orderBy,
     }),
     db.template.groupBy({ by: ["category"], where: owned(scope), _count: true }),
     scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { defaultImageUrl: true, bannerUrl: true } }) : null,
@@ -48,6 +58,8 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
   const marketingCount = counts.find((c) => c.category === "MARKETING")?._count ?? 0;
   // What an image template without its own picture will send.
   const fallbackFor = (c: { defaultImageUrl: string | null; bannerUrl: string | null }) => c.defaultImageUrl ?? c.bannerUrl;
+
+  const sortSuffix = sort && sort !== "latest" ? `&sort=${encodeURIComponent(sort)}` : "";
 
   return (
     <>
@@ -65,19 +77,22 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
           </>
         }
         tabs={
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between w-full">
             <FilterChips
               label="Template category"
               items={[{ key: "", label: "All", n: total }, ...(Object.keys(CATEGORY_INFO) as Category[]).map((c) => ({ key: c, label: CATEGORY_INFO[c].label, n: counts.find((x) => x.category === c)?._count ?? 0 }))].map((tab) => ({
                 href: tab.key
-                  ? `/dashboard/templates?category=${tab.key}${query ? `&q=${encodeURIComponent(query)}` : ""}`
-                  : `/dashboard/templates${query ? `?q=${encodeURIComponent(query)}` : ""}`,
+                  ? `/dashboard/templates?category=${tab.key}${query ? `&q=${encodeURIComponent(query)}` : ""}${sortSuffix}`
+                  : `/dashboard/templates${query ? `?q=${encodeURIComponent(query)}` : ""}${sort && sort !== "latest" ? `${query ? "&" : "?"}sort=${encodeURIComponent(sort)}` : ""}`,
                 label: tab.label,
                 count: tab.n,
                 active: (active ?? "") === tab.key,
               }))}
             />
-            <TemplateSearchInput defaultValue={query} />
+            <div className="flex items-center gap-2 sm:shrink-0">
+              <TemplateSortSelect currentSort={sort} />
+              <TemplateSearchInput defaultValue={query} />
+            </div>
           </div>
         }
       />
@@ -145,7 +160,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <Link href={`/dashboard/templates/${t.id}`} className="block truncate font-mono text-sm font-semibold text-ink hover:underline" title={t.name}>{t.name}</Link>
-                      <p className="mt-0.5 text-xs text-muted">{!scope.clientId && `${t.client.name} · `}{t.language} · updated {fmtDate(t.updatedAt, "d MMM")}{t._count.campaigns ? ` · ${t._count.campaigns} campaign${t._count.campaigns > 1 ? "s" : ""}` : ""}</p>
+                      <p className="mt-0.5 text-xs text-muted">{!scope.clientId && `${t.client.name} · `}{t.language} · {templateDateLabel(t.createdAt, t.updatedAt, { preferUpdated: sort === "updated" })}{t._count.campaigns ? ` · ${t._count.campaigns} campaign${t._count.campaigns > 1 ? "s" : ""}` : ""}</p>
                     </div>
                     <StatusBadge status={t.status} />
                   </div>

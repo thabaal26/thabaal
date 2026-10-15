@@ -220,7 +220,28 @@ export async function syncTemplates(): Promise<ActionResult> {
         const image =
           parsed.headerType === "IMAGE" && local?.headerMediaUrl == null ? await syncedHeaderImage(r.name, r.components ?? []) : null;
         if (local) {
-          await db.template.update({ where: { id: local.id }, data: { ...content, ...(image && { headerMediaUrl: image }) } });
+          const hasChanged =
+            local.status !== content.status ||
+            local.statusReason !== content.statusReason ||
+            local.category !== content.category ||
+            local.body !== content.body ||
+            local.headerType !== content.headerType ||
+            local.headerText !== content.headerText ||
+            local.footer !== content.footer ||
+            local.metaId !== content.metaId ||
+            local.businessAccountId !== content.businessAccountId ||
+            (image != null && local.headerMediaUrl !== image) ||
+            stable(local.buttons) !== stable(content.buttons);
+
+          if (hasChanged) {
+            await db.template.update({ where: { id: local.id }, data: { ...content, ...(image && { headerMediaUrl: image }) } });
+          } else {
+            await db.$executeRaw`
+              UPDATE "Template"
+              SET "lastSyncedAt" = ${content.lastSyncedAt}
+              WHERE "id" = ${local.id}
+            `;
+          }
         } else {
           await db.template.create({ data: { clientId, name: r.name, language: r.language, ...content, ...(image && { headerMediaUrl: image }), variables: { "1": { source: "first_name" } } } });
           imported++;

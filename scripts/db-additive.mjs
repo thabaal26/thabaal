@@ -5,7 +5,10 @@
 // If a file fails, the build fails and the previous deployment stays live.
 import { execSync } from "node:child_process";
 
-const FILES = ["prisma/sql/2026-10-15-loyalty-redeem.sql"];
+const FILES = [
+  "prisma/sql/2026-10-15-loyalty-redeem.sql",
+  "prisma/sql/2026-10-15-template-dates.sql",
+];
 
 if (process.env.VERCEL !== "1") {
   console.log("db-additive: not a Vercel build, skipped");
