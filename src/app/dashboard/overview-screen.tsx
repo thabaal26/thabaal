@@ -3,7 +3,7 @@ import { CheckCheck, Clock, Send, TriangleAlert } from "@/components/icons";
 import Link from "@/components/intent-link";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { ActionButton } from "@/components/action-button";
-import { Calendar3D, Eye3D, Messages3D, Rupee3D, Send3D, Template3D } from "@/components/icons-3d";
+import { Calendar3D, Clock3D, Eye3D, Messages3D, Rupee3D, Send3D, ShoppingBag3D, Sparkles3D, Template3D } from "@/components/icons-3d";
 import { Avatar, Badge, buttonClass, Callout, Card, CardHeader, EmptyState, Meter, StatusBadge } from "@/components/ui";
 import { detectCategory, getCatalogWithProducts } from "@/lib/catalog";
 import { isSectionEnabled } from "@/lib/client-sections";
@@ -399,6 +399,14 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
   const cancelledCartRevenue = curCancelledCarts.reduce((n, o) => n + o.total, 0);
   const prevRevenue = prevBoughtOrders.reduce((n, o) => n + o.total, 0);
   const replies = replySeries.reduce((n, r) => n + Number(r.n), 0);
+
+  const prevAllOrders = orders.filter((o) => o.createdAt >= prevStart && o.createdAt < prevEnd);
+  const prevUnpaidCarts = prevAllOrders.filter(isUnpaidCart);
+  const prevCancelledCarts = prevAllOrders.filter((o) => o.status === "CANCELLED");
+
+  const cartSpark = keys.map((k) => curAllOrders.filter((o) => keyOf(o.createdAt) === k).length);
+  const unpaidSpark = keys.map((k) => curUnpaidCarts.filter((o) => keyOf(o.createdAt) === k).length);
+  const cancelledSpark = keys.map((k) => curCancelledCarts.filter((o) => keyOf(o.createdAt) === k).length);
 
   const sentSpark = keys.map((k) => at(k));
   const deliveredSpark = keys.map((k) => at(k, "DELIVERED") + at(k, "READ"));
@@ -1930,6 +1938,56 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
 
       {view === "carts" && ordersOn && (
         <div className="space-y-3.5 sm:space-y-5">
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
+            <KpiTile
+              label="Carts placed"
+              value={curAllOrders.length}
+              format="count"
+              sub={`₹${Math.round(revenue + unpaidCartRevenue + cancelledCartRevenue).toLocaleString("en-IN")} total value · ${new Set(curAllOrders.map((o) => o.customerId)).size} buyers`}
+              icon={ShoppingBag3D}
+              color={C.brand}
+              spark={cartSpark}
+              delta={{ cur: curAllOrders.length, prev: prevAllOrders.length, kind: "pct" }}
+              vs={prevLabel}
+              href="/dashboard/orders?show=all"
+            />
+            <KpiTile
+              label="Paid orders"
+              value={curOrders.length}
+              format="count"
+              sub={`${curAllOrders.length ? Math.round((curOrders.length / curAllOrders.length) * 100) : 0}% converted · ₹${Math.round(revenue).toLocaleString("en-IN")}`}
+              icon={Rupee3D}
+              color={C.gold}
+              spark={revenueSpark}
+              delta={{ cur: revenue, prev: prevRevenue, kind: "pct" }}
+              vs={prevLabel}
+              href="/dashboard/orders?show=paid"
+            />
+            <KpiTile
+              label="Unpaid carts waiting"
+              value={curUnpaidCarts.length}
+              format="count"
+              sub={`₹${Math.round(unpaidCartRevenue).toLocaleString("en-IN")} awaiting payment`}
+              icon={Clock3D}
+              color={C.glow}
+              spark={unpaidSpark}
+              delta={{ cur: curUnpaidCarts.length, prev: prevUnpaidCarts.length, kind: "pct", goodWhenUp: false }}
+              vs={prevLabel}
+              href="/dashboard/orders?show=unpaid"
+            />
+            <KpiTile
+              label="Replaced / cancelled"
+              value={curCancelledCarts.length}
+              format="count"
+              sub={`₹${Math.round(cancelledCartRevenue).toLocaleString("en-IN")} revised away`}
+              icon={Sparkles3D}
+              color={C.failed}
+              spark={cancelledSpark}
+              delta={{ cur: curCancelledCarts.length, prev: prevCancelledCarts.length, kind: "pct", goodWhenUp: false }}
+              vs={prevLabel}
+              href="/dashboard/orders?show=cancelled"
+            />
+          </div>
           <CartMentalityCard data={cartMentalityData} />
         </div>
       )}

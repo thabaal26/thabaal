@@ -1,4 +1,4 @@
-import { BarChart3, Trophy } from "@/components/icons";
+import { ChartBar3D, Target3D, Trophy3D } from "@/components/icons-3d";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
 import { Card, CardHeader, PageHeader, PickClientNotice } from "@/components/ui";
@@ -100,7 +100,7 @@ export default async function ReportPage({ searchParams }: PageProps<"/dashboard
 
   const now = new Date();
   const [r, campaigns, refills] = await Promise.all([weeklyReport(scope.clientId, now), campaignResults(scope.clientId, 7), refillForecast(scope.clientId, now)]);
-  const range = `${fmtDate(r.from, "d MMM")} – ${fmtDate(new Date(r.to.getTime() - 1), "d MMM yyyy")}`;
+  const range = `${fmtDate(r.from, "d MMM")} – ${fmtDate(now, "d MMM yyyy")}`;
   const topCampaign = [...campaigns].sort((a, b) => b.revenue - a.revenue || b.replied - a.replied)[0];
   const dueNext = refills.due.filter((d) => d.daysLeft >= 0 && d.daysLeft <= 7);
   const overdue = refills.due.filter((d) => d.daysLeft < 0);
@@ -133,8 +133,8 @@ export default async function ReportPage({ searchParams }: PageProps<"/dashboard
       />
 
       <div className="grid grid-cols-1 gap-4 sm:gap-5 xl:grid-cols-12">
-        <Card className="xl:col-span-5">
-          <CardHeader tone="brand" icon={<BarChart3 className="size-5 stroke-[2]" />} title="The week in numbers" description="vs the week before" />
+        <Card className="card-3d xl:col-span-5">
+          <CardHeader tone="brand" icon={<ChartBar3D />} title="The week in numbers" description="vs the week before" />
           <table className="ui-table w-full text-sm">
             <tbody>
               {ROWS.map((row) => {
@@ -163,8 +163,8 @@ export default async function ReportPage({ searchParams }: PageProps<"/dashboard
         </Card>
 
         <div className="space-y-4 sm:space-y-5 xl:col-span-7">
-          <Card>
-            <CardHeader tone="gold" icon={<Trophy className="size-5 stroke-[2]" />} title="Paid sales per day" />
+          <Card className="card-3d">
+            <CardHeader tone="gold" icon={<Trophy3D />} title="Paid sales per day" />
             <div className="p-4 sm:p-5">
               <ColumnChart
                 format="inr"
@@ -177,14 +177,14 @@ export default async function ReportPage({ searchParams }: PageProps<"/dashboard
           </Card>
 
           <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2">
-            <Card>
-              <CardHeader tone="brand" icon={<Trophy className="size-5 stroke-[2]" />} title="Top products" />
+            <Card className="card-3d">
+              <CardHeader tone="brand" icon={<Trophy3D />} title="Top products" />
               <div className="p-4 sm:p-5">
                 <BarList format="inr" empty="No paid orders last week." items={r.topProducts.map((p) => ({ key: p.name, label: p.name, value: p.revenue, sub: `${fmtNumber(p.units)} sold` }))} />
               </div>
             </Card>
-            <Card>
-              <CardHeader tone="violet" icon={<BarChart3 className="size-5 stroke-[2]" />} title="To do this week" />
+            <Card className="card-3d">
+              <CardHeader tone="violet" icon={<Target3D />} title="To do this week" />
               {todo.length ? (
                 <ul className="space-y-2 p-4 text-sm text-ink-2 sm:p-5">
                   {todo.map((t) => (

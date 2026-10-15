@@ -348,13 +348,14 @@ async function weekFigures(clientId: string, from: Date, to: Date): Promise<Week
     replies,
     repliers: repliers.length,
     carts: orders.length,
-    abandoned: orders.filter((o) => o.status === "NEW" && !o.paidAt).length,
+    abandoned: orders.filter((o) => (o.status === "NEW" || o.status === "CANCELLED") && !o.paidAt).length,
   };
 }
 
 export async function weeklyReport(clientId: string, now = new Date()): Promise<WeeklyReport> {
-  const to = dayStart(now);
-  const from = new Date(to.getTime() - 7 * DAY);
+  const today = dayStart(now);
+  const to = addDays(today, 1);
+  const from = new Date(today.getTime() - 6 * DAY);
   const prevFrom = new Date(from.getTime() - 7 * DAY);
   const [cur, prev, orders] = await Promise.all([
     weekFigures(clientId, from, to),
@@ -363,7 +364,12 @@ export async function weeklyReport(clientId: string, now = new Date()): Promise<
   ]);
   const daily = Array.from({ length: 7 }, (_, i) => {
     const d = addDays(from, i);
-    return { key: formatInTimeZone(d, APP_TZ, "yyyy-MM-dd"), label: formatInTimeZone(d, APP_TZ, "EEE"), revenue: 0 };
+    const isToday = i === 6;
+    return {
+      key: formatInTimeZone(d, APP_TZ, "yyyy-MM-dd"),
+      label: isToday ? "Today" : formatInTimeZone(d, APP_TZ, "EEE"),
+      revenue: 0,
+    };
   });
   const catalog = await catalogFor(clientId);
   const prods = new Map<string, { units: number; revenue: number }>();
@@ -372,7 +378,7 @@ export async function weeklyReport(clientId: string, now = new Date()): Promise<
     const day = daily.find((d) => d.key === formatInTimeZone(o.createdAt, APP_TZ, "yyyy-MM-dd"));
     if (day) day.revenue += o.total;
     for (const i of (o.items as OrderItem[] | null) ?? []) {
-      const nme = catalog.item(i)?.name;
+      const nme = catalog.item(i)?.name ?? i.name;
       if (!nme) continue;
       const p = prods.get(nme) ?? { units: 0, revenue: 0 };
       p.units += Number(i.quantity) || 1;
