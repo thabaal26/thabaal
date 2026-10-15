@@ -222,7 +222,7 @@ export function PurchaseJourney({
                     <span className="font-normal text-muted">(= ₹{fmtNumber(loyalty.rewardRupees)} reward value)</span>
                   </h4>
                   <p className="text-[11px] text-muted">
-                    1 pt per ₹10 spent + 50 bonus pts per repeat order · 100 pts = ₹50 off
+                    1 pt per ₹100 spent + 50 bonus pts per repeat order · 100 pts = ₹50 off
                   </p>
                 </div>
               </div>

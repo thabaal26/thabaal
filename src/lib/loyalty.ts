@@ -14,7 +14,7 @@ export type RfmSegment =
   | "Cold Prospect";
 
 export type CustomerLoyaltySummary = {
-  /** Points from confirmed order spend (1 pt per ₹10 spent) */
+  /** Points from confirmed order spend (1 pt per ₹100 spent) */
   spendPoints: number;
   /** Bonus points from order frequency (+50 pts for every repeat order after the 1st) */
   frequencyPoints: number;
@@ -55,6 +55,9 @@ export type CustomerLoyaltySummary = {
 };
 
 const BONUS_TAG_PREFIX = "loyalty-bonus:";
+
+/** Rupees a customer spends to earn 1 loyalty point. */
+export const RUPEES_PER_POINT = 100;
 
 /** Reads manual bonus/redeemed points stored in Customer.tags (e.g. "loyalty-bonus:150" or "loyalty-bonus:-100"). */
 export function parseManualLoyaltyPoints(tags: string[] | null | undefined): number {
@@ -117,11 +120,11 @@ export function computeCustomerLoyalty(input: {
     : 0;
 
   // 1. Points formula:
-  //    - 1 pt per ₹10 spent on confirmed WhatsApp orders (5% value back in points)
+  //    - 1 pt per ₹100 spent on confirmed WhatsApp orders (the client's rule)
   //    - +50 pts per repeat WhatsApp order (2nd order onwards)
   //    - +35 pts per historical sheet purchase item
   //    - + manual bonus / minus redeemed points
-  const spendPoints = Math.floor(spent / 10);
+  const spendPoints = Math.floor(spent / RUPEES_PER_POINT);
   const frequencyPoints = Math.max(0, paidOrders - 1) * 50;
   const sheetPoints = sheetItemsCount * 35;
   const manualPoints = parseManualLoyaltyPoints(input.tags);
@@ -293,8 +296,8 @@ export function computeCustomerLoyalty(input: {
   } else {
     offerBadge = "First Order";
     offerHeadline = "Invite them to place their first WhatsApp order";
-    offerReason = "Hasn't ordered on WhatsApp yet. Every order earns points (1 point per ₹10), so tell them about it.";
-    whatsappOfferCopy = `Vanakkam ${firstName}! Welcome to ${brand}. Order on WhatsApp and earn loyalty points on every order: 1 point for every ₹10, and 100 points = ₹50 off.`;
+    offerReason = `Hasn't ordered on WhatsApp yet. Every order earns points (1 point per ₹${RUPEES_PER_POINT}), so tell them about it.`;
+    whatsappOfferCopy = `Vanakkam ${firstName}! Welcome to ${brand}. Order on WhatsApp and earn loyalty points on every order: 1 point for every ₹${RUPEES_PER_POINT}, and 100 points = ₹50 off.`;
   }
 
   return {

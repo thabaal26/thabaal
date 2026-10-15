@@ -6,13 +6,14 @@ import { applyManualLoyaltyDelta, computeCustomerLoyalty } from "../../src/lib/l
 const base = { name: "Meena R", brandName: "Test Shop" };
 
 describe("loyalty points", () => {
-  test("1 point per ₹10 spent, +50 for each repeat order, 100 points = ₹50", () => {
+  test("1 point per ₹100 spent, +50 for each repeat order, 100 points = ₹50", () => {
     const l = computeCustomerLoyalty({ ...base, paidOrdersCount: 3, totalSpent: 1250 });
-    assert.equal(l.spendPoints, 125);
+    assert.equal(l.spendPoints, 12); // ₹1,250 ÷ 100, rounded down
     assert.equal(l.frequencyPoints, 100); // 2nd and 3rd orders
-    assert.equal(l.totalPoints, 225);
-    assert.equal(l.rewardRupees, 113); // 225 × ₹0.50, rounded
-    assert.equal(l.redeemableRupees, 100); // in ₹25 steps
+    assert.equal(l.totalPoints, 112);
+    assert.equal(l.rewardRupees, 56); // 112 × ₹0.50
+    assert.equal(l.redeemableRupees, 50); // in ₹25 steps
+    assert.equal(computeCustomerLoyalty({ ...base, paidOrdersCount: 1, totalSpent: 99 }).spendPoints, 0);
   });
 
   test("old order-sheet items earn 35 points each; manual changes add or take away", () => {
