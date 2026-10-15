@@ -51,8 +51,8 @@ function Logo({ size }: { size: "sm" | "md" }) {
   return (
     <Link href="/dashboard" aria-label="Thabaal home" className="flex shrink-0 items-center gap-2 transition hover:opacity-90">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/brands/thabaal/artifact-logo.png" alt="" width={40} height={22} data-keep className={size === "md" ? "h-auto w-10" : "h-auto w-9"} />
-      <b className={`font-display font-semibold leading-none tracking-[-0.3px] text-ink ${size === "md" ? "text-[22px]" : "text-[20px]"}`}>thabaal</b>
+      <img src="/brands/thabaal/artifact-logo.png" alt="" width={40} height={22} data-keep className={`h-auto dark:[filter:drop-shadow(0_0_0.6px_#fff)_drop-shadow(0_0_1.2px_rgb(255_255_255/0.55))] ${size === "md" ? "w-11" : "w-9"}`} />
+      <b className={`font-display font-semibold leading-none tracking-[-0.3px] text-ink ${size === "md" ? "text-[24px]" : "text-[20px]"}`}>thabaal</b>
     </Link>
   );
 }
@@ -124,7 +124,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
   return (
     <NotificationProvider initialUnreadCount={unreadNotifications}>
       <ShellProvider notifications={notificationsOn}>
-        <div {...appearanceAttrs(look)} style={themeStyle(client)} className="min-h-dvh w-full overflow-x-clip bg-canvas lg:flex print:bg-white">
+        <div {...appearanceAttrs(look)} style={themeStyle(client)} className="min-h-dvh w-full overflow-x-clip bg-canvas lg:flex lg:items-start lg:gap-3 lg:bg-desk lg:p-3 print:bg-white print:p-0">
           {client && themeCss(client) && <style>{themeCss(client)}</style>}
           {/* The portal's look (Settings → Appearance, or this client's own): set on <html> before
               anything paints, so sheets and dialogs wear it too. */}
@@ -135,17 +135,18 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
             Skip to content
           </a>
 
-          {/* Computers: the menu, pinned on the left while the page scrolls. */}
-          <aside className="sticky top-0 hidden h-dvh w-[248px] shrink-0 flex-col border-r border-line bg-panel lg:flex print:!hidden">
-            <div className="flex h-16 shrink-0 items-center px-5">
+          {/* Computers: two floating bars on a darker backdrop. The menu (white) stays pinned while the
+              page bar (cream) scrolls with the window, so sticky headers and pinned buttons keep working. */}
+          <aside className="sticky top-3 hidden h-[calc(100dvh-1.5rem)] w-[248px] shrink-0 flex-col overflow-hidden rounded-[22px] border border-line bg-panel shadow-float lg:flex print:!hidden">
+            <div className="flex h-[72px] shrink-0 items-center justify-center border-b border-line px-5">
               <Logo size="md" />
             </div>
             {scope.isAdmin && (
-              <div className="shrink-0 px-3 pb-1">
+              <div className="shrink-0 px-3 pb-1 pt-3">
                 <ClientSwitcher clients={clients} current={scope.clientId} />
               </div>
             )}
-            <div className="thin-scroll min-h-0 flex-1 overflow-y-auto px-3 py-2">
+            <div className="thin-scroll min-h-0 flex-1 overflow-y-auto px-3 py-3">
               <SideNav
                 isAdmin={scope.isAdmin}
                 showWallet={client?.billingMode === "wallet"}
@@ -186,7 +187,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
             </div>
           </header>
 
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 lg:min-h-[calc(100dvh-1.5rem)] lg:rounded-[22px] lg:border lg:border-line lg:bg-canvas lg:shadow-float print:border-0 print:shadow-none">
             <main
               id="main"
               className="stagger relative mx-auto w-full max-w-page px-3 pb-[calc(4.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pt-6 lg:px-8 lg:pb-10 lg:pt-7 print:p-0"

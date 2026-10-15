@@ -78,6 +78,7 @@
   --color-canvas: #FFF9F0; /* warm cream canvas */
   --color-panel: #FFFFFF; /* crisp white card surface */
   --color-card: #FFFFFF; /* same as panel (some screens say bg-card) */
+  --color-desk: #E4D6BE; /* computers: the backdrop the two floating bars (menu, page) sit on */
   --color-surface: #FFFFFF;
   --color-subtle: #FFF9F0; /* warm parchment sidebar and secondary surfaces */
   --color-sunken: #F5EDE0; /* inset areas inside a card: item lists, read-only values, segmented tracks */
@@ -164,6 +165,7 @@
   --shadow-xs: 0 1px 2px rgb(16 24 40 / 0.05);
   --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.03);
   --shadow-pop: 0 16px 40px -12px rgb(16 24 40 / 0.22), 0 4px 10px -4px rgb(16 24 40 / 0.08);
+  --shadow-float: 0 1px 2px rgb(16 40 59 / 0.06), 0 16px 40px -16px rgb(16 40 59 / 0.28); /* the two floating bars */
   --shadow-bar: 0 -1px 0 rgb(16 24 40 / 0.06), 0 -8px 24px -16px rgb(16 24 40 / 0.18); /* bars pinned to the bottom of the screen */
 
   /* Layout */
@@ -565,6 +567,8 @@ input:-webkit-autofill:active {
   --color-canvas: #0B1E2D;
   --color-panel: #133248;
   --color-card: #133248;
+  --color-desk: #050F17;
+  --shadow-float: 0 0 0 1px rgb(255 255 255 / 0.04), 0 18px 44px -14px rgb(0 0 0 / 0.75);
   --color-surface: #133248;
   --color-subtle: #0B1E2D;
   --color-sunken: #0E2535;
