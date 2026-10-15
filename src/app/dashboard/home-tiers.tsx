@@ -96,13 +96,13 @@ function waitText(since: Date | null) {
 
 function TodoTile({ href, big, title, sub, go }: { href: string; big: string; title: string; sub: string; go: string }) {
   return (
-    <Link href={href} className="flex items-center gap-4 rounded-xl border-[1.5px] border-line bg-panel p-4 transition hover:border-ink">
-      <span className="tabular shrink-0 font-display text-[26px] font-semibold leading-none text-ink">{big}</span>
+    <Link href={href} className="flex items-center gap-3 rounded-xl border-[1.5px] border-line bg-panel p-3.5 transition hover:border-ink active:scale-[0.99] sm:gap-4 sm:p-4">
+      <span className="tabular shrink-0 font-display text-[22px] font-semibold leading-none text-ink sm:text-[26px]">{big}</span>
       <span className="min-w-0 flex-1">
-        <b className="block text-[14.5px] font-bold text-ink">{title}</b>
-        <span className="block text-[13px] text-muted">{sub}</span>
+        <b className="block truncate text-[13.5px] font-bold text-ink sm:text-[14.5px]">{title}</b>
+        <span className="block truncate text-[12px] text-muted sm:text-[13px]">{sub}</span>
       </span>
-      <span className="ml-auto whitespace-nowrap text-[14px] font-bold text-ink dark:text-brand">{go} ›</span>
+      <span className="ml-auto shrink-0 whitespace-nowrap text-[13px] font-bold text-ink dark:text-brand sm:text-[14px]">{go} ›</span>
     </Link>
   );
 }
@@ -131,16 +131,16 @@ export function HomeTiers(p: HomeTiersProps) {
   const rangeWord = RANGES.find((r) => r.id === p.activeRange)?.label ?? "7 days";
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 sm:space-y-7">
+    <div className="mx-auto max-w-5xl space-y-5 sm:space-y-7">
       <header className="flex flex-col gap-3 pt-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-display text-3xl font-semibold tracking-[-0.3px] text-ink sm:text-[32px]">{p.greetingText}</h1>
-          <p className="mt-1 text-[14.5px] text-muted">Here is today, in plain words.</p>
+          <h1 className="font-display text-2xl font-semibold tracking-[-0.3px] text-ink sm:text-[32px]">{p.greetingText}</h1>
+          <p className="mt-0.5 text-[13px] text-muted sm:mt-1 sm:text-[14.5px]">Here is today, in plain words.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
           {p.actions}
           {p.ordersOn && (
-            <Link href="/dashboard/orders?new=1" className="inline-flex min-h-[40px] items-center gap-2 rounded-control bg-brand px-4 text-[14px] font-semibold text-on-brand shadow-xs transition hover:brightness-105 active:scale-[0.98]">
+            <Link href="/dashboard/orders?new=1" className="inline-flex min-h-[38px] items-center gap-2 rounded-control bg-brand px-3.5 text-[13.5px] font-semibold text-on-brand shadow-xs transition hover:brightness-105 active:scale-[0.98] sm:min-h-[40px] sm:px-4 sm:text-[14px]">
               <Plus aria-hidden className="size-4" />
               New order
             </Link>
@@ -152,21 +152,21 @@ export function HomeTiers(p: HomeTiersProps) {
       {p.alerts && <div className="space-y-3 [&>*]:mb-0 [&>div]:space-y-3 empty:hidden">{p.alerts}</div>}
 
       {todos.length > 0 && (
-        <section className={cn(card, "p-5 sm:p-6")}>
-          <div className="mb-4">
-            <h2 className="font-display text-[20px] font-semibold text-ink">
+        <section className={cn(card, "p-4 sm:p-6")}>
+          <div className="mb-3.5 sm:mb-4">
+            <h2 className="font-display text-[18px] font-semibold text-ink sm:text-[20px]">
               {needing === 0 ? "Nothing needs you right now" : `${needing} thing${needing === 1 ? "" : "s"} need${needing === 1 ? "s" : ""} you today`}
             </h2>
-            <p className="mt-0.5 text-[13.5px] text-muted">{needing === 0 ? "All caught up. New orders and chats will show here." : "Start here. Everything else can wait."}</p>
+            <p className="mt-0.5 text-[12.5px] text-muted sm:text-[13.5px]">{needing === 0 ? "All caught up. New orders and chats will show here." : "Start here. Everything else can wait."}</p>
           </div>
-          <div className={cn("grid grid-cols-1 gap-3 sm:gap-4", todos.length === 3 ? "md:grid-cols-3" : todos.length === 2 ? "md:grid-cols-2" : "")}>{todos.map((t) => t.node)}</div>
+          <div className={cn("grid grid-cols-1 gap-2.5 sm:gap-4", todos.length === 3 ? "md:grid-cols-3" : todos.length === 2 ? "md:grid-cols-2" : "")}>{todos.map((t) => t.node)}</div>
         </section>
       )}
 
       <section>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-display text-[20px] font-semibold text-ink">How the business is doing</h2>
-          <nav aria-label="Period" className="inline-flex rounded-full border-[1.5px] border-line bg-panel p-[3px]">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2.5">
+          <h2 className="font-display text-[18px] font-semibold text-ink sm:text-[20px]">How the business is doing</h2>
+          <nav aria-label="Period" className="inline-flex rounded-full border-[1.5px] border-line bg-panel p-[2.5px] sm:p-[3px]">
             {RANGES.map((r) => {
               const active = p.activeRange === r.id;
               return (
@@ -174,7 +174,7 @@ export function HomeTiers(p: HomeTiersProps) {
                   key={r.id}
                   href={r.id === "7d" ? "/dashboard" : `/dashboard?range=${r.id}`}
                   aria-current={active ? "page" : undefined}
-                  className={cn("rounded-full px-3.5 py-1 text-xs font-semibold transition", active ? "bg-ink text-canvas" : "text-muted hover:text-ink")}
+                  className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition sm:px-3.5 sm:py-1 sm:text-xs", active ? "bg-ink text-canvas" : "text-muted hover:text-ink")}
                 >
                   {r.label}
                 </Link>
@@ -182,17 +182,17 @@ export function HomeTiers(p: HomeTiersProps) {
             })}
           </nav>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
           {p.kpis.map((k) => {
             const dl = delta(k);
             const body = (
               <>
-                <div className="px-4 pt-4 sm:px-5 sm:pt-5">
-                  <div className="text-[13px] font-medium text-muted sm:text-[13.5px]">{k.label}</div>
-                  <div className="tabular mt-1 font-display text-[24px] font-semibold leading-tight text-ink sm:text-[28px]">{k.value}</div>
-                  <div className={cn("tabular mt-1 text-[13px] font-semibold", dl.tone === "up" ? "text-success" : dl.tone === "down" ? "text-danger" : "text-muted")}>{dl.text}</div>
+                <div className="px-3 pt-3 sm:px-5 sm:pt-5">
+                  <div className="truncate text-[11.5px] font-medium text-muted sm:text-[13.5px]">{k.label}</div>
+                  <div className="tabular mt-0.5 font-display text-[20px] font-semibold leading-tight text-ink sm:mt-1 sm:text-[28px] truncate">{k.value}</div>
+                  <div className={cn("tabular mt-0.5 text-[11.5px] font-semibold sm:mt-1 sm:text-[13px] truncate", dl.tone === "up" ? "text-success" : dl.tone === "down" ? "text-danger" : "text-muted")}>{dl.text}</div>
                 </div>
-                <div className="mt-3 overflow-hidden rounded-b-[inherit]">
+                <div className="mt-2 overflow-hidden rounded-b-[inherit] sm:mt-3">
                   <AreaSparkline data={k.spark} tone={dl.tone === "down" ? "danger" : "brand"} />
                 </div>
               </>
@@ -208,7 +208,7 @@ export function HomeTiers(p: HomeTiersProps) {
             );
           })}
         </div>
-        <p className="mt-2.5 text-[12.5px] text-muted">
+        <p className="mt-2 text-[12px] text-muted sm:mt-2.5 sm:text-[12.5px]">
           Compared with the previous {rangeWord}. <Link href="/dashboard/report" className="font-semibold text-ink underline-offset-4 hover:underline">Full reports ›</Link>
         </p>
       </section>

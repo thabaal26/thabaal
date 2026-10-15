@@ -61,21 +61,21 @@ export function ChatList({
                 scroll={false}
                 onClick={() => onSelectCustomer?.(item.customerId)}
                 aria-current={current ? "true" : undefined}
-                className={cn("block px-4 py-3.5 transition-colors", current ? "bg-brand-soft" : "hover:bg-sunken/60")}
+                className={cn("block px-3.5 py-2.5 sm:px-4 sm:py-3.5 transition-colors", current ? "bg-brand-soft" : "hover:bg-sunken/60")}
               >
                 <div className="flex items-baseline justify-between gap-2">
-                  <p className="truncate text-[15px] font-bold text-ink">{item.name}</p>
-                  <time className="tabular shrink-0 text-[13px] font-semibold text-muted">{item.timeStr}</time>
+                  <p className="truncate text-[14px] sm:text-[15px] font-bold text-ink">{item.name}</p>
+                  <time className="tabular shrink-0 text-[11.5px] sm:text-[13px] font-semibold text-muted">{item.timeStr}</time>
                 </div>
-                <p className="mt-1 truncate text-[14px] text-muted">
+                <p className="mt-0.5 sm:mt-1 truncate text-[12.5px] sm:text-[14px] text-muted">
                   {item.isButton && <span className="font-semibold text-success">Tapped: </span>}
                   {item.previewText}
                 </p>
                 {(item.unpaidLabel || item.openCount > 1 || item.handled) && (
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    {item.unpaidLabel && <span className="rounded-full bg-warning-bg px-2 py-0.5 text-[11px] font-bold text-warning">{item.unpaidLabel}</span>}
-                    {item.openCount > 1 && <span className="rounded-full bg-success-bg px-2 py-0.5 text-[11px] font-bold text-success">{item.openCount} new</span>}
-                    {item.handled && <span className="text-[11.5px] font-medium text-muted">✓ Handled</span>}
+                  <div className="mt-1 sm:mt-1.5 flex flex-wrap items-center gap-1.5">
+                    {item.unpaidLabel && <span className="rounded-full bg-warning-bg px-2 py-0.5 text-[10.5px] sm:text-[11px] font-bold text-warning">{item.unpaidLabel}</span>}
+                    {item.openCount > 1 && <span className="rounded-full bg-success-bg px-2 py-0.5 text-[10.5px] sm:text-[11px] font-bold text-success">{item.openCount} new</span>}
+                    {item.handled && <span className="text-[11px] sm:text-[11.5px] font-medium text-muted">✓ Handled</span>}
                   </div>
                 )}
               </Link>

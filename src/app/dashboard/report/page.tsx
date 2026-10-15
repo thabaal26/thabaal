@@ -145,11 +145,11 @@ export default async function ReportPage({ searchParams }: PageProps<"/dashboard
                 const goodWhenDown = row.key === "abandoned";
                 return (
                   <tr key={row.key} className="border-t border-line">
-                    <td className="px-4 py-2 text-ink-2 sm:px-5">{row.label}</td>
-                    <td className="tabular px-3 py-2 text-right font-semibold text-ink">{formatValue(c, row.fmt)}</td>
+                    <td className="px-3 py-2 text-xs text-ink-2 sm:px-5 sm:text-sm">{row.label}</td>
+                    <td className="tabular px-2.5 py-2 text-right text-xs font-semibold text-ink sm:px-3 sm:text-sm">{formatValue(c, row.fmt)}</td>
                     <td
                       className={cn(
-                        "tabular w-20 px-4 py-2 text-right text-xs font-semibold sm:px-5",
+                        "tabular w-16 px-2.5 py-2 text-right text-[11px] font-semibold sm:w-20 sm:px-5 sm:text-xs",
                         ch.startsWith("▲") || ch.startsWith("▼") ? (up !== goodWhenDown ? "text-success" : "text-danger") : "text-muted",
                       )}
                     >
@@ -165,7 +165,7 @@ export default async function ReportPage({ searchParams }: PageProps<"/dashboard
         <div className="space-y-4 sm:space-y-5 xl:col-span-7">
           <Card className="card-3d">
             <CardHeader tone="gold" icon={<Trophy3D />} title="Paid sales per day" />
-            <div className="p-4 sm:p-5">
+            <div className="p-3.5 sm:p-5">
               <ColumnChart
                 format="inr"
                 minWidth={320}
@@ -179,14 +179,14 @@ export default async function ReportPage({ searchParams }: PageProps<"/dashboard
           <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2">
             <Card className="card-3d">
               <CardHeader tone="brand" icon={<Trophy3D />} title="Top products" />
-              <div className="p-4 sm:p-5">
+              <div className="p-3.5 sm:p-5">
                 <BarList format="inr" empty="No paid orders last week." items={r.topProducts.map((p) => ({ key: p.name, label: p.name, value: p.revenue, sub: `${fmtNumber(p.units)} sold` }))} />
               </div>
             </Card>
             <Card className="card-3d">
               <CardHeader tone="violet" icon={<Target3D />} title="To do this week" />
               {todo.length ? (
-                <ul className="space-y-2 p-4 text-sm text-ink-2 sm:p-5">
+                <ul className="space-y-2 p-3.5 text-xs text-ink-2 sm:p-5 sm:text-sm">
                   {todo.map((t) => (
                     <li key={t} className="flex gap-2">
                       <span aria-hidden className="mt-1.5 size-1.5 shrink-0 rounded-full bg-brand" />
@@ -195,9 +195,9 @@ export default async function ReportPage({ searchParams }: PageProps<"/dashboard
                   ))}
                 </ul>
               ) : (
-                <p className="p-4 text-sm text-muted sm:p-5">Nothing urgent. Good week.</p>
+                <p className="p-3.5 text-xs text-muted sm:p-5 sm:text-sm">Nothing urgent. Good week.</p>
               )}
-              <div className="flex flex-wrap gap-3 border-t border-line px-4 py-3 text-xs font-semibold sm:px-5">
+              <div className="flex flex-wrap gap-2.5 border-t border-line px-3.5 py-2.5 text-xs font-semibold sm:gap-3 sm:px-5 sm:py-3">
                 <Link href="/dashboard/refills" className="text-brand-deep hover:underline">
                   Reorders →
                 </Link>

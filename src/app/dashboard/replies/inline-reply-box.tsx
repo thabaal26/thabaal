@@ -112,12 +112,12 @@ export function InlineReplyBox({
     });
   };
 
-  const ctl = "inline-flex min-h-11 items-center gap-1.5 rounded-xl border-[1.5px] border-line bg-panel px-4 text-[14.5px] font-semibold text-ink transition hover:border-ink disabled:opacity-50";
+  const ctl = "inline-flex min-h-[34px] items-center gap-1.5 rounded-xl border-[1.5px] border-line bg-panel px-3 text-xs font-semibold text-ink transition hover:border-ink disabled:opacity-50 sm:min-h-11 sm:px-4 sm:text-[14.5px]";
 
   return (
-    <div className="space-y-3 px-5 pb-5 pt-4">
+    <div className="space-y-2.5 px-3.5 pb-3.5 pt-2.5 sm:space-y-3 sm:px-5 sm:pb-5 sm:pt-4">
       <div className="flex items-center justify-between gap-2">
-        <label htmlFor="reply-input" className="text-[15px] font-semibold text-ink">
+        <label htmlFor="reply-input" className="text-[13.5px] font-semibold text-ink sm:text-[15px]">
           Your reply
         </label>
         {aiResult && (
@@ -217,7 +217,7 @@ export function InlineReplyBox({
           }
         }}
         placeholder="Type a reply"
-        className="min-h-24 w-full resize-y rounded-xl border-[1.5px] border-line bg-panel px-4 py-3 text-[15px] text-ink transition placeholder:text-muted focus:border-ink focus:outline-none"
+        className="min-h-20 w-full resize-y rounded-xl border-[1.5px] border-line bg-panel px-3 py-2 text-[14px] text-ink transition placeholder:text-muted focus:border-ink focus:outline-none sm:min-h-24 sm:px-4 sm:py-3 sm:text-[15px]"
       />
 
       {/* Language and the reply helper. */}
@@ -247,7 +247,7 @@ export function InlineReplyBox({
           type="button"
           disabled={(!text.trim() && !mediaUrl.trim()) || sending}
           onClick={() => submit(false)}
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-brand px-5 text-[14.5px] font-bold text-on-brand transition hover:brightness-105 active:scale-[0.98] disabled:opacity-50"
+          className="inline-flex min-h-[34px] items-center gap-1.5 rounded-xl bg-brand px-4 text-xs font-bold text-on-brand transition hover:brightness-105 active:scale-[0.98] disabled:opacity-50 sm:min-h-11 sm:px-5 sm:text-[14.5px]"
         >
           {sending ? "Sending…" : "Send"}
         </button>

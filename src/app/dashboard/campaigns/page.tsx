@@ -176,11 +176,11 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
           {visible.map((c) => {
             const last = c.runs[0];
             return (
-              <Card key={c.id} className={cn("card-3d relative flex flex-col overflow-hidden p-4 active:bg-sunken sm:p-5", !c.active && "opacity-90")}>
+              <Card key={c.id} className={cn("card-3d relative flex flex-col overflow-hidden p-3.5 active:bg-sunken sm:p-5", !c.active && "opacity-90")}>
                 <span aria-hidden className={cn("absolute inset-x-0 top-0 h-[3px]", c.active ? "bg-brand" : "bg-line-strong")} />
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <Link href={`/dashboard/campaigns/${c.id}`} className="block truncate text-base font-semibold text-ink outline-none after:absolute after:inset-0 after:rounded-card hover:underline focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-[var(--color-brand-deep)]">
+                    <Link href={`/dashboard/campaigns/${c.id}`} className="block truncate text-[14.5px] font-semibold text-ink outline-none after:absolute after:inset-0 after:rounded-card hover:underline focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-[var(--color-brand-deep)] sm:text-base">
                       {c.name}
                     </Link>
                     <p className="mt-0.5 truncate text-xs text-muted">
@@ -191,7 +191,7 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
                   {c.active ? <Badge tone="green" dot>Active</Badge> : <Badge dot>Paused</Badge>}
                 </div>
 
-                <div className="mt-4 space-y-2">
+                <div className="mt-3.5 space-y-2 sm:mt-4">
                   <div className="flex items-center gap-2">
                     {c.scheduleType === "WEEKLY" ? (
                       <Badge tone="brand">
@@ -227,18 +227,18 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
                   )}
                 </div>
 
-                <dl className="tabular mt-4 grid grid-cols-3 gap-2 rounded-control bg-sunken/75 p-2.5 text-xs">
+                <dl className="tabular mt-3.5 grid grid-cols-3 gap-1.5 rounded-control bg-sunken/75 p-2 text-xs sm:mt-4 sm:gap-2 sm:p-2.5">
                   <div>
-                    <dt className="text-muted">Time</dt>
-                    <dd className="mt-0.5 whitespace-nowrap text-sm font-semibold text-ink">{c.sendTime}</dd>
+                    <dt className="text-muted text-[11px] sm:text-xs">Time</dt>
+                    <dd className="mt-0.5 whitespace-nowrap text-xs font-semibold text-ink sm:text-sm">{c.sendTime}</dd>
                   </div>
                   <div>
-                    <dt className="text-muted">Pace</dt>
-                    <dd className="mt-0.5 whitespace-nowrap text-sm font-semibold text-ink">{c.batchSize} / {effectiveInterval(c.intervalMinutes)}m</dd>
+                    <dt className="text-muted text-[11px] sm:text-xs">Pace</dt>
+                    <dd className="mt-0.5 whitespace-nowrap text-xs font-semibold text-ink sm:text-sm">{c.batchSize} / {effectiveInterval(c.intervalMinutes)}m</dd>
                   </div>
                   <div>
-                    <dt className="text-muted">Takes</dt>
-                    <dd className="mt-0.5 whitespace-nowrap text-sm font-semibold text-ink">~{formatMinutes(estimateDuration(audienceOf(c.clientId), c.batchSize, c.intervalMinutes))}</dd>
+                    <dt className="text-muted text-[11px] sm:text-xs">Takes</dt>
+                    <dd className="mt-0.5 whitespace-nowrap text-xs font-semibold text-ink sm:text-sm">~{formatMinutes(estimateDuration(audienceOf(c.clientId), c.batchSize, c.intervalMinutes))}</dd>
                   </div>
                 </dl>
 

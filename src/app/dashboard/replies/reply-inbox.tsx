@@ -170,8 +170,8 @@ export function ReplyInbox({
     };
   });
 
-  const card = "min-h-0 overflow-hidden rounded-[20px] border-[1.5px] border-line bg-panel shadow-card";
-  const headBtn = "inline-flex min-h-10 items-center gap-1.5 rounded-xl border-[1.5px] border-line bg-panel px-4 text-[14px] font-semibold text-ink transition hover:border-ink";
+  const card = "min-h-0 overflow-hidden rounded-[16px] border-[1.5px] border-line bg-panel shadow-card sm:rounded-[20px]";
+  const headBtn = "inline-flex min-h-[34px] items-center gap-1.5 rounded-xl border-[1.5px] border-line bg-panel px-2.5 text-xs font-semibold text-ink transition hover:border-ink sm:min-h-10 sm:px-4 sm:text-[14px]";
   const menuItem = "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13.5px] font-medium text-ink transition hover:bg-sunken";
 
   return (
@@ -206,8 +206,8 @@ export function ReplyInbox({
       {/* Right Conversation Card */}
       {selected ? (
         <section aria-label={`Conversation with ${selected.customer.name}`} className={cn(card, mobileView === "list" ? "hidden lg:flex" : "flex", "flex-col")}>
-          <header className="flex shrink-0 flex-wrap items-start justify-between gap-3 px-5 pb-4 pt-5">
-            <div className="min-w-0 flex items-start gap-2.5">
+          <header className="flex shrink-0 flex-wrap items-start justify-between gap-2.5 px-3.5 pb-2.5 pt-3 sm:gap-3 sm:px-5 sm:pb-4 sm:pt-5">
+            <div className="min-w-0 flex items-start gap-2 sm:gap-2.5">
               <button
                 type="button"
                 onClick={() => setMobileView("list")}
@@ -216,26 +216,26 @@ export function ReplyInbox({
                 <ArrowLeft aria-hidden className="size-3.5" /> All Chats
               </button>
               <div>
-                <h2 className="truncate font-display text-[21px] font-semibold leading-tight text-ink">{selected.customer.name}</h2>
-                <p className="mt-1 truncate text-[14.5px] text-muted">{currentPurchasesSubtitle}</p>
+                <h2 className="truncate font-display text-[17px] font-semibold leading-tight text-ink sm:text-[21px]">{selected.customer.name}</h2>
+                <p className="mt-0.5 truncate text-xs text-muted sm:mt-1 sm:text-[14.5px]">{currentPurchasesSubtitle}</p>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               {windowTimeRemaining ? (
-                <span className="inline-flex items-center rounded-full bg-success-bg px-3 py-1 text-[13.5px] font-semibold text-success">Free replies · {windowTimeRemaining}</span>
+                <span className="inline-flex items-center rounded-full bg-success-bg px-2.5 py-0.5 text-xs font-semibold text-success sm:px-3 sm:py-1 sm:text-[13.5px]">Free replies · {windowTimeRemaining}</span>
               ) : (
-                <span className="inline-flex items-center rounded-full bg-warning-bg px-3 py-1 text-[13.5px] font-semibold text-warning">Free replies closed</span>
+                <span className="inline-flex items-center rounded-full bg-warning-bg px-2.5 py-0.5 text-xs font-semibold text-warning sm:px-3 sm:py-1 sm:text-[13.5px]">Free replies closed</span>
               )}
               <Link href={`/dashboard/customers/${selected.customer.id}`} className={headBtn}>
                 Profile
               </Link>
               <Link href={`/dashboard/customers/${selected.customer.id}#call`} className={headBtn}>
-                <Phone aria-hidden className="size-4" /> Call
+                <Phone aria-hidden className="size-3.5 sm:size-4" /> Call
               </Link>
               {canOperate && (
                 <details className="relative">
-                  <summary className={cn(headBtn, "cursor-pointer list-none px-3 [&::-webkit-details-marker]:hidden")} aria-label="More actions">
-                    <MoreHorizontal aria-hidden className="size-4" />
+                  <summary className={cn(headBtn, "cursor-pointer list-none px-2 sm:px-3 [&::-webkit-details-marker]:hidden")} aria-label="More actions">
+                    <MoreHorizontal aria-hidden className="size-3.5 sm:size-4" />
                   </summary>
                   <div className="absolute right-0 top-full z-20 mt-2 w-60 rounded-xl border border-line bg-panel p-1.5 shadow-pop">
                     <ActionButton action={setReplyHandled.bind(null, selected.id, !selected.handled)} variant="ghost" size="sm" className={menuItem}>
@@ -268,7 +268,7 @@ export function ReplyInbox({
           </header>
 
           {/* The messages sit in a soft beige panel inside the card. */}
-          <div className="mx-5 flex h-[55dvh] min-h-0 flex-col overflow-hidden rounded-2xl bg-track lg:h-auto lg:flex-1">
+          <div className="mx-2.5 flex h-[55dvh] min-h-0 flex-col overflow-hidden rounded-xl bg-track sm:mx-5 sm:rounded-2xl lg:h-auto lg:flex-1">
             <Conversation entries={thread} plain className="min-h-0 flex-1" />
           </div>
 

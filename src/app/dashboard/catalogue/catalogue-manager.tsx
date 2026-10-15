@@ -493,19 +493,19 @@ export function CatalogueManager({
                       : "bg-warning-solid",
                   )}
                 />
-                <div className="flex gap-3 p-4">
-                  <div className={cn("relative size-16 shrink-0 overflow-hidden rounded-control bg-subtle shadow-2xs ring-1 ring-line", !item.inStock && "opacity-60 grayscale")}>
+                <div className="flex gap-2.5 p-3 sm:gap-3 sm:p-4">
+                  <div className={cn("relative size-14 shrink-0 overflow-hidden rounded-control bg-subtle shadow-2xs ring-1 ring-line sm:size-16", !item.inStock && "opacity-60 grayscale")}>
                     {item.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={item.imageUrl} alt="" className="size-full object-cover" />
                     ) : (
                       <div className="grid size-full place-items-center text-faint">
-                        <Package aria-hidden className="size-6" />
+                        <Package aria-hidden className="size-5 sm:size-6" />
                       </div>
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h4 className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-ink">{item.name}</h4>
+                    <h4 className="line-clamp-2 min-h-9 text-[13.5px] font-semibold leading-5 text-ink sm:min-h-10 sm:text-sm">{item.name}</h4>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
                       <Badge tone="brand" className="text-2xs">{item.category || "General"}</Badge>
                       <span className="rounded bg-sunken px-1.5 py-0.5 font-mono text-2xs font-medium text-ink-2 ring-1 ring-line">{item.retailerId}</span>
@@ -545,10 +545,10 @@ export function CatalogueManager({
                     </div>
                   </div>
                 </div>
-                <p className="line-clamp-2 min-h-[2lh] px-4 text-xs leading-relaxed text-muted">{item.description}</p>
-                <div className="mt-auto flex items-center justify-between gap-2 px-4 pb-3 pt-3">
+                <p className="line-clamp-2 min-h-[2lh] px-3 text-xs leading-relaxed text-muted sm:px-4">{item.description}</p>
+                <div className="mt-auto flex items-center justify-between gap-2 px-3 pb-3 pt-2 sm:px-4 sm:pt-3">
                   <div className="flex flex-col">
-                    <span className="tabular text-xl font-bold tracking-tight text-ink">₹{item.priceAmount.toLocaleString("en-IN")}</span>
+                    <span className="tabular text-lg font-bold tracking-tight text-ink sm:text-xl">₹{item.priceAmount.toLocaleString("en-IN")}</span>
                     {demand && demand.revenue > 0 && (
                       <span className="text-2xs font-medium text-success">₹{demand.revenue.toLocaleString("en-IN")} sales</span>
                     )}

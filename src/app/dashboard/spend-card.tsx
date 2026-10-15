@@ -110,38 +110,38 @@ async function SpendBody({ clientId, canManage }: { clientId: string; canManage:
     <>
       {/* Top 4-KPI Summary Strip */}
       <dl className="grid grid-cols-2 divide-x divide-y divide-line border-b border-line bg-subtle/30 sm:grid-cols-4 sm:divide-y-0">
-        <div className="px-3 py-2.5 sm:px-5 sm:py-3.5">
-          <dt className="text-[11px] text-muted sm:text-xs">{s.monthLabel} so far (ex-GST)</dt>
-          <dd className="tabular mt-0.5 text-base font-semibold leading-tight text-ink sm:mt-1 sm:text-xl">{rupees(s.totalMonthSpent)}</dd>
-          <dd className="tabular mt-0.5 text-[10px] text-muted sm:text-2xs">
+        <div className="px-2.5 py-2 sm:px-5 sm:py-3.5">
+          <dt className="truncate text-[10.5px] text-muted sm:text-xs">{s.monthLabel} so far (ex-GST)</dt>
+          <dd className="tabular mt-0.5 truncate text-[15px] font-semibold leading-tight text-ink sm:mt-1 sm:text-xl">{rupees(s.totalMonthSpent)}</dd>
+          <dd className="tabular mt-0.5 truncate text-[10px] text-muted sm:text-2xs">
             {s.totalMonthSpent > 0 ? `${rupees(s.totalMonthSpentWithGst)} incl. 18% GST` : "No charges yet"}
           </dd>
         </div>
 
-        <div className="px-3 py-2.5 sm:px-5 sm:py-3.5">
-          <dt className="text-[11px] text-muted sm:text-xs">{s.lastMonthLabel}</dt>
-          <dd className="tabular mt-0.5 text-base font-semibold leading-tight text-ink sm:mt-1 sm:text-xl">{rupees(totalLastMonthSpent)}</dd>
-          <dd className="tabular mt-0.5 text-[10px] text-muted sm:text-2xs">
+        <div className="px-2.5 py-2 sm:px-5 sm:py-3.5">
+          <dt className="truncate text-[10.5px] text-muted sm:text-xs">{s.lastMonthLabel}</dt>
+          <dd className="tabular mt-0.5 truncate text-[15px] font-semibold leading-tight text-ink sm:mt-1 sm:text-xl">{rupees(totalLastMonthSpent)}</dd>
+          <dd className="tabular mt-0.5 truncate text-[10px] text-muted sm:text-2xs">
             {s.metaTotalDelivered > 0 ? `${fmtNumber(s.metaTotalDelivered)} delivered on Meta` : `${fmtNumber(s.previous.reduce((a, r) => a + r.charged, 0))} charged`}
           </dd>
         </div>
 
-        <div className="px-3 py-2.5 sm:px-5 sm:py-3.5">
-          <dt className="text-[11px] text-muted sm:text-xs">Prepaid wallet</dt>
-          <dd className={cn("tabular mt-0.5 text-base font-semibold leading-tight sm:mt-1 sm:text-xl", low ? "text-warning" : "text-ink")}>
+        <div className="px-2.5 py-2 sm:px-5 sm:py-3.5">
+          <dt className="truncate text-[10.5px] text-muted sm:text-xs">Prepaid wallet</dt>
+          <dd className={cn("tabular mt-0.5 truncate text-[15px] font-semibold leading-tight sm:mt-1 sm:text-xl", low ? "text-warning" : "text-ink")}>
             {recorded ? rupees(s.remainingBalance) : "—"}
           </dd>
-          <dd className="tabular mt-0.5 text-[10px] text-muted sm:text-2xs">
+          <dd className="tabular mt-0.5 truncate text-[10px] text-muted sm:text-2xs">
             {recorded ? `~${fmtNumber(estMarketingRunway)} mktg · ~${fmtNumber(estUtilityRunway)} util msgs` : "Not synced yet"}
           </dd>
         </div>
 
-        <div className="px-3 py-2.5 sm:px-5 sm:py-3.5">
-          <dt className="text-[11px] text-muted sm:text-xs">Free 24h Service Quota</dt>
-          <dd className="tabular mt-0.5 text-base font-semibold leading-tight text-success sm:mt-1 sm:text-xl">
-            {fmtNumber(s.serviceQuota.freeRemaining)} <span className="text-xs font-medium text-muted">/ {fmtNumber(s.serviceQuota.totalFreeLimit)} left</span>
+        <div className="px-2.5 py-2 sm:px-5 sm:py-3.5">
+          <dt className="truncate text-[10.5px] text-muted sm:text-xs">Free 24h Service Quota</dt>
+          <dd className="tabular mt-0.5 truncate text-[15px] font-semibold leading-tight text-success sm:mt-1 sm:text-xl">
+            {fmtNumber(s.serviceQuota.freeRemaining)} <span className="text-[11px] font-medium text-muted sm:text-xs">/ {fmtNumber(s.serviceQuota.totalFreeLimit)}</span>
           </dd>
-          <dd className="tabular mt-0.5 text-[10px] text-muted sm:text-2xs">
+          <dd className="tabular mt-0.5 truncate text-[10px] text-muted sm:text-2xs">
             1,000 free/mo per number · {fmtNumber(s.serviceQuota.freeUsed)} used
           </dd>
         </div>

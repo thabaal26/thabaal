@@ -86,7 +86,7 @@ export function Conversation({ entries, className, plain }: { entries: Conversat
             </li>
           ) : r.entry.type === "in" ? (
             <li key={r.key} className="flex">
-              <div className="max-w-[min(85%,36rem)] rounded-[14px] bg-panel px-4 py-2.5 text-[15px] text-ink shadow-[0_1px_1px_rgba(16,40,59,0.06)]">
+              <div className="max-w-[min(90%,36rem)] rounded-[12px] bg-panel px-3 py-2 text-[13.5px] text-ink shadow-[0_1px_1px_rgba(16,40,59,0.06)] sm:rounded-[14px] sm:px-4 sm:py-2.5 sm:text-[15px]">
                 {r.entry.kind === "button" && <p className="mb-1 flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">Tapped a button</p>}
                 {r.entry.kind === "order" && (
                   r.entry.text.toLowerCase().includes("upi payment") || r.entry.text.toLowerCase().includes("payment completed") ? (
@@ -109,7 +109,7 @@ export function Conversation({ entries, className, plain }: { entries: Conversat
             </li>
           ) : (
             <li key={r.key} className="flex justify-end">
-              <div className={cn("max-w-[min(85%,36rem)] rounded-[14px] px-4 py-2.5 text-[15px] shadow-[0_1px_1px_rgba(16,40,59,0.06)]", r.entry.status === "FAILED" ? "bg-danger-bg ring-1 ring-danger-border text-ink" : "bg-[#D9FDD3] text-[#111B21] dark:bg-[#005C4B] dark:text-[#E9EDEF]")}>
+              <div className={cn("max-w-[min(90%,36rem)] rounded-[12px] px-3 py-2 text-[13.5px] shadow-[0_1px_1px_rgba(16,40,59,0.06)] sm:rounded-[14px] sm:px-4 sm:py-2.5 sm:text-[15px]", r.entry.status === "FAILED" ? "bg-danger-bg ring-1 ring-danger-border text-ink" : "bg-[#D9FDD3] text-[#111B21] dark:bg-[#005C4B] dark:text-[#E9EDEF]")}>
                 {(!TYPED.has(r.entry.template) || r.entry.campaign) && (
                   <p className="mb-1 flex flex-wrap items-center gap-x-1.5 text-xs text-[#54656F] dark:text-[#8696A0]">
                     {!TYPED.has(r.entry.template) && <span>{templateLabel(r.entry.template)}</span>}

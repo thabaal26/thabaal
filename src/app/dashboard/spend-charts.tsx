@@ -376,32 +376,32 @@ export function SpendAnalyticsCharts({
 
         {/* Bottom Analytical KPI Strip + Actionable Optimization Insight */}
         <div className="space-y-2.5">
-          <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-control border border-line bg-subtle/35 px-2.5 py-2">
-              <p className="truncate text-[10px] font-medium uppercase tracking-wide text-muted">Peak day spend</p>
-              <p className="tabular mt-0.5 text-xs font-semibold text-ink sm:text-sm">
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+            <div className="rounded-control border border-line bg-subtle/35 px-2 py-1.5 sm:px-2.5 sm:py-2">
+              <p className="truncate text-[9.5px] font-medium uppercase tracking-wide text-muted sm:text-[10px]">Peak day spend</p>
+              <p className="tabular mt-0.5 truncate text-[11px] font-semibold text-ink sm:text-sm">
                 {peakDay && peakDay.totalCost > 0 ? rupees(peakDay.totalCost) : "₹0.00"}
               </p>
-              <p className="truncate text-[10px] text-muted">{peakDay && peakDay.totalCost > 0 ? `${peakDay.label} · ${peakDay.chargedVolume} msgs` : "No charges in 14d"}</p>
+              <p className="truncate text-[9.5px] text-muted sm:text-[10px]">{peakDay && peakDay.totalCost > 0 ? `${peakDay.label} · ${peakDay.chargedVolume} msgs` : "No charges in 14d"}</p>
             </div>
 
-            <div className="rounded-control border border-line bg-subtle/35 px-2.5 py-2">
-              <p className="truncate text-[10px] font-medium uppercase tracking-wide text-muted">Effective rate</p>
-              <p className="tabular mt-0.5 text-xs font-semibold text-ink sm:text-sm">
+            <div className="rounded-control border border-line bg-subtle/35 px-2 py-1.5 sm:px-2.5 sm:py-2">
+              <p className="truncate text-[9.5px] font-medium uppercase tracking-wide text-muted sm:text-[10px]">Effective rate</p>
+              <p className="tabular mt-0.5 truncate text-[11px] font-semibold text-ink sm:text-sm">
                 {totalMsgs > 0 ? rupees(effectiveCostPerMsg) : `₹${rates.marketing ?? 0.86}`}
               </p>
-              <p className="truncate text-[10px] text-muted">per msg ({fmtNumber(totalMsgs)} delivered)</p>
+              <p className="truncate text-[9.5px] text-muted sm:text-[10px]">per msg ({fmtNumber(totalMsgs)} msgs)</p>
             </div>
 
-            <div className="rounded-control border border-line bg-subtle/35 px-2.5 py-2">
-              <p className="truncate text-[10px] font-medium uppercase tracking-wide text-muted">
-                {roas > 0 ? "Meta spend ROAS" : "24h window saved"}
+            <div className="rounded-control border border-line bg-subtle/35 px-2 py-1.5 sm:px-2.5 sm:py-2">
+              <p className="truncate text-[9.5px] font-medium uppercase tracking-wide text-muted sm:text-[10px]">
+                {roas > 0 ? "Meta ROAS" : "Window saved"}
               </p>
-              <p className="tabular mt-0.5 text-xs font-semibold text-success sm:text-sm">
+              <p className="tabular mt-0.5 truncate text-[11px] font-semibold text-success sm:text-sm">
                 {roas > 0 ? `${roas}× return` : rupees(savedByFreeWindow)}
               </p>
-              <p className="truncate text-[10px] text-muted">
-                {roas > 0 ? `₹${monthOrderRevenue.toLocaleString("en-IN")} (${monthOrdersCount} orders)` : `${fmtNumber(totalFree)} free service msgs`}
+              <p className="truncate text-[9.5px] text-muted sm:text-[10px]">
+                {roas > 0 ? `₹${monthOrderRevenue.toLocaleString("en-IN")}` : `${fmtNumber(totalFree)} free msgs`}
               </p>
             </div>
           </div>

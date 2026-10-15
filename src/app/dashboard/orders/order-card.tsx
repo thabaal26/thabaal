@@ -119,14 +119,14 @@ export function OrderCard({
       : null;
 
   return (
-    <div className="relative flex h-full flex-col gap-3 rounded-[18px] border-[1.5px] border-line bg-panel p-4 sm:p-5 shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)] dark:shadow-[0_14px_30px_-22px_rgba(0,0,0,.7)] transition">
+    <div className="relative flex h-full flex-col gap-2.5 rounded-[16px] border-[1.5px] border-line bg-panel p-3.5 shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)] transition sm:gap-3 sm:rounded-[18px] sm:p-5 dark:shadow-[0_14px_30px_-22px_rgba(0,0,0,.7)]">
 
-      <div className="flex items-start justify-between gap-2.5">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <Avatar name={o.customer.name} className="size-9 shrink-0" />
+      <div className="flex items-start justify-between gap-2 sm:gap-2.5">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
+          <Avatar name={o.customer.name} className="size-8 shrink-0 text-xs sm:size-9 sm:text-sm" />
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <Link href={`/dashboard/customers/${o.customer.id}`} className="truncate text-sm font-semibold text-ink hover:underline sm:text-[15px]">
+            <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
+              <Link href={`/dashboard/customers/${o.customer.id}`} className="truncate text-[13.5px] font-semibold text-ink hover:underline sm:text-[15px]">
                 {o.customer.name}
               </Link>
               <span className="rounded-control bg-sunken px-1.5 py-0.5 font-mono text-2xs font-semibold text-ink-2 ring-1 ring-inset ring-line">
@@ -139,7 +139,7 @@ export function OrderCard({
               )}
               {isSuperseded && <Badge tone="gray">Replaced</Badge>}
             </div>
-            <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11.5px] text-muted sm:text-xs">
               <span className="tabular">{formatPhone(o.customer.phone)}</span>
               {o.customer.location && (
                 <span className="inline-flex items-center gap-0.5 text-ink-2">
@@ -158,10 +158,10 @@ export function OrderCard({
 
       <OrderStepper status={o.status} isPaid={isPaid && payState !== "part_paid"} unpaidLabel={payState === "cod_due" ? "COD" : payState === "part_paid" ? "Part paid" : "Not paid"} />
 
-      <div className="rounded-control border border-line/80 bg-sunken/60 px-3 py-1 text-xs sm:text-sm">
+      <div className="rounded-control border border-line/80 bg-sunken/60 px-2.5 py-1 text-xs sm:px-3 sm:text-sm">
         <ul className="divide-y divide-line/70">
           {items.map((i, k) => (
-            <li key={k} className="flex items-baseline justify-between gap-2.5 py-1.5">
+            <li key={k} className="flex items-baseline justify-between gap-2 py-1 sm:gap-2.5 sm:py-1.5">
               <span className="min-w-0 truncate text-ink">
                 <span className="tabular mr-1.5 inline-block rounded bg-panel px-1.5 py-0.5 text-2xs font-semibold text-ink-2 ring-1 ring-line">
                   {i.quantity}×

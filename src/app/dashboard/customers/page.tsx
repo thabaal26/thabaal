@@ -307,25 +307,25 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
             {/* Phones: one tappable row per customer. */}
             <ul className="divide-y divide-line sm:hidden">
               {rows.map((c) => (
-                <li key={c.id} className="relative flex items-start gap-3 px-4 py-3 transition-colors active:bg-sunken">
-                  <Avatar name={c.name} />
+                <li key={c.id} className="relative flex items-start gap-2.5 px-3.5 py-2.5 transition-colors active:bg-sunken">
+                  <Avatar name={c.name} className="size-8.5 shrink-0 text-xs" />
                   <div className="min-w-0 flex-1">
-                    <Link href={`/dashboard/customers/${c.id}`} className="block truncate font-medium text-ink after:absolute after:inset-0">
+                    <Link href={`/dashboard/customers/${c.id}`} className="block truncate text-[13.5px] font-semibold text-ink after:absolute after:inset-0">
                       {c.name}
                     </Link>
-                    <p className="tabular truncate text-xs text-muted">
+                    <p className="tabular truncate text-[11.5px] text-muted">
                       {formatPhone(c.phone)}
                       {c.location && ` · ${c.location}`}
                       {lastMessage(c) && ` · ${lastMessage(c)}`}
                     </p>
-                    {c.purchases && <p className="mt-0.5 line-clamp-2 text-xs text-ink-2">{c.purchases}</p>}
-                    <div className="mt-1.5 flex flex-wrap gap-1 empty:hidden">
+                    {c.purchases && <p className="mt-0.5 line-clamp-1 text-[11px] text-ink-2">{c.purchases}</p>}
+                    <div className="mt-1 flex flex-wrap gap-1 empty:hidden">
                       {flags(c)}
                       {rowTags(c.tags, c.client?.name).map((t) => <Badge key={t}>{t}</Badge>)}
                     </div>
                   </div>
                   {scope.canManage && (
-                    <div className="relative z-10 -my-1 -mr-2">
+                    <div className="relative z-10 -my-1 -mr-1">
                       <CustomerMenu name={c.name} optedOut={c.optedOut} toggle={setOptOut.bind(null, c.id, !c.optedOut)} remove={deleteCustomer.bind(null, c.id)} />
                     </div>
                   )}

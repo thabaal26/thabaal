@@ -583,7 +583,7 @@ export function Th({ numeric, className, ...p }: ComponentProps<"th"> & { numeri
     <th
       scope="col"
       className={cn(
-        "sticky top-0 z-[1] whitespace-nowrap border-b border-line bg-subtle px-4 py-2.5 text-left text-[0.6875rem] font-semibold uppercase tracking-wider text-muted lg:top-16",
+        "sticky top-0 z-[1] whitespace-nowrap border-b border-line bg-subtle px-2.5 py-2 text-left text-[10.5px] font-semibold uppercase tracking-wider text-muted sm:px-4 sm:py-2.5 sm:text-[0.6875rem] lg:top-16",
         numeric && "text-right",
         className,
       )}
@@ -593,7 +593,7 @@ export function Th({ numeric, className, ...p }: ComponentProps<"th"> & { numeri
 }
 
 export function Td({ numeric, className, ...p }: ComponentProps<"td"> & { numeric?: boolean }) {
-  return <td className={cn("px-4 py-3 align-top", numeric && "tabular text-right", className)} {...p} />;
+  return <td className={cn("px-2.5 py-2 text-xs align-top sm:px-4 sm:py-3 sm:text-sm", numeric && "tabular text-right", className)} {...p} />;
 }
 
 /** Table body rows: dividers and a hover tint. */
@@ -702,22 +702,22 @@ export function Stat({
 }) {
   const body = (
     <>
-      <div className="flex items-center justify-between gap-2">
-        <span className="min-w-0 truncate text-[13.5px] font-medium text-muted">
+      <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+        <span className="min-w-0 truncate text-[11.5px] font-medium text-muted sm:text-[13.5px]">
           {label}
         </span>
         {icon && (
-          <span aria-hidden className="shrink-0 text-muted [&_svg]:size-[18px] [&_svg]:stroke-2">
+          <span aria-hidden className="shrink-0 text-muted [&_svg]:size-4 sm:[&_svg]:size-[18px] [&_svg]:stroke-2">
             {icon}
           </span>
         )}
       </div>
-      <div className="tabular mt-1 font-display font-semibold text-2xl sm:text-[28px] leading-tight tracking-[-0.2px] text-ink">{value}</div>
-      {meter !== undefined && <Meter raised value={meter} tone={tone === "amber" || tone === "rose" ? "warning" : "brand"} className="mt-2 sm:mt-2.5" />}
-      {sub && <div className="mt-1 text-[13px] font-semibold text-muted leading-snug">{sub}</div>}
+      <div className="tabular mt-0.5 sm:mt-1 font-display font-semibold text-xl sm:text-[26px] lg:text-[28px] leading-tight tracking-[-0.2px] text-ink truncate">{value}</div>
+      {meter !== undefined && <Meter raised value={meter} tone={tone === "amber" || tone === "rose" ? "warning" : "brand"} className="mt-1.5 sm:mt-2.5" />}
+      {sub && <div className="mt-0.5 sm:mt-1 text-[11px] sm:text-[13px] font-semibold text-muted leading-tight sm:leading-snug truncate sm:line-clamp-none">{sub}</div>}
     </>
   );
-  const cardCls = "relative flex h-full min-w-0 flex-col justify-between rounded-[18px] border-[1.5px] border-line bg-panel p-4 sm:p-5 shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)] dark:shadow-[0_14px_30px_-22px_rgba(0,0,0,.7)] transition";
+  const cardCls = "relative flex h-full min-w-0 flex-col justify-between rounded-[14px] sm:rounded-[18px] border-[1.5px] border-line bg-panel p-3 sm:p-5 shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)] dark:shadow-[0_14px_30px_-22px_rgba(0,0,0,.7)] transition";
   return href ? (
     <Link href={href} className={cn(cardCls, "hover:border-ink active:scale-[0.99]")}>
       {body}
@@ -840,14 +840,14 @@ export function OrderStepper({
             : 0;
 
   return (
-    <div aria-label={`Order progress: ${ORDER_STEPS[activeIdx]?.label}`} className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
+    <div aria-label={`Order progress: ${ORDER_STEPS[activeIdx]?.label}`} className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] sm:text-xs text-muted">
       {ORDER_STEPS.map((step, idx) => {
         const done = idx <= activeIdx || (step.key === "PAID" && isPaid);
         const current = idx === activeIdx;
         const owed = unpaidLabel && step.key === "PAID" && !isPaid && idx < activeIdx;
         const label = owed ? unpaidLabel : step.label;
         return (
-          <span key={step.key} className="inline-flex items-center gap-1.5">
+          <span key={step.key} className="inline-flex items-center gap-1 sm:gap-1.5">
             <span
               className={cn(
                 "inline-flex items-center gap-1 font-semibold transition-colors",
@@ -861,7 +861,7 @@ export function OrderStepper({
               <span
                 aria-hidden
                 className={cn(
-                  "size-2.5 rounded-full transition-colors",
+                  "size-2 sm:size-2.5 rounded-full transition-colors",
                   owed
                     ? "bg-brand"
                     : done
@@ -872,7 +872,7 @@ export function OrderStepper({
               {label}
             </span>
             {idx < ORDER_STEPS.length - 1 && (
-              <span aria-hidden className="text-muted/40 select-none">
+              <span aria-hidden className="text-muted/40 select-none text-[10px] sm:text-xs">
                 ›
               </span>
             )}
