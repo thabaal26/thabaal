@@ -82,6 +82,8 @@ If you need to inspect any earlier conversation step or code diff from previous 
 ---
 
 ## 5. Recent Git Commits (All Pushed to `origin/main` & `thabaal/main`)
+- `604a436`: **style(mobile): Optimize Data Density, Compact Layouts, and Responsive Alignment Across All Pages** — Refined `Stat`, `Table`, `Th`, `Td`, and `OrderStepper` in `src/components/ui.tsx` with compact padding, truncation, and responsive typography to prevent multi-line number wrapping on 360-390px mobile screens. Compacted `HomeTiers` TodoTiles, section padding, and 4 KPI cards in `src/app/dashboard/home-tiers.tsx`. Refined `OrderCard` and phone customer list rows with compact avatar sizing, tighter spacing, and proper truncation. Optimized `ChatList`, `Conversation` bubbles, `ReplyInbox` header, and `InlineReplyBox` composer padding to prevent keyboard crowding on mobile. Compacted 4-KPI spend strip, ECharts metric tiles, report summary table, campaign schedule cards, and catalogue product cards. Ensured 100% desktop fidelity and breathing room via `sm:*` and `lg:*` responsive utility parity.
+- `e22d50e`: **style(ui): Polish Layout Spacing, Fluid Button Swaps, and Sign-in Theme/Language Indicators** — Corrected sign-in theme toggle track inversion bug (day mode renders blue daytime sky with clouds; night mode renders dark starry sky). Added animated sliding indicator to language toggle pill (`EN | தமிழ்`) with spring physics transition. Upgraded `buttonClass` with hover elevation (`hover:-translate-y-px`), tactile active compression (`active:scale-[0.97]`), and subtle variant shadows. Added fluid button-swap transitions to `FilterChips`, `Segmented` radio switches, and sub-view navs across Campaigns, Customers, Inbox, Catalogue, Revenue, and Reports. Fixed customer sub-nav tab label from 'Refills' to 'Reorders'. Refined `PageHeader`, `Section`, and `CardHeader` spacing rhythm and vertical centering. Refined dashboard layout container padding (`px-3.5 pt-3.5` on mobile, `lg:pb-12` on desktop).
 - `98bb860`: **perf(db): Add Compound Indexes on Message, Customer, and Reply for High-Throughput Scaling** — Added `@@index([customerId, createdAt])` and `@@index([senderId])` to `Message` to eliminate full-table scans during customer chat history lookups. Added `@@index([clientId, optedOut, unreachable])` to `Customer` for instant audience filtering during high-volume campaign broadcasts. Added `@@index([senderId])` to `Reply`. Created additive migration `prisma/sql/2026-10-16-indexes.sql`, registered in `scripts/db-additive.mjs` for Vercel, and executed on live Neon PostgreSQL database.
 - `0b43005`: **Theme & UI Consistency: Elevate 100% of Dashboard Cards to 3D Glassmorphism Across All 34 Pages** — Upgraded every `<Card>` across Settings, Wallet, Campaigns, Customers, Orders, Replies, and Templates to `card-3d` with matching glossy `IconCube` headers and theme tone bands (`brand`, `violet`, `info`, `gold`, `rose`, `amber`). Verified 0 direct imports of `lucide-react` across application code.
 - `81e695c`: **Reports & Analytics Overhaul** — Rolling 7-day range, today's live data inclusion in `weeklyReport`, top products fallback, direct 1-tap WhatsApp report sharing link (`wa.me/?text=...`), and 4-KPI carts summary tiles.
@@ -105,11 +107,26 @@ If you need to inspect any earlier conversation step or code diff from previous 
 
 ## 6. Where We Left Off & Next Potential Tasks
 In our latest session:
-1. **Database Index Optimization Complete (Commit `98bb860`)**:
+1. **Mobile Data Simplification & Compact Responsive Alignment Complete (Commit `604a436`)**:
+   - Refined `Stat`, `Table`, `Th`, `Td`, and `OrderStepper` in `src/components/ui.tsx` with compact padding, truncation, and responsive typography to prevent multi-line number wrapping on 360-390px mobile screens.
+   - Compacted `HomeTiers` TodoTiles, section padding, and 4 KPI cards in `src/app/dashboard/home-tiers.tsx`.
+   - Refined `OrderCard` and phone customer list rows with compact avatar sizing, tighter spacing, and proper truncation.
+   - Optimized `ChatList`, `Conversation` bubbles, `ReplyInbox` header, and `InlineReplyBox` composer padding to prevent keyboard crowding on mobile.
+   - Compacted 4-KPI spend strip, ECharts metric tiles, report summary table, campaign schedule cards, and catalogue product cards.
+   - Ensured 100% desktop fidelity and breathing room via `sm:*` and `lg:*` responsive utility parity.
+   - 100% tests passing (36/36), 0 TypeScript errors, verified production build, pushed to both `origin` and `thabaal`.
+2. **Layout Spacing, Button Swap Animations & Sign-in Theme/Language Indicators Complete (Commit `e22d50e`)**:
+   - Corrected sign-in theme toggle track inversion bug (day mode renders blue daytime sky; night mode renders dark starry sky).
+   - Added animated sliding indicator to language toggle pill (`EN | தமிழ்`) with spring physics transition.
+   - Upgraded `buttonClass` with hover elevation (`hover:-translate-y-px`), tactile active compression (`active:scale-[0.97]`), and subtle variant shadows.
+   - Added fluid button-swap transitions to `FilterChips`, `Segmented` radio switches, and sub-view navs across Campaigns, Customers, Inbox, Catalogue, Revenue, and Reports.
+   - Fixed customer sub-nav tab label from 'Refills' to 'Reorders'.
+   - Refined `PageHeader`, `Section`, and `CardHeader` spacing rhythm and vertical centering.
+   - Refined dashboard layout container padding (`px-3.5 pt-3.5` on mobile, `lg:pb-12` on desktop).
+3. **Database Index Optimization Complete (Commit `98bb860`)**:
    - Added compound and foreign-key indexes on `Message(customerId, createdAt)`, `Message(senderId)`, `Customer(clientId, optedOut, unreachable)`, and `Reply(senderId)`.
    - Additive SQL migration registered in `scripts/db-additive.mjs` and applied to live Neon PostgreSQL database.
-   - 100% tests passing (36/36), 0 TypeScript errors, production build verified.
-2. **Held Tasks (Per User Request)**:
+4. **Held Tasks (Per User Request)**:
    - **Item 1 (Hold)**: COD-to-Prepaid Instant Discount Nudge (`₹20–₹50 OFF` or `+100 Bonus Loyalty Points`).
    - **Item 2 (Hold)**: Auto-Generated PDF Receipt / GST Bill in Chat upon order payment.
    - **Item 4 (Hold)**: Shipping Tracking Link Integration (`Shiprocket` / `Delhivery` / `India Post` / ST Courier) in `order_status` cards.
