@@ -209,6 +209,7 @@ model Customer {
   @@unique([clientId, phone])
   @@index([phone])
   @@index([clientId, region])
+  @@index([clientId, optedOut, unreachable])
 }
 
 /// Customers transcribed from paper sheets whose phone number was blank or unusable.
@@ -385,6 +386,8 @@ model Message {
   @@index([runId, status])
   @@index([createdAt])
   @@index([status])
+  @@index([customerId, createdAt])
+  @@index([senderId])
 }
 
 /// A message a customer sent back: a typed reply or a quick-reply button tap such as "Order now".
@@ -406,6 +409,7 @@ model Reply {
 
   @@index([customerId, receivedAt])
   @@index([handled, receivedAt])
+  @@index([senderId])
 }
 
 enum OrderStatus {

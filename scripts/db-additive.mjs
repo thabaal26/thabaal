@@ -8,6 +8,7 @@ import { execSync } from "node:child_process";
 const FILES = [
   "prisma/sql/2026-10-15-loyalty-redeem.sql",
   "prisma/sql/2026-10-15-template-dates.sql",
+  "prisma/sql/2026-10-16-indexes.sql",
 ];
 
 if (process.env.VERCEL !== "1") {
