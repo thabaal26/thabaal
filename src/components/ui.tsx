@@ -47,7 +47,7 @@ export function PageHeader({
   rowActions?: boolean;
 }) {
   return (
-    <header className="mb-3.5 sm:mb-6">
+    <header className="mb-4 sm:mb-6 lg:mb-7">
       {back && <BackLink href={back.href}>{back.label}</BackLink>}
       <div className={cn("flex gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-6", inlineActions ? "items-start" : "flex-col")}>
         <div className="min-w-0 flex-1 sm:min-w-48">
@@ -67,7 +67,7 @@ export function PageHeader({
           ))}
         <PageTools />
       </div>
-      {tabs && <div className="mt-3 sm:mt-5">{tabs}</div>}
+      {tabs && <div className="mt-3.5 sm:mt-5 lg:mt-6">{tabs}</div>}
     </header>
   );
 }
@@ -87,8 +87,8 @@ export function Section({
   className?: string;
 }) {
   return (
-    <section className={cn("mt-5 sm:mt-10", className)}>
-      <div className="mb-2.5 flex items-end justify-between gap-2.5 sm:mb-3 sm:gap-3">
+    <section className={cn("mt-6 sm:mt-10 lg:mt-11", className)}>
+      <div className="mb-2.5 flex items-end justify-between gap-2.5 sm:mb-3.5 sm:gap-3">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-ink sm:text-base">{title}</h2>
           {description && <p className="mt-0.5 max-w-read text-xs text-muted sm:text-sm">{description}</p>}
@@ -170,11 +170,11 @@ export function CardHeader({
   return (
     <div
       className={cn(
-        "relative flex flex-wrap items-start justify-between gap-x-2.5 gap-y-1.5 border-b border-line px-3.5 py-2.5 sm:flex-nowrap sm:gap-4 sm:px-5 sm:py-4",
+        "relative flex flex-wrap items-start justify-between gap-x-2.5 gap-y-1.5 border-b border-line px-3.5 py-2.5 sm:flex-nowrap sm:gap-4 sm:px-5 sm:py-3.5",
         t && ["rounded-t-[inherit] bg-gradient-to-r to-transparent to-75%", t.band, "before:absolute before:inset-x-0 before:top-0 before:h-[3px] before:rounded-t-[inherit]", t.strip],
       )}
     >
-      <div className="flex min-w-0 flex-1 basis-36 items-start gap-2.5 sm:basis-40 sm:gap-3">
+      <div className={cn("flex min-w-0 flex-1 basis-36 gap-2.5 sm:basis-40 sm:gap-3", description ? "items-start" : "items-center")}>
         {t && icon && <IconCube tone={tone} size="md">{icon}</IconCube>}
         {/* flex-1: the title's box doesn't change size when a description streams in later. */}
         <div className="min-w-0 flex-1">
@@ -190,15 +190,15 @@ export function CardHeader({
 /* ───────────────────────── Buttons ───────────────────────── */
 
 const variants = {
-  primary: "bg-brand text-on-brand font-semibold border-[1.5px] border-brand hover:brightness-105 active:scale-[0.98]",
-  secondary: "border-[1.5px] border-line bg-panel text-ink font-semibold shadow-xs hover:border-ink active:scale-[0.98]",
-  ghost: "text-muted hover:text-ink hover:bg-black/5 dark:hover:bg-white/5",
-  danger: "border-[1.5px] border-danger-border bg-panel text-danger font-semibold shadow-xs hover:bg-danger-bg active:bg-danger-bg",
-  dangerSolid: "bg-danger-solid text-white font-semibold shadow-xs hover:brightness-95 active:brightness-90",
+  primary: "bg-brand text-on-brand font-semibold border-[1.5px] border-brand hover:brightness-105 hover:shadow-md hover:shadow-brand/20 active:scale-[0.97]",
+  secondary: "border-[1.5px] border-line bg-panel text-ink font-semibold shadow-xs hover:border-ink hover:shadow-sm active:scale-[0.97]",
+  ghost: "text-muted hover:text-ink hover:bg-black/5 dark:hover:bg-white/5 active:scale-[0.97]",
+  danger: "border-[1.5px] border-danger-border bg-panel text-danger font-semibold shadow-xs hover:bg-danger-bg hover:shadow-sm active:bg-danger-bg active:scale-[0.97]",
+  dangerSolid: "bg-danger-solid text-white font-semibold shadow-xs hover:brightness-95 hover:shadow-md hover:shadow-danger-solid/25 active:brightness-90 active:scale-[0.97]",
   /** Text-only action inside a sentence or card header. */
   link: "text-brand-deep underline-offset-4 hover:underline font-semibold",
   /** For the dark sidebar and phone header. */
-  onDark: "text-white/80 hover:bg-white/10 hover:text-white active:bg-white/15",
+  onDark: "text-white/80 hover:bg-white/10 hover:text-white active:bg-white/15 active:scale-[0.97]",
 };
 export type ButtonVariant = keyof typeof variants;
 export type ButtonSize = "sm" | "md";
@@ -208,8 +208,9 @@ export type ButtonSize = "sm" | "md";
  */
 export function buttonClass(variant: ButtonVariant = "primary", size: ButtonSize = "md", icon = false) {
   return cn(
-    "ui-btn relative inline-flex select-none items-center justify-center gap-2 whitespace-nowrap transition active:scale-[0.98] [&_svg]:shrink-0 [&_svg:not([class*=size-])]:size-4",
-    "disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 aria-disabled:pointer-events-none aria-disabled:opacity-50",
+    "ui-btn relative inline-flex select-none items-center justify-center gap-2 whitespace-nowrap transition-all duration-200 ease-out active:scale-[0.97] [&_svg]:shrink-0 [&_svg:not([class*=size-])]:size-4",
+    variant !== "link" && "hover:-translate-y-px active:translate-y-0",
+    "disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 disabled:hover:translate-y-0 disabled:hover:shadow-none aria-disabled:pointer-events-none aria-disabled:opacity-50",
     icon
       ? size === "sm"
         ? "size-8.5 rounded-[10px]"
@@ -480,10 +481,10 @@ export function FilterChips({ label, items, className }: { label: string; items:
               href={t.href}
               aria-current={t.active ? "page" : undefined}
               className={cn(
-                "inline-flex min-h-[34px] items-center gap-1.5 whitespace-nowrap rounded-full border-[1.5px] px-3.5 text-[13.5px] font-semibold transition active:scale-[0.97]",
+                "inline-flex min-h-[34px] items-center gap-1.5 whitespace-nowrap rounded-full border-[1.5px] px-3.5 text-[13.5px] font-semibold transition-all duration-200 ease-out active:scale-[0.96]",
                 t.active
-                  ? "border-ink bg-ink text-canvas"
-                  : "border-line bg-panel text-muted hover:border-ink",
+                  ? "border-ink bg-ink text-canvas shadow-xs -translate-y-px"
+                  : "border-line bg-panel text-muted hover:border-ink hover:text-ink hover:-translate-y-px hover:shadow-2xs",
               )}
             >
               <span>{t.label}</span>
@@ -531,8 +532,8 @@ export function Segmented<T extends string>({
             aria-checked={on}
             onClick={() => onChange(o.value)}
             className={cn(
-              "min-h-8 flex-1 whitespace-nowrap rounded-[calc(var(--radius-control)-4px)] px-2.5 text-xs font-medium transition sm:min-h-8 sm:px-3 sm:text-sm",
-              on ? "bg-panel text-ink shadow-xs ring-1 ring-line" : "text-muted hover:text-ink",
+              "min-h-8 flex-1 whitespace-nowrap rounded-[calc(var(--radius-control)-4px)] px-2.5 text-xs font-medium transition-all duration-200 ease-out active:scale-[0.97] sm:min-h-8 sm:px-3 sm:text-sm",
+              on ? "bg-panel text-ink shadow-xs ring-1 ring-line/80 font-bold" : "text-muted hover:text-ink hover:bg-subtle/60",
             )}
           >
             {o.label}

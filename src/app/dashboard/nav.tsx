@@ -134,8 +134,8 @@ export function SideNav({
                       href={href}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "group relative flex h-10 items-center gap-2.5 rounded-xl px-2.5 text-[14.5px] transition",
-                        active ? "bg-brand font-semibold text-on-brand" : "font-medium text-ink hover:bg-brand-soft",
+                        "group relative flex h-10 items-center gap-2.5 rounded-xl px-2.5 text-[14.5px] transition-all duration-200 ease-out active:scale-[0.98]",
+                        active ? "bg-brand font-semibold text-on-brand shadow-xs shadow-brand/25" : "font-medium text-ink hover:bg-brand-soft hover:translate-x-0.5",
                       )}
                     >
                       <Icon aria-hidden className={cn("size-[19px] shrink-0 transition-colors", active ? "text-on-brand" : "text-muted group-hover:text-ink")} />
@@ -181,7 +181,7 @@ export function BottomNav({
 
   const tabClass = (active: boolean) =>
     cn(
-      "flex h-14 min-w-0 flex-col items-center justify-center gap-1 text-[10.5px] leading-tight transition active:scale-95 sm:h-16 sm:text-xs",
+      "flex h-14 min-w-0 flex-col items-center justify-center gap-1 text-[10.5px] leading-tight transition-all duration-200 ease-out active:scale-90 sm:h-16 sm:text-xs",
       active ? "font-bold text-ink dark:text-brand" : "font-medium text-muted hover:text-ink",
     );
   const dot = "absolute -right-2 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-danger-solid px-1 text-[9px] font-bold text-white";
@@ -197,7 +197,7 @@ export function BottomNav({
             <li key={href} className="min-w-0">
               <Link href={href} aria-current={active ? "page" : undefined} className={tabClass(active)}>
                 <span className="relative">
-                  <Icon aria-hidden className={cn("size-5 transition-colors", active ? "text-ink dark:text-brand" : "text-muted")} />
+                  <Icon aria-hidden className={cn("size-5 transition-all duration-200 ease-out", active ? "text-ink dark:text-brand scale-110" : "text-muted scale-100")} />
                   {count?.n ? (
                     <span className={dot}>
                       {count.n > 99 ? "99+" : count.n}
@@ -213,7 +213,7 @@ export function BottomNav({
         <li className="min-w-0">
           <button type="button" onClick={() => setOpenedOn(path)} aria-haspopup="dialog" aria-expanded={moreOpen} className={cn(tabClass(moreActive), "w-full")}>
             <span className="relative">
-              <Menu aria-hidden className={cn("size-5 transition-colors", moreActive ? "text-ink dark:text-brand" : "text-muted")} />
+              <Menu aria-hidden className={cn("size-5 transition-all duration-200 ease-out", moreActive ? "text-ink dark:text-brand scale-110" : "text-muted scale-100")} />
               {hiddenCount > 0 && <span className={dot}>{hiddenCount > 99 ? "99+" : hiddenCount}</span>}
             </span>
             <span>More</span>

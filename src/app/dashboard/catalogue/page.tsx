@@ -70,9 +70,9 @@ export default async function CataloguePage({ searchParams }: PageProps<"/dashbo
           <nav aria-label="Product sub-views" className="inline-flex rounded-xl border border-line bg-card p-1 shadow-2xs">
             <Link
               href="/dashboard/catalogue"
-              className={`inline-flex min-h-[32px] items-center gap-1.5 rounded-lg px-3.5 text-[13.5px] font-semibold transition active:scale-[0.97] ${
+              className={`inline-flex min-h-[32px] items-center gap-1.5 rounded-lg px-3.5 text-[13.5px] font-semibold transition-all duration-200 ease-out active:scale-[0.96] ${
                 currentView === "catalogue"
-                  ? "bg-ink text-canvas shadow-xs"
+                  ? "bg-ink text-canvas shadow-xs -translate-y-px"
                   : "text-muted hover:text-ink hover:bg-subtle/60"
               }`}
             >
@@ -87,9 +87,9 @@ export default async function CataloguePage({ searchParams }: PageProps<"/dashbo
             </Link>
             <Link
               href="/dashboard/catalogue?view=demand"
-              className={`inline-flex min-h-[32px] items-center gap-1.5 rounded-lg px-3.5 text-[13.5px] font-semibold transition active:scale-[0.97] ${
+              className={`inline-flex min-h-[32px] items-center gap-1.5 rounded-lg px-3.5 text-[13.5px] font-semibold transition-all duration-200 ease-out active:scale-[0.96] ${
                 currentView === "demand"
-                  ? "bg-ink text-canvas shadow-xs"
+                  ? "bg-ink text-canvas shadow-xs -translate-y-px"
                   : "text-muted hover:text-ink hover:bg-subtle/60"
               }`}
             >

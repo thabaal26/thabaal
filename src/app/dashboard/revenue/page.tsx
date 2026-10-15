@@ -71,7 +71,7 @@ export default async function RevenuePage({ searchParams }: { searchParams: Prom
           key={t.key}
           href={t.href}
           aria-current={t.on ? "page" : undefined}
-          className={`inline-flex min-h-[34px] items-center whitespace-nowrap rounded-[9px] px-3 text-[13.5px] font-semibold transition ${t.on ? "bg-ink text-canvas" : "text-muted hover:text-ink"}`}
+          className={`inline-flex min-h-[34px] items-center whitespace-nowrap rounded-[9px] px-3.5 text-[13.5px] font-semibold transition-all duration-200 ease-out active:scale-[0.96] ${t.on ? "bg-ink text-canvas shadow-xs -translate-y-px" : "text-muted hover:text-ink hover:bg-subtle/60"}`}
         >
           {t.label}
         </Link>

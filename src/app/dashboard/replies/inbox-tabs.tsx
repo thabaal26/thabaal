@@ -17,10 +17,10 @@ export function InboxTabs({ active }: { active: "inbox" | "priority" | "calls" }
           href={t.href}
           aria-current={t.key === active ? "page" : undefined}
           className={cn(
-            "inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold transition",
+            "inline-flex min-h-[32px] items-center rounded-lg px-3.5 text-[13.5px] font-semibold transition-all duration-200 ease-out active:scale-[0.96]",
             t.key === active
-              ? "bg-ink text-canvas shadow-xs"
-              : "text-muted hover:text-ink",
+              ? "bg-ink text-canvas shadow-xs -translate-y-px"
+              : "text-muted hover:text-ink hover:bg-subtle/60",
           )}
         >
           {t.label}

@@ -175,8 +175,8 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
             <Link
               href="/dashboard/customers"
               className={cn(
-                "inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold transition",
-                !tag ? "bg-ink text-canvas shadow-xs" : "text-muted hover:text-ink",
+                "inline-flex min-h-[32px] items-center rounded-lg px-3.5 text-[13.5px] font-semibold transition-all duration-200 ease-out active:scale-[0.96]",
+                !tag ? "bg-ink text-canvas shadow-xs -translate-y-px" : "text-muted hover:text-ink hover:bg-subtle/60",
               )}
             >
               All customers
@@ -184,8 +184,8 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
             <Link
               href="/dashboard/customers?tag=lapsed"
               className={cn(
-                "inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold transition",
-                tag === "lapsed" ? "bg-ink text-canvas shadow-xs" : "text-muted hover:text-ink",
+                "inline-flex min-h-[32px] items-center rounded-lg px-3.5 text-[13.5px] font-semibold transition-all duration-200 ease-out active:scale-[0.96]",
+                tag === "lapsed" ? "bg-ink text-canvas shadow-xs -translate-y-px" : "text-muted hover:text-ink hover:bg-subtle/60",
               )}
             >
               Groups to reach
@@ -193,17 +193,17 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
             <Link
               href="/dashboard/customers?tag=loyalty"
               className={cn(
-                "inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold transition",
-                tag === "loyalty" ? "bg-ink text-canvas shadow-xs" : "text-muted hover:text-ink",
+                "inline-flex min-h-[32px] items-center rounded-lg px-3.5 text-[13.5px] font-semibold transition-all duration-200 ease-out active:scale-[0.96]",
+                tag === "loyalty" ? "bg-ink text-canvas shadow-xs -translate-y-px" : "text-muted hover:text-ink hover:bg-subtle/60",
               )}
             >
               Loyalty
             </Link>
             <Link
               href="/dashboard/refills"
-              className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink transition"
+              className="inline-flex min-h-[32px] items-center rounded-lg px-3.5 text-[13.5px] font-semibold text-muted hover:text-ink hover:bg-subtle/60 transition-all duration-200 ease-out active:scale-[0.96]"
             >
-              Refills
+              Reorders
             </Link>
           </nav>
         }

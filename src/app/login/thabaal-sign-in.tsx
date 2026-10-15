@@ -79,6 +79,7 @@ export function ThabaalSignIn() {
           role="group"
           aria-label={lang === "ta" ? "மொழி" : "Language"}
         >
+          <span className="thabaal-lang-slider" aria-hidden="true" />
           <button
             type="button"
             onClick={() => setLang("en")}

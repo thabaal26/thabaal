@@ -78,8 +78,8 @@ export default async function ReportPage({ searchParams }: PageProps<"/dashboard
             href={t.key === "week" ? "/dashboard/report" : `/dashboard/report?tab=${t.key}`}
             aria-current={t.key === tab ? "page" : undefined}
             className={cn(
-              "inline-flex min-h-[34px] items-center whitespace-nowrap rounded-[9px] px-3 text-[13.5px] font-semibold transition",
-              t.key === tab ? "bg-ink text-canvas" : "text-muted hover:text-ink",
+              "inline-flex min-h-[34px] items-center whitespace-nowrap rounded-[9px] px-3.5 text-[13.5px] font-semibold transition-all duration-200 ease-out active:scale-[0.96]",
+              t.key === tab ? "bg-ink text-canvas shadow-xs -translate-y-px" : "text-muted hover:text-ink hover:bg-subtle/60",
             )}
           >
             {t.label}

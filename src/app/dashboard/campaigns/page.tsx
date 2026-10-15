@@ -99,25 +99,25 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
             <nav aria-label="Campaign sub-views" className="inline-flex rounded-xl border border-line bg-card p-1 shadow-2xs">
               <Link
                 href="/dashboard/campaigns"
-                className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold bg-ink text-canvas shadow-xs"
+                className="inline-flex min-h-[32px] items-center rounded-lg px-3.5 text-[13.5px] font-semibold bg-ink text-canvas shadow-xs -translate-y-px transition-all duration-200 ease-out active:scale-[0.96]"
               >
                 Campaigns
               </Link>
               <Link
                 href="/dashboard/templates"
-                className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink transition"
+                className="inline-flex min-h-[32px] items-center rounded-lg px-3.5 text-[13.5px] font-semibold text-muted hover:text-ink hover:bg-subtle/60 transition-all duration-200 ease-out active:scale-[0.96]"
               >
                 Message templates
               </Link>
               <a
                 href="#reorder-settings"
-                className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink transition"
+                className="inline-flex min-h-[32px] items-center rounded-lg px-3.5 text-[13.5px] font-semibold text-muted hover:text-ink hover:bg-subtle/60 transition-all duration-200 ease-out active:scale-[0.96]"
               >
                 Automatic messages
               </a>
               <Link
                 href="/dashboard/messages"
-                className="inline-flex min-h-[32px] items-center rounded-lg px-3 text-[13.5px] font-semibold text-muted hover:text-ink transition"
+                className="inline-flex min-h-[32px] items-center rounded-lg px-3.5 text-[13.5px] font-semibold text-muted hover:text-ink hover:bg-subtle/60 transition-all duration-200 ease-out active:scale-[0.96]"
               >
                 Message log
               </Link>

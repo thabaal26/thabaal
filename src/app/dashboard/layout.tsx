@@ -203,7 +203,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           <div className="min-w-0 flex-1 lg:min-h-[calc(100dvh-1.5rem)] lg:rounded-[22px] lg:border lg:border-line lg:bg-canvas lg:shadow-float print:border-0 print:shadow-none">
             <main
               id="main"
-              className="stagger relative mx-auto w-full max-w-page px-3 pb-[calc(4.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pt-6 lg:px-8 lg:pb-10 lg:pt-7 print:p-0"
+              className="stagger relative mx-auto w-full max-w-page px-3.5 pb-[calc(4.75rem+env(safe-area-inset-bottom))] pt-3.5 sm:px-6 sm:pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pt-6 lg:px-8 lg:pb-12 lg:pt-7 print:p-0"
             >
               {client?.billingMode === "wallet" && <WalletBanner clientId={client.id} lowAlert={client.walletLowAlert} />}
               {children}
