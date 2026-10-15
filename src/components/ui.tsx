@@ -108,21 +108,20 @@ export function Card({ className, ...p }: ComponentProps<"div">) {
 export const cardPad = "p-3.5 sm:p-5";
 
 /**
- * Coloured header treatments: a soft tinted band, an accent strip along the card's top edge and a
- * glossy icon tile. Each card on a busy page gets its own colour so it can be found at a glance.
+ * Clean, high-contrast header: crystal-clear typography in night and day modes,
+ * zero murky color washes, and clean uncolored monochrome icons.
  */
-const headerTones = {
-  brand: { band: "from-brand-soft/90", strip: "before:bg-brand", tile: "from-[#34d399] via-[#10b981] to-[#059669] shadow-[0_5px_12px_-3px_rgb(16_185_129/0.55)]" },
-  violet: { band: "from-accent-bg", strip: "before:bg-accent", tile: "from-[#c084fc] via-[#9333ea] to-[#7e22ce] shadow-[0_5px_12px_-3px_rgb(147_51_234/0.55)]" },
-  gold: { band: "from-gold-soft", strip: "before:bg-gold", tile: "from-[#fde047] via-[#f59e0b] to-[#d97706] shadow-[0_5px_12px_-3px_rgb(245_158_11/0.55)]" },
-  info: { band: "from-info-bg", strip: "before:bg-info", tile: "from-[#38bdf8] via-[#0ea5e9] to-[#0284c7] shadow-[0_5px_12px_-3px_rgb(14_165_233/0.55)]" },
-  rose: { band: "from-danger-bg", strip: "before:bg-danger-solid", tile: "from-[#fb7185] via-[#f43f5e] to-[#e11d48] shadow-[0_5px_12px_-3px_rgb(244_63_94/0.55)]" },
-  amber: { band: "from-warning-bg", strip: "before:bg-warning-solid", tile: "from-[#fbbf24] via-[#f59e0b] to-[#d97706] shadow-[0_5px_12px_-3px_rgb(245_158_11/0.55)]" },
+export const headerTones = {
+  brand: { strip: "" },
+  violet: { strip: "" },
+  gold: { strip: "" },
+  info: { strip: "" },
+  rose: { strip: "" },
+  amber: { strip: "" },
 };
 export type HeaderTone = keyof typeof headerTones;
 
 export function IconCube({
-  tone = "brand",
   size = "md",
   children,
   className,
@@ -132,17 +131,16 @@ export function IconCube({
   children: ReactNode;
   className?: string;
 }) {
-  const t = headerTones[tone] ?? headerTones.brand;
   const dims =
     size === "sm"
-      ? "size-7 rounded-[8px] [&>svg]:size-4 sm:size-8 sm:rounded-[10px] sm:[&>svg]:size-[18px]"
+      ? "size-7 [&>svg]:size-4 sm:size-8 sm:[&>svg]:size-[18px]"
       : size === "lg"
-        ? "size-9 rounded-[11px] [&>svg]:size-5 sm:size-11 sm:rounded-[13px] sm:[&>svg]:size-6"
-        : "size-8 rounded-[9px] [&>svg]:size-[17px] sm:size-9 sm:rounded-[11px] sm:[&>svg]:size-5";
+        ? "size-9 [&>svg]:size-5 sm:size-10 sm:[&>svg]:size-6"
+        : "size-8 [&>svg]:size-[17px] sm:size-8.5 sm:[&>svg]:size-[18px]";
   return (
     <span
       aria-hidden
-      className={cn("icon-cube-3d grid shrink-0 place-items-center bg-gradient-to-br text-white ring-1 ring-inset ring-white/40", dims, t.tile, className)}
+      className={cn("grid shrink-0 place-items-center text-muted [&>svg]:stroke-[1.8]", dims, className)}
     >
       {children}
     </span>
@@ -161,21 +159,22 @@ export function CardHeader({
   description?: ReactNode;
   action?: ReactNode;
   as?: "h2" | "h3";
-  /** A coloured header band and accent strip (used on the Overview's 3D cards). */
+  /** A coloured header band and accent strip (kept for backwards compatibility). */
   tone?: HeaderTone;
-  /** An icon in a glossy tile beside the title; shown when `tone` is set. */
+  /** An icon beside the title; rendered cleanly with no colored box. */
   icon?: ReactNode;
 }) {
-  const t = tone ? headerTones[tone] : null;
+  void tone;
   return (
     <div
-      className={cn(
-        "relative flex flex-wrap items-start justify-between gap-x-2.5 gap-y-1.5 border-b border-line px-3.5 py-2.5 sm:flex-nowrap sm:gap-4 sm:px-5 sm:py-3.5",
-        t && ["rounded-t-[inherit] bg-gradient-to-r to-transparent to-75%", t.band, "before:absolute before:inset-x-0 before:top-0 before:h-[3px] before:rounded-t-[inherit]", t.strip],
-      )}
+      className="relative flex flex-wrap items-start justify-between gap-x-2.5 gap-y-1.5 border-b border-line px-3.5 py-2.5 sm:flex-nowrap sm:gap-4 sm:px-5 sm:py-3.5"
     >
       <div className={cn("flex min-w-0 flex-1 basis-36 gap-2.5 sm:basis-40 sm:gap-3", description ? "items-start" : "items-center")}>
-        {t && icon && <IconCube tone={tone} size="md">{icon}</IconCube>}
+        {icon && (
+          <span aria-hidden className="shrink-0 text-muted mt-0.5 [&_svg]:size-[18px] sm:[&_svg]:size-5 [&_svg]:stroke-[1.8] flex items-center justify-center">
+            {icon}
+          </span>
+        )}
         {/* flex-1: the title's box doesn't change size when a description streams in later. */}
         <div className="min-w-0 flex-1">
           <H className="text-[0.875rem] font-semibold leading-5 text-ink sm:text-[0.9375rem] sm:leading-6">{title}</H>
@@ -646,7 +645,7 @@ export function EmptyState({ icon, title, children, action }: { icon?: ReactNode
   return (
     <div className="flex flex-col items-center px-4 py-7 text-center sm:px-6 sm:py-14">
       {icon && (
-        <div aria-hidden className="pedestal-3d icon-cube-3d mb-3 grid size-11 place-items-center rounded-xl text-white ring-1 ring-inset ring-white/45 [&>svg]:size-5 sm:mb-4 sm:size-14 sm:rounded-2xl sm:[&>svg]:size-7">
+        <div aria-hidden className="mb-3 grid size-11 place-items-center rounded-xl bg-subtle text-muted ring-1 ring-line/80 dark:bg-white/[0.05] dark:text-ink/80 dark:ring-white/[0.08] [&>svg]:size-5 sm:mb-4 sm:size-14 sm:rounded-2xl sm:[&>svg]:size-7">
           {icon}
         </div>
       )}
@@ -670,13 +669,13 @@ export function Skeleton({ className }: { className?: string }) {
   return <div aria-hidden className={cn("animate-pulse rounded-control bg-line/60", className)} />;
 }
 
-const STAT_TONES: Record<HeaderTone, { color: string; tile: string }> = {
-  brand: { color: "#167d63", tile: headerTones.brand.tile },
-  violet: { color: "#6941c6", tile: headerTones.violet.tile },
-  gold: { color: "#d4a514", tile: headerTones.gold.tile },
-  info: { color: "#1d64a8", tile: headerTones.info.tile },
-  rose: { color: "#c93636", tile: headerTones.rose.tile },
-  amber: { color: "#b7791f", tile: headerTones.amber.tile },
+const STAT_TONES: Record<HeaderTone, { color: string }> = {
+  brand: { color: "#167d63" },
+  violet: { color: "#6941c6" },
+  gold: { color: "#d4a514" },
+  info: { color: "#1d64a8" },
+  rose: { color: "#c93636" },
+  amber: { color: "#b7791f" },
 };
 
 /**

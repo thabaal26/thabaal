@@ -1,7 +1,6 @@
-import { ExternalLink, Trash2 } from "@/components/icons";
+import { ExternalLink, Trash2, Wallet } from "@/components/icons";
 import { cache, Suspense } from "react";
 import { ActionButton } from "@/components/action-button";
-import { Wallet3D } from "@/components/icons-3d";
 import { Badge, buttonClass, Card, CardHeader, Skeleton } from "@/components/ui";
 import { Disclosure } from "@/components/viz";
 import { cn } from "@/lib/cn";
@@ -31,8 +30,7 @@ export function SpendCard({ clientId, canManage, className }: { clientId: string
   return (
     <Card className={cn("card-3d", className)}>
       <CardHeader
-        tone="gold"
-        icon={<Wallet3D />}
+        icon={<Wallet className="size-5" />}
         title="Meta WhatsApp spend & wallet telemetry"
         description={
           <Suspense fallback="Loading spend from Meta…">

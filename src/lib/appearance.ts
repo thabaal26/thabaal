@@ -181,8 +181,8 @@ export const APPEARANCE_KEYS = Object.keys(OPTIONS) as AppearanceKey[];
 export const BUILT_IN: Appearance = {
   iconPack: "hugeicons",
   iconWeight: "regular",
-  tileLook: "3d",
-  tileTone: "color",
+  tileLook: "2d",
+  tileTone: "plain",
   tileArt: "glyph",
   cardStyle: "3d",
   uiStyle: "thabaal",

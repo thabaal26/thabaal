@@ -14,7 +14,7 @@ export type Icon3DProps = Omit<SVGProps<SVGSVGElement>, "ref" | "children" | "st
 function tile(id: string, name: string) {
   const Icon = ({ className, strokeWidth, ...props }: Icon3DProps) => {
     void strokeWidth;
-    return <svg aria-hidden="true" focusable="false" {...props} className={cn("pi ipt size-4 shrink-0 select-none", `pi-t-${id}`, className)} />;
+    return <svg aria-hidden="true" focusable="false" {...props} className={cn("pi size-4 shrink-0 select-none", `pi-t-${id}`, className)} />;
   };
   Icon.displayName = name;
   return Icon;

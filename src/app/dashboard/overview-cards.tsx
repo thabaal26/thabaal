@@ -1,27 +1,25 @@
 import {
   ArrowDownRight,
   ArrowUpRight,
+  BarChart3,
   BookOpen,
   CheckCheck,
+  Clock,
+  Eye,
+  Gauge,
+  MessageSquareText,
+  Send,
   ShieldAlert,
+  ShoppingBag,
   ShoppingCart,
+  Trophy,
 } from "@/components/icons";
 import Link from "@/components/intent-link";
 import type { ComponentType, ReactNode } from "react";
 import { CountUp, DeliveryDonut, HeatGrid, Sparkline, TrendChart, UsageGauge, type Series } from "@/components/charts";
 import { BarList, StackedRows } from "@/components/viz";
 import { cssColor } from "@/lib/chart-theme";
-import {
-  ChartBar3D,
-  Clock3D,
-  Eye3D,
-  Gauge3D,
-  Messages3D,
-  Send3D,
-  ShoppingBag3D,
-  Target3D,
-  Trophy3D,
-} from "@/components/icons-3d";
+import { Target3D } from "@/components/icons-3d";
 import { formatValue, type ValueFormat } from "@/lib/chart-math";
 import { Card, CardHeader, QualityBadge, buttonClass } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -39,15 +37,6 @@ export const C = {
   pending: "#d0d5dd",
   glow: "#eabf26",
 };
-
-function brightCubeGradient(color: string) {
-  if (color === C.brand) return "linear-gradient(145deg, #34d399 0%, #10b981 52%, #059669 100%)";
-  if (color === C.read) return "linear-gradient(145deg, #c084fc 0%, #9333ea 52%, #7e22ce 100%)";
-  if (color === C.gold) return "linear-gradient(145deg, #fde047 0%, #f59e0b 52%, #d97706 100%)";
-  if (color === C.info) return "linear-gradient(145deg, #38bdf8 0%, #0ea5e9 52%, #0284c7 100%)";
-  if (color === C.failed) return "linear-gradient(145deg, #fb7185 0%, #f43f5e 52%, #e11d48 100%)";
-  return `linear-gradient(145deg, rgb(255 255 255 / 0.42), rgb(255 255 255 / 0) 60%), ${color}`;
-}
 
 /* ───────────────────────── Period switch ───────────────────────── */
 
@@ -133,17 +122,15 @@ export function KpiTile({
 }) {
   const body = (
     <>
-      <span aria-hidden className="absolute inset-x-0 top-0 h-[3px]" style={{ background: color }} />
-      <div className="flex items-center justify-between gap-1.5 px-3 pt-2.5 sm:gap-2 sm:px-5 sm:pt-5">
-        <p className="min-w-0 truncate text-[11px] font-semibold uppercase leading-tight tracking-wide sm:text-[0.8125rem]" style={{ color }}>
+      <div className="flex items-center justify-between gap-1.5 px-3 pt-2.5 sm:gap-2 sm:px-5 sm:pt-4">
+        <p className="min-w-0 truncate text-[11px] font-semibold uppercase leading-tight tracking-wide text-muted sm:text-[0.8125rem]">
           {label}
         </p>
         <span
           aria-hidden
-          className="icon-cube-3d grid size-7 shrink-0 place-items-center rounded-[8px] text-white ring-1 ring-inset ring-white/40 sm:size-10 sm:rounded-[11px]"
-          style={{ background: brightCubeGradient(color), boxShadow: `inset 0 1.5px 0 rgb(255 255 255 / 0.65), inset 0 -2px 0 rgb(0 0 0 / 0.2), 0 6px 14px -3px ${color}99` }}
+          className="grid size-7 shrink-0 place-items-center text-muted sm:size-9 [&_svg]:size-4.5 sm:[&_svg]:size-5.5"
         >
-          <Icon className="size-4 sm:size-[22px]" />
+          <Icon className="size-4.5 sm:size-5.5 stroke-[1.8]" />
         </span>
       </div>
       <div className="px-3 sm:px-5">
@@ -164,14 +151,12 @@ export function KpiTile({
       </div>
     </>
   );
-  // A faint wash of the tile's own colour from the top, over the raised 3D surface.
-  const surface = { background: `linear-gradient(180deg, ${color}14 0%, var(--color-panel) 46%, var(--color-panel-2) 100%)` };
   return href ? (
-    <Link href={href} className="card-3d relative flex h-full min-w-0 flex-col overflow-hidden rounded-card border" style={surface}>
+    <Link href={href} className="card-3d relative flex h-full min-w-0 flex-col overflow-hidden rounded-card border">
       {body}
     </Link>
   ) : (
-    <Card className="card-3d relative flex h-full flex-col overflow-hidden" style={surface}>
+    <Card className="card-3d relative flex h-full flex-col overflow-hidden">
       {body}
     </Card>
   );
@@ -183,8 +168,7 @@ export function ActivityCard({ labels, tooltipLabels, series, every, title, desc
   return (
     <Card className="card-3d h-full">
       <CardHeader
-        tone="brand"
-        icon={<ChartBar3D />}
+        icon={<BarChart3 className="size-5" />}
         title={title}
         description={description}
         action={
@@ -236,8 +220,7 @@ export function DeliveryCard({ read, delivered, sent, failed }: { read: number; 
   return (
     <Card className="card-3d h-full">
       <CardHeader
-        tone="violet"
-        icon={<Gauge3D />}
+        icon={<Gauge className="size-5" />}
         title="Message delivery health"
         description="How many WhatsApp messages reached and were read by customers"
       />
@@ -257,13 +240,13 @@ const FUNNEL: {
   color: string;
 }[] = [
   // One hue for every step: a funnel is one quantity shrinking, not different things.
-  { key: "messaged", label: "Messaged", icon: Send3D, color: "emerald" },
+  { key: "messaged", label: "Messaged", icon: Send, color: "emerald" },
   { key: "delivered", label: "Received it", icon: CheckCheck, color: "emerald" },
-  { key: "read", label: "Read it", icon: Eye3D, color: "emerald" },
-  { key: "replied", label: "Replied / tapped button", icon: Messages3D, color: "emerald" },
+  { key: "read", label: "Read it", icon: Eye, color: "emerald" },
+  { key: "replied", label: "Replied / tapped button", icon: MessageSquareText, color: "emerald" },
   { key: "browsed", label: "Viewed catalogue / price list", icon: BookOpen, color: "emerald" },
   { key: "addedToCart", label: "Added to cart (sent cart)", icon: ShoppingCart, color: "emerald" },
-  { key: "ordered", label: "Bought (paid / confirmed)", icon: ShoppingBag3D, color: "emerald" },
+  { key: "ordered", label: "Bought (paid / confirmed)", icon: ShoppingBag, color: "emerald" },
 ];
 
 /** People, not messages: each step is a share of everyone messaged in the period. */
@@ -299,7 +282,6 @@ export function FunnelCard({
   return (
     <Card className="card-3d h-full">
       <CardHeader
-        tone="gold"
         icon={<Target3D />}
         title={showOrders ? "From message to cart & purchase" : "Customer engagement funnel"}
         description="Customers messaged this period, where they engaged, and where they dropped off"
@@ -470,7 +452,7 @@ export function NumberLimitsCard({ numbers }: { numbers: Health }) {
   const checked = numbers.map((n) => n.statusCheckedAt).filter((d): d is Date => Boolean(d)).sort((a, b) => a.getTime() - b.getTime())[0];
   return (
     <Card className="card-3d flex h-full flex-col">
-      <CardHeader tone="info" icon={<Gauge3D />} title="Daily sending limit" description="Different people messaged in the last 24 hours" />
+      <CardHeader icon={<Gauge className="size-5" />} title="Daily sending limit" description="Different people messaged in the last 24 hours" />
       {head && (
         <div className="border-b border-line px-3.5 py-3 sm:px-5 sm:py-4">
           <LimitRing used={head.used} limit={head.limit} left={head.left} label="Business limit" />
@@ -518,8 +500,7 @@ export function BestTimeCard({ cells, days }: { cells: { d: number; b: number; n
   return (
     <Card className="card-3d h-full">
       <CardHeader
-        tone="brand"
-        icon={<Clock3D />}
+        icon={<Clock className="size-5" />}
         title="Best time to reach customers"
         description={`When customers wrote back, last ${days} days`}
         action={
@@ -566,8 +547,7 @@ export function TopProductsCard({ items, rangeLabel }: { items: ProductDemandRow
   return (
     <Card className="card-3d h-full">
       <CardHeader
-        tone="gold"
-        icon={<Trophy3D />}
+        icon={<Trophy className="size-5" />}
         title="Product demand: bought vs. left in cart"
         description={`Paid/confirmed sales vs. items added to cart & unpaid (${rangeLabel.toLowerCase()})`}
         action={

@@ -1,5 +1,15 @@
-import { Alert3D, ChartBar3D, Clock3D, Rupee3D, ShoppingBag3D, Wallet3D } from "@/components/icons-3d";
-import { Banknote, CheckCircle2, CreditCard, IndianRupee, Wallet } from "@/components/icons";
+import {
+  AlertTriangle,
+  Banknote,
+  BarChart3,
+  CheckCircle2,
+  Clock,
+  CreditCard,
+  IndianRupee,
+  ShoppingCart,
+  Undo2,
+  Wallet,
+} from "@/components/icons";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "@/components/intent-link";
@@ -34,14 +44,12 @@ function CashList({
   hint,
   items,
   icon,
-  tone,
   action,
 }: {
   title: string;
   hint: string;
   items: CashItem[];
   icon: ReactNode;
-  tone: "amber" | "info" | "violet" | "rose";
   action?: (o: CashItem) => ReactNode;
 }) {
   const sum = items.reduce((n, o) => n + o.total, 0);
@@ -49,7 +57,6 @@ function CashList({
     <Card className="card-3d flex h-full flex-col justify-between overflow-hidden">
       <div>
         <CardHeader
-          tone={tone}
           icon={icon}
           title={
             <div className="flex flex-wrap items-center gap-2">
@@ -243,8 +250,7 @@ export default async function RevenuePage({
 
       <Card className="card-3d">
         <CardHeader
-          tone="brand"
-          icon={<ChartBar3D />}
+          icon={<BarChart3 className="size-5" />}
           title={weekly ? "Sales per week" : "Sales per day"}
           description={`${period.label} · by how they paid, on the day the payment came in`}
         />
@@ -289,8 +295,7 @@ export default async function RevenuePage({
             title="Check payment"
             hint="Customer says they paid. Check your UPI app or bank, then confirm on the order"
             items={r.toVerify}
-            icon={<Clock3D />}
-            tone="amber"
+            icon={<Clock className="size-5" />}
           />
         )}
         {r.refundsDue.length > 0 && (
@@ -298,39 +303,34 @@ export default async function RevenuePage({
             title="Refund due"
             hint="Cancelled after paying. Send the money back, then record the refund on the order"
             items={r.refundsDue}
-            icon={<Alert3D />}
-            tone="rose"
+            icon={<Undo2 className="size-5" />}
           />
         )}
         <CashList
           title="Pay link sent"
           hint="WhatsApp “Review and pay” sent, not paid yet"
           items={r.awaitingPayment}
-          icon={<Rupee3D />}
-          tone="amber"
+          icon={<CreditCard className="size-5" />}
         />
         <CashList
           title="Cash on delivery"
           hint="Confirmed as cash on delivery, cash not recorded yet"
           items={r.codToCollect}
-          icon={<Wallet3D />}
-          tone="violet"
+          icon={<Wallet className="size-5" />}
         />
         {r.owed.length > 0 && (
           <CashList
             title="Confirmed, not paid"
             hint="Confirmed or delivered with no payment and no COD: ask for payment or record it"
             items={r.owed}
-            icon={<Alert3D />}
-            tone="rose"
+            icon={<AlertTriangle className="size-5" />}
           />
         )}
         <CashList
           title="Carts without a pay link"
           hint="New carts nobody has asked to pay yet"
           items={r.unpaidCarts}
-          icon={<ShoppingBag3D />}
-          tone="info"
+          icon={<ShoppingCart className="size-5" />}
           action={
             scope.canOperate
               ? (o) => (

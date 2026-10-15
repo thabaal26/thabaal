@@ -453,54 +453,24 @@ tbody > tr {
 .tile-3d { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.35), inset 0 -1px 0 rgb(0 0 0 / 0.08), 0 1px 2px rgb(16 24 40 / 0.1); }
 
 /*
- * 3D Tactile Icon Cube: top specular highlight, diagonal glass sheen, and 3D extruded bottom ledge.
- * Uses pure GPU-composited box-shadow & transform (no per-SVG filter drop-shadow pass) for 120 FPS scrolling.
+ * Clean, subtle icon container rules: neutral, uncolored, and performant.
  */
 .icon-cube-3d {
   position: relative;
   overflow: hidden;
-  /* Brighter, more vivid tile colours (the white glyph stays white). */
-  filter: saturate(1.35) brightness(1.06);
   contain: layout paint style;
   backface-visibility: hidden;
-  box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.65),
-    inset 0 -2px 0 rgb(0 0 0 / 0.18),
-    0 2px 0 0 rgb(16 24 40 / 0.1),
-    0 6px 14px -3px rgb(16 24 40 / 0.2);
   transition: transform 0.2s var(--ease-snappy);
-}
-.icon-cube-3d::after {
-  content: "";
-  pointer-events: none;
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  border-radius: inherit;
-  background: linear-gradient(135deg, rgb(255 255 255 / 0.34) 0%, rgb(255 255 255 / 0.06) 36%, transparent 45%);
 }
 .icon-cube-3d > svg {
   position: relative;
   z-index: 1;
 }
-@media (hover: hover) and (pointer: fine) {
-  .card-3d:hover .icon-cube-3d,
-  a:hover > .icon-cube-3d,
-  .group:hover .icon-cube-3d {
-    transform: translate3d(0, -1.5px, 0) scale(1.04);
-  }
-}
 
-/* 3D EmptyState luminous emerald pedestal with floating depth and bright inner rim. */
+/* Neutral empty-state container */
 .pedestal-3d {
   position: relative;
   contain: layout paint style;
-  background: linear-gradient(145deg, #34d399 0%, #10b981 52%, #059669 100%);
-  box-shadow:
-    inset 0 2px 0 rgb(255 255 255 / 0.65),
-    inset 0 -2.5px 0 rgb(0 0 0 / 0.2),
-    0 4px 0 -1px rgb(5 150 105 / 0.25),
-    0 12px 24px -6px rgb(16 185 129 / 0.45);
 }
 
 /* Chart lines draw themselves in once; areas and markers fade in after them. */
