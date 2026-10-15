@@ -205,7 +205,7 @@ export function PurchaseJourney({
           value={nextIn === null ? (avgGap ? `~${avgGap}d` : "—") : nextIn < 0 ? `${Math.abs(nextIn)}d overdue` : nextIn === 0 ? "today" : `in ${nextIn}d`}
           tone={nextIn !== null && nextIn < 0 ? "bad" : "ink"}
         />
-        <StatChip label="Best time to message" value={bestTimeLabel ?? "6pm–9pm"} />
+        <StatChip label="Best time to message" value={bestTimeLabel ?? "Not known yet"} />
       </div>
 
       {/* Loyalty Points, RFM Breakdown & Smart Offer Suggestion */}
@@ -295,7 +295,7 @@ export function PurchaseJourney({
                     action={adjustLoyaltyPoints.bind(null, customer.id, -100)}
                     variant="ghost"
                     size="sm"
-                    confirm={`Redeem 100 loyalty points (₹50 discount) for ${customer.name}?`}
+                    confirm={`Redeem 100 points for ${customer.name}? Take ₹50 off their order when you confirm it.`}
                   >
                     Redeem 100 pts (-₹50)
                   </ActionButton>

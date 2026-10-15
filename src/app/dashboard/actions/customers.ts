@@ -219,7 +219,7 @@ export async function importCustomers(csv: string, extraTags: string, optInSourc
   };
 }
 
-import { applyManualLoyaltyDelta, parseManualLoyaltyPoints } from "@/lib/loyalty";
+import { applyManualLoyaltyDelta, computeCustomerLoyalty, parseManualLoyaltyPoints } from "@/lib/loyalty";
 
 export async function setOptOut(id: string, optedOut: boolean): Promise<ActionResult> {
   const s = await requireManager();
@@ -245,10 +245,32 @@ export async function adjustLoyaltyPoints(id: string, delta: number): Promise<Ac
   if ("denied" in s) return { ok: false, message: s.denied };
   if (!Number.isFinite(delta) || delta === 0) return { ok: false, message: "Enter a valid points change." };
 
-  const c = await db.customer.findFirst({ where: { id, ...owned(s) }, select: { id: true, name: true, tags: true } });
+  const c = await db.customer.findFirst({
+    where: { id, ...owned(s) },
+    select: {
+      id: true,
+      name: true,
+      tags: true,
+      purchases: true,
+      // Bought orders: paid, or confirmed and beyond (the same rule the Customers page uses).
+      orders: { where: { OR: [{ paidAt: { not: null } }, { status: { in: ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"] } }] }, select: { total: true } },
+    },
+  });
   if (!c) return { ok: false, message: "Customer not found." };
 
-  const nextTags = applyManualLoyaltyDelta(c.tags, delta);
+  // The balance right now, worked out the same way as on screen.
+  const balance = computeCustomerLoyalty({
+    name: c.name,
+    paidOrdersCount: c.orders.length,
+    totalSpent: c.orders.reduce((n, o) => n + o.total, 0),
+    sheetPurchases: c.purchases,
+    tags: c.tags,
+  }).totalPoints;
+  if (delta < 0 && -delta > balance) {
+    return { ok: false, message: `${c.name} has only ${balance} points, so ${Math.abs(Math.round(delta))} can't be redeemed.` };
+  }
+
+  const nextTags = applyManualLoyaltyDelta(c.tags, delta, balance + Math.round(delta));
   const manualAfter = parseManualLoyaltyPoints(nextTags);
   await db.customer.update({ where: { id: c.id }, data: { tags: nextTags } });
 

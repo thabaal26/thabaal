@@ -26,7 +26,7 @@ export type CustomerLoyaltySummary = {
   totalPoints: number;
   /** Equivalent ₹ discount value (100 pts = ₹50, i.e. ₹0.50 per point) */
   rewardRupees: number;
-  /** Redeemable ₹ voucher right now (rounded to nearest ₹25 for clean offers, min ₹25 if >=50 pts) */
+  /** ₹ the customer can use as a discount now: balance in ₹25 steps, max ₹250, 0 below 50 points */
   redeemableRupees: number;
   /** Tier classification */
   tier: LoyaltyTier;
@@ -129,12 +129,9 @@ export function computeCustomerLoyalty(input: {
 
   // 2. Rupee conversion: 100 pts = ₹50 reward credit (1 pt = ₹0.50)
   const rewardRupees = Math.round(totalPoints * 0.5);
-  const redeemableRupees =
-    totalPoints >= 100
-      ? Math.min(250, Math.floor(rewardRupees / 25) * 25)
-      : totalPoints >= 50
-        ? 30
-        : 25;
+  // What can be offered as a discount right now: the balance in steps of ₹25, at most ₹250,
+  // and nothing below 50 points. Never more than the customer actually has.
+  const redeemableRupees = totalPoints >= 50 ? Math.min(250, Math.floor(rewardRupees / 25) * 25) : 0;
 
   // 3. RFM (Recency, Frequency, Monetary) 1–5 Scoring
   const days = input.daysSinceLastOrder ?? null;
@@ -242,11 +239,16 @@ export function computeCustomerLoyalty(input: {
     progressPct = Math.min(99, Math.round((totalPoints / 250) * 100));
   }
 
-  // 6. Smart Offer Suggestion tailored to this customer's exact buying & cart behavior
+  // 6. Suggested offer for this customer, from their real orders, carts and points.
+  // Messages only mention points and discounts the customer really has (redeemableRupees), and never
+  // promise things the portal doesn't do (free delivery, double points, free samples).
   const firstName = input.name.trim().split(/\s+/)[0] || "there";
   const brand = input.brandName || "our store";
-  const fav = input.favoriteProduct || "your favourite essentials";
+  const fav = input.favoriteProduct || "your usual items";
   const dropped = input.droppedProduct;
+  const credit = redeemableRupees;
+  const pointsLine = totalPoints > 0 ? ` You have ${totalPoints} loyalty points with ${brand}.` : "";
+  const creditLine = credit > 0 ? ` You can use ₹${credit} of them as a discount.` : "";
 
   let offerBadge = "Loyalty Perk";
   let offerHeadline = "";
@@ -254,45 +256,45 @@ export function computeCustomerLoyalty(input: {
   let whatsappOfferCopy = "";
 
   if ((input.unpaidCartValue ?? 0) > 0) {
-    const discount = Math.max(30, Math.min(100, redeemableRupees));
-    offerBadge = `Instant Cart Saver · ₹${discount} off`;
-    offerHeadline = `Apply ₹${discount} loyalty credit (${totalPoints} pts) to close their open ₹${Math.round(input.unpaidCartValue!)} unpaid cart today`;
-    offerReason = `Customer has an active unpaid cart right now. Letting them redeem ₹${discount} from their loyalty balance removes checkout hesitation immediately.`;
-    whatsappOfferCopy = `Hi ${firstName}! You have ${totalPoints || 60} loyalty points with ${brand}. Complete your open WhatsApp cart today and enjoy ₹${discount} instant loyalty discount + priority dispatch!`;
+    const cart = Math.round(input.unpaidCartValue!);
+    offerBadge = credit > 0 ? `Cart Saver · ₹${credit} off` : "Cart Reminder";
+    offerHeadline = credit > 0
+      ? `Let them use ₹${credit} of their points (${totalPoints} pts) on the ₹${cart} unpaid cart`
+      : `Remind them about the ₹${cart} unpaid cart`;
+    offerReason = "They have an unpaid cart right now. A reminder, with their own points as a discount if they have enough, removes the last bit of hesitation.";
+    whatsappOfferCopy = `Hi ${firstName}! Your ${brand} cart of ₹${cart} is still waiting.${pointsLine}${creditLine} Reply here and we'll confirm it for you.`;
   } else if (dropped) {
-    const comboOff = Math.max(40, Math.min(100, redeemableRupees));
-    offerBadge = `Dropped-Item Offer · ₹${comboOff} off`;
-    offerHeadline = `Offer ₹${comboOff} off (or ${Math.max(80, totalPoints)} loyalty pts) to add back "${dropped}" on their next order`;
-    offerReason = `They previously added "${dropped}" to cart and removed it before paying. A targeted combo/loyalty discount converts price hesitation into a larger basket.`;
-    whatsappOfferCopy = `Vanakkam ${firstName}! We noticed you checked out ${dropped} earlier. Use your ${totalPoints || 80} loyalty points at ${brand} to get ₹${comboOff} off when you include ${dropped} in your next order!`;
+    offerBadge = credit > 0 ? `Dropped Item · ₹${credit} off` : "Dropped Item";
+    offerHeadline = credit > 0
+      ? `Offer ₹${credit} off from their points if they add "${dropped}" back`
+      : `Remind them about "${dropped}", which they removed from a cart`;
+    offerReason = `They added "${dropped}" to a cart and removed it before paying, usually price or pack size. A nudge, with their points as a discount if they have enough, can bring it back.`;
+    whatsappOfferCopy = `Vanakkam ${firstName}! You looked at ${dropped} at ${brand} earlier.${pointsLine}${creditLine} Shall we add it to your next order?`;
   } else if (rfmSegment === "Big Spender · At Risk") {
-    const winbackCredit = Math.max(75, redeemableRupees);
-    offerBadge = `VIP Win-Back · ₹${winbackCredit} off`;
-    offerHeadline = `High-spend customer cooling down (RFM ${rfmCode}) — send ₹${winbackCredit} VIP win-back credit on ${fav}`;
-    offerReason = `High Monetary/Frequency score (M:${mScore}, F:${fScore}) but low Recency (R:${rScore}). Losing a top spender hurts revenue most — intervene with a VIP voucher now.`;
-    whatsappOfferCopy = `Vanakkam ${firstName}! We miss serving you at ${brand}. You have ${totalPoints} VIP loyalty points (worth ₹${winbackCredit} off) waiting! Tap below to restock fresh ${fav} with free priority delivery.`;
+    offerBadge = credit > 0 ? `Win-Back · ₹${credit} off` : "Win-Back";
+    offerHeadline = `A good customer who hasn't ordered for a while (RFM ${rfmCode})${credit > 0 ? `: offer ₹${credit} from their points` : ""}`;
+    offerReason = `High spend or order count (M:${mScore}, F:${fScore}) but no recent order (R:${rScore}). These customers are worth the most to win back.`;
+    whatsappOfferCopy = `Vanakkam ${firstName}! We miss you at ${brand}.${pointsLine}${creditLine} Shall we send your usual ${fav}?`;
   } else if (tier === "platinum" || (paidOrders >= 3 && spent >= 1500)) {
-    const vipCredit = Math.max(75, redeemableRupees);
-    offerBadge = `VIP Reward · ₹${vipCredit} credit`;
-    offerHeadline = `Reward with ₹${vipCredit} VIP loyalty voucher (${totalPoints} pts) + free sample of a new/slow-moving item with ${fav}`;
-    offerReason = `Top frequent buyer (${paidOrders} paid orders · ₹${Math.round(spent).toLocaleString("en-IN")} spent · RFM ${rfmCode}). VIP perks lock in retention and help introduce new catalogue items.`;
-    whatsappOfferCopy = `Vanakkam ${firstName}! Thank you for being a ${tierLabel} customer at ${brand} (${totalPoints} loyalty pts earned!). Enjoy ₹${vipCredit} off + a complimentary trial pack on your next order of ${fav}.`;
+    offerBadge = credit > 0 ? `VIP Thank You · ₹${credit} off` : "VIP Thank You";
+    offerHeadline = `Thank a top customer${credit > 0 ? ` and let them use ₹${credit} of their ${totalPoints} points` : ""}`;
+    offerReason = `One of the best customers (${paidOrders} paid orders · ₹${Math.round(spent).toLocaleString("en-IN")} spent · RFM ${rfmCode}). A thank-you keeps them coming back.`;
+    whatsappOfferCopy = `Vanakkam ${firstName}! Thank you for being a ${tierLabel} customer at ${brand}.${pointsLine}${creditLine} Your next ${fav} is ready whenever you are.`;
   } else if (isFrequentBuyer && days !== null && days >= 25) {
-    offerBadge = `Reorder Due · ₹${redeemableRupees} off + 2× pts`;
-    offerHeadline = `Due for reorder (${days}d since last order) — offer ₹${redeemableRupees} loyalty credit on ${fav}`;
-    offerReason = `Repeat buyer whose usual reorder window (~${input.avgGapDays ?? 30}d) is open now. Reaching out with their earned points prevents switching to local stores.`;
-    whatsappOfferCopy = `Hi ${firstName}, running low on ${fav}? You have ${totalPoints} loyalty points (worth ₹${rewardRupees}) waiting at ${brand}! Place your reorder this week to redeem ₹${redeemableRupees} off + earn 2× bonus points.`;
+    offerBadge = credit > 0 ? `Reorder Due · ₹${credit} off` : "Reorder Due";
+    offerHeadline = `Due for a reorder (${days} days since the last order)${credit > 0 ? `: offer ₹${credit} from their points` : ""}`;
+    offerReason = `A repeat buyer whose usual gap (~${input.avgGapDays ?? 30} days) has passed. Reaching out now stops them buying elsewhere.`;
+    whatsappOfferCopy = `Hi ${firstName}, running low on ${fav}?${pointsLine}${creditLine} Reply to reorder this week.`;
   } else if (paidOrders >= 1 || sheetItemsCount >= 1) {
-    const voucher = Math.max(40, redeemableRupees);
-    offerBadge = `Repeat Booster · ₹${voucher} off`;
-    offerHeadline = `Convert into a frequent buyer: offer ₹${voucher} loyalty discount (${totalPoints} pts) on their next order of ${fav}`;
-    offerReason = `Has ordered before (${paidOrders ? `${paidOrders} WhatsApp order${paidOrders === 1 ? "" : "s"}` : "past sheet buyer"}). The 2nd order is the biggest milestone for long-term retention.`;
-    whatsappOfferCopy = `Hi ${firstName}! You've earned ${totalPoints} loyalty points from your purchase at ${brand}. Redeem ₹${voucher} off on your next WhatsApp order of ${fav} this week!`;
+    offerBadge = credit > 0 ? `Second Order · ₹${credit} off` : "Second Order";
+    offerHeadline = `Turn them into a repeat buyer${credit > 0 ? ` with ₹${credit} off from their points` : ""}`;
+    offerReason = `Has bought before (${paidOrders ? `${paidOrders} WhatsApp order${paidOrders === 1 ? "" : "s"}` : "past sheet buyer"}). The second order is the biggest step to a regular customer.`;
+    whatsappOfferCopy = `Hi ${firstName}! Thank you for buying from ${brand}.${pointsLine}${creditLine} Reply to order your ${fav} again.`;
   } else {
-    offerBadge = "1st-Order Welcome · +50 pts";
-    offerHeadline = "Send a First-Order Free Delivery + 50 Bonus Loyalty Points welcome offer";
-    offerReason = "Has not placed their first WhatsApp order yet. A welcome loyalty bonus + free delivery lowers first-order friction.";
-    whatsappOfferCopy = `Vanakkam ${firstName}! Welcome to ${brand}. Place your first WhatsApp catalogue order this week to get FREE doorstep delivery + 50 Bonus Loyalty Points (₹25 credit)!`;
+    offerBadge = "First Order";
+    offerHeadline = "Invite them to place their first WhatsApp order";
+    offerReason = "Hasn't ordered on WhatsApp yet. Every order earns points (1 point per ₹10), so tell them about it.";
+    whatsappOfferCopy = `Vanakkam ${firstName}! Welcome to ${brand}. Order on WhatsApp and earn loyalty points on every order: 1 point for every ₹10, and 100 points = ₹50 off.`;
   }
 
   return {

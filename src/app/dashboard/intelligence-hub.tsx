@@ -1042,7 +1042,7 @@ export function TopFrequentCustomersCard({ data }: { data: TopFrequentCustomersD
                       action={adjustLoyaltyPoints.bind(null, activeCustomer.id, -100)}
                       variant="ghost"
                       size="sm"
-                      confirm={`Redeem 100 points (₹50 discount) for ${activeCustomer.name}?`}
+                      confirm={`Redeem 100 points for ${activeCustomer.name}? Take ₹50 off their order when you confirm it.`}
                     >
                       Redeem 100
                     </ActionButton>

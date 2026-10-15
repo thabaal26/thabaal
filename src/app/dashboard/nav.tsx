@@ -3,6 +3,7 @@
 import {
   BarChart3,
   Building2,
+  FileText,
   Home,
   IndianRupee,
   Megaphone,
@@ -42,7 +43,8 @@ export const NAV: NavItem[] = [
 
   { href: "/dashboard/customers", label: "Customers", short: "Customers", icon: Users, group: "Grow", also: ["/dashboard/refills"] },
   { href: "/dashboard/catalogue", label: "Products", short: "Products", icon: Tag, group: "Grow" },
-  { href: "/dashboard/campaigns", label: "Campaigns", short: "Campaigns", icon: Megaphone, group: "Grow", also: ["/dashboard/templates", "/dashboard/messages"] },
+  { href: "/dashboard/campaigns", label: "Campaigns", short: "Campaigns", icon: Megaphone, group: "Grow", also: ["/dashboard/messages"] },
+  { href: "/dashboard/templates", label: "Templates", short: "Templates", icon: FileText, group: "Grow" },
 
   { href: "/dashboard/report", label: "Reports", short: "Reports", icon: BarChart3, group: "Understand" },
 
