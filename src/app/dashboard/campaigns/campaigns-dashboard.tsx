@@ -266,22 +266,22 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
       }
     >
       {/* 4-KPI Stat Strip */}
-      <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
-        <div className="card stat">
+      <div className="grid g4 keep2" suppressHydrationWarning style={{ marginBottom: 16 }}>
+        <div className="card stat" suppressHydrationWarning>
           <div className="l">Sent this month</div>
           <div className="v">{kpi.sent.toLocaleString("en-IN")}</div>
         </div>
-        <div className="card stat">
+        <div className="card stat" suppressHydrationWarning>
           <div className="l">Money spent</div>
           <div className="v">{R(kpi.spent)}</div>
           <div className="d muted">Meta message charges</div>
         </div>
-        <div className="card stat">
+        <div className="card stat" suppressHydrationWarning>
           <div className="l">Sales from campaigns</div>
           <div className="v">{R(kpi.sales)}</div>
           <div className="d muted">Paid orders</div>
         </div>
-        <div className="card stat">
+        <div className="card stat" suppressHydrationWarning>
           <div className="l">Back for every ₹1</div>
           <div className="v">{kpi.spent > 0 ? R(kpi.back) : "—"}</div>
           <div className="d muted">Sales, not profit</div>
@@ -289,7 +289,7 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
       </div>
 
       {/* Tabs */}
-      <div className="tabs" data-tabs role="tablist">
+      <div className="tabs" data-tabs role="tablist" aria-label="Campaign views" suppressHydrationWarning>
         {TAB_DEFS.map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => switchTab(t.id)}>
             <T ta={t.ta}>{t.label}</T>
@@ -298,19 +298,23 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
       </div>
 
       {tab !== "auto" ? (
-        <section data-panel={tab}>
+        <section data-panel={tab} suppressHydrationWarning>
           {/* Toolbar */}
-          <div className="toolbar">
+          <div className="toolbar" role="search" suppressHydrationWarning>
             <div className="search">
-              <svg viewBox="0 0 24 24">
+              <label htmlFor="cam-cq" className="sr-only">
+                Search campaigns
+              </label>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="11" cy="11" r="7" />
                 <path d="m20 20-4-4" />
               </svg>
               <input
                 type="search"
                 id="cam-cq"
+                name="q"
                 placeholder="Search campaign name"
-                aria-label="Search campaigns"
+                aria-label="Search campaign name"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -384,7 +388,7 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                         )}
                       </h2>
                       <p>
-                        {c.w} · {c.aud} · “{c.tpl}”
+                        {c.w} · {c.aud} · &ldquo;{c.tpl}&rdquo;
                       </p>
                     </div>
                     <div className="tools">
@@ -574,8 +578,20 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                     )}
 
                     {c.s !== "drafts" && (
-                      <label className="small muted" style={{ display: "flex", gap: 6, alignItems: "center", marginLeft: "auto", cursor: "pointer" }}>
-                        <input type="checkbox" className="cc" checked={selectedIds.includes(c.id)} onChange={() => toggleSelect(c.id)} />
+                      <label
+                        htmlFor={`cmp-${c.id}`}
+                        className="small muted"
+                        style={{ display: "flex", gap: 6, alignItems: "center", marginLeft: "auto", cursor: "pointer" }}
+                      >
+                        <input
+                          type="checkbox"
+                          id={`cmp-${c.id}`}
+                          name={`compare-${c.id}`}
+                          className="cc"
+                          aria-label={`Compare ${c.n}`}
+                          checked={selectedIds.includes(c.id)}
+                          onChange={() => toggleSelect(c.id)}
+                        />
                         Compare
                       </label>
                     )}
@@ -589,14 +605,14 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
         </section>
       ) : (
         /* Automations Tab */
-        <section data-panel="auto">
+        <section data-panel="auto" suppressHydrationWarning>
           <p className="muted" style={{ marginBottom: 14 }}>
             Set these once. They run on their own, with no campaign to start.
           </p>
-          <div className="card">
-            <div className="list" id="au">
+          <div className="card" suppressHydrationWarning>
+            <div className="list" id="au" suppressHydrationWarning>
               {automations.map((a, i) => (
-                <div key={a.name} className="row">
+                <div key={a.name} className="row" suppressHydrationWarning>
                   <div className="grow">
                     <div className="t">
                       {a.name} <span className="pill mute" style={{ marginLeft: 6 }}>{a.cat}</span>
@@ -627,9 +643,16 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
 
       {/* Progress / Result Modal */}
       {progModal && (
-        <dialog id="prog" open style={{ display: "block", position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 100 }}>
+        <dialog
+          id="prog"
+          open
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="prog-title"
+          style={{ display: "block", position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 100 }}
+        >
           <div className="dlg">
-            <h2>{progModal.n}</h2>
+            <h2 id="prog-title">{progModal.n}</h2>
             <div className="list">
               <div className="row">
                 <div className="grow muted">Sent</div>
@@ -670,9 +693,16 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
 
       {/* Preview Modal */}
       {pvModal && (
-        <dialog id="pv" open style={{ display: "block", position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 100 }}>
+        <dialog
+          id="pv"
+          open
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pv-title"
+          style={{ display: "block", position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 100 }}
+        >
           <div className="dlg">
-            <h2>Preview: {pvModal.n}</h2>
+            <h2 id="pv-title">Preview: {pvModal.n}</h2>
             <div className="phone">
               <div className="bubble">{pvModal.body || `${pvModal.n}! Special offer for your next order today.`}</div>
               {pvModal.buttons && pvModal.buttons.length > 0 && (

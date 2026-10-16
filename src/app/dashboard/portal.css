@@ -2,7 +2,7 @@
 .thabaal-portal{
   /* Layout: fixed left menu (grouped by job), one calm column of white cards on cream. Mango is the only loud colour. */
   --bg:#FFF9F0; --card:#fff; --fg:#10283B; --muted:#5A6B7B; --line:#EADFCB; --soft:#FFF3D6; --mango:#FFC329; --ink:#10283B;
-  --ok:#0E8A5B; --ok-bg:rgba(32,201,133,.16); --warn:#8A5A00; --warn-bg:rgba(255,195,41,.28); --bad:#C0412A; --bad-bg:rgba(244,107,78,.16);
+  --ok:#086842; --ok-bg:rgba(32,201,133,.16); --warn:#8A5A00; --warn-bg:rgba(255,195,41,.28); --bad:#B73822; --bad-bg:rgba(244,107,78,.16);
   --info:#2B5C86; --info-bg:rgba(43,92,134,.12); --bar:#10283B; --bar2:#FFC329; --bar3:#F46B4E; --bar4:#20C985;
   --shadow:0 1px 0 rgba(16,40,59,.04),0 14px 30px -22px rgba(16,40,59,.35);
   --display:"Fredoka","Noto Sans Tamil",ui-rounded,system-ui,sans-serif; --ui:"DM Sans","Noto Sans Tamil",system-ui,-apple-system,"Segoe UI",sans-serif;

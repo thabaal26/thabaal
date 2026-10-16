@@ -192,8 +192,11 @@ export default async function CampaignsPage() {
   const when = (c: (typeof campaigns)[number], s: State) => {
     if (s === "running") return `Sending now${WAITING[c.runs[0]?.status] ? ` · ${WAITING[c.runs[0].status]}` : ""}`;
     if (c.nextRunAt) {
-      const days = c.scheduleType === "WEEKLY" ? (c.daysOfWeek.length === 7 ? "Every day" : c.daysOfWeek.map((d) => DAYS[d]).join(", ")) : null;
-      return `${days ? `${days} · ` : ""}${fmtDate(c.nextRunAt, "EEE d MMM · h:mm a")}`;
+      if (c.scheduleType === "WEEKLY") {
+        const days = c.daysOfWeek.length === 7 ? "Every day" : c.daysOfWeek.map((d) => DAYS[d]).join(", ");
+        return `${days} · ${fmtDate(c.nextRunAt, "h:mm a").toLowerCase()}`;
+      }
+      return `${fmtDate(c.nextRunAt, "EEE d MMM · h:mm a").toLowerCase()}`;
     }
     if (c.runs[0]) return `Ended ${fmtDate(c.runs[0].startedAt, "d MMM")}`;
     return "Not scheduled";

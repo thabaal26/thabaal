@@ -56,7 +56,14 @@ export function T({ ta, children }: { ta?: string; children: ReactNode }) {
 export function LangButton() {
   const lang = useLang();
   return (
-    <button type="button" className="iconbtn" aria-label="Language: English or Tamil" style={{ width: "auto", padding: "0 12px", fontWeight: 700 }} onClick={() => setLang(lang === "ta" ? "en" : "ta")}>
+    <button
+      type="button"
+      className="iconbtn"
+      aria-label={lang === "ta" ? "Switch language to English (EN)" : "மொழியை தமிழுக்கு மாற்று (தமிழ்)"}
+      title="Language: English or Tamil"
+      style={{ width: "auto", padding: "0 12px", fontWeight: 700 }}
+      onClick={() => setLang(lang === "ta" ? "en" : "ta")}
+    >
       {lang === "ta" ? "EN" : "தமிழ்"}
     </button>
   );
@@ -81,14 +88,14 @@ export function PortalPage({
   children: ReactNode;
 }) {
   return (
-    <div className="thabaal-portal">
-      <div className="wrapin">
-        <header className="top">
-          <div>
+    <div className="thabaal-portal" suppressHydrationWarning>
+      <div className="wrapin" suppressHydrationWarning>
+        <header className="top" suppressHydrationWarning>
+          <div suppressHydrationWarning>
             <h1>{titleTa ? <T ta={titleTa}>{title}</T> : title}</h1>
             {sub && <p className="sub">{subTa ? <T ta={subTa}>{sub}</T> : sub}</p>}
           </div>
-          <div className="tools">
+          <div className="tools" suppressHydrationWarning>
             {actions}
             <LangButton />
             <PageTools />
