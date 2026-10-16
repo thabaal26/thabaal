@@ -232,7 +232,7 @@ export function HomeTiers(p: HomeTiersProps) {
               <div className="tools" style={{ marginTop: 12 }}>
                 <Link className="btn primary sm" href="/dashboard/campaigns/new">+ <T ta="பிரச்சாரம் உருவாக்கு">Create campaign</T></Link>
                 {p.reminderDays !== undefined && (
-                  <Link className="btn sm" href="/dashboard/campaigns#reorder-settings">
+                  <Link className="btn sm" href="/dashboard/campaigns?show=auto">
                     Reorder settings
                   </Link>
                 )}

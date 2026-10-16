@@ -36,7 +36,7 @@ export default async function RefillsPage() {
       {!f.refillAutoOn && scope.canManage && (
         <div className="note" style={{ marginBottom: 14 }}>
           <b>Automatic refill reminders are off.</b> Pick a reminder template and the number of days in{" "}
-          <Link className="linkb" href="/dashboard/campaigns#reorder-settings">
+          <Link className="linkb" href="/dashboard/campaigns?show=auto">
             Campaigns › Automatic messages
           </Link>
           . Until then you can remind customers one by one here{f.refillTemplateName ? "" : " once a template is chosen"}.
