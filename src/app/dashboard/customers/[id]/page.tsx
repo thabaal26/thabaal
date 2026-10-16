@@ -5,9 +5,9 @@ import Link from "@/components/intent-link";
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
 import { Conversation, type ConversationEntry } from "@/components/conversation";
-import { Eye3D, Inbox3D, Messages3D, Send3D, ShoppingBag3D } from "@/components/icons-3d";
+import { Messages3D, ShoppingBag3D } from "@/components/icons-3d";
 import { OverflowMenu } from "@/components/overflow-menu";
-import { Badge, buttonClass, Card, CardHeader, EmptyState, PageHeader, Stat } from "@/components/ui";
+import { Badge, buttonClass, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
 import { db } from "@/lib/db";
 import { fmtDate, fmtNumber, pct } from "@/lib/format";
 import { itemsText, money, type OrderItem } from "@/lib/orders";
@@ -137,11 +137,41 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
         }
       />
 
-      <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
-        <Stat label="Messages received" value={fmtNumber(sent.length)} sub={c.optedOut ? "Opted out of campaigns" : "From your campaigns"} icon={<Send3D />} tone="brand" />
-        <Stat label="Read" value={`${pct(read, delivered)}%`} sub={`${read} of ${delivered} delivered`} icon={<Eye3D />} tone="info" meter={pct(read, delivered)} />
-        <Stat label="Replies" value={fmtNumber(c.replies.length)} sub={c.replies[0] ? `Last ${fmtDate(c.replies[0].receivedAt, "d MMM")}` : "None yet"} icon={<Inbox3D />} tone="violet" />
-      </div>
+      {(() => {
+        // The design's profile figures: what they bought, from orders that stand.
+        const bought = c.orders.filter((o) => o.status !== "CANCELLED" && (o.paidAt || ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"].includes(o.status)));
+        const spent = bought.reduce((n, o) => n + o.total, 0);
+        const last = bought.reduce<Date | null>((d, o) => (!d || o.createdAt > d ? o.createdAt : d), null);
+        const unpaid = c.orders.filter((o) => !o.paidAt && (o.status === "NEW" || o.status === "CONFIRMED")).reduce((n, o) => n + o.total, 0);
+        return (
+          <>
+            <div className="grid g4 keep2">
+              <div className="card stat">
+                <div className="l">Orders</div>
+                <div className="v">{fmtNumber(bought.length)}</div>
+              </div>
+              <div className="card stat">
+                <div className="l">Spend</div>
+                <div className="v">{money(spent)}</div>
+              </div>
+              <div className="card stat">
+                <div className="l">Average order</div>
+                <div className="v">{bought.length ? money(spent / bought.length) : "—"}</div>
+              </div>
+              <div className="card stat">
+                <div className="l">Last order</div>
+                <div className="v" style={{ fontSize: 22 }}>{last ? fmtDate(last, "d MMM") : "Never"}</div>
+                {unpaid > 0 && <div className="d down">Unpaid cart {money(unpaid)}</div>}
+              </div>
+            </div>
+            <p className="muted small" style={{ marginTop: 8 }}>
+              {fmtNumber(sent.length)} campaign message{sent.length === 1 ? "" : "s"} received · {pct(read, delivered)}% read · {fmtNumber(c.replies.length)} repl{c.replies.length === 1 ? "y" : "ies"}
+              {c.replies[0] ? ` (last ${fmtDate(c.replies[0].receivedAt, "d MMM")})` : ""}
+              {c.optedOut ? " · opted out of campaigns" : ""}
+            </p>
+          </>
+        );
+      })()}
 
       {/* Computers: the profile in a sticky side column beside the send panel and conversation. */}
       <div className="mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:items-start">

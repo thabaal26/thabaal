@@ -154,20 +154,17 @@ export function CardHeader({
   as?: "h2" | "h3";
   /** A coloured header band and accent strip (kept for backwards compatibility). */
   tone?: HeaderTone;
-  /** An icon beside the title; rendered cleanly with no colored box. */
+  /** Accepted for older callers; the design's card headers have no icon. */
   icon?: ReactNode;
 }) {
   void tone;
+  void icon;
   return (
     <div
       className="relative flex flex-wrap items-start justify-between gap-x-2.5 gap-y-1.5 px-4 pb-1 pt-4 sm:flex-nowrap sm:gap-4 sm:px-5 sm:pt-5"
     >
       <div className={cn("flex min-w-0 flex-1 basis-36 gap-2.5 sm:basis-40 sm:gap-3", description ? "items-start" : "items-center")}>
-        {icon && (
-          <span aria-hidden className="shrink-0 text-muted mt-0.5 [&_svg]:size-[18px] sm:[&_svg]:size-5 [&_svg]:stroke-[1.8] flex items-center justify-center">
-            {icon}
-          </span>
-        )}
+        {/* The portal design's card headers carry no icon; `icon` is accepted and left out. */}
         {/* flex-1: the title's box doesn't change size when a description streams in later. */}
         <div className="min-w-0 flex-1">
           <H className="font-display text-[17px] font-semibold leading-snug tracking-[-0.2px] text-ink sm:text-[19px]">{title}</H>
@@ -692,17 +689,14 @@ export function Stat({
   tone?: HeaderTone;
   meter?: number;
 }) {
+  void icon;
   const body = (
     <>
       <div className="flex items-center justify-between gap-1.5 sm:gap-2">
         <span className="min-w-0 truncate text-[11.5px] font-medium text-muted sm:text-[13.5px]">
           {label}
         </span>
-        {icon && (
-          <span aria-hidden className="shrink-0 text-muted [&_svg]:size-4 sm:[&_svg]:size-[18px] [&_svg]:stroke-2">
-            {icon}
-          </span>
-        )}
+        {/* The design's stat tiles have no icon. */}
       </div>
       <div className="tabular mt-0.5 sm:mt-1 font-display font-semibold text-xl sm:text-[26px] lg:text-[28px] leading-tight tracking-[-0.2px] text-ink truncate">{value}</div>
       {meter !== undefined && <Meter raised value={meter} tone={tone === "amber" || tone === "rose" ? "warning" : "brand"} className="mt-1.5 sm:mt-2.5" />}
