@@ -14,7 +14,7 @@ export function PageInfo({ title, description }: { title: string; description?: 
   return (
     <>
       <div className="flex items-center gap-1 sm:items-start">
-        <h1 className="min-w-0 font-display font-semibold text-2xl sm:text-3xl leading-snug tracking-[-0.2px] text-ink [overflow-wrap:anywhere]">{title}</h1>
+        <h1 style={{ minWidth: 0, overflowWrap: "anywhere" }}>{title}</h1>
         {description && (
           <button
             type="button"
@@ -29,7 +29,7 @@ export function PageInfo({ title, description }: { title: string; description?: 
         )}
       </div>
       {description && (
-        <p id={id} className={cn("mt-1 text-sm text-muted leading-snug sm:leading-normal", !open && "max-sm:hidden")}>
+        <p id={id} className={cn("sub", !open && "max-sm:hidden")}>
           {description}
         </p>
       )}

@@ -1,4 +1,16 @@
 /* Generated from thabaal-portal.html: the portal design, scoped to .thabaal-portal. */
+.thabaal-portal{
+  /* Layout: fixed left menu (grouped by job), one calm column of white cards on cream. Mango is the only loud colour. */
+  --bg:#FFF9F0; --card:#fff; --fg:#10283B; --muted:#5A6B7B; --line:#EADFCB; --soft:#FFF3D6; --mango:#FFC329; --ink:#10283B;
+  --ok:#0E8A5B; --ok-bg:rgba(32,201,133,.16); --warn:#8A5A00; --warn-bg:rgba(255,195,41,.28); --bad:#C0412A; --bad-bg:rgba(244,107,78,.16);
+  --info:#2B5C86; --info-bg:rgba(43,92,134,.12); --bar:#10283B; --bar2:#FFC329; --bar3:#F46B4E; --bar4:#20C985;
+  --shadow:0 1px 0 rgba(16,40,59,.04),0 14px 30px -22px rgba(16,40,59,.35);
+  --display:"Fredoka","Noto Sans Tamil",ui-rounded,system-ui,sans-serif; --ui:"DM Sans","Noto Sans Tamil",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+html.dark .thabaal-portal{
+  --bg:#0B1E2D; --card:#133248; --fg:#FFF9F0; --muted:#A8BACA; --line:#27465C; --soft:#1B3B52; --ink:#FFF9F0;
+  --ok:#5BE3AE; --ok-bg:rgba(32,201,133,.18); --warn:#FFD76A; --warn-bg:rgba(255,195,41,.18); --bad:#FF9C86; --bad-bg:rgba(244,107,78,.2);
+  --info:#8EC3EE; --info-bg:rgba(142,195,238,.15); --bar:#FFF9F0; --shadow:0 14px 30px -22px rgba(0,0,0,.7); color-scheme:dark}
 @layer base {
 /* The app's Tailwind base resets heading sizes and lists; the design relies on browser defaults. */
 .thabaal-portal h1{font-size:2em}
@@ -21,23 +33,11 @@
 .thabaal-portal dialog{border:0;border-radius:20px;padding:0;background:var(--card);color:var(--fg);width:min(520px,calc(100vw - 32px));box-shadow:0 30px 80px -20px rgba(0,0,0,.55)}
 .thabaal-portal dialog::backdrop{background:rgba(16,40,59,.55)}
 }
-.thabaal-portal{
-  /* Layout: fixed left menu (grouped by job), one calm column of white cards on cream. Mango is the only loud colour. */
-  --bg:#FFF9F0; --card:#fff; --fg:#10283B; --muted:#5A6B7B; --line:#EADFCB; --soft:#FFF3D6; --mango:#FFC329; --ink:#10283B;
-  --ok:#0E8A5B; --ok-bg:rgba(32,201,133,.16); --warn:#8A5A00; --warn-bg:rgba(255,195,41,.28); --bad:#C0412A; --bad-bg:rgba(244,107,78,.16);
-  --info:#2B5C86; --info-bg:rgba(43,92,134,.12); --bar:#10283B; --bar2:#FFC329; --bar3:#F46B4E; --bar4:#20C985;
-  --shadow:0 1px 0 rgba(16,40,59,.04),0 14px 30px -22px rgba(16,40,59,.35);
-  --display:"Fredoka","Noto Sans Tamil",ui-rounded,system-ui,sans-serif; --ui:"DM Sans","Noto Sans Tamil",system-ui,-apple-system,"Segoe UI",sans-serif;
-}
-html.dark .thabaal-portal{
-  --bg:#0B1E2D; --card:#133248; --fg:#FFF9F0; --muted:#A8BACA; --line:#27465C; --soft:#1B3B52; --ink:#FFF9F0;
-  --ok:#5BE3AE; --ok-bg:rgba(32,201,133,.18); --warn:#FFD76A; --warn-bg:rgba(255,195,41,.18); --bad:#FF9C86; --bad-bg:rgba(244,107,78,.2);
-  --info:#8EC3EE; --info-bg:rgba(142,195,238,.15); --bar:#FFF9F0; --shadow:0 14px 30px -22px rgba(0,0,0,.7); color-scheme:dark}
+@layer components {
 .thabaal-portal, .thabaal-portal *{box-sizing:border-box}
 .thabaal-portal{scroll-behavior:smooth}
 .thabaal-portal{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--ui);-webkit-font-smoothing:antialiased}
 .thabaal-portal .app{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:100vh;padding-left:max(0px,env(safe-area-inset-left,0px));padding-right:max(0px,env(safe-area-inset-right,0px))}
-/* menu */
 .thabaal-portal .side{position:sticky;top:0;height:100vh;overflow:auto;padding:20px 14px;border-right:1.5px solid var(--line);display:flex;flex-direction:column;gap:18px;min-width:0}
 .thabaal-portal .logo{display:flex;align-items:center;gap:10px;padding:0 8px;text-decoration:none}
 .thabaal-portal .logo img{width:40px;height:auto}
@@ -54,7 +54,6 @@ html.dark .thabaal-portal{
 .thabaal-portal .side .foot a{color:var(--muted)}
 .thabaal-portal .live{display:inline-flex;align-items:center;gap:6px}
 .thabaal-portal .live i{width:8px;height:8px;border-radius:50%;background:#20C985}
-/* main */
 .thabaal-portal .main{min-width:0;padding:22px max(20px,4vw) 60px}
 .thabaal-portal .wrapin{max-width:1040px;margin:0 auto}
 .thabaal-portal .top{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;justify-content:space-between;margin-bottom:20px}
@@ -64,7 +63,6 @@ html.dark .thabaal-portal{
 .thabaal-portal .iconbtn{position:relative;width:42px;height:42px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);display:grid;place-items:center;cursor:pointer}
 .thabaal-portal .iconbtn:hover{border-color:var(--fg)}
 .thabaal-portal .iconbtn .b{position:absolute;top:-6px;right:-6px;background:var(--bad);color:#fff;border-radius:999px;font-size:11px;font-weight:700;padding:1px 6px}
-/* buttons */
 .thabaal-portal .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 16px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);font-weight:600;font-size:14.5px;cursor:pointer;text-decoration:none;white-space:nowrap}
 .thabaal-portal .btn:hover{border-color:var(--fg)}
 .thabaal-portal .btn.primary{background:var(--mango);border-color:var(--mango);color:#10283B}
@@ -72,7 +70,6 @@ html.dark .thabaal-portal{
 .thabaal-portal .btn.sm{min-height:34px;padding:0 12px;font-size:13.5px;border-radius:10px}
 .thabaal-portal .btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
 .thabaal-portal .btn.danger{color:var(--bad)}
-/* tabs & chips */
 .thabaal-portal .tabs{display:flex;gap:4px;border-bottom:1.5px solid var(--line);margin:0 0 20px;overflow-x:auto}
 .thabaal-portal .tabs button{border:0;background:none;padding:10px 14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1.5px;white-space:nowrap;font-size:15px}
 .thabaal-portal .tabs button[aria-selected=true]{color:var(--fg);border-bottom-color:var(--mango)}
@@ -83,46 +80,56 @@ html.dark .thabaal-portal{
 .thabaal-portal .seg{display:inline-flex;border:1.5px solid var(--line);border-radius:12px;padding:3px;background:var(--card)}
 .thabaal-portal .seg button{border:0;background:none;padding:6px 12px;border-radius:9px;font-weight:600;font-size:13.5px;color:var(--muted);cursor:pointer}
 .thabaal-portal .seg button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
-/* cards */
 .thabaal-portal .card{background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:20px;box-shadow:var(--shadow);min-width:0}
 .thabaal-portal .card>h2,.thabaal-portal .card>.hd h2{font-size:19px}
 .thabaal-portal .hd{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px}
 .thabaal-portal .hd p{color:var(--muted);font-size:14px}
 .thabaal-portal .stack{display:flex;flex-direction:column;gap:16px}
-.thabaal-portal .grid{display:grid;gap:16px}
-.thabaal-portal .g2{grid-template-columns:repeat(2,minmax(0,1fr))}.thabaal-portal .g3{grid-template-columns:repeat(3,minmax(0,1fr))}.thabaal-portal .g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.thabaal-portal .grid:where(.g2,.g3,.g4,.split,.gx){display:grid;gap:16px}
+.thabaal-portal .g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.thabaal-portal .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.thabaal-portal .g4{grid-template-columns:repeat(4,minmax(0,1fr))}
 .thabaal-portal .split{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
 .thabaal-portal .stat .l{color:var(--muted);font-size:13.5px;font-weight:500}
 .thabaal-portal .stat .v{font:600 clamp(26px,3vw,34px)/1.1 var(--display);margin-top:4px;font-variant-numeric:tabular-nums}
 .thabaal-portal .stat .d{font-size:13px;margin-top:4px;font-weight:600}
-.thabaal-portal .up{color:var(--ok)}.thabaal-portal .down{color:var(--bad)}.thabaal-portal .flat{color:var(--muted)}
-.thabaal-portal .muted{color:var(--muted)}.thabaal-portal .small{font-size:13px}
+.thabaal-portal .up{color:var(--ok)}
+.thabaal-portal .down{color:var(--bad)}
+.thabaal-portal .flat{color:var(--muted)}
+.thabaal-portal .muted{color:var(--muted)}
+.thabaal-portal .small{font-size:13px}
 .thabaal-portal .pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:700;white-space:nowrap}
-.thabaal-portal .pill.ok{background:var(--ok-bg);color:var(--ok)}.thabaal-portal .pill.warn{background:var(--warn-bg);color:var(--warn)}.thabaal-portal .pill.bad{background:var(--bad-bg);color:var(--bad)}.thabaal-portal .pill.info{background:var(--info-bg);color:var(--info)}.thabaal-portal .pill.mute{background:var(--soft);color:var(--muted)}
-/* tables & lists */
+.thabaal-portal .pill.ok{background:var(--ok-bg);color:var(--ok)}
+.thabaal-portal .pill.warn{background:var(--warn-bg);color:var(--warn)}
+.thabaal-portal .pill.bad{background:var(--bad-bg);color:var(--bad)}
+.thabaal-portal .pill.info{background:var(--info-bg);color:var(--info)}
+.thabaal-portal .pill.mute{background:var(--soft);color:var(--muted)}
 .thabaal-portal .tw{overflow-x:auto}
 .thabaal-portal td.num,.thabaal-portal th.num{text-align:right;font-variant-numeric:tabular-nums}
 .thabaal-portal .list{display:flex;flex-direction:column}
 .thabaal-portal .row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
-.thabaal-portal .row:last-child{border-bottom:0;padding-bottom:0}.thabaal-portal .row:first-child{padding-top:0}
+.thabaal-portal .row:last-child{border-bottom:0;padding-bottom:0}
+.thabaal-portal .row:first-child{padding-top:0}
 .thabaal-portal .row .grow{flex:1;min-width:180px}
 .thabaal-portal .row .t{font-weight:600}
 .thabaal-portal .todo{display:flex;align-items:center;gap:14px;padding:16px;border:1.5px solid var(--line);border-radius:16px;text-decoration:none;background:var(--card)}
 .thabaal-portal .todo:hover{border-color:var(--fg)}
 .thabaal-portal .todo .big{font:600 26px var(--display);font-variant-numeric:tabular-nums}
 .thabaal-portal .todo .go{margin-left:auto;white-space:nowrap;font-weight:700;display:flex;gap:6px;align-items:center}
-/* forms */
-.thabaal-portal .field{display:flex;flex-direction:column;gap:6px}
+.thabaal-portal .field:not(input,select,textarea){display:flex;flex-direction:column;gap:6px}
 .thabaal-portal .field label{font-weight:600;font-size:13.5px}
 .thabaal-portal .formgrid{display:grid;gap:14px;grid-template-columns:repeat(2,minmax(0,1fr))}
-.thabaal-portal .msg{font-size:13px;font-weight:600;min-height:0}.thabaal-portal .msg.err{color:var(--bad)}.thabaal-portal .msg.ok{color:var(--ok)}
+.thabaal-portal .msg{font-size:13px;font-weight:600;min-height:0}
+.thabaal-portal .msg.err{color:var(--bad)}
+.thabaal-portal .msg.ok{color:var(--ok)}
 .thabaal-portal .sw{width:46px;height:28px;border-radius:999px;border:0;background:var(--line);position:relative;cursor:pointer;flex:none;transition:background .2s}
 .thabaal-portal .sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .2s}
-.thabaal-portal .sw[aria-checked=true]{background:var(--ok)}.thabaal-portal .sw[aria-checked=true]::after{transform:translateX(18px)}
+.thabaal-portal .sw[aria-checked=true]{background:var(--ok)}
+.thabaal-portal .sw[aria-checked=true]::after{transform:translateX(18px)}
 .thabaal-portal .search{position:relative;min-width:200px;flex:1;max-width:340px}
-.thabaal-portal .search input{padding-left:38px}.thabaal-portal .search svg{position:absolute;left:12px;top:12px;width:18px;height:18px;stroke:var(--muted);fill:none;stroke-width:2;stroke-linecap:round}
+.thabaal-portal .search input{padding-left:38px}
+.thabaal-portal .search svg{position:absolute;left:12px;top:12px;width:18px;height:18px;stroke:var(--muted);fill:none;stroke-width:2;stroke-linecap:round}
 .thabaal-portal .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
-/* bars/charts */
 .thabaal-portal .bar{height:10px;border-radius:999px;background:var(--soft);overflow:hidden;display:flex}
 .thabaal-portal .bar i{display:block;height:100%}
 .thabaal-portal .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:10px}
@@ -141,7 +148,6 @@ html.dark .thabaal-portal .phone{background:#0E2535;color:#FFF9F0}
 .thabaal-portal .bubble.me{background:#DCF8C6;border-radius:14px 4px 14px 14px;margin-left:auto}
 .thabaal-portal .qr{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
 .thabaal-portal .qr span{background:#fff;color:#1A6FB5;border-radius:8px;padding:5px 10px;font-weight:600;font-size:13px;box-shadow:0 1px 1px rgba(0,0,0,.08)}
-/* dialogs, drawer, toast */
 .thabaal-portal .dlg{padding:22px;display:flex;flex-direction:column;gap:14px;max-height:85vh;overflow:auto}
 .thabaal-portal .dlg .acts{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
 .thabaal-portal .drawer{position:fixed;top:0;right:0;bottom:0;width:min(420px,100vw);background:var(--card);border-left:1.5px solid var(--line);box-shadow:-20px 0 50px -30px rgba(0,0,0,.5);z-index:50;transform:translateX(105%);transition:transform .25s;display:flex;flex-direction:column;padding:20px 20px 24px;gap:14px;overflow:auto}
@@ -161,7 +167,8 @@ html.dark .thabaal-portal .phone{background:#0E2535;color:#FFF9F0}
 .thabaal-portal .steps{display:flex;gap:4px;align-items:center;font-size:12px;color:var(--muted);flex-wrap:wrap}
 .thabaal-portal .steps b{display:inline-flex;align-items:center;gap:4px;font-weight:600}
 .thabaal-portal .steps b::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--line)}
-.thabaal-portal .steps b.on{color:var(--fg)}.thabaal-portal .steps b.on::before{background:var(--ok)}
+.thabaal-portal .steps b.on{color:var(--fg)}
+.thabaal-portal .steps b.on::before{background:var(--ok)}
 .thabaal-portal .menuhint{display:none}
 @media (max-width:900px){
   .thabaal-portal .app{grid-template-columns:minmax(0,1fr)}
@@ -175,19 +182,13 @@ html.dark .thabaal-portal .phone{background:#0E2535;color:#FFF9F0}
 }
 @media (prefers-reduced-motion:reduce){.thabaal-portal, .thabaal-portal *{transition:none!important;scroll-behavior:auto!important}}
 .thabaal-portal .linkb{background:none;border:0;padding:2px 0;color:var(--fg);font-weight:600;text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-size:inherit}
-
 .thabaal-portal .hx{display:none!important}
-
 .thabaal-portal [hidden]{display:none!important}
-
 .thabaal-portal .chart .vlab{font-size:12px;fill:var(--fg)}
-
 .thabaal-portal .chart .axt{font-size:12px;font-weight:600;fill:var(--muted)}
-
-/* ---- */
-.thabaal-portal .pg[hidden]{display:none}.thabaal-portal .pgact[hidden]{display:none}.thabaal-portal .pgact{display:contents}
-/* ---- */
-
+.thabaal-portal .pg[hidden]{display:none}
+.thabaal-portal .pgact[hidden]{display:none}
+.thabaal-portal .pgact{display:contents}
 .thabaal-portal .fdd{position:relative}
 .thabaal-portal .fdd>summary{list-style:none;cursor:pointer}
 .thabaal-portal .fdd>summary::-webkit-details-marker{display:none}
@@ -197,7 +198,6 @@ html.dark .thabaal-portal .phone{background:#0E2535;color:#FFF9F0}
 .thabaal-portal .fpan .ch small{display:block;color:var(--muted)}
 .thabaal-portal .fpan hr{border:0;border-top:1px solid var(--line);margin:12px 0}
 @media(max-width:640px){.thabaal-portal .fpan{left:auto;right:0}}
-
 /* ── App additions (not in the static design): links that behave like the design's buttons ── */
 .thabaal-portal .tabs a{border:0;background:none;padding:10px 14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1.5px;white-space:nowrap;font-size:15px;text-decoration:none}
 .thabaal-portal .tabs a[aria-selected=true]{color:var(--fg);border-bottom-color:var(--mango)}
@@ -213,3 +213,25 @@ html.dark .thabaal-portal .phone{background:#0E2535;color:#FFF9F0}
 .thabaal-portal .scrolly{overflow-y:auto}
 .thabaal-portal .show-sm{display:none}
 @media (max-width:900px){.thabaal-portal .hide-sm{display:none!important}.thabaal-portal .show-sm{display:inline-flex}}
+/* ── The app's own form fields, in the design's input look (same layer as the app's .field, so per-field utilities still win) ── */
+.thabaal-portal input.field,.thabaal-portal select.field,.thabaal-portal textarea.field{min-height:42px;border-radius:12px;border:1.5px solid var(--line);background-color:var(--card);color:var(--fg);box-shadow:none}
+.thabaal-portal input.field:focus,.thabaal-portal select.field:focus,.thabaal-portal textarea.field:focus{outline:none;border-color:var(--fg);box-shadow:0 0 0 4px rgba(255,195,41,.4)}
+
+}
+/* menu */
+/* main */
+/* buttons */
+/* tabs & chips */
+/* cards */
+/* tables & lists */
+/* forms */
+/* bars/charts */
+/* dialogs, drawer, toast */
+
+/* ---- */
+/* ---- */
+
+/* ── The app's own cards inside the design: the design's card surface (the app's .card-3d is unlayered, so this is too) ── */
+.thabaal-portal .ui-card,.thabaal-portal .card-3d{background:var(--card);border:1.5px solid var(--line);border-radius:18px;box-shadow:var(--shadow);transform:none}
+.thabaal-portal .card-3d:hover{transform:none;border-color:var(--line)}
+html.dark .thabaal-portal .ui-card,html.dark .thabaal-portal .card-3d{border-color:var(--line);box-shadow:var(--shadow)}

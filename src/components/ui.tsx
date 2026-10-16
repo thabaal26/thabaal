@@ -5,24 +5,23 @@ import { cssColor, type ChartColor } from "@/lib/chart-theme";
 import { cn } from "@/lib/cn";
 import { PageInfo } from "./page-info";
 import { PageTools } from "./shell-tools";
+import { LangButton } from "@/app/dashboard/portal-ui";
 
 /* ───────────────────────── Page structure ───────────────────────── */
 
-/** A small "← Customers" link above a detail page's title. */
+/** A small "‹ Customers" link above a detail page's title (portal design). */
 export function BackLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link
-      href={href}
-      className="-ml-1 mb-0.5 inline-flex min-h-9 items-center gap-1 rounded-control px-1 text-xs font-medium text-muted transition hover:text-ink sm:mb-1 sm:min-h-8 sm:gap-1.5 sm:text-sm print:hidden"
-    >
-      <ArrowLeft aria-hidden className="size-3.5 sm:size-4" /> {children}
+    <Link href={href} className="btn sm ghost print:hidden" style={{ marginLeft: -12, marginBottom: 4 }}>
+      <ArrowLeft aria-hidden className="ic" style={{ width: 16, height: 16 }} /> {children}
     </Link>
   );
 }
 
 /**
- * The top of every page: title, a short description, actions, and optionally a back link
- * (detail pages), `meta` (facts that must always show, like a customer's phone) and `tabs`.
+ * The top of every page, in the portal design's header (.top): title, a short description,
+ * actions with the language switch, bell and theme, and optionally a back link (detail pages),
+ * `meta` (facts that must always show, like a customer's phone) and `tabs` under it.
  * On phones the description folds behind an info button so the page's content comes first.
  */
 export function PageHeader({
@@ -32,8 +31,6 @@ export function PageHeader({
   actions,
   back,
   tabs,
-  inlineActions,
-  rowActions,
 }: {
   title: string;
   description?: ReactNode;
@@ -41,34 +38,30 @@ export function PageHeader({
   actions?: ReactNode;
   back?: { href: string; label: string };
   tabs?: ReactNode;
-  /** Phones: keep one or two compact actions beside the title instead of a row of full-width buttons. */
+  /** Kept for older callers; the design header lays actions out the same way everywhere. */
   inlineActions?: boolean;
-  /** Phones: all actions share one row under the title (use short labels and an OverflowMenu). */
   rowActions?: boolean;
 }) {
   return (
-    <header className="mb-4 sm:mb-6 lg:mb-7">
+    <>
       {back && <BackLink href={back.href}>{back.label}</BackLink>}
-      <div className={cn("flex gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-6", inlineActions ? "items-start" : "flex-col")}>
-        <div className="min-w-0 flex-1 sm:min-w-48">
+      <header className="top">
+        <div style={{ minWidth: 0 }}>
           <PageInfo title={title} description={description} />
-          {meta && <div className="mt-1 text-xs text-muted sm:mt-1.5 sm:text-sm">{meta}</div>}
-        </div>
-        {actions &&
-          (inlineActions ? (
-            <div className="flex shrink-0 gap-1.5 sm:max-w-[70%] sm:shrink sm:flex-wrap sm:justify-end sm:gap-2 print:hidden">{actions}</div>
-          ) : rowActions ? (
-            <div className="flex gap-1.5 *:flex-1 sm:max-w-[70%] sm:flex-wrap sm:justify-end sm:gap-2 sm:*:flex-none print:hidden">{actions}</div>
-          ) : (
-            // Phones: buttons share the row and wrap two-up instead of squeezing four into one line.
-            <div className="flex flex-wrap gap-1.5 *:min-w-[calc(50%-0.1875rem)] *:flex-1 sm:max-w-[70%] sm:justify-end sm:gap-2 sm:*:min-w-0 sm:*:flex-none print:hidden">
-              {actions}
+          {meta && (
+            <div className="muted" style={{ marginTop: 6 }}>
+              {meta}
             </div>
-          ))}
-        <PageTools />
-      </div>
-      {tabs && <div className="mt-3.5 sm:mt-5 lg:mt-6">{tabs}</div>}
-    </header>
+          )}
+        </div>
+        <div className="tools print:hidden">
+          {actions}
+          <LangButton />
+          <PageTools />
+        </div>
+      </header>
+      {tabs && <div style={{ marginBottom: 20 }}>{tabs}</div>}
+    </>
   );
 }
 
@@ -90,7 +83,7 @@ export function Section({
     <section className={cn("mt-6 sm:mt-10 lg:mt-11", className)}>
       <div className="mb-2.5 flex items-end justify-between gap-2.5 sm:mb-3.5 sm:gap-3">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-ink sm:text-base">{title}</h2>
+          <h2 className="font-display text-[17px] font-semibold text-ink sm:text-[19px]">{title}</h2>
           {description && <p className="mt-0.5 max-w-read text-xs text-muted sm:text-sm">{description}</p>}
         </div>
         {action}
@@ -167,7 +160,7 @@ export function CardHeader({
   void tone;
   return (
     <div
-      className="relative flex flex-wrap items-start justify-between gap-x-2.5 gap-y-1.5 border-b border-line px-3.5 py-2.5 sm:flex-nowrap sm:gap-4 sm:px-5 sm:py-3.5"
+      className="relative flex flex-wrap items-start justify-between gap-x-2.5 gap-y-1.5 px-4 pb-1 pt-4 sm:flex-nowrap sm:gap-4 sm:px-5 sm:pt-5"
     >
       <div className={cn("flex min-w-0 flex-1 basis-36 gap-2.5 sm:basis-40 sm:gap-3", description ? "items-start" : "items-center")}>
         {icon && (
@@ -177,8 +170,8 @@ export function CardHeader({
         )}
         {/* flex-1: the title's box doesn't change size when a description streams in later. */}
         <div className="min-w-0 flex-1">
-          <H className="text-[0.875rem] font-semibold leading-5 text-ink sm:text-[0.9375rem] sm:leading-6">{title}</H>
-          {description && <p className="mt-0.5 text-[11.5px] leading-snug text-muted sm:text-sm sm:leading-relaxed">{description}</p>}
+          <H className="font-display text-[17px] font-semibold leading-snug tracking-[-0.2px] text-ink sm:text-[19px]">{title}</H>
+          {description && <p className="mt-0.5 text-[13px] leading-snug text-muted sm:text-[14px]">{description}</p>}
         </div>
       </div>
       {action && <div className="flex min-w-0 max-w-full shrink-0 items-center gap-1.5 self-center sm:gap-2">{action}</div>}
@@ -261,7 +254,7 @@ export function Button({
 
 export function Label({ children, hint, htmlFor, required }: { children: ReactNode; hint?: ReactNode; htmlFor?: string; required?: boolean }) {
   return (
-    <label htmlFor={htmlFor} className="mb-1.5 flex items-baseline justify-between gap-x-2 text-sm font-medium text-ink">
+    <label htmlFor={htmlFor} className="mb-1.5 flex items-baseline justify-between gap-x-2 text-[13.5px] font-semibold text-ink">
       <span className="min-w-0">
         {children}
         {required && <span aria-hidden className="ml-0.5 text-danger">*</span>}
@@ -356,7 +349,7 @@ export type Tone = keyof typeof tones;
 /** A short status label. Colour supports the text, never replaces it. */
 export function Badge({ tone = "gray", children, dot, className }: { tone?: Tone; children: ReactNode; dot?: boolean; className?: string }) {
   return (
-    <span className={cn("inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-px text-xs font-medium leading-5 ring-1 ring-inset", tones[tone], className)}>
+    <span className={cn("inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[12.5px] font-bold leading-5", tones[tone], className)}>
       {dot && <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-current" />}
       <span className="truncate [&>svg]:mr-1 [&>svg]:inline [&>svg]:size-3 [&>svg]:align-[-2px]">{children}</span>
     </span>
@@ -451,7 +444,7 @@ export function Callout({
   role?: "alert" | "status";
 }) {
   return (
-    <div role={role} className={cn("flex flex-col gap-2.5 rounded-card border px-3.5 py-2.5 text-xs sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4 sm:py-3.5 sm:text-sm", calloutTones[tone], className)}>
+    <div role={role} className={cn("flex flex-col gap-2.5 rounded-[12px] border-0 px-3.5 py-3 text-[13.5px] sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:text-[14px]", calloutTones[tone], className)}>
       <div className="flex min-w-0 gap-2 sm:gap-2.5">
         {icon && <span aria-hidden className="mt-0.5 shrink-0 [&>svg]:size-4">{icon}</span>}
         <div className="min-w-0">
@@ -520,7 +513,7 @@ export function Segmented<T extends string>({
   className?: string;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className={cn("inline-flex max-w-full flex-wrap rounded-control bg-sunken p-0.5 sm:flex-nowrap sm:p-1", className)}>
+    <div role="radiogroup" aria-label={label} className={cn("inline-flex max-w-full flex-wrap rounded-[12px] border-[1.5px] border-line bg-panel p-[3px] sm:flex-nowrap", className)}>
       {options.map((o) => {
         const on = o.value === value;
         return (
@@ -531,8 +524,8 @@ export function Segmented<T extends string>({
             aria-checked={on}
             onClick={() => onChange(o.value)}
             className={cn(
-              "min-h-8 flex-1 whitespace-nowrap rounded-[calc(var(--radius-control)-4px)] px-2.5 text-xs font-medium transition-all duration-200 ease-out active:scale-[0.97] sm:min-h-8 sm:px-3 sm:text-sm",
-              on ? "bg-panel text-ink shadow-xs ring-1 ring-line/80 font-bold" : "text-muted hover:text-ink hover:bg-subtle/60",
+              "min-h-8 flex-1 whitespace-nowrap rounded-[9px] px-3 text-[13.5px] font-semibold transition-all duration-200 ease-out active:scale-[0.97]",
+              on ? "bg-ink text-canvas" : "text-muted hover:text-ink",
             )}
           >
             {o.label}
@@ -582,7 +575,7 @@ export function Th({ numeric, className, ...p }: ComponentProps<"th"> & { numeri
     <th
       scope="col"
       className={cn(
-        "sticky top-0 z-[1] whitespace-nowrap border-b border-line bg-subtle px-2.5 py-2 text-left text-[10.5px] font-semibold uppercase tracking-wider text-muted sm:px-4 sm:py-2.5 sm:text-[0.6875rem] lg:top-16",
+        "sticky top-0 z-[1] whitespace-nowrap border-b-[1.5px] border-line bg-panel px-3 py-2 text-left text-[12.5px] font-bold uppercase tracking-[0.04em] text-muted",
         numeric && "text-right",
         className,
       )}
@@ -592,11 +585,11 @@ export function Th({ numeric, className, ...p }: ComponentProps<"th"> & { numeri
 }
 
 export function Td({ numeric, className, ...p }: ComponentProps<"td"> & { numeric?: boolean }) {
-  return <td className={cn("px-2.5 py-2 text-xs align-top sm:px-4 sm:py-3 sm:text-sm", numeric && "tabular text-right", className)} {...p} />;
+  return <td className={cn("px-3 py-3 text-[14px] align-middle sm:text-[14.5px]", numeric && "tabular text-right", className)} {...p} />;
 }
 
 /** Table body rows: dividers and a hover tint. */
-export const rowClass = "border-b border-line last:border-0 transition-colors hover:bg-subtle/80";
+export const rowClass = "border-b border-line last:border-0 transition-colors hover:bg-brand-soft/40";
 
 /** A mobile list row that leads somewhere: the whole row is the link, with press feedback. */
 export function ListRow({
@@ -645,11 +638,11 @@ export function EmptyState({ icon, title, children, action }: { icon?: ReactNode
   return (
     <div className="flex flex-col items-center px-4 py-7 text-center sm:px-6 sm:py-14">
       {icon && (
-        <div aria-hidden className="mb-3 grid size-11 place-items-center rounded-xl bg-subtle text-muted ring-1 ring-line/80 dark:bg-white/[0.05] dark:text-ink/80 dark:ring-white/[0.08] [&>svg]:size-5 sm:mb-4 sm:size-14 sm:rounded-2xl sm:[&>svg]:size-7">
+        <div aria-hidden className="mb-3 grid size-11 place-items-center rounded-xl bg-brand-soft text-muted [&>svg]:size-5 sm:mb-4 sm:size-12 sm:[&>svg]:size-6">
           {icon}
         </div>
       )}
-      <h3 className="text-sm font-semibold text-ink sm:text-[0.9375rem]">{title}</h3>
+      <h3 className="font-display text-[17px] font-semibold text-ink">{title}</h3>
       {children && <p className="mt-1 max-w-sm text-xs text-muted sm:text-sm">{children}</p>}
       {action && <div className="mt-3.5 sm:mt-5">{action}</div>}
     </div>

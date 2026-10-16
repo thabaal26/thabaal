@@ -143,7 +143,7 @@ export function HomeTiers(p: HomeTiersProps) {
                 <p>{needing === 0 ? "All caught up. New orders and chats will show here." : "Start here. Everything else can wait."}</p>
               </div>
             </div>
-            <div className={`grid ${todos.length === 3 ? "g3" : todos.length === 2 ? "g2" : ""}`}>{todos.map((t) => t.node)}</div>
+            <div className={`grid ${todos.length === 3 ? "g3" : todos.length === 2 ? "g2" : "gx"}`}>{todos.map((t) => t.node)}</div>
           </section>
         )}
 
