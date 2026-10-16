@@ -28,9 +28,6 @@ function Header() {
       <h2>
         <T ta="வாட்ஸ்அப் வாலட்">WhatsApp wallet</T>
       </h2>
-      <Link className="btn sm" href="/dashboard/revenue?tab=costs">
-        <T ta="செலவுகள்">Costs</T>
-      </Link>
     </div>
   );
 }
@@ -111,9 +108,6 @@ async function WalletBody({ clientId, isWallet, lowAlert, canManage }: { clientI
             <T ta="மெட்டாவில் ரீசார்ஜ்">Recharge on Meta</T> <ExternalLink aria-hidden className="ic" style={{ width: 14, height: 14 }} />
           </a>
         )}
-        <Link className="btn sm" href="/dashboard/revenue?tab=costs">
-          Spend breakdown
-        </Link>
       </div>
     </section>
   );
@@ -123,7 +117,7 @@ function Unavailable() {
   return (
     <section className="card">
       <Header />
-      <p className="muted small">WhatsApp costs couldn&apos;t be loaded just now. Open Costs to try again.</p>
+      <p className="muted small">WhatsApp wallet couldn&apos;t be loaded just now.</p>
     </section>
   );
 }

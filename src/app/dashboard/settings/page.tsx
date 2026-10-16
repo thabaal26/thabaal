@@ -154,9 +154,11 @@ export default async function SettingsPage() {
                 <h2>WhatsApp billing</h2>
                 <p>What Meta charges you for messages.</p>
               </div>
-              <Link className="btn sm" href="/dashboard/revenue?tab=costs">
-                See costs
-              </Link>
+              {spend.metaAccount.billingUrl && (
+                <a className="btn sm" href={spend.metaAccount.billingUrl} target="_blank" rel="noopener noreferrer">
+                  Billing hub
+                </a>
+              )}
             </div>
             <div className="grid g3">
               <div className="stat">

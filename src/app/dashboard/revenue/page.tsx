@@ -9,7 +9,6 @@ import { LoyaltyRedeemSetting } from "../orders/loyalty-points-ui";
 import { PaymentForm } from "../orders/payment-form";
 import { inr } from "../portal-format";
 import { LinkTabs, PortalPage, Seg } from "../portal-ui";
-import { SpendCard } from "../spend-card";
 import { CollectList, CsvButton, ReceiptButton, RecordByNumber, TxnTable } from "./payments-board";
 import Link from "@/components/intent-link";
 
@@ -22,7 +21,6 @@ const TABS = [
   { id: "cod", label: "Cash / COD", ta: "ரொக்கம்" },
   { id: "all", label: "All transactions", ta: "அனைத்தும்" },
   { id: "set", label: "Payment settings", ta: "அமைப்பு" },
-  { id: "costs", label: "WhatsApp costs", ta: "வாட்ஸ்அப் செலவு" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
@@ -298,7 +296,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
       </div>
     );
   } else {
-    body = <SpendCard clientId={clientId} canManage={scope.canManage} />;
+    body = <CollectList rows={d.collect} nowMs={now} canOperate={scope.canOperate} />;
   }
 
   return (
