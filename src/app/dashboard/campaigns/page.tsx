@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Plus } from "@/components/icons";
+import { Plus, Search } from "@/components/icons";
 import Link from "@/components/intent-link";
 import { campaignResults, type CampaignResult } from "@/lib/business-reports";
 import { db } from "@/lib/db";
@@ -151,7 +151,13 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
 
         {s === "scheduled" && (
           <p className="small">
-            Will go to about <b>{reach(c.clientId).toLocaleString("en-IN")}</b> people · costs about <b>{inr(reach(c.clientId) * PER_MSG)}</b> if all are delivered.
+            {c.audienceTag ? (
+              <>Goes to the customers in this audience. Open it to see how many and what it costs.</>
+            ) : (
+              <>
+                Will go to about <b>{reach(c.clientId).toLocaleString("en-IN")}</b> people · costs about <b>{inr(reach(c.clientId) * PER_MSG)}</b> if all are delivered.
+              </>
+            )}
             {resume && <span className="down"> Quiet hours: it will wait and start at {fmtDate(resume, "h:mm a")}.</span>}
           </p>
         )}
@@ -328,6 +334,7 @@ export default async function CampaignsPage({ searchParams }: PageProps<"/dashbo
           <form className="toolbar" role="search">
             {show !== "all" && <input type="hidden" name="show" value={show} />}
             <div className="search">
+              <Search aria-hidden />
               <input type="search" name="q" defaultValue={q} placeholder="Search campaign name" aria-label="Search campaigns" />
             </div>
             <Link className="btn sm" href="/dashboard/campaigns/compare" style={{ marginLeft: "auto" }}>
