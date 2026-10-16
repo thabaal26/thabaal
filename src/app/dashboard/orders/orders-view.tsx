@@ -336,26 +336,26 @@ export function OrdersView({
       {activeTab === "orders" && (
         <section data-panel="orders">
           {/* Top KPI 4-Card Strip */}
-          <div className="grid g4 keep2" id="ok" style={{ marginBottom: 16 }}>
-            <div className="card stat" style={{ cursor: "pointer" }} onClick={() => setShow("new")}>
+          <div className="grid g4 keep2" id="ok" style={{ marginBottom: 18, gap: 16 }}>
+            <div className="card stat" style={{ cursor: "pointer", transition: "transform 0.15s ease, border-color 0.15s ease" }} onClick={() => setShow("new")}>
               <div className="l">New orders</div>
               <div className="v">{newCount}</div>
-              <div className="d muted">{hasConfirm ? "Confirm these first" : "Take payment"}</div>
+              <div className="d muted" style={{ minHeight: "1.25em" }}>{hasConfirm ? "Confirm these first" : "Take payment"}</div>
             </div>
-            <div className="card stat" style={{ cursor: "pointer" }} onClick={() => { setShow("all"); setPayFilter("none"); }}>
+            <div className="card stat" style={{ cursor: "pointer", transition: "transform 0.15s ease, border-color 0.15s ease" }} onClick={() => { setShow("all"); setPayFilter("none"); }}>
               <div className="l">Payment waiting</div>
               <div className="v">{inr(waitingSum)}</div>
-              <div className="d muted">Not received yet</div>
+              <div className="d muted" style={{ minHeight: "1.25em" }}>Not received yet</div>
             </div>
-            <div className="card stat" style={{ cursor: "pointer" }} onClick={() => setActiveTab("pack")}>
+            <div className="card stat" style={{ cursor: "pointer", transition: "transform 0.15s ease, border-color 0.15s ease" }} onClick={() => setActiveTab("pack")}>
               <div className="l">{hasPack ? "To pack" : "To finish"}</div>
               <div className="v">{toPackCount}</div>
-              <div className="d muted">Paid or COD</div>
+              <div className="d muted" style={{ minHeight: "1.25em" }}>Paid or COD</div>
             </div>
-            <div className="card stat" style={{ cursor: "pointer" }} onClick={() => setShow("dispatched")}>
+            <div className="card stat" style={{ cursor: "pointer", transition: "transform 0.15s ease, border-color 0.15s ease" }} onClick={() => setShow("dispatched")}>
               <div className="l">{hasDispatch ? "Dispatched" : "Finished today"}</div>
               <div className="v">{dispatchedCount}</div>
-              <div className="d muted"></div>
+              <div className="d muted" style={{ minHeight: "1.25em" }}>{hasDispatch ? "Out for delivery" : "Completed today"}</div>
             </div>
           </div>
 
@@ -549,12 +549,31 @@ export function OrdersView({
           </div>
 
           {/* Steps Line */}
-          <p className="muted small" style={{ margin: "-6px 0 14px" }}>
-            Steps: <span id="flowline">{steps.map((f) => f.label).join(" › ")}</span> ·{" "}
-            <Link href="/dashboard/settings#order-steps">
-              <b>Change steps</b>
+          <div
+            style={{
+              margin: "2px 0 16px",
+              fontSize: 13,
+              color: "var(--muted)",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              flexWrap: "wrap",
+            }}
+          >
+            <span>Steps:</span>
+            <span id="flowline" style={{ fontWeight: 500 }}>
+              {steps.map((f, i) => (
+                <Fragment key={f.key}>
+                  {i > 0 && <span style={{ opacity: 0.45, margin: "0 4px", userSelect: "none" }}>›</span>}
+                  <span>{f.label}</span>
+                </Fragment>
+              ))}
+            </span>
+            <span style={{ opacity: 0.5 }}>·</span>
+            <Link href="/dashboard/settings#order-steps" className="linkb" style={{ fontSize: 13, fontWeight: 600 }}>
+              Change steps
             </Link>
-          </p>
+          </div>
 
           {/* Orders Stack */}
           <div className="stack" id="ol">
@@ -584,7 +603,7 @@ export function OrdersView({
         <section data-panel="pack">
           <div className="grid split">
             <div>
-              <div className="chips" style={{ marginBottom: 14 }}>
+              <div className="chips" style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <button
                   type="button"
                   className="chip"
@@ -609,7 +628,7 @@ export function OrdersView({
                 >
                   Cash on delivery <small>{waitingPackOrders.filter(isOrderCod).length}</small>
                 </button>
-                <div className="seg" style={{ marginLeft: "auto" }}>
+                <div className="seg" style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center" }}>
                   <button
                     type="button"
                     aria-pressed={packSort === "old"}

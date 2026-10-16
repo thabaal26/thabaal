@@ -113,6 +113,8 @@ export function OrderCard({
 
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [showItems, setShowItems] = useState(false);
+  const [itemsCopied, setItemsCopied] = useState(false);
   const [editLines, setEditLines] = useState<EditableOrderLine[]>(() =>
     items.length > 0
       ? items.map((i) => ({
@@ -354,47 +356,286 @@ export function OrderCard({
     ...(o.refundedAt ? [["Refunded", when(o.refundedAt)] as [string, string | null]] : []),
   ];
 
-  const itemsDescription =
-    items.map((i) => `${i.quantity} × ${i.name ?? i.id}`).join(", ") || "No items";
+  const itemCount = items.length;
+  const totalUnits = items.reduce((s, i) => s + (i.quantity || 1), 0);
+  const firstItem = items[0];
+  const firstItemLabel = firstItem
+    ? `${firstItem.quantity || 1} × ${firstItem.name ?? firstItem.id}`
+    : "No items";
+  const remainingCount = itemCount - 1;
+
+  const handleCopyItems = () => {
+    const lines = items.map(
+      (i) => `• ${i.quantity || 1} × ${i.name ?? i.id}${i.price > 0 ? ` (${inr((i.quantity || 1) * i.price)})` : ""}`
+    );
+    const text = `Order #${refText} (${o.customer.name}):\n${lines.join("\n")}\nTotal: ${inr(pricing.total)}`;
+    navigator.clipboard?.writeText(text);
+    setItemsCopied(true);
+    setTimeout(() => setItemsCopied(false), 1800);
+  };
 
   return (
     <article className="card">
       {/* 1. Header: #1052 · Anbu M. [Catalogue] and Total ₹960 */}
-      <div className="hd" style={{ marginBottom: 8 }}>
-        <div>
-          <h2 style={{ fontSize: 17 }}>
+      <div className="hd" style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 14 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h2 style={{ fontSize: 17, margin: 0, lineHeight: 1.3, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             #{refText} ·{" "}
             <Link href={`/dashboard/customers/${o.customer.id}`} style={{ textDecoration: "none" }}>
               {o.customer.name}
             </Link>{" "}
             <span
               className={`pill ${source.tone}`}
-              style={{ verticalAlign: "middle", marginLeft: 4 }}
+              style={{ verticalAlign: "middle" }}
             >
               {source.label}
             </span>
             {showClient && o.customer.client && (
               <span
                 className="pill mute"
-                style={{ verticalAlign: "middle", marginLeft: 4 }}
+                style={{ verticalAlign: "middle" }}
               >
                 {o.customer.client.name}
               </span>
             )}
           </h2>
-          <p>{itemsDescription}</p>
+
+          {/* Items shortlist & drop button */}
+          <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ color: "var(--muted)", fontSize: 13.5, lineHeight: 1.45 }}>
+              {firstItemLabel}
+              {remainingCount > 0 && (
+                <span style={{ opacity: 0.85, fontWeight: 500, marginLeft: 4 }}>
+                  + {remainingCount} more
+                </span>
+              )}
+            </span>
+
+            {itemCount > 1 && (
+              <button
+                type="button"
+                onClick={() => setShowItems(!showItems)}
+                className="btn sm ghost"
+                style={{
+                  minHeight: 26,
+                  height: 26,
+                  padding: "0 8px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderRadius: 8,
+                  background: showItems ? "var(--ink)" : "var(--soft)",
+                  color: showItems ? "var(--bg)" : "var(--fg)",
+                  border: "1px solid var(--line)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+                aria-expanded={showItems}
+                title={showItems ? "Hide items breakdown" : `View all ${itemCount} items`}
+              >
+                <span>{itemCount} items</span>
+                <svg
+                  style={{
+                    width: 12,
+                    height: 12,
+                    transform: showItems ? "rotate(180deg)" : "none",
+                    transition: "transform 0.2s ease",
+                  }}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
-        <b style={{ font: "600 20px var(--display)" }}>{inr(pricing.total)}</b>
+        <b style={{ font: "600 21px var(--display)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", letterSpacing: "-0.2px", marginTop: 1 }}>{inr(pricing.total)}</b>
       </div>
+
+      {/* Expandable items breakdown card */}
+      {showItems && (
+        <div
+          style={{
+            marginTop: 4,
+            marginBottom: 12,
+            padding: "12px 14px",
+            borderRadius: 14,
+            border: "1.5px solid var(--line)",
+            background: "var(--soft)",
+            boxShadow: "0 2px 6px -1px rgba(0,0,0,0.06)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 8,
+              paddingBottom: 6,
+              borderBottom: "1px solid var(--line)",
+            }}
+          >
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+                color: "var(--muted)",
+              }}
+            >
+              Order items ({itemCount} {itemCount === 1 ? "item" : "items"} · {totalUnits} {totalUnits === 1 ? "unit" : "units"})
+            </span>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <button
+                type="button"
+                onClick={handleCopyItems}
+                className="linkb"
+                style={{ fontSize: 12, fontWeight: 600 }}
+                title="Copy items list for WhatsApp or packing"
+              >
+                {itemsCopied ? "✓ Copied" : "Copy list"}
+              </button>
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => setEditOpen(true)}
+                  className="linkb"
+                  style={{ fontSize: 12, fontWeight: 600 }}
+                >
+                  Edit items
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowItems(false)}
+                className="linkb"
+                style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}
+              >
+                Close ▴
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {items.map((item, idx) => {
+              const qty = item.quantity || 1;
+              const price = item.price || 0;
+              const lineTotal = qty * price;
+              return (
+                <div
+                  key={item.id ? `${item.id}-${idx}` : idx}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "4px 0",
+                    fontSize: 13.5,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      flex: 1,
+                      minWidth: 0,
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        minWidth: 26,
+                        height: 20,
+                        padding: "0 6px",
+                        borderRadius: 6,
+                        background: "var(--card)",
+                        border: "1px solid var(--line)",
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        color: "var(--fg)",
+                      }}
+                    >
+                      {qty}×
+                    </span>
+                    <span
+                      style={{
+                        fontWeight: 500,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {item.name ?? item.id ?? "Item"}
+                    </span>
+                    {price > 0 && (
+                      <span style={{ color: "var(--muted)", fontSize: 12 }}>
+                        @ {inr(price)}
+                      </span>
+                    )}
+                  </div>
+                  <b
+                    style={{
+                      fontVariantNumeric: "tabular-nums",
+                      marginLeft: 12,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {inr(lineTotal)}
+                  </b>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Pricing breakdown strip */}
+          <div
+            style={{
+              marginTop: 8,
+              paddingTop: 8,
+              borderTop: "1px dashed var(--line)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              fontSize: 12.5,
+              color: "var(--muted)",
+              flexWrap: "wrap",
+              gap: 6,
+            }}
+          >
+            <span>
+              Items: <b style={{ color: "var(--fg)" }}>{inr(pricing.subtotal)}</b>
+              {pricing.shipping > 0 && (
+                <> · Delivery: <b style={{ color: "var(--fg)" }}>+{inr(pricing.shipping)}</b></>
+              )}
+              {pricing.discount > 0 && (
+                <> · Points: <b style={{ color: "var(--ok)" }}>-{inr(pricing.discount)}</b></>
+              )}
+            </span>
+            <span style={{ fontWeight: 700, color: "var(--fg)", fontSize: 13.5 }}>
+              Total: {inr(pricing.total)}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* 2. Steps Stepper */}
       {o.status === "CANCELLED" ? (
         <span className="pill bad">Cancelled</span>
       ) : (
-        <div className="steps">
+        <div className="steps" style={{ marginTop: 6, marginBottom: 12, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", fontSize: 12.5 }}>
           {steps.map((f, i) => (
             <Fragment key={f.key}>
-              {i > 0 && "›"}
+              {i > 0 && <span style={{ opacity: 0.45, margin: "0 3px", fontSize: 13, userSelect: "none" }}>›</span>}
               <b className={i <= reached ? "on" : undefined}>{f.label}</b>
             </Fragment>
           ))}
@@ -402,9 +643,9 @@ export function OrderCard({
       )}
 
       {/* 3. Payment bar */}
-      <div className="tools" style={{ marginTop: 12 }}>
+      <div className="tools" style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <span className={`pill ${payPill.tone}`}>{payPill.label}</span>
-        <span className="muted small">{payText}</span>
+        <span className="muted small" style={{ fontSize: 13.5, fontWeight: 500 }}>{payText}</span>
         {isLate && <span className="pill bad">Late {lateText}</span>}
       </div>
 
@@ -414,18 +655,23 @@ export function OrderCard({
           className="note small"
           style={{
             marginTop: 12,
+            padding: "10px 14px",
+            borderRadius: 12,
+            border: "1px solid var(--line)",
+            background: "var(--soft)",
             display: "flex",
-            gap: 10,
+            justifyContent: "space-between",
             alignItems: "center",
+            gap: 12,
             flexWrap: "wrap",
           }}
         >
-          <b>{missingBadges.join(" · ")}</b>
+          <b style={{ fontSize: 13.5 }}>{missingBadges.join(" · ")}</b>
           {missingBadges[0] === "Address needed" ? (
             <button
               type="button"
               className="btn sm"
-              style={{ marginLeft: "auto" }}
+              style={{ minHeight: 32, padding: "0 12px", fontSize: 13 }}
               onClick={() => setEditingAddress(true)}
             >
               Add address
@@ -434,7 +680,7 @@ export function OrderCard({
             <Link
               className="btn sm"
               href={`/dashboard/customers/${o.customer.id}`}
-              style={{ marginLeft: "auto" }}
+              style={{ minHeight: 32, padding: "0 12px", fontSize: 13 }}
             >
               Ask the customer
             </Link>
@@ -443,18 +689,41 @@ export function OrderCard({
       )}
 
       {/* 5. Primary and Secondary Action Buttons */}
-      <div className="tools" style={{ marginTop: 14 }}>
+      <div className="tools" style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <button
           type="button"
           className="btn primary"
           disabled={pending}
           onClick={handlePrimaryClick}
+          style={{
+            minHeight: 38,
+            height: 38,
+            padding: "0 18px",
+            borderRadius: 10,
+            fontSize: 14,
+            fontWeight: 600,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+          }}
         >
           {primaryAction.label}
         </button>
         <Link
           className="btn sm ghost"
           href={`/dashboard/replies?q=${encodeURIComponent(o.customer.phone || o.customer.name)}`}
+          style={{
+            minHeight: 38,
+            height: 38,
+            padding: "0 12px",
+            fontSize: 13.5,
+            fontWeight: 600,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 10,
+          }}
         >
           Open chat
         </Link>
@@ -467,6 +736,17 @@ export function OrderCard({
           }
           target="_blank"
           rel="noopener"
+          style={{
+            minHeight: 38,
+            height: 38,
+            padding: "0 12px",
+            fontSize: 13.5,
+            fontWeight: 600,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 10,
+          }}
         >
           Call
         </a>
@@ -474,6 +754,17 @@ export function OrderCard({
           type="button"
           className="btn sm ghost"
           onClick={() => setShowTimeline(!showTimeline)}
+          style={{
+            minHeight: 38,
+            height: 38,
+            padding: "0 12px",
+            fontSize: 13.5,
+            fontWeight: 600,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 10,
+          }}
         >
           {showTimeline ? "Hide timeline" : "Timeline"}
         </button>
@@ -481,11 +772,20 @@ export function OrderCard({
 
       {/* 6. Expandable Timeline */}
       {showTimeline && (
-        <div className="list" style={{ marginTop: 12 }}>
+        <div
+          className="list"
+          style={{
+            marginTop: 14,
+            padding: "10px 16px",
+            borderRadius: 12,
+            border: "1px solid var(--line)",
+            background: "var(--soft)",
+          }}
+        >
           {timelineEvents.map(([label, at]) => (
-            <div key={label} className="row">
-              <div className={`grow${at ? "" : " muted"}`}>{label}</div>
-              <span className="muted small">{at ?? "Not yet"}</span>
+            <div key={label} className="row" style={{ padding: "8px 0" }}>
+              <div className={`grow${at ? "" : " muted"}`} style={{ fontSize: 13.5 }}>{label}</div>
+              <span className="muted small" style={{ fontSize: 13 }}>{at ?? "Not yet"}</span>
             </div>
           ))}
         </div>
@@ -493,7 +793,7 @@ export function OrderCard({
 
       {/* 7. Address Row */}
       {editingAddress ? (
-        <div className="tools" style={{ marginTop: 12 }}>
+        <div className="tools" style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <input
             type="text"
             id="ad"
@@ -501,13 +801,14 @@ export function OrderCard({
             onChange={(e) => setAddressInput(e.target.value)}
             placeholder="Address from the customer"
             aria-label="Address"
-            style={{ flex: 1, minWidth: 200 }}
+            style={{ flex: 1, minWidth: 200, minHeight: 38 }}
           />
           <button
             type="button"
             className="btn sm primary"
             disabled={pending}
             onClick={handleSaveAddress}
+            style={{ minHeight: 38, height: 38, padding: "0 14px", borderRadius: 8 }}
           >
             Save
           </button>
@@ -515,13 +816,14 @@ export function OrderCard({
             type="button"
             className="btn sm"
             onClick={() => setEditingAddress(false)}
+            style={{ minHeight: 38, height: 38, padding: "0 12px", borderRadius: 8 }}
           >
             Cancel
           </button>
         </div>
       ) : fullAddress ? (
-        <p className="muted small" style={{ marginTop: 12 }}>
-          Deliver to: {fullAddress} ·{" "}
+        <p className="muted small" style={{ marginTop: 12, fontSize: 13.5, lineHeight: 1.5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+          Deliver to: <b style={{ color: "var(--fg)" }}>{fullAddress}</b> ·{" "}
           <button
             type="button"
             className="linkb"
@@ -533,7 +835,7 @@ export function OrderCard({
             Change
           </button>
         </p>
-      ) : o.status !== "CANCELLED" ? (
+      ) : o.status !== "CANCELLED" && !missingBadges.includes("Address needed") ? (
         <p style={{ marginTop: 12 }}>
           <button
             type="button"
@@ -546,9 +848,9 @@ export function OrderCard({
       ) : null}
 
       {/* 8. More actions Accordion */}
-      <details className="more">
-        <summary>More actions</summary>
-        <div className="tools" style={{ marginTop: 10 }}>
+      <details className="more" style={{ borderTop: "1px solid var(--line)", marginTop: 14, paddingTop: 12 }}>
+        <summary style={{ fontSize: 14, fontWeight: 600, color: "var(--muted)", cursor: "pointer" }}>More actions</summary>
+        <div className="tools" style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
           {canEdit && (
             <button
               type="button"
