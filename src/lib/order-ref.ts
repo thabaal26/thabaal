@@ -29,3 +29,12 @@ export function prefixFromName(name: string) {
   const p = (initials.length >= 2 ? initials : (words[0] ?? "OR").replace(/[^A-Z]/g, "")).slice(0, 4);
   return p.length >= 2 ? p : "OR";
 }
+
+export type OrderItem = {
+  id: string;
+  name?: string;
+  quantity: number;
+  price: number;
+  currency?: string;
+};
+
