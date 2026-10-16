@@ -1,13 +1,13 @@
 "use client";
 
-import { Check, CheckCircle2, Copy, Eye, EyeOff, Image as ImageIcon, Loader2, Package, PencilLine, Plus, Search, Trash2, Upload, X, XCircle } from "@/components/icons";
+import { Image as ImageIcon, Loader2, Package, Plus, Search, Trash2, Upload } from "@/components/icons";
+import Link from "@/components/intent-link";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { confirmAction } from "@/components/confirm";
 import { Sheet } from "@/components/sheet";
 import { toast, toastResult } from "@/components/toast";
-import { Badge, Button, Card, EmptyState, Field, Segmented } from "@/components/ui";
-import { cn } from "@/lib/cn";
+import { Badge, Button, Field } from "@/components/ui";
 import type { CatalogProductDetail } from "@/lib/catalog";
 import type { ProductDemandStats } from "@/lib/catalog-demand";
 import { createProduct, deleteProduct, updateProduct, uploadProductImage } from "../actions/catalog";
@@ -298,296 +298,169 @@ export function CatalogueManager({
     });
   };
 
-  const chip = (on: boolean) =>
-    cn(
-      "inline-flex h-9 items-center whitespace-nowrap rounded-full border px-3 text-xs font-medium transition active:scale-[0.97] sm:h-8 sm:text-[0.8125rem]",
-      on ? "border-ink bg-ink text-panel" : "border-line-2 bg-panel text-ink-2 hover:border-line-strong hover:bg-subtle hover:text-ink",
-    );
-
   const canAdd = canManage && isLive;
+  const pillFor = (st: CatalogProductDetail["whatsappStatus"]) =>
+    !isLive
+      ? { tone: "mute", label: "Saved copy" }
+      : st === "APPROVED"
+        ? { tone: "ok", label: "Synced" }
+        : st === "REJECTED"
+          ? { tone: "bad", label: "Rejected by Meta" }
+          : st === "PENDING" || st === "OUTDATED"
+            ? { tone: "warn", label: "Waiting for Meta" }
+            : { tone: "mute", label: "Not synced" };
 
   return (
-    <div className="space-y-4">
-      {/* Toolbar: search, stock and price list on one row; categories under it. */}
-      <Card className="card-3d space-y-3 p-3 sm:p-4">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center">
-          <div className="relative min-w-0 flex-1 md:max-w-sm">
-            <label htmlFor="catalogue-search" className="sr-only">
-              Search products
-            </label>
-            <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
-            <input
-              id="catalogue-search"
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search products or SKU"
-              className="field pl-9 pr-10"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                aria-label="Clear search"
-                className="absolute right-1 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-control text-muted hover:bg-sunken hover:text-ink"
-              >
-                <X aria-hidden className="size-4" />
-              </button>
-            )}
-          </div>
-          <Segmented
-            label="Stock"
-            value={stockFilter}
-            onChange={setStockFilter}
-            options={[
-              { value: "ALL", label: "All" },
-              { value: "IN_STOCK", label: "In stock" },
-              { value: "OUT_OF_STOCK", label: "Out of stock" },
-            ]}
-            className="w-full md:w-auto"
-          />
-          <div className="flex gap-2 md:ml-auto">
-            <Button variant="secondary" onClick={() => setPreviewOpen(!previewOpen)} aria-expanded={previewOpen} className="max-md:flex-1">
-              {previewOpen ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
-              {previewOpen ? "Hide price list" : "Price list message"}
-            </Button>
-            {canAdd && (
-              <Button onClick={() => setAdding(true)} className="max-md:flex-1">
-                <Plus aria-hidden /> Add product
-              </Button>
-            )}
-          </div>
+    <div>
+      <div className="toolbar">
+        <div className="search">
+          <Search aria-hidden />
+          <input type="search" placeholder="Search products" aria-label="Search products" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <div className="chips">
+          {(
+            [
+              ["ALL", "All"],
+              ["IN_STOCK", "In stock"],
+              ["OUT_OF_STOCK", "Out of stock"],
+            ] as const
+          ).map(([k, label]) => (
+            <button key={k} type="button" className="chip" aria-pressed={stockFilter === k} onClick={() => setStockFilter(k)}>
+              {label}
+            </button>
+          ))}
+          {inCartsCount > 0 && (
+            <button type="button" className="chip" aria-pressed={cartFilter === "IN_CARTS"} onClick={() => setCartFilter(cartFilter === "IN_CARTS" ? "ALL" : "IN_CARTS")}>
+              In carts <small>{inCartsCount}</small>
+            </button>
+          )}
         </div>
         {categories.length > 2 && (
-          <div role="group" aria-label="Filters" className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
-            <div className="flex flex-wrap items-center gap-1.5">
-              {categories.map((c) => (
-                <button key={c} type="button" aria-pressed={category === c} onClick={() => setCategory(c)} className={chip(category === c)}>
-                  {c === "ALL" ? "All categories" : c}
-                </button>
-              ))}
-              {inCartsCount > 0 && (
-                <button
-                  type="button"
-                  aria-pressed={cartFilter === "IN_CARTS"}
-                  onClick={() => setCartFilter(cartFilter === "IN_CARTS" ? "ALL" : "IN_CARTS")}
-                  className={cn(
-                    chip(cartFilter === "IN_CARTS"),
-                    cartFilter === "IN_CARTS"
-                      ? "border-brand bg-brand text-panel font-semibold"
-                      : "border-brand/40 bg-brand/5 text-brand hover:border-brand hover:bg-brand/10",
-                  )}
-                >
-                  <span className="mr-1">🛒</span>
-                  In carts ({inCartsCount})
-                </button>
-              )}
-            </div>
-            {isLive && (
-              <div className="flex flex-wrap items-center gap-1.5 pt-1 sm:pt-0">
-                <span className="text-xs text-muted">WhatsApp:</span>
-                <button
-                  type="button"
-                  aria-pressed={statusFilter === "ALL"}
-                  onClick={() => setStatusFilter("ALL")}
-                  className={chip(statusFilter === "ALL")}
-                >
-                  All ({products.length})
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={statusFilter === "APPROVED"}
-                  onClick={() => setStatusFilter("APPROVED")}
-                  className={cn(
-                    chip(statusFilter === "APPROVED"),
-                    statusFilter === "APPROVED" && "border-success-border bg-success-bg text-success",
-                  )}
-                >
-                  <span className="mr-1 inline-block size-1.5 rounded-full bg-emerald-500" />
-                  Live ({products.filter((p) => p.whatsappStatus === "APPROVED").length})
-                </button>
-                {products.some((p) => p.whatsappStatus === "PENDING" || p.whatsappStatus === "OUTDATED") && (
-                  <button
-                    type="button"
-                    aria-pressed={statusFilter === "REVIEW"}
-                    onClick={() => setStatusFilter("REVIEW")}
-                    className={cn(
-                      chip(statusFilter === "REVIEW"),
-                      statusFilter === "REVIEW" && "border-warning-border bg-warning-bg text-warning",
-                    )}
-                  >
-                    <span className="mr-1 inline-block size-1.5 rounded-full bg-amber-500" />
-                    Review ({products.filter((p) => p.whatsappStatus === "PENDING" || p.whatsappStatus === "OUTDATED").length})
-                  </button>
-                )}
-                {products.some((p) => p.whatsappStatus === "REJECTED") && (
-                  <button
-                    type="button"
-                    aria-pressed={statusFilter === "REJECTED"}
-                    onClick={() => setStatusFilter("REJECTED")}
-                    className={cn(
-                      chip(statusFilter === "REJECTED"),
-                      statusFilter === "REJECTED" && "border-danger-border bg-danger-bg text-danger",
-                    )}
-                  >
-                    <span className="mr-1 inline-block size-1.5 rounded-full bg-rose-500" />
-                    Rejected ({products.filter((p) => p.whatsappStatus === "REJECTED").length})
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+          <select aria-label="Category" style={{ width: "auto" }} value={category} onChange={(e) => setCategory(e.target.value)}>
+            {categories.map((c) => (
+              <option key={c} value={c}>
+                {c === "ALL" ? "Category: all" : c}
+              </option>
+            ))}
+          </select>
         )}
-      </Card>
+        {isLive && (
+          <select aria-label="WhatsApp status" style={{ width: "auto" }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}>
+            <option value="ALL">WhatsApp: all</option>
+            <option value="APPROVED">Synced to catalogue</option>
+            <option value="REVIEW">Waiting for Meta</option>
+            <option value="REJECTED">Rejected by Meta</option>
+          </select>
+        )}
+        <div className="tools" style={{ marginLeft: "auto" }}>
+          <button type="button" className="btn sm" aria-expanded={previewOpen} onClick={() => setPreviewOpen(!previewOpen)}>
+            {previewOpen ? "Hide price list" : "Price list message"}
+          </button>
+          {canAdd && (
+            <button type="button" className="btn sm primary" onClick={() => setAdding(true)}>
+              <Plus aria-hidden className="ic" style={{ width: 15, height: 15 }} /> Add product
+            </button>
+          )}
+        </div>
+      </div>
 
-      {/* The automatic price list reply, as WhatsApp will show it. */}
       {previewOpen && (
-        <Card className="card-3d animate-rise">
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-4 py-3.5 sm:px-5">
-            <div className="min-w-0">
-              <h3 className="flex items-center gap-2 text-[0.9375rem] font-semibold text-ink">
-                Price list message <Badge tone="brand">Auto-reply</Badge>
-              </h3>
-              <p className="mt-0.5 text-xs text-muted sm:text-sm">Sent when a customer asks for the price list or rates. Built from in-stock items with a price.</p>
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="hd">
+            <div>
+              <h2>Price list message</h2>
+              <p>In-stock products with a price. Paste it in a chat; customers get your catalogue with “View catalog”.</p>
             </div>
-            <Button size="sm" variant="secondary" onClick={copyPriceList}>
-              {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
+            <button type="button" className="btn sm" onClick={copyPriceList}>
               {copied ? "Copied" : "Copy text"}
-            </Button>
+            </button>
           </div>
-          <div className="chat-wall p-4 sm:p-5">
-            <div className="max-w-md rounded-card rounded-tl-sm bg-bubble p-3.5 shadow-xs">
-              <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-ink">{priceListText}</pre>
-            </div>
+          <div className="phone">
+            <div className="bubble">{priceListText}</div>
           </div>
-        </Card>
+        </div>
       )}
 
-      <p className="text-sm text-muted" aria-live="polite">
-        Showing <span className="tabular font-medium text-ink-2">{filtered.length}</span> of <span className="tabular">{products.length}</span> products
-      </p>
-
-      {/* Products Grid */}
-      {filtered.length === 0 ? (
-        <Card className="card-3d">
-          <EmptyState icon={<Package />} title={products.length ? "No products match" : "No products yet"}>
-            {products.length ? "Try another search, category or stock filter." : canAdd ? "Add your first product to start taking orders on WhatsApp." : "Products added in Meta Commerce Manager will show here."}
-          </EmptyState>
-        </Card>
-      ) : (
-        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4">
-          {filtered.map((item) => {
-            const demand = demandBySku[item.retailerId];
-            return (
-              <li key={item.id} className="card-3d relative flex flex-col overflow-hidden rounded-card border border-line bg-panel">
-                <span
-                  aria-hidden
-                  className={cn(
-                    "absolute inset-x-0 top-0 h-[3px]",
-                    item.whatsappStatus === "REJECTED"
-                      ? "bg-danger-solid"
-                      : item.whatsappStatus === "PENDING" || item.whatsappStatus === "OUTDATED"
-                      ? "bg-warning-solid"
-                      : item.inStock
-                      ? "bg-brand"
-                      : "bg-warning-solid",
-                  )}
-                />
-                <div className="flex gap-2.5 p-3 sm:gap-3 sm:p-4">
-                  <div className={cn("relative size-14 shrink-0 overflow-hidden rounded-control bg-subtle shadow-2xs ring-1 ring-line sm:size-16", !item.inStock && "opacity-60 grayscale")}>
-                    {item.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={item.imageUrl} alt="" className="size-full object-cover" />
-                    ) : (
-                      <div className="grid size-full place-items-center text-faint">
-                        <Package aria-hidden className="size-5 sm:size-6" />
+      <div className="card" style={{ padding: 0 }}>
+        <div className="tw">
+          <table>
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Category</th>
+                <th className="num">Price</th>
+                <th>WhatsApp</th>
+                <th>In stock</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((item) => {
+                const pill = pillFor(item.whatsappStatus);
+                const d = demandBySku[item.retailerId];
+                return (
+                  <tr key={item.id}>
+                    <td>
+                      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                        {item.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- Meta's product photo
+                          <img src={item.imageUrl} alt="" width={40} height={40} style={{ width: 40, height: 40, borderRadius: 10, objectFit: "cover", flex: "none" }} />
+                        ) : (
+                          <span className="note" style={{ width: 40, height: 40, padding: 0, display: "grid", placeItems: "center", flex: "none" }}>
+                            <Package aria-hidden className="ic" style={{ width: 16, height: 16 }} />
+                          </span>
+                        )}
+                        <div>
+                          <b>{item.name}</b>
+                          <div className="muted small">
+                            {item.retailerId}
+                            {d && d.cartCount > 0 && ` · in ${d.cartCount} cart${d.cartCount === 1 ? "" : "s"}`}
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h4 className="line-clamp-2 min-h-9 text-[13.5px] font-semibold leading-5 text-ink sm:min-h-10 sm:text-sm">{item.name}</h4>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
-                      <Badge tone="brand" className="text-2xs">{item.category || "General"}</Badge>
-                      <span className="rounded bg-sunken px-1.5 py-0.5 font-mono text-2xs font-medium text-ink-2 ring-1 ring-line">{item.retailerId}</span>
-                      {item.whatsappStatus === "APPROVED" ? (
-                        <Badge tone="green" dot className="text-2xs font-medium">
-                          Live
-                        </Badge>
-                      ) : item.whatsappStatus === "REJECTED" ? (
-                        <Badge tone="red" dot className="text-2xs font-medium">
-                          Rejected
-                        </Badge>
-                      ) : item.whatsappStatus ? (
-                        <Badge tone="amber" dot className="text-2xs font-medium">
-                          In review
-                        </Badge>
-                      ) : null}
-                      {demand && demand.impressions > 0 && (
-                        <Badge tone="gray" className="text-2xs font-medium">
-                          👁️ {demand.impressions} views
-                        </Badge>
-                      )}
-                      {demand && demand.cartCount > 0 && (
-                        <Badge tone="brand" className="text-2xs font-semibold">
-                          🛒 {demand.cartCount} cart{demand.cartCount > 1 ? "s" : ""}
-                        </Badge>
-                      )}
-                      {demand && demand.conversionRate > 0 && (
-                        <Badge tone="green" className="text-2xs font-semibold">
-                          {demand.conversionRate}% conv
-                        </Badge>
-                      )}
-                      {demand && demand.cartCount >= 3 && demand.conversionRate === 0 && (
-                        <Badge tone="amber" className="text-2xs font-semibold">
-                          Cart drop
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <p className="line-clamp-2 min-h-[2lh] px-3 text-xs leading-relaxed text-muted sm:px-4">{item.description}</p>
-                <div className="mt-auto flex items-center justify-between gap-2 px-3 pb-3 pt-2 sm:px-4 sm:pt-3">
-                  <div className="flex flex-col">
-                    <span className="tabular text-lg font-bold tracking-tight text-ink sm:text-xl">₹{item.priceAmount.toLocaleString("en-IN")}</span>
-                    {demand && demand.revenue > 0 && (
-                      <span className="text-2xs font-medium text-success">₹{demand.revenue.toLocaleString("en-IN")} sales</span>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center justify-end gap-1.5">
-                  {item.whatsappStatus === "APPROVED" ? (
-                    <Badge tone="green" dot className="text-xs">
-                      Live on WhatsApp
-                    </Badge>
-                  ) : item.whatsappStatus === "REJECTED" ? (
-                    <Badge tone="red" dot className="text-xs">
-                      Meta Rejected
-                    </Badge>
-                  ) : item.whatsappStatus ? (
-                    <Badge tone="amber" dot className="text-xs">
-                      Meta Reviewing
-                    </Badge>
-                  ) : null}
-                  <Badge tone={item.inStock ? "green" : "amber"} dot>
-                    {item.inStock ? "In stock" : "Out of stock"}
-                  </Badge>
-                </div>
-              </div>
-              <div className="flex gap-2 border-t border-line bg-subtle/50 p-3">
-                <Button variant="secondary" size="sm" onClick={() => handleToggleStock(item)} loading={togglingId === item.id} disabled={togglingId !== null} className="flex-1">
-                  {item.inStock ? <XCircle aria-hidden /> : <CheckCircle2 aria-hidden />}
-                  {item.inStock ? "Mark out of stock" : "Mark in stock"}
-                </Button>
-                <Button variant="secondary" size="sm" onClick={() => handleOpenEdit(item)} aria-label={`Edit ${item.name}`}>
-                  <PencilLine aria-hidden /> Edit
-                </Button>
-              </div>
-            </li>
-          );
-        })}
-        </ul>
-      )}
+                    </td>
+                    <td>{item.category || "—"}</td>
+                    <td className="num">{item.priceAmount > 0 ? `₹${item.priceAmount.toLocaleString("en-IN")}` : <span className="muted">No price</span>}</td>
+                    <td>
+                      <span className={`pill ${pill.tone}`}>{pill.label}</span>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="sw"
+                        role="switch"
+                        aria-checked={item.inStock}
+                        aria-label={`In stock: ${item.name}`}
+                        disabled={!canManage || togglingId !== null || !isLive}
+                        onClick={() => handleToggleStock(item)}
+                        style={togglingId === item.id ? { opacity: 0.6 } : undefined}
+                      />
+                    </td>
+                    <td>
+                      <div className="tools">
+                        {canManage && isLive && (
+                          <button type="button" className="btn sm" onClick={() => handleOpenEdit(item)} aria-label={`Edit ${item.name}`}>
+                            Edit
+                          </button>
+                        )}
+                        <Link className="btn sm ghost" href="/dashboard/campaigns/new">
+                          Make a campaign
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {filtered.length === 0 && (
+          <p className="muted" style={{ padding: 16 }}>
+            {products.length ? "No products match." : "No products yet."}
+          </p>
+        )}
+      </div>
 
-      {/* Edit */}
       <Sheet
         open={!!editing}
         onClose={() => !saving && setEditing(null)}

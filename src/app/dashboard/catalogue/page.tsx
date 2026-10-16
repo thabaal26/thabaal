@@ -1,14 +1,15 @@
-import { CheckCircle2, CloudOff, ExternalLink, PackageCheck, PackageX, ShoppingBag, Tag } from "@/components/icons";
+import { ExternalLink } from "@/components/icons";
 import type { Metadata } from "next";
-import Link from "@/components/intent-link";
-import { Badge, buttonClass, Callout, PageHeader, PickClientNotice, Stat } from "@/components/ui";
+import { PickClientNotice } from "@/components/ui";
 import { getCatalogWithProducts } from "@/lib/catalog";
 import { getCatalogDemandSummary } from "@/lib/catalog-demand";
 import { db } from "@/lib/db";
 import { fmtNumber } from "@/lib/format";
 import { getScope } from "@/lib/session";
 import { CatalogueManager } from "./catalogue-manager";
-import { DemandLeaderboard } from "./demand-leaderboard";
+import { PortalPage } from "../portal-ui";
+import { ProductsPerf } from "./products-perf";
+import { ProductsTabs } from "./products-tabs";
 
 export const metadata: Metadata = { title: "Products" };
 export const dynamic = "force-dynamic";
@@ -17,10 +18,10 @@ export default async function CataloguePage({ searchParams }: PageProps<"/dashbo
   const scope = await getScope();
   if (!scope.clientId) {
     return (
-      <>
-        <PageHeader title="Catalogue & Menu" />
+      <PortalPage title="Products" sub="What you sell, and which items need your attention.">
+        <ProductsTabs active="cat" />
         <PickClientNotice what="catalogue" />
-      </>
+      </PortalPage>
     );
   }
 
@@ -44,145 +45,79 @@ export default async function CataloguePage({ searchParams }: PageProps<"/dashbo
   const pending = products.filter((p) => p.whatsappStatus === "PENDING" || p.whatsappStatus === "OUTDATED").length;
   const rejected = products.filter((p) => p.whatsappStatus === "REJECTED").length;
 
+  const notes = [
+    readError && "Meta didn't answer just now, so products can't be shown. Refresh the page in a minute.",
+    !isLive && !readError && products.length === 0 && "No catalogue connected yet. Create one in Meta Commerce Manager and connect it to this WhatsApp account; its products show here and customers can order them in WhatsApp.",
+    !isLive && products.length > 0 && "Showing the portal's saved product list: Meta's live catalogue couldn't be read, so prices and stock may differ from what customers see.",
+    isLive && rejected > 0 && `${rejected} product${rejected > 1 ? "s were" : " was"} rejected by Meta and can't be ordered in WhatsApp. Update the details or photo in Commerce Manager.`,
+  ].filter(Boolean) as string[];
+  const unpaid = currentView === "demand" ? await db.order.aggregate({ where: { clientId: scope.clientId, status: { in: ["NEW", "CONFIRMED"] }, paidAt: null }, _sum: { total: true } }) : null;
+
   return (
-    <>
-      <PageHeader
-        title="Products"
-        description="What you sell, and which items need your attention."
-        rowActions
-        actions={
-          <>
-            <Link href="/dashboard/orders" className={buttonClass("secondary")}>
-              <ShoppingBag aria-hidden className="size-4 stroke-[2]" /> Orders
-            </Link>
-            <Link href="/dashboard/catalogue/combos" className={buttonClass("secondary")}>
-              Combo ideas
-            </Link>
-            {commerceManagerUrl && (
-              <a href={commerceManagerUrl} target="_blank" rel="noreferrer" className={buttonClass("secondary")}>
-                <ExternalLink aria-hidden className="size-4 stroke-[2]" /> Commerce Manager
-                <span className="sr-only">(opens Meta)</span>
-              </a>
-            )}
-          </>
-        }
-        tabs={
-          <nav aria-label="Product sub-views" className="inline-flex rounded-xl border border-line bg-card p-1 shadow-2xs">
-            <Link
-              href="/dashboard/catalogue"
-              className={`inline-flex min-h-[32px] items-center gap-1.5 rounded-lg px-3.5 text-[13.5px] font-semibold transition-all duration-200 ease-out active:scale-[0.96] ${
-                currentView === "catalogue"
-                  ? "bg-ink text-canvas shadow-xs -translate-y-px"
-                  : "text-muted hover:text-ink hover:bg-subtle/60"
-              }`}
-            >
-              <span>Catalogue</span>
-              <span
-                className={`rounded-full px-1.5 py-0.5 text-2xs font-bold ${
-                  currentView === "catalogue" ? "bg-white/20 text-white" : "bg-line/70 text-muted"
-                }`}
-              >
-                {total}
-              </span>
-            </Link>
-            <Link
-              href="/dashboard/catalogue?view=demand"
-              className={`inline-flex min-h-[32px] items-center gap-1.5 rounded-lg px-3.5 text-[13.5px] font-semibold transition-all duration-200 ease-out active:scale-[0.96] ${
-                currentView === "demand"
-                  ? "bg-ink text-canvas shadow-xs -translate-y-px"
-                  : "text-muted hover:text-ink hover:bg-subtle/60"
-              }`}
-            >
-              <span>How products sell</span>
-              <span
-                className={`rounded-full px-1.5 py-0.5 text-2xs font-bold ${
-                  currentView === "demand" ? "bg-white/20 text-white" : "bg-line/70 text-muted"
-                }`}
-              >
-                {demandSummary.totalCartsAnalyzed} carts
-              </span>
-            </Link>
-          </nav>
-        }
-      />
+    <PortalPage
+      title="Products"
+      titleTa="பொருட்கள்"
+      sub="What you sell, and which items need your attention."
+      subTa="நீங்கள் விற்பவை, கவனிக்க வேண்டிய பொருட்கள்."
+      actions={
+        commerceManagerUrl ? (
+          <a className="btn" href={commerceManagerUrl} target="_blank" rel="noreferrer">
+            <ExternalLink aria-hidden className="ic" style={{ width: 15, height: 15 }} /> Commerce Manager
+          </a>
+        ) : undefined
+      }
+    >
+      <ProductsTabs active={currentView === "demand" ? "perf" : "cat"} />
 
-      {readError && (
-        <Callout tone="warning" icon={<CloudOff className="size-4 stroke-[2]" />} title="Couldn't reach Meta's catalogue" className="mb-4">
-          Meta didn&apos;t answer just now, so products can&apos;t be shown. Refresh the page in a minute.
-        </Callout>
-      )}
-      {!isLive && !readError && products.length === 0 && (
-        <Callout tone="info" icon={<CloudOff className="size-4 stroke-[2]" />} title="No catalogue connected yet" className="mb-4">
-          Create a catalogue in Meta Commerce Manager and connect it to this WhatsApp account. Its products will show here, and customers can order from them
-          in WhatsApp.
-        </Callout>
-      )}
-      {!isLive && products.length > 0 && (
-        <Callout tone="info" icon={<CloudOff className="size-4 stroke-[2]" />} title="Showing the portal's saved product list" className="mb-4">
-          Meta&apos;s live catalogue couldn&apos;t be read for this WhatsApp account, so prices and stock here may differ from what customers see in WhatsApp.
-        </Callout>
-      )}
-      {isLive && pending > 0 && (
-        <Callout tone="warning" title={`${pending} product${pending > 1 ? "s" : ""} in Meta review`} className="mb-4">
-          Meta is currently reviewing {pending > 1 ? "these products" : "this product"}. Once approved, {pending > 1 ? "they" : "it"} will automatically show in your WhatsApp catalogue.
-        </Callout>
-      )}
-      {isLive && rejected > 0 && (
-        <Callout tone="danger" title={`${rejected} product${rejected > 1 ? "s" : ""} rejected by Meta`} className="mb-4">
-          {rejected > 1 ? "These products were" : "This product was"} rejected under Meta Commerce policy and cannot be ordered in WhatsApp. Update details or photo in Meta Commerce Manager.
-        </Callout>
-      )}
-
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <Stat label="Products" value={fmtNumber(total)} sub="In the catalogue" icon={<Tag className="size-5 stroke-[2]" />} tone="info" />
-        <Stat
-          label="In stock"
-          value={fmtNumber(inStock)}
-          sub="Customers can order these"
-          icon={<PackageCheck className="size-5 stroke-[2]" />}
-          tone="brand"
-          meter={total > 0 ? Math.round((inStock / total) * 100) : 0}
-        />
-        <Stat
-          label="Out of stock"
-          value={fmtNumber(outOfStock)}
-          sub="Hidden from new orders"
-          icon={<PackageX className="size-5 stroke-[2]" />}
-          tone={outOfStock > 0 ? "amber" : "gold"}
-        />
-        <Stat
-          label="WhatsApp status"
-          tone={isLive ? (rejected > 0 ? "amber" : pending > 0 ? "amber" : "brand") : "violet"}
-          icon={<ShoppingBag className="size-5 stroke-[2]" />}
-          value={
-            <Badge
-              tone={isLive ? (rejected > 0 ? "red" : pending > 0 ? "amber" : "green") : "gray"}
-              dot
-              className="text-sm"
-            >
-              {isLive ? `${approved} / ${total} Approved` : "Saved copy"}
-            </Badge>
-          }
-          sub={
-            isLive
-              ? pending > 0
-                ? `${pending} pending review`
-                : rejected > 0
-                  ? `${rejected} rejected`
-                  : "All 25 live on WhatsApp"
-              : catalogId
-                ? <span className="font-mono">ID {catalogId}</span>
-                : "No catalogue linked"
-          }
-        />
-      </div>
+      {notes.map((n) => (
+        <div key={n} className="note" style={{ marginBottom: 14 }}>
+          {n}
+        </div>
+      ))}
 
       {currentView === "demand" ? (
-        <div id="demand-leaderboard" className="mb-5">
-          <DemandLeaderboard summary={demandSummary} commerceManagerUrl={commerceManagerUrl} />
-        </div>
+        <ProductsPerf
+          products={demandSummary.products}
+          nowMs={new Date().getTime()}
+          paidSales={demandSummary.totalCatalogRevenue}
+          unpaidCarts={unpaid?._sum.total ?? 0}
+          cartToPaid={demandSummary.overallCartToPaidRate}
+        />
       ) : (
-        <div id="catalogue-items">
+        <>
+          <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
+            <div className="card stat">
+              <div className="l">Products</div>
+              <div className="v">{fmtNumber(total)}</div>
+            </div>
+            <div className="card stat">
+              <div className="l">In stock</div>
+              <div className="v">{fmtNumber(inStock)}</div>
+            </div>
+            <div className="card stat">
+              <div className="l">Out of stock</div>
+              <div className="v">{fmtNumber(outOfStock)}</div>
+            </div>
+            <div className="card stat">
+              <div className="l">Waiting for Meta</div>
+              <div className="v">{fmtNumber(pending)}</div>
+              <div className="d muted">Not in WhatsApp yet</div>
+            </div>
+          </div>
+          {isLive && (
+            <div className="row" style={{ marginBottom: 14, padding: "10px 14px", background: "var(--soft)", borderRadius: 12 }}>
+              <span className="live">
+                <i />
+              </span>
+              <div className="grow small">
+                <b>
+                  {approved} product{approved === 1 ? "" : "s"} live in your WhatsApp catalogue
+                </b>
+                {pending > 0 && ` · ${pending} waiting for Meta to approve`}
+                {catalogId && <span className="muted"> · catalogue {catalogId}</span>}
+              </div>
+            </div>
+          )}
           <CatalogueManager
             products={products}
             catalogId={catalogId}
@@ -192,8 +127,8 @@ export default async function CataloguePage({ searchParams }: PageProps<"/dashbo
             canManage={scope.canManage}
             demandBySku={demandSummary.demandBySku}
           />
-        </div>
+        </>
       )}
-    </>
+    </PortalPage>
   );
 }
