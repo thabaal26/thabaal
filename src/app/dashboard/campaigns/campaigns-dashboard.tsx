@@ -600,7 +600,25 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
               );
             })}
 
-            {filteredItems.length === 0 && <p className="muted">Nothing here yet.</p>}
+            {filteredItems.length === 0 && (
+              <section className="card" style={{ padding: "36px 20px", textAlign: "center" }}>
+                <h2 style={{ fontSize: 18, marginBottom: 8 }}>
+                  {items.length ? "No campaigns in this view" : "No campaigns yet"}
+                </h2>
+                <p className="muted" style={{ maxWidth: 440, margin: "0 auto 16px" }}>
+                  {items.length
+                    ? "Try switching to another tab or clearing your search."
+                    : canManage
+                      ? "Create your first WhatsApp broadcast to announce offers, new arrivals, or discounts."
+                      : "Broadcast campaigns set up for your store will appear here."}
+                </p>
+                {canManage && !items.length && (
+                  <Link className="btn primary" href="/dashboard/campaigns/new" style={{ display: "inline-flex", margin: "0 auto" }}>
+                    <Plus aria-hidden className="ic" /> New campaign
+                  </Link>
+                )}
+              </section>
+            )}
           </div>
         </section>
       ) : (
