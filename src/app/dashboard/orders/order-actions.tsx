@@ -14,12 +14,14 @@ import {
   notifyOrder,
   requestPayment,
   saveOrderNote,
+  setOrderPacked,
   setOrderStatus,
   updateOrderItems,
   type DispatchDetails,
 } from "../actions/orders";
 import { deliverCod, setPaymentMethod, undoPayment, verifyPaymentClaim } from "../actions/payments";
 import { RecordPaymentSheet, RefundSheet } from "./payment-ui";
+import { DEFAULT_FLOW, flowHas, stepLabel, type OrderFlowKey } from "@/lib/order-flow";
 import {
   blankOrderLine,
   OrderItemsEditor,
@@ -88,7 +90,13 @@ export function OrderActions({
   isLiveCatalog = false,
   customerId,
   timeline,
+  flow = DEFAULT_FLOW,
+  packed = false,
 }: {
+  /** The client's order steps (Settings → Order steps): which buttons move the order along. */
+  flow?: OrderFlowKey;
+  /** Marked packed already (the "Packed" step). */
+  packed?: boolean;
   /** For the Open chat and Call buttons. */
   customerId?: string;
   /** The order's timeline, shown when "Timeline" is tapped. */
@@ -189,25 +197,62 @@ export function OrderActions({
       },
     });
   }
-  if (status === "NEW")
+  const hasConfirm = flowHas(flow, "CONFIRMED");
+  const hasPack = flowHas(flow, "PACKED");
+  const hasDispatch = flowHas(flow, "DISPATCHED");
+  const finishLabel = stepLabel(flow, "DELIVERED") ?? "Delivered";
+  if (status === "NEW" && hasConfirm)
     steps.push({
       key: "confirm",
       label: "Confirm & message customer",
       variant: "primary",
       run: () => run("confirm", () => notifyOrder(id, "confirm")),
     });
-  if (status === "NEW" && open && !cod)
+  if (status === "NEW" && hasConfirm && hasDispatch && open && !cod)
     steps.push({
       key: "codconfirm",
       label: "Cash on delivery & confirm",
       variant: "secondary",
       run: () => run("codconfirm", () => setPaymentMethod(id, "cod", { confirm: true })),
     });
-  if (status === "CONFIRMED" || status === "PAID")
+  if (hasPack && !packed && (status === "CONFIRMED" || status === "PAID"))
+    steps.push({
+      key: "pack",
+      label: "Mark packed",
+      variant: pay?.hold ? "secondary" : "primary",
+      run: () => run("pack", () => setOrderPacked(id, true)),
+    });
+  if (hasPack && packed && (status === "NEW" || status === "CONFIRMED" || status === "PAID"))
+    steps.push({
+      key: "unpack",
+      label: "Not packed yet",
+      variant: "ghost",
+      run: () => run("unpack", () => setOrderPacked(id, false)),
+    });
+  // Pickup and service orders finish at the counter: no dispatch, one tap to close.
+  if (!hasDispatch && (status === "NEW" || status === "CONFIRMED" || status === "PAID"))
+    steps.push({
+      key: "finish",
+      label: flow === "pickup" ? "Collected by customer" : `Mark ${finishLabel.toLowerCase()}`,
+      variant: !open || flow === "service" ? "primary" : "secondary",
+      run: async () => {
+        if (
+          open &&
+          !(await confirmAction({
+            title: "Not paid yet",
+            message: `${who} hasn't paid ${inr(due)} yet. Close the order anyway? You can still record the payment later.`,
+            confirmLabel: flow === "pickup" ? "Mark collected" : "Mark done",
+          }))
+        )
+          return;
+        run("finish", () => setOrderStatus(id, "DELIVERED"));
+      },
+    });
+  if (hasDispatch && (status === "CONFIRMED" || status === "PAID"))
     steps.push({
       key: "dispatch",
-      label: "Dispatch & message customer",
-      variant: pay?.hold ? "secondary" : "primary",
+      label: flow === "courier" ? "Ship & message customer" : "Dispatch & message customer",
+      variant: pay?.hold || (hasPack && !packed) ? "secondary" : "primary",
       run: async () => {
         if (
           pay?.hold &&
@@ -222,7 +267,7 @@ export function OrderActions({
         setDispatchOpen(true);
       },
     });
-  if (status === "CONFIRMED" && open && !cod)
+  if (status === "CONFIRMED" && hasDispatch && open && !cod)
     steps.push({
       key: "cod",
       label: "Cash on delivery",
@@ -268,7 +313,8 @@ export function OrderActions({
     steps.push({
       key: "record",
       label: status === "DELIVERED" ? `Record ${inr(due)} received` : "Record payment",
-      variant: status === "DELIVERED" || pay?.state === "part_paid" ? "primary" : "secondary",
+      // At a counter, taking the money is the next step.
+      variant: status === "DELIVERED" || pay?.state === "part_paid" || flow === "pickup" ? "primary" : "secondary",
       run: sheet(setPayOpen),
     });
   if (pay && pay.refundable > 0 && (pay.state === "refund_due" || pay.overpaid >= 1 || status === "DELIVERED" || status === "CANCELLED"))

@@ -29,6 +29,7 @@ import { PaymentForm } from "./payment-form";
 import { inr } from "../portal-format";
 import { AutoSelect, PAction, PortalPage } from "../portal-ui";
 import { OrdersTabs } from "./orders-tabs";
+import { flowHas, flowSteps, readFlow, stepLabel, type StageKey } from "@/lib/order-flow";
 
 /** The utility templates that let order updates go out after the customer's 24-hour window. */
 const ORDER_FILTERS: FilterSection[] = ["period", "products", "area"];
@@ -57,6 +58,7 @@ const TABS = [
   { key: "new", label: "New", where: { status: "NEW" } },
   { key: "confirmed", label: "Confirmed", where: { status: "CONFIRMED" } },
   { key: "paid", label: "Paid", where: { OR: [{ status: "PAID" }, { paidAt: { not: null } }] } },
+  { key: "packed", label: "Packed", where: { packedAt: { not: null }, status: { in: ["NEW", "CONFIRMED", "PAID"] } } },
   { key: "dispatched", label: "Dispatched", where: { status: "DISPATCHED" } },
   { key: "done", label: "Delivered", where: { status: "DELIVERED" } },
   { key: "cancelled", label: "Cancelled", where: { status: "CANCELLED" } },
@@ -191,6 +193,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     catalogData,
     paidToPackCount,
     activeSum,
+    packedCount,
   ] = await Promise.all([
     db.order.findMany({
       where: baseWhere,
@@ -240,7 +243,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     db.order.count({ where: { ...scoped, ...COD_WHERE } as object }),
     db.order.count({ where: { ...scoped, ...REFUND_WHERE } as object }),
     scope.clientId ? db.template.findMany({ where: { clientId: scope.clientId, name: { in: ORDER_TEMPLATE_NAMES.flatMap(orderTemplateNames) } }, select: { name: true, status: true, headerMediaUrl: true } }) : [],
-    scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { paymentConfig: true, defaultImageUrl: true, bannerUrl: true, customFields: true, loyaltyAutoRedeem: true } }) : null,
+    scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { paymentConfig: true, defaultImageUrl: true, bannerUrl: true, customFields: true, loyaltyAutoRedeem: true, orderFlow: true } }) : null,
     scope.clientId ? db.template.findFirst({ where: { clientId: scope.clientId, name: PAYMENT_TEMPLATE }, select: { status: true } }) : null,
     scope.clientId ? paymentTemplateFor(scope.clientId) : null,
     scope.clientId ? getCatalogWithProducts(scope.clientId) : null,
@@ -248,6 +251,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     db.order.count({ where: { ...mine, ...dateWhere, ...extraWhere, status: "PAID" } }),
     // What the active orders are worth (the list below may be a filtered or capped view).
     db.order.findMany({ where: { ...mine, ...dateWhere, ...extraWhere, status: { in: ["NEW", "CONFIRMED", "PAID", "DISPATCHED"] } }, select: { items: true, total: true, pointsRedeemed: true } }),
+    db.order.count({ where: { ...mine, ...dateWhere, ...extraWhere, packedAt: { not: null }, status: { in: ["NEW", "CONFIRMED", "PAID"] } } }),
   ]);
 
   const waiting = await db.order.aggregate({ where: { ...scoped, status: { in: ["NEW", "CONFIRMED", "DISPATCHED"] }, paidAt: null }, _sum: { total: true } });
@@ -306,6 +310,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
     new: newCount,
     confirmed: confirmedCount,
     paid: paidCount,
+    packed: packedCount,
     unpaid: unpaidCount,
     dispatched: dispatchedCount,
     done: deliveredCount,
@@ -330,6 +335,14 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
   const orderFields = readFields(client?.customFields, "order");
   // Client staff pack and dispatch their own orders, so they get the order buttons too.
   const canEdit = scope.canOperate && (scope.canManage || !!scope.clientId);
+
+  // The client's order steps (Settings → Order steps) decide which stage chips show and what they're called.
+  const flow = readFlow(client?.orderFlow);
+  const TAB_STAGE: Record<string, StageKey> = { new: "NEW", confirmed: "CONFIRMED", paid: "PAID", packed: "PACKED", dispatched: "DISPATCHED", done: "DELIVERED" };
+  const shownTabs = TABS.filter((t) => !TAB_STAGE[t.key] || flowHas(flow, TAB_STAGE[t.key]) || t.key === show).map((t) => ({
+    ...t,
+    label: TAB_STAGE[t.key] ? (stepLabel(flow, TAB_STAGE[t.key]) ?? t.label) : t.label,
+  }));
 
   const filtered = Boolean(q || date || payKey || srcKey || (sort && sort !== "new") || filterCount(filters) || filters.range !== "all");
 
@@ -367,7 +380,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         </Link>
         <Link className="card stat" href="/dashboard/orders/packing" style={{ textDecoration: "none" }}>
           <div className="l">To pack</div>
-          <div className="v">{fmtNumber(confirmedCount + paidToPackCount)}</div>
+          <div className="v">{fmtNumber(Math.max(0, confirmedCount + paidToPackCount - packedCount))}</div>
           <div className="d muted">
             {fmtNumber(paidToPackCount)} paid · {fmtNumber(confirmedCount)} confirmed
           </div>
@@ -419,7 +432,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
       )}
 
       <div className="chips" style={{ marginBottom: 14, alignItems: "center" }}>
-        {TABS.map((t) => (
+        {shownTabs.map((t) => (
           <Link key={t.key} className="chip" href={qs({ show: t.key || undefined })} aria-pressed={tab.key === t.key} scroll={false}>
             {t.label} <small>{fmtNumber(tabCount[t.key])}</small>
           </Link>
@@ -431,7 +444,15 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         )}
       </div>
       <p className="muted small" style={{ margin: "-6px 0 14px" }}>
-        Steps: New › Confirmed › Paid / COD › Dispatched › Delivered
+        Steps: {flowSteps(flow).map((x) => x.label).join(" › ")}
+        {scope.clientId && scope.canManage && (
+          <>
+            {" · "}
+            <Link href="/dashboard/settings#order-steps" style={{ color: "inherit", fontWeight: 600, textDecoration: "underline" }}>
+              Change steps
+            </Link>
+          </>
+        )}
       </p>
 
       <div className="stack">
@@ -486,6 +507,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
               isLiveCatalog={isLiveCatalog}
               orderFields={orderFields}
               points={pointsFor(o)}
+              flow={flow}
             />
           ))
         ) : (

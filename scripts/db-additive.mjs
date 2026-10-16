@@ -9,6 +9,7 @@ const FILES = [
   "prisma/sql/2026-10-15-loyalty-redeem.sql",
   "prisma/sql/2026-10-15-template-dates.sql",
   "prisma/sql/2026-10-16-indexes.sql",
+  "prisma/sql/2026-10-16-order-steps.sql",
 ];
 
 if (process.env.VERCEL !== "1") {

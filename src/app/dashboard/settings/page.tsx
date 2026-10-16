@@ -17,6 +17,8 @@ import { getSettings, wahaConfig } from "@/lib/provider";
 import { waConfig } from "@/lib/whatsapp";
 import { LocalSessionPanel, ProviderSwitch } from "./provider-panel";
 import { PasswordForm } from "./password-form";
+import { OrderStepsForm } from "./order-steps-form";
+import { readFlow } from "@/lib/order-flow";
 import { AppearanceEditor } from "../appearance-editor";
 import { portalDefault } from "@/lib/appearance";
 import { spendSummary } from "@/lib/spend";
@@ -108,7 +110,7 @@ export default async function SettingsPage() {
             .then((c) => c?.products.length ?? null)
             .catch(() => null),
           db.order.count({ where: { clientId: cid } }),
-          db.client.findUnique({ where: { id: cid }, select: { name: true, website: true, supportPhone: true, paymentConfig: true, billingMode: true } }),
+          db.client.findUnique({ where: { id: cid }, select: { name: true, website: true, supportPhone: true, paymentConfig: true, billingMode: true, orderFlow: true } }),
           spendSummary(cid).catch(() => null),
         ])
       : [[], 0, null, 0, null, null];
@@ -142,6 +144,8 @@ export default async function SettingsPage() {
             </div>
           </section>
         )}
+
+        {cid && client && <OrderStepsForm current={readFlow(client.orderFlow)} canChange={scope.canManage} />}
 
         {cid && spend && (
           <section className="card">
@@ -257,6 +261,9 @@ export default async function SettingsPage() {
 
   const cfg = waConfig();
   const settings = await getSettings();
+  // An admin looking at one client can set that client's order steps here too.
+  const adminScope = await getScope();
+  const pickedFlow = adminScope.clientId ? (await db.client.findUnique({ where: { id: adminScope.clientId }, select: { orderFlow: true } }))?.orderFlow : undefined;
   const h = await headers();
   const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
 
@@ -329,6 +336,11 @@ export default async function SettingsPage() {
           </div>
         </div>
       </div>
+      {adminScope.clientId && pickedFlow !== undefined && (
+        <div className="mt-4 sm:mt-6">
+          <OrderStepsForm current={readFlow(pickedFlow)} canChange />
+        </div>
+      )}
       <Card id="appearance" className="card-3d mt-4 scroll-mt-20 sm:mt-6">
         <CardHeader
           tone="violet"

@@ -12,6 +12,7 @@ import { PaymentSummary } from "./payment-status";
 import { OrderExtra } from "./order-extra";
 import { readValues, type CustomField } from "@/lib/custom-fields";
 import type { CatalogProductOption } from "./order-items-editor";
+import { DEFAULT_FLOW, flowHas, flowSteps, reachedIndex, stageRank, stepLabel, type OrderFlowKey } from "@/lib/order-flow";
 
 export type OrderCardData = {
   id: string;
@@ -23,6 +24,8 @@ export type OrderCardData = {
   note: string | null;
   internalNote: string | null;
   createdAt: Date;
+  /** When it was marked packed (the "Packed" step). */
+  packedAt?: Date | null;
   /** Set for carts sent from WhatsApp; empty for orders typed in by the team. */
   waMessageId?: string | null;
   paidAt: Date | null;
@@ -67,15 +70,6 @@ export type OrderCardData = {
   extra?: unknown;
 };
 
-/** The order's stages in the portal design's step tracker (Paid / COD is one step). */
-const FLOW = [
-  { key: "NEW", label: "New" },
-  { key: "CONFIRMED", label: "Confirmed" },
-  { key: "PAID", label: "Paid / COD" },
-  { key: "DISPATCHED", label: "Dispatched" },
-  { key: "DELIVERED", label: "Delivered" },
-] as const;
-
 const when = (d: Date) => fmtDate(d, "EEE d MMM, h:mm a");
 
 /** One order: who, what, the total, where it stands, delivery address, customer cart mentality, and the buttons that move it along. */
@@ -88,7 +82,10 @@ export function OrderCard({
   isLiveCatalog = false,
   orderFields = [],
   points = null,
+  flow = DEFAULT_FLOW,
 }: {
+  /** The client's order steps (Settings → Order steps). */
+  flow?: OrderFlowKey;
   /** The client's custom order fields (lib/custom-fields.ts). */
   orderFields?: CustomField[];
   /** What the customer could take off this order in points (₹, ₹25 steps) and their unused points. */
@@ -121,8 +118,11 @@ export function OrderCard({
 
   // How far along: the "Paid / COD" step counts once the money is in or cash on delivery is set.
   const cod = payState === "cod_due" || methodOf(o) === "cod";
-  const reached =
-    o.status === "DELIVERED" ? 4 : o.status === "DISPATCHED" ? 3 : o.status === "PAID" || isPaid || cod ? 2 : o.status === "CONFIRMED" ? 1 : 0;
+  const rank = stageRank({ status: o.status, packedAt: o.packedAt, paid: isPaid, cod });
+  const steps = flowSteps(flow);
+  const reached = reachedIndex(flow, rank);
+  // Timeline: whether a stage (by ladder rank) is done.
+  const past = (r: number) => rank >= r;
   const source = o.waMessageId ? { tone: "info", label: "WhatsApp cart" } : { tone: "mute", label: "Manual entry" };
   // The address has its own row below (with "Add address"); flag only what has no other place.
   const missing = [!o.customer.phone ? "Phone number missing" : null].filter(Boolean);
@@ -133,11 +133,12 @@ export function OrderCard({
     ...(o.status === "CANCELLED"
       ? ([["Cancelled", "Done"]] as [string, string][])
       : ([
-          ["Confirmed", reached >= 1 ? "Done" : null],
+          ...(flowHas(flow, "CONFIRMED") ? ([["Confirmed", past(1) ? "Done" : null]] as [string, string | null][]) : []),
           ...(o.paymentRequestedAt ? ([["Payment link sent", when(o.paymentRequestedAt)]] as [string, string][]) : []),
           [cod ? "Cash on delivery chosen" : "Payment received", o.paidAt ? when(o.paidAt) : cod ? "Collect on delivery" : null],
-          ["Dispatched", reached >= 3 ? "Done" : null],
-          ["Delivered", reached >= 4 ? "Done" : null],
+          ...(flowHas(flow, "PACKED") ? ([["Packed", o.packedAt ? when(o.packedAt) : past(3) ? "Done" : null]] as [string, string | null][]) : []),
+          ...(flowHas(flow, "DISPATCHED") ? ([[stepLabel(flow, "DISPATCHED")!, past(4) ? "Done" : null]] as [string, string | null][]) : []),
+          [stepLabel(flow, "DELIVERED") ?? "Delivered", past(5) ? "Done" : null],
         ] as [string, string | null][])),
     ...(o.refundedAt ? ([["Refunded", when(o.refundedAt)]] as [string, string][]) : []),
   ];
@@ -197,7 +198,7 @@ export function OrderCard({
         <span className="pill bad">Cancelled</span>
       ) : (
         <div className="steps">
-          {FLOW.map((f, i) => (
+          {steps.map((f, i) => (
             <span key={f.key} style={{ display: "contents" }}>
               {i > 0 && "›"}
               <b className={i <= reached ? "on" : undefined}>{f.key === "PAID" && cod && !isPaid ? "COD" : f.label}</b>
@@ -274,6 +275,8 @@ export function OrderCard({
         customerId={o.customer.id}
         timeline={timeline}
         status={o.status}
+        flow={flow}
+        packed={Boolean(o.packedAt)}
         isPaid={isPaid}
         note={o.internalNote}
         customerNote={o.note}
