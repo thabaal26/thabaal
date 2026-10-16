@@ -33,13 +33,13 @@ type NavItem = {
   also?: string[];
 };
 
-/** The menu: five groups, in the order a working day goes. */
+/** The menu: six groups, in the order a working day goes (portal design). */
 export const NAV: NavItem[] = [
   { href: "/dashboard", label: "Home", short: "Home", icon: Home, group: "Today" },
 
   { href: "/dashboard/replies", label: "Chats", short: "Chats", icon: MessageCircle, group: "Daily work", also: ["/dashboard/calls"] },
   { href: "/dashboard/orders", label: "Orders", short: "Orders", icon: Package, group: "Daily work" },
-  { href: "/dashboard/revenue", label: "Money", short: "Money", icon: IndianRupee, group: "Daily work" },
+  { href: "/dashboard/revenue", label: "Payments", short: "Payments", icon: IndianRupee, group: "Money" },
 
   { href: "/dashboard/customers", label: "Customers", short: "Customers", icon: Users, group: "Grow", also: ["/dashboard/refills"] },
   { href: "/dashboard/catalogue", label: "Products", short: "Products", icon: Tag, group: "Grow" },
