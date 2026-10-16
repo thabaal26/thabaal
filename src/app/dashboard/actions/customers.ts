@@ -282,3 +282,17 @@ export async function adjustLoyaltyPoints(id: string, delta: number): Promise<Ac
   };
 }
 
+
+/** Adds one tag to the chosen customers (Customers › select › Add a tag / Make a campaign for these). */
+export async function tagCustomers(ids: string[], rawTag: string): Promise<ActionResult & { tag?: string }> {
+  const s = await requireManager();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const tag = rawTag.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9:_-]/g, "").slice(0, 40);
+  if (!tag) return { ok: false, message: "Type a tag, e.g. diwali-offer." };
+  const pick = [...new Set(ids)].slice(0, 5000);
+  const found = await db.customer.findMany({ where: { id: { in: pick }, ...owned(s) }, select: { id: true, tags: true } });
+  const todo = found.filter((c) => !c.tags.includes(tag));
+  await db.$transaction(todo.map((c) => db.customer.update({ where: { id: c.id }, data: { tags: { push: tag } } })));
+  revalidatePath("/dashboard/customers");
+  return { ok: true, tag, message: `Tag “${tag}” added to ${todo.length} customer${todo.length === 1 ? "" : "s"}${found.length > todo.length ? ` (${found.length - todo.length} already had it)` : ""}.` };
+}
