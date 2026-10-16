@@ -2,8 +2,8 @@ import { Suspense } from "react";
 import { ExternalLink } from "@/components/icons";
 import Link from "@/components/intent-link";
 import { cn } from "@/lib/cn";
-import { spendSummary } from "@/lib/spend";
-import { walletBalance } from "@/lib/wallet";
+import { INDIA_GST_RATE, RATES, spendSummary } from "@/lib/spend";
+import { affordableMessages, walletBalance } from "@/lib/wallet";
 
 /*
  * Home's WhatsApp money card, from live figures: a wallet client's Thabaal balance, or for everyone
@@ -23,6 +23,18 @@ function Bar({ pct, low }: { pct: number; low: boolean }) {
   );
 }
 
+/** "About 140 marketing messages left." Rounded down to a friendly figure; it's an estimate. */
+function messagesLeftText(n: number) {
+  if (!Number.isFinite(n)) return "";
+  if (n <= 0) return "Not enough left for a marketing message.";
+  const shown = n >= 1000 ? Math.floor(n / 100) * 100 : n >= 100 ? Math.floor(n / 10) * 10 : n;
+  return `About ${shown.toLocaleString("en-IN")} marketing message${shown === 1 ? "" : "s"} left.`;
+}
+
+function LowPill() {
+  return <span className="mr-1.5 inline-flex items-center rounded-full bg-warning-bg px-2.5 py-0.5 text-[12px] font-bold text-warning">Low balance</span>;
+}
+
 function Header() {
   return (
     <div className="mb-3.5 flex items-center justify-between gap-2">
@@ -36,7 +48,7 @@ function Header() {
 
 async function WalletBody({ clientId, isWallet, lowAlert, canManage }: { clientId: string; isWallet: boolean; lowAlert: number; canManage: boolean }) {
   if (isWallet) {
-    const balance = await walletBalance(clientId).catch(() => null);
+    const [balance, canSend] = await Promise.all([walletBalance(clientId).catch(() => null), affordableMessages(clientId, "MARKETING").catch(() => Infinity)]);
     if (balance === null) return <Unavailable />;
     const low = balance < lowAlert;
     return (
@@ -46,7 +58,10 @@ async function WalletBody({ clientId, isWallet, lowAlert, canManage }: { clientI
           <div className="text-[13.5px] font-medium text-muted">Wallet balance</div>
           <div className="tabular mt-0.5 font-display text-[26px] font-semibold text-ink">{inr(balance)}</div>
           <Bar pct={lowAlert > 0 ? (balance / (lowAlert * 4)) * 100 : 100} low={low} />
-          <p className="text-[13px] text-muted">{balance <= 0 ? "Empty: campaigns are stopped until you add money." : low ? "Running low. Add money so campaigns keep going." : "Enough for your next campaigns."}</p>
+          <p className="text-[13px] text-muted">
+            {low && balance > 0 && <LowPill />}
+            {messagesLeftText(canSend)} {balance <= 0 ? "Empty: campaigns are stopped until you add money." : low ? "Add money before your next campaign." : "Enough for your next campaigns."}
+          </p>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3">
           <Link href="/dashboard/wallet" className={cn(smallBtn, "bg-brand text-on-brand hover:brightness-105")}>
@@ -83,6 +98,8 @@ async function WalletBody({ clientId, isWallet, lowAlert, canManage }: { clientI
           </>
         )}
         <p className="text-[13px] text-muted">
+          {synced && low && <LowPill />}
+          {synced && `${messagesLeftText(Math.floor(left / (RATES.marketing * (1 + INDIA_GST_RATE))))}${low ? " Top up before your next campaign." : ""} `}
           {synced ? `${inr(s.totalMonthSpentWithGst)} spent in ${s.monthLabel}, incl. GST${s.liveSyncedFromMeta ? "" : " (estimate)"}. ` : `Incl. GST${s.liveSyncedFromMeta ? ", from Meta" : " (estimate)"}. `}
           {q.freeRemaining.toLocaleString("en-IN")} of {q.totalFreeLimit.toLocaleString("en-IN")} free replies left this month.
         </p>

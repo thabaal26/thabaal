@@ -44,7 +44,7 @@ export function AiBusinessCopilot({
     <section className="space-y-4 rounded-card border-[1.5px] border-line bg-panel p-5 shadow-card">
       <div>
         <h2 className="font-display text-[19px] font-semibold text-ink">Your daily brief</h2>
-        <p className="mt-0.5 text-[13.5px] text-muted">Plain words about today, from your live numbers.</p>
+        <p className="mt-0.5 text-[13.5px] text-muted">Plain-language advice for today, from your live numbers.</p>
       </div>
 
       <div className="text-[14.5px] leading-relaxed text-ink" aria-live="polite" aria-busy={pending}>

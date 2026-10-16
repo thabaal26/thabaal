@@ -33,6 +33,10 @@ export type HomeTiersProps = {
   unpaidCartsCount: number;
   unpaidCartsValue: number;
   toPackCount: number;
+  /** How the orders to pack are paid: marked paid, cash on delivery, or confirmed with payment still to come. */
+  toPackSplit?: { paid: number; cod: number; other: number };
+  /** Messages sent and customer replies received since midnight. */
+  today?: { sent: number; replies: number };
   unhandledRepliesCount: number;
   /** When the longest-waiting unanswered chat first wrote (null when none). */
   oldestWaitingAt: Date | null;
@@ -94,6 +98,13 @@ function waitText(since: Date | null) {
   return h < 48 ? `Longest wait ${h} h` : `Longest wait ${Math.round(h / 24)} days`;
 }
 
+/** "2 paid · 1 COD" from the real orders; "Paid or COD" when there's nothing to pack. */
+function packText(s: HomeTiersProps["toPackSplit"]) {
+  if (!s) return "Paid or COD";
+  const parts = [s.paid && `${s.paid} paid`, s.cod && `${s.cod} COD`, s.other && `${s.other} confirmed`].filter(Boolean);
+  return parts.length ? parts.join(" · ") : "Paid or COD";
+}
+
 function TodoTile({ href, big, title, sub, go }: { href: string; big: string; title: string; sub: string; go: string }) {
   return (
     <Link href={href} className="flex items-center gap-3 rounded-xl border-[1.5px] border-line bg-panel p-3.5 transition hover:border-ink active:scale-[0.99] sm:gap-4 sm:p-4">
@@ -124,7 +135,7 @@ const pill = {
 export function HomeTiers(p: HomeTiersProps) {
   const todos = [
     p.ordersOn && { key: "carts", n: p.unpaidCartsCount, node: <TodoTile key="carts" href="/dashboard/orders?show=unpaid" big={inr(p.unpaidCartsValue)} title="Unpaid carts" sub={`${p.unpaidCartsCount} customer${p.unpaidCartsCount === 1 ? "" : "s"}`} go="Chase" /> },
-    p.ordersOn && { key: "pack", n: p.toPackCount, node: <TodoTile key="pack" href="/dashboard/orders/packing" big={String(p.toPackCount)} title="Orders to pack" sub="Confirmed or paid" go="Pack" /> },
+    p.ordersOn && { key: "pack", n: p.toPackCount, node: <TodoTile key="pack" href="/dashboard/orders/packing" big={String(p.toPackCount)} title="Orders to pack" sub={packText(p.toPackSplit)} go="Pack" /> },
     p.repliesOn && { key: "chats", n: p.unhandledRepliesCount, node: <TodoTile key="chats" href="/dashboard/replies" big={String(p.unhandledRepliesCount)} title="Chats waiting" sub={waitText(p.oldestWaitingAt)} go="Reply" /> },
   ].filter((t): t is { key: string; n: number; node: React.JSX.Element } => Boolean(t));
   const needing = todos.filter((t) => t.n > 0).length;
@@ -247,6 +258,16 @@ export function HomeTiers(p: HomeTiersProps) {
                       </div>
                     </div>
                     <span className={cn("inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[12px] font-bold", p.reminderDays ? pill.On : pill.Off)}>{p.reminderDays ? "On" : "Off"}</span>
+                  </li>
+                )}
+                {p.today && (
+                  <li className="flex items-center gap-3 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[14.5px] font-semibold text-ink">Today so far</div>
+                      <div className="tabular text-[13px] text-muted">
+                        {p.today.sent.toLocaleString("en-IN")} message{p.today.sent === 1 ? "" : "s"} sent · {p.today.replies.toLocaleString("en-IN")} repl{p.today.replies === 1 ? "y" : "ies"}
+                      </div>
+                    </div>
                   </li>
                 )}
               </ul>
