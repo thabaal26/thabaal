@@ -40,7 +40,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
   const stFilter =
     st === "approved" ? { status: "APPROVED" as const } : st === "review" ? { status: "PENDING" as const } : st === "rejected" ? { status: { in: ["REJECTED", "PAUSED", "DISABLED"] as ("REJECTED" | "PAUSED" | "DISABLED")[] } } : st === "draft" ? { status: "DRAFT" as const } : {};
   const lgFilter = lg ? { language: { startsWith: lg } } : {};
-  const fmFilter = fm === "image" ? { headerType: { in: ["IMAGE", "VIDEO", "DOCUMENT"] as ("IMAGE" | "VIDEO" | "DOCUMENT")[] } } : {};
+  const fmFilter = fm === "image" ? { headerType: "IMAGE" as const } : {};
 
   const orderBy =
     sort === "name"
@@ -78,7 +78,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
   const statusPill = (s: string) =>
     s === "APPROVED" ? { tone: "ok", label: "Approved" } : s === "PENDING" ? { tone: "warn", label: "In review" } : s === "DRAFT" ? { tone: "mute", label: "Draft" } : { tone: "bad", label: s === "PAUSED" ? "Paused by Meta" : s === "DISABLED" ? "Disabled by Meta" : "Rejected" };
   const kindTone = { MARKETING: "warn", UTILITY: "info", AUTHENTICATION: "mute" } as const;
-  const formatOf = (t: (typeof templates)[number]) => (t.headerType === "IMAGE" ? "Image" : t.headerType === "VIDEO" ? "Video" : t.headerType === "DOCUMENT" ? "Document" : hasButtons(t) ? "Interactive" : "Text");
+  const formatOf = (t: (typeof templates)[number]) => (t.headerType === "IMAGE" ? "Image" : hasButtons(t) ? "Interactive" : "Text");
 
   return (
     <PortalPage title="Templates" titleTa="டெம்ப்ளேட்" sub="Meta-approved messages you can send. Marketing, Utility and Authentication." subTa="நீங்கள் அனுப்பக்கூடிய மெட்டா அங்கீகரித்த செய்திகள்.">
