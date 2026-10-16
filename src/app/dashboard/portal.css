@@ -1,10 +1,26 @@
 /* Generated from thabaal-portal.html: the portal design, scoped to .thabaal-portal. */
+@layer base {
 /* The app's Tailwind base resets heading sizes and lists; the design relies on browser defaults. */
 .thabaal-portal h1{font-size:2em}
 .thabaal-portal h2{font-size:1.5em}
 .thabaal-portal h3{font-size:1.17em}
 .thabaal-portal h4{font-size:1em}
 .thabaal-portal ul,.thabaal-portal ol{list-style:revert;padding-left:1.4em;margin:0}
+.thabaal-portal h1,.thabaal-portal h2,.thabaal-portal h3{font-family:var(--display);font-weight:600;margin:0;letter-spacing:-.2px;text-wrap:balance}
+.thabaal-portal p{margin:0}
+.thabaal-portal a{color:inherit}
+.thabaal-portal button,.thabaal-portal input,.thabaal-portal select,.thabaal-portal textarea{font:inherit;color:inherit}
+.thabaal-portal :focus-visible{outline:3px solid var(--mango);outline-offset:2px;border-radius:8px}
+.thabaal-portal table{width:100%;border-collapse:collapse;font-size:14.5px}
+.thabaal-portal th{text-align:left;font-size:12.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding:8px 12px;border-bottom:1.5px solid var(--line);white-space:nowrap}
+.thabaal-portal td{padding:12px;border-bottom:1px solid var(--line);vertical-align:middle}
+.thabaal-portal tr:last-child td{border-bottom:0}
+.thabaal-portal input[type=text],.thabaal-portal input[type=search],.thabaal-portal input[type=tel],.thabaal-portal input[type=email],.thabaal-portal input[type=password],.thabaal-portal input[type=number],.thabaal-portal input[type=time],.thabaal-portal input[type=date],.thabaal-portal select,.thabaal-portal textarea{width:100%;min-height:42px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);padding:8px 12px;font-size:15px}
+.thabaal-portal textarea{min-height:90px;resize:vertical}
+.thabaal-portal input:focus,.thabaal-portal select:focus,.thabaal-portal textarea:focus{outline:none;border-color:var(--fg);box-shadow:0 0 0 4px rgba(255,195,41,.4)}
+.thabaal-portal dialog{border:0;border-radius:20px;padding:0;background:var(--card);color:var(--fg);width:min(520px,calc(100vw - 32px));box-shadow:0 30px 80px -20px rgba(0,0,0,.55)}
+.thabaal-portal dialog::backdrop{background:rgba(16,40,59,.55)}
+}
 .thabaal-portal{
   /* Layout: fixed left menu (grouped by job), one calm column of white cards on cream. Mango is the only loud colour. */
   --bg:#FFF9F0; --card:#fff; --fg:#10283B; --muted:#5A6B7B; --line:#EADFCB; --soft:#FFF3D6; --mango:#FFC329; --ink:#10283B;
@@ -20,11 +36,6 @@ html.dark .thabaal-portal{
 .thabaal-portal, .thabaal-portal *{box-sizing:border-box}
 .thabaal-portal{scroll-behavior:smooth}
 .thabaal-portal{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--ui);-webkit-font-smoothing:antialiased}
-.thabaal-portal h1,.thabaal-portal h2,.thabaal-portal h3{font-family:var(--display);font-weight:600;margin:0;letter-spacing:-.2px;text-wrap:balance}
-.thabaal-portal p{margin:0}
-.thabaal-portal a{color:inherit}
-.thabaal-portal button,.thabaal-portal input,.thabaal-portal select,.thabaal-portal textarea{font:inherit;color:inherit}
-.thabaal-portal :focus-visible{outline:3px solid var(--mango);outline-offset:2px;border-radius:8px}
 .thabaal-portal .app{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:100vh;padding-left:max(0px,env(safe-area-inset-left,0px));padding-right:max(0px,env(safe-area-inset-right,0px))}
 /* menu */
 .thabaal-portal .side{position:sticky;top:0;height:100vh;overflow:auto;padding:20px 14px;border-right:1.5px solid var(--line);display:flex;flex-direction:column;gap:18px;min-width:0}
@@ -90,10 +101,6 @@ html.dark .thabaal-portal{
 .thabaal-portal .pill.ok{background:var(--ok-bg);color:var(--ok)}.thabaal-portal .pill.warn{background:var(--warn-bg);color:var(--warn)}.thabaal-portal .pill.bad{background:var(--bad-bg);color:var(--bad)}.thabaal-portal .pill.info{background:var(--info-bg);color:var(--info)}.thabaal-portal .pill.mute{background:var(--soft);color:var(--muted)}
 /* tables & lists */
 .thabaal-portal .tw{overflow-x:auto}
-.thabaal-portal table{width:100%;border-collapse:collapse;font-size:14.5px}
-.thabaal-portal th{text-align:left;font-size:12.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding:8px 12px;border-bottom:1.5px solid var(--line);white-space:nowrap}
-.thabaal-portal td{padding:12px;border-bottom:1px solid var(--line);vertical-align:middle}
-.thabaal-portal tr:last-child td{border-bottom:0}
 .thabaal-portal td.num,.thabaal-portal th.num{text-align:right;font-variant-numeric:tabular-nums}
 .thabaal-portal .list{display:flex;flex-direction:column}
 .thabaal-portal .row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
@@ -107,9 +114,6 @@ html.dark .thabaal-portal{
 /* forms */
 .thabaal-portal .field{display:flex;flex-direction:column;gap:6px}
 .thabaal-portal .field label{font-weight:600;font-size:13.5px}
-.thabaal-portal input[type=text],.thabaal-portal input[type=search],.thabaal-portal input[type=tel],.thabaal-portal input[type=email],.thabaal-portal input[type=password],.thabaal-portal input[type=number],.thabaal-portal input[type=time],.thabaal-portal input[type=date],.thabaal-portal select,.thabaal-portal textarea{width:100%;min-height:42px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);padding:8px 12px;font-size:15px}
-.thabaal-portal textarea{min-height:90px;resize:vertical}
-.thabaal-portal input:focus,.thabaal-portal select:focus,.thabaal-portal textarea:focus{outline:none;border-color:var(--fg);box-shadow:0 0 0 4px rgba(255,195,41,.4)}
 .thabaal-portal .formgrid{display:grid;gap:14px;grid-template-columns:repeat(2,minmax(0,1fr))}
 .thabaal-portal .msg{font-size:13px;font-weight:600;min-height:0}.thabaal-portal .msg.err{color:var(--bad)}.thabaal-portal .msg.ok{color:var(--ok)}
 .thabaal-portal .sw{width:46px;height:28px;border-radius:999px;border:0;background:var(--line);position:relative;cursor:pointer;flex:none;transition:background .2s}
@@ -138,8 +142,6 @@ html.dark .thabaal-portal .phone{background:#0E2535;color:#FFF9F0}
 .thabaal-portal .qr{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
 .thabaal-portal .qr span{background:#fff;color:#1A6FB5;border-radius:8px;padding:5px 10px;font-weight:600;font-size:13px;box-shadow:0 1px 1px rgba(0,0,0,.08)}
 /* dialogs, drawer, toast */
-.thabaal-portal dialog{border:0;border-radius:20px;padding:0;background:var(--card);color:var(--fg);width:min(520px,calc(100vw - 32px));box-shadow:0 30px 80px -20px rgba(0,0,0,.55)}
-.thabaal-portal dialog::backdrop{background:rgba(16,40,59,.55)}
 .thabaal-portal .dlg{padding:22px;display:flex;flex-direction:column;gap:14px;max-height:85vh;overflow:auto}
 .thabaal-portal .dlg .acts{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
 .thabaal-portal .drawer{position:fixed;top:0;right:0;bottom:0;width:min(420px,100vw);background:var(--card);border-left:1.5px solid var(--line);box-shadow:-20px 0 50px -30px rgba(0,0,0,.5);z-index:50;transform:translateX(105%);transition:transform .25s;display:flex;flex-direction:column;padding:20px 20px 24px;gap:14px;overflow:auto}
