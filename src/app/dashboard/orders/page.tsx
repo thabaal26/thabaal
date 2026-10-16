@@ -14,7 +14,7 @@ import { maxPointsDiscount } from "@/lib/loyalty-redeem";
 import { LoyaltyRedeemSetting } from "./loyalty-points-ui";
 import { readFields } from "@/lib/custom-fields";
 import { isPictureVersion, isTemplatePicture, ORDER_TEMPLATE_NAMES, orderTemplateNames } from "@/lib/order-templates";
-import { money, orderRef, type OrderItem } from "@/lib/orders";
+import { orderRef, type OrderItem } from "@/lib/orders";
 import { ORDER_REF_RE, orderWhereRef } from "@/lib/order-ref";
 import { slipPay } from "@/lib/payment-state";
 import { formatPhone } from "@/lib/phone";
