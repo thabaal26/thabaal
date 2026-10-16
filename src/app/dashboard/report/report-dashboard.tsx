@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "@/components/intent-link";
+import { PageTools } from "@/components/shell-tools";
 import type { ComprehensiveReportData, PeriodFigures, PeriodKey } from "@/lib/reports-data";
 import "./reports.css";
 
@@ -110,81 +111,10 @@ function ReportBars({
   );
 }
 
-type NotifItem = {
-  t: "order" | "reply" | "call" | "alert";
-  u: number;
-  h: string;
-  s: string;
-  a: string;
-  l: string;
-};
-
-const INITIAL_NOTIFS: NotifItem[] = [
-  { t: "order", u: 1, h: "New order #1048 · ₹1,240", s: "Meena R. · 4 items · 10 min ago", a: "View order", l: "/dashboard/orders" },
-  { t: "reply", u: 1, h: "Reply from Karthik S.", s: "“Is the 5 kg pack available?” · 25 min ago", a: "Reply", l: "/dashboard/replies" },
-  { t: "call", u: 1, h: "Missed WhatsApp call", s: "Priya V. · 1 h ago", a: "Call back", l: "/dashboard/calls" },
-  { t: "alert", u: 0, h: "Wallet is getting low", s: "About 140 marketing messages left · 3 h ago", a: "Top up", l: "/dashboard/wallet" },
-  { t: "order", u: 0, h: "Order #1044 delivered", s: "Yesterday, 6:40 pm", a: "View order", l: "/dashboard/orders" },
-  { t: "reply", u: 0, h: "Reply from Lakshmi N.", s: "“Thank you, received.” · Yesterday", a: "Reply", l: "/dashboard/replies" },
-];
-
 export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
   const [per, setPer] = useState<PeriodKey>("m");
   const [tab, setTab] = useState<"ov" | "camp" | "cust" | "prod">("ov");
   const [cs, setCs] = useState<"a" | "b">("a");
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [notifFilter, setNotifFilter] = useState<"all" | "unread" | "order" | "reply" | "call" | "alert">("all");
-  const [notifs, setNotifs] = useState<NotifItem[]>(INITIAL_NOTIFS);
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const [lang, setLang] = useState<"en" | "ta">("en");
-
-  const tr = (en: string, ta: string) => (lang === "ta" ? ta : en);
-
-  const showToast = (msg: string) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 2600);
-  };
-
-  const toggleLang = () => {
-    const next = lang === "en" ? "ta" : "en";
-    setLang(next);
-    showToast(next === "ta" ? "தமிழ்" : "English");
-  };
-
-  const toggleTheme = () => {
-    const isDark =
-      document.documentElement.classList.contains("dark") ||
-      document.documentElement.getAttribute("data-theme") === "dark";
-    const next = isDark ? "light" : "dark";
-    document.documentElement.classList.toggle("dark", next === "dark");
-    document.documentElement.setAttribute("data-theme", next);
-    try {
-      localStorage.setItem("th-theme", next);
-      localStorage.setItem("theme", next);
-    } catch {}
-    window.dispatchEvent(new CustomEvent("themechange", { detail: next }));
-    showToast(next === "dark" ? "Dark mode on" : "Light mode on");
-  };
-
-  const markAllRead = () => {
-    setNotifs((prev) => prev.map((n) => ({ ...n, u: 0 })));
-    showToast("All marked read");
-  };
-
-  const unreadCount = notifs.filter((n) => n.u).length;
-  const filteredNotifs = notifs.filter((n) => {
-    if (notifFilter === "all") return true;
-    if (notifFilter === "unread") return n.u > 0;
-    return n.t === notifFilter;
-  });
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setDrawerOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
 
   useEffect(() => {
     const fromHash = () => {
@@ -206,6 +136,8 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
       /* ignore */
     }
   };
+
+  const tr = (en: string, _ta?: string) => en;
 
   const d: PeriodFigures = per === "m" ? data.overview.m : data.overview.w;
   const r = d.returnRatio;
@@ -251,44 +183,7 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
               )}
             </p>
           </div>
-          <div className="tools">
-            <button
-              type="button"
-              className="iconbtn"
-              data-bell
-              aria-label="Notifications"
-              onClick={() => setDrawerOpen(true)}
-              title="Notifications"
-            >
-              <svg className="ic" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M6 9a6 6 0 0 1 12 0c0 6 2 7 2 7H4s2-1 2-7" />
-                <path d="M10 20a2 2 0 0 0 4 0" />
-              </svg>
-              {unreadCount > 0 && <span className="b">{unreadCount}</span>}
-            </button>
-            <button
-              type="button"
-              className="iconbtn"
-              id="langBtn"
-              aria-label="Language: English or Tamil"
-              style={{ width: "auto", padding: "0 12px", fontWeight: 700 }}
-              onClick={toggleLang}
-            >
-              {lang === "ta" ? "EN" : "தமிழ்"}
-            </button>
-            <button
-              type="button"
-              className="iconbtn"
-              id="themeBtn"
-              aria-label="Switch light or dark"
-              onClick={toggleTheme}
-            >
-              <svg className="ic" viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" />
-              </svg>
-            </button>
-          </div>
+          <PageTools />
         </header>
 
       {/* Top Verdict Card */}
@@ -336,16 +231,8 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
           </div>
         </div>
         <p id="verds">
-          {lang === "ta" ? (
-            <>
-              செய்திகளுக்கு <b>{R(d.cost)}</b> செலவழித்து, <b>{R(d.sales)}</b> மதிப்புள்ள கட்டணம் செலுத்தப்பட்ட ஆர்டர்களைப் பெற்றுள்ளீர்கள். செலவழித்த ஒவ்வொரு <b>₹1</b>-க்கும் <b>{R(r)}</b> விற்பனை வந்துள்ளது.
-            </>
-          ) : (
-            <>
-              You spent <b>{R(d.cost)}</b> on messages and received <b>{R(d.sales)}</b> in paid orders. Every{" "}
-              <b>₹1</b> spent brought back <b>{R(r)}</b> in sales.
-            </>
-          )}
+          You spent <b>{R(d.cost)}</b> on messages and received <b>{R(d.sales)}</b> in paid orders. Every{" "}
+          <b>₹1</b> spent brought back <b>{R(r)}</b> in sales.
         </p>
       </div>
 
@@ -887,99 +774,6 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
           </div>
         </div>
       </section>
-      </div>
-
-      {/* Drawer backdrop */}
-      {drawerOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 z-40 backdrop-blur-[2px] transition-opacity"
-          onClick={() => setDrawerOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-
-      {/* Notifications Drawer */}
-      <aside
-        className={`drawer ${drawerOpen ? "open" : ""}`}
-        id="drawer"
-        aria-label="Notifications"
-      >
-        <div className="hd">
-          <h2>{tr("Notifications", "அறிவிப்புகள்")}</h2>
-          <div className="tools">
-            <button type="button" className="btn sm" id="nread" onClick={markAllRead}>
-              {tr("Mark all read", "அனைத்தும் படித்ததாக குறி")}
-            </button>
-            <button
-              type="button"
-              className="btn sm"
-              id="nclose"
-              onClick={() => setDrawerOpen(false)}
-            >
-              {tr("Close", "மூடு")}
-            </button>
-          </div>
-        </div>
-
-        <div className="chips" id="nchips">
-          {(
-            [
-              { key: "all", label: tr("All", "அனைத்தும்") },
-              { key: "unread", label: `${tr("Unread", "படிக்காதவை")} (${unreadCount})` },
-              { key: "order", label: tr("Orders", "ஆர்டர்கள்") },
-              { key: "reply", label: tr("Replies", "பதில்கள்") },
-              { key: "call", label: tr("Calls", "அழைப்புகள்") },
-              { key: "alert", label: tr("Alerts", "எச்சரிக்கைகள்") },
-            ] as const
-          ).map((c) => (
-            <button
-              key={c.key}
-              type="button"
-              className="chip"
-              data-f={c.key}
-              aria-pressed={notifFilter === c.key}
-              onClick={() => setNotifFilter(c.key)}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="list" id="nlist">
-          {filteredNotifs.length ? (
-            filteredNotifs.map((n, idx) => (
-              <div key={idx} className={`row ${n.u ? "unread" : ""}`}>
-                <div className="grow">
-                  <div className="t">{n.h}</div>
-                  <div className="muted small">{n.s}</div>
-                </div>
-                <Link
-                  className="btn sm"
-                  href={n.l}
-                  onClick={() => {
-                    setDrawerOpen(false);
-                  }}
-                >
-                  {n.a}
-                </Link>
-              </div>
-            ))
-          ) : (
-            <p className="muted" style={{ padding: "16px 0" }}>
-              {tr("Nothing here.", "இங்கு எதுவும் இல்லை.")}
-            </p>
-          )}
-        </div>
-      </aside>
-
-      {/* Floating Toast */}
-      <div
-        className={`toast ${toastMsg ? "on" : ""}`}
-        id="toast"
-        role="status"
-        aria-live="polite"
-      >
-        {toastMsg || ""}
       </div>
     </div>
   );
