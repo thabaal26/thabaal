@@ -1,5 +1,4 @@
 import { AlertTriangle, Banknote, CheckCircle2, Clock, Hourglass, ReceiptText, Undo2 } from "@/components/icons";
-import { Badge } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { fmtDate } from "@/lib/format";
 import { money } from "@/lib/orders";
@@ -18,6 +17,8 @@ export type PaymentView = PayFields & {
 };
 
 const when = (d: Date) => fmtDate(d, "d MMM, h:mm a");
+/** The app's badge tones as the portal design's pill classes. */
+const PILL = { green: "ok", amber: "warn", red: "bad", blue: "info", gray: "mute", violet: "info" } as const;
 
 /** Where the order's money stands, in one line plus what to do about it. */
 export function PaymentSummary({ o, className }: { o: PaymentView; className?: string }) {
@@ -49,16 +50,21 @@ export function PaymentSummary({ o, className }: { o: PaymentView; className?: s
   if (state === "paid" && extra >= 1) detail = `${detail ? `${detail} · ` : ""}${money(extra, o.currency)} more than the total was paid: refund the extra`;
 
   return (
-    <div className={cn("flex items-start gap-2 text-xs", className)}>
-      <Badge tone={tone} className="shrink-0">
-        <Icon aria-hidden className="size-3" />
-        {state === "cod_due" ? "COD" : STATE_LABEL[state]}
-      </Badge>
+    <div className={cn("tools", className)} style={{ marginTop: 12 }}>
+      <span className={`pill ${PILL[tone]}`}>
+        <Icon aria-hidden className="ic" style={{ width: 13, height: 13 }} />
+        {state === "cod_due" ? "Cash on delivery" : STATE_LABEL[state]}
+      </span>
       {(detail || partRefund) && (
-        <p className={cn("min-w-0 pt-0.5 leading-snug", state === "failed" || state === "refund_due" ? "text-danger" : state === "claimed" ? "text-warning" : "text-muted")}>
+        <span className={`small ${state === "failed" || state === "refund_due" ? "down" : "muted"}`}>
           {detail}
-          {partRefund && <span className="block text-muted">{money(o.refundAmount ?? 0, o.currency)} refunded{o.refundedAt ? ` · ${when(o.refundedAt)}` : ""}</span>}
-        </p>
+          {partRefund && (
+            <>
+              {" "}
+              · {money(o.refundAmount ?? 0, o.currency)} refunded{o.refundedAt ? ` · ${when(o.refundedAt)}` : ""}
+            </>
+          )}
+        </span>
       )}
     </div>
   );

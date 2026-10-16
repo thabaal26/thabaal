@@ -268,3 +268,16 @@ export function PAction({
     </button>
   );
 }
+
+/** A design <select> inside a GET form that applies itself as soon as it changes. */
+export function AutoSelect({ name, value, options, label, style }: { name: string; value: string; options: { value: string; label: string }[]; label: string; style?: React.CSSProperties }) {
+  return (
+    <select name={name} defaultValue={value} aria-label={label} style={{ width: "auto", ...style }} onChange={(e) => e.currentTarget.form?.requestSubmit()}>
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  );
+}

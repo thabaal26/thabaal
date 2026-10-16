@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreHorizontal, PencilLine } from "@/components/icons";
+import Link from "@/components/intent-link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { confirmAction } from "@/components/confirm";
@@ -86,7 +86,13 @@ export function OrderActions({
   pay = null,
   catalogProducts = [],
   isLiveCatalog = false,
+  customerId,
+  timeline,
 }: {
+  /** For the Open chat and Call buttons. */
+  customerId?: string;
+  /** The order's timeline, shown when "Timeline" is tapped. */
+  timeline?: React.ReactNode;
   id: string;
   who: string;
   status: Status;
@@ -110,6 +116,7 @@ export function OrderActions({
   const [dispatchOpen, setDispatchOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [refundOpen, setRefundOpen] = useState(false);
   const [d, setD] = useState<DispatchDetails>({ eta: "today evening", by: "", phone: "", link: "" });
@@ -336,73 +343,66 @@ export function OrderActions({
   const saveNote = () => run("note", () => saveOrderNote(id, text));
 
   return (
-    <div className="mt-auto space-y-2 border-t border-line pt-2.5">
-      {note && (
-        <button
-          type="button"
-          onClick={() => setMoreOpen(true)}
-          className="flex w-full items-center justify-between gap-2 rounded-control bg-subtle/60 px-2.5 py-1 text-left text-xs text-ink-2 transition hover:bg-sunken"
-          title="Click to edit team note"
-        >
-          <span className="truncate">
-            <span className="font-semibold text-muted">Note: </span>
-            {note}
-          </span>
-          <PencilLine aria-hidden className="size-3 shrink-0 text-muted" />
-        </button>
-      )}
-      {/* Buttons wrap onto a second line instead of cutting their labels short. */}
-      <div className="flex flex-wrap items-center gap-2">
+    <div>
+      <div className="tools" style={{ marginTop: 14 }}>
         {primaryStep && (
-          <Button
-            size="sm"
-            className="min-w-0 max-w-full flex-auto"
-            variant={primaryStep.variant}
-            disabled={pending}
-            loading={busy === primaryStep.key}
-            onClick={primaryStep.run}
-          >
-            <span className="truncate">{primaryStep.label}</span>
-          </Button>
+          <button type="button" className="btn primary" disabled={pending} aria-busy={busy === primaryStep.key} onClick={primaryStep.run}>
+            {busy === primaryStep.key ? "Working…" : primaryStep.label}
+          </button>
         )}
         {secondaryStep && (
-          <Button
-            size="sm"
-            className="hidden flex-auto sm:inline-flex"
-            variant={secondaryStep.variant}
-            disabled={pending}
-            loading={busy === secondaryStep.key}
-            onClick={secondaryStep.run}
-          >
-            <span>{secondaryStep.label}</span>
-          </Button>
+          <button type="button" className={`btn sm${secondaryStep.variant === "danger" ? " danger" : ""}`} disabled={pending} aria-busy={busy === secondaryStep.key} onClick={secondaryStep.run}>
+            {busy === secondaryStep.key ? "Working…" : secondaryStep.label}
+          </button>
         )}
-        {!done && primaryStep?.key !== "edit" && (
-          <Button
-            size="sm"
-            variant="secondary"
-            icon
-            className="shrink-0"
-            aria-label={`Customize or edit items for ${who}'s order`}
-            title="Customize or edit items"
-            onClick={openEditSheet}
-          >
-            <PencilLine aria-hidden className="size-4" />
-          </Button>
+        {customerId && (
+          <>
+            <Link className="btn sm ghost" href={`/dashboard/replies?r=${customerId}`}>
+              Open chat
+            </Link>
+            <Link className="btn sm ghost" href={`/dashboard/customers/${customerId}#call`}>
+              Call
+            </Link>
+          </>
         )}
-        <Button
-          size="sm"
-          variant="secondary"
-          icon={!!primaryStep}
-          className={primaryStep ? "shrink-0" : "flex-1"}
-          aria-label={primaryStep ? `More actions and team note for ${who}'s order` : undefined}
-          title="More actions & team note"
-          onClick={() => setMoreOpen(true)}
-        >
-          <MoreHorizontal aria-hidden className="size-4" />
-          {!primaryStep && "Order actions & note"}
-        </Button>
+        {timeline && (
+          <button type="button" className="btn sm ghost" aria-expanded={showTimeline} onClick={() => setShowTimeline((v) => !v)}>
+            {showTimeline ? "Hide timeline" : "Timeline"}
+          </button>
+        )}
       </div>
+
+      {showTimeline && timeline}
+
+      {note && (
+        <p className="muted small" style={{ marginTop: 12 }}>
+          Team note: {note}{" "}
+          <button type="button" className="linkb" onClick={() => setMoreOpen(true)}>
+            Edit
+          </button>
+        </p>
+      )}
+
+      <details className="more">
+        <summary>More actions</summary>
+        <div className="tools" style={{ marginTop: 10 }}>
+          {restSteps
+            .filter((s) => s.key !== secondaryStep?.key)
+            .map((s) => (
+              <button key={s.key} type="button" className={`btn sm${s.variant === "danger" ? " danger" : ""}`} disabled={pending} aria-busy={busy === s.key} onClick={s.run}>
+                {busy === s.key ? "Working…" : s.label}
+              </button>
+            ))}
+          {!done && !restSteps.some((s) => s.key === "edit") && primaryStep?.key !== "edit" && (
+            <button type="button" className="btn sm" onClick={openEditSheet}>
+              Edit items
+            </button>
+          )}
+          <button type="button" className="btn sm" onClick={() => setMoreOpen(true)}>
+            {note ? "Edit team note" : "Add team note"}
+          </button>
+        </div>
+      </details>
 
       <Sheet open={moreOpen} onClose={() => setMoreOpen(false)} title={`Order for ${who}`}>
         <div className="space-y-5">

@@ -1,6 +1,4 @@
-import { History, MapPin, Sparkles, Truck } from "@/components/icons";
 import Link from "@/components/intent-link";
-import { Avatar, Badge, Card, OrderStatusBadge, OrderStepper } from "@/components/ui";
 import { analyzeCartMentality } from "@/lib/cart-mentality";
 import { fmtDate } from "@/lib/format";
 import { getOrderPricing, pointsDiscount } from "@/lib/order-pricing";
@@ -25,6 +23,8 @@ export type OrderCardData = {
   note: string | null;
   internalNote: string | null;
   createdAt: Date;
+  /** Set for carts sent from WhatsApp; empty for orders typed in by the team. */
+  waMessageId?: string | null;
   paidAt: Date | null;
   paymentTxnId: string | null;
   paymentRequestedAt: Date | null;
@@ -67,14 +67,16 @@ export type OrderCardData = {
   extra?: unknown;
 };
 
-const STATUS_ACCENT: Record<OrderCardData["status"], string> = {
-  NEW: "#b7791f",
-  CONFIRMED: "#1d64a8",
-  PAID: "#167d63",
-  DISPATCHED: "#6941c6",
-  DELIVERED: "#11704c",
-  CANCELLED: "#8b95a5",
-};
+/** The order's stages in the portal design's step tracker (Paid / COD is one step). */
+const FLOW = [
+  { key: "NEW", label: "New" },
+  { key: "CONFIRMED", label: "Confirmed" },
+  { key: "PAID", label: "Paid / COD" },
+  { key: "DISPATCHED", label: "Dispatched" },
+  { key: "DELIVERED", label: "Delivered" },
+] as const;
+
+const when = (d: Date) => fmtDate(d, "EEE d MMM, h:mm a");
 
 /** One order: who, what, the total, where it stands, delivery address, customer cart mentality, and the buttons that move it along. */
 export function OrderCard({
@@ -101,7 +103,6 @@ export function OrderCard({
   const isPaid = o.status === "PAID" || o.paidAt !== null;
   const payState = paymentState(o);
   const received = receivedOf(o);
-  const accent = STATUS_ACCENT[o.status] ?? "#167d63";
   const refText = orderRef(o);
   const pricing = getOrderPricing(items, o.total, { applyDefaultWhenEqual: true, discount: pointsDiscount(o) });
   const pointsCanChange = canEdit && o.status !== "CANCELLED" && !o.paidAt && received <= 0;
@@ -118,134 +119,132 @@ export function OrderCard({
         )
       : null;
 
+  // How far along: the "Paid / COD" step counts once the money is in or cash on delivery is set.
+  const cod = payState === "cod_due" || methodOf(o) === "cod";
+  const reached =
+    o.status === "DELIVERED" ? 4 : o.status === "DISPATCHED" ? 3 : o.status === "PAID" || isPaid || cod ? 2 : o.status === "CONFIRMED" ? 1 : 0;
+  const source = o.waMessageId ? { tone: "info", label: "WhatsApp cart" } : { tone: "mute", label: "Manual entry" };
+  const missing = [!o.note?.trim() && !o.customer.location && !o.customer.locationRaw && o.status !== "CANCELLED" ? "Address needed" : null, !o.customer.phone ? "Phone number missing" : null].filter(Boolean);
+
+  // What the app records, in order. Stages without a saved time show "Done" once reached.
+  const events: [string, string | null][] = [
+    ["Order placed", when(o.createdAt)],
+    ...(o.status === "CANCELLED"
+      ? ([["Cancelled", "Done"]] as [string, string][])
+      : ([
+          ["Confirmed", reached >= 1 ? "Done" : null],
+          ...(o.paymentRequestedAt ? ([["Payment link sent", when(o.paymentRequestedAt)]] as [string, string][]) : []),
+          [cod ? "Cash on delivery chosen" : "Payment received", o.paidAt ? when(o.paidAt) : cod ? "Collect on delivery" : null],
+          ["Dispatched", reached >= 3 ? "Done" : null],
+          ["Delivered", reached >= 4 ? "Done" : null],
+        ] as [string, string | null][])),
+    ...(o.refundedAt ? ([["Refunded", when(o.refundedAt)]] as [string, string][]) : []),
+  ];
+  const timeline = (
+    <div className="list" style={{ marginTop: 12 }}>
+      {events.map(([label, at]) => (
+        <div key={label} className="row">
+          <div className={`grow${at ? "" : " muted"}`}>{label}</div>
+          <span className="muted small">{at ?? "Not yet"}</span>
+        </div>
+      ))}
+    </div>
+  );
+
   return (
-    <div className="relative flex h-full flex-col gap-2.5 rounded-[16px] border-[1.5px] border-line bg-panel p-3.5 shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)] transition sm:gap-3 sm:rounded-[18px] sm:p-5 dark:shadow-[0_14px_30px_-22px_rgba(0,0,0,.7)]">
-
-      <div className="flex items-start justify-between gap-2 sm:gap-2.5">
-        <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
-          <Avatar name={o.customer.name} className="size-8 shrink-0 text-xs sm:size-9 sm:text-sm" />
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
-              <Link href={`/dashboard/customers/${o.customer.id}`} className="truncate text-[13.5px] font-semibold text-ink hover:underline sm:text-[15px]">
-                {o.customer.name}
-              </Link>
-              <span className="rounded-control bg-sunken px-1.5 py-0.5 font-mono text-2xs font-semibold text-ink-2 ring-1 ring-inset ring-line">
-                {refText}
-              </span>
-              {mentality && mentality.attemptCount > 1 && (
-                <Badge tone={mentality.behavior === "downsized" ? "amber" : mentality.behavior === "upsized" ? "green" : "blue"}>
-                  Cart #{mentality.attemptCount}
-                </Badge>
-              )}
-              {isSuperseded && <Badge tone="gray">Replaced</Badge>}
-            </div>
-            <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11.5px] text-muted sm:text-xs">
-              <span className="tabular">{formatPhone(o.customer.phone)}</span>
-              {o.customer.location && (
-                <span className="inline-flex items-center gap-0.5 text-ink-2">
-                  · <MapPin aria-hidden className="size-3 text-muted" /> {o.customer.location}
-                </span>
-              )}
-              <span className="tabular text-muted">· {fmtDate(o.createdAt, "d MMM, h:mm a")}</span>
-            </p>
-          </div>
-        </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <OrderStatusBadge status={o.status} />
-          {showClient && <Badge>{o.customer.client.name}</Badge>}
-        </div>
-      </div>
-
-      <OrderStepper status={o.status} isPaid={isPaid && payState !== "part_paid"} unpaidLabel={payState === "cod_due" ? "COD" : payState === "part_paid" ? "Part paid" : "Not paid"} />
-
-      <div className="rounded-control border border-line/80 bg-sunken/60 px-2.5 py-1 text-xs sm:px-3 sm:text-sm">
-        <ul className="divide-y divide-line/70">
-          {items.map((i, k) => (
-            <li key={k} className="flex items-baseline justify-between gap-2 py-1 sm:gap-2.5 sm:py-1.5">
-              <span className="min-w-0 truncate text-ink">
-                <span className="tabular mr-1.5 inline-block rounded bg-panel px-1.5 py-0.5 text-2xs font-semibold text-ink-2 ring-1 ring-line">
-                  {i.quantity}×
-                </span>
-                {i.name ?? i.id}
-              </span>
-              <span className="tabular shrink-0 font-medium text-ink-2">
-                {i.price > 0 ? money(i.price * i.quantity, i.currency) : <span className="text-xs text-warning">Set price</span>}
-              </span>
-            </li>
-          ))}
-        </ul>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line py-2">
-          <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
-            <span className="font-semibold uppercase tracking-wider text-ink-2">Total</span>
-            {pricing.subtotal > 0 && (pricing.shipping > 0 || pricing.discount > 0) && (
-              <span className="tabular text-2xs text-muted">
-                ({money(pricing.subtotal, o.currency)}
-                {pricing.shipping > 0 && (
-                  <>
-                    {" "}+ <Truck aria-hidden className="inline size-3 text-brand-deep" /> {money(pricing.shipping, o.currency)}
-                  </>
-                )}
-                {pricing.discount > 0 && <span className="text-success"> − points {money(pricing.discount, o.currency)}</span>})
+    <article className="card">
+      <div className="hd" style={{ marginBottom: 8 }}>
+        <div style={{ minWidth: 0 }}>
+          <h2 style={{ fontSize: 17 }}>
+            {refText} ·{" "}
+            <Link href={`/dashboard/customers/${o.customer.id}`} style={{ textDecoration: "none" }}>
+              {o.customer.name}
+            </Link>{" "}
+            <span className={`pill ${source.tone}`} style={{ verticalAlign: "middle", marginLeft: 4 }}>
+              {source.label}
+            </span>
+            {mentality && mentality.attemptCount > 1 && (
+              <span className="pill warn" style={{ verticalAlign: "middle", marginLeft: 4 }}>
+                Cart #{mentality.attemptCount}
               </span>
             )}
-          </div>
-          <span className="tabular text-sm font-bold text-ink sm:text-base">{money(pricing.total, o.currency)}</span>
+            {isSuperseded && (
+              <span className="pill mute" style={{ verticalAlign: "middle", marginLeft: 4 }}>
+                Replaced
+              </span>
+            )}
+            {showClient && (
+              <span className="pill mute" style={{ verticalAlign: "middle", marginLeft: 4 }}>
+                {o.customer.client.name}
+              </span>
+            )}
+          </h2>
+          <p>
+            {items.map((i) => `${i.quantity} × ${i.name ?? i.id}`).join(", ") || "No items"}
+          </p>
+          <p className="muted small" style={{ marginTop: 2 }}>
+            {formatPhone(o.customer.phone)} · {fmtDate(o.createdAt, "d MMM, h:mm a")}
+            {pricing.shipping > 0 && ` · includes ${money(pricing.shipping, o.currency)} delivery`}
+            {pricing.discount > 0 && ` · ${money(pricing.discount, o.currency)} off with points`}
+            {items.some((i) => !(i.price > 0)) && " · some items need a price"}
+          </p>
         </div>
+        <b style={{ font: "600 20px var(--display)" }}>{money(pricing.total, o.currency)}</b>
       </div>
 
-      {/* Collapsible Customer Cart Mentality */}
+      {o.status === "CANCELLED" ? (
+        <span className="pill bad">Cancelled</span>
+      ) : (
+        <div className="steps">
+          {FLOW.map((f, i) => (
+            <span key={f.key} style={{ display: "contents" }}>
+              {i > 0 && "›"}
+              <b className={i <= reached ? "on" : undefined}>{f.key === "PAID" && cod && !isPaid ? "COD" : f.label}</b>
+            </span>
+          ))}
+        </div>
+      )}
+
+      <PaymentSummary o={o} />
+
+      {missing.length > 0 && (
+        <div className="note small" style={{ marginTop: 12 }}>
+          <b>{missing.join(" · ")}</b>
+        </div>
+      )}
+
       {mentality && mentality.attemptCount > 1 && (
-        <details className="group rounded-control border border-warning-border/70 bg-warning-bg/35 px-2.5 py-1.5 text-xs">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 font-medium text-ink">
-            <span className="inline-flex min-w-0 items-center gap-1.5 truncate">
-              <Sparkles aria-hidden className="size-3.5 shrink-0 text-warning" />
-              <span className="truncate">{mentality.headline}</span>
-            </span>
-            <span className="shrink-0 text-2xs font-semibold text-brand-deep group-open:hidden">
-              View changes
-            </span>
-            <span className="hidden shrink-0 text-2xs font-semibold text-muted group-open:inline">
-              Hide
-            </span>
-          </summary>
-          <div className="mt-2 space-y-1 border-t border-warning-border/50 pt-2 text-ink-2">
+        <details className="more">
+          <summary>{mentality.headline}</summary>
+          <div className="small" style={{ marginTop: 8, display: "grid", gap: 4 }}>
             {mentality.droppedItems.length > 0 && (
               <p>
-                <span className="font-semibold text-danger">Dropped: </span>
+                <b className="down">Dropped: </b>
                 {mentality.droppedItems.map((d) => `${d.name}${d.price > 0 ? ` (${money(d.price * d.quantity, o.currency)})` : ""}`).join(", ")}
               </p>
             )}
             {mentality.addedItems.length > 0 && (
               <p>
-                <span className="font-semibold text-success">Added now: </span>
-                {mentality.addedItems.map((a) => `${a.name}${a.price > 0 ? ` (${money(a.price * a.quantity, o.currency)})` : ""}`).join(", ")}
+                <b className="up">Added now: </b>
+                {mentality.addedItems.map((x) => `${x.name}${x.price > 0 ? ` (${money(x.price * x.quantity, o.currency)})` : ""}`).join(", ")}
               </p>
             )}
             {mentality.keptItems.length > 0 && (
               <p>
-                <span className="font-semibold text-brand-deep">Kept: </span>
+                <b>Kept: </b>
                 {mentality.keptItems.map((k) => k.name).join(", ")}
               </p>
             )}
-            <div className="mt-1.5 border-t border-warning-border/40 pt-1.5 text-2xs text-muted">
-              {mentality.previousCarts.slice(0, 2).map((pc) => (
-                <p key={pc.id} className="flex items-center justify-between gap-2">
-                  <span className="truncate">
-                    <History aria-hidden className="mr-1 inline size-3 align-[-1px]" />
-                    Earlier {orderRef(pc)}: {itemsText(pc.items)}
-                  </span>
-                  <span className="tabular shrink-0">
-                    {money(pc.total, pc.currency)} · {fmtDate(pc.createdAt, "d MMM, h:mm a")}
-                  </span>
-                </p>
-              ))}
-            </div>
+            {mentality.previousCarts.slice(0, 2).map((pc) => (
+              <p key={pc.id} className="muted">
+                Earlier {orderRef(pc)}: {itemsText(pc.items)} · {money(pc.total, pc.currency)} · {fmtDate(pc.createdAt, "d MMM, h:mm a")}
+              </p>
+            ))}
           </div>
         </details>
       )}
 
-      {/* Compact Delivery Address & Payment Status */}
-      <div className="space-y-1.5">
+      <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
         <OrderAddressControl
           orderId={o.id}
           orderRefText={refText}
@@ -265,13 +264,14 @@ export function OrderCard({
           canChange={pointsCanChange}
           paymentSent={Boolean(o.paymentRequestedAt)}
         />
-        <PaymentSummary o={o} />
         <OrderExtra orderId={o.id} fields={orderFields} values={readValues(o.extra)} canEdit={canEdit} />
       </div>
 
       <OrderActions
         id={o.id}
         who={o.customer.name}
+        customerId={o.customer.id}
+        timeline={timeline}
         status={o.status}
         isPaid={isPaid}
         note={o.internalNote}
@@ -293,6 +293,6 @@ export function OrderCard({
         catalogProducts={catalogProducts}
         isLiveCatalog={isLiveCatalog}
       />
-    </div>
+    </article>
   );
 }
