@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
+import { PhoneCall, PhoneIncoming, PhoneMissed, PhoneOff } from "@/components/icons";
+import { Stat } from "@/components/ui";
 import { db } from "@/lib/db";
 import { fmtDate } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
@@ -49,23 +51,34 @@ export default async function CallsPage() {
       <InboxTabs active="calls" />
 
       <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
-        <div className="card stat">
-          <div className="l">Connected</div>
-          <div className="v">{connected}</div>
-        </div>
-        <div className="card stat">
-          <div className="l">Answered</div>
-          <div className="v">{answeredIn}</div>
-        </div>
-        <div className="card stat">
-          <div className="l">Missed</div>
-          <div className="v">{missed}</div>
-          {missed > 0 && <div className="d down">Call these back</div>}
-        </div>
-        <div className="card stat">
-          <div className="l">Declined</div>
-          <div className="v">{declined}</div>
-        </div>
+        <Stat
+          label="Connected"
+          value={connected}
+          sub="Total voice calls"
+          icon={<PhoneCall className="size-4" />}
+          tone="brand"
+        />
+        <Stat
+          label="Answered"
+          value={answeredIn}
+          sub="Inbound calls picked up"
+          icon={<PhoneIncoming className="size-4" />}
+          tone="info"
+        />
+        <Stat
+          label="Missed"
+          value={missed}
+          sub={missed > 0 ? "Call these back" : "No missed calls"}
+          icon={<PhoneMissed className="size-4" />}
+          tone={missed > 0 ? "rose" : "brand"}
+        />
+        <Stat
+          label="Declined"
+          value={declined}
+          sub="Rejected or busy"
+          icon={<PhoneOff className="size-4" />}
+          tone="amber"
+        />
       </div>
 
       <div className="card">

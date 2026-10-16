@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Search } from "@/components/icons";
+import { AlertCircle, Clock, Hourglass, Search, ShoppingBag } from "@/components/icons";
+import { Stat } from "@/components/ui";
 import Link from "@/components/intent-link";
 import { sendCatalogue } from "../../actions/catalog";
 import { requestPayment } from "../../actions/orders";
@@ -98,23 +99,34 @@ export function PriorityBoard({ items, nowMs, canOperate }: { items: BoardItem[]
 
   const stats = (
     <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
-      <div className="card stat">
-        <div className="l">Value in open carts</div>
-        <div className="v">{inr(cartValue)}</div>
-      </div>
-      <div className="card stat">
-        <div className="l">Closing within 3 hours</div>
-        <div className="v">{closing}</div>
-        {closing > 0 && <div className="d down">Free reply window ends soon</div>}
-      </div>
-      <div className="card stat">
-        <div className="l">Window already closed</div>
-        <div className="v">{closed}</div>
-      </div>
-      <div className="card stat">
-        <div className="l">Longest wait</div>
-        <div className="v">{longest}</div>
-      </div>
+      <Stat
+        label="Value in open carts"
+        value={inr(cartValue)}
+        sub="Open checkout value"
+        icon={<ShoppingBag className="size-4" />}
+        tone="brand"
+      />
+      <Stat
+        label="Closing within 3 hours"
+        value={closing}
+        sub={closing > 0 ? "Free reply window ends soon" : "Windows healthy"}
+        icon={<Clock className="size-4" />}
+        tone={closing > 0 ? "rose" : "brand"}
+      />
+      <Stat
+        label="Window already closed"
+        value={closed}
+        sub="Needs template to reply"
+        icon={<AlertCircle className="size-4" />}
+        tone="amber"
+      />
+      <Stat
+        label="Longest wait"
+        value={longest}
+        sub="Customer waiting time"
+        icon={<Hourglass className="size-4" />}
+        tone="info"
+      />
     </div>
   );
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useTransition, useState, useEffect } from "react";
+import { useTransition, useState } from "react";
 import { Search, X } from "@/components/icons";
 
 export function TemplateSearchInput({
@@ -15,12 +15,14 @@ export function TemplateSearchInput({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const currentQ = searchParams.get("q") ?? "";
+  const [prevQ, setPrevQ] = useState(currentQ);
   const [value, setValue] = useState(defaultValue);
 
-  // Sync state if URL query changes externally
-  useEffect(() => {
-    setValue(searchParams.get("q") ?? "");
-  }, [searchParams]);
+  if (currentQ !== prevQ) {
+    setPrevQ(currentQ);
+    setValue(currentQ);
+  }
 
   function updateQuery(nextQ: string) {
     const params = new URLSearchParams(searchParams.toString());

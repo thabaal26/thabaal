@@ -1,5 +1,4 @@
-import { orderRef } from "@/lib/order-ref";
-import { MapPin, MessageCircle, ShoppingBag } from "@/components/icons";
+import { ArrowUpRight, Clock, IndianRupee, MapPin, MessageCircle, ShoppingBag } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
 import { notFound } from "next/navigation";
@@ -7,9 +6,10 @@ import { ActionButton } from "@/components/action-button";
 import { Conversation, type ConversationEntry } from "@/components/conversation";
 import { Messages3D, ShoppingBag3D } from "@/components/icons-3d";
 import { OverflowMenu } from "@/components/overflow-menu";
-import { Badge, buttonClass, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
+import { Badge, buttonClass, Card, CardHeader, EmptyState, PageHeader, Stat } from "@/components/ui";
 import { db } from "@/lib/db";
 import { fmtDate, fmtNumber, pct } from "@/lib/format";
+import { orderRef } from "@/lib/order-ref";
 import { itemsText, money, type OrderItem } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { replyWindowEnd } from "@/lib/replies";
@@ -146,23 +146,34 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
         return (
           <>
             <div className="grid g4 keep2">
-              <div className="card stat">
-                <div className="l">Orders</div>
-                <div className="v">{fmtNumber(bought.length)}</div>
-              </div>
-              <div className="card stat">
-                <div className="l">Spend</div>
-                <div className="v">{money(spent)}</div>
-              </div>
-              <div className="card stat">
-                <div className="l">Average order</div>
-                <div className="v">{bought.length ? money(spent / bought.length) : "—"}</div>
-              </div>
-              <div className="card stat">
-                <div className="l">Last order</div>
-                <div className="v" style={{ fontSize: 22 }}>{last ? fmtDate(last, "d MMM") : "Never"}</div>
-                {unpaid > 0 && <div className="d down">Unpaid cart {money(unpaid)}</div>}
-              </div>
+              <Stat
+                label="Orders"
+                value={fmtNumber(bought.length)}
+                sub="Standing orders"
+                icon={<ShoppingBag className="size-4" />}
+                tone="brand"
+              />
+              <Stat
+                label="Spend"
+                value={money(spent)}
+                sub="Total paid"
+                icon={<IndianRupee className="size-4" />}
+                tone="info"
+              />
+              <Stat
+                label="Average order"
+                value={bought.length ? money(spent / bought.length) : "—"}
+                sub="Per order"
+                icon={<ArrowUpRight className="size-4" />}
+                tone="violet"
+              />
+              <Stat
+                label="Last order"
+                value={last ? fmtDate(last, "d MMM") : "Never"}
+                sub={unpaid > 0 ? `Unpaid cart ${money(unpaid)}` : "All paid"}
+                icon={<Clock className="size-4" />}
+                tone={unpaid > 0 ? "amber" : "gold"}
+              />
             </div>
             <p className="muted small" style={{ marginTop: 8 }}>
               {fmtNumber(sent.length)} campaign message{sent.length === 1 ? "" : "s"} received · {pct(read, delivered)}% read · {fmtNumber(c.replies.length)} repl{c.replies.length === 1 ? "y" : "ies"}

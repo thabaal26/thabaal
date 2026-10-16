@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { Plus } from "@/components/icons";
+import { IndianRupee, MessageCircle, Plus, Repeat, ShoppingBag } from "@/components/icons";
+import { Stat } from "@/components/ui";
 import Link from "@/components/intent-link";
 import { AiBusinessCopilot } from "./ai-copilot";
 import { inr } from "./portal-format";
@@ -155,24 +156,41 @@ export function HomeTiers(p: HomeTiersProps) {
           <div className="grid g4 keep2">
             {p.kpis.map((k) => {
               const dl = delta(k);
-              const body = (
-                <>
-                  <div className="l">{k.label}</div>
-                  <div className="v">{k.value}</div>
-                  <div className={`d ${dl.tone}`}>{dl.text}</div>
-                  <div style={{ marginTop: 8 }}>
-                    <Spark data={k.spark} down={dl.tone === "down"} />
-                  </div>
-                </>
-              );
-              return k.href ? (
-                <Link key={k.label} href={k.href} className="card stat" style={{ textDecoration: "none" }}>
-                  {body}
-                </Link>
+              const labelLower = k.label.toLowerCase();
+              const icon = labelLower.includes("sale") ? (
+                <IndianRupee className="size-4" />
+              ) : labelLower.includes("order") ? (
+                <ShoppingBag className="size-4" />
+              ) : labelLower.includes("chat") || labelLower.includes("repl") ? (
+                <MessageCircle className="size-4" />
               ) : (
-                <div key={k.label} className="card stat">
-                  {body}
-                </div>
+                <Repeat className="size-4" />
+              );
+              const tone = labelLower.includes("sale")
+                ? "brand"
+                : labelLower.includes("order")
+                ? "info"
+                : labelLower.includes("chat")
+                ? "violet"
+                : "gold";
+
+              return (
+                <Stat
+                  key={k.label}
+                  label={k.label}
+                  value={k.value}
+                  sub={
+                    <div>
+                      <div className={`d ${dl.tone}`}>{dl.text}</div>
+                      <div style={{ marginTop: 8 }}>
+                        <Spark data={k.spark} down={dl.tone === "down"} />
+                      </div>
+                    </div>
+                  }
+                  icon={icon}
+                  tone={tone}
+                  href={k.href}
+                />
               );
             })}
           </div>

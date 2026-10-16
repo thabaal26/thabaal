@@ -13,6 +13,8 @@ import { orderRef, type OrderItem } from "@/lib/order-ref";
 import { createOrder } from "../actions/orders";
 import { OrderCard, type OrderCardData } from "./order-card";
 import type { CatalogProductOption } from "./order-items-editor";
+import { Clock, Package, PackageCheck, ShoppingBag } from "@/components/icons";
+import { Stat } from "@/components/ui";
 import {
   downloadOrdersCsv,
   downloadOrdersExcel,
@@ -314,6 +316,7 @@ export function OrdersView({
       <div className="tabs" data-tabs role="tablist">
         <button
           type="button"
+          role="tab"
           data-tab="orders"
           data-ta="ஆர்டர்கள்"
           aria-selected={activeTab === "orders"}
@@ -323,6 +326,7 @@ export function OrdersView({
         </button>
         <button
           type="button"
+          role="tab"
           data-tab="pack"
           data-ta="பேக்கிங்"
           aria-selected={activeTab === "pack"}
@@ -337,26 +341,41 @@ export function OrdersView({
         <section data-panel="orders">
           {/* Top KPI 4-Card Strip */}
           <div className="grid g4 keep2" id="ok" style={{ marginBottom: 18, gap: 16 }}>
-            <div className="card stat" style={{ cursor: "pointer", transition: "transform 0.15s ease, border-color 0.15s ease" }} onClick={() => setShow("new")}>
-              <div className="l">New orders</div>
-              <div className="v">{newCount}</div>
-              <div className="d muted" style={{ minHeight: "1.25em" }}>{hasConfirm ? "Confirm these first" : "Take payment"}</div>
-            </div>
-            <div className="card stat" style={{ cursor: "pointer", transition: "transform 0.15s ease, border-color 0.15s ease" }} onClick={() => { setShow("all"); setPayFilter("none"); }}>
-              <div className="l">Payment waiting</div>
-              <div className="v">{inr(waitingSum)}</div>
-              <div className="d muted" style={{ minHeight: "1.25em" }}>Not received yet</div>
-            </div>
-            <div className="card stat" style={{ cursor: "pointer", transition: "transform 0.15s ease, border-color 0.15s ease" }} onClick={() => setActiveTab("pack")}>
-              <div className="l">{hasPack ? "To pack" : "To finish"}</div>
-              <div className="v">{toPackCount}</div>
-              <div className="d muted" style={{ minHeight: "1.25em" }}>Paid or COD</div>
-            </div>
-            <div className="card stat" style={{ cursor: "pointer", transition: "transform 0.15s ease, border-color 0.15s ease" }} onClick={() => setShow("dispatched")}>
-              <div className="l">{hasDispatch ? "Dispatched" : "Finished today"}</div>
-              <div className="v">{dispatchedCount}</div>
-              <div className="d muted" style={{ minHeight: "1.25em" }}>{hasDispatch ? "Out for delivery" : "Completed today"}</div>
-            </div>
+            <Stat
+              label="New orders"
+              value={newCount}
+              sub={hasConfirm ? "Confirm these first" : "Take payment"}
+              icon={<ShoppingBag className="size-4" />}
+              tone="brand"
+              onClick={() => setShow("new")}
+            />
+            <Stat
+              label="Payment waiting"
+              value={inr(waitingSum)}
+              sub="Not received yet"
+              icon={<Clock className="size-4" />}
+              tone="amber"
+              onClick={() => {
+                setShow("all");
+                setPayFilter("none");
+              }}
+            />
+            <Stat
+              label={hasPack ? "To pack" : "To finish"}
+              value={toPackCount}
+              sub="Paid or COD"
+              icon={<Package className="size-4" />}
+              tone="info"
+              onClick={() => setActiveTab("pack")}
+            />
+            <Stat
+              label={hasDispatch ? "Dispatched" : "Finished today"}
+              value={dispatchedCount}
+              sub={hasDispatch ? "Out for delivery" : "Completed today"}
+              icon={<PackageCheck className="size-4" />}
+              tone="violet"
+              onClick={() => setShow("dispatched")}
+            />
           </div>
 
           {/* Toolbar */}

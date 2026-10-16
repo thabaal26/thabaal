@@ -2,7 +2,8 @@
 
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Search } from "@/components/icons";
+import { CheckCircle2, Search, Sparkles, Trophy, Users } from "@/components/icons";
+import { Stat } from "@/components/ui";
 import Link from "@/components/intent-link";
 import { toastResult } from "@/components/toast";
 import type { CustomerRow, Status, Tier } from "@/lib/customers-data";
@@ -295,26 +296,35 @@ export function LoyaltyPanel({ rows, canManage }: { rows: CustomerRow[]; canMana
   return (
     <>
       <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
-        <div className="card stat">
-          <div className="l">Points with customers</div>
-          <div className="v">{total.toLocaleString("en-IN")}</div>
-          <div className="d muted">You owe about {inr(worth)}</div>
-        </div>
-        <div className="card stat">
-          <div className="l">Ready to redeem</div>
-          <div className="v">{ready.length}</div>
-          <div className="d muted">Have 50 points or more</div>
-        </div>
-        <div className="card stat">
-          <div className="l">Customers earning</div>
-          <div className="v">{members.filter((m) => m.points > 0).length}</div>
-          <div className="d muted">Of {rows.length} on your list</div>
-        </div>
-        <div className="card stat">
-          <div className="l">Top balance</div>
-          <div className="v">{(members[0]?.points ?? 0).toLocaleString("en-IN")}</div>
-          <div className="d muted">{members[0]?.name ?? "Nobody yet"}</div>
-        </div>
+        <Stat
+          label="Points with customers"
+          value={total.toLocaleString("en-IN")}
+          sub={`You owe about ${inr(worth)}`}
+          icon={<Sparkles className="size-4" />}
+          tone="gold"
+        />
+        <Stat
+          label="Ready to redeem"
+          value={ready.length}
+          sub="Have 50 points or more"
+          icon={<CheckCircle2 className="size-4" />}
+          tone="brand"
+          meter={members.length > 0 ? Math.round((ready.length / members.length) * 100) : 0}
+        />
+        <Stat
+          label="Customers earning"
+          value={members.filter((m) => m.points > 0).length}
+          sub={`Of ${rows.length} on your list`}
+          icon={<Users className="size-4" />}
+          tone="info"
+        />
+        <Stat
+          label="Top balance"
+          value={(members[0]?.points ?? 0).toLocaleString("en-IN")}
+          sub={members[0]?.name ?? "Nobody yet"}
+          icon={<Trophy className="size-4" />}
+          tone="violet"
+        />
       </div>
 
       <div style={{ marginBottom: 16 }}>

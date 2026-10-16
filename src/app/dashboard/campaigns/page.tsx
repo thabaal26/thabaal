@@ -108,8 +108,10 @@ export default async function CampaignsPage() {
       const last = c.runs[0];
       const templateButtons: string[] = [];
       if (Array.isArray(c.template.buttons)) {
-        for (const b of c.template.buttons as any[]) {
-          if (b && typeof b.text === "string") templateButtons.push(b.text);
+        for (const b of c.template.buttons as unknown[]) {
+          if (b && typeof b === "object" && "text" in b && typeof b.text === "string") {
+            templateButtons.push(b.text);
+          }
         }
       }
 

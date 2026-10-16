@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { AlertCircle, ArrowUpRight, Clock, IndianRupee, Repeat, ShoppingBag, Users } from "@/components/icons";
 import Link from "@/components/intent-link";
 import { PageTools } from "@/components/shell-tools";
 import { LangButton, useLang } from "../portal-ui";
@@ -149,11 +150,11 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
   const okv = r >= 3;
 
   const k = [
-    [tr("WhatsApp cost", "வாட்ஸ்அப் கட்டணம்"), R(d.cost), tr("Meta message charges", "மெட்டா மெசேஜ் கட்டணம்")],
-    [tr("Paid sales", "செலுத்தப்பட்ட விற்பனை"), R(d.sales), tr("From customers you messaged", "மெசேஜ் அனுப்பிய வாடிக்கையாளர்களிடமிருந்து")],
-    [tr("Money waiting", "நிலுவை பணம்"), R(d.wait), tr("Ordered, not yet paid", "ஆர்டர் செய்யப்பட்டது, பணம் செலுத்தப்படவில்லை")],
-    [tr("Return per ₹1", "ரூ.1-க்கு வருமானம்"), R(r), tr("Sales, not profit", "விற்பனை, லாபம் அல்ல")],
-  ];
+    [tr("WhatsApp cost", "வாட்ஸ்அப் கட்டணம்"), R(d.cost), tr("Meta message charges", "மெட்டா மெசேஜ் கட்டணம்"), <IndianRupee key="c" className="size-4" />],
+    [tr("Paid sales", "செலுத்தப்பட்ட விற்பனை"), R(d.sales), tr("From customers you messaged", "மெசேஜ் அனுப்பிய வாடிக்கையாளர்களிடமிருந்து"), <ShoppingBag key="s" className="size-4" />],
+    [tr("Money waiting", "நிலுவை பணம்"), R(d.wait), tr("Ordered, not yet paid", "ஆர்டர் செய்யப்பட்டது, பணம் செலுத்தப்படவில்லை"), <Clock key="w" className="size-4" />],
+    [tr("Return per ₹1", "ரூ.1-க்கு வருமானம்"), R(r), tr("Sales, not profit", "விற்பனை, லாபம் அல்ல"), <ArrowUpRight key="r" className="size-4" />],
+  ] as const;
 
   const J = [
     ["Messages sent", d.sent, "Customers you chose"],
@@ -247,7 +248,10 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
       <div className="grid g4 keep2" id="rk" style={{ marginBottom: 16 }}>
         {k.map((x) => (
           <div key={x[0]} className="card stat">
-            <div className="l">{x[0]}</div>
+            <div className="l">
+              <span>{x[0]}</span>
+              {x[3]}
+            </div>
             <div className="v">{x[1]}</div>
             <div className="d muted">{x[2]}</div>
           </div>
@@ -613,30 +617,38 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
               Based on when your customers read and replied.
             </p>
             <div className="list">
-              {data.campaigns.bestTimes.map((bt) => (
-                <div key={bt.slot} className="row">
-                  <div className="grow">{bt.slot}</div>
-                  <span className={`pill ${bt.badgeType}`}>{bt.badge}</span>
-                </div>
-              ))}
+              {data.campaigns.bestTimes.length ? (
+                data.campaigns.bestTimes.map((bt) => (
+                  <div key={bt.slot} className="row">
+                    <div className="grow">{bt.slot}</div>
+                    <span className={`pill ${bt.badgeType}`}>{bt.badge}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="muted small">Not enough customer reply activity yet.</p>
+              )}
             </div>
           </div>
 
           <div className="card">
             <h2 style={{ marginBottom: 10 }}>What to repeat</h2>
             <div className="list">
-              {data.campaigns.whatToRepeat.map((rpt, idx) => (
-                <div key={idx} className="row">
-                  <div className="grow">{rpt.title}</div>
-                  {rpt.isPill ? (
-                    <span className={`pill ${rpt.pillType || "bad"}`}>{rpt.actionText}</span>
-                  ) : (
-                    <Link className="btn sm" href={rpt.actionHref || "/dashboard/campaigns/new"}>
-                      {rpt.actionText}
-                    </Link>
-                  )}
-                </div>
-              ))}
+              {data.campaigns.whatToRepeat.length ? (
+                data.campaigns.whatToRepeat.map((rpt, idx) => (
+                  <div key={idx} className="row">
+                    <div className="grow">{rpt.title}</div>
+                    {rpt.isPill ? (
+                      <span className={`pill ${rpt.pillType || "bad"}`}>{rpt.actionText}</span>
+                    ) : (
+                      <Link className="btn sm" href={rpt.actionHref || "/dashboard/campaigns/new"}>
+                        {rpt.actionText}
+                      </Link>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p className="muted small">Run your first broadcast campaign to see performance insights.</p>
+              )}
             </div>
           </div>
         </div>
@@ -646,21 +658,33 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
       <section data-panel="cust" hidden={tab !== "cust"}>
         <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
           <div className="card stat">
-            <div className="l">Bought this month</div>
+            <div className="l">
+              <span>Bought this month</span>
+              <ShoppingBag className="size-4" />
+            </div>
             <div className="v">{data.customers.boughtThisMonth.toLocaleString("en-IN")}</div>
             <div className="d up">{data.customers.boughtDiff}</div>
           </div>
           <div className="card stat">
-            <div className="l">New customers</div>
+            <div className="l">
+              <span>New customers</span>
+              <Users className="size-4" />
+            </div>
             <div className="v">{data.customers.newCustomers.toLocaleString("en-IN")}</div>
           </div>
           <div className="card stat">
-            <div className="l">Came back</div>
+            <div className="l">
+              <span>Came back</span>
+              <Repeat className="size-4" />
+            </div>
             <div className="v">{data.customers.cameBack.toLocaleString("en-IN")}</div>
             <div className="d muted">{data.customers.repeatRatioLabel}</div>
           </div>
           <div className="card stat">
-            <div className="l">Have not bought in 60 days</div>
+            <div className="l">
+              <span>Have not bought in 60 days</span>
+              <AlertCircle className="size-4" />
+            </div>
             <div className="v">{data.customers.lapsed60Days.toLocaleString("en-IN")}</div>
           </div>
         </div>
@@ -770,17 +794,21 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
           <div className="card">
             <h2 style={{ marginBottom: 10 }}>Worth promoting</h2>
             <div className="list">
-              {data.products.worthPromoting.map((wp, idx) => (
-                <div key={idx} className="row">
-                  <div className="grow">
-                    <div className="t">{wp.title}</div>
-                    <div className="muted small">{wp.desc}</div>
+              {data.products.worthPromoting.length ? (
+                data.products.worthPromoting.map((wp, idx) => (
+                  <div key={idx} className="row">
+                    <div className="grow">
+                      <div className="t">{wp.title}</div>
+                      <div className="muted small">{wp.desc}</div>
+                    </div>
+                    <Link className={`btn sm ${wp.primary ? "primary" : ""}`} href={wp.actionHref}>
+                      {wp.actionText}
+                    </Link>
                   </div>
-                  <Link className={`btn sm ${wp.primary ? "primary" : ""}`} href={wp.actionHref}>
-                    {wp.actionText}
-                  </Link>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="muted small">Add products to your catalogue to get promotional recommendations.</p>
+              )}
             </div>
           </div>
         </div>

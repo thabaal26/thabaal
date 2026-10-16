@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useTransition } from "react";
 import Link from "@/components/intent-link";
-import { Plus } from "@/components/icons";
+import { ArrowUpRight, IndianRupee, Plus, Send, ShoppingBag } from "@/components/icons";
+import { Stat } from "@/components/ui";
 import { PortalPage, T } from "../portal-ui";
 import { deleteCampaign, duplicateCampaign, toggleCampaign } from "../actions/campaigns";
 import { useRouter } from "next/navigation";
@@ -101,10 +102,12 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
   const [pvModal, setPvModal] = useState<CampaignItem | null>(null);
   const [, startTransition] = useTransition();
 
-  // Keep state updated when server revalidates
-  useEffect(() => {
+  // Keep state updated when server revalidates (React-recommended state adjustment during render)
+  const [prevInitial, setPrevInitial] = useState(initialCampaigns);
+  if (initialCampaigns !== prevInitial) {
+    setPrevInitial(initialCampaigns);
     setItems(initialCampaigns);
-  }, [initialCampaigns]);
+  }
 
   // Sync tab with URL hash on mount & hash change
   useEffect(() => {
@@ -121,7 +124,9 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
 
   const switchTab = (t: TabId) => {
     setTab(t);
-    window.location.hash = t;
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", `#${t}`);
+    }
   };
 
   const showToast = (msg: string) => {
@@ -267,25 +272,34 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
     >
       {/* 4-KPI Stat Strip */}
       <div className="grid g4 keep2" suppressHydrationWarning style={{ marginBottom: 16 }}>
-        <div className="card stat" suppressHydrationWarning>
-          <div className="l">Sent this month</div>
-          <div className="v">{kpi.sent.toLocaleString("en-IN")}</div>
-        </div>
-        <div className="card stat" suppressHydrationWarning>
-          <div className="l">Money spent</div>
-          <div className="v">{R(kpi.spent)}</div>
-          <div className="d muted">Meta message charges</div>
-        </div>
-        <div className="card stat" suppressHydrationWarning>
-          <div className="l">Sales from campaigns</div>
-          <div className="v">{R(kpi.sales)}</div>
-          <div className="d muted">Paid orders</div>
-        </div>
-        <div className="card stat" suppressHydrationWarning>
-          <div className="l">Back for every ₹1</div>
-          <div className="v">{kpi.spent > 0 ? R(kpi.back) : "—"}</div>
-          <div className="d muted">Sales, not profit</div>
-        </div>
+        <Stat
+          label="Sent this month"
+          value={kpi.sent.toLocaleString("en-IN")}
+          sub="Broadcast messages"
+          icon={<Send className="size-4" />}
+          tone="info"
+        />
+        <Stat
+          label="Money spent"
+          value={R(kpi.spent)}
+          sub="Meta message charges"
+          icon={<IndianRupee className="size-4" />}
+          tone="amber"
+        />
+        <Stat
+          label="Sales from campaigns"
+          value={R(kpi.sales)}
+          sub="Paid orders"
+          icon={<ShoppingBag className="size-4" />}
+          tone="brand"
+        />
+        <Stat
+          label="Back for every ₹1"
+          value={kpi.spent > 0 ? R(kpi.back) : "—"}
+          sub="Sales, not profit"
+          icon={<ArrowUpRight className="size-4" />}
+          tone="violet"
+        />
       </div>
 
       {/* Tabs */}

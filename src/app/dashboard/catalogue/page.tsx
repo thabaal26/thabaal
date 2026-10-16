@@ -1,6 +1,6 @@
-import { ExternalLink } from "@/components/icons";
+import { AlertCircle, CheckCircle2, Clock, ExternalLink, Package } from "@/components/icons";
 import type { Metadata } from "next";
-import { PickClientNotice } from "@/components/ui";
+import { PickClientNotice, Stat } from "@/components/ui";
 import { getCatalogWithProducts } from "@/lib/catalog";
 import { getCatalogDemandSummary } from "@/lib/catalog-demand";
 import { db } from "@/lib/db";
@@ -86,23 +86,35 @@ export default async function CataloguePage({ searchParams }: PageProps<"/dashbo
       ) : (
         <>
           <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
-            <div className="card stat">
-              <div className="l">Products</div>
-              <div className="v">{fmtNumber(total)}</div>
-            </div>
-            <div className="card stat">
-              <div className="l">In stock</div>
-              <div className="v">{fmtNumber(inStock)}</div>
-            </div>
-            <div className="card stat">
-              <div className="l">Out of stock</div>
-              <div className="v">{fmtNumber(outOfStock)}</div>
-            </div>
-            <div className="card stat">
-              <div className="l">Waiting for Meta</div>
-              <div className="v">{fmtNumber(pending)}</div>
-              <div className="d muted">Not in WhatsApp yet</div>
-            </div>
+            <Stat
+              label="Products"
+              value={fmtNumber(total)}
+              sub="In the catalogue"
+              icon={<Package className="size-4" />}
+              tone="info"
+            />
+            <Stat
+              label="In stock"
+              value={fmtNumber(inStock)}
+              sub="Customers can order these"
+              icon={<CheckCircle2 className="size-4" />}
+              tone="brand"
+              meter={total > 0 ? Math.round((inStock / total) * 100) : 0}
+            />
+            <Stat
+              label="Out of stock"
+              value={fmtNumber(outOfStock)}
+              sub="Hidden from new orders"
+              icon={<AlertCircle className="size-4" />}
+              tone={outOfStock > 0 ? "amber" : "gold"}
+            />
+            <Stat
+              label="Waiting for Meta"
+              value={fmtNumber(pending)}
+              sub="Not in WhatsApp yet"
+              icon={<Clock className="size-4" />}
+              tone={pending > 0 ? "amber" : "brand"}
+            />
           </div>
           {isLive && (
             <div className="row" style={{ marginBottom: 14, padding: "10px 14px", background: "var(--soft)", borderRadius: 12 }}>

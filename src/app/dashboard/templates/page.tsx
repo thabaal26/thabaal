@@ -1,6 +1,7 @@
-import { Plus, RefreshCw, Search } from "@/components/icons";
+import { CheckCircle2, Clock, FileText, Megaphone, Plus, RefreshCw, Search } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
+import { Stat } from "@/components/ui";
 import { WhatsAppBubble } from "@/components/whatsapp-preview";
 import { DefaultImage } from "./default-image";
 import { db } from "@/lib/db";
@@ -83,25 +84,37 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
   return (
     <PortalPage title="Templates" titleTa="டெம்ப்ளேட்" sub="Meta-approved messages you can send. Marketing, Utility and Authentication." subTa="நீங்கள் அனுப்பக்கூடிய மெட்டா அங்கீகரித்த செய்திகள்.">
       <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
-        <div className="card stat">
-          <div className="l">Templates</div>
-          <div className="v">{fmtNumber(total)}</div>
-        </div>
-        <div className="card stat">
-          <div className="l">Approved</div>
-          <div className="v">{fmtNumber(byStatus("APPROVED"))}</div>
-          <div className="d muted">Ready to send</div>
-        </div>
-        <div className="card stat">
-          <div className="l">Waiting on Meta</div>
-          <div className="v">{fmtNumber(byStatus("PENDING"))}</div>
-          <div className="d muted">{byStatus("DRAFT") ? `${byStatus("DRAFT")} draft${byStatus("DRAFT") === 1 ? "" : "s"} too` : ""}</div>
-        </div>
-        <div className="card stat">
-          <div className="l">Need fixing</div>
-          <div className="v">{fmtNumber(byStatus("REJECTED", "PAUSED", "DISABLED"))}</div>
-          <div className="d muted">Rejected or paused by Meta</div>
-        </div>
+        <Stat
+          label="Total templates"
+          value={fmtNumber(total)}
+          sub="Synced with Meta"
+          icon={<FileText className="size-4" />}
+          tone="info"
+          href="/dashboard/templates"
+        />
+        <Stat
+          label="Approved"
+          value={fmtNumber(byStatus("APPROVED"))}
+          sub="Ready to send"
+          icon={<CheckCircle2 className="size-4" />}
+          tone="brand"
+          meter={total > 0 ? Math.round((byStatus("APPROVED") / total) * 100) : 0}
+        />
+        <Stat
+          label="Marketing"
+          value={fmtNumber(counts.find((c) => c.category === "MARKETING")?._count ?? 0)}
+          sub="Promotions & offers"
+          icon={<Megaphone className="size-4" />}
+          tone="violet"
+          href={qsFor({ category: "MARKETING" })}
+        />
+        <Stat
+          label="In review / Draft"
+          value={fmtNumber(byStatus("PENDING", "DRAFT"))}
+          sub={byStatus("REJECTED", "PAUSED", "DISABLED") > 0 ? `${byStatus("REJECTED", "PAUSED", "DISABLED")} need fixing` : "Waiting on Meta"}
+          icon={<Clock className="size-4" />}
+          tone="amber"
+        />
       </div>
 
       <p className="muted" style={{ marginBottom: 12 }}>

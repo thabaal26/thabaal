@@ -1,6 +1,7 @@
+import { AlertCircle, CheckCircle2, MapPin, Users } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
-import { PickClientNotice } from "@/components/ui";
+import { PickClientNotice, Stat } from "@/components/ui";
 import { readFields } from "@/lib/custom-fields";
 import { customersData, type CustomerRow } from "@/lib/customers-data";
 import { db } from "@/lib/db";
@@ -181,23 +182,35 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
       <>
         {scope.canManage && pendingRows.length > 0 && <PendingCustomersBanner rows={pendingRows} />}
         <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
-          <div className="card stat">
-            <div className="l">Customers</div>
-            <div className="v">{total.toLocaleString("en-IN")}</div>
-          </div>
-          <div className="card stat">
-            <div className="l">Can receive WhatsApp</div>
-            <div className="v">{(total - optedOut).toLocaleString("en-IN")}</div>
-          </div>
-          <div className="card stat">
-            <div className="l">Opted out</div>
-            <div className="v">{optedOut.toLocaleString("en-IN")}</div>
-          </div>
-          <div className="card stat">
-            <div className="l">{home}</div>
-            <div className="v">{atHome.toLocaleString("en-IN")}</div>
-            <div className="d muted">{(total - atHome).toLocaleString("en-IN")} elsewhere or not noted</div>
-          </div>
+          <Stat
+            label="Customers"
+            value={total.toLocaleString("en-IN")}
+            sub={`${(total - optedOut).toLocaleString("en-IN")} reachable`}
+            icon={<Users className="size-4" />}
+            tone="info"
+          />
+          <Stat
+            label="Can receive WhatsApp"
+            value={(total - optedOut).toLocaleString("en-IN")}
+            sub="Opted in for campaigns"
+            icon={<CheckCircle2 className="size-4" />}
+            tone="brand"
+            meter={total > 0 ? Math.round(((total - optedOut) / total) * 100) : 0}
+          />
+          <Stat
+            label="Opted out"
+            value={optedOut.toLocaleString("en-IN")}
+            sub="Replied STOP or unreachable"
+            icon={<AlertCircle className="size-4" />}
+            tone={optedOut > 0 ? "amber" : "gold"}
+          />
+          <Stat
+            label={home}
+            value={atHome.toLocaleString("en-IN")}
+            sub={`${(total - atHome).toLocaleString("en-IN")} elsewhere`}
+            icon={<MapPin className="size-4" />}
+            tone="violet"
+          />
         </div>
         {badPhones > 0 && (
           <div className="note" style={{ marginBottom: 14 }}>

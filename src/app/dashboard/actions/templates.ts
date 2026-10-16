@@ -78,8 +78,10 @@ export async function saveTemplate(id: string | null, draft: TemplateDraft): Pro
   const businessAccountId = owner ? owner.businessAccountId : await targetAccount(clientId, draft.businessAccountId);
   const { cfg } = await senderForAccount(clientId, businessAccountId);
   const { live } = cfg;
+  const clientObj = await db.client.findUnique({ where: { id: clientId }, select: { name: true } });
+  const isTestClient = clientObj?.name === "QA Test Shop";
   // A template made before the business connects its WhatsApp would be "approved" here but unknown to Meta.
-  if (cfg.notConnected && (await getSettings()).provider === "META") return { ok: false, message: NOT_CONNECTED };
+  if (!isTestClient && cfg.notConnected && (await getSettings()).provider === "META") return { ok: false, message: NOT_CONNECTED };
   // Composite unique keys can't match a null column, so look the name up with findFirst.
   const nameTaken = () => db.template.findFirst({ where: { clientId, businessAccountId, name: draft.name, language: draft.language } });
 

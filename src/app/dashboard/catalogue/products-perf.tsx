@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "@/components/intent-link";
+import { CheckCircle2, Clock, IndianRupee } from "@/components/icons";
+import { Stat } from "@/components/ui";
 import type { ProductDemandStats } from "@/lib/catalog-demand";
 import { inr } from "../portal-format";
 import { Chips, Pill, type PillTone } from "../portal-ui";
@@ -55,21 +57,29 @@ export function ProductsPerf({ products, nowMs, paidSales, unpaidCarts, cartToPa
   return (
     <>
       <div className="grid g3 keep2" style={{ marginBottom: 16 }}>
-        <div className="card stat">
-          <div className="l">Paid sales</div>
-          <div className="v">{inr(paidSales)}</div>
-          <div className="d muted">From catalogue products</div>
-        </div>
-        <div className="card stat">
-          <div className="l">Waiting in unpaid carts</div>
-          <div className="v">{inr(unpaidCarts)}</div>
-          <div className="d muted">Still recoverable</div>
-        </div>
-        <div className="card stat">
-          <div className="l">Carts that got paid</div>
-          <div className="v">{Math.round(cartToPaid)}%</div>
-          <div className="d muted">Of carts sent from WhatsApp</div>
-        </div>
+        <Stat
+          label="Paid sales"
+          value={inr(paidSales)}
+          sub="From catalogue products"
+          icon={<IndianRupee className="size-4" />}
+          tone="brand"
+        />
+        <Stat
+          label="Waiting in unpaid carts"
+          value={inr(unpaidCarts)}
+          sub="Still recoverable"
+          icon={<Clock className="size-4" />}
+          tone="amber"
+          href="/dashboard/orders?show=unpaid"
+        />
+        <Stat
+          label="Carts that got paid"
+          value={`${Math.round(cartToPaid)}%`}
+          sub="Of carts sent from WhatsApp"
+          icon={<CheckCircle2 className="size-4" />}
+          tone="info"
+          meter={Math.round(cartToPaid)}
+        />
       </div>
 
       <div className="grid split">

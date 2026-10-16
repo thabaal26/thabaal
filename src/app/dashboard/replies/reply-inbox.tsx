@@ -67,9 +67,15 @@ function formatWindowPill(lastReplyAt: Date | undefined) {
 
 /** Live countdown hook that ticks every 30 seconds for accurate WhatsApp window display. */
 function useWindowCountdown(lastInboundAt: Date | undefined) {
+  const [prevInbound, setPrevInbound] = useState(lastInboundAt);
   const [pill, setPill] = useState(() => formatWindowPill(lastInboundAt));
-  useEffect(() => {
+
+  if (lastInboundAt !== prevInbound) {
+    setPrevInbound(lastInboundAt);
     setPill(formatWindowPill(lastInboundAt));
+  }
+
+  useEffect(() => {
     const timer = setInterval(() => {
       setPill(formatWindowPill(lastInboundAt));
     }, 30000);

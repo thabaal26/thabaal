@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
-import { PickClientNotice } from "@/components/ui";
+import { AlertCircle, Calendar, Clock, Repeat } from "@/components/icons";
+import { PickClientNotice, Stat } from "@/components/ui";
 import { refillForecast } from "@/lib/refill-forecast";
 import { getScope } from "@/lib/session";
 import { CustomersTabs, CUSTOMERS_SUB, CUSTOMERS_SUB_TA } from "../customers/customers-tabs";
@@ -44,26 +45,35 @@ export default async function RefillsPage() {
       )}
 
       <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
-        <div className="card stat">
-          <div className="l">Due this week</div>
-          <div className="v">{week.length}</div>
-          <div className="d muted">about {inr(week.reduce((n, d) => n + d.avgOrder, 0))} in reorders</div>
-        </div>
-        <div className="card stat">
-          <div className="l">Overdue</div>
-          <div className="v">{overdue.length}</div>
-          <div className={`d ${overdue.length ? "down" : "muted"}`}>about {inr(overdue.reduce((n, d) => n + d.avgOrder, 0))} not yet reordered</div>
-        </div>
-        <div className="card stat">
-          <div className="l">Typical reorder</div>
-          <div className="v">{typical} days</div>
-          <div className="d muted">{own.length ? `from ${own.length} repeat buyers` : "default setting"}</div>
-        </div>
-        <Link className="card stat" href="/dashboard/customers?tab=groups" style={{ textDecoration: "none" }}>
-          <div className="l">Lapsed</div>
-          <div className="v">{f.lapsedCount}</div>
-          <div className="d muted">no order in {f.lapsedDays}+ days · win back</div>
-        </Link>
+        <Stat
+          label="Due this week"
+          value={week.length}
+          sub={`about ${inr(week.reduce((n, d) => n + d.avgOrder, 0))} in reorders`}
+          icon={<Calendar className="size-4" />}
+          tone="info"
+        />
+        <Stat
+          label="Overdue"
+          value={overdue.length}
+          sub={`about ${inr(overdue.reduce((n, d) => n + d.avgOrder, 0))} not yet reordered`}
+          icon={<Clock className="size-4" />}
+          tone={overdue.length ? "rose" : "brand"}
+        />
+        <Stat
+          label="Typical reorder"
+          value={`${typical} days`}
+          sub={own.length ? `from ${own.length} repeat buyers` : "default setting"}
+          icon={<Repeat className="size-4" />}
+          tone="brand"
+        />
+        <Stat
+          label="Lapsed"
+          value={f.lapsedCount}
+          sub={`no order in ${f.lapsedDays}+ days · win back`}
+          icon={<AlertCircle className="size-4" />}
+          tone="amber"
+          href="/dashboard/customers?tab=groups"
+        />
       </div>
 
       {f.due.length ? (

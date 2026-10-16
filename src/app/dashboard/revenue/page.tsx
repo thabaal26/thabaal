@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { PickClientNotice } from "@/components/ui";
+import { AlertCircle, Banknote, Clock, IndianRupee } from "@/components/icons";
+import { PickClientNotice, Stat } from "@/components/ui";
 import { db } from "@/lib/db";
 import { fmtDate } from "@/lib/format";
 import { PAYMENT_TEMPLATE, paymentTemplateFor } from "@/lib/payments";
@@ -64,26 +65,38 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
 
   const kpis = (
     <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
-      <div className="card stat">
-        <div className="l">Received today</div>
-        <div className="v">{inr(d.receivedToday)}</div>
-        <div className="d muted">Money in your account</div>
-      </div>
-      <div className="card stat">
-        <div className="l">Money to collect</div>
-        <div className="v">{inr(toCollect)}</div>
-        <div className="d muted">{claimed ? `${claimed} say they paid · check` : "Not paid yet"}</div>
-      </div>
-      <div className="card stat">
-        <div className="l">COD pending</div>
-        <div className="v">{inr(codPending)}</div>
-        <div className="d muted">Collect during delivery</div>
-      </div>
-      <div className="card stat">
-        <div className="l">Failed or expired</div>
-        <div className="v">{failed}</div>
-        <div className={`d ${failed ? "down" : "muted"}`}>{failed ? "Needs your attention" : "Nothing stuck"}</div>
-      </div>
+      <Stat
+        label="Received today"
+        value={inr(d.receivedToday)}
+        sub="Money in your account"
+        icon={<IndianRupee className="size-4" />}
+        tone="brand"
+        href="/dashboard/revenue?tab=got"
+      />
+      <Stat
+        label="Money to collect"
+        value={inr(toCollect)}
+        sub={claimed ? `${claimed} say they paid · check` : "Not paid yet"}
+        icon={<Clock className="size-4" />}
+        tone="amber"
+        href="/dashboard/revenue?tab=collect"
+      />
+      <Stat
+        label="COD pending"
+        value={inr(codPending)}
+        sub="Collect during delivery"
+        icon={<Banknote className="size-4" />}
+        tone="info"
+        href="/dashboard/revenue?tab=cod"
+      />
+      <Stat
+        label="Failed or expired"
+        value={failed}
+        sub={failed ? "Needs your attention" : "Nothing stuck"}
+        icon={<AlertCircle className="size-4" />}
+        tone={failed ? "rose" : "brand"}
+        href="/dashboard/revenue?tab=collect"
+      />
     </div>
   );
 

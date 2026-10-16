@@ -158,14 +158,16 @@ export function CardHeader({
   icon?: ReactNode;
 }) {
   void tone;
-  void icon;
   return (
     <div
       className="relative flex flex-wrap items-start justify-between gap-x-2.5 gap-y-1.5 px-4 pb-1 pt-4 sm:flex-nowrap sm:gap-4 sm:px-5 sm:pt-5"
     >
       <div className={cn("flex min-w-0 flex-1 basis-36 gap-2.5 sm:basis-40 sm:gap-3", description ? "items-start" : "items-center")}>
-        {/* The portal design's card headers carry no icon; `icon` is accepted and left out. */}
-        {/* flex-1: the title's box doesn't change size when a description streams in later. */}
+        {icon && (
+          <span aria-hidden className="shrink-0 text-muted mt-0.5 [&_svg]:size-[18px] sm:[&_svg]:size-5 [&_svg]:stroke-[1.8] flex items-center justify-center">
+            {icon}
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <H className="font-display text-[17px] font-semibold leading-snug tracking-[-0.2px] text-ink sm:text-[19px]">{title}</H>
           {description && <p className="mt-0.5 text-[13px] leading-snug text-muted sm:text-[14px]">{description}</p>}
@@ -680,6 +682,9 @@ export function Stat({
   href,
   tone = "brand",
   meter,
+  onClick,
+  className,
+  id,
 }: {
   label: string;
   value: ReactNode;
@@ -688,15 +693,21 @@ export function Stat({
   href?: string;
   tone?: HeaderTone;
   meter?: number;
+  onClick?: () => void;
+  className?: string;
+  id?: string;
 }) {
-  void icon;
   const body = (
     <>
       <div className="flex items-center justify-between gap-1.5 sm:gap-2">
         <span className="min-w-0 truncate text-[11.5px] font-medium text-muted sm:text-[13.5px]">
           {label}
         </span>
-        {/* The design's stat tiles have no icon. */}
+        {icon && (
+          <span aria-hidden className="shrink-0 text-muted [&_svg]:size-4 sm:[&_svg]:size-[18px] [&_svg]:stroke-2">
+            {icon}
+          </span>
+        )}
       </div>
       <div className="tabular mt-0.5 sm:mt-1 font-display font-semibold text-xl sm:text-[26px] lg:text-[28px] leading-tight tracking-[-0.2px] text-ink truncate">{value}</div>
       {meter !== undefined && <Meter raised value={meter} tone={tone === "amber" || tone === "rose" ? "warning" : "brand"} className="mt-1.5 sm:mt-2.5" />}
@@ -705,11 +716,15 @@ export function Stat({
   );
   const cardCls = "relative flex h-full min-w-0 flex-col justify-between rounded-[14px] sm:rounded-[18px] border-[1.5px] border-line bg-panel p-3 sm:p-5 shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)] dark:shadow-[0_14px_30px_-22px_rgba(0,0,0,.7)] transition";
   return href ? (
-    <Link href={href} className={cn(cardCls, "hover:border-ink active:scale-[0.99]")}>
+    <Link href={href} id={id} className={cn(cardCls, "hover:border-ink active:scale-[0.99]", className)}>
       {body}
     </Link>
+  ) : onClick ? (
+    <button type="button" id={id} onClick={onClick} className={cn(cardCls, "w-full text-left hover:border-ink active:scale-[0.99] cursor-pointer", className)}>
+      {body}
+    </button>
   ) : (
-    <div className={cardCls}>
+    <div id={id} className={cn(cardCls, className)}>
       {body}
     </div>
   );

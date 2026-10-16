@@ -173,8 +173,9 @@ export function OrderCard({
   }
 
   // Late detection
+  const [mountedNow] = useState(() => Date.now());
   const createdAtMs = new Date(o.createdAt).getTime();
-  const hoursAgo = (Date.now() - createdAtMs) / (1000 * 60 * 60);
+  const hoursAgo = (mountedNow - createdAtMs) / (1000 * 60 * 60);
   const isLate = !isPaid && !isCod && o.status !== "CANCELLED" && hoursAgo > 24;
   const lateDays = Math.floor(hoursAgo / 24);
   const lateText = lateDays > 1 ? `${lateDays} days` : "1 day";
