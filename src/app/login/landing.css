@@ -7,7 +7,7 @@
   --shadow: 0 1px 2px rgb(6 37 72 / .06), 0 10px 30px -12px rgb(6 37 72 / .18);
   background: var(--bg);
   color: var(--fg);
-  font-family: var(--font-nunito), "Nunito", var(--font-tamil), ui-rounded, system-ui, sans-serif;
+  font-family: var(--font-dm-sans), "DM Sans", var(--font-tamil), ui-rounded, system-ui, sans-serif;
   transition: background 1s var(--ease), color 1s var(--ease);
 }
 [data-theme="night"] .tl {

@@ -50,7 +50,7 @@
   width: 15%; aspect-ratio: 1; border-radius: 50% 50% 50% 8%;
   background: #fff; color: #062548; border: 3px solid #062548;
   display: grid; place-items: center;
-  font: 900 clamp(14px, 3.4cqw, 30px) / 1 var(--font-nunito), system-ui, sans-serif;
+  font: 900 clamp(14px, 3.4cqw, 30px) / 1 var(--font-dm-sans), "DM Sans", system-ui, sans-serif;
   opacity: 0; transform: scale(.3) rotate(-20deg); transform-origin: 0 100%;
 }
 

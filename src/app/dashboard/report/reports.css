@@ -1,5 +1,5 @@
 /* Exact CSS for Reports section based on reports.html */
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fredoka:wght@500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap");
 
 .thabaal-reports {
   --bg: #FFF9F0;
@@ -23,8 +23,8 @@
   --bar3: #F46B4E;
   --bar4: #20C985;
   --shadow: 0 1px 0 rgba(16, 40, 59, 0.04), 0 14px 30px -22px rgba(16, 40, 59, 0.35);
-  --display: "Fredoka", "Noto Sans Tamil", ui-rounded, system-ui, sans-serif;
-  --ui: "DM Sans", "Noto Sans Tamil", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display: var(--font-dm-sans), "DM Sans", "Noto Sans Tamil", ui-rounded, system-ui, sans-serif;
+  --ui: var(--font-dm-sans), "DM Sans", "Noto Sans Tamil", system-ui, -apple-system, "Segoe UI", sans-serif;
 
   min-width: 0;
   color: var(--fg);

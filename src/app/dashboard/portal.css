@@ -5,7 +5,7 @@
   --ok:#086842; --ok-bg:rgba(32,201,133,.16); --warn:#8A5A00; --warn-bg:rgba(255,195,41,.28); --bad:#B73822; --bad-bg:rgba(244,107,78,.16);
   --info:#2B5C86; --info-bg:rgba(43,92,134,.12); --bar:#10283B; --bar2:#FFC329; --bar3:#F46B4E; --bar4:#20C985;
   --shadow:0 1px 0 rgba(16,40,59,.04),0 14px 30px -22px rgba(16,40,59,.35);
-  --display:"Fredoka","Noto Sans Tamil",ui-rounded,system-ui,sans-serif; --ui:"DM Sans","Noto Sans Tamil",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --display:var(--font-dm-sans),"DM Sans","Noto Sans Tamil",ui-rounded,system-ui,sans-serif; --ui:var(--font-dm-sans),"DM Sans","Noto Sans Tamil",system-ui,-apple-system,"Segoe UI",sans-serif;
 }
 html.dark .thabaal-portal{
   --bg:#0B1E2D; --card:#133248; --fg:#FFF9F0; --muted:#A8BACA; --line:#27465C; --soft:#1B3B52; --ink:#FFF9F0;

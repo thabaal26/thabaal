@@ -68,7 +68,7 @@
 }
 
 .thabaal-scroll-pill-text {
-  font-family: var(--font-nunito), system-ui, sans-serif;
+  font-family: var(--font-dm-sans), "DM Sans", system-ui, sans-serif;
   font-size: 13.5px;
   font-weight: 800;
   color: #062548;
