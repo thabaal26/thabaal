@@ -2,20 +2,125 @@
 
 import { useState } from "react";
 import Link from "@/components/intent-link";
-import { cn } from "@/lib/cn";
-import { buttonClass } from "@/components/ui";
-import { ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Copy, ExternalLink, Printer, Send, Sparkles, TriangleAlert } from "@/components/icons";
+import { Send, Copy, Printer } from "@/components/icons";
 import type { ComprehensiveReportData, PeriodFigures, PeriodKey } from "@/lib/reports-data";
+import "./reports.css";
+
+function R(n: number) {
+  return "₹" + Math.round(n).toLocaleString("en-IN");
+}
+
+function ReportBars({
+  labels,
+  series,
+  fmt = (v: number) => String(v),
+  label = "Chart",
+  stacked = true,
+}: {
+  labels: string[];
+  series: { name: string; color: string; vals: number[] }[];
+  fmt?: (v: number) => string;
+  label?: string;
+  stacked?: boolean;
+}) {
+  const W = 640;
+  const H = 220;
+  const pl = 44;
+  const pb = 26;
+  const pt = 10;
+  const iw = W - pl - 6;
+  const ih = H - pb - pt;
+  const n = labels.length;
+
+  const tot = labels.map((_, i) => series.reduce((a, s) => a + (s.vals[i] || 0), 0));
+  let mx = Math.max(...(stacked === false ? series.flatMap((s) => s.vals) : tot)) || 1;
+  const step = Math.pow(10, Math.floor(Math.log(mx) / Math.LN10));
+  mx = Math.ceil(mx / step) * step;
+
+  const gridLines = [];
+  for (let k = 0; k <= 4; k++) {
+    const y = pt + ih - (ih * k) / 4;
+    gridLines.push({
+      y,
+      val: fmt(Math.round((mx * k) / 4)),
+    });
+  }
+
+  const bw = iw / n;
+  const gap = bw * 0.28;
+  const bwid = bw - gap;
+
+  return (
+    <svg className="chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label}>
+      {gridLines.map((g, i) => (
+        <g key={i}>
+          <line x1={pl} x2={W - 6} y1={g.y} y2={g.y} stroke="currentColor" opacity="0.12" />
+          <text x={pl - 8} y={g.y + 4} textAnchor="end">
+            {g.val}
+          </text>
+        </g>
+      ))}
+      {labels.map((lb, i) => {
+        const x = pl + i * bw + gap / 2;
+        let acc = 0;
+        return (
+          <g key={lb}>
+            {series.map((s, j) => {
+              const val = s.vals[i] || 0;
+              const hh = (ih * val) / mx;
+              if (stacked === false) {
+                const sw = bwid / series.length;
+                return (
+                  <rect
+                    key={s.name}
+                    x={x + j * sw}
+                    y={pt + ih - hh}
+                    width={Math.max(1, sw - 2)}
+                    height={hh}
+                    rx={3}
+                    fill={s.color}
+                  >
+                    <title>{`${s.name}: ${fmt(val)}`}</title>
+                  </rect>
+                );
+              } else {
+                acc += hh;
+                const r = acc === hh ? 3 : 0;
+                return (
+                  <rect
+                    key={s.name}
+                    x={x}
+                    y={pt + ih - acc}
+                    width={bwid}
+                    height={hh}
+                    rx={r}
+                    fill={s.color}
+                  >
+                    <title>{`${lb} · ${s.name}: ${fmt(val)}`}</title>
+                  </rect>
+                );
+              }
+            })}
+            <text x={x + bwid / 2} y={H - 8} textAnchor="middle">
+              {lb}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
 
 export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
-  const [period, setPeriod] = useState<PeriodKey>("m");
+  const [per, setPer] = useState<PeriodKey>("m");
   const [tab, setTab] = useState<"ov" | "camp" | "cust" | "prod">("ov");
-  const [chartMode, setChartMode] = useState<"a" | "b">("a");
+  const [cs, setCs] = useState<"a" | "b">("a");
   const [copied, setCopied] = useState(false);
 
-  const cur: PeriodFigures = period === "m" ? data.overview.m : data.overview.w;
-  const isGood = cur.verdictGood;
-  const isOk = cur.verdictOk;
+  const d: PeriodFigures = per === "m" ? data.overview.m : data.overview.w;
+  const r = d.returnRatio;
+  const good = r >= 10;
+  const okv = r >= 3;
 
   const waShareUrl = `https://wa.me/?text=${encodeURIComponent(data.summaryText)}`;
 
@@ -29,885 +134,641 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
     }
   };
 
+  const k = [
+    ["WhatsApp cost", R(d.cost), "Meta message charges"],
+    ["Paid sales", R(d.sales), "From customers you messaged"],
+    ["Money waiting", R(d.wait), "Ordered, not yet paid"],
+    ["Return per ₹1", R(r), "Sales, not profit"],
+  ];
+
+  const J = [
+    ["Messages sent", d.sent, "Customers you chose"],
+    ["Reached their phone", d.reached, ""],
+    ["Read it", d.read, ""],
+    ["Replied", d.rep, "Within 3 days"],
+    ["Ordered", d.ord, "Within 7 days"],
+    ["Paid", d.paid, "Money in your account"],
+  ] as const;
+
+  const readDiff = Math.max(0, d.read - d.rep);
+  const A = [
+    [`${d.wait > 0 ? "1" : "0"} unpaid order`, R(d.wait), "Send reminder", "/dashboard/orders?show=unpaid"],
+    [`${readDiff} read it, did not order`, "Follow up", "Create campaign", "/dashboard/campaigns/new"],
+    [`${data.customers.followUps[1]?.sub || "Reorder due"}`, "Reach today", "View customers", "/dashboard/refills"],
+  ] as const;
+
+  const { wallet, spend, daily, breakdown, limits } = data.overview;
+
   return (
-    <div className="space-y-4 sm:space-y-6">
-      {/* Top Header Actions (WhatsApp share, Copy, Print) */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3 sm:pb-4">
+    <div className="thabaal-reports">
+      {/* Top Header */}
+      <header className="top">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-ink sm:text-2xl">Reports</h1>
-          <p className="text-xs text-muted sm:text-sm">Is WhatsApp bringing business? One answer, then the reason, then what to do.</p>
+          <h1>Reports</h1>
+          <p className="sub">Is WhatsApp bringing business? One answer, then the reason, then what to do.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="tools">
           <a
+            className="btn sm"
             href={waShareUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className={buttonClass("secondary", "sm")}
             title="Share summary directly on WhatsApp"
           >
-            <Send aria-hidden className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span>Share on WhatsApp</span>
+            <Send aria-hidden className="size-3.5 text-emerald-600 dark:text-emerald-400" /> Share on WhatsApp
           </a>
-          <button
-            type="button"
-            onClick={copySummary}
-            className={buttonClass("secondary", "sm")}
-            title="Copy formatted summary"
-          >
-            <Copy aria-hidden className="size-3.5" />
-            <span>{copied ? "Copied" : "Copy text"}</span>
+          <button type="button" className="btn sm" onClick={copySummary} title="Copy formatted summary">
+            <Copy aria-hidden className="size-3.5" /> {copied ? "Copied" : "Copy text"}
           </button>
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className={buttonClass("secondary", "sm")}
-            title="Print report"
-          >
-            <Printer aria-hidden className="size-3.5" />
-            <span className="hidden sm:inline">Print</span>
+          <button type="button" className="btn sm" onClick={() => window.print()} title="Print report">
+            <Printer aria-hidden className="size-3.5" /> Print
           </button>
         </div>
-      </div>
+      </header>
 
       {/* Top Verdict Card */}
       <div
-        className={cn(
-          "rounded-card border border-line bg-panel p-4 shadow-sm transition-all sm:p-5",
-          "border-l-[6px]",
-          isGood
-            ? "border-l-emerald-600 dark:border-l-emerald-400"
-            : isOk
-            ? "border-l-amber-500 dark:border-l-amber-400"
-            : "border-l-rose-500 dark:border-l-rose-400",
-        )}
+        className="card"
+        style={{
+          marginBottom: 16,
+          borderLeft: `6px solid ${good ? "var(--ok)" : okv ? "var(--bar2)" : "var(--bad)"}`,
+        }}
       >
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="hd" style={{ marginBottom: 6 }}>
           <div>
-            <h2 className="text-lg font-bold text-ink sm:text-xl">{cur.verdictTitle}</h2>
+            <h2 style={{ fontSize: 22 }} id="verd">
+              {good
+                ? `WhatsApp is working well ${per === "m" ? "this month" : "this week"}.`
+                : okv
+                ? `WhatsApp is doing alright ${per === "m" ? "this month" : "this week"}.`
+                : `WhatsApp is not paying back ${per === "m" ? "this month" : "this week"}.`}
+            </h2>
           </div>
-          {/* Period Toggle Switch */}
-          <div className="inline-flex shrink-0 self-start rounded-control border-[1.5px] border-line bg-canvas p-[3px] sm:self-auto">
+          <div className="seg" id="rp">
             <button
               type="button"
-              onClick={() => setPeriod("m")}
-              aria-pressed={period === "m"}
-              className={cn(
-                "inline-flex min-h-[30px] items-center rounded-[8px] px-3 text-xs font-semibold transition-all sm:min-h-[32px] sm:px-3.5 sm:text-[13px]",
-                period === "m"
-                  ? "bg-ink text-canvas shadow-xs -translate-y-px"
-                  : "text-muted hover:text-ink hover:bg-subtle/60",
-              )}
+              data-v="m"
+              aria-pressed={per === "m"}
+              onClick={() => setPer("m")}
             >
               This month
             </button>
             <button
               type="button"
-              onClick={() => setPeriod("w")}
-              aria-pressed={period === "w"}
-              className={cn(
-                "inline-flex min-h-[30px] items-center rounded-[8px] px-3 text-xs font-semibold transition-all sm:min-h-[32px] sm:px-3.5 sm:text-[13px]",
-                period === "w"
-                  ? "bg-ink text-canvas shadow-xs -translate-y-px"
-                  : "text-muted hover:text-ink hover:bg-subtle/60",
-              )}
+              data-v="w"
+              aria-pressed={per === "w"}
+              onClick={() => setPer("w")}
             >
               This week
             </button>
           </div>
         </div>
-        <p className="mt-2.5 text-xs text-ink-2 sm:text-sm">
-          You spent <b className="font-semibold text-ink">₹{Math.round(cur.cost).toLocaleString("en-IN")}</b> on messages and received{" "}
-          <b className="font-semibold text-ink">₹{Math.round(cur.sales).toLocaleString("en-IN")}</b> in paid orders. Every{" "}
-          <b className="font-semibold text-ink">₹1</b> spent brought back{" "}
-          <b className="font-semibold text-ink">₹{cur.returnRatio.toLocaleString("en-IN")}</b> in sales.
+        <p id="verds">
+          You spent <b>{R(d.cost)}</b> on messages and received <b>{R(d.sales)}</b> in paid orders. Every{" "}
+          <b>₹1</b> spent brought back <b>{R(r)}</b> in sales.
         </p>
       </div>
 
-      {/* 4-KPI Stat Strip */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-        <div className="rounded-card border border-line bg-panel p-3.5 shadow-sm sm:p-4">
-          <div className="text-[12px] font-medium text-muted sm:text-xs">WhatsApp cost</div>
-          <div className="tabular mt-1 text-xl font-bold tracking-tight text-ink sm:text-2xl">
-            ₹{Math.round(cur.cost).toLocaleString("en-IN")}
+      {/* 4-KPI Grid */}
+      <div className="grid g4 keep2" id="rk" style={{ marginBottom: 16 }}>
+        {k.map((x, i) => (
+          <div key={x[0]} className="card stat">
+            <div className="l">{x[0]}</div>
+            <div className="v" style={i === 1 || i === 3 ? { color: "var(--ok)" } : undefined}>
+              {x[1]}
+            </div>
+            <div className="d muted">{x[2]}</div>
           </div>
-          <div className="mt-1 text-[11px] text-muted sm:text-xs">Meta message charges</div>
-        </div>
-
-        <div className="rounded-card border border-line bg-panel p-3.5 shadow-sm sm:p-4">
-          <div className="text-[12px] font-medium text-muted sm:text-xs">Paid sales</div>
-          <div className="tabular mt-1 text-xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 sm:text-2xl">
-            ₹{Math.round(cur.sales).toLocaleString("en-IN")}
-          </div>
-          <div className="mt-1 text-[11px] text-muted sm:text-xs">From customers you messaged</div>
-        </div>
-
-        <div className="rounded-card border border-line bg-panel p-3.5 shadow-sm sm:p-4">
-          <div className="text-[12px] font-medium text-muted sm:text-xs">Money waiting</div>
-          <div className="tabular mt-1 text-xl font-bold tracking-tight text-ink sm:text-2xl">
-            ₹{Math.round(cur.wait).toLocaleString("en-IN")}
-          </div>
-          <div className="mt-1 text-[11px] text-muted sm:text-xs">Ordered, not yet paid</div>
-        </div>
-
-        <div className="rounded-card border border-line bg-panel p-3.5 shadow-sm sm:p-4">
-          <div className="text-[12px] font-medium text-muted sm:text-xs">Return per ₹1</div>
-          <div className="tabular mt-1 text-xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 sm:text-2xl">
-            ₹{cur.returnRatio.toLocaleString("en-IN")}
-          </div>
-          <div className="mt-1 text-[11px] text-muted sm:text-xs">Sales, not profit</div>
-        </div>
+        ))}
       </div>
 
-      {/* Main Tabs Navigation */}
-      <div className="border-b border-line">
-        <nav aria-label="Report tabs" className="no-scrollbar -mb-px flex gap-2 overflow-x-auto sm:gap-6">
-          <button
-            type="button"
-            onClick={() => setTab("ov")}
-            aria-selected={tab === "ov"}
-            className={cn(
-              "whitespace-nowrap border-b-2 px-3 py-2.5 text-xs font-semibold transition-all sm:text-sm",
-              tab === "ov"
-                ? "border-brand text-ink"
-                : "border-transparent text-muted hover:border-line hover:text-ink",
-            )}
-          >
-            Overview
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("camp")}
-            aria-selected={tab === "camp"}
-            className={cn(
-              "whitespace-nowrap border-b-2 px-3 py-2.5 text-xs font-semibold transition-all sm:text-sm",
-              tab === "camp"
-                ? "border-brand text-ink"
-                : "border-transparent text-muted hover:border-line hover:text-ink",
-            )}
-          >
-            Campaigns
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("cust")}
-            aria-selected={tab === "cust"}
-            className={cn(
-              "whitespace-nowrap border-b-2 px-3 py-2.5 text-xs font-semibold transition-all sm:text-sm",
-              tab === "cust"
-                ? "border-brand text-ink"
-                : "border-transparent text-muted hover:border-line hover:text-ink",
-            )}
-          >
-            Customers
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("prod")}
-            aria-selected={tab === "prod"}
-            className={cn(
-              "whitespace-nowrap border-b-2 px-3 py-2.5 text-xs font-semibold transition-all sm:text-sm",
-              tab === "prod"
-                ? "border-brand text-ink"
-                : "border-transparent text-muted hover:border-line hover:text-ink",
-            )}
-          >
-            Products
-          </button>
-        </nav>
+      {/* Main Tabs */}
+      <div className="tabs" data-tabs role="tablist">
+        <button
+          type="button"
+          data-tab="ov"
+          data-ta="மொத்தம்"
+          aria-selected={tab === "ov"}
+          onClick={() => setTab("ov")}
+        >
+          Overview
+        </button>
+        <button
+          type="button"
+          data-tab="camp"
+          aria-selected={tab === "camp"}
+          onClick={() => setTab("camp")}
+        >
+          Campaigns
+        </button>
+        <button
+          type="button"
+          data-tab="cust"
+          aria-selected={tab === "cust"}
+          onClick={() => setTab("cust")}
+        >
+          Customers
+        </button>
+        <button
+          type="button"
+          data-tab="prod"
+          aria-selected={tab === "prod"}
+          onClick={() => setTab("prod")}
+        >
+          Products
+        </button>
       </div>
 
-      {/* TAB 1: OVERVIEW */}
-      {tab === "ov" && (
-        <div className="space-y-4 sm:space-y-6">
-          {/* Funnel Card: From message to money */}
-          <div className="rounded-card border border-line bg-panel p-4 shadow-sm sm:p-5">
-            <div className="mb-4">
-              <h2 className="text-base font-bold text-ink sm:text-lg">From message to money</h2>
-              <p className="text-xs text-muted sm:text-sm">Out of the customers you messaged, this is how far they came.</p>
+      {/* SECTION 1: OVERVIEW */}
+      <section data-panel="ov" hidden={tab !== "ov"}>
+        {/* From message to money */}
+        <div className="card">
+          <div className="hd">
+            <div>
+              <h2>From message to money</h2>
+              <p>Out of the customers you messaged, this is how far they came.</p>
             </div>
-            <div className="divide-y divide-line/60">
-              {cur.funnel.map((item, idx) => {
-                const barColor =
-                  idx === 0
-                    ? "bg-slate-700 dark:bg-slate-300"
-                    : idx <= 2
-                    ? "bg-amber-500 dark:bg-amber-400"
-                    : idx <= 4
-                    ? "bg-rose-500 dark:bg-rose-400"
-                    : "bg-emerald-600 dark:bg-emerald-400";
-                return (
-                  <div key={item.name} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs font-semibold text-ink sm:text-sm">{item.name}</div>
-                      <div className="mt-1.5 h-2 w-full max-w-lg overflow-hidden rounded-full bg-subtle">
-                        <div className={cn("h-full rounded-full transition-all duration-500", barColor)} style={{ width: `${item.pct}%` }} />
-                      </div>
-                      {item.sub && <div className="mt-1 text-[11px] text-muted sm:text-xs">{item.sub}</div>}
+          </div>
+          <div className="list" id="jl">
+            {J.map((j, i) => {
+              const p = d.sent ? Math.round((j[1] / d.sent) * 100) : 0;
+              const barBg = i === 0 ? "var(--bar)" : i > 3 ? "var(--bar4)" : "var(--bar2)";
+              return (
+                <div key={j[0]} className="row">
+                  <div className="grow">
+                    <div className="t">{j[0]}</div>
+                    <div className="bar" style={{ marginTop: 6 }}>
+                      <i style={{ width: `${p}%`, background: barBg }}></i>
                     </div>
-                    <div className="text-left sm:text-right">
-                      <div className="tabular text-sm font-bold text-ink sm:text-base">{item.value.toLocaleString("en-IN")}</div>
-                      {idx > 0 && <div className="text-[11px] text-muted sm:text-xs">{item.pct} of 100 sent</div>}
-                    </div>
+                    {j[2] ? <div className="muted small" style={{ marginTop: 4 }}>{j[2]}</div> : null}
                   </div>
-                );
-              })}
+                  <div style={{ textAlign: "right", minWidth: 120 }}>
+                    <b style={{ font: "600 18px var(--display)" }}>{j[1].toLocaleString("en-IN")}</b>
+                    {i ? <div className="muted small">{p} of 100 sent</div> : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* What you should do now */}
+        <h2 style={{ font: "600 18px var(--display)", margin: "18px 0 10px" }}>What you should do now</h2>
+        <div className="grid g3" id="acts">
+          {A.map((a) => (
+            <div key={a[0]} className="card">
+              <div className="muted small">{a[0]}</div>
+              <div className="v" style={{ font: "600 22px var(--display)", margin: "6px 0" }}>
+                {a[1]}
+              </div>
+              <Link className="btn primary sm" href={a[3]}>
+                {a[2]}
+              </Link>
+            </div>
+          ))}
+        </div>
+
+        {/* Costblock: Wallet, Spend, Daily spend, Limits */}
+        <div id="costblock" style={{ marginTop: 16 }}>
+          <div className="grid g2" style={{ marginBottom: 16 }}>
+            {/* Wallet */}
+            <div className="card">
+              <div className="hd">
+                <h2>Wallet</h2>
+                <div className="tools">
+                  <a className="btn sm primary" href="https://business.facebook.com/" target="_blank" rel="noopener noreferrer">
+                    Recharge
+                  </a>
+                  <a className="btn sm" href="https://business.facebook.com/" target="_blank" rel="noopener noreferrer">
+                    Billing on Meta
+                  </a>
+                </div>
+              </div>
+              <div className="stat">
+                <div className="l">Balance</div>
+                <div className="v">{R(wallet.balance)}</div>
+              </div>
+              <div className="bar" style={{ margin: "12px 0" }}>
+                <i
+                  style={{
+                    width: `${Math.min(100, Math.max(10, Math.round((wallet.balance / 2000) * 100)))}%`,
+                    background: "var(--bar3)",
+                  }}
+                ></i>
+              </div>
+              <p className="small">
+                <span className={`pill ${wallet.isLow ? "warn" : "ok"}`}>
+                  {wallet.isLow ? "Low balance" : "Healthy balance"}
+                </span>{" "}
+                You can send about <b>{wallet.marketingMsgsLeft.toLocaleString("en-IN")}</b> marketing or{" "}
+                <b>{wallet.utilityMsgsLeft.toLocaleString("en-IN")}</b> utility messages. Top up soon.
+              </p>
+            </div>
+
+            {/* Spend */}
+            <div className="card">
+              <div className="hd">
+                <h2>Spend</h2>
+              </div>
+              <div className="grid g2">
+                <div className="stat">
+                  <div className="l">This month</div>
+                  <div className="v">{R(spend.thisMonth)}</div>
+                  <div className="d muted">{R(spend.thisMonthGst)} with GST</div>
+                </div>
+                <div className="stat">
+                  <div className="l">Last month</div>
+                  <div className="v">{R(spend.lastMonth)}</div>
+                </div>
+                <div className="stat">
+                  <div className="l">Free replies left</div>
+                  <div className="v">{spend.freeRepliesLeft.toLocaleString("en-IN")}</div>
+                  <div className="d muted">of {spend.freeRepliesTotal.toLocaleString("en-IN")} this month</div>
+                </div>
+                <div className="stat">
+                  <div className="l">Return per ₹1</div>
+                  <div className="v">{R(spend.returnPerRupee)}</div>
+                  <div className="d up">in sales</div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Action Cards: What you should do now */}
-          <div>
-            <h2 className="mb-3 text-sm font-bold tracking-tight text-ink sm:text-base">What you should do now</h2>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-              {cur.actions.map((act) => (
-                <div key={act.title} className="flex flex-col justify-between rounded-card border border-line bg-panel p-4 shadow-sm">
-                  <div>
-                    <div className="text-xs text-muted sm:text-[13px]">{act.title}</div>
-                    <div className="tabular my-1.5 text-lg font-bold text-ink sm:text-xl">{act.value}</div>
+          {/* Daily spend split */}
+          <div className="grid split">
+            <div className="card">
+              <div className="hd">
+                <h2>Daily spend</h2>
+                <div className="seg" id="cs">
+                  <button
+                    type="button"
+                    data-v="a"
+                    aria-pressed={cs === "a"}
+                    onClick={() => setCs("a")}
+                  >
+                    Daily ₹
+                  </button>
+                  <button
+                    type="button"
+                    data-v="b"
+                    aria-pressed={cs === "b"}
+                    onClick={() => setCs("b")}
+                  >
+                    Paid vs free
+                  </button>
+                </div>
+              </div>
+              <div id="cc">
+                {cs === "a" ? (
+                  <ReportBars
+                    labels={daily.days}
+                    series={[
+                      { name: "Marketing", color: "#F46B4E", vals: daily.marketing },
+                      { name: "Utility", color: "#FFC329", vals: daily.utility },
+                    ]}
+                    fmt={(x) => "₹" + Math.round(x)}
+                    label="Daily WhatsApp spend"
+                  />
+                ) : (
+                  <ReportBars
+                    labels={daily.days}
+                    series={[
+                      { name: "Paid messages", color: "#10283B", vals: daily.paid },
+                      { name: "Free messages", color: "#20C985", vals: daily.free },
+                    ]}
+                    fmt={(x) => String(Math.round(x))}
+                    label="Paid and free messages per day"
+                  />
+                )}
+              </div>
+              <div className="legend" id="cg">
+                {cs === "a" ? (
+                  <>
+                    <span style={{ "--c": "#F46B4E" } as React.CSSProperties}>Marketing</span>
+                    <span style={{ "--c": "#FFC329" } as React.CSSProperties}>Utility</span>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ "--c": "#10283B" } as React.CSSProperties}>Paid</span>
+                    <span style={{ "--c": "#20C985" } as React.CSSProperties}>Free</span>
+                  </>
+                )}
+              </div>
+              <p className="muted small" style={{ marginTop: 10 }}>
+                Highest day: ₹{daily.highestDay}. Cost per delivered message: ₹{daily.costPerDelivered}.
+              </p>
+            </div>
+
+            <div className="stack">
+              <div className="card">
+                <h2 style={{ marginBottom: 12 }}>Where the money goes</h2>
+                <div className="row">
+                  <div className="grow">
+                    Marketing
+                    <div className="bar" style={{ marginTop: 6 }}>
+                      <i
+                        style={{
+                          width: `${Math.round((breakdown.marketing / Math.max(1, breakdown.marketing + breakdown.utility)) * 100)}%`,
+                          background: "var(--bar3)",
+                        }}
+                      ></i>
+                    </div>
                   </div>
-                  <Link href={act.href} className={cn(buttonClass("primary", "sm"), "mt-2 self-start")}>
-                    {act.action}
+                  <b>{R(breakdown.marketing)}</b>
+                </div>
+                <div className="row">
+                  <div className="grow">
+                    Utility
+                    <div className="bar" style={{ marginTop: 6 }}>
+                      <i
+                        style={{
+                          width: `${Math.round((breakdown.utility / Math.max(1, breakdown.marketing + breakdown.utility)) * 100)}%`,
+                          background: "var(--bar2)",
+                        }}
+                      ></i>
+                    </div>
+                  </div>
+                  <b>{R(breakdown.utility)}</b>
+                </div>
+                <div className="row">
+                  <div className="grow">
+                    Service replies
+                    <div className="bar" style={{ marginTop: 6 }}>
+                      <i style={{ width: "100%", background: "var(--bar4)" }}></i>
+                    </div>
+                  </div>
+                  <b>Free</b>
+                </div>
+              </div>
+
+              <div className="card">
+                <h2 style={{ marginBottom: 6 }}>Sending limit today</h2>
+                <p className="muted small">Meta lets you message a set number of new people every 24 hours.</p>
+                <div className="bar" style={{ margin: "12px 0 6px" }}>
+                  <i
+                    style={{
+                      width: `${Math.min(100, Math.round((limits.used / Math.max(1, limits.limit)) * 100))}%`,
+                      background: "var(--bar)",
+                    }}
+                  ></i>
+                </div>
+                <p className="small">
+                  <b>{limits.used}</b> of {limits.limit} used · <b>{limits.left}</b> more allowed · a small buffer is kept for retries
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <details className="card more" style={{ marginTop: 16 }}>
+            <summary>
+              <b style={{ font: "600 18px var(--display)" }}>How WhatsApp charges, in plain words</b>
+            </summary>
+            <div className="stack" style={{ marginTop: 12 }}>
+              <p>Replies to a customer within 24 hours of their message are free (first 1,000 a month).</p>
+              <p>Utility messages (order updates) cost less than marketing messages (offers).</p>
+              <p>Replies to customers who came from your ads are free for 72 hours.</p>
+              <p>You pay only for messages that are delivered.</p>
+              <div className="note">
+                <b>Save money:</b> send offers to people who recently replied, and keep order updates as utility messages.
+              </div>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      {/* SECTION 2: CAMPAIGNS */}
+      <section data-panel="camp" hidden={tab !== "camp"}>
+        <p className="muted" style={{ marginBottom: 12 }}>
+          Which broadcast worked best? Sorted by money back for every ₹1 spent.
+        </p>
+        <div className="card" style={{ padding: 0 }}>
+          <div className="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th>Campaign</th>
+                  <th className="num">Sent</th>
+                  <th className="num">Read</th>
+                  <th className="num">Replies</th>
+                  <th className="num">Paid orders</th>
+                  <th className="num">Spent</th>
+                  <th className="num">Sales</th>
+                  <th className="num">Back per ₹1</th>
+                  <th>Verdict</th>
+                </tr>
+              </thead>
+              <tbody id="ct">
+                {data.campaigns.campaigns.length ? (
+                  data.campaigns.campaigns.map((c) => (
+                    <tr key={c.id}>
+                      <td>
+                        <b>{c.name}</b>
+                      </td>
+                      <td className="num">{c.sent.toLocaleString("en-IN")}</td>
+                      <td className="num">{c.read.toLocaleString("en-IN")}</td>
+                      <td className="num">{c.replies.toLocaleString("en-IN")}</td>
+                      <td className="num">{c.paidOrders.toLocaleString("en-IN")}</td>
+                      <td className="num">{R(c.spent)}</td>
+                      <td className="num">{R(c.sales)}</td>
+                      <td className="num">
+                        <b>{R(c.returnRatio)}</b>
+                      </td>
+                      <td>
+                        <span className={`pill ${c.verdict}`}>{c.verdictLabel}</span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={9} style={{ textAlign: "center", padding: 24 }} className="muted">
+                      No broadcast campaigns run yet. Create a campaign to start tracking returns.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="grid g2" style={{ marginTop: 16 }}>
+          <div className="card">
+            <h2 style={{ marginBottom: 10 }}>Best day and time</h2>
+            <p className="muted small" style={{ marginBottom: 10 }}>
+              Based on when your customers read and replied.
+            </p>
+            <div className="list">
+              {data.campaigns.bestTimes.map((bt) => (
+                <div key={bt.slot} className="row">
+                  <div className="grow">{bt.slot}</div>
+                  <span className={`pill ${bt.badgeType}`}>{bt.badge}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card">
+            <h2 style={{ marginBottom: 10 }}>What to repeat</h2>
+            <div className="list">
+              {data.campaigns.whatToRepeat.map((rpt, idx) => (
+                <div key={idx} className="row">
+                  <div className="grow">{rpt.title}</div>
+                  {rpt.isPill ? (
+                    <span className={`pill ${rpt.pillType || "bad"}`}>{rpt.actionText}</span>
+                  ) : (
+                    <Link className="btn sm" href={rpt.actionHref || "/dashboard/campaigns/new"}>
+                      {rpt.actionText}
+                    </Link>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 3: CUSTOMERS */}
+      <section data-panel="cust" hidden={tab !== "cust"}>
+        <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
+          <div className="card stat">
+            <div className="l">Bought this month</div>
+            <div className="v">{data.customers.boughtThisMonth.toLocaleString("en-IN")}</div>
+            <div className="d up">{data.customers.boughtDiff}</div>
+          </div>
+          <div className="card stat">
+            <div className="l">New customers</div>
+            <div className="v">{data.customers.newCustomers.toLocaleString("en-IN")}</div>
+          </div>
+          <div className="card stat">
+            <div className="l">Came back</div>
+            <div className="v">{data.customers.cameBack.toLocaleString("en-IN")}</div>
+            <div className="d muted">{data.customers.repeatRatioLabel}</div>
+          </div>
+          <div className="card stat">
+            <div className="l">Have not bought in 60 days</div>
+            <div className="v">{data.customers.lapsed60Days.toLocaleString("en-IN")}</div>
+          </div>
+        </div>
+
+        <div className="grid g2">
+          <div className="card">
+            <div className="hd">
+              <div>
+                <h2>Who needs a follow-up</h2>
+                <p>Each group has a message ready.</p>
+              </div>
+            </div>
+            <div className="list" id="cs2">
+              {data.customers.followUps.map((fu) => (
+                <div key={fu.title} className="row">
+                  <div className="grow">
+                    <div className="t">{fu.title}</div>
+                    <div className="muted small">{fu.sub}</div>
+                  </div>
+                  <Link className="btn sm" href={fu.href}>
+                    {fu.action}
                   </Link>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Wallet & Spend Row */}
-          <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-2">
-            {/* Wallet Card */}
-            <div className="rounded-card border border-line bg-panel p-4 shadow-sm sm:p-5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-base font-bold text-ink sm:text-lg">Wallet</h2>
-                <div className="flex items-center gap-2">
-                  <a
-                    href="https://business.facebook.com/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={buttonClass("primary", "sm")}
-                  >
-                    Recharge
-                  </a>
-                  <a
-                    href="https://business.facebook.com/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={buttonClass("secondary", "sm")}
-                  >
-                    Billing on Meta
-                  </a>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <div className="text-xs font-medium text-muted">Balance</div>
-                <div className="tabular text-2xl font-bold text-ink sm:text-3xl">
-                  ₹{Math.round(data.overview.wallet.balance).toLocaleString("en-IN")}
-                </div>
-              </div>
-
-              <div className="my-3 h-2.5 w-full overflow-hidden rounded-full bg-subtle">
-                <div
-                  className={cn(
-                    "h-full rounded-full transition-all duration-500",
-                    data.overview.wallet.isLow ? "bg-rose-500" : "bg-emerald-600 dark:bg-emerald-400",
-                  )}
-                  style={{ width: `${Math.min(100, Math.max(10, (data.overview.wallet.balance / 2000) * 100))}%` }}
-                />
-              </div>
-
-              <p className="text-xs text-ink-2 sm:text-sm">
-                <span
-                  className={cn(
-                    "mr-2 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold",
-                    data.overview.wallet.isLow
-                      ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
-                      : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
-                  )}
-                >
-                  {data.overview.wallet.isLow ? "Low balance" : "Healthy balance"}
-                </span>
-                You can send about <b className="font-semibold text-ink">{data.overview.wallet.marketingMsgsLeft.toLocaleString("en-IN")}</b> marketing
-                or <b className="font-semibold text-ink">{data.overview.wallet.utilityMsgsLeft.toLocaleString("en-IN")}</b> utility messages.
-              </p>
+          <div className="card">
+            <div className="hd">
+              <h2>Where your customers are</h2>
             </div>
-
-            {/* Spend Card */}
-            <div className="rounded-card border border-line bg-panel p-4 shadow-sm sm:p-5">
-              <h2 className="text-base font-bold text-ink sm:text-lg">Spend</h2>
-              <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4">
-                <div>
-                  <div className="text-xs font-medium text-muted">This month</div>
-                  <div className="tabular text-lg font-bold text-ink sm:text-xl">
-                    ₹{Math.round(data.overview.spend.thisMonth).toLocaleString("en-IN")}
+            <div className="list">
+              {data.customers.locations.map((loc) => (
+                <div key={loc.name} className="row">
+                  <div className="grow">
+                    {loc.name}
+                    <div className="bar" style={{ marginTop: 6 }}>
+                      <i style={{ width: `${loc.pct}%`, background: "var(--bar)" }}></i>
+                    </div>
                   </div>
-                  <div className="text-[11px] text-muted">₹{data.overview.spend.thisMonthGst.toLocaleString("en-IN")} with GST</div>
+                  <b>{loc.count.toLocaleString("en-IN")}</b>
                 </div>
-
-                <div>
-                  <div className="text-xs font-medium text-muted">Last month</div>
-                  <div className="tabular text-lg font-bold text-ink sm:text-xl">
-                    ₹{Math.round(data.overview.spend.lastMonth).toLocaleString("en-IN")}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-xs font-medium text-muted">Free replies left</div>
-                  <div className="tabular text-lg font-bold text-ink sm:text-xl">
-                    {data.overview.spend.freeRepliesLeft.toLocaleString("en-IN")}
-                  </div>
-                  <div className="text-[11px] text-muted">of {data.overview.spend.freeRepliesTotal.toLocaleString("en-IN")} this month</div>
-                </div>
-
-                <div>
-                  <div className="text-xs font-medium text-muted">Return per ₹1</div>
-                  <div className="tabular text-lg font-bold text-emerald-600 dark:text-emerald-400 sm:text-xl">
-                    ₹{data.overview.spend.returnPerRupee.toLocaleString("en-IN")}
-                  </div>
-                  <div className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">in sales</div>
-                </div>
-              </div>
+              ))}
             </div>
+            <p className="muted small" style={{ marginTop: 10 }}>
+              {data.customers.topLocationInsight}
+            </p>
           </div>
-
-          {/* Daily Spend & Breakdown Row */}
-          <div className="grid grid-cols-1 gap-4 sm:gap-5 xl:grid-cols-12">
-            {/* Daily spend chart */}
-            <div className="rounded-card border border-line bg-panel p-4 shadow-sm sm:p-5 xl:col-span-7">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-base font-bold text-ink sm:text-lg">Daily spend</h2>
-                <div className="inline-flex rounded-control border-[1.5px] border-line bg-canvas p-[2px]">
-                  <button
-                    type="button"
-                    onClick={() => setChartMode("a")}
-                    aria-pressed={chartMode === "a"}
-                    className={cn(
-                      "rounded-[7px] px-2.5 py-1 text-xs font-semibold transition-all",
-                      chartMode === "a" ? "bg-ink text-canvas shadow-xs" : "text-muted hover:text-ink",
-                    )}
-                  >
-                    Daily ₹
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setChartMode("b")}
-                    aria-pressed={chartMode === "b"}
-                    className={cn(
-                      "rounded-[7px] px-2.5 py-1 text-xs font-semibold transition-all",
-                      chartMode === "b" ? "bg-ink text-canvas shadow-xs" : "text-muted hover:text-ink",
-                    )}
-                  >
-                    Paid vs free
-                  </button>
-                </div>
-              </div>
-
-              {/* Responsive SVG Chart */}
-              <div className="mt-4">
-                <svg className="w-full" viewBox="0 0 640 160" preserveAspectRatio="none">
-                  {/* Grid lines */}
-                  {[0, 1, 2, 3].map((k) => {
-                    const y = 10 + (130 * k) / 3;
-                    return (
-                      <line
-                        key={k}
-                        x1="30"
-                        x2="630"
-                        y1={y}
-                        y2={y}
-                        stroke="currentColor"
-                        strokeOpacity="0.1"
-                        strokeDasharray="2,2"
-                      />
-                    );
-                  })}
-                  {/* Bars */}
-                  {data.overview.daily.days.map((lb, i) => {
-                    const totalDays = data.overview.daily.days.length;
-                    const slotWidth = (600 - 30) / totalDays;
-                    const barWidth = Math.max(6, slotWidth * 0.6);
-                    const x = 35 + i * slotWidth;
-
-                    const maxVal = Math.max(
-                      1,
-                      chartMode === "a"
-                        ? Math.max(...data.overview.daily.marketing.map((v, idx) => v + data.overview.daily.utility[idx]))
-                        : Math.max(...data.overview.daily.paid.map((v, idx) => v + data.overview.daily.free[idx])),
-                    );
-
-                    if (chartMode === "a") {
-                      const mktVal = data.overview.daily.marketing[i] || 0;
-                      const utVal = data.overview.daily.utility[i] || 0;
-                      const mktHeight = (mktVal / maxVal) * 120;
-                      const utHeight = (utVal / maxVal) * 120;
-
-                      return (
-                        <g key={lb}>
-                          {/* Marketing bar */}
-                          <rect
-                            x={x}
-                            y={140 - mktHeight - utHeight}
-                            width={barWidth}
-                            height={mktHeight}
-                            className="fill-rose-500"
-                            rx="2"
-                          >
-                            <title>{`Day ${lb} · Marketing: ₹${mktVal}`}</title>
-                          </rect>
-                          {/* Utility bar */}
-                          <rect
-                            x={x}
-                            y={140 - utHeight}
-                            width={barWidth}
-                            height={utHeight}
-                            className="fill-amber-500"
-                            rx="2"
-                          >
-                            <title>{`Day ${lb} · Utility: ₹${utVal}`}</title>
-                          </rect>
-                          <text x={x + barWidth / 2} y={154} textAnchor="middle" className="fill-muted text-[10px]">
-                            {lb}
-                          </text>
-                        </g>
-                      );
-                    } else {
-                      const paidVal = data.overview.daily.paid[i] || 0;
-                      const freeVal = data.overview.daily.free[i] || 0;
-                      const paidHeight = (paidVal / maxVal) * 120;
-                      const freeHeight = (freeVal / maxVal) * 120;
-
-                      return (
-                        <g key={lb}>
-                          {/* Paid messages */}
-                          <rect
-                            x={x}
-                            y={140 - paidHeight - freeHeight}
-                            width={barWidth}
-                            height={paidHeight}
-                            className="fill-slate-700 dark:fill-slate-300"
-                            rx="2"
-                          >
-                            <title>{`Day ${lb} · Paid: ${paidVal}`}</title>
-                          </rect>
-                          {/* Free messages */}
-                          <rect
-                            x={x}
-                            y={140 - freeHeight}
-                            width={barWidth}
-                            height={freeHeight}
-                            className="fill-emerald-500"
-                            rx="2"
-                          >
-                            <title>{`Day ${lb} · Free: ${freeVal}`}</title>
-                          </rect>
-                          <text x={x + barWidth / 2} y={154} textAnchor="middle" className="fill-muted text-[10px]">
-                            {lb}
-                          </text>
-                        </g>
-                      );
-                    }
-                  })}
-                </svg>
-              </div>
-
-              {/* Chart Legend */}
-              <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-muted">
-                {chartMode === "a" ? (
-                  <>
-                    <span className="flex items-center gap-1.5">
-                      <span className="size-2.5 rounded-sm bg-rose-500" /> Marketing
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="size-2.5 rounded-sm bg-amber-500" /> Utility
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span className="flex items-center gap-1.5">
-                      <span className="size-2.5 rounded-sm bg-slate-700 dark:bg-slate-300" /> Paid
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="size-2.5 rounded-sm bg-emerald-500" /> Free
-                    </span>
-                  </>
-                )}
-              </div>
-              <p className="mt-2 text-xs text-muted">
-                Highest day: ₹{data.overview.daily.highestDay}. Cost per delivered message: ₹{data.overview.daily.costPerDelivered}.
-              </p>
-            </div>
-
-            {/* Breakdown stack */}
-            <div className="space-y-4 xl:col-span-5">
-              {/* Where the money goes */}
-              <div className="rounded-card border border-line bg-panel p-4 shadow-sm sm:p-5">
-                <h2 className="mb-3 text-base font-bold text-ink sm:text-lg">Where the money goes</h2>
-                <div className="space-y-3">
-                  <div>
-                    <div className="flex items-center justify-between text-xs font-semibold text-ink sm:text-sm">
-                      <span>Marketing</span>
-                      <span className="tabular">₹{data.overview.breakdown.marketing.toLocaleString("en-IN")}</span>
-                    </div>
-                    <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-subtle">
-                      <div className="h-full rounded-full bg-rose-500" style={{ width: "75%" }} />
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between text-xs font-semibold text-ink sm:text-sm">
-                      <span>Utility</span>
-                      <span className="tabular">₹{data.overview.breakdown.utility.toLocaleString("en-IN")}</span>
-                    </div>
-                    <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-subtle">
-                      <div className="h-full rounded-full bg-amber-500" style={{ width: "25%" }} />
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between text-xs font-semibold text-ink sm:text-sm">
-                      <span>Service replies</span>
-                      <span className="font-bold text-emerald-600 dark:text-emerald-400">Free</span>
-                    </div>
-                    <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-subtle">
-                      <div className="h-full rounded-full bg-emerald-500" style={{ width: "100%" }} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Sending limit today */}
-              <div className="rounded-card border border-line bg-panel p-4 shadow-sm sm:p-5">
-                <h2 className="text-base font-bold text-ink sm:text-lg">Sending limit today</h2>
-                <p className="mt-1 text-xs text-muted">Meta lets you message a set number of new people every 24 hours.</p>
-
-                <div className="my-3 h-2 w-full overflow-hidden rounded-full bg-subtle">
-                  <div
-                    className="h-full rounded-full bg-slate-700 dark:bg-slate-300"
-                    style={{
-                      width: `${Math.min(100, Math.round((data.overview.limits.used / Math.max(1, data.overview.limits.limit)) * 100))}%`,
-                    }}
-                  />
-                </div>
-                <p className="text-xs text-ink-2">
-                  <b className="font-semibold text-ink">{data.overview.limits.used}</b> of {data.overview.limits.limit} used ·{" "}
-                  <b className="font-semibold text-ink">{data.overview.limits.left}</b> more allowed · a small buffer is kept for retries
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* How WhatsApp charges disclosure */}
-          <details className="group rounded-card border border-line bg-panel p-4 shadow-sm sm:p-5">
-            <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-bold text-ink sm:text-base">
-              <span>How WhatsApp charges, in plain words</span>
-              <ChevronDown className="size-4 text-muted transition-transform group-open:rotate-180" />
-            </summary>
-            <div className="mt-3.5 space-y-2 border-t border-line/60 pt-3 text-xs text-ink-2 sm:text-sm">
-              <p>Replies to a customer within 24 hours of their message are free (first 1,000 a month).</p>
-              <p>Utility messages (order updates, tracking) cost less than marketing messages (promotions, offers).</p>
-              <p>Replies to customers who came from your ads or Facebook page are free for 72 hours.</p>
-              <p>You pay only for messages that are delivered to customer phones, never for failed sends.</p>
-              <div className="rounded-card bg-subtle p-3 text-xs text-ink">
-                <b className="font-semibold text-ink">Save money:</b> send offers to people who recently replied, and keep order updates as utility messages.
-              </div>
-            </div>
-          </details>
         </div>
-      )}
+      </section>
 
-      {/* TAB 2: CAMPAIGNS */}
-      {tab === "camp" && (
-        <div className="space-y-4 sm:space-y-6">
-          <div>
-            <p className="text-xs text-muted sm:text-sm">Which broadcast worked best? Sorted by money back for every ₹1 spent.</p>
-          </div>
-
-          {/* Campaign Table */}
-          <div className="overflow-hidden rounded-card border border-line bg-panel shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs sm:text-sm">
-                <thead>
-                  <tr className="border-b border-line bg-subtle/50 text-[11px] font-bold uppercase tracking-wider text-muted sm:text-xs">
-                    <th className="px-3.5 py-2.5 sm:px-4 sm:py-3">Campaign</th>
-                    <th className="tabular px-3 py-2.5 text-right sm:px-4 sm:py-3">Sent</th>
-                    <th className="tabular px-3 py-2.5 text-right sm:px-4 sm:py-3">Read</th>
-                    <th className="tabular px-3 py-2.5 text-right sm:px-4 sm:py-3">Replies</th>
-                    <th className="tabular px-3 py-2.5 text-right sm:px-4 sm:py-3">Paid orders</th>
-                    <th className="tabular px-3 py-2.5 text-right sm:px-4 sm:py-3">Spent</th>
-                    <th className="tabular px-3 py-2.5 text-right sm:px-4 sm:py-3">Sales</th>
-                    <th className="tabular px-3 py-2.5 text-right sm:px-4 sm:py-3">Back per ₹1</th>
-                    <th className="px-3.5 py-2.5 sm:px-4 sm:py-3">Verdict</th>
+      {/* SECTION 4: PRODUCTS */}
+      <section data-panel="prod" hidden={tab !== "prod"}>
+        <div className="card" style={{ padding: 0, marginBottom: 16 }}>
+          <div className="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th className="num">Sold</th>
+                  <th className="num">Sales</th>
+                  <th className="num">Left in carts</th>
+                  <th>What to do</th>
+                </tr>
+              </thead>
+              <tbody id="pt2">
+                {data.products.products.map((p) => (
+                  <tr key={p.name}>
+                    <td>
+                      <b>{p.name}</b>
+                    </td>
+                    <td className="num">{p.sold.toLocaleString("en-IN")}</td>
+                    <td className="num">{R(p.sales)}</td>
+                    <td className="num">{p.leftInCarts.toLocaleString("en-IN")}</td>
+                    <td>
+                      <span className={`pill ${p.pillType}`}>{p.action}</span>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {data.campaigns.campaigns.length ? (
-                    data.campaigns.campaigns.map((c) => (
-                      <tr key={c.id} className="hover:bg-subtle/40">
-                        <td className="px-3.5 py-3 font-semibold text-ink sm:px-4">
-                          <div>{c.name}</div>
-                          <div className="text-[11px] font-normal text-muted">{c.template}</div>
-                        </td>
-                        <td className="tabular px-3 py-3 text-right font-medium text-ink sm:px-4">{c.sent.toLocaleString("en-IN")}</td>
-                        <td className="tabular px-3 py-3 text-right font-medium text-ink sm:px-4">{c.read.toLocaleString("en-IN")}</td>
-                        <td className="tabular px-3 py-3 text-right font-medium text-ink sm:px-4">{c.replies.toLocaleString("en-IN")}</td>
-                        <td className="tabular px-3 py-3 text-right font-medium text-ink sm:px-4">{c.paidOrders.toLocaleString("en-IN")}</td>
-                        <td className="tabular px-3 py-3 text-right font-medium text-ink sm:px-4">₹{c.spent.toLocaleString("en-IN")}</td>
-                        <td className="tabular px-3 py-3 text-right font-bold text-ink sm:px-4">₹{c.sales.toLocaleString("en-IN")}</td>
-                        <td className="tabular px-3 py-3 text-right font-bold text-emerald-600 dark:text-emerald-400 sm:px-4">
-                          ₹{c.returnRatio.toLocaleString("en-IN")}
-                        </td>
-                        <td className="px-3.5 py-3 sm:px-4">
-                          <span
-                            className={cn(
-                              "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold",
-                              c.verdict === "ok"
-                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                : c.verdict === "warn"
-                                ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                                : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300",
-                            )}
-                          >
-                            {c.verdictLabel}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={9} className="px-4 py-8 text-center text-muted">
-                        No broadcast campaigns run yet. Create a campaign to start tracking returns.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Bottom Cards: Best Day/Time & What to Repeat */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
-            {/* Best day and time */}
-            <div className="rounded-card border border-line bg-panel p-4 shadow-sm sm:p-5">
-              <h2 className="text-base font-bold text-ink sm:text-lg">Best day and time</h2>
-              <p className="mt-1 text-xs text-muted">Based on when your customers read and replied.</p>
-              <div className="mt-4 divide-y divide-line/60">
-                {data.campaigns.bestTimes.map((bt) => (
-                  <div key={bt.slot} className="flex items-center justify-between py-2.5">
-                    <span className="text-xs font-semibold text-ink sm:text-sm">{bt.slot}</span>
-                    <span
-                      className={cn(
-                        "inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold",
-                        bt.badgeType === "ok"
-                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                          : bt.badgeType === "warn"
-                          ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                          : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300",
-                      )}
-                    >
-                      {bt.badge}
-                    </span>
-                  </div>
                 ))}
-              </div>
-            </div>
-
-            {/* What to repeat */}
-            <div className="rounded-card border border-line bg-panel p-4 shadow-sm sm:p-5">
-              <h2 className="text-base font-bold text-ink sm:text-lg">What to repeat</h2>
-              <div className="mt-4 divide-y divide-line/60">
-                {data.campaigns.whatToRepeat.map((rpt) => (
-                  <div key={rpt.title} className="flex items-center justify-between gap-3 py-2.5">
-                    <span className="text-xs font-semibold text-ink sm:text-sm">{rpt.title}</span>
-                    {rpt.isPill ? (
-                      <span className="inline-flex items-center rounded-full bg-rose-50 px-2.5 py-0.5 text-[11px] font-bold text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
-                        {rpt.actionText}
-                      </span>
-                    ) : (
-                      <Link href={rpt.actionHref || "/dashboard/campaigns/new"} className={buttonClass("secondary", "sm")}>
-                        {rpt.actionText}
-                      </Link>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+              </tbody>
+            </table>
           </div>
         </div>
-      )}
 
-      {/* TAB 3: CUSTOMERS */}
-      {tab === "cust" && (
-        <div className="space-y-4 sm:space-y-6">
-          {/* Top 4 Stats */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-            <div className="rounded-card border border-line bg-panel p-3.5 shadow-sm sm:p-4">
-              <div className="text-[12px] font-medium text-muted sm:text-xs">Bought this month</div>
-              <div className="tabular mt-1 text-xl font-bold tracking-tight text-ink sm:text-2xl">
-                {data.customers.boughtThisMonth.toLocaleString("en-IN")}
-              </div>
-              <div className="mt-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 sm:text-xs">
-                {data.customers.boughtDiff}
-              </div>
-            </div>
-
-            <div className="rounded-card border border-line bg-panel p-3.5 shadow-sm sm:p-4">
-              <div className="text-[12px] font-medium text-muted sm:text-xs">New customers</div>
-              <div className="tabular mt-1 text-xl font-bold tracking-tight text-ink sm:text-2xl">
-                {data.customers.newCustomers.toLocaleString("en-IN")}
-              </div>
-            </div>
-
-            <div className="rounded-card border border-line bg-panel p-3.5 shadow-sm sm:p-4">
-              <div className="text-[12px] font-medium text-muted sm:text-xs">Came back</div>
-              <div className="tabular mt-1 text-xl font-bold tracking-tight text-ink sm:text-2xl">
-                {data.customers.cameBack.toLocaleString("en-IN")}
-              </div>
-              <div className="mt-1 text-[11px] text-muted sm:text-xs">{data.customers.repeatRatioLabel}</div>
-            </div>
-
-            <div className="rounded-card border border-line bg-panel p-3.5 shadow-sm sm:p-4">
-              <div className="text-[12px] font-medium text-muted sm:text-xs">Have not bought in 60 days</div>
-              <div className="tabular mt-1 text-xl font-bold tracking-tight text-ink sm:text-2xl">
-                {data.customers.lapsed60Days.toLocaleString("en-IN")}
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom Cards: Who needs follow-up & Locations */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
-            {/* Who needs a follow-up */}
-            <div className="rounded-card border border-line bg-panel p-4 shadow-sm sm:p-5">
-              <h2 className="text-base font-bold text-ink sm:text-lg">Who needs a follow-up</h2>
-              <p className="mt-1 text-xs text-muted">Each group has a message ready.</p>
-              <div className="mt-4 divide-y divide-line/60">
-                {data.customers.followUps.map((fu) => (
-                  <div key={fu.title} className="flex flex-wrap items-center justify-between gap-2 py-3">
-                    <div>
-                      <div className="text-xs font-semibold text-ink sm:text-sm">{fu.title}</div>
-                      <div className="text-[11px] text-muted sm:text-xs">{fu.sub}</div>
-                    </div>
-                    <Link href={fu.href} className={buttonClass("secondary", "sm")}>
-                      {fu.action}
+        <div className="grid g2">
+          <div className="card">
+            <h2 style={{ marginBottom: 10 }}>Stuck in carts</h2>
+            <p className="muted small" style={{ marginBottom: 10 }}>
+              Customers added these and did not pay. Worth {R(data.products.stuckInCarts.totalWaiting)} in total.
+            </p>
+            <div className="list">
+              {data.products.stuckInCarts.items.length ? (
+                data.products.stuckInCarts.items.map((it, idx) => (
+                  <div key={idx} className="row">
+                    <div className="grow">{it.text}</div>
+                    <Link className="btn sm" href={it.href}>
+                      Chase payment
                     </Link>
                   </div>
-                ))}
-              </div>
+                ))
+              ) : (
+                <p className="muted small">No items currently stuck in unpaid carts.</p>
+              )}
             </div>
+          </div>
 
-            {/* Where your customers are */}
-            <div className="rounded-card border border-line bg-panel p-4 shadow-sm sm:p-5">
-              <h2 className="text-base font-bold text-ink sm:text-lg">Where your customers are</h2>
-              <div className="mt-4 space-y-3">
-                {data.customers.locations.map((loc) => (
-                  <div key={loc.name}>
-                    <div className="flex items-center justify-between text-xs font-semibold text-ink sm:text-sm">
-                      <span>{loc.name}</span>
-                      <span className="tabular">{loc.count.toLocaleString("en-IN")}</span>
-                    </div>
-                    <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-subtle">
-                      <div className="h-full rounded-full bg-slate-700 dark:bg-slate-300" style={{ width: `${loc.pct}%` }} />
-                    </div>
+          <div className="card">
+            <h2 style={{ marginBottom: 10 }}>Worth promoting</h2>
+            <div className="list">
+              {data.products.worthPromoting.map((wp, idx) => (
+                <div key={idx} className="row">
+                  <div className="grow">
+                    <div className="t">{wp.title}</div>
+                    <div className="muted small">{wp.desc}</div>
                   </div>
-                ))}
-              </div>
-              <p className="mt-4 text-xs text-muted">{data.customers.topLocationInsight}</p>
+                  <Link className={`btn sm ${wp.primary ? "primary" : ""}`} href={wp.actionHref}>
+                    {wp.actionText}
+                  </Link>
+                </div>
+              ))}
             </div>
           </div>
         </div>
-      )}
-
-      {/* TAB 4: PRODUCTS */}
-      {tab === "prod" && (
-        <div className="space-y-4 sm:space-y-6">
-          {/* Product Demand & Sales Table */}
-          <div className="overflow-hidden rounded-card border border-line bg-panel shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs sm:text-sm">
-                <thead>
-                  <tr className="border-b border-line bg-subtle/50 text-[11px] font-bold uppercase tracking-wider text-muted sm:text-xs">
-                    <th className="px-3.5 py-2.5 sm:px-4 sm:py-3">Product</th>
-                    <th className="tabular px-3 py-2.5 text-right sm:px-4 sm:py-3">Sold</th>
-                    <th className="tabular px-3 py-2.5 text-right sm:px-4 sm:py-3">Sales</th>
-                    <th className="tabular px-3 py-2.5 text-right sm:px-4 sm:py-3">Left in carts</th>
-                    <th className="px-3.5 py-2.5 sm:px-4 sm:py-3">What to do</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {data.products.products.map((p) => (
-                    <tr key={p.name} className="hover:bg-subtle/40">
-                      <td className="px-3.5 py-3 font-semibold text-ink sm:px-4">{p.name}</td>
-                      <td className="tabular px-3 py-3 text-right font-medium text-ink sm:px-4">{p.sold.toLocaleString("en-IN")}</td>
-                      <td className="tabular px-3 py-3 text-right font-bold text-ink sm:px-4">₹{p.sales.toLocaleString("en-IN")}</td>
-                      <td className="tabular px-3 py-3 text-right font-medium text-ink sm:px-4">{p.leftInCarts.toLocaleString("en-IN")}</td>
-                      <td className="px-3.5 py-3 sm:px-4">
-                        <span
-                          className={cn(
-                            "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold",
-                            p.pillType === "ok"
-                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                              : p.pillType === "warn"
-                              ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                              : p.pillType === "mute"
-                              ? "bg-subtle text-muted"
-                              : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300",
-                          )}
-                        >
-                          {p.action}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Bottom Cards: Stuck in carts & Worth promoting */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
-            {/* Stuck in carts */}
-            <div className="rounded-card border border-line bg-panel p-4 shadow-sm sm:p-5">
-              <h2 className="text-base font-bold text-ink sm:text-lg">Stuck in carts</h2>
-              <p className="mt-1 text-xs text-muted">
-                Customers added these and did not pay. Worth ₹{data.products.stuckInCarts.totalWaiting.toLocaleString("en-IN")} in total.
-              </p>
-              <div className="mt-4 divide-y divide-line/60">
-                {data.products.stuckInCarts.items.length ? (
-                  data.products.stuckInCarts.items.map((it) => (
-                    <div key={it.text} className="flex items-center justify-between gap-3 py-2.5">
-                      <span className="text-xs font-semibold text-ink sm:text-sm">{it.text}</span>
-                      <Link href={it.href} className={buttonClass("secondary", "sm")}>
-                        Chase payment
-                      </Link>
-                    </div>
-                  ))
-                ) : (
-                  <p className="py-4 text-xs text-muted sm:text-sm">No items currently stuck in unpaid carts.</p>
-                )}
-              </div>
-            </div>
-
-            {/* Worth promoting */}
-            <div className="rounded-card border border-line bg-panel p-4 shadow-sm sm:p-5">
-              <h2 className="text-base font-bold text-ink sm:text-lg">Worth promoting</h2>
-              <div className="mt-4 divide-y divide-line/60">
-                {data.products.worthPromoting.map((wp) => (
-                  <div key={wp.title} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <div className="text-xs font-semibold text-ink sm:text-sm">{wp.title}</div>
-                      <div className="text-[11px] text-muted sm:text-xs">{wp.desc}</div>
-                    </div>
-                    <Link
-                      href={wp.actionHref}
-                      className={cn(buttonClass(wp.primary ? "primary" : "secondary", "sm"), "self-start sm:self-auto")}
-                    >
-                      {wp.actionText}
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      </section>
     </div>
   );
 }
