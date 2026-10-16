@@ -281,3 +281,18 @@ export function AutoSelect({ name, value, options, label, style }: { name: strin
     </select>
   );
 }
+
+/** Settings › Language: the same switch as the header, as a two-way choice. */
+export function LangChoice() {
+  const lang = useLang();
+  return (
+    <div className="seg" role="group" aria-label="Language">
+      <button type="button" aria-pressed={lang === "en"} onClick={() => setLang("en")}>
+        English
+      </button>
+      <button type="button" aria-pressed={lang === "ta"} onClick={() => setLang("ta")} lang="ta">
+        தமிழ்
+      </button>
+    </div>
+  );
+}

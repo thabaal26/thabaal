@@ -1,16 +1,16 @@
-import { Building2, CheckCircle2, Circle, LogOut, SquarePen } from "@/components/icons";
-import { Building3D, Clock3D, Eye3D, Phone3D, Send3D, Sparkles3D, Users3D } from "@/components/icons-3d";
+import { Building2, CheckCircle2, Circle, LogOut } from "@/components/icons";
+import { Clock3D, Send3D, Sparkles3D } from "@/components/icons-3d";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "@/components/intent-link";
-import { Badge, buttonClass, Callout, Card, CardHeader, PageHeader, QualityBadge } from "@/components/ui";
+import { Badge, buttonClass, Callout, Card, CardHeader } from "@/components/ui";
 import { ThemeChoice } from "@/components/theme-toggle";
 import { getCatalogWithProducts } from "@/lib/catalog";
 import { db } from "@/lib/db";
 import { numberHealth } from "@/lib/limits";
 import { fmtDate } from "@/lib/format";
 import { keyId } from "@/lib/secret-box";
-import { requireUser } from "@/lib/session";
+import { getScope, requireUser } from "@/lib/session";
 import { logout } from "../../login/actions";
 import { cn } from "@/lib/cn";
 import { getSettings, wahaConfig } from "@/lib/provider";
@@ -19,6 +19,9 @@ import { LocalSessionPanel, ProviderSwitch } from "./provider-panel";
 import { PasswordForm } from "./password-form";
 import { AppearanceEditor } from "../appearance-editor";
 import { portalDefault } from "@/lib/appearance";
+import { spendSummary } from "@/lib/spend";
+import { inr } from "../portal-format";
+import { LangChoice, PortalPage } from "../portal-ui";
 
 /** Within the last two days (module scope keeps the clock read out of render). */
 const seenRecently = (d: Date | null) => Boolean(d && Date.now() - d.getTime() < 2 * 86_400_000);
@@ -49,25 +52,55 @@ function Copyable({ label, value }: { label: string; value: string }) {
 
 export default async function SettingsPage() {
   const user = await requireUser();
-  const account = (
-    <Card className="card-3d">
-      <CardHeader tone="violet" icon={<Users3D />} title="Your account" description={`Signed in as ${user.email}`} />
+  const accountCard = (
+    <section className="card">
+      <div className="hd">
+        <div>
+          <h2>Your account</h2>
+          <p>Signed in as {user.email}</p>
+        </div>
+        <form action={logout}>
+          <button className="btn sm">
+            <LogOut aria-hidden className="ic" style={{ width: 15, height: 15 }} /> Sign out
+          </button>
+        </form>
+      </div>
       <PasswordForm />
-      <form action={logout} className="border-t border-line p-4 sm:p-5">
-        <button className={buttonClass("secondary") + " w-full sm:w-auto"}>
-          <LogOut aria-hidden className="size-4" /> Sign out
-        </button>
-      </form>
-    </Card>
+    </section>
   );
-  const look = (
-    <Card className="card-3d">
-      <CardHeader tone="amber" icon={<Eye3D />} title="Look" description="Light, dark, or follow this phone or computer. Remembered on this device." action={<ThemeChoice />} />
-    </Card>
+  const lookCard = (
+    <section className="card">
+      <div className="hd">
+        <div>
+          <h2>Look</h2>
+          <p>Light, dark, or follow your device. Remembered on this device.</p>
+        </div>
+        <ThemeChoice />
+      </div>
+    </section>
   );
+  const langCard = (
+    <section className="card">
+      <div className="hd">
+        <div>
+          <h2>Language</h2>
+          <p>Changes the labels across the portal. Also on the button at the top of every page.</p>
+        </div>
+        <LangChoice />
+      </div>
+      <p className="muted small">Helper text stays in simple words. Numbers, money and buttons look the same in both languages.</p>
+    </section>
+  );
+  const frame = (children: React.ReactNode, actions?: React.ReactNode) => (
+    <PortalPage title="Settings" titleTa="அமைப்புகள்" sub="WhatsApp numbers, payment details, language and your account." subTa="வாட்ஸ்அப் எண்கள், பண விவரங்கள், மொழி மற்றும் உங்கள் கணக்கு." actions={actions}>
+      {children}
+    </PortalPage>
+  );
+
   if (user.role !== "ADMIN") {
     const cid = user.clientId;
-    const [numbers, customers, products, ordersCount] = cid
+    const scope = await getScope();
+    const [numbers, customers, products, ordersCount, client, spend] = cid
       ? await Promise.all([
           numberHealth(cid).catch(() => []),
           db.customer.count({ where: { clientId: cid, optedOut: false } }),
@@ -75,65 +108,150 @@ export default async function SettingsPage() {
             .then((c) => c?.products.length ?? null)
             .catch(() => null),
           db.order.count({ where: { clientId: cid } }),
+          db.client.findUnique({ where: { id: cid }, select: { name: true, website: true, supportPhone: true, paymentConfig: true, billingMode: true } }),
+          spendSummary(cid).catch(() => null),
         ])
-      : [[], 0, null, 0];
-    return (
-      <>
-        <PageHeader
-          title="Settings"
-          description={user.client ? `Your login, look and WhatsApp numbers for ${user.client.name}.` : "Your account."}
-          actions={<Link href="/dashboard/templates" className={buttonClass("secondary") + " lg:hidden"}><SquarePen aria-hidden className="size-4" /> Templates</Link>}
-        />
-        <div className="grid max-w-5xl items-start gap-4 sm:gap-6 lg:grid-cols-2">
-          <div className="space-y-4 sm:space-y-6">
-            {look}
-            {cid && (
-              <Card className="card-3d">
-                <CardHeader tone="brand" icon={<Phone3D />} title="WhatsApp numbers" description="Live from Meta: how healthy each number is and how many people it can message a day." />
-                {numbers.length ? (
-                  <ul className="divide-y divide-line">
-                    {numbers.map((n) => (
-                      <li key={n.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 sm:px-5">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-ink">
-                            {n.verifiedName || n.label}
-                            {n.isDefault && <span className="ml-1.5 text-xs font-medium text-muted">· main number</span>}
-                          </p>
-                          <p className="tabular text-xs text-muted">
-                            {n.displayPhone ?? "Number not shown yet"}
-                            {n.limit != null ? ` · up to ${n.limit.toLocaleString("en-IN")} customers a day` : ""}
-                          </p>
-                        </div>
-                        <QualityBadge rating={n.qualityRating} />
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="px-4 py-3 text-sm text-muted sm:px-5">No WhatsApp number connected yet. Your Thabaal admin adds it.</p>
-                )}
-              </Card>
+      : [[], 0, null, 0, null, null];
+    const quality = (r: string | null | undefined) => (r === "GREEN" ? { tone: "ok", label: "High quality" } : r === "YELLOW" ? { tone: "warn", label: "Medium quality" } : r === "RED" ? { tone: "bad", label: "Low quality" } : { tone: "mute", label: "Not rated yet" });
+    return frame(
+      <div className="stack">
+        {cid && (
+          <section className="card">
+            <div className="hd">
+              <div>
+                <h2>How customers pay</h2>
+                <p>WhatsApp payments, UPI and cash on delivery.</p>
+              </div>
+              <Link className="btn sm" href="/dashboard/revenue?tab=set">
+                Open payment settings
+              </Link>
+            </div>
+            <div className="list">
+              <div className="row">
+                <div className="grow t">Pay inside WhatsApp</div>
+                <span className={`pill ${client?.paymentConfig ? "ok" : "mute"}`}>{client?.paymentConfig ? "On" : "Off"}</span>
+              </div>
+              <div className="row">
+                <div className="grow t">UPI or bank (marked paid by you)</div>
+                <span className="pill ok">On</span>
+              </div>
+              <div className="row">
+                <div className="grow t">Cash on delivery</div>
+                <span className="muted small">Chosen per order</span>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {cid && spend && (
+          <section className="card">
+            <div className="hd">
+              <div>
+                <h2>WhatsApp billing</h2>
+                <p>What Meta charges you for messages.</p>
+              </div>
+              <Link className="btn sm" href="/dashboard/revenue?tab=costs">
+                See costs
+              </Link>
+            </div>
+            <div className="grid g3">
+              <div className="stat">
+                <div className="l">{spend.metaAccount.liveBalance > 0 || spend.prepaidFunds > 0 ? "Balance left" : "Balance"}</div>
+                <div className="v">{spend.metaAccount.liveBalance > 0 || spend.prepaidFunds > 0 ? inr(spend.remainingBalance) : "—"}</div>
+              </div>
+              <div className="stat">
+                <div className="l">This month</div>
+                <div className="v">{inr(spend.totalMonthSpentWithGst)}</div>
+                <div className="d muted">with GST{spend.liveSyncedFromMeta ? "" : " (estimate)"}</div>
+              </div>
+              <div className="stat">
+                <div className="l">Free replies left</div>
+                <div className="v">{spend.serviceQuota.freeRemaining.toLocaleString("en-IN")}</div>
+                <div className="d muted">of {spend.serviceQuota.totalFreeLimit.toLocaleString("en-IN")}</div>
+              </div>
+            </div>
+            {spend.metaAccount.billingUrl && scope.canManage && (
+              <div className="tools" style={{ marginTop: 12 }}>
+                <a className="btn primary sm" href={spend.metaAccount.billingUrl} target="_blank" rel="noopener noreferrer">
+                  Recharge on Meta
+                </a>
+              </div>
             )}
-            {cid && (
-              <Card className="card-3d">
-                <CardHeader tone="brand" icon={<Building3D />} title="Business details" description={user.client?.name} />
-                <dl className="grid grid-cols-3 divide-x divide-line">
-                  {[
-                    ["Customers", customers],
-                    ["Products", products],
-                    ["Orders", ordersCount],
-                  ].map(([label, v]) => (
-                    <div key={label as string} className="px-4 py-3 sm:px-5">
-                      <dt className="text-xs text-muted">{label}</dt>
-                      <dd className="tabular font-display text-xl font-semibold text-ink">{v == null ? "—" : Number(v).toLocaleString("en-IN")}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </Card>
-            )}
-          </div>
-          {account}
+          </section>
+        )}
+
+        <div className="grid g2" style={{ alignItems: "start" }}>
+          {langCard}
+          {lookCard}
         </div>
-      </>
+
+        {accountCard}
+
+        {cid && (
+          <section className="card">
+            <div className="hd">
+              <div>
+                <h2>WhatsApp numbers</h2>
+                <p>Quality rating shows how customers feel about your messages.</p>
+              </div>
+            </div>
+            <div className="list">
+              {numbers.map((n) => {
+                const qy = quality(n.qualityRating);
+                return (
+                  <div key={n.id} className="row">
+                    <div className="grow">
+                      <div className="t">
+                        {n.verifiedName || n.label}
+                        {n.isDefault && <span className="muted small"> · main number</span>}
+                      </div>
+                      <div className="muted small">
+                        {n.displayPhone ?? "Number not shown yet"}
+                        {n.limit != null ? ` · up to ${n.limit.toLocaleString("en-IN")} customers a day` : ""}
+                      </div>
+                    </div>
+                    <span className={`pill ${qy.tone}`}>{qy.label}</span>
+                  </div>
+                );
+              })}
+              {numbers.length === 0 && <p className="muted small">No WhatsApp number connected yet. Your Thabaal admin adds it.</p>}
+            </div>
+          </section>
+        )}
+
+        {cid && (
+          <section className="card">
+            <div className="hd">
+              <div>
+                <h2>Business details</h2>
+                <p>{client?.name}</p>
+              </div>
+            </div>
+            <div className="grid g3" style={{ marginBottom: 12 }}>
+              {[
+                ["Customers", customers],
+                ["Orders", ordersCount],
+                ["Products", products],
+              ].map(([label, v]) => (
+                <div key={label as string} className="stat">
+                  <div className="l">{label}</div>
+                  <div className="v">{v == null ? "—" : Number(v).toLocaleString("en-IN")}</div>
+                </div>
+              ))}
+            </div>
+            <div className="list">
+              <div className="row">
+                <div className="grow muted">Website</div>
+                <span>{client?.website || "—"}</span>
+              </div>
+              <div className="row">
+                <div className="grow muted">Phone</div>
+                <span>{client?.supportPhone || "—"}</span>
+              </div>
+            </div>
+          </section>
+        )}
+      </div>,
     );
   }
 
@@ -142,18 +260,8 @@ export default async function SettingsPage() {
   const h = await headers();
   const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
 
-  return (
+  return frame(
     <>
-      <PageHeader
-        title="Settings"
-        description="Your login, look and WhatsApp numbers."
-        actions={
-          <>
-            <Link href="/dashboard/templates" className={buttonClass("secondary") + " lg:hidden"}><SquarePen aria-hidden className="size-4" /> Templates</Link>
-            <Link href="/dashboard/clients" className={buttonClass("secondary")}><Building2 aria-hidden className="size-4" /> Clients</Link>
-          </>
-        }
-      />
       <ProviderSwitch provider={settings.provider} metaLive={cfg.live} localReady={!!wahaConfig(settings)} />
       <div className="mt-4 grid items-start gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-2">
         <LocalSessionPanel
@@ -215,8 +323,9 @@ export default async function SettingsPage() {
             </div>
           </Card>
           <div className="space-y-4 sm:space-y-6">
-            {look}
-            {account}
+            {langCard}
+            {lookCard}
+            {accountCard}
           </div>
         </div>
       </div>
@@ -232,6 +341,9 @@ export default async function SettingsPage() {
           <AppearanceEditor mode="portal" initial={portalDefault(settings.appearance)} />
         </div>
       </Card>
-    </>
+    </>,
+    <Link className="btn" href="/dashboard/clients">
+      <Building2 aria-hidden className="ic" style={{ width: 15, height: 15 }} /> Clients
+    </Link>,
   );
 }

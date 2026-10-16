@@ -2,34 +2,54 @@
 
 import { useState, useTransition } from "react";
 import { toastResult } from "@/components/toast";
-import { Button, Field } from "@/components/ui";
 import { changePassword } from "../actions/account";
 
+/** Change password, in the portal design's form style. */
 export function PasswordForm() {
   const [cur, setCur] = useState("");
   const [next, setNext] = useState("");
+  const [again, setAgain] = useState("");
   const [pending, start] = useTransition();
+  const mismatch = again.length > 0 && again !== next;
   return (
     <form
-      className="max-w-md space-y-4 p-4 sm:p-5"
+      className="stack"
+      style={{ gap: 12, marginTop: 12 }}
       onSubmit={(e) => {
         e.preventDefault();
+        if (mismatch) return;
         start(async () => {
           const r = await changePassword(cur, next);
           toastResult(r);
-          if (r.ok) { setCur(""); setNext(""); }
+          if (r.ok) {
+            setCur("");
+            setNext("");
+            setAgain("");
+          }
         });
       }}
     >
-      <Field id="cur" label="Current password" required>
-        <input type="password" autoComplete="current-password" className="field" value={cur} onChange={(e) => setCur(e.target.value)} />
-      </Field>
-      <Field id="new" label="New password" hint="8+ characters" required>
-        <input type="password" autoComplete="new-password" minLength={8} className="field" value={next} onChange={(e) => setNext(e.target.value)} />
-      </Field>
-      <Button type="submit" className="max-sm:w-full" loading={pending}>
-        Change password
-      </Button>
+      <div className="field">
+        <label htmlFor="cur">Current password</label>
+        <input id="cur" type="password" autoComplete="current-password" required value={cur} onChange={(e) => setCur(e.target.value)} />
+      </div>
+      <div className="formgrid">
+        <div className="field">
+          <label htmlFor="new">New password</label>
+          <input id="new" type="password" autoComplete="new-password" minLength={8} required value={next} onChange={(e) => setNext(e.target.value)} />
+        </div>
+        <div className="field">
+          <label htmlFor="again">Type it again</label>
+          <input id="again" type="password" autoComplete="new-password" minLength={8} required value={again} onChange={(e) => setAgain(e.target.value)} />
+        </div>
+      </div>
+      {mismatch && <p className="msg err">The two new passwords don&apos;t match.</p>}
+      <div className="tools">
+        <button type="submit" className="btn primary" disabled={pending || mismatch}>
+          {pending ? "Changing…" : "Change password"}
+        </button>
+        <span className="muted small">8 or more characters.</span>
+      </div>
     </form>
   );
 }
