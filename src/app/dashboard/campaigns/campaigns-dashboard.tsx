@@ -1,0 +1,725 @@
+"use client";
+
+import React, { useState, useEffect, useTransition } from "react";
+import Link from "@/components/intent-link";
+import { Plus } from "@/components/icons";
+import { PortalPage, T } from "../portal-ui";
+import { deleteCampaign, duplicateCampaign, toggleCampaign } from "../actions/campaigns";
+import { useRouter } from "next/navigation";
+
+export type CampaignItem = {
+  id: string;
+  n: string;
+  w: string;
+  tpl: string;
+  s: "scheduled" | "running" | "paused" | "completed" | "drafts";
+  aud: string;
+  cnt: number;
+  sent: number;
+  seen: number;
+  rep: number;
+  ord: number;
+  sp: number;
+  sale: number;
+  fail?: number;
+  est?: number;
+  body?: string;
+  buttons?: string[];
+  isLive?: boolean;
+};
+
+export type CampaignsDashboardProps = {
+  kpi: {
+    sent: number;
+    spent: number;
+    sales: number;
+    back: number;
+  };
+  campaigns: CampaignItem[];
+  canManage: boolean;
+  children?: React.ReactNode;
+};
+
+const TAB_DEFS = [
+  { id: "all", label: "All", ta: "அனைத்தும்" },
+  { id: "scheduled", label: "Scheduled", ta: "திட்டமிடப்பட்டது" },
+  { id: "running", label: "Running", ta: "இயங்குகிறது" },
+  { id: "completed", label: "Completed", ta: "முடிந்தது" },
+  { id: "drafts", label: "Drafts", ta: "வரைவுகள்" },
+  { id: "paused", label: "Paused", ta: "நிறுத்தப்பட்டது" },
+  { id: "auto", label: "Automations", ta: "தானியங்கு" },
+] as const;
+
+type TabId = (typeof TAB_DEFS)[number]["id"];
+
+const SL: Record<CampaignItem["s"], [string, string]> = {
+  scheduled: ["info", "Scheduled"],
+  running: ["ok", "Running"],
+  completed: ["mute", "Completed"],
+  drafts: ["mute", "Draft"],
+  paused: ["warn", "Paused"],
+};
+
+function R(n: number) {
+  return "₹" + Math.round(n).toLocaleString("en-IN");
+}
+
+function ver(c: CampaignItem): [string, string] | null {
+  if (!c.sp || !c.ord) return null;
+  const r = c.sale / c.sp;
+  return r >= 10 ? ["ok", "Working well"] : r >= 3 ? ["warn", "OK"] : ["bad", "Not paying back"];
+}
+
+function sum(c: CampaignItem) {
+  const r = Math.round((c.sale / c.sp) * 100) / 100;
+  return (
+    "Reached " +
+    c.sent.toLocaleString("en-IN") +
+    " customers. " +
+    Math.round((c.sent * c.seen) / 100).toLocaleString("en-IN") +
+    " read it. " +
+    c.ord +
+    " paid orders brought " +
+    R(c.sale) +
+    ". You spent " +
+    R(c.sp) +
+    ". Every ₹1 spent brought " +
+    R(r) +
+    " in sales."
+  );
+}
+
+export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage, children }: CampaignsDashboardProps) {
+  const router = useRouter();
+  const [items, setItems] = useState<CampaignItem[]>(initialCampaigns);
+  const [tab, setTab] = useState<TabId>("all");
+  const [search, setSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showCompare, setShowCompare] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [progModal, setProgModal] = useState<CampaignItem | null>(null);
+  const [pvModal, setPvModal] = useState<CampaignItem | null>(null);
+  const [, startTransition] = useTransition();
+
+  // Keep state updated when server revalidates
+  useEffect(() => {
+    setItems(initialCampaigns);
+  }, [initialCampaigns]);
+
+  // Sync tab with URL hash on mount & hash change
+  useEffect(() => {
+    const handleHash = () => {
+      const h = window.location.hash.replace("#", "").toLowerCase() as TabId;
+      if (TAB_DEFS.some((t) => t.id === h)) {
+        setTab(h);
+      }
+    };
+    handleHash();
+    window.addEventListener("hashchange", handleHash);
+    return () => window.removeEventListener("hashchange", handleHash);
+  }, []);
+
+  const switchTab = (t: TabId) => {
+    setTab(t);
+    window.location.hash = t;
+  };
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => {
+      setToastMsg((prev) => (prev === msg ? null : prev));
+    }, 2800);
+  };
+
+  // Compare selection toggle
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const handleCompareClick = () => {
+    if (selectedIds.length < 2) {
+      showToast("Tick “Compare” on two or more campaigns");
+      return;
+    }
+    setShowCompare(true);
+  };
+
+  // Action handlers
+  const handlePause = async (c: CampaignItem) => {
+    if (c.isLive) {
+      startTransition(async () => {
+        const res = await toggleCampaign(c.id, false);
+        showToast(res.message || "Campaign paused");
+        router.refresh();
+      });
+    } else {
+      setItems((prev) => prev.map((x) => (x.id === c.id ? { ...x, s: "paused" } : x)));
+      showToast("Campaign paused");
+    }
+  };
+
+  const handleResume = async (c: CampaignItem) => {
+    if (c.isLive) {
+      startTransition(async () => {
+        const res = await toggleCampaign(c.id, true);
+        showToast(res.message || "Campaign resumed");
+        router.refresh();
+      });
+    } else {
+      setItems((prev) => prev.map((x) => (x.id === c.id ? { ...x, s: "running" } : x)));
+      showToast("Campaign resumed");
+    }
+  };
+
+  const handleDelete = async (c: CampaignItem) => {
+    if (!window.confirm(`Delete "${c.n}"?`)) return;
+    if (c.isLive) {
+      startTransition(async () => {
+        const res = await deleteCampaign(c.id);
+        showToast(res.message || "Campaign deleted");
+        router.refresh();
+      });
+    } else {
+      setItems((prev) => prev.filter((x) => x.id !== c.id));
+      setSelectedIds((prev) => prev.filter((x) => x !== c.id));
+      showToast("Campaign deleted");
+    }
+  };
+
+  const handleDuplicate = async (c: CampaignItem) => {
+    if (c.isLive) {
+      startTransition(async () => {
+        const res = await duplicateCampaign(c.id);
+        showToast(res.message || "Copy saved as a draft");
+        router.refresh();
+      });
+    } else {
+      const copy: CampaignItem = {
+        ...c,
+        id: "draft-" + Date.now(),
+        n: c.n + " (copy)",
+        s: "drafts",
+        sent: 0,
+        sale: 0,
+        sp: 0,
+        ord: 0,
+        rep: 0,
+        seen: 0,
+        fail: 0,
+      };
+      setItems((prev) => [copy, ...prev]);
+      showToast("Copy saved as a draft");
+    }
+  };
+
+  const handleViewProgress = (c: CampaignItem) => {
+    setProgModal(c);
+  };
+
+  const handlePreview = (c: CampaignItem) => {
+    setPvModal(c);
+  };
+
+  // Automations list from prototype
+  const [automations, setAutomations] = useState([
+    { name: "Order updates", desc: "Confirmed, paid, dispatched, delivered and cancelled messages.", cat: "Utility", val: 1 },
+    { name: "Payment reminder", desc: "If a customer has not paid after 1 day, send one gentle reminder with the link.", cat: "Utility", val: 1 },
+    { name: "Refill reminders", desc: "30 days after an order, once, unless they already reordered.", cat: "Marketing", val: 1 },
+    { name: "Win-back", desc: "One message to customers who have not bought for 56 days.", cat: "Marketing", val: 0 },
+    { name: "Replies to button taps", desc: "Customers who tap “Send price list” or “Order now” get the answer straight away.", cat: "Free", val: 1 },
+    { name: "Pay inside WhatsApp (UPI)", desc: "Customers pay with GPay, PhonePe, Paytm or BHIM. Paid orders are marked and a receipt is sent.", cat: "Utility", val: 1 },
+    { name: "Login codes", desc: "Codes sent when someone signs in.", cat: "Authentication", val: 2 },
+    { name: "Stop promotions", desc: "Customers who reply STOP are removed from offers. Always on.", cat: "Free", val: 2 },
+  ]);
+
+  const toggleAutomation = (idx: number) => {
+    setAutomations((prev) =>
+      prev.map((a, i) => {
+        if (i !== idx || a.val === 2) return a;
+        const nextVal = a.val === 1 ? 0 : 1;
+        showToast(`${a.name} ${nextVal ? "turned on" : "turned off"}`);
+        return { ...a, val: nextVal };
+      }),
+    );
+  };
+
+  const filteredItems = items.filter((x) => {
+    const matchesTab = tab === "all" || x.s === tab;
+    const matchesSearch = !search || x.n.toLowerCase().includes(search.toLowerCase());
+    return matchesTab && matchesSearch;
+  });
+
+  const comparedList = items.filter((x) => selectedIds.includes(x.id));
+
+  return (
+    <PortalPage
+      title="Campaigns"
+      titleTa="பிரச்சாரம்"
+      sub="Create, schedule and improve your WhatsApp broadcasts."
+      subTa="உங்கள் வாட்ஸ்அப் செய்திகளை உருவாக்கி, நேரம் அமைத்து, மேம்படுத்துங்கள்."
+      actions={
+        canManage ? (
+          <Link className="btn primary" href="/dashboard/campaigns/new">
+            <Plus aria-hidden className="ic" /> New campaign
+          </Link>
+        ) : undefined
+      }
+    >
+      {/* 4-KPI Stat Strip */}
+      <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
+        <div className="card stat">
+          <div className="l">Sent this month</div>
+          <div className="v">{kpi.sent.toLocaleString("en-IN")}</div>
+        </div>
+        <div className="card stat">
+          <div className="l">Money spent</div>
+          <div className="v">{R(kpi.spent)}</div>
+          <div className="d muted">Meta message charges</div>
+        </div>
+        <div className="card stat">
+          <div className="l">Sales from campaigns</div>
+          <div className="v">{R(kpi.sales)}</div>
+          <div className="d muted">Paid orders</div>
+        </div>
+        <div className="card stat">
+          <div className="l">Back for every ₹1</div>
+          <div className="v">{kpi.spent > 0 ? R(kpi.back) : "—"}</div>
+          <div className="d muted">Sales, not profit</div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="tabs" data-tabs role="tablist">
+        {TAB_DEFS.map((t) => (
+          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => switchTab(t.id)}>
+            <T ta={t.ta}>{t.label}</T>
+          </button>
+        ))}
+      </div>
+
+      {tab !== "auto" ? (
+        <section data-panel={tab}>
+          {/* Toolbar */}
+          <div className="toolbar">
+            <div className="search">
+              <svg viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-4-4" />
+              </svg>
+              <input
+                type="search"
+                id="cam-cq"
+                placeholder="Search campaign name"
+                aria-label="Search campaigns"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <button type="button" className="btn sm" id="cmp" style={{ marginLeft: "auto" }} onClick={handleCompareClick}>
+              Compare selected
+            </button>
+          </div>
+
+          {/* Comparison drawer / card */}
+          {showCompare && (
+            <div className="card" id="cmpb" style={{ marginTop: 16, marginBottom: 16 }}>
+              <div className="hd">
+                <h2>Comparison</h2>
+                <button type="button" className="btn sm" id="cmpx" onClick={() => setShowCompare(false)}>
+                  Close
+                </button>
+              </div>
+              <div className="tw">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Campaign</th>
+                      <th className="num">Sent</th>
+                      <th className="num">Read</th>
+                      <th className="num">Replies</th>
+                      <th className="num">Orders</th>
+                      <th className="num">Spent</th>
+                      <th className="num">Sales</th>
+                      <th className="num">Back per ₹1</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {comparedList.map((c) => (
+                      <tr key={c.id}>
+                        <td>
+                          <b>{c.n}</b>
+                        </td>
+                        <td className="num">{c.sent.toLocaleString("en-IN")}</td>
+                        <td className="num">{Math.round((c.sent * c.seen) / 100).toLocaleString("en-IN")}</td>
+                        <td className="num">{c.rep}</td>
+                        <td className="num">{c.ord}</td>
+                        <td className="num">{R(c.sp)}</td>
+                        <td className="num">{R(c.sale)}</td>
+                        <td className="num">{c.sp > 0 ? R(Math.round((c.sale / c.sp) * 100) / 100) : "–"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Campaign cards stack */}
+          <div className="stack" id={`l-${tab}`}>
+            {filteredItems.map((c) => {
+              const v = ver(c);
+              const pct = c.cnt > 0 ? Math.round((c.sent / c.cnt) * 100) : 0;
+              return (
+                <article key={c.id} className="card">
+                  {/* Card Header */}
+                  <div className="hd" style={{ marginBottom: 8 }}>
+                    <div>
+                      <h2 style={{ fontSize: 18 }}>
+                        {c.isLive ? (
+                          <Link href={`/dashboard/campaigns/${c.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+                            {c.n}
+                          </Link>
+                        ) : (
+                          c.n
+                        )}
+                      </h2>
+                      <p>
+                        {c.w} · {c.aud} · “{c.tpl}”
+                      </p>
+                    </div>
+                    <div className="tools">
+                      <span className={`pill ${SL[c.s][0]}`}>{SL[c.s][1]}</span>
+                      {v && <span className={`pill ${v[0]}`}>{v[1]}</span>}
+                    </div>
+                  </div>
+
+                  {/* Card Body */}
+                  {c.s === "scheduled" && (
+                    <p className="small">
+                      Will go to <b>{c.cnt.toLocaleString("en-IN")}</b> people · costs about <b>{R(c.est ?? 0)}</b> from your wallet.
+                    </p>
+                  )}
+
+                  {c.s === "drafts" && <p className="small muted">Not finished. Pick the customers and the time to start it.</p>}
+
+                  {(c.s === "running" || c.s === "paused" || c.s === "completed") && (
+                    <>
+                      {c.s === "running" && (
+                        <>
+                          <div className="bar" style={{ marginBottom: 10 }}>
+                            <i style={{ width: `${pct}%`, background: "var(--bar)" }} />
+                          </div>
+                          <p className="small muted" style={{ marginBottom: 8 }}>
+                            {c.sent.toLocaleString("en-IN")} of {c.cnt.toLocaleString("en-IN")} sent ({pct}%)
+                            {c.fail ? ` · ${c.fail} failed` : ""}
+                          </p>
+                        </>
+                      )}
+
+                      <div className="grid g4 keep2">
+                        <div className="stat">
+                          <div className="l">Sent</div>
+                          <div className="v" style={{ fontSize: 20 }}>
+                            {c.sent.toLocaleString("en-IN")}
+                          </div>
+                        </div>
+                        <div className="stat">
+                          <div className="l">Read</div>
+                          <div className="v" style={{ fontSize: 20 }}>
+                            {Math.round((c.sent * c.seen) / 100).toLocaleString("en-IN")}
+                          </div>
+                          <div className="d muted">{c.seen} of 100</div>
+                        </div>
+                        <div className="stat">
+                          <div className="l">Replies</div>
+                          <div className="v" style={{ fontSize: 20 }}>
+                            {c.rep}
+                          </div>
+                        </div>
+                        <div className="stat">
+                          <div className="l">Paid orders</div>
+                          <div className="v" style={{ fontSize: 20 }}>
+                            {c.ord}
+                          </div>
+                        </div>
+                      </div>
+
+                      {c.s === "completed" ? (
+                        <p className="note small" style={{ marginTop: 12 }}>
+                          {sum(c)}
+                        </p>
+                      ) : (
+                        <p className="small" style={{ marginTop: 10 }}>
+                          Spent <b>{R(c.sp)}</b> · Sales <b>{R(c.sale)}</b>
+                        </p>
+                      )}
+                    </>
+                  )}
+
+                  {/* Card Actions Footer */}
+                  <div className="tools" style={{ marginTop: 12 }}>
+                    {c.s === "scheduled" && (
+                      <>
+                        {c.isLive ? (
+                          <Link className="btn primary" href={`/dashboard/campaigns/${c.id}`}>
+                            View schedule
+                          </Link>
+                        ) : (
+                          <button type="button" className="btn primary" onClick={() => handleViewProgress(c)}>
+                            View schedule
+                          </button>
+                        )}
+                        {c.isLive ? (
+                          <Link className="btn sm" href={`/dashboard/campaigns/${c.id}`}>
+                            Edit time
+                          </Link>
+                        ) : (
+                          <button type="button" className="btn sm" onClick={() => showToast("Edit opens in the live app")}>
+                            Edit time
+                          </button>
+                        )}
+                        <button type="button" className="btn sm" onClick={() => handlePause(c)}>
+                          Pause
+                        </button>
+                        <button type="button" className="btn sm" onClick={() => handlePreview(c)}>
+                          Preview
+                        </button>
+                      </>
+                    )}
+
+                    {c.s === "running" && (
+                      <>
+                        <button type="button" className="btn primary" onClick={() => handleViewProgress(c)}>
+                          View progress
+                        </button>
+                        <button type="button" className="btn sm" onClick={() => handlePause(c)}>
+                          Pause
+                        </button>
+                        <Link className="btn sm" href="/dashboard/messages?status=FAILED">
+                          View failed messages
+                        </Link>
+                      </>
+                    )}
+
+                    {c.s === "paused" && (
+                      <>
+                        <button type="button" className="btn primary" onClick={() => handleResume(c)}>
+                          Resume
+                        </button>
+                        {c.isLive ? (
+                          <Link className="btn sm" href={`/dashboard/campaigns/${c.id}`}>
+                            Edit
+                          </Link>
+                        ) : (
+                          <button type="button" className="btn sm" onClick={() => showToast("Edit opens in the live app")}>
+                            Edit
+                          </button>
+                        )}
+                        <button type="button" className="btn sm" onClick={() => handleDuplicate(c)}>
+                          Duplicate
+                        </button>
+                        <button type="button" className="btn sm danger" onClick={() => handleDelete(c)}>
+                          Delete
+                        </button>
+                      </>
+                    )}
+
+                    {c.s === "completed" && (
+                      <>
+                        <button type="button" className="btn primary" onClick={() => handleViewProgress(c)}>
+                          View result
+                        </button>
+                        <button type="button" className="btn sm" onClick={() => handleDuplicate(c)}>
+                          Duplicate
+                        </button>
+                        <Link className="btn sm" href="/dashboard/campaigns/new">
+                          Send follow-up
+                        </Link>
+                        <button
+                          type="button"
+                          className="btn sm"
+                          onClick={() => {
+                            if (!selectedIds.includes(c.id)) {
+                              setSelectedIds((prev) => [...prev, c.id]);
+                            }
+                            showToast("Tick “Compare” on two campaigns, then press Compare selected");
+                          }}
+                        >
+                          Compare
+                        </button>
+                      </>
+                    )}
+
+                    {c.s === "drafts" && (
+                      <>
+                        {c.isLive ? (
+                          <Link className="btn primary" href={`/dashboard/campaigns/${c.id}`}>
+                            Continue setup
+                          </Link>
+                        ) : (
+                          <Link className="btn primary" href="/dashboard/campaigns/new">
+                            Continue setup
+                          </Link>
+                        )}
+                        <button type="button" className="btn sm" onClick={() => handlePreview(c)}>
+                          Preview
+                        </button>
+                        <button type="button" className="btn sm" onClick={() => handleDuplicate(c)}>
+                          Duplicate
+                        </button>
+                        <button type="button" className="btn sm danger" onClick={() => handleDelete(c)}>
+                          Delete
+                        </button>
+                      </>
+                    )}
+
+                    {c.s !== "drafts" && (
+                      <label className="small muted" style={{ display: "flex", gap: 6, alignItems: "center", marginLeft: "auto", cursor: "pointer" }}>
+                        <input type="checkbox" className="cc" checked={selectedIds.includes(c.id)} onChange={() => toggleSelect(c.id)} />
+                        Compare
+                      </label>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+
+            {filteredItems.length === 0 && <p className="muted">Nothing here yet.</p>}
+          </div>
+        </section>
+      ) : (
+        /* Automations Tab */
+        <section data-panel="auto">
+          <p className="muted" style={{ marginBottom: 14 }}>
+            Set these once. They run on their own, with no campaign to start.
+          </p>
+          <div className="card">
+            <div className="list" id="au">
+              {automations.map((a, i) => (
+                <div key={a.name} className="row">
+                  <div className="grow">
+                    <div className="t">
+                      {a.name} <span className="pill mute" style={{ marginLeft: 6 }}>{a.cat}</span>
+                    </div>
+                    <div className="muted small">{a.desc}</div>
+                  </div>
+                  {a.val === 2 ? (
+                    <span className="pill ok">Always on</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="sw"
+                      role="switch"
+                      aria-checked={a.val === 1}
+                      aria-label={a.name}
+                      onClick={() => toggleAutomation(i)}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Live Reorder & Winback config */}
+          {children && <div style={{ marginTop: 16 }}>{children}</div>}
+        </section>
+      )}
+
+      {/* Progress / Result Modal */}
+      {progModal && (
+        <dialog id="prog" open style={{ display: "block", position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 100 }}>
+          <div className="dlg">
+            <h2>{progModal.n}</h2>
+            <div className="list">
+              <div className="row">
+                <div className="grow muted">Sent</div>
+                <b>
+                  {progModal.sent.toLocaleString("en-IN")} of {progModal.cnt.toLocaleString("en-IN")}
+                </b>
+              </div>
+              <div className="row">
+                <div className="grow muted">Read</div>
+                <b>{Math.round((progModal.sent * progModal.seen) / 100).toLocaleString("en-IN")}</b>
+              </div>
+              <div className="row">
+                <div className="grow muted">Replies</div>
+                <b>{progModal.rep}</b>
+              </div>
+              <div className="row">
+                <div className="grow muted">Paid orders</div>
+                <b>{progModal.ord}</b>
+              </div>
+              <div className="row">
+                <div className="grow muted">Failed</div>
+                <b>{progModal.fail || 0}</b>
+              </div>
+              <div className="row" style={{ borderTop: "2px solid var(--line)" }}>
+                <div className="grow t">Sales</div>
+                <b>{R(progModal.sale)}</b>
+              </div>
+            </div>
+            {progModal.sp > 0 && <p className="note small" style={{ marginTop: 12 }}>{sum(progModal)}</p>}
+            <div className="acts">
+              <button type="button" className="btn" onClick={() => setProgModal(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </dialog>
+      )}
+
+      {/* Preview Modal */}
+      {pvModal && (
+        <dialog id="pv" open style={{ display: "block", position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 100 }}>
+          <div className="dlg">
+            <h2>Preview: {pvModal.n}</h2>
+            <div className="phone">
+              <div className="bubble">{pvModal.body || `${pvModal.n}! Special offer for your next order today.`}</div>
+              {pvModal.buttons && pvModal.buttons.length > 0 && (
+                <div className="qr">
+                  {pvModal.buttons.map((b) => (
+                    <span key={b}>{b}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="acts">
+              <button type="button" className="btn" onClick={() => setPvModal(null)}>
+                Close
+              </button>
+              <button
+                type="button"
+                className="btn primary"
+                onClick={() => {
+                  showToast("Test message sent to your own number");
+                  setPvModal(null);
+                }}
+              >
+                Send me a test
+              </button>
+            </div>
+          </div>
+        </dialog>
+      )}
+
+      {/* Backdrop for open dialogs */}
+      {(progModal || pvModal) && (
+        <div
+          onClick={() => {
+            setProgModal(null);
+            setPvModal(null);
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(16,40,59,.55)",
+            zIndex: 90,
+          }}
+        />
+      )}
+
+      {/* Floating Toast Notification */}
+      <div className={`toast ${toastMsg ? "on" : ""}`}>{toastMsg}</div>
+    </PortalPage>
+  );
+}
