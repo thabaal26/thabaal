@@ -41,7 +41,7 @@ html.dark .thabaal-portal{
 .thabaal-portal .side{position:sticky;top:0;height:100vh;overflow:auto;padding:20px 14px;border-right:1.5px solid var(--line);display:flex;flex-direction:column;gap:18px;min-width:0}
 .thabaal-portal .logo{display:flex;align-items:center;gap:10px;padding:0 8px;text-decoration:none}
 .thabaal-portal .logo img{width:40px;height:auto}
-.thabaal-portal .logo b{font:600 22px var(--display);letter-spacing:-.3px}
+.thabaal-portal .logo b{font:600 22px var(--font-brand, "Fredoka", sans-serif);letter-spacing:-.3px}
 .thabaal-portal .nav{display:flex;flex-direction:column;gap:14px}
 .thabaal-portal .nav h4{margin:0 0 4px;padding:0 10px;font:600 11px var(--ui);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .thabaal-portal .nav a{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:12px;text-decoration:none;font-weight:500;color:var(--fg)}

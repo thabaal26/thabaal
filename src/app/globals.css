@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Fredoka:wght@500;600;700&display=swap");
 @import "tailwindcss";
 @import "./icons.generated.css";
 @import "./appearance.css";
@@ -7,6 +7,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
+  --font-brand: "Fredoka", var(--font-dm-sans), "DM Sans", var(--font-tamil), ui-rounded, system-ui, sans-serif;
   --font-display: var(--font-dm-sans), "DM Sans", var(--font-tamil), ui-rounded, system-ui, sans-serif;
   --font-ui: var(--font-dm-sans), "DM Sans", var(--font-tamil), system-ui, -apple-system, sans-serif;
   --font-sans: var(--font-dm-sans), "DM Sans", var(--font-tamil), ui-sans-serif, system-ui, sans-serif;
@@ -14,6 +15,7 @@
 }
 
 :root {
+  --font-brand: "Fredoka", var(--font-dm-sans), "DM Sans", var(--font-tamil), ui-rounded, system-ui, sans-serif;
   --display: var(--font-dm-sans), "DM Sans", var(--font-tamil), ui-rounded, system-ui, sans-serif;
   --ui: var(--font-dm-sans), "DM Sans", var(--font-tamil), system-ui, -apple-system, "Segoe UI", sans-serif;
   --bg: #FFF9F0;
@@ -622,6 +624,7 @@ input:-webkit-autofill:active {
 html.theme-anim, html.theme-anim * { transition: background-color 0.25s ease, border-color 0.25s ease, color 0.2s ease !important; }
 
 /* ───────────────────────── Artifact Design System Classes ───────────────────────── */
+.font-brand { font-family: var(--font-brand); }
 .font-display { font-family: var(--display); }
 .font-ui { font-family: var(--ui); }
 
