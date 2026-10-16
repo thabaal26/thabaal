@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "@/components/intent-link";
 import { PageTools } from "@/components/shell-tools";
+import { LangButton, useLang } from "../portal-ui";
 import type { ComprehensiveReportData, PeriodFigures, PeriodKey } from "@/lib/reports-data";
 import "./reports.css";
 
@@ -128,6 +129,8 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
     return () => window.removeEventListener("hashchange", fromHash);
   }, []);
 
+  const lang = useLang();
+
   const selectTab = (t: "ov" | "camp" | "cust" | "prod") => {
     setTab(t);
     try {
@@ -137,7 +140,8 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
     }
   };
 
-  const tr = (en: string, _ta?: string) => en;
+  // English or Tamil, from the portal's language switch (shared with every page).
+  const tr = (en: string, ta?: string) => (lang === "ta" && ta ? ta : en);
 
   const d: PeriodFigures = per === "m" ? data.overview.m : data.overview.w;
   const r = d.returnRatio;
@@ -183,6 +187,7 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
               )}
             </p>
           </div>
+          <LangButton />
           <PageTools />
         </header>
 
