@@ -63,7 +63,7 @@ export function CollectList({ rows, nowMs, canOperate, intro = true }: { rows: C
       <div className="toolbar">
         <div className="search">
           <Search aria-hidden />
-          <input type="search" placeholder="Search customer or order" aria-label="Search" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input id="payment-search" name="q" type="search" placeholder="Search customer or order" aria-label="Search" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <Chips label="Payment state" value={filter} onChange={setFilter} options={opts.map((o) => ({ ...o, n: count(o.id) }))} />
         {canOperate && remindable.length > 0 && <RemindAll ids={remindable.map((r) => r.id)} />}

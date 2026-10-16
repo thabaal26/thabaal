@@ -65,7 +65,7 @@ function ReportBars({
         const x = pl + i * bw + gap / 2;
         let acc = 0;
         return (
-          <g key={lb}>
+          <g key={`${lb}-${i}`}>
             {series.map((s, j) => {
               const val = s.vals[i] || 0;
               const hh = (ih * val) / mx;
@@ -187,8 +187,10 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
               )}
             </p>
           </div>
-          <LangButton />
-          <PageTools />
+          <div className="tools">
+            <LangButton />
+            <PageTools />
+          </div>
         </header>
 
       {/* Top Verdict Card */}
@@ -256,6 +258,7 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
       <div className="tabs" data-tabs role="tablist">
         <button
           type="button"
+          role="tab"
           data-tab="ov"
           data-ta="மொத்தம்"
           aria-selected={tab === "ov"}
@@ -265,6 +268,7 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
         </button>
         <button
           type="button"
+          role="tab"
           data-tab="camp"
           aria-selected={tab === "camp"}
           onClick={() => selectTab("camp")}
@@ -273,6 +277,7 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
         </button>
         <button
           type="button"
+          role="tab"
           data-tab="cust"
           aria-selected={tab === "cust"}
           onClick={() => selectTab("cust")}
@@ -281,6 +286,7 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
         </button>
         <button
           type="button"
+          role="tab"
           data-tab="prod"
           aria-selected={tab === "prod"}
           onClick={() => selectTab("prod")}

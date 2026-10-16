@@ -48,7 +48,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {/* Sets light or dark before the first paint, from the saved choice or the device setting. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
-      <body className="min-h-full font-sans">
+      <body className="min-h-full font-sans" suppressHydrationWarning>
         {children}
         <Toaster />
         <ConfirmHost />
