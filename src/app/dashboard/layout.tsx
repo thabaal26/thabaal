@@ -90,7 +90,7 @@ function ClientMark({ logoUrl, name }: { logoUrl?: string | null; name: string }
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
   await requireUser();
   const scope = await getScope();
-  const [settings, client, sender, clients, rawOpenReplies, rawOrdersToHandle] = await Promise.all([
+  const [settings, client, sender, clients, rawOpenReplies, rawOrdersToHandle, rawPaymentsToCheck] = await Promise.all([
     getSettings(),
     brandedClient(),
     scope.clientId ? senderFor(scope.clientId) : null,
@@ -98,6 +98,18 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
     db.reply.groupBy({ by: ["customerId"], where: { handled: false, ...ownedMessages(scope) } }).then((g) => g.length),
     // New orders to confirm plus confirmed or paid ones to pack: the same work Home and Orders count.
     db.order.count({ where: { status: { in: ["NEW", "CONFIRMED", "PAID"] }, ...owned(scope) } }).catch(() => 0),
+    // Payments that need someone: customers who say they paid (check the bank), and refunds still due.
+    db.order
+      .count({
+        where: {
+          ...owned(scope),
+          OR: [
+            { paidAt: null, paymentClaimedAt: { not: null }, status: { not: "CANCELLED" } },
+            { status: "CANCELLED", refundedAt: null, OR: [{ paidAt: { not: null } }, { paidAmount: { gt: 0 } }] },
+          ],
+        },
+      })
+      .catch(() => 0),
   ]);
 
   const disabledSections = client?.disabledSections ?? [];
@@ -109,6 +121,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
   const openReplies = repliesOn ? rawOpenReplies : 0;
   const ordersToHandle = ordersOn ? rawOrdersToHandle : 0;
   const unreadNotifications = openReplies + ordersToHandle;
+  const paymentsToCheck = ordersOn ? rawPaymentsToCheck : 0;
 
   const look = resolveAppearance(settings.appearance, client);
   const lookData = appearanceDataset(look);
@@ -168,7 +181,11 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
                 openReplies={openReplies}
                 newOrders={ordersToHandle}
                 unreadNotifications={unreadNotifications}
+                paymentsToCheck={paymentsToCheck}
               />
+              <Link href="/dashboard/guide" className="mt-4 block px-3 text-[12.5px] text-muted underline-offset-4 hover:text-ink hover:underline">
+                What changed in this menu
+              </Link>
             </div>
             <div className="shrink-0 border-t border-line p-3">
               <Link href="/dashboard/settings" className="flex items-center gap-2.5 rounded-xl p-2 transition hover:bg-sunken">
@@ -219,6 +236,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
             openReplies={openReplies}
             newOrders={ordersToHandle}
             unreadNotifications={unreadNotifications}
+            paymentsToCheck={paymentsToCheck}
           />
         </div>
       </ShellProvider>

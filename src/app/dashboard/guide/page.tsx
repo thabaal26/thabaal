@@ -1,261 +1,158 @@
-import { BarChart3, Home, IndianRupee, Megaphone, MessageCircle, Package, Settings, Tag, Users } from "@/components/icons";
+import { BarChart3, FileText, Home, IndianRupee, Megaphone, MessageCircle, Package, Settings, Tag, Users } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
+import { PortalPage } from "../portal-ui";
 
-export const metadata: Metadata = {
-  title: "What changed in this menu · Thabaal",
-  description: "A map from the old menu to the new 9-page architecture.",
-};
+export const metadata: Metadata = { title: "What changed" };
 
 const PAGES = [
-  {
-    href: "/dashboard",
-    title: "Home",
-    icon: Home,
-    desc: "Today at a glance: 3 things to do, key numbers, wallet, next campaign, daily brief.",
-  },
-  {
-    href: "/dashboard/replies",
-    title: "Chats",
-    icon: MessageCircle,
-    desc: "Open chats, priority board, calls.",
-  },
-  {
-    href: "/dashboard/orders",
-    title: "Orders",
-    icon: Package,
-    desc: "Every order, packing list, new order.",
-  },
-  {
-    href: "/dashboard/revenue",
-    title: "Money",
-    icon: IndianRupee,
-    desc: "Cash in, follow-ups, WhatsApp costs and wallet.",
-  },
-  {
-    href: "/dashboard/customers",
-    title: "Customers",
-    icon: Users,
-    desc: "All customers, groups to reach, loyalty, refills.",
-  },
-  {
-    href: "/dashboard/catalogue",
-    title: "Products",
-    icon: Tag,
-    desc: "Catalogue and how products sell.",
-  },
-  {
-    href: "/dashboard/campaigns",
-    title: "Campaigns",
-    icon: Megaphone,
-    desc: "Campaigns, templates, automatic messages, message log.",
-  },
-  {
-    href: "/dashboard/report",
-    title: "Reports",
-    icon: BarChart3,
-    desc: "This week, message-to-sale funnel, carts, who and when.",
-  },
-  {
-    href: "/dashboard/settings",
-    title: "Settings",
-    icon: Settings,
-    desc: "Password, look, WhatsApp numbers, business details.",
-  },
+  { href: "/dashboard", title: "Home", icon: Home, desc: "Today at a glance: 3 things to do, key numbers, wallet, next campaign, daily brief." },
+  { href: "/dashboard/replies", title: "Chats", icon: MessageCircle, desc: "Open chats, priority board, calls." },
+  { href: "/dashboard/orders", title: "Orders", icon: Package, desc: "Track, pack, dispatch and deliver. Packing list." },
+  { href: "/dashboard/revenue", title: "Payments", icon: IndianRupee, desc: "To collect, received, cash/COD, all transactions, payment settings, WhatsApp costs." },
+  { href: "/dashboard/customers", title: "Customers", icon: Users, desc: "All customers, groups to reach, loyalty, refills." },
+  { href: "/dashboard/catalogue", title: "Products", icon: Tag, desc: "Catalogue, how products sell, combo ideas." },
+  { href: "/dashboard/campaigns", title: "Campaigns", icon: Megaphone, desc: "All, scheduled, running, completed, drafts, paused and automations." },
+  { href: "/dashboard/templates", title: "Templates", icon: FileText, desc: "Meta templates with Marketing, Utility and Authentication filters." },
+  { href: "/dashboard/report", title: "Reports", icon: BarChart3, desc: "Overview, campaigns, customers and products." },
+  { href: "/dashboard/settings", title: "Settings", icon: Settings, desc: "Password, look, language, WhatsApp numbers, business details." },
 ];
 
-const MAPPING = [
-  {
-    old: "Dashboard › Overview",
-    now: "Home (summary, wallet, brief, next campaign). Costs went to Money › WhatsApp costs. Funnel and message activity went to Reports.",
-  },
-  {
-    old: "Dashboard › Customers view",
-    now: "Customers › Groups to reach and Loyalty. Area, what customers buy and best time went to Reports › Who and when.",
-  },
-  {
-    old: "Dashboard › Products view",
-    now: "Products › How products sell.",
-  },
-  {
-    old: "Dashboard › Carts view",
-    now: "Reports › Carts.",
-  },
-  {
-    old: "Notifications and bell",
-    now: "The bell at the top of every page. It opens a list with filters.",
-  },
-  {
-    old: "Orders",
-    now: "Orders › Orders.",
-  },
-  {
-    old: "Orders › Packing list",
-    now: "Orders › Packing list.",
-  },
-  {
-    old: "Refills",
-    now: "Customers › Refills. Refill reminder switch is in Campaigns › Automatic messages.",
-  },
-  {
-    old: "Revenue and cash",
-    now: "Money › Cash in.",
-  },
-  {
-    old: "Catalogue and Menu",
-    now: "Products › Catalogue.",
-  },
-  {
-    old: "Replies",
-    now: "Chats › Open chats.",
-  },
-  {
-    old: "Replies › Priority board",
-    now: "Chats › Priority.",
-  },
-  {
-    old: "Calls",
-    now: "Chats › Calls.",
-  },
-  {
-    old: "Campaigns",
-    now: "Campaigns › Campaigns. Win-back and STOP opt-out are in Automatic messages.",
-  },
-  {
-    old: "Templates",
-    now: "Campaigns › Message templates.",
-  },
-  {
-    old: "Customers (directory)",
-    now: "Customers › All customers.",
-  },
-  {
-    old: "Weekly report",
-    now: "Reports › This week.",
-  },
-  {
-    old: "Message log",
-    now: "Campaigns › Message log.",
-  },
-  {
-    old: "Settings",
-    now: "Settings. Theme, WhatsApp numbers and business details moved here too.",
-  },
-  {
-    old: "Sidebar and header",
-    now: "One simple menu in 5 groups. Urgent counts show next to Chats and Orders.",
-  },
-  {
-    old: "Payments and order messages",
-    now: "Campaigns › Automatic messages (order updates, UPI payments in WhatsApp).",
-  },
-  {
-    old: "Accessibility",
-    now: "Kept on every page: skip link, labelled buttons, visible focus.",
-  },
+const MOVES: [string, string, string?][] = [
+  ["Dashboard › Overview", "Home (summary, wallet, brief, next campaign). Funnel and message activity are in Reports.", "/dashboard"],
+  ["Dashboard › Customers view", "Customers › Groups to reach and Loyalty. Who and when is in Reports.", "/dashboard/customers?tab=groups"],
+  ["Dashboard › Products view", "Products › How products sell.", "/dashboard/catalogue?view=demand"],
+  ["Notifications and bell", "The bell at the top of every page. It opens a list with filters."],
+  ["Orders", "Orders › Orders. Each order shows its stage, a timeline and one main button.", "/dashboard/orders"],
+  ["Orders › Packing list", "Orders › Packing list.", "/dashboard/orders/packing"],
+  ["Refills", "Customers › Refills. The refill reminder switch is in Campaigns › Automations.", "/dashboard/refills"],
+  ["Revenue and cash (Money)", "Payments › Received. Money still to come in: Payments › To collect.", "/dashboard/revenue"],
+  ["WhatsApp costs", "Payments › WhatsApp costs. Meta billing summary is also in Settings.", "/dashboard/revenue?tab=costs"],
+  ["Catalogue and Menu", "Products › Catalogue.", "/dashboard/catalogue"],
+  ["Replies", "Chats › Open chats.", "/dashboard/replies"],
+  ["Replies › Priority board", "Chats › Priority.", "/dashboard/replies/priority"],
+  ["Calls", "Chats › Calls.", "/dashboard/calls"],
+  ["Campaigns", "Campaigns. Refill reminders, win-back and STOP opt-out are in Automations.", "/dashboard/campaigns"],
+  ["Message log", "Campaigns › Message log, and each campaign's View progress or View result.", "/dashboard/messages"],
+  ["Templates", "Templates (its own page) with kind, status, language and format filters.", "/dashboard/templates"],
+  ["Customers (directory)", "Customers › All customers.", "/dashboard/customers"],
+  ["Settings", "Settings. Look, language, WhatsApp numbers and business details are here too.", "/dashboard/settings"],
+  ["Sidebar and header", "One simple menu in 6 groups, with an English/தமிழ் switch on every page. Urgent counts show next to Chats and Orders."],
+  ["Accessibility", "Kept on every page: skip link, labelled buttons, visible focus."],
 ];
 
-const SIMPLIFIED = [
-  "Menu: 22 items → 9 pages in 5 groups",
-  "Each page has one job, with tabs for the rest",
-  "One yellow button for the main action. Red only for problems, green only for “done”",
-  "Rare actions (edit, cancel, undo) sit under “More”",
-  "Costs, charts and Meta rules moved out of the home page",
+const BUTTONS: [string, string, string][] = [
+  ["New", "Confirm & message customer · Cash on delivery & confirm · Request payment", "The order moves to Confirmed; cash on delivery also confirms it."],
+  ["Confirmed, not paid", "Request payment (UPI) · Dispatch · Cash on delivery", "A WhatsApp payment turns the order paid by itself."],
+  ["Customer says they paid", "Payment received · Not received", "One tap after seeing the money in your bank or UPI app."],
+  ["Paid or cash on delivery", "Dispatch & message customer", "Asks for the delivery time and person, and can send a tracking link."],
+  ["Dispatched", "Delivered & thank customer · Delivered & cash collected", "Cash on delivery closes here."],
+  ["Any open order", "Open chat · Call · Timeline · More: edit items, team note, record payment, refund, cancel", "Rare actions stay under More actions."],
 ];
 
-export default function MenuGuidePage() {
+/** What changed: a map from the old menu to the new pages (portal design). */
+export default function GuidePage() {
   return (
-    <div className="space-y-6 sm:space-y-8 max-w-5xl mx-auto">
-      {/* Top Header */}
-      <div>
-        <h1 className="font-display font-semibold text-2xl sm:text-3xl text-ink">
-          What changed
-        </h1>
-        <p className="mt-1 text-sm text-muted">
-          A map from the old menu to the new pages.
-        </p>
-      </div>
+    <PortalPage title="What changed" titleTa="என்ன மாறியது" sub="A map from the old menu to the new pages." subTa="பழைய மெனுவிலிருந்து புதிய பக்கங்களுக்கு வழிகாட்டி.">
+      <div className="stack">
+        <section>
+          <h2 style={{ marginBottom: 12 }}>All pages</h2>
+          <div className="grid g3">
+            {PAGES.map((p) => {
+              const Icon = p.icon;
+              return (
+                <Link key={p.href} className="todo" href={p.href} style={{ flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
+                  <span style={{ display: "flex", gap: 8, alignItems: "center", font: "600 18px var(--display)" }}>
+                    <Icon aria-hidden className="ic" /> {p.title}
+                  </span>
+                  <span className="muted small">{p.desc}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
 
-      {/* 9 Pages Grid */}
-      <section className="space-y-3">
-        <h2 className="font-display font-semibold text-lg text-ink">
-          All pages
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-          {PAGES.map((p) => {
-            const Icon = p.icon;
-            return (
-              <Link
-                key={p.href}
-                href={p.href}
-                className="card-3d flex flex-col items-start gap-2 p-4 rounded-2xl border-[1.5px] border-line bg-panel hover:border-ink transition"
-              >
-                <div className="flex items-center gap-2.5 font-display font-semibold text-[17px] text-ink">
-                  <Icon className="size-[19px] shrink-0 text-ink dark:text-[#FFC329]" strokeWidth={2} />
-                  <span>{p.title}</span>
-                </div>
-                <p className="text-[13px] text-muted leading-snug">
-                  {p.desc}
-                </p>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Migration Table */}
-      <section className="card-3d rounded-[18px] border-[1.5px] border-line bg-panel p-5">
-        <div className="mb-4">
-          <h2 className="font-display font-semibold text-[19px] text-ink">
-            Where did the old sections go?
-          </h2>
-          <p className="text-[13.5px] text-muted mt-0.5">
-            22 menu items became 9 pages. Nothing was removed.
-          </p>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-[14px] border-collapse">
-            <thead>
-              <tr className="border-b-[1.5px] border-line">
-                <th className="py-2.5 px-3 text-[12px] font-bold uppercase tracking-wider text-muted">
-                  Old place
-                </th>
-                <th className="py-2.5 px-3 text-[12px] font-bold uppercase tracking-wider text-muted">
-                  Now
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {MAPPING.map((row) => (
-                <tr key={row.old} className="hover:bg-[#FFF9F0]/50 dark:hover:bg-white/[0.02]">
-                  <td className="py-3 px-3 font-semibold text-ink whitespace-nowrap align-top">
-                    {row.old}
-                  </td>
-                  <td className="py-3 px-3 text-muted leading-relaxed">
-                    {row.now}
-                  </td>
+        <section className="card">
+          <div className="hd">
+            <div>
+              <h2>Where did the old sections go?</h2>
+              <p>The long menu became 10 pages. Nothing was removed.</p>
+            </div>
+          </div>
+          <div className="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th>Old place</th>
+                  <th>Now</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+              </thead>
+              <tbody>
+                {MOVES.map(([old, now, href]) => (
+                  <tr key={old}>
+                    <td>
+                      <b>{old}</b>
+                    </td>
+                    <td>
+                      {now}
+                      {href && (
+                        <>
+                          {" "}
+                          <Link className="linkb" href={href}>
+                            Open
+                          </Link>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
-      {/* What Got Simpler */}
-      <section className="card-3d rounded-[18px] border-[1.5px] border-line bg-panel p-5">
-        <h2 className="font-display font-semibold text-[19px] text-ink mb-3">
-          What got simpler
-        </h2>
-        <ul className="divide-y divide-line">
-          {SIMPLIFIED.map((item) => (
-            <li key={item} className="py-2.5 text-[14px] text-ink font-medium flex items-center gap-2.5">
-              <span className="size-1.5 rounded-full bg-brand shrink-0" />
-              <span>{item}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
-    </div>
+        <section className="card">
+          <div className="hd">
+            <div>
+              <h2>Buttons on each order</h2>
+              <p>What the owner sees, in the order things happen.</p>
+            </div>
+          </div>
+          <div className="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th>Order is…</th>
+                  <th>Buttons</th>
+                  <th>What happens</th>
+                </tr>
+              </thead>
+              <tbody>
+                {BUTTONS.map(([state, buttons, what]) => (
+                  <tr key={state}>
+                    <td>
+                      <b>{state}</b>
+                    </td>
+                    <td>{buttons}</td>
+                    <td className="muted">{what}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="card">
+          <h2 style={{ marginBottom: 10 }}>What got simpler</h2>
+          <ul>
+            <li>Menu: 10 pages in 6 groups</li>
+            <li>Each page has one job, with tabs for the rest</li>
+            <li>One yellow button for the main action. Red only for problems, green only for “done”</li>
+            <li>Rare actions (edit, cancel, undo) sit under “More”</li>
+            <li>Costs, charts and Meta rules moved out of the home page</li>
+          </ul>
+        </section>
+      </div>
+    </PortalPage>
   );
 }
