@@ -116,7 +116,7 @@ html.dark .thabaal-portal{
 .thabaal-portal .todo:hover{border-color:var(--fg)}
 .thabaal-portal .todo .big{font:600 26px var(--display);font-variant-numeric:tabular-nums}
 .thabaal-portal .todo .go{margin-left:auto;white-space:nowrap;font-weight:700;display:flex;gap:6px;align-items:center}
-.thabaal-portal .field:not(input,select,textarea){display:flex;flex-direction:column;gap:6px}
+.thabaal-portal .field:not(input,select,textarea,button){display:flex;flex-direction:column;gap:6px}
 .thabaal-portal .field label{font-weight:600;font-size:13.5px}
 .thabaal-portal .formgrid{display:grid;gap:14px;grid-template-columns:repeat(2,minmax(0,1fr))}
 .thabaal-portal .msg{font-size:13px;font-weight:600;min-height:0}

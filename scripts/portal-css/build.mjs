@@ -24,7 +24,7 @@ const scope = (sel) => {
   // Tailwind also has a "grid" class: the design's 16px gap applies only to the design's own grids.
   if (/^\.grid(\s*\{|$)/.test(sel) || sel === ".grid") return `${S} .grid:where(.g2,.g3,.g4,.split,.gx)`;
   // The app's inputs use a "field" class too: the design's label column is never an input.
-  if (sel === ".field") return `${S} .field:not(input,select,textarea)`;
+  if (sel === ".field") return `${S} .field:not(input,select,textarea,button)`;
   return `${S} ${sel}`;
 };
 for (const node of [...root.nodes]) {
