@@ -1,0 +1,607 @@
+/* Exact CSS for Reports section based on reports.html */
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fredoka:wght@500;600&display=swap");
+
+.thabaal-reports {
+  --bg: #FFF9F0;
+  --card: #FFFFFF;
+  --fg: #10283B;
+  --muted: #5A6B7B;
+  --line: #EADFCB;
+  --soft: #FFF3D6;
+  --mango: #FFC329;
+  --ink: #10283B;
+  --ok: #0E8A5B;
+  --ok-bg: rgba(32, 201, 133, 0.16);
+  --warn: #8A5A00;
+  --warn-bg: rgba(255, 195, 41, 0.28);
+  --bad: #C0412A;
+  --bad-bg: rgba(244, 107, 78, 0.16);
+  --info: #2B5C86;
+  --info-bg: rgba(43, 92, 134, 0.12);
+  --bar: #10283B;
+  --bar2: #FFC329;
+  --bar3: #F46B4E;
+  --bar4: #20C985;
+  --shadow: 0 1px 0 rgba(16, 40, 59, 0.04), 0 14px 30px -22px rgba(16, 40, 59, 0.35);
+  --display: "Fredoka", "Noto Sans Tamil", ui-rounded, system-ui, sans-serif;
+  --ui: "DM Sans", "Noto Sans Tamil", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  min-width: 0;
+  color: var(--fg);
+  font: 15px/1.5 var(--ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+:root[data-theme="dark"] .thabaal-reports,
+:root.dark .thabaal-reports,
+.dark .thabaal-reports,
+html.dark .thabaal-reports,
+body.dark .thabaal-reports,
+[data-theme="night"] .thabaal-reports {
+  --bg: #0B1E2D;
+  --card: #133248;
+  --fg: #FFF9F0;
+  --muted: #A8BACA;
+  --line: #27465C;
+  --soft: #1B3B52;
+  --ink: #FFF9F0;
+  --ok: #5BE3AE;
+  --ok-bg: rgba(32, 201, 133, 0.18);
+  --warn: #FFD76A;
+  --warn-bg: rgba(255, 195, 41, 0.18);
+  --bad: #FF9C86;
+  --bad-bg: rgba(244, 107, 78, 0.2);
+  --info: #8EC3EE;
+  --info-bg: rgba(142, 195, 238, 0.15);
+  --bar: #FFF9F0;
+  --shadow: 0 14px 30px -22px rgba(0, 0, 0, 0.7);
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not(.light) .thabaal-reports {
+    --bg: #0B1E2D;
+    --card: #133248;
+    --fg: #FFF9F0;
+    --muted: #A8BACA;
+    --line: #27465C;
+    --soft: #1B3B52;
+    --ink: #FFF9F0;
+    --ok: #5BE3AE;
+    --ok-bg: rgba(32, 201, 133, 0.18);
+    --warn: #FFD76A;
+    --warn-bg: rgba(255, 195, 41, 0.18);
+    --bad: #FF9C86;
+    --bad-bg: rgba(244, 107, 78, 0.2);
+    --info: #8EC3EE;
+    --info-bg: rgba(142, 195, 238, 0.15);
+    --bar: #FFF9F0;
+    --shadow: 0 14px 30px -22px rgba(0, 0, 0, 0.7);
+    color-scheme: dark;
+  }
+}
+
+.thabaal-reports * {
+  box-sizing: border-box;
+}
+
+.thabaal-reports h1,
+.thabaal-reports h2,
+.thabaal-reports h3 {
+  font-family: var(--display);
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.2px;
+  text-wrap: balance;
+}
+
+.thabaal-reports p {
+  margin: 0;
+}
+
+.thabaal-reports a {
+  color: inherit;
+}
+
+.thabaal-reports button,
+.thabaal-reports input,
+.thabaal-reports select,
+.thabaal-reports textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* top */
+.thabaal-reports .top {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.thabaal-reports .top h1 {
+  font-size: clamp(26px, 3vw, 34px);
+  line-height: 1.1;
+}
+.thabaal-reports .top .sub {
+  color: var(--muted);
+  margin-top: 6px;
+  max-width: 34em;
+  font-size: 14.5px;
+}
+.thabaal-reports .tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* icon button */
+.thabaal-reports .iconbtn {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1.5px solid var(--line);
+  background: var(--card);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.thabaal-reports .iconbtn:hover {
+  border-color: var(--fg);
+}
+.thabaal-reports .iconbtn .b {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: var(--bad);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+}
+.thabaal-reports .ic {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+
+/* buttons */
+.thabaal-reports .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 1.5px solid var(--line);
+  background: var(--card);
+  font-weight: 600;
+  font-size: 14.5px;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all 0.2s ease-out;
+}
+.thabaal-reports .btn:hover {
+  border-color: var(--fg);
+}
+.thabaal-reports .btn.primary {
+  background: var(--mango);
+  border-color: var(--mango);
+  color: #10283B;
+}
+.thabaal-reports .btn.primary:hover {
+  filter: brightness(1.05);
+}
+.thabaal-reports .btn.sm {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 13.5px;
+  border-radius: 10px;
+}
+.thabaal-reports .btn.ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+.thabaal-reports .btn.danger {
+  color: var(--bad);
+}
+
+/* tabs & seg */
+.thabaal-reports .tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1.5px solid var(--line);
+  margin: 0 0 20px;
+  overflow-x: auto;
+}
+.thabaal-reports .tabs button {
+  border: 0;
+  background: none;
+  padding: 10px 14px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1.5px;
+  white-space: nowrap;
+  font-size: 15px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.thabaal-reports .tabs button[aria-selected="true"] {
+  color: var(--fg);
+  border-bottom-color: var(--mango);
+}
+
+.thabaal-reports .seg {
+  display: inline-flex;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  padding: 3px;
+  background: var(--card);
+}
+.thabaal-reports .seg button {
+  border: 0;
+  background: none;
+  padding: 6px 12px;
+  border-radius: 9px;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.thabaal-reports .seg button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.thabaal-reports .chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.thabaal-reports .chip {
+  border: 1.5px solid var(--line);
+  background: var(--card);
+  border-radius: 999px;
+  padding: 6px 13px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--muted);
+  transition: all 0.15s;
+}
+.thabaal-reports .chip[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+.thabaal-reports .chip small {
+  opacity: 0.7;
+  margin-left: 4px;
+  font-weight: 600;
+}
+
+/* cards */
+.thabaal-reports .card {
+  background: var(--card);
+  border: 1.5px solid var(--line);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+  min-width: 0;
+}
+.thabaal-reports .card > h2,
+.thabaal-reports .card > .hd h2 {
+  font-size: 19px;
+}
+.thabaal-reports .hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.thabaal-reports .hd p {
+  color: var(--muted);
+  font-size: 14px;
+}
+.thabaal-reports .stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.thabaal-reports .grid {
+  display: grid;
+  gap: 16px;
+}
+.thabaal-reports .g2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.thabaal-reports .g3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.thabaal-reports .g4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.thabaal-reports .split {
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+}
+
+/* stat */
+.thabaal-reports .stat .l {
+  color: var(--muted);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.thabaal-reports .stat .v {
+  font: 600 clamp(26px, 3vw, 34px) / 1.1 var(--display);
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.thabaal-reports .stat .d {
+  font-size: 13px;
+  margin-top: 4px;
+  font-weight: 600;
+}
+.thabaal-reports .up {
+  color: var(--ok);
+}
+.thabaal-reports .down {
+  color: var(--bad);
+}
+.thabaal-reports .flat {
+  color: var(--muted);
+}
+.thabaal-reports .muted {
+  color: var(--muted);
+}
+.thabaal-reports .small {
+  font-size: 13px;
+}
+
+/* pills */
+.thabaal-reports .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.thabaal-reports .pill.ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.thabaal-reports .pill.warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.thabaal-reports .pill.bad {
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+.thabaal-reports .pill.info {
+  background: var(--info-bg);
+  color: var(--info);
+}
+.thabaal-reports .pill.mute {
+  background: var(--soft);
+  color: var(--muted);
+}
+
+/* tables */
+.thabaal-reports .tw {
+  overflow-x: auto;
+}
+.thabaal-reports table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14.5px;
+}
+.thabaal-reports th {
+  text-align: left;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 8px 12px;
+  border-bottom: 1.5px solid var(--line);
+  white-space: nowrap;
+}
+.thabaal-reports td {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+.thabaal-reports tr:last-child td {
+  border-bottom: 0;
+}
+.thabaal-reports td.num,
+.thabaal-reports th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* lists & rows */
+.thabaal-reports .list {
+  display: flex;
+  flex-direction: column;
+}
+.thabaal-reports .row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.thabaal-reports .row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.thabaal-reports .row:first-child {
+  padding-top: 0;
+}
+.thabaal-reports .row .grow {
+  flex: 1;
+  min-width: 180px;
+}
+.thabaal-reports .row .t {
+  font-weight: 600;
+}
+
+/* bars */
+.thabaal-reports .bar {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--soft);
+  overflow: hidden;
+  display: flex;
+}
+.thabaal-reports .bar i {
+  display: block;
+  height: 100%;
+}
+
+/* legend */
+.thabaal-reports .legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 10px;
+}
+.thabaal-reports .legend span::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--c);
+  margin-right: 6px;
+}
+
+/* svg chart */
+.thabaal-reports svg.chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.thabaal-reports svg.chart text {
+  fill: var(--muted);
+  font: 12px var(--ui);
+}
+
+/* details more */
+.thabaal-reports details.more {
+  border-top: 1px solid var(--line);
+  margin-top: 12px;
+  padding-top: 10px;
+}
+.thabaal-reports details.more > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--muted);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.thabaal-reports details.more > summary::-webkit-details-marker {
+  display: none;
+}
+.thabaal-reports details.more > summary::after {
+  content: "+";
+  margin-left: auto;
+  font: 600 20px var(--display);
+}
+.thabaal-reports details.more[open] > summary::after {
+  content: "\2212";
+}
+
+.thabaal-reports .note {
+  background: var(--soft);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 14px;
+}
+
+/* drawer, toast, unread */
+.thabaal-reports .drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(420px, 100vw);
+  background: var(--card);
+  border-left: 1.5px solid var(--line);
+  box-shadow: -20px 0 50px -30px rgba(0, 0, 0, 0.5);
+  z-index: 50;
+  transform: translateX(105%);
+  transition: transform 0.25s;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 20px 24px;
+  gap: 14px;
+  overflow: auto;
+}
+.thabaal-reports .drawer.open {
+  transform: none;
+}
+.thabaal-reports .toast {
+  position: fixed;
+  left: 50%;
+  bottom: max(20px, env(safe-area-inset-bottom, 0px));
+  transform: translate(-50%, 30px);
+  background: var(--ink);
+  color: var(--bg);
+  padding: 11px 18px;
+  border-radius: 12px;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  transition: 0.25s;
+  z-index: 60;
+  max-width: calc(100vw - 32px);
+  text-align: center;
+}
+.thabaal-reports .toast.on {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.thabaal-reports .unread {
+  border-left: 4px solid var(--mango);
+  padding-left: 12px;
+}
+
+/* responsive */
+@media (max-width: 900px) {
+  .thabaal-reports .g3,
+  .thabaal-reports .g4,
+  .thabaal-reports .g2,
+  .thabaal-reports .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .thabaal-reports .g4.keep2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -1,217 +1,24 @@
-import { ChartBar3D, Target3D, Trophy3D } from "@/components/icons-3d";
 import type { Metadata } from "next";
-import Link from "@/components/intent-link";
-import { Card, CardHeader, PageHeader, PickClientNotice } from "@/components/ui";
-import { BarList, ColumnChart } from "@/components/viz";
-import { campaignResults, weeklyReport, type WeekFigures } from "@/lib/business-reports";
-import { formatValue } from "@/lib/chart-math";
-import { cn } from "@/lib/cn";
-import { fmtDate, fmtNumber, pct } from "@/lib/format";
-import { refillForecast } from "@/lib/refill-forecast";
+import { PageHeader, PickClientNotice } from "@/components/ui";
 import { getScope } from "@/lib/session";
-import { db } from "@/lib/db";
-import { isSectionEnabled } from "@/lib/client-sections";
-import { OverviewScreen } from "../overview-screen";
-import { ReportTools } from "./report-tools";
+import { getComprehensiveReportData } from "@/lib/reports-data";
+import { ReportDashboard } from "./report-dashboard";
 
 export const metadata: Metadata = { title: "Reports" };
 export const dynamic = "force-dynamic";
 
-function change(cur: number, prev: number) {
-  if (!prev) return cur ? "new" : "—";
-  const d = Math.round(((cur - prev) / prev) * 100);
-  return d === 0 ? "same" : `${d > 0 ? "▲" : "▼"} ${Math.abs(d)}%`;
-}
-
-const ROWS: { key: string; label: string; of: (w: WeekFigures) => number; fmt: "inr" | "count" | "percent" }[] = [
-  { key: "revenue", label: "Paid sales", of: (w) => w.revenue, fmt: "inr" },
-  { key: "orders", label: "Paid orders", of: (w) => w.orders, fmt: "count" },
-  { key: "buyers", label: "Buyers", of: (w) => w.buyers, fmt: "count" },
-  { key: "aov", label: "Average order", of: (w) => (w.orders ? w.revenue / w.orders : 0), fmt: "inr" },
-  { key: "carts", label: "Carts received", of: (w) => w.carts, fmt: "count" },
-  { key: "abandoned", label: "Carts left unpaid", of: (w) => w.abandoned, fmt: "count" },
-  { key: "sent", label: "Messages sent", of: (w) => w.sent, fmt: "count" },
-  { key: "readRate", label: "Read rate", of: (w) => pct(w.read, w.delivered), fmt: "percent" },
-  { key: "replies", label: "Customers who replied", of: (w) => w.repliers, fmt: "count" },
-  { key: "new", label: "New customers", of: (w) => w.newCustomers, fmt: "count" },
-];
-
-const TABS = [
-  { key: "week", label: "This week", needsOrders: false },
-  { key: "funnel", label: "From message to sale", needsOrders: false },
-  { key: "carts", label: "Carts", needsOrders: true },
-  { key: "audience", label: "Who and when", needsOrders: false },
-  { key: "products", label: "Products", needsOrders: true },
-] as const;
-type TabKey = (typeof TABS)[number]["key"];
-
-const DESCRIPTIONS: Record<TabKey, string> = {
-  week: "The last seven days against the week before, ready to share.",
-  funnel: "From a message sent to an order paid: what was read, answered and bought.",
-  carts: "Carts customers filled on WhatsApp: what they kept, changed and left unpaid.",
-  audience: "Who buys, who is drifting away, where they are and when they answer.",
-  products: "What sells, what sits in carts, and which campaigns moved each product.",
-};
-
-export default async function ReportPage({ searchParams }: PageProps<"/dashboard/report">) {
-  const sp = await searchParams;
+export default async function ReportPage() {
   const scope = await getScope();
-  if (!scope.clientId)
+  if (!scope.clientId) {
     return (
       <>
         <PageHeader title="Reports" />
         <PickClientNotice what="reports" />
       </>
     );
-
-  const client = await db.client.findUnique({ where: { id: scope.clientId }, select: { disabledSections: true } });
-  const ordersOn = isSectionEnabled(client?.disabledSections ?? [], "orders");
-  const tabs = TABS.filter((t) => ordersOn || !t.needsOrders);
-  const tab: TabKey = tabs.find((t) => t.key === sp.tab)?.key ?? "week";
-
-  const tabNav = (
-    <nav aria-label="Report views" className="no-scrollbar -mx-3 overflow-x-auto px-3 sm:mx-0 sm:px-0">
-      <div className="inline-flex rounded-control border-[1.5px] border-line bg-panel p-[3px]">
-        {tabs.map((t) => (
-          <Link
-            key={t.key}
-            href={t.key === "week" ? "/dashboard/report" : `/dashboard/report?tab=${t.key}`}
-            aria-current={t.key === tab ? "page" : undefined}
-            className={cn(
-              "inline-flex min-h-[34px] items-center whitespace-nowrap rounded-[9px] px-3.5 text-[13.5px] font-semibold transition-all duration-200 ease-out active:scale-[0.96]",
-              t.key === tab ? "bg-ink text-canvas shadow-xs -translate-y-px" : "text-muted hover:text-ink hover:bg-subtle/60",
-            )}
-          >
-            {t.label}
-          </Link>
-        ))}
-      </div>
-    </nav>
-  );
-
-  if (tab !== "week") {
-    return (
-      <>
-        <PageHeader title="Reports" description={DESCRIPTIONS[tab]} tabs={tabNav} />
-        <OverviewScreen sp={sp} mode={tab} />
-      </>
-    );
   }
 
-  const now = new Date();
-  const [r, campaigns, refills] = await Promise.all([weeklyReport(scope.clientId, now), campaignResults(scope.clientId, 7), refillForecast(scope.clientId, now)]);
-  const range = `${fmtDate(r.from, "d MMM")} – ${fmtDate(now, "d MMM yyyy")}`;
-  const topCampaign = [...campaigns].sort((a, b) => b.revenue - a.revenue || b.replied - a.replied)[0];
-  const dueNext = refills.due.filter((d) => d.daysLeft >= 0 && d.daysLeft <= 7);
-  const overdue = refills.due.filter((d) => d.daysLeft < 0);
+  const data = await getComprehensiveReportData(scope.clientId);
 
-  const todo = [
-    overdue.length && `Remind ${fmtNumber(overdue.length)} overdue reorder customer${overdue.length === 1 ? "" : "s"}`,
-    dueNext.length && `${fmtNumber(dueNext.length)} reorder${dueNext.length === 1 ? "" : "s"} due this week (~${formatValue(dueNext.reduce((n, d) => n + d.avgOrder, 0), "inr")})`,
-    r.cur.abandoned && `Follow up ${fmtNumber(r.cur.abandoned)} unpaid cart${r.cur.abandoned === 1 ? "" : "s"}`,
-    topCampaign && topCampaign.revenue > 0 && `Repeat “${topCampaign.name}”, it brought ${formatValue(topCampaign.revenue, "inr")}`,
-  ].filter(Boolean) as string[];
-
-  const summary = [
-    `*Weekly report · ${range}*`,
-    `Paid sales: ${formatValue(r.cur.revenue, "inr")} (${change(r.cur.revenue, r.prev.revenue)})`,
-    `Orders: ${r.cur.orders} from ${r.cur.buyers} buyers · avg ${formatValue(r.cur.orders ? r.cur.revenue / r.cur.orders : 0, "inr")}`,
-    `Messages: ${r.cur.sent} sent · ${pct(r.cur.read, r.cur.delivered)}% read · ${r.cur.repliers} replied`,
-    r.topProducts[0] && `Top product: ${r.topProducts[0].name} (${r.topProducts[0].units} sold)`,
-    todo.length && `\n*This week:*\n${todo.map((t) => `• ${t}`).join("\n")}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  return (
-    <>
-      <PageHeader
-        title="Reports"
-        description={DESCRIPTIONS.week}
-        actions={<ReportTools text={summary} />}
-        tabs={tabNav}
-      />
-
-      <div className="grid grid-cols-1 gap-4 sm:gap-5 xl:grid-cols-12">
-        <Card className="card-3d xl:col-span-5">
-          <CardHeader tone="brand" icon={<ChartBar3D />} title="The week in numbers" description="vs the week before" />
-          <table className="ui-table w-full text-sm">
-            <tbody>
-              {ROWS.map((row) => {
-                const c = row.of(r.cur);
-                const p = row.of(r.prev);
-                const ch = change(c, p);
-                const up = ch.startsWith("▲");
-                const goodWhenDown = row.key === "abandoned";
-                return (
-                  <tr key={row.key} className="border-t border-line">
-                    <td className="px-3 py-2 text-xs text-ink-2 sm:px-5 sm:text-sm">{row.label}</td>
-                    <td className="tabular px-2.5 py-2 text-right text-xs font-semibold text-ink sm:px-3 sm:text-sm">{formatValue(c, row.fmt)}</td>
-                    <td
-                      className={cn(
-                        "tabular w-16 px-2.5 py-2 text-right text-[11px] font-semibold sm:w-20 sm:px-5 sm:text-xs",
-                        ch.startsWith("▲") || ch.startsWith("▼") ? (up !== goodWhenDown ? "text-success" : "text-danger") : "text-muted",
-                      )}
-                    >
-                      {row.fmt === "percent" && p ? `${c - p >= 0 ? "+" : ""}${c - p} pts` : ch}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Card>
-
-        <div className="space-y-4 sm:space-y-5 xl:col-span-7">
-          <Card className="card-3d">
-            <CardHeader tone="gold" icon={<Trophy3D />} title="Paid sales per day" />
-            <div className="p-3.5 sm:p-5">
-              <ColumnChart
-                format="inr"
-                minWidth={320}
-                height={130}
-                label="Paid sales per day last week"
-                columns={r.daily.map((d) => ({ key: d.key, label: d.label, parts: [{ key: "r", label: "Paid", value: d.revenue, color: "emerald" }] }))}
-              />
-            </div>
-          </Card>
-
-          <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2">
-            <Card className="card-3d">
-              <CardHeader tone="brand" icon={<Trophy3D />} title="Top products" />
-              <div className="p-3.5 sm:p-5">
-                <BarList format="inr" empty="No paid orders last week." items={r.topProducts.map((p) => ({ key: p.name, label: p.name, value: p.revenue, sub: `${fmtNumber(p.units)} sold` }))} />
-              </div>
-            </Card>
-            <Card className="card-3d">
-              <CardHeader tone="violet" icon={<Target3D />} title="To do this week" />
-              {todo.length ? (
-                <ul className="space-y-2 p-3.5 text-xs text-ink-2 sm:p-5 sm:text-sm">
-                  {todo.map((t) => (
-                    <li key={t} className="flex gap-2">
-                      <span aria-hidden className="mt-1.5 size-1.5 shrink-0 rounded-full bg-brand" />
-                      {t}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="p-3.5 text-xs text-muted sm:p-5 sm:text-sm">Nothing urgent. Good week.</p>
-              )}
-              <div className="flex flex-wrap gap-2.5 border-t border-line px-3.5 py-2.5 text-xs font-semibold sm:gap-3 sm:px-5 sm:py-3">
-                <Link href="/dashboard/refills" className="text-brand-deep hover:underline">
-                  Reorders →
-                </Link>
-                <Link href="/dashboard/orders?show=unpaid" className="text-brand-deep hover:underline">
-                  Unpaid carts →
-                </Link>
-                <Link href="/dashboard/campaigns/compare?days=30" className="text-brand-deep hover:underline">
-                  Campaigns →
-                </Link>
-              </div>
-            </Card>
-          </div>
-        </div>
-      </div>
-    </>
-  );
+  return <ReportDashboard data={data} />;
 }
