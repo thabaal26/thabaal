@@ -197,4 +197,3 @@ export function Spark({ data, down }: { data: number[]; down?: boolean }) {
   );
 }
 
-export const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;

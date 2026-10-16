@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import { Plus } from "@/components/icons";
 import Link from "@/components/intent-link";
 import { AiBusinessCopilot } from "./ai-copilot";
-import { Pill, PortalPage, Seg, Spark, T, inr } from "./portal-ui";
+import { inr } from "./portal-format";
+import { Pill, PortalPage, Seg, Spark, T } from "./portal-ui";
 
 /*
  * Home: a short, live summary of today. Every figure comes from the client's own orders, chats and
