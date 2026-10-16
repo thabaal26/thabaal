@@ -7,7 +7,9 @@
  */
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useSyncExternalStore, type ReactNode } from "react";
+import { useCallback, useRef, useSyncExternalStore, useTransition, type ReactNode } from "react";
+import { confirmAction } from "@/components/confirm";
+import { toastResult } from "@/components/toast";
 import Link from "@/components/intent-link";
 import { PageTools } from "@/components/shell-tools";
 import "./portal.css";
@@ -197,3 +199,72 @@ export function Spark({ data, down }: { data: number[]; down?: boolean }) {
   );
 }
 
+
+/** Tabs that are separate addresses (each tab is its own page). `current` is the open tab's id. */
+export function LinkTabs({ tabs, current, label }: { tabs: { id: string; label: string; ta?: string; href: string; count?: number }[]; current: string; label: string }) {
+  return (
+    <nav className="tabs" aria-label={label}>
+      {tabs.map((t) => (
+        <Link key={t.id} href={t.href} aria-current={t.id === current ? "page" : undefined} aria-selected={t.id === current}>
+          <T ta={t.ta}>{t.label}</T>
+          {t.count ? <small style={{ marginLeft: 6, opacity: 0.7 }}>{t.count}</small> : null}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+type ActResult = { ok: boolean; message?: string; errors?: string[] };
+
+/**
+ * A design button (.btn) that runs a bound server action: optional confirmation (the app's own
+ * dialog), then the result as a toast and a refresh. Ignores repeat taps while it runs.
+ */
+export function PAction({
+  action,
+  children,
+  confirm,
+  className = "sm",
+  title,
+  style,
+  "aria-label": ariaLabel,
+}: {
+  action: () => Promise<ActResult>;
+  children: ReactNode;
+  confirm?: string;
+  /** Extra design classes after "btn": "sm", "primary sm", "ghost sm"… */
+  className?: string;
+  title?: string;
+  style?: React.CSSProperties;
+  "aria-label"?: string;
+}) {
+  const [pending, start] = useTransition();
+  const busy = useRef(false);
+  const router = useRouter();
+  return (
+    <button
+      type="button"
+      className={`btn ${className}`}
+      title={title}
+      aria-label={ariaLabel}
+      aria-busy={pending}
+      disabled={pending}
+      style={{ ...style, ...(pending ? { opacity: 0.6 } : null) }}
+      onClick={async () => {
+        if (busy.current) return;
+        busy.current = true;
+        try {
+          if (confirm && !(await confirmAction(confirm))) return;
+          start(async () => {
+            toastResult(await action());
+            router.refresh();
+          });
+        } finally {
+          busy.current = false;
+        }
+      }}
+    >
+      {children}
+    </button>
+  );
+}

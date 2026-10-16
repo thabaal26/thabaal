@@ -1,4 +1,10 @@
 /* Generated from thabaal-portal.html: the portal design, scoped to .thabaal-portal. */
+/* The app's Tailwind base resets heading sizes and lists; the design relies on browser defaults. */
+.thabaal-portal h1{font-size:2em}
+.thabaal-portal h2{font-size:1.5em}
+.thabaal-portal h3{font-size:1.17em}
+.thabaal-portal h4{font-size:1em}
+.thabaal-portal ul,.thabaal-portal ol{list-style:revert;padding-left:1.4em;margin:0}
 .thabaal-portal{
   /* Layout: fixed left menu (grouped by job), one calm column of white cards on cream. Mango is the only loud colour. */
   --bg:#FFF9F0; --card:#fff; --fg:#10283B; --muted:#5A6B7B; --line:#EADFCB; --soft:#FFF3D6; --mango:#FFC329; --ink:#10283B;
@@ -189,3 +195,19 @@ html.dark .thabaal-portal .phone{background:#0E2535;color:#FFF9F0}
 .thabaal-portal .fpan .ch small{display:block;color:var(--muted)}
 .thabaal-portal .fpan hr{border:0;border-top:1px solid var(--line);margin:12px 0}
 @media(max-width:640px){.thabaal-portal .fpan{left:auto;right:0}}
+
+/* ── App additions (not in the static design): links that behave like the design's buttons ── */
+.thabaal-portal .tabs a{border:0;background:none;padding:10px 14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1.5px;white-space:nowrap;font-size:15px;text-decoration:none}
+.thabaal-portal .tabs a[aria-selected=true]{color:var(--fg);border-bottom-color:var(--mango)}
+.thabaal-portal .cl a{display:flex;flex-direction:column;gap:2px;text-align:left;border-bottom:1px solid var(--line);padding:12px;text-decoration:none;color:inherit}
+.thabaal-portal .cl a[aria-current=true]{background:var(--soft)}
+.thabaal-portal .cl a:hover{background:var(--soft)}
+.thabaal-portal a.chip{text-decoration:none}
+.thabaal-portal .btn{text-decoration:none;color:inherit}
+.thabaal-portal .btn.primary{color:#10283B}
+.thabaal-portal .btn:disabled{opacity:.5;cursor:not-allowed}
+.thabaal-portal .menu{position:absolute;z-index:20;top:calc(100% + 6px);right:0;min-width:220px;padding:6px;display:flex;flex-direction:column;gap:2px}
+.thabaal-portal .menu .btn{justify-content:flex-start;border-color:transparent;width:100%}
+.thabaal-portal .scrolly{overflow-y:auto}
+.thabaal-portal .show-sm{display:none}
+@media (max-width:900px){.thabaal-portal .hide-sm{display:none!important}.thabaal-portal .show-sm{display:inline-flex}}

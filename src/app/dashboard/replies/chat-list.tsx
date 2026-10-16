@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "@/components/intent-link";
 import { Search } from "@/components/icons";
-import { cn } from "@/lib/cn";
 
 export type ChatListItem = {
   id: string;
@@ -34,56 +33,40 @@ export function ChatList({
   const filtered = q ? items.filter((i) => i.name.toLowerCase().includes(q) || i.phone.includes(q) || i.previewText.toLowerCase().includes(q)) : items;
 
   return (
-    <div className="flex h-full flex-col">
+    <>
       {items.length > 6 && (
-        <div className="border-b border-line p-3">
-          <label className="relative block">
-            <span className="sr-only">Search chats</span>
-            <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search name, number or message"
-              className="field !min-h-10 !pl-9 !text-sm"
-            />
-          </label>
+        <div style={{ padding: 12, borderBottom: "1px solid var(--line)" }}>
+          <div className="search" style={{ maxWidth: "none" }}>
+            <Search aria-hidden />
+            <input type="search" aria-label="Search chats" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name or message" />
+          </div>
         </div>
       )}
-
-      <ul aria-label="Customer conversations" className="thin-scroll flex-1 overflow-y-auto">
+      <nav className="cl scrolly" aria-label="Customer conversations" style={{ flex: 1 }}>
         {filtered.map((item) => {
           const current = selectedCustomerId === item.customerId;
           return (
-            <li key={item.customerId} className="border-b border-line last:border-b-0">
-              <Link
-                href={item.href}
-                scroll={false}
-                onClick={() => onSelectCustomer?.(item.customerId)}
-                aria-current={current ? "true" : undefined}
-                className={cn("block px-3.5 py-2.5 sm:px-4 sm:py-3.5 transition-colors", current ? "bg-brand-soft" : "hover:bg-sunken/60")}
-              >
-                <div className="flex items-baseline justify-between gap-2">
-                  <p className="truncate text-[14px] sm:text-[15px] font-bold text-ink">{item.name}</p>
-                  <time className="tabular shrink-0 text-[11.5px] sm:text-[13px] font-semibold text-muted">{item.timeStr}</time>
-                </div>
-                <p className="mt-0.5 sm:mt-1 truncate text-[12.5px] sm:text-[14px] text-muted">
-                  {item.isButton && <span className="font-semibold text-success">Tapped: </span>}
-                  {item.previewText}
-                </p>
-                {(item.unpaidLabel || item.openCount > 1 || item.handled) && (
-                  <div className="mt-1 sm:mt-1.5 flex flex-wrap items-center gap-1.5">
-                    {item.unpaidLabel && <span className="rounded-full bg-warning-bg px-2 py-0.5 text-[10.5px] sm:text-[11px] font-bold text-warning">{item.unpaidLabel}</span>}
-                    {item.openCount > 1 && <span className="rounded-full bg-success-bg px-2 py-0.5 text-[10.5px] sm:text-[11px] font-bold text-success">{item.openCount} new</span>}
-                    {item.handled && <span className="text-[11px] sm:text-[11.5px] font-medium text-muted">✓ Handled</span>}
-                  </div>
-                )}
-              </Link>
-            </li>
+            <Link key={item.customerId} href={item.href} scroll={false} onClick={() => onSelectCustomer?.(item.customerId)} aria-current={current ? "true" : undefined}>
+              <span className="nm">
+                <span>{item.name}</span>
+                <span className="muted small">{item.timeStr}</span>
+              </span>
+              <span className="pv">
+                {item.isButton && <b className="up">Tapped: </b>}
+                {item.previewText}
+              </span>
+              {(item.unpaidLabel || item.openCount > 1 || item.handled) && (
+                <span className="chips" style={{ gap: 6, marginTop: 4 }}>
+                  {item.unpaidLabel && <span className="pill warn">{item.unpaidLabel}</span>}
+                  {item.openCount > 1 && <span className="pill ok">{item.openCount} new</span>}
+                  {item.handled && <span className="muted small">✓ Handled</span>}
+                </span>
+              )}
+            </Link>
           );
         })}
-        {filtered.length === 0 && <li className="px-4 py-6 text-center text-sm text-muted">No chats match “{search}”.</li>}
-      </ul>
-    </div>
+        {filtered.length === 0 && <p className="muted" style={{ padding: 14 }}>No chats match “{search}”.</p>}
+      </nav>
+    </>
   );
 }

@@ -43,3 +43,17 @@ export async function handleAllReplies(): Promise<ActionResult> {
   revalidatePath("/dashboard", "layout");
   return { ok: true, message: `${r.count} replies marked as handled.` };
 }
+
+/** Marks the conversations behind these replies handled (one group on the Priority board). */
+export async function handleRepliesOf(replyIds: string[]): Promise<ActionResult> {
+  const scope = await getScope();
+  if (!scope.canOperate) return { ok: false, message: "Your login can view but not change anything." };
+  const ids = [...new Set(replyIds)].slice(0, 500);
+  if (!ids.length) return { ok: true, message: "Nothing to mark." };
+  const targets = await db.reply.findMany({ where: { id: { in: ids }, ...ownedMessages(scope) }, select: { customerId: true } });
+  const customerIds = [...new Set(targets.map((t) => t.customerId))];
+  if (!customerIds.length) return { ok: false, message: "Those chats weren't found." };
+  const r = await db.reply.updateMany({ where: { customerId: { in: customerIds }, handled: false, ...ownedMessages(scope) }, data: { handled: true } });
+  revalidatePath("/dashboard", "layout");
+  return { ok: true, message: `${customerIds.length} chat${customerIds.length === 1 ? "" : "s"} marked as handled (${r.count} message${r.count === 1 ? "" : "s"}).` };
+}
