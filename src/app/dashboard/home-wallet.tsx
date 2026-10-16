@@ -1,27 +1,18 @@
 import { Suspense } from "react";
 import { ExternalLink } from "@/components/icons";
 import Link from "@/components/intent-link";
-import { cn } from "@/lib/cn";
 import { INDIA_GST_RATE, RATES, spendSummary } from "@/lib/spend";
 import { affordableMessages, walletBalance } from "@/lib/wallet";
+import { T } from "./portal-ui";
 
 /*
  * Home's WhatsApp money card, from live figures: a wallet client's Thabaal balance, or for everyone
- * else this month's WhatsApp spend, the prepaid Meta balance left (when it has been synced) and the
- * free replies left this month. It streams in after the rest of Home (Meta may be slow to answer).
+ * else the prepaid Meta balance left (when it has been synced) or this month's WhatsApp spend, with
+ * an estimate of marketing messages left. Streams in after the rest of Home (Meta may be slow).
+ * Markup follows the portal design (portal.css classes).
  */
 
-const card = "flex flex-col justify-between rounded-card border-[1.5px] border-line bg-panel p-5 shadow-card";
-const inr = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: n < 100 ? 2 : 0 })}`;
-const smallBtn = "inline-flex min-h-[34px] items-center justify-center gap-1.5 rounded-xl px-3.5 text-[13.5px] font-semibold transition";
-
-function Bar({ pct, low }: { pct: number; low: boolean }) {
-  return (
-    <div className="my-3 h-2.5 overflow-hidden rounded-full bg-track" role="presentation">
-      <div className={cn("h-full rounded-full", low ? "bg-danger-solid" : "bg-brand")} style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
-    </div>
-  );
-}
+const money = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: n < 100 ? 2 : 0 })}`;
 
 /** "About 140 marketing messages left." Rounded down to a friendly figure; it's an estimate. */
 function messagesLeftText(n: number) {
@@ -31,17 +22,23 @@ function messagesLeftText(n: number) {
   return `About ${shown.toLocaleString("en-IN")} marketing message${shown === 1 ? "" : "s"} left.`;
 }
 
-function LowPill() {
-  return <span className="mr-1.5 inline-flex items-center rounded-full bg-warning-bg px-2.5 py-0.5 text-[12px] font-bold text-warning">Low balance</span>;
-}
-
 function Header() {
   return (
-    <div className="mb-3.5 flex items-center justify-between gap-2">
-      <h2 className="font-display text-[19px] font-semibold text-ink">WhatsApp wallet</h2>
-      <Link href="/dashboard/revenue?tab=costs" className="inline-flex min-h-[32px] items-center justify-center rounded-[10px] border-[1.5px] border-line px-3 text-[13.5px] font-semibold text-muted transition hover:text-ink">
-        Costs
+    <div className="hd">
+      <h2>
+        <T ta="வாட்ஸ்அப் வாலட்">WhatsApp wallet</T>
+      </h2>
+      <Link className="btn sm" href="/dashboard/revenue?tab=costs">
+        <T ta="செலவுகள்">Costs</T>
       </Link>
+    </div>
+  );
+}
+
+function Bar({ pct, low }: { pct: number; low: boolean }) {
+  return (
+    <div className="bar" style={{ margin: "12px 0 6px" }} role="presentation">
+      <i style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: low ? "var(--bar3)" : "var(--bar2)" }} />
     </div>
   );
 }
@@ -52,19 +49,19 @@ async function WalletBody({ clientId, isWallet, lowAlert, canManage }: { clientI
     if (balance === null) return <Unavailable />;
     const low = balance < lowAlert;
     return (
-      <section className={card}>
-        <div>
-          <Header />
-          <div className="text-[13.5px] font-medium text-muted">Wallet balance</div>
-          <div className="tabular mt-0.5 font-display text-[26px] font-semibold text-ink">{inr(balance)}</div>
-          <Bar pct={lowAlert > 0 ? (balance / (lowAlert * 4)) * 100 : 100} low={low} />
-          <p className="text-[13px] text-muted">
-            {low && balance > 0 && <LowPill />}
-            {messagesLeftText(canSend)} {balance <= 0 ? "Empty: campaigns are stopped until you add money." : low ? "Add money before your next campaign." : "Enough for your next campaigns."}
-          </p>
+      <section className="card">
+        <Header />
+        <div className="stat">
+          <div className="l">Balance</div>
+          <div className="v">{money(balance)}</div>
         </div>
-        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3">
-          <Link href="/dashboard/wallet" className={cn(smallBtn, "bg-brand text-on-brand hover:brightness-105")}>
+        <Bar pct={lowAlert > 0 ? (balance / (lowAlert * 4)) * 100 : 100} low={low} />
+        <p className="small">
+          {low && balance > 0 && <span className="pill warn">Low balance</span>} {messagesLeftText(canSend)}{" "}
+          {balance <= 0 ? "Empty: campaigns are stopped until you add money." : low ? "Add money before your next campaign." : "Enough for your next campaigns."}
+        </p>
+        <div className="tools" style={{ marginTop: 12 }}>
+          <Link className="btn primary sm" href="/dashboard/wallet">
             + Add money
           </Link>
         </div>
@@ -79,40 +76,44 @@ async function WalletBody({ clientId, isWallet, lowAlert, canManage }: { clientI
   const low = synced && s.prepaidFunds > 0 && left / s.prepaidFunds < 0.2;
   const q = s.serviceQuota;
   return (
-    <section className={card}>
-      <div>
-        <Header />
-        {synced ? (
-          <>
-            <div className="text-[13.5px] font-medium text-muted">Meta balance left</div>
-            <div className="tabular mt-0.5 font-display text-[26px] font-semibold text-ink">
-              {inr(left)} <span className="font-ui text-[14px] font-normal text-muted">of {inr(Math.round(s.prepaidFunds))}</span>
-            </div>
-            <Bar pct={s.prepaidFunds > 0 ? (left / s.prepaidFunds) * 100 : 0} low={low} />
-          </>
-        ) : (
-          <>
-            <div className="text-[13.5px] font-medium text-muted">Spent on WhatsApp in {s.monthLabel}</div>
-            <div className="tabular mt-0.5 font-display text-[26px] font-semibold text-ink">{inr(s.totalMonthSpentWithGst)}</div>
-            <div className="my-3 h-px bg-line" />
-          </>
-        )}
-        <p className="text-[13px] text-muted">
-          {synced && low && <LowPill />}
-          {synced && `${messagesLeftText(Math.floor(left / (RATES.marketing * (1 + INDIA_GST_RATE))))}${low ? " Top up before your next campaign." : ""} `}
-          {synced ? `${inr(s.totalMonthSpentWithGst)} spent in ${s.monthLabel}, incl. GST${s.liveSyncedFromMeta ? "" : " (estimate)"}. ` : `Incl. GST${s.liveSyncedFromMeta ? ", from Meta" : " (estimate)"}. `}
-          {q.freeRemaining.toLocaleString("en-IN")} of {q.totalFreeLimit.toLocaleString("en-IN")} free replies left this month.
-        </p>
-      </div>
-      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3">
-        <Link href="/dashboard/revenue?tab=costs" className={cn(smallBtn, "border-[1.5px] border-line text-ink hover:border-ink")}>
-          Spend breakdown
-        </Link>
+    <section className="card">
+      <Header />
+      {synced ? (
+        <>
+          <div className="stat">
+            <div className="l">Balance</div>
+            <div className="v">{money(left)}</div>
+          </div>
+          <Bar pct={s.prepaidFunds > 0 ? (left / s.prepaidFunds) * 100 : 0} low={low} />
+          <p className="small">
+            {low && <span className="pill warn">Low balance</span>} {messagesLeftText(Math.floor(left / (RATES.marketing * (1 + INDIA_GST_RATE))))}
+            {low ? " Top up before your next campaign." : ""}
+          </p>
+          <p className="muted small" style={{ marginTop: 6 }}>
+            {money(s.totalMonthSpentWithGst)} spent in {s.monthLabel}, incl. GST{s.liveSyncedFromMeta ? "" : " (estimate)"}. {q.freeRemaining.toLocaleString("en-IN")} of{" "}
+            {q.totalFreeLimit.toLocaleString("en-IN")} free replies left this month.
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="stat">
+            <div className="l">Spent on WhatsApp in {s.monthLabel}</div>
+            <div className="v">{money(s.totalMonthSpentWithGst)}</div>
+          </div>
+          <p className="muted small" style={{ marginTop: 10 }}>
+            Incl. GST{s.liveSyncedFromMeta ? ", from Meta" : " (estimate)"}. {q.freeRemaining.toLocaleString("en-IN")} of {q.totalFreeLimit.toLocaleString("en-IN")} free replies left this month.
+          </p>
+        </>
+      )}
+      <div className="tools" style={{ marginTop: 12 }}>
         {canManage && s.metaAccount.billingUrl && (
-          <a href={s.metaAccount.billingUrl} target="_blank" rel="noopener noreferrer" className={cn(smallBtn, "bg-brand text-on-brand hover:brightness-105")}>
-            Recharge on Meta <ExternalLink aria-hidden className="size-3.5" />
+          <a className="btn primary sm" href={s.metaAccount.billingUrl} target="_blank" rel="noopener noreferrer">
+            <T ta="மெட்டாவில் ரீசார்ஜ்">Recharge on Meta</T> <ExternalLink aria-hidden className="ic" style={{ width: 14, height: 14 }} />
           </a>
         )}
+        <Link className="btn sm" href="/dashboard/revenue?tab=costs">
+          Spend breakdown
+        </Link>
       </div>
     </section>
   );
@@ -120,25 +121,22 @@ async function WalletBody({ clientId, isWallet, lowAlert, canManage }: { clientI
 
 function Unavailable() {
   return (
-    <section className={card}>
-      <div>
-        <Header />
-        <p className="text-[13.5px] text-muted">WhatsApp costs couldn&apos;t be loaded just now. Open Costs to try again.</p>
-      </div>
+    <section className="card">
+      <Header />
+      <p className="muted small">WhatsApp costs couldn&apos;t be loaded just now. Open Costs to try again.</p>
     </section>
   );
 }
 
 function Loading() {
   return (
-    <section className={card} aria-busy="true">
-      <div>
-        <Header />
-        <div className="h-4 w-32 animate-pulse rounded bg-sunken" />
-        <div className="mt-2 h-8 w-40 animate-pulse rounded bg-sunken" />
-        <div className="my-3 h-2.5 animate-pulse rounded-full bg-sunken" />
-        <div className="h-4 w-3/4 animate-pulse rounded bg-sunken" />
+    <section className="card" aria-busy="true">
+      <Header />
+      <div className="stat">
+        <div className="l">Balance</div>
+        <div className="v muted">…</div>
       </div>
+      <div className="bar" style={{ margin: "12px 0 6px" }} />
     </section>
   );
 }
