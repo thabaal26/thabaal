@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "@/components/intent-link";
-import { Send, Copy, Printer } from "@/components/icons";
 import type { ComprehensiveReportData, PeriodFigures, PeriodKey } from "@/lib/reports-data";
 import "./reports.css";
 
@@ -133,7 +132,6 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
   const [per, setPer] = useState<PeriodKey>("m");
   const [tab, setTab] = useState<"ov" | "camp" | "cust" | "prod">("ov");
   const [cs, setCs] = useState<"a" | "b">("a");
-  const [copied, setCopied] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [notifFilter, setNotifFilter] = useState<"all" | "unread" | "order" | "reply" | "call" | "alert">("all");
   const [notifs, setNotifs] = useState<NotifItem[]>(INITIAL_NOTIFS);
@@ -214,18 +212,6 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
   const good = r >= 10;
   const okv = r >= 3;
 
-  const waShareUrl = `https://wa.me/?text=${encodeURIComponent(data.summaryText)}`;
-
-  const copySummary = async () => {
-    try {
-      await navigator.clipboard.writeText(data.summaryText);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* clipboard unavailable */
-    }
-  };
-
   const k = [
     [tr("WhatsApp cost", "வாட்ஸ்அப் கட்டணம்"), R(d.cost), tr("Meta message charges", "மெட்டா மெசேஜ் கட்டணம்")],
     [tr("Paid sales", "செலுத்தப்பட்ட விற்பனை"), R(d.sales), tr("From customers you messaged", "மெசேஜ் அனுப்பிய வாடிக்கையாளர்களிடமிருந்து")],
@@ -302,21 +288,6 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
                 <path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" />
               </svg>
             </button>
-            <a
-              className="btn sm"
-              href={waShareUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Share summary directly on WhatsApp"
-            >
-              <Send aria-hidden className="size-3.5 text-emerald-600 dark:text-emerald-400" /> Share on WhatsApp
-            </a>
-            <button type="button" className="btn sm" onClick={copySummary} title="Copy formatted summary">
-              <Copy aria-hidden className="size-3.5" /> {copied ? "Copied" : "Copy text"}
-            </button>
-            <button type="button" className="btn sm" onClick={() => window.print()} title="Print report">
-              <Printer aria-hidden className="size-3.5" /> Print
-            </button>
           </div>
         </header>
 
@@ -331,11 +302,18 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
         <div className="hd" style={{ marginBottom: 6 }}>
           <div>
             <h2 style={{ fontSize: 22 }} id="verd">
-              {good
-                ? `WhatsApp is working well ${per === "m" ? "this month" : "this week"}.`
-                : okv
-                ? `WhatsApp is doing alright ${per === "m" ? "this month" : "this week"}.`
-                : `WhatsApp is not paying back ${per === "m" ? "this month" : "this week"}.`}
+              {tr(
+                good
+                  ? `WhatsApp is working well ${per === "m" ? "this month" : "this week"}.`
+                  : okv
+                  ? `WhatsApp is doing alright ${per === "m" ? "this month" : "this week"}.`
+                  : `WhatsApp is not paying back ${per === "m" ? "this month" : "this week"}.`,
+                good
+                  ? `${per === "m" ? "இந்த மாதம்" : "இந்த வாரம்"} வாட்ஸ்அப் சிறப்பாக செயல்படுகிறது.`
+                  : okv
+                  ? `${per === "m" ? "இந்த மாதம்" : "இந்த வாரம்"} வாட்ஸ்அப் சராசரியாக உள்ளது.`
+                  : `${per === "m" ? "இந்த மாதம்" : "இந்த வாரம்"} வாட்ஸ்அப் போதிய பலன் தரவில்லை.`
+              )}
             </h2>
           </div>
           <div className="seg" id="rp">
@@ -345,7 +323,7 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
               aria-pressed={per === "m"}
               onClick={() => setPer("m")}
             >
-              This month
+              {tr("This month", "இந்த மாதம்")}
             </button>
             <button
               type="button"
@@ -353,24 +331,30 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
               aria-pressed={per === "w"}
               onClick={() => setPer("w")}
             >
-              This week
+              {tr("This week", "இந்த வாரம்")}
             </button>
           </div>
         </div>
         <p id="verds">
-          You spent <b>{R(d.cost)}</b> on messages and received <b>{R(d.sales)}</b> in paid orders. Every{" "}
-          <b>₹1</b> spent brought back <b>{R(r)}</b> in sales.
+          {lang === "ta" ? (
+            <>
+              செய்திகளுக்கு <b>{R(d.cost)}</b> செலவழித்து, <b>{R(d.sales)}</b> மதிப்புள்ள கட்டணம் செலுத்தப்பட்ட ஆர்டர்களைப் பெற்றுள்ளீர்கள். செலவழித்த ஒவ்வொரு <b>₹1</b>-க்கும் <b>{R(r)}</b> விற்பனை வந்துள்ளது.
+            </>
+          ) : (
+            <>
+              You spent <b>{R(d.cost)}</b> on messages and received <b>{R(d.sales)}</b> in paid orders. Every{" "}
+              <b>₹1</b> spent brought back <b>{R(r)}</b> in sales.
+            </>
+          )}
         </p>
       </div>
 
       {/* 4-KPI Grid */}
       <div className="grid g4 keep2" id="rk" style={{ marginBottom: 16 }}>
-        {k.map((x, i) => (
+        {k.map((x) => (
           <div key={x[0]} className="card stat">
             <div className="l">{x[0]}</div>
-            <div className="v" style={i === 1 || i === 3 ? { color: "var(--ok)" } : undefined}>
-              {x[1]}
-            </div>
+            <div className="v">{x[1]}</div>
             <div className="d muted">{x[2]}</div>
           </div>
         ))}
