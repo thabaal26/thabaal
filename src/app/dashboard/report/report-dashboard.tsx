@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "@/components/intent-link";
 import { Send, Copy, Printer } from "@/components/icons";
 import type { ComprehensiveReportData, PeriodFigures, PeriodKey } from "@/lib/reports-data";
@@ -117,6 +117,27 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
   const [cs, setCs] = useState<"a" | "b">("a");
   const [copied, setCopied] = useState(false);
 
+  useEffect(() => {
+    const fromHash = () => {
+      const h = window.location.hash.slice(1);
+      if (h === "ov" || h === "camp" || h === "cust" || h === "prod") {
+        setTab(h);
+      }
+    };
+    fromHash();
+    window.addEventListener("hashchange", fromHash);
+    return () => window.removeEventListener("hashchange", fromHash);
+  }, []);
+
+  const selectTab = (t: "ov" | "camp" | "cust" | "prod") => {
+    setTab(t);
+    try {
+      window.history.replaceState(null, "", "#" + t);
+    } catch {
+      /* ignore */
+    }
+  };
+
   const d: PeriodFigures = per === "m" ? data.overview.m : data.overview.w;
   const r = d.returnRatio;
   const good = r >= 10;
@@ -161,8 +182,9 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
 
   return (
     <div className="thabaal-reports">
-      {/* Top Header */}
-      <header className="top">
+      <div className="wrapin">
+        {/* Top Header */}
+        <header className="top">
         <div>
           <h1>Reports</h1>
           <p className="sub">Is WhatsApp bringing business? One answer, then the reason, then what to do.</p>
@@ -249,7 +271,7 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
           data-tab="ov"
           data-ta="மொத்தம்"
           aria-selected={tab === "ov"}
-          onClick={() => setTab("ov")}
+          onClick={() => selectTab("ov")}
         >
           Overview
         </button>
@@ -257,7 +279,7 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
           type="button"
           data-tab="camp"
           aria-selected={tab === "camp"}
-          onClick={() => setTab("camp")}
+          onClick={() => selectTab("camp")}
         >
           Campaigns
         </button>
@@ -265,7 +287,7 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
           type="button"
           data-tab="cust"
           aria-selected={tab === "cust"}
-          onClick={() => setTab("cust")}
+          onClick={() => selectTab("cust")}
         >
           Customers
         </button>
@@ -273,7 +295,7 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
           type="button"
           data-tab="prod"
           aria-selected={tab === "prod"}
-          onClick={() => setTab("prod")}
+          onClick={() => selectTab("prod")}
         >
           Products
         </button>
@@ -769,6 +791,7 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
           </div>
         </div>
       </section>
+      </div>
     </div>
   );
 }

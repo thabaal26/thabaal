@@ -33,6 +33,9 @@
 
 :root[data-theme="dark"] .thabaal-reports,
 :root.dark .thabaal-reports,
+.dark .thabaal-reports,
+html.dark .thabaal-reports,
+body.dark .thabaal-reports,
 [data-theme="night"] .thabaal-reports {
   --bg: #0B1E2D;
   --card: #133248;
