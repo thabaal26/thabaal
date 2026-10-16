@@ -16,6 +16,7 @@ import { ShellProvider } from "@/components/shell-tools";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AppearanceSync } from "@/components/appearance-sync";
 import { IconSetLink } from "@/components/icon-set-link";
+import { InlineScript } from "@/components/inline-script";
 import { appearanceAttrs, appearanceDataset, appearanceScript, resolveAppearance } from "@/lib/appearance";
 
 /** The client whose look the dashboard wears: a client login's own, or the one an admin picked.
@@ -142,7 +143,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           {/* The portal's look (Settings → Appearance, or this client's own): set on <html> before
               anything paints, so sheets and dialogs wear it too. */}
           <IconSetLink set={lookData.iconset} />
-          <script dangerouslySetInnerHTML={{ __html: appearanceScript(lookData) }} />
+          <InlineScript html={appearanceScript(lookData)} />
           <AppearanceSync data={lookData} />
           <a href="#main" className="sr-only z-[70] rounded-control bg-panel px-4 py-2 text-sm font-medium text-ink shadow-pop focus:not-sr-only focus:fixed focus:left-4 focus:top-4">
             Skip to content
