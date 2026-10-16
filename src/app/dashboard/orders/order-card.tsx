@@ -124,7 +124,8 @@ export function OrderCard({
   const reached =
     o.status === "DELIVERED" ? 4 : o.status === "DISPATCHED" ? 3 : o.status === "PAID" || isPaid || cod ? 2 : o.status === "CONFIRMED" ? 1 : 0;
   const source = o.waMessageId ? { tone: "info", label: "WhatsApp cart" } : { tone: "mute", label: "Manual entry" };
-  const missing = [!o.note?.trim() && !o.customer.location && !o.customer.locationRaw && o.status !== "CANCELLED" ? "Address needed" : null, !o.customer.phone ? "Phone number missing" : null].filter(Boolean);
+  // The address has its own row below (with "Add address"); flag only what has no other place.
+  const missing = [!o.customer.phone ? "Phone number missing" : null].filter(Boolean);
 
   // What the app records, in order. Stages without a saved time show "Done" once reached.
   const events: [string, string | null][] = [

@@ -26,6 +26,7 @@ import { OrderCard } from "./order-card";
 import type { CatalogProductOption } from "./order-items-editor";
 import { PrintButton, type ExportableOrderRow } from "./packing/print-button";
 import { PaymentForm } from "./payment-form";
+import { inr } from "../portal-format";
 import { AutoSelect, PAction, PortalPage } from "../portal-ui";
 import { OrdersTabs } from "./orders-tabs";
 
@@ -361,7 +362,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         </Link>
         <Link className="card stat" href={qs({ show: "all", pay: "unpaid" })} style={{ textDecoration: "none" }}>
           <div className="l">Payment waiting</div>
-          <div className="v">{money(waitingSum)}</div>
+          <div className="v">{inr(waitingSum)}</div>
           <div className="d muted">{fmtNumber(unpaidCount)} order{unpaidCount === 1 ? "" : "s"} · not received yet</div>
         </Link>
         <Link className="card stat" href="/dashboard/orders/packing" style={{ textDecoration: "none" }}>
@@ -374,7 +375,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/dashboard
         <Link className="card stat" href={qs({ show: "dispatched" })} style={{ textDecoration: "none" }}>
           <div className="l">Dispatched</div>
           <div className="v">{fmtNumber(dispatchedCount)}</div>
-          <div className="d muted">{activeCount > 0 ? `${money(activeWorth)} in active orders` : "Nothing in progress"}</div>
+          <div className="d muted">{activeCount > 0 ? `${inr(activeWorth)} in active orders` : "Nothing in progress"}</div>
         </Link>
       </div>
 
