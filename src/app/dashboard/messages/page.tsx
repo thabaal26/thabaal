@@ -1,4 +1,5 @@
 import { CheckCheck, ChevronDown, ChevronLeft, ChevronRight, Download, Search } from "@/components/icons";
+import { T } from "../portal-ui";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
 import { Alert3D, Eye3D, Messages3D } from "@/components/icons-3d";
@@ -194,10 +195,10 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
               />
             )}
           </div>
-          <button className={cn(buttonClass("secondary"), "max-sm:hidden")}>Filter</button>
+          <button className={cn(buttonClass("secondary"), "max-sm:hidden")}><T>Filter</T></button>
           {filtered && (
             <Link href={href({ view: p.view }, {})} className={cn(buttonClass("ghost"), "max-sm:h-9 max-sm:justify-self-start max-sm:px-1 max-sm:text-sm")}>
-              Clear filters
+              <T>Clear filters</T>
             </Link>
           )}
         </form>

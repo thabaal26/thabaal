@@ -604,10 +604,8 @@ export function OrderCard({
               <button
                 type="button"
                 onClick={() => setShowItems(!showItems)}
-                className="btn sm ghost"
+                className="btn sm ghost itemsbtn"
                 style={{
-                  minHeight: 26,
-                  height: 26,
                   padding: "0 8px",
                   fontSize: 12,
                   fontWeight: 600,
@@ -624,7 +622,9 @@ export function OrderCard({
                 aria-expanded={showItems}
                 title={showItems ? "Hide items breakdown" : `View all ${itemCount} items`}
               >
-                <span>{itemCount} items</span>
+                <span>
+                  <T ta={`${itemCount} பொருட்கள்`}>{`${itemCount} items`}</T>
+                </span>
                 <svg
                   style={{
                     width: 12,
@@ -853,6 +853,7 @@ export function OrderCard({
             type="button"
             onClick={handleCopyRef}
             title={isTa ? "UPI குறிப்பு எண்ணை நகலெடு" : "Click to copy UPI reference"}
+            className="max-sm:min-h-10"
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -1064,7 +1065,7 @@ export function OrderCard({
         </div>
       ) : fullAddress ? (
         <p className="muted small" style={{ marginTop: 12, fontSize: 13.5, lineHeight: 1.5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-          Deliver to: <b style={{ color: "var(--fg)" }}>{fullAddress}</b> ·{" "}
+          <T ta="அனுப்பும் முகவரி:">Deliver to:</T> <b style={{ color: "var(--fg)" }}>{fullAddress}</b> ·{" "}
           <button
             type="button"
             className="linkb"
@@ -1073,7 +1074,7 @@ export function OrderCard({
               setEditingAddress(true);
             }}
           >
-            Change
+            <T>Change</T>
           </button>
         </p>
       ) : o.status !== "CANCELLED" && !missingBadges.includes("Address needed") ? (
@@ -1083,7 +1084,7 @@ export function OrderCard({
             className="linkb"
             onClick={() => setEditingAddress(true)}
           >
-            + Add address
+            <T>+ Add address</T>
           </button>
         </p>
       ) : null}

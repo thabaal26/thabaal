@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { T } from "../portal-ui";
 import { safeAction, toastResult } from "@/components/toast";
 import { changePassword } from "../actions/account";
 
@@ -46,7 +47,7 @@ export function PasswordForm() {
       {mismatch && <p className="msg err">The two new passwords don&apos;t match.</p>}
       <div className="tools">
         <button type="submit" className="btn primary" disabled={pending || mismatch}>
-          {pending ? "Changing…" : "Change password"}
+          <T>{pending ? "Changing…" : "Change password"}</T>
         </button>
         <span className="muted small">8 or more characters.</span>
       </div>

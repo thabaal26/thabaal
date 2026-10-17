@@ -408,7 +408,7 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                     <div>
                       <h2 style={{ fontSize: 18 }}>
                         {c.isLive ? (
-                          <Link href={`/dashboard/campaigns/${c.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+                          <Link href={`/dashboard/campaigns/${c.id}`} className="max-sm:inline-flex max-sm:min-h-10 max-sm:items-center" style={{ textDecoration: "none", color: "inherit" }}>
                             {c.n}
                           </Link>
                         ) : (

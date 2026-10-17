@@ -6,6 +6,7 @@ import { ReplyMedia } from "@/components/reply-media";
 import { cn } from "@/lib/cn";
 import { fmtDate } from "@/lib/format";
 import { plainError, templateLabel } from "@/lib/plain-error";
+import { T } from "@/app/dashboard/portal-ui";
 
 export type ConversationEntry =
   | { at: Date; type: "out"; id: string; template: string; campaign: string | null; status: string; body: string | null; readAt: Date | null; error: string | null; via: string | null }
@@ -89,7 +90,7 @@ export function Conversation({ entries, className, plain }: { entries: Conversat
           ) : r.entry.type === "in" ? (
             <li key={r.key} className="flex">
               <div className="max-w-[min(90%,36rem)] rounded-[12px] bg-panel px-3 py-2 text-[13.5px] text-ink shadow-[0_1px_1px_rgba(16,40,59,0.06)] sm:rounded-[14px] sm:px-4 sm:py-2.5 sm:text-[15px]">
-                {r.entry.kind === "button" && <p className="mb-1 flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">Tapped a button</p>}
+                {r.entry.kind === "button" && <p className="mb-1 flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400"><T>Tapped a button</T></p>}
                 {r.entry.kind === "order" && (
                   r.entry.text.toLowerCase().includes("upi payment") || r.entry.text.toLowerCase().includes("payment completed") ? (
                     <p className="mb-1 flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
@@ -97,14 +98,14 @@ export function Conversation({ entries, className, plain }: { entries: Conversat
                     </p>
                   ) : (
                     <p className="mb-1 flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400">
-                      <ShoppingBag className="size-3.5" /> Catalogue Order Cart
+                      <ShoppingBag className="size-3.5" /> <T>Catalogue Order Cart</T>
                     </p>
                   )
                 )}
                 {r.entry.text && <p className="whitespace-pre-wrap [overflow-wrap:anywhere] leading-relaxed">{r.entry.text}</p>}
                 {r.entry.mediaId && <ReplyMedia id={r.entry.id} type={r.entry.mediaType} />}
                 <p className="tabular mt-1 text-right text-[11px] text-[#667781] dark:text-[#8696A0]">
-                  {r.entry.via && `to ${r.entry.via} · `}
+                  {r.entry.via && <T ta={`${r.entry.via}-க்கு · `}>{`to ${r.entry.via} · `}</T>}
                   <time dateTime={r.entry.at.toISOString()}>{fmtDate(r.entry.at, "h:mm a")}</time>
                 </p>
               </div>
@@ -132,7 +133,7 @@ export function Conversation({ entries, className, plain }: { entries: Conversat
                             className="mb-1.5 flex items-center gap-2 rounded-control border border-black/10 bg-white/70 dark:border-white/10 dark:bg-white/10 px-3 py-2 text-xs font-medium text-brand-deep hover:underline"
                           >
                             <FileText aria-hidden className="size-4 shrink-0" />
-                            <span className="truncate">Open PDF attachment</span>
+                            <span className="truncate"><T>Open PDF attachment</T></span>
                           </a>
                         ) : (
                           <a href={mediaUrl} target="_blank" rel="noreferrer" className="mb-1.5 block overflow-hidden rounded-control border border-black/10">
@@ -147,7 +148,7 @@ export function Conversation({ entries, className, plain }: { entries: Conversat
                 })()}
                 {r.entry.error && <p className="mt-1 text-xs text-danger">{plainError(r.entry.error)}</p>}
                 <p className="tabular mt-1 flex flex-wrap items-center justify-end gap-1.5 text-[11px] text-[#667781] dark:text-[#8696A0]">
-                  {r.entry.via && <span>from {r.entry.via} ·</span>}
+                  {r.entry.via && <span><T ta={`${r.entry.via}-லிருந்து ·`}>{`from ${r.entry.via} ·`}</T></span>}
                   <time dateTime={r.entry.at.toISOString()}>{fmtDate(r.entry.at, "h:mm a")}</time>
                   <Ticks status={r.entry.status} />
                 </p>

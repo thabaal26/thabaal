@@ -1,4 +1,5 @@
 import { orderRef } from "@/lib/order-ref";
+import { T } from "../portal-ui";
 import { ChevronRight } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
@@ -266,7 +267,7 @@ export default async function NotificationsPage({
           {days.map((day) => (
             <section key={day.key} aria-labelledby={`day-${day.key}`}>
               <h2 id={`day-${day.key}`} className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-muted">
-                {day.label}
+                <T>{day.label}</T>
               </h2>
               <Card className="card-3d overflow-hidden">
                 <ul className="divide-y divide-line">
@@ -282,7 +283,7 @@ export default async function NotificationsPage({
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <p className={cn("min-w-0 truncate text-sm", item.unread ? "font-semibold text-ink" : "font-medium text-ink-2")}>
-                              <Link href={item.href} className="outline-none after:absolute after:inset-0 focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-brand">
+                              <Link href={item.href} className="-my-2.5 inline-block py-2.5 outline-none after:absolute after:inset-0 focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-brand sm:my-0 sm:py-0">
                                 {item.title}
                               </Link>
                             </p>

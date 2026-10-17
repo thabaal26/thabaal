@@ -84,6 +84,13 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
     `customer since ${fmtDate(c.createdAt, "d MMM yyyy")}`,
     c.callAllowedUntil && c.callAllowedUntil > new Date() ? `calls allowed until ${fmtDate(c.callAllowedUntil, "d MMM")}` : null,
   ].filter(Boolean);
+  const metaTa = [
+    formatPhone(c.phone),
+    c.location ? `${c.location}${c.region && c.region !== "Not sure" ? `, ${c.region}` : ""}` : null,
+    !scope.clientId ? c.client.name : null,
+    `${fmtDate(c.createdAt, "d MMM yyyy")} முதல் வாடிக்கையாளர்`,
+    c.callAllowedUntil && c.callAllowedUntil > new Date() ? `${fmtDate(c.callAllowedUntil, "d MMM")} வரை அழைக்கலாம்` : null,
+  ].filter(Boolean);
 
   // Secondary actions: inline on computers, in a "⋯" sheet on phones.
   const more = [
@@ -114,21 +121,22 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
     <>
       <PageHeader
         title={c.name}
+        titleIsData
         back={{ href: "/dashboard/customers", label: "Customers" }}
-        meta={<span className="tabular">{meta.join(" · ")}</span>}
+        meta={<span className="tabular"><T ta={metaTa.join(" · ")}>{meta.join(" · ")}</T></span>}
         rowActions
         actions={
           <>
             <a href={`https://wa.me/${c.phone}`} target="_blank" rel="noreferrer" className={buttonClass("primary")}>
               <MessageCircle aria-hidden className="size-4" />
               <span>
-                <span className="max-sm:sr-only">Message on </span>WhatsApp
+                <span className="max-sm:sr-only"><T ta="செய்தி அனுப்பு · ">Message on </T></span>WhatsApp
               </span>
             </a>
             {scope.canOperate && <CallButton customerId={c.id} name={c.name} primary={callAllowed} />}
             <Link href={`/dashboard?cust=${c.id}&range=all`} className={buttonClass("secondary")}>
               <span>
-                <span className="max-sm:sr-only">Their </span>insights
+                <span className="max-sm:sr-only"><T ta="அவர்களின் ">Their </T></span><T ta="விவரங்கள்">insights</T>
               </span>
             </Link>
             {more.length > 0 && (
@@ -172,16 +180,21 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
               />
               <Stat
                 label="Last order"
-                value={last ? fmtDate(last, "d MMM") : "Never"}
+                value={last ? fmtDate(last, "d MMM") : <T>Never</T>}
                 sub={unpaid > 0 ? `Unpaid cart ${money(unpaid)}` : "All paid"}
+                subTa={unpaid > 0 ? `நிலுவை கார்ட் ${money(unpaid)}` : undefined}
                 icon={<Clock className="size-4" />}
                 tone={unpaid > 0 ? "amber" : "gold"}
               />
             </div>
             <p className="muted small" style={{ marginTop: 8 }}>
-              {fmtNumber(sent.length)} campaign message{sent.length === 1 ? "" : "s"} received · {pct(read, delivered)}% read · {fmtNumber(c.replies.length)} repl{c.replies.length === 1 ? "y" : "ies"}
-              {c.replies[0] ? ` (last ${fmtDate(c.replies[0].receivedAt, "d MMM")})` : ""}
-              {c.optedOut ? " · opted out of campaigns" : ""}
+              <T
+                ta={`${fmtNumber(sent.length)} பிரச்சாரச் செய்திகள் பெற்றார் · ${pct(read, delivered)}% படித்தார் · ${fmtNumber(c.replies.length)} பதில்கள்${c.replies[0] ? ` (கடைசியாக ${fmtDate(c.replies[0].receivedAt, "d MMM")})` : ""}${c.optedOut ? " · பிரச்சாரங்களை நிறுத்தியவர்" : ""}`}
+              >
+                {fmtNumber(sent.length)} campaign message{sent.length === 1 ? "" : "s"} received · {pct(read, delivered)}% read · {fmtNumber(c.replies.length)} repl{c.replies.length === 1 ? "y" : "ies"}
+                {c.replies[0] ? ` (last ${fmtDate(c.replies[0].receivedAt, "d MMM")})` : ""}
+                {c.optedOut ? " · opted out of campaigns" : ""}
+              </T>
             </p>
           </>
         );
@@ -265,8 +278,8 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                   {activeOrders.length > 0 && (
                     <div>
                       <p className="mb-1.5 flex items-center justify-between text-xs font-medium text-muted">
-                        <span>Current &amp; past orders ({activeOrders.length})</span>
-                        <span className="tabular">Spent {money(activeOrders.reduce((sum, o) => sum + o.total, 0))}</span>
+                        <span><T ta={`இப்போதைய & பழைய ஆர்டர்கள் (${activeOrders.length})`}>{`Current & past orders (${activeOrders.length})`}</T></span>
+                        <span className="tabular"><T ta={`செலவு ${money(activeOrders.reduce((sum, o) => sum + o.total, 0))}`}>{`Spent ${money(activeOrders.reduce((sum, o) => sum + o.total, 0))}`}</T></span>
                       </p>
                       <ul className="divide-y divide-line rounded-control bg-sunken px-3 text-sm">
                         {activeOrders.map((o) => (
@@ -286,11 +299,11 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                   {replacedCarts.length > 0 && (
                     <div className="rounded-control border border-warning-border/60 bg-warning-bg/35 p-2.5 text-xs">
                       <p className="flex items-center justify-between font-semibold text-ink-2">
-                        <span>Cart mentality · Earlier / replaced carts ({replacedCarts.length})</span>
+                        <span><T ta={`கார்ட் பழக்கம் · முந்தைய / மாற்றப்பட்ட கார்ட்கள் (${replacedCarts.length})`}>{`Cart mentality · Earlier / replaced carts (${replacedCarts.length})`}</T></span>
                       </p>
                       {consideredOnly.length > 0 && (
                         <p className="mt-1 text-ink-2">
-                          <span className="font-semibold text-danger">Considered &amp; dropped: </span>
+                          <span className="font-semibold text-danger"><T ta="பார்த்து கைவிட்டவை: ">Considered &amp; dropped: </T></span>
                           {consideredOnly.join(", ")}
                         </p>
                       )}
@@ -300,7 +313,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                             <div className="flex justify-between gap-2">
                               <span>
                                 <strong className="font-mono text-ink-2">{orderRef(o)}</strong> · {fmtDate(o.createdAt, "d MMM, h:mm a")}
-                                {o.internalNote && /superseded by/i.test(o.internalNote) ? " · replaced" : " · cancelled"}
+                                {o.internalNote && /superseded by/i.test(o.internalNote) ? <T ta=" · மாற்றப்பட்டது"> · replaced</T> : <T ta=" · ரத்து"> · cancelled</T>}
                               </span>
                               <span className="tabular">{money(o.total, o.currency)}</span>
                             </div>
@@ -319,18 +332,18 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                 {c.purchases}
               </p>
             ) : (
-              c.orders.length === 0 && <p className="text-sm text-muted">No purchase recorded.</p>
+              c.orders.length === 0 && <p className="text-sm text-muted"><T>No purchase recorded.</T></p>
             )}
             {c.location && (
               <div className="flex items-start gap-2 text-sm">
                 <MapPin aria-hidden className="mt-0.5 size-4 shrink-0 text-brand-deep" />
                 <div>
-                  <Link href={`/dashboard/customers?area=${encodeURIComponent(`loc:${c.location}`)}`} className="hover:underline">
+                  <Link href={`/dashboard/customers?area=${encodeURIComponent(`loc:${c.location}`)}`} className="inline-flex min-h-10 items-center hover:underline sm:min-h-0">
                     {c.location}
                   </Link>
                   <p className="text-xs text-muted">
                     {c.region}
-                    {c.locationRaw && c.locationRaw !== c.location ? ` · written as "${c.locationRaw}"` : ""}
+                    {c.locationRaw && c.locationRaw !== c.location ? <T ta={` · "${c.locationRaw}" என எழுதப்பட்டது`}>{` · written as "${c.locationRaw}"`}</T> : ""}
                   </p>
                 </div>
               </div>
@@ -351,24 +364,24 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
             })()}
             {pausedUntil && <PausedOffersNote until={pausedUntil} />}
             <div className="rounded-control bg-sunken px-3 py-2 text-xs">
-              <p className="font-medium text-ink-2">Agreed to WhatsApp messages</p>
+              <p className="font-medium text-ink-2"><T>Agreed to WhatsApp messages</T></p>
               {c.optInSource ? (
                 <p className="mt-0.5 text-muted">
                   {c.optInSource}
                   {c.optInAt ? ` · ${fmtDate(c.optInAt, "d MMM yyyy")}` : ""}
                 </p>
               ) : (
-                <p className="mt-0.5 text-warning">Not recorded. Meta requires consent before marketing messages.</p>
+                <p className="mt-0.5 text-warning"><T>Not recorded. Meta requires consent before marketing messages.</T></p>
               )}
             </div>
             {(productTags.length > 0 || c.optedOut || c.unreachable) && (
               <div>
-                <p className="mb-1.5 text-xs font-medium text-muted">Groups</p>
+                <p className="mb-1.5 text-xs font-medium text-muted"><T>Groups</T></p>
                 <div className="flex flex-wrap gap-1">
                   {c.optedOut && <Badge tone="red">Opted out</Badge>}
                   {c.unreachable && <Badge tone="amber">Can&apos;t receive WhatsApp</Badge>}
                   {productTags.map((t) => (
-                    <Link key={t} href={`/dashboard/customers?tag=${encodeURIComponent(t)}`} className="rounded-full py-1">
+                    <Link key={t} href={`/dashboard/customers?tag=${encodeURIComponent(t)}`} className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-full sm:min-h-0 sm:min-w-0 sm:py-1">
                       <Badge>{t === "no-item-info" ? "no item recorded" : t}</Badge>
                     </Link>
                   ))}

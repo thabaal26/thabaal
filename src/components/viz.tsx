@@ -1,5 +1,6 @@
 "use client";
 
+import { useTr } from "@/lib/i18n/context";
 /**
  * The portal's chart kit. Every chart is Apache ECharts (components/echart.tsx) in one shared look:
  * the validated palette (lib/chart-theme.ts), 4px rounded data ends, hairline grids, the same dark
@@ -814,6 +815,9 @@ export function Legend({ items, className }: { items: { label: string; color: Ch
 
 /** A figure with a label: the compact replacement for sentence-style stat lines. */
 export function StatChip({ label, value, tone = "ink", hint }: { label: string; value: ReactNode; tone?: "ink" | "good" | "bad" | "warn"; hint?: string }) {
+  const { tr, trn } = useTr();
+  label = tr(label);
+  value = trn(value);
   const color = { ink: "text-ink", good: "text-success", bad: "text-danger", warn: "text-warning" }[tone];
   return (
     <div className="min-w-0 rounded-control border border-line bg-panel px-3 py-2" title={hint}>

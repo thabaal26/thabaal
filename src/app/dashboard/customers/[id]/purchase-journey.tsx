@@ -14,6 +14,7 @@ import { computeCustomerLoyalty } from "@/lib/loyalty";
 import type { OrderItem } from "@/lib/orders";
 import { formatInTimeZone } from "date-fns-tz";
 import { adjustLoyaltyPoints } from "../../actions/customers";
+import { T } from "../../portal-ui";
 
 const DAY = 86_400_000;
 // Paid = emerald, waiting = gold, replaced or cancelled = neutral: the same meaning as every chart.
@@ -205,7 +206,17 @@ export function PurchaseJourney({
         />
         <StatChip
           label="Next refill"
-          value={nextIn === null ? (avgGap ? `~${avgGap}d` : "—") : nextIn < 0 ? `${Math.abs(nextIn)}d overdue` : nextIn === 0 ? "today" : `in ${nextIn}d`}
+          value={
+            nextIn === null ? (
+              avgGap ? `~${avgGap}d` : "—"
+            ) : nextIn < 0 ? (
+              <T ta={`${Math.abs(nextIn)} நாள் தாமதம்`}>{`${Math.abs(nextIn)}d overdue`}</T>
+            ) : nextIn === 0 ? (
+              <T ta="இன்று">today</T>
+            ) : (
+              <T ta={`${nextIn} நாளில்`}>{`in ${nextIn}d`}</T>
+            )
+          }
           tone={nextIn !== null && nextIn < 0 ? "bad" : "ink"}
         />
         <StatChip label="Best time to message" value={bestTimeLabel ?? "Not known yet"} />
@@ -221,11 +232,18 @@ export function PurchaseJourney({
                 <Trophy3D className="size-5 shrink-0" />
                 <div>
                   <h4 className="text-xs font-semibold text-ink sm:text-sm">
-                    Loyalty wallet: <span className="tabular text-brand-deep">{fmtNumber(loyalty.totalPoints)} pts</span>{" "}
-                    <span className="font-normal text-muted">(= ₹{fmtNumber(loyalty.rewardRupees)} reward value)</span>
+                    <T ta="லாயல்டி வாலட்:">Loyalty wallet:</T>{" "}
+                    <span className="tabular text-brand-deep">
+                      <T ta={`${fmtNumber(loyalty.totalPoints)} புள்ளிகள்`}>{`${fmtNumber(loyalty.totalPoints)} pts`}</T>
+                    </span>{" "}
+                    <span className="font-normal text-muted">
+                      <T ta={`(= ₹${fmtNumber(loyalty.rewardRupees)} வெகுமதி மதிப்பு)`}>{`(= ₹${fmtNumber(loyalty.rewardRupees)} reward value)`}</T>
+                    </span>
                   </h4>
                   <p className="text-[11px] text-muted">
-                    1 pt per ₹100 spent + 50 bonus pts per repeat order · 100 pts = ₹50 off
+                    <T ta="₹100 செலவுக்கு 1 புள்ளி + ஒவ்வொரு மறு ஆர்டருக்கும் 50 போனஸ் புள்ளிகள் · 100 புள்ளிகள் = ₹50 தள்ளுபடி">
+                      1 pt per ₹100 spent + 50 bonus pts per repeat order · 100 pts = ₹50 off
+                    </T>
                   </p>
                 </div>
               </div>
@@ -235,19 +253,19 @@ export function PurchaseJourney({
             {/* Points breakdown pills */}
             <div className="mt-2.5 flex flex-wrap gap-1.5 text-[11px]">
               <span className="rounded-md bg-subtle px-2 py-0.5 text-ink-2">
-                Spend: <strong className="tabular text-ink">+{loyalty.spendPoints} pts</strong>
+                <T ta="செலவு:">Spend:</T> <strong className="tabular text-ink">+{loyalty.spendPoints} <T ta="புள்ளி">pts</T></strong>
               </span>
               <span className="rounded-md bg-subtle px-2 py-0.5 text-ink-2">
-                Repeat frequency: <strong className="tabular text-ink">+{loyalty.frequencyPoints} pts</strong>
+                <T ta="மறு ஆர்டர்:">Repeat frequency:</T> <strong className="tabular text-ink">+{loyalty.frequencyPoints} <T ta="புள்ளி">pts</T></strong>
               </span>
               {loyalty.sheetPoints > 0 && (
                 <span className="rounded-md bg-subtle px-2 py-0.5 text-ink-2">
-                  Past sheet: <strong className="tabular text-ink">+{loyalty.sheetPoints} pts</strong>
+                  <T ta="பழைய ஷீட்:">Past sheet:</T> <strong className="tabular text-ink">+{loyalty.sheetPoints} <T ta="புள்ளி">pts</T></strong>
                 </span>
               )}
               {loyalty.manualPoints !== 0 && (
                 <span className={cn("rounded-md px-2 py-0.5 font-medium", loyalty.manualPoints > 0 ? "bg-success-bg text-success" : "bg-warning-bg text-warning")}>
-                  Admin adjustment: <strong className="tabular">{loyalty.manualPoints > 0 ? `+${loyalty.manualPoints}` : loyalty.manualPoints} pts</strong>
+                  <T ta="நிர்வாகி மாற்றம்:">Admin adjustment:</T> <strong className="tabular">{loyalty.manualPoints > 0 ? `+${loyalty.manualPoints}` : loyalty.manualPoints} pts</strong>
                 </span>
               )}
               <span className="rounded-md bg-subtle px-2 py-0.5 text-ink-2" title="Recency (1-5) · Frequency (1-5) · Monetary (1-5)">
@@ -258,8 +276,12 @@ export function PurchaseJourney({
             {loyalty.nextTierLabel && (
               <div className="mt-2.5">
                 <div className="mb-1 flex items-center justify-between text-[11px] text-muted">
-                  <span>Progress to <strong className="text-ink-2">{loyalty.nextTierLabel}</strong></span>
-                  <span className="tabular">{loyalty.pointsToNextTier} more pts needed</span>
+                  <span>
+                    <T ta="அடுத்த நிலை:">Progress to</T> <strong className="text-ink-2">{loyalty.nextTierLabel}</strong>
+                  </span>
+                  <span className="tabular">
+                    <T ta={`இன்னும் ${loyalty.pointsToNextTier} புள்ளிகள் தேவை`}>{`${loyalty.pointsToNextTier} more pts needed`}</T>
+                  </span>
                 </div>
                 <Meter value={loyalty.progressPct} label="Tier progress" />
               </div>
@@ -268,7 +290,7 @@ export function PurchaseJourney({
             {/* Admin Quick Award / Redeem Loyalty Points */}
             {canManage && customer && (
               <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-line pt-2.5">
-                <span className="mr-1 text-[11px] font-medium text-muted">Give / redeem points:</span>
+                <span className="mr-1 text-[11px] font-medium text-muted"><T>Give / redeem points:</T></span>
                 <ActionButton
                   action={adjustLoyaltyPoints.bind(null, customer.id, 50)}
                   variant="secondary"
@@ -300,7 +322,7 @@ export function PurchaseJourney({
                     size="sm"
                     confirm={`Redeem 100 points for ${customer.name}? Take ₹50 off their order when you confirm it.`}
                   >
-                    Redeem 100 pts (-₹50)
+                    <T ta="100 புள்ளிகள் பயன்படுத்து (-₹50)">Redeem 100 pts (-₹50)</T>
                   </ActionButton>
                 )}
               </div>
@@ -312,7 +334,10 @@ export function PurchaseJourney({
             <div>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-deep">
-                  <Sparkles aria-hidden className="size-4" /> Recommended offer for {customer?.name.split(/\s+/)[0] ?? "this customer"}
+                  <Sparkles aria-hidden className="size-4" />{" "}
+                  <T ta={`${customer?.name.split(/\s+/)[0] ?? "இந்த வாடிக்கையாளர்"}-க்குப் பரிந்துரைக்கும் சலுகை`}>
+                    {`Recommended offer for ${customer?.name.split(/\s+/)[0] ?? "this customer"}`}
+                  </T>
                 </span>
                 <Badge tone="green">{loyalty.offerBadge}</Badge>
               </div>
@@ -330,7 +355,7 @@ export function PurchaseJourney({
                   rel="noreferrer"
                   className={buttonClass("primary", "sm")}
                 >
-                  <MessageCircle aria-hidden className="size-3.5" /> Send offer on WhatsApp
+                  <MessageCircle aria-hidden className="size-3.5" /> <T>Send offer on WhatsApp</T>
                 </a>
               </div>
             )}
@@ -345,10 +370,12 @@ export function PurchaseJourney({
           <div className="rounded-control border border-line bg-canvas/40 p-3 sm:p-3.5">
             <div className="mb-2.5 flex items-center justify-between gap-2">
               <h4 className="flex items-center gap-1.5 text-xs font-semibold text-ink sm:text-sm">
-                <PackageCheck aria-hidden className="size-4 text-success" /> Mostly bought products
+                <PackageCheck aria-hidden className="size-4 text-success" /> <T>Mostly bought products</T>
               </h4>
               {mostlyBought.length > 0 && (
-                <span className="text-[11px] text-muted">{mostlyBought.length} product{mostlyBought.length === 1 ? "" : "s"}</span>
+                <span className="text-[11px] text-muted">
+                  <T ta={`${mostlyBought.length} பொருட்கள்`}>{`${mostlyBought.length} product${mostlyBought.length === 1 ? "" : "s"}`}</T>
+                </span>
               )}
             </div>
             {mostlyBought.length > 0 ? (
@@ -372,7 +399,9 @@ export function PurchaseJourney({
                         />
                       </div>
                       <span className="tabular shrink-0 text-[10px] text-muted">
-                        {item.ordersCount} order{item.ordersCount === 1 ? "" : "s"} · last {fmtDate(item.lastAt, "d MMM")}
+                        <T ta={`${item.ordersCount} ஆர்டர் · கடைசியாக ${fmtDate(item.lastAt, "d MMM")}`}>
+                          {`${item.ordersCount} order${item.ordersCount === 1 ? "" : "s"} · last ${fmtDate(item.lastAt, "d MMM")}`}
+                        </T>
                       </span>
                     </div>
                   </li>
@@ -380,11 +409,11 @@ export function PurchaseJourney({
               </ul>
             ) : sheetPurchases ? (
               <div className="space-y-1 text-xs text-ink-2">
-                <p className="font-medium text-ink">Recorded from order sheet:</p>
+                <p className="font-medium text-ink"><T>Recorded from order sheet:</T></p>
                 <p className="rounded bg-panel p-2 text-xs text-ink-2">{sheetPurchases}</p>
               </div>
             ) : (
-              <p className="py-3 text-xs text-muted">No confirmed product purchases yet.</p>
+              <p className="py-3 text-xs text-muted"><T>No confirmed product purchases yet.</T></p>
             )}
           </div>
 
@@ -392,17 +421,19 @@ export function PurchaseJourney({
           <div className="rounded-control border border-line bg-canvas/40 p-3 sm:p-3.5">
             <div className="mb-2.5 flex items-center justify-between gap-2">
               <h4 className="flex items-center gap-1.5 text-xs font-semibold text-ink sm:text-sm">
-                <TriangleAlert aria-hidden className="size-4 text-warning" /> Mostly dropped / hesitated
+                <TriangleAlert aria-hidden className="size-4 text-warning" /> <T>Mostly dropped / hesitated</T>
               </h4>
               {mostlyDropped.length > 0 && (
-                <span className="text-[11px] text-muted">{droppedCarts.length} replaced/cancelled cart{droppedCarts.length === 1 ? "" : "s"}</span>
+                <span className="text-[11px] text-muted">
+                  <T ta={`${droppedCarts.length} மாற்றப்பட்ட/ரத்தான கார்ட்கள்`}>{`${droppedCarts.length} replaced/cancelled cart${droppedCarts.length === 1 ? "" : "s"}`}</T>
+                </span>
               )}
             </div>
 
             {unpaidItems.length > 0 && (
               <div className="mb-2.5 rounded-md border border-warning-border/60 bg-warning-bg/40 p-2.5 text-xs">
                 <p className="flex items-center gap-1.5 font-semibold text-ink">
-                  <ShoppingCart aria-hidden className="size-3.5 text-warning" /> Waiting in unpaid cart right now:
+                  <ShoppingCart aria-hidden className="size-3.5 text-warning" /> <T>Waiting in unpaid cart right now:</T>
                 </p>
                 <ul className="mt-1 space-y-0.5 text-ink-2">
                   {unpaidItems.map((u, i) => (
@@ -422,8 +453,11 @@ export function PurchaseJourney({
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-ink">{item.name}</p>
                       <p className="text-[11px] text-muted">
-                        Dropped in {item.cartsCount} cart{item.cartsCount === 1 ? "" : "s"} ({item.qty} unit{item.qty === 1 ? "" : "s"})
-                        {item.boughtLater ? " · Bought in another order" : " · Never bought"}
+                        <T
+                          ta={`${item.cartsCount} கார்ட்டில் கைவிட்டார் (${item.qty} அலகு)${item.boughtLater ? " · வேறு ஆர்டரில் வாங்கினார்" : " · வாங்கவே இல்லை"}`}
+                        >
+                          {`Dropped in ${item.cartsCount} cart${item.cartsCount === 1 ? "" : "s"} (${item.qty} unit${item.qty === 1 ? "" : "s"})${item.boughtLater ? " · Bought in another order" : " · Never bought"}`}
+                        </T>
                       </p>
                     </div>
                     <div className="shrink-0 text-right">
@@ -438,7 +472,7 @@ export function PurchaseJourney({
             ) : (
               <p className="py-3 text-xs text-muted">
                 <Sparkles aria-hidden className="mr-1 inline size-3.5 text-brand" />
-                Zero dropped or cancelled carts — this customer is decisive when ordering.
+                <T>Zero dropped or cancelled carts — this customer is decisive when ordering.</T>
               </p>
             )}
           </div>
@@ -484,11 +518,11 @@ export function PurchaseJourney({
                     </span>
                     <span className="tabular text-2xs text-muted">
                       {fmtDate(o.createdAt, "d MMM yyyy")}
-                      {gap !== null && gap > 0 ? ` · ${gap}d after previous` : ""}
+                      {gap !== null && gap > 0 ? <T ta={` · முந்தையதற்கு ${gap} நாள் பின்`}>{` · ${gap}d after previous`}</T> : ""}
                     </span>
                   </p>
                   <p className={cn("text-2xs font-semibold uppercase tracking-wide", k === "paid" ? "text-success" : k === "open" ? "text-warning" : "text-muted")}>
-                    {k === "paid" ? (o.paidAt ? "Paid" : o.status.toLowerCase()) : k === "open" ? "Not paid yet" : /superseded/i.test(o.internalNote ?? "") ? "Replaced by a newer cart" : "Cancelled"}
+                    <T>{k === "paid" ? (o.paidAt ? "Paid" : o.status.toLowerCase()) : k === "open" ? "Not paid yet" : /superseded/i.test(o.internalNote ?? "") ? "Replaced by a newer cart" : "Cancelled"}</T>
                   </p>
                   {items.length > 0 && <p className="mt-0.5 line-clamp-2 text-xs text-ink-2">{items.join(", ")}</p>}
                 </li>

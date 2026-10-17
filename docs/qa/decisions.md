@@ -53,4 +53,12 @@ Each decision taken without the owner, and why.
 16. **The existing pull request #1 (Madhu_changes → main) is used** rather than opening a second one for the same
     branch; the QA report is posted on it as a comment. It is not merged.
 17. **Tap targets:** the crawler flags under 32px on phones and the visual run under 40px (the brief's rule).
-    Table checkboxes and inline text links inside sentences are left at their size.
+    Inline text links inside sentences are left at their size. A checkbox counts by its label (table checkboxes
+    now sit in a 40px label); screen-reader-only controls (a chart's keyboard list) aren't finger targets.
+18. **Tamil for shared components comes from one phrase list** (`src/lib/i18n/phrases-ta.ts`): Button, Label,
+    Field help, CardHeader, Callout, Badge, EmptyState, Segmented, Picker, Stat and `<T>` look the English up there
+    in Tamil mode and show it unchanged when there's no entry. Sentences with numbers or names are written per
+    screen. Names, places, products and a language's own name ("English" on the language switch) stay as written;
+    the visual check skips them (`data-data`, `lang`).
+19. **On phones, compact controls grow to 40px** (`min-h-10 sm:…`) and return to their desktop size from the `sm`
+    breakpoint, so computers look the same as before.

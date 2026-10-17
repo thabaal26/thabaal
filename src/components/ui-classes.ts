@@ -46,10 +46,10 @@ export function buttonClass(variant: ButtonVariant = "primary", size: ButtonSize
     "disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 disabled:hover:translate-y-0 disabled:hover:shadow-none aria-disabled:pointer-events-none aria-disabled:opacity-50",
     icon
       ? size === "sm"
-        ? "size-8.5 rounded-[10px]"
+        ? "size-10 rounded-[10px] sm:size-8.5"
         : "size-10.5 rounded-[12px]"
       : size === "sm"
-        ? "min-h-[34px] px-3 text-[13.5px] rounded-[10px]"
+        ? "min-h-10 px-3 text-[13.5px] rounded-[10px] sm:min-h-[34px]"
         : "min-h-[42px] px-4 text-[14.5px] rounded-[12px]",
     variants[variant],
   );

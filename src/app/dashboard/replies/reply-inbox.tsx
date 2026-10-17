@@ -216,7 +216,7 @@ export function ReplyInbox({
               <button type="button" className="btn sm show-sm" onClick={() => setMobileView("list")} style={{ marginBottom: 8 }}>
                 <ArrowLeft aria-hidden className="ic" style={{ width: 15, height: 15 }} /> {isTamil ? "அனைத்து உரையாடல்கள்" : "All chats"}
               </button>
-              <h2>{selected.customer.name}</h2>
+              <h2 data-data>{selected.customer.name}</h2>
               <p>{currentPurchasesSubtitle}</p>
             </div>
             <div className="tools">

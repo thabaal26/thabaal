@@ -140,7 +140,7 @@ export default async function PackingPage({ searchParams }: PageProps<"/dashboar
           <div className="chips" style={{ marginBottom: 14, alignItems: "center" }}>
             {PAY.map((t) => (
               <Link key={t.key} className="chip" href={qs({ pay: t.key })} aria-pressed={pay === t.key} scroll={false}>
-                {t.label} <small>{fmtNumber(count[t.key])}</small>
+                <T>{t.label}</T> <small>{fmtNumber(count[t.key])}</small>
               </Link>
             ))}
             <span style={{ marginLeft: "auto" }}>
@@ -155,8 +155,10 @@ export default async function PackingPage({ searchParams }: PageProps<"/dashboar
             </span>
           </div>
           <p className="muted small" style={{ margin: "-6px 0 14px" }}>
-            {fmtNumber(orders.length)} {which} order{orders.length === 1 ? "" : "s"} waiting to be dispatched, grouped by area
-            {toCollect > 0 && <> · <b>{money(toCollect)}</b> to collect</>}
+            <T ta={`அனுப்பக் காத்திருக்கும் ${fmtNumber(orders.length)} ஆர்டர்கள், பகுதி வாரியாக${toCollect > 0 ? ` · ${money(toCollect)} வசூலிக்க வேண்டும்` : ""}`}>
+              {fmtNumber(orders.length)} {which} order{orders.length === 1 ? "" : "s"} waiting to be dispatched, grouped by area
+              {toCollect > 0 && <> · <b>{money(toCollect)}</b> to collect</>}
+            </T>
           </p>
 
           {orders.length ? (
@@ -164,9 +166,9 @@ export default async function PackingPage({ searchParams }: PageProps<"/dashboar
               {areas.map(([area, list]) => (
                 <div key={area} className="card">
                   <div className="hd" style={{ marginBottom: 8 }}>
-                    <h2 style={{ fontSize: 17 }}>{area}</h2>
+                    <h2 style={{ fontSize: 17 }} data-data>{area}</h2>
                     <span className="muted small">
-                      {list.length} order{list.length === 1 ? "" : "s"}
+                      <T ta={`${list.length} ஆர்டர்கள்`}>{`${list.length} order${list.length === 1 ? "" : "s"}`}</T>
                     </span>
                   </div>
                   <div className="list">
@@ -182,7 +184,7 @@ export default async function PackingPage({ searchParams }: PageProps<"/dashboar
                             <div className="muted small">
                               {formatPhone(o.customer.phone)} · {money(shownTotal(o), o.currency)} · {fmtDate(o.createdAt, "d MMM, h:mm a")}
                             </div>
-                            {o.internalNote && <div className="muted small">Note: {o.internalNote}</div>}
+                            {o.internalNote && <div className="muted small"><T ta="குறிப்பு:">Note:</T> {o.internalNote}</div>}
                             <div style={{ marginTop: 6 }}>
                               <OrderAddressControl
                                 orderId={o.id}
@@ -198,11 +200,11 @@ export default async function PackingPage({ searchParams }: PageProps<"/dashboar
                             </div>
                           </div>
                           {isPaid(o) ? (
-                            <span className="pill ok">Paid</span>
+                            <span className="pill ok"><T>Paid</T></span>
                           ) : isCod(o) ? (
-                            <span className="pill info">Cash on delivery · {money(due, o.currency)}</span>
+                            <span className="pill info"><T>Cash on delivery</T> · {money(due, o.currency)}</span>
                           ) : (
-                            <span className="pill warn">Not paid · {money(due, o.currency)}</span>
+                            <span className="pill warn"><T>Not paid</T> · {money(due, o.currency)}</span>
                           )}
                           <SingleSlipExportButtons order={toExportRow(o)} />
                         </div>
@@ -214,9 +216,9 @@ export default async function PackingPage({ searchParams }: PageProps<"/dashboar
             </div>
           ) : (
             <section className="card">
-              <h2>{pay ? `No ${which} orders to pack` : "Nothing to pack"}</h2>
+              <h2>{pay ? <T ta="இந்தப் பிரிவில் பேக் செய்ய ஆர்டர் இல்லை">{`No ${which} orders to pack`}</T> : <T>Nothing to pack</T>}</h2>
               <p className="muted" style={{ marginTop: 6 }}>
-                {pay ? "Try All to see every confirmed and paid order." : "Confirmed and paid orders appear here until they're dispatched."}
+                <T>{pay ? "Try All to see every confirmed and paid order." : "Confirmed and paid orders appear here until they're dispatched."}</T>
               </p>
             </section>
           )}
@@ -226,7 +228,7 @@ export default async function PackingPage({ searchParams }: PageProps<"/dashboar
           <div className="hd">
             <div>
               <h2><T ta="இருப்பிலிருந்து எடுக்க">Pull from stock</T></h2>
-              <p>One total for all waiting orders.</p>
+              <p><T>One total for all waiting orders.</T></p>
             </div>
           </div>
           <div className="list">
@@ -236,7 +238,7 @@ export default async function PackingPage({ searchParams }: PageProps<"/dashboar
                 <b>{fmtNumber(qty)}</b>
               </div>
             ))}
-            {picks.length === 0 && <p className="muted small">Nothing waiting.</p>}
+            {picks.length === 0 && <p className="muted small"><T>Nothing waiting.</T></p>}
           </div>
           {orders.length > 0 && (
             <div className="tools" style={{ marginTop: 14 }}>

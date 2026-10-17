@@ -12,6 +12,7 @@ import { confirmAction } from "@/components/confirm";
 import { safeAction, toastResult } from "@/components/toast";
 import Link from "@/components/intent-link";
 import { PageTools } from "@/components/shell-tools";
+import { trNode } from "@/lib/i18n/phrases-ta";
 import "./portal.css";
 
 /* ── Language: the same choice as the sign-in page ("thabaal-lang"), per device ── */
@@ -56,7 +57,7 @@ export function setLang(l: Lang) {
 /** English text, or its Tamil version when Tamil is chosen (the design's data-ta strings). */
 export function T({ ta, children }: { ta?: string; children: ReactNode }) {
   const lang = useLang();
-  return <>{lang === "ta" && ta ? ta : children}</>;
+  return <>{lang === "ta" ? (ta ?? trNode(children, true)) : children}</>;
 }
 
 export function LangButton() {
@@ -98,8 +99,14 @@ export function PortalPage({
       <div className="wrapin" suppressHydrationWarning>
         <header className="top" suppressHydrationWarning>
           <div suppressHydrationWarning>
-            <h1>{titleTa ? <T ta={titleTa}>{title}</T> : title}</h1>
-            {sub && <p className="sub">{subTa ? <T ta={subTa}>{sub}</T> : sub}</p>}
+            <h1>
+              <T ta={titleTa}>{title}</T>
+            </h1>
+            {sub && (
+              <p className="sub">
+                <T ta={subTa}>{sub}</T>
+              </p>
+            )}
           </div>
           <div className="tools" suppressHydrationWarning>
             {actions}
@@ -189,7 +196,11 @@ export function Seg({ options, value, onChange, label }: { options: { id: string
 
 export type PillTone = "ok" | "warn" | "bad" | "info" | "mute";
 export function Pill({ tone, children }: { tone: PillTone; children: ReactNode }) {
-  return <span className={`pill ${tone}`}>{children}</span>;
+  return (
+    <span className={`pill ${tone}`}>
+      <T>{children}</T>
+    </span>
+  );
 }
 
 /** Small area sparkline in the design's colours (gold, or red when falling). */
@@ -300,7 +311,7 @@ export function LangChoice() {
   const lang = useLang();
   return (
     <div className="seg" role="group" aria-label="Language">
-      <button type="button" aria-pressed={lang === "en"} onClick={() => setLang("en")}>
+      <button type="button" aria-pressed={lang === "en"} onClick={() => setLang("en")} lang="en">
         English
       </button>
       <button type="button" aria-pressed={lang === "ta"} onClick={() => setLang("ta")} lang="ta">

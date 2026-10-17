@@ -12,7 +12,7 @@ comment). **Not merged.** Nothing was pushed to main.
 - **Every page** opened as owner, staff, viewer, admin and another business, on desktop and phone (1,366 page
   visits): no errors, no broken values, no sample data, no business seeing another's data.
 - **Visual check** of 24 pages × 5 screen sizes × light/dark × English/Tamil (480 screenshots): nothing off-screen,
-  cut off or scrolling sideways. Left: some in-page buttons under 40px on phones, some English in Tamil mode.
+  cut off or scrolling sideways, no English headings or buttons in Tamil mode, every phone control at least 40px.
 - Typecheck, lint, unit tests and production build pass. 115/115 server actions check permissions.
 
 ## Most important fixes (full list in docs/qa/REPORT.md)
@@ -27,7 +27,8 @@ comment). **Not merged.** Nothing was pushed to main.
 6. Order card: refunds, undo, "payment not received", part payments and correct amounts are back; printing a packing
    slip prints that order; dispatch respects "send WhatsApp update"; sample rider names removed.
 7. A dropped connection or expired session no longer breaks the page or loses what was typed.
-8. Phones: 40px tap targets, Tamil layout fixes, some missing Tamil labels.
+8. Phones: every control at least 40px. Tamil on every screen, including the campaign builder, audiences,
+   template editor and customer profile.
 
 ## What needs you (docs/qa/needs-owner.md)
 
@@ -39,7 +40,6 @@ comment). **Not merged.** Nothing was pushed to main.
 
 ## What didn't get done
 
-- Some screens still show English headings/buttons in Tamil mode, and some small in-page buttons on phones are
-  32–39px (both listed in REPORT.md → Known limitations).
+- The Tamil wording needs one read-through by a Tamil speaker (`src/lib/i18n/phrases-ta.ts` holds most of it).
 - Sending real WhatsApp messages can't be tested without a real number (refusals and everything before sending were).
 - CodeRabbit isn't installed on the repository, so there were no CodeRabbit comments.

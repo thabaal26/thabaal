@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { fmtNumber } from "@/lib/format";
 import { getScope } from "@/lib/session";
 import { CatalogueManager } from "./catalogue-manager";
-import { PortalPage } from "../portal-ui";
+import { PortalPage, T } from "../portal-ui";
 import { ProductsPerf } from "./products-perf";
 import { ProductsTabs } from "./products-tabs";
 
@@ -71,7 +71,7 @@ export default async function CataloguePage({ searchParams }: PageProps<"/dashbo
 
       {notes.map((n) => (
         <div key={n} className="note" style={{ marginBottom: 14 }}>
-          {n}
+          <T>{n}</T>
         </div>
       ))}
 

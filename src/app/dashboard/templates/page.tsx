@@ -200,16 +200,16 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
                 )}
                 <div className="tools" style={{ marginTop: "auto", paddingTop: 10 }}>
                   <Link className="btn sm" href={`/dashboard/templates/${t.id}`}>
-                    {scope.canManage ? (broken ? "Fix and resend" : "Edit") : "Preview"}
+                    <T>{scope.canManage ? (broken ? "Fix and resend" : "Edit") : "Preview"}</T>
                   </Link>
                   {t.category === "MARKETING" && t.status === "APPROVED" && canCreate && (
                     <Link className="btn sm primary" href="/dashboard/campaigns/new">
-                      Use in campaign
+                      <T>Use in campaign</T>
                     </Link>
                   )}
                   {scope.canManage && (
                     <PAction action={deleteTemplate.bind(null, t.id)} className="sm ghost" confirm={`Delete "${t.name}"? This also deletes it from Meta.`} aria-label={`Delete ${t.name}`}>
-                      Delete
+                      <T>Delete</T>
                     </PAction>
                   )}
                 </div>

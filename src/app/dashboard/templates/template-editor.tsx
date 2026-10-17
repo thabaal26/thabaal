@@ -24,6 +24,7 @@ import {
   type VarSource,
 } from "@/lib/template";
 import { Picker } from "@/components/picker";
+import { useTr } from "@/lib/i18n/context";
 import { generateAiTemplateAction } from "../actions/ai";
 import { saveTemplate, sendTestMessage } from "../actions/templates";
 
@@ -71,6 +72,7 @@ export function TemplateEditor({
   /** The client's WhatsApp Business Accounts; a new template picks one when there are several. */
   accounts?: { id: string; label: string }[];
 }) {
+  const { tr, isTa } = useTr();
   const [t, setT] = useState<TemplateDraft>(initial);
   const [pending, start] = useTransition();
   const [testPhone, setTestPhone] = useState("");
@@ -203,7 +205,7 @@ export function TemplateEditor({
         {status && (status === "REJECTED" || statusReason) && (
           <Callout tone="danger" role="alert" icon={<TriangleAlert />} title={status === "REJECTED" ? "Meta rejected this template" : "Meta returned an error"}>
             {statusReason && <p>{statusReason}</p>}
-            <p className="mt-1">Edit the content below and save to resubmit.</p>
+            <p className="mt-1">{tr("Edit the content below and save to resubmit.")}</p>
           </Callout>
         )}
 
@@ -211,8 +213,8 @@ export function TemplateEditor({
           <CardHeader tone="brand" icon={<Template3D />} title="Basics" description={locked ? "Meta doesn't allow the name, language or category to change after submission." : "Meta reviews every template before it can be sent."} />
           <div className="space-y-5 p-4 sm:p-5">
             <fieldset>
-              <legend className="mb-1.5 text-sm font-medium text-ink-2">Category</legend>
-              <div role="radiogroup" aria-label="Category" className="grid gap-2 sm:grid-cols-3">
+              <legend className="mb-1.5 text-sm font-medium text-ink-2">{tr("Category")}</legend>
+              <div role="radiogroup" aria-label={tr("Category")} className="grid gap-2 sm:grid-cols-3">
                 {(Object.keys(CATEGORY_INFO) as Category[]).map((c) => (
                   <button
                     key={c}
@@ -227,8 +229,8 @@ export function TemplateEditor({
                       t.category === c ? "border-brand bg-brand-soft" : "border-line-strong/50 bg-panel hover:border-line-strong",
                     )}
                   >
-                    <p className={cn("text-sm font-medium", t.category === c ? "text-brand-deep" : "text-ink")}>{CATEGORY_INFO[c].label}</p>
-                    <p className={cn("mt-0.5 text-xs", t.category === c ? "text-brand-deep" : "text-muted")}>{CATEGORY_INFO[c].hint}</p>
+                    <p className={cn("text-sm font-medium", t.category === c ? "text-brand-deep" : "text-ink")}>{tr(CATEGORY_INFO[c].label)}</p>
+                    <p className={cn("mt-0.5 text-xs", t.category === c ? "text-brand-deep" : "text-muted")}>{tr(CATEGORY_INFO[c].hint)}</p>
                   </button>
                 ))}
               </div>
@@ -292,7 +294,7 @@ export function TemplateEditor({
                   <input className="field" maxLength={25} value={t.buttons[0]?.text ?? "Copy code"} onChange={(e) => set({ buttons: [{ type: "COPY_CODE", text: e.target.value }] })} />
                 </Field>
               </div>
-              <p className="rounded-control bg-sunken p-3 text-xs text-muted">Authentication templates are sent by your website or app during login, so they can&apos;t be used in campaigns.</p>
+              <p className="rounded-control bg-sunken p-3 text-xs text-muted">{tr("Authentication templates are sent by your website or app during login, so they can't be used in campaigns.")}</p>
             </div>
           </Card>
         ) : (
@@ -317,7 +319,7 @@ export function TemplateEditor({
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <input
                     className="field flex-1 text-sm"
-                    placeholder="Describe your message (e.g., Diwali silk saree 20% off, or ST Courier dispatch update)…"
+                    placeholder={isTa ? "உங்கள் செய்தியை விவரியுங்கள் (உ.தா. தீபாவளி பட்டுப் புடவை 20% தள்ளுபடி)…" : "Describe your message (e.g., Diwali silk saree 20% off, or ST Courier dispatch update)…"}
                     value={aiPrompt}
                     onChange={(e) => setAiPrompt(e.target.value)}
                     onKeyDown={(e) => {
@@ -337,23 +339,23 @@ export function TemplateEditor({
                     type="button"
                     disabled={aiGenerating}
                     onClick={() => runAiTemplate("optimize_utility")}
-                    className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-line bg-panel px-2.5 py-1 text-xs font-medium text-ink transition hover:border-brand hover:text-brand-deep disabled:opacity-50"
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-line bg-panel px-3 py-1 text-xs font-medium text-ink transition hover:border-brand hover:text-brand-deep disabled:opacity-50 sm:min-h-7 sm:px-2.5"
                   >
-                    💡 Convert to ₹0.115 Utility (Save 86%)
+                    {tr("💡 Convert to ₹0.115 Utility (Save 86%)")}
                   </button>
                   <button
                     type="button"
                     disabled={aiGenerating}
                     onClick={() => runAiTemplate("translate_tamil")}
-                    className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-line bg-panel px-2.5 py-1 text-xs font-medium text-ink transition hover:border-brand hover:text-brand-deep disabled:opacity-50"
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-line bg-panel px-3 py-1 text-xs font-medium text-ink transition hover:border-brand hover:text-brand-deep disabled:opacity-50 sm:min-h-7 sm:px-2.5"
                   >
-                    🇮🇳 Translate to Tamil (தமிழ்)
+                    {tr("🇮🇳 Translate to Tamil (தமிழ்)")}
                   </button>
                 </div>
 
                 {aiTip && (
                   <p className="rounded-control border border-brand/25 bg-panel/90 px-3 py-2 text-xs text-ink-2">
-                    <b className="font-semibold text-brand-deep">AI Meta Compliance &amp; Cost Tip:</b> {aiTip}
+                    <b className="font-semibold text-brand-deep">{tr("AI Meta Compliance & Cost Tip:")}</b> {aiTip}
                   </p>
                 )}
               </div>
@@ -363,7 +365,7 @@ export function TemplateEditor({
               <CardHeader tone="brand" icon={<Messages3D />} title="Content" />
               <div className="space-y-5 p-4 sm:p-5">
                 <div>
-                  <p id="header-label" className="mb-1.5 text-sm font-medium text-ink-2">Header</p>
+                  <p id="header-label" className="mb-1.5 text-sm font-medium text-ink-2">{tr("Header")}</p>
                   <Segmented
                     label="Header"
                     value={t.headerType}
@@ -376,7 +378,7 @@ export function TemplateEditor({
                     className="mb-3"
                   />
                   {t.headerType === "TEXT" && (
-                    <input className="field" maxLength={60} value={t.headerText} placeholder="Headline, optionally with {{1}}" aria-labelledby="header-label" onChange={(e) => set({ headerText: e.target.value })} />
+                    <input className="field" maxLength={60} value={t.headerText} placeholder={isTa ? "தலைப்பு, விருப்பமாக {{1}} உடன்" : "Headline, optionally with {{1}}"} aria-labelledby="header-label" onChange={(e) => set({ headerText: e.target.value })} />
                   )}
                   {t.headerType === "IMAGE" && (
                     <div className="space-y-2">
@@ -392,21 +394,21 @@ export function TemplateEditor({
                         <div className="flex flex-wrap gap-2">
                           <label className={cn(buttonClass("secondary", "sm"), "cursor-pointer has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-brand-deep", uploading && "pointer-events-none opacity-60")}>
                             {uploading ? <Spinner /> : <Upload aria-hidden className="size-4" />}
-                            {uploading ? "Uploading…" : t.headerMediaUrl ? "Replace image" : "Upload image"}
+                            {tr(uploading ? "Uploading…" : t.headerMediaUrl ? "Replace image" : "Upload image")}
                             <input type="file" accept="image/jpeg,image/png" className="sr-only" onChange={(e) => { uploadImage(e.target.files?.[0]); e.target.value = ""; }} />
                           </label>
                           {t.headerMediaUrl && !uploading && (
-                            <button type="button" className={buttonClass("ghost", "sm")} onClick={() => set({ headerMediaUrl: "" })}>Remove</button>
+                            <button type="button" className={buttonClass("ghost", "sm")} onClick={() => set({ headerMediaUrl: "" })}>{tr("Remove")}</button>
                           )}
                         </div>
                       </div>
                       {!t.headerMediaUrl && (
                         <p className="flex items-center gap-1.5 text-xs text-warning">
-                          <TriangleAlert aria-hidden className="size-3.5 shrink-0" /> Add an image: WhatsApp rejects image-header messages sent without one.
+                          <TriangleAlert aria-hidden className="size-3.5 shrink-0" /> {tr("Add an image: WhatsApp rejects image-header messages sent without one.")}
                         </p>
                       )}
-                      <input className="field sm:text-xs" inputMode="url" value={t.headerMediaUrl} placeholder="…or paste an image link: https://yourdomain.com/offer.jpg" onChange={(e) => set({ headerMediaUrl: e.target.value })} aria-label="Image link" />
-                      <p className="text-xs text-muted">JPG or PNG, up to 4 MB. A wide image (about 1200×628) reads best in the chat.</p>
+                      <input className="field sm:text-xs" inputMode="url" value={t.headerMediaUrl} placeholder={isTa ? "…அல்லது பட இணைப்பை ஒட்டவும்: https://yourdomain.com/offer.jpg" : "…or paste an image link: https://yourdomain.com/offer.jpg"} onChange={(e) => set({ headerMediaUrl: e.target.value })} aria-label="Image link" />
+                      <p className="text-xs text-muted">{tr("JPG or PNG, up to 4 MB. A wide image (about 1200×628) reads best in the chat.")}</p>
                     </div>
                   )}
                 </div>
@@ -414,19 +416,19 @@ export function TemplateEditor({
                 <div>
                   <Label htmlFor="body" hint={`${t.body.length}/1024`}>Message</Label>
                   <div className="overflow-hidden rounded-control border border-line-strong focus-within:border-brand-deep focus-within:outline-2 focus-within:outline-brand-deep">
-                    <div role="toolbar" aria-label="Formatting" className="flex items-center gap-0.5 border-b border-line bg-sunken px-1.5 py-1">
+                    <div role="toolbar" aria-label={tr("Formatting")} className="flex items-center gap-0.5 border-b border-line bg-sunken px-1.5 py-1">
                       {[
                         { m: "*", I: Bold, l: "Bold" },
                         { m: "_", I: Italic, l: "Italic" },
                         { m: "~", I: Strikethrough, l: "Strikethrough" },
                       ].map(({ m, I, l }) => (
-                        <button key={l} type="button" title={l} aria-label={l} onClick={() => wrap(m)} className="grid size-11 shrink-0 place-items-center rounded-control text-ink-2 transition hover:bg-panel active:bg-panel sm:size-8 sm:pointer-coarse:size-11">
+                        <button key={l} type="button" title={tr(l)} aria-label={tr(l)} onClick={() => wrap(m)} className="grid size-11 shrink-0 place-items-center rounded-control text-ink-2 transition hover:bg-panel active:bg-panel sm:size-8 sm:pointer-coarse:size-11">
                           <I aria-hidden className="size-4" />
                         </button>
                       ))}
                       <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-line-strong/40" />
                       <button type="button" onClick={insertVariable} className="flex h-11 shrink-0 items-center gap-1.5 rounded-control px-2.5 text-sm font-medium text-brand-deep transition hover:bg-panel active:bg-panel sm:h-8 sm:pointer-coarse:h-11">
-                        <Braces aria-hidden className="size-4" /> Add variable
+                        <Braces aria-hidden className="size-4" /> {tr("Add variable")}
                       </button>
                     </div>
                     <textarea
@@ -442,7 +444,7 @@ export function TemplateEditor({
                   </div>
                 </div>
 
-                <Field id="footer" label="Footer" hint={`${t.footer.length}/60 · optional`}>
+                <Field id="footer" label="Footer" hint={`${t.footer.length}/60 · ${isTa ? "விருப்பம்" : "optional"}`}>
                   <input className="field" maxLength={60} value={t.footer} placeholder="Reply STOP to unsubscribe" onChange={(e) => set({ footer: e.target.value })} />
                 </Field>
               </div>
@@ -456,17 +458,17 @@ export function TemplateEditor({
                     const v = t.variables[key] ?? { source: "name" };
                     return (
                       <div key={key} className="grid items-center gap-2 px-4 py-3 sm:grid-cols-[7rem_1fr_1fr] sm:gap-3 sm:px-5">
-                        <span className="font-mono text-sm font-medium text-ink-2">{key === "h1" ? "Header {{1}}" : `{{${key}}}`}</span>
+                        <span className="font-mono text-sm font-medium text-ink-2">{key === "h1" ? (isTa ? "தலைப்பு {{1}}" : "Header {{1}}") : `{{${key}}}`}</span>
                         <Picker
-                          title={`What fills ${key === "h1" ? "the header variable" : `{{${key}}}`}`}
+                          title={isTa ? `${key === "h1" ? "தலைப்பு மாறியில்" : `{{${key}}}-ல்`} என்ன நிரப்ப வேண்டும்` : `What fills ${key === "h1" ? "the header variable" : `{{${key}}}`}`}
                           value={v.source}
                           onChange={(source) => setVar(key, { ...v, source: source as VarSource["source"] })}
                           options={SOURCES.map((s) => ({ value: s.value, label: s.label }))}
                         />
                         {v.source === "static" ? (
-                          <input className="field" placeholder="Text to insert" aria-label={`Text for ${key === "h1" ? "the header variable" : `{{${key}}}`}`} value={v.value ?? ""} onChange={(e) => setVar(key, { ...v, value: e.target.value })} />
+                          <input className="field" placeholder={tr("Text to insert")} aria-label={`Text for ${key === "h1" ? "the header variable" : `{{${key}}}`}`} value={v.value ?? ""} onChange={(e) => setVar(key, { ...v, value: e.target.value })} />
                         ) : (
-                          <span className="text-xs text-muted">e.g. {preview.bodyParams[bodyVars.indexOf(Number(key))] ?? preview.headerParams[0]}</span>
+                          <span className="text-xs text-muted">{isTa ? "உ.தா." : "e.g."} {preview.bodyParams[bodyVars.indexOf(Number(key))] ?? preview.headerParams[0]}</span>
                         )}
                       </div>
                     );
@@ -523,7 +525,7 @@ export function TemplateEditor({
                       <Badge tone={b.type === "URL" ? "blue" : b.type === "PHONE_NUMBER" || b.type === "CATALOG" || b.type === "ORDER_DETAILS" ? "green" : "gray"}>
                         {b.type === "URL" ? "Link" : b.type === "PHONE_NUMBER" ? "Call" : b.type === "CATALOG" ? "Catalogue" : b.type === "ORDER_DETAILS" ? "Review & pay" : "Reply"}
                       </Badge>
-                      <input className="field max-sm:col-span-2" maxLength={25} placeholder="Button label" aria-label={`Button ${i + 1} label`} value={b.text} onChange={(e) => setButton(i, { text: e.target.value })} />
+                      <input className="field max-sm:col-span-2" maxLength={25} placeholder={tr("Button label")} aria-label={`Button ${i + 1} label`} value={b.text} onChange={(e) => setButton(i, { text: e.target.value })} />
                       {b.type === "URL" ? (
                         <input className="field max-sm:col-span-2" inputMode="url" placeholder="https://…" aria-label={`Button ${i + 1} link`} value={b.url ?? ""} onChange={(e) => setButton(i, { url: e.target.value })} />
                       ) : b.type === "PHONE_NUMBER" ? (
@@ -540,7 +542,7 @@ export function TemplateEditor({
                   ))}
                 </div>
               ) : (
-                <p className="px-4 py-4 text-sm text-muted sm:px-5">No buttons.</p>
+                <p className="px-4 py-4 text-sm text-muted sm:px-5">{tr("No buttons.")}</p>
               )}
             </Card>
           </>
@@ -550,7 +552,7 @@ export function TemplateEditor({
       <aside aria-label="Preview and save" className="space-y-4 lg:sticky lg:top-8">
         <div className="hidden space-y-4 lg:block">
           <div className="flex items-center justify-between">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">Live preview</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">{tr("Live preview")}</h2>
             {status && <StatusBadge status={status} />}
           </div>
           <PhoneFrame name={businessName}>
@@ -562,12 +564,12 @@ export function TemplateEditor({
             buttons={t.buttons}
           />
         </PhoneFrame>
-          <p className="text-center text-xs text-muted">Previewed for {SAMPLE_CUSTOMER.name}</p>
+          <p className="text-center text-xs text-muted">{isTa ? `${SAMPLE_CUSTOMER.name}-க்கான முன்னோட்டம்` : `Previewed for ${SAMPLE_CUSTOMER.name}`}</p>
         </div>
 
         {errors.length > 0 && (
           <div role="status" className="rounded-card border border-warning-border bg-warning-bg p-3 text-sm text-warning">
-            <p className="mb-1 font-semibold">Fix before saving</p>
+            <p className="mb-1 font-semibold">{tr("Fix before saving")}</p>
             <ul className="space-y-1 text-xs">
               {errors.map((e) => (
                 <li key={e} className="flex gap-2">
@@ -613,10 +615,10 @@ export function TemplateEditor({
           <Eye aria-hidden className="size-4" /> Preview
         </Button>
         <Button className="!flex-[1.4]" disabled={errors.length > 0} loading={pending} onClick={save}>
-          {errors.length ? `Fix ${errors.length} issue${errors.length > 1 ? "s" : ""}` : id ? "Save changes" : "Create template"}
+          {errors.length ? (isTa ? `${errors.length} பிழை சரிசெய்` : `Fix ${errors.length} issue${errors.length > 1 ? "s" : ""}`) : id ? "Save changes" : "Create template"}
         </Button>
       </MobileActionBar>
-      <Sheet open={previewOpen} onClose={() => setPreviewOpen(false)} title="Preview" className="bg-canvas">
+      <Sheet open={previewOpen} onClose={() => setPreviewOpen(false)} title={tr("Preview")} className="bg-canvas">
         <PhoneFrame name={businessName}>
           <WhatsAppBubble
             header={preview.header}
@@ -626,7 +628,7 @@ export function TemplateEditor({
             buttons={t.buttons}
           />
         </PhoneFrame>
-        <p className="mt-3 text-center text-xs text-muted">Previewed for {SAMPLE_CUSTOMER.name}</p>
+        <p className="mt-3 text-center text-xs text-muted">{isTa ? `${SAMPLE_CUSTOMER.name}-க்கான முன்னோட்டம்` : `Previewed for ${SAMPLE_CUSTOMER.name}`}</p>
       </Sheet>
     </div>
   );

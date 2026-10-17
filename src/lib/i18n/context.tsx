@@ -9,6 +9,7 @@ import React, {
   type ReactNode,
 } from "react";
 import { DICTIONARY } from "./dict";
+import { trNode, trText } from "./phrases-ta";
 
 export type Lang = "en" | "ta";
 export const LANG_KEY = "thabaal-lang";
@@ -97,6 +98,21 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       {children}
     </LanguageContext.Provider>
   );
+}
+
+/**
+ * `tr("Save")` gives the Tamil for a fixed phrase in Tamil mode (English otherwise, or when the
+ * phrase has no Tamil yet); `trn(children)` does the same for the text parts of a label.
+ */
+export function useTr() {
+  const { isTa } = useLanguage();
+  return {
+    isTa,
+    tr: (s: string) => trText(s, isTa),
+    trn: (n: ReactNode) => trNode(n, isTa),
+    /** Pick the English or the Tamil sentence. */
+    L: <V,>(en: V, ta: V): V => (isTa ? ta : en),
+  };
 }
 
 export function useLanguage(): LanguageContextType {

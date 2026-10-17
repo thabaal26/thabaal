@@ -4,6 +4,7 @@ import { Info } from "@/components/icons";
 import { useId, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { useLanguage } from "@/lib/i18n/context";
+import { trText } from "@/lib/i18n/phrases-ta";
 
 const TITLE_TA_MAP: Record<string, { title: string; desc?: string }> = {
   "Orders": { title: "ஆர்டர்கள்", desc: "WhatsApp கார்ட்கள் மற்றும் வாடிக்கையாளர் ஆர்டர்கள்" },
@@ -40,11 +41,14 @@ export function PageInfo({
   description,
   titleTa,
   descriptionTa,
+  titleIsData,
 }: {
   title: string;
   description?: ReactNode;
   titleTa?: string;
   descriptionTa?: ReactNode;
+  /** The title is data (a customer's or template's name), so it stays as written in any language. */
+  titleIsData?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const id = useId();
@@ -52,15 +56,17 @@ export function PageInfo({
 
   const isTa = lang === "ta";
   const mapped = TITLE_TA_MAP[title];
-  const displayTitle = isTa ? (titleTa ?? mapped?.title ?? title) : title;
+  const displayTitle = isTa ? (titleTa ?? mapped?.title ?? trText(title, true)) : title;
   const displayDescription = isTa
-    ? (descriptionTa ?? (typeof description === "string" ? (mapped?.desc ?? description) : description))
+    ? (descriptionTa ?? (typeof description === "string" ? (mapped?.desc ?? trText(description, true)) : description))
     : description;
 
   return (
     <>
       <div className="flex items-center gap-1 sm:items-start">
-        <h1 style={{ minWidth: 0, overflowWrap: "anywhere" }}>{displayTitle}</h1>
+        <h1 style={{ minWidth: 0, overflowWrap: "anywhere" }} data-data={titleIsData || undefined} translate={titleIsData ? "no" : undefined}>
+          {titleIsData ? title : displayTitle}
+        </h1>
         {displayDescription && (
           <button
             type="button"

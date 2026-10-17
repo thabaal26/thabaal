@@ -53,11 +53,19 @@ export function timeUntil(at: Date, now = new Date()) {
   return `in ${days} day${days === 1 ? "" : "s"}`;
 }
 
-export function formatMinutes(mins: number) {
-  if (mins < 1) return "instantly";
+export function formatMinutes(mins: number, ta = false) {
+  if (mins < 1) return ta ? "உடனே" : "instantly";
   const h = Math.floor(mins / 60);
   const m = mins % 60;
-  return [h && `${h}h`, m && `${m}m`].filter(Boolean).join(" ");
+  return [h && (ta ? `${h} மணி` : `${h}h`), m && (ta ? `${m} நிமி` : `${m}m`)].filter(Boolean).join(" ");
+}
+
+/** Short day names in Tamil, Sunday first like DAYS. */
+export const DAYS_TA = ["ஞாயி", "திங்", "செவ்", "புத", "வியா", "வெள்", "சனி"] as const;
+
+/** A day's short name (0 = Sunday) in English or Tamil. */
+export function dayName(i: number, ta = false): string {
+  return (ta ? DAYS_TA : DAYS)[i] ?? "";
 }
 
 export const TIME_PRESETS = [
@@ -77,10 +85,12 @@ export function describeScheduleSummary(
   scheduleType: "ONCE" | "WEEKLY",
   daysOfWeek: number[],
   sendTime: string,
-  runDate?: string
+  runDate?: string,
+  ta = false,
 ): string {
   const [h, m] = (sendTime || "10:00").split(":").map(Number);
   const timeFormatted = `${(h % 12) || 12}:${String(m || 0).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+  if (ta) return describeScheduleTa(scheduleType, daysOfWeek, timeFormatted, runDate);
 
   if (scheduleType === "ONCE") {
     if (!runDate) return `Once at ${timeFormatted}`;
@@ -112,5 +122,23 @@ export function describeScheduleSummary(
     return `${sorted.length}× a week (${sorted.map((d) => DAYS[d]).join(", ")}) at ${timeFormatted}`;
   }
   return `Weekly at ${timeFormatted} (pick at least one day)`;
+}
+
+function describeScheduleTa(scheduleType: "ONCE" | "WEEKLY", daysOfWeek: number[], time: string, runDate?: string): string {
+  if (scheduleType === "ONCE") {
+    if (!runDate) return `${time}-க்கு ஒருமுறை`;
+    const [y, mo, d] = runDate.split("-").map(Number);
+    const date = new Date(y, mo - 1, d).toLocaleDateString("ta-IN", { weekday: "short", day: "numeric", month: "short" });
+    return `${date} அன்று ${time}-க்கு ஒருமுறை`;
+  }
+  const sorted = [...new Set(daysOfWeek)].sort();
+  const name = (i: number) => DAYS_TA[i];
+  if (sorted.length === 7) return `தினமும் ${time}-க்கு`;
+  if (sorted.length === 5 && sorted.every((d) => d >= 1 && d <= 5)) return `ஒவ்வொரு வார நாளும் (திங்–வெள்) ${time}-க்கு`;
+  if (sorted.length === 2 && sorted.includes(0) && sorted.includes(6)) return `ஒவ்வொரு வார இறுதியும் (சனி & ஞாயி) ${time}-க்கு`;
+  if (sorted.length === 1) return `ஒவ்வொரு ${name(sorted[0])} (வாரம் ஒருமுறை) ${time}-க்கு`;
+  if (sorted.length === 2) return `ஒவ்வொரு ${name(sorted[0])} & ${name(sorted[1])} (வாரம் 2 முறை) ${time}-க்கு`;
+  if (sorted.length > 0) return `வாரம் ${sorted.length} முறை (${sorted.map(name).join(", ")}) ${time}-க்கு`;
+  return `வாரந்தோறும் ${time}-க்கு (குறைந்தது ஒரு நாளைத் தேர்வு செய்யவும்)`;
 }
 

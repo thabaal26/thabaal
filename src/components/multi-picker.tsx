@@ -3,6 +3,7 @@
 import { Check, ChevronDown, Search } from "@/components/icons";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
+import { useTr } from "@/lib/i18n/context";
 import { Sheet } from "./sheet";
 import { Button } from "./ui";
 import type { PickerOption } from "./picker";
@@ -12,7 +13,7 @@ import type { PickerOption } from "./picker";
  * for long lists). Changes apply as they're ticked; "Done" just closes.
  */
 export function MultiPicker({
-  options,
+  options: rawOptions,
   value,
   onChange,
   title,
@@ -28,6 +29,11 @@ export function MultiPicker({
   placeholder?: string;
   className?: string;
 }) {
+  const { isTa, tr } = useTr();
+  title = tr(title);
+  placeholder = tr(placeholder);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- tr only changes with isTa
+  const options = useMemo(() => (isTa ? rawOptions.map((o) => ({ ...o, label: tr(o.label), hint: o.hint && tr(o.hint) })) : rawOptions), [isTa, rawOptions]);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const shown = useMemo(() => {
@@ -45,7 +51,7 @@ export function MultiPicker({
     <>
       <button type="button" id={id} aria-haspopup="dialog" onClick={() => setOpen(true)} className={cn("field flex items-center justify-between gap-2 text-left", className)}>
         <span className={cn("min-w-0 truncate", !picked.length && "text-muted")}>
-          {picked.length ? (picked.length === 1 ? picked[0].label : `${picked.length} selected`) : placeholder}
+          {picked.length ? (picked.length === 1 ? picked[0].label : isTa ? `${picked.length} தேர்வு செய்யப்பட்டன` : `${picked.length} selected`) : placeholder}
         </span>
         <ChevronDown aria-hidden className="size-4 shrink-0 text-muted" />
       </button>
@@ -67,7 +73,7 @@ export function MultiPicker({
         {options.length > 8 && (
           <div className="relative mb-3">
             <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
-            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search" aria-label={`Search ${title.toLowerCase()}`} className="field pl-10" />
+            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tr("Search")} aria-label={isTa ? `${title} தேடு` : `Search ${title.toLowerCase()}`} className="field pl-10" />
           </div>
         )}
         <ul aria-label={title} className="-mx-2 space-y-0.5">
@@ -96,7 +102,7 @@ export function MultiPicker({
               </li>
             );
           })}
-          {!shown.length && <li className="px-3 py-6 text-center text-sm text-muted">Nothing matches &ldquo;{query}&rdquo;</li>}
+          {!shown.length && <li className="px-3 py-6 text-center text-sm text-muted">{tr("Nothing matches")} &ldquo;{query}&rdquo;</li>}
         </ul>
       </Sheet>
     </>

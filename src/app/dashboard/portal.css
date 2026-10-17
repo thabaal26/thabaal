@@ -247,3 +247,16 @@ html.dark .thabaal-portal .ui-card,html.dark .thabaal-portal .card-3d{border-col
   .thabaal-portal .seg button{min-height:40px}
 }
 @media (max-width:639px){.thabaal-portal details.more>summary{min-height:40px;display:flex;align-items:center}}
+/* Phones: every in-page control at least 40px tall. The switch keeps its look; a clear border widens what a finger can hit. */
+@media (max-width:639px){
+  .thabaal-portal .seg a{min-height:40px;display:inline-flex;align-items:center}
+  .thabaal-portal .linkb{min-height:40px;display:inline-flex;align-items:center}
+  .thabaal-portal .sw{box-sizing:content-box;border:6px solid transparent;background-clip:padding-box;margin:-6px}
+  .thabaal-portal .btn{min-height:40px}
+  .thabaal-portal .iconbtn{min-width:40px;min-height:40px}
+}
+/* A table row's checkbox: the 40px label around it is what a finger hits. */
+.thabaal-portal label.pick{display:inline-grid;place-items:center;min-width:40px;min-height:40px;margin:-10px -8px;cursor:pointer}
+/* The "N items" toggle on an order card: compact on computers, a full tap target on phones. */
+.thabaal-portal .btn.itemsbtn{min-height:26px;height:26px}
+@media (max-width:639px){.thabaal-portal .btn.itemsbtn{min-height:40px;height:auto}}

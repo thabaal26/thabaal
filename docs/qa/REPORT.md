@@ -16,8 +16,8 @@ No real customer, number, sheet, Meta account or money was touched. Run it again
 | Payments by hand in Chrome (`tests/qa/payments-ui.mjs`) | 12 / 12 |
 | Create / edit / delete + permissions (`tests/qa/crud.mjs`) | 12 / 12 |
 | Every page, 5 roles, desktop (`tests/qa/crawl.mjs desktop`) | 683 page visits, 0 problems |
-| Every page, 5 roles, phone (`tests/qa/crawl.mjs phone`) | 683 page visits: no errors, broken values, sample data, leaks between businesses or sideways scroll; only small in-page buttons remain (see limitations) |
-| Visual matrix: 24 routes × 5 sizes × light/dark × en/ta (`tests/qa/visual.mjs`) | 480 screens: nothing off-screen, clipped or scrolling sideways; remaining findings are in-page buttons under 40px on phones and English text in Tamil mode on secondary screens |
+| Every page, 5 roles, phone (`tests/qa/crawl.mjs phone`) | 683 page visits: no errors, broken values, sample data, leaks between businesses or sideways scroll; the only control under 32px left was the Customers filter checkbox rows, raised to 40px after the run |
+| Visual matrix: 24 routes × 5 sizes × light/dark × en/ta (`tests/qa/visual.mjs`) | 480 screens: nothing off-screen, clipped or scrolling sideways; no English headings or buttons in Tamil mode; every in-page control at least 40px on phones |
 | Production build (`next build`) | pass |
 
 ## The 25 payment scenarios
@@ -88,16 +88,21 @@ No real customer, number, sheet, Meta account or money was touched. Run it again
 21. Phones: header controls, filter chips and small buttons now at least 40px; theme switch moved to Settings on phones.
 22. Home "to do" link pushed off the screen in Tamil; notification chips showed stray bullets.
 23. Tamil: greeting, customer page buttons.
+24. Tamil on the remaining screens: campaign builder, audiences, template editor, customer profile (send panel,
+    purchase history and loyalty), refills, guide, message filters, notifications, packing, Settings. Shared
+    components (buttons, labels, cards, pickers, badges, empty states) now fall back to one Tamil phrase list,
+    `src/lib/i18n/phrases-ta.ts`, so a new screen built from them is in Tamil without extra work.
+25. Phones: every in-page control is at least 40px: small buttons, two-way switches, campaign day/time chips,
+    AI draft chips, slip PNG/PDF, address "Edit"/"Change", UPI reference chip, message status links, table
+    checkboxes, the stock switch, notification rows.
 
 Before screenshots: `docs/qa/screens/*-before.png`; after: `*-after.png`.
 
 ## Known limitations
 
-- Several screens still have English headings and buttons in Tamil mode: campaign builder, audiences, template
-  editor, customer profile, refills, guide, messages filters, notification day labels (suggestions.md, item 2).
-- On phones some in-page buttons are 32–39px tall instead of 40px: campaign/template builder choices, Settings
-  look switch, packing slip PNG/PDF, "Change" address, UPI reference chip, refill day chips, message status links.
-  The header, navigation, filter chips and every order money button meet 40px.
+- The Tamil wording has not been read by a native speaker yet (suggestions.md, item 2). Text that comes from
+  outside the screens stays in English: template validation messages, AI-written offers, Meta's error messages,
+  and names, places and products (they're data).
 - WhatsApp sending itself (payment request delivery, thank-you messages) can't be run in QA without a real
   number; the code paths up to sending, and the refusals, were tested.
 - The Vercel preview of Madhu_changes could not be opened from here (no Vercel access); see needs-owner.md.

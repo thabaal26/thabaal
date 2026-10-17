@@ -21,7 +21,7 @@ export default async function NewCampaignPage({ searchParams }: { searchParams: 
   const tomorrow = daysAgo(-1).toISOString().slice(0, 10);
   return (
     <>
-      <PageHeader title="New campaign" back={{ href: "/dashboard/campaigns", label: "Campaigns" }} description={`For ${scope.clientName}. Choose what to send, when to send it and how fast.`} />
+      <PageHeader title="New campaign" back={{ href: "/dashboard/campaigns", label: "Campaigns" }} description={`For ${scope.clientName}. Choose what to send, when to send it and how fast.`} descriptionTa={`${scope.clientName}-க்காக. என்ன அனுப்புவது, எப்போது, எவ்வளவு வேகமாக என்பதைத் தேர்வு செய்யுங்கள்.`} />
       <CampaignForm
         id={null}
         templates={templates}

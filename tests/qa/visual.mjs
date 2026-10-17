@@ -98,7 +98,8 @@ for (const theme of THEMES)
             // (Screen-reader-only text is clipped to 1px on purpose.)
             const srOnly = r.width <= 2 || r.height <= 2 || /sr-only/.test(String(el.className)) || st.clip === "rect(0px, 0px, 0px, 0px)";
             if (!srOnly && el.children.length === 0 && (el.textContent || "").trim() && st.overflow === "hidden" && st.textOverflow !== "ellipsis" && el.scrollWidth > el.clientWidth + 2 && !/line-clamp/.test(String(el.className))) out.clipped.push(label);
-            if (phone && el.matches("a[href],button,input:not([type=hidden]):not([type=checkbox]):not([type=radio]),select,textarea,[role=button],[role=tab],summary") && (r.height < 40 || r.width < 40)) {
+            // Screen-reader-only controls (e.g. a chart's keyboard list) aren't finger targets.
+            if (phone && !srOnly && !el.closest(".sr-only") && el.matches("a[href],button,input:not([type=hidden]):not([type=checkbox]):not([type=radio]),select,textarea,[role=button],[role=tab],summary") && (r.height < 40 || r.width < 40)) {
               const inline = el.matches("a") && /\S/.test((el.parentElement?.textContent || "").replace(el.textContent || "", ""));
               if (!inline) out.small.push(`${label} ${Math.round(r.width)}x${Math.round(r.height)}`);
             }
@@ -106,7 +107,8 @@ for (const theme of THEMES)
           if (lang === "ta") {
             // Headings, navigation and buttons only (names, places and products are data, in whatever language).
             for (const h of document.querySelectorAll("h1, h2, nav a, button:not([role=radio])")) {
-              if (h.closest("[data-data], article, li, td")) continue;
+              // Names and places are data; a language's own name (lang="en" on "English") is meant to stay as written.
+              if (h.closest("[data-data], article, li, td, [lang]:not(html)")) continue;
               const t = (h.textContent || "").trim();
               if (t.length > 3 && /^[A-Za-z][A-Za-z ,.'&-]+$/.test(t) && !/^(WhatsApp|UPI|COD|QA|Thabaal|PDF|CSV|OK|Google|Meta)\b/.test(t)) out.english.push(t.slice(0, 30));
             }

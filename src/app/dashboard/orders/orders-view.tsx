@@ -476,7 +476,7 @@ export function OrdersView({
                   style={{ width: "100%", justifyContent: "flex-start" }}
                   onClick={handleExportExcel}
                 >
-                  Excel
+                  <T>Excel</T>
                 </button>
                 <button
                   type="button"
@@ -665,7 +665,7 @@ export function OrdersView({
                   aria-pressed={packFilter === "cod"}
                   onClick={() => setPackFilter("cod")}
                 >
-                  Cash on delivery <small>{waitingPackOrders.filter(isOrderCod).length}</small>
+                  <T>Cash on delivery</T> <small>{waitingPackOrders.filter(isOrderCod).length}</small>
                 </button>
                 <div className="seg" style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center" }}>
                   <button
@@ -673,14 +673,14 @@ export function OrdersView({
                     aria-pressed={packSort === "old"}
                     onClick={() => setPackSort("old")}
                   >
-                    Oldest first
+                    <T>Oldest first</T>
                   </button>
                   <button
                     type="button"
                     aria-pressed={packSort === "new"}
                     onClick={() => setPackSort("new")}
                   >
-                    Newest first
+                    <T>Newest first</T>
                   </button>
                 </div>
               </div>
@@ -690,8 +690,8 @@ export function OrdersView({
                 {areaGroups.map((grp) => (
                   <div key={grp.area} className="card">
                     <div className="hd" style={{ marginBottom: 8 }}>
-                      <h2 style={{ fontSize: 17 }}>{grp.area}</h2>
-                      <span className="muted small">{grp.orders.length} orders</span>
+                      <h2 style={{ fontSize: 17 }} data-data>{grp.area}</h2>
+                      <span className="muted small"><T ta={`${grp.orders.length} ஆர்டர்கள்`}>{`${grp.orders.length} orders`}</T></span>
                     </div>
                     {grp.orders.map((o) => {
                       const itms = (o.items as OrderItem[]) ?? [];
@@ -707,7 +707,7 @@ export function OrdersView({
                             </div>
                           </div>
                           <span className={`pill ${paid ? "ok" : "info"}`}>
-                            {paid ? "Paid" : "Cash on delivery"}
+                            <T>{paid ? "Paid" : "Cash on delivery"}</T>
                           </span>
                           <button
                             type="button"
@@ -747,7 +747,7 @@ export function OrdersView({
                               );
                             }}
                           >
-                            Slip
+                            <T>Slip</T>
                           </button>
                         </div>
                       );
@@ -766,8 +766,8 @@ export function OrdersView({
             <div className="card" style={{ alignSelf: "start" }}>
               <div className="hd">
                 <div>
-                  <h2>Pull from stock</h2>
-                  <p>One total for all waiting orders.</p>
+                  <h2><T>Pull from stock</T></h2>
+                  <p><T>One total for all waiting orders.</T></p>
                 </div>
               </div>
               <div className="list">
@@ -787,14 +787,14 @@ export function OrdersView({
                   className="btn sm"
                   onClick={() => downloadOrdersImage([], stockPicks, "Stock Pull List", "stock-pull")}
                 >
-                  Share as image
+                  <T>Share as image</T>
                 </button>
                 <button
                   type="button"
                   className="btn sm"
                   onClick={() => downloadOrdersExcel([], stockPicks, "stock-pull")}
                 >
-                  Excel
+                  <T>Excel</T>
                 </button>
               </div>
             </div>

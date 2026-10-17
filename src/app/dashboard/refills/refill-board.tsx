@@ -1,6 +1,7 @@
 "use client";
 
 import { BellRing, Check, MessageCircle, ShoppingCart } from "@/components/icons";
+import { T } from "../portal-ui";
 import Link from "@/components/intent-link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
@@ -90,8 +91,8 @@ export function RefillBoard({ rows, today, canSend, templateName }: { rows: Refi
           description={active ? `${fmtNumber(list.length)} customer${list.length === 1 ? "" : "s"}` : "Most urgent first · overdue at the top"}
           action={
             active ? (
-              <button type="button" onClick={() => setPick(null)} className="text-xs font-semibold text-brand-deep hover:underline">
-                Show all
+              <button type="button" onClick={() => setPick(null)} className="inline-flex min-h-10 items-center text-xs font-semibold text-brand-deep hover:underline sm:min-h-0">
+                <T>Show all</T>
               </button>
             ) : undefined
           }

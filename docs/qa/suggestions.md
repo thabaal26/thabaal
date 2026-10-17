@@ -4,9 +4,8 @@ Bigger ideas noticed while testing as a shop owner, staff member and admin. Each
 
 1. **Ask "who collected the cash?" on "Delivered, cash received".** The one-tap COD button records the cash without a
    name; the Record payment sheet has "Collected by". A small optional prompt would make cash reconciliation easier.
-2. **Finish Tamil on the remaining screens.** The visual run lists headings and buttons still in English in Tamil
-   mode (campaign builder, audiences, template editor, calls, refills, guide, parts of Settings and the customer
-   profile). A glossary exists in `docs/tamil-glossary.md`; one pass per page with a Tamil reviewer is suggested.
+2. **Have a Tamil speaker read the wording.** Every screen now has Tamil; most short labels live in
+   `src/lib/i18n/phrases-ta.ts` (one place to correct a word everywhere) and `docs/tamil-glossary.md`.
 3. **Managers-only refunds and undo** (see needs-owner.md): protects against hidden cash mistakes.
 4. **One order card everywhere.** `orders/order-actions.tsx` (the older card) is no longer used anywhere; removing
    it avoids two versions of the same buttons drifting apart. Kept for now in case the owner wants parts of it back.

@@ -89,7 +89,7 @@ export function CustomerTable({ rows, canManage }: { rows: CustomerRow[]; canMan
 
   const toggle = (g: keyof Sel, v: string) => setSel((s) => ({ ...s, [g]: s[g].includes(v) ? s[g].filter((x) => x !== v) : [...s[g], v] }));
   const box = (g: keyof Sel, v: string, label: string, n?: number) => (
-    <label key={v} className="small" style={{ display: "flex", gap: 8, alignItems: "center", padding: "4px 0" }}>
+    <label key={v} className="small" style={{ display: "flex", gap: 8, alignItems: "center", padding: "4px 0", minHeight: 40 }}>
       <input type="checkbox" checked={sel[g].includes(v)} onChange={() => toggle(g, v)} />
       <span style={{ flex: 1 }}>{label}</span>
       {n !== undefined && <span className="muted">{n}</span>}
@@ -236,12 +236,14 @@ export function CustomerTable({ rows, canManage }: { rows: CustomerRow[]; canMan
             <thead>
               <tr>
                 <th>
-                  <input
-                    type="checkbox"
-                    aria-label={isTamil ? "அனைத்தையும் தேர்வு செய்" : "Select all shown"}
-                    checked={shown.length > 0 && shown.every((c) => picked.has(c.id))}
-                    onChange={(e) => setPicked(e.target.checked ? new Set([...picked, ...shown.map((c) => c.id)]) : new Set([...picked].filter((id) => !shown.some((c) => c.id === id))))}
-                  />
+                  <label className="pick">
+                    <input
+                      type="checkbox"
+                      aria-label={isTamil ? "அனைத்தையும் தேர்வு செய்" : "Select all shown"}
+                      checked={shown.length > 0 && shown.every((c) => picked.has(c.id))}
+                      onChange={(e) => setPicked(e.target.checked ? new Set([...picked, ...shown.map((c) => c.id)]) : new Set([...picked].filter((id) => !shown.some((c) => c.id === id))))}
+                    />
+                  </label>
                 </th>
                 <th>{isTamil ? "வாடிக்கையாளர்" : "Customer"}</th>
                 <th>{isTamil ? "பகுதி" : "Area"}</th>
@@ -256,9 +258,10 @@ export function CustomerTable({ rows, canManage }: { rows: CustomerRow[]; canMan
               {shown.map((c) => (
                 <tr key={c.id}>
                   <td>
+                    <label className="pick">
                     <input
                       type="checkbox"
-                      aria-label={`Select ${c.name}`}
+                      aria-label={isTamil ? `${c.name} தேர்வு` : `Select ${c.name}`}
                       checked={picked.has(c.id)}
                       onChange={() =>
                         setPicked((p) => {
@@ -269,6 +272,7 @@ export function CustomerTable({ rows, canManage }: { rows: CustomerRow[]; canMan
                         })
                       }
                     />
+                    </label>
                   </td>
                   <td>
                     <Link href={`/dashboard/customers/${c.id}`} style={{ fontWeight: 700, textDecoration: "none" }}>

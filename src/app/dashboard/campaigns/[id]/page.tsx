@@ -76,6 +76,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
     <>
       <PageHeader
         title={c.name}
+        titleIsData
         back={{ href: "/dashboard/campaigns", label: "Campaigns" }}
         meta={
           <span className="flex flex-wrap items-center gap-2">

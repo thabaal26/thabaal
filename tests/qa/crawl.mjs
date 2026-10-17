@@ -68,7 +68,11 @@ for (const role of roles) {
           if (/(auto|scroll|hidden|clip)/.test(s.overflowX)) { scroller = true; break; }
         }
         if (!scroller && r.right > vw + 2 && el.children.length === 0) offRight.push(`${el.tagName.toLowerCase()}.${String(el.className).slice(0, 40)} "${(el.textContent || "").trim().slice(0, 30)}" right=${Math.round(r.right)}`);
-        if (phone && el.matches("a[href],button,input:not([type=hidden]),select,textarea,[role=button],[role=tab],summary") && (r.height < 32 || r.width < 32)) {
+        // A checkbox or radio is tapped through its label, so the label's size is what counts; screen-reader-only
+        // controls (a chart's keyboard list, a hidden file input) aren't finger targets.
+        const hit = el.matches("input[type=checkbox],input[type=radio]") ? (el.closest("label") ?? el).getBoundingClientRect() : r;
+        const srOnly = r.width <= 2 || r.height <= 2 || el.closest(".sr-only");
+        if (phone && !srOnly && el.matches("a[href],button,input:not([type=hidden]),select,textarea,[role=button],[role=tab],summary") && (hit.height < 32 || hit.width < 32)) {
           const inSentence = el.matches("a") && el.parentElement && /\S/.test((el.parentElement.textContent || "").replace(el.textContent || "", ""));
           if (!inSentence) small.push(`${el.tagName.toLowerCase()} "${(el.textContent || el.getAttribute("aria-label") || "").trim().slice(0, 28)}" ${Math.round(r.width)}x${Math.round(r.height)}`);
         }

@@ -72,7 +72,7 @@ export function TemplateSearchInput({
         }}
         placeholder={placeholder}
         aria-label="Search templates"
-        className="field h-9 w-full rounded-xl border border-line bg-panel pl-9 pr-8 text-xs text-ink placeholder:text-muted focus:border-brand focus:ring-1 focus:ring-brand shadow-sm"
+        className="field h-10 w-full rounded-xl sm:h-9 border border-line bg-panel pl-9 pr-8 text-xs text-ink placeholder:text-muted focus:border-brand focus:ring-1 focus:ring-brand shadow-sm"
       />
       {value && (
         <button

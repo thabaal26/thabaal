@@ -9,7 +9,7 @@ import { buttonClass, type ButtonSize, type ButtonVariant, type HeaderTone } fro
 import { PageInfo } from "./page-info";
 import { PageTools } from "./shell-tools";
 import { LangButton } from "@/app/dashboard/portal-ui";
-import { useLanguage } from "@/lib/i18n/context";
+import { useLanguage, useTr } from "@/lib/i18n/context";
 
 /* ───────────────────────── Page structure ───────────────────────── */
 
@@ -49,9 +49,12 @@ export function PageHeader({
   actions,
   back,
   tabs,
+  titleIsData,
 }: {
   title: string;
   titleTa?: string;
+  /** The title is a name (customer, template), shown as written in any language. */
+  titleIsData?: boolean;
   description?: ReactNode;
   descriptionTa?: ReactNode;
   meta?: ReactNode;
@@ -67,7 +70,7 @@ export function PageHeader({
       {back && <BackLink href={back.href}>{back.label}</BackLink>}
       <header className="top">
         <div style={{ minWidth: 0 }}>
-          <PageInfo title={title} description={description} titleTa={titleTa} descriptionTa={descriptionTa} />
+          <PageInfo title={title} description={description} titleTa={titleTa} descriptionTa={descriptionTa} titleIsData={titleIsData} />
           {meta && (
             <div className="muted" style={{ marginTop: 6 }}>
               {meta}
@@ -99,12 +102,13 @@ export function Section({
   children: ReactNode;
   className?: string;
 }) {
+  const { trn } = useTr();
   return (
     <section className={cn("mt-6 sm:mt-10 lg:mt-11", className)}>
       <div className="mb-2.5 flex items-end justify-between gap-2.5 sm:mb-3.5 sm:gap-3">
         <div className="min-w-0">
-          <h2 className="font-display text-[17px] font-semibold text-ink sm:text-[19px]">{title}</h2>
-          {description && <p className="mt-0.5 max-w-read text-xs text-muted sm:text-sm">{description}</p>}
+          <h2 className="font-display text-[17px] font-semibold text-ink sm:text-[19px]">{trn(title)}</h2>
+          {description && <p className="mt-0.5 max-w-read text-xs text-muted sm:text-sm">{trn(description)}</p>}
         </div>
         {action}
       </div>
@@ -165,9 +169,9 @@ export function CardHeader({
   icon?: ReactNode;
 }) {
   void tone;
-  const { lang } = useLanguage();
-  const renderedTitle = lang === "ta" && titleTa ? titleTa : title;
-  const renderedDesc = lang === "ta" && descriptionTa ? descriptionTa : description;
+  const { isTa, trn } = useTr();
+  const renderedTitle = isTa ? (titleTa ?? trn(title)) : title;
+  const renderedDesc = isTa ? (descriptionTa ?? trn(description)) : description;
   return (
     <div
       className="relative flex flex-wrap items-start justify-between gap-x-2.5 gap-y-1.5 px-4 pb-1 pt-4 sm:flex-nowrap sm:gap-4 sm:px-5 sm:pt-5"
@@ -209,18 +213,20 @@ export function Button({
   type = "button",
   ...p
 }: ComponentProps<"button"> & { variant?: ButtonVariant; size?: ButtonSize; icon?: boolean; loading?: boolean }) {
+  const { isTa, trn } = useTr();
+  const label = trn(children);
   return (
     <button type={type} disabled={disabled || loading} aria-busy={loading || undefined} className={cn(buttonClass(variant, size, icon), className)} {...p}>
       {loading ? (
         <>
-          <span className="invisible inline-flex items-center gap-2">{children}</span>
+          <span className="invisible inline-flex items-center gap-2">{label}</span>
           <span className="absolute inset-0 grid place-items-center">
             <Spinner />
-            <span className="sr-only">Working…</span>
+            <span className="sr-only">{isTa ? "செயல்படுகிறது…" : "Working…"}</span>
           </span>
         </>
       ) : (
-        children
+        label
       )}
     </button>
   );
@@ -229,14 +235,15 @@ export function Button({
 /* ───────────────────────── Forms ───────────────────────── */
 
 export function Label({ children, hint, htmlFor, required }: { children: ReactNode; hint?: ReactNode; htmlFor?: string; required?: boolean }) {
+  const { isTa, trn } = useTr();
   return (
     <label htmlFor={htmlFor} className="mb-1.5 flex items-baseline justify-between gap-x-2 text-[13.5px] font-semibold text-ink">
       <span className="min-w-0">
-        {children}
+        {trn(children)}
         {required && <span aria-hidden className="ml-0.5 text-danger">*</span>}
-        {required && <span className="sr-only"> (required)</span>}
+        {required && <span className="sr-only">{isTa ? " (கட்டாயம்)" : " (required)"}</span>}
       </span>
-      {hint && <span className="shrink-0 text-xs font-normal text-muted">{hint}</span>}
+      {hint && <span className="shrink-0 text-xs font-normal text-muted">{trn(hint)}</span>}
     </label>
   );
 }
@@ -266,6 +273,7 @@ export function Field({
   className?: string;
   children: ReactElement<Record<string, unknown>>;
 }) {
+  const { trn } = useTr();
   const describedBy = [help && `${id}-help`, error && `${id}-error`].filter(Boolean).join(" ") || undefined;
   const child = Children.only(children);
   return (
@@ -278,7 +286,7 @@ export function Field({
         : child}
       {help && (
         <p id={`${id}-help`} className="mt-1.5 text-xs text-muted">
-          {help}
+          {trn(help)}
         </p>
       )}
       {error && (
@@ -297,12 +305,13 @@ export function CheckRow({
   className,
   ...input
 }: Omit<ComponentProps<"input">, "type"> & { label: ReactNode; description?: ReactNode }) {
+  const { trn } = useTr();
   return (
     <label className={cn("flex min-h-11 cursor-pointer items-start gap-3 rounded-control py-2 text-sm has-disabled:cursor-not-allowed has-disabled:opacity-60", className)}>
       <input type="checkbox" className="check mt-0.5" {...input} />
       <span className="min-w-0">
-        <span className="font-medium text-ink">{label}</span>
-        {description && <span className="mt-0.5 block text-xs text-muted">{description}</span>}
+        <span className="font-medium text-ink">{trn(label)}</span>
+        {description && <span className="mt-0.5 block text-xs text-muted">{trn(description)}</span>}
       </span>
     </label>
   );
@@ -324,10 +333,11 @@ export type Tone = keyof typeof tones;
 
 /** A short status label. Colour supports the text, never replaces it. */
 export function Badge({ tone = "gray", children, dot, className }: { tone?: Tone; children: ReactNode; dot?: boolean; className?: string }) {
+  const { trn } = useTr();
   return (
     <span className={cn("inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[12.5px] font-bold leading-5", tones[tone], className)}>
       {dot && <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-current" />}
-      <span className="truncate [&>svg]:mr-1 [&>svg]:inline [&>svg]:size-3 [&>svg]:align-[-2px]">{children}</span>
+      <span className="truncate [&>svg]:mr-1 [&>svg]:inline [&>svg]:size-3 [&>svg]:align-[-2px]">{trn(children)}</span>
     </span>
   );
 }
@@ -419,6 +429,9 @@ export function Callout({
   className?: string;
   role?: "alert" | "status";
 }) {
+  const { trn } = useTr();
+  title = trn(title);
+  children = trn(children);
   return (
     <div role={role} className={cn("flex flex-col gap-2.5 rounded-[12px] border-0 px-3.5 py-3 text-[13.5px] sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:text-[14px]", calloutTones[tone], className)}>
       <div className="flex min-w-0 gap-2 sm:gap-2.5">
@@ -440,6 +453,7 @@ export function Callout({
  * Wraps cleanly on mobile and desktop so all filters are visible without horizontal swiping.
  */
 export function FilterChips({ label, items, className }: { label: string; items: { href: string; label: string; count?: number | string; active: boolean }[]; className?: string }) {
+  const { tr } = useTr();
   return (
     <nav aria-label={label} className={cn("w-full", className)}>
       <ul className="m-0 flex list-none flex-wrap items-center gap-2 p-0">
@@ -455,7 +469,7 @@ export function FilterChips({ label, items, className }: { label: string; items:
                   : "border-line bg-panel text-muted hover:border-ink hover:text-ink hover:-translate-y-px hover:shadow-2xs",
               )}
             >
-              <span>{t.label}</span>
+              <span>{tr(t.label)}</span>
               {t.count !== undefined && (
                 <span
                   className={cn(
@@ -488,8 +502,9 @@ export function Segmented<T extends string>({
   onChange: (v: T) => void;
   className?: string;
 }) {
+  const { tr, trn } = useTr();
   return (
-    <div role="radiogroup" aria-label={label} className={cn("inline-flex max-w-full flex-wrap rounded-[12px] border-[1.5px] border-line bg-panel p-[3px] sm:flex-nowrap", className)}>
+    <div role="radiogroup" aria-label={tr(label)} className={cn("inline-flex max-w-full flex-wrap rounded-[12px] border-[1.5px] border-line bg-panel p-[3px] sm:flex-nowrap", className)}>
       {options.map((o) => {
         const on = o.value === value;
         return (
@@ -500,11 +515,11 @@ export function Segmented<T extends string>({
             aria-checked={on}
             onClick={() => onChange(o.value)}
             className={cn(
-              "min-h-8 flex-1 whitespace-nowrap rounded-[9px] px-3 text-[13.5px] font-semibold transition-all duration-200 ease-out active:scale-[0.97]",
+              "min-h-10 flex-1 whitespace-nowrap rounded-[9px] px-3 text-[13.5px] font-semibold transition-all duration-200 ease-out active:scale-[0.97] sm:min-h-8",
               on ? "bg-ink text-canvas" : "text-muted hover:text-ink",
             )}
           >
-            {o.label}
+            {trn(o.label)}
           </button>
         );
       })}
@@ -608,6 +623,9 @@ export function ListRow({
 /* ───────────────────────── Empty, loading, KPIs ───────────────────────── */
 
 export function EmptyState({ icon, title, children, action }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
+  const { tr, trn } = useTr();
+  title = tr(title);
+  children = trn(children);
   return (
     <div className="flex flex-col items-center px-4 py-7 text-center sm:px-6 sm:py-14">
       {icon && (
@@ -624,9 +642,12 @@ export function EmptyState({ icon, title, children, action }: { icon?: ReactNode
 
 /** Shown to an admin in "All clients" view on pages that create something for one client. */
 export function PickClientNotice({ what }: { what: string }) {
+  const { isTa } = useTr();
   return (
     <Card className="card-3d">
-      <EmptyState title="Pick a client first">Choose a client in the sidebar switcher, then add the {what} for them.</EmptyState>
+      <EmptyState title="Pick a client first">
+        {isTa ? "பக்கப்பட்டியில் ஒரு வணிகத்தைத் தேர்வு செய்து, பிறகு அவர்களுக்குச் சேர்க்கவும்." : <>Choose a client in the sidebar switcher, then add the {what} for them.</>}
+      </EmptyState>
     </Card>
   );
 }
@@ -697,8 +718,9 @@ export function Stat({
   id?: string;
 }) {
   const { lang } = useLanguage();
-  const displayLabel = lang === "ta" ? (labelTa ?? STAT_LABEL_MAP[label] ?? label) : label;
-  const displaySub = lang === "ta" && subTa ? subTa : sub;
+  const { trn } = useTr();
+  const displayLabel = lang === "ta" ? (labelTa ?? STAT_LABEL_MAP[label] ?? trn(label)) : label;
+  const displaySub = lang === "ta" ? (subTa ?? trn(sub)) : sub;
 
   const body = (
     <>
@@ -760,6 +782,7 @@ export function DistributionBar({
   segments: { key: string; label: string; value: number; color: ChartColor; href?: string }[];
   className?: string;
 }) {
+  const { tr } = useTr();
   const total = segments.reduce((sum, s) => sum + s.value, 0);
   if (total <= 0) return null;
   return (
@@ -782,7 +805,7 @@ export function DistributionBar({
           const content = (
             <>
               <span aria-hidden className="size-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: cssColor(s.color) }} />
-              <span className="font-medium text-ink-2">{s.label}</span>
+              <span className="font-medium text-ink-2">{tr(s.label)}</span>
               <span className="tabular font-semibold text-ink">{s.value.toLocaleString("en-IN")}</span>
               <span className="tabular text-muted">({share}%)</span>
             </>
@@ -790,7 +813,7 @@ export function DistributionBar({
           return (
             <li key={s.key}>
               {s.href ? (
-                <Link href={s.href} className="inline-flex items-center gap-1.5 rounded-control px-1.5 py-0.5 transition hover:bg-sunken">
+                <Link href={s.href} className="inline-flex min-h-10 items-center gap-1.5 rounded-control px-1.5 py-0.5 transition hover:bg-sunken sm:min-h-0">
                   {content}
                 </Link>
               ) : (

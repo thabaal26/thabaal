@@ -1,7 +1,7 @@
 import { BarChart3, FileText, Home, IndianRupee, Megaphone, MessageCircle, Package, Settings, Tag, Users } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
-import { PortalPage } from "../portal-ui";
+import { PortalPage, T } from "../portal-ui";
 
 export const metadata: Metadata = { title: "What changed" };
 
@@ -56,7 +56,7 @@ export default function GuidePage() {
     <PortalPage title="What changed" titleTa="என்ன மாறியது" sub="A map from the old menu to the new pages." subTa="பழைய மெனுவிலிருந்து புதிய பக்கங்களுக்கு வழிகாட்டி.">
       <div className="stack">
         <section>
-          <h2 style={{ marginBottom: 12 }}>All pages</h2>
+          <h2 style={{ marginBottom: 12 }}><T>All pages</T></h2>
           <div className="grid g3">
             {PAGES.map((p) => {
               const Icon = p.icon;
@@ -114,8 +114,8 @@ export default function GuidePage() {
         <section className="card">
           <div className="hd">
             <div>
-              <h2>Buttons on each order</h2>
-              <p>What the owner sees, in the order things happen.</p>
+              <h2><T>Buttons on each order</T></h2>
+              <p><T ta="உரிமையாளர் பார்ப்பது, நடக்கும் வரிசையில்.">What the owner sees, in the order things happen.</T></p>
             </div>
           </div>
           <div className="tw">
@@ -143,7 +143,7 @@ export default function GuidePage() {
         </section>
 
         <section className="card">
-          <h2 style={{ marginBottom: 10 }}>What got simpler</h2>
+          <h2 style={{ marginBottom: 10 }}><T>What got simpler</T></h2>
           <ul>
             <li>Menu: 10 pages in 6 groups</li>
             <li>Each page has one job, with tabs for the rest</li>
