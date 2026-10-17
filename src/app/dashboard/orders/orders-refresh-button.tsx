@@ -3,7 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw } from "@/components/icons";
-import { buttonClass } from "@/components/ui";
+import { buttonClass } from "@/components/ui-classes";
 import { cn } from "@/lib/cn";
 
 export function OrdersRefreshButton({ className }: { className?: string }) {

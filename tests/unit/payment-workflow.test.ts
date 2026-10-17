@@ -343,4 +343,61 @@ describe("Payment Workflow & Security Invariants", () => {
       assert.equal(checkedOld.status, "CANCELLED");
     });
   });
+
+  describe("5. Money is never counted twice (QA run, scenarios 10, 16, 21, 22, 24)", () => {
+    const newOrder = (total: number) =>
+      db.order.create({ data: { clientId, customerId, status: "CONFIRMED", total, currency: "INR", items: [{ name: "Ghee", quantity: 1, price: total }] } });
+
+    test("two full payments recorded at the same moment (staff + webhook) are saved once", async () => {
+      const order = await newOrder(900);
+      const results = await Promise.all([
+        confirmPayment(order.id, "TXN-RACE-1", { method: "upi_whatsapp", source: "meta", amount: 900, quiet: true }),
+        confirmPayment(order.id, null, { method: "cash", source: "staff", quiet: true }),
+      ]);
+      assert.equal(results.filter(Boolean).length, 1);
+      const o = await db.order.findUniqueOrThrow({ where: { id: order.id } });
+      assert.equal(o.paidAmount, 900);
+      assert.equal(o.status, "PAID");
+    });
+
+    test("the same WhatsApp part payment delivered twice is counted once", async () => {
+      const order = await newOrder(1000);
+      assert.equal(await confirmPayment(order.id, "TXN-PART-1", { source: "meta", amount: 400, quiet: true }), true);
+      assert.equal(await confirmPayment(order.id, "TXN-PART-1", { source: "meta", amount: 400, quiet: true }), false);
+      const o = await db.order.findUniqueOrThrow({ where: { id: order.id } });
+      assert.equal(o.paidAmount, 400);
+      assert.equal(paymentState(o), "part_paid");
+      assert.equal(dueOf(o), 600);
+    });
+
+    test("a double-tapped part payment from staff is recorded once (seenReceived)", async () => {
+      const order = await newOrder(1000);
+      const tap = () => confirmPayment(order.id, null, { method: "cash", source: "staff", amount: 300, quiet: true, seenReceived: 0 });
+      const results = await Promise.all([tap(), tap()]);
+      assert.equal(results.filter(Boolean).length, 1);
+      // And a late second tap after the first finished is refused too.
+      assert.equal(await tap(), false);
+      const o = await db.order.findUniqueOrThrow({ where: { id: order.id } });
+      assert.equal(o.paidAmount, 300);
+    });
+
+    test("a late WhatsApp webhook after staff already recorded the payment adds nothing", async () => {
+      const order = await newOrder(750);
+      assert.equal(await confirmPayment(order.id, null, { method: "upi", source: "staff", quiet: true }), true);
+      assert.equal(await confirmPayment(order.id, "TXN-LATE-1", { source: "meta", amount: 750, quiet: true }), false);
+      const o = await db.order.findUniqueOrThrow({ where: { id: order.id } });
+      assert.equal(o.paidAmount, 750);
+      assert.equal(o.paymentSource, "staff");
+    });
+
+    test("ten parallel webhook deliveries of one payment still save it once", async () => {
+      const order = await newOrder(1200);
+      const results = await Promise.all(
+        Array.from({ length: 10 }, () => confirmPayment(order.id, "TXN-FLOOD-1", { source: "meta", amount: 1200, quiet: true })),
+      );
+      assert.equal(results.filter(Boolean).length, 1);
+      const o = await db.order.findUniqueOrThrow({ where: { id: order.id } });
+      assert.equal(o.paidAmount, 1200);
+    });
+  });
 });

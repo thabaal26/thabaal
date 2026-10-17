@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useRef, useTransition, type ReactNode } from "react";
 import { confirmAction } from "./confirm";
-import { toastResult } from "./toast";
+import { safeAction, toastResult } from "./toast";
 import { Button, type ButtonSize, type ButtonVariant } from "./ui";
 
 type Result = { ok: boolean; message?: string; errors?: string[] };
@@ -45,7 +45,7 @@ export function ActionButton({
         try {
           if (confirm && !(await confirmAction(confirm))) return;
           start(async () => {
-            toastResult(await action());
+            toastResult(await safeAction(action));
             router.refresh();
           });
         } finally {

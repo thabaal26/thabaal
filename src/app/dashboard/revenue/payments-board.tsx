@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Search } from "@/components/icons";
 import Link from "@/components/intent-link";
 import { confirmAction } from "@/components/confirm";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import type { CollectRow, ReceivedRow, TxnRow } from "@/lib/payments-data";
 import { useLanguage } from "@/lib/i18n/context";
 import { requestPayment } from "../actions/orders";
@@ -225,7 +225,7 @@ function RemindAll({ ids, isTa = false }: { ids: string[]; isTa?: boolean }) {
             let ok = 0;
             const errors: string[] = [];
             for (const id of ids) {
-              const r = await requestPayment(id);
+              const r = await safeAction(() => requestPayment(id));
               if (r.ok) ok += 1;
               else if (r.message) errors.push(r.message);
             }

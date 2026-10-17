@@ -1,4 +1,5 @@
 "use client";
+import { safeAction } from "@/components/toast";
 
 import React, { useState, useEffect, useTransition } from "react";
 import Link from "@/components/intent-link";
@@ -166,7 +167,7 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
   const handlePause = async (c: CampaignItem) => {
     if (c.isLive) {
       startTransition(async () => {
-        const res = await toggleCampaign(c.id, false);
+        const res = await safeAction(() => toggleCampaign(c.id, false));
         showToast(res.message || "Campaign paused");
         router.refresh();
       });
@@ -179,7 +180,7 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
   const handleResume = async (c: CampaignItem) => {
     if (c.isLive) {
       startTransition(async () => {
-        const res = await toggleCampaign(c.id, true);
+        const res = await safeAction(() => toggleCampaign(c.id, true));
         showToast(res.message || "Campaign resumed");
         router.refresh();
       });
@@ -193,7 +194,7 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
     if (!window.confirm(`Delete "${c.n}"?`)) return;
     if (c.isLive) {
       startTransition(async () => {
-        const res = await deleteCampaign(c.id);
+        const res = await safeAction(() => deleteCampaign(c.id));
         showToast(res.message || "Campaign deleted");
         router.refresh();
       });
@@ -207,7 +208,7 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
   const handleDuplicate = async (c: CampaignItem) => {
     if (c.isLive) {
       startTransition(async () => {
-        const res = await duplicateCampaign(c.id);
+        const res = await safeAction(() => duplicateCampaign(c.id));
         showToast(res.message || "Copy saved as a draft");
         router.refresh();
       });

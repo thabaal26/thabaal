@@ -8,7 +8,7 @@ import { CalendarPicker, getTodayStr } from "@/components/calendar-picker";
 import { MobileActionBar } from "@/components/mobile-action-bar";
 import { MultiPicker } from "@/components/multi-picker";
 import { Picker } from "@/components/picker";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import { Button, Callout, Card, CardHeader, CheckRow, Field, Segmented } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { DAYS, describeScheduleSummary, effectiveInterval, estimateDuration, formatMinutes, SCHEDULER_TICK_MINUTES, TIME_PRESETS, WEEKLY_PAIRS } from "@/lib/schedule";
@@ -146,7 +146,7 @@ export function CampaignForm({
   function save() {
     if (pending) return;
     start(async () => {
-      const r = await saveCampaign(id, c);
+      const r = await safeAction(() => saveCampaign(id, c));
       toastResult(r);
       if (r.ok) {
         router.push(`/dashboard/campaigns/${r.id}`);

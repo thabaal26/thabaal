@@ -9,7 +9,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useRef, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { confirmAction } from "@/components/confirm";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import Link from "@/components/intent-link";
 import { PageTools } from "@/components/shell-tools";
 import "./portal.css";
@@ -269,7 +269,7 @@ export function PAction({
         try {
           if (confirm && !(await confirmAction(confirm))) return;
           start(async () => {
-            toastResult(await action());
+            toastResult(await safeAction(action));
             router.refresh();
           });
         } finally {

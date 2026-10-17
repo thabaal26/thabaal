@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import { confirmAction } from "@/components/confirm";
 import { Sheet } from "@/components/sheet";
 import { Button } from "@/components/ui";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import { fmtDate } from "@/lib/format";
+import { canUndoPayment, dueOf, paymentState, receivedOf } from "@/lib/payment-state";
 import { inr } from "../portal-format";
 import { T, useLang } from "../portal-ui";
 import { getOrderPricing, pointsDiscount } from "@/lib/order-pricing";
@@ -29,7 +30,8 @@ import {
   setOrderStatus,
   updateOrderItems,
 } from "../actions/orders";
-import { deliverCod, recordPayment, setPaymentMethod } from "../actions/payments";
+import { deliverCod, setPaymentMethod, undoPayment, verifyPaymentClaim } from "../actions/payments";
+import { RecordPaymentSheet, RefundSheet } from "./payment-ui";
 import {
   blankOrderLine,
   OrderItemsEditor,
@@ -106,14 +108,21 @@ export function OrderCard({
 
   // Modals state
   const [dispatchOpen, setDispatchOpen] = useState(false);
-  const [dispatchMethod, setDispatchMethod] = useState("Murugan (bike)");
+  // How it goes out: the shop's own delivery person (name optional), a courier (tracking number) or pickup.
+  const [dispatchMethod, setDispatchMethod] = useState<"own" | "Courier" | "Customer pickup">("own");
+  const [deliveryBy, setDeliveryBy] = useState("");
   const [trackingNumber, setTrackingNumber] = useState("");
   const [sendUpdate, setSendUpdate] = useState(true);
+  const openDispatch = () => {
+    setDispatchMethod("own");
+    setDeliveryBy("");
+    setTrackingNumber("");
+    setSendUpdate(true);
+    setDispatchOpen(true);
+  };
 
   const [payModalOpen, setPayModalOpen] = useState(false);
-  const [payMethod, setPayMethod] = useState("upi");
-  const [payRef, setPayRef] = useState("");
-  const [payAmount, setPayAmount] = useState<number>(o.total);
+  const [refundOpen, setRefundOpen] = useState(false);
 
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -186,6 +195,29 @@ export function OrderCard({
     });
   };
 
+  // Money on this order, from the same helpers the server uses (part payments, claims, failures, refunds).
+  const payFields = {
+    status: o.status,
+    total: o.total,
+    paidAt: o.paidAt ? new Date(o.paidAt) : null,
+    paymentMethod: o.paymentMethod ?? null,
+    paidAmount: o.paidAmount ?? null,
+    paymentRequestedAt: o.paymentRequestedAt ? new Date(o.paymentRequestedAt) : null,
+    paymentClaimedAt: o.paymentClaimedAt ? new Date(o.paymentClaimedAt) : null,
+    paymentFailedAt: o.paymentFailedAt ? new Date(o.paymentFailedAt) : null,
+    refundedAt: o.refundedAt ? new Date(o.refundedAt) : null,
+    refundAmount: o.refundAmount ?? null,
+    internalNote: o.internalNote,
+  };
+  const payState = paymentState(payFields);
+  const received = receivedOf(payFields);
+  const due = dueOf(payFields);
+  const refunded = o.refundAmount ?? 0;
+  const refundable = Math.max(0, Math.round((received - refunded) * 100) / 100);
+  // Paid more than the order now costs (items edited down after paying): that much is owed back.
+  const overpaid = o.status === "CANCELLED" ? refundable : Math.max(0, Math.round((received - refunded - o.total) * 100) / 100);
+  const canUndo = canUndoPayment({ ...payFields, paymentSource: o.paymentSource ?? null, paymentTxnId: o.paymentTxnId }) && refunded <= 0 && o.status !== "DISPATCHED" && o.status !== "DELIVERED";
+
   const isPaid = o.status === "PAID" || o.paidAt !== null;
   const isCod =
     o.paymentMethod === "cod" ||
@@ -211,19 +243,50 @@ export function OrderCard({
   // Payment pill & text
   let payPill: { tone: "ok" | "warn" | "info" | "mute" | "bad"; label: string };
   let payText: string;
-  if (isPaid) {
-    payPill = { tone: "ok", label: isTa ? "செலுத்தப்பட்டது" : "Paid" };
-    payText = isTa ? `${inr(pricing.total)} பெறப்பட்டது` : `${inr(pricing.total)} received`;
-  } else if (isCod) {
-    payPill = { tone: "info", label: isTa ? "டெலிவரியின் போது பணம்" : "Cash on delivery" };
-    payText = isTa ? `டெலிவரியின் போது ${inr(pricing.total)} பெறவும்` : `Collect ${inr(pricing.total)} on delivery`;
-  } else if (o.paymentRequestedAt) {
-    payPill = { tone: "warn", label: isTa ? "கட்டண இணைப்பு அனுப்பப்பட்டது" : "Payment link sent" };
-    payText = isTa ? `${inr(pricing.total)} இன்னும் பெறப்படவில்லை` : `${inr(pricing.total)} not received yet`;
-  } else {
-    payPill = { tone: "mute", label: isTa ? "கட்டணம் நிலுவை" : "Payment waiting" };
-    payText = isTa ? `${inr(pricing.total)} இன்னும் பெறப்படவில்லை` : `${inr(pricing.total)} not received yet`;
+  const notYet = isTa ? `${inr(due)} இன்னும் பெறப்படவில்லை` : `${inr(due)} not received yet`;
+  switch (payState) {
+    case "paid":
+      payPill = { tone: "ok", label: isTa ? "செலுத்தப்பட்டது" : "Paid" };
+      payText = isTa ? `${inr(received)} பெறப்பட்டது` : `${inr(received)} received`;
+      break;
+    case "part_paid":
+      payPill = { tone: "warn", label: isTa ? "பகுதி செலுத்தப்பட்டது" : "Part paid" };
+      payText = isTa ? `${inr(received)} பெறப்பட்டது · ${inr(due)} நிலுவை` : `${inr(received)} received · ${inr(due)} due`;
+      break;
+    case "cod_due":
+      payPill = { tone: "info", label: isTa ? "டெலிவரியின் போது பணம்" : "Cash on delivery" };
+      payText = isTa ? `டெலிவரியின் போது ${inr(due)} பெறவும்` : `Collect ${inr(due)} on delivery`;
+      break;
+    case "claimed":
+      payPill = { tone: "warn", label: isTa ? "செலுத்தியதாகக் கூறுகிறார் · சரிபார்க்கவும்" : "Customer says paid · check" };
+      payText = o.paymentClaimNote?.trim() || notYet;
+      break;
+    case "failed":
+      payPill = { tone: "bad", label: isTa ? "கட்டணம் தோல்வி" : "Payment failed" };
+      payText = o.paymentFailReason?.trim() ? `${notYet} · ${o.paymentFailReason.trim()}` : notYet;
+      break;
+    case "requested":
+      payPill = { tone: "warn", label: isTa ? "கட்டண இணைப்பு அனுப்பப்பட்டது" : "Payment link sent" };
+      payText = notYet;
+      break;
+    case "refund_due":
+      payPill = { tone: "bad", label: isTa ? "திருப்பித் தர வேண்டும்" : "Refund due" };
+      payText = isTa ? `${inr(refundable)} திருப்பித் தர வேண்டும்` : `${inr(refundable)} to give back`;
+      break;
+    case "refunded":
+      payPill = { tone: "mute", label: isTa ? "திருப்பி அளிக்கப்பட்டது" : "Refunded" };
+      payText = isTa ? `${inr(refunded)} திருப்பி அளிக்கப்பட்டது` : `${inr(refunded)} refunded`;
+      break;
+    case "none":
+      payPill = { tone: "mute", label: isTa ? "கட்டணம் இல்லை" : "No payment" };
+      payText = isTa ? "பணம் எதுவும் பெறப்படவில்லை" : "No money was received";
+      break;
+    default:
+      payPill = { tone: "mute", label: isTa ? "கட்டணம் நிலுவை" : "Payment waiting" };
+      payText = notYet;
   }
+  if (o.status !== "CANCELLED" && overpaid > 0.5) payText += isTa ? ` · ${inr(overpaid)} திருப்பித் தர வேண்டும்` : ` · ${inr(overpaid)} to give back`;
+  else if (o.status !== "CANCELLED" && refunded > 0) payText += isTa ? ` · ${inr(refunded)} திருப்பி அளிக்கப்பட்டது` : ` · ${inr(refunded)} refunded`;
 
   // Late detection
   const [mountedNow] = useState(() => Date.now());
@@ -288,7 +351,7 @@ export function OrderCard({
     }
   } else if (o.status === "DISPATCHED") {
     if (isCod && !isPaid) {
-      primaryAction = { key: "codin", label: `Delivered, cash received ${inr(pricing.total)}` };
+      primaryAction = { key: "codin", label: `Delivered, cash received ${inr(due)}` };
     } else {
       primaryAction = { key: "deliver", label: `Mark ${finishLabel.toLowerCase()}` };
     }
@@ -297,25 +360,30 @@ export function OrderCard({
   } else {
     primaryAction = { key: "restore", label: "Restore order" };
   }
+  // The customer says they paid: checking the UPI app comes before reminding them again.
+  if (payState === "claimed" && (o.status === "NEW" || o.status === "CONFIRMED")) primaryAction = { key: "verify", label: "Payment received" };
 
   const PRIMARY_ACTION_TA: Record<string, string> = {
+    verify: "பணம் வந்தது",
     confirm: "ஆர்டரை உறுதி செய்",
     pack: "பேக் செய்",
     dispatch: flow === "courier" ? "கொரியரில் அனுப்பு" : "டெலிவரிக்கு அனுப்பு",
     deliver: "டெலிவரி ஆனதாகக் குறி",
     remind: "நினைவூட்டல் அனுப்பு",
     link: "கட்டண இணைப்பு அனுப்பு",
-    codin: `டெலிவரி ஆனது, பணம் வரவு ${inr(pricing.total)}`,
+    codin: `டெலிவரி ஆனது, பணம் வரவு ${inr(due)}`,
     receipt: "ரசீது பார்க்க",
     restore: "ஆர்டரை மீட்டெடு",
   };
   const primaryActionLabel = isTa ? (PRIMARY_ACTION_TA[primaryAction.key] ?? primaryAction.label) : primaryAction.label;
 
   // Action runners
-  const runAction = (name: string, fn: () => Promise<{ ok: boolean; message?: string }>) => {
+  // A dropped connection shows a message instead of breaking the page; onOk runs only when the server saved it.
+  const runAction = (name: string, fn: () => Promise<{ ok: boolean; message?: string }>, onOk?: () => void) => {
     startTransition(async () => {
-      const res = await fn();
+      const res = await safeAction(fn);
       toastResult(res);
+      if (res.ok) onOk?.();
       router.refresh();
     });
   };
@@ -329,13 +397,16 @@ export function OrderCard({
         runAction("pack", () => setOrderPacked(o.id, true));
         break;
       case "dispatch":
-        setDispatchOpen(true);
+        openDispatch();
+        break;
+      case "verify":
+        runAction("verify", () => verifyPaymentClaim(o.id, true));
         break;
       case "deliver":
         runAction("deliver", () => setOrderStatus(o.id, "DELIVERED"));
         break;
       case "codin":
-        runAction("codin", () => deliverCod(o.id, { collected: true, amount: pricing.total }));
+        runAction("codin", () => deliverCod(o.id, { collected: true, amount: due }));
         break;
       case "link":
         runAction("link", () => requestPayment(o.id));
@@ -374,28 +445,45 @@ export function OrderCard({
     runAction("cancel", () => setOrderStatus(o.id, "CANCELLED"));
   };
 
+  // The dialog closes only once the server saved it, so a failed attempt can be retried without retyping.
   const submitDispatch = (e: React.FormEvent) => {
     e.preventDefault();
-    setDispatchOpen(false);
-    runAction("dispatch", () =>
-      notifyOrder(o.id, "dispatch", {
-        by: dispatchMethod,
-        link: dispatchMethod === "Courier" ? trackingNumber : undefined,
-        eta: "today evening",
-      }),
+    if (pending) return;
+    const by = dispatchMethod === "own" ? deliveryBy.trim() : dispatchMethod;
+    runAction(
+      "dispatch",
+      () =>
+        sendUpdate
+          ? notifyOrder(o.id, "dispatch", {
+              by: by || undefined,
+              link: dispatchMethod === "Courier" ? trackingNumber.trim() || undefined : undefined,
+            })
+          : setOrderStatus(o.id, "DISPATCHED"),
+      () => setDispatchOpen(false),
     );
   };
 
-  const submitMarkPaid = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPayModalOpen(false);
-    runAction("paid", () =>
-      recordPayment(o.id, {
-        method: payMethod,
-        amount: payAmount,
-        reference: payRef || undefined,
-      }),
-    );
+  const handleUndoPayment = async () => {
+    const ok = await confirmAction({
+      title: isTa ? "கட்டணத்தை நீக்கவா?" : `Undo the payment on #${refText}?`,
+      message: isTa
+        ? `${inr(received)} பதிவு நீக்கப்படும், ஆர்டர் செலுத்தப்படாததாகக் காட்டப்படும்.`
+        : `The ${inr(received)} recorded will be removed and the order shows as not paid again. Use this only for a payment recorded by mistake.`,
+      confirmLabel: isTa ? "நீக்கு" : "Undo payment",
+      danger: true,
+    });
+    if (ok) runAction("undo", () => undoPayment(o.id));
+  };
+
+  const handleNotReceived = async () => {
+    const ok = await confirmAction({
+      title: isTa ? "பணம் வரவில்லையா?" : "Payment not found?",
+      message: isTa
+        ? `${o.customer.name} அவர்களிடம் UPI குறிப்பு எண் (UTR) அல்லது ஸ்கிரீன்ஷாட் கேட்கப்படும்.`
+        : `Mark ${o.customer.name}'s payment as not received? They'll be asked for the UPI reference (UTR) or a screenshot.`,
+      confirmLabel: isTa ? "பணம் வரவில்லை" : "Not received",
+    });
+    if (ok) runAction("notpaid", () => verifyPaymentClaim(o.id, false));
   };
 
   const when = (d: Date | string | null | undefined) => (d ? fmtDate(new Date(d), "EEE d MMM, h:mm a") : null);
@@ -726,14 +814,7 @@ export function OrderCard({
       >
         <span className={`pill ${payPill.tone}`}>{payPill.label}</span>
         <span className="muted small" style={{ fontSize: 13.5, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4 }}>
-          {isPaid ? (
-            <>
-              <b style={{ color: "var(--fg)", fontWeight: 600 }}>{inr(pricing.total)}</b>{" "}
-              <span>{isTa ? "பெறப்பட்டது" : "received"}</span>
-            </>
-          ) : (
-            payText
-          )}
+          {payText}
         </span>
 
         {/* Dedicated UPI Reference Pill with 1-tap copy and clean visual breathing room */}
@@ -1036,13 +1117,31 @@ export function OrderCard({
             </button>
           )}
 
-          {!isPaid && (
+          {due > 0 && o.status !== "CANCELLED" && (
             <button
               type="button"
               className="btn sm"
               onClick={() => setPayModalOpen(true)}
             >
               <T ta="பணம் பதிவு செய்">Mark paid</T>
+            </button>
+          )}
+
+          {payState === "claimed" && (
+            <button type="button" className="btn sm" disabled={pending} onClick={handleNotReceived}>
+              <T ta="பணம் வரவில்லை">Payment not received</T>
+            </button>
+          )}
+
+          {refundable > 0 && (o.status === "CANCELLED" || overpaid > 0.5 || payState === "paid" || payState === "part_paid") && (
+            <button type="button" className="btn sm" onClick={() => setRefundOpen(true)}>
+              <T ta="திருப்பி அளித்ததைப் பதிவு செய்">Record refund</T>
+            </button>
+          )}
+
+          {canUndo && (
+            <button type="button" className="btn sm" disabled={pending} onClick={handleUndoPayment}>
+              <T ta="கட்டணப் பதிவை நீக்கு">Undo payment</T>
             </button>
           )}
 
@@ -1061,7 +1160,7 @@ export function OrderCard({
             <button
               type="button"
               className="btn sm"
-              onClick={() => setDispatchOpen(true)}
+              onClick={openDispatch}
             >
               <T ta="டெலிவரிக்கு அனுப்பு">Dispatch order</T>
             </button>
@@ -1138,14 +1237,26 @@ export function OrderCard({
               <select
                 id="dsw"
                 value={dispatchMethod}
-                onChange={(e) => setDispatchMethod(e.target.value)}
+                onChange={(e) => setDispatchMethod(e.target.value as typeof dispatchMethod)}
               >
-                <option value="Murugan (bike)">Murugan (bike)</option>
-                <option value="Selvam (bike)">Selvam (bike)</option>
+                <option value="own">{isTa ? "எங்கள் டெலிவரி நபர்" : "Our delivery person"}</option>
                 <option value="Courier">{isTa ? "கொரியர் (Courier)" : "Courier"}</option>
                 <option value="Customer pickup">{isTa ? "நேரடி வருகை (Customer pickup)" : "Customer pickup"}</option>
               </select>
             </div>
+            {dispatchMethod === "own" && (
+              <div className="field">
+                <label htmlFor="dsb"><T ta="டெலிவரி செய்பவர் பெயர் (விருப்பத்தேர்வு)">Delivery person&apos;s name (optional)</T></label>
+                <input
+                  id="dsb"
+                  type="text"
+                  maxLength={60}
+                  autoComplete="off"
+                  value={deliveryBy}
+                  onChange={(e) => setDeliveryBy(e.target.value)}
+                />
+              </div>
+            )}
             {dispatchMethod === "Courier" && (
               <div className="field">
                 <label htmlFor="dst"><T ta="டிராக்கிங் எண்">Tracking number</T></label>
@@ -1185,80 +1296,24 @@ export function OrderCard({
         </div>
       )}
 
-      {/* Mark Paid Modal (#mp) */}
-      {payModalOpen && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 60,
-            display: "grid",
-            placeItems: "center",
-            background: "rgba(16,40,59,.55)",
-            padding: 16,
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setPayModalOpen(false);
-          }}
-        >
-          <form
-            className="dlg card"
-            style={{ width: "min(520px, calc(100vw - 32px))" }}
-            onSubmit={submitMarkPaid}
-          >
-            <h2><T ta="பணம் பதிவு செய்">Mark paid</T> #{refText}</h2>
-            <p className="muted small">
-              <T ta="Thabaal-க்கு வெளியே வாடிக்கையாளர் பணம் செலுத்திய போது இதைப் பயன்படுத்தவும்.">Use this when the customer paid you outside thabaal.</T>
-            </p>
-            <div className="formgrid">
-              <div className="field">
-                <label htmlFor="mpw"><T ta="எப்படி செலுத்தப்பட்டது?">How did they pay?</T></label>
-                <select
-                  id="mpw"
-                  value={payMethod}
-                  onChange={(e) => setPayMethod(e.target.value)}
-                >
-                  <option value="upi">UPI (GPay, PhonePe, Paytm)</option>
-                  <option value="cash">{isTa ? "ரொக்கம் (Cash)" : "Cash"}</option>
-                  <option value="bank">{isTa ? "வங்கி பரிவர்த்தனை" : "Bank transfer"}</option>
-                  <option value="card">{isTa ? "அட்டை (Card)" : "Card"}</option>
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="mpa"><T ta="தொகை (₹)">Amount (₹)</T></label>
-                <input
-                  id="mpa"
-                  type="number"
-                  value={payAmount}
-                  onChange={(e) => setPayAmount(parseFloat(e.target.value) || 0)}
-                />
-              </div>
-            </div>
-            <div className="field">
-              <label htmlFor="mpr"><T ta="குறிப்பு எண் (விருப்பத்தேர்வு)">Reference (optional)</T></label>
-              <input
-                id="mpr"
-                type="text"
-                placeholder={isTa ? "UPI எண் அல்லது குறிப்பு" : "UPI reference or note"}
-                value={payRef}
-                onChange={(e) => setPayRef(e.target.value)}
-              />
-            </div>
-            <div className="acts">
-              <button
-                type="button"
-                className="btn"
-                onClick={() => setPayModalOpen(false)}
-              >
-                <T ta="ரத்து">Cancel</T>
-              </button>
-              <button className="btn primary" type="submit" disabled={pending}>
-                <T ta="பணத்தைச் சேமி">Save payment</T>
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      {/* Record payment / refund: the shared sheets (part payments, who collected cash, double-tap safe). */}
+      <RecordPaymentSheet
+        open={payModalOpen}
+        onClose={() => setPayModalOpen(false)}
+        id={o.id}
+        who={o.customer.name}
+        due={due}
+        received={received}
+        cod={Boolean(isCod)}
+      />
+      <RefundSheet
+        open={refundOpen}
+        onClose={() => setRefundOpen(false)}
+        id={o.id}
+        who={o.customer.name}
+        refundable={refundable}
+        suggested={overpaid > 0.5 ? Math.min(overpaid, refundable) : refundable}
+      />
 
       {/* Receipt Modal (#rec) */}
       {receiptOpen && (

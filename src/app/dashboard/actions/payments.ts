@@ -38,7 +38,7 @@ const done = (message: string, ok = true): SendResult => {
  */
 export async function recordPayment(
   id: string,
-  input: { method: string; amount?: number | null; reference?: string; collectedBy?: string; tell?: boolean },
+  input: { method: string; amount?: number | null; reference?: string; collectedBy?: string; tell?: boolean; seenReceived?: number | null },
 ): Promise<SendResult> {
   const r = await ownOrder(id);
   if (!r.order) return { ok: false, message: r.denied };
@@ -51,13 +51,19 @@ export async function recordPayment(
   if (!(amount > 0)) return { ok: false, message: "Enter the amount received." };
   if (amount > due + 0.5 && due > 0) return { ok: false, message: `That's more than the ${money(due, o.currency)} still due. Check the amount or edit the order total.` };
   const ref = input.reference?.trim().slice(0, 60) || null;
-  await confirmPayment(o.id, ref, {
+  // The screen said how much was already received; if that changed meanwhile (a second tap, another staff member,
+  // WhatsApp confirming the payment), nothing is recorded so the same money isn't counted twice.
+  if (input.seenReceived != null && Math.abs(receivedOf(o) - input.seenReceived) > 0.005)
+    return done(`${orderRef(o)} was updated a moment ago (now ${money(receivedOf(o), o.currency)} received). Check the order before recording again.`, false);
+  const saved = await confirmPayment(o.id, ref, {
     method: input.method,
     source: "staff",
     amount,
     collectedBy: input.collectedBy?.trim() || null,
     quiet: input.tell === false,
+    seenReceived: input.seenReceived ?? null,
   });
+  if (!saved) return done(`${orderRef(o)} is already paid or was updated a moment ago. Nothing new was recorded.`, false);
   const full = amount + 0.5 >= due;
   return done(
     full
@@ -152,8 +158,9 @@ export async function recordRefund(id: string, input: { amount?: number | null; 
   if (amount > left + 0.5) return { ok: false, message: `Only ${money(left, o.currency)} can be refunded on this order.` };
   const how = input.method && isPaymentMethod(input.method) ? methodLabel(input.method, true) : null;
   const line = `${stamp()}: refunded ${money(amount, o.currency)}${how ? ` by ${how}` : ""}${input.note?.trim() ? ` (${input.note.trim()})` : ""}`;
-  await db.order.update({
-    where: { id: o.id },
+  // Only if no other refund was recorded since this order was read (a double tap, two staff at once).
+  const saved = await db.order.updateMany({
+    where: { id: o.id, refundAmount: o.refundAmount },
     data: {
       refundedAt: new Date(),
       refundAmount: Math.round((already + amount) * 100) / 100,
@@ -161,6 +168,7 @@ export async function recordRefund(id: string, input: { amount?: number | null; 
       internalNote: addNote(o.internalNote, line),
     },
   });
+  if (saved.count === 0) return done(`A refund on ${orderRef(o)} was recorded a moment ago. Check the order before recording another.`, false);
   pushOrderToSheet(o.id, "ORDER_UPDATE", "Refunded");
   let told = false;
   if (input.tell !== false) {
@@ -180,8 +188,8 @@ export async function undoPayment(id: string): Promise<SendResult> {
   if (!canUndoPayment(o)) return { ok: false, message: "WhatsApp confirmed this payment, so it can't be undone here. Record a refund instead." };
   if (o.refundAmount && o.refundAmount > 0) return { ok: false, message: "This order already has a refund recorded. Undo is not allowed." };
   if (o.status === "DISPATCHED" || o.status === "DELIVERED") return { ok: false, message: "Cannot undo payment on an order that is already dispatched or delivered." };
-  await db.order.update({
-    where: { id: o.id },
+  const saved = await db.order.updateMany({
+    where: { id: o.id, paidAmount: o.paidAmount, paidAt: o.paidAt },
     data: {
       paidAt: null,
       paidAmount: null,
@@ -192,6 +200,7 @@ export async function undoPayment(id: string): Promise<SendResult> {
       internalNote: addNote(o.internalNote, `${stamp()}: payment of ${money(receivedOf(o), o.currency)} undone`),
     },
   });
+  if (saved.count === 0) return done(`${orderRef(o)} changed a moment ago. Check the order before undoing.`, false);
   pushOrderToSheet(o.id, "ORDER_UPDATE", "Payment undone");
   return done(`Payment removed from ${orderRef(o)}. It shows as not paid again.`);
 }

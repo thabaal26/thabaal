@@ -4,7 +4,7 @@ import { Sparkles } from "@/components/icons";
 import { Users3D } from "@/components/icons-3d";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import { Button, Card, CardHeader, Field, Spinner } from "@/components/ui";
 import type { AudienceFilter } from "@/lib/audiences";
 import { generateAudienceFilterAction } from "../../actions/ai";
@@ -94,7 +94,7 @@ export function AudienceBuilder({ regions }: { regions: string[] }) {
         onSubmit={(e) => {
           e.preventDefault();
           start(async () => {
-            const r = await saveAudience(name, filter);
+            const r = await safeAction(() => saveAudience(name, filter));
             toastResult(r);
             if (r.ok) router.refresh();
           });

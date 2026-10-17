@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import { FLOW_KEYS, ORDER_FLOWS, type OrderFlowKey } from "@/lib/order-flow";
 import { useLanguage } from "@/lib/i18n/context";
 import { saveOrderFlow } from "../actions/orders";
@@ -22,7 +22,7 @@ export function OrderStepsForm({ current, canChange }: { current: OrderFlowKey; 
   const [pending, start] = useTransition();
   const save = () =>
     start(async () => {
-      const r = await saveOrderFlow(flow);
+      const r = await safeAction(() => saveOrderFlow(flow));
       toastResult(r);
       if (r.ok) router.refresh();
     });

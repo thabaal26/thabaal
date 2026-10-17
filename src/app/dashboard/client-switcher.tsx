@@ -4,7 +4,7 @@ import { Building2, ChevronDown } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useTransition, type ReactNode } from "react";
 import { Picker } from "@/components/picker";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import { cn } from "@/lib/cn";
 import { setActiveClient } from "./actions/clients";
 
@@ -20,7 +20,7 @@ function useSwitch() {
   const router = useRouter();
   const change = (id: string) =>
     start(async () => {
-      const r = await setActiveClient(id);
+      const r = await safeAction(() => setActiveClient(id));
       if (!r.ok) toastResult(r);
       router.refresh();
     });

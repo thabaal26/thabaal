@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import { changePassword } from "../actions/account";
 
 /** Change password, in the portal design's form style. */
@@ -19,7 +19,7 @@ export function PasswordForm() {
         e.preventDefault();
         if (mismatch) return;
         start(async () => {
-          const r = await changePassword(cur, next);
+          const r = await safeAction(() => changePassword(cur, next));
           toastResult(r);
           if (r.ok) {
             setCur("");

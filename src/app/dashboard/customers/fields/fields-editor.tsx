@@ -3,7 +3,7 @@
 import { Plus, Trash2 } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import { Button } from "@/components/ui";
 import { FIELD_TYPES, fieldKey, type CustomField, type CustomFieldTarget, type CustomFieldType } from "@/lib/custom-fields";
 import { saveCustomFields } from "../../actions/custom-fields";
@@ -30,7 +30,7 @@ export function FieldsEditor({ initial }: { initial: CustomField[] }) {
           on: r.on,
           ...(r.type === "select" && { options: r.options.split(",").map((o) => o.trim()).filter(Boolean) }),
         }));
-      const res = await saveCustomFields(fields);
+      const res = await safeAction(() => saveCustomFields(fields));
       toastResult(res);
       if (res.ok) router.refresh();
     });

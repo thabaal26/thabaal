@@ -15,6 +15,23 @@ export function toastResult(r: { ok: boolean; message?: string; errors?: string[
   toast(r.ok, r.message ?? (r.ok ? "Done." : "Please fix the following:"), r.errors);
 }
 
+/** Shown when a server action never got an answer (offline, connection dropped, server restarting). */
+export const CONNECTION_PROBLEM = "Couldn't reach Thabaal. Check your internet connection and try again. If you're not sure it saved, refresh the page first.";
+
+/**
+ * Runs a server action and turns a dropped connection into a normal failed result, so the form stays open with a
+ * clear message instead of the page breaking. Actions are safe to retry: money actions refuse to count twice.
+ */
+export async function safeAction<T extends { ok: boolean; message?: string }>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    console.error("Server action failed", e);
+    // Only ok and message are set; callers read other fields after checking ok.
+    return { ok: false, message: CONNECTION_PROBLEM } as T;
+  }
+}
+
 /** Up to three results at once, newest last; errors stay longer and can be dismissed early. */
 export function Toaster() {
   const [items, setItems] = useState<Toast[]>([]);

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { ExternalLink, CheckCircle2, AlertCircle, HelpCircle, ShieldCheck, Landmark, Sparkles } from "@/components/icons";
 import { Rupee3D } from "@/components/icons-3d";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import { Badge, Button, Card, CardHeader, Field } from "@/components/ui";
 import { createPaymentTemplate, savePaymentConfig } from "../actions/orders";
 
@@ -126,7 +126,7 @@ export function PaymentForm({
           onSubmit={(e) => {
             e.preventDefault();
             start(async () => {
-              toastResult(await savePaymentConfig(name));
+              toastResult(await safeAction(() => savePaymentConfig(name)));
               router.refresh();
             });
           }}

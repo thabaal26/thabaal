@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import { Button, Field } from "@/components/ui";
 import { saveSheetHook } from "../../actions/sheets";
 
@@ -20,7 +20,7 @@ export function SheetHookForm({ linked, source, hasSecret }: { linked: string; s
   const [secret, setSecret] = useState("");
   const save = (l: string, sec: string, clear = false) =>
     start(async () => {
-      const r = await saveSheetHook(l, sec, clear);
+      const r = await safeAction(() => saveSheetHook(l, sec, clear));
       toastResult(r);
       if (r.ok) {
         setSecret("");

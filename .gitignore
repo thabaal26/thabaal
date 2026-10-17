@@ -46,3 +46,7 @@ next-env.d.ts
 
 # Local test database (tests/run.mjs, scripts/test-db.mjs)
 /.testdb/
+
+# QA run (tests/qa/serve.mjs)
+/.qadb/
+/.qa-shots/

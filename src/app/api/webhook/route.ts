@@ -32,19 +32,30 @@ const OPT_OUT = /^\s*(stop|unsubscribe|opt[\s-]?out|cancel|dont\s*send|don't\s*s
 
 type StatusUpdate = { id: string; status: string; timestamp: string; pricing?: { category?: string; billable?: boolean }; errors?: { code?: number; title?: string; message?: string; error_data?: { details?: string } }[] };
 
-function validSignature(raw: string, header: string | null) {
+/**
+ * "signed": Meta's signature checks out. "unchecked": no app secret is configured, so messages are still taken
+ * (nothing is lost) but nothing in them can mark an order paid; payments become "customer says paid" for staff
+ * to verify. "invalid": a wrong or missing signature while a secret is configured; rejected.
+ */
+type SignatureCheck = "signed" | "unchecked" | "invalid";
+
+function checkSignature(raw: string, header: string | null): SignatureCheck {
   const secret = process.env.META_APP_SECRET;
-  // If secret is missing or set to the placeholder string "[SENSITIVE]", don't drop incoming Meta webhooks
-  if (!secret || secret === "[SENSITIVE]") return true;
-  if (!header?.startsWith("sha256=")) return false;
+  if (!secret || secret === "[SENSITIVE]") return "unchecked";
+  if (!header?.startsWith("sha256=")) return "invalid";
   try {
     const expected = Buffer.from(createHmac("sha256", secret).update(raw).digest("hex"));
     const given = Buffer.from(header.slice(7));
-    return expected.length === given.length && timingSafeEqual(expected, given);
+    return expected.length === given.length && timingSafeEqual(expected, given) ? "signed" : "invalid";
   } catch {
-    return false;
+    return "invalid";
   }
 }
+
+const UNVERIFIED_NOTE = "WhatsApp reported a payment, but the webhook couldn't be verified (META_APP_SECRET is not set). Check your UPI app before packing.";
+
+/** A transaction status other than success: failed, pending, expired. */
+const notSucceeded = (status: unknown) => typeof status === "string" && !["success", "completed", "captured", "paid"].includes(status.toLowerCase());
 
 async function applyStatus(s: StatusUpdate) {
   const msg = await db.message.findUnique({
@@ -119,13 +130,14 @@ type PaymentUpdate = {
   payment?: {
     reference_id?: string;
     amount?: { value?: number; offset?: number };
+    currency?: string;
     transaction?: { id?: string; status?: string; error?: { code?: string | number; reason?: string; message?: string } };
   };
   errors?: { code?: number; title?: string; message?: string; error_data?: { details?: string } }[];
 };
 
 /** The customer paid (or failed to pay) through "Review and pay"; reference_id is our order number (e.g. FM-1001). */
-async function applyPayment(s: PaymentUpdate, phoneNumberId?: string) {
+async function applyPayment(s: PaymentUpdate, phoneNumberId: string | undefined, signed: boolean) {
   const txn = s.payment?.transaction;
   const paid =
     txn?.status === "success" ||
@@ -170,6 +182,16 @@ async function applyPayment(s: PaymentUpdate, phoneNumberId?: string) {
     await recordPaymentClaim(order.id, "WhatsApp reported a payment of ₹0. Check your UPI app before packing.").catch(() => {});
     return;
   }
+  if (!signed) {
+    await recordPaymentClaim(order.id, UNVERIFIED_NOTE, txn?.id ?? null).catch(() => {});
+    return;
+  }
+  // A payment in another currency is never counted as this order's money; staff check it.
+  const currency = s.payment?.currency;
+  if (currency && currency.toUpperCase() !== order.currency.toUpperCase()) {
+    await recordPaymentClaim(order.id, `WhatsApp reported a payment in ${currency.toUpperCase()}, but the order is in ${order.currency}. Check your UPI app before packing.`, txn?.id ?? null).catch(() => {});
+    return;
+  }
   // confirmPayment keeps a smaller amount as a part payment, so the order is only "Paid" when the full total arrived.
   await confirmPayment(order.id, txn?.id ?? s.id ?? null, { method: "upi_whatsapp", source: "meta", amount });
 }
@@ -191,6 +213,7 @@ async function detectAndApplyUpiPayment(
   m: Record<string, any>,
   phoneNumberId: string | undefined,
   base: { text: string; kind: "text" | "button" | "media" | "order"; media?: { id: string; type: string } },
+  signed: boolean,
 ): Promise<{ text: string; kind: "text" | "button" | "media" | "order"; media?: { id: string; type: string }; handledAsPayment: boolean }> {
   if (!m.from || m.type === "order") return { ...base, handledAsPayment: false };
 
@@ -251,8 +274,14 @@ async function detectAndApplyUpiPayment(
     const amount = parseMetaAmount(m.payment?.amount);
     // Only a bubble that says how much was paid is recorded straight away (a smaller amount stays part paid);
     // without an amount, staff check the UPI app first, like any other "I paid".
-    if (!(amount != null && amount > 0)) {
-      await recordPaymentClaim(targetOrder.id, `WhatsApp showed a completed UPI payment without the amount. Check your UPI app for ${totalFormatted}.`, String(txnId)).catch(() => {});
+    if (notSucceeded(m.payment?.transaction?.status)) {
+      const reason = m.payment?.transaction?.error?.reason ?? m.payment?.transaction?.error?.message ?? `UPI payment ${m.payment.transaction.status}`;
+      await recordPaymentFailure(targetOrder.id, String(reason)).catch(() => {});
+      return { text: `UPI payment for ${ref} didn't go through (${reason})`, kind: "order", media: base.media, handledAsPayment: true };
+    }
+    if (!(amount != null && amount > 0) || !signed) {
+      const note = signed ? `WhatsApp showed a completed UPI payment without the amount. Check your UPI app for ${totalFormatted}.` : UNVERIFIED_NOTE;
+      await recordPaymentClaim(targetOrder.id, note, String(txnId)).catch(() => {});
       return { text: `UPI payment on WhatsApp for ${ref} (${totalFormatted}) · check the amount`, kind: "order", media: base.media, handledAsPayment: true };
     }
     await confirmPayment(targetOrder.id, String(txnId), { method: "upi_whatsapp", source: "meta", amount }).catch((e) => console.error("Auto confirmPayment on UPI bubble failed", e));
@@ -445,10 +474,17 @@ async function applyCallPermission(phone: string, phoneNumberId: string | undefi
 
 export async function POST(req: NextRequest) {
   const raw = await req.text();
-  if (!validSignature(raw, req.headers.get("x-hub-signature-256"))) {
+  const signature = checkSignature(raw, req.headers.get("x-hub-signature-256"));
+  if (signature === "invalid") {
     return new NextResponse("Invalid signature", { status: 401 });
   }
-  const payload = JSON.parse(raw);
+  const signed = signature === "signed";
+  let payload;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    return new NextResponse("Bad request", { status: 400 });
+  }
 
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
@@ -456,13 +492,13 @@ export async function POST(req: NextRequest) {
       if (change.field === "messages") {
         for (const s of v.statuses ?? []) {
           await (s.type === "payment" || Boolean(s.payment)
-            ? applyPayment(s, v.metadata?.phone_number_id)
+            ? applyPayment(s, v.metadata?.phone_number_id, signed)
             : applyStatus(s));
         }
         for (const m of v.messages ?? []) {
           const base = metaReplyContent(m);
           const phoneNumberId = v.metadata?.phone_number_id;
-          const { text, kind, media, handledAsPayment } = await detectAndApplyUpiPayment(m, phoneNumberId, base);
+          const { text, kind, media, handledAsPayment } = await detectAndApplyUpiPayment(m, phoneNumberId, base, signed);
           if (OPT_OUT.test(text)) await optOut(m.from, phoneNumberId);
           if (m.interactive?.type === "call_permission_reply") await applyCallPermission(m.from, phoneNumberId, m.interactive.call_permission_reply ?? {});
           // "JOIN van" from an opt-in QR code or link: add them as an opted-in customer first.

@@ -5,7 +5,7 @@ import Link from "@/components/intent-link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { confirmAction } from "@/components/confirm";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import { Badge, Button, Card, CardHeader, EmptyState } from "@/components/ui";
 import { Calendar3D } from "@/components/icons-3d";
 import { ColumnChart, type ChartColor } from "@/components/viz";
@@ -120,7 +120,7 @@ function RefillRow({ r, canSend, templateName }: { r: RefillDue; canSend: boolea
 
   const send = () =>
     start(async () => {
-      let res = await sendRefillNudge(r.customerId);
+      let res = await safeAction(() => sendRefillNudge(r.customerId));
       if (!res.ok && res.soft && (await confirmAction(res.message))) res = await sendRefillNudge(r.customerId, true);
       if (res.ok || !res.soft) toastResult(res);
       if (res.ok) {

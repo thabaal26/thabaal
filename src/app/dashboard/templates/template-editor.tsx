@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { MobileActionBar } from "@/components/mobile-action-bar";
 import { Sheet } from "@/components/sheet";
-import { toastResult } from "@/components/toast";
-import { Badge, Button, buttonClass, Callout, Card, CardHeader, CheckRow, Field, Label, Segmented, Spinner, StatusBadge } from "@/components/ui";
+import { safeAction, toastResult } from "@/components/toast";
+import { Badge, Button, Callout, Card, CardHeader, CheckRow, Field, Label, Segmented, Spinner, StatusBadge } from "@/components/ui";
+import { buttonClass } from "@/components/ui-classes";
 import { PhoneFrame, WhatsAppBubble } from "@/components/whatsapp-preview";
 import { cn } from "@/lib/cn";
 import {
@@ -187,7 +188,7 @@ export function TemplateEditor({
   function save() {
     if (pending) return;
     start(async () => {
-      const r = await saveTemplate(id, t);
+      const r = await safeAction(() => saveTemplate(id, t));
       toastResult(r);
       if (r.ok || r.id) {
         router.push(r.id && !id ? `/dashboard/templates/${r.id}` : "/dashboard/templates");

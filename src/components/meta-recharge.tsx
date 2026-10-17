@@ -2,7 +2,7 @@
 
 import { Copy, ExternalLink, HelpCircle } from "@/components/icons";
 import { toast } from "@/components/toast";
-import { buttonClass } from "@/components/ui";
+import { buttonClass } from "@/components/ui-classes";
 import { cn } from "@/lib/cn";
 
 /**

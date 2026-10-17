@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, Search, Sparkles, Trophy, Users } from "@/components/icons";
 import { Stat } from "@/components/ui";
 import Link from "@/components/intent-link";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import type { CustomerRow, Status, Tier } from "@/lib/customers-data";
 import { useLanguage } from "@/lib/i18n/context";
 import { adjustLoyaltyPoints, tagCustomers } from "../actions/customers";
@@ -111,7 +111,7 @@ export function CustomerTable({ rows, canManage }: { rows: CustomerRow[]; canMan
   const tag = (then?: (tag: string) => void) => {
     const value = tagRef.current?.value ?? "";
     start(async () => {
-      const r = await tagCustomers(chosen.map((c) => c.id), value);
+      const r = await safeAction(() => tagCustomers(chosen.map((c) => c.id), value));
       toastResult(r);
       if (r.ok && r.tag) {
         router.refresh();
@@ -327,7 +327,7 @@ export function LoyaltyPanel({ rows, canManage }: { rows: CustomerRow[]; canMana
   const run = (delta: number) =>
     start(async () => {
       if (!c) return;
-      const r = await adjustLoyaltyPoints(c.id, delta);
+      const r = await safeAction(() => adjustLoyaltyPoints(c.id, delta));
       toastResult(r);
       if (r.ok) {
         setAmt("");

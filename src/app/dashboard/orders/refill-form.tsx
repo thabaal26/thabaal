@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Clock3D } from "@/components/icons-3d";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import { Button, Card, CardHeader, CheckRow, Field } from "@/components/ui";
 import { saveRefillRule } from "../actions/orders";
 import { templateLabel } from "@/lib/plain-error";
@@ -32,7 +32,7 @@ export function RefillForm({ days, templateId, templates }: { days: number | nul
         onSubmit={(e) => {
           e.preventDefault();
           start(async () => {
-            toastResult(await saveRefillRule(on ? n : 0, tid));
+            toastResult(await safeAction(() => saveRefillRule(on ? n : 0, tid)));
             router.refresh();
           });
         }}

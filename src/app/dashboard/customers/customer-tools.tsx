@@ -5,9 +5,10 @@ import Link from "@/components/intent-link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { confirmAction } from "@/components/confirm";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import { Sheet } from "@/components/sheet";
-import { Badge, Button, buttonClass, Field } from "@/components/ui";
+import { Badge, Button, Field } from "@/components/ui";
+import { buttonClass } from "@/components/ui-classes";
 import { cn } from "@/lib/cn";
 import { CustomFieldInputs } from "@/components/custom-field-inputs";
 import type { CustomField } from "@/lib/custom-fields";
@@ -172,7 +173,7 @@ function CustomerForm({
       onSubmit={(e) => {
         e.preventDefault();
         start(async () => {
-          const r = await saveCustomer(id, v);
+          const r = await safeAction(() => saveCustomer(id, v));
           toastResult(r);
           if (r.ok) {
             done();
@@ -347,7 +348,7 @@ function PendingRowItem({ row }: { row: PendingCustomerRow }) {
           disabled={busy}
           onClick={() =>
             start(async () => {
-              const res = await deletePendingCustomer(row.id);
+              const res = await safeAction(() => deletePendingCustomer(row.id));
               toastResult(res);
               if (res.ok) router.refresh();
             })
@@ -393,7 +394,7 @@ function ImportForm({ done }: { done: () => void }) {
         e.preventDefault();
         if (!file) return;
         start(async () => {
-          const r = await importCustomers(await file.text(), tags, consent);
+          const r = await safeAction(async () => importCustomers(await file.text(), tags, consent));
           toastResult(r);
           if (r.ok) { done(); router.refresh(); }
         });

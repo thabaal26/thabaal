@@ -1,7 +1,8 @@
 import { ExternalLink, Trash2, Wallet } from "@/components/icons";
 import { cache, Suspense } from "react";
 import { ActionButton } from "@/components/action-button";
-import { Badge, buttonClass, Card, CardHeader, Skeleton } from "@/components/ui";
+import { Badge, Card, CardHeader, Skeleton } from "@/components/ui";
+import { buttonClass } from "@/components/ui-classes";
 import { Disclosure } from "@/components/viz";
 import { cn } from "@/lib/cn";
 import { fmtDate, fmtNumber } from "@/lib/format";

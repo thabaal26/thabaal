@@ -1,4 +1,5 @@
 "use client";
+import { safeAction } from "@/components/toast";
 
 import { ArrowUpRight, Sparkles } from "@/components/icons";
 import Link from "@/components/intent-link";
@@ -31,7 +32,7 @@ export function AiBusinessCopilot({
     if (!query) return;
     setError(null);
     start(async () => {
-      const res = await askAiBusinessCopilotAction(query);
+      const res = await safeAction(() => askAiBusinessCopilotAction(query));
       if (res.ok && res.data) {
         setAnswer(res.data.answer);
         if (res.data.actionItems?.length) setActions(res.data.actionItems);

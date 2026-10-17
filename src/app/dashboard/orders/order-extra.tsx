@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { CustomFieldInputs } from "@/components/custom-field-inputs";
 import { Sheet } from "@/components/sheet";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import { Button } from "@/components/ui";
 import { showValue, type CustomField } from "@/lib/custom-fields";
 import { updateOrderExtra } from "../actions/orders";
@@ -42,7 +42,7 @@ export function OrderExtra({ orderId, fields, values, canEdit }: { orderId: stri
           onSubmit={(e) => {
             e.preventDefault();
             start(async () => {
-              const r = await updateOrderExtra(orderId, draft);
+              const r = await safeAction(() => updateOrderExtra(orderId, draft));
               toastResult(r);
               if (r.ok) {
                 setOpen(false);

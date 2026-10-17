@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Sparkles3D } from "@/components/icons-3d";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import { Button, Card, CardHeader, Field } from "@/components/ui";
 import { saveWinbackRule } from "../actions/orders";
 import { templateLabel } from "@/lib/plain-error";
@@ -44,7 +44,7 @@ export function WinbackForm({
         onSubmit={(e) => {
           e.preventDefault();
           start(async () => {
-            toastResult(await saveWinbackRule(n, tid));
+            toastResult(await safeAction(() => saveWinbackRule(n, tid)));
             router.refresh();
           });
         }}
