@@ -66,9 +66,25 @@ function Logo({ size }: { size: "sm" | "md" }) {
         data-keep
         className={`h-auto dark:[filter:drop-shadow(0_0_0.6px_#fff)_drop-shadow(0_0_1.2px_rgb(255_255_255/0.55))] ${size === "md" ? "w-11" : "w-9"}`}
       />
-      <b className={`font-brand font-semibold leading-none tracking-[-0.3px] text-ink ${size === "md" ? "text-[24px]" : "text-[20px]"}`}>
-        thabaal
-      </b>
+      {/* The same drawn wordmark as the sign-in page (dark letters by day, white at night), not typed text. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/brands/thabaal/w-day.png"
+        alt="thabaal"
+        width={900}
+        height={252}
+        data-keep
+        className={`w-auto dark:hidden ${size === "md" ? "h-7" : "h-6"}`}
+      />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/brands/thabaal/w-night.png"
+        alt="thabaal"
+        width={900}
+        height={252}
+        data-keep
+        className={`hidden w-auto dark:block ${size === "md" ? "h-7" : "h-6"}`}
+      />
     </Link>
   );
 }
