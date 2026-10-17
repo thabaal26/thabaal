@@ -266,11 +266,6 @@ export async function recordPaymentClaim(orderId: string, note: string, referenc
   return true;
 }
 
-/** A WhatsApp payment attempt failed (declined, timed out): keep the reason so staff can resend the link or call. */
-export async function recordPaymentFailure(orderId: string, reason: string) {
-  await db.order.updateMany({ where: { id: orderId, paidAt: null }, data: { paymentFailedAt: new Date(), paymentFailReason: reason.slice(0, 200) } });
-}
-
 /** A plain WhatsApp text inside the customer's 24-hour window; false when the window is closed or messages are off. */
 export async function textInWindow(customer: { id: string; clientId: string; phone: string; optedOut: boolean }, text: string, label: string) {
   if (customer.optedOut || (await getSettings()).provider !== "META") return false;
@@ -279,6 +274,21 @@ export async function textInWindow(customer: { id: string; clientId: string; pho
   const res = await sendTextMessage(cfg, customer.phone, text);
   await logMessage(customer.id, label, text, res, number?.id ?? null);
   return true;
+}
+
+/** A WhatsApp payment attempt failed (declined, timed out): keep the reason, alert the customer in window, and update sheet. */
+export async function recordPaymentFailure(orderId: string, reason: string) {
+  await db.order.updateMany({ where: { id: orderId, paidAt: null }, data: { paymentFailedAt: new Date(), paymentFailReason: reason.slice(0, 200) } });
+  pushOrderToSheet(orderId, "ORDER_UPDATE", "Payment failed");
+  const order = await db.order.findUnique({
+    where: { id: orderId },
+    include: { customer: true },
+  });
+  if (order && !order.customer.optedOut) {
+    const first = order.customer.name.trim().split(/\s+/)[0] || "there";
+    const text = `Hello ${first}, your payment of ${money(dueOf(order), order.currency)} for order ${orderRef(order)} could not be completed (${reason}). Tap the payment link above to try again, or reply "COD" to pay in cash upon delivery.`;
+    await textInWindow(order.customer, text, "Payment failed").catch(() => false);
+  }
 }
 
 const CARD_LABEL = { processing: "Payment received", shipped: "Order dispatched", completed: "Order delivered", canceled: "Order cancelled" } as const;

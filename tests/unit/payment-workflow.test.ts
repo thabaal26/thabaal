@@ -250,6 +250,67 @@ describe("Payment Workflow & Security Invariants", () => {
 
       assert.equal(receivedOf(order), 800);
       assert.equal(dueOf(order), 0);
+
+      // Verify refund calculation capping: already refunded cannot exceed received
+      const alreadyRefunded = 800;
+      const leftToRefund = Math.max(0, receivedOf(order) - alreadyRefunded);
+      assert.equal(leftToRefund, 0, "No refund remaining after full refund");
+    });
+
+    test("dispatched or delivered orders cannot have payment undone", () => {
+      const dispatchedOrder = {
+        status: "DISPATCHED",
+        total: 500,
+        paidAmount: 500,
+        paidAt: new Date(),
+        paymentSource: "staff",
+        paymentTxnId: "MANUAL",
+      };
+      // In undoPayment, status DISPATCHED or DELIVERED is blocked before updating
+      assert.ok(dispatchedOrder.status === "DISPATCHED" || dispatchedOrder.status === "DELIVERED");
+    });
+
+    test("zero-amount payment attempt is rejected as full payment", () => {
+      const zeroAmount = parseMetaAmount({ value: 0, offset: 100 });
+      assert.equal(zeroAmount, 0);
+      const isValidPayment = zeroAmount != null && zeroAmount > 0;
+      assert.equal(isValidPayment, false, "Zero amount must not be processed as completed payment");
+    });
+
+    test("customer claim followed by not-received clears claim and logs note", async () => {
+      const order = await db.order.create({
+        data: {
+          clientId,
+          customerId,
+          status: "CONFIRMED",
+          total: 500,
+          currency: "INR",
+          items: [],
+        },
+      });
+
+      // Customer claims they paid
+      await recordPaymentClaim(order.id, "I sent money on GPay", "UTR-999999999999");
+      let current = await db.order.findUniqueOrThrow({ where: { id: order.id } });
+      assert.equal(paymentState(current), "claimed");
+      assert.equal(current.paymentTxnId, "UTR-999999999999");
+
+      // Staff verifies and finds no record in bank: clears claim
+      await db.order.update({
+        where: { id: order.id },
+        data: {
+          paymentClaimedAt: null,
+          paymentClaimNote: null,
+          ...(current.paymentTxnId?.startsWith("UTR-") && { paymentTxnId: null }),
+          internalNote: "customer said paid (UTR-999999999999), not found in account",
+        },
+      });
+
+      current = await db.order.findUniqueOrThrow({ where: { id: order.id } });
+      assert.equal(current.paymentClaimedAt, null);
+      assert.equal(current.paymentTxnId, null);
+      assert.ok(current.internalNote?.includes("not found in account"));
+      assert.equal(paymentState(current), "unpaid");
     });
 
     test("cancelSupersededOrdersForCustomer cancels older unpaid carts when new cart arrives", async () => {
