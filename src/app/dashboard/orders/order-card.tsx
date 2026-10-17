@@ -5,6 +5,7 @@ import Link from "@/components/intent-link";
 import { useRouter } from "next/navigation";
 import { confirmAction } from "@/components/confirm";
 import { Sheet } from "@/components/sheet";
+import { Button } from "@/components/ui";
 import { toastResult } from "@/components/toast";
 import { fmtDate } from "@/lib/format";
 import { inr } from "../portal-format";
@@ -126,7 +127,8 @@ export function OrderCard({
     setRefCopied(true);
     setTimeout(() => setRefCopied(false), 1800);
   };
-  const [editLines, setEditLines] = useState<EditableOrderLine[]>(() =>
+  // The order's current items as editable lines; rebuilt each time the edit sheet opens so it never shows stale items.
+  const linesFromOrder = (): EditableOrderLine[] =>
     items.length > 0
       ? items.map((i) => ({
           id: i.id ?? "custom",
@@ -135,14 +137,54 @@ export function OrderCard({
           price: i.price || 0,
           custom: !catalogProducts.some((p) => p.retailerId === i.id || p.name === i.name),
         }))
-      : [blankOrderLine()],
-  );
+      : [blankOrderLine()];
+  const [editLines, setEditLines] = useState<EditableOrderLine[]>(linesFromOrder);
 
   const refText = orderRef(o);
   const pricing = getOrderPricing(items, o.total, {
     applyDefaultWhenEqual: true,
     discount: pointsDiscount(o),
   });
+
+  // Edit sheet: the shipping charge the order has now (kept on save, editable), and the total the edit would give.
+  const [editShipping, setEditShipping] = useState<number>(pricing.shipping);
+  const [editSaving, setEditSaving] = useState(false);
+  const openEdit = () => {
+    setEditLines(linesFromOrder());
+    setEditShipping(pricing.shipping);
+    setEditOpen(true);
+  };
+  const editGross = getOrderPricing(editLines, null, { customShippingFee: editShipping });
+  // Points already used stay on the order, cut back to ₹25 steps if the items now cost less (as the server does).
+  const editPricing = getOrderPricing(editLines, null, {
+    customShippingFee: editShipping,
+    discount: Math.min(pricing.discount, Math.floor(editGross.subtotal / 25) * 25),
+  });
+  const editValid = editLines.some((l) => l.name.trim()) && editLines.every((l) => !l.name.trim() || (l.quantity > 0 && l.price >= 0));
+  const saveEdit = () => {
+    if (!editValid || editSaving) return;
+    setEditSaving(true);
+    startTransition(async () => {
+      try {
+        const res = await updateOrderItems(o.id, {
+          items: editLines
+            .filter((l) => l.name.trim())
+            .map((l) => ({ id: l.custom ? undefined : l.id, name: l.name, quantity: l.quantity, price: l.price })),
+          shippingFee: editShipping,
+        });
+        toastResult(res);
+        if (res.ok) {
+          setEditOpen(false);
+          router.refresh();
+        }
+      } catch {
+        // No connection or the server didn't answer: keep the sheet open with the changes, so nothing typed is lost.
+        toastResult({ ok: false, message: isTa ? "சேமிக்க முடியவில்லை. இணைப்பைச் சரிபார்த்து மீண்டும் முயலவும்." : "Couldn't save. Check the connection and try again." });
+      } finally {
+        setEditSaving(false);
+      }
+    });
+  };
 
   const isPaid = o.status === "PAID" || o.paidAt !== null;
   const isCod =
@@ -535,7 +577,7 @@ export function OrderCard({
               {canEdit && (
                 <button
                   type="button"
-                  onClick={() => setEditOpen(true)}
+                  onClick={openEdit}
                   className="linkb"
                   style={{ fontSize: 12, fontWeight: 600 }}
                 >
@@ -945,7 +987,7 @@ export function OrderCard({
             <button
               type="button"
               className="btn sm"
-              onClick={() => setEditOpen(true)}
+              onClick={openEdit}
             >
               <T ta="பொருட்கள் மாற்றம்">Edit order</T>
             </button>
@@ -1315,37 +1357,65 @@ export function OrderCard({
         onClose={() => setEditOpen(false)}
         title={isTa ? `பொருட்கள் மாற்றம் · #${refText}` : `Edit items · #${refText}`}
         description={isTa ? "இந்த ஆர்டரின் பொருட்கள், எண்ணிக்கை மற்றும் விலைகளை மாற்றுக." : "Update products, quantities and pricing for this order."}
+        footer={
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={() => setEditOpen(false)} disabled={editSaving}>
+              <T ta="ரத்து">Cancel</T>
+            </Button>
+            <Button type="submit" form={`edit-items-${o.id}`} className="w-full sm:w-auto" loading={editSaving} disabled={!editValid || editSaving}>
+              <T ta="பொருட்களைச் சேமி">Save items</T>
+            </Button>
+          </div>
+        }
       >
         <form
+          id={`edit-items-${o.id}`}
           onSubmit={(e) => {
             e.preventDefault();
-            setEditOpen(false);
-            runAction("edititems", () =>
-              updateOrderItems(o.id, {
-                items: editLines.map((l) => ({
-                  id: l.custom ? undefined : l.id,
-                  name: l.name,
-                  quantity: l.quantity,
-                  price: l.price,
-                })),
-                shippingFee: 0,
-              }),
-            );
+            saveEdit();
           }}
           className="space-y-4"
         >
-          <OrderItemsEditor
-            lines={editLines}
-            catalogProducts={catalogProducts}
-            onChange={setEditLines}
-          />
-          <div className="acts">
-            <button type="button" className="btn" onClick={() => setEditOpen(false)}>
-              <T ta="ரத்து">Cancel</T>
-            </button>
-            <button type="submit" className="btn primary" disabled={pending}>
-              <T ta="பொருட்களைச் சேமி">Save items</T>
-            </button>
+          <OrderItemsEditor lines={editLines} catalogProducts={catalogProducts} onChange={setEditLines} />
+
+          <div className="space-y-2 rounded-control border border-line bg-sunken px-4 py-3 text-sm">
+            <div className="flex items-center justify-between text-xs text-ink-2">
+              <span><T ta="பொருட்களின் கூட்டுத்தொகை">Items subtotal</T></span>
+              <span className="tabular font-medium text-ink">{inr(editPricing.subtotal)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3 text-xs text-ink-2">
+              <label htmlFor={`edit-ship-${o.id}`}><T ta="டெலிவரி கட்டணம்">Shipping charge</T></label>
+              <div className="relative w-28">
+                <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted">₹</span>
+                <input
+                  id={`edit-ship-${o.id}`}
+                  type="number"
+                  min={0}
+                  step="1"
+                  inputMode="numeric"
+                  value={editShipping}
+                  onChange={(e) => setEditShipping(Math.max(0, Number(e.target.value) || 0))}
+                  className="field tabular h-9 min-h-9 pl-6 pr-2 text-right text-sm font-semibold"
+                />
+              </div>
+            </div>
+            {editPricing.discount > 0 && (
+              <div className="flex items-center justify-between text-xs text-ink-2">
+                <span><T ta="லாயல்டி புள்ளிகள்">Loyalty points used</T> ({editPricing.discount * 2})</span>
+                <span className="tabular font-medium text-success">−{inr(editPricing.discount)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between border-t border-line pt-2 font-semibold text-ink">
+              <span><T ta="புதிய மொத்தம்">New total</T></span>
+              <span className="tabular text-base">{inr(editPricing.total)}</span>
+            </div>
+            {isPaid && editPricing.total !== pricing.total && (
+              <p className="text-xs text-warning">
+                <T ta="இந்த ஆர்டருக்கு ஏற்கனவே பணம் வந்துள்ளது. சேமித்த பின் மீதி அல்லது திருப்பித் தர வேண்டிய தொகை காட்டப்படும்.">
+                  This order is already paid. After saving, the balance due or the refund owed will be shown.
+                </T>
+              </p>
+            )}
           </div>
         </form>
       </Sheet>
