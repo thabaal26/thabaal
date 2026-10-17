@@ -161,18 +161,19 @@ export function OrderCard({
   // Payment pill & text
   let payPill: { tone: "ok" | "warn" | "info" | "mute" | "bad"; label: string };
   let payText: string;
+  const refSuffix = o.paymentTxnId ? ` · ${isTa ? "குறிப்பு" : "Ref"}: ${o.paymentTxnId}` : "";
   if (isPaid) {
-    payPill = { tone: "ok", label: "Paid" };
-    payText = `${inr(pricing.total)} received`;
+    payPill = { tone: "ok", label: isTa ? "செலுத்தப்பட்டது" : "Paid" };
+    payText = `${isTa ? `${inr(pricing.total)} பெறப்பட்டது` : `${inr(pricing.total)} received`}${refSuffix}`;
   } else if (isCod) {
-    payPill = { tone: "info", label: "Cash on delivery" };
-    payText = `Collect ${inr(pricing.total)} on delivery`;
+    payPill = { tone: "info", label: isTa ? "டெலிவரியின் போது பணம்" : "Cash on delivery" };
+    payText = isTa ? `டெலிவரியின் போது ${inr(pricing.total)} பெறவும்` : `Collect ${inr(pricing.total)} on delivery`;
   } else if (o.paymentRequestedAt) {
-    payPill = { tone: "warn", label: "Payment link sent" };
-    payText = `${inr(pricing.total)} not received yet`;
+    payPill = { tone: "warn", label: isTa ? "கட்டண இணைப்பு அனுப்பப்பட்டது" : "Payment link sent" };
+    payText = isTa ? `${inr(pricing.total)} இன்னும் பெறப்படவில்லை` : `${inr(pricing.total)} not received yet`;
   } else {
-    payPill = { tone: "mute", label: "Payment waiting" };
-    payText = `${inr(pricing.total)} not received yet`;
+    payPill = { tone: "mute", label: isTa ? "கட்டணம் நிலுவை" : "Payment waiting" };
+    payText = isTa ? `${inr(pricing.total)} இன்னும் பெறப்படவில்லை` : `${inr(pricing.total)} not received yet`;
   }
 
   // Late detection
@@ -362,7 +363,11 @@ export function OrderCard({
             : []),
           [
             isCod ? "Cash on delivery chosen" : "Payment received",
-            o.paidAt ? when(o.paidAt) : isCod ? "Collect on delivery" : null,
+            o.paidAt
+              ? `${when(o.paidAt)}${o.paymentTxnId ? ` · Ref: ${o.paymentTxnId}` : ""}`
+              : isCod
+              ? "Collect on delivery"
+              : null,
           ] as [string, string | null],
           ...(hasPack ? [["Packed", o.packedAt ? when(o.packedAt) : rank >= 3 ? "Done" : null] as [string, string | null]] : []),
           ...(hasDispatch
@@ -1178,6 +1183,12 @@ export function OrderCard({
                 <div className="grow muted"><T ta="செலுத்திய முறை">Paid by</T></div>
                 <b>{o.paymentMethod ? o.paymentMethod.toUpperCase() : "Online"}</b>
               </div>
+              {o.paymentTxnId && (
+                <div className="row">
+                  <div className="grow muted"><T ta="UPI / குறிப்பு எண்">UPI / Ref number</T></div>
+                  <b style={{ fontFamily: "var(--mono, monospace)", fontSize: 13 }}>{o.paymentTxnId}</b>
+                </div>
+              )}
               <div className="row">
                 <div className="grow muted"><T ta="நேரம்">When</T></div>
                 <b>
@@ -1207,7 +1218,7 @@ export function OrderCard({
                 href={
                   o.customer.phone
                     ? `https://wa.me/${o.customer.phone.replace(/\D/g, "")}?text=${encodeURIComponent(
-                        `Receipt for Order #${refText}: ${inr(pricing.total)} paid. Thank you!`,
+                        `Receipt for Order #${refText}: ${inr(pricing.total)} paid${o.paymentTxnId ? ` (Ref: ${o.paymentTxnId})` : ""}. Thank you!`,
                       )}`
                     : undefined
                 }
