@@ -8,7 +8,9 @@ import Link from "@/components/intent-link";
 import { safeAction, toastResult } from "@/components/toast";
 import type { CustomerRow, Status, Tier } from "@/lib/customers-data";
 import { useLanguage } from "@/lib/i18n/context";
+import type { PointEvent } from "@/lib/loyalty-history";
 import { adjustLoyaltyPoints, tagCustomers } from "../actions/customers";
+import { replyToCustomer } from "../actions/send";
 import { inr } from "../portal-format";
 import { Chips, Pill, Seg } from "../portal-ui";
 
@@ -315,7 +317,25 @@ export function CustomerTable({ rows, canManage }: { rows: CustomerRow[]; canMan
   );
 }
 /** Customers › Loyalty: give or take back points, everyone's balance, how points work. */
-export function LoyaltyPanel({ rows, canManage }: { rows: CustomerRow[]; canManage: boolean }) {
+const REASONS: [string, string][] = [
+  ["Walk-in purchase", "கடையில் நேரடி வாங்குதல்"],
+  ["Referred a friend", "நண்பரைப் பரிந்துரைத்தார்"],
+  ["Birthday gift", "பிறந்தநாள் பரிசு"],
+  ["Festival bonus", "பண்டிகை போனஸ்"],
+  ["Sorry for a problem", "சிரமத்திற்கு வருத்தம்"],
+  ["Correcting a mistake", "தவறைத் திருத்துதல்"],
+  ["Other", "மற்றவை"],
+];
+const LOG_FILTERS: { id: string; label: string; ta: string }[] = [
+  { id: "all", label: "Everything", ta: "அனைத்தும்" },
+  { id: "auto", label: "Given by the rule", ta: "விதிப்படி வழங்கியவை" },
+  { id: "hand", label: "Given by hand", ta: "கையால் வழங்கியவை" },
+  { id: "used", label: "Used", ta: "பயன்படுத்தியவை" },
+  { id: "back", label: "Taken back", ta: "திரும்பப் பெற்றவை" },
+];
+
+/** Customers › Loyalty: give or take back points, everyone's balance, how points work, and the history. */
+export function LoyaltyPanel({ rows, canManage, history = [] }: { rows: CustomerRow[]; canManage: boolean; history?: PointEvent[] }) {
   const router = useRouter();
   const { isTamil } = useLanguage();
   const members = rows.filter((c) => c.points > 0 || c.orders > 0).sort((a, b) => b.points - a.points);
@@ -325,19 +345,62 @@ export function LoyaltyPanel({ rows, canManage }: { rows: CustomerRow[]; canMana
   const [q, setQ] = useState("");
   const [f, setF] = useState("all");
   const [pending, start] = useTransition();
+  const [why, setWhy] = useState(REASONS[0][0]);
+  const [tell, setTell] = useState(true);
+  const [logF, setLogF] = useState("all");
+  const [logCust, setLogCust] = useState<string | null>(null);
   const c = members.find((m) => m.id === cid) ?? members[0];
   const n = Math.round(Number(amt) || 0);
+  const canRedeem = Boolean(c) && n >= 50 && n % 50 === 0 && n <= 500 && n <= (c?.points ?? 0);
 
-  const run = (delta: number) =>
+  // The WhatsApp line the customer gets: typed, so it goes while their 24-hour window is open.
+  const msgFor = (kind: "give" | "take" | "redeem", pts: number, after: number) => {
+    const name = c?.name.trim().split(/\s+/)[0] || "there";
+    const worthAfter = inr(Math.round(after * 0.5));
+    if (isTamil)
+      return kind === "give"
+        ? `வணக்கம் ${name}! உங்களுக்கு ${pts} புள்ளிகள் கிடைத்துள்ளன. இப்போது உங்கள் இருப்பு ${after} புள்ளிகள், மதிப்பு ${worthAfter}. அடுத்த ஆர்டரில் பயன்படுத்துங்கள்.`
+        : kind === "redeem"
+          ? `வணக்கம் ${name}! உங்கள் ${pts} புள்ளிகள் மூலம் பில்லில் ${inr(Math.round(pts * 0.5))} தள்ளுபடி. மீதமுள்ள இருப்பு ${after} புள்ளிகள்.`
+          : `வணக்கம் ${name}, உங்கள் புள்ளிகளில் ${pts} திருத்தப்பட்டது. இப்போது உங்கள் இருப்பு ${after} புள்ளிகள்.`;
+    return kind === "give"
+      ? `Hi ${name}! You earned ${pts} points. Your balance is ${after} points, worth ${worthAfter}. Use them on your next order.`
+      : kind === "redeem"
+        ? `Hi ${name}! You used ${pts} points for ${inr(Math.round(pts * 0.5))} off your bill. Your balance is now ${after} points.`
+        : `Hi ${name}, we corrected your loyalty points by ${pts}. Your balance is now ${after} points.`;
+  };
+
+  const run = (kind: "give" | "take" | "redeem") =>
     start(async () => {
       if (!c) return;
-      const r = await safeAction(() => adjustLoyaltyPoints(c.id, delta));
+      const delta = kind === "give" ? n : -n;
+      const r = await safeAction(() => adjustLoyaltyPoints(c.id, delta, { kind, reason: kind === "redeem" ? "Walk-in bill" : why }));
       toastResult(r);
-      if (r.ok) {
-        setAmt("");
-        router.refresh();
+      if (!r.ok) return;
+      if (tell) {
+        const sent = await safeAction(() => replyToCustomer(c.id, msgFor(kind, n, Math.max(0, c.points + delta))));
+        toastResult(
+          sent.ok
+            ? { ok: true, message: isTamil ? "வாடிக்கையாளருக்கு WhatsApp-ல் தெரிவிக்கப்பட்டது." : "Customer told on WhatsApp." }
+            : { ok: false, message: `${isTamil ? "புள்ளிகள் சேமிக்கப்பட்டன; WhatsApp-ல் தெரிவிக்க முடியவில்லை: " : "Points saved, but the customer wasn't told on WhatsApp: "}${sent.message}` },
+        );
       }
+      setAmt("");
+      router.refresh();
     });
+
+  const logRows = history.filter((g) => (logF === "all" || g.kind === logF) && (!logCust || g.customerId === logCust));
+  const exportLog = () => {
+    const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+    const csv = [["When", "Customer", "What happened", "Why", "Points", "By"], ...logRows.map((g) => [new Date(g.at).toLocaleString("en-IN"), g.name, g.what, g.why, g.points, g.by])]
+      .map((r) => r.map(esc).join(","))
+      .join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = "point-history.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
 
   const total = members.reduce((s, m) => s + m.points, 0);
   const worth = members.reduce((s, m) => s + m.pointsWorth, 0);
@@ -389,6 +452,7 @@ export function LoyaltyPanel({ rows, canManage }: { rows: CustomerRow[]; canMana
             { id: "give", label: isTamil ? "புள்ளிகள் வழங்க" : "Give points" },
             { id: "cust", label: isTamil ? "வாடிக்கையாளர் புள்ளிகள்" : "Customer points" },
             { id: "set", label: isTamil ? "புள்ளிகள் முறை" : "How points work" },
+            { id: "log", label: isTamil ? "புள்ளி வரலாறு" : "Point history" },
           ]}
         />
       </div>
@@ -427,25 +491,57 @@ export function LoyaltyPanel({ rows, canManage }: { rows: CustomerRow[]; canMana
                 <Chips
                   label={isTamil ? "விரைவுத் தொகைகள்" : "Quick amounts"}
                   value={String(n)}
-                  onChange={setAmt}
-                  options={[25, 50, 100, 200].map((v) => ({ id: String(v), label: `+${v}` }))}
+                  onChange={(v) => {
+                    if (v === "ref") {
+                      setAmt("100");
+                      setWhy("Referred a friend");
+                    } else setAmt(v);
+                  }}
+                  options={[...[25, 50, 100, 200].map((v) => ({ id: String(v), label: `+${v}` })), { id: "ref", label: isTamil ? "பரிந்துரை 100" : "Referral 100" }]}
                   style={{ marginBottom: 12 }}
                 />
-                <div className="field">
-                  <label htmlFor="lamt">{isTamil ? "புள்ளிகள்" : "Points"}</label>
-                  <input id="lamt" type="number" min={1} placeholder="50" value={amt} onChange={(e) => setAmt(e.target.value)} />
+                <div className="formgrid">
+                  <div className="field">
+                    <label htmlFor="lamt">{isTamil ? "புள்ளிகள்" : "Points"}</label>
+                    <input id="lamt" type="number" min={1} placeholder="50" value={amt} onChange={(e) => setAmt(e.target.value)} />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="lwhy">{isTamil ? "ஏன்?" : "Why?"}</label>
+                    <select id="lwhy" value={why} onChange={(e) => setWhy(e.target.value)}>
+                      {REASONS.map(([en, ta]) => (
+                        <option key={en} value={en}>
+                          {isTamil ? ta : en}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <div className="tools" style={{ marginTop: 12 }}>
-                  <button type="button" className="btn primary" disabled={!canManage || pending || n <= 0} onClick={() => run(n)}>
+                <label className="small" style={{ display: "flex", gap: 8, alignItems: "center", margin: "10px 0", minHeight: 40, cursor: "pointer" }}>
+                  <input type="checkbox" checked={tell} onChange={(e) => setTell(e.target.checked)} />
+                  {isTamil ? "வாடிக்கையாளருக்கு WhatsApp-ல் தெரிவிக்கவும்" : "Tell the customer on WhatsApp"}
+                </label>
+                <div className="tools" style={{ marginTop: 4 }}>
+                  <button type="button" className="btn primary" disabled={!canManage || pending || n <= 0} onClick={() => run("give")}>
                     {isTamil ? "புள்ளிகள் வழங்க" : "Give points"}
                   </button>
-                  <button type="button" className="btn" disabled={!canManage || pending || n <= 0 || n > c.points} onClick={() => run(-n)}>
+                  <button type="button" className="btn" disabled={!canManage || pending || n <= 0 || n > c.points} onClick={() => run("take")}>
                     {isTamil ? "புள்ளிகள் குறைக்க" : "Take back"}
                   </button>
-                  <Link className="btn sm ghost" href={`/dashboard/replies?r=${c.id}`}>
-                    {isTamil ? "உரையாடலில் தெரிவிக்க" : "Tell them in chat"}
-                  </Link>
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={!canManage || pending || !canRedeem}
+                    title={isTamil ? "50 புள்ளிகள் படிகளில், அதிகபட்சம் 500 (₹250)" : "In steps of 50 points (₹25), up to 500 points (₹250)"}
+                    onClick={() => run("redeem")}
+                  >
+                    {isTamil ? "பில்லுக்குப் பயன்படுத்து" : "Redeem for a bill"}
+                  </button>
                 </div>
+                {n > 0 && !canRedeem && n <= c.points && (
+                  <p className="muted small" style={{ marginTop: 8 }}>
+                    {isTamil ? "பில்லுக்குப் பயன்படுத்த: 50 புள்ளிகள் படிகளில், அதிகபட்சம் 500 புள்ளிகள் (₹250)." : "To use points on a bill: steps of 50 points (₹25), up to 500 points (₹250)."}
+                  </p>
+                )}
                 {!canManage && (
                   <p className="muted small" style={{ marginTop: 8 }}>
                     {isTamil ? "புள்ளிகளை மாற்ற நிர்வாகியிடம் கேட்கவும்." : "Ask your admin to change points."}
@@ -461,26 +557,14 @@ export function LoyaltyPanel({ rows, canManage }: { rows: CustomerRow[]; canMana
           <div className="stack">
             {c && (
               <div className="card">
-                <h2 style={{ marginBottom: 8 }}>{isTamil ? "வாடிக்கையாளருக்கு அனுப்ப வேண்டிய செய்தி" : "What to tell the customer"}</h2>
+                <h2 style={{ marginBottom: 8 }}>{isTamil ? "வாடிக்கையாளருக்குக் கிடைப்பது" : "What the customer gets"}</h2>
                 <div className="phone">
-                  <div className="bubble">
-                    {isTamil ? (
-                      <>
-                        வணக்கம் {c.name.split(" ")[0]}! {n > 0 ? `உங்களுக்கு ${n} போனஸ் புள்ளிகள் வழங்கப்பட்டுள்ளன. ` : ""}உங்கள் இருப்பு {c.points + (n > 0 ? n : 0)} புள்ளிகள்
-                        {c.redeemable > 0 ? `, அடுத்த ஆர்டரில் ${inr(c.redeemable)} தள்ளுபடி பெறலாம்` : ""}. நன்றி!
-                      </>
-                    ) : (
-                      <>
-                        Hi {c.name.split(" ")[0]}! {n > 0 ? `You earned ${n} bonus points. ` : ""}Your balance is {c.points + (n > 0 ? n : 0)} points
-                        {c.redeemable > 0 ? `, and you can take ${inr(c.redeemable)} off your next order` : ""}. Thank you!
-                      </>
-                    )}
-                  </div>
+                  <div className="bubble">{msgFor("give", n || 50, c.points + (n || 50))}</div>
                 </div>
                 <p className="muted small" style={{ marginTop: 10 }}>
                   {isTamil
-                    ? "புள்ளிகள் மாற்றங்கள் இங்கே சேமிக்கப்படும்; தானாக செய்தி போகாது. விருப்பப்பட்டால் உரையாடல் மூலம் அனுப்பலாம்."
-                    : "Points changes are saved here; they aren't messaged automatically. Send this from the chat if you like."}
+                    ? "“WhatsApp-ல் தெரிவிக்கவும்” தேர்வு செய்தால், வாடிக்கையாளரின் 24 மணி நேர சாளரம் திறந்திருக்கும் போது இது அனுப்பப்படும்."
+                    : "Sent when “Tell the customer” is ticked, while the customer's 24-hour WhatsApp window is open."}
                 </p>
               </div>
             )}
@@ -566,16 +650,29 @@ export function LoyaltyPanel({ rows, canManage }: { rows: CustomerRow[]; canMana
                       <td className="num">{m.points}</td>
                       <td className="num">{inr(m.pointsWorth)}</td>
                       <td>
-                        <button
-                          type="button"
-                          className="btn sm"
-                          onClick={() => {
-                            setCid(m.id);
-                            setView("give");
-                          }}
-                        >
-                          {isTamil ? "மாற்றுக" : "Edit"}
-                        </button>
+                        <div className="tools" style={{ flexWrap: "nowrap" }}>
+                          <button
+                            type="button"
+                            className="btn sm"
+                            onClick={() => {
+                              setCid(m.id);
+                              setView("give");
+                            }}
+                          >
+                            {isTamil ? "மாற்றுக" : "Edit"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn sm ghost"
+                            onClick={() => {
+                              setLogCust(m.id);
+                              setLogF("all");
+                              setView("log");
+                            }}
+                          >
+                            {isTamil ? "வரலாறு" : "History"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -632,6 +729,67 @@ export function LoyaltyPanel({ rows, canManage }: { rows: CustomerRow[]; canMana
               : "Turn on automatic use at checkout in Payments › Payment settings. On each order, the points control lets you apply or remove a discount."}
           </p>
         </div>
+      )}
+
+      {view === "log" && (
+        <>
+          <div className="toolbar">
+            <Chips label={isTamil ? "காட்டுக" : "Show"} value={logF} onChange={setLogF} options={LOG_FILTERS.map((x) => ({ id: x.id, label: isTamil ? x.ta : x.label }))} />
+            {logCust && (
+              <button type="button" className="chip" aria-pressed onClick={() => setLogCust(null)}>
+                {rows.find((r) => r.id === logCust)?.name ?? ""} ✕
+              </button>
+            )}
+            <button type="button" className="btn sm" style={{ marginLeft: "auto" }} disabled={!logRows.length} onClick={exportLog}>
+              {isTamil ? "CSV பதிவிறக்கு" : "Export CSV"}
+            </button>
+          </div>
+          <div className="card" style={{ padding: 0 }}>
+            <div className="tw">
+              <table>
+                <thead>
+                  <tr>
+                    <th>{isTamil ? "எப்போது" : "When"}</th>
+                    <th>{isTamil ? "வாடிக்கையாளர்" : "Customer"}</th>
+                    <th>{isTamil ? "என்ன நடந்தது" : "What happened"}</th>
+                    <th>{isTamil ? "ஏன்" : "Why"}</th>
+                    <th className="num">{isTamil ? "புள்ளிகள்" : "Points"}</th>
+                    <th>{isTamil ? "யார்" : "By"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logRows.slice(0, 300).map((g) => (
+                    <tr key={g.id}>
+                      <td className="muted">{new Date(g.at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td>
+                      <td>
+                        <b>{g.name}</b>
+                      </td>
+                      <td>{g.what}</td>
+                      <td className="muted">{g.why}</td>
+                      <td className="num">
+                        <b style={{ color: g.points < 0 ? "var(--bad, #c0392b)" : "var(--ok)" }}>
+                          {g.points > 0 ? "+" : ""}
+                          {g.points}
+                        </b>
+                      </td>
+                      <td className="muted">{g.by === "Automatic" && isTamil ? "தானியங்கி" : g.by}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {logRows.length === 0 && (
+              <p className="muted" style={{ padding: 16 }}>
+                {isTamil ? "இன்னும் எதுவும் இல்லை." : "Nothing here yet."}
+              </p>
+            )}
+          </div>
+          <p className="muted small" style={{ marginTop: 10 }}>
+            {isTamil
+              ? "ஆர்டர்களில் பெற்ற மற்றும் பயன்படுத்திய புள்ளிகள், கையால் செய்த மாற்றங்கள் அனைத்தும் இங்கே காரணத்துடன் உள்ளன."
+              : "Points earned and used on orders, and every change made by hand with its reason and who made it."}
+          </p>
+        </>
       )}
     </>
   );

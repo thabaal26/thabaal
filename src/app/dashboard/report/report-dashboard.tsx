@@ -189,8 +189,7 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
             </p>
           </div>
           <div className="tools">
-            <LangButton />
-            <PageTools />
+            <PageTools lang={<LangButton />} />
           </div>
         </header>
 

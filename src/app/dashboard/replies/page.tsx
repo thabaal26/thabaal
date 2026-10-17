@@ -12,14 +12,17 @@ import { ReplyInbox } from "./reply-inbox";
 export const metadata: Metadata = { title: "Chats" };
 export const dynamic = "force-dynamic";
 
+// Every chat by default, as in the design; "Open" narrows to the ones still waiting.
 const TABS = [
-  { key: "all", label: "All", labelTa: "அனைத்தும்" },
-  { key: "", label: "Open", labelTa: "திறந்தவை" },
+  { key: "", label: "All", labelTa: "அனைத்தும்" },
+  { key: "open", label: "Open", labelTa: "திறந்தவை" },
   { key: "handled", label: "Handled", labelTa: "பார்த்தவை" },
 ] as const;
 
 export default async function RepliesPage({ searchParams }: PageProps<"/dashboard/replies">) {
-  const { show = "", r: picked } = await searchParams;
+  const { show: rawShow = "", r: picked } = await searchParams;
+  // Older links say show=all for everything.
+  const show = rawShow === "all" ? "" : rawShow;
   const scope = await getScope();
   const mine = ownedMessages(scope);
 
@@ -89,14 +92,12 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
   const openThreadsCount = allThreads.filter((t) => !t.handled).length;
   const handledThreadsCount = allThreads.filter((t) => t.handled).length;
   const tabCount = {
-    "": openThreadsCount,
+    "": allThreads.length,
+    open: openThreadsCount,
     handled: handledThreadsCount,
-    all: allThreads.length,
   };
 
-  const replies = allThreads.filter((t) =>
-    show === "handled" ? t.handled : show === "all" ? true : !t.handled,
-  );
+  const replies = allThreads.filter((t) => (show === "handled" ? t.handled : show === "open" ? !t.handled : true));
 
   // Computers show the picked customer's conversation beside the list (the newest customer thread by default).
   let selected = replies.find((x) => x.id === picked || x.customer.id === picked);
@@ -180,7 +181,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
         />
       ) : (
         <section className="card">
-          <h2>{show === "handled" ? "Nothing handled yet" : show === "all" ? "No replies yet" : "You're all caught up"}</h2>
+          <h2>{show === "handled" ? "Nothing handled yet" : show === "open" ? "You're all caught up" : "No replies yet"}</h2>
           <p className="muted" style={{ marginTop: 6 }}>
             When customers tap &ldquo;Order now&rdquo; or write back after a campaign, each customer&apos;s conversation appears here.
           </p>

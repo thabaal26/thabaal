@@ -162,7 +162,7 @@ export function HomeTiers(p: HomeTiersProps) {
       node: (
         <TodoTile
           key="chats"
-          href="/dashboard/replies"
+          href="/dashboard/replies?show=open"
           big={String(p.unhandledRepliesCount)}
           title="Chats waiting"
           titleTa="காத்திருக்கும் உரையாடல்கள்"

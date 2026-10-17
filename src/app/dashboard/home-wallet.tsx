@@ -28,6 +28,9 @@ function Header() {
       <h2>
         <T ta="வாட்ஸ்அப் வாலட்">WhatsApp wallet</T>
       </h2>
+      <Link className="btn sm" href="/dashboard/report">
+        <T ta="செலவுகள்">Costs</T>
+      </Link>
     </div>
   );
 }

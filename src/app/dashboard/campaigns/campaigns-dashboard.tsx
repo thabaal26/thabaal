@@ -1,5 +1,6 @@
 "use client";
 import { safeAction } from "@/components/toast";
+import { confirmAction } from "@/components/confirm";
 
 import React, { useState, useEffect, useTransition } from "react";
 import Link from "@/components/intent-link";
@@ -191,7 +192,8 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
   };
 
   const handleDelete = async (c: CampaignItem) => {
-    if (!window.confirm(`Delete "${c.n}"?`)) return;
+    // The portal's own dialog, like every other delete (a browser pop-up looks foreign and blocks the page).
+    if (!(await confirmAction({ title: `Delete "${c.n}"?`, message: "Messages already sent stay in the log.", confirmLabel: "Delete", danger: true }))) return;
     if (c.isLive) {
       startTransition(async () => {
         const res = await safeAction(() => deleteCampaign(c.id));

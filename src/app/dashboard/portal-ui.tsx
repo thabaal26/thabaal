@@ -110,8 +110,7 @@ export function PortalPage({
           </div>
           <div className="tools" suppressHydrationWarning>
             {actions}
-            <LangButton />
-            <PageTools />
+            <PageTools lang={<LangButton />} />
           </div>
         </header>
         {children}

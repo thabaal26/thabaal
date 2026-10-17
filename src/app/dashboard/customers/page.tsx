@@ -6,6 +6,7 @@ import { readFields } from "@/lib/custom-fields";
 import { customersData, type CustomerRow } from "@/lib/customers-data";
 import { db } from "@/lib/db";
 import { homeCityOf, regionsFor } from "@/lib/regions";
+import { loyaltyHistory } from "@/lib/loyalty-history";
 import { refillForecast } from "@/lib/refill-forecast";
 import { getScope, owned } from "@/lib/session";
 import { inr } from "../portal-format";
@@ -169,7 +170,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
       </>
     );
   } else if (tab === "loyalty") {
-    body = <LoyaltyPanel rows={rows} canManage={scope.canManage} />;
+    body = <LoyaltyPanel rows={rows} canManage={scope.canManage} history={await loyaltyHistory(clientId).catch(() => [])} />;
   } else {
     const total = rows.length;
     const optedOut = rows.filter((c) => c.optedOut || c.unreachable).length;

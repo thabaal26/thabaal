@@ -364,7 +364,7 @@ export function CatalogueManager({
         )}
         <div className="tools" style={{ marginLeft: "auto" }}>
           <button type="button" className="btn sm" aria-expanded={previewOpen} onClick={() => setPreviewOpen(!previewOpen)}>
-            {previewOpen ? (isTa ? "விலைப் பட்டியலை மறை" : "Hide price list") : (isTa ? "விலைப் பட்டியல் செய்தி" : "Price list message")}
+            {previewOpen ? (isTa ? "விலைப் பட்டியலை மறை" : "Hide price list") : (isTa ? "விலைப் பட்டியல் அனுப்பு" : "Send price list")}
           </button>
           {canAdd && (
             <button type="button" className="btn sm primary" onClick={() => setAdding(true)}>
@@ -399,8 +399,8 @@ export function CatalogueManager({
                 <th>{isTa ? "பொருள்" : "Product"}</th>
                 <th>{isTa ? "வகை" : "Category"}</th>
                 <th className="num">{isTa ? "விலை" : "Price"}</th>
-                <th>WhatsApp</th>
                 <th>{isTa ? "இருப்பு நிலை" : "In stock"}</th>
+                <th>WhatsApp</th>
                 <th />
               </tr>
             </thead>
@@ -432,9 +432,6 @@ export function CatalogueManager({
                     <td>{item.category || "—"}</td>
                     <td className="num">{item.priceAmount > 0 ? `₹${item.priceAmount.toLocaleString("en-IN")}` : <span className="muted">{isTa ? "விலை இல்லை" : "No price"}</span>}</td>
                     <td>
-                      <span className={`pill ${pill.tone}`}>{pill.label}</span>
-                    </td>
-                    <td>
                       <button
                         type="button"
                         className="sw"
@@ -445,6 +442,9 @@ export function CatalogueManager({
                         onClick={() => handleToggleStock(item)}
                         style={togglingId === item.id ? { opacity: 0.6 } : undefined}
                       />
+                    </td>
+                    <td>
+                      <span className={`pill ${pill.tone}`}>{pill.label}</span>
                     </td>
                     <td>
                       <div className="tools">

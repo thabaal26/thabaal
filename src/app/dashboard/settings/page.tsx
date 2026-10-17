@@ -162,13 +162,11 @@ export default async function SettingsPage() {
             <div className="hd">
               <div>
                 <h2><T ta="WhatsApp கட்டண விவரங்கள்">WhatsApp billing</T></h2>
-                <p><T ta="செய்திகளுக்கு Meta உங்களிடம் வசூலிப்பது.">What Meta charges you for messages.</T></p>
+                <p><T ta="செய்திகளுக்கு Meta உங்களிடம் வசூலிப்பது. எளிய விவரம் அறிக்கைகளில் உள்ளது.">What Meta charges you for messages. The simple version is in Reports.</T></p>
               </div>
-              {spend.metaAccount.billingUrl && (
-                <a className="btn sm" href={spend.metaAccount.billingUrl} target="_blank" rel="noopener noreferrer">
-                  <T ta="கட்டண மையம்">Billing hub</T>
-                </a>
-              )}
+              <Link className="btn" href="/dashboard/report">
+                <T ta="அறிக்கைகளில் செலவுகள்">See costs in Reports</T>
+              </Link>
             </div>
             <div className="grid g3">
               <div className="stat">
@@ -198,10 +196,18 @@ export default async function SettingsPage() {
                 </div>
               </div>
             </div>
-            {spend.metaAccount.billingUrl && scope.canManage && (
-              <div className="tools" style={{ marginTop: 12 }}>
-                <a className="btn primary sm" href={spend.metaAccount.billingUrl} target="_blank" rel="noopener noreferrer">
-                  <T ta="Meta-வில் ரீசார்ஜ் செய்">Recharge on Meta</T>
+            {spend.metaAccount.billingUrl && (
+              <div className="tools" style={{ marginTop: 14 }}>
+                {scope.canManage && (
+                  <a className="btn primary sm" href={spend.metaAccount.billingUrl} target="_blank" rel="noopener noreferrer">
+                    <T ta="Meta-வில் ரீசார்ஜ் செய்">Recharge on Meta</T>
+                  </a>
+                )}
+                <a className="btn sm" href={spend.metaAccount.billingUrl} target="_blank" rel="noopener noreferrer">
+                  <T ta="Meta விலைப்பட்டியல்களைப் பதிவிறக்கு">Download Meta invoices</T>
+                </a>
+                <a className="btn sm ghost" href="https://business.facebook.com/commerce" target="_blank" rel="noopener noreferrer">
+                  <T ta="Meta-வில் பட்டியல்">Catalogue on Meta</T>
                 </a>
               </div>
             )}

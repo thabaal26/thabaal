@@ -207,6 +207,7 @@ model Customer {
   replies          Reply[]
   orders           Order[]
   calls            Call[]
+  loyaltyEntries   LoyaltyEntry[]
 
   @@unique([clientId, phone])
   @@index([phone])
@@ -588,6 +589,27 @@ model WalletEntry {
 }
 
 /// Failed password logins, for slowing down guessing (lib/login-guard.ts). Old rows are pruned.
+/// Loyalty points given, taken back or used on a bill by hand (Customers › Loyalty), with the reason and who did it.
+/// Points earned and used on orders come from the orders themselves; these are the hand changes for the history.
+model LoyaltyEntry {
+  id         String   @id @default(cuid())
+  clientId   String
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  /// Points added (positive) or taken off (negative).
+  delta      Int
+  /// "give", "take" or "redeem"
+  kind       String
+  reason     String
+  byName     String?
+  /// Whether the customer was told on WhatsApp.
+  told       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([clientId, createdAt])
+  @@index([customerId])
+}
+
 model LoginAttempt {
   id        String   @id @default(cuid())
   /// "email:<address>" or "ip:<address>"

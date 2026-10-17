@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { confirmAction } from "@/components/confirm";
 import { Sheet } from "@/components/sheet";
 import { Button } from "@/components/ui";
+import { callWidgetReady, placeCall } from "@/components/call-widget";
 import { safeAction, toastResult } from "@/components/toast";
 import { fmtDate } from "@/lib/format";
 import { canUndoPayment, dueOf, paymentState, receivedOf, slipPay } from "@/lib/payment-state";
@@ -24,6 +25,7 @@ import {
   type OrderFlowKey,
 } from "@/lib/order-flow";
 import {
+  createOrder,
   notifyOrder,
   requestPayment,
   saveOrderAddress,
@@ -114,8 +116,8 @@ export function OrderCard({
   const [deliveryBy, setDeliveryBy] = useState("");
   const [trackingNumber, setTrackingNumber] = useState("");
   const [sendUpdate, setSendUpdate] = useState(true);
-  const openDispatch = () => {
-    setDispatchMethod("own");
+  const openDispatch = (method: "own" | "Courier" | "Customer pickup" = "own") => {
+    setDispatchMethod(method);
     setDeliveryBy("");
     setTrackingNumber("");
     setSendUpdate(true);
@@ -517,6 +519,68 @@ export function OrderCard({
       `Packing slip #${refText}`,
     );
   };
+
+  // Rings the customer through WhatsApp calling when the shop has it set up; otherwise the phone's own dialler.
+  const callCustomer = () => {
+    if (callWidgetReady()) placeCall({ customerId: o.customer.id, name: o.customer.name });
+    else if (!missingPhone) window.location.href = `tel:+${phoneClean}`;
+    else toastResult({ ok: false, message: isTa ? "இந்த வாடிக்கையாளருக்குத் தொலைபேசி எண் இல்லை." : "This customer has no phone number." });
+  };
+
+  // A new order with the same items for the same customer. Nothing is sent to them; it starts as a new order.
+  const copyOrder = async (kind: "repeat" | "duplicate") => {
+    const ok = await confirmAction({
+      title: isTa ? "புதிய ஆர்டர் சேர்க்கவா?" : kind === "repeat" ? `Repeat order #${refText}?` : `Duplicate order #${refText}?`,
+      message: isTa
+        ? `${o.customer.name} அவர்களுக்கு அதே பொருட்களுடன் (${inr(pricing.total)}) புதிய ஆர்டர் சேர்க்கப்படும். வாடிக்கையாளருக்கு எதுவும் அனுப்பப்படாது.`
+        : `A new order with the same items (${inr(pricing.total)}) is added for ${o.customer.name}. Nothing is sent to the customer.`,
+      confirmLabel: isTa ? "ஆர்டர் சேர்" : "Add order",
+    });
+    if (!ok) return;
+    runAction(kind, () =>
+      createOrder({
+        phone: o.customer.phone,
+        name: o.customer.name,
+        items: items.map((i) => ({ id: i.id, name: i.name ?? i.id ?? "Item", quantity: i.quantity || 1, price: i.price || 0 })),
+        shippingFee: pricing.shipping,
+        address: fullAddress || undefined,
+        syncCustomerAddress: false,
+        paymentMode: isCod ? "cod" : "later",
+      }),
+    );
+  };
+
+  // Out for delivery but it didn't arrive: back to ready to dispatch, so it can go out again.
+  const handleNotDelivered = async () => {
+    const ok = await confirmAction({
+      title: isTa ? "டெலிவரி ஆகவில்லையா?" : `#${refText} not delivered?`,
+      message: isTa
+        ? "ஆர்டர் மீண்டும் அனுப்பத் தயார் நிலைக்குத் திரும்பும்; மறுபடி அனுப்பலாம்."
+        : "The order goes back to ready to dispatch, so you can send it out again.",
+      confirmLabel: isTa ? "டெலிவரி ஆகவில்லை" : "Not delivered",
+    });
+    if (!ok) return;
+    runAction("fail", async () => {
+      const r = await setOrderStatus(o.id, isPaid ? "PAID" : "CONFIRMED");
+      return r.ok ? { ok: true, message: isTa ? "டெலிவரி ஆகவில்லை எனக் குறிக்கப்பட்டது." : "Marked not delivered. It's back in ready to dispatch." } : r;
+    });
+  };
+
+  // What was noted on the order when it was cancelled.
+  const showWhyCancelled = () => {
+    const why = o.internalNote?.trim();
+    toastResult({
+      ok: true,
+      message: why
+        ? (isTa ? `குறிப்பு: ${why}` : `Note on this order: ${why}`)
+        : isTa
+          ? "ரத்து செய்யும் போது காரணம் எதுவும் குறிக்கப்படவில்லை."
+          : "No reason was noted when it was cancelled.",
+    });
+  };
+  // The "packed" stage: ready to go out, so the dispatch details come next.
+  const packedStage = hasDispatch && (o.status === "CONFIRMED" || o.status === "PAID") && primaryAction.key === "dispatch";
+  const readyStage = (o.status === "CONFIRMED" || o.status === "PAID") && (isPaid || isCod) && !packedStage;
 
   // Timeline events matching prototype
   const timelineEvents: [string, string | null][] = [
@@ -969,15 +1033,10 @@ export function OrderCard({
         >
           <T ta="உரையாடல்">Open chat</T>
         </Link>
-        <a
+        <button
+          type="button"
           className="btn sm ghost"
-          href={
-            o.customer.phone
-              ? `https://wa.me/${o.customer.phone.replace(/\D/g, "")}`
-              : undefined
-          }
-          target="_blank"
-          rel="noopener"
+          onClick={callCustomer}
           style={{
             minHeight: 40,
             height: 40,
@@ -990,8 +1049,8 @@ export function OrderCard({
             borderRadius: 10,
           }}
         >
-          WhatsApp
-        </a>
+          <T ta="அழை">Call</T>
+        </button>
         <button
           type="button"
           className="btn sm ghost"
@@ -1095,7 +1154,7 @@ export function OrderCard({
           <T ta="கூடுதல் செயல்கள்">More actions</T>
         </summary>
         <div className="tools" style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {canEdit && (
+          {canEdit && o.status !== "CANCELLED" && o.status !== "DELIVERED" && (
             <button
               type="button"
               className="btn sm"
@@ -1135,7 +1194,7 @@ export function OrderCard({
             </button>
           )}
 
-          {!isPaid && !isCod && (
+          {!isPaid && !isCod && o.status !== "CANCELLED" && (
             <button
               type="button"
               className="btn sm"
@@ -1176,7 +1235,7 @@ export function OrderCard({
             </button>
           )}
 
-          {hasPack && o.packedAt && (
+          {hasPack && o.packedAt && (o.status === "NEW" || o.status === "CONFIRMED" || o.status === "PAID") && (
             <button
               type="button"
               className="btn sm"
@@ -1187,27 +1246,112 @@ export function OrderCard({
             </button>
           )}
 
-          {hasDispatch && (o.status === "CONFIRMED" || o.status === "PAID") && (
+          {hasDispatch && (o.status === "CONFIRMED" || o.status === "PAID") && !packedStage && (
             <button
               type="button"
               className="btn sm"
-              onClick={openDispatch}
+              onClick={() => openDispatch()}
             >
               <T ta="டெலிவரிக்கு அனுப்பு">Dispatch order</T>
             </button>
           )}
 
-          {canEdit && (
+          {packedStage && (
+            <button type="button" className="btn sm" onClick={() => openDispatch("Courier")}>
+              <T ta="டிராக்கிங் எண் சேர்">Add tracking number</T>
+            </button>
+          )}
+
+          {packedStage && (
+            <button type="button" className="btn sm" onClick={() => openDispatch()}>
+              <T ta="டெலிவரி முறையைத் தேர்வு செய்">Choose delivery method</T>
+            </button>
+          )}
+
+          {(readyStage || packedStage) && (
+            <button
+              type="button"
+              className="btn sm"
+              onClick={() => {
+                setAddressInput(fullAddress);
+                setEditingAddress(true);
+              }}
+            >
+              <T ta="முகவரி சேர் அல்லது மாற்று">Add or change address</T>
+            </button>
+          )}
+
+          {readyStage && canEdit && (
+            <button type="button" className="btn sm" onClick={openEdit}>
+              <T ta="டெலிவரி கட்டணம் மாற்று">Edit delivery charge</T>
+            </button>
+          )}
+
+          {o.status === "DISPATCHED" && (
+            <button type="button" className="btn sm" onClick={() => openDispatch("Courier")}>
+              <T ta="டிராக்கிங் புதுப்பி">Update tracking</T>
+            </button>
+          )}
+
+          {o.status === "DISPATCHED" && (
+            <button type="button" className="btn sm" disabled={pending} onClick={() => runAction("update", () => notifyOrder(o.id, "dispatch"))}>
+              <T ta="டெலிவரி தகவல் அனுப்பு">Send delivery update</T>
+            </button>
+          )}
+
+          {o.status === "DISPATCHED" && (
+            <button type="button" className="btn sm" onClick={callCustomer}>
+              <T ta="வாடிக்கையாளரைத் தொடர்பு கொள்">Contact customer</T>
+            </button>
+          )}
+
+          {o.status === "DISPATCHED" && (
+            <button type="button" className="btn sm" disabled={pending} onClick={handleNotDelivered}>
+              <T ta="டெலிவரி ஆகவில்லை">Not delivered</T>
+            </button>
+          )}
+
+          {o.status === "DELIVERED" && (
+            <button
+              type="button"
+              className="btn sm"
+              disabled={pending}
+              onClick={() =>
+                runAction("thanks", async () => {
+                  const r = await notifyOrder(o.id, "deliver");
+                  // Already delivered: when nothing could be sent, say so plainly.
+                  return r.ok && /^Marked delivered\. No message sent/.test(r.message)
+                    ? {
+                        ok: false,
+                        message: isTa
+                          ? "நன்றி செய்தி அனுப்பப்படவில்லை: 24 மணி நேர சாளரம் மூடப்பட்டது, order_delivered டெம்ப்ளேட் இன்னும் அனுமதிக்கப்படவில்லை."
+                          : "Thank-you not sent: the customer's 24-hour window has closed and the order_delivered template isn't approved yet.",
+                      }
+                    : r;
+                })
+              }
+            >
+              <T ta="நன்றி செய்தி அனுப்பு">Send thank-you message</T>
+            </button>
+          )}
+
+          {o.status === "DELIVERED" && canEdit && items.length > 0 && (
+            <button type="button" className="btn sm" disabled={pending} onClick={() => copyOrder("repeat")}>
+              <T ta="மீண்டும் அதே ஆர்டர்">Create repeat order</T>
+            </button>
+          )}
+
+          {canEdit && o.status !== "DISPATCHED" && o.status !== "DELIVERED" && o.status !== "CANCELLED" && (
             <button
               type="button"
               className="btn sm"
               onClick={printSlip}
             >
-              <T ta="பேக்கிங் ரசீது அச்சிடுக">Print packing slip</T>
+              {packedStage ? <T ta="லேபிள் அச்சிடுக">Print label</T> : <T ta="பேக்கிங் ரசீது அச்சிடுக">Print packing slip</T>}
             </button>
           )}
 
-          {canEdit && (
+          {canEdit && o.status !== "CANCELLED" && (
             <button
               type="button"
               className="btn sm"
@@ -1217,7 +1361,7 @@ export function OrderCard({
             </button>
           )}
 
-          {o.status !== "CANCELLED" && (
+          {o.status !== "CANCELLED" && o.status !== "DISPATCHED" && o.status !== "DELIVERED" && (
             <button
               type="button"
               className="btn sm danger"
@@ -1228,14 +1372,15 @@ export function OrderCard({
             </button>
           )}
 
+          {o.status === "CANCELLED" && canEdit && items.length > 0 && (
+            <button type="button" className="btn sm" disabled={pending} onClick={() => copyOrder("duplicate")}>
+              <T ta="ஆர்டர் நகல்">Duplicate order</T>
+            </button>
+          )}
+
           {o.status === "CANCELLED" && (
-            <button
-              type="button"
-              className="btn sm"
-              disabled={pending}
-              onClick={() => runAction("restore", () => setOrderStatus(o.id, "NEW"))}
-            >
-              <T ta="ஆர்டரை மீட்டெடு">Restore order</T>
+            <button type="button" className="btn sm" onClick={showWhyCancelled}>
+              <T ta="ஏன் ரத்து செய்யப்பட்டது?">Why was it cancelled?</T>
             </button>
           )}
         </div>
@@ -1262,7 +1407,7 @@ export function OrderCard({
             style={{ width: "min(520px, calc(100vw - 32px))" }}
             onSubmit={submitDispatch}
           >
-            <h2><T ta="ஆர்டர் அனுப்புக">Dispatch order</T> #{refText}</h2>
+            <h2>{o.status === "DISPATCHED" ? <T ta="டிராக்கிங் புதுப்பி">Update tracking</T> : <T ta="ஆர்டர் அனுப்புக">Dispatch order</T>} #{refText}</h2>
             <div className="field">
               <label htmlFor="dsw"><T ta="டெலிவரி செய்யும் முறை">Delivery method</T></label>
               <select

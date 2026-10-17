@@ -54,14 +54,16 @@ function detail(it: BoardItem) {
 function Row({ it, lane, nowMs, canOperate }: { it: BoardItem; lane: BoardItem["lane"]; nowMs: number; canOperate: boolean }) {
   const mins = Math.max(0, Math.round((nowMs - it.waitingSinceMs) / 60000));
   return (
-    <div className="row">
-      <div className="grow">
+    // The wait and the buttons stay together: on a narrow card they move under the name as one group.
+    <div className="row" style={{ flexWrap: "wrap", rowGap: 8 }}>
+      <div className="grow" style={{ minWidth: 180 }}>
         <Link className="t" href={`/dashboard/customers/${it.customerId}`} style={{ textDecoration: "none" }}>
           {it.name}
         </Link>
         <div className="muted small">{detail(it)}</div>
       </div>
-      <span className="muted small">{waitText(mins)}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto", flexWrap: "nowrap" }}>
+      <span className="muted small" style={{ whiteSpace: "nowrap" }}>{waitText(mins)}</span>
       <Link className={`btn sm${lane === "money" ? " primary" : ""}`} href={`/dashboard/replies?r=${it.customerId}`}>
         Reply
       </Link>
@@ -80,6 +82,7 @@ function Row({ it, lane, nowMs, canOperate }: { it: BoardItem; lane: BoardItem["
           Done
         </PAction>
       )}
+      </div>
     </div>
   );
 }

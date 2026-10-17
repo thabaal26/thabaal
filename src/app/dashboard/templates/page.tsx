@@ -4,6 +4,7 @@ import Link from "@/components/intent-link";
 import { Stat } from "@/components/ui";
 import { WhatsAppBubble } from "@/components/whatsapp-preview";
 import { DefaultImage } from "./default-image";
+import { TemplatePreview } from "./template-preview";
 import { db } from "@/lib/db";
 import { fmtNumber } from "@/lib/format";
 import { templateLabel } from "@/lib/plain-error";
@@ -199,12 +200,39 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
                   </p>
                 )}
                 <div className="tools" style={{ marginTop: "auto", paddingTop: 10 }}>
-                  <Link className="btn sm" href={`/dashboard/templates/${t.id}`}>
-                    <T>{scope.canManage ? (broken ? "Fix and resend" : "Edit") : "Preview"}</T>
-                  </Link>
+                  <TemplatePreview
+                    id={t.id}
+                    name={templateLabel(t.name)}
+                    summary={`${CATEGORY_INFO[t.category as Category].label} · ${t.language} · ${formatOf(t)} · ${sp2.label}`}
+                    kind={CATEGORY_INFO[t.category as Category].label}
+                    priceBand={t.category === "MARKETING" ? "Highest" : t.category === "UTILITY" ? "Lower" : "Fixed by Meta"}
+                    used={t._count.campaigns ? `In ${t._count.campaigns} campaign${t._count.campaigns > 1 ? "s" : ""}` : "Not in a campaign yet"}
+                    why={broken ? t.statusReason : null}
+                    canTest={Boolean(scope.canManage) && t.status === "APPROVED"}
+                    useHref={t.category === "MARKETING" && t.status === "APPROVED" && canCreate ? "/dashboard/campaigns/new" : null}
+                  >
+                    <WhatsAppBubble
+                      header={r.header}
+                      headerImage={t.headerType === "IMAGE" ? t.headerMediaUrl || fallbackFor(t.client) : undefined}
+                      body={r.body}
+                      footer={r.footer}
+                      buttons={t.buttons as TemplateButton[]}
+                      className="pointer-events-none max-w-[17rem]"
+                    />
+                  </TemplatePreview>
                   {t.category === "MARKETING" && t.status === "APPROVED" && canCreate && (
                     <Link className="btn sm primary" href="/dashboard/campaigns/new">
                       <T>Use in campaign</T>
+                    </Link>
+                  )}
+                  {scope.canManage && (
+                    <Link className="btn sm ghost" href={`/dashboard/templates/${t.id}`}>
+                      <T>{broken ? "Fix and resend" : "Edit"}</T>
+                    </Link>
+                  )}
+                  {canCreate && (
+                    <Link className="btn sm ghost" href={`/dashboard/templates/new?from=${t.id}`}>
+                      <T ta="நகல்">Duplicate</T>
                     </Link>
                   )}
                   {scope.canManage && (

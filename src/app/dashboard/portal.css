@@ -30,7 +30,7 @@ html.dark .thabaal-portal{
 .thabaal-portal input[type=text],.thabaal-portal input[type=search],.thabaal-portal input[type=tel],.thabaal-portal input[type=email],.thabaal-portal input[type=password],.thabaal-portal input[type=number],.thabaal-portal input[type=time],.thabaal-portal input[type=date],.thabaal-portal select,.thabaal-portal textarea{width:100%;min-height:42px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);padding:8px 12px;font-size:15px}
 .thabaal-portal textarea{min-height:90px;resize:vertical}
 .thabaal-portal input:focus,.thabaal-portal select:focus,.thabaal-portal textarea:focus{outline:none;border-color:var(--fg);box-shadow:0 0 0 4px rgba(255,195,41,.4)}
-.thabaal-portal dialog{border:0;border-radius:20px;padding:0;background:var(--card);color:var(--fg);width:min(520px,calc(100vw - 32px));box-shadow:0 30px 80px -20px rgba(0,0,0,.55)}
+.thabaal-portal dialog{margin:auto;border:0;border-radius:20px;padding:0;background:var(--card);color:var(--fg);width:min(520px,calc(100vw - 32px));box-shadow:0 30px 80px -20px rgba(0,0,0,.55)}
 .thabaal-portal dialog::backdrop{background:rgba(16,40,59,.55)}
 }
 @layer components {

@@ -79,8 +79,7 @@ export function PageHeader({
         </div>
         <div className="tools print:hidden">
           {actions}
-          <LangButton />
-          <PageTools />
+          <PageTools lang={<LangButton />} />
         </div>
       </header>
       {tabs && <div style={{ marginBottom: 20 }}>{tabs}</div>}
