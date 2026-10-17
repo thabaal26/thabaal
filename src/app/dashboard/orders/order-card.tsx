@@ -8,7 +8,8 @@ import { Sheet } from "@/components/sheet";
 import { Button } from "@/components/ui";
 import { safeAction, toastResult } from "@/components/toast";
 import { fmtDate } from "@/lib/format";
-import { canUndoPayment, dueOf, paymentState, receivedOf } from "@/lib/payment-state";
+import { canUndoPayment, dueOf, paymentState, receivedOf, slipPay } from "@/lib/payment-state";
+import { openPrintablePdfWindow } from "./packing/print-button";
 import { inr } from "../portal-format";
 import { T, useLang } from "../portal-ui";
 import { getOrderPricing, pointsDiscount } from "@/lib/order-pricing";
@@ -487,6 +488,35 @@ export function OrderCard({
   };
 
   const when = (d: Date | string | null | undefined) => (d ? fmtDate(new Date(d), "EEE d MMM, h:mm a") : null);
+
+  // This order's packing slip, in the same printable layout as the Packing list.
+  const printSlip = () => {
+    const slip = slipPay(payFields, pricing.total);
+    openPrintablePdfWindow(
+      [
+        {
+          id: o.id,
+          orderRef: refText,
+          createdAt: new Date(o.createdAt).toISOString(),
+          status: o.status,
+          isPaid,
+          payLabel: slip.label,
+          collect: slip.collect,
+          customerName: o.customer.name,
+          customerPhone: o.customer.phone,
+          area: o.customer.location ?? "",
+          address: fullAddress,
+          items: items.map((i) => ({ name: i.name ?? i.id, quantity: i.quantity || 1, price: i.price || 0 })),
+          total: o.total,
+          discount: pricing.discount,
+          currency: o.currency,
+          note: "",
+        },
+      ],
+      items.map((i) => ({ name: i.name ?? i.id, quantity: i.quantity || 1 })),
+      `Packing slip #${refText}`,
+    );
+  };
 
   // Timeline events matching prototype
   const timelineEvents: [string, string | null][] = [
@@ -1170,7 +1200,7 @@ export function OrderCard({
             <button
               type="button"
               className="btn sm"
-              onClick={() => window.print()}
+              onClick={printSlip}
             >
               <T ta="பேக்கிங் ரசீது அச்சிடுக">Print packing slip</T>
             </button>
@@ -1180,7 +1210,7 @@ export function OrderCard({
             <button
               type="button"
               className="btn sm"
-              onClick={() => window.print()}
+              onClick={() => setReceiptOpen(true)}
             >
               <T ta="விலைப்பட்டியல் அச்சிடுக">Print invoice</T>
             </button>
@@ -1368,16 +1398,28 @@ export function OrderCard({
                 <b>
                   {o.paidAt
                     ? fmtDate(new Date(o.paidAt), "EEE d MMM, h:mm a")
-                    : (isTa ? "இன்று" : "Today")}
+                    : (isTa ? "இன்னும் முழுமையாகச் செலுத்தப்படவில்லை" : "Not fully paid yet")}
                 </b>
               </div>
               <div
                 className="row"
                 style={{ borderTop: "2px solid var(--line)", marginTop: 6 }}
               >
-                <div className="grow t"><T ta="தொகை">Amount</T></div>
-                <b style={{ font: "600 20px var(--display)" }}>{inr(pricing.total)}</b>
+                <div className="grow t"><T ta="பெறப்பட்ட தொகை">Amount received</T></div>
+                <b style={{ font: "600 20px var(--display)" }}>{inr(received)}</b>
               </div>
+              {due > 0 && o.status !== "CANCELLED" && (
+                <div className="row">
+                  <div className="grow muted"><T ta="நிலுவை">Still due</T></div>
+                  <b>{inr(due)}</b>
+                </div>
+              )}
+              {refunded > 0 && (
+                <div className="row">
+                  <div className="grow muted"><T ta="திருப்பி அளிக்கப்பட்டது">Refunded</T></div>
+                  <b>{inr(refunded)}</b>
+                </div>
+              )}
             </div>
             <div className="acts">
               <button
@@ -1392,7 +1434,7 @@ export function OrderCard({
                 href={
                   o.customer.phone
                     ? `https://wa.me/${o.customer.phone.replace(/\D/g, "")}?text=${encodeURIComponent(
-                        `Receipt for Order #${refText}: ${inr(pricing.total)} paid${o.paymentTxnId ? ` (Ref: ${o.paymentTxnId})` : ""}. Thank you!`,
+                        `Receipt for Order #${refText}: ${inr(received)} received${due > 0 && o.status !== "CANCELLED" ? `, ${inr(due)} still due` : ""}${o.paymentTxnId ? ` (Ref: ${o.paymentTxnId})` : ""}. Thank you!`,
                       )}`
                     : undefined
                 }

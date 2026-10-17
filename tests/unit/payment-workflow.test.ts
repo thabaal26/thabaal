@@ -390,6 +390,16 @@ describe("Payment Workflow & Security Invariants", () => {
       assert.equal(o.paymentSource, "staff");
     });
 
+    test("a payment whose id was first noted on a 'customer says paid' claim is still recorded when it arrives", async () => {
+      const order = await newOrder(640);
+      await recordPaymentClaim(order.id, "WhatsApp showed a completed UPI payment without the amount.", "TXN-CLAIMED-1");
+      assert.equal(await confirmPayment(order.id, "TXN-CLAIMED-1", { source: "meta", amount: 640, quiet: true }), true);
+      const o = await db.order.findUniqueOrThrow({ where: { id: order.id } });
+      assert.equal(o.paidAmount, 640);
+      assert.ok(o.paidAt);
+      assert.equal(o.paymentClaimedAt, null);
+    });
+
     test("ten parallel webhook deliveries of one payment still save it once", async () => {
       const order = await newOrder(1200);
       const results = await Promise.all(

@@ -184,7 +184,8 @@ async function confirmPaymentOnce(orderId: string, txnId: string | null | undefi
   const order = await db.order.findUnique({ where: { id: orderId }, include: { customer: true, client: { select: { name: true } } } });
   if (!order) return false;
   // The same WhatsApp transaction delivered again (Meta retries webhooks) is already counted, even for a part payment.
-  if (txnId && rec.source !== "staff" && order.paymentTxnId === txnId) return false;
+  // (Not when the id was only noted with a "customer says paid" claim: then this is the real payment arriving.)
+  if (txnId && rec.source !== "staff" && order.paymentTxnId === txnId && receivedOf(order) > 0 && !order.paymentClaimedAt) return false;
 
   // If customer paid an old superseded/cancelled cart, automatically route the payment to their latest active order!
   if (order.status === "CANCELLED") {
