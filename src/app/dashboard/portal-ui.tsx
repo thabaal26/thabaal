@@ -64,7 +64,7 @@ export function LangButton() {
   return (
     <button
       type="button"
-      className="iconbtn"
+      className="iconbtn hidden lg:inline-flex"
       aria-label={lang === "ta" ? "Switch language to English (EN)" : "மொழியை தமிழுக்கு மாற்று (தமிழ்)"}
       title="Language: English or Tamil"
       style={{ width: "auto", padding: "0 12px", fontWeight: 700 }}
