@@ -7,10 +7,12 @@ comment). **Not merged.** Nothing was pushed to main.
 
 - An isolated QA copy of Thabaal (private database with a fake "QA Test Shop", every real key blanked) and scripts
   that test it end to end: `powershell -File tests/qa/run-all.ps1`.
-- **All 25 payment scenarios pass** (26 browser + webhook checks, 81 unit tests): money is never counted twice under
+- **All 25 payment scenarios pass** (26 browser and webhook checks, plus 76 unit tests): money is never counted twice under
   double taps, slow or dropped connections, refreshes, late or repeated webhooks.
-- **Every page** opened as owner, staff, viewer, admin and another business, on desktop and phone: RESULT_CRAWL.
-- **Visual check** of 24 pages × 5 screen sizes × light/dark × English/Tamil: RESULT_VISUAL.
+- **Every page** opened as owner, staff, viewer, admin and another business, on desktop and phone (1,366 page
+  visits): no errors, no broken values, no sample data, no business seeing another's data.
+- **Visual check** of 24 pages × 5 screen sizes × light/dark × English/Tamil (480 screenshots): nothing off-screen,
+  cut off or scrolling sideways. Left: some in-page buttons under 40px on phones, some English in Tamil mode.
 - Typecheck, lint, unit tests and production build pass. 115/115 server actions check permissions.
 
 ## Most important fixes (full list in docs/qa/REPORT.md)
@@ -37,6 +39,7 @@ comment). **Not merged.** Nothing was pushed to main.
 
 ## What didn't get done
 
-- Some screens still show English headings/buttons in Tamil mode (list in suggestions.md).
+- Some screens still show English headings/buttons in Tamil mode, and some small in-page buttons on phones are
+  32–39px (both listed in REPORT.md → Known limitations).
 - Sending real WhatsApp messages can't be tested without a real number (refusals and everything before sending were).
 - CodeRabbit isn't installed on the repository, so there were no CodeRabbit comments.

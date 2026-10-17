@@ -13,4 +13,4 @@ Logins for the QA roles are written to `.git/qa-state.json` on start.
 | 4. User journeys | done within the payment and CRUD scripts (owner: confirm, request, record, refund; staff: cash, COD, dispatch; admin: crawl across businesses) |
 | 5. Visual QA | done: `tests/qa/visual.mjs`, 24 routes × 5 sizes × light/dark × en/ta; screenshots in `.qa-shots/` |
 | 6. Fix | done for everything listed in the morning summary; open items in needs-owner.md and suggestions.md |
-| 7. Verify | final run of `run-all.ps1` + tsc, eslint, unit tests, build; pull request |
+| 7. Verify | done: final build + run-all (payments 14/14, browser payments 12/12, CRUD 12/12, crawls, visual), tsc, eslint, 76 unit tests; QA report posted on PR #1 (not merged) |

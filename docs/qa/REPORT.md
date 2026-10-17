@@ -15,9 +15,9 @@ No real customer, number, sheet, Meta account or money was touched. Run it again
 | Payment webhooks (`tests/qa/payments.mjs`) | 14 / 14 |
 | Payments by hand in Chrome (`tests/qa/payments-ui.mjs`) | 12 / 12 |
 | Create / edit / delete + permissions (`tests/qa/crud.mjs`) | 12 / 12 |
-| Every page, 5 roles, desktop (`tests/qa/crawl.mjs desktop`) | CRAWL_DESKTOP |
-| Every page, 5 roles, phone (`tests/qa/crawl.mjs phone`) | CRAWL_PHONE |
-| Visual matrix: 24 routes × 5 sizes × light/dark × en/ta (`tests/qa/visual.mjs`) | VISUAL |
+| Every page, 5 roles, desktop (`tests/qa/crawl.mjs desktop`) | 683 page visits, 0 problems |
+| Every page, 5 roles, phone (`tests/qa/crawl.mjs phone`) | 683 page visits: no errors, broken values, sample data, leaks between businesses or sideways scroll; only small in-page buttons remain (see limitations) |
+| Visual matrix: 24 routes × 5 sizes × light/dark × en/ta (`tests/qa/visual.mjs`) | 480 screens: nothing off-screen, clipped or scrolling sideways; remaining findings are in-page buttons under 40px on phones and English text in Tamil mode on secondary screens |
 | Production build (`next build`) | pass |
 
 ## The 25 payment scenarios
@@ -93,7 +93,11 @@ Before screenshots: `docs/qa/screens/*-before.png`; after: `*-after.png`.
 
 ## Known limitations
 
-- Several screens still have English headings and buttons in Tamil mode (list in suggestions.md, item 2).
+- Several screens still have English headings and buttons in Tamil mode: campaign builder, audiences, template
+  editor, customer profile, refills, guide, messages filters, notification day labels (suggestions.md, item 2).
+- On phones some in-page buttons are 32–39px tall instead of 40px: campaign/template builder choices, Settings
+  look switch, packing slip PNG/PDF, "Change" address, UPI reference chip, refill day chips, message status links.
+  The header, navigation, filter chips and every order money button meet 40px.
 - WhatsApp sending itself (payment request delivery, thank-you messages) can't be run in QA without a real
   number; the code paths up to sending, and the refusals, were tested.
 - The Vercel preview of Madhu_changes could not be opened from here (no Vercel access); see needs-owner.md.
