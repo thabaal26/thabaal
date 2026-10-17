@@ -106,7 +106,7 @@ export function Section({
     <section className={cn("mt-6 sm:mt-10 lg:mt-11", className)}>
       <div className="mb-2.5 flex items-end justify-between gap-2.5 sm:mb-3.5 sm:gap-3">
         <div className="min-w-0">
-          <h2 className="font-display text-[17px] font-semibold text-ink sm:text-[19px]">{trn(title)}</h2>
+          <h2 className="font-title text-[18px] font-semibold text-ink sm:text-[21px]">{trn(title)}</h2>
           {description && <p className="mt-0.5 max-w-read text-xs text-muted sm:text-sm">{trn(description)}</p>}
         </div>
         {action}
@@ -182,8 +182,8 @@ export function CardHeader({
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <H className="font-display text-[17px] font-semibold leading-snug tracking-[-0.2px] text-ink sm:text-[19px]">{renderedTitle}</H>
-          {renderedDesc && <p className="mt-0.5 text-[13px] leading-snug text-muted sm:text-[14px]">{renderedDesc}</p>}
+          <H className="font-title text-[18px] font-semibold leading-tight text-ink sm:text-[20px]">{renderedTitle}</H>
+          {renderedDesc && <p className="mt-1 text-[13px] leading-snug text-muted sm:text-[14px]">{renderedDesc}</p>}
         </div>
       </div>
       {action && <div className="flex min-w-0 max-w-full shrink-0 items-center gap-1.5 self-center sm:gap-2">{action}</div>}
@@ -632,7 +632,7 @@ export function EmptyState({ icon, title, children, action }: { icon?: ReactNode
           {icon}
         </div>
       )}
-      <h3 className="font-display text-[17px] font-semibold text-ink">{title}</h3>
+      <h3 className="font-title text-[18px] font-semibold text-ink">{title}</h3>
       {children && <p className="mt-1 max-w-sm text-xs text-muted sm:text-sm">{children}</p>}
       {action && <div className="mt-3.5 sm:mt-5">{action}</div>}
     </div>
@@ -733,7 +733,7 @@ export function Stat({
           </span>
         )}
       </div>
-      <div className="tabular mt-0.5 sm:mt-1 font-display font-semibold text-xl sm:text-[26px] lg:text-[28px] leading-tight tracking-[-0.2px] text-ink truncate">{value}</div>
+      <div className="tabular mt-0.5 sm:mt-1 font-display font-bold text-xl sm:text-[26px] lg:text-[28px] leading-tight tracking-[-0.5px] text-ink truncate">{value}</div>
       {meter !== undefined && <Meter raised value={meter} tone={tone === "amber" || tone === "rose" ? "warning" : "brand"} className="mt-1.5 sm:mt-2.5" />}
       {displaySub && <div className="mt-0.5 sm:mt-1 text-[11px] sm:text-[13px] font-semibold text-muted leading-tight sm:leading-snug truncate sm:line-clamp-none">{displaySub}</div>}
     </>

@@ -333,7 +333,7 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
         </div>
 
         {/* What you should do now */}
-        <h2 style={{ font: "600 18px var(--display)", margin: "18px 0 10px" }}>{tr("What you should do now", "அடுத்து நீங்கள் செய்ய வேண்டியவை")}</h2>
+        <h2 style={{ font: "600 19px var(--title)", margin: "18px 0 10px" }}>{tr("What you should do now", "அடுத்து நீங்கள் செய்ய வேண்டியவை")}</h2>
         <div className="grid g3" id="acts">
           {A.map((a) => (
             <div key={a[0]} className="card">

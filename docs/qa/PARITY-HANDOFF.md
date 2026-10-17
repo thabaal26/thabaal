@@ -104,6 +104,22 @@ Gaps against the sample, now fixed:
 11. Priority: the wait time and buttons stay together on narrow cards.
 12. Dialogs (template preview, payments' Mark paid / receipt) open centred; before they sat in the top-left corner.
 
+## Later changes (18 Oct, owner's requests)
+
+- Reports followed the computer's dark mode even with the app set to light; it now follows the app's switch only.
+- Menu logo: the drawn "thabaal" wordmark from the sign-in page (dark letters by day, white at night). The brand name
+  is always that image, never typed in a font.
+- Type levels: page titles and section headings in Baloo Thambi 2 (rounded, Latin + Tamil); sub-headings, labels,
+  body and numbers in DM Sans (numbers bold, tabular). Headings that are data (order ref, customer or campaign name)
+  carry `data-data` and stay in DM Sans. Variables `--title` / `font-title` in `globals.css`.
+- Sign-in page: the legal links appear once, in the page footer, which is one line on computers
+  (© name | links | WhatsApp trademark note) and stacked on phones.
+- Packing list switched off ("not needed"): the Orders › Packing list tab and its panel are commented out / never
+  shown, `/dashboard/orders/packing` redirects to Orders filtered to "to pack" (`?show=topack`, the same rule as the
+  To pack count), and Home/brand/guide links point there. The old page is kept, commented, in
+  `orders/packing/page.tsx`; `packing/print-button.tsx` stays (order cards print slips with it).
+- Pushed to `main` on the owner's instruction (fast-forward from Madhu_changes; main had nothing of its own).
+
 ## Deliberate differences (keep)
 
 - DM Sans font, stat icons, the floating panel shell, the "Combo ideas" tab, the "Payments to look at" callout, AI Ask

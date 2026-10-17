@@ -45,13 +45,37 @@ function pump() {
   else pumping = false;
 }
 
+/**
+ * Scrolling is tracked from the moment this module loads, not from the first chart: otherwise the first chart to
+ * scroll into view saw "never scrolled" and loaded and drew in the middle of the scroll (one ~100 ms hitch).
+ */
+function listen() {
+  if (listening || typeof window === "undefined") return;
+  listening = true;
+  // Capture also hears scrolling panes (scroll events don't bubble).
+  window.addEventListener("scroll", () => (lastScroll = performance.now()), { passive: true, capture: true });
+}
+listen();
+
+/** Fetches and starts the chart library while the page is idle and not scrolling, so it is ready before a chart needs it. */
+let preloading = false;
+function preloadWhenQuiet() {
+  if (preloading || typeof window === "undefined") return;
+  preloading = true;
+  const idle = (cb: () => void) => (typeof window.requestIdleCallback === "function" ? window.requestIdleCallback(cb, { timeout: 2500 }) : setTimeout(cb, 300));
+  const attempt = () => {
+    if (performance.now() - lastScroll < SCROLL_QUIET_MS * 2) {
+      window.setTimeout(() => idle(attempt), SCROLL_QUIET_MS * 2);
+      return;
+    }
+    void loadEcharts();
+  };
+  idle(attempt);
+}
+
 /** Runs `fn` now if nothing is scrolling, else when it's this chart's turn and scrolling has paused; returns a cancel function. */
 function drawSoon(fn: () => void) {
-  if (!listening) {
-    listening = true;
-    // Capture also hears scrolling panes (scroll events don't bubble).
-    window.addEventListener("scroll", () => (lastScroll = performance.now()), { passive: true, capture: true });
-  }
+  listen();
   if (!pumping && (!lastScroll || performance.now() - lastScroll > 1000)) {
     fn();
     return () => {};
@@ -141,6 +165,7 @@ export function EChart({
   useEffect(() => {
     const node = el.current;
     if (!node) return;
+    preloadWhenQuiet();
     // Old browsers without IntersectionObserver: draw straight away.
     if (typeof IntersectionObserver === "undefined") {
       queueMicrotask(() => setVisible(true));

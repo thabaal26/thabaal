@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "What changed" };
 const PAGES = [
   { href: "/dashboard", title: "Home", icon: Home, desc: "Today at a glance: 3 things to do, key numbers, wallet, next campaign, daily brief." },
   { href: "/dashboard/replies", title: "Chats", icon: MessageCircle, desc: "Open chats, priority board, calls." },
-  { href: "/dashboard/orders", title: "Orders", icon: Package, desc: "Track, pack, dispatch and deliver. Packing list." },
+  { href: "/dashboard/orders", title: "Orders", icon: Package, desc: "Track, pack, dispatch and deliver." },
   { href: "/dashboard/revenue", title: "Payments", icon: IndianRupee, desc: "To collect, received, cash/COD, all transactions, payment settings." },
   { href: "/dashboard/customers", title: "Customers", icon: Users, desc: "All customers, groups to reach, loyalty, refills." },
   { href: "/dashboard/catalogue", title: "Products", icon: Tag, desc: "Catalogue, how products sell, combo ideas." },
@@ -24,7 +24,8 @@ const MOVES: [string, string, string?][] = [
   ["Dashboard › Products view", "Products › How products sell.", "/dashboard/catalogue?view=demand"],
   ["Notifications and bell", "The bell at the top of every page. It opens a list with filters."],
   ["Orders", "Orders › Orders. Each order shows its stage, a timeline and one main button.", "/dashboard/orders"],
-  ["Orders › Packing list", "Orders › Packing list.", "/dashboard/orders/packing"],
+  // Packing list switched off (owner, 18 Oct 2026):
+  // ["Orders › Packing list", "Orders › Packing list.", "/dashboard/orders/packing"],
   ["Refills", "Customers › Refills. The refill reminder switch is in Campaigns › Automations.", "/dashboard/refills"],
   ["Revenue and cash (Money)", "Payments › Received. Money still to come in: Payments › To collect.", "/dashboard/revenue"],
   ["WhatsApp billing", "Meta billing summary is in Settings.", "/dashboard/settings#billing"],

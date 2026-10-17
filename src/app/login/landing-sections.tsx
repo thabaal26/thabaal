@@ -147,7 +147,7 @@ const LEGAL: { href: string; label: T }[] = [
   { href: "/privacy#delete-your-data", label: { en: "Delete your data", ta: "உங்கள் தரவை நீக்க" } },
 ];
 
-/** Privacy, terms, about and data deletion: under the sign-in form and in the page footer. */
+/** Privacy, terms, about and data deletion: once, in the page footer (on the same page as sign-in). */
 export function LegalLinks({ lang, className }: { lang: Lang; className?: string }) {
   return (
     <nav aria-label={lang === "ta" ? "சட்ட விவரங்கள்" : "Legal"} className={className}>
@@ -424,14 +424,14 @@ export function LandingSections({ lang }: { lang: Lang }) {
         </div>
       </section>
 
-      <footer className="tl-footer">
-        <div className="tl-wrap tl-footer-row">
-          <span lang="ta">தபால் · Thabaal</span>
-          <span>{ta ? "WhatsApp என்பது Meta Platforms, Inc.-இன் வர்த்தகக் குறி." : "WhatsApp is a trademark of Meta Platforms, Inc. Thabaal uses the official WhatsApp Cloud API."}</span>
-        </div>
+      {/* One line: name and year on the left, the legal links in the middle, the WhatsApp trademark note on the right. */}
+      <footer className={ta ? "tl-footer tl-footer-ta" : "tl-footer"}>
         <div className="tl-wrap tl-footer-row tl-footer-links">
-          <span>© {new Date().getFullYear()} Thabaal</span>
+          <span className="tl-footer-name">
+            © {new Date().getFullYear()} Thabaal · <span lang="ta">தபால்</span>
+          </span>
           <LegalLinks lang={lang} />
+          <span className="tl-footer-tm">{ta ? "WhatsApp என்பது Meta Platforms, Inc.-இன் வர்த்தகக் குறி." : "WhatsApp is a trademark of Meta Platforms, Inc."}</span>
         </div>
       </footer>
     </div>

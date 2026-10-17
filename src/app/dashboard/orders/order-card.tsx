@@ -632,7 +632,7 @@ export function OrderCard({
       {/* 1. Header: #1052 · Anbu M. [Catalogue] and Total ₹960 */}
       <div className="hd" style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 14 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h2 style={{ fontSize: 17, margin: 0, lineHeight: 1.3, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+          <h2 data-data style={{ fontSize: 17, margin: 0, lineHeight: 1.3, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             #{refText} ·{" "}
             <Link href={`/dashboard/customers/${o.customer.id}`} style={{ textDecoration: "none" }}>
               {o.customer.name}

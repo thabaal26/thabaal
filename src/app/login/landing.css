@@ -219,7 +219,22 @@
 
 .tl-footer { background: var(--bg); border-top: 1px solid var(--line); padding: 22px 0 calc(22px + env(safe-area-inset-bottom)); font-size: 13px; color: var(--muted); }
 .tl-footer-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; }
-.tl-footer-links { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); align-items: center; }
+/* One row on computers: name | links (centred) | trademark note; the note wraps inside its own column if it must. */
+.tl-footer-links { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px 28px; }
+.tl-footer-links nav { justify-content: center; }
+.tl-footer-name { white-space: nowrap; }
+.tl-footer-tm { text-align: right; line-height: 1.4; white-space: nowrap; }
+.tl-footer-links nav { gap: 4px 16px; }
+@media (max-width: 1200px) { .tl-footer-tm { white-space: normal; max-width: 18em; } }
+/* Tamil labels are about twice as long: links stay on one line and the trademark note gets the line under them. */
+@media (max-width: 1600px) and (min-width: 901px) {
+  .tl-footer-ta .tl-footer-links { grid-template-columns: auto minmax(0, 1fr); }
+  .tl-footer-ta .tl-footer-tm { grid-column: 1 / -1; text-align: center; white-space: normal; max-width: none; }
+}
+@media (max-width: 900px) {
+  .tl-footer-links { display: flex; flex-direction: column; justify-content: center; text-align: center; gap: 2px; }
+  .tl-footer-tm { max-width: none; text-align: center; }
+}
 .tl-footer-links nav { display: flex; flex-wrap: wrap; gap: 4px 18px; }
 .tl-footer-links a { color: var(--muted); text-decoration: none; display: inline-flex; align-items: center; min-height: 40px; }
 .tl-footer-links a:hover { color: var(--fg, inherit); text-decoration: underline; }

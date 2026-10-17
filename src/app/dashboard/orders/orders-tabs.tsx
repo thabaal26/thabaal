@@ -8,7 +8,8 @@ export function OrdersTabs({ active }: { active: "orders" | "pack" }) {
       current={active}
       tabs={[
         { id: "orders", href: "/dashboard/orders", label: "Orders", ta: "ஆர்டர்கள்" },
-        { id: "pack", href: "/dashboard/orders/packing", label: "Packing list", ta: "பேக்கிங்" },
+        // Packing list switched off (owner, 18 Oct 2026):
+        // { id: "pack", href: "/dashboard/orders/packing", label: "Packing list", ta: "பேக்கிங்" },
       ]}
     />
   );

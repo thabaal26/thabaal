@@ -361,31 +361,6 @@
   text-decoration: underline;
 }
 
-/* Privacy · Terms · About under the sign-in form. */
-.thabaal-legal {
-  margin-top: 14px;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0 14px;
-  font-size: 12.5px;
-}
-.thabaal-legal a {
-  color: var(--muted);
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-}
-.thabaal-legal a:hover {
-  text-decoration: underline;
-}
-@media (max-width: 639px) {
-  .thabaal-legal a {
-    min-height: 40px;
-  }
-}
-
 .thabaal-lang-pill {
   position: absolute;
   top: 24px;

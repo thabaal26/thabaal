@@ -86,7 +86,7 @@ export function CollectList({ rows, nowMs, canOperate, intro = true }: { rows: C
             <article key={r.id} className="card">
               <div className="hd" style={{ marginBottom: 6 }}>
                 <div>
-                  <h2 style={{ fontSize: 17 }}>
+                  <h2 data-data style={{ fontSize: 17 }}>
                     <Link href={`/dashboard/customers/${r.customerId}`} style={{ textDecoration: "none" }}>
                       {r.name}
                     </Link>{" "}

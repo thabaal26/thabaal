@@ -39,7 +39,7 @@ function todosOf(w: HeroWork): Todo[] {
   if (w.showOrders && w.unpaidCartsCount)
     t.push({ key: "unpaid", href: "/dashboard/orders?show=unpaid", color: "#d97706", icon: ShoppingCart, text: <><b>{formatValue(w.unpaidCartsValue, "inr")}</b> in {w.unpaidCartsCount} unpaid cart{w.unpaidCartsCount === 1 ? "" : "s"}</> });
   if (w.showOrders && w.toDispatchCount)
-    t.push({ key: "pack", href: "/dashboard/orders/packing", color: "#167d63", icon: PackageCheck, text: <><b>{fmtNumber(w.toDispatchCount)}</b> to pack</> });
+    t.push({ key: "pack", href: "/dashboard/orders?show=topack", color: "#167d63", icon: PackageCheck, text: <><b>{fmtNumber(w.toDispatchCount)}</b> to pack</> });
   if (w.showReplies && w.unhandledRepliesCount)
     t.push({ key: "chats", href: "/dashboard/replies/priority", color: "#6941c6", icon: MessageCircle, text: <><b>{fmtNumber(w.unhandledRepliesCount)}</b> chat{w.unhandledRepliesCount === 1 ? "" : "s"} to answer</> });
   if (w.showOrders && w.refillsDueCount)

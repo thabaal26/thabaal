@@ -408,7 +408,7 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                   {/* Card Header */}
                   <div className="hd" style={{ marginBottom: 8 }}>
                     <div>
-                      <h2 style={{ fontSize: 18 }}>
+                      <h2 data-data style={{ fontSize: 18 }}>
                         {c.isLive ? (
                           <Link href={`/dashboard/campaigns/${c.id}`} className="max-sm:inline-flex max-sm:min-h-10 max-sm:items-center" style={{ textDecoration: "none", color: "inherit" }}>
                             {c.n}
@@ -727,7 +727,7 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
           style={{ display: "block", position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 100 }}
         >
           <div className="dlg">
-            <h2 id="prog-title">{progModal.n}</h2>
+            <h2 id="prog-title" data-data>{progModal.n}</h2>
             <div className="list">
               <div className="row">
                 <div className="grow muted">{isTamil ? "அனுப்பியது" : "Sent"}</div>
@@ -777,7 +777,7 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
           style={{ display: "block", position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 100 }}
         >
           <div className="dlg">
-            <h2 id="pv-title">{isTamil ? "முன்னோட்டம்: " : "Preview: "}{pvModal.n}</h2>
+            <h2 id="pv-title" data-data>{isTamil ? "முன்னோட்டம்: " : "Preview: "}{pvModal.n}</h2>
             <div className="phone">
               <div className="bubble">{pvModal.body || `${pvModal.n}! Special offer for your next order today.`}</div>
               {pvModal.buttons && pvModal.buttons.length > 0 && (

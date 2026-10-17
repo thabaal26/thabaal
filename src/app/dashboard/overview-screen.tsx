@@ -2060,7 +2060,7 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
   const briefActions = [
     repliesOn && unhandledGroup.length ? { label: `Reply to ${plural(unhandledGroup.length, "chat")}`, href: "/dashboard/replies" } : null,
     ordersOn && curUnpaidCarts.length ? { label: "Chase unpaid carts", href: "/dashboard/orders?show=unpaid" } : null,
-    ordersOn && toDispatchCount ? { label: "Packing list", href: "/dashboard/orders/packing" } : null,
+    ordersOn && toDispatchCount ? { label: "Orders to pack", href: "/dashboard/orders?show=topack" } : null,
     refillsWeek.length ? { label: "Reorders due", href: "/dashboard/refills" } : null,
   ].filter((a): a is { label: string; href: string } => Boolean(a)).slice(0, 3);
 

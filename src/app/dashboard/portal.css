@@ -57,8 +57,8 @@ html.dark .thabaal-portal{
 .thabaal-portal .main{min-width:0;padding:22px max(20px,4vw) 60px}
 .thabaal-portal .wrapin{max-width:1040px;margin:0 auto}
 .thabaal-portal .top{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;justify-content:space-between;margin-bottom:20px}
-.thabaal-portal .top h1{font-size:clamp(26px,3vw,34px);line-height:1.1}
-.thabaal-portal .top .sub{color:var(--muted);margin-top:6px;max-width:34em}
+.thabaal-portal .top h1{font-family:var(--title);font-weight:700;letter-spacing:0;font-size:clamp(28px,3.2vw,36px);line-height:1.1}
+.thabaal-portal .top .sub{color:var(--muted);margin-top:6px;max-width:34em;font-size:15px;line-height:1.5}
 .thabaal-portal .tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .thabaal-portal .iconbtn{position:relative;width:42px;height:42px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);display:grid;place-items:center;cursor:pointer}
 .thabaal-portal .iconbtn:hover{border-color:var(--fg)}
@@ -81,18 +81,24 @@ html.dark .thabaal-portal{
 .thabaal-portal .seg button{border:0;background:none;padding:6px 12px;border-radius:9px;font-weight:600;font-size:13.5px;color:var(--muted);cursor:pointer}
 .thabaal-portal .seg button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
 .thabaal-portal .card{background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:20px;box-shadow:var(--shadow);min-width:0}
-.thabaal-portal .card>h2,.thabaal-portal .card>.hd h2{font-size:19px}
+/* Type levels: page title and section headings in the rounded title face (Baloo Thambi 2); everything you read or
+   compare (sub-headings, labels, body, numbers) in DM Sans. A card heading that is data (an order or a name) opts out
+   with data-data. */
+.thabaal-portal .card>h2,.thabaal-portal .card>.hd h2{font-family:var(--title);font-weight:600;font-size:20px;line-height:1.25;letter-spacing:0}
+.thabaal-portal h2:not([data-data]):not([class]){font-family:var(--title);font-weight:600;letter-spacing:0}
+.thabaal-portal .card>h2[data-data],.thabaal-portal .card>.hd h2[data-data]{font-family:var(--display);font-weight:700;letter-spacing:-.2px}
+.thabaal-portal h3{font-family:var(--ui);font-weight:600;font-size:16px;letter-spacing:-.1px}
 .thabaal-portal .hd{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px}
-.thabaal-portal .hd p{color:var(--muted);font-size:14px}
+.thabaal-portal .hd p{color:var(--muted);font-size:14px;line-height:1.45;margin-top:2px}
 .thabaal-portal .stack{display:flex;flex-direction:column;gap:16px}
 .thabaal-portal .grid:where(.g2,.g3,.g4,.split,.gx){display:grid;gap:16px}
 .thabaal-portal .g2{grid-template-columns:repeat(2,minmax(0,1fr))}
 .thabaal-portal .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .thabaal-portal .g4{grid-template-columns:repeat(4,minmax(0,1fr))}
 .thabaal-portal .split{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
-.thabaal-portal .stat .l{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:13.5px;font-weight:500}
+.thabaal-portal .stat .l{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:13px;font-weight:600}
 .thabaal-portal .stat .l svg,.thabaal-portal .stat .l .ic{width:16px;height:16px;color:var(--muted);flex-shrink:0;opacity:0.85}
-.thabaal-portal .stat .v{font:600 clamp(26px,3vw,34px)/1.1 var(--display);margin-top:4px;font-variant-numeric:tabular-nums}
+.thabaal-portal .stat .v{font:700 clamp(26px,3vw,34px)/1.1 var(--display);letter-spacing:-.6px;margin-top:4px;font-variant-numeric:tabular-nums}
 .thabaal-portal .stat .d{font-size:13px;margin-top:4px;font-weight:600}
 .thabaal-portal .up{color:var(--ok)}
 .thabaal-portal .down{color:var(--bad)}
@@ -112,10 +118,10 @@ html.dark .thabaal-portal{
 .thabaal-portal .row:last-child{border-bottom:0;padding-bottom:0}
 .thabaal-portal .row:first-child{padding-top:0}
 .thabaal-portal .row .grow{flex:1;min-width:180px}
-.thabaal-portal .row .t{font-weight:600}
+.thabaal-portal .row .t{font-weight:600;font-size:15px;color:var(--fg)}
 .thabaal-portal .todo{display:flex;align-items:center;gap:14px;padding:16px;border:1.5px solid var(--line);border-radius:16px;text-decoration:none;background:var(--card)}
 .thabaal-portal .todo:hover{border-color:var(--fg)}
-.thabaal-portal .todo .big{font:600 26px var(--display);font-variant-numeric:tabular-nums}
+.thabaal-portal .todo .big{font:700 26px var(--display);letter-spacing:-.5px;font-variant-numeric:tabular-nums}
 .thabaal-portal .todo .go{margin-left:auto;white-space:nowrap;font-weight:700;display:flex;gap:6px;align-items:center}
 /* Long labels (Tamil) on narrow phones: the text column shrinks and wraps, and the link drops to its own line, right-aligned. */
 /* "Things that need you" tiles: figure, words and action on one row when the tile is wide enough; in a narrow tile

@@ -145,7 +145,7 @@ export function HomeTiers(p: HomeTiersProps) {
       node: (
         <TodoTile
           key="pack"
-          href="/dashboard/orders/packing"
+          href="/dashboard/orders?show=topack"
           big={String(p.toPackCount)}
           title="Orders to pack"
           titleTa="பேக் செய்ய வேண்டியவை"

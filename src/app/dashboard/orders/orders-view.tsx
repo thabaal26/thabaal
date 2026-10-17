@@ -56,7 +56,10 @@ export function OrdersView({
   const router = useRouter();
   const lang = useLang();
   const isTa = lang === "ta";
-  const [activeTab, setActiveTab] = useState<"orders" | "pack">(initialTab);
+  // Packing list switched off (owner, 18 Oct 2026): only the Orders panel shows. The tab and its panel are kept
+  // (commented out / never reached) so it can come back; was useState(initialTab) with setActiveTab.
+  void initialTab;
+  const [activeTab] = useState<"orders" | "pack">("orders");
   const [show, setShow] = useState<string>(initialShow);
   const [payFilter, setPayFilter] = useState<string>(initialPay);
   const [srcFilter, setSrcFilter] = useState<string>(initialSrc);
@@ -124,6 +127,8 @@ export function OrdersView({
     if (show === "new" && o.status !== "NEW") return false;
     if (show === "confirmed" && o.status !== "CONFIRMED") return false;
     if (show === "paid" && !isOrderPaid(o) && !isOrderCod(o)) return false;
+    // "To pack" (from the To pack card and Home): confirmed or paid, not packed yet. Same rule as toPackCount.
+    if (show === "topack" && !((o.status === "CONFIRMED" || o.status === "PAID") && !o.packedAt)) return false;
     if (show === "packed" && (o.packedAt == null || o.status === "CANCELLED")) return false;
     if (show === "dispatched" && o.status !== "DISPATCHED") return false;
     if (show === "done" && o.status !== "DELIVERED") return false;
@@ -314,7 +319,7 @@ export function OrdersView({
 
   return (
     <>
-      {/* Top Tabs: Orders vs Packing list */}
+      {/* Top Tabs: Orders vs Packing list. Switched off with the packing list (owner, 18 Oct 2026):
       <div className="tabs" data-tabs role="tablist">
         <button
           type="button"
@@ -337,6 +342,7 @@ export function OrdersView({
           <T ta="பேக்கிங்">Packing list</T>
         </button>
       </div>
+      */}
 
       {/* Panel 1: Orders */}
       {activeTab === "orders" && (
@@ -374,7 +380,7 @@ export function OrdersView({
               subTa="பணம் அல்லது COD"
               icon={<Package className="size-4" />}
               tone="info"
-              onClick={() => setActiveTab("pack")}
+              onClick={() => setShow("topack")}
             />
             <Stat
               label={hasDispatch ? (isTa ? "அனுப்பப்பட்டவை" : "Dispatched") : (isTa ? "இன்று முடித்தவை" : "Finished today")}
@@ -535,7 +541,7 @@ export function OrdersView({
               type="button"
               className="chip"
               aria-pressed={show === "paid"}
-              onClick={() => setShow("paid")}
+              onClick={() => setShow("topack")}
             >
               <T ta="பணம் / COD">Paid / COD</T> <small>{paidCount}</small>
             </button>
@@ -637,7 +643,7 @@ export function OrdersView({
         </section>
       )}
 
-      {/* Panel 2: Packing List */}
+      {/* Panel 2: Packing List. Never shown now (activeTab stays "orders"); kept for when it comes back. */}
       {activeTab === "pack" && (
         <section data-panel="pack">
           <div className="grid split">
