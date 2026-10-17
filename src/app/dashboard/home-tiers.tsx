@@ -108,6 +108,8 @@ function TodoTile({ href, big, title, titleTa, sub, subTa, go, goTa }: { href: s
   );
 }
 
+const GREETING_TA: Record<string, string> = { "Good morning": "காலை வணக்கம்", "Good afternoon": "மதிய வணக்கம்", "Good evening": "மாலை வணக்கம்" };
+
 const RANGES = [
   { id: "7d", label: "7 days", ta: "7 நாட்கள்" },
   { id: "30d", label: "30 days", ta: "30 நாட்கள்" },
@@ -178,6 +180,7 @@ export function HomeTiers(p: HomeTiersProps) {
   return (
     <PortalPage
       title={p.greetingText}
+      titleTa={GREETING_TA[p.greetingText] ?? "வணக்கம்"}
       sub="Here is today, in plain words."
       subTa="இன்றைய நிலை, எளிய வார்த்தைகளில்."
       actions={

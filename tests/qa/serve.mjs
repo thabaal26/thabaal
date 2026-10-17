@@ -23,6 +23,7 @@ for (const f of [".env", ".env.local", ".env.production", ".env.production.local
 export const QA_ENV = {
   ...process.env,
   ...blanked,
+  THABAAL_QA: "1",
   APP_TIMEZONE: "Asia/Kolkata",
   DEFAULT_COUNTRY_CODE: "91",
   META_GRAPH_VERSION: "v21.0",

@@ -50,7 +50,7 @@ const THEMES = arg("themes", "light,dark");
 const LANGS = arg("langs", "en,ta");
 const OUT = ".qa-shots";
 
-const slug = (r) => (r.replace(/^\/dashboard\/?/, "home/").replace(/[?=&/]+/g, "_").replace(/_+$/, "") || "home").replace(/^home_$/, "home");
+const slug = (r) => r.replace(/^\/dashboard\/?/, "").replace(/[?=&/]+/g, "_").replace(/_+$/, "") || "home";
 const b = await chromium.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe" });
 const report = [];
 for (const theme of THEMES)
@@ -95,14 +95,18 @@ for (const theme of THEMES)
             const label = `${el.tagName.toLowerCase()} "${(el.textContent || el.getAttribute("aria-label") || "").trim().replace(/\s+/g, " ").slice(0, 26)}"`;
             if (el.children.length === 0 && r.right > vw + 1 && !inScroller(el) && st.position !== "fixed") out.off.push(`${label} right=${Math.round(r.right)}`);
             // Text cut off inside its own box without an ellipsis.
-            if (el.children.length === 0 && (el.textContent || "").trim() && st.overflow === "hidden" && st.textOverflow !== "ellipsis" && el.scrollWidth > el.clientWidth + 2 && !/line-clamp/.test(el.className)) out.clipped.push(label);
+            // (Screen-reader-only text is clipped to 1px on purpose.)
+            const srOnly = r.width <= 2 || r.height <= 2 || /sr-only/.test(String(el.className)) || st.clip === "rect(0px, 0px, 0px, 0px)";
+            if (!srOnly && el.children.length === 0 && (el.textContent || "").trim() && st.overflow === "hidden" && st.textOverflow !== "ellipsis" && el.scrollWidth > el.clientWidth + 2 && !/line-clamp/.test(String(el.className))) out.clipped.push(label);
             if (phone && el.matches("a[href],button,input:not([type=hidden]):not([type=checkbox]):not([type=radio]),select,textarea,[role=button],[role=tab],summary") && (r.height < 40 || r.width < 40)) {
               const inline = el.matches("a") && /\S/.test((el.parentElement?.textContent || "").replace(el.textContent || "", ""));
               if (!inline) out.small.push(`${label} ${Math.round(r.width)}x${Math.round(r.height)}`);
             }
           }
           if (lang === "ta") {
-            for (const h of document.querySelectorAll("h1, h2, nav a, button")) {
+            // Headings, navigation and buttons only (names, places and products are data, in whatever language).
+            for (const h of document.querySelectorAll("h1, h2, nav a, button:not([role=radio])")) {
+              if (h.closest("[data-data], article, li, td")) continue;
               const t = (h.textContent || "").trim();
               if (t.length > 3 && /^[A-Za-z][A-Za-z ,.'&-]+$/.test(t) && !/^(WhatsApp|UPI|COD|QA|Thabaal|PDF|CSV|OK|Google|Meta)\b/.test(t)) out.english.push(t.slice(0, 30));
             }

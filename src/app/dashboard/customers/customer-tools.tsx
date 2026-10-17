@@ -11,8 +11,37 @@ import { Badge, Button, Field } from "@/components/ui";
 import { buttonClass } from "@/components/ui-classes";
 import { cn } from "@/lib/cn";
 import { CustomFieldInputs } from "@/components/custom-field-inputs";
+import { useLanguage } from "@/lib/i18n/context";
 import type { CustomField } from "@/lib/custom-fields";
-import { deletePendingCustomer, importCustomers, promotePendingCustomer, saveCustomer } from "../actions/customers";
+import { deleteCustomer, deletePendingCustomer, importCustomers, promotePendingCustomer, saveCustomer } from "../actions/customers";
+
+/** Deletes a customer from their profile after a confirmation, then goes back to the customer list. */
+export function DeleteCustomerButton({ id, name }: { id: string; name: string }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  return (
+    <Button
+      variant="danger"
+      loading={pending}
+      onClick={async () => {
+        const ok = await confirmAction({
+          title: `Delete ${name}?`,
+          message: "They are removed with their chats and messages. This can't be undone. Customers with orders can't be deleted (their payments must stay on record): opt them out instead.",
+          confirmLabel: "Delete customer",
+          danger: true,
+        });
+        if (!ok) return;
+        start(async () => {
+          const r = await safeAction(() => deleteCustomer(id));
+          toastResult(r);
+          if (r.ok) router.push("/dashboard/customers");
+        });
+      }}
+    >
+      <Trash2 aria-hidden className="size-4" /> Delete customer
+    </Button>
+  );
+}
 
 const LINKS = [
   { href: "/dashboard/customers/grow", label: "Get more customers", icon: QrCode, manager: false },
@@ -45,6 +74,7 @@ export function CustomerActions({
   exportCount?: number;
 }) {
   const [open, setOpen] = useState<"add" | "import" | "more" | null>(null);
+  const ta = useLanguage().lang === "ta";
   const links = hasClient ? LINKS.filter((l) => canManage || !l.manager) : [];
   const manage = canManage && hasClient;
   const exportLabel = `Export ${exportCount.toLocaleString("en-IN")} customer${exportCount === 1 ? "" : "s"} as CSV`;
@@ -52,16 +82,21 @@ export function CustomerActions({
     <>
       {exportHref && (
         <a href={exportHref} download className={cn(buttonClass("secondary"), "max-sm:hidden")} title={exportLabel}>
-          <Download aria-hidden className="size-4" /> Export CSV
+          <Download aria-hidden className="size-4" /> {ta ? "CSV ஏற்றுமதி" : "Export CSV"}
         </a>
       )}
       {manage && (
         <>
           <Button variant="secondary" className="max-sm:hidden" onClick={() => setOpen("import")}>
-            <FileUp aria-hidden className="size-4" /> Import CSV
+            <FileUp aria-hidden className="size-4" /> {ta ? "CSV இறக்குமதி" : "Import CSV"}
           </Button>
           <Button onClick={() => setOpen("add")} className="max-sm:px-3.5">
-            <UserPlus aria-hidden className="size-4" /> <span>Add<span className="max-sm:sr-only"> customer</span></span>
+            <UserPlus aria-hidden className="size-4" />{" "}
+            {ta ? (
+              <span>சேர்<span className="max-sm:sr-only"> வாடிக்கையாளர்</span></span>
+            ) : (
+              <span>Add<span className="max-sm:sr-only"> customer</span></span>
+            )}
           </Button>
         </>
       )}

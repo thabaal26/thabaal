@@ -270,7 +270,7 @@ export function SettingsLink() {
       aria-label="Settings"
       aria-current={active ? "page" : undefined}
       className={cn(
-        "grid size-9 shrink-0 place-items-center rounded-xl transition active:scale-95 sm:size-11",
+        "grid size-10 shrink-0 place-items-center rounded-xl transition active:scale-95 sm:size-11",
         active ? "bg-sunken text-ink" : "text-muted hover:bg-sunken hover:text-ink",
       )}
     >

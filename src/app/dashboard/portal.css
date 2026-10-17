@@ -117,6 +117,9 @@ html.dark .thabaal-portal{
 .thabaal-portal .todo:hover{border-color:var(--fg)}
 .thabaal-portal .todo .big{font:600 26px var(--display);font-variant-numeric:tabular-nums}
 .thabaal-portal .todo .go{margin-left:auto;white-space:nowrap;font-weight:700;display:flex;gap:6px;align-items:center}
+/* Long labels (Tamil) on narrow phones: the text column shrinks and wraps, and the link drops to its own line, right-aligned. */
+.thabaal-portal .todo{flex-wrap:wrap}
+.thabaal-portal .todo>span:nth-child(2){flex:1 1 9rem;min-width:0;overflow-wrap:anywhere}
 .thabaal-portal .field:not(input,select,textarea,button){display:flex;flex-direction:column;gap:6px}
 .thabaal-portal .field label{font-weight:600;font-size:13.5px}
 .thabaal-portal .formgrid{display:grid;gap:14px;grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -236,3 +239,10 @@ html.dark .thabaal-portal .phone{background:#0E2535;color:#FFF9F0}
 .thabaal-portal .ui-card,.thabaal-portal .card-3d{background:var(--card);border:1.5px solid var(--line);border-radius:18px;box-shadow:var(--shadow);transform:none}
 .thabaal-portal .card-3d:hover{transform:none;border-color:var(--line)}
 html.dark .thabaal-portal .ui-card,html.dark .thabaal-portal .card-3d{border-color:var(--line);box-shadow:var(--shadow)}
+
+/* Phones: every tap target at least 40px tall (filter chips, small buttons, segmented choices). */
+@media (max-width:639px){
+  .thabaal-portal .chip{min-height:40px;display:inline-flex;align-items:center}
+  .thabaal-portal .btn.sm{min-height:40px}
+  .thabaal-portal .seg button{min-height:40px}
+}

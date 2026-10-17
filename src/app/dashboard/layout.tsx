@@ -206,7 +206,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
 
           {/* Phones and tablets: a slim top bar with the logo, the business and quick controls. */}
           <header className="sticky top-0 z-30 w-full border-b border-line bg-canvas/95 pt-[env(safe-area-inset-top)] text-ink backdrop-blur-md lg:hidden print:hidden">
-            <div className="flex h-12 items-center gap-2 pl-3 pr-1.5 sm:h-14 sm:gap-3 sm:pl-4 sm:pr-2">
+            <div className="flex h-14 items-center gap-1.5 pl-3 pr-1.5 sm:gap-3 sm:pl-4 sm:pr-2">
               <Logo size="sm" />
               {scope.isAdmin ? (
                 <HeaderClientSwitcher clients={clients} current={scope.clientId} title={client ? name : "All clients"}>
@@ -218,9 +218,10 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
                   {status && <div className="flex justify-end text-2xs leading-tight">{status}</div>}
                 </div>
               )}
-              <LanguageSwitch size="sm" />
-              <ThemeToggle />
-              {notificationsOn && <NotificationBell />}
+              {/* 40px tap targets on phones; the light/dark switch lives in Settings there, to leave room for the name. */}
+              <LanguageSwitch size="sm" className="h-10 [&>button]:min-h-9" />
+              <ThemeToggle className="max-sm:hidden" />
+              {notificationsOn && <NotificationBell className="max-sm:size-10" />}
               <SettingsLink />
             </div>
           </header>

@@ -233,6 +233,11 @@ export async function setOptOut(id: string, optedOut: boolean): Promise<ActionRe
 export async function deleteCustomer(id: string): Promise<ActionResult> {
   const s = await requireManager();
   if ("denied" in s) return { ok: false, message: s.denied };
+  // Orders are deleted with the customer (cascade), so a customer with orders is kept: their payments, refunds
+  // and reports must stay on record. Opting out stops all messages instead.
+  const orders = await db.order.count({ where: { customerId: id, ...owned(s) } });
+  if (orders > 0)
+    return { ok: false, message: `This customer has ${orders} order${orders === 1 ? "" : "s"}, so they're kept for your payment records. Use "Opt out" to stop all messages to them.` };
   const r = await db.customer.deleteMany({ where: { id, ...owned(s) } });
   if (!r.count) return { ok: false, message: "Customer not found." };
   revalidatePath("/dashboard/customers");

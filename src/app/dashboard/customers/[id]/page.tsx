@@ -23,7 +23,7 @@ import { META_SAMPLES } from "@/lib/template";
 import { sendCatalogue } from "../../actions/catalog";
 import { requestCallPermission } from "../../actions/calls";
 import { setOptOut } from "../../actions/customers";
-import { EditCustomerButton } from "../customer-tools";
+import { DeleteCustomerButton, EditCustomerButton } from "../customer-tools";
 import { CallButton } from "./call-button";
 import { PausedOffersNote } from "./paused-offers-note";
 import { PurchaseJourney } from "./purchase-journey";
@@ -106,6 +106,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
         {c.optedOut ? "Opt back in" : "Opt out"}
       </ActionButton>
     ),
+    scope.canManage && c.orders.length === 0 && <DeleteCustomerButton key="del" id={c.id} name={c.name} />,
   ].filter(Boolean);
 
   return (

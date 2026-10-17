@@ -442,14 +442,14 @@ export function Callout({
 export function FilterChips({ label, items, className }: { label: string; items: { href: string; label: string; count?: number | string; active: boolean }[]; className?: string }) {
   return (
     <nav aria-label={label} className={cn("w-full", className)}>
-      <ul className="flex flex-wrap items-center gap-2">
+      <ul className="m-0 flex list-none flex-wrap items-center gap-2 p-0">
         {items.map((t) => (
-          <li key={t.href}>
+          <li key={t.href} className="list-none">
             <Link
               href={t.href}
               aria-current={t.active ? "page" : undefined}
               className={cn(
-                "inline-flex min-h-[34px] items-center gap-1.5 whitespace-nowrap rounded-full border-[1.5px] px-3.5 text-[13.5px] font-semibold transition-all duration-200 ease-out active:scale-[0.96]",
+                "inline-flex min-h-10 items-center sm:min-h-[34px] gap-1.5 whitespace-nowrap rounded-full border-[1.5px] px-3.5 text-[13.5px] font-semibold transition-all duration-200 ease-out active:scale-[0.96]",
                 t.active
                   ? "border-ink bg-ink text-canvas shadow-xs -translate-y-px"
                   : "border-line bg-panel text-muted hover:border-ink hover:text-ink hover:-translate-y-px hover:shadow-2xs",
