@@ -49,6 +49,6 @@ jobs:
         continue-on-error: true
         run: npx eslint .
       - name: Build
-        run: npx next build
+        run: npx next build --webpack
       - name: Automatic tests (test database only)
         run: node tests/run.mjs --http

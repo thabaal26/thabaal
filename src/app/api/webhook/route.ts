@@ -10,8 +10,7 @@ import { money, orderRef, orderWhereRef, recordOrder } from "@/lib/orders";
 import { ORDER_REF_RE } from "@/lib/order-ref";
 import { metaReplyContent, receivingNumber, recordReply } from "@/lib/replies";
 import { autoRedeemPoints } from "@/lib/loyalty-redeem";
-import { autoRequestPayment, cancelSupersededOrdersForCustomer, confirmPayment, recordPaymentClaim, recordPaymentFailure, sendCodConfirmationPrompt, textInWindow, updateOrderCard } from "@/lib/payments";
-import { parseAddressText } from "@/lib/address";
+import { autoRequestPayment, cancelSupersededOrdersForCustomer, confirmPayment, parseMetaAmount, recordPaymentClaim, recordPaymentFailure, sendCodConfirmationPrompt, textInWindow, updateOrderCard } from "@/lib/payments";
 import { autoReplyToButton, autoSendCatalogue, catalogueTrigger, firstMessageToday } from "@/lib/catalog";
 import { mapMetaStatus } from "@/lib/whatsapp";
 import { JOIN_RE, joinFromWhatsApp } from "@/lib/optin";
@@ -165,9 +164,8 @@ async function applyPayment(s: PaymentUpdate, phoneNumberId?: string) {
     await recordPaymentFailure(order.id, String(reason));
     return;
   }
-  // Meta sends the amount in paise-like units: value / 10^offset.
-  const amt = s.payment?.amount;
-  const amount = amt?.value != null ? amt.value / 10 ** (amt.offset ?? 2) : null;
+  // Meta sends the amount in paise-like units: value / offset (divisor 100) or value / 10^offset (exponent 2).
+  const amount = parseMetaAmount(s.payment?.amount);
   if (amount != null && !(amount > 0)) {
     await recordPaymentClaim(order.id, "WhatsApp reported a payment of ₹0. Check your UPI app before packing.").catch(() => {});
     return;
@@ -175,6 +173,8 @@ async function applyPayment(s: PaymentUpdate, phoneNumberId?: string) {
   // confirmPayment keeps a smaller amount as a part payment, so the order is only "Paid" when the full total arrived.
   await confirmPayment(order.id, txn?.id ?? s.id ?? null, { method: "upi_whatsapp", source: "meta", amount });
 }
+
+
 
 const NEGATIVE_PAY_RE = /\b(not\s+paid|haven'?t\s+paid|didn'?t\s+pay|how\s+to\s+pay|will\s+pay|pay\s+later|failed|pending|error|issue|problem|unable|can'?t\s+pay|cannot\s+pay)\b/i;
 const POSITIVE_PAY_RE = /\b(paid|payment\s+(done|sent|completed|successful|success)|gpay\s+done|phonepe\s+done|paytm\s+done|upi\s+(done|paid|sent)|money\s+sent|amount\s+(sent|paid))\b/i;
@@ -248,8 +248,7 @@ async function detectAndApplyUpiPayment(
 
   if (isNativePaymentBubble) {
     const txnId = m.payment?.transaction?.id ?? m.id ?? "WA-UPI";
-    const amt = m.payment?.amount;
-    const amount = amt?.value != null ? Number(amt.value) / 10 ** (amt.offset ?? 2) : null;
+    const amount = parseMetaAmount(m.payment?.amount);
     // Only a bubble that says how much was paid is recorded straight away (a smaller amount stays part paid);
     // without an amount, staff check the UPI app first, like any other "I paid".
     if (!(amount != null && amount > 0)) {

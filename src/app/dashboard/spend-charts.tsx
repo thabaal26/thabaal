@@ -9,6 +9,7 @@ import { cn } from "@/lib/cn";
 import { MetaRecharge } from "@/components/meta-recharge";
 import { fmtNumber } from "@/lib/format";
 import type { DailySpendPoint, ServiceQuotaInfo, SpendRow } from "@/lib/spend";
+import { useLanguage } from "@/lib/i18n/context";
 
 const rupees = (n: number) => `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -60,8 +61,16 @@ export function SpendAnalyticsCharts({
   monthOrdersCount,
   monthOrderRevenue,
 }: SpendChartsProps) {
+  const { isTa } = useLanguage();
   const [tab, setTab] = useState<ChartTab>("spend");
   const [activeDay, setActiveDay] = useState<string | null>(null);
+
+  const catLabelsTa: Record<string, string> = {
+    marketing: "விளம்பரம்",
+    utility: "பயன்பாடு",
+    authentication: "அங்கீகாரம்",
+    service: "வாடிக்கையாளர் சேவை",
+  };
 
   // Build Donut slices for current month spend by category
   const catOrder = ["marketing", "utility", "authentication", "service"] as const;
@@ -82,21 +91,21 @@ export function SpendAnalyticsCharts({
     const rate = rates[cat];
     const subParts: string[] = [];
     if (cat === "service") {
-      subParts.push(`${fmtNumber(serviceQuota.freeUsed)}/${fmtNumber(serviceQuota.totalFreeLimit)} free`);
-      if (charged > 0) subParts.push(`${fmtNumber(charged)} overage @ ₹${rate}`);
-      else subParts.push("1,000/mo free");
+      subParts.push(isTa ? `${fmtNumber(serviceQuota.freeUsed)}/${fmtNumber(serviceQuota.totalFreeLimit)} இலவசம்` : `${fmtNumber(serviceQuota.freeUsed)}/${fmtNumber(serviceQuota.totalFreeLimit)} free`);
+      if (charged > 0) subParts.push(isTa ? `${fmtNumber(charged)} கூடுதல் @ ₹${rate}` : `${fmtNumber(charged)} overage @ ₹${rate}`);
+      else subParts.push(isTa ? "மாதம் 1,000 இலவசம்" : "1,000/mo free");
     } else {
-      if (charged > 0) subParts.push(`${fmtNumber(charged)} charged`);
-      if (free > 0) subParts.push(`${fmtNumber(free)} free (72h CTWA)`);
-      if (rate) subParts.push(`₹${rate}/msg`);
+      if (charged > 0) subParts.push(isTa ? `${fmtNumber(charged)} கட்டணம்` : `${fmtNumber(charged)} charged`);
+      if (free > 0) subParts.push(isTa ? `${fmtNumber(free)} இலவசம் (72h CTWA)` : `${fmtNumber(free)} free (72h CTWA)`);
+      if (rate) subParts.push(isTa ? `₹${rate}/செய்தி` : `₹${rate}/msg`);
     }
     return [
       {
         key: cat,
-        label: categoryLabels[cat] ?? cat,
+        label: isTa ? (catLabelsTa[cat] ?? categoryLabels[cat] ?? cat) : (categoryLabels[cat] ?? cat),
         value: cost,
         color: catColors[cat],
-        sub: subParts.join(" · ") || "No messages this month",
+        sub: subParts.join(" · ") || (isTa ? "இந்த மாதம் செய்திகள் இல்லை" : "No messages this month"),
       },
     ];
   });
@@ -107,12 +116,12 @@ export function SpendAnalyticsCharts({
     label: d.label,
     sub: d.sub,
     highlight: d.totalCost > 0 && d.totalCost === Math.max(...daily.map((x) => x.totalCost)),
-    tip: `${fmtNumber(d.chargedVolume)} paid msg${d.chargedVolume === 1 ? "" : "s"}${d.freeVolume > 0 ? ` · ${fmtNumber(d.freeVolume)} free` : ""}`,
+    tip: `${fmtNumber(d.chargedVolume)} ${isTa ? "கட்டண செய்தி" : "paid msg"}${d.chargedVolume === 1 ? "" : isTa ? "கள்" : "s"}${d.freeVolume > 0 ? ` · ${fmtNumber(d.freeVolume)} ${isTa ? "இலவசம்" : "free"}` : ""}`,
     parts: [
-      { key: "marketing", label: "Marketing", value: d.marketingCost, color: "gold" },
-      { key: "utility", label: "Utility", value: d.utilityCost, color: "blue" },
-      ...(d.authCost > 0 ? [{ key: "auth", label: "Authentication", value: d.authCost, color: "violet" as const }] : []),
-      ...(d.serviceCost > 0 ? [{ key: "service", label: "Service (>1k quota)", value: d.serviceCost, color: "emerald" as const }] : []),
+      { key: "marketing", label: isTa ? "விளம்பரம்" : "Marketing", value: d.marketingCost, color: "gold" },
+      { key: "utility", label: isTa ? "பயன்பாடு" : "Utility", value: d.utilityCost, color: "blue" },
+      ...(d.authCost > 0 ? [{ key: "auth", label: isTa ? "அங்கீகாரம்" : "Authentication", value: d.authCost, color: "violet" as const }] : []),
+      ...(d.serviceCost > 0 ? [{ key: "service", label: isTa ? "வாடிக்கையாளர் சேவை (>1k)" : "Service (>1k quota)", value: d.serviceCost, color: "emerald" as const }] : []),
     ],
   }));
 
@@ -122,10 +131,10 @@ export function SpendAnalyticsCharts({
     label: d.label,
     sub: d.sub,
     highlight: d.chargedVolume + d.freeVolume > 0 && d.chargedVolume + d.freeVolume === Math.max(...daily.map((x) => x.chargedVolume + x.freeVolume)),
-    tip: d.totalCost > 0 ? `Day spend: ${rupees(d.totalCost)} ex-GST` : "₹0.00 spend",
+    tip: d.totalCost > 0 ? (isTa ? `நாள் செலவு: ${rupees(d.totalCost)} (GST தவிர)` : `Day spend: ${rupees(d.totalCost)} ex-GST`) : (isTa ? "₹0.00 செலவு" : "₹0.00 spend"),
     parts: [
-      { key: "charged", label: "Charged messages", value: d.chargedVolume, color: "gold" },
-      { key: "free", label: "Free 24h window", value: d.freeVolume, color: "emerald" },
+      { key: "charged", label: isTa ? "கட்டண செய்திகள்" : "Charged messages", value: d.chargedVolume, color: "gold" },
+      { key: "free", label: isTa ? "இலவச 24h சாளரம்" : "Free 24h window", value: d.freeVolume, color: "emerald" },
     ],
   }));
 
@@ -173,14 +182,16 @@ export function SpendAnalyticsCharts({
             <>
               <div className="flex flex-wrap items-center justify-between gap-1.5">
                 <p className="text-[11px] font-medium text-ink-2 sm:text-xs">
-                  Prepaid wallet · {lastSyncedLabel}
+                  {isTa ? "ப்ரீபெய்ட் வாலட்" : "Prepaid wallet"} · {lastSyncedLabel}
                 </p>
                 {low ? (
                   <Badge tone="amber" dot>
-                    Low balance · Top up soon
+                    {isTa ? "குறைந்த இருப்பு · விரைவில் ரீசார்ஜ் செய்யவும்" : "Low balance · Top up soon"}
                   </Badge>
                 ) : (
-                  <Badge tone="green">~{fmtNumber(estMarketingRunway)} mktg msgs left</Badge>
+                  <Badge tone="green">
+                    {isTa ? `~${fmtNumber(estMarketingRunway)} விளம்பர செய்தி இருப்பு` : `~${fmtNumber(estMarketingRunway)} mktg msgs left`}
+                  </Badge>
                 )}
               </div>
 
@@ -190,10 +201,10 @@ export function SpendAnalyticsCharts({
                   max={500}
                   full={low}
                   size={84}
-                  label={`Prepaid wallet balance ${rupees(remainingBalance)}`}
+                  label={isTa ? `ப்ரீபெய்ட் வாலட் இருப்பு ${rupees(remainingBalance)}` : `Prepaid wallet balance ${rupees(remainingBalance)}`}
                 >
                   <span className="tabular text-xs font-semibold leading-none text-ink">~{fmtNumber(estMarketingRunway)}</span>
-                  <span className="mt-0.5 text-[9px] font-medium text-muted">mktg left</span>
+                  <span className="mt-0.5 text-[9px] font-medium text-muted">{isTa ? "விளம்பரம்" : "mktg left"}</span>
                 </UsageGauge>
 
                 <div className="min-w-0 flex-1">
@@ -201,12 +212,12 @@ export function SpendAnalyticsCharts({
                   <p className="mt-0.5 truncate text-[11px] text-muted sm:text-xs">{accountName}</p>
                   <div className="mt-2 grid grid-cols-2 gap-1.5 text-[11px]">
                     <div className="rounded-md border border-line/80 bg-panel/80 px-2 py-1">
-                      <span className="block text-[10px] text-muted">Marketing cap.</span>
-                      <span className="tabular font-semibold text-ink">~{fmtNumber(estMarketingRunway)} msgs</span>
+                      <span className="block text-[10px] text-muted">{isTa ? "விளம்பர வரம்பு" : "Marketing cap."}</span>
+                      <span className="tabular font-semibold text-ink">~{fmtNumber(estMarketingRunway)} {isTa ? "செய்திகள்" : "msgs"}</span>
                     </div>
                     <div className="rounded-md border border-line/80 bg-panel/80 px-2 py-1">
-                      <span className="block text-[10px] text-muted">Utility cap.</span>
-                      <span className="tabular font-semibold text-ink">~{fmtNumber(estUtilityRunway)} msgs</span>
+                      <span className="block text-[10px] text-muted">{isTa ? "பயன்பாட்டு வரம்பு" : "Utility cap."}</span>
+                      <span className="tabular font-semibold text-ink">~{fmtNumber(estUtilityRunway)} {isTa ? "செய்திகள்" : "msgs"}</span>
                     </div>
                   </div>
                 </div>
@@ -214,8 +225,12 @@ export function SpendAnalyticsCharts({
             </>
           ) : (
             <>
-              <p className="text-xs font-medium text-ink-2">Prepaid balance</p>
-              <p className="mt-1 text-xs text-muted">No balance is recorded for this WhatsApp account yet. Sync it below or open Meta&apos;s Billing Hub.</p>
+              <p className="text-xs font-medium text-ink-2">{isTa ? "ப்ரீபெய்ட் இருப்பு" : "Prepaid balance"}</p>
+              <p className="mt-1 text-xs text-muted">
+                {isTa
+                  ? "இந்த WhatsApp கணக்கிற்கு இன்னும் இருப்பு பதிவு செய்யப்படவில்லை. கீழே இணைக்கவும் அல்லது Meta-வின் கட்டண மையத்தைத் திறக்கவும்."
+                  : "No balance is recorded for this WhatsApp account yet. Sync it below or open Meta's Billing Hub."}
+              </p>
             </>
           )}
           <MetaRecharge billingUrl={billingUrl} primary={low} />
@@ -224,16 +239,20 @@ export function SpendAnalyticsCharts({
         {/* Apache ECharts DonutPanel: Month Spend Breakdown by Category */}
         <div>
           <div className="mb-2 flex items-center justify-between gap-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted sm:text-xs">{monthLabel} spend share (ECharts)</p>
-            <span className="tabular text-[11px] text-muted">{fmtNumber(totalCharged)} charged · {fmtNumber(totalFree)} free</span>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted sm:text-xs">
+              {monthLabel} {isTa ? "செலவுப் பகிர்வு (ECharts)" : "spend share (ECharts)"}
+            </p>
+            <span className="tabular text-[11px] text-muted">
+              {fmtNumber(totalCharged)} {isTa ? "கட்டணம்" : "charged"} · {fmtNumber(totalFree)} {isTa ? "இலவசம்" : "free"}
+            </span>
           </div>
           <DonutPanel
             slices={slices}
             format="inr"
             size={152}
             centerValue={rupees(totalMonthSpent)}
-            centerLabel={`${monthLabel} ex-GST`}
-            label={`${monthLabel} spend by category: total ${rupees(totalMonthSpent)}`}
+            centerLabel={`${monthLabel} ${isTa ? "(GST தவிர)" : "ex-GST"}`}
+            label={`${monthLabel} ${isTa ? "வகை வாரியான செலவு: மொத்தம்" : "spend by category: total"} ${rupees(totalMonthSpent)}`}
           />
         </div>
 
@@ -241,10 +260,10 @@ export function SpendAnalyticsCharts({
         <div className="rounded-control border border-emerald-500/25 bg-emerald-500/[0.06] p-2.5 sm:p-3">
           <div className="flex flex-wrap items-center justify-between gap-1.5">
             <span className="text-[11px] font-semibold text-ink sm:text-xs">
-              Free Service Quota (1,000/mo per number)
+              {isTa ? "இலவச சேவை வரம்பு (மாதம் 1,000/எண்)" : "Free Service Quota (1,000/mo per number)"}
             </span>
             <Badge tone={serviceQuota.freeRemaining > 150 ? "green" : "amber"}>
-              {fmtNumber(serviceQuota.freeRemaining)} free left
+              {fmtNumber(serviceQuota.freeRemaining)} {isTa ? "இலவசம் மீதம்" : "free left"}
             </Badge>
           </div>
           <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-line/70">
@@ -257,12 +276,13 @@ export function SpendAnalyticsCharts({
           </div>
           <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1 text-[10px] text-muted sm:text-[11px]">
             <span className="tabular">
-              <b className="text-ink">{fmtNumber(serviceQuota.freeUsed)}</b> / {fmtNumber(serviceQuota.totalFreeLimit)} free 24h replies used ({serviceQuota.phoneCount} {serviceQuota.phoneCount === 1 ? "number" : "numbers"})
+              <b className="text-ink">{fmtNumber(serviceQuota.freeUsed)}</b> / {fmtNumber(serviceQuota.totalFreeLimit)}{" "}
+              {isTa ? "இலவச 24h பதில்கள்" : "free 24h replies used"} ({serviceQuota.phoneCount} {isTa ? "எண்" : serviceQuota.phoneCount === 1 ? "number" : "numbers"})
             </span>
             <span className="tabular">
               {serviceQuota.overQuotaCharged > 0
-                ? `${fmtNumber(serviceQuota.overQuotaCharged)} overage (${rupees(serviceQuota.overQuotaCharged * serviceQuota.rateAfterQuota)})`
-                : `Then ₹${serviceQuota.rateAfterQuota}/msg`}
+                ? `${fmtNumber(serviceQuota.overQuotaCharged)} ${isTa ? "கூடுதல்" : "overage"} (${rupees(serviceQuota.overQuotaCharged * serviceQuota.rateAfterQuota)})`
+                : isTa ? `பிறகு ₹${serviceQuota.rateAfterQuota}/செய்தி` : `Then ₹${serviceQuota.rateAfterQuota}/msg`}
             </span>
           </div>
         </div>
@@ -275,17 +295,17 @@ export function SpendAnalyticsCharts({
             <div>
               <p className="text-xs font-semibold text-ink sm:text-sm">
                 {tab === "spend"
-                  ? "Daily Meta spend breakdown (last 14 days)"
+                  ? (isTa ? "தினசரி Meta செலவு (கடந்த 14 நாட்கள்)" : "Daily Meta spend breakdown (last 14 days)")
                   : tab === "volume"
-                    ? "Daily paid vs. free 24h window messages"
-                    : `${monthLabel} vs ${lastMonthLabel} category comparison`}
+                    ? (isTa ? "தினசரி கட்டணம் vs. இலவச 24h சாளர செய்திகள்" : "Daily paid vs. free 24h window messages")
+                    : (isTa ? `${monthLabel} vs ${lastMonthLabel} வகை ஒப்பீடு` : `${monthLabel} vs ${lastMonthLabel} category comparison`)}
               </p>
               <p className="text-[11px] text-muted sm:text-xs">
                 {tab === "spend"
-                  ? "Marketing (₹0.8631) vs Utility (₹0.115) daily cost · tap any bar to inspect"
+                  ? (isTa ? "விளம்பரம் (₹0.8631) vs பயன்பாடு (₹0.115) தினசரி செலவு" : "Marketing (₹0.8631) vs Utility (₹0.115) daily cost · tap any bar to inspect")
                   : tab === "volume"
-                    ? "Charged templates vs free service replies (1,000/mo free per number)"
-                    : "Category spend comparison across current and previous month"}
+                    ? (isTa ? "கட்டண டெம்ப்ளேட்கள் vs இலவச சேவை பதில்கள் (மாதம் 1,000/எண்)" : "Charged templates vs free service replies (1,000/mo free per number)")
+                    : (isTa ? "நடப்பு மற்றும் முந்தைய மாதத்திற்கான வகை வாரியான செலவு ஒப்பீடு" : "Category spend comparison across current and previous month")}
               </p>
             </div>
 
@@ -293,9 +313,9 @@ export function SpendAnalyticsCharts({
             <div role="tablist" aria-label="Spend chart view" className="inline-flex flex-wrap gap-1 self-start rounded-control bg-sunken p-0.5 sm:p-1">
               {(
                 [
-                  { id: "spend", label: "Daily ₹" },
-                  { id: "volume", label: "Paid vs Free" },
-                  { id: "compare", label: "Vs last mo" },
+                  { id: "spend", label: isTa ? "தினசரி ₹" : "Daily ₹" },
+                  { id: "volume", label: isTa ? "கட்டணம் vs இலவசம்" : "Paid vs Free" },
+                  { id: "compare", label: isTa ? "கடந்த மாத ஒப்பீடு" : "Vs last mo" },
                 ] as const
               ).map((t) => (
                 <button
@@ -324,10 +344,10 @@ export function SpendAnalyticsCharts({
                 activeKey={activeDay}
                 onColumnClick={(k) => setActiveDay((prev) => (prev === k ? null : k))}
                 legend={[
-                  { label: "Marketing (₹0.8631/msg)", color: "gold" },
-                  { label: "Utility (₹0.115/msg)", color: "blue" },
+                  { label: isTa ? "விளம்பரம் (₹0.8631/செய்தி)" : "Marketing (₹0.8631/msg)", color: "gold" },
+                  { label: isTa ? "பயன்பாடு (₹0.115/செய்தி)" : "Utility (₹0.115/msg)", color: "blue" },
                 ]}
-                label="Daily Meta WhatsApp spend over the last 14 days"
+                label={isTa ? "கடந்த 14 நாட்களின் தினசரி Meta WhatsApp செலவு" : "Daily Meta WhatsApp spend over the last 14 days"}
               />
             )}
 
@@ -339,10 +359,10 @@ export function SpendAnalyticsCharts({
                 activeKey={activeDay}
                 onColumnClick={(k) => setActiveDay((prev) => (prev === k ? null : k))}
                 legend={[
-                  { label: "Charged messages", color: "gold" },
-                  { label: "Free 24h service / 72h CTWA (₹0)", color: "emerald" },
+                  { label: isTa ? "கட்டண செய்திகள்" : "Charged messages", color: "gold" },
+                  { label: isTa ? "இலவச 24h சேவை / 72h CTWA (₹0)" : "Free 24h service / 72h CTWA (₹0)", color: "emerald" },
                 ]}
-                label="Daily charged vs free WhatsApp messages over the last 14 days"
+                label={isTa ? "கடந்த 14 நாட்களின் தினசரி கட்டணம் மற்றும் இலவச செய்திகள்" : "Daily charged vs free WhatsApp messages over the last 14 days"}
               />
             )}
 
@@ -355,7 +375,7 @@ export function SpendAnalyticsCharts({
                     { label: monthLabel, color: "gold" },
                     { label: lastMonthLabel, color: "neutral" },
                   ]}
-                  label={`${monthLabel} vs ${lastMonthLabel} spend by category`}
+                  label={`${monthLabel} vs ${lastMonthLabel} ${isTa ? "வகை வாரியான செலவு" : "spend by category"}`}
                 />
               </div>
             )}
@@ -365,10 +385,10 @@ export function SpendAnalyticsCharts({
           {selectedDay && (tab === "spend" || tab === "volume") && (
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-control border border-line bg-subtle/60 px-3 py-1.5 text-xs">
               <span className="font-medium text-ink">
-                {selectedDay.sub}, {selectedDay.label}: <b className="tabular">{rupees(selectedDay.totalCost)}</b> ex-GST
+                {selectedDay.sub}, {selectedDay.label}: <b className="tabular">{rupees(selectedDay.totalCost)}</b> {isTa ? "(GST தவிர)" : "ex-GST"}
               </span>
               <span className="tabular text-muted">
-                Mktg {rupees(selectedDay.marketingCost)} · Util {rupees(selectedDay.utilityCost)} · {fmtNumber(selectedDay.chargedVolume)} paid / {fmtNumber(selectedDay.freeVolume)} free
+                {isTa ? "விளம்பரம்" : "Mktg"} {rupees(selectedDay.marketingCost)} · {isTa ? "பயன்பாடு" : "Util"} {rupees(selectedDay.utilityCost)} · {fmtNumber(selectedDay.chargedVolume)} {isTa ? "கட்டணம்" : "paid"} / {fmtNumber(selectedDay.freeVolume)} {isTa ? "இலவசம்" : "free"}
               </span>
             </div>
           )}
@@ -378,40 +398,48 @@ export function SpendAnalyticsCharts({
         <div className="space-y-2.5">
           <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
             <div className="rounded-control border border-line bg-subtle/35 px-2 py-1.5 sm:px-2.5 sm:py-2">
-              <p className="truncate text-[9.5px] font-medium uppercase tracking-wide text-muted sm:text-[10px]">Peak day spend</p>
+              <p className="truncate text-[9.5px] font-medium uppercase tracking-wide text-muted sm:text-[10px]">{isTa ? "அதிகபட்ச நாள் செலவு" : "Peak day spend"}</p>
               <p className="tabular mt-0.5 truncate text-[11px] font-semibold text-ink sm:text-sm">
                 {peakDay && peakDay.totalCost > 0 ? rupees(peakDay.totalCost) : "₹0.00"}
               </p>
-              <p className="truncate text-[9.5px] text-muted sm:text-[10px]">{peakDay && peakDay.totalCost > 0 ? `${peakDay.label} · ${peakDay.chargedVolume} msgs` : "No charges in 14d"}</p>
+              <p className="truncate text-[9.5px] text-muted sm:text-[10px]">{peakDay && peakDay.totalCost > 0 ? `${peakDay.label} · ${peakDay.chargedVolume} ${isTa ? "செய்திகள்" : "msgs"}` : (isTa ? "14 நாட்களில் செலவு இல்லை" : "No charges in 14d")}</p>
             </div>
 
             <div className="rounded-control border border-line bg-subtle/35 px-2 py-1.5 sm:px-2.5 sm:py-2">
-              <p className="truncate text-[9.5px] font-medium uppercase tracking-wide text-muted sm:text-[10px]">Effective rate</p>
+              <p className="truncate text-[9.5px] font-medium uppercase tracking-wide text-muted sm:text-[10px]">{isTa ? "செயல்முறை கட்டணம்" : "Effective rate"}</p>
               <p className="tabular mt-0.5 truncate text-[11px] font-semibold text-ink sm:text-sm">
                 {totalMsgs > 0 ? rupees(effectiveCostPerMsg) : `₹${rates.marketing ?? 0.86}`}
               </p>
-              <p className="truncate text-[9.5px] text-muted sm:text-[10px]">per msg ({fmtNumber(totalMsgs)} msgs)</p>
+              <p className="truncate text-[9.5px] text-muted sm:text-[10px]">{isTa ? `செய்திக்கு (${fmtNumber(totalMsgs)} செய்திகள்)` : `per msg (${fmtNumber(totalMsgs)} msgs)`}</p>
             </div>
 
             <div className="rounded-control border border-line bg-subtle/35 px-2 py-1.5 sm:px-2.5 sm:py-2">
               <p className="truncate text-[9.5px] font-medium uppercase tracking-wide text-muted sm:text-[10px]">
-                {roas > 0 ? "Meta ROAS" : "Window saved"}
+                {roas > 0 ? "Meta ROAS" : (isTa ? "சேமிக்கப்பட்ட தொகை" : "Window saved")}
               </p>
               <p className="tabular mt-0.5 truncate text-[11px] font-semibold text-success sm:text-sm">
-                {roas > 0 ? `${roas}× return` : rupees(savedByFreeWindow)}
+                {roas > 0 ? `${roas}× ${isTa ? "வருமானம்" : "return"}` : rupees(savedByFreeWindow)}
               </p>
               <p className="truncate text-[9.5px] text-muted sm:text-[10px]">
-                {roas > 0 ? `₹${monthOrderRevenue.toLocaleString("en-IN")}` : `${fmtNumber(totalFree)} free msgs`}
+                {roas > 0 ? `₹${monthOrderRevenue.toLocaleString("en-IN")}${monthOrdersCount ? ` (${monthOrdersCount} ${isTa ? "ஆர்டர்கள்" : "orders"})` : ""}` : `${fmtNumber(totalFree)} ${isTa ? "இலவச செய்திகள்" : "free msgs"}`}
               </p>
             </div>
           </div>
 
           <div className="rounded-control border border-brand/25 bg-brand-soft/35 p-2.5 text-xs text-ink-2 sm:p-3">
             <p className="flex items-center gap-1.5 font-semibold text-brand-deep">
-              <Lightbulb aria-hidden className="size-3.5 shrink-0" /> Meta India Oct 2026 billing rules &amp; cost saver
+              <Lightbulb aria-hidden className="size-3.5 shrink-0" /> {isTa ? "Meta இந்தியா கட்டண விதிகள் & பண சேமிப்பு குறிப்புகள்" : "Meta India Oct 2026 billing rules & cost saver"}
             </p>
             <p className="mt-0.5 text-[11px] leading-relaxed sm:text-xs">
-              Each number gets <b>1,000 FREE service replies/month</b> inside the 24h customer window (then <b>₹{rates.service ?? 0.115}/msg</b>). Utility templates cost <b>₹{rates.utility}/msg</b> (7.5× cheaper than Marketing at <b>₹{rates.marketing}/msg</b>). Click-to-WhatsApp Ad &amp; FB Page CTA replies unlock a <b>72-hour FREE window</b> across all categories, and Meta charges <b>only on DELIVERED</b> messages (never on failed/held).
+              {isTa ? (
+                <>
+                  ஒவ்வொரு எண்ணிற்கும் 24 மணி நேர வாடிக்கையாளர் சாளரத்திற்குள் <b>மாதம் 1,000 இலவச சேவை பதில்கள்</b> கிடைக்கும் (பிறகு <b>₹{rates.service ?? 0.115}/செய்தி</b>). பயன்பாட்டு டெம்ப்ளேட்களின் கட்டணம் <b>₹{rates.utility}/செய்தி</b> (விளம்பரக் கட்டணமான <b>₹{rates.marketing}</b> ஐ விட 7.5 மடங்கு குறைவு). WhatsApp விளம்பரங்கள் மூலம் வரும் பதில்களுக்கு <b>72 மணி நேர இலவச சாளரம்</b> கிடைக்கும்; மேலும் சென்றடைந்த செய்திகளுக்கு மட்டுமே Meta கட்டணம் வசூலிக்கிறது.
+                </>
+              ) : (
+                <>
+                  Each number gets <b>1,000 FREE service replies/month</b> inside the 24h customer window (then <b>₹{rates.service ?? 0.115}/msg</b>). Utility templates cost <b>₹{rates.utility}/msg</b> (7.5× cheaper than Marketing at <b>₹{rates.marketing}/msg</b>). Click-to-WhatsApp Ad &amp; FB Page CTA replies unlock a <b>72-hour FREE window</b> across all categories, and Meta charges <b>only on DELIVERED</b> messages (never on failed/held).
+                </>
+              )}
             </p>
           </div>
         </div>

@@ -92,7 +92,7 @@ export async function getCatalogDemandSummary(
   clientId: string,
   catalogProducts: CatalogProductDetail[],
 ): Promise<CatalogDemandSummary> {
-  const [orders, readMessagesCount, totalCustomersCount] = await Promise.all([
+  const [orders, readMessagesCount] = await Promise.all([
     db.order.findMany({
       where: { clientId },
       select: {
@@ -113,9 +113,6 @@ export async function getCatalogDemandSummary(
         customer: { clientId },
         status: "READ",
       },
-    }),
-    db.customer.count({
-      where: { clientId },
     }),
   ]);
 

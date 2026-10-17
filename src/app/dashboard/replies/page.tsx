@@ -13,9 +13,9 @@ export const metadata: Metadata = { title: "Chats" };
 export const dynamic = "force-dynamic";
 
 const TABS = [
-  { key: "all", label: "All" },
-  { key: "", label: "Open" },
-  { key: "handled", label: "Handled" },
+  { key: "all", label: "All", labelTa: "அனைத்தும்" },
+  { key: "", label: "Open", labelTa: "திறந்தவை" },
+  { key: "handled", label: "Handled", labelTa: "பார்த்தவை" },
 ] as const;
 
 export default async function RepliesPage({ searchParams }: PageProps<"/dashboard/replies">) {
@@ -153,7 +153,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
   }
 
   return (
-    <PortalPage title="Chats" titleTa="அரட்டை" sub={CHATS_SUB} subTa={CHATS_SUB_TA}>
+    <PortalPage title="Chats" titleTa="உரையாடல்கள்" sub={CHATS_SUB} subTa={CHATS_SUB_TA}>
       <InboxTabs active="inbox" />
 
       <div className="chips" style={{ marginBottom: 14, alignItems: "center" }}>

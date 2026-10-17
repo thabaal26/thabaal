@@ -63,12 +63,14 @@ export function Conversation({ entries, className, plain }: { entries: Conversat
   });
 
   // Automatically scroll to the latest message at bottom on initial load and whenever entries update
+  const entriesCount = entries.length;
+  const firstEntryId = entries[0]?.id;
   useEffect(() => {
     const el = scrollRef.current;
     if (el) {
       el.scrollTop = el.scrollHeight;
     }
-  }, [entries.length, entries[0]?.id]);
+  }, [entriesCount, firstEntryId]);
 
   return (
     <div

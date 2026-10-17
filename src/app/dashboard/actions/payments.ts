@@ -178,6 +178,8 @@ export async function undoPayment(id: string): Promise<SendResult> {
   const o = r.order;
   if (!o.paidAt && !(o.paidAmount && o.paidAmount > 0)) return { ok: false, message: "No payment is recorded on this order." };
   if (!canUndoPayment(o)) return { ok: false, message: "WhatsApp confirmed this payment, so it can't be undone here. Record a refund instead." };
+  if (o.refundAmount && o.refundAmount > 0) return { ok: false, message: "This order already has a refund recorded. Undo is not allowed." };
+  if (o.status === "DISPATCHED" || o.status === "DELIVERED") return { ok: false, message: "Cannot undo payment on an order that is already dispatched or delivered." };
   await db.order.update({
     where: { id: o.id },
     data: {

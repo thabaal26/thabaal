@@ -23,6 +23,18 @@ const REMIND_AFTER_MS = 6 * 3_600_000;
 /** Orders older than this aren't chased any more. */
 const REMIND_WITHIN_MS = 3 * 86_400_000;
 
+/**
+ * Parses amount from Meta payment objects.
+ * Handles both divisor representation (offset: 100 for paise) and exponent mode (offset: 2 for 10^2).
+ */
+export function parseMetaAmount(amt: { value?: number | string | null; offset?: number | null } | null | undefined): number | null {
+  if (!amt || amt.value == null) return null;
+  const num = Number(amt.value);
+  if (isNaN(num)) return null;
+  const offset = amt.offset != null ? Number(amt.offset) : 2;
+  return offset >= 10 ? num / offset : num / 10 ** offset;
+}
+
 const hasPayButton = (t: { buttons: unknown }) => (t.buttons as TemplateButton[]).some((b) => b.type === "ORDER_DETAILS");
 
 /**

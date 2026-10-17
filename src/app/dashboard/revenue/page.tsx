@@ -4,12 +4,12 @@ import { PickClientNotice, Stat } from "@/components/ui";
 import { db } from "@/lib/db";
 import { fmtDate } from "@/lib/format";
 import { PAYMENT_TEMPLATE, paymentTemplateFor } from "@/lib/payments";
-import { paymentsData, WAY_COLOR, WAY_LABEL, type Way } from "@/lib/payments-data";
+import { paymentsData, WAY_COLOR, WAY_LABEL, WAY_LABEL_TA, type Way } from "@/lib/payments-data";
 import { getScope } from "@/lib/session";
 import { LoyaltyRedeemSetting } from "../orders/loyalty-points-ui";
 import { PaymentForm } from "../orders/payment-form";
 import { inr } from "../portal-format";
-import { LinkTabs, PortalPage, Seg } from "../portal-ui";
+import { LinkTabs, PortalPage, Seg, T } from "../portal-ui";
 import { CollectList, CsvButton, ReceiptButton, RecordByNumber, TxnTable } from "./payments-board";
 import Link from "@/components/intent-link";
 
@@ -26,9 +26,9 @@ const TABS = [
 type TabId = (typeof TABS)[number]["id"];
 
 const PERIODS = [
-  { id: "t", label: "Today" },
-  { id: "w", label: "This week" },
-  { id: "m", label: "This month" },
+  { id: "t", label: "Today", ta: "இன்று" },
+  { id: "w", label: "This week", ta: "இந்த வாரம்" },
+  { id: "m", label: "This month", ta: "இந்த மாதம்" },
 ] as const;
 
 const SUB = "Money received, money waiting and what you should collect today.";
@@ -116,11 +116,11 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
           <Seg label="Period" value={per} options={PERIODS.map((p) => ({ ...p, href: href({ per: p.id === "t" ? undefined : p.id }) }))} />
           <div className="chips" style={{ marginLeft: 8 }}>
             <Link className="chip" href={href({ way: undefined })} aria-pressed={!way} scroll={false}>
-              All ways
+              <T ta="அனைத்து வழிகள்">All ways</T>
             </Link>
             {ways.map((w) => (
               <Link key={w} className="chip" href={href({ way: w })} aria-pressed={way === w} scroll={false}>
-                {WAY_LABEL[w]}
+                <T ta={WAY_LABEL_TA[w]}>{WAY_LABEL[w]}</T>
               </Link>
             ))}
           </div>
@@ -132,10 +132,12 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         </div>
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="hd">
-            <h2>How customers paid</h2>
-            <b>
-              {inr(total)} from {list.length} payment{list.length === 1 ? "" : "s"}
-            </b>
+            <div>
+              <h2><T ta="வாடிக்கையாளர் செலுத்திய விதம்">How customers paid</T></h2>
+              <b>
+                {inr(total)} <T ta={`(${list.length} முறை)`}>{`from ${list.length} payment${list.length === 1 ? "" : "s"}`}</T>
+              </b>
+            </div>
           </div>
           <div className="bar" style={{ height: 14 }}>
             {ways.map((w) => (
@@ -145,7 +147,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
           <div className="legend" style={{ marginTop: 10 }}>
             {ways.map((w) => (
               <span key={w} style={{ ["--c" as string]: WAY_COLOR[w] }}>
-                {WAY_LABEL[w]} {inr(by[w] ?? 0)}
+                <T ta={WAY_LABEL_TA[w]}>{WAY_LABEL[w]}</T> {inr(by[w] ?? 0)}
               </span>
             ))}
           </div>
@@ -155,11 +157,11 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
             <table>
               <thead>
                 <tr>
-                  <th>When</th>
-                  <th>Order</th>
-                  <th>Customer</th>
-                  <th>Paid by</th>
-                  <th className="num">Amount</th>
+                  <th><T ta="நேரம்">When</T></th>
+                  <th><T ta="ஆர்டர்">Order</T></th>
+                  <th><T ta="வாடிக்கையாளர்">Customer</T></th>
+                  <th><T ta="செலுத்திய முறை">Paid by</T></th>
+                  <th className="num"><T ta="தொகை">Amount</T></th>
                   <th />
                 </tr>
               </thead>
@@ -172,7 +174,9 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                       <b>{r.name}</b>
                     </td>
                     <td>
-                      <span className={`pill ${r.way === "cash" ? "info" : "ok"}`}>{WAY_LABEL[r.way]}</span>
+                      <span className={`pill ${r.way === "cash" ? "info" : "ok"}`}>
+                        <T ta={WAY_LABEL_TA[r.way]}>{WAY_LABEL[r.way]}</T>
+                      </span>
                     </td>
                     <td className="num">{inr(r.amount)}</td>
                     <td>
@@ -183,7 +187,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                 {list.length === 0 && (
                   <tr>
                     <td colSpan={6} className="muted">
-                      Nothing received in this period.
+                      <T ta="இந்த காலத்தில் பணம் எதுவும் வரவில்லை.">Nothing received in this period.</T>
                     </td>
                   </tr>
                 )}
@@ -202,8 +206,8 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="hd">
             <div>
-              <h2>Cash to collect</h2>
-              <p>Tap “Record cash received” once the money is in your hand.</p>
+              <h2><T ta="வசூலிக்க வேண்டிய ரொக்கம்">Cash to collect</T></h2>
+              <p><T ta="பணம் உங்கள் கைக்கு வந்ததும் 'ரொக்கம் பதிவு செய்' என்பதை அழுத்தவும்.">Tap “Record cash received” once the money is in your hand.</T></p>
             </div>
           </div>
           <CollectList rows={cod} nowMs={now} canOperate={scope.canOperate} intro={false} />
@@ -211,8 +215,8 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         <div className="card">
           <div className="hd">
             <div>
-              <h2>Day close</h2>
-              <p>Cash recorded today, by who collected it. Count what each person hands over.</p>
+              <h2><T ta="நாள் கணக்கு முடிவு">Day close</T></h2>
+              <p><T ta="இன்று வசூலான ரொக்கம். ஒவ்வொருவரும் ஒப்படைக்கும் தொகையை சரிபார்க்கவும்.">Cash recorded today, by who collected it. Count what each person hands over.</T></p>
             </div>
           </div>
           <div className="list">
@@ -220,17 +224,17 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
               <div key={r.by} className="row">
                 <div className="grow t">{r.by}</div>
                 <span className="muted small">
-                  {r.orders} order{r.orders === 1 ? "" : "s"}
+                  {r.orders} <T ta="ஆர்டர்கள்">{`order${r.orders === 1 ? "" : "s"}`}</T>
                 </span>
                 <b>{inr(r.amount)}</b>
               </div>
             ))}
-            {d.cashDay.length === 0 && <p className="muted small">No cash recorded today yet.</p>}
+            {d.cashDay.length === 0 && <p className="muted small"><T ta="இன்று இதுவரை ரொக்கம் எதுவும் பதிவாகவில்லை.">No cash recorded today yet.</T></p>}
           </div>
           <div className="row" style={{ borderTop: "2px solid var(--line)" }}>
-            <div className="grow t">Total</div>
+            <div className="grow t"><T ta="மொத்தம்">Total</T></div>
             <div className="muted small">
-              {dayOrders} order{dayOrders === 1 ? "" : "s"}
+              {dayOrders} <T ta="ஆர்டர்கள்">{`order${dayOrders === 1 ? "" : "s"}`}</T>
             </div>
             <b>{inr(dayTotal)}</b>
           </div>
@@ -255,26 +259,28 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         <section className="card">
           <div className="hd">
             <div>
-              <h2>How customers pay</h2>
-              <p>Pay inside WhatsApp, a UPI link or QR, or cash on delivery. Orders and Payments change to match.</p>
+              <h2><T ta="வாடிக்கையாளர்கள் பணம் செலுத்தும் முறை">How customers pay</T></h2>
+              <p><T ta="WhatsApp மூலம் செலுத்துதல், UPI இணைப்பு அல்லது ரொக்கம்.">Pay inside WhatsApp, a UPI link or QR, or cash on delivery. Orders and Payments change to match.</T></p>
             </div>
           </div>
           {scope.canManage && client ? (
             <PaymentForm config={client.paymentConfig} own={{ name: PAYMENT_TEMPLATE, status: ownPaymentTemplate?.status ?? null }} using={paymentTemplate?.name ?? null} />
           ) : (
-            <p className="muted small">Ask your admin to change payment settings.</p>
+            <p className="muted small"><T ta="அமைப்புகளை மாற்ற நிர்வாகியிடம் கேட்கவும்.">Ask your admin to change payment settings.</T></p>
           )}
           <div className="note small" style={{ marginTop: 14 }}>
-            <b>How an order flows:</b> offer message › Order now › catalogue › cart › Review and pay › paid. Orders without WhatsApp payments go through a UPI link or QR, or cash on delivery, and you mark them
-            paid. Cash on delivery is chosen per order (Orders › More actions).
+            <b><T ta="ஆர்டர் வழிமுறை: ">How an order flows: </T></b>
+            <T ta="சலுகை செய்தி › Order now › பட்டியல் › கார்ட் › Review and pay › பணம் செலுத்தப்பட்டது. WhatsApp கட்டணம் இல்லாத ஆர்டர்கள் UPI அல்லது ரொக்கம் மூலம் முடியும்.">
+              offer message › Order now › catalogue › cart › Review and pay › paid. Orders without WhatsApp payments go through a UPI link or QR, or cash on delivery, and you mark them paid.
+            </T>
           </div>
         </section>
         {scope.canManage && client && (
           <section className="card">
             <div className="hd">
               <div>
-                <h2>Loyalty points at checkout</h2>
-                <p>Let customers use their points on an order.</p>
+                <h2><T ta="செக்அவுட்டில் லாயல்டி புள்ளிகள்">Loyalty points at checkout</T></h2>
+                <p><T ta="ஆர்டரில் வாடிக்கையாளர்கள் தங்கள் லாயல்டி புள்ளிகளைப் பயன்படுத்த அனுமதிக்கவும்.">Let customers use their points on an order.</T></p>
               </div>
             </div>
             <LoyaltyRedeemSetting on={client.loyaltyAutoRedeem} />
@@ -283,25 +289,33 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         <section className="card">
           <div className="hd">
             <div>
-              <h2>Reminders</h2>
-              <p>thabaal chases the money for you.</p>
+              <h2><T ta="நினைவூட்டல்கள்">Reminders</T></h2>
+              <p><T ta="தபால் உங்களுக்காகப் பணத்தை வசூலிக்க நினைவூட்டும்.">thabaal chases the money for you.</T></p>
             </div>
           </div>
           <div className="list">
             <div className="row">
               <div className="grow">
-                <div className="t">One automatic reminder</div>
-                <div className="muted small">When a WhatsApp payment request is still unpaid after a few hours, the customer gets one polite reminder.</div>
+                <div className="t"><T ta="தானியங்கி நினைவூட்டல்">One automatic reminder</T></div>
+                <div className="muted small">
+                  <T ta="WhatsApp கட்டணக் கோரிக்கை சில மணிநேரங்களாக செலுத்தப்படாமல் இருந்தால், வாடிக்கையாளருக்கு தானாக ஒரு பணிவான நினைவூட்டல் அனுப்பப்படும்.">
+                    When a WhatsApp payment request is still unpaid after a few hours, the customer gets one polite reminder.
+                  </T>
+                </div>
               </div>
-              <span className="pill ok">On</span>
+              <span className="pill ok"><T ta="இயங்குகிறது">On</T></span>
             </div>
             <div className="row">
               <div className="grow">
-                <div className="t">Remind everyone now</div>
-                <div className="muted small">To collect › Remind everyone sends the request again to everyone waiting.</div>
+                <div className="t"><T ta="அனைவருக்கும் நினைவூட்டல் அனுப்பு">Remind everyone now</T></div>
+                <div className="muted small">
+                  <T ta="வசூலிக்க › அனைவருக்கும் நினைவூட்டு மூலம் காத்திருக்கும் அனைவருக்கும் கோரிக்கை மீண்டும் அனுப்பப்படும்.">
+                    To collect › Remind everyone sends the request again to everyone waiting.
+                  </T>
+                </div>
               </div>
               <Link className="btn sm" href="/dashboard/revenue">
-                Open
+                <T ta="திற">Open</T>
               </Link>
             </div>
           </div>

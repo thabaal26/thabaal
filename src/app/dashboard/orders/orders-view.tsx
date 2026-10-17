@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { toastResult } from "@/components/toast";
 import { fmtDate } from "@/lib/format";
 import { inr } from "../portal-format";
-import { T } from "../portal-ui";
+import { T, useLang } from "../portal-ui";
 import { DEFAULT_FLOW, flowHas, flowSteps, readFlow, stepLabel, type OrderFlowKey } from "@/lib/order-flow";
 import { getOrderPricing, pointsDiscount } from "@/lib/order-pricing";
 import { orderRef, type OrderItem } from "@/lib/order-ref";
@@ -54,6 +54,8 @@ export function OrdersView({
   initialTab = "orders",
 }: OrdersViewProps) {
   const router = useRouter();
+  const lang = useLang();
+  const isTa = lang === "ta";
   const [activeTab, setActiveTab] = useState<"orders" | "pack">(initialTab);
   const [show, setShow] = useState<string>(initialShow);
   const [payFilter, setPayFilter] = useState<string>(initialPay);
@@ -342,17 +344,21 @@ export function OrdersView({
           {/* Top KPI 4-Card Strip */}
           <div className="grid g4 keep2" id="ok" style={{ marginBottom: 18, gap: 16 }}>
             <Stat
-              label="New orders"
+              label={isTa ? "புதிய ஆர்டர்கள்" : "New orders"}
+              labelTa="புதிய ஆர்டர்கள்"
               value={newCount}
-              sub={hasConfirm ? "Confirm these first" : "Take payment"}
+              sub={hasConfirm ? (isTa ? "முதலில் உறுதிப்படுத்தவும்" : "Confirm these first") : (isTa ? "பணம் வசூலிக்கவும்" : "Take payment")}
+              subTa={hasConfirm ? "முதலில் உறுதிப்படுத்தவும்" : "பணம் வசூலிக்கவும்"}
               icon={<ShoppingBag className="size-4" />}
               tone="brand"
               onClick={() => setShow("new")}
             />
             <Stat
-              label="Payment waiting"
+              label={isTa ? "பணம் வர வேண்டியவை" : "Payment waiting"}
+              labelTa="பணம் வர வேண்டியவை"
               value={inr(waitingSum)}
-              sub="Not received yet"
+              sub={isTa ? "இன்னும் வரவில்லை" : "Not received yet"}
+              subTa="இன்னும் வரவில்லை"
               icon={<Clock className="size-4" />}
               tone="amber"
               onClick={() => {
@@ -361,17 +367,21 @@ export function OrdersView({
               }}
             />
             <Stat
-              label={hasPack ? "To pack" : "To finish"}
+              label={hasPack ? (isTa ? "பேக் செய்ய வேண்டியவை" : "To pack") : (isTa ? "முடிக்க வேண்டியவை" : "To finish")}
+              labelTa={hasPack ? "பேக் செய்ய வேண்டியவை" : "முடிக்க வேண்டியவை"}
               value={toPackCount}
-              sub="Paid or COD"
+              sub={isTa ? "பணம் அல்லது COD" : "Paid or COD"}
+              subTa="பணம் அல்லது COD"
               icon={<Package className="size-4" />}
               tone="info"
               onClick={() => setActiveTab("pack")}
             />
             <Stat
-              label={hasDispatch ? "Dispatched" : "Finished today"}
+              label={hasDispatch ? (isTa ? "அனுப்பப்பட்டவை" : "Dispatched") : (isTa ? "இன்று முடித்தவை" : "Finished today")}
+              labelTa={hasDispatch ? "அனுப்பப்பட்டவை" : "இன்று முடித்தவை"}
               value={dispatchedCount}
-              sub={hasDispatch ? "Out for delivery" : "Completed today"}
+              sub={hasDispatch ? (isTa ? "டெலிவரிக்கு சென்றவை" : "Out for delivery") : (isTa ? "இன்று முடித்தவை" : "Completed today")}
+              subTa={hasDispatch ? "டெலிவரிக்கு சென்றவை" : "இன்று முடித்தவை"}
               icon={<PackageCheck className="size-4" />}
               tone="violet"
               onClick={() => setShow("dispatched")}
@@ -388,8 +398,8 @@ export function OrdersView({
               <input
                 type="search"
                 id="oq"
-                placeholder="Search customer, phone, order or item"
-                aria-label="Search orders"
+                placeholder={isTa ? "வாடிக்கையாளர், தொலைபேசி, ஆர்டர் எண் தேடுக" : "Search customer, phone, order or item"}
+                aria-label={isTa ? "ஆர்டர்களைத் தேடுக" : "Search orders"}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
@@ -402,11 +412,11 @@ export function OrdersView({
               value={payFilter}
               onChange={(e) => setPayFilter(e.target.value)}
             >
-              <option value="all">Payment: all</option>
-              <option value="none">Payment: waiting</option>
-              <option value="sent">Payment: link sent</option>
-              <option value="paid">Payment: paid</option>
-              <option value="cod">Payment: cash on delivery</option>
+              <option value="all">{isTa ? "பணம்: அனைத்தும்" : "Payment: all"}</option>
+              <option value="none">{isTa ? "பணம்: வர வேண்டியவை" : "Payment: waiting"}</option>
+              <option value="sent">{isTa ? "பணம்: இணைப்பு அனுப்பப்பட்டது" : "Payment: link sent"}</option>
+              <option value="paid">{isTa ? "பணம்: செலுத்தப்பட்டது" : "Payment: paid"}</option>
+              <option value="cod">{isTa ? "பணம்: டெலிவரியின் போது (COD)" : "Payment: cash on delivery"}</option>
             </select>
 
             <select
@@ -416,11 +426,11 @@ export function OrdersView({
               value={srcFilter}
               onChange={(e) => setSrcFilter(e.target.value)}
             >
-              <option value="all">From: everywhere</option>
-              <option value="cat">From: catalogue</option>
-              <option value="camp">From: campaign</option>
-              <option value="chat">From: chat</option>
-              <option value="manual">From: manual entry</option>
+              <option value="all">{isTa ? "வகை: அனைத்தும்" : "From: everywhere"}</option>
+              <option value="cat">{isTa ? "வகை: பட்டியல்" : "From: catalogue"}</option>
+              <option value="camp">{isTa ? "வகை: பிரச்சாரம்" : "From: campaign"}</option>
+              <option value="chat">{isTa ? "வகை: உரையாடல்" : "From: chat"}</option>
+              <option value="manual">{isTa ? "வகை: கைமுறை பதிவு" : "From: manual entry"}</option>
             </select>
 
             {/* Export Details Dropdown */}
@@ -431,7 +441,7 @@ export function OrdersView({
               style={{ border: 0, margin: 0, padding: 0, position: "relative" }}
             >
               <summary className="btn" style={{ listStyle: "none", cursor: "pointer" }}>
-                Export
+                <T ta="ஏற்றுமதி">Export</T>
               </summary>
               <div
                 className="card"
@@ -458,7 +468,7 @@ export function OrdersView({
                   style={{ width: "100%", justifyContent: "flex-start" }}
                   onClick={handleExportImage}
                 >
-                  Image to share
+                  <T ta="பகிர்வதற்கான படம்">Image to share</T>
                 </button>
                 <button
                   type="button"
@@ -489,7 +499,7 @@ export function OrdersView({
               <svg className="ic" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M12 5v14M5 12h14" />
               </svg>
-              New order
+              <T ta="புதிய ஆர்டர்">New order</T>
             </button>
           </div>
 
@@ -501,7 +511,7 @@ export function OrdersView({
               aria-pressed={show === "all"}
               onClick={() => setShow("all")}
             >
-              All <small>{allCount}</small>
+              <T ta="அனைத்தும்">All</T> <small>{allCount}</small>
             </button>
             <button
               type="button"
@@ -509,7 +519,7 @@ export function OrdersView({
               aria-pressed={show === "new"}
               onClick={() => setShow("new")}
             >
-              New <small>{newCount}</small>
+              <T ta="புதியவை">New</T> <small>{newCount}</small>
             </button>
             {hasConfirm && (
               <button
@@ -518,7 +528,7 @@ export function OrdersView({
                 aria-pressed={show === "confirmed"}
                 onClick={() => setShow("confirmed")}
               >
-                Confirmed <small>{confirmedCount}</small>
+                <T ta="உறுதியானவை">Confirmed</T> <small>{confirmedCount}</small>
               </button>
             )}
             <button
@@ -527,7 +537,7 @@ export function OrdersView({
               aria-pressed={show === "paid"}
               onClick={() => setShow("paid")}
             >
-              Paid / COD <small>{paidCount}</small>
+              <T ta="பணம் / COD">Paid / COD</T> <small>{paidCount}</small>
             </button>
             {hasPack && (
               <button
@@ -536,7 +546,7 @@ export function OrdersView({
                 aria-pressed={show === "packed"}
                 onClick={() => setShow("packed")}
               >
-                Packed <small>{packedCount}</small>
+                <T ta="பேக் செய்தவை">Packed</T> <small>{packedCount}</small>
               </button>
             )}
             {hasDispatch && (
@@ -546,7 +556,7 @@ export function OrdersView({
                 aria-pressed={show === "dispatched"}
                 onClick={() => setShow("dispatched")}
               >
-                Dispatched <small>{dispatchedCount}</small>
+                <T ta="அனுப்பியவை">Dispatched</T> <small>{dispatchedCount}</small>
               </button>
             )}
             <button
@@ -555,7 +565,7 @@ export function OrdersView({
               aria-pressed={show === "done"}
               onClick={() => setShow("done")}
             >
-              {finishLabel} <small>{deliveredCount}</small>
+              <T ta={finishLabel === "Delivered" ? "டெலிவரி ஆனவை" : finishLabel}>{finishLabel}</T> <small>{deliveredCount}</small>
             </button>
             <button
               type="button"
@@ -563,7 +573,7 @@ export function OrdersView({
               aria-pressed={show === "cancelled"}
               onClick={() => setShow("cancelled")}
             >
-              Cancelled <small>{cancelledCount}</small>
+              <T ta="ரத்து செய்தவை">Cancelled</T> <small>{cancelledCount}</small>
             </button>
           </div>
 
@@ -579,18 +589,28 @@ export function OrdersView({
               flexWrap: "wrap",
             }}
           >
-            <span>Steps:</span>
+            <span><T ta="நிலைகள்:">Steps:</T></span>
             <span id="flowline" style={{ fontWeight: 500 }}>
-              {steps.map((f, i) => (
-                <Fragment key={f.key}>
-                  {i > 0 && <span style={{ opacity: 0.45, margin: "0 4px", userSelect: "none" }}>›</span>}
-                  <span>{f.label}</span>
-                </Fragment>
-              ))}
+              {steps.map((f, i) => {
+                const taMap: Record<string, string> = {
+                  "Placed": "ஆர்டர் வந்தது",
+                  "Confirmed": "உறுதியானது",
+                  "Paid": "பணம் வந்தது",
+                  "Packed": "பேக் செய்யப்பட்டது",
+                  "Dispatched": "அனுப்பப்பட்டது",
+                  "Delivered": "டெலிவரி ஆனது",
+                };
+                return (
+                  <Fragment key={f.key}>
+                    {i > 0 && <span style={{ opacity: 0.45, margin: "0 4px", userSelect: "none" }}>›</span>}
+                    <span><T ta={taMap[f.label] ?? f.label}>{f.label}</T></span>
+                  </Fragment>
+                );
+              })}
             </span>
             <span style={{ opacity: 0.5 }}>·</span>
             <Link href="/dashboard/settings#order-steps" className="linkb" style={{ fontSize: 13, fontWeight: 600 }}>
-              Change steps
+              <T ta="நிலைகளை மாற்று">Change steps</T>
             </Link>
           </div>
 
@@ -611,7 +631,7 @@ export function OrdersView({
 
           {filteredOrders.length === 0 && (
             <p className="muted" id="oe">
-              No orders match.
+              <T ta="பொருத்தமான ஆர்டர்கள் எதுவும் இல்லை.">No orders match.</T>
             </p>
           )}
         </section>

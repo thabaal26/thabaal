@@ -7,6 +7,7 @@ import { Stat } from "@/components/ui";
 import { PortalPage, T } from "../portal-ui";
 import { deleteCampaign, duplicateCampaign, toggleCampaign } from "../actions/campaigns";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/lib/i18n/context";
 
 export type CampaignItem = {
   id: string;
@@ -53,26 +54,37 @@ const TAB_DEFS = [
 
 type TabId = (typeof TAB_DEFS)[number]["id"];
 
-const SL: Record<CampaignItem["s"], [string, string]> = {
-  scheduled: ["info", "Scheduled"],
-  running: ["ok", "Running"],
-  completed: ["mute", "Completed"],
-  drafts: ["mute", "Draft"],
-  paused: ["warn", "Paused"],
+const SL: Record<CampaignItem["s"], [string, string, string]> = {
+  scheduled: ["info", "Scheduled", "திட்டமிடப்பட்டது"],
+  running: ["ok", "Running", "இயங்குகிறது"],
+  completed: ["mute", "Completed", "முடிந்தது"],
+  drafts: ["mute", "Draft", "வரைவு"],
+  paused: ["warn", "Paused", "நிறுத்தப்பட்டது"],
 };
 
 function R(n: number) {
   return "₹" + Math.round(n).toLocaleString("en-IN");
 }
 
-function ver(c: CampaignItem): [string, string] | null {
+function ver(c: CampaignItem, isTamil = false): [string, string] | null {
   if (!c.sp || !c.ord) return null;
   const r = c.sale / c.sp;
+  if (isTamil) {
+    return r >= 10 ? ["ok", "மிகச் சிறந்த பலன்"] : r >= 3 ? ["warn", "நல்ல பலன்"] : ["bad", "செலவுக்கு ஏற்ற பலனில்லை"];
+  }
   return r >= 10 ? ["ok", "Working well"] : r >= 3 ? ["warn", "OK"] : ["bad", "Not paying back"];
 }
 
-function sum(c: CampaignItem) {
+function sum(c: CampaignItem, isTamil = false) {
   const r = Math.round((c.sale / c.sp) * 100) / 100;
+  if (isTamil) {
+    return (
+      `${c.sent.toLocaleString("en-IN")} வாடிக்கையாளர்களை சென்றடைந்தது. ` +
+      `${Math.round((c.sent * c.seen) / 100).toLocaleString("en-IN")} பேர் படித்தனர். ` +
+      `${c.ord} ஆர்டர்கள் மூலம் ${R(c.sale)} விற்பனை வந்தது. ` +
+      `செலவு ${R(c.sp)}. ஒவ்வொரு ₹1 செலவுக்கும் ${R(r)} விற்பனை.`
+    );
+  }
   return (
     "Reached " +
     c.sent.toLocaleString("en-IN") +
@@ -92,6 +104,7 @@ function sum(c: CampaignItem) {
 
 export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage, children }: CampaignsDashboardProps) {
   const router = useRouter();
+  const { isTamil } = useLanguage();
   const [items, setItems] = useState<CampaignItem[]>(initialCampaigns);
   const [tab, setTab] = useState<TabId>("all");
   const [search, setSearch] = useState("");
@@ -259,13 +272,13 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
   return (
     <PortalPage
       title="Campaigns"
-      titleTa="பிரச்சாரம்"
+      titleTa="பிரச்சாரங்கள்"
       sub="Create, schedule and improve your WhatsApp broadcasts."
-      subTa="உங்கள் வாட்ஸ்அப் செய்திகளை உருவாக்கி, நேரம் அமைத்து, மேம்படுத்துங்கள்."
+      subTa="உங்கள் WhatsApp பிரச்சாரங்களை உருவாக்கி, திட்டமிட்டு, பலன்களைக் காணுங்கள்."
       actions={
         canManage ? (
           <Link className="btn primary" href="/dashboard/campaigns/new">
-            <Plus aria-hidden className="ic" /> New campaign
+            <Plus aria-hidden className="ic" /> {isTamil ? "புதிய பிரச்சாரம்" : "New campaign"}
           </Link>
         ) : undefined
       }
@@ -273,37 +286,37 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
       {/* 4-KPI Stat Strip */}
       <div className="grid g4 keep2" suppressHydrationWarning style={{ marginBottom: 16 }}>
         <Stat
-          label="Sent this month"
+          label={isTamil ? "இம்மாதம் அனுப்பியவை" : "Sent this month"}
           value={kpi.sent.toLocaleString("en-IN")}
-          sub="Broadcast messages"
+          sub={isTamil ? "பிரச்சாரச் செய்திகள்" : "Broadcast messages"}
           icon={<Send className="size-4" />}
           tone="info"
         />
         <Stat
-          label="Money spent"
+          label={isTamil ? "செலவான தொகை" : "Money spent"}
           value={R(kpi.spent)}
-          sub="Meta message charges"
+          sub={isTamil ? "Meta கட்டணங்கள்" : "Meta message charges"}
           icon={<IndianRupee className="size-4" />}
           tone="amber"
         />
         <Stat
-          label="Sales from campaigns"
+          label={isTamil ? "பிரச்சார விற்பனை" : "Sales from campaigns"}
           value={R(kpi.sales)}
-          sub="Paid orders"
+          sub={isTamil ? "பணம் வந்த ஆர்டர்கள்" : "Paid orders"}
           icon={<ShoppingBag className="size-4" />}
           tone="brand"
         />
         <Stat
-          label="Back for every ₹1"
+          label={isTamil ? "ஒவ்வொரு ₹1-க்கும் வருவாய்" : "Back for every ₹1"}
           value={kpi.spent > 0 ? R(kpi.back) : "—"}
-          sub="Sales, not profit"
+          sub={isTamil ? "விற்பனைத் தொகை" : "Sales, not profit"}
           icon={<ArrowUpRight className="size-4" />}
           tone="violet"
         />
       </div>
 
       {/* Tabs */}
-      <div className="tabs" data-tabs role="tablist" aria-label="Campaign views" suppressHydrationWarning>
+      <div className="tabs" data-tabs role="tablist" aria-label={isTamil ? "பிரச்சார பார்வைகள்" : "Campaign views"} suppressHydrationWarning>
         {TAB_DEFS.map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => switchTab(t.id)}>
             <T ta={t.ta}>{t.label}</T>
@@ -317,7 +330,7 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
           <div className="toolbar" role="search" suppressHydrationWarning>
             <div className="search">
               <label htmlFor="cam-cq" className="sr-only">
-                Search campaigns
+                {isTamil ? "பிரச்சாரங்களைத் தேடுக" : "Search campaigns"}
               </label>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="11" cy="11" r="7" />
@@ -327,14 +340,14 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                 type="search"
                 id="cam-cq"
                 name="q"
-                placeholder="Search campaign name"
-                aria-label="Search campaign name"
+                placeholder={isTamil ? "பிரச்சாரத்தின் பெயரைத் தேடுக…" : "Search campaign name"}
+                aria-label={isTamil ? "பிரச்சாரத்தின் பெயரைத் தேடுக" : "Search campaign name"}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
             <button type="button" className="btn sm" id="cmp" style={{ marginLeft: "auto" }} onClick={handleCompareClick}>
-              Compare selected
+              {isTamil ? "தேர்வு செய்தவற்றை ஒப்பிடு" : "Compare selected"}
             </button>
           </div>
 
@@ -342,23 +355,23 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
           {showCompare && (
             <div className="card" id="cmpb" style={{ marginTop: 16, marginBottom: 16 }}>
               <div className="hd">
-                <h2>Comparison</h2>
+                <h2>{isTamil ? "ஒப்பீடு" : "Comparison"}</h2>
                 <button type="button" className="btn sm" id="cmpx" onClick={() => setShowCompare(false)}>
-                  Close
+                  {isTamil ? "மூடுக" : "Close"}
                 </button>
               </div>
               <div className="tw">
                 <table>
                   <thead>
                     <tr>
-                      <th>Campaign</th>
-                      <th className="num">Sent</th>
-                      <th className="num">Read</th>
-                      <th className="num">Replies</th>
-                      <th className="num">Orders</th>
-                      <th className="num">Spent</th>
-                      <th className="num">Sales</th>
-                      <th className="num">Back per ₹1</th>
+                      <th>{isTamil ? "பிரச்சாரம்" : "Campaign"}</th>
+                      <th className="num">{isTamil ? "அனுப்பியது" : "Sent"}</th>
+                      <th className="num">{isTamil ? "படித்தது" : "Read"}</th>
+                      <th className="num">{isTamil ? "பதில்கள்" : "Replies"}</th>
+                      <th className="num">{isTamil ? "ஆர்டர்கள்" : "Orders"}</th>
+                      <th className="num">{isTamil ? "செலவு" : "Spent"}</th>
+                      <th className="num">{isTamil ? "விற்பனை" : "Sales"}</th>
+                      <th className="num">{isTamil ? "வருவாய்" : "Return"}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -385,7 +398,7 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
           {/* Campaign cards stack */}
           <div className="stack" id={`l-${tab}`}>
             {filteredItems.map((c) => {
-              const v = ver(c);
+              const v = ver(c, isTamil);
               const pct = c.cnt > 0 ? Math.round((c.sent / c.cnt) * 100) : 0;
               return (
                 <article key={c.id} className="card">
@@ -406,7 +419,7 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                       </p>
                     </div>
                     <div className="tools">
-                      <span className={`pill ${SL[c.s][0]}`}>{SL[c.s][1]}</span>
+                      <span className={`pill ${SL[c.s][0]}`}>{isTamil ? SL[c.s][2] : SL[c.s][1]}</span>
                       {v && <span className={`pill ${v[0]}`}>{v[1]}</span>}
                     </div>
                   </div>
@@ -414,11 +427,23 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                   {/* Card Body */}
                   {c.s === "scheduled" && (
                     <p className="small">
-                      Will go to <b>{c.cnt.toLocaleString("en-IN")}</b> people · costs about <b>{R(c.est ?? 0)}</b> from your wallet.
+                      {isTamil ? (
+                        <>
+                          <b>{c.cnt.toLocaleString("en-IN")}</b> நபர்களுக்கு செல்லும் · வாலட்டிலிருந்து சுமார் <b>{R(c.est ?? 0)}</b> செலவாகும்.
+                        </>
+                      ) : (
+                        <>
+                          Will go to <b>{c.cnt.toLocaleString("en-IN")}</b> people · costs about <b>{R(c.est ?? 0)}</b> from your wallet.
+                        </>
+                      )}
                     </p>
                   )}
 
-                  {c.s === "drafts" && <p className="small muted">Not finished. Pick the customers and the time to start it.</p>}
+                  {c.s === "drafts" && (
+                    <p className="small muted">
+                      {isTamil ? "முடிக்கப்படவில்லை. வாடிக்கையாளர்களையும் தொடங்கும் நேரத்தையும் தேர்வு செய்யவும்." : "Not finished. Pick the customers and the time to start it."}
+                    </p>
+                  )}
 
                   {(c.s === "running" || c.s === "paused" || c.s === "completed") && (
                     <>
@@ -428,34 +453,35 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                             <i style={{ width: `${pct}%`, background: "var(--bar)" }} />
                           </div>
                           <p className="small muted" style={{ marginBottom: 8 }}>
-                            {c.sent.toLocaleString("en-IN")} of {c.cnt.toLocaleString("en-IN")} sent ({pct}%)
-                            {c.fail ? ` · ${c.fail} failed` : ""}
+                            {isTamil
+                              ? `${c.sent.toLocaleString("en-IN")} / ${c.cnt.toLocaleString("en-IN")} அனுப்பப்பட்டது (${pct}%)${c.fail ? ` · ${c.fail} தோல்வி` : ""}`
+                              : `${c.sent.toLocaleString("en-IN")} of ${c.cnt.toLocaleString("en-IN")} sent (${pct}%)${c.fail ? ` · ${c.fail} failed` : ""}`}
                           </p>
                         </>
                       )}
 
                       <div className="grid g4 keep2">
                         <div className="stat">
-                          <div className="l">Sent</div>
+                          <div className="l">{isTamil ? "அனுப்பியது" : "Sent"}</div>
                           <div className="v" style={{ fontSize: 20 }}>
                             {c.sent.toLocaleString("en-IN")}
                           </div>
                         </div>
                         <div className="stat">
-                          <div className="l">Read</div>
+                          <div className="l">{isTamil ? "படித்தது" : "Read"}</div>
                           <div className="v" style={{ fontSize: 20 }}>
                             {Math.round((c.sent * c.seen) / 100).toLocaleString("en-IN")}
                           </div>
-                          <div className="d muted">{c.seen} of 100</div>
+                          <div className="d muted">{isTamil ? `100-ல் ${c.seen}` : `${c.seen} of 100`}</div>
                         </div>
                         <div className="stat">
-                          <div className="l">Replies</div>
+                          <div className="l">{isTamil ? "பதில்கள்" : "Replies"}</div>
                           <div className="v" style={{ fontSize: 20 }}>
                             {c.rep}
                           </div>
                         </div>
                         <div className="stat">
-                          <div className="l">Paid orders</div>
+                          <div className="l">{isTamil ? "ஆர்டர்கள்" : "Paid orders"}</div>
                           <div className="v" style={{ fontSize: 20 }}>
                             {c.ord}
                           </div>
@@ -464,11 +490,11 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
 
                       {c.s === "completed" ? (
                         <p className="note small" style={{ marginTop: 12 }}>
-                          {sum(c)}
+                          {sum(c, isTamil)}
                         </p>
                       ) : (
                         <p className="small" style={{ marginTop: 10 }}>
-                          Spent <b>{R(c.sp)}</b> · Sales <b>{R(c.sale)}</b>
+                          {isTamil ? "செலவு " : "Spent "}<b>{R(c.sp)}</b> · {isTamil ? "விற்பனை " : "Sales "}<b>{R(c.sale)}</b>
                         </p>
                       )}
                     </>
@@ -480,27 +506,27 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                       <>
                         {c.isLive ? (
                           <Link className="btn primary" href={`/dashboard/campaigns/${c.id}`}>
-                            View schedule
+                            {isTamil ? "நேரத்தைக் காண்க" : "View schedule"}
                           </Link>
                         ) : (
                           <button type="button" className="btn primary" onClick={() => handleViewProgress(c)}>
-                            View schedule
+                            {isTamil ? "நேரத்தைக் காண்க" : "View schedule"}
                           </button>
                         )}
                         {c.isLive ? (
                           <Link className="btn sm" href={`/dashboard/campaigns/${c.id}`}>
-                            Edit time
+                            {isTamil ? "நேரத்தை மாற்றுக" : "Edit time"}
                           </Link>
                         ) : (
-                          <button type="button" className="btn sm" onClick={() => showToast("Edit opens in the live app")}>
-                            Edit time
+                          <button type="button" className="btn sm" onClick={() => showToast(isTamil ? "நேரலை செயலியில் மாற்றலாம்" : "Edit opens in the live app")}>
+                            {isTamil ? "நேரத்தை மாற்றுக" : "Edit time"}
                           </button>
                         )}
                         <button type="button" className="btn sm" onClick={() => handlePause(c)}>
-                          Pause
+                          {isTamil ? "நிறுத்துக" : "Pause"}
                         </button>
                         <button type="button" className="btn sm" onClick={() => handlePreview(c)}>
-                          Preview
+                          {isTamil ? "முன்னோட்டம்" : "Preview"}
                         </button>
                       </>
                     )}
@@ -508,13 +534,13 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                     {c.s === "running" && (
                       <>
                         <button type="button" className="btn primary" onClick={() => handleViewProgress(c)}>
-                          View progress
+                          {isTamil ? "நிலையைக் காண்க" : "View progress"}
                         </button>
                         <button type="button" className="btn sm" onClick={() => handlePause(c)}>
-                          Pause
+                          {isTamil ? "நிறுத்துக" : "Pause"}
                         </button>
                         <Link className="btn sm" href="/dashboard/messages?status=FAILED">
-                          View failed messages
+                          {isTamil ? "தோல்வியடைந்த செய்திகள்" : "View failed messages"}
                         </Link>
                       </>
                     )}
@@ -522,22 +548,22 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                     {c.s === "paused" && (
                       <>
                         <button type="button" className="btn primary" onClick={() => handleResume(c)}>
-                          Resume
+                          {isTamil ? "தொடங்குக" : "Resume"}
                         </button>
                         {c.isLive ? (
                           <Link className="btn sm" href={`/dashboard/campaigns/${c.id}`}>
-                            Edit
+                            {isTamil ? "மாற்றுக" : "Edit"}
                           </Link>
                         ) : (
-                          <button type="button" className="btn sm" onClick={() => showToast("Edit opens in the live app")}>
-                            Edit
+                          <button type="button" className="btn sm" onClick={() => showToast(isTamil ? "நேரலை செயலியில் மாற்றலாம்" : "Edit opens in the live app")}>
+                            {isTamil ? "மாற்றுக" : "Edit"}
                           </button>
                         )}
                         <button type="button" className="btn sm" onClick={() => handleDuplicate(c)}>
-                          Duplicate
+                          {isTamil ? "நகலெடு" : "Duplicate"}
                         </button>
                         <button type="button" className="btn sm danger" onClick={() => handleDelete(c)}>
-                          Delete
+                          {isTamil ? "நீக்குக" : "Delete"}
                         </button>
                       </>
                     )}
@@ -545,13 +571,13 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                     {c.s === "completed" && (
                       <>
                         <button type="button" className="btn primary" onClick={() => handleViewProgress(c)}>
-                          View result
+                          {isTamil ? "முடிவைக் காண்க" : "View result"}
                         </button>
                         <button type="button" className="btn sm" onClick={() => handleDuplicate(c)}>
-                          Duplicate
+                          {isTamil ? "நகலெடு" : "Duplicate"}
                         </button>
                         <Link className="btn sm" href="/dashboard/campaigns/new">
-                          Send follow-up
+                          {isTamil ? "தொடர் செய்தி அனுப்பு" : "Send follow-up"}
                         </Link>
                         <button
                           type="button"
@@ -560,10 +586,10 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                             if (!selectedIds.includes(c.id)) {
                               setSelectedIds((prev) => [...prev, c.id]);
                             }
-                            showToast("Tick “Compare” on two campaigns, then press Compare selected");
+                            showToast(isTamil ? "இரண்டு பிரச்சாரங்களை ஒப்பிடுவதற்குத் தேர்வு செய்யவும்" : "Tick “Compare” on two campaigns, then press Compare selected");
                           }}
                         >
-                          Compare
+                          {isTamil ? "ஒப்பிடு" : "Compare"}
                         </button>
                       </>
                     )}
@@ -572,21 +598,21 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                       <>
                         {c.isLive ? (
                           <Link className="btn primary" href={`/dashboard/campaigns/${c.id}`}>
-                            Continue setup
+                            {isTamil ? "அமைப்பைத் தொடரவும்" : "Continue setup"}
                           </Link>
                         ) : (
                           <Link className="btn primary" href="/dashboard/campaigns/new">
-                            Continue setup
+                            {isTamil ? "அமைப்பைத் தொடரவும்" : "Continue setup"}
                           </Link>
                         )}
                         <button type="button" className="btn sm" onClick={() => handlePreview(c)}>
-                          Preview
+                          {isTamil ? "முன்னோட்டம்" : "Preview"}
                         </button>
                         <button type="button" className="btn sm" onClick={() => handleDuplicate(c)}>
-                          Duplicate
+                          {isTamil ? "நகலெடு" : "Duplicate"}
                         </button>
                         <button type="button" className="btn sm danger" onClick={() => handleDelete(c)}>
-                          Delete
+                          {isTamil ? "நீக்குக" : "Delete"}
                         </button>
                       </>
                     )}
@@ -602,11 +628,11 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                           id={`cmp-${c.id}`}
                           name={`compare-${c.id}`}
                           className="cc"
-                          aria-label={`Compare ${c.n}`}
+                          aria-label={isTamil ? `${c.n} ஒப்பிடு` : `Compare ${c.n}`}
                           checked={selectedIds.includes(c.id)}
                           onChange={() => toggleSelect(c.id)}
                         />
-                        Compare
+                        {isTamil ? "ஒப்பிடு" : "Compare"}
                       </label>
                     )}
                   </div>
@@ -617,18 +643,30 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
             {filteredItems.length === 0 && (
               <section className="card" style={{ padding: "36px 20px", textAlign: "center" }}>
                 <h2 style={{ fontSize: 18, marginBottom: 8 }}>
-                  {items.length ? "No campaigns in this view" : "No campaigns yet"}
+                  {items.length
+                    ? isTamil
+                      ? "இந்த பிரிவில் பிரச்சாரங்கள் இல்லை"
+                      : "No campaigns in this view"
+                    : isTamil
+                    ? "இன்னும் பிரச்சாரங்கள் உருவாக்கப்படவில்லை"
+                    : "No campaigns yet"}
                 </h2>
                 <p className="muted" style={{ maxWidth: 440, margin: "0 auto 16px" }}>
                   {items.length
-                    ? "Try switching to another tab or clearing your search."
+                    ? isTamil
+                      ? "வேறு பிரிவைத் தேர்வு செய்யவும் அல்லது தேடலை அழிக்கவும்."
+                      : "Try switching to another tab or clearing your search."
                     : canManage
-                      ? "Create your first WhatsApp broadcast to announce offers, new arrivals, or discounts."
-                      : "Broadcast campaigns set up for your store will appear here."}
+                    ? isTamil
+                      ? "சலுகைகள், புதிய வரவுகள் அல்லது தள்ளுபடிகளை அறிவிக்க உங்கள் முதல் WhatsApp பிரச்சாரத்தை உருவாக்கவும்."
+                      : "Create your first WhatsApp broadcast to announce offers, new arrivals, or discounts."
+                    : isTamil
+                    ? "உங்கள் கடைக்கு அமைக்கப்பட்ட பிரச்சாரங்கள் இங்கு தோன்றும்."
+                    : "Broadcast campaigns set up for your store will appear here."}
                 </p>
                 {canManage && !items.length && (
                   <Link className="btn primary" href="/dashboard/campaigns/new" style={{ display: "inline-flex", margin: "0 auto" }}>
-                    <Plus aria-hidden className="ic" /> New campaign
+                    <Plus aria-hidden className="ic" /> {isTamil ? "புதிய பிரச்சாரம்" : "New campaign"}
                   </Link>
                 )}
               </section>
@@ -639,7 +677,9 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
         /* Automations Tab */
         <section data-panel="auto" suppressHydrationWarning>
           <p className="muted" style={{ marginBottom: 14 }}>
-            Set these once. They run on their own, with no campaign to start.
+            {isTamil
+              ? "இவற்றை ஒருமுறை அமைத்தால் போதும். பிரச்சாரங்கள் இல்லாமலேயே தானாக இயங்கும்."
+              : "Set these once. They run on their own, with no campaign to start."}
           </p>
           <div className="card" suppressHydrationWarning>
             <div className="list" id="au" suppressHydrationWarning>
@@ -652,7 +692,7 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                     <div className="muted small">{a.desc}</div>
                   </div>
                   {a.val === 2 ? (
-                    <span className="pill ok">Always on</span>
+                    <span className="pill ok">{isTamil ? "எப்போதும் இயங்கும்" : "Always on"}</span>
                   ) : (
                     <button
                       type="button"
@@ -687,36 +727,36 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
             <h2 id="prog-title">{progModal.n}</h2>
             <div className="list">
               <div className="row">
-                <div className="grow muted">Sent</div>
+                <div className="grow muted">{isTamil ? "அனுப்பியது" : "Sent"}</div>
                 <b>
-                  {progModal.sent.toLocaleString("en-IN")} of {progModal.cnt.toLocaleString("en-IN")}
+                  {progModal.sent.toLocaleString("en-IN")} {isTamil ? "மொத்தம்" : "of"} {progModal.cnt.toLocaleString("en-IN")}
                 </b>
               </div>
               <div className="row">
-                <div className="grow muted">Read</div>
+                <div className="grow muted">{isTamil ? "படித்தது" : "Read"}</div>
                 <b>{Math.round((progModal.sent * progModal.seen) / 100).toLocaleString("en-IN")}</b>
               </div>
               <div className="row">
-                <div className="grow muted">Replies</div>
+                <div className="grow muted">{isTamil ? "பதில்கள்" : "Replies"}</div>
                 <b>{progModal.rep}</b>
               </div>
               <div className="row">
-                <div className="grow muted">Paid orders</div>
+                <div className="grow muted">{isTamil ? "பணம் வந்த ஆர்டர்கள்" : "Paid orders"}</div>
                 <b>{progModal.ord}</b>
               </div>
               <div className="row">
-                <div className="grow muted">Failed</div>
+                <div className="grow muted">{isTamil ? "தோல்வியடைந்தது" : "Failed"}</div>
                 <b>{progModal.fail || 0}</b>
               </div>
               <div className="row" style={{ borderTop: "2px solid var(--line)" }}>
-                <div className="grow t">Sales</div>
+                <div className="grow t">{isTamil ? "விற்பனை" : "Sales"}</div>
                 <b>{R(progModal.sale)}</b>
               </div>
             </div>
-            {progModal.sp > 0 && <p className="note small" style={{ marginTop: 12 }}>{sum(progModal)}</p>}
+            {progModal.sp > 0 && <p className="note small" style={{ marginTop: 12 }}>{sum(progModal, isTamil)}</p>}
             <div className="acts">
               <button type="button" className="btn" onClick={() => setProgModal(null)}>
-                Close
+                {isTamil ? "மூடுக" : "Close"}
               </button>
             </div>
           </div>
@@ -734,7 +774,7 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
           style={{ display: "block", position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 100 }}
         >
           <div className="dlg">
-            <h2 id="pv-title">Preview: {pvModal.n}</h2>
+            <h2 id="pv-title">{isTamil ? "முன்னோட்டம்: " : "Preview: "}{pvModal.n}</h2>
             <div className="phone">
               <div className="bubble">{pvModal.body || `${pvModal.n}! Special offer for your next order today.`}</div>
               {pvModal.buttons && pvModal.buttons.length > 0 && (
@@ -747,17 +787,17 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
             </div>
             <div className="acts">
               <button type="button" className="btn" onClick={() => setPvModal(null)}>
-                Close
+                {isTamil ? "மூடுக" : "Close"}
               </button>
               <button
                 type="button"
                 className="btn primary"
                 onClick={() => {
-                  showToast("Test message sent to your own number");
+                  showToast(isTamil ? "உங்கள் எண்ணிற்கு சோதனைச் செய்தி அனுப்பப்பட்டது" : "Test message sent to your own number");
                   setPvModal(null);
                 }}
               >
-                Send me a test
+                {isTamil ? "எனக்கு சோதனைச் செய்தி அனுப்பு" : "Send me a test"}
               </button>
             </div>
           </div>

@@ -1,19 +1,34 @@
+"use client";
+
 import { ArrowLeft, Loader2 } from "@/components/icons";
-import Link from "@/components/intent-link";
 import { Children, cloneElement, isValidElement, type ComponentProps, type ReactElement, type ReactNode } from "react";
+import Link from "@/components/intent-link";
 import { cssColor, type ChartColor } from "@/lib/chart-theme";
 import { cn } from "@/lib/cn";
 import { PageInfo } from "./page-info";
 import { PageTools } from "./shell-tools";
 import { LangButton } from "@/app/dashboard/portal-ui";
+import { useLanguage } from "@/lib/i18n/context";
 
 /* ───────────────────────── Page structure ───────────────────────── */
 
+const BACK_LABEL_MAP: Record<string, string> = {
+  "Orders": "ஆர்டர்கள்",
+  "Customers": "வாடிக்கையாளர்கள்",
+  "Campaigns": "பிரச்சாரங்கள்",
+  "Templates": "டெம்ப்ளேட்கள்",
+  "Settings": "அமைப்புகள்",
+  "Products": "பொருட்கள்",
+  "Back": "பின்செல்",
+};
+
 /** A small "‹ Customers" link above a detail page's title (portal design). */
 export function BackLink({ href, children }: { href: string; children: ReactNode }) {
+  const { lang } = useLanguage();
+  const display = lang === "ta" && typeof children === "string" ? (BACK_LABEL_MAP[children] ?? children) : children;
   return (
     <Link href={href} className="btn sm ghost print:hidden" style={{ marginLeft: -12, marginBottom: 4 }}>
-      <ArrowLeft aria-hidden className="ic" style={{ width: 16, height: 16 }} /> {children}
+      <ArrowLeft aria-hidden className="ic" style={{ width: 16, height: 16 }} /> {display}
     </Link>
   );
 }
@@ -26,17 +41,21 @@ export function BackLink({ href, children }: { href: string; children: ReactNode
  */
 export function PageHeader({
   title,
+  titleTa,
   description,
+  descriptionTa,
   meta,
   actions,
   back,
   tabs,
 }: {
   title: string;
+  titleTa?: string;
   description?: ReactNode;
+  descriptionTa?: ReactNode;
   meta?: ReactNode;
   actions?: ReactNode;
-  back?: { href: string; label: string };
+  back?: { href: string; label: string; labelTa?: string };
   tabs?: ReactNode;
   /** Kept for older callers; the design header lays actions out the same way everywhere. */
   inlineActions?: boolean;
@@ -47,7 +66,7 @@ export function PageHeader({
       {back && <BackLink href={back.href}>{back.label}</BackLink>}
       <header className="top">
         <div style={{ minWidth: 0 }}>
-          <PageInfo title={title} description={description} />
+          <PageInfo title={title} description={description} titleTa={titleTa} descriptionTa={descriptionTa} />
           {meta && (
             <div className="muted" style={{ marginTop: 6 }}>
               {meta}
@@ -142,14 +161,18 @@ export function IconCube({
 
 export function CardHeader({
   title,
+  titleTa,
   description,
+  descriptionTa,
   action,
   as: H = "h2",
   tone,
   icon,
 }: {
   title: ReactNode;
+  titleTa?: ReactNode;
   description?: ReactNode;
+  descriptionTa?: ReactNode;
   action?: ReactNode;
   as?: "h2" | "h3";
   /** A coloured header band and accent strip (kept for backwards compatibility). */
@@ -158,19 +181,22 @@ export function CardHeader({
   icon?: ReactNode;
 }) {
   void tone;
+  const { lang } = useLanguage();
+  const renderedTitle = lang === "ta" && titleTa ? titleTa : title;
+  const renderedDesc = lang === "ta" && descriptionTa ? descriptionTa : description;
   return (
     <div
       className="relative flex flex-wrap items-start justify-between gap-x-2.5 gap-y-1.5 px-4 pb-1 pt-4 sm:flex-nowrap sm:gap-4 sm:px-5 sm:pt-5"
     >
-      <div className={cn("flex min-w-0 flex-1 basis-36 gap-2.5 sm:basis-40 sm:gap-3", description ? "items-start" : "items-center")}>
+      <div className={cn("flex min-w-0 flex-1 basis-36 gap-2.5 sm:basis-40 sm:gap-3", renderedDesc ? "items-start" : "items-center")}>
         {icon && (
           <span aria-hidden className="shrink-0 text-muted mt-0.5 [&_svg]:size-[18px] sm:[&_svg]:size-5 [&_svg]:stroke-[1.8] flex items-center justify-center">
             {icon}
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <H className="font-display text-[17px] font-semibold leading-snug tracking-[-0.2px] text-ink sm:text-[19px]">{title}</H>
-          {description && <p className="mt-0.5 text-[13px] leading-snug text-muted sm:text-[14px]">{description}</p>}
+          <H className="font-display text-[17px] font-semibold leading-snug tracking-[-0.2px] text-ink sm:text-[19px]">{renderedTitle}</H>
+          {renderedDesc && <p className="mt-0.5 text-[13px] leading-snug text-muted sm:text-[14px]">{renderedDesc}</p>}
         </div>
       </div>
       {action && <div className="flex min-w-0 max-w-full shrink-0 items-center gap-1.5 self-center sm:gap-2">{action}</div>}
@@ -661,13 +687,34 @@ export function Skeleton({ className }: { className?: string }) {
   return <div aria-hidden className={cn("animate-pulse rounded-control bg-line/60", className)} />;
 }
 
-const STAT_TONES: Record<HeaderTone, { color: string }> = {
-  brand: { color: "#167d63" },
-  violet: { color: "#6941c6" },
-  gold: { color: "#d4a514" },
-  info: { color: "#1d64a8" },
-  rose: { color: "#c93636" },
-  amber: { color: "#b7791f" },
+const STAT_LABEL_MAP: Record<string, string> = {
+  "Total Orders": "மொத்த ஆர்டர்கள்",
+  "Carts": "கார்ட்கள்",
+  "Revenue": "வருமானம்",
+  "Unpaid carts": "நிலுவை கார்ட்கள்",
+  "Total Customers": "மொத்த வாடிக்கையாளர்கள்",
+  "Active Buyers": "வாங்கும் வாடிக்கையாளர்கள்",
+  "Repeat Rate": "மறுமுறை வாங்கியோர்",
+  "Loyalty Points": "லாயல்டி புள்ளிகள்",
+  "Total Products": "மொத்த பொருட்கள்",
+  "Products": "பொருட்கள்",
+  "In Stock": "இருப்பு உள்ளது",
+  "In stock": "இருப்பு உள்ளது",
+  "Out of Stock": "இருப்பு இல்லை",
+  "Out of stock": "இருப்பு இல்லை",
+  "Waiting for Meta": "Meta அனுமதிக்கு காத்திருக்கிறது",
+  "Total Revenue": "மொத்த வருமானம்",
+  "Cash in Hand": "கையில் உள்ள ரொக்கம்",
+  "Bank & UPI": "வங்கி & UPI",
+  "Pending COD to Collect": "வசூலிக்க வேண்டிய COD",
+  "Held in wallets": "வாலட்களில் உள்ள தொகை",
+  "Received today": "இன்று வந்த பணம்",
+  "Money to collect": "வர வேண்டிய பணம்",
+  "COD pending": "ரொக்கம் (COD)",
+  "Failed or expired": "தோல்வி / காலாவதி",
+  "Paid sales": "விற்பனை தொகை",
+  "Waiting in unpaid carts": "கார்ட்டில் நிலுவை",
+  "Carts that got paid": "செலுத்தப்பட்ட கார்ட்டுகள்",
 };
 
 /**
@@ -676,8 +723,10 @@ const STAT_TONES: Record<HeaderTone, { color: string }> = {
  */
 export function Stat({
   label,
+  labelTa,
   value,
   sub,
+  subTa,
   icon,
   href,
   tone = "brand",
@@ -687,8 +736,10 @@ export function Stat({
   id,
 }: {
   label: string;
+  labelTa?: string;
   value: ReactNode;
   sub?: ReactNode;
+  subTa?: ReactNode;
   icon?: ReactNode;
   href?: string;
   tone?: HeaderTone;
@@ -697,11 +748,15 @@ export function Stat({
   className?: string;
   id?: string;
 }) {
+  const { lang } = useLanguage();
+  const displayLabel = lang === "ta" ? (labelTa ?? STAT_LABEL_MAP[label] ?? label) : label;
+  const displaySub = lang === "ta" && subTa ? subTa : sub;
+
   const body = (
     <>
       <div className="flex items-center justify-between gap-1.5 sm:gap-2">
         <span className="min-w-0 truncate text-[11.5px] font-medium text-muted sm:text-[13.5px]">
-          {label}
+          {displayLabel}
         </span>
         {icon && (
           <span aria-hidden className="shrink-0 text-muted [&_svg]:size-4 sm:[&_svg]:size-[18px] [&_svg]:stroke-2">
@@ -711,7 +766,7 @@ export function Stat({
       </div>
       <div className="tabular mt-0.5 sm:mt-1 font-display font-semibold text-xl sm:text-[26px] lg:text-[28px] leading-tight tracking-[-0.2px] text-ink truncate">{value}</div>
       {meter !== undefined && <Meter raised value={meter} tone={tone === "amber" || tone === "rose" ? "warning" : "brand"} className="mt-1.5 sm:mt-2.5" />}
-      {sub && <div className="mt-0.5 sm:mt-1 text-[11px] sm:text-[13px] font-semibold text-muted leading-tight sm:leading-snug truncate sm:line-clamp-none">{sub}</div>}
+      {displaySub && <div className="mt-0.5 sm:mt-1 text-[11px] sm:text-[13px] font-semibold text-muted leading-tight sm:leading-snug truncate sm:line-clamp-none">{displaySub}</div>}
     </>
   );
   const cardCls = "relative flex h-full min-w-0 flex-col justify-between rounded-[14px] sm:rounded-[18px] border-[1.5px] border-line bg-panel p-3 sm:p-5 shadow-[0_1px_0_rgba(16,40,59,.04),0_14px_30px_-22px_rgba(16,40,59,.35)] dark:shadow-[0_14px_30px_-22px_rgba(0,0,0,.7)] transition";
@@ -801,13 +856,14 @@ export function DistributionBar({
   );
 }
 
-const ORDER_STEPS = [
-  { key: "NEW", label: "Placed" },
-  { key: "CONFIRMED", label: "Confirmed" },
-  { key: "PAID", label: "Paid" },
-  { key: "DISPATCHED", label: "Dispatched" },
-  { key: "DELIVERED", label: "Delivered" },
-] as const;
+type OrderStepItem = { key: string; label: string; labelTa: string };
+const ORDER_STEPS: OrderStepItem[] = [
+  { key: "NEW", label: "Placed", labelTa: "ஆர்டர் வந்தது" },
+  { key: "CONFIRMED", label: "Confirmed", labelTa: "உறுதியானது" },
+  { key: "PAID", label: "Paid", labelTa: "பணம் வந்தது" },
+  { key: "DISPATCHED", label: "Dispatched", labelTa: "அனுப்பப்பட்டது" },
+  { key: "DELIVERED", label: "Delivered", labelTa: "டெலிவரி ஆனது" },
+];
 
 /** Visual 5-step order fulfilment tracker for OrderCard matching artifact .steps format. */
 export function OrderStepper({
@@ -819,11 +875,14 @@ export function OrderStepper({
   isPaid: boolean;
   unpaidLabel?: string;
 }) {
+  const { lang } = useLanguage();
+  const isTa = lang === "ta";
+
   if (status === "CANCELLED") {
     return (
       <div className="flex items-center gap-1.5 text-xs font-semibold text-danger">
         <span aria-hidden className="size-2 rounded-full bg-danger-solid" />
-        Cancelled
+        {isTa ? "ரத்து செய்யப்பட்டது" : "Cancelled"}
       </div>
     );
   }
@@ -840,13 +899,16 @@ export function OrderStepper({
               : 1
             : 0;
 
+  const currentStep = ORDER_STEPS[activeIdx];
+  const stepAria = isTa ? (currentStep?.labelTa ?? currentStep?.label) : currentStep?.label;
+
   return (
-    <div aria-label={`Order progress: ${ORDER_STEPS[activeIdx]?.label}`} className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] sm:text-xs text-muted">
+    <div aria-label={`Order progress: ${stepAria}`} className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] sm:text-xs text-muted">
       {ORDER_STEPS.map((step, idx) => {
         const done = idx <= activeIdx || (step.key === "PAID" && isPaid);
-        const current = idx === activeIdx;
         const owed = unpaidLabel && step.key === "PAID" && !isPaid && idx < activeIdx;
-        const label = owed ? unpaidLabel : step.label;
+        const stepName = isTa ? (step.labelTa ?? step.label) : step.label;
+        const label = owed ? unpaidLabel : stepName;
         return (
           <span key={step.key} className="inline-flex items-center gap-1 sm:gap-1.5">
             <span

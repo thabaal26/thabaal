@@ -40,24 +40,24 @@ type NavItem = {
 export const NAV: NavItem[] = [
   { href: "/dashboard", label: "Home", short: "Home", icon: Home, group: "Today", ta: "முகப்பு" },
 
-  { href: "/dashboard/replies", label: "Chats", short: "Chats", icon: MessageCircle, group: "Daily work", ta: "அரட்டை", also: ["/dashboard/calls"] },
+  { href: "/dashboard/replies", label: "Chats", short: "Chats", icon: MessageCircle, group: "Daily work", ta: "உரையாடல்கள்", also: ["/dashboard/calls"] },
   { href: "/dashboard/orders", label: "Orders", short: "Orders", icon: Package, group: "Daily work", ta: "ஆர்டர்கள்" },
   { href: "/dashboard/revenue", label: "Payments", short: "Payments", icon: IndianRupee, group: "Money", ta: "பணம்" },
 
-  { href: "/dashboard/customers", label: "Customers", short: "Customers", icon: Users, group: "Grow", ta: "வாடிக்கையாளர்", also: ["/dashboard/refills"] },
+  { href: "/dashboard/customers", label: "Customers", short: "Customers", icon: Users, group: "Grow", ta: "வாடிக்கையாளர்கள்", also: ["/dashboard/refills"] },
   { href: "/dashboard/catalogue", label: "Products", short: "Products", icon: Tag, group: "Grow", ta: "பொருட்கள்" },
-  { href: "/dashboard/campaigns", label: "Campaigns", short: "Campaigns", icon: Megaphone, group: "Grow", ta: "பிரச்சாரம்", also: ["/dashboard/messages"] },
-  { href: "/dashboard/templates", label: "Templates", short: "Templates", icon: FileText, group: "Grow", ta: "டெம்ப்ளேட்" },
+  { href: "/dashboard/campaigns", label: "Campaigns", short: "Campaigns", icon: Megaphone, group: "Grow", ta: "பிரச்சாரங்கள்", also: ["/dashboard/messages"] },
+  { href: "/dashboard/templates", label: "Templates", short: "Templates", icon: FileText, group: "Grow", ta: "டெம்ப்ளேட்கள்" },
 
-  { href: "/dashboard/report", label: "Reports", short: "Reports", icon: BarChart3, group: "Understand", ta: "அறிக்கை" },
+  { href: "/dashboard/report", label: "Reports", short: "Reports", icon: BarChart3, group: "Understand", ta: "அறிக்கைகள்" },
 
   { href: "/dashboard/settings", label: "Settings", short: "Settings", icon: Settings, group: "Account", ta: "அமைப்புகள்" },
 ];
 
-const ADMIN_NAV: NavItem[] = [{ href: "/dashboard/clients", label: "Clients", short: "Clients", icon: Building2, group: "Account" }];
+const ADMIN_NAV: NavItem[] = [{ href: "/dashboard/clients", label: "Clients", short: "Clients", icon: Building2, group: "Account", ta: "நிறுவனங்கள்" }];
 
 /** Thabaal wallet: admins, and clients billed through the wallet. */
-const WALLET_NAV: NavItem[] = [{ href: "/dashboard/wallet", label: "Wallet", short: "Wallet", icon: Wallet, group: "Account" }];
+const WALLET_NAV: NavItem[] = [{ href: "/dashboard/wallet", label: "Wallet", short: "Wallet", icon: Wallet, group: "Account", ta: "வாலட்" }];
 
 /**
  * Phone tabs: what each role opens most. Staff pack orders and answer customers all day;
@@ -217,7 +217,7 @@ export function BottomNav({
                     </span>
                   ) : null}
                 </span>
-                <span className="max-w-full truncate px-0.5">{short}</span>
+                <span className="max-w-full truncate px-0.5"><T ta={item.ta}>{short}</T></span>
               </Link>
             </li>
           );
@@ -228,7 +228,7 @@ export function BottomNav({
               <Menu aria-hidden className={cn("size-5 transition-all duration-200 ease-out", moreActive ? "text-ink dark:text-brand scale-110" : "text-muted scale-100")} />
               {hiddenCount > 0 && <span className={dot}>{hiddenCount > 99 ? "99+" : hiddenCount}</span>}
             </span>
-            <span>More</span>
+            <span><T ta="மேலும்">More</T></span>
           </button>
         </li>
       </ul>
@@ -249,7 +249,7 @@ export function BottomNav({
                   )}
                 >
                   <Icon aria-hidden className={cn("size-5 shrink-0", active ? "text-ink" : "text-muted")} />
-                  <span className="min-w-0 flex-1 truncate">{label}</span>
+                  <span className="min-w-0 flex-1 truncate"><T ta={item.ta}>{label}</T></span>
                   {count && <CountBadge n={count.n} label={count.label} className="bg-danger-solid text-white" />}
                 </Link>
               </li>

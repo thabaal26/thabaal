@@ -22,6 +22,7 @@ export function dayStart(d = new Date()) {
 /** How the money came in, as the design groups it. */
 export type Way = "wa" | "upi" | "cash" | "bank";
 export const WAY_LABEL: Record<Way, string> = { wa: "WhatsApp pay", upi: "UPI", cash: "Cash", bank: "Bank / card / other" };
+export const WAY_LABEL_TA: Record<Way, string> = { wa: "WhatsApp", upi: "UPI", cash: "ரொக்கம்", bank: "வங்கி / கார்டு" };
 export const WAY_COLOR: Record<Way, string> = { wa: "var(--bar)", upi: "var(--bar2)", cash: "var(--bar3)", bank: "var(--bar4)" };
 
 export function wayOf(method: string | null, source?: string | null): Way {

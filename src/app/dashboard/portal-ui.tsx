@@ -43,8 +43,14 @@ export function useLang(): Lang {
 export function setLang(l: Lang) {
   try {
     localStorage.setItem(LANG_KEY, l);
+    if (typeof document !== "undefined") {
+      document.cookie = `thabaal-lang=${l};path=/;max-age=31536000;SameSite=Lax`;
+      document.documentElement.lang = l;
+    }
   } catch {}
-  window.dispatchEvent(new Event(LANG_EVENT));
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(LANG_EVENT));
+  }
 }
 
 /** English text, or its Tamil version when Tamil is chosen (the design's data-ta strings). */
@@ -163,17 +169,17 @@ export function Chips({ options, value, onChange, label, style }: { options: { i
 }
 
 /** The design's segmented switch (7 / 30 / 90 days…). With `hrefs`, each option is a link. */
-export function Seg({ options, value, onChange, label }: { options: { id: string; label: string; href?: string }[]; value: string; onChange?: (v: string) => void; label: string }) {
+export function Seg({ options, value, onChange, label }: { options: { id: string; label: string; ta?: string; href?: string }[]; value: string; onChange?: (v: string) => void; label: string }) {
   return (
     <div className="seg" role="group" aria-label={label}>
       {options.map((o) =>
         o.href ? (
           <Link key={o.id} href={o.href} scroll={false} aria-pressed={value === o.id} role="button" style={{ border: 0, padding: "6px 12px", borderRadius: 9, fontWeight: 600, fontSize: 13.5, textDecoration: "none", color: value === o.id ? "var(--bg)" : "var(--muted)", background: value === o.id ? "var(--ink)" : "none" }}>
-            {o.label}
+            <T ta={o.ta}>{o.label}</T>
           </Link>
         ) : (
           <button key={o.id} type="button" aria-pressed={value === o.id} onClick={() => onChange?.(o.id)}>
-            {o.label}
+            <T ta={o.ta}>{o.label}</T>
           </button>
         ),
       )}

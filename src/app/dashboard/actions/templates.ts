@@ -273,7 +273,7 @@ export async function deleteTemplate(id: string): Promise<ActionResult> {
 
   try {
     const { cfg } = await senderForAccount(t.clientId, t.businessAccountId);
-    if (cfg.live) await deleteMetaTemplate(cfg, t.name, t.metaId ?? undefined);
+    if (cfg.live) await deleteMetaTemplate(cfg, t.name);
   } catch (e) {
     const msg = errText(e);
     // If the template was already deleted in Meta or not found, proceed with deleting from our database

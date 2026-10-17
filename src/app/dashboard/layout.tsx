@@ -14,6 +14,7 @@ import { WalletBanner } from "./wallet/wallet-banner";
 import { NotificationBell, NotificationProvider } from "@/components/notification-center";
 import { ShellProvider } from "@/components/shell-tools";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageSwitch } from "@/lib/i18n/language-switch";
 import { AppearanceSync } from "@/components/appearance-sync";
 import { IconSetLink } from "@/components/icon-set-link";
 import { InlineScript } from "@/components/inline-script";
@@ -188,7 +189,11 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
                 What changed in this menu
               </Link>
             </div>
-            <div className="shrink-0 border-t border-line p-3">
+            <div className="shrink-0 border-t border-line p-3 space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-2xs font-semibold text-muted">மொழி / Lang</span>
+                <LanguageSwitch size="sm" />
+              </div>
               <Link href="/dashboard/settings" className="flex items-center gap-2.5 rounded-xl p-2 transition hover:bg-sunken">
                 <ClientMark logoUrl={client?.logoUrl} name={name} />
                 <span className="min-w-0 flex-1">
@@ -213,6 +218,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
                   {status && <div className="flex justify-end text-2xs leading-tight">{status}</div>}
                 </div>
               )}
+              <LanguageSwitch size="sm" />
               <ThemeToggle />
               {notificationsOn && <NotificationBell />}
               <SettingsLink />

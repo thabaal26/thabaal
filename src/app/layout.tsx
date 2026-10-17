@@ -42,15 +42,31 @@ export const viewport: Viewport = {
   themeColor: "#171b24",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+import { cookies } from "next/headers";
+import { LanguageProvider } from "@/lib/i18n/context";
+
+const LANG_SCRIPT = `(function(){try{var l=localStorage.getItem("thabaal-lang");if(l==="ta"||l==="en"){document.documentElement.lang=l;}}catch(e){}})();`;
+
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  let lang = "en";
+  try {
+    const store = await cookies();
+    const c = store.get("thabaal-lang")?.value;
+    if (c === "ta" || c === "en") lang = c;
+  } catch {}
+
   return (
-    <html lang="en" suppressHydrationWarning className={`${dmSans.variable} ${geistSans.variable} ${geistMono.variable} ${tamil.variable} ${nunito.variable} ${inter.variable} ${poppins.variable} h-full antialiased`}>
+    <html lang={lang} suppressHydrationWarning className={`${dmSans.variable} ${geistSans.variable} ${geistMono.variable} ${tamil.variable} ${nunito.variable} ${inter.variable} ${poppins.variable} h-full antialiased`}>
       <head>
         {/* Sets light or dark before the first paint, from the saved choice or the device setting. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        {/* Sets html lang before the first paint, from the saved choice or cookie. */}
+        <script dangerouslySetInnerHTML={{ __html: LANG_SCRIPT }} />
       </head>
       <body className="min-h-full font-sans" suppressHydrationWarning>
-        {children}
+        <LanguageProvider>
+          {children}
+        </LanguageProvider>
         <Toaster />
         <ConfirmHost />
         <ServiceWorkerRegister />

@@ -19,13 +19,24 @@ let B: { id: string };
 let C: { id: string };
 
 before(async () => {
+  await db.order.deleteMany({ where: { client: { name: { in: ["Alpha Stores", "Beta Foods", "Alpha Spices"] } } } }).catch(() => {});
+  await db.customer.deleteMany({ where: { client: { name: { in: ["Alpha Stores", "Beta Foods", "Alpha Spices"] } } } }).catch(() => {});
+  await db.whatsAppNumber.deleteMany({ where: { client: { name: { in: ["Alpha Stores", "Beta Foods", "Alpha Spices"] } } } }).catch(() => {});
+  await db.client.deleteMany({ where: { name: { in: ["Alpha Stores", "Beta Foods", "Alpha Spices"] } } }).catch(() => {});
+
   // First client created = the "legacy" one that may use the deployment-wide sheet link.
   A = await db.client.create({ data: { name: "Alpha Stores", homeCity: "Chennai" } });
   B = await db.client.create({ data: { name: "Beta Foods", homeCity: "Coimbatore" } });
   C = await db.client.create({ data: { name: "Alpha Spices", homeCity: "Madurai" } });
+  process.env.GOOGLE_SHEET_CLIENT_ID = A.id;
   await db.setting.upsert({ where: { id: 1 }, update: { provider: "META" }, create: { id: 1, provider: "META" } });
 });
 after(async () => {
+  delete process.env.GOOGLE_SHEET_CLIENT_ID;
+  await db.order.deleteMany({ where: { client: { name: { in: ["Alpha Stores", "Beta Foods", "Alpha Spices"] } } } }).catch(() => {});
+  await db.customer.deleteMany({ where: { client: { name: { in: ["Alpha Stores", "Beta Foods", "Alpha Spices"] } } } }).catch(() => {});
+  await db.whatsAppNumber.deleteMany({ where: { client: { name: { in: ["Alpha Stores", "Beta Foods", "Alpha Spices"] } } } }).catch(() => {});
+  await db.client.deleteMany({ where: { name: { in: ["Alpha Stores", "Beta Foods", "Alpha Spices"] } } }).catch(() => {});
   await raw.$disconnect();
   await db.$disconnect();
 });

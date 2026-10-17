@@ -69,29 +69,39 @@ function delta(k: HomeKpi): { text: string; tone: "up" | "down" | "flat" } {
   return d === 0 ? { text: "0%", tone: "flat" } : { text: `${d > 0 ? "+" : "−"}${Math.abs(d)}%`, tone: d > 0 ? "up" : "down" };
 }
 
-function waitText(since: Date | null) {
-  if (!since) return "No one waiting";
+function waitText(since: Date | null, ta = false) {
+  if (!since) return ta ? "யாரும் காத்திருக்கவில்லை" : "No one waiting";
   const mins = Math.max(1, Math.round((Date.now() - since.getTime()) / 60000));
-  if (mins < 60) return `Longest wait ${mins} min`;
+  if (mins < 60) return ta ? `அதிகபட்ச காத்திருப்பு ${mins} நிமிடம்` : `Longest wait ${mins} min`;
   const h = Math.round(mins / 60);
-  return h < 48 ? `Longest wait ${h} h` : `Longest wait ${Math.round(h / 24)} days`;
+  return h < 48
+    ? (ta ? `அதிகபட்ச காத்திருப்பு ${h} மணிநேரம்` : `Longest wait ${h} h`)
+    : (ta ? `அதிகபட்ச காத்திருப்பு ${Math.round(h / 24)} நாட்கள்` : `Longest wait ${Math.round(h / 24)} days`);
 }
 
 /** "2 paid · 1 COD" from the real orders; "Paid or COD" when there's nothing to pack. */
-function packText(s: HomeTiersProps["toPackSplit"]) {
-  if (!s) return "Paid or COD";
+function packText(s: HomeTiersProps["toPackSplit"], ta = false) {
+  if (!s) return ta ? "செலுத்தப்பட்டது அல்லது COD" : "Paid or COD";
+  if (ta) {
+    const parts = [
+      s.paid && `${s.paid} செலுத்தப்பட்டது`,
+      s.cod && `${s.cod} COD`,
+      s.other && `${s.other} உறுதியானது`,
+    ].filter(Boolean);
+    return parts.length ? parts.join(" · ") : "செலுத்தப்பட்டது அல்லது COD";
+  }
   const parts = [s.paid && `${s.paid} paid`, s.cod && `${s.cod} COD`, s.other && `${s.other} confirmed`].filter(Boolean);
   return parts.length ? parts.join(" · ") : "Paid or COD";
 }
 
-function TodoTile({ href, big, title, titleTa, sub, go, goTa }: { href: string; big: string; title: string; titleTa: string; sub: string; go: string; goTa: string }) {
+function TodoTile({ href, big, title, titleTa, sub, subTa, go, goTa }: { href: string; big: string; title: string; titleTa: string; sub: string; subTa?: string; go: string; goTa: string }) {
   return (
     <Link className="todo" href={href}>
       <span className="big">{big}</span>
       <span>
         <b><T ta={titleTa}>{title}</T></b>
         <br />
-        <span className="muted small">{sub}</span>
+        <span className="muted small"><T ta={subTa}>{sub}</T></span>
       </span>
       <span className="go"><T ta={goTa}>{go}</T> ›</span>
     </Link>
@@ -99,21 +109,70 @@ function TodoTile({ href, big, title, titleTa, sub, go, goTa }: { href: string; 
 }
 
 const RANGES = [
-  { id: "7d", label: "7 days" },
-  { id: "30d", label: "30 days" },
-  { id: "90d", label: "90 days" },
+  { id: "7d", label: "7 days", ta: "7 நாட்கள்" },
+  { id: "30d", label: "30 days", ta: "30 நாட்கள்" },
+  { id: "90d", label: "90 days", ta: "90 நாட்கள்" },
 ];
 
 const campaignTone = { Scheduled: "info", Sending: "ok", "Template not approved": "warn" } as const;
 
 export function HomeTiers(p: HomeTiersProps) {
   const todos = [
-    p.ordersOn && { key: "carts", n: p.unpaidCartsCount, node: <TodoTile key="carts" href="/dashboard/orders?show=unpaid" big={inr(p.unpaidCartsValue)} title="Unpaid carts" titleTa="செலுத்தாத கார்ட்கள்" sub={`${p.unpaidCartsCount} customer${p.unpaidCartsCount === 1 ? "" : "s"}`} go="Chase" goTa="நினைவூட்டு" /> },
-    p.ordersOn && { key: "pack", n: p.toPackCount, node: <TodoTile key="pack" href="/dashboard/orders/packing" big={String(p.toPackCount)} title="Orders to pack" titleTa="பேக் செய்ய வேண்டியவை" sub={packText(p.toPackSplit)} go="Pack" goTa="பேக்" /> },
-    p.repliesOn && { key: "chats", n: p.unhandledRepliesCount, node: <TodoTile key="chats" href="/dashboard/replies" big={String(p.unhandledRepliesCount)} title="Chats waiting" titleTa="காத்திருக்கும் அரட்டைகள்" sub={waitText(p.oldestWaitingAt)} go="Reply" goTa="பதில்" /> },
+    p.ordersOn && {
+      key: "carts",
+      n: p.unpaidCartsCount,
+      node: (
+        <TodoTile
+          key="carts"
+          href="/dashboard/orders?show=unpaid"
+          big={inr(p.unpaidCartsValue)}
+          title="Unpaid carts"
+          titleTa="செலுத்தப்படாத கார்ட்டுகள்"
+          sub={`${p.unpaidCartsCount} customer${p.unpaidCartsCount === 1 ? "" : "s"}`}
+          subTa={`${p.unpaidCartsCount} வாடிக்கையாளர்${p.unpaidCartsCount === 1 ? "" : "கள்"}`}
+          go="Chase"
+          goTa="நினைவூட்டு"
+        />
+      ),
+    },
+    p.ordersOn && {
+      key: "pack",
+      n: p.toPackCount,
+      node: (
+        <TodoTile
+          key="pack"
+          href="/dashboard/orders/packing"
+          big={String(p.toPackCount)}
+          title="Orders to pack"
+          titleTa="பேக் செய்ய வேண்டியவை"
+          sub={packText(p.toPackSplit, false)}
+          subTa={packText(p.toPackSplit, true)}
+          go="Pack"
+          goTa="பேக்"
+        />
+      ),
+    },
+    p.repliesOn && {
+      key: "chats",
+      n: p.unhandledRepliesCount,
+      node: (
+        <TodoTile
+          key="chats"
+          href="/dashboard/replies"
+          big={String(p.unhandledRepliesCount)}
+          title="Chats waiting"
+          titleTa="காத்திருக்கும் உரையாடல்கள்"
+          sub={waitText(p.oldestWaitingAt, false)}
+          subTa={waitText(p.oldestWaitingAt, true)}
+          go="Reply"
+          goTa="பதில்"
+        />
+      ),
+    },
   ].filter((t): t is { key: string; n: number; node: React.JSX.Element } => Boolean(t));
   const needing = todos.filter((t) => t.n > 0).length;
   const rangeWord = RANGES.find((r) => r.id === p.activeRange)?.label ?? "7 days";
+  const rangeWordTa = RANGES.find((r) => r.id === p.activeRange)?.ta ?? "7 நாட்கள்";
   const activeRange = RANGES.some((r) => r.id === p.activeRange) ? p.activeRange : "7d";
 
   return (
@@ -140,8 +199,20 @@ export function HomeTiers(p: HomeTiersProps) {
           <section className="card">
             <div className="hd">
               <div>
-                <h2>{needing === 0 ? "Nothing needs you right now" : `${needing} thing${needing === 1 ? "" : "s"} need${needing === 1 ? "s" : ""} you today`}</h2>
-                <p>{needing === 0 ? "All caught up. New orders and chats will show here." : "Start here. Everything else can wait."}</p>
+                <h2>
+                  {needing === 0 ? (
+                    <T ta="இப்போது உடனடி கவனம் எதுவும் தேவையில்லை">Nothing needs you right now</T>
+                  ) : (
+                    <T ta={`இன்று உங்களுக்கு ${needing} பணிகள் உள்ளன`}>{`${needing} thing${needing === 1 ? "" : "s"} need${needing === 1 ? "s" : ""} you today`}</T>
+                  )}
+                </h2>
+                <p>
+                  {needing === 0 ? (
+                    <T ta="அனைத்தும் முடிந்தது. புதிய ஆர்டர்களும் உரையாடல்களும் இங்கு காட்டப்படும்.">All caught up. New orders and chats will show here.</T>
+                  ) : (
+                    <T ta="இங்கிருந்து தொடங்குங்கள். மற்றவை காத்திருக்கலாம்.">Start here. Everything else can wait.</T>
+                  )}
+                </p>
               </div>
             </div>
             <div className={`grid ${todos.length === 3 ? "g3" : todos.length === 2 ? "g2" : "gx"}`}>{todos.map((t) => t.node)}</div>
@@ -195,7 +266,10 @@ export function HomeTiers(p: HomeTiersProps) {
             })}
           </div>
           <p className="muted small" style={{ marginTop: 8 }}>
-            Compared with the previous {rangeWord}. <Link href="/dashboard/report" className="linkb">Full reports ›</Link>
+            <T ta={`முந்தைய ${rangeWordTa} உடன் ஒப்பிடப்பட்டது.`}>{`Compared with the previous ${rangeWord}.`}</T>{" "}
+            <Link href="/dashboard/report" className="linkb">
+              <T ta="முழு அறிக்கைகள் ›">Full reports ›</T>
+            </Link>
           </p>
         </section>
 

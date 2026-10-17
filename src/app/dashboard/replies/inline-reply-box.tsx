@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toastResult } from "@/components/toast";
 import type { ReplyAnalysisResult } from "@/lib/ai";
+import { useLanguage } from "@/lib/i18n/context";
 import { getAiSmartRepliesAction } from "../actions/ai";
 import { uploadProductImage } from "../actions/catalog";
 import { setReplyHandled } from "../actions/replies";
@@ -34,6 +35,7 @@ export function InlineReplyBox({
   more?: React.ReactNode;
 }) {
   const router = useRouter();
+  const { isTamil } = useLanguage();
   const [text, setText] = useState("");
   const [mediaUrl, setMediaUrl] = useState("");
   const [showMedia, setShowMedia] = useState(false);
@@ -48,11 +50,14 @@ export function InlineReplyBox({
     return (
       <>
         <div className="note" style={{ marginTop: 14 }}>
-          <b className="down">Free replies have closed for this chat.</b> Send a template to start talking again.
+          <b className="down">
+            {isTamil ? "இந்த உரையாடலுக்கான இலவச பதில் நேரம் முடிந்துவிட்டது." : "Free replies have closed for this chat."}
+          </b>{" "}
+          {isTamil ? "மீண்டும் பேச Meta அங்கீகரித்த டெம்ப்ளேட் அனுப்பவும்." : "Send a template to start talking again."}
         </div>
         <div className="tools" style={{ marginTop: 12 }}>
           <Link className="btn primary sm" href={`/dashboard/customers/${customerId}#reply`}>
-            <MessageCircle aria-hidden className="ic" style={{ width: 15, height: 15 }} /> Send template
+            <MessageCircle aria-hidden className="ic" style={{ width: 15, height: 15 }} /> {isTamil ? "டெம்ப்ளேட் அனுப்பு" : "Send template"}
           </Link>
           {more}
         </div>
@@ -109,13 +114,13 @@ export function InlineReplyBox({
       <div className="field" style={{ marginTop: 14 }}>
         <div className="row" style={{ padding: 0, border: 0 }}>
           <label htmlFor="reply-input" className="grow" style={{ minWidth: 0 }}>
-            Your reply
+            {isTamil ? "உங்கள் பதில்" : "Your reply"}
           </label>
           {aiResult && (
             <>
               <span className={`pill ${aiResult.urgency === "HIGH" ? "warn" : "ok"}`}>{aiResult.intentLabel}</span>
               <button type="button" className="linkb small" onClick={() => setAiResult(null)}>
-                Clear
+                {isTamil ? "அழிக்க" : "Clear"}
               </button>
             </>
           )}
@@ -145,9 +150,16 @@ export function InlineReplyBox({
 
         {(showMedia || mediaUrl) && (
           <div className="toolbar" style={{ marginBottom: 0 }}>
-            <input type="text" aria-label="Image or PDF link" style={{ flex: 1, minWidth: 180 }} placeholder="Paste an image or PDF link, or upload" value={mediaUrl} onChange={(e) => setMediaUrl(e.target.value)} />
+            <input
+              type="text"
+              aria-label={isTamil ? "படம் அல்லது PDF இணைப்பு" : "Image or PDF link"}
+              style={{ flex: 1, minWidth: 180 }}
+              placeholder={isTamil ? "படம் அல்லது PDF இணைப்பை ஒட்டவும், அல்லது பதிவேற்றவும்" : "Paste an image or PDF link, or upload"}
+              value={mediaUrl}
+              onChange={(e) => setMediaUrl(e.target.value)}
+            />
             <label className="btn sm" style={{ cursor: "pointer" }}>
-              {uploading ? "Uploading…" : "Upload photo/PDF"}
+              {uploading ? (isTamil ? "ஏற்றப்படுகிறது…" : "Uploading…") : (isTamil ? "படம்/PDF பதிவேற்றுக" : "Upload photo/PDF")}
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp,application/pdf"
@@ -169,7 +181,7 @@ export function InlineReplyBox({
             <button
               type="button"
               className="btn sm ghost"
-              aria-label="Remove attachment"
+              aria-label={isTamil ? "இணைப்பை நீக்குக" : "Remove attachment"}
               onClick={() => {
                 setMediaUrl("");
                 setShowMedia(false);
@@ -195,37 +207,47 @@ export function InlineReplyBox({
               submit(false);
             }
           }}
-          placeholder="Type a reply"
+          placeholder={
+            customerName
+              ? isTamil
+                ? `${customerName}-க்கு பதில் எழுதவும்…`
+                : `Type a reply to ${customerName}…`
+              : isTamil
+              ? "பதில் எழுதவும்…"
+              : "Type a reply…"
+          }
         />
       </div>
 
       <div className="tools" style={{ marginTop: 10 }}>
-        <select value={selectedLang} onChange={(e) => handleLangChange(e.target.value as "EN" | "Tanglish" | "Tamil")} style={{ width: "auto" }} aria-label="Reply language">
+        <select value={selectedLang} onChange={(e) => handleLangChange(e.target.value as "EN" | "Tanglish" | "Tamil")} style={{ width: "auto" }} aria-label={isTamil ? "பதில் மொழி" : "Reply language"}>
           <option value="EN">English</option>
           <option value="Tanglish">Tanglish</option>
-          <option value="Tamil">Tamil</option>
+          <option value="Tamil">தமிழ்</option>
         </select>
         <button type="button" className="btn sm" disabled={aiLoading} onClick={runAiSuggest}>
           <Sparkles aria-hidden className="ic" style={{ width: 15, height: 15 }} />
-          {aiLoading ? "Thinking…" : "Suggest a reply"}
+          {aiLoading ? (isTamil ? "யோசிக்கிறது…" : "Thinking…") : (isTamil ? "AI பதில் பரிந்துரை" : "Suggest a reply")}
         </button>
       </div>
 
       <div className="tools" style={{ marginTop: 14 }}>
         <button type="button" className="btn primary" disabled={(!text.trim() && !mediaUrl.trim()) || sending} onClick={() => submit(false)}>
-          {sending ? "Sending…" : "Send"}
+          {sending ? (isTamil ? "அனுப்பப்படுகிறது…" : "Sending…") : (isTamil ? "அனுப்புக" : "Send")}
         </button>
         {!replyHandled && (
           <button type="button" className="btn" disabled={(!text.trim() && !mediaUrl.trim()) || sending} onClick={() => submit(true)}>
-            Send and close
+            {isTamil ? "அனுப்பி முடிக்க" : "Send and close"}
           </button>
         )}
         <details className="more" style={{ border: 0, margin: 0, padding: 0, position: "relative" }} open={showMore} onToggle={(e) => setShowMore(e.currentTarget.open)}>
-          <summary style={{ padding: "8px 12px", border: "1.5px solid var(--line)", borderRadius: 12, display: "inline-flex" }}>More</summary>
+          <summary style={{ padding: "8px 12px", border: "1.5px solid var(--line)", borderRadius: 12, display: "inline-flex" }}>
+            {isTamil ? "மேலும்" : "More"}
+          </summary>
           <div className="tools" style={{ marginTop: 8 }}>
             {more}
             <Link className="btn sm" href={`/dashboard/customers/${customerId}#reply`}>
-              <MessageCircle aria-hidden className="ic" style={{ width: 15, height: 15 }} /> Send template
+              <MessageCircle aria-hidden className="ic" style={{ width: 15, height: 15 }} /> {isTamil ? "டெம்ப்ளேட் அனுப்பு" : "Send template"}
             </Link>
             <button
               type="button"
@@ -235,13 +257,13 @@ export function InlineReplyBox({
                 setShowMore(false);
               }}
             >
-              <ImagePlus aria-hidden className="ic" style={{ width: 15, height: 15 }} /> Attach photo or PDF
+              <ImagePlus aria-hidden className="ic" style={{ width: 15, height: 15 }} /> {isTamil ? "படம் அல்லது PDF இணைக்க" : "Attach photo or PDF"}
             </button>
           </div>
         </details>
       </div>
       <p className="muted small" style={{ marginTop: 8 }}>
-        Ctrl + Enter sends.
+        {isTamil ? "அனுப்ப Ctrl + Enter அழுத்தவும்." : "Ctrl + Enter sends."}
       </p>
     </div>
   );

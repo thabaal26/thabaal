@@ -7,30 +7,32 @@ import Link from "@/components/intent-link";
 import { confirmAction } from "@/components/confirm";
 import { toastResult } from "@/components/toast";
 import type { CollectRow, ReceivedRow, TxnRow } from "@/lib/payments-data";
+import { useLanguage } from "@/lib/i18n/context";
 import { requestPayment } from "../actions/orders";
 import { setPaymentMethod, verifyPaymentClaim } from "../actions/payments";
 import { RecordPaymentSheet } from "../orders/payment-ui";
 import { inr } from "../portal-format";
 import { Chips, PAction, Pill, type PillTone } from "../portal-ui";
 
-const STATE: Record<string, { tone: PillTone; label: string; group: string }> = {
-  requested: { tone: "warn", label: "Payment waiting", group: "unpaid" },
-  unpaid: { tone: "mute", label: "No payment request sent", group: "nolink" },
-  failed: { tone: "bad", label: "Payment failed", group: "failed" },
-  claimed: { tone: "warn", label: "Customer says paid · check", group: "claimed" },
-  cod_due: { tone: "info", label: "Cash on delivery", group: "cod" },
-  part_paid: { tone: "warn", label: "Part paid", group: "unpaid" },
+const STATE: Record<string, { tone: PillTone; label: string; labelTa: string; group: string }> = {
+  requested: { tone: "warn", label: "Payment waiting", labelTa: "பணம் நிலுவையில் உள்ளது", group: "unpaid" },
+  unpaid: { tone: "mute", label: "No payment request sent", labelTa: "கோரிக்கை அனுப்பப்படவில்லை", group: "nolink" },
+  failed: { tone: "bad", label: "Payment failed", labelTa: "தோல்வி அடைந்தது", group: "failed" },
+  claimed: { tone: "warn", label: "Customer says paid · check", labelTa: "செலுத்திவிட்டதாக கூறுகிறார் · சரிபார்க்கவும்", group: "claimed" },
+  cod_due: { tone: "info", label: "Cash on delivery", labelTa: "டெலிவரி ரொக்கம் (COD)", group: "cod" },
+  part_paid: { tone: "warn", label: "Part paid", labelTa: "பகுதி செலுத்தப்பட்டது", group: "unpaid" },
 };
 
-function waited(ms: number, now: number) {
+function waited(ms: number, now: number, isTa = false) {
   const m = Math.max(0, Math.round((now - ms) / 60000));
-  if (m < 60) return `${m} min`;
-  if (m < 48 * 60) return `${Math.round(m / 60)} hours`;
-  return `${Math.round(m / 1440)} days`;
+  if (m < 60) return isTa ? `${m} நிமிடம்` : `${m} min`;
+  if (m < 48 * 60) return isTa ? `${Math.round(m / 60)} மணிநேரம்` : `${Math.round(m / 60)} hours`;
+  return isTa ? `${Math.round(m / 1440)} நாட்கள்` : `${Math.round(m / 1440)} days`;
 }
 
 /** Payments › To collect: every order still owed money, with the next step for each. */
 export function CollectList({ rows, nowMs, canOperate, intro = true }: { rows: CollectRow[]; nowMs: number; canOperate: boolean; intro?: boolean }) {
+  const { isTa } = useLanguage();
   const [filter, setFilter] = useState("all");
   const [q, setQ] = useState("");
   const [paying, setPaying] = useState<CollectRow | null>(null);
@@ -38,13 +40,13 @@ export function CollectList({ rows, nowMs, canOperate, intro = true }: { rows: C
   const groupOf = (r: CollectRow) => STATE[r.state]?.group ?? "unpaid";
   const count = (f: string) => (f === "all" ? rows.length : f === "late" ? rows.filter((r) => r.late).length : rows.filter((r) => groupOf(r) === f).length);
   const opts = [
-    { id: "all", label: "All" },
-    { id: "unpaid", label: "Payment waiting" },
-    { id: "nolink", label: "No request sent" },
-    { id: "claimed", label: "Customer says paid" },
-    { id: "cod", label: "Cash on delivery" },
-    { id: "failed", label: "Failed" },
-    { id: "late", label: "Late" },
+    { id: "all", label: isTa ? "அனைத்தும்" : "All" },
+    { id: "unpaid", label: isTa ? "பணம் நிலுவை" : "Payment waiting" },
+    { id: "nolink", label: isTa ? "அனுப்பப்படாதவை" : "No request sent" },
+    { id: "claimed", label: isTa ? "செலுத்தியதாகக் கூறியவை" : "Customer says paid" },
+    { id: "cod", label: isTa ? "ரொக்கம் (COD)" : "Cash on delivery" },
+    { id: "failed", label: isTa ? "தோல்வி" : "Failed" },
+    { id: "late", label: isTa ? "தாமதம்" : "Late" },
   ].filter((o) => o.id === "all" || count(o.id) > 0 || filter === o.id);
   const ql = q.trim().toLowerCase();
   const list = rows
@@ -57,16 +59,24 @@ export function CollectList({ rows, nowMs, canOperate, intro = true }: { rows: C
     <>
       {intro && (
         <p className="muted" style={{ marginBottom: 12 }}>
-          Orders where the money has not come in yet. Chase the oldest first.
+          {isTa ? "இன்னும் பணம் வராத ஆர்டர்கள். பழைய ஆர்டர்களுக்கு முதலில் நினைவூட்டுங்கள்." : "Orders where the money has not come in yet. Chase the oldest first."}
         </p>
       )}
       <div className="toolbar">
         <div className="search">
           <Search aria-hidden />
-          <input id="payment-search" name="q" type="search" placeholder="Search customer or order" aria-label="Search" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input
+            id="payment-search"
+            name="q"
+            type="search"
+            placeholder={isTa ? "வாடிக்கையாளர் அல்லது ஆர்டரைத் தேடுங்கள்…" : "Search customer or order"}
+            aria-label={isTa ? "வாடிக்கையாளர் அல்லது ஆர்டரைத் தேடுங்கள்" : "Search"}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
         </div>
-        <Chips label="Payment state" value={filter} onChange={setFilter} options={opts.map((o) => ({ ...o, n: count(o.id) }))} />
-        {canOperate && remindable.length > 0 && <RemindAll ids={remindable.map((r) => r.id)} />}
+        <Chips label={isTa ? "பண நிலை" : "Payment state"} value={filter} onChange={setFilter} options={opts.map((o) => ({ ...o, n: count(o.id) }))} />
+        {canOperate && remindable.length > 0 && <RemindAll ids={remindable.map((r) => r.id)} isTa={isTa} />}
       </div>
 
       <div className="stack">
@@ -83,66 +93,104 @@ export function CollectList({ rows, nowMs, canOperate, intro = true }: { rows: C
                     · {r.ref}
                   </h2>
                   <p>
-                    {r.cod ? "Cash on delivery · " : r.requested ? "Payment link · " : ""}waiting {waited(r.waitingSinceMs, nowMs)} · order {r.status.toLowerCase()}
+                    {r.cod ? (isTa ? "டெலிவரி ரொக்கம் · " : "Cash on delivery · ") : r.requested ? (isTa ? "பண இணைப்பு · " : "Payment link · ") : ""}
+                    {isTa ? `காத்திருப்பு ${waited(r.waitingSinceMs, nowMs, isTa)} · ஆர்டர் ${r.status.toLowerCase()}` : `waiting ${waited(r.waitingSinceMs, nowMs)} · order ${r.status.toLowerCase()}`}
                   </p>
                 </div>
                 <b style={{ font: "600 20px var(--display)" }}>{inr(r.due)}</b>
               </div>
               <div className="tools" style={{ margin: "10px 0" }}>
-                <Pill tone={st.tone}>{st.label}</Pill>
-                {r.late && <Pill tone="bad">Late</Pill>}
-                {r.state === "requested" && <span className="muted small">Turns green by itself when they pay on WhatsApp</span>}
-                {r.due < r.total && <span className="muted small">{inr(r.total - r.due)} already received</span>}
+                <Pill tone={st.tone}>{isTa ? st.labelTa : st.label}</Pill>
+                {r.late && <Pill tone="bad">{isTa ? "தாமதம்" : "Late"}</Pill>}
+                {r.state === "requested" && (
+                  <span className="muted small">
+                    {isTa ? "WhatsApp-ல் பணம் செலுத்தியதும் தானாகப் பச்சையாக மாறும்" : "Turns green by itself when they pay on WhatsApp"}
+                  </span>
+                )}
+                {r.due < r.total && (
+                  <span className="muted small">
+                    {isTa ? `${inr(r.total - r.due)} ஏற்கனவே பெறப்பட்டது` : `${inr(r.total - r.due)} already received`}
+                  </span>
+                )}
               </div>
               {canOperate && (
                 <div className="tools">
                   {r.state === "claimed" ? (
                     <>
                       <PAction action={verifyPaymentClaim.bind(null, r.id, true)} className="primary">
-                        Payment received
+                        {isTa ? "பணம் பெறப்பட்டது" : "Payment received"}
                       </PAction>
-                      <PAction action={verifyPaymentClaim.bind(null, r.id, false)} confirm={`Mark ${r.name}'s payment as not received? They'll be asked for the UPI reference or a screenshot.`}>
-                        Not received
+                      <PAction
+                        action={verifyPaymentClaim.bind(null, r.id, false)}
+                        confirm={
+                          isTa
+                            ? `${r.name}-ன் பணம் பெறப்படவில்லை எனக் குறிக்கவா? அவரிடம் UPI குறிப்பு எண் அல்லது ஸ்கிரீன்ஷாட் கேட்கப்படும்.`
+                            : `Mark ${r.name}'s payment as not received? They'll be asked for the UPI reference or a screenshot.`
+                        }
+                      >
+                        {isTa ? "பெறப்படவில்லை" : "Not received"}
                       </PAction>
                     </>
                   ) : r.cod ? (
                     <button type="button" className="btn primary" onClick={() => setPaying(r)}>
-                      Record cash received
+                      {isTa ? "ரொக்கம் பதிவு செய்" : "Record cash received"}
                     </button>
                   ) : r.state === "unpaid" ? (
                     <>
                       {r.canRequest && (
-                        <PAction action={requestPayment.bind(null, r.id)} className="primary" confirm={`Send ${r.name} the WhatsApp “Review and pay” message for ${r.ref}?`}>
-                          Send payment link
+                        <PAction
+                          action={requestPayment.bind(null, r.id)}
+                          className="primary"
+                          confirm={
+                            isTa
+                              ? `${r.ref} ஆர்டருக்காக ${r.name}-க்கு WhatsApp 'Review and pay' செய்தி அனுப்பவா?`
+                              : `Send ${r.name} the WhatsApp “Review and pay” message for ${r.ref}?`
+                          }
+                        >
+                          {isTa ? "பண இணைப்பு அனுப்பு" : "Send payment link"}
                         </PAction>
                       )}
-                      <PAction action={setPaymentMethod.bind(null, r.id, "cod")}>Mark as cash on delivery</PAction>
+                      <PAction action={setPaymentMethod.bind(null, r.id, "cod")}>
+                        {isTa ? "டெலிவரி ரொக்கமாக மாற்று" : "Mark as cash on delivery"}
+                      </PAction>
                       <button type="button" className="btn sm" onClick={() => setPaying(r)}>
-                        Mark paid
+                        {isTa ? "செலுத்தப்பட்டதாகக் குறி" : "Mark paid"}
                       </button>
                     </>
                   ) : (
                     <>
                       {r.canRequest && (
                         <PAction action={requestPayment.bind(null, r.id)} className="primary">
-                          {r.state === "failed" ? "Send a new link" : "Send reminder"}
+                          {r.state === "failed" ? (isTa ? "புதிய இணைப்பு அனுப்பு" : "Send a new link") : isTa ? "நினைவூட்டல் அனுப்பு" : "Send reminder"}
                         </PAction>
                       )}
                       <button type="button" className="btn sm" onClick={() => setPaying(r)}>
-                        Mark paid
+                        {isTa ? "செலுத்தப்பட்டதாகக் குறி" : "Mark paid"}
                       </button>
-                      <PAction action={setPaymentMethod.bind(null, r.id, "cod")}>Change to cash on delivery</PAction>
+                      <PAction action={setPaymentMethod.bind(null, r.id, "cod")}>
+                        {isTa ? "டெலிவரி ரொக்கமாக மாற்று" : "Change to cash on delivery"}
+                      </PAction>
                     </>
                   )}
                   <Link className="btn sm ghost" href={`/dashboard/replies?r=${r.customerId}`}>
-                    Open chat
+                    {isTa ? "உரையாடலைத் திற" : "Open chat"}
                   </Link>
                 </div>
               )}
             </article>
           );
         })}
-        {list.length === 0 && <p className="muted">{rows.length ? "Nothing matches." : "Nothing to collect. Good work."}</p>}
+        {list.length === 0 && (
+          <p className="muted">
+            {rows.length
+              ? isTa
+                ? "எதுவும் பொருந்தவில்லை."
+                : "Nothing matches."
+              : isTa
+                ? "வசூலிக்க வேண்டிய தொகை எதுவும் இல்லை. நன்று."
+                : "Nothing to collect. Good work."}
+          </p>
+        )}
       </div>
 
       {paying && <RecordPaymentSheet open onClose={() => setPaying(null)} id={paying.id} who={paying.name} due={paying.due} cod={paying.cod} />}
@@ -151,7 +199,7 @@ export function CollectList({ rows, nowMs, canOperate, intro = true }: { rows: C
 }
 
 /** Sends the payment request again to everyone whose link is waiting. */
-function RemindAll({ ids }: { ids: string[] }) {
+function RemindAll({ ids, isTa = false }: { ids: string[]; isTa?: boolean }) {
   const [pending, start] = useTransition();
   const busy = useRef(false);
   const router = useRouter();
@@ -165,7 +213,14 @@ function RemindAll({ ids }: { ids: string[] }) {
         if (busy.current) return;
         busy.current = true;
         try {
-          if (!(await confirmAction(`Send the payment request again to ${ids.length} customer${ids.length === 1 ? "" : "s"} who haven't paid?`))) return;
+          if (
+            !(await confirmAction(
+              isTa
+                ? `பணம் செலுத்தாத ${ids.length} வாடிக்கையாளர்களுக்கு மீண்டும் பணக் கோரிக்கையை அனுப்பவா?`
+                : `Send the payment request again to ${ids.length} customer${ids.length === 1 ? "" : "s"} who haven't paid?`
+            ))
+          )
+            return;
           start(async () => {
             let ok = 0;
             const errors: string[] = [];
@@ -174,7 +229,11 @@ function RemindAll({ ids }: { ids: string[] }) {
               if (r.ok) ok += 1;
               else if (r.message) errors.push(r.message);
             }
-            toastResult({ ok: ok > 0, message: `Reminder sent to ${ok} of ${ids.length}.`, errors: errors.slice(0, 3) });
+            toastResult({
+              ok: ok > 0,
+              message: isTa ? `${ids.length} பேரில் ${ok} பேருக்கு நினைவூட்டல் அனுப்பப்பட்டது.` : `Reminder sent to ${ok} of ${ids.length}.`,
+              errors: errors.slice(0, 3),
+            });
             router.refresh();
           });
         } finally {
@@ -182,13 +241,14 @@ function RemindAll({ ids }: { ids: string[] }) {
         }
       }}
     >
-      {pending ? "Sending…" : "Remind everyone"}
+      {pending ? (isTa ? "அனுப்பப்படுகிறது…" : "Sending…") : isTa ? "அனைவருக்கும் நினைவூட்டு" : "Remind everyone"}
     </button>
   );
 }
 
 /** "Record a payment": find an order still owed money by its number, then record it. */
 export function RecordByNumber({ rows }: { rows: CollectRow[] }) {
+  const { isTa } = useLanguage();
   const dlg = useRef<HTMLDialogElement>(null);
   const [num, setNum] = useState("");
   const [paying, setPaying] = useState<CollectRow | null>(null);
@@ -197,7 +257,7 @@ export function RecordByNumber({ rows }: { rows: CollectRow[] }) {
   return (
     <>
       <button type="button" className="btn primary" onClick={() => dlg.current?.showModal()}>
-        + Record a payment
+        {isTa ? "+ பணம் பதிவு செய்" : "+ Record a payment"}
       </button>
       <dialog ref={dlg} onClick={(e) => e.target === dlg.current && dlg.current?.close()}>
         <form
@@ -210,25 +270,36 @@ export function RecordByNumber({ rows }: { rows: CollectRow[] }) {
             setPaying(match);
           }}
         >
-          <h2>Mark paid</h2>
-          <p className="muted small">Use this when the customer paid you outside thabaal.</p>
+          <h2>{isTa ? "செலுத்தப்பட்டதாகக் குறிக்க" : "Mark paid"}</h2>
+          <p className="muted small">
+            {isTa ? "வாடிக்கையாளர் போர்ட்டலுக்கு வெளியே நேரடியாக பணம் செலுத்தும்போது இதைப் பயன்படுத்தவும்." : "Use this when the customer paid you outside thabaal."}
+          </p>
           <div className="field">
-            <label htmlFor="mpo">Order number</label>
+            <label htmlFor="mpo">{isTa ? "ஆர்டர் எண்" : "Order number"}</label>
             <input id="mpo" type="text" inputMode="numeric" placeholder="1047" value={num} onChange={(e) => setNum(e.target.value)} autoFocus />
             {match ? (
               <p className="note small">
-                Order <b>{match.ref}</b> · {match.name} · {inr(match.due)} waiting
+                {isTa ? "ஆர்டர் " : "Order "}
+                <b>{match.ref}</b> · {match.name} · {inr(match.due)} {isTa ? "வர வேண்டியுள்ளது" : "waiting"}
               </p>
             ) : (
-              <p className="muted small">{digits ? `No order ${digits} is waiting for payment.` : "Type the number you see on the order in Orders."}</p>
+              <p className="muted small">
+                {digits
+                  ? isTa
+                    ? `${digits} என்ற ஆர்டர் பணத்திற்காகக் காத்திருக்கவில்லை.`
+                    : `No order ${digits} is waiting for payment.`
+                  : isTa
+                    ? "ஆர்டர்கள் பக்கத்தில் நீங்கள் பார்க்கும் எண்ணைத் தட்டச்சு செய்யவும்."
+                    : "Type the number you see on the order in Orders."}
+              </p>
             )}
           </div>
           <div className="acts">
             <button type="button" className="btn" onClick={() => dlg.current?.close()}>
-              Cancel
+              {isTa ? "ரத்து" : "Cancel"}
             </button>
             <button type="submit" className="btn primary" disabled={!match}>
-              Next
+              {isTa ? "அடுத்து" : "Next"}
             </button>
           </div>
         </form>
@@ -240,55 +311,56 @@ export function RecordByNumber({ rows }: { rows: CollectRow[] }) {
 
 /** One payment's receipt in the design's dialog. */
 export function ReceiptButton({ row, way, when }: { row: ReceivedRow; way: string; when: string }) {
+  const { isTa } = useLanguage();
   const dlg = useRef<HTMLDialogElement>(null);
   return (
     <>
       <button type="button" className="btn sm" onClick={() => dlg.current?.showModal()}>
-        View receipt
+        {isTa ? "ரசீது காண்க" : "View receipt"}
       </button>
       <dialog ref={dlg} onClick={(e) => e.target === dlg.current && dlg.current?.close()}>
         <div className="dlg">
-          <h2>Receipt</h2>
+          <h2>{isTa ? "ரசீது" : "Receipt"}</h2>
           <div className="list">
             <div className="row">
-              <div className="grow muted">Order</div>
+              <div className="grow muted">{isTa ? "ஆர்டர்" : "Order"}</div>
               <b>{row.ref}</b>
             </div>
             <div className="row">
-              <div className="grow muted">Customer</div>
+              <div className="grow muted">{isTa ? "வாடிக்கையாளர்" : "Customer"}</div>
               <b>{row.name}</b>
             </div>
             <div className="row">
-              <div className="grow muted">Paid by</div>
+              <div className="grow muted">{isTa ? "செலுத்திய முறை" : "Paid by"}</div>
               <b>{way}</b>
             </div>
             {row.reference && (
               <div className="row">
-                <div className="grow muted">Reference</div>
+                <div className="grow muted">{isTa ? "குறிப்பு எண்" : "Reference"}</div>
                 <b>{row.reference}</b>
               </div>
             )}
             {row.collectedBy && (
               <div className="row">
-                <div className="grow muted">Collected by</div>
+                <div className="grow muted">{isTa ? "வசூலித்தவர்" : "Collected by"}</div>
                 <b>{row.collectedBy}</b>
               </div>
             )}
             <div className="row">
-              <div className="grow muted">When</div>
+              <div className="grow muted">{isTa ? "நேரம்" : "When"}</div>
               <b>{when}</b>
             </div>
             <div className="row" style={{ borderTop: "2px solid var(--line)" }}>
-              <div className="grow t">Amount</div>
+              <div className="grow t">{isTa ? "தொகை" : "Amount"}</div>
               <b style={{ font: "600 20px var(--display)" }}>{inr(row.amount)}</b>
             </div>
           </div>
           <div className="acts">
             <Link className="btn" href={`/dashboard/replies?r=${row.customerId}`}>
-              Open chat
+              {isTa ? "உரையாடலைத் திற" : "Open chat"}
             </Link>
             <button type="button" className="btn primary" onClick={() => dlg.current?.close()}>
-              Close
+              {isTa ? "மூடு" : "Close"}
             </button>
           </div>
         </div>
@@ -298,7 +370,9 @@ export function ReceiptButton({ row, way, when }: { row: ReceivedRow; way: strin
 }
 
 /** Downloads rows as a CSV file (opens in Excel). */
-export function CsvButton({ name, rows, label = "Export CSV" }: { name: string; rows: (string | number)[][]; label?: string }) {
+export function CsvButton({ name, rows, label }: { name: string; rows: (string | number)[][]; label?: string }) {
+  const { isTa } = useLanguage();
+  const defaultLabel = label ?? (isTa ? "CSV ஏற்றுமதி" : "Export CSV");
   return (
     <button
       type="button"
@@ -310,7 +384,7 @@ export function CsvButton({ name, rows, label = "Export CSV" }: { name: string; 
           const s = String(v);
           return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
         };
-        const blob = new Blob(["﻿" + rows.map((r) => r.map(esc).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
+        const blob = new Blob(["\uFEFF" + rows.map((r) => r.map(esc).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
         a.download = `${name}.csv`;
@@ -318,13 +392,14 @@ export function CsvButton({ name, rows, label = "Export CSV" }: { name: string; 
         setTimeout(() => URL.revokeObjectURL(a.href), 1000);
       }}
     >
-      {label}
+      {defaultLabel}
     </button>
   );
 }
 
 /** Payments › All transactions: money in, refunds and failed payments, searchable. */
 export function TxnTable({ rows }: { rows: (TxnRow & { when: string })[] }) {
+  const { isTa } = useLanguage();
   const [f, setF] = useState("all");
   const [q, setQ] = useState("");
   const ql = q.trim().toLowerCase();
@@ -335,33 +410,46 @@ export function TxnTable({ rows }: { rows: (TxnRow & { when: string })[] }) {
       <div className="toolbar">
         <div className="search">
           <Search aria-hidden />
-          <input type="search" placeholder="Search customer, order or amount" aria-label="Search transactions" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input
+            type="search"
+            placeholder={isTa ? "வாடிக்கையாளர், ஆர்டர் அல்லது தொகையைத் தேடுங்கள்…" : "Search customer, order or amount"}
+            aria-label={isTa ? "பரிவர்த்தனைகளைத் தேடுங்கள்" : "Search transactions"}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
         </div>
         <Chips
-          label="Kind"
+          label={isTa ? "வகை" : "Kind"}
           value={f}
           onChange={setF}
           options={[
-            { id: "all", label: "All" },
-            { id: "in", label: "Money in" },
-            { id: "refund", label: "Refunds" },
-            { id: "fail", label: "Failed or expired" },
+            { id: "all", label: isTa ? "அனைத்தும்" : "All" },
+            { id: "in", label: isTa ? "வந்த பணம்" : "Money in" },
+            { id: "refund", label: isTa ? "திருப்பிச் செலுத்தியவை" : "Refunds" },
+            { id: "fail", label: isTa ? "தோல்வி / காலாவதி" : "Failed or expired" },
           ]}
         />
-        <CsvButton name="transactions" rows={[["Date", "Order", "Customer", "Kind", "Way", "Amount", "Status"], ...list.map((r) => [r.when, r.ref, r.name, r.kind === "in" ? "Money in" : r.kind === "refund" ? "Refund" : "Failed", r.way, r.amount, r.status])]} />
+        <CsvButton
+          name="transactions"
+          label={isTa ? "ஏற்றுமதி" : "Export"}
+          rows={[
+            [isTa ? "தேதி" : "Date", isTa ? "ஆர்டர்" : "Order", isTa ? "வாடிக்கையாளர்" : "Customer", isTa ? "வகை" : "Kind", isTa ? "முறை" : "Way", isTa ? "தொகை" : "Amount", isTa ? "நிலை" : "Status"],
+            ...list.map((r) => [r.when, r.ref, r.name, r.kind === "in" ? (isTa ? "வந்த பணம்" : "Money in") : r.kind === "refund" ? (isTa ? "திருப்பிச் செலுத்தியது" : "Refund") : isTa ? "தோல்வி" : "Failed", r.way, r.amount, r.status]),
+          ]}
+        />
       </div>
       <div className="card" style={{ padding: 0 }}>
         <div className="tw">
           <table>
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Order</th>
-                <th>Customer</th>
-                <th>Kind</th>
-                <th>Way</th>
-                <th className="num">Amount</th>
-                <th>Status</th>
+                <th>{isTa ? "தேதி" : "Date"}</th>
+                <th>{isTa ? "ஆர்டர்" : "Order"}</th>
+                <th>{isTa ? "வாடிக்கையாளர்" : "Customer"}</th>
+                <th>{isTa ? "வகை" : "Kind"}</th>
+                <th>{isTa ? "முறை" : "Way"}</th>
+                <th className="num">{isTa ? "தொகை" : "Amount"}</th>
+                <th>{isTa ? "நிலை" : "Status"}</th>
               </tr>
             </thead>
             <tbody>
@@ -372,7 +460,7 @@ export function TxnTable({ rows }: { rows: (TxnRow & { when: string })[] }) {
                   <td>
                     <b>{r.name}</b>
                   </td>
-                  <td>{r.kind === "in" ? "Money in" : r.kind === "refund" ? "Refund" : "Payment"}</td>
+                  <td>{r.kind === "in" ? (isTa ? "வந்த பணம்" : "Money in") : r.kind === "refund" ? (isTa ? "திருப்பிச் செலுத்தியது" : "Refund") : isTa ? "தோல்வி" : "Payment"}</td>
                   <td>{r.way}</td>
                   <td className="num">{r.kind === "refund" ? `−${inr(r.amount)}` : inr(r.amount)}</td>
                   <td>
@@ -385,7 +473,7 @@ export function TxnTable({ rows }: { rows: (TxnRow & { when: string })[] }) {
         </div>
         {list.length === 0 && (
           <p className="muted" style={{ padding: 16 }}>
-            Nothing matches.
+            {isTa ? "பொருத்தமான பரிவர்த்தனைகள் எதுவும் இல்லை." : "Nothing matches."}
           </p>
         )}
       </div>

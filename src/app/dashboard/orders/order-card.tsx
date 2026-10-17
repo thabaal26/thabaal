@@ -8,6 +8,7 @@ import { Sheet } from "@/components/sheet";
 import { toastResult } from "@/components/toast";
 import { fmtDate } from "@/lib/format";
 import { inr } from "../portal-format";
+import { T, useLang } from "../portal-ui";
 import { getOrderPricing, pointsDiscount } from "@/lib/order-pricing";
 import { orderRef, type OrderItem } from "@/lib/order-ref";
 import {
@@ -92,6 +93,8 @@ export function OrderCard({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const lang = useLang();
+  const isTa = lang === "ta";
 
   // Local interactive UI state
   const [showTimeline, setShowTimeline] = useState(false);
@@ -244,6 +247,19 @@ export function OrderCard({
   } else {
     primaryAction = { key: "restore", label: "Restore order" };
   }
+
+  const PRIMARY_ACTION_TA: Record<string, string> = {
+    confirm: "ஆர்டரை உறுதி செய்",
+    pack: "பேக் செய்",
+    dispatch: flow === "courier" ? "கொரியரில் அனுப்பு" : "டெலிவரிக்கு அனுப்பு",
+    deliver: "டெலிவரி ஆனதாகக் குறி",
+    remind: "நினைவூட்டல் அனுப்பு",
+    link: "கட்டண இணைப்பு அனுப்பு",
+    codin: `டெலிவரி ஆனது, பணம் வரவு ${inr(pricing.total)}`,
+    receipt: "ரசீது பார்க்க",
+    restore: "ஆர்டரை மீட்டெடு",
+  };
+  const primaryActionLabel = isTa ? (PRIMARY_ACTION_TA[primaryAction.key] ?? primaryAction.label) : primaryAction.label;
 
   // Action runners
   const runAction = (name: string, fn: () => Promise<{ ok: boolean; message?: string }>) => {
@@ -709,7 +725,7 @@ export function OrderCard({
             boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
           }}
         >
-          {primaryAction.label}
+          {primaryActionLabel}
         </button>
         <Link
           className="btn sm ghost"
@@ -726,7 +742,7 @@ export function OrderCard({
             borderRadius: 10,
           }}
         >
-          Open chat
+          <T ta="உரையாடல்">Open chat</T>
         </Link>
         <a
           className="btn sm ghost"
@@ -749,7 +765,7 @@ export function OrderCard({
             borderRadius: 10,
           }}
         >
-          Call
+          WhatsApp
         </a>
         <button
           type="button"
@@ -767,7 +783,7 @@ export function OrderCard({
             borderRadius: 10,
           }}
         >
-          {showTimeline ? "Hide timeline" : "Timeline"}
+          {showTimeline ? (isTa ? "காலவரிசையை மறை" : "Hide timeline") : (isTa ? "காலவரிசை" : "Timeline")}
         </button>
       </div>
 
@@ -850,7 +866,9 @@ export function OrderCard({
 
       {/* 8. More actions Accordion */}
       <details className="more" style={{ borderTop: "1px solid var(--line)", marginTop: 14, paddingTop: 12 }}>
-        <summary style={{ fontSize: 14, fontWeight: 600, color: "var(--muted)", cursor: "pointer" }}>More actions</summary>
+        <summary style={{ fontSize: 14, fontWeight: 600, color: "var(--muted)", cursor: "pointer" }}>
+          <T ta="கூடுதல் செயல்கள்">More actions</T>
+        </summary>
         <div className="tools" style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
           {canEdit && (
             <button
@@ -858,7 +876,7 @@ export function OrderCard({
               className="btn sm"
               onClick={() => setEditOpen(true)}
             >
-              Edit order
+              <T ta="பொருட்கள் மாற்றம்">Edit order</T>
             </button>
           )}
 
@@ -873,7 +891,7 @@ export function OrderCard({
                 )
               }
             >
-              Confirm as cash on delivery
+              <T ta="COD என உறுதிப்படுத்து">Confirm as cash on delivery</T>
             </button>
           )}
 
@@ -888,7 +906,7 @@ export function OrderCard({
                 )
               }
             >
-              Change to cash on delivery
+              <T ta="COD ஆக மாற்றுக">Change to cash on delivery</T>
             </button>
           )}
 
@@ -899,7 +917,9 @@ export function OrderCard({
               disabled={pending}
               onClick={() => runAction("link", () => requestPayment(o.id))}
             >
-              {o.paymentRequestedAt ? "Send link again" : "Send payment link"}
+              <T ta={o.paymentRequestedAt ? "இணைப்பை மீண்டும் அனுப்பு" : "கட்டண இணைப்பு அனுப்பு"}>
+                {o.paymentRequestedAt ? "Send link again" : "Send payment link"}
+              </T>
             </button>
           )}
 
@@ -909,7 +929,7 @@ export function OrderCard({
               className="btn sm"
               onClick={() => setPayModalOpen(true)}
             >
-              Mark paid
+              <T ta="பணம் பதிவு செய்">Mark paid</T>
             </button>
           )}
 
@@ -920,7 +940,7 @@ export function OrderCard({
               disabled={pending}
               onClick={() => runAction("unpack", () => setOrderPacked(o.id, false))}
             >
-              Not packed yet
+              <T ta="இன்னும் பேக் ஆகவில்லை">Not packed yet</T>
             </button>
           )}
 
@@ -930,7 +950,7 @@ export function OrderCard({
               className="btn sm"
               onClick={() => setDispatchOpen(true)}
             >
-              Dispatch order
+              <T ta="டெலிவரிக்கு அனுப்பு">Dispatch order</T>
             </button>
           )}
 
@@ -940,7 +960,7 @@ export function OrderCard({
               className="btn sm"
               onClick={() => window.print()}
             >
-              Print packing slip
+              <T ta="பேக்கிங் ரசீது அச்சிடுக">Print packing slip</T>
             </button>
           )}
 
@@ -950,7 +970,7 @@ export function OrderCard({
               className="btn sm"
               onClick={() => window.print()}
             >
-              Print invoice
+              <T ta="விலைப்பட்டியல் அச்சிடுக">Print invoice</T>
             </button>
           )}
 
@@ -961,7 +981,7 @@ export function OrderCard({
               disabled={pending}
               onClick={handleCancelOrder}
             >
-              Cancel order
+              <T ta="ஆர்டரை ரத்து செய்">Cancel order</T>
             </button>
           )}
 
@@ -972,7 +992,7 @@ export function OrderCard({
               disabled={pending}
               onClick={() => runAction("restore", () => setOrderStatus(o.id, "NEW"))}
             >
-              Restore order
+              <T ta="ஆர்டரை மீட்டெடு">Restore order</T>
             </button>
           )}
         </div>
@@ -999,9 +1019,9 @@ export function OrderCard({
             style={{ width: "min(520px, calc(100vw - 32px))" }}
             onSubmit={submitDispatch}
           >
-            <h2>Dispatch order #{refText}</h2>
+            <h2><T ta="ஆர்டர் அனுப்புக">Dispatch order</T> #{refText}</h2>
             <div className="field">
-              <label htmlFor="dsw">Delivery method</label>
+              <label htmlFor="dsw"><T ta="டெலிவரி செய்யும் முறை">Delivery method</T></label>
               <select
                 id="dsw"
                 value={dispatchMethod}
@@ -1009,13 +1029,13 @@ export function OrderCard({
               >
                 <option value="Murugan (bike)">Murugan (bike)</option>
                 <option value="Selvam (bike)">Selvam (bike)</option>
-                <option value="Courier">Courier</option>
-                <option value="Customer pickup">Customer pickup</option>
+                <option value="Courier">{isTa ? "கொரியர் (Courier)" : "Courier"}</option>
+                <option value="Customer pickup">{isTa ? "நேரடி வருகை (Customer pickup)" : "Customer pickup"}</option>
               </select>
             </div>
             {dispatchMethod === "Courier" && (
               <div className="field">
-                <label htmlFor="dst">Tracking number</label>
+                <label htmlFor="dst"><T ta="டிராக்கிங் எண்">Tracking number</T></label>
                 <input
                   id="dst"
                   type="text"
@@ -1034,7 +1054,7 @@ export function OrderCard({
                 checked={sendUpdate}
                 onChange={(e) => setSendUpdate(e.target.checked)}
               />
-              Send the customer a WhatsApp delivery update
+              <T ta="வாடிக்கையாளருக்கு WhatsApp டெலிவரி செய்தி அனுப்பவும்">Send the customer a WhatsApp delivery update</T>
             </label>
             <div className="acts">
               <button
@@ -1042,10 +1062,10 @@ export function OrderCard({
                 className="btn"
                 onClick={() => setDispatchOpen(false)}
               >
-                Cancel
+                <T ta="ரத்து">Cancel</T>
               </button>
               <button className="btn primary" type="submit" disabled={pending}>
-                Dispatch
+                <T ta="அனுப்புக">Dispatch</T>
               </button>
             </div>
           </form>
@@ -1073,26 +1093,26 @@ export function OrderCard({
             style={{ width: "min(520px, calc(100vw - 32px))" }}
             onSubmit={submitMarkPaid}
           >
-            <h2>Mark paid #{refText}</h2>
+            <h2><T ta="பணம் பதிவு செய்">Mark paid</T> #{refText}</h2>
             <p className="muted small">
-              Use this when the customer paid you outside thabaal.
+              <T ta="Thabaal-க்கு வெளியே வாடிக்கையாளர் பணம் செலுத்திய போது இதைப் பயன்படுத்தவும்.">Use this when the customer paid you outside thabaal.</T>
             </p>
             <div className="formgrid">
               <div className="field">
-                <label htmlFor="mpw">How did they pay?</label>
+                <label htmlFor="mpw"><T ta="எப்படி செலுத்தப்பட்டது?">How did they pay?</T></label>
                 <select
                   id="mpw"
                   value={payMethod}
                   onChange={(e) => setPayMethod(e.target.value)}
                 >
                   <option value="upi">UPI (GPay, PhonePe, Paytm)</option>
-                  <option value="cash">Cash</option>
-                  <option value="bank">Bank transfer</option>
-                  <option value="card">Card</option>
+                  <option value="cash">{isTa ? "ரொக்கம் (Cash)" : "Cash"}</option>
+                  <option value="bank">{isTa ? "வங்கி பரிவர்த்தனை" : "Bank transfer"}</option>
+                  <option value="card">{isTa ? "அட்டை (Card)" : "Card"}</option>
                 </select>
               </div>
               <div className="field">
-                <label htmlFor="mpa">Amount (₹)</label>
+                <label htmlFor="mpa"><T ta="தொகை (₹)">Amount (₹)</T></label>
                 <input
                   id="mpa"
                   type="number"
@@ -1102,11 +1122,11 @@ export function OrderCard({
               </div>
             </div>
             <div className="field">
-              <label htmlFor="mpr">Reference (optional)</label>
+              <label htmlFor="mpr"><T ta="குறிப்பு எண் (விருப்பத்தேர்வு)">Reference (optional)</T></label>
               <input
                 id="mpr"
                 type="text"
-                placeholder="UPI reference or note"
+                placeholder={isTa ? "UPI எண் அல்லது குறிப்பு" : "UPI reference or note"}
                 value={payRef}
                 onChange={(e) => setPayRef(e.target.value)}
               />
@@ -1117,10 +1137,10 @@ export function OrderCard({
                 className="btn"
                 onClick={() => setPayModalOpen(false)}
               >
-                Cancel
+                <T ta="ரத்து">Cancel</T>
               </button>
               <button className="btn primary" type="submit" disabled={pending}>
-                Save payment
+                <T ta="பணத்தைச் சேமி">Save payment</T>
               </button>
             </div>
           </form>
@@ -1144,33 +1164,33 @@ export function OrderCard({
           }}
         >
           <div className="dlg card" style={{ width: "min(520px, calc(100vw - 32px))" }}>
-            <h2>Receipt #{refText}</h2>
+            <h2><T ta="ரசீது">Receipt</T> #{refText}</h2>
             <div className="list">
               <div className="row">
-                <div className="grow muted">Order</div>
+                <div className="grow muted"><T ta="ஆர்டர்">Order</T></div>
                 <b>#{refText}</b>
               </div>
               <div className="row">
-                <div className="grow muted">Customer</div>
+                <div className="grow muted"><T ta="வாடிக்கையாளர்">Customer</T></div>
                 <b>{o.customer.name}</b>
               </div>
               <div className="row">
-                <div className="grow muted">Paid by</div>
+                <div className="grow muted"><T ta="செலுத்திய முறை">Paid by</T></div>
                 <b>{o.paymentMethod ? o.paymentMethod.toUpperCase() : "Online"}</b>
               </div>
               <div className="row">
-                <div className="grow muted">When</div>
+                <div className="grow muted"><T ta="நேரம்">When</T></div>
                 <b>
                   {o.paidAt
                     ? fmtDate(new Date(o.paidAt), "EEE d MMM, h:mm a")
-                    : "Today"}
+                    : (isTa ? "இன்று" : "Today")}
                 </b>
               </div>
               <div
                 className="row"
                 style={{ borderTop: "2px solid var(--line)", marginTop: 6 }}
               >
-                <div className="grow t">Amount</div>
+                <div className="grow t"><T ta="தொகை">Amount</T></div>
                 <b style={{ font: "600 20px var(--display)" }}>{inr(pricing.total)}</b>
               </div>
             </div>
@@ -1180,7 +1200,7 @@ export function OrderCard({
                 className="btn"
                 onClick={() => setReceiptOpen(false)}
               >
-                Close
+                <T ta="மூடுக">Close</T>
               </button>
               <a
                 className="btn primary"
@@ -1194,7 +1214,7 @@ export function OrderCard({
                 target="_blank"
                 rel="noopener"
               >
-                Send on WhatsApp
+                <T ta="WhatsApp-ல் அனுப்புக">Send on WhatsApp</T>
               </a>
             </div>
           </div>
@@ -1205,8 +1225,8 @@ export function OrderCard({
       <Sheet
         open={editOpen}
         onClose={() => setEditOpen(false)}
-        title={`Edit items · #${refText}`}
-        description="Update products, quantities and pricing for this order."
+        title={isTa ? `பொருட்கள் மாற்றம் · #${refText}` : `Edit items · #${refText}`}
+        description={isTa ? "இந்த ஆர்டரின் பொருட்கள், எண்ணிக்கை மற்றும் விலைகளை மாற்றுக." : "Update products, quantities and pricing for this order."}
       >
         <form
           onSubmit={(e) => {
@@ -1233,10 +1253,10 @@ export function OrderCard({
           />
           <div className="acts">
             <button type="button" className="btn" onClick={() => setEditOpen(false)}>
-              Cancel
+              <T ta="ரத்து">Cancel</T>
             </button>
             <button type="submit" className="btn primary" disabled={pending}>
-              Save items
+              <T ta="பொருட்களைச் சேமி">Save items</T>
             </button>
           </div>
         </form>

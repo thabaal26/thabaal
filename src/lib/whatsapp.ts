@@ -505,7 +505,7 @@ export async function editMetaTemplate(cfg: WaConfig, metaId: string, components
   return graph<{ success: boolean }>(cfg, metaId, { method: "POST", body: JSON.stringify({ components }) });
 }
 
-export async function deleteMetaTemplate(cfg: WaConfig, name: string, _metaId?: string) {
+export async function deleteMetaTemplate(cfg: WaConfig, name: string) {
   const { wabaId } = cfg;
   return graph(cfg, `${wabaId}/message_templates?name=${encodeURIComponent(name)}`, { method: "DELETE" });
 }

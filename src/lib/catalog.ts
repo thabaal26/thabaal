@@ -497,7 +497,7 @@ export async function createCatalogProductItem(
 
   const { cfg } = await senderFor(clientId);
   if (!cfg.live) {
-    const newItem: CatalogProductDetail = {
+    const newItem: CatalogProductDetail & { deleted?: boolean } = {
       id: retailerId,
       retailerId,
       name: p.name.trim(),
@@ -509,6 +509,7 @@ export async function createCatalogProductItem(
       imageUrl: p.imageUrl,
       category: detectCategory(p.name.trim()),
       whatsappStatus: "APPROVED",
+      deleted: false,
     };
     saveOverride(clientId, retailerId, newItem);
     forgetCatalog(clientId);

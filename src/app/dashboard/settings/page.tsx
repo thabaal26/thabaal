@@ -23,7 +23,7 @@ import { AppearanceEditor } from "../appearance-editor";
 import { portalDefault } from "@/lib/appearance";
 import { spendSummary } from "@/lib/spend";
 import { inr } from "../portal-format";
-import { LangChoice, PortalPage } from "../portal-ui";
+import { LangChoice, PortalPage, T } from "../portal-ui";
 
 /** Within the last two days (module scope keeps the clock read out of render). */
 const seenRecently = (d: Date | null) => Boolean(d && Date.now() - d.getTime() < 2 * 86_400_000);
@@ -58,12 +58,12 @@ export default async function SettingsPage() {
     <section className="card">
       <div className="hd">
         <div>
-          <h2>Your account</h2>
-          <p>Signed in as {user.email}</p>
+          <h2><T ta="உங்கள் கணக்கு">Your account</T></h2>
+          <p><T ta="உள்நுழைந்துள்ள கணக்கு">Signed in as</T> {user.email}</p>
         </div>
         <form action={logout}>
           <button className="btn sm">
-            <LogOut aria-hidden className="ic" style={{ width: 15, height: 15 }} /> Sign out
+            <LogOut aria-hidden className="ic" style={{ width: 15, height: 15 }} /> <T ta="வெளியேறு">Sign out</T>
           </button>
         </form>
       </div>
@@ -74,8 +74,8 @@ export default async function SettingsPage() {
     <section className="card">
       <div className="hd">
         <div>
-          <h2>Look</h2>
-          <p>Light, dark, or follow your device. Remembered on this device.</p>
+          <h2><T ta="தோற்றம்">Look</T></h2>
+          <p><T ta="வெளிச்சம், இருள் அல்லது உங்கள் சாதனத்தின்படி. இந்த சாதனத்தில் நினைவில் வைக்கப்படும்.">Light, dark, or follow your device. Remembered on this device.</T></p>
         </div>
         <ThemeChoice />
       </div>
@@ -85,12 +85,12 @@ export default async function SettingsPage() {
     <section className="card">
       <div className="hd">
         <div>
-          <h2>Language</h2>
-          <p>Changes the labels across the portal. Also on the button at the top of every page.</p>
+          <h2><T ta="மொழி">Language</T></h2>
+          <p><T ta="போர்ட்டலில் உள்ள அனைத்து சொற்களையும் மாற்றுகிறது. ஒவ்வொரு பக்கத்தின் மேலேயும் உள்ள பொத்தானிலும் மாற்றலாம்.">Changes the labels across the portal. Also on the button at the top of every page.</T></p>
         </div>
         <LangChoice />
       </div>
-      <p className="muted small">Helper text stays in simple words. Numbers, money and buttons look the same in both languages.</p>
+      <p className="muted small"><T ta="எளிய தமிழில் காட்டப்படும். எண்கள், தொகை மற்றும் பொத்தான்கள் இரு மொழிகளிலும் ஒரே மாதிரியாக இருக்கும்.">Helper text stays in simple words. Numbers, money and buttons look the same in both languages.</T></p>
     </section>
   );
   const frame = (children: React.ReactNode, actions?: React.ReactNode) => (
@@ -114,32 +114,41 @@ export default async function SettingsPage() {
           spendSummary(cid).catch(() => null),
         ])
       : [[], 0, null, 0, null, null];
-    const quality = (r: string | null | undefined) => (r === "GREEN" ? { tone: "ok", label: "High quality" } : r === "YELLOW" ? { tone: "warn", label: "Medium quality" } : r === "RED" ? { tone: "bad", label: "Low quality" } : { tone: "mute", label: "Not rated yet" });
+    const quality = (r: string | null | undefined) => (
+      r === "GREEN" ? { tone: "ok", label: "High quality", labelTa: "உயர்ந்த தரம்" }
+      : r === "YELLOW" ? { tone: "warn", label: "Medium quality", labelTa: "நடுத்தர தரம்" }
+      : r === "RED" ? { tone: "bad", label: "Low quality", labelTa: "குறைந்த தரம்" }
+      : { tone: "mute", label: "Not rated yet", labelTa: "இன்னும் மதிப்பிடப்படவில்லை" }
+    );
     return frame(
       <div className="stack">
         {cid && (
           <section className="card">
             <div className="hd">
               <div>
-                <h2>How customers pay</h2>
-                <p>WhatsApp payments, UPI and cash on delivery.</p>
+                <h2><T ta="வாடிக்கையாளர்கள் எவ்வாறு செலுத்துகிறார்கள்">How customers pay</T></h2>
+                <p><T ta="WhatsApp கொடுப்பனவுகள், UPI மற்றும் டெலிவரி ரொக்கம் (COD).">WhatsApp payments, UPI and cash on delivery.</T></p>
               </div>
               <Link className="btn sm" href="/dashboard/revenue?tab=set">
-                Open payment settings
+                <T ta="பண அமைப்புகளைத் திற">Open payment settings</T>
               </Link>
             </div>
             <div className="list">
               <div className="row">
-                <div className="grow t">Pay inside WhatsApp</div>
-                <span className={`pill ${client?.paymentConfig ? "ok" : "mute"}`}>{client?.paymentConfig ? "On" : "Off"}</span>
+                <div className="grow t"><T ta="WhatsApp-லேயே செலுத்தவும்">Pay inside WhatsApp</T></div>
+                <span className={`pill ${client?.paymentConfig ? "ok" : "mute"}`}>
+                  <T ta={client?.paymentConfig ? "இயக்கத்தில் உள்ளது" : "முடக்கப்பட்டுள்ளது"}>
+                    {client?.paymentConfig ? "On" : "Off"}
+                  </T>
+                </span>
               </div>
               <div className="row">
-                <div className="grow t">UPI or bank (marked paid by you)</div>
-                <span className="pill ok">On</span>
+                <div className="grow t"><T ta="UPI அல்லது வங்கி (உங்களால் செலுத்தப்பட்டதாக குறிக்கப்படும்)">UPI or bank (marked paid by you)</T></div>
+                <span className="pill ok"><T ta="இயக்கத்தில் உள்ளது">On</T></span>
               </div>
               <div className="row">
-                <div className="grow t">Cash on delivery</div>
-                <span className="muted small">Chosen per order</span>
+                <div className="grow t"><T ta="டெலிவரி ரொக்கம் (COD)">Cash on delivery</T></div>
+                <span className="muted small"><T ta="ஒவ்வொரு ஆர்டருக்கும் தேர்வு செய்யப்படும்">Chosen per order</T></span>
               </div>
             </div>
           </section>
@@ -151,35 +160,47 @@ export default async function SettingsPage() {
           <section className="card">
             <div className="hd">
               <div>
-                <h2>WhatsApp billing</h2>
-                <p>What Meta charges you for messages.</p>
+                <h2><T ta="WhatsApp கட்டண விவரங்கள்">WhatsApp billing</T></h2>
+                <p><T ta="செய்திகளுக்கு Meta உங்களிடம் வசூலிப்பது.">What Meta charges you for messages.</T></p>
               </div>
               {spend.metaAccount.billingUrl && (
                 <a className="btn sm" href={spend.metaAccount.billingUrl} target="_blank" rel="noopener noreferrer">
-                  Billing hub
+                  <T ta="கட்டண மையம்">Billing hub</T>
                 </a>
               )}
             </div>
             <div className="grid g3">
               <div className="stat">
-                <div className="l">{spend.metaAccount.liveBalance > 0 || spend.prepaidFunds > 0 ? "Balance left" : "Balance"}</div>
+                <div className="l">
+                  <T ta={spend.metaAccount.liveBalance > 0 || spend.prepaidFunds > 0 ? "மீதமுள்ள இருப்பு" : "இருப்பு"}>
+                    {spend.metaAccount.liveBalance > 0 || spend.prepaidFunds > 0 ? "Balance left" : "Balance"}
+                  </T>
+                </div>
                 <div className="v">{spend.metaAccount.liveBalance > 0 || spend.prepaidFunds > 0 ? inr(spend.remainingBalance) : "—"}</div>
               </div>
               <div className="stat">
-                <div className="l">This month</div>
+                <div className="l"><T ta="இந்த மாதம்">This month</T></div>
                 <div className="v">{inr(spend.totalMonthSpentWithGst)}</div>
-                <div className="d muted">with GST{spend.liveSyncedFromMeta ? "" : " (estimate)"}</div>
+                <div className="d muted">
+                  <T ta={spend.liveSyncedFromMeta ? "GST உடன்" : "GST உடன் (மதிப்பீடு)"}>
+                    with GST{spend.liveSyncedFromMeta ? "" : " (estimate)"}
+                  </T>
+                </div>
               </div>
               <div className="stat">
-                <div className="l">Free replies left</div>
+                <div className="l"><T ta="மீதமுள்ள இலவச பதில்கள்">Free replies left</T></div>
                 <div className="v">{spend.serviceQuota.freeRemaining.toLocaleString("en-IN")}</div>
-                <div className="d muted">of {spend.serviceQuota.totalFreeLimit.toLocaleString("en-IN")}</div>
+                <div className="d muted">
+                  <T ta={`${spend.serviceQuota.totalFreeLimit.toLocaleString("en-IN")}-ல்`}>
+                    of {spend.serviceQuota.totalFreeLimit.toLocaleString("en-IN")}
+                  </T>
+                </div>
               </div>
             </div>
             {spend.metaAccount.billingUrl && scope.canManage && (
               <div className="tools" style={{ marginTop: 12 }}>
                 <a className="btn primary sm" href={spend.metaAccount.billingUrl} target="_blank" rel="noopener noreferrer">
-                  Recharge on Meta
+                  <T ta="Meta-வில் ரீசார்ஜ் செய்">Recharge on Meta</T>
                 </a>
               </div>
             )}
@@ -197,8 +218,8 @@ export default async function SettingsPage() {
           <section className="card">
             <div className="hd">
               <div>
-                <h2>WhatsApp numbers</h2>
-                <p>Quality rating shows how customers feel about your messages.</p>
+                <h2><T ta="WhatsApp எண்கள்">WhatsApp numbers</T></h2>
+                <p><T ta="தரம் மதிப்பீடு உங்கள் செய்திகளைப் பற்றி வாடிக்கையாளர்கள் எவ்வாறு உணர்கிறார்கள் என்பதைக் காட்டுகிறது.">Quality rating shows how customers feel about your messages.</T></p>
               </div>
             </div>
             <div className="list">
@@ -209,18 +230,30 @@ export default async function SettingsPage() {
                     <div className="grow">
                       <div className="t">
                         {n.verifiedName || n.label}
-                        {n.isDefault && <span className="muted small"> · main number</span>}
+                        {n.isDefault && (
+                          <span className="muted small">
+                            {" "}· <T ta="முதன்மை எண்">main number</T>
+                          </span>
+                        )}
                       </div>
                       <div className="muted small">
-                        {n.displayPhone ?? "Number not shown yet"}
-                        {n.limit != null ? ` · up to ${n.limit.toLocaleString("en-IN")} customers a day` : ""}
+                        {n.displayPhone ?? <T ta="எண் இன்னும் காட்டப்படவில்லை">Number not shown yet</T>}
+                        {n.limit != null ? (
+                          <>
+                            {" "}· <T ta={`ஒரு நாளைக்கு ${n.limit.toLocaleString("en-IN")} வாடிக்கையாளர்கள் வரை`}>{`up to ${n.limit.toLocaleString("en-IN")} customers a day`}</T>
+                          </>
+                        ) : ""}
                       </div>
                     </div>
-                    <span className={`pill ${qy.tone}`}>{qy.label}</span>
+                    <span className={`pill ${qy.tone}`}><T ta={qy.labelTa}>{qy.label}</T></span>
                   </div>
                 );
               })}
-              {numbers.length === 0 && <p className="muted small">No WhatsApp number connected yet. Your Thabaal admin adds it.</p>}
+              {numbers.length === 0 && (
+                <p className="muted small">
+                  <T ta="இன்னும் WhatsApp எண் இணைக்கப்படவில்லை. உங்கள் தபால் நிர்வாகி இதைச் சேர்ப்பார்.">No WhatsApp number connected yet. Your Thabaal admin adds it.</T>
+                </p>
+              )}
             </div>
           </section>
         )}
@@ -229,29 +262,29 @@ export default async function SettingsPage() {
           <section className="card">
             <div className="hd">
               <div>
-                <h2>Business details</h2>
+                <h2><T ta="வணிக விவரங்கள்">Business details</T></h2>
                 <p>{client?.name}</p>
               </div>
             </div>
             <div className="grid g3" style={{ marginBottom: 12 }}>
               {[
-                ["Customers", customers],
-                ["Orders", ordersCount],
-                ["Products", products],
-              ].map(([label, v]) => (
-                <div key={label as string} className="stat">
-                  <div className="l">{label}</div>
+                { label: "Customers", labelTa: "வாடிக்கையாளர்கள்", v: customers },
+                { label: "Orders", labelTa: "ஆர்டர்கள்", v: ordersCount },
+                { label: "Products", labelTa: "பொருட்கள்", v: products },
+              ].map(({ label, labelTa, v }) => (
+                <div key={label} className="stat">
+                  <div className="l"><T ta={labelTa}>{label}</T></div>
                   <div className="v">{v == null ? "—" : Number(v).toLocaleString("en-IN")}</div>
                 </div>
               ))}
             </div>
             <div className="list">
               <div className="row">
-                <div className="grow muted">Website</div>
+                <div className="grow muted"><T ta="இணையதளம்">Website</T></div>
                 <span>{client?.website || "—"}</span>
               </div>
               <div className="row">
-                <div className="grow muted">Phone</div>
+                <div className="grow muted"><T ta="தொலைபேசி எண்">Phone</T></div>
                 <span>{client?.supportPhone || "—"}</span>
               </div>
             </div>
