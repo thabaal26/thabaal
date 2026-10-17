@@ -28,6 +28,8 @@ export type ProductDemandStats = {
   conversionRate: number;
   /** Number of carts where product was added but not completed/paid */
   hesitationCount: number;
+  /** Of those, carts the order was cancelled on: added, then dropped */
+  droppedCount?: number;
   /** Popularity percentage relative to the #1 most carted item (0 - 100%) for progress bar */
   demandIndex: number;
   /** Leaderboard rank (1 = most popular) */
@@ -92,7 +94,7 @@ export async function getCatalogDemandSummary(
   clientId: string,
   catalogProducts: CatalogProductDetail[],
 ): Promise<CatalogDemandSummary> {
-  const [orders, readMessagesCount, totalCustomersCount] = await Promise.all([
+  const [orders, readMessagesCount] = await Promise.all([
     db.order.findMany({
       where: { clientId },
       select: {
@@ -113,9 +115,6 @@ export async function getCatalogDemandSummary(
         customer: { clientId },
         status: "READ",
       },
-    }),
-    db.customer.count({
-      where: { clientId },
     }),
   ]);
 
@@ -145,6 +144,7 @@ export async function getCatalogDemandSummary(
     paidUnits: number;
     revenue: number;
     hesitationCount: number;
+    droppedCount: number;
     lastCartedAt: Date | null;
     sampleName: string;
     samplePrice: number;
@@ -163,6 +163,7 @@ export async function getCatalogDemandSummary(
       paidUnits: 0,
       revenue: 0,
       hesitationCount: 0,
+      droppedCount: 0,
       lastCartedAt: null,
       sampleName: p.name,
       samplePrice: p.priceAmount,
@@ -205,6 +206,7 @@ export async function getCatalogDemandSummary(
           paidUnits: 0,
           revenue: 0,
           hesitationCount: 0,
+      droppedCount: 0,
           lastCartedAt: null,
           sampleName: rawName || targetSku,
           samplePrice: price,
@@ -228,6 +230,7 @@ export async function getCatalogDemandSummary(
         totalCatalogRevenue += lineRev;
       } else {
         acc.hesitationCount += 1;
+        if (o.status === "CANCELLED") acc.droppedCount += 1;
       }
     }
   }
@@ -259,6 +262,7 @@ export async function getCatalogDemandSummary(
       revenue: acc.revenue,
       conversionRate,
       hesitationCount: acc.hesitationCount,
+      droppedCount: acc.droppedCount,
       lastCartedAt: acc.lastCartedAt,
     });
   }

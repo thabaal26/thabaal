@@ -5,7 +5,7 @@ import { Phone3D, Send3D } from "@/components/icons-3d";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { confirmAction } from "@/components/confirm";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import { Badge, Button, Card, CardHeader, Field, Spinner } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import {
@@ -58,7 +58,7 @@ export function ProviderSwitch({ provider, metaLive, localReady }: { provider: P
                     : "Switch to Meta Cloud API? Only Meta-approved templates will be sent.";
                 if (!(await confirmAction({ message: warn, confirmLabel: "Switch", danger: o.value === "LOCAL" }))) return;
                 start(async () => {
-                  toastResult(await setProvider(o.value));
+                  toastResult(await safeAction(() => setProvider(o.value)));
                   router.refresh();
                 });
               }}

@@ -23,6 +23,18 @@ const REMIND_AFTER_MS = 6 * 3_600_000;
 /** Orders older than this aren't chased any more. */
 const REMIND_WITHIN_MS = 3 * 86_400_000;
 
+/**
+ * Parses amount from Meta payment objects.
+ * Handles both divisor representation (offset: 100 for paise) and exponent mode (offset: 2 for 10^2).
+ */
+export function parseMetaAmount(amt: { value?: number | string | null; offset?: number | null } | null | undefined): number | null {
+  if (!amt || amt.value == null) return null;
+  const num = Number(amt.value);
+  if (isNaN(num)) return null;
+  const offset = amt.offset != null ? Number(amt.offset) : 2;
+  return offset >= 10 ? num / offset : num / 10 ** offset;
+}
+
 const hasPayButton = (t: { buttons: unknown }) => (t.buttons as TemplateButton[]).some((b) => b.type === "ORDER_DETAILS");
 
 /**
@@ -86,21 +98,26 @@ export async function sendPaymentRequestFor(orderId: string, opts: { reminder?: 
   const ref = orderRef(order);
   // With loyalty points used, WhatsApp's payment card shows the order as one line at the amount to pay (its items
   // must add up to the total); the message text above it lists the items, shipping and the points discount.
+  // Only what is still owed is asked for: after a part payment, the request is for the balance.
+  const due = dueOf(order);
+  if (due <= 0) return { ok: false, message: "This order is already paid." };
+  const balanceOnly = due + 0.005 < pricing.total;
+  const oneLine = pricing.discount > 0 || balanceOnly;
   const payment = {
     referenceId: ref,
     configuration: order.client.paymentConfig,
-    items:
-      pricing.discount > 0
-        ? [{ id: "order", name: `Order ${ref} after loyalty points`, quantity: 1, price: pricing.total }]
-        : items.map((i) => ({ id: i.id, name: i.name ?? i.id, quantity: i.quantity, price: i.price })),
-    total: pricing.total,
-    catalogId: pricing.discount > 0 ? null : order.catalogId,
+    items: oneLine
+      ? [{ id: "order", name: balanceOnly ? `Balance for order ${ref}` : `Order ${ref} after loyalty points`, quantity: 1, price: due }]
+      : items.map((i) => ({ id: i.id, name: i.name ?? i.id, quantity: i.quantity, price: i.price })),
+    total: due,
+    catalogId: oneLine ? null : order.catalogId,
   };
   const pointsLine = pricing.discount > 0 ? `\nLoyalty points (${order.pointsRedeemed}): -${money(pricing.discount, order.currency)}` : "";
+  const balanceLines = balanceOnly ? `\nAlready received: ${money(receivedOf(order), order.currency)}\nBalance to pay: ${money(due, order.currency)}` : "";
   const breakdownLines =
-    pricing.shipping > 0 || pricing.discount > 0
+    (pricing.shipping > 0 || pricing.discount > 0
       ? `Items: ${itemsText(items)} (${money(pricing.subtotal, order.currency)})${pricing.shipping > 0 ? `\nShipping: ${money(pricing.shipping, order.currency)}` : ""}${pointsLine}\nTotal: ${money(pricing.total, order.currency)}`
-      : `Items: ${itemsText(items)}\nTotal: ${money(pricing.total, order.currency)}`;
+      : `Items: ${itemsText(items)}\nTotal: ${money(pricing.total, order.currency)}`) + balanceLines;
   const isReplacement = Boolean(order.internalNote?.includes("Replaced unpaid cart"));
   const text = opts.reminder
     ? `Hello ${firstName(c.name)}, a reminder that your ${order.client.name} order ${ref} is waiting for payment.\n\n${breakdownLines}\n\nTap "Review and pay" to pay by UPI, and we will pack it right away.`
@@ -150,6 +167,8 @@ export type PaymentRecord = {
   collectedBy?: string | null;
   /** Record it without messaging the customer (e.g. cash taken at the door, already thanked on delivery). */
   quiet?: boolean;
+  /** What staff saw as already received when they recorded it; if that changed meanwhile, nothing is recorded. */
+  seenReceived?: number | null;
 };
 
 /**
@@ -157,9 +176,16 @@ export type PaymentRecord = {
  * recording UPI, cash or COD) and thanks the customer once when it's fully paid. A smaller amount is kept as a
  * part payment. Orders already dispatched just record the payment. False when already paid or not found.
  */
-export async function confirmPayment(orderId: string, txnId?: string | null, rec: PaymentRecord = {}) {
+export async function confirmPayment(orderId: string, txnId?: string | null, rec: PaymentRecord = {}): Promise<boolean> {
+  return confirmPaymentOnce(orderId, txnId, rec, 0);
+}
+
+async function confirmPaymentOnce(orderId: string, txnId: string | null | undefined, rec: PaymentRecord, attempt: number): Promise<boolean> {
   const order = await db.order.findUnique({ where: { id: orderId }, include: { customer: true, client: { select: { name: true } } } });
   if (!order) return false;
+  // The same WhatsApp transaction delivered again (Meta retries webhooks) is already counted, even for a part payment.
+  // (Not when the id was only noted with a "customer says paid" claim: then this is the real payment arriving.)
+  if (txnId && rec.source !== "staff" && order.paymentTxnId === txnId && receivedOf(order) > 0 && !order.paymentClaimedAt) return false;
 
   // If customer paid an old superseded/cancelled cart, automatically route the payment to their latest active order!
   if (order.status === "CANCELLED") {
@@ -176,21 +202,24 @@ export async function confirmPayment(orderId: string, txnId?: string | null, rec
           internalNote: [order.internalNote, `Payment received via this cancelled link was routed to active order ${orderRef(activeOrder)}`].filter(Boolean).join(" | ").slice(0, 1000),
         },
       });
-      return confirmPayment(activeOrder.id, txnId, rec);
+      return confirmPaymentOnce(activeOrder.id, txnId, rec, attempt);
     }
   }
 
   // Meta may send the same payment twice; only the first one marks it paid and thanks the customer.
   // (A paid order whose items were later raised still takes the difference.)
   if (dueOf(order) <= 0) return false;
+  if (rec.seenReceived != null && Math.abs(receivedOf(order) - rec.seenReceived) > 0.005) return false;
   const before = receivedOf(order);
   const due = dueOf(order);
   const amount = rec.amount != null && rec.amount > 0 ? rec.amount : due;
   const received = Math.round((before + amount) * 100) / 100;
   const full = received + 0.5 >= order.total;
   const method = rec.method ?? order.paymentMethod ?? (rec.source === "meta" ? "upi_whatsapp" : null);
-  await db.order.update({
-    where: { id: order.id },
+  // Saved only if nobody else recorded money on this order since it was read (a webhook and staff at the same moment,
+  // a double tap, Meta delivering the same update twice in parallel); otherwise read again, so money is never added twice.
+  const saved = await db.order.updateMany({
+    where: { id: order.id, paidAmount: order.paidAmount, paidAt: order.paidAt, status: order.status },
     data: {
       paidAmount: received,
       paymentMethod: method,
@@ -216,6 +245,7 @@ export async function confirmPayment(orderId: string, txnId?: string | null, rec
       }),
     },
   });
+  if (saved.count === 0) return attempt < 2 ? confirmPaymentOnce(orderId, txnId, rec, attempt + 1) : false;
   pushOrderToSheet(order.id, "ORDER_UPDATE", full ? "Payment received" : "Part payment received");
   if (!full || rec.quiet) return true;
 
@@ -254,11 +284,6 @@ export async function recordPaymentClaim(orderId: string, note: string, referenc
   return true;
 }
 
-/** A WhatsApp payment attempt failed (declined, timed out): keep the reason so staff can resend the link or call. */
-export async function recordPaymentFailure(orderId: string, reason: string) {
-  await db.order.updateMany({ where: { id: orderId, paidAt: null }, data: { paymentFailedAt: new Date(), paymentFailReason: reason.slice(0, 200) } });
-}
-
 /** A plain WhatsApp text inside the customer's 24-hour window; false when the window is closed or messages are off. */
 export async function textInWindow(customer: { id: string; clientId: string; phone: string; optedOut: boolean }, text: string, label: string) {
   if (customer.optedOut || (await getSettings()).provider !== "META") return false;
@@ -267,6 +292,21 @@ export async function textInWindow(customer: { id: string; clientId: string; pho
   const res = await sendTextMessage(cfg, customer.phone, text);
   await logMessage(customer.id, label, text, res, number?.id ?? null);
   return true;
+}
+
+/** A WhatsApp payment attempt failed (declined, timed out): keep the reason, alert the customer in window, and update sheet. */
+export async function recordPaymentFailure(orderId: string, reason: string) {
+  await db.order.updateMany({ where: { id: orderId, paidAt: null }, data: { paymentFailedAt: new Date(), paymentFailReason: reason.slice(0, 200) } });
+  pushOrderToSheet(orderId, "ORDER_UPDATE", "Payment failed");
+  const order = await db.order.findUnique({
+    where: { id: orderId },
+    include: { customer: true },
+  });
+  if (order && !order.customer.optedOut) {
+    const first = order.customer.name.trim().split(/\s+/)[0] || "there";
+    const text = `Hello ${first}, your payment of ${money(dueOf(order), order.currency)} for order ${orderRef(order)} could not be completed (${reason}). Tap the payment link above to try again, or reply "COD" to pay in cash upon delivery.`;
+    await textInWindow(order.customer, text, "Payment failed").catch(() => false);
+  }
 }
 
 const CARD_LABEL = { processing: "Payment received", shipped: "Order dispatched", completed: "Order delivered", canceled: "Order cancelled" } as const;

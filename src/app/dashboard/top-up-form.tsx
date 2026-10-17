@@ -3,7 +3,7 @@
 import { RefreshCw } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import { Button, Field } from "@/components/ui";
 import { addTopUp, refreshMetaLiveStatusAction, syncMetaAccountBalanceAction } from "./actions/spend";
 
@@ -65,7 +65,7 @@ export function TopUpForm({ clientId, wabaId }: { clientId: string; wabaId: stri
           onSubmit={(e) => {
             e.preventDefault();
             start(async () => {
-              const r = await addTopUp(Number(amount), note);
+              const r = await safeAction(() => addTopUp(Number(amount), note));
               toastResult(r);
               if (r.ok) {
                 setAmount("");

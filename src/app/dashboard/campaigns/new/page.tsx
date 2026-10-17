@@ -9,7 +9,10 @@ import { campaignFormData } from "../form-data";
 export const metadata: Metadata = { title: "New campaign" };
 export const dynamic = "force-dynamic";
 
-export default async function NewCampaignPage() {
+export default async function NewCampaignPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  // ?tag=… (from Customers › selected customers, or a group to reach) picks that audience.
+  const sp = await searchParams;
+  const tag = typeof sp.tag === "string" ? sp.tag.trim().slice(0, 80) : "";
   const scope = await getScope();
   if (!scope.canManage) redirect("/dashboard/campaigns");
   if (!scope.clientId) return <><PageHeader title="New campaign" back={{ href: "/dashboard/campaigns", label: "Campaigns" }} /><PickClientNotice what="campaign" /></>;
@@ -18,17 +21,17 @@ export default async function NewCampaignPage() {
   const tomorrow = daysAgo(-1).toISOString().slice(0, 10);
   return (
     <>
-      <PageHeader title="New campaign" back={{ href: "/dashboard/campaigns", label: "Campaigns" }} description={`For ${scope.clientName}. Choose what to send, when to send it and how fast.`} />
+      <PageHeader title="New campaign" back={{ href: "/dashboard/campaigns", label: "Campaigns" }} description={`For ${scope.clientName}. Choose what to send, when to send it and how fast.`} descriptionTa={`${scope.clientName}-க்காக. என்ன அனுப்புவது, எப்போது, எவ்வளவு வேகமாக என்பதைத் தேர்வு செய்யுங்கள்.`} />
       <CampaignForm
         id={null}
         templates={templates}
         audience={audience}
         numbers={numbers}
         initial={{
-          name: "",
+          name: tag ? `For ${tag.replace(/^aud:/, "saved group ")}` : "",
           templateId: templates.find((t) => t.status === "APPROVED" && (!defaultAccount || !t.businessAccountId || t.businessAccountId === defaultAccount))?.id ?? "",
           senderId: "",
-          audienceTag: "",
+          audienceTag: tag,
           scheduleType: "WEEKLY",
           daysOfWeek: [2, 5],
           sendTime: "10:00",

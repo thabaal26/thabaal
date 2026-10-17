@@ -4,7 +4,8 @@ import Link from "@/components/intent-link";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { ActionButton } from "@/components/action-button";
 import { Calendar3D, Clock3D, Eye3D, Messages3D, Rupee3D, Send3D, ShoppingBag3D, Sparkles3D, Template3D } from "@/components/icons-3d";
-import { Avatar, Badge, buttonClass, Callout, Card, CardHeader, EmptyState, Meter, StatusBadge } from "@/components/ui";
+import { Avatar, Badge, Callout, Card, CardHeader, EmptyState, Meter, StatusBadge } from "@/components/ui";
+import { buttonClass } from "@/components/ui-classes";
 import { detectCategory, getCatalogWithProducts } from "@/lib/catalog";
 import { isSectionEnabled } from "@/lib/client-sections";
 import { db } from "@/lib/db";
@@ -134,7 +135,7 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
     [client, reachable, msgByCustomer, repliersMonth, health, blocked, areaRows],
     [customers, optedOut, prevStatus, msgSeries, activeRuns, upcoming, recentRaw, failures, settings, ordersRaw, replySeries, repliers, prevReplies, funnelRows, heat, todayMsgs, todayReplies],
     [paymentsToCheckCount, refundsDueCount],
-    [catalogueMsgs, periodReplies, unhandledGroup, toDispatchCount, catalogRes, customerLifecycleRows],
+    [catalogueMsgs, periodReplies, unhandledGroup, toPackGroups, catalogRes, customerLifecycleRows],
     heldToday,
     paused,
     runProgress,
@@ -303,7 +304,8 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
       })
       .catch(() => []),
     db.reply.groupBy({ by: ["customerId"], where: { ...myMessages, handled: false }, _count: true, _min: { receivedAt: true } }).catch(() => []),
-    db.order.count({ where: { ...mineOrders, status: { in: ["CONFIRMED", "PAID"] } } }).catch(() => 0),
+    // Orders to pack, split by how they're paid (Home shows "2 paid · 1 cash on delivery").
+    db.order.groupBy({ by: ["status", "paymentMethod"], where: { ...mineOrders, status: { in: ["CONFIRMED", "PAID"] } }, _count: true }).catch(() => []),
     cid ? getCatalogWithProducts(cid).catch(() => null) : Promise.resolve(null),
     cid
       ? db
@@ -353,6 +355,13 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
     // Reorders due this week (shown only when the Orders section is on).
     cid ? refillForecast(cid, now).catch(() => null) : null,
   ]);
+
+  const toDispatchCount = toPackGroups.reduce((n, g) => n + g._count, 0);
+  // Paid = marked paid; cash on delivery = confirmed with COD/cash; the rest are confirmed, payment not yet in.
+  const isCod = (m: string | null) => m === "cod" || m === "cash";
+  const toPackPaid = toPackGroups.filter((g) => g.status === "PAID").reduce((n, g) => n + g._count, 0);
+  const toPackCod = toPackGroups.filter((g) => g.status === "CONFIRMED" && isCod(g.paymentMethod)).reduce((n, g) => n + g._count, 0);
+  const toPackOther = toDispatchCount - toPackPaid - toPackCod;
 
   const failedToday = failures.reduce((n, f) => n + f._count, 0);
   // GitHub runs the scheduler every 5 minutes, sometimes late; 20 minutes of silence means it stopped.
@@ -2032,7 +2041,7 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
       .map((c) => ({
         id: c.id,
         name: c.name,
-        when: c.nextRunAt ? fmtDate(c.nextRunAt, "EEE, d MMM · h:mm a") : "Not scheduled",
+        when: `${c.nextRunAt ? fmtDate(c.nextRunAt, "EEE, d MMM · h:mm a") : "Not scheduled"}${c.template.name ? ` · Template “${templateLabel(c.template.name)}”` : ""}`,
         status: c.template.status === "APPROVED" ? ("Scheduled" as const) : ("Template not approved" as const),
       })),
   ].slice(0, 3);
@@ -2142,12 +2151,15 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
       <div className="mb-6 sm:mb-8">
         <HomeTiers
           greetingText={greetingText}
+          businessName={cid ? scope.clientName : null}
           ordersOn={ordersOn}
           repliesOn={repliesOn}
           campaignsOn={campaignsOn}
           unpaidCartsCount={curUnpaidCarts.length}
           unpaidCartsValue={unpaidCartRevenue}
           toPackCount={toDispatchCount}
+          toPackSplit={{ paid: toPackPaid, cod: toPackCod, other: toPackOther }}
+          today={{ sent: todayMsgs.reduce((n, r) => n + Number(r.n), 0), replies: todayReplies.reduce((n, r) => n + Number(r.n), 0) }}
           unhandledRepliesCount={unhandledGroup.length}
           oldestWaitingAt={oldestWaitingAt}
           activeRange={filters.range}

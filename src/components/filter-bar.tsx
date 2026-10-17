@@ -6,6 +6,7 @@ import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { ALL_SECTIONS, filterQuery, PRESETS, withQuery, type FilterSection, type FilterState, type RangeKey } from "@/lib/filters";
 import type { FilterOptions } from "@/lib/filter-scope";
+import { useTr } from "@/lib/i18n/context";
 import { Sheet } from "./sheet";
 import { Button } from "./ui";
 
@@ -120,11 +121,12 @@ export function FilterBar({
       : options.areas;
   }, [options.areas, areaQuery]);
 
+  const { tr } = useTr();
   const btn = cn(
     "inline-flex shrink-0 items-center gap-1.5 rounded-full font-semibold transition",
     compact
-      ? "min-h-8 bg-sunken px-2.5 text-xs text-ink hover:bg-line/60 sm:min-h-9 sm:px-3"
-      : "min-h-9 border border-line bg-panel px-3 text-xs text-ink-2 shadow-xs hover:border-line-2 hover:text-ink sm:min-h-10 sm:px-3.5 sm:text-sm",
+      ? "min-h-10 bg-sunken px-2.5 text-xs text-ink hover:bg-line/60 sm:min-h-9 sm:px-3"
+      : "min-h-10 border border-line bg-panel px-3 text-xs text-ink-2 shadow-xs hover:border-line-2 hover:text-ink sm:px-3.5 sm:text-sm",
     pending && "opacity-60",
   );
 
@@ -134,7 +136,7 @@ export function FilterBar({
         {has("period") && (
           <button type="button" onClick={openPanel} className={btn} aria-label={`Period: ${periodLabel}. Change`}>
             <CalendarDays aria-hidden className="size-3.5 shrink-0 text-brand" />
-            <span className="max-w-[9rem] truncate">{periodLabel}</span>
+            <span className="max-w-[9rem] truncate">{tr(periodLabel)}</span>
             {periodOnly && <ChevronDown aria-hidden className="size-3.5 shrink-0 text-muted" />}
           </button>
         )}
@@ -146,7 +148,7 @@ export function FilterBar({
             aria-label={`Filters${count ? `, ${count} active` : ""}`}
           >
             <SlidersHorizontal aria-hidden className="size-3.5 shrink-0" />
-            <span>Filter</span>
+            <span>{tr("Filter")}</span>
             {count > 0 && (
               <span className="tabular grid min-w-4.5 place-items-center rounded-full bg-brand px-1 text-2xs font-bold text-on-brand sm:min-w-5">
                 {count}
@@ -159,13 +161,13 @@ export function FilterBar({
       <Sheet
         open={open}
         onClose={() => setOpen(false)}
-        title={periodOnly ? "Date period" : "Filter"}
-        description={
+        title={tr(periodOnly ? "Date period" : "Filter")}
+        description={tr(
           note ??
-          (periodOnly
-            ? "Choose a preset period or pick exact From and To dates."
-            : "Choose a date period and narrow results by product or delivery area.")
-        }
+            (periodOnly
+              ? "Choose a preset period or pick exact From and To dates."
+              : "Choose a date period and narrow results by product or delivery area."),
+        )}
         footer={
           <div className="flex items-center justify-between gap-2">
             <Button variant="ghost" onClick={clearAll}>

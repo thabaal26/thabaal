@@ -16,6 +16,11 @@ export type CallRequest = { customerId: string; name: string };
 export function placeCall(r: CallRequest) {
   window.dispatchEvent(new CustomEvent<CallRequest>(CALL_EVENT, { detail: r }));
 }
+let listening = 0;
+/** True while the call widget is on the page (WhatsApp calling is set up for this shop and user). */
+export function callWidgetReady() {
+  return listening > 0;
+}
 
 const ENDED_BEFORE_ANSWER: Record<string, string> = { MISSED: "No answer.", REJECTED: "The customer declined the call." };
 
@@ -168,7 +173,11 @@ export function CallWidget() {
       }
     };
     window.addEventListener(CALL_EVENT, onCall);
-    return () => window.removeEventListener(CALL_EVENT, onCall);
+    listening++;
+    return () => {
+      window.removeEventListener(CALL_EVENT, onCall);
+      listening--;
+    };
   }, [newConnection, cleanup]);
 
   async function answer(c: Ringing) {

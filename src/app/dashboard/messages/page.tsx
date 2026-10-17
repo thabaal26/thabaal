@@ -1,9 +1,11 @@
 import { CheckCheck, ChevronDown, ChevronLeft, ChevronRight, Download, Search } from "@/components/icons";
+import { T } from "../portal-ui";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
 import { Alert3D, Eye3D, Messages3D } from "@/components/icons-3d";
 import { Picker } from "@/components/picker";
-import { Avatar, Badge, buttonClass, Card, DistributionBar, EmptyState, FilterChips, PageHeader, rowClass, Stat, StatusBadge, Table, Td, Th } from "@/components/ui";
+import { Avatar, Badge, Card, DistributionBar, EmptyState, FilterChips, PageHeader, Stat, StatusBadge, Table, Td, Th } from "@/components/ui";
+import { buttonClass, rowClass } from "@/components/ui-classes";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { fmtDate, fmtNumber, pct } from "@/lib/format";
@@ -193,10 +195,10 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
               />
             )}
           </div>
-          <button className={cn(buttonClass("secondary"), "max-sm:hidden")}>Filter</button>
+          <button className={cn(buttonClass("secondary"), "max-sm:hidden")}><T>Filter</T></button>
           {filtered && (
             <Link href={href({ view: p.view }, {})} className={cn(buttonClass("ghost"), "max-sm:h-9 max-sm:justify-self-start max-sm:px-1 max-sm:text-sm")}>
-              Clear filters
+              <T>Clear filters</T>
             </Link>
           )}
         </form>

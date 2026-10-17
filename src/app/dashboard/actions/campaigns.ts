@@ -203,6 +203,33 @@ export async function cancelRun(runId: string): Promise<ActionResult> {
   return { ok: true, message: `Stopped. ${skipped.count} queued messages won't be sent.` };
 }
 
+export async function duplicateCampaign(id: string): Promise<ActionResult> {
+  const s = await requireManager();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const c = await db.campaign.findUnique({ where: { id } });
+  if (!c || !mine(s, c.clientId)) return { ok: false, message: "Campaign not found." };
+  const duplicated = await db.campaign.create({
+    data: {
+      clientId: c.clientId,
+      name: `${c.name} (copy)`,
+      templateId: c.templateId,
+      senderId: c.senderId,
+      audienceTag: c.audienceTag,
+      scheduleType: c.scheduleType,
+      daysOfWeek: c.daysOfWeek,
+      sendTime: c.sendTime,
+      runAt: null,
+      timezone: c.timezone,
+      batchSize: c.batchSize,
+      intervalMinutes: c.intervalMinutes,
+      active: false,
+      nextRunAt: null,
+    },
+  });
+  refresh();
+  return { ok: true, id: duplicated.id, message: "Copy saved as a draft." };
+}
+
 export async function runDispatcherNow(): Promise<ActionResult> {
   const s = await requireAdmin();
   if ("denied" in s) return { ok: false, message: s.denied };
@@ -210,3 +237,4 @@ export async function runDispatcherNow(): Promise<ActionResult> {
   refresh();
   return { ok: true, message: `Scheduler ran: ${r.campaignsStarted} campaigns started, ${r.sent} sent, ${r.failed} failed.` };
 }
+

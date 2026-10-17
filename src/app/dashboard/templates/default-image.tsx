@@ -4,7 +4,8 @@ import { ImageIcon, Upload } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toastResult } from "@/components/toast";
-import { buttonClass, Card, Spinner } from "@/components/ui";
+import { Card, Spinner } from "@/components/ui";
+import { buttonClass } from "@/components/ui-classes";
 import { cn } from "@/lib/cn";
 import { setDefaultImage } from "../actions/templates";
 

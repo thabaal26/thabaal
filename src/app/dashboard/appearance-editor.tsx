@@ -8,7 +8,8 @@ import { IconSetLink } from "@/components/icon-set-link";
 import { TrendChart, UsageGauge } from "@/components/charts";
 import { BarList, ColumnChart } from "@/components/viz";
 import { toastResult } from "@/components/toast";
-import { Badge, Button, Card, CardHeader, IconCube, rowClass, Table, Td, Th, type HeaderTone } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, IconCube, Table, Td, Th, type HeaderTone } from "@/components/ui";
+import { rowClass } from "@/components/ui-classes";
 import { cn } from "@/lib/cn";
 import {
   APPEARANCE_KEYS,

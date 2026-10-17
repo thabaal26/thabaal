@@ -4,6 +4,7 @@ import { Check, ChevronDown, Search } from "@/components/icons";
 import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { useTr } from "@/lib/i18n/context";
 import { Sheet } from "./sheet";
 
 export type PickerOption = { value: string; label: string; hint?: string; disabled?: boolean };
@@ -15,7 +16,7 @@ export type PickerOption = { value: string; label: string; hint?: string; disabl
  * `autoSubmit` it applies a filter form as soon as something is picked.
  */
 export function Picker({
-  options,
+  options: rawOptions,
   value,
   defaultValue = "",
   onChange,
@@ -44,6 +45,11 @@ export function Picker({
   trigger?: (selected: PickerOption | undefined) => ReactNode;
   "aria-label"?: string;
 }) {
+  const { isTa, tr } = useTr();
+  title = tr(title);
+  placeholder = tr(placeholder);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- tr only changes with isTa
+  const options = useMemo(() => (isTa ? rawOptions.map((o) => ({ ...o, label: tr(o.label), hint: o.hint && tr(o.hint) })) : rawOptions), [isTa, rawOptions]);
   const router = useRouter();
   const pathname = usePathname();
   const [inner, setInner] = useState(defaultValue);
@@ -111,7 +117,7 @@ export function Picker({
         {options.length > 8 && (
           <div className="relative mb-3">
             <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
-            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search" aria-label={`Search ${title.toLowerCase()}`} className="field pl-10" />
+            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tr("Search")} aria-label={isTa ? `${title} தேடு` : `Search ${title.toLowerCase()}`} className="field pl-10" />
           </div>
         )}
         <ul role="listbox" aria-label={title} className="-mx-2 space-y-0.5">
@@ -139,7 +145,7 @@ export function Picker({
               </li>
             );
           })}
-          {!shown.length && <li className="px-3 py-6 text-center text-sm text-muted">Nothing matches &ldquo;{query}&rdquo;</li>}
+          {!shown.length && <li className="px-3 py-6 text-center text-sm text-muted">{tr("Nothing matches")} &ldquo;{query}&rdquo;</li>}
         </ul>
       </Sheet>
     </>

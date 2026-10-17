@@ -8,10 +8,11 @@ import { CalendarPicker, getTodayStr } from "@/components/calendar-picker";
 import { MobileActionBar } from "@/components/mobile-action-bar";
 import { MultiPicker } from "@/components/multi-picker";
 import { Picker } from "@/components/picker";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import { Button, Callout, Card, CardHeader, CheckRow, Field, Segmented } from "@/components/ui";
 import { cn } from "@/lib/cn";
-import { DAYS, describeScheduleSummary, effectiveInterval, estimateDuration, formatMinutes, SCHEDULER_TICK_MINUTES, TIME_PRESETS, WEEKLY_PAIRS } from "@/lib/schedule";
+import { useTr } from "@/lib/i18n/context";
+import { dayName, DAYS, describeScheduleSummary, effectiveInterval, estimateDuration, formatMinutes, SCHEDULER_TICK_MINUTES, TIME_PRESETS, WEEKLY_PAIRS } from "@/lib/schedule";
 import { AUDIENCE_PREFIX, decodeTags, describeTags, encodeTags, TAGS_PREFIX, type TagPick } from "@/lib/audience-tags";
 import { countCampaignAudience, saveCampaign, type CampaignInput } from "../actions/campaigns";
 
@@ -47,6 +48,7 @@ export function CampaignForm({
   audience: { all: number; tags: { tag: string; label: string; hint?: string; n: number }[] };
   numbers: { id: string; label: string; businessAccountId: string; isDefault: boolean; dailyLimit: number | null; quality: string | null }[];
 }) {
+  const { tr, isTa } = useTr();
   const [c, setC] = useState(initial);
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -146,7 +148,7 @@ export function CampaignForm({
   function save() {
     if (pending) return;
     start(async () => {
-      const r = await saveCampaign(id, c);
+      const r = await safeAction(() => saveCampaign(id, c));
       toastResult(r);
       if (r.ok) {
         router.push(`/dashboard/campaigns/${r.id}`);
@@ -166,7 +168,7 @@ export function CampaignForm({
             </Field>
             {numbers.length > 1 && (
               <div className="sm:col-span-2">
-                <label htmlFor="sender" className="mb-1.5 block text-sm font-medium text-ink-2">Send from</label>
+                <label htmlFor="sender" className="mb-1.5 block text-sm font-medium text-ink-2">{tr("Send from")}</label>
                 <Picker
                   id="sender"
                   title="Send from"
@@ -178,14 +180,14 @@ export function CampaignForm({
                   }}
                   options={[
                     { value: "", label: "Default number", hint: numbers.find((n) => n.isDefault)?.label ?? numbers[0].label },
-                    ...numbers.map((n) => ({ value: n.id, label: n.label, hint: n.dailyLimit ? `Up to ${n.dailyLimit.toLocaleString("en-IN")} people a day` : "No daily limit" })),
+                    ...numbers.map((n) => ({ value: n.id, label: n.label, hint: n.dailyLimit ? (isTa ? `நாளுக்கு ${n.dailyLimit.toLocaleString("en-IN")} பேர் வரை` : `Up to ${n.dailyLimit.toLocaleString("en-IN")} people a day`) : "No daily limit" })),
                   ]}
                 />
-                <p className="mt-1.5 text-xs text-muted">Templates below are the ones approved for this number.</p>
+                <p className="mt-1.5 text-xs text-muted">{tr("Templates below are the ones approved for this number.")}</p>
               </div>
             )}
             <div className="sm:col-span-2">
-              <label htmlFor="tpl" className="mb-1.5 block text-sm font-medium text-ink-2">Template</label>
+              <label htmlFor="tpl" className="mb-1.5 block text-sm font-medium text-ink-2">{tr("Template")}</label>
               <Picker
                 id="tpl"
                 title="Template"
@@ -195,13 +197,13 @@ export function CampaignForm({
                 options={usable.map((t) => ({
                   value: t.id,
                   label: t.name,
-                  hint: `${t.category.charAt(0)}${t.category.slice(1).toLowerCase()}${t.status !== "APPROVED" ? " · not approved yet" : " · approved"}`,
+                  hint: `${tr(`${t.category.charAt(0)}${t.category.slice(1).toLowerCase()}`)}${t.status !== "APPROVED" ? (isTa ? " · இன்னும் அனுமதிக்கப்படவில்லை" : " · not approved yet") : isTa ? " · அனுமதிக்கப்பட்டது" : " · approved"}`,
                 }))}
               />
-              {chosen && chosen.status !== "APPROVED" && <p className="mt-1.5 text-xs text-warning">Sending waits until Meta approves this template.</p>}
+              {chosen && chosen.status !== "APPROVED" && <p className="mt-1.5 text-xs text-warning">{tr("Sending waits until Meta approves this template.")}</p>}
             </div>
             <fieldset className="space-y-3 sm:col-span-2">
-              <legend className="mb-1.5 text-sm font-medium text-ink-2">Send to</legend>
+              <legend className="mb-1.5 text-sm font-medium text-ink-2">{tr("Send to")}</legend>
               <Segmented
                 label="Send to"
                 value={sendTo}
@@ -222,7 +224,7 @@ export function CampaignForm({
                     placeholder={tagOptions.length ? "Choose one or more tags…" : "No tags yet"}
                     value={pick.tags}
                     onChange={(tags) => choosePick({ ...pick, tags })}
-                    options={tagOptions.map((t) => ({ value: t.tag, label: t.label, hint: `${t.n.toLocaleString("en-IN")} customers` }))}
+                    options={tagOptions.map((t) => ({ value: t.tag, label: t.label, hint: `${t.n.toLocaleString("en-IN")} ${tr("customers")}` }))}
                   />
                   {pick.tags.length > 0 && (
                     <ul aria-label="Chosen tags" className="flex flex-wrap gap-1.5">
@@ -232,7 +234,7 @@ export function CampaignForm({
                             {tagLabel(tag)}
                             <button
                               type="button"
-                              aria-label={`Remove ${tagLabel(tag)}`}
+                              aria-label={isTa ? `${tagLabel(tag)} நீக்கு` : `Remove ${tagLabel(tag)}`}
                               onClick={() => choosePick({ ...pick, tags: pick.tags.filter((x) => x !== tag) })}
                               className="grid size-7 place-items-center rounded-full transition hover:bg-brand/15 active:bg-brand/20 pointer-coarse:size-9"
                             >
@@ -245,7 +247,7 @@ export function CampaignForm({
                   )}
                   {pick.tags.length > 1 && (
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                      <span className="text-sm text-ink-2">Customers with</span>
+                      <span className="text-sm text-ink-2">{tr("Customers with")}</span>
                       <Segmented
                         label="Customers with"
                         value={pick.match}
@@ -266,12 +268,22 @@ export function CampaignForm({
                   title="Saved audience"
                   value={c.audienceTag}
                   onChange={(audienceTag) => set({ audienceTag })}
-                  options={savedOptions.map((t) => ({ value: t.tag, label: t.label.replace(/^★\s*/, ""), hint: `${t.n.toLocaleString("en-IN")} customers${t.hint ? ` · ${t.hint}` : ""}` }))}
+                  options={savedOptions.map((t) => ({ value: t.tag, label: t.label.replace(/^★\s*/, ""), hint: `${t.n.toLocaleString("en-IN")} ${tr("customers")}${t.hint ? ` · ${t.hint}` : ""}` }))}
                 />
               )}
 
               <p className="tabular text-sm text-muted" aria-live="polite">
-                {sendTo === "all"
+                {isTa
+                  ? sendTo === "all"
+                    ? `ஒப்புதல் அளித்த அனைத்து ${audience.all.toLocaleString("en-IN")} வாடிக்கையாளர்களும்.`
+                    : sendTo === "tags" && !pick.tags.length
+                      ? tr("Pick at least one tag.")
+                      : counting
+                        ? tr("Counting customers…")
+                        : multi && counted?.n === -1
+                          ? `${describeTags(pick, tagLabel)} குறிச்சொல் உள்ளவர்கள். இப்போது எண்ண முடியவில்லை; பொருந்தும் அனைவருக்கும் பிரச்சாரம் சென்றடையும்.`
+                          : `${size.toLocaleString("en-IN")} வாடிக்கையாளர்கள்${sendTo === "tags" ? ` (${describeTags(pick, tagLabel)})` : ""}.`
+                  : sendTo === "all"
                   ? `All ${audience.all.toLocaleString("en-IN")} opted-in customers.`
                   : sendTo === "tags" && !pick.tags.length
                     ? "Pick at least one tag."
@@ -290,8 +302,8 @@ export function CampaignForm({
           <div className="space-y-5 p-4 sm:p-5">
             {/* Mode selection buttons */}
             <fieldset>
-              <legend className="mb-2 block text-sm font-medium text-ink-2">Schedule type</legend>
-              <div role="radiogroup" aria-label="Schedule type" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <legend className="mb-2 block text-sm font-medium text-ink-2">{tr("Schedule type")}</legend>
+              <div role="radiogroup" aria-label={tr("Schedule type")} className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {[
                   { key: "DATE" as const, title: "Calendar date", hint: "Send once on a date", icon: CalendarIcon },
                   { key: "WEEKLY_1" as const, title: "Weekly once", hint: "1 day every week", icon: Repeat },
@@ -318,10 +330,10 @@ export function CampaignForm({
                     >
                       <span className="flex items-center gap-1.5 text-xs font-semibold sm:text-sm">
                         <Icon aria-hidden className="size-3.5 sm:size-4 shrink-0" />
-                        <span className="truncate">{m.title}</span>
+                        <span className="truncate">{tr(m.title)}</span>
                       </span>
-                      <span className={cn("mt-0.5 truncate text-2xs sm:text-xs", on ? "text-brand-deep/80" : "text-muted")}>
-                        {m.hint}
+                      <span className={cn("mt-0.5 text-2xs leading-tight sm:text-xs", on ? "text-brand-deep/80" : "text-muted")}>
+                        {tr(m.hint)}
                       </span>
                     </button>
                   );
@@ -332,7 +344,7 @@ export function CampaignForm({
             {/* If DATE: Show interactive calendar */}
             {scheduleMode === "DATE" && (
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-ink-2">Pick date from calendar</label>
+                <label className="block text-sm font-medium text-ink-2">{tr("Pick date from calendar")}</label>
                 <CalendarPicker
                   value={c.runDate}
                   onChange={(runDate) => set({ runDate })}
@@ -344,10 +356,10 @@ export function CampaignForm({
             {scheduleMode === "WEEKLY_1" && (
               <fieldset className="space-y-2">
                 <legend className="flex w-full items-baseline justify-between gap-2 text-sm font-medium text-ink-2">
-                  <span>Day to send each week</span>
-                  <span className="text-xs font-normal text-muted">Pick 1 day</span>
+                  <span>{tr("Day to send each week")}</span>
+                  <span className="text-xs font-normal text-muted">{tr("Pick 1 day")}</span>
                 </legend>
-                <div className="grid grid-cols-7 gap-1 sm:flex sm:flex-wrap sm:gap-2">
+                <div className="grid grid-cols-7 gap-0.5 sm:flex sm:flex-wrap sm:gap-2">
                   {DAYS.map((d, i) => {
                     const on = c.daysOfWeek.includes(i);
                     return (
@@ -361,13 +373,17 @@ export function CampaignForm({
                           on ? "border-brand bg-brand text-on-brand shadow-xs font-semibold" : "border-line-strong/50 bg-panel text-ink-2 hover:border-line-strong",
                         )}
                       >
-                        {d}
+                        {dayName(i, isTa)}
                       </button>
                     );
                   })}
                 </div>
                 <p className="text-xs text-muted">
-                  Sends once every week on <b>{c.daysOfWeek.length ? DAYS[c.daysOfWeek[0]] : "selected day"}</b>.
+                  {isTa ? (
+                    <>ஒவ்வொரு வாரமும் <b>{c.daysOfWeek.length ? dayName(c.daysOfWeek[0], true) : "தேர்வு செய்த நாள்"}</b> அன்று ஒருமுறை அனுப்பும்.</>
+                  ) : (
+                    <>Sends once every week on <b>{c.daysOfWeek.length ? DAYS[c.daysOfWeek[0]] : "selected day"}</b>.</>
+                  )}
                 </p>
               </fieldset>
             )}
@@ -376,12 +392,12 @@ export function CampaignForm({
             {scheduleMode === "WEEKLY_2" && (
               <fieldset className="space-y-3">
                 <legend className="flex w-full items-baseline justify-between gap-2 text-sm font-medium text-ink-2">
-                  <span>Days to send each week</span>
-                  <span className="text-xs font-normal text-muted">{c.daysOfWeek.length} of 2 selected</span>
+                  <span>{tr("Days to send each week")}</span>
+                  <span className="text-xs font-normal text-muted">{isTa ? `2-ல் ${c.daysOfWeek.length} தேர்வு` : `${c.daysOfWeek.length} of 2 selected`}</span>
                 </legend>
                 {/* Quick pair presets */}
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-xs text-muted mr-1">Popular pairs:</span>
+                  <span className="text-xs text-muted mr-1">{tr("Popular pairs:")}</span>
                   {WEEKLY_PAIRS.map((p) => {
                     const activePair = c.daysOfWeek.length === 2 && c.daysOfWeek.includes(p.days[0]) && c.daysOfWeek.includes(p.days[1]);
                     return (
@@ -390,19 +406,19 @@ export function CampaignForm({
                         type="button"
                         onClick={() => set({ daysOfWeek: [...p.days] })}
                         className={cn(
-                          "min-h-8 rounded-full border px-2.5 py-1 text-xs font-medium transition active:scale-95 pointer-coarse:min-h-10 pointer-coarse:px-3",
+                          "min-h-10 rounded-full border px-3 py-1 text-xs font-medium transition active:scale-95 sm:min-h-8 sm:px-2.5 sm:pointer-coarse:min-h-10",
                           activePair
                             ? "border-brand bg-brand text-on-brand shadow-xs"
                             : "border-line bg-sunken/60 text-ink-2 hover:border-line-strong",
                         )}
                       >
-                        {p.label}
+                        {tr(p.label)}
                       </button>
                     );
                   })}
                 </div>
                 {/* 7 day buttons */}
-                <div className="grid grid-cols-7 gap-1 sm:flex sm:flex-wrap sm:gap-2">
+                <div className="grid grid-cols-7 gap-0.5 sm:flex sm:flex-wrap sm:gap-2">
                   {DAYS.map((d, i) => {
                     const on = c.daysOfWeek.includes(i);
                     return (
@@ -425,16 +441,20 @@ export function CampaignForm({
                           on ? "border-brand bg-brand text-on-brand shadow-xs font-semibold" : "border-line-strong/50 bg-panel text-ink-2 hover:border-line-strong",
                         )}
                       >
-                        {d}
+                        {dayName(i, isTa)}
                       </button>
                     );
                   })}
                 </div>
                 {c.daysOfWeek.length < 2 ? (
-                  <p className="text-xs text-warning">Pick 1 more day to make 2 days per week.</p>
+                  <p className="text-xs text-warning">{tr("Pick 1 more day to make 2 days per week.")}</p>
                 ) : (
                   <p className="text-xs text-muted">
-                    Sends twice a week on <b>{DAYS[c.daysOfWeek[0]]}</b> and <b>{DAYS[c.daysOfWeek[1]]}</b>.
+                    {isTa ? (
+                      <>வாரம் இருமுறை <b>{dayName(c.daysOfWeek[0], true)}</b> மற்றும் <b>{dayName(c.daysOfWeek[1], true)}</b> அன்று அனுப்பும்.</>
+                    ) : (
+                      <>Sends twice a week on <b>{DAYS[c.daysOfWeek[0]]}</b> and <b>{DAYS[c.daysOfWeek[1]]}</b>.</>
+                    )}
                   </p>
                 )}
               </fieldset>
@@ -444,10 +464,10 @@ export function CampaignForm({
             {scheduleMode === "WEEKDAYS" && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm font-medium text-ink-2">
-                  <span>Every weekday</span>
-                  <span className="text-xs font-normal text-muted">5 days per week</span>
+                  <span>{tr("Every weekday")}</span>
+                  <span className="text-xs font-normal text-muted">{tr("5 days per week")}</span>
                 </div>
-                <div className="grid grid-cols-7 gap-1 sm:flex sm:flex-wrap sm:gap-2">
+                <div className="grid grid-cols-7 gap-0.5 sm:flex sm:flex-wrap sm:gap-2">
                   {DAYS.map((d, i) => {
                     const on = i >= 1 && i <= 5;
                     return (
@@ -458,12 +478,12 @@ export function CampaignForm({
                           on ? "border-brand bg-brand text-on-brand shadow-xs font-semibold" : "border-line bg-sunken text-muted/50 opacity-60",
                         )}
                       >
-                        {d}
+                        {dayName(i, isTa)}
                       </div>
                     );
                   })}
                 </div>
-                <p className="text-xs text-muted">Sends Monday through Friday (skips weekends).</p>
+                <p className="text-xs text-muted">{tr("Sends Monday through Friday (skips weekends).")}</p>
               </div>
             )}
 
@@ -471,20 +491,20 @@ export function CampaignForm({
             {scheduleMode === "DAILY" && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm font-medium text-ink-2">
-                  <span>Every day</span>
-                  <span className="text-xs font-normal text-muted">7 days per week</span>
+                  <span>{tr("Every day")}</span>
+                  <span className="text-xs font-normal text-muted">{tr("7 days per week")}</span>
                 </div>
-                <div className="grid grid-cols-7 gap-1 sm:flex sm:flex-wrap sm:gap-2">
-                  {DAYS.map((d) => (
+                <div className="grid grid-cols-7 gap-0.5 sm:flex sm:flex-wrap sm:gap-2">
+                  {DAYS.map((d, i) => (
                     <div
                       key={d}
                       className="flex h-11 min-w-0 items-center justify-center rounded-control border border-brand bg-brand text-on-brand shadow-xs px-0.5 text-xs font-semibold sm:w-12 sm:flex-none"
                     >
-                      {d}
+                      {dayName(i, isTa)}
                     </div>
                   ))}
                 </div>
-                <p className="text-xs text-muted">Sends every day, Sunday through Saturday.</p>
+                <p className="text-xs text-muted">{tr("Sends every day, Sunday through Saturday.")}</p>
               </div>
             )}
 
@@ -492,10 +512,10 @@ export function CampaignForm({
             {scheduleMode === "CUSTOM" && (
               <fieldset className="space-y-2">
                 <legend className="flex w-full items-baseline justify-between gap-2 text-sm font-medium text-ink-2">
-                  <span>Custom days</span>
-                  <span className="text-xs font-normal text-muted">{c.daysOfWeek.length} per week</span>
+                  <span>{tr("Custom days")}</span>
+                  <span className="text-xs font-normal text-muted">{isTa ? `வாரம் ${c.daysOfWeek.length}` : `${c.daysOfWeek.length} per week`}</span>
                 </legend>
-                <div className="grid grid-cols-7 gap-1 sm:flex sm:flex-wrap sm:gap-2">
+                <div className="grid grid-cols-7 gap-0.5 sm:flex sm:flex-wrap sm:gap-2">
                   {DAYS.map((d, i) => {
                     const on = c.daysOfWeek.includes(i);
                     return (
@@ -509,15 +529,17 @@ export function CampaignForm({
                           on ? "border-brand bg-brand text-on-brand shadow-xs font-semibold" : "border-line-strong/50 bg-panel text-ink-2 hover:border-line-strong",
                         )}
                       >
-                        {d}
+                        {dayName(i, isTa)}
                       </button>
                     );
                   })}
                 </div>
                 <p className="text-xs text-muted">
                   {c.daysOfWeek.length === 0
-                    ? "Pick at least one day."
-                    : `Sends on ${c.daysOfWeek.map((d) => DAYS[d]).join(", ")} (${c.daysOfWeek.length}× per week).`}
+                    ? tr("Pick at least one day.")
+                    : isTa
+                      ? `${c.daysOfWeek.map((d) => dayName(d, true)).join(", ")} அன்று அனுப்பும் (வாரம் ${c.daysOfWeek.length} முறை).`
+                      : `Sends on ${c.daysOfWeek.map((d) => DAYS[d]).join(", ")} (${c.daysOfWeek.length}× per week).`}
                 </p>
               </fieldset>
             )}
@@ -525,8 +547,8 @@ export function CampaignForm({
             {/* Start Time section */}
             <div className="space-y-2.5 border-t border-line/60 pt-4">
               <div className="flex items-center justify-between">
-                <label htmlFor="time" className="text-sm font-medium text-ink-2">Start time (IST)</label>
-                <span className="text-xs text-muted">India Standard Time</span>
+                <label htmlFor="time" className="text-sm font-medium text-ink-2">{tr("Start time (IST)")}</label>
+                <span className="text-xs text-muted">{tr("India Standard Time")}</span>
               </div>
               {/* Quick time chips */}
               <div className="flex flex-wrap gap-1.5">
@@ -538,13 +560,13 @@ export function CampaignForm({
                       type="button"
                       onClick={() => set({ sendTime: tp.time })}
                       className={cn(
-                        "min-h-8 rounded-full border px-2.5 py-1 text-xs font-medium transition active:scale-95 pointer-coarse:min-h-10 pointer-coarse:px-3",
+                        "min-h-10 rounded-full border px-3 py-1 text-xs font-medium transition active:scale-95 sm:min-h-8 sm:px-2.5 sm:pointer-coarse:min-h-10",
                         on
                           ? "border-brand bg-brand text-on-brand shadow-xs"
                           : "border-line bg-sunken/60 text-ink-2 hover:border-line-strong",
                       )}
                     >
-                      {tp.label} ({tp.hint})
+                      {tr(tp.label)} ({tp.hint})
                     </button>
                   );
                 })}
@@ -564,15 +586,17 @@ export function CampaignForm({
             <div className="flex items-center gap-2.5 rounded-control bg-brand-soft/70 px-3.5 py-2.5 text-xs text-brand-deep border border-brand/20">
               <Clock aria-hidden className="size-4 shrink-0 text-brand" />
               <div className="min-w-0">
-                <span className="font-semibold">Schedule summary: </span>
-                <span>{describeScheduleSummary(c.scheduleType, c.daysOfWeek, c.sendTime, c.runDate)}</span>
+                <span className="font-semibold">{tr("Schedule summary:")} </span>
+                <span>{describeScheduleSummary(c.scheduleType, c.daysOfWeek, c.sendTime, c.runDate, isTa)}</span>
               </div>
             </div>
 
             {/* Validation warning if past date/time chosen */}
             {isPastTimeToday && (
               <Callout tone="warning">
-                The time {c.sendTime} has already passed for today. Please choose a later time or select tomorrow.
+                {isTa
+                  ? `இன்று ${c.sendTime} நேரம் ஏற்கனவே கடந்துவிட்டது. பிந்தைய நேரத்தையோ நாளையையோ தேர்வு செய்யவும்.`
+                  : `The time ${c.sendTime} has already passed for today. Please choose a later time or select tomorrow.`}
               </Callout>
             )}
           </div>
@@ -595,9 +619,9 @@ export function CampaignForm({
                       on ? "border-brand bg-brand-soft text-brand-deep" : "border-line-strong/50 bg-panel hover:border-line-strong",
                     )}
                   >
-                    <span className="block text-sm font-medium">{p.label}</span>
+                    <span className="block text-sm font-medium">{tr(p.label)}</span>
                     <span className={on ? "text-brand-deep" : "text-muted"}>
-                      {p.batch} every {p.interval} min
+                      {isTa ? `${p.interval} நிமிடத்துக்கு ${p.batch}` : `${p.batch} every ${p.interval} min`}
                     </span>
                   </button>
                 );
@@ -613,57 +637,75 @@ export function CampaignForm({
             </div>
             {c.intervalMinutes > 0 && c.intervalMinutes < SCHEDULER_TICK_MINUTES && (
               <Callout tone="warning">
-                Batches go out at most once every {SCHEDULER_TICK_MINUTES} minutes, so {c.intervalMinutes} min works as {SCHEDULER_TICK_MINUTES}. For a faster pace, raise the batch size instead.
+                {isTa
+                  ? `தொகுதிகள் அதிகபட்சம் ${SCHEDULER_TICK_MINUTES} நிமிடத்துக்கு ஒருமுறை செல்லும், எனவே ${c.intervalMinutes} நிமிடம் ${SCHEDULER_TICK_MINUTES} ஆகவே செயல்படும். வேகமாக அனுப்ப, தொகுதி அளவை உயர்த்துங்கள்.`
+                  : `Batches go out at most once every ${SCHEDULER_TICK_MINUTES} minutes, so ${c.intervalMinutes} min works as ${SCHEDULER_TICK_MINUTES}. For a faster pace, raise the batch size instead.`}
               </Callout>
             )}
           </div>
         </Card>
       </div>
 
-      <aside aria-label="Summary" className="min-w-0 space-y-4 lg:sticky lg:top-8">
+      <aside aria-label={isTa ? "சுருக்கம்" : "Summary"} className="min-w-0 space-y-4 lg:sticky lg:top-8">
         <Card className="card-3d overflow-hidden">
           <div className="surface-dark bg-night p-5 text-white">
-            <p className="text-xs font-semibold uppercase tracking-wider text-white/70">Each send</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-white/70">{tr("Each send")}</p>
             <p className="tabular mt-2 text-3xl font-semibold">
-              {sizeKnown ? size.toLocaleString("en-IN") : "…"} <span className="text-base font-normal text-white/75">customers</span>
+              {sizeKnown ? size.toLocaleString("en-IN") : "…"} <span className="text-base font-normal text-white/75">{tr("customers")}</span>
             </p>
             <p className="mt-1 text-sm text-white/80">
-              {!sizeKnown ? "Counting customers…" : !size ? "No customers match yet" : <>{batches} batch{batches === 1 ? "" : "es"} · done in {days > 1 ? `about ${days} days` : formatMinutes(mins)}</>}
+              {!sizeKnown
+                ? tr("Counting customers…")
+                : !size
+                  ? tr("No customers match yet")
+                  : isTa
+                    ? `${batches} தொகுதி · ${days > 1 ? `சுமார் ${days} நாட்களில்` : formatMinutes(mins, true)} முடியும்`
+                    : <>{batches} batch{batches === 1 ? "" : "es"} · done in {days > 1 ? `about ${days} days` : formatMinutes(mins)}</>}
             </p>
             {days > 1 && sender?.dailyLimit && (
               <p className="mt-2 rounded-control bg-white/10 px-2.5 py-1.5 text-xs text-white/85">
-                {sender.label.split(" · ")[0]} can message {sender.dailyLimit.toLocaleString("en-IN")} people a day, so this send continues automatically each day until everyone is reached.
+                {isTa
+                  ? `${sender.label.split(" · ")[0]} நாளுக்கு ${sender.dailyLimit.toLocaleString("en-IN")} பேருக்கு அனுப்ப முடியும்; அனைவரையும் அடையும் வரை இந்த அனுப்புதல் ஒவ்வொரு நாளும் தானாகத் தொடரும்.`
+                  : `${sender.label.split(" · ")[0]} can message ${sender.dailyLimit.toLocaleString("en-IN")} people a day, so this send continues automatically each day until everyone is reached.`}
               </p>
             )}
             {sender?.quality === "RED" && (
-              <p className="mt-2 rounded-control bg-white/10 px-2.5 py-1.5 text-xs text-danger-on-dark">This number&apos;s quality is low. Sends stay paused until Meta rates it higher.</p>
+              <p className="mt-2 rounded-control bg-white/10 px-2.5 py-1.5 text-xs text-danger-on-dark">
+                {isTa ? "இந்த எண்ணின் தரம் குறைவு. Meta மதிப்பீட்டை உயர்த்தும் வரை அனுப்புதல் நிறுத்தப்பட்டிருக்கும்." : "This number's quality is low. Sends stay paused until Meta rates it higher."}
+              </p>
             )}
           </div>
           <ul className="space-y-3 p-5 text-sm">
             <li className="flex gap-3">
               <Users aria-hidden className="mt-0.5 size-4 shrink-0 text-muted" />
-              {c.batchSize || 0} customers at a time
+              {isTa ? `ஒரே நேரத்தில் ${c.batchSize || 0} வாடிக்கையாளர்கள்` : `${c.batchSize || 0} customers at a time`}
             </li>
             <li className="flex gap-3">
               <Gauge aria-hidden className="mt-0.5 size-4 shrink-0 text-muted" />
-              then waits {effectiveInterval(c.intervalMinutes || 0)} minute{effectiveInterval(c.intervalMinutes || 0) === 1 ? "" : "s"}
+              {isTa
+                ? `பிறகு ${effectiveInterval(c.intervalMinutes || 0)} நிமிடம் காத்திருக்கும்`
+                : `then waits ${effectiveInterval(c.intervalMinutes || 0)} minute${effectiveInterval(c.intervalMinutes || 0) === 1 ? "" : "s"}`}
             </li>
             <li className="flex gap-3">
               <Clock aria-hidden className="mt-0.5 size-4 shrink-0 text-muted" />
               <span className="tabular">
-                {c.sendTime} → about {end.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
-                {end.getDate() !== 1 && " (next day)"}
+                {c.sendTime} → {isTa ? "சுமார்" : "about"} {end.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
+                {end.getDate() !== 1 && (isTa ? " (மறுநாள்)" : " (next day)")}
               </span>
             </li>
           </ul>
           {perWeek > 0 && sizeKnown && (
             <p className="border-t border-line px-5 py-3 text-xs text-muted">
-              {perWeek}× a week ≈ <b className="text-ink">{(size * perWeek).toLocaleString("en-IN")}</b> messages weekly.
+              {isTa ? (
+                <>வாரம் {perWeek} முறை ≈ வாரத்துக்கு <b className="text-ink">{(size * perWeek).toLocaleString("en-IN")}</b> செய்திகள்.</>
+              ) : (
+                <>{perWeek}× a week ≈ <b className="text-ink">{(size * perWeek).toLocaleString("en-IN")}</b> messages weekly.</>
+              )}
             </p>
           )}
           <div className="border-t border-line px-5 py-3 text-xs text-muted">
-            <p className="font-semibold text-ink">Schedule</p>
-            <p className="mt-0.5">{describeScheduleSummary(c.scheduleType, c.daysOfWeek, c.sendTime, c.runDate)}</p>
+            <p className="font-semibold text-ink">{tr("Schedule")}</p>
+            <p className="mt-0.5">{describeScheduleSummary(c.scheduleType, c.daysOfWeek, c.sendTime, c.runDate, isTa)}</p>
           </div>
         </Card>
 
@@ -676,13 +718,21 @@ export function CampaignForm({
             {id ? "Save changes" : "Create campaign"}
           </Button>
         </div>
-        {id && <p className="text-center text-xs text-muted">Pacing changes also apply to a run that is already sending, from its next batch.</p>}
+        {id && <p className="text-center text-xs text-muted">{tr("Pacing changes also apply to a run that is already sending, from its next batch.")}</p>}
       </aside>
       <MobileActionBar>
         <div className="min-w-0 flex-1 leading-tight">
-          <p className="tabular truncate text-sm font-semibold">{sizeKnown ? `${size.toLocaleString("en-IN")} customers` : "Counting…"}</p>
+          <p className="tabular truncate text-sm font-semibold">{sizeKnown ? `${size.toLocaleString("en-IN")} ${tr("customers")}` : tr("Counting…")}</p>
           <p className="truncate text-xs text-muted">
-            {!sizeKnown ? `Tagged ${describeTags(pick, tagLabel)}` : !size ? "No customers match yet" : `${batches} batch${batches === 1 ? "" : "es"} · ${days > 1 ? `about ${days} days` : `done in ${formatMinutes(mins)}`}`}
+            {!sizeKnown
+              ? isTa
+                ? `${describeTags(pick, tagLabel)} குறிச்சொல்`
+                : `Tagged ${describeTags(pick, tagLabel)}`
+              : !size
+                ? tr("No customers match yet")
+                : isTa
+                  ? `${batches} தொகுதி · ${days > 1 ? `சுமார் ${days} நாட்கள்` : `${formatMinutes(mins, true)}-ல் முடியும்`}`
+                  : `${batches} batch${batches === 1 ? "" : "es"} · ${days > 1 ? `about ${days} days` : `done in ${formatMinutes(mins)}`}`}
           </p>
         </div>
         <Button className="!flex-none shrink-0 px-6" loading={pending} onClick={save}>

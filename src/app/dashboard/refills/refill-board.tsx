@@ -1,11 +1,12 @@
 "use client";
 
 import { BellRing, Check, MessageCircle, ShoppingCart } from "@/components/icons";
+import { T } from "../portal-ui";
 import Link from "@/components/intent-link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { confirmAction } from "@/components/confirm";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import { Badge, Button, Card, CardHeader, EmptyState } from "@/components/ui";
 import { Calendar3D } from "@/components/icons-3d";
 import { ColumnChart, type ChartColor } from "@/components/viz";
@@ -52,6 +53,27 @@ export function RefillBoard({ rows, today, canSend, templateName }: { rows: Refi
   });
   const active = cols.find((c) => c.key === pick);
   const list = active ? rows.filter((r) => active.test(r.daysLeft)) : rows.filter((r) => r.daysLeft < 14);
+  const router = useRouter();
+  const [bulk, startBulk] = useTransition();
+  // Overdue and not yet reminded since their last order.
+  const overdue = rows.filter((r) => r.daysLeft < 0 && !(r.reminderSentAt && r.reminderSentAt > r.lastOrderAt));
+  const remindAll = () =>
+    startBulk(async () => {
+      if (!(await confirmAction({ title: `Remind ${overdue.length} overdue customer${overdue.length === 1 ? "" : "s"}?`, message: `Each gets the refill reminder${templateName ? ` (${templateName})` : ""} on WhatsApp. Anyone messaged too recently is skipped.`, confirmLabel: "Remind all" }))) return;
+      let sent = 0;
+      let problem = "";
+      for (const r of overdue) {
+        const res = await safeAction(() => sendRefillNudge(r.customerId));
+        if (res.ok) sent++;
+        else problem ||= res.message;
+      }
+      toastResult(
+        sent === overdue.length
+          ? { ok: true, message: `Reminder sent to ${sent} customer${sent === 1 ? "" : "s"}.` }
+          : { ok: sent > 0, message: `Reminder sent to ${sent} of ${overdue.length}.${problem ? ` ${problem}` : ""}` },
+      );
+      router.refresh();
+    });
 
   return (
     <>
@@ -90,9 +112,13 @@ export function RefillBoard({ rows, today, canSend, templateName }: { rows: Refi
           description={active ? `${fmtNumber(list.length)} customer${list.length === 1 ? "" : "s"}` : "Most urgent first · overdue at the top"}
           action={
             active ? (
-              <button type="button" onClick={() => setPick(null)} className="text-xs font-semibold text-brand-deep hover:underline">
-                Show all
+              <button type="button" onClick={() => setPick(null)} className="inline-flex min-h-10 items-center text-xs font-semibold text-brand-deep hover:underline sm:min-h-0">
+                <T>Show all</T>
               </button>
+            ) : canSend && overdue.length > 0 ? (
+              <Button size="sm" loading={bulk} disabled={!templateName} title={templateName ? undefined : "Choose a reorder template on the Campaigns page first"} onClick={remindAll}>
+                <T ta="தாமதமான அனைவருக்கும் நினைவூட்டு">Remind all overdue</T>
+              </Button>
             ) : undefined
           }
         />
@@ -120,7 +146,7 @@ function RefillRow({ r, canSend, templateName }: { r: RefillDue; canSend: boolea
 
   const send = () =>
     start(async () => {
-      let res = await sendRefillNudge(r.customerId);
+      let res = await safeAction(() => sendRefillNudge(r.customerId));
       if (!res.ok && res.soft && (await confirmAction(res.message))) res = await sendRefillNudge(r.customerId, true);
       if (res.ok || !res.soft) toastResult(res);
       if (res.ok) {

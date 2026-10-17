@@ -139,6 +139,27 @@ function Talk({ lang, className = "" }: { lang: Lang; className?: string }) {
 }
 
 /** The sections under the sign-in hero: what Thabaal does, in the sign-in page's own look. */
+const LEGAL: { href: string; label: T }[] = [
+  { href: "/privacy", label: { en: "Privacy Policy", ta: "தனியுரிமைக் கொள்கை" } },
+  { href: "/terms", label: { en: "Terms of Service", ta: "சேவை விதிமுறைகள்" } },
+  { href: "/about", label: { en: "About Thabaal", ta: "தபால் பற்றி" } },
+  { href: "/about#google-data", label: { en: "Google sign-in", ta: "Google உள்நுழைவு" } },
+  { href: "/privacy#delete-your-data", label: { en: "Delete your data", ta: "உங்கள் தரவை நீக்க" } },
+];
+
+/** Privacy, terms, about and data deletion: under the sign-in form and in the page footer. */
+export function LegalLinks({ lang, className }: { lang: Lang; className?: string }) {
+  return (
+    <nav aria-label={lang === "ta" ? "சட்ட விவரங்கள்" : "Legal"} className={className}>
+      {LEGAL.map((l) => (
+        <a key={l.href} href={l.href}>
+          {l.label[lang]}
+        </a>
+      ))}
+    </nav>
+  );
+}
+
 export function LandingSections({ lang }: { lang: Lang }) {
   const ta = lang === "ta";
   const t = (x: T) => x[lang];
@@ -407,6 +428,10 @@ export function LandingSections({ lang }: { lang: Lang }) {
         <div className="tl-wrap tl-footer-row">
           <span lang="ta">தபால் · Thabaal</span>
           <span>{ta ? "WhatsApp என்பது Meta Platforms, Inc.-இன் வர்த்தகக் குறி." : "WhatsApp is a trademark of Meta Platforms, Inc. Thabaal uses the official WhatsApp Cloud API."}</span>
+        </div>
+        <div className="tl-wrap tl-footer-row tl-footer-links">
+          <span>© {new Date().getFullYear()} Thabaal</span>
+          <LegalLinks lang={lang} />
         </div>
       </footer>
     </div>

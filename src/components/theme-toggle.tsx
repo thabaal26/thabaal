@@ -3,6 +3,7 @@
 import { Monitor, Moon, Sun } from "@/components/icons";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
+import { useTr } from "@/lib/i18n/context";
 
 export type ThemeMode = "light" | "dark" | "system";
 const KEY = "theme";
@@ -99,13 +100,14 @@ export function ThemeToggle({ onDark, className }: { onDark?: boolean; className
 /** Settings → Look: the three choices side by side. */
 export function ThemeChoice() {
   const [mode, choose] = useThemeMode();
+  const { tr } = useTr();
   const options: { id: ThemeMode; label: string; Icon: typeof Sun }[] = [
     { id: "system", label: "Device", Icon: Monitor },
     { id: "light", label: "Light", Icon: Sun },
     { id: "dark", label: "Dark", Icon: Moon },
   ];
   return (
-    <div role="radiogroup" aria-label="Look" className="inline-flex rounded-control border-[1.5px] border-line bg-panel p-[3px]">
+    <div role="radiogroup" aria-label={tr("Look")} className="inline-flex rounded-control border-[1.5px] border-line bg-panel p-[3px]">
       {options.map(({ id, label, Icon }) => (
         <button
           key={id}
@@ -114,11 +116,11 @@ export function ThemeChoice() {
           aria-checked={mode === id}
           onClick={() => choose(id)}
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-[9px] px-3 py-1.5 text-[13.5px] font-semibold transition",
+            "inline-flex min-h-10 items-center gap-1.5 rounded-[9px] px-3 py-1.5 text-[13.5px] font-semibold transition sm:min-h-0",
             mode === id ? "bg-ink text-canvas" : "text-muted hover:text-ink",
           )}
         >
-          <Icon aria-hidden className="size-4" /> {label}
+          <Icon aria-hidden className="size-4" /> {tr(label)}
         </button>
       ))}
     </div>

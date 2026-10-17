@@ -1,0 +1,6 @@
+/* The app's Tailwind base resets heading sizes and lists; the design relies on browser defaults. */
+.thabaal-portal h1{font-size:2em}
+.thabaal-portal h2{font-size:1.5em}
+.thabaal-portal h3{font-size:1.17em}
+.thabaal-portal h4{font-size:1em}
+.thabaal-portal ul,.thabaal-portal ol{list-style:revert;padding-left:1.4em;margin:0}

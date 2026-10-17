@@ -22,6 +22,7 @@ import { useEffect, useState } from "react";
 import { Sheet } from "@/components/sheet";
 import { isHrefEnabled } from "@/lib/client-sections";
 import { cn } from "@/lib/cn";
+import { T } from "./portal-ui";
 
 type NavItem = {
   href: string;
@@ -29,32 +30,34 @@ type NavItem = {
   short: string;
   icon: IconComponent;
   group: string;
+  /** Tamil label (portal design), shown when Tamil is chosen. */
+  ta?: string;
   /** Pages that live under this item (opened from its tabs), so it stays highlighted there. */
   also?: string[];
 };
 
-/** The menu: five groups, in the order a working day goes. */
+/** The menu: six groups, in the order a working day goes (portal design). */
 export const NAV: NavItem[] = [
-  { href: "/dashboard", label: "Home", short: "Home", icon: Home, group: "Today" },
+  { href: "/dashboard", label: "Home", short: "Home", icon: Home, group: "Today", ta: "முகப்பு" },
 
-  { href: "/dashboard/replies", label: "Chats", short: "Chats", icon: MessageCircle, group: "Daily work", also: ["/dashboard/calls"] },
-  { href: "/dashboard/orders", label: "Orders", short: "Orders", icon: Package, group: "Daily work" },
-  { href: "/dashboard/revenue", label: "Money", short: "Money", icon: IndianRupee, group: "Daily work" },
+  { href: "/dashboard/replies", label: "Chats", short: "Chats", icon: MessageCircle, group: "Daily work", ta: "உரையாடல்கள்", also: ["/dashboard/calls"] },
+  { href: "/dashboard/orders", label: "Orders", short: "Orders", icon: Package, group: "Daily work", ta: "ஆர்டர்கள்" },
+  { href: "/dashboard/revenue", label: "Payments", short: "Payments", icon: IndianRupee, group: "Money", ta: "பணம்" },
 
-  { href: "/dashboard/customers", label: "Customers", short: "Customers", icon: Users, group: "Grow", also: ["/dashboard/refills"] },
-  { href: "/dashboard/catalogue", label: "Products", short: "Products", icon: Tag, group: "Grow" },
-  { href: "/dashboard/campaigns", label: "Campaigns", short: "Campaigns", icon: Megaphone, group: "Grow", also: ["/dashboard/messages"] },
-  { href: "/dashboard/templates", label: "Templates", short: "Templates", icon: FileText, group: "Grow" },
+  { href: "/dashboard/customers", label: "Customers", short: "Customers", icon: Users, group: "Grow", ta: "வாடிக்கையாளர்கள்", also: ["/dashboard/refills"] },
+  { href: "/dashboard/catalogue", label: "Products", short: "Products", icon: Tag, group: "Grow", ta: "பொருட்கள்" },
+  { href: "/dashboard/campaigns", label: "Campaigns", short: "Campaigns", icon: Megaphone, group: "Grow", ta: "பிரச்சாரங்கள்", also: ["/dashboard/messages"] },
+  { href: "/dashboard/templates", label: "Templates", short: "Templates", icon: FileText, group: "Grow", ta: "டெம்ப்ளேட்கள்" },
 
-  { href: "/dashboard/report", label: "Reports", short: "Reports", icon: BarChart3, group: "Understand" },
+  { href: "/dashboard/report", label: "Reports", short: "Reports", icon: BarChart3, group: "Understand", ta: "அறிக்கைகள்" },
 
-  { href: "/dashboard/settings", label: "Settings", short: "Settings", icon: Settings, group: "Account" },
+  { href: "/dashboard/settings", label: "Settings", short: "Settings", icon: Settings, group: "Account", ta: "அமைப்புகள்" },
 ];
 
-const ADMIN_NAV: NavItem[] = [{ href: "/dashboard/clients", label: "Clients", short: "Clients", icon: Building2, group: "Account" }];
+const ADMIN_NAV: NavItem[] = [{ href: "/dashboard/clients", label: "Clients", short: "Clients", icon: Building2, group: "Account", ta: "நிறுவனங்கள்" }];
 
 /** Thabaal wallet: admins, and clients billed through the wallet. */
-const WALLET_NAV: NavItem[] = [{ href: "/dashboard/wallet", label: "Wallet", short: "Wallet", icon: Wallet, group: "Account" }];
+const WALLET_NAV: NavItem[] = [{ href: "/dashboard/wallet", label: "Wallet", short: "Wallet", icon: Wallet, group: "Account", ta: "வாலட்" }];
 
 /**
  * Phone tabs: what each role opens most. Staff pack orders and answer customers all day;
@@ -67,7 +70,10 @@ const PHONE_TABS = {
 };
 
 export type NavRole = keyof typeof PHONE_TABS;
-type Counts = { openReplies?: number; newOrders?: number; unreadNotifications?: number };
+type Counts = { openReplies?: number; newOrders?: number; unreadNotifications?: number; paymentsToCheck?: number };
+
+/** The design's Tamil group headings. */
+const GROUP_TA: Record<string, string> = { Today: "இன்று", "Daily work": "தினசரி வேலை", Money: "பணம்", Grow: "வளர்ச்சி", Understand: "புரிந்துகொள்ள", Account: "கணக்கு" };
 
 function CountBadge({ n, label, className }: { n?: number; label: string; className?: string }) {
   if (!n) return null;
@@ -90,7 +96,9 @@ const countFor = (href: string, c: Counts) =>
     ? { n: c.openReplies, label: "open chats" }
     : href === "/dashboard/orders"
       ? { n: c.newOrders, label: "orders to handle" }
-      : null;
+      : href === "/dashboard/revenue"
+        ? { n: c.paymentsToCheck, label: "payments to check" }
+        : null;
 
 function menuItems(isAdmin: boolean, showWallet: boolean, disabledSections?: readonly string[]) {
   return [...NAV.filter((n) => isHrefEnabled(n.href, disabledSections)), ...(isAdmin || showWallet ? WALLET_NAV : []), ...(isAdmin ? ADMIN_NAV : [])];
@@ -103,6 +111,7 @@ export function SideNav({
   openReplies,
   newOrders,
   unreadNotifications,
+  paymentsToCheck,
 }: { isAdmin: boolean; showWallet?: boolean; disabledSections?: readonly string[] } & Counts) {
   const path = usePathname();
   const router = useRouter();
@@ -119,7 +128,7 @@ export function SideNav({
       {groups.map((g) => (
         <div key={g} role="group" aria-labelledby={`nav-${g}`}>
           <p id={`nav-${g}`} className="mb-1.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted">
-            {g}
+            <T ta={GROUP_TA[g]}>{g}</T>
           </p>
           <ul className="space-y-1">
             {items
@@ -127,7 +136,7 @@ export function SideNav({
               .map((item) => {
                 const { href, label, icon: Icon } = item;
                 const active = isActive(path, item);
-                const count = countFor(href, { openReplies, newOrders, unreadNotifications });
+                const count = countFor(href, { openReplies, newOrders, unreadNotifications, paymentsToCheck });
                 return (
                   <li key={href}>
                     <Link
@@ -139,7 +148,9 @@ export function SideNav({
                       )}
                     >
                       <Icon aria-hidden className={cn("size-[19px] shrink-0 transition-colors", active ? "text-on-brand" : "text-muted group-hover:text-ink")} />
-                      <span className="flex-1 truncate">{label}</span>
+                      <span className="flex-1 truncate">
+                        <T ta={item.ta}>{label}</T>
+                      </span>
                       {count && <CountBadge n={count.n} label={count.label} className={active ? "bg-on-brand text-brand" : "bg-danger-solid text-white"} />}
                     </Link>
                   </li>
@@ -161,6 +172,7 @@ export function BottomNav({
   openReplies,
   newOrders,
   unreadNotifications,
+  paymentsToCheck,
 }: { isAdmin: boolean; showWallet?: boolean; role: NavRole; disabledSections?: readonly string[] } & Counts) {
   const path = usePathname();
   // Remembers the page "More" was opened on, so the sheet closes by itself once a tapped page opens.
@@ -177,7 +189,7 @@ export function BottomNav({
   const more = all.filter((n) => !tabs.includes(n.href));
   const moreActive = more.some((n) => isActive(path, n));
   // Counts for sections that live under "More" show on the More tab too.
-  const hiddenCount = more.reduce((sum, n) => sum + (countFor(n.href, { openReplies, newOrders, unreadNotifications })?.n ?? 0), 0);
+  const hiddenCount = more.reduce((sum, n) => sum + (countFor(n.href, { openReplies, newOrders, unreadNotifications, paymentsToCheck })?.n ?? 0), 0);
 
   const tabClass = (active: boolean) =>
     cn(
@@ -192,7 +204,7 @@ export function BottomNav({
         {tabItems.map((item) => {
           const { href, short, icon: Icon } = item;
           const active = isActive(path, item);
-          const count = countFor(href, { openReplies, newOrders, unreadNotifications });
+          const count = countFor(href, { openReplies, newOrders, unreadNotifications, paymentsToCheck });
           return (
             <li key={href} className="min-w-0">
               <Link href={href} aria-current={active ? "page" : undefined} className={tabClass(active)}>
@@ -205,7 +217,7 @@ export function BottomNav({
                     </span>
                   ) : null}
                 </span>
-                <span className="max-w-full truncate px-0.5">{short}</span>
+                <span className="max-w-full truncate px-0.5"><T ta={item.ta}>{short}</T></span>
               </Link>
             </li>
           );
@@ -216,7 +228,7 @@ export function BottomNav({
               <Menu aria-hidden className={cn("size-5 transition-all duration-200 ease-out", moreActive ? "text-ink dark:text-brand scale-110" : "text-muted scale-100")} />
               {hiddenCount > 0 && <span className={dot}>{hiddenCount > 99 ? "99+" : hiddenCount}</span>}
             </span>
-            <span>More</span>
+            <span><T ta="மேலும்">More</T></span>
           </button>
         </li>
       </ul>
@@ -225,7 +237,7 @@ export function BottomNav({
           {more.map((item) => {
             const { href, label, icon: Icon } = item;
             const active = isActive(path, item);
-            const count = countFor(href, { openReplies, newOrders, unreadNotifications });
+            const count = countFor(href, { openReplies, newOrders, unreadNotifications, paymentsToCheck });
             return (
               <li key={href}>
                 <Link
@@ -237,7 +249,7 @@ export function BottomNav({
                   )}
                 >
                   <Icon aria-hidden className={cn("size-5 shrink-0", active ? "text-ink" : "text-muted")} />
-                  <span className="min-w-0 flex-1 truncate">{label}</span>
+                  <span className="min-w-0 flex-1 truncate"><T ta={item.ta}>{label}</T></span>
                   {count && <CountBadge n={count.n} label={count.label} className="bg-danger-solid text-white" />}
                 </Link>
               </li>
@@ -258,7 +270,7 @@ export function SettingsLink() {
       aria-label="Settings"
       aria-current={active ? "page" : undefined}
       className={cn(
-        "grid size-9 shrink-0 place-items-center rounded-xl transition active:scale-95 sm:size-11",
+        "grid size-10 shrink-0 place-items-center rounded-xl transition active:scale-95 sm:size-11",
         active ? "bg-sunken text-ink" : "text-muted hover:bg-sunken hover:text-ink",
       )}
     >

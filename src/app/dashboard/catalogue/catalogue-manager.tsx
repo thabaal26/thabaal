@@ -1,15 +1,16 @@
 "use client";
 
-import { Check, CheckCircle2, Copy, Eye, EyeOff, Image as ImageIcon, Loader2, Package, PencilLine, Plus, Search, Trash2, Upload, X, XCircle } from "@/components/icons";
+import { Image as ImageIcon, Loader2, Package, Plus, Search, Trash2, Upload } from "@/components/icons";
+import Link from "@/components/intent-link";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { confirmAction } from "@/components/confirm";
 import { Sheet } from "@/components/sheet";
 import { toast, toastResult } from "@/components/toast";
-import { Badge, Button, Card, EmptyState, Field, Segmented } from "@/components/ui";
-import { cn } from "@/lib/cn";
+import { Badge, Button, Field } from "@/components/ui";
 import type { CatalogProductDetail } from "@/lib/catalog";
 import type { ProductDemandStats } from "@/lib/catalog-demand";
+import { useLanguage } from "@/lib/i18n/context";
 import { createProduct, deleteProduct, updateProduct, uploadProductImage } from "../actions/catalog";
 
 type StockFilter = "ALL" | "IN_STOCK" | "OUT_OF_STOCK";
@@ -28,7 +29,7 @@ function nextSku(products: CatalogProductDetail[]) {
 }
 
 /** Photo picker shared by the add and edit sheets: upload to storage or paste a public link. */
-function PhotoField({ value, onChange, removable }: { value: string | null; onChange: (url: string | null) => void; removable: boolean }) {
+function PhotoField({ value, onChange, removable, isTa = false }: { value: string | null; onChange: (url: string | null) => void; removable: boolean; isTa?: boolean }) {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,13 +44,13 @@ function PhotoField({ value, onChange, removable }: { value: string | null; onCh
     setUploading(false);
     if (res.ok && res.url) {
       onChange(res.url);
-      toast(true, "Photo uploaded. Save to apply it.");
-    } else toast(false, res.message ?? "Couldn't upload the photo.");
+      toast(true, isTa ? "படம் பதிவேற்றப்பட்டது. சேமிக்கவும்." : "Photo uploaded. Save to apply it.");
+    } else toast(false, res.message ?? (isTa ? "படத்தை பதிவேற்ற முடியவில்லை." : "Couldn't upload the photo."));
   };
 
   return (
     <div>
-      <p className="mb-1.5 text-sm font-medium text-ink">Photo</p>
+      <p className="mb-1.5 text-sm font-medium text-ink">{isTa ? "புகைப்படம்" : "Photo"}</p>
       <div className="flex items-center gap-4 rounded-control border border-line bg-subtle p-3">
         <div className="relative size-20 shrink-0 overflow-hidden rounded-control bg-panel ring-1 ring-line">
           {value ? (
@@ -63,7 +64,7 @@ function PhotoField({ value, onChange, removable }: { value: string | null; onCh
           {uploading && (
             <div className="absolute inset-0 grid place-items-center bg-night/50 text-white">
               <Loader2 aria-hidden className="size-5 animate-spin" />
-              <span className="sr-only">Uploading</span>
+              <span className="sr-only">{isTa ? "பதிவேற்றப்படுகிறது" : "Uploading"}</span>
             </div>
           )}
         </div>
@@ -72,24 +73,24 @@ function PhotoField({ value, onChange, removable }: { value: string | null; onCh
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="secondary" size="sm" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
               {uploading ? <Loader2 aria-hidden className="animate-spin" /> : <Upload aria-hidden />}
-              {uploading ? "Uploading…" : value ? "Replace photo" : "Upload photo"}
+              {uploading ? (isTa ? "பதிவேற்றப்படுகிறது…" : "Uploading…") : value ? (isTa ? "படத்தை மாற்று" : "Replace photo") : (isTa ? "படம் பதிவேற்று" : "Upload photo")}
             </Button>
             {value && removable && (
               <Button type="button" variant="ghost" size="sm" onClick={() => onChange(null)} className="text-danger hover:text-danger">
-                Remove
+                {isTa ? "நீக்கு" : "Remove"}
               </Button>
             )}
           </div>
-          <p className="text-xs text-muted">JPG, PNG or WebP, under 4 MB. Square photos look best in WhatsApp.</p>
+          <p className="text-xs text-muted">{isTa ? "JPG, PNG அல்லது WebP, 4 MB-க்குள். சதுர படங்கள் WhatsApp-ல் அழகாக இருக்கும்." : "JPG, PNG or WebP, under 4 MB. Square photos look best in WhatsApp."}</p>
         </div>
       </div>
       <label htmlFor="product-image-url" className="sr-only">
-        Image link
+        {isTa ? "பட இணைப்பு" : "Image link"}
       </label>
       <input
         id="product-image-url"
         type="url"
-        placeholder="Or paste a public image link (https://…)"
+        placeholder={isTa ? "அல்லது நேரடிப் பட இணைப்பை ஒட்டவும் (https://…)" : "Or paste a public image link (https://…)"}
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value || null)}
         className="field mt-2"
@@ -114,6 +115,7 @@ export function CatalogueManager({
   demandBySku?: Record<string, ProductDemandStats>;
 }) {
   const router = useRouter();
+  const { isTa } = useLanguage();
   const [products, setProducts] = useState(initialProducts);
   // Fresh data from the server (after a save and refresh) replaces local, optimistic state.
   const [serverProducts, setServerProducts] = useState(initialProducts);
@@ -177,14 +179,14 @@ export function CatalogueManager({
     const active = products.filter((p) => p.inStock && p.priceAmount > 0);
     const groups: Record<string, CatalogProductDetail[]> = {};
     active.forEach((p) => {
-      const cat = p.category || "General";
+      const cat = p.category || (isTa ? "பொதுவானவை" : "General");
       if (!groups[cat]) groups[cat] = [];
       groups[cat].push(p);
     });
 
     const lines: string[] = [
-      `🛒 *${clientName} – Price List*`,
-      `விலைப் பட்டியல்\n`,
+      `🛒 *${clientName} – ${isTa ? "விலைப் பட்டியல்" : "Price List"}*`,
+      isTa ? `விலைப் பட்டியல்\n` : `Price List\n`,
     ];
 
     Object.entries(groups).forEach(([cat, items]) => {
@@ -195,18 +197,18 @@ export function CatalogueManager({
       lines.push("");
     });
 
-    lines.push(`Tap *View catalog* below to order 👇`);
+    lines.push(isTa ? `ஆர்டர் செய்ய கீழே உள்ள *View catalog*-ஐ அழுத்தவும் 👇` : `Tap *View catalog* below to order 👇`);
     return lines.join("\n");
-  }, [products, clientName]);
+  }, [products, clientName, isTa]);
 
   const copyPriceList = async () => {
     try {
       await navigator.clipboard.writeText(priceListText);
       setCopied(true);
-      toast(true, "Price list copied to clipboard");
+      toast(true, isTa ? "விலைப் பட்டியல் நகலெடுக்கப்பட்டது" : "Price list copied to clipboard");
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast(false, "Couldn't copy. Select the text and copy it instead.");
+      toast(false, isTa ? "நகலெடுக்க முடியவில்லை. உரையைத் தேர்ந்தெடுத்து நகலெடுக்கவும்." : "Couldn't copy. Select the text and copy it instead.");
     }
   };
 
@@ -261,9 +263,11 @@ export function CatalogueManager({
     if (!editing) return;
     const item = editing;
     const yes = await confirmAction({
-      title: `Delete ${item.name}?`,
-      message: `It will be removed from your WhatsApp catalogue (${item.retailerId}) and customers can no longer order it. Past orders keep their details.`,
-      confirmLabel: "Delete product",
+      title: isTa ? `${item.name}-ஐ நீக்கவா?` : `Delete ${item.name}?`,
+      message: isTa
+        ? `இது உங்கள் WhatsApp பட்டியலில் இருந்து (${item.retailerId}) நீக்கப்படும். வாடிக்கையாளர்கள் இனி இதை ஆர்டர் செய்ய முடியாது. பழைய ஆர்டர்கள் அப்படியே இருக்கும்.`
+        : `It will be removed from your WhatsApp catalogue (${item.retailerId}) and customers can no longer order it. Past orders keep their details.`,
+      confirmLabel: isTa ? "பொருளை நீக்கு" : "Delete product",
       danger: true,
     });
     if (!yes) return;
@@ -298,314 +302,193 @@ export function CatalogueManager({
     });
   };
 
-  const chip = (on: boolean) =>
-    cn(
-      "inline-flex h-9 items-center whitespace-nowrap rounded-full border px-3 text-xs font-medium transition active:scale-[0.97] sm:h-8 sm:text-[0.8125rem]",
-      on ? "border-ink bg-ink text-panel" : "border-line-2 bg-panel text-ink-2 hover:border-line-strong hover:bg-subtle hover:text-ink",
-    );
-
   const canAdd = canManage && isLive;
+  const pillFor = (st: CatalogProductDetail["whatsappStatus"]) =>
+    !isLive
+      ? { tone: "mute", label: isTa ? "சேமிக்கப்பட்ட நகல்" : "Saved copy" }
+      : st === "APPROVED"
+        ? { tone: "ok", label: isTa ? "இணைக்கப்பட்டது" : "Synced" }
+        : st === "REJECTED"
+          ? { tone: "bad", label: isTa ? "Meta-வால் நிராகரிக்கப்பட்டது" : "Rejected by Meta" }
+          : st === "PENDING" || st === "OUTDATED"
+            ? { tone: "warn", label: isTa ? "Meta அனுமதிக்கு காத்திருக்கிறது" : "Waiting for Meta" }
+            : { tone: "mute", label: isTa ? "இணைக்கப்படவில்லை" : "Not synced" };
 
   return (
-    <div className="space-y-4">
-      {/* Toolbar: search, stock and price list on one row; categories under it. */}
-      <Card className="card-3d space-y-3 p-3 sm:p-4">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center">
-          <div className="relative min-w-0 flex-1 md:max-w-sm">
-            <label htmlFor="catalogue-search" className="sr-only">
-              Search products
-            </label>
-            <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
-            <input
-              id="catalogue-search"
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search products or SKU"
-              className="field pl-9 pr-10"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                aria-label="Clear search"
-                className="absolute right-1 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-control text-muted hover:bg-sunken hover:text-ink"
-              >
-                <X aria-hidden className="size-4" />
-              </button>
-            )}
-          </div>
-          <Segmented
-            label="Stock"
-            value={stockFilter}
-            onChange={setStockFilter}
-            options={[
-              { value: "ALL", label: "All" },
-              { value: "IN_STOCK", label: "In stock" },
-              { value: "OUT_OF_STOCK", label: "Out of stock" },
-            ]}
-            className="w-full md:w-auto"
+    <div>
+      <div className="toolbar">
+        <div className="search">
+          <Search aria-hidden />
+          <input
+            type="search"
+            placeholder={isTa ? "பொருட்களைத் தேடுங்கள்…" : "Search products"}
+            aria-label={isTa ? "பொருட்களைத் தேடுங்கள்" : "Search products"}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
           />
-          <div className="flex gap-2 md:ml-auto">
-            <Button variant="secondary" onClick={() => setPreviewOpen(!previewOpen)} aria-expanded={previewOpen} className="max-md:flex-1">
-              {previewOpen ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
-              {previewOpen ? "Hide price list" : "Price list message"}
-            </Button>
-            {canAdd && (
-              <Button onClick={() => setAdding(true)} className="max-md:flex-1">
-                <Plus aria-hidden /> Add product
-              </Button>
-            )}
-          </div>
+        </div>
+        <div className="chips">
+          {(
+            [
+              ["ALL", isTa ? "அனைத்தும்" : "All"],
+              ["IN_STOCK", isTa ? "இருப்பு உள்ளது" : "In stock"],
+              ["OUT_OF_STOCK", isTa ? "இருப்பு இல்லை" : "Out of stock"],
+            ] as const
+          ).map(([k, label]) => (
+            <button key={k} type="button" className="chip" aria-pressed={stockFilter === k} onClick={() => setStockFilter(k)}>
+              {label}
+            </button>
+          ))}
+          {inCartsCount > 0 && (
+            <button type="button" className="chip" aria-pressed={cartFilter === "IN_CARTS"} onClick={() => setCartFilter(cartFilter === "IN_CARTS" ? "ALL" : "IN_CARTS")}>
+              {isTa ? "கார்ட்டில் உள்ளவை" : "In carts"} <small>{inCartsCount}</small>
+            </button>
+          )}
         </div>
         {categories.length > 2 && (
-          <div role="group" aria-label="Filters" className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
-            <div className="flex flex-wrap items-center gap-1.5">
-              {categories.map((c) => (
-                <button key={c} type="button" aria-pressed={category === c} onClick={() => setCategory(c)} className={chip(category === c)}>
-                  {c === "ALL" ? "All categories" : c}
-                </button>
-              ))}
-              {inCartsCount > 0 && (
-                <button
-                  type="button"
-                  aria-pressed={cartFilter === "IN_CARTS"}
-                  onClick={() => setCartFilter(cartFilter === "IN_CARTS" ? "ALL" : "IN_CARTS")}
-                  className={cn(
-                    chip(cartFilter === "IN_CARTS"),
-                    cartFilter === "IN_CARTS"
-                      ? "border-brand bg-brand text-panel font-semibold"
-                      : "border-brand/40 bg-brand/5 text-brand hover:border-brand hover:bg-brand/10",
-                  )}
-                >
-                  <span className="mr-1">🛒</span>
-                  In carts ({inCartsCount})
-                </button>
-              )}
-            </div>
-            {isLive && (
-              <div className="flex flex-wrap items-center gap-1.5 pt-1 sm:pt-0">
-                <span className="text-xs text-muted">WhatsApp:</span>
-                <button
-                  type="button"
-                  aria-pressed={statusFilter === "ALL"}
-                  onClick={() => setStatusFilter("ALL")}
-                  className={chip(statusFilter === "ALL")}
-                >
-                  All ({products.length})
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={statusFilter === "APPROVED"}
-                  onClick={() => setStatusFilter("APPROVED")}
-                  className={cn(
-                    chip(statusFilter === "APPROVED"),
-                    statusFilter === "APPROVED" && "border-success-border bg-success-bg text-success",
-                  )}
-                >
-                  <span className="mr-1 inline-block size-1.5 rounded-full bg-emerald-500" />
-                  Live ({products.filter((p) => p.whatsappStatus === "APPROVED").length})
-                </button>
-                {products.some((p) => p.whatsappStatus === "PENDING" || p.whatsappStatus === "OUTDATED") && (
-                  <button
-                    type="button"
-                    aria-pressed={statusFilter === "REVIEW"}
-                    onClick={() => setStatusFilter("REVIEW")}
-                    className={cn(
-                      chip(statusFilter === "REVIEW"),
-                      statusFilter === "REVIEW" && "border-warning-border bg-warning-bg text-warning",
-                    )}
-                  >
-                    <span className="mr-1 inline-block size-1.5 rounded-full bg-amber-500" />
-                    Review ({products.filter((p) => p.whatsappStatus === "PENDING" || p.whatsappStatus === "OUTDATED").length})
-                  </button>
-                )}
-                {products.some((p) => p.whatsappStatus === "REJECTED") && (
-                  <button
-                    type="button"
-                    aria-pressed={statusFilter === "REJECTED"}
-                    onClick={() => setStatusFilter("REJECTED")}
-                    className={cn(
-                      chip(statusFilter === "REJECTED"),
-                      statusFilter === "REJECTED" && "border-danger-border bg-danger-bg text-danger",
-                    )}
-                  >
-                    <span className="mr-1 inline-block size-1.5 rounded-full bg-rose-500" />
-                    Rejected ({products.filter((p) => p.whatsappStatus === "REJECTED").length})
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+          <select aria-label={isTa ? "வகை" : "Category"} style={{ width: "auto" }} value={category} onChange={(e) => setCategory(e.target.value)}>
+            {categories.map((c) => (
+              <option key={c} value={c}>
+                {c === "ALL" ? (isTa ? "வகை: அனைத்தும்" : "Category: all") : c}
+              </option>
+            ))}
+          </select>
         )}
-      </Card>
+        {isLive && (
+          <select aria-label={isTa ? "WhatsApp நிலை" : "WhatsApp status"} style={{ width: "auto" }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}>
+            <option value="ALL">{isTa ? "WhatsApp: அனைத்தும்" : "WhatsApp: all"}</option>
+            <option value="APPROVED">{isTa ? "பட்டியலில் இணைந்தது" : "Synced to catalogue"}</option>
+            <option value="REVIEW">{isTa ? "Meta அனுமதிக்கு காத்திருக்கிறது" : "Waiting for Meta"}</option>
+            <option value="REJECTED">{isTa ? "Meta-வால் நிராகரிக்கப்பட்டது" : "Rejected by Meta"}</option>
+          </select>
+        )}
+        <div className="tools" style={{ marginLeft: "auto" }}>
+          <button type="button" className="btn sm" aria-expanded={previewOpen} onClick={() => setPreviewOpen(!previewOpen)}>
+            {previewOpen ? (isTa ? "விலைப் பட்டியலை மறை" : "Hide price list") : (isTa ? "விலைப் பட்டியல் அனுப்பு" : "Send price list")}
+          </button>
+          {canAdd && (
+            <button type="button" className="btn sm primary" onClick={() => setAdding(true)}>
+              <Plus aria-hidden className="ic" style={{ width: 15, height: 15 }} /> {isTa ? "பொருள் சேர்" : "Add product"}
+            </button>
+          )}
+        </div>
+      </div>
 
-      {/* The automatic price list reply, as WhatsApp will show it. */}
       {previewOpen && (
-        <Card className="card-3d animate-rise">
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-4 py-3.5 sm:px-5">
-            <div className="min-w-0">
-              <h3 className="flex items-center gap-2 text-[0.9375rem] font-semibold text-ink">
-                Price list message <Badge tone="brand">Auto-reply</Badge>
-              </h3>
-              <p className="mt-0.5 text-xs text-muted sm:text-sm">Sent when a customer asks for the price list or rates. Built from in-stock items with a price.</p>
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="hd">
+            <div>
+              <h2>{isTa ? "விலைப் பட்டியல் செய்தி" : "Price list message"}</h2>
+              <p>{isTa ? "விலை உள்ள பொருட்கள். வாடிக்கையாளர்களுக்கு அனுப்பும்போது அவர்கள் 'View catalog' மூலம் ஆர்டர் செய்யலாம்." : "In-stock products with a price. Paste it in a chat; customers get your catalogue with “View catalog”."}</p>
             </div>
-            <Button size="sm" variant="secondary" onClick={copyPriceList}>
-              {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
-              {copied ? "Copied" : "Copy text"}
-            </Button>
+            <button type="button" className="btn sm" onClick={copyPriceList}>
+              {copied ? (isTa ? "நகலெடுக்கப்பட்டது" : "Copied") : (isTa ? "நகலெடு" : "Copy text")}
+            </button>
           </div>
-          <div className="chat-wall p-4 sm:p-5">
-            <div className="max-w-md rounded-card rounded-tl-sm bg-bubble p-3.5 shadow-xs">
-              <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-ink">{priceListText}</pre>
-            </div>
+          <div className="phone">
+            <div className="bubble">{priceListText}</div>
           </div>
-        </Card>
+        </div>
       )}
 
-      <p className="text-sm text-muted" aria-live="polite">
-        Showing <span className="tabular font-medium text-ink-2">{filtered.length}</span> of <span className="tabular">{products.length}</span> products
-      </p>
-
-      {/* Products Grid */}
-      {filtered.length === 0 ? (
-        <Card className="card-3d">
-          <EmptyState icon={<Package />} title={products.length ? "No products match" : "No products yet"}>
-            {products.length ? "Try another search, category or stock filter." : canAdd ? "Add your first product to start taking orders on WhatsApp." : "Products added in Meta Commerce Manager will show here."}
-          </EmptyState>
-        </Card>
-      ) : (
-        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4">
-          {filtered.map((item) => {
-            const demand = demandBySku[item.retailerId];
-            return (
-              <li key={item.id} className="card-3d relative flex flex-col overflow-hidden rounded-card border border-line bg-panel">
-                <span
-                  aria-hidden
-                  className={cn(
-                    "absolute inset-x-0 top-0 h-[3px]",
-                    item.whatsappStatus === "REJECTED"
-                      ? "bg-danger-solid"
-                      : item.whatsappStatus === "PENDING" || item.whatsappStatus === "OUTDATED"
-                      ? "bg-warning-solid"
-                      : item.inStock
-                      ? "bg-brand"
-                      : "bg-warning-solid",
-                  )}
-                />
-                <div className="flex gap-2.5 p-3 sm:gap-3 sm:p-4">
-                  <div className={cn("relative size-14 shrink-0 overflow-hidden rounded-control bg-subtle shadow-2xs ring-1 ring-line sm:size-16", !item.inStock && "opacity-60 grayscale")}>
-                    {item.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={item.imageUrl} alt="" className="size-full object-cover" />
-                    ) : (
-                      <div className="grid size-full place-items-center text-faint">
-                        <Package aria-hidden className="size-5 sm:size-6" />
+      <div className="card" style={{ padding: 0 }}>
+        <div className="tw">
+          <table>
+            <thead>
+              <tr>
+                <th>{isTa ? "பொருள்" : "Product"}</th>
+                <th>{isTa ? "வகை" : "Category"}</th>
+                <th className="num">{isTa ? "விலை" : "Price"}</th>
+                <th>{isTa ? "இருப்பு நிலை" : "In stock"}</th>
+                <th>WhatsApp</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((item) => {
+                const pill = pillFor(item.whatsappStatus);
+                const d = demandBySku[item.retailerId];
+                return (
+                  <tr key={item.id}>
+                    <td>
+                      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                        {item.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- Meta's product photo
+                          <img src={item.imageUrl} alt="" width={40} height={40} style={{ width: 40, height: 40, borderRadius: 10, objectFit: "cover", flex: "none" }} />
+                        ) : (
+                          <span className="note" style={{ width: 40, height: 40, padding: 0, display: "grid", placeItems: "center", flex: "none" }}>
+                            <Package aria-hidden className="ic" style={{ width: 16, height: 16 }} />
+                          </span>
+                        )}
+                        <div>
+                          <b>{item.name}</b>
+                          <div className="muted small">
+                            {item.retailerId}
+                            {d && d.cartCount > 0 && (isTa ? ` · ${d.cartCount} கார்ட்டுகளில்` : ` · in ${d.cartCount} cart${d.cartCount === 1 ? "" : "s"}`)}
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h4 className="line-clamp-2 min-h-9 text-[13.5px] font-semibold leading-5 text-ink sm:min-h-10 sm:text-sm">{item.name}</h4>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
-                      <Badge tone="brand" className="text-2xs">{item.category || "General"}</Badge>
-                      <span className="rounded bg-sunken px-1.5 py-0.5 font-mono text-2xs font-medium text-ink-2 ring-1 ring-line">{item.retailerId}</span>
-                      {item.whatsappStatus === "APPROVED" ? (
-                        <Badge tone="green" dot className="text-2xs font-medium">
-                          Live
-                        </Badge>
-                      ) : item.whatsappStatus === "REJECTED" ? (
-                        <Badge tone="red" dot className="text-2xs font-medium">
-                          Rejected
-                        </Badge>
-                      ) : item.whatsappStatus ? (
-                        <Badge tone="amber" dot className="text-2xs font-medium">
-                          In review
-                        </Badge>
-                      ) : null}
-                      {demand && demand.impressions > 0 && (
-                        <Badge tone="gray" className="text-2xs font-medium">
-                          👁️ {demand.impressions} views
-                        </Badge>
-                      )}
-                      {demand && demand.cartCount > 0 && (
-                        <Badge tone="brand" className="text-2xs font-semibold">
-                          🛒 {demand.cartCount} cart{demand.cartCount > 1 ? "s" : ""}
-                        </Badge>
-                      )}
-                      {demand && demand.conversionRate > 0 && (
-                        <Badge tone="green" className="text-2xs font-semibold">
-                          {demand.conversionRate}% conv
-                        </Badge>
-                      )}
-                      {demand && demand.cartCount >= 3 && demand.conversionRate === 0 && (
-                        <Badge tone="amber" className="text-2xs font-semibold">
-                          Cart drop
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <p className="line-clamp-2 min-h-[2lh] px-3 text-xs leading-relaxed text-muted sm:px-4">{item.description}</p>
-                <div className="mt-auto flex items-center justify-between gap-2 px-3 pb-3 pt-2 sm:px-4 sm:pt-3">
-                  <div className="flex flex-col">
-                    <span className="tabular text-lg font-bold tracking-tight text-ink sm:text-xl">₹{item.priceAmount.toLocaleString("en-IN")}</span>
-                    {demand && demand.revenue > 0 && (
-                      <span className="text-2xs font-medium text-success">₹{demand.revenue.toLocaleString("en-IN")} sales</span>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center justify-end gap-1.5">
-                  {item.whatsappStatus === "APPROVED" ? (
-                    <Badge tone="green" dot className="text-xs">
-                      Live on WhatsApp
-                    </Badge>
-                  ) : item.whatsappStatus === "REJECTED" ? (
-                    <Badge tone="red" dot className="text-xs">
-                      Meta Rejected
-                    </Badge>
-                  ) : item.whatsappStatus ? (
-                    <Badge tone="amber" dot className="text-xs">
-                      Meta Reviewing
-                    </Badge>
-                  ) : null}
-                  <Badge tone={item.inStock ? "green" : "amber"} dot>
-                    {item.inStock ? "In stock" : "Out of stock"}
-                  </Badge>
-                </div>
-              </div>
-              <div className="flex gap-2 border-t border-line bg-subtle/50 p-3">
-                <Button variant="secondary" size="sm" onClick={() => handleToggleStock(item)} loading={togglingId === item.id} disabled={togglingId !== null} className="flex-1">
-                  {item.inStock ? <XCircle aria-hidden /> : <CheckCircle2 aria-hidden />}
-                  {item.inStock ? "Mark out of stock" : "Mark in stock"}
-                </Button>
-                <Button variant="secondary" size="sm" onClick={() => handleOpenEdit(item)} aria-label={`Edit ${item.name}`}>
-                  <PencilLine aria-hidden /> Edit
-                </Button>
-              </div>
-            </li>
-          );
-        })}
-        </ul>
-      )}
+                    </td>
+                    <td>{item.category || "—"}</td>
+                    <td className="num">{item.priceAmount > 0 ? `₹${item.priceAmount.toLocaleString("en-IN")}` : <span className="muted">{isTa ? "விலை இல்லை" : "No price"}</span>}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="sw"
+                        role="switch"
+                        aria-checked={item.inStock}
+                        aria-label={`${isTa ? "இருப்பு நிலை" : "In stock"}: ${item.name}`}
+                        disabled={!canManage || togglingId !== null || !isLive}
+                        onClick={() => handleToggleStock(item)}
+                        style={togglingId === item.id ? { opacity: 0.6 } : undefined}
+                      />
+                    </td>
+                    <td>
+                      <span className={`pill ${pill.tone}`}>{pill.label}</span>
+                    </td>
+                    <td>
+                      <div className="tools">
+                        {canManage && isLive && (
+                          <button type="button" className="btn sm" onClick={() => handleOpenEdit(item)} aria-label={`${isTa ? "திருத்து" : "Edit"} ${item.name}`}>
+                            {isTa ? "திருத்து" : "Edit"}
+                          </button>
+                        )}
+                        <Link className="btn sm ghost" href="/dashboard/campaigns/new">
+                          {isTa ? "பிரச்சாரம் செய்" : "Make a campaign"}
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {filtered.length === 0 && (
+          <p className="muted" style={{ padding: 16 }}>
+            {products.length ? (isTa ? "பொருட்கள் எதுவும் பொருந்தவில்லை." : "No products match.") : (isTa ? "இன்னும் பொருட்கள் எதுவும் இல்லை." : "No products yet.")}
+          </p>
+        )}
+      </div>
 
-      {/* Edit */}
       <Sheet
         open={!!editing}
         onClose={() => !saving && setEditing(null)}
-        title="Edit product"
+        title={isTa ? "பொருளைத் திருத்து" : "Edit product"}
         description={editing ? <>SKU <span className="font-mono">{editing.retailerId}</span></> : undefined}
         className="sm:max-w-lg"
         footer={
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
             {canManage && isLive && (
               <Button type="button" variant="ghost" onClick={handleDelete} disabled={saving} className="text-danger hover:bg-danger-bg hover:text-danger sm:mr-auto">
-                <Trash2 aria-hidden /> Delete
+                <Trash2 aria-hidden /> {isTa ? "நீக்கு" : "Delete"}
               </Button>
             )}
             <Button type="button" variant="secondary" onClick={() => setEditing(null)} disabled={saving} className="sm:ml-auto">
-              Cancel
+              {isTa ? "ரத்து" : "Cancel"}
             </Button>
             <Button type="submit" form="edit-product" loading={saving}>
-              Save product
+              {isTa ? "சேமிக்க" : "Save product"}
             </Button>
           </div>
         }
@@ -614,48 +497,48 @@ export function CatalogueManager({
           <form id="edit-product" onSubmit={handleSaveEdit} className="space-y-4">
             {isLive && editing.whatsappStatus && (
               <div className="flex items-center justify-between rounded-control border border-line bg-subtle p-3 text-xs">
-                <span className="font-medium text-ink">Meta WhatsApp Review:</span>
+                <span className="font-medium text-ink">{isTa ? "Meta WhatsApp ஆய்வு:" : "Meta WhatsApp Review:"}</span>
                 {editing.whatsappStatus === "APPROVED" ? (
                   <Badge tone="green" dot>
-                    Approved & Live on WhatsApp
+                    {isTa ? "அங்கீகரிக்கப்பட்டு WhatsApp-ல் உள்ளது" : "Approved & Live on WhatsApp"}
                   </Badge>
                 ) : editing.whatsappStatus === "REJECTED" ? (
                   <Badge tone="red" dot>
-                    Rejected by Meta Policy
+                    {isTa ? "Meta விதிகளால் நிராகரிக்கப்பட்டது" : "Rejected by Meta Policy"}
                   </Badge>
                 ) : (
                   <Badge tone="amber" dot>
-                    Under Review by Meta
+                    {isTa ? "Meta பரிசீலனையில் உள்ளது" : "Under Review by Meta"}
                   </Badge>
                 )}
               </div>
             )}
-            <PhotoField value={editImageUrl} onChange={setEditImageUrl} removable={!isLive} />
+            <PhotoField value={editImageUrl} onChange={setEditImageUrl} removable={!isLive} isTa={isTa} />
 
-            <Field id="productName" label="Product name" required>
+            <Field id="productName" label={isTa ? "பொருளின் பெயர்" : "Product name"} required>
               <input name="productName" defaultValue={editing.name} maxLength={100} className="field" />
             </Field>
 
             <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
-              <Field id="price" label="Price" hint="₹ INR" required>
+              <Field id="price" label={isTa ? "விலை" : "Price"} hint="₹ INR" required>
                 <input name="price" type="number" inputMode="decimal" step="0.01" min="1" defaultValue={editing.priceAmount} className="field tabular" />
               </Field>
-              <Field id="inStock" label="Stock">
+              <Field id="inStock" label={isTa ? "இருப்பு" : "Stock"}>
                 <select name="inStock" defaultValue={editing.inStock ? "true" : "false"} className="field">
-                  <option value="true">In stock</option>
-                  <option value="false">Out of stock</option>
+                  <option value="true">{isTa ? "இருப்பு உள்ளது" : "In stock"}</option>
+                  <option value="false">{isTa ? "இருப்பு இல்லை" : "Out of stock"}</option>
                 </select>
               </Field>
             </div>
 
-            <Field id="description" label="Description" hint="optional">
-              <textarea name="description" defaultValue={editing.description ?? ""} rows={3} maxLength={5000} className="field" placeholder="E.g. Sulphur free, 100% cold pressed" />
+            <Field id="description" label={isTa ? "விவரம்" : "Description"} hint={isTa ? "விருப்பத்தேர்வு" : "optional"}>
+              <textarea name="description" defaultValue={editing.description ?? ""} rows={3} maxLength={5000} className="field" placeholder={isTa ? "உதாரணமாக: கலப்படமில்லாத சுத்தமான நல்லெண்ணெய்" : "E.g. Sulphur free, 100% cold pressed"} />
             </Field>
 
             <p className="rounded-control bg-subtle p-3 text-xs text-muted">
               {isLive
-                ? "Saving updates this product in your WhatsApp catalogue on Meta. It can take a minute before customers see the change."
-                : "Demo mode: changes are kept in the portal only, because the WhatsApp Cloud API isn't connected."}
+                ? (isTa ? "சேமிக்கும்போது Meta-வில் உங்கள் WhatsApp பட்டியலில் இது புதுப்பிக்கப்படும். வாடிக்கையாளர்களுக்குத் தெரிய ஒரு நிமிடம் ஆகலாம்." : "Saving updates this product in your WhatsApp catalogue on Meta. It can take a minute before customers see the change.")
+                : (isTa ? "டெமோ முறை: WhatsApp Cloud API இணைக்கப்படாததால், மாற்றங்கள் போர்ட்டலில் மட்டுமே வைக்கப்படும்." : "Demo mode: changes are kept in the portal only, because the WhatsApp Cloud API isn't connected.")}
             </p>
           </form>
         )}
@@ -665,42 +548,42 @@ export function CatalogueManager({
       <Sheet
         open={adding}
         onClose={() => !saving && setAdding(false)}
-        title="Add product"
-        description="It appears in your WhatsApp catalogue for customers to order."
+        title={isTa ? "புதிய பொருள் சேர்" : "Add product"}
+        description={isTa ? "வாடிக்கையாளர்கள் ஆர்டர் செய்ய இது உங்கள் WhatsApp பட்டியலில் தோன்றும்." : "It appears in your WhatsApp catalogue for customers to order."}
         className="sm:max-w-lg"
         footer={
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="secondary" onClick={() => setAdding(false)} disabled={saving}>
-              Cancel
+              {isTa ? "ரத்து" : "Cancel"}
             </Button>
             <Button type="submit" form="add-product" loading={saving}>
-              Add product
+              {isTa ? "பொருள் சேர்" : "Add product"}
             </Button>
           </div>
         }
       >
         {adding && (
           <form id="add-product" onSubmit={handleCreate} className="space-y-4">
-            <PhotoField value={addImageUrl} onChange={setAddImageUrl} removable />
-            <Field id="newName" label="Product name" required>
-              <input name="newName" maxLength={100} className="field" placeholder="E.g. Basmati rice 5kg" />
+            <PhotoField value={addImageUrl} onChange={setAddImageUrl} removable isTa={isTa} />
+            <Field id="newName" label={isTa ? "பொருளின் பெயர்" : "Product name"} required>
+              <input name="newName" maxLength={100} className="field" placeholder={isTa ? "எ.கா. செக்கு நல்லெண்ணெய் 1L" : "E.g. Basmati rice 5kg"} />
             </Field>
             <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
-              <Field id="sku" label="SKU" hint="unique code" required>
+              <Field id="sku" label="SKU" hint={isTa ? "தனி குறியீடு" : "unique code"} required>
                 <input name="sku" defaultValue={nextSku(products)} maxLength={50} pattern="[\w.\-]{1,50}" className="field font-mono" />
               </Field>
-              <Field id="newPrice" label="Price" hint="₹ INR" required>
+              <Field id="newPrice" label={isTa ? "விலை" : "Price"} hint="₹ INR" required>
                 <input name="newPrice" type="number" inputMode="decimal" step="0.01" min="1" className="field tabular" />
               </Field>
             </div>
-            <Field id="newStock" label="Stock">
+            <Field id="newStock" label={isTa ? "இருப்பு" : "Stock"}>
               <select name="newStock" defaultValue="true" className="field">
-                <option value="true">In stock</option>
-                <option value="false">Out of stock</option>
+                <option value="true">{isTa ? "இருப்பு உள்ளது" : "In stock"}</option>
+                <option value="false">{isTa ? "இருப்பு இல்லை" : "Out of stock"}</option>
               </select>
             </Field>
-            <Field id="newDescription" label="Description" hint="optional">
-              <textarea name="newDescription" rows={3} maxLength={5000} className="field" placeholder="What makes it special" />
+            <Field id="newDescription" label={isTa ? "விவரம்" : "Description"} hint={isTa ? "விருப்பத்தேர்வு" : "optional"}>
+              <textarea name="newDescription" rows={3} maxLength={5000} className="field" placeholder={isTa ? "பொருளின் சிறப்பு அம்சங்கள்" : "What makes it special"} />
             </Field>
           </form>
         )}

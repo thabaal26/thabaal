@@ -1,5 +1,5 @@
 /* Exact CSS for Reports section based on reports.html */
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fredoka:wght@500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap");
 
 .thabaal-reports {
   --bg: #FFF9F0;
@@ -23,8 +23,8 @@
   --bar3: #F46B4E;
   --bar4: #20C985;
   --shadow: 0 1px 0 rgba(16, 40, 59, 0.04), 0 14px 30px -22px rgba(16, 40, 59, 0.35);
-  --display: "Fredoka", "Noto Sans Tamil", ui-rounded, system-ui, sans-serif;
-  --ui: "DM Sans", "Noto Sans Tamil", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display: var(--font-dm-sans), "DM Sans", "Noto Sans Tamil", ui-rounded, system-ui, sans-serif;
+  --ui: var(--font-dm-sans), "DM Sans", "Noto Sans Tamil", system-ui, -apple-system, "Segoe UI", sans-serif;
 
   min-width: 0;
   color: var(--fg);
@@ -58,28 +58,8 @@ body.dark .thabaal-reports,
   color-scheme: dark;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]):not(.light) .thabaal-reports {
-    --bg: #0B1E2D;
-    --card: #133248;
-    --fg: #FFF9F0;
-    --muted: #A8BACA;
-    --line: #27465C;
-    --soft: #1B3B52;
-    --ink: #FFF9F0;
-    --ok: #5BE3AE;
-    --ok-bg: rgba(32, 201, 133, 0.18);
-    --warn: #FFD76A;
-    --warn-bg: rgba(255, 195, 41, 0.18);
-    --bad: #FF9C86;
-    --bad-bg: rgba(244, 107, 78, 0.2);
-    --info: #8EC3EE;
-    --info-bg: rgba(142, 195, 238, 0.15);
-    --bar: #FFF9F0;
-    --shadow: 0 14px 30px -22px rgba(0, 0, 0, 0.7);
-    color-scheme: dark;
-  }
-}
+/* No prefers-color-scheme rule here: the app's light/dark switch (components/theme-toggle) sets html.dark itself,
+   including "follow the computer", so Reports turns dark exactly when every other page does. */
 
 .thabaal-reports * {
   box-sizing: border-box;
@@ -347,6 +327,17 @@ body.dark .thabaal-reports,
   color: var(--muted);
   font-size: 13.5px;
   font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.thabaal-reports .stat .l svg,
+.thabaal-reports .stat .l .ic {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  flex-shrink: 0;
+  opacity: 0.85;
 }
 .thabaal-reports .stat .v {
   font: 600 clamp(26px, 3vw, 34px) / 1.1 var(--display);

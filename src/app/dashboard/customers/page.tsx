@@ -1,441 +1,292 @@
-import { CheckCircle2, ChevronLeft, ChevronRight, MapPin, Search, Users, UserX } from "@/components/icons";
+import { AlertCircle, CheckCircle2, MapPin, Users } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
-import { Picker } from "@/components/picker";
-import { ActionButton } from "@/components/action-button";
-import { Avatar, Badge, buttonClass, Card, EmptyState, PageHeader, rowClass, Stat, Table, Td, Th } from "@/components/ui";
-import { cn } from "@/lib/cn";
-import { db } from "@/lib/db";
-import { fmtDate, fmtNumber, pct } from "@/lib/format";
-import { formatPhone } from "@/lib/phone";
-import { marketingPaused } from "@/lib/held";
-import { customerFilters, customerWhere } from "@/lib/customer-query";
-import { ActiveFilters, FilterBar } from "@/components/filter-bar";
-import { activeCount as filterCount, filterQuery, keepFilters, readFilters, resolvePeriod, type FilterSection } from "@/lib/filters";
-import { ACTIVITY, customerSegmentIds, filterOptions, STAGES } from "@/lib/filter-scope";
-import { computeCustomerLoyalty, isInternalLoyaltyTag } from "@/lib/loyalty";
-import { homeCityOf, regionsFor } from "@/lib/regions";
+import { PickClientNotice, Stat } from "@/components/ui";
 import { readFields } from "@/lib/custom-fields";
+import { customersData, type CustomerRow } from "@/lib/customers-data";
+import { db } from "@/lib/db";
+import { homeCityOf, regionsFor } from "@/lib/regions";
+import { loyaltyHistory } from "@/lib/loyalty-history";
+import { refillForecast } from "@/lib/refill-forecast";
 import { getScope, owned } from "@/lib/session";
-import { deleteCustomer, setOptOut } from "../actions/customers";
-import { CustomerActions, CustomerMenu, PendingCustomersBanner } from "./customer-tools";
+import { inr } from "../portal-format";
+import { PortalPage } from "../portal-ui";
+import { CopyText } from "./copy-text";
+import { CustomerActions, PendingCustomersBanner } from "./customer-tools";
+import { CustomersTabs, CUSTOMERS_SUB, CUSTOMERS_SUB_TA } from "./customers-tabs";
+import { CustomerTable, LoyaltyPanel } from "./customers-board";
+import { GroupCampaign } from "./group-campaign";
 
 export const metadata: Metadata = { title: "Customers" };
 export const dynamic = "force-dynamic";
 
-const PAGE_SIZE = 50;
-const CUSTOMER_FILTERS: FilterSection[] = ["period", "products"];
-
+/** Customers (portal design): all customers, groups to reach, loyalty. Refills is its own page. */
 export default async function CustomersPage({ searchParams }: PageProps<"/dashboard/customers">) {
   const sp = await searchParams;
-  // Area filter: "region:Madurai city", "loc:Anna Nagar" or "none" (no location noted).
-  const { q, tag, area } = customerFilters(sp);
-  const page = Math.max(1, Number(sp.page) || 1);
+  const tab = sp.tab === "groups" || sp.tag === "lapsed" ? "groups" : sp.tab === "loyalty" || sp.tag === "loyalty" ? "loyalty" : "all";
   const scope = await getScope();
 
-  // Period and catalogue product filters live in FilterBar; tag, area, stage, and activity have dedicated toolbar pickers.
-  const filters = keepFilters(readFilters(sp, "all"), CUSTOMER_FILTERS);
-  const period = resolvePeriod(filters);
-  const stage = typeof sp.stage === "string" ? sp.stage : "";
-  const act = typeof sp.act === "string" ? sp.act : "";
-  const baseExtra: Record<string, string | undefined> = {
-    q: q || undefined,
-    tag: tag || undefined,
-    area: area || undefined,
-    stage: stage || undefined,
-    act: act || undefined,
-  };
-  const listQs = filterQuery(filters, baseExtra, "all");
-  const exportHref = `/api/customers/export${listQs ? `?${listQs}` : ""}`;
-  // First round: who the filters cover, the filter choices, and the figures that don't depend on them.
-  const [segment, baseWhere, filterOpts, [tags, areas, homeClient, totalAll, optedOutCount, pendingRows]] = await Promise.all([
-    scope.clientId
-      ? customerSegmentIds(scope.clientId, filters, { stage, act, ...(filters.range !== "all" && { start: period.start, end: period.end }) })
-      : null,
-    customerWhere(scope, { q, tag, area }),
-    scope.clientId ? filterOptions(scope.clientId) : null,
-    Promise.all([
-      db.$queryRaw<{ tag: string; n: bigint }[]>`
-        SELECT unnest(tags) AS tag, count(*) AS n FROM "Customer"
-        WHERE ${scope.clientId}::text IS NULL OR "clientId" = ${scope.clientId} GROUP BY 1 ORDER BY 2 DESC, 1`,
-      db.customer.groupBy({ by: ["region", "location"], where: owned(scope), _count: true }),
-      scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { homeCity: true, customFields: true } }) : null,
-      db.customer.count({ where: owned(scope) }),
-      db.customer.count({ where: { ...owned(scope), OR: [{ optedOut: true }, { unreachable: true }] } }),
-      scope.canManage
-        ? db.pendingCustomer.findMany({
-            where: owned(scope),
-            orderBy: { createdAt: "desc" },
-            select: { id: true, name: true, rawPhone: true, location: true, payment: true, items: true, notes: true, page: true },
-          })
-        : Promise.resolve([]),
-    ]),
-  ]);
-  const where = { ...baseWhere, ...(segment && { id: { in: segment } }) };
-  // Then the page of customers itself.
-  const [rows, total] = await Promise.all([
-    db.customer.findMany({
-      where,
-      include: {
-        messages: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true, status: true } },
-        orders: { where: { status: { not: "CANCELLED" } }, select: { total: true, status: true, paidAt: true, pointsRedeemed: true } },
-        client: { select: { name: true } },
-      },
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-    }),
-    db.customer.count({ where }),
-  ]);
-  // Customers Meta is currently holding marketing back from (their campaign messages wait).
-  const paused = await marketingPaused(rows.map((c) => c.id));
-  const regionCount = (r: string | null) => areas.filter((a) => a.region === r).reduce((n, a) => n + a._count, 0);
-  const noLocation = areas.filter((a) => !a.location).reduce((n, a) => n + a._count, 0);
-  const reachableAll = Math.max(0, totalAll - optedOutCount);
-  // Regions are relative to the client's home city; any other saved region names still get a choice.
-  const regions = regionsFor(homeCityOf(homeClient));
-  const regionChoices = [...regions, ...new Set(areas.map((a) => a.region).filter((r): r is string => !!r && !regions.includes(r)))];
-  const homeCount = regionCount(regions[0]);
-  const areaOptions = [
-    { value: "", label: "All areas" },
-    ...regionChoices.filter((r) => regionCount(r)).map((r) => ({ value: `region:${r}`, label: r, hint: `${fmtNumber(regionCount(r))} customers` })),
-    ...(noLocation ? [{ value: "none", label: "No location noted", hint: `${fmtNumber(noLocation)} customers` }] : []),
-    ...areas
-      .filter((a) => a.location)
-      .sort((a, b) => b._count - a._count || a.location!.localeCompare(b.location!))
-      .map((a) => ({ value: `loc:${a.location}`, label: a.location!, hint: `${a.region ?? "Area"} · ${fmtNumber(a._count)} customer${a._count === 1 ? "" : "s"}` })),
-  ];
-  // Every customer of a client carries the client's own tag (e.g. "Thenan Oils"); it says nothing here, so hide it
-  // however it was spelled ("thenan-oils", "Thenan Oils", "thenan_oils").
-  const plain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
-  const clientTag = scope.clientName ? plain(scope.clientName) : undefined;
-  const rowTags = (tags: string[], clientName?: string) =>
-    tags.filter((t) => !isInternalLoyaltyTag(t) && plain(t) !== (clientName ? plain(clientName) : clientTag));
-  const tagLabel = (t: string) =>
-    t.startsWith("product:")
-      ? t.slice(8)
-      : t === "no-item-info"
-        ? "No item recorded"
-        : t.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase());
-  const qs = (patch: Record<string, string | undefined>) => {
-    const s = filterQuery(filters, { ...baseExtra, ...patch }, "all");
-    return `/dashboard/customers${s ? `?${s}` : ""}`;
-  };
-  const filtered = Boolean(tag || q || area || stage || act || filterCount(filters) || filters.range !== "all");
-
-  const loyaltyFor = (c: (typeof rows)[number]) => {
-    const paidOrders = c.orders.filter((o) => Boolean(o.paidAt) || ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"].includes(o.status));
-    const spent = paidOrders.reduce((s, o) => s + o.total, 0);
-    return {
-      paidCount: paidOrders.length,
-      spent,
-      summary: computeCustomerLoyalty({
-        name: c.name,
-        paidOrdersCount: paidOrders.length,
-        totalSpent: spent,
-        sheetPurchases: c.purchases,
-        tags: c.tags,
-        redeemedPoints: c.orders.reduce((n, o) => n + (o.pointsRedeemed ?? 0), 0),
-      }),
-    };
-  };
-
-  const flags = (c: (typeof rows)[number]) => {
-    const { summary } = loyaltyFor(c);
+  if (!scope.clientId)
     return (
+      <PortalPage title="Customers" titleTa="வாடிக்கையாளர்" sub={CUSTOMERS_SUB} subTa={CUSTOMERS_SUB_TA}>
+        <CustomersTabs active={tab} />
+        <PickClientNotice what="customers" />
+      </PortalPage>
+    );
+  const clientId = scope.clientId;
+
+  const [{ customers: rows, platinumCut, goldCut }, client, pendingRows] = await Promise.all([
+    customersData(clientId, { clientName: scope.clientName }),
+    db.client.findUnique({ where: { id: clientId }, select: { homeCity: true, customFields: true } }),
+    scope.canManage
+      ? db.pendingCustomer.findMany({
+          where: owned(scope),
+          orderBy: { createdAt: "desc" },
+          select: { id: true, name: true, rawPhone: true, location: true, payment: true, items: true, notes: true, page: true },
+        })
+      : Promise.resolve([]),
+  ]);
+  const regions = regionsFor(homeCityOf(client));
+
+  let body: React.ReactNode;
+
+  if (tab === "groups") {
+    const f = await refillForecast(clientId, new Date());
+    const dueIds = new Set(f.due.filter((d) => d.daysLeft <= 7).map((d) => d.customerId));
+    const sum = (xs: CustomerRow[]) => xs.reduce((n, c) => n + c.cart, 0);
+    const unpaid = rows.filter((c) => c.cart > 0);
+    const groups: { title: string; tag: string; list: CustomerRow[]; money?: number; what: string; why: string; steps: string[]; msg: string; href: string }[] = [
+      {
+        title: "Unpaid cart",
+        tag: "unpaid-cart",
+        list: unpaid,
+        money: sum(unpaid),
+        what: "They asked for items but did not pay.",
+        why: "Customers get busy or unsure about delivery.",
+        steps: ["Send a pay link again", "Offer free delivery or small credit", "Call the biggest carts"],
+        msg: "Hi! Your cart is saved. Complete your order today and we will deliver soon.",
+        href: "/dashboard/revenue",
+      },
+      {
+        title: "Refill due",
+        tag: "refill-due",
+        list: rows.filter((c) => dueIds.has(c.id)),
+        what: "They are about to run out, or already have.",
+        why: "They reorder on a rhythm.",
+        steps: ["Send a refill reminder", "Include the last item they bought", "Offer a one-tap reorder"],
+        msg: "Hi! You may be running low. Want the same order again?",
+        href: "/dashboard/refills",
+      },
+      {
+        title: "Lapsed",
+        tag: "lapsed",
+        list: rows.filter((c) => c.status === "Lost"),
+        what: `Not bought for much longer than usual (${f.lapsedDays}+ days or 3× their own gap).`,
+        why: "They forgot, or found another shop.",
+        steps: ["Send a friendly win-back", "Add a small offer", "Stop after one message"],
+        msg: "We miss you! Here is a small gift on your next order.",
+        href: "/dashboard/campaigns",
+      },
+      {
+        title: "Warm, not bought",
+        tag: "warm-lead",
+        list: rows.filter((c) => c.orders === 0 && c.chatted),
+        what: "They chatted but never ordered.",
+        why: "Price or trust questions.",
+        steps: ["Share the price list", "Answer their last question", "Offer a small first-order gift"],
+        msg: "Hi! Here is our price list. Happy to help you choose.",
+        href: "/dashboard/replies",
+      },
+      {
+        title: "Never ordered",
+        tag: "never-ordered",
+        list: rows.filter((c) => c.orders === 0 && !c.chatted),
+        what: "On your list, no order yet.",
+        why: "They may not know what you sell.",
+        steps: ["Send your catalogue", "Share a best seller", "Wait a week before the next message"],
+        msg: "Welcome! See what we sell and order right here on WhatsApp.",
+        href: "/dashboard/catalogue",
+      },
+    ];
+    body = (
       <>
-        {summary.totalPoints > 0 && (
-          <Badge tone={summary.tierTone}>
-            {summary.tierLabel} · {fmtNumber(summary.totalPoints)} pts
-          </Badge>
-        )}
-        {c.optedOut && <Badge tone="red">Opted out</Badge>}
-        {c.unreachable && <Badge tone="amber">Can&apos;t receive</Badge>}
-        {paused.has(c.id) && <Badge tone="amber">Offers paused till {fmtDate(paused.get(c.id)!, "d MMM")}</Badge>}
+        <p className="muted" style={{ marginBottom: 14 }}>
+          Each group has a message that is ready to send, and 3 simple steps.{" "}
+          <Link className="linkb" href="/dashboard/customers/audiences">
+            Your saved groups
+          </Link>{" "}
+          ·{" "}
+          <Link className="linkb" href="/dashboard/customers/grow">
+            Get more customers (QR code)
+          </Link>
+        </p>
+        <div className="stack">
+          {groups.map((g, i) => (
+            <details key={g.title} className="card more" style={{ margin: 0 }} open={i === 0}>
+              <summary style={{ gap: 10, flexWrap: "wrap" }}>
+                <b style={{ font: "600 18px var(--display)" }}>{g.title}</b>
+                <span className="pill info">
+                  {g.list.length} customer{g.list.length === 1 ? "" : "s"}
+                </span>
+                {g.money ? <span className="pill bad">{inr(g.money)}</span> : null}
+              </summary>
+              <div className="grid g2" style={{ marginTop: 14 }}>
+                <div>
+                  <p>{g.what}</p>
+                  <p className="muted small" style={{ marginTop: 4 }}>
+                    Why: {g.why}
+                  </p>
+                  <ol style={{ margin: "10px 0 0", paddingLeft: 20 }}>
+                    {g.steps.map((s) => (
+                      <li key={s}>{s}</li>
+                    ))}
+                  </ol>
+                  {g.list.length > 0 && (
+                    <p className="muted small" style={{ marginTop: 10 }}>
+                      {g.list
+                        .slice(0, 6)
+                        .map((c) => c.name)
+                        .join(", ")}
+                      {g.list.length > 6 ? ` and ${g.list.length - 6} more` : ""}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <div className="phone">
+                    <div className="bubble">{g.msg}</div>
+                  </div>
+                  <div className="tools" style={{ marginTop: 10 }}>
+                    <CopyText text={g.msg} />
+                    <Link className="btn sm" href={g.href}>
+                      Open
+                    </Link>
+                    {scope.canManage && g.list.length > 0 && <GroupCampaign ids={g.list.map((c) => c.id)} tag={g.tag} />}
+                  </div>
+                </div>
+              </div>
+            </details>
+          ))}
+        </div>
       </>
     );
-  };
-  const lastMessage = (c: (typeof rows)[number]) => (c.messages[0] ? `${fmtDate(c.messages[0].createdAt, "d MMM")} · ${c.messages[0].status.toLowerCase()}` : null);
+  } else if (tab === "loyalty") {
+    body = <LoyaltyPanel rows={rows} canManage={scope.canManage} history={await loyaltyHistory(clientId).catch(() => [])} />;
+  } else {
+    const total = rows.length;
+    const optedOut = rows.filter((c) => c.optedOut || c.unreachable).length;
+    const home = regions[0];
+    const atHome = rows.filter((c) => c.region === home).length;
+    const badPhones = rows.filter((c) => c.badPhone).length;
+    const count = (t: string) => rows.filter((c) => c.tier === t).length;
+    const countS = (t: string) => rows.filter((c) => c.status === t).length;
+    body = (
+      <>
+        {scope.canManage && pendingRows.length > 0 && <PendingCustomersBanner rows={pendingRows} />}
+        <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
+          <Stat
+            label="Customers"
+            value={total.toLocaleString("en-IN")}
+            sub={`${(total - optedOut).toLocaleString("en-IN")} reachable`}
+            icon={<Users className="size-4" />}
+            tone="info"
+          />
+          <Stat
+            label="Can receive WhatsApp"
+            value={(total - optedOut).toLocaleString("en-IN")}
+            sub="Opted in for campaigns"
+            icon={<CheckCircle2 className="size-4" />}
+            tone="brand"
+            meter={total > 0 ? Math.round(((total - optedOut) / total) * 100) : 0}
+          />
+          <Stat
+            label="Opted out"
+            value={optedOut.toLocaleString("en-IN")}
+            sub="Replied STOP or unreachable"
+            icon={<AlertCircle className="size-4" />}
+            tone={optedOut > 0 ? "amber" : "gold"}
+          />
+          <Stat
+            label={home}
+            value={atHome.toLocaleString("en-IN")}
+            sub={`${(total - atHome).toLocaleString("en-IN")} elsewhere`}
+            icon={<MapPin className="size-4" />}
+            tone="violet"
+          />
+        </div>
+        {badPhones > 0 && (
+          <div className="note" style={{ marginBottom: 14 }}>
+            <b>
+              {badPhones} number{badPhones === 1 ? " is" : "s are"} missing or incomplete.
+            </b>{" "}
+            Open those customers and fix the number so they can be reached.
+          </div>
+        )}
+        <div className="toolbar" style={{ justifyContent: "flex-end", marginBottom: 0 }}>
+          <CustomerActions
+            canManage={scope.canManage}
+            hasClient
+            regions={regions}
+            fields={readFields(client?.customFields, "customer")}
+            exportHref={scope.canManage && total > 0 ? "/api/customers/export" : null}
+            exportCount={total}
+          />
+        </div>
+        <CustomerTable rows={rows} canManage={scope.canManage} />
+        <details className="card more" style={{ marginTop: 14 }}>
+          <summary>
+            <b style={{ font: "600 17px var(--display)" }}>How tier and buying status are decided</b>
+          </summary>
+          <div className="grid g2" style={{ marginTop: 12 }}>
+            <div>
+              <h3 style={{ font: "600 15px var(--display)", marginBottom: 8 }}>Tier — how much they spend</h3>
+              <div className="list">
+                {[
+                  ["Platinum", `Top 10% · ${inr(Number.isFinite(platinumCut) ? platinumCut : 0)}+ and 3 or more orders`, "ok"],
+                  ["Gold", `Next 20% · ${inr(Number.isFinite(goldCut) ? goldCut : 0)}+`, "warn"],
+                  ["Silver", "Everyone else who has bought", "mute"],
+                  ["New", "First order, within 30 days", "info"],
+                ].map(([t, d, tone]) => (
+                  <div key={t} className="row">
+                    <span className={`pill ${tone}`}>{t}</span>
+                    <div className="grow muted small">{d}</div>
+                    <b>{count(t)}</b>
+                  </div>
+                ))}
+              </div>
+              <p className="muted small" style={{ marginTop: 8 }}>
+                Only confirmed or paid orders count. Worked out fresh every time you open this page.
+              </p>
+            </div>
+            <div>
+              <h3 style={{ font: "600 15px var(--display)", marginBottom: 8 }}>How they are buying — their own rhythm</h3>
+              <div className="list">
+                {[
+                  ["Active", "Ordered within their usual gap", "ok"],
+                  ["Slipping", "1.5 to 3 times their usual gap", "warn"],
+                  ["Lost", "More than 3 times the gap, or 180 days", "bad"],
+                ].map(([t, d, tone]) => (
+                  <div key={t} className="row">
+                    <span className={`pill ${tone}`}>{t}</span>
+                    <div className="grow muted small">{d}</div>
+                    <b>{countS(t)}</b>
+                  </div>
+                ))}
+              </div>
+              <p className="muted small" style={{ marginTop: 8 }}>
+                Each customer is judged against their own gap between orders (30 days until they have two orders), not a fixed number of days.
+              </p>
+            </div>
+          </div>
+        </details>
+      </>
+    );
+  }
 
   return (
-    <>
-      <PageHeader
-        title="Customers"
-        meta={
-          <>
-            <span className="tabular font-medium text-ink-2">{fmtNumber(total)}</span>
-            {filtered ? " matching" : ""} customers{scope.clientName ? ` of ${scope.clientName}` : ""}
-          </>
-        }
-        description="Everyone you sell to, who to reach today, and how to reward them."
-        inlineActions
-        actions={scope.clientId || scope.isAdmin ? <CustomerActions canManage={scope.canManage} hasClient={!!scope.clientId} regions={regions} fields={readFields(homeClient?.customFields, "customer")} exportHref={scope.canManage && total > 0 ? exportHref : null} exportCount={total} /> : undefined}
-        tabs={
-          <nav aria-label="Customer sub-views" className="inline-flex rounded-xl border border-line bg-card p-1 shadow-2xs">
-            <Link
-              href="/dashboard/customers"
-              className={cn(
-                "inline-flex min-h-[32px] items-center rounded-lg px-3.5 text-[13.5px] font-semibold transition-all duration-200 ease-out active:scale-[0.96]",
-                !tag ? "bg-ink text-canvas shadow-xs -translate-y-px" : "text-muted hover:text-ink hover:bg-subtle/60",
-              )}
-            >
-              All customers
-            </Link>
-            <Link
-              href="/dashboard/customers?tag=lapsed"
-              className={cn(
-                "inline-flex min-h-[32px] items-center rounded-lg px-3.5 text-[13.5px] font-semibold transition-all duration-200 ease-out active:scale-[0.96]",
-                tag === "lapsed" ? "bg-ink text-canvas shadow-xs -translate-y-px" : "text-muted hover:text-ink hover:bg-subtle/60",
-              )}
-            >
-              Groups to reach
-            </Link>
-            <Link
-              href="/dashboard/customers?tag=loyalty"
-              className={cn(
-                "inline-flex min-h-[32px] items-center rounded-lg px-3.5 text-[13.5px] font-semibold transition-all duration-200 ease-out active:scale-[0.96]",
-                tag === "loyalty" ? "bg-ink text-canvas shadow-xs -translate-y-px" : "text-muted hover:text-ink hover:bg-subtle/60",
-              )}
-            >
-              Loyalty
-            </Link>
-            <Link
-              href="/dashboard/refills"
-              className="inline-flex min-h-[32px] items-center rounded-lg px-3.5 text-[13.5px] font-semibold text-muted hover:text-ink hover:bg-subtle/60 transition-all duration-200 ease-out active:scale-[0.96]"
-            >
-              Reorders
-            </Link>
-          </nav>
-        }
-      />
-
-      {scope.canManage && pendingRows.length > 0 && <PendingCustomersBanner rows={pendingRows} />}
-
-      <section aria-label="Customer summary" className="mb-4 grid grid-cols-2 gap-2.5 sm:mb-5 sm:gap-3.5 lg:grid-cols-4">
-        <Stat
-          label="Total directory"
-          value={fmtNumber(totalAll)}
-          sub={filtered ? `${fmtNumber(total)} matching filters` : "All saved contacts"}
-          icon={<Users className="size-5 stroke-[2]" />}
-          tone="brand"
-        />
-        <Stat
-          label="Reachable on WhatsApp"
-          value={fmtNumber(reachableAll)}
-          sub={`${pct(reachableAll, totalAll)}% of directory`}
-          icon={<CheckCircle2 className="size-5 stroke-[2]" />}
-          tone="info"
-          meter={pct(reachableAll, totalAll)}
-        />
-        <Stat
-          label={regions[0]}
-          value={fmtNumber(homeCount)}
-          sub={noLocation > 0 ? `${fmtNumber(noLocation)} without area` : "Local delivery zone"}
-          icon={<MapPin className="size-5 stroke-[2]" />}
-          tone="violet"
-        />
-        <Stat
-          label="Opted out / Unreachable"
-          value={fmtNumber(optedOutCount)}
-          sub={optedOutCount > 0 ? "Skipped by campaigns" : "Everyone can receive"}
-          icon={<UserX className="size-5 stroke-[2]" />}
-          tone={optedOutCount > 0 ? "amber" : "gold"}
-        />
-      </section>
-
-      <Card className="card-3d">
-        <form role="search" aria-label="Find customers" className="grid gap-2 border-b border-line bg-subtle/40 p-3 sm:flex sm:flex-wrap">
-          <div className="relative min-w-0 sm:min-w-56 sm:flex-1">
-            <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
-            <input key={q} name="q" type="search" enterKeyHint="search" defaultValue={q} placeholder="Search by name or phone number" aria-label="Search by name or phone number" className="field pl-10" />
-          </div>
-          <div className={cn("grid gap-2 sm:contents", areaOptions.length > 1 && "grid-cols-2")}>
-            <Picker
-              name="tag"
-              autoSubmit
-              title="Customer group / tag"
-              aria-label="Filter by group or tag"
-              defaultValue={tag}
-              className="sm:w-52"
-              options={[
-                { value: "", label: "All groups & tags" },
-                { value: "__optout", label: "Opted out" },
-                ...tags
-                  .filter((t) => !isInternalLoyaltyTag(t.tag) && plain(t.tag) !== clientTag)
-                  .map((t) => ({ value: t.tag, label: tagLabel(t.tag), hint: `${fmtNumber(Number(t.n))} customers` })),
-              ]}
-            />
-            {areaOptions.length > 1 && <Picker name="area" autoSubmit title="Delivery area" aria-label="Filter by area" defaultValue={area} className="sm:w-48" options={areaOptions} />}
-          </div>
-          <div className="grid grid-cols-2 gap-2 sm:contents">
-            <Picker name="stage" autoSubmit title="Customer stage" aria-label="Filter by stage" defaultValue={stage} className="sm:w-52" options={[...STAGES]} />
-            <Picker name="act" autoSubmit title="Activity in the period" aria-label="Filter by activity" defaultValue={act} className="sm:w-52" options={[...ACTIVITY]} />
-          </div>
-          {[...new URLSearchParams(filterQuery(filters, {}, "all"))].map(([k, v], i) => (
-            <input key={`${k}-${i}`} type="hidden" name={k} value={v} />
-          ))}
-          {filterOpts && (
-            <FilterBar
-              value={filters}
-              options={filterOpts}
-              basePath="/dashboard/customers"
-              extra={baseExtra}
-              defaultRange="all"
-              sections={CUSTOMER_FILTERS}
-              note="Pick a date period (for customer activity) or filter by catalogue products bought."
-              periodLabel={filters.range === "all" ? "Any date" : period.label}
-            />
-          )}
-          <button className={cn(buttonClass("secondary"), "max-sm:hidden")}>Search</button>
-          {filtered && (
-            <Link href="/dashboard/customers" className={cn(buttonClass("ghost"), "max-sm:h-9 max-sm:justify-self-start max-sm:px-1 max-sm:text-sm")}>
-              Clear filters
-            </Link>
-          )}
-        </form>
-        {filterOpts && filterCount(filters) > 0 && (
-          <div className="border-b border-line px-3 py-2.5">
-            <ActiveFilters value={filters} options={filterOpts} basePath="/dashboard/customers" extra={baseExtra} defaultRange="all" />
-          </div>
-        )}
-        {act && filters.range === "all" && (
-          <p className="border-b border-line bg-warning-bg/50 px-3 py-2 text-xs text-ink-2">Activity filters look at all time. Pick a period with the calendar button to narrow it.</p>
-        )}
-
-        {rows.length ? (
-          <>
-            {/* Phones: one tappable row per customer. */}
-            <ul className="divide-y divide-line sm:hidden">
-              {rows.map((c) => (
-                <li key={c.id} className="relative flex items-start gap-2.5 px-3.5 py-2.5 transition-colors active:bg-sunken">
-                  <Avatar name={c.name} className="size-8.5 shrink-0 text-xs" />
-                  <div className="min-w-0 flex-1">
-                    <Link href={`/dashboard/customers/${c.id}`} className="block truncate text-[13.5px] font-semibold text-ink after:absolute after:inset-0">
-                      {c.name}
-                    </Link>
-                    <p className="tabular truncate text-[11.5px] text-muted">
-                      {formatPhone(c.phone)}
-                      {c.location && ` · ${c.location}`}
-                      {lastMessage(c) && ` · ${lastMessage(c)}`}
-                    </p>
-                    {c.purchases && <p className="mt-0.5 line-clamp-1 text-[11px] text-ink-2">{c.purchases}</p>}
-                    <div className="mt-1 flex flex-wrap gap-1 empty:hidden">
-                      {flags(c)}
-                      {rowTags(c.tags, c.client?.name).map((t) => <Badge key={t}>{t}</Badge>)}
-                    </div>
-                  </div>
-                  {scope.canManage && (
-                    <div className="relative z-10 -my-1 -mr-1">
-                      <CustomerMenu name={c.name} optedOut={c.optedOut} toggle={setOptOut.bind(null, c.id, !c.optedOut)} remove={deleteCustomer.bind(null, c.id)} />
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-
-            {/* Larger screens: a table. Narrower ones fold the low-priority columns into the first. */}
-            <div className="max-sm:hidden">
-              <Table>
-                <thead>
-                  <tr>
-                    <Th>Customer</Th>
-                    {!scope.clientId && <Th className="max-lg:hidden">Client</Th>}
-                    <Th>Area</Th>
-                    <Th className="max-xl:hidden">Purchased</Th>
-                    <Th className="max-lg:hidden">Tags</Th>
-                    <Th>Last message</Th>
-                    <Th className="max-2xl:hidden">Added</Th>
-                    {scope.canManage && <Th><span className="sr-only">Actions</span></Th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((c) => (
-                    <tr key={c.id} className={rowClass}>
-                      <Td className="min-w-52">
-                        <div className="flex items-start gap-2.5">
-                          <Avatar name={c.name} />
-                          <div className="min-w-0">
-                            <Link href={`/dashboard/customers/${c.id}`} className="font-medium text-ink hover:underline">
-                              {c.name}
-                            </Link>
-                            <p className="tabular text-xs text-muted">{formatPhone(c.phone)}</p>
-                            {!scope.clientId && <p className="text-xs text-ink-2 lg:hidden">{c.client.name}</p>}
-                            {c.purchases && <p className="mt-0.5 line-clamp-1 max-w-xs text-xs text-ink-2 xl:hidden" title={c.purchases}>{c.purchases}</p>}
-                            <div className="mt-1 flex flex-wrap gap-1 empty:hidden lg:hidden">
-                              {flags(c)}
-                              {rowTags(c.tags, c.client?.name).map((t) => <Badge key={t}>{t}</Badge>)}
-                            </div>
-                          </div>
-                        </div>
-                      </Td>
-                      {!scope.clientId && <Td className="text-xs text-ink-2 max-lg:hidden">{c.client.name}</Td>}
-                      <Td className="text-xs">
-                        {c.location ? (
-                          <>
-                            <Link href={qs({ area: `loc:${c.location}`, page: undefined })} className="text-ink-2 hover:underline">
-                              {c.location}
-                            </Link>
-                            <p className="text-muted">{c.region}</p>
-                          </>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
-                      </Td>
-                      <Td className="max-w-xs text-xs text-ink-2 max-xl:hidden">
-                        {c.purchases ? <span className="line-clamp-2" title={c.purchases}>{c.purchases}</span> : <span className="text-muted">—</span>}
-                      </Td>
-                      <Td className="max-lg:hidden">
-                        <div className="flex max-w-56 flex-wrap gap-1">
-                          {flags(c)}
-                          {rowTags(c.tags, c.client?.name).map((t) => (
-                            <Link key={t} href={qs({ tag: t, page: undefined })} className="rounded-full">
-                              <Badge>{t}</Badge>
-                            </Link>
-                          ))}
-                        </div>
-                      </Td>
-                      <Td className="whitespace-nowrap text-xs text-muted">{lastMessage(c) ?? "—"}</Td>
-                      <Td className="tabular whitespace-nowrap text-xs text-muted max-2xl:hidden">{fmtDate(c.createdAt, "d MMM yyyy")}</Td>
-                      {scope.canManage && (
-                        <Td className="py-2 text-right">
-                          <div className="flex justify-end gap-1">
-                            <ActionButton action={setOptOut.bind(null, c.id, !c.optedOut)} variant="ghost" aria-label={`${c.optedOut ? "Opt in" : "Opt out"} ${c.name}`}>
-                              {c.optedOut ? "Opt in" : "Opt out"}
-                            </ActionButton>
-                            <ActionButton action={deleteCustomer.bind(null, c.id)} variant="ghost" className="text-danger hover:bg-danger-bg hover:text-danger" confirm={`Delete ${c.name} and their message history?`} aria-label={`Delete ${c.name}`}>
-                              Delete
-                            </ActionButton>
-                          </div>
-                        </Td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </div>
-          </>
-        ) : (
-          <EmptyState icon={<Users className="size-5 stroke-[2]" />} title={filtered ? "No matching customers" : "No customers yet"}>
-            {filtered ? "Try a different search or filter." : scope.canManage ? "Import your customer list as a CSV to get started." : "Customers will appear here once they're added."}
-          </EmptyState>
-        )}
-
-        {total > PAGE_SIZE && (
-          <nav aria-label="Pages" className="flex items-center justify-between gap-3 border-t border-line px-4 py-3 text-sm text-muted">
-            <span className="tabular">
-              {fmtNumber((page - 1) * PAGE_SIZE + 1)}–{fmtNumber(Math.min(page * PAGE_SIZE, total))} of {fmtNumber(total)}
-            </span>
-            <div className="flex gap-2">
-              <Link aria-disabled={page <= 1 || undefined} href={qs({ page: String(page - 1) })} className={buttonClass("secondary", "sm")}>
-                <ChevronLeft aria-hidden className="size-4" /> Prev
-              </Link>
-              <Link aria-disabled={page * PAGE_SIZE >= total || undefined} href={qs({ page: String(page + 1) })} className={buttonClass("secondary", "sm")}>
-                Next <ChevronRight aria-hidden className="size-4" />
-              </Link>
-            </div>
-          </nav>
-        )}
-      </Card>
-    </>
+    <PortalPage title="Customers" titleTa="வாடிக்கையாளர்" sub={CUSTOMERS_SUB} subTa={CUSTOMERS_SUB_TA}>
+      <CustomersTabs active={tab} />
+      {body}
+    </PortalPage>
   );
 }
+

@@ -90,7 +90,8 @@ export const CHART_MOTIONS = [
 ] as const;
 
 export const FONTS = [
-  { id: "geist", label: "Geist", hint: "Modern and compact. The default." },
+  { id: "dm-sans", label: "DM Sans", hint: "Clean, geometric, and friendly. The default." },
+  { id: "geist", label: "Geist", hint: "Modern and compact." },
   { id: "inter", label: "Inter", hint: "Neutral and very readable." },
   { id: "poppins", label: "Poppins", hint: "Round and friendly." },
   { id: "nunito", label: "Nunito", hint: "Soft, rounded letters." },
@@ -193,7 +194,7 @@ export const BUILT_IN: Appearance = {
   chartGrid: "on",
   chartBars: "round",
   chartMotion: "on",
-  font: "geist",
+  font: "dm-sans",
   density: "normal",
   inputStyle: "outlined",
   tableStyle: "lined",

@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fredoka:wght@500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Fredoka:wght@500;600;700&display=swap");
 @import "tailwindcss";
 @import "./icons.generated.css";
 @import "./appearance.css";
@@ -7,15 +7,17 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
-  --font-display: "Fredoka", var(--font-tamil), ui-rounded, system-ui, sans-serif;
-  --font-ui: "DM Sans", var(--font-tamil), system-ui, -apple-system, sans-serif;
-  --font-sans: var(--font-ui), var(--font-geist-sans), var(--font-tamil), ui-sans-serif, system-ui, sans-serif;
+  --font-brand: "Fredoka", var(--font-dm-sans), "DM Sans", var(--font-tamil), ui-rounded, system-ui, sans-serif;
+  --font-display: var(--font-dm-sans), "DM Sans", var(--font-tamil), ui-rounded, system-ui, sans-serif;
+  --font-ui: var(--font-dm-sans), "DM Sans", var(--font-tamil), system-ui, -apple-system, sans-serif;
+  --font-sans: var(--font-dm-sans), "DM Sans", var(--font-tamil), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
 :root {
-  --display: "Fredoka", var(--font-tamil), ui-rounded, system-ui, sans-serif;
-  --ui: "DM Sans", var(--font-tamil), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-brand: "Fredoka", var(--font-dm-sans), "DM Sans", var(--font-tamil), ui-rounded, system-ui, sans-serif;
+  --display: var(--font-dm-sans), "DM Sans", var(--font-tamil), ui-rounded, system-ui, sans-serif;
+  --ui: var(--font-dm-sans), "DM Sans", var(--font-tamil), system-ui, -apple-system, "Segoe UI", sans-serif;
   --bg: #FFF9F0;
   --card: #FFFFFF;
   --fg: #10283B;
@@ -249,6 +251,7 @@ html {
 }
 
 body {
+  font-family: var(--font-dm-sans), "DM Sans", var(--font-tamil), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: var(--color-canvas);
   color: var(--color-ink);
   font-feature-settings: "ss01", "cv11";
@@ -621,6 +624,7 @@ input:-webkit-autofill:active {
 html.theme-anim, html.theme-anim * { transition: background-color 0.25s ease, border-color 0.25s ease, color 0.2s ease !important; }
 
 /* ───────────────────────── Artifact Design System Classes ───────────────────────── */
+.font-brand { font-family: var(--font-brand); }
 .font-display { font-family: var(--display); }
 .font-ui { font-family: var(--ui); }
 
@@ -736,3 +740,37 @@ html.theme-anim, html.theme-anim * { transition: background-color 0.25s ease, bo
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Tamil Typography & Layout Rules (தமிழ் எழுத்துரு மற்றும் வடிவமைப்பு)
+   ───────────────────────────────────────────────────────────────────────── */
+html[lang="ta"] body {
+  font-family: var(--font-tamil), var(--font-dm-sans), system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+}
+
+html[lang="ta"] button,
+html[lang="ta"] .btn,
+html[lang="ta"] .chip,
+html[lang="ta"] .chip-btn,
+html[lang="ta"] .seg-control button,
+html[lang="ta"] .seg-control a,
+html[lang="ta"] .pill,
+html[lang="ta"] .badge {
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* Ensure accessible touch target heights on mobile (>= 40px) */
+@media (max-width: 640px) {
+  html[lang="ta"] .btn,
+  html[lang="ta"] button.btn,
+  html[lang="ta"] a.btn {
+    min-height: 40px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+}
+

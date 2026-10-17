@@ -6,7 +6,8 @@ import { Suspense } from "react";
 import { ActionButton } from "@/components/action-button";
 import { Calendar3D, Rupee3D, Send3D, ShoppingBag3D, Users3D } from "@/components/icons-3d";
 import { OverflowMenu } from "@/components/overflow-menu";
-import { Badge, Card, CardHeader, EmptyState, PageHeader, rowClass, Stat, StatusBadge, Table, Td, Th } from "@/components/ui";
+import { Badge, Card, CardHeader, EmptyState, PageHeader, Stat, StatusBadge, Table, Td, Th } from "@/components/ui";
+import { rowClass } from "@/components/ui-classes";
 import { cn } from "@/lib/cn";
 import { Prisma } from "@prisma/client";
 import { campaignAudienceWhere } from "@/lib/audiences";
@@ -75,6 +76,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
     <>
       <PageHeader
         title={c.name}
+        titleIsData
         back={{ href: "/dashboard/campaigns", label: "Campaigns" }}
         meta={
           <span className="flex flex-wrap items-center gap-2">

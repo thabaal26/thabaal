@@ -4,7 +4,7 @@ import { Banknote, CalendarClock, CreditCard, Landmark, QrCode, Smartphone, Truc
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Sheet } from "@/components/sheet";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import { Button, Field } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { recordPayment, recordRefund } from "../actions/payments";
@@ -110,6 +110,7 @@ export function RecordPaymentSheet({
   id,
   who,
   due,
+  received,
   cod,
 }: {
   open: boolean;
@@ -117,6 +118,8 @@ export function RecordPaymentSheet({
   id: string;
   who: string;
   due: number;
+  /** Already received, as this screen shows it; the server refuses if it changed meanwhile (no double counting). */
+  received?: number;
   cod: boolean;
 }) {
   const router = useRouter();
@@ -148,7 +151,7 @@ export function RecordPaymentSheet({
         onSubmit={(e) => {
           e.preventDefault();
           start(async () => {
-            const r = await recordPayment(id, { method, amount: n, reference, collectedBy: by, tell });
+            const r = await safeAction(() => recordPayment(id, { method, amount: n, reference, collectedBy: by, tell, seenReceived: received ?? null }));
             toastResult(r);
             if (r.ok) {
               onClose();
@@ -249,7 +252,7 @@ export function RefundSheet({
         onSubmit={(e) => {
           e.preventDefault();
           start(async () => {
-            const r = await recordRefund(id, { amount: n, method, note, tell });
+            const r = await safeAction(() => recordRefund(id, { amount: n, method, note, tell }));
             toastResult(r);
             if (r.ok) {
               onClose();

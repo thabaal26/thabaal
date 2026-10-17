@@ -243,10 +243,21 @@ function saveOverride(clientId: string, productId: string, updates: Partial<Cata
 /** The demo catalogue (sends simulated) with any edits made in demo mode. */
 function demoProducts(clientId: string) {
   const overrides = getOverrides(clientId);
-  return DEFAULT_PRODUCTS.map((p) => {
+  const base = DEFAULT_PRODUCTS.map((p) => {
     const ovr = overrides[p.id] || overrides[p.retailerId];
     return ovr ? { ...p, ...ovr } : p;
-  });
+  }).filter((p) => !(p as { deleted?: boolean }).deleted);
+
+  const defaultKeys = new Set(DEFAULT_PRODUCTS.flatMap((p) => [p.id, p.retailerId]));
+  const addedMap = new Map<string, CatalogProductDetail>();
+  for (const [key, val] of Object.entries(overrides)) {
+    if (!defaultKeys.has(key) && !(val as { deleted?: boolean }).deleted && val.retailerId) {
+      const existing = addedMap.get(val.retailerId);
+      const merged = existing ? { ...existing, ...val } : (val as CatalogProductDetail);
+      addedMap.set(val.retailerId, merged);
+    }
+  }
+  return [...base, ...addedMap.values()];
 }
 
 /** The catalogue connected to this WhatsApp Business Account, or null when none is. */
@@ -382,6 +393,11 @@ export const getCatalogWithProducts = cache(async (clientId: string): Promise<{
   /** Meta couldn't be read just now (the list is empty for this request). */
   readError?: boolean;
 }> => {
+  const { cfg } = await senderFor(clientId);
+  if (!cfg.live) {
+    return { catalogId: null, products: demoProducts(clientId), commerceManagerUrl: "https://business.facebook.com/commerce_manager", isLive: false };
+  }
+
   try {
     const live = await cachedLiveCatalog(clientId);
     // Live: Meta is the only source of truth. Local demo edits are never layered on top.
@@ -416,13 +432,18 @@ export async function updateCatalogProductItem(
 
   // Demo mode (no WhatsApp Cloud API): edits are kept locally so the screens can be tried.
   if (!cfg.live) {
-    saveOverride(clientId, params.id, {
+    const key = params.retailerId || params.id;
+    const patch = {
       ...(params.priceAmount !== undefined && { priceAmount: params.priceAmount, price: `₹ ${params.priceAmount.toFixed(2)}` }),
       ...(params.inStock !== undefined && { inStock: params.inStock }),
       ...(params.name && { name: params.name }),
       ...(params.description !== undefined && { description: params.description }),
       ...(params.imageUrl !== undefined && { imageUrl: params.imageUrl }),
-    });
+    };
+    saveOverride(clientId, key, patch);
+    if (params.id && params.id !== key) {
+      saveOverride(clientId, params.id, patch);
+    }
     return { ok: true, metaUpdated: false, message: "Saved in demo mode. Connect the WhatsApp Cloud API to change the real catalogue." };
   }
 
@@ -469,12 +490,32 @@ export async function createCatalogProductItem(
   p: { retailerId: string; name: string; priceAmount: number; inStock: boolean; description: string; imageUrl: string | null; brand: string; link: string },
 ): Promise<Result> {
   forgetCatalog(clientId);
-  const { cfg } = await senderFor(clientId);
-  if (!cfg.live) return { ok: false, metaUpdated: false, message: "Adding products needs the WhatsApp Cloud API connected." };
   const retailerId = p.retailerId.trim();
   if (!/^[\w.-]{1,50}$/.test(retailerId)) return { ok: false, metaUpdated: false, message: "SKU can use letters, numbers, dots, dashes and underscores (up to 50)." };
   if (!p.name.trim()) return { ok: false, metaUpdated: false, message: "Enter a product name." };
   if (!(p.priceAmount > 0)) return { ok: false, metaUpdated: false, message: "Enter a price above ₹0." };
+
+  const { cfg } = await senderFor(clientId);
+  if (!cfg.live) {
+    const newItem: CatalogProductDetail & { deleted?: boolean } = {
+      id: retailerId,
+      retailerId,
+      name: p.name.trim(),
+      price: `₹ ${p.priceAmount.toFixed(2)}`,
+      priceAmount: p.priceAmount,
+      currency: "INR",
+      inStock: p.inStock,
+      description: p.description.trim() || p.name.trim(),
+      imageUrl: p.imageUrl,
+      category: detectCategory(p.name.trim()),
+      whatsappStatus: "APPROVED",
+      deleted: false,
+    };
+    saveOverride(clientId, retailerId, newItem);
+    forgetCatalog(clientId);
+    return { ok: true, metaUpdated: false, message: "Product added to catalogue." };
+  }
+
   const image = publicImage(p.imageUrl);
   if (!image) return { ok: false, metaUpdated: false, message: "Upload a photo: WhatsApp shows every product with one." };
 
@@ -509,7 +550,12 @@ export async function createCatalogProductItem(
 export async function deleteCatalogProductItem(clientId: string, retailerId: string): Promise<Result> {
   forgetCatalog(clientId);
   const { cfg } = await senderFor(clientId);
-  if (!cfg.live) return { ok: false, metaUpdated: false, message: "Deleting products needs the WhatsApp Cloud API connected." };
+  if (!cfg.live) {
+    saveOverride(clientId, retailerId, { deleted: true } as never);
+    forgetCatalog(clientId);
+    return { ok: true, metaUpdated: false, message: "Product deleted from catalogue." };
+  }
+
   try {
     const catalogId = await catalogIdFor(cfg);
     if (!catalogId) return { ok: false, metaUpdated: false, message: "No catalogue is connected to this WhatsApp account in Meta." };

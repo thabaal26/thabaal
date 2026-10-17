@@ -1,9 +1,11 @@
 "use client";
+import { safeAction } from "@/components/toast";
 
 import { ArrowUpRight, Sparkles } from "@/components/icons";
 import Link from "@/components/intent-link";
 import { useState, useTransition } from "react";
 import { askAiBusinessCopilotAction } from "./actions/ai";
+import { T } from "./portal-ui";
 
 const QUICK_QUESTIONS = ["What should I do first?", "What is selling best?", "Who should I win back?"];
 
@@ -30,7 +32,7 @@ export function AiBusinessCopilot({
     if (!query) return;
     setError(null);
     start(async () => {
-      const res = await askAiBusinessCopilotAction(query);
+      const res = await safeAction(() => askAiBusinessCopilotAction(query));
       if (res.ok && res.data) {
         setAnswer(res.data.answer);
         if (res.data.actionItems?.length) setActions(res.data.actionItems);
@@ -41,41 +43,47 @@ export function AiBusinessCopilot({
   };
 
   return (
-    <section className="space-y-4 rounded-card border-[1.5px] border-line bg-panel p-5 shadow-card">
-      <div>
-        <h2 className="font-display text-[19px] font-semibold text-ink">Your daily brief</h2>
-        <p className="mt-0.5 text-[13.5px] text-muted">Plain words about today, from your live numbers.</p>
+    <section className="card">
+      <div className="hd">
+        <div>
+          <h2>
+            <T ta="உங்கள் தினசரி சுருக்கம்">Your daily brief</T>
+          </h2>
+          <p>
+            <T ta="இன்றைக்கான எளிய ஆலோசனை, உங்கள் நேரடி எண்களிலிருந்து.">Plain-language advice for today, from your live numbers.</T>
+          </p>
+        </div>
       </div>
 
-      <div className="text-[14.5px] leading-relaxed text-ink" aria-live="polite" aria-busy={pending}>
-        <p className={pending ? "opacity-60" : undefined}>{answer}</p>
-        {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+      <div aria-live="polite" aria-busy={pending}>
+        <p style={pending ? { opacity: 0.6 } : undefined}>{answer}</p>
+        {error && (
+          <p className="msg err" style={{ marginTop: 8 }}>
+            {error}
+          </p>
+        )}
         {actions.length > 0 && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="tools" style={{ marginTop: 12 }}>
             {actions.map((a) => (
-              <Link
-                key={a.href + a.label}
-                href={a.href}
-                className="inline-flex items-center gap-1 rounded-lg border-[1.5px] border-line bg-canvas px-3 py-1 text-[12.5px] font-semibold text-ink transition hover:border-ink"
-              >
-                {a.label} <ArrowUpRight aria-hidden className="size-3" />
+              <Link key={a.href + a.label} href={a.href} className="btn sm">
+                {a.label} <ArrowUpRight aria-hidden className="ic" style={{ width: 14, height: 14 }} />
               </Link>
             ))}
           </div>
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 pt-1">
+      <div className="chips" style={{ marginTop: 14 }}>
         {QUICK_QUESTIONS.map((q) => (
           <button
             key={q}
             type="button"
+            className="chip"
             disabled={pending}
             onClick={() => {
               setQuestion(q);
               ask(q);
             }}
-            className="rounded-full border-[1.5px] border-line bg-panel px-3.5 py-1.5 text-left text-[13px] font-semibold text-muted transition hover:border-ink hover:text-ink disabled:opacity-50"
           >
             {q}
           </button>
@@ -83,28 +91,26 @@ export function AiBusinessCopilot({
       </div>
 
       <form
-        className="flex flex-col gap-2 pt-1 sm:flex-row"
+        className="toolbar"
+        style={{ marginTop: 12, marginBottom: 0 }}
         onSubmit={(e) => {
           e.preventDefault();
           ask(question);
         }}
       >
-        <label htmlFor="brief-question" className="sr-only">
+        <label htmlFor="brief-question" className="hx">
           Ask about your orders, customers or WhatsApp costs
         </label>
         <input
           id="brief-question"
-          className="field flex-1"
+          type="text"
+          style={{ flex: 1, minWidth: 200 }}
           placeholder="Ask about your orders, customers or WhatsApp costs…"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
         />
-        <button
-          type="submit"
-          disabled={!question.trim() || pending}
-          className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-control bg-brand px-4 text-[14px] font-semibold text-on-brand transition hover:brightness-105 disabled:opacity-50"
-        >
-          <Sparkles aria-hidden className="size-4" /> Ask
+        <button type="submit" className="btn primary" disabled={!question.trim() || pending}>
+          <Sparkles aria-hidden className="ic" /> Ask
         </button>
       </form>
     </section>

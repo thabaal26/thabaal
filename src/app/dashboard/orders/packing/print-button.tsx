@@ -3,6 +3,7 @@
 import { Download, FileSpreadsheet, FileText, Image as ImageIcon, Loader2, Printer } from "@/components/icons";
 import { useState } from "react";
 import { Button } from "@/components/ui";
+import { T } from "../../portal-ui";
 import { getOrderPricing } from "@/lib/order-pricing";
 
 export type ExportableOrderRow = {
@@ -662,7 +663,7 @@ export function PrintButton({
                 className="flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left text-xs font-medium text-ink transition hover:bg-sunken"
               >
                 <Printer className="size-4 text-brand-deep" />
-                <span>Print / Save PDF</span>
+                <span><T>Print / Save PDF</T></span>
               </button>
               {orders.length > 0 && (
                 <>
@@ -672,7 +673,7 @@ export function PrintButton({
                     className="flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left text-xs font-medium text-ink transition hover:bg-sunken"
                   >
                     <ImageIcon className="size-4 text-ink-2" />
-                    <span>Image (PNG)</span>
+                    <span><T>Image (PNG)</T></span>
                   </button>
                   <button
                     type="button"
@@ -680,7 +681,7 @@ export function PrintButton({
                     className="flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left text-xs font-medium text-ink transition hover:bg-sunken"
                   >
                     <FileSpreadsheet className="size-4 text-ink-2" />
-                    <span>Excel (.xls)</span>
+                    <span><T>Excel (.xls)</T></span>
                   </button>
                   <button
                     type="button"
@@ -688,7 +689,7 @@ export function PrintButton({
                     className="flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left text-xs font-medium text-ink transition hover:bg-sunken"
                   >
                     <Download className="size-4 text-ink-2" />
-                    <span>CSV Spreadsheet</span>
+                    <span><T>CSV Spreadsheet</T></span>
                   </button>
                 </>
               )}
@@ -709,7 +710,7 @@ export function PrintButton({
         title="Print or save as PDF"
       >
         {busy === "pdf" ? <Loader2 className="size-4 animate-spin" /> : <Printer className="size-4" />}
-        <span>Print / PDF</span>
+        <span><T>Print / PDF</T></span>
       </Button>
 
       {orders.length > 0 && (
@@ -722,7 +723,7 @@ export function PrintButton({
             title="Download high-resolution PNG image to share on WhatsApp"
           >
             {busy === "img" ? <Loader2 className="size-4 animate-spin" /> : <ImageIcon className="size-4" />}
-            <span>Image (PNG)</span>
+            <span><T>Image (PNG)</T></span>
           </Button>
 
           <Button
@@ -733,7 +734,7 @@ export function PrintButton({
             title="Download formatted Excel (.xls) sheet"
           >
             {busy === "xls" ? <Loader2 className="size-4 animate-spin" /> : <FileSpreadsheet className="size-4" />}
-            <span>Excel (.xls)</span>
+            <span><T>Excel (.xls)</T></span>
           </Button>
 
           <Button
@@ -767,7 +768,7 @@ export function SingleSlipExportButtons({ order }: { order: ExportableOrderRow }
           )
         }
         title={`Download ${order.orderRef} slip as PNG image for WhatsApp`}
-        className="inline-flex items-center gap-1 rounded-control bg-panel px-2 py-1 text-2xs font-semibold text-ink-2 ring-1 ring-line transition hover:bg-sunken hover:text-ink"
+        className="inline-flex min-h-10 items-center gap-1 rounded-control bg-panel px-3 py-1 text-2xs font-semibold text-ink-2 ring-1 ring-line transition hover:bg-sunken hover:text-ink sm:min-h-0 sm:px-2"
       >
         <ImageIcon aria-hidden className="size-3" />
         <span>PNG</span>
@@ -778,7 +779,7 @@ export function SingleSlipExportButtons({ order }: { order: ExportableOrderRow }
           openPrintablePdfWindow([order], [], `Delivery Slip · ${order.orderRef}`)
         }
         title={`Print or save ${order.orderRef} slip as PDF`}
-        className="inline-flex items-center gap-1 rounded-control bg-panel px-2 py-1 text-2xs font-semibold text-ink-2 ring-1 ring-line transition hover:bg-sunken hover:text-ink"
+        className="inline-flex min-h-10 items-center gap-1 rounded-control bg-panel px-3 py-1 text-2xs font-semibold text-ink-2 ring-1 ring-line transition hover:bg-sunken hover:text-ink sm:min-h-0 sm:px-2"
       >
         <FileText aria-hidden className="size-3" />
         <span>PDF</span>

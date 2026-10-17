@@ -4,6 +4,7 @@ import { Check, Loader2, MapPin, MessageSquareQuote, PencilLine, Plus, Sparkles 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Sheet } from "@/components/sheet";
+import { T } from "../portal-ui";
 import { toastResult } from "@/components/toast";
 import { Badge, Button, Field } from "@/components/ui";
 import { parseAddressText } from "@/lib/address";
@@ -129,7 +130,7 @@ export function OrderAddressControl({
             type="button"
             onClick={openSheet}
             className={cn(
-              "print:hidden inline-flex shrink-0 items-center gap-1 rounded-control px-2 py-0.5 text-2xs font-semibold transition",
+              "print:hidden inline-flex min-h-10 shrink-0 items-center gap-1 rounded-control px-3 py-0.5 text-2xs font-semibold transition sm:min-h-0 sm:px-2",
               effectiveAddress
                 ? "bg-panel text-ink-2 ring-1 ring-line hover:bg-sunken hover:text-ink"
                 : "bg-brand text-on-brand shadow-xs hover:bg-brand-deep",
@@ -138,12 +139,12 @@ export function OrderAddressControl({
             {effectiveAddress ? (
               <>
                 <PencilLine aria-hidden className="size-3" />
-                <span>Edit</span>
+                <span><T>Edit</T></span>
               </>
             ) : (
               <>
                 <Plus aria-hidden className="size-3" />
-                <span>Add address</span>
+                <span><T>Add address</T></span>
               </>
             )}
           </button>

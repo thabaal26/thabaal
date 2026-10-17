@@ -3,7 +3,8 @@
 import { RotateCcw, TriangleAlert } from "@/components/icons";
 import Link from "@/components/intent-link";
 import { useEffect } from "react";
-import { Button, buttonClass, Card } from "@/components/ui";
+import { Button, Card } from "@/components/ui";
+import { buttonClass } from "@/components/ui-classes";
 
 /** Shown in place of a dashboard page that failed to load, keeping the sidebar and tabs usable. */
 export default function DashboardError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {

@@ -8,6 +8,8 @@ const eslintConfig = defineConfig([
   // Override default ignores of eslint-config-next.
   globalIgnores([
     "mobile/**",
+    ".tmp-ui/**",
+    "scripts/**",
     // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",

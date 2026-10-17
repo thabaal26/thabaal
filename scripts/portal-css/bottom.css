@@ -1,0 +1,18 @@
+/* ── App additions (not in the static design): links that behave like the design's buttons ── */
+.thabaal-portal .tabs a{border:0;background:none;padding:10px 14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1.5px;white-space:nowrap;font-size:15px;text-decoration:none}
+.thabaal-portal .tabs a[aria-selected=true]{color:var(--fg);border-bottom-color:var(--mango)}
+.thabaal-portal .cl a{display:flex;flex-direction:column;gap:2px;text-align:left;border-bottom:1px solid var(--line);padding:12px;text-decoration:none;color:inherit}
+.thabaal-portal .cl a[aria-current=true]{background:var(--soft)}
+.thabaal-portal .cl a:hover{background:var(--soft)}
+.thabaal-portal a.chip{text-decoration:none}
+.thabaal-portal .btn{text-decoration:none;color:inherit}
+.thabaal-portal .btn.primary{color:#10283B}
+.thabaal-portal .btn:disabled{opacity:.5;cursor:not-allowed}
+.thabaal-portal .menu{position:absolute;z-index:20;top:calc(100% + 6px);right:0;min-width:220px;padding:6px;display:flex;flex-direction:column;gap:2px}
+.thabaal-portal .menu .btn{justify-content:flex-start;border-color:transparent;width:100%}
+.thabaal-portal .scrolly{overflow-y:auto}
+.thabaal-portal .show-sm{display:none}
+@media (max-width:900px){.thabaal-portal .hide-sm{display:none!important}.thabaal-portal .show-sm{display:inline-flex}}
+/* ── The app's own form fields, in the design's input look (same layer as the app's .field, so per-field utilities still win) ── */
+.thabaal-portal input.field,.thabaal-portal select.field,.thabaal-portal textarea.field{min-height:42px;border-radius:12px;border:1.5px solid var(--line);background-color:var(--card);color:var(--fg);box-shadow:none}
+.thabaal-portal input.field:focus,.thabaal-portal select.field:focus,.thabaal-portal textarea.field:focus{outline:none;border-color:var(--fg);box-shadow:0 0 0 4px rgba(255,195,41,.4)}

@@ -2,7 +2,7 @@ import "server-only";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { addDays } from "date-fns";
 import { db } from "./db";
-import { APP_TZ, fmtNumber } from "./format";
+import { APP_TZ } from "./format";
 import { campaignResults } from "./business-reports";
 import { refillForecast } from "./refill-forecast";
 import { numberHealth } from "./limits";
@@ -221,9 +221,9 @@ async function computePeriodFigures(
     }),
   ]);
 
-  let replies = rawReplies;
+  const replies = rawReplies;
   let cost = 0;
-  let sent = msgs.length;
+  const sent = msgs.length;
   let reached = 0;
   let read = 0;
 
@@ -253,45 +253,25 @@ async function computePeriodFigures(
     }
   }
 
-  if (sent === 0 && orders.length === 0) {
-    // Seamless baseline fallback if client has 0 activity yet
-    if (periodName === "this month") {
-      cost = 3840;
-      sales = 142800;
-      wait = 18400;
-      sent = 2570;
-      reached = 2480;
-      read = 1824;
-      replies = 214;
-      paidCount = 74;
-      unpaidCount = 12;
-    } else {
-      cost = 910;
-      sales = 28600;
-      wait = 6200;
-      sent = 640;
-      reached = 618;
-      read = 441;
-      replies = 52;
-      paidCount = 18;
-      unpaidCount = 3;
-    }
-  }
-
   cost = Math.round(cost * 100) / 100;
   const returnRatio = cost > 0 ? Math.round((sales / cost) * 100) / 100 : sales;
 
-  const verdictGood = returnRatio >= 10;
-  const verdictOk = returnRatio >= 3;
-  const verdictTitle = verdictGood
+  const hasActivity = sent > 0 || orders.length > 0;
+  const verdictGood = hasActivity && returnRatio >= 10;
+  const verdictOk = hasActivity && returnRatio >= 3;
+  const verdictTitle = !hasActivity
+    ? `No message activity yet ${periodName}.`
+    : verdictGood
     ? `WhatsApp is working well ${periodName}.`
     : verdictOk
     ? `WhatsApp is doing alright ${periodName}.`
     : `WhatsApp is not paying back ${periodName}.`;
 
-  const verdictSub = `You spent ${fmtInr(cost)} on messages and received ${fmtInr(
-    sales,
-  )} in paid orders. Every ₹1 spent brought back ${fmtInr(returnRatio)} in sales.`;
+  const verdictSub = !hasActivity
+    ? `Broadcast campaigns and customer orders will calculate your live return on message spend here.`
+    : `You spent ${fmtInr(cost)} on messages and received ${fmtInr(
+        sales,
+      )} in paid orders. Every ₹1 spent brought back ${fmtInr(returnRatio)} in sales.`;
 
   // Funnel steps (6 steps)
   const funnel = [
@@ -316,9 +296,9 @@ async function computePeriodFigures(
     },
     {
       name: "Ordered",
-      value: orders.length || (sent ? Math.round(sent * 0.033) : 0),
+      value: orders.length,
       sub: "Within 7 days",
-      pct: sent ? Math.min(100, Math.round(((orders.length || Math.round(sent * 0.033)) / sent) * 100)) : 0,
+      pct: sent ? Math.min(100, Math.round((orders.length / sent) * 100)) : 0,
     },
     {
       name: "Paid",
@@ -332,19 +312,19 @@ async function computePeriodFigures(
   const readNoReply = Math.max(0, read - replies);
   const actions = [
     {
-      title: `${unpaidCount || 9} unpaid order${(unpaidCount || 9) === 1 ? "" : "s"}`,
-      value: wait > 0 ? fmtInr(wait) : "₹18,400",
+      title: `${unpaidCount} unpaid order${unpaidCount === 1 ? "" : "s"}`,
+      value: wait > 0 ? fmtInr(wait) : "₹0",
       action: "Send reminder",
       href: "/dashboard/orders?show=unpaid",
     },
     {
-      title: `${readNoReply || 1610} read it, did not order`,
+      title: `${readNoReply} read it, did not order`,
       value: "Follow up",
       action: "Create campaign",
       href: "/dashboard/campaigns/new",
     },
     {
-      title: `${refillDueCount || 12} may reorder`,
+      title: `${refillDueCount} may reorder`,
       value: "Reach today",
       action: "View customers",
       href: "/dashboard/refills",
@@ -359,7 +339,7 @@ async function computePeriodFigures(
     reached,
     read,
     rep: replies,
-    ord: orders.length || (sent ? Math.round(sent * 0.033) : 0),
+    ord: orders.length,
     paid: paidCount,
     returnRatio,
     verdictGood,
@@ -558,71 +538,6 @@ export async function getComprehensiveReportData(clientId: string): Promise<Comp
       verdictLabel,
     };
   });
-  const baselineCampaigns: ReportCampaignRow[] = [
-    {
-      id: "base-navratri",
-      name: "Navratri offer",
-      template: "festival_offer",
-      sent: 360,
-      read: 266,
-      replies: 58,
-      paidOrders: 21,
-      spent: 295,
-      sales: 10900,
-      returnRatio: 36.95,
-      verdict: "ok",
-      verdictLabel: "Working well",
-    },
-    {
-      id: "base-refill",
-      name: "Refill reminder",
-      template: "thenan_refill_reminder",
-      sent: 1260,
-      read: 894,
-      replies: 214,
-      paidOrders: 38,
-      spent: 1033,
-      sales: 14820,
-      returnRatio: 14.35,
-      verdict: "ok",
-      verdictLabel: "Working well",
-    },
-    {
-      id: "base-winback",
-      name: "Weekend win-back",
-      template: "thenan_winback",
-      sent: 640,
-      read: 422,
-      replies: 42,
-      paidOrders: 9,
-      spent: 525,
-      sales: 1800,
-      returnRatio: 3.43,
-      verdict: "warn",
-      verdictLabel: "OK",
-    },
-    {
-      id: "base-freedelivery",
-      name: "Free delivery weekend",
-      template: "free_delivery",
-      sent: 300,
-      read: 156,
-      replies: 11,
-      paidOrders: 2,
-      spent: 246,
-      sales: 380,
-      returnRatio: 1.54,
-      verdict: "bad",
-      verdictLabel: "Stop",
-    },
-  ];
-
-  for (const b of baselineCampaigns) {
-    if (campaigns.length >= 4) break;
-    if (!campaigns.some((c) => c.name.toLowerCase() === b.name.toLowerCase())) {
-      campaigns.push(b);
-    }
-  }
   campaigns.sort((a, b) => b.returnRatio - a.returnRatio);
 
   // Best day and time calculation from customer replies
@@ -640,44 +555,57 @@ export async function getComprehensiveReportData(clientId: string): Promise<Comp
   }
 
   const sortedSlots = Object.entries(timeBuckets).sort((a, b) => b[1] - a[1]);
-  const bestTimes: BestDayTimeSlot[] = [
-    {
-      slot: sortedSlots[0]?.[0] || "Saturday 9–11 am",
-      count: sortedSlots[0]?.[1] || 18,
-      badge: "Best",
-      badgeType: "ok",
-    },
-    {
-      slot: sortedSlots[1]?.[0] || "Weekday 6–8 pm",
-      count: sortedSlots[1]?.[1] || 12,
-      badge: "Good",
-      badgeType: "warn",
-    },
-    {
-      slot: sortedSlots[sortedSlots.length - 1]?.[0] || "After 9 pm",
-      count: sortedSlots[sortedSlots.length - 1]?.[1] || 1,
-      badge: "Avoid",
-      badgeType: "bad",
-    },
-  ];
+  const bestTimes: BestDayTimeSlot[] = sortedSlots.length
+    ? [
+        {
+          slot: sortedSlots[0][0],
+          count: sortedSlots[0][1],
+          badge: "Best",
+          badgeType: "ok",
+        },
+        ...(sortedSlots[1]
+          ? [
+              {
+                slot: sortedSlots[1][0],
+                count: sortedSlots[1][1],
+                badge: "Good" as const,
+                badgeType: "warn" as const,
+              },
+            ]
+          : []),
+        ...(sortedSlots.length > 2
+          ? [
+              {
+                slot: sortedSlots[sortedSlots.length - 1][0],
+                count: sortedSlots[sortedSlots.length - 1][1],
+                badge: "Avoid" as const,
+                badgeType: "bad" as const,
+              },
+            ]
+          : []),
+      ]
+    : [];
 
-  const whatToRepeat: RepeatItem[] = [
-    {
-      title:
-        campaigns[0]?.sales > 0 && campaigns[0]?.returnRatio >= 10
-          ? `${campaigns[0].name} brought ₹${Math.round(campaigns[0].returnRatio)} back for every ₹1`
-          : "Festival offers brought ₹37 back for every ₹1",
+  const topCampaign = campaigns[0];
+  const whatToRepeat: RepeatItem[] = [];
+  if (topCampaign && topCampaign.sales > 0 && topCampaign.returnRatio >= 3) {
+    whatToRepeat.push({
+      title: `${topCampaign.name} brought ₹${Math.round(topCampaign.returnRatio)} back for every ₹1`,
       actionText: "Run again",
       actionHref: "/dashboard/campaigns/new",
       isPill: false,
-    },
-    {
-      title: "Free delivery weekend lost money",
-      actionText: "Stop",
+    });
+  }
+  const lowCampaign = [...campaigns].reverse().find((c) => c.returnRatio < 2 && c.spent > 0);
+  if (lowCampaign) {
+    whatToRepeat.push({
+      title: `${lowCampaign.name} had low return (${lowCampaign.returnRatio}x)`,
+      actionText: "Review",
+      actionHref: `/dashboard/campaigns/${lowCampaign.id}`,
       isPill: true,
       pillType: "bad",
-    },
-  ];
+    });
+  }
 
   // 4. Customers Performance
   const sixtyDaysAgo = new Date(now.getTime() - 60 * DAY);
@@ -723,7 +651,7 @@ export async function getComprehensiveReportData(clientId: string): Promise<Comp
   lapsed60Days = Math.max(lapsed60Days, taggedLapsed, refills.lapsedCount);
 
   // Unpaid carts customers
-  const unpaidOrders = allOrders.filter((o) => o.status === "NEW" && !o.paidAt);
+  const unpaidOrders = allOrders.filter((o) => (o.status === "NEW" || o.status === "CONFIRMED") && !o.paidAt);
   const unpaidCustCount = new Set(unpaidOrders.map((o) => o.customerId)).size;
   const unpaidTotalAmt = unpaidOrders.reduce((sum, o) => sum + o.total, 0);
 
@@ -769,21 +697,10 @@ export async function getComprehensiveReportData(clientId: string): Promise<Comp
     pct: Math.round((count / maxLocCount) * 100),
   }));
 
-  const baselineLocations: LocationRow[] = [
-    { name: "Anna Nagar", count: 124, pct: 82 },
-    { name: "KK Nagar", count: 91, pct: 60 },
-    { name: "Sellur", count: 67, pct: 44 },
-    { name: "Villapuram", count: 36, pct: 24 },
-  ];
-  for (const b of baselineLocations) {
-    if (locations.length >= 4) break;
-    if (!locations.some((l) => l.name.toLowerCase() === b.name.toLowerCase())) {
-      locations.push(b);
-    }
-  }
-
-  const topLocName = locations[0]?.name || "Anna Nagar";
-  const topLocationInsight = `${topLocName} buys the most. A delivery-day offer for that area usually works.`;
+  const topLocName = locations[0]?.name;
+  const topLocationInsight = topLocName
+    ? `${topLocName} buys the most. A delivery-day offer for that area usually works.`
+    : "Customer area trends will show once locations are recorded on orders.";
 
   // 5. Products Performance
   const productMap = new Map<string, { sold: number; sales: number; leftInCarts: number }>();
@@ -832,22 +749,6 @@ export async function getComprehensiveReportData(clientId: string): Promise<Comp
       pillType,
     };
   });
-
-  const baselineProducts: ProductDemandRow[] = [
-    { name: "Oil 1 L", sold: 142, sales: 53960, leftInCarts: 2, action: "Keep in stock", pillType: "ok" },
-    { name: "Oil 5 L", sold: 48, sales: 84000, leftInCarts: 3, action: "Your money maker", pillType: "ok" },
-    { name: "Gingelly 500 ml", sold: 36, sales: 10440, leftInCarts: 1, action: "Try a combo", pillType: "warn" },
-    { name: "Coconut 1 L", sold: 21, sales: 6720, leftInCarts: 4, action: "Chase the carts", pillType: "warn" },
-    { name: "Groundnut 1 L", sold: 4, sales: 1440, leftInCarts: 0, action: "Sold before, not now", pillType: "mute" },
-    { name: "Gift pack", sold: 0, sales: 0, leftInCarts: 0, action: "Promote for Deepavali", pillType: "bad" },
-  ];
-
-  for (const b of baselineProducts) {
-    if (productRows.length >= 6) break;
-    if (!productRows.some((p) => p.name.toLowerCase() === b.name.toLowerCase())) {
-      productRows.push(b);
-    }
-  }
   productRows.sort((a, b) => b.sales - a.sales || b.leftInCarts - a.leftInCarts);
 
   // Stuck in carts items
@@ -860,29 +761,28 @@ export async function getComprehensiveReportData(clientId: string): Promise<Comp
       });
     }
   }
-  if (stuckItems.length === 0) {
-    stuckItems.push(
-      { text: "Coconut 1 L · 4 carts", href: "/dashboard/orders?show=unpaid" },
-      { text: "Oil 5 L · 3 carts", href: "/dashboard/orders?show=unpaid" },
-    );
-  }
 
   // Worth promoting items
-  const worthPromoting: WorthPromotingItem[] = [
-    {
-      title: "Gift pack",
-      desc: "Nobody has bought it yet. Deepavali is close.",
+  const worthPromoting: WorthPromotingItem[] = [];
+  const topSeller = productRows.find((p) => p.sold > 0);
+  if (topSeller) {
+    worthPromoting.push({
+      title: topSeller.name,
+      desc: "Top seller by volume. Great anchor product for your next broadcast.",
       actionText: "Make a campaign",
       actionHref: "/dashboard/campaigns/new",
       primary: true,
-    },
-    {
-      title: "Oil 5 L + Gingelly 500 ml",
-      desc: "Often bought together. Try a combo price.",
+    });
+  }
+  const zeroSold = productRows.find((p) => p.sold === 0);
+  if (zeroSold) {
+    worthPromoting.push({
+      title: zeroSold.name,
+      desc: "Zero recent orders. Try featuring this with a special introductory discount.",
       actionText: "Open products",
-      actionHref: "/dashboard/products",
-    },
-  ];
+      actionHref: "/dashboard/catalogue",
+    });
+  }
 
   // 6. Summary Text (WhatsApp format)
   const rangeStr = `${formatInTimeZone(thisMonth, APP_TZ, "d MMM")} – ${formatInTimeZone(now, APP_TZ, "d MMM yyyy")}`;

@@ -18,6 +18,7 @@ import { isTemplatePicture, orderTemplateNames, picturePrefixFor } from "@/lib/o
 import { cleanValues, readFields, readValues } from "@/lib/custom-fields";
 import { senderFor } from "@/lib/senders";
 import { requireManager, requireOrderAccess } from "@/lib/session";
+import { FLOW_KEYS, ORDER_FLOWS, type OrderFlowKey } from "@/lib/order-flow";
 import { sendText } from "@/lib/waha";
 import { sendTemplateMessage, sendTextMessage } from "@/lib/whatsapp";
 import { explainSendError, type SendResult } from "./send-helpers";
@@ -87,12 +88,36 @@ export async function setOrderStatus(id: string, status: OrderStatus): Promise<S
     revalidatePath("/dashboard", "layout");
     return { ok: true, message: "Marked paid and thanked the customer." };
   }
-  await db.order.update({ where: { id: order.id }, data: { status } });
+  // Reopening starts the order over, so it isn't still shown as packed.
+  await db.order.update({ where: { id: order.id }, data: { status, ...(status === "NEW" ? { packedAt: null } : {}) } });
   pushOrderToSheet(order.id, "ORDER_UPDATE");
   let told = false;
   if (status === "CANCELLED" && !order.customer.optedOut) told = await tellCancelled(order).catch((e) => (console.error("Could not tell the customer about the cancellation", e), false));
   revalidatePath("/dashboard", "layout");
   return { ok: true, message: `Marked ${status.toLowerCase()}.${told ? " The customer was told on WhatsApp." : ""}` };
+}
+
+/** The "Packed" step: marks the order packed (or takes it back). The status stays as it is until dispatch. */
+export async function setOrderPacked(id: string, packed: boolean): Promise<SendResult> {
+  const s = await requireOrderAccess();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const r = await db.order.updateMany({
+    where: { id, ...(s.clientId ? { clientId: s.clientId } : {}), status: { in: ["NEW", "CONFIRMED", "PAID"] } },
+    data: { packedAt: packed ? new Date() : null },
+  });
+  if (!r.count) return { ok: false, message: "This order can't be marked packed now." };
+  revalidatePath("/dashboard", "layout");
+  return { ok: true, message: packed ? "Marked packed." : "No longer marked packed." };
+}
+
+/** Settings → Order steps: the stages this client's orders go through. */
+export async function saveOrderFlow(flow: string): Promise<SendResult> {
+  const s = await requireManager(true);
+  if ("denied" in s) return { ok: false, message: s.denied };
+  if (!FLOW_KEYS.includes(flow as OrderFlowKey)) return { ok: false, message: "Pick one of the order steps." };
+  await db.client.update({ where: { id: s.clientId }, data: { orderFlow: flow } });
+  revalidatePath("/dashboard", "layout");
+  return { ok: true, message: `Order steps saved: ${ORDER_FLOWS[flow as OrderFlowKey].label}.` };
 }
 
 export async function saveOrderNote(id: string, note: string): Promise<SendResult> {

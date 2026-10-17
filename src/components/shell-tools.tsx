@@ -15,14 +15,16 @@ const round = "grid size-10 place-items-center rounded-full border-[1.5px] borde
 
 /**
  * Computers: the bell and the light/dark switch at the right of every page title (phones have
- * them in the top bar). Renders nothing outside the dashboard frame.
+ * them in the top bar). Renders nothing outside the dashboard frame. The language button goes between the bell
+ * and the light/dark switch, in the design's order.
  */
-export function PageTools() {
+export function PageTools({ lang }: { lang?: ReactNode }) {
   const shell = useContext(ShellContext);
-  if (!shell) return null;
+  if (!shell) return <>{lang}</>;
   return (
     <div className="hidden shrink-0 items-center gap-2 lg:flex print:hidden">
       {shell.notifications && <NotificationBell className={round} />}
+      {lang}
       <ThemeToggle className={round} />
     </div>
   );

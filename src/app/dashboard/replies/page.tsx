@@ -1,28 +1,28 @@
-import { CheckCheck, MessageCircle } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
-import { ActionButton } from "@/components/action-button";
 import type { ConversationEntry } from "@/components/conversation";
-import { Card, EmptyState, PageHeader } from "@/components/ui";
-import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { fmtNumber } from "@/lib/format";
 import { getScope, ownedMessages } from "@/lib/session";
 import { handleAllReplies } from "../actions/replies";
-import { InboxTabs } from "./inbox-tabs";
+import { CHATS_SUB, CHATS_SUB_TA, InboxTabs } from "./inbox-tabs";
+import { PAction, PortalPage, T } from "../portal-ui";
 import { ReplyInbox } from "./reply-inbox";
 
 export const metadata: Metadata = { title: "Chats" };
 export const dynamic = "force-dynamic";
 
+// Every chat by default, as in the design; "Open" narrows to the ones still waiting.
 const TABS = [
-  { key: "", label: "Open" },
-  { key: "handled", label: "Handled" },
-  { key: "all", label: "All" },
+  { key: "", label: "All", labelTa: "அனைத்தும்" },
+  { key: "open", label: "Open", labelTa: "திறந்தவை" },
+  { key: "handled", label: "Handled", labelTa: "பார்த்தவை" },
 ] as const;
 
 export default async function RepliesPage({ searchParams }: PageProps<"/dashboard/replies">) {
-  const { show = "", r: picked } = await searchParams;
+  const { show: rawShow = "", r: picked } = await searchParams;
+  // Older links say show=all for everything.
+  const show = rawShow === "all" ? "" : rawShow;
   const scope = await getScope();
   const mine = ownedMessages(scope);
 
@@ -92,15 +92,12 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
   const openThreadsCount = allThreads.filter((t) => !t.handled).length;
   const handledThreadsCount = allThreads.filter((t) => t.handled).length;
   const tabCount = {
-    "": openThreadsCount,
+    "": allThreads.length,
+    open: openThreadsCount,
     handled: handledThreadsCount,
-    all: allThreads.length,
   };
 
-  const replies = allThreads.filter((t) =>
-    show === "handled" ? t.handled : show === "all" ? true : !t.handled,
-  );
-  const orderInquiryCount = replies.filter((r) => r.hasOrderInquiry).length;
+  const replies = allThreads.filter((t) => (show === "handled" ? t.handled : show === "open" ? !t.handled : true));
 
   // Computers show the picked customer's conversation beside the list (the newest customer thread by default).
   let selected = replies.find((x) => x.id === picked || x.customer.id === picked);
@@ -157,77 +154,39 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
   }
 
   return (
-    <div className="flex flex-col gap-3.5">
-      <PageHeader
-        title="Chats"
-        description="Answer customers first. Free replies are open for 24 hours after they write."
-        actions={<InboxTabs active="inbox" />}
-        inlineActions
-      />
+    <PortalPage title="Chats" titleTa="உரையாடல்கள்" sub={CHATS_SUB} subTa={CHATS_SUB_TA}>
+      <InboxTabs active="inbox" />
 
-      {/* Filter pills and Mark All Handled action bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5">
-        <div className="flex items-center gap-2">
-          {TABS.map((t) => {
-            const count = tabCount[t.key];
-            const active = show === t.key;
-            return (
-              <Link
-                key={t.key}
-                href={t.key ? `/dashboard/replies?show=${t.key}` : "/dashboard/replies"}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold transition",
-                  active
-                    ? "bg-ink text-canvas shadow-xs"
-                    : "border border-line bg-card text-muted hover:border-line-strong hover:text-ink dark:hover:text-white",
-                )}
-              >
-                <span>{t.label}</span>
-                <span className={cn("rounded-full px-1.5 py-0.2 text-[11px] font-bold", active ? "bg-white/20 dark:bg-black/20" : "bg-subtle text-muted")}>
-                  {fmtNumber(count)}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-
+      <div className="chips" style={{ marginBottom: 14, alignItems: "center" }}>
+        {TABS.map((t) => (
+          <Link key={t.key} href={t.key ? `/dashboard/replies?show=${t.key}` : "/dashboard/replies"} className="chip" aria-pressed={show === t.key} scroll={false}>
+            {t.label} <small>{fmtNumber(tabCount[t.key])}</small>
+          </Link>
+        ))}
         {scope.canOperate && openThreadsCount > 0 && (
-          <ActionButton
-            action={handleAllReplies}
-            size="sm"
-            confirm="Mark every open customer conversation as handled?"
-            aria-label="Mark all handled"
-            className="text-xs font-medium text-muted hover:text-ink hover:underline"
-          >
-            <CheckCheck aria-hidden className="size-4 text-emerald-600 dark:text-emerald-400" />
-            <span>Mark all handled</span>
-          </ActionButton>
+          <PAction action={handleAllReplies} className="sm ghost" style={{ marginLeft: "auto" }} confirm="Mark every open customer conversation as handled?">
+            <T ta="அனைத்தையும் முடிந்ததாகக் குறி">Mark all handled</T>
+          </PAction>
         )}
       </div>
 
-      {/* WhatsApp 2-Column Chat Interface */}
       {replies.length ? (
-        <div className="w-full lg:h-[calc(100dvh-12rem)] lg:min-h-[660px]">
-          <ReplyInbox
-            replies={replies}
-            selectedId={selected?.id}
-            thread={thread}
-            show={typeof show === "string" ? show : ""}
-            canOperate={scope.canOperate}
-            showClient={!scope.clientId}
-          />
-        </div>
+        <ReplyInbox
+          replies={replies}
+          selectedId={selected?.id}
+          thread={thread}
+          show={typeof show === "string" ? show : ""}
+          canOperate={scope.canOperate}
+          showClient={!scope.clientId}
+        />
       ) : (
-        <Card className="card-3d rounded-[24px] p-8">
-          <EmptyState
-            icon={<MessageCircle className="size-6 stroke-[2] text-brand" />}
-            title={show === "handled" ? "Nothing handled yet" : show === "all" ? "No replies yet" : "You're all caught up"}
-          >
+        <section className="card">
+          <h2>{show === "handled" ? "Nothing handled yet" : show === "open" ? "You're all caught up" : "No replies yet"}</h2>
+          <p className="muted" style={{ marginTop: 6 }}>
             When customers tap &ldquo;Order now&rdquo; or write back after a campaign, each customer&apos;s conversation appears here.
-          </EmptyState>
-        </Card>
+          </p>
+        </section>
       )}
-    </div>
+    </PortalPage>
   );
 }
-

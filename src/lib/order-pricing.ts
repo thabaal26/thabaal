@@ -50,7 +50,9 @@ export function getOrderPricing(
     const gross = r2(storedTotal + discount);
     const diff = r2(gross - subtotal);
     if (diff > 0) return out(diff, gross);
-    if (options?.applyDefaultWhenEqual && subtotal > 0) return out(DEFAULT_SHIPPING_FEE, subtotal + DEFAULT_SHIPPING_FEE);
+    // The stored total is what the customer owes and what payments are checked against, so a stored order never
+    // gains a shipping charge it wasn't saved with (free delivery set on Edit items, orders from before shipping).
+    // applyDefaultWhenEqual is kept for callers but no longer adds ₹60 here.
     return out(0, gross);
   }
 

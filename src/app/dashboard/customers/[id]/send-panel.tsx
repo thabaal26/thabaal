@@ -11,6 +11,7 @@ import { generateCustomerFollowUpAction } from "../../actions/ai";
 import { uploadProductImage } from "../../actions/catalog";
 import { replyToCustomer, sendToCustomer } from "../../actions/send";
 import { templateLabel } from "@/lib/plain-error";
+import { useTr } from "@/lib/i18n/context";
 
 export type PanelTemplate = {
   id: string;
@@ -48,6 +49,7 @@ export function SendPanel({
   /** Why sending is off for this customer (opted out, unreachable), if it is. */
   blocked: string | null;
 }) {
+  const { tr, isTa } = useTr();
   const router = useRouter();
   const [templateId, setTemplateId] = useState(templates[0]?.id ?? "");
   const [senderId, setSenderId] = useState(numbers[0]?.id ?? "");
@@ -91,12 +93,12 @@ export function SendPanel({
 
   return (
     <Card className="@container">
-      <CardHeader title={`Message ${customer.name}`} description="Send one message to this customer now, from your portal." />
+      <CardHeader title={`Message ${customer.name}`} titleTa={`${customer.name}-க்குச் செய்தி`} description="Send one message to this customer now, from your portal." />
       <div className="grid gap-6 p-4 sm:p-5 @2xl:grid-cols-2">
         {canSend && (
           <div className="space-y-4">
             <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
-              <Send aria-hidden className="size-4 text-brand-deep" /> Send a template
+              <Send aria-hidden className="size-4 text-brand-deep" /> {tr("Send a template")}
             </p>
             {blocked ? (
               <Callout tone="warning">{blocked}</Callout>
@@ -104,7 +106,7 @@ export function SendPanel({
               <>
                 <Field id="tpl" label="Template">
                   <select className="field" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-                    {templates.map((x) => <option key={x.id} value={x.id}>{templateLabel(x.name)} · {x.category.toLowerCase()}</option>)}
+                    {templates.map((x) => <option key={x.id} value={x.id}>{templateLabel(x.name)} · {isTa ? tr(`${x.category.charAt(0)}${x.category.slice(1).toLowerCase()}`) : x.category.toLowerCase()}</option>)}
                   </select>
                 </Field>
                 {numbers.length > 0 && (
@@ -127,7 +129,7 @@ export function SendPanel({
                 )}
                 {preview && (
                   <div aria-label="Preview" className="rounded-card rounded-tr-sm bg-bubble-out px-3 py-2 text-sm text-ink shadow-card">
-                    {t?.headerType === "IMAGE" && <p className="mb-1 text-xs text-muted">[image header]</p>}
+                    {t?.headerType === "IMAGE" && <p className="mb-1 text-xs text-muted">{isTa ? "[தலைப்புப் படம்]" : "[image header]"}</p>}
                     {preview.header && <p className="font-semibold">{preview.header}</p>}
                     <p className="whitespace-pre-wrap">
                       {t?.category === "AUTHENTICATION"
@@ -139,11 +141,11 @@ export function SendPanel({
                   </div>
                 )}
                 <Button className="w-full" disabled={!templateId} loading={sending} onClick={() => send(false)}>
-                  <Send aria-hidden className="size-4" /> Send to {customer.name.split(" ")[0]}
+                  <Send aria-hidden className="size-4" /> {isTa ? `${customer.name.split(" ")[0]}-க்கு அனுப்பு` : `Send to ${customer.name.split(" ")[0]}`}
                 </Button>
               </>
             ) : (
-              <p className="text-sm text-muted">No approved templates yet. Templates appear here once Meta approves them.</p>
+              <p className="text-sm text-muted">{tr("No approved templates yet. Templates appear here once Meta approves them.")}</p>
             )}
           </div>
         )}
@@ -151,16 +153,16 @@ export function SendPanel({
         <div className="scroll-mt-24 space-y-3" id="reply">
           <div className="flex items-center justify-between gap-2">
             <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
-              <MessageSquareText aria-hidden className="size-4 text-brand-deep" /> Type a reply
+              <MessageSquareText aria-hidden className="size-4 text-brand-deep" /> {tr("Type a reply")}
             </p>
             {windowOpen && (
               <button
                 type="button"
                 onClick={() => setShowMediaInput((v) => !v)}
-                className="inline-flex items-center gap-1 text-xs font-medium text-brand-deep hover:underline"
+                className="inline-flex min-h-10 items-center gap-1 text-xs font-medium text-brand-deep hover:underline sm:min-h-0"
               >
                 <ImagePlus aria-hidden className="size-3.5" />
-                {showMediaInput || mediaUrl ? "Hide attachment" : "Attach photo / PDF"}
+                {tr(showMediaInput || mediaUrl ? "Hide attachment" : "Attach photo / PDF")}
               </button>
             )}
           </div>
@@ -168,35 +170,43 @@ export function SendPanel({
             <>
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-deep">
-                  <Sparkles aria-hidden className="size-3.5" /> Free AI Draft:
+                  <Sparkles aria-hidden className="size-3.5" /> {tr("Free AI Draft:")}
                 </span>
                 <button
                   type="button"
                   disabled={aiDrafting}
                   onClick={() => draftWithAi("winback")}
-                  className="rounded-full border border-line bg-subtle px-2.5 py-0.5 text-[11px] font-medium text-ink transition hover:border-brand hover:text-brand-deep disabled:opacity-50"
+                  className="inline-flex min-h-10 items-center rounded-full border border-line bg-subtle px-3 py-0.5 text-[11px] font-medium text-ink transition hover:border-brand hover:text-brand-deep disabled:opacity-50 sm:min-h-0 sm:px-2.5"
                 >
-                  ✨ Restock / Win-Back
+                  {tr("✨ Restock / Win-Back")}
                 </button>
                 <button
                   type="button"
                   disabled={aiDrafting}
                   onClick={() => draftWithAi("payment_followup")}
-                  className="rounded-full border border-line bg-subtle px-2.5 py-0.5 text-[11px] font-medium text-ink transition hover:border-brand hover:text-brand-deep disabled:opacity-50"
+                  className="inline-flex min-h-10 items-center rounded-full border border-line bg-subtle px-3 py-0.5 text-[11px] font-medium text-ink transition hover:border-brand hover:text-brand-deep disabled:opacity-50 sm:min-h-0 sm:px-2.5"
                 >
-                  💳 Payment Reminder
+                  {tr("💳 Payment Reminder")}
                 </button>
                 <button
                   type="button"
                   disabled={aiDrafting}
                   onClick={() => draftWithAi("vip_new_arrival")}
-                  className="rounded-full border border-line bg-subtle px-2.5 py-0.5 text-[11px] font-medium text-ink transition hover:border-brand hover:text-brand-deep disabled:opacity-50"
+                  className="inline-flex min-h-10 items-center rounded-full border border-line bg-subtle px-3 py-0.5 text-[11px] font-medium text-ink transition hover:border-brand hover:text-brand-deep disabled:opacity-50 sm:min-h-0 sm:px-2.5"
                 >
-                  🌟 VIP New Arrival
+                  {tr("🌟 VIP New Arrival")}
                 </button>
               </div>
-              <Field id="reply-text" label={`Reply to ${customer.name}`} help={`They wrote to you recently, so you can reply freely until ${windowEndsAt} (1,000 free/mo per number).`}>
-                <textarea className="field min-h-28" maxLength={4000} placeholder={`Reply to ${customer.name}…`} value={text} onChange={(e) => setText(e.target.value)} />
+              <Field
+                id="reply-text"
+                label={isTa ? `${customer.name}-க்குப் பதில்` : `Reply to ${customer.name}`}
+                help={
+                  isTa
+                    ? `அவர்கள் சமீபத்தில் உங்களுக்கு எழுதினார்கள், எனவே ${windowEndsAt} வரை தாராளமாகப் பதில் அனுப்பலாம் (ஒரு எண்ணுக்கு மாதம் 1,000 இலவசம்).`
+                    : `They wrote to you recently, so you can reply freely until ${windowEndsAt} (1,000 free/mo per number).`
+                }
+              >
+                <textarea className="field min-h-28" maxLength={4000} placeholder={isTa ? `${customer.name}-க்குப் பதில்…` : `Reply to ${customer.name}…`} value={text} onChange={(e) => setText(e.target.value)} />
               </Field>
               {(showMediaInput || mediaUrl) && (
                 <div className="space-y-2 rounded-control border border-line bg-sunken/70 p-2.5">
@@ -210,18 +220,18 @@ export function SendPanel({
                     {mediaUrl && (
                       <button
                         type="button"
-                        aria-label="Clear attachment"
+                        aria-label={isTa ? "இணைப்பை அழி" : "Clear attachment"}
                         onClick={() => setMediaUrl("")}
-                        className="rounded-control p-1.5 text-muted hover:bg-canvas hover:text-ink"
+                        className="grid size-10 place-items-center rounded-control text-muted hover:bg-canvas hover:text-ink sm:size-8"
                       >
                         <X className="size-4" />
                       </button>
                     )}
                   </div>
                   <div className="flex items-center justify-between gap-2 text-xs text-muted">
-                    <span>Or upload a photo or PDF (max 4 MB):</span>
-                    <label className="cursor-pointer font-semibold text-brand-deep hover:underline">
-                      {uploading ? "Uploading…" : "Choose file"}
+                    <span>{tr("Or upload a photo or PDF (max 4 MB):")}</span>
+                    <label className="inline-flex min-h-10 cursor-pointer items-center font-semibold text-brand-deep hover:underline sm:min-h-0">
+                      {tr(uploading ? "Uploading…" : "Choose file")}
                       <input
                         type="file"
                         accept="image/jpeg,image/png,image/webp,application/pdf"
@@ -265,7 +275,7 @@ export function SendPanel({
             </>
           ) : (
             <p className="rounded-control bg-sunken px-3 py-2 text-sm text-muted">
-              Typed messages need the customer to have written to you in the last 24 hours. Until then, send a template.
+              {tr("Typed messages need the customer to have written to you in the last 24 hours. Until then, send a template.")}
             </p>
           )}
         </div>

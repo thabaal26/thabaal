@@ -1,18 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Inter, Noto_Sans_Tamil, Nunito, Poppins } from "next/font/google";
+import { DM_Sans, Geist, Geist_Mono, Inter, Noto_Sans_Tamil, Nunito, Poppins } from "next/font/google";
 import { ConfirmHost } from "@/components/confirm";
 import { ServiceWorkerRegister } from "@/components/sw-register";
 import { Toaster } from "@/components/toast";
 import { THEME_SCRIPT } from "@/lib/theme-script";
 import "./globals.css";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"], display: "swap" });
+const dmSans = DM_Sans({ variable: "--font-dm-sans", subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap" });
+const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"], display: "swap", preload: false });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"], display: "swap", preload: false });
 // Fonts a portal can pick (Settings → Appearance). Not preloaded: a browser only downloads one
 // when the page actually uses it.
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"], display: "swap", preload: false });
 const poppins = Poppins({ variable: "--font-poppins", subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap", preload: false });
-const nunito = Nunito({ variable: "--font-nunito", subsets: ["latin"], weight: ["400", "600", "700", "800"], display: "swap" });
+const nunito = Nunito({ variable: "--font-nunito", subsets: ["latin"], weight: ["400", "600", "700", "800"], display: "swap", preload: false });
 // Campaign text, replies and the catalogue are often Tamil. The font's unicode-range means
 // browsers only fetch it on pages that actually contain Tamil, so it isn't preloaded.
 const tamil = Noto_Sans_Tamil({ variable: "--font-tamil", subsets: ["tamil"], weight: ["400", "500", "600", "700"], display: "swap", preload: false });
@@ -41,15 +42,31 @@ export const viewport: Viewport = {
   themeColor: "#171b24",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+import { cookies } from "next/headers";
+import { LanguageProvider } from "@/lib/i18n/context";
+
+const LANG_SCRIPT = `(function(){try{var l=localStorage.getItem("thabaal-lang");if(l==="ta"||l==="en"){document.documentElement.lang=l;}}catch(e){}})();`;
+
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  let lang = "en";
+  try {
+    const store = await cookies();
+    const c = store.get("thabaal-lang")?.value;
+    if (c === "ta" || c === "en") lang = c;
+  } catch {}
+
   return (
-    <html lang="en" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} ${tamil.variable} ${nunito.variable} ${inter.variable} ${poppins.variable} h-full antialiased`}>
+    <html lang={lang} suppressHydrationWarning className={`${dmSans.variable} ${geistSans.variable} ${geistMono.variable} ${tamil.variable} ${nunito.variable} ${inter.variable} ${poppins.variable} h-full antialiased`}>
       <head>
         {/* Sets light or dark before the first paint, from the saved choice or the device setting. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        {/* Sets html lang before the first paint, from the saved choice or cookie. */}
+        <script dangerouslySetInnerHTML={{ __html: LANG_SCRIPT }} />
       </head>
-      <body className="min-h-full font-sans">
-        {children}
+      <body className="min-h-full font-sans" suppressHydrationWarning>
+        <LanguageProvider>
+          {children}
+        </LanguageProvider>
         <Toaster />
         <ConfirmHost />
         <ServiceWorkerRegister />

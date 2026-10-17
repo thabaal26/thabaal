@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useTransition, useState, useEffect } from "react";
+import { useTransition, useState } from "react";
 import { Search, X } from "@/components/icons";
 
 export function TemplateSearchInput({
@@ -15,12 +15,14 @@ export function TemplateSearchInput({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const currentQ = searchParams.get("q") ?? "";
+  const [prevQ, setPrevQ] = useState(currentQ);
   const [value, setValue] = useState(defaultValue);
 
-  // Sync state if URL query changes externally
-  useEffect(() => {
-    setValue(searchParams.get("q") ?? "");
-  }, [searchParams]);
+  if (currentQ !== prevQ) {
+    setPrevQ(currentQ);
+    setValue(currentQ);
+  }
 
   function updateQuery(nextQ: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -70,7 +72,7 @@ export function TemplateSearchInput({
         }}
         placeholder={placeholder}
         aria-label="Search templates"
-        className="field h-9 w-full rounded-xl border border-line bg-panel pl-9 pr-8 text-xs text-ink placeholder:text-muted focus:border-brand focus:ring-1 focus:ring-brand shadow-sm"
+        className="field h-10 w-full rounded-xl sm:h-9 border border-line bg-panel pl-9 pr-8 text-xs text-ink placeholder:text-muted focus:border-brand focus:ring-1 focus:ring-brand shadow-sm"
       />
       {value && (
         <button

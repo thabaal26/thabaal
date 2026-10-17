@@ -13,7 +13,7 @@ let url = process.env.TEST_DATABASE_URL;
 if (!url) {
   const { default: EmbeddedPostgres } = await import("embedded-postgres");
   const dir = path.resolve(".testdb");
-  pg = new EmbeddedPostgres({ databaseDir: dir, user: "postgres", password: "test", port: 5433, persistent: true, onLog: () => {} });
+  pg = new EmbeddedPostgres({ databaseDir: dir, user: "postgres", password: "test", port: 5433, persistent: true, initdbFlags: ["-E", "UTF8", "--locale=C"], onLog: () => {} });
   if (!fs.existsSync(path.join(dir, "PG_VERSION"))) await pg.initialise();
   await pg.start();
   await pg.dropDatabase("thabaal_test").catch(() => {});

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Trophy } from "@/components/icons";
 import { Sparkles3D } from "@/components/icons-3d";
-import { toastResult } from "@/components/toast";
+import { safeAction, toastResult } from "@/components/toast";
 import { Badge, Button, Card, CardHeader } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { saveLoyaltyAutoRedeem, setOrderPointsAction } from "../actions/orders";
@@ -44,7 +44,7 @@ export function OrderPointsControl({
 
   const run = (value: number) =>
     start(async () => {
-      toastResult(await setOrderPointsAction(orderId, value));
+      toastResult(await safeAction(() => setOrderPointsAction(orderId, value)));
       router.refresh();
     });
 
@@ -108,7 +108,7 @@ export function LoyaltyRedeemSetting({ on }: { on: boolean }) {
     if (next === value) return;
     setValue(next);
     start(async () => {
-      const r = await saveLoyaltyAutoRedeem(next);
+      const r = await safeAction(() => saveLoyaltyAutoRedeem(next));
       toastResult(r);
       if (!r.ok) setValue(!next);
       router.refresh();

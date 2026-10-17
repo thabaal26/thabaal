@@ -25,6 +25,7 @@ export default async function EditTemplatePage({ params }: PageProps<"/dashboard
       <>
         <PageHeader
           title={t.name}
+          titleIsData
           back={back}
           meta={
             <span className="flex flex-wrap items-center gap-2">
@@ -49,6 +50,7 @@ export default async function EditTemplatePage({ params }: PageProps<"/dashboard
     <>
       <PageHeader
         title={t.name}
+        titleIsData
         back={back}
         meta={`${t.client.name} · ${templateDateLabel(t.createdAt, t.updatedAt)}${t.lastSyncedAt ? ` · synced with Meta ${fmtDate(t.lastSyncedAt)}` : ""}`}
       />

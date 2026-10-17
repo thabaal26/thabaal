@@ -1,5 +1,6 @@
 import Link from "@/components/intent-link";
 import { cn } from "@/lib/cn";
+import { T } from "../../portal-ui";
 
 /** Newest or oldest orders first; a link pair so the choice lives in the URL like the filters. */
 export function SortSwitch({ value, newHref, oldHref }: { value: "new" | "old"; newHref: string; oldHref: string }) {
@@ -11,10 +12,10 @@ export function SortSwitch({ value, newHref, oldHref }: { value: "new" | "old"; 
   return (
     <nav aria-label="Order" className="inline-flex w-full rounded-control bg-sunken p-1 sm:w-auto">
       <Link href={newHref} aria-current={value === "new" ? "true" : undefined} className={item(value === "new")}>
-        Newest first
+        <T>Newest first</T>
       </Link>
       <Link href={oldHref} aria-current={value === "old" ? "true" : undefined} className={item(value === "old")}>
-        Oldest first
+        <T>Oldest first</T>
       </Link>
     </nav>
   );

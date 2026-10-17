@@ -1,24 +1,30 @@
-import { Building2, CheckCircle2, Circle, LogOut, SquarePen } from "@/components/icons";
-import { Building3D, Clock3D, Eye3D, Phone3D, Send3D, Sparkles3D, Users3D } from "@/components/icons-3d";
+import { Building2, CheckCircle2, Circle, LogOut } from "@/components/icons";
+import { Clock3D, Send3D, Sparkles3D } from "@/components/icons-3d";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "@/components/intent-link";
-import { Badge, buttonClass, Callout, Card, CardHeader, PageHeader, QualityBadge } from "@/components/ui";
+import { Badge, Callout, Card, CardHeader } from "@/components/ui";
+import { buttonClass } from "@/components/ui-classes";
 import { ThemeChoice } from "@/components/theme-toggle";
 import { getCatalogWithProducts } from "@/lib/catalog";
 import { db } from "@/lib/db";
 import { numberHealth } from "@/lib/limits";
 import { fmtDate } from "@/lib/format";
 import { keyId } from "@/lib/secret-box";
-import { requireUser } from "@/lib/session";
+import { getScope, requireUser } from "@/lib/session";
 import { logout } from "../../login/actions";
 import { cn } from "@/lib/cn";
 import { getSettings, wahaConfig } from "@/lib/provider";
 import { waConfig } from "@/lib/whatsapp";
 import { LocalSessionPanel, ProviderSwitch } from "./provider-panel";
 import { PasswordForm } from "./password-form";
+import { OrderStepsForm } from "./order-steps-form";
+import { readFlow } from "@/lib/order-flow";
 import { AppearanceEditor } from "../appearance-editor";
 import { portalDefault } from "@/lib/appearance";
+import { spendSummary } from "@/lib/spend";
+import { inr } from "../portal-format";
+import { LangChoice, PortalPage, T } from "../portal-ui";
 
 /** Within the last two days (module scope keeps the clock read out of render). */
 const seenRecently = (d: Date | null) => Boolean(d && Date.now() - d.getTime() < 2 * 86_400_000);
@@ -49,25 +55,55 @@ function Copyable({ label, value }: { label: string; value: string }) {
 
 export default async function SettingsPage() {
   const user = await requireUser();
-  const account = (
-    <Card className="card-3d">
-      <CardHeader tone="violet" icon={<Users3D />} title="Your account" description={`Signed in as ${user.email}`} />
+  const accountCard = (
+    <section className="card">
+      <div className="hd">
+        <div>
+          <h2><T ta="உங்கள் கணக்கு">Your account</T></h2>
+          <p><T ta="உள்நுழைந்துள்ள கணக்கு">Signed in as</T> {user.email}</p>
+        </div>
+        <form action={logout}>
+          <button className="btn sm">
+            <LogOut aria-hidden className="ic" style={{ width: 15, height: 15 }} /> <T ta="வெளியேறு">Sign out</T>
+          </button>
+        </form>
+      </div>
       <PasswordForm />
-      <form action={logout} className="border-t border-line p-4 sm:p-5">
-        <button className={buttonClass("secondary") + " w-full sm:w-auto"}>
-          <LogOut aria-hidden className="size-4" /> Sign out
-        </button>
-      </form>
-    </Card>
+    </section>
   );
-  const look = (
-    <Card className="card-3d">
-      <CardHeader tone="amber" icon={<Eye3D />} title="Look" description="Light, dark, or follow this phone or computer. Remembered on this device." action={<ThemeChoice />} />
-    </Card>
+  const lookCard = (
+    <section className="card">
+      <div className="hd">
+        <div>
+          <h2><T ta="தோற்றம்">Look</T></h2>
+          <p><T ta="வெளிச்சம், இருள் அல்லது உங்கள் சாதனத்தின்படி. இந்த சாதனத்தில் நினைவில் வைக்கப்படும்.">Light, dark, or follow your device. Remembered on this device.</T></p>
+        </div>
+        <ThemeChoice />
+      </div>
+    </section>
   );
+  const langCard = (
+    <section className="card">
+      <div className="hd">
+        <div>
+          <h2><T ta="மொழி">Language</T></h2>
+          <p><T ta="போர்ட்டலில் உள்ள அனைத்து சொற்களையும் மாற்றுகிறது. ஒவ்வொரு பக்கத்தின் மேலேயும் உள்ள பொத்தானிலும் மாற்றலாம்.">Changes the labels across the portal. Also on the button at the top of every page.</T></p>
+        </div>
+        <LangChoice />
+      </div>
+      <p className="muted small"><T ta="எளிய தமிழில் காட்டப்படும். எண்கள், தொகை மற்றும் பொத்தான்கள் இரு மொழிகளிலும் ஒரே மாதிரியாக இருக்கும்.">Helper text stays in simple words. Numbers, money and buttons look the same in both languages.</T></p>
+    </section>
+  );
+  const frame = (children: React.ReactNode, actions?: React.ReactNode) => (
+    <PortalPage title="Settings" titleTa="அமைப்புகள்" sub="WhatsApp numbers, payment details, language and your account." subTa="வாட்ஸ்அப் எண்கள், பண விவரங்கள், மொழி மற்றும் உங்கள் கணக்கு." actions={actions}>
+      {children}
+    </PortalPage>
+  );
+
   if (user.role !== "ADMIN") {
     const cid = user.clientId;
-    const [numbers, customers, products, ordersCount] = cid
+    const scope = await getScope();
+    const [numbers, customers, products, ordersCount, client, spend] = cid
       ? await Promise.all([
           numberHealth(cid).catch(() => []),
           db.customer.count({ where: { clientId: cid, optedOut: false } }),
@@ -75,85 +111,206 @@ export default async function SettingsPage() {
             .then((c) => c?.products.length ?? null)
             .catch(() => null),
           db.order.count({ where: { clientId: cid } }),
+          db.client.findUnique({ where: { id: cid }, select: { name: true, website: true, supportPhone: true, paymentConfig: true, billingMode: true, orderFlow: true } }),
+          spendSummary(cid).catch(() => null),
         ])
-      : [[], 0, null, 0];
-    return (
-      <>
-        <PageHeader
-          title="Settings"
-          description={user.client ? `Your login, look and WhatsApp numbers for ${user.client.name}.` : "Your account."}
-          actions={<Link href="/dashboard/templates" className={buttonClass("secondary") + " lg:hidden"}><SquarePen aria-hidden className="size-4" /> Templates</Link>}
-        />
-        <div className="grid max-w-5xl items-start gap-4 sm:gap-6 lg:grid-cols-2">
-          <div className="space-y-4 sm:space-y-6">
-            {look}
-            {cid && (
-              <Card className="card-3d">
-                <CardHeader tone="brand" icon={<Phone3D />} title="WhatsApp numbers" description="Live from Meta: how healthy each number is and how many people it can message a day." />
-                {numbers.length ? (
-                  <ul className="divide-y divide-line">
-                    {numbers.map((n) => (
-                      <li key={n.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 sm:px-5">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-ink">
-                            {n.verifiedName || n.label}
-                            {n.isDefault && <span className="ml-1.5 text-xs font-medium text-muted">· main number</span>}
-                          </p>
-                          <p className="tabular text-xs text-muted">
-                            {n.displayPhone ?? "Number not shown yet"}
-                            {n.limit != null ? ` · up to ${n.limit.toLocaleString("en-IN")} customers a day` : ""}
-                          </p>
-                        </div>
-                        <QualityBadge rating={n.qualityRating} />
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="px-4 py-3 text-sm text-muted sm:px-5">No WhatsApp number connected yet. Your Thabaal admin adds it.</p>
+      : [[], 0, null, 0, null, null];
+    const quality = (r: string | null | undefined) => (
+      r === "GREEN" ? { tone: "ok", label: "High quality", labelTa: "உயர்ந்த தரம்" }
+      : r === "YELLOW" ? { tone: "warn", label: "Medium quality", labelTa: "நடுத்தர தரம்" }
+      : r === "RED" ? { tone: "bad", label: "Low quality", labelTa: "குறைந்த தரம்" }
+      : { tone: "mute", label: "Not rated yet", labelTa: "இன்னும் மதிப்பிடப்படவில்லை" }
+    );
+    return frame(
+      <div className="stack">
+        {cid && (
+          <section className="card">
+            <div className="hd">
+              <div>
+                <h2><T ta="வாடிக்கையாளர்கள் எவ்வாறு செலுத்துகிறார்கள்">How customers pay</T></h2>
+                <p><T ta="WhatsApp கொடுப்பனவுகள், UPI மற்றும் டெலிவரி ரொக்கம் (COD).">WhatsApp payments, UPI and cash on delivery.</T></p>
+              </div>
+              <Link className="btn sm" href="/dashboard/revenue?tab=set">
+                <T ta="பண அமைப்புகளைத் திற">Open payment settings</T>
+              </Link>
+            </div>
+            <div className="list">
+              <div className="row">
+                <div className="grow t"><T ta="WhatsApp-லேயே செலுத்தவும்">Pay inside WhatsApp</T></div>
+                <span className={`pill ${client?.paymentConfig ? "ok" : "mute"}`}>
+                  <T ta={client?.paymentConfig ? "இயக்கத்தில் உள்ளது" : "முடக்கப்பட்டுள்ளது"}>
+                    {client?.paymentConfig ? "On" : "Off"}
+                  </T>
+                </span>
+              </div>
+              <div className="row">
+                <div className="grow t"><T ta="UPI அல்லது வங்கி (உங்களால் செலுத்தப்பட்டதாக குறிக்கப்படும்)">UPI or bank (marked paid by you)</T></div>
+                <span className="pill ok"><T ta="இயக்கத்தில் உள்ளது">On</T></span>
+              </div>
+              <div className="row">
+                <div className="grow t"><T ta="டெலிவரி ரொக்கம் (COD)">Cash on delivery</T></div>
+                <span className="muted small"><T ta="ஒவ்வொரு ஆர்டருக்கும் தேர்வு செய்யப்படும்">Chosen per order</T></span>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {cid && client && <OrderStepsForm current={readFlow(client.orderFlow)} canChange={scope.canManage} />}
+
+        {cid && spend && (
+          <section className="card">
+            <div className="hd">
+              <div>
+                <h2><T ta="WhatsApp கட்டண விவரங்கள்">WhatsApp billing</T></h2>
+                <p><T ta="செய்திகளுக்கு Meta உங்களிடம் வசூலிப்பது. எளிய விவரம் அறிக்கைகளில் உள்ளது.">What Meta charges you for messages. The simple version is in Reports.</T></p>
+              </div>
+              <Link className="btn" href="/dashboard/report">
+                <T ta="அறிக்கைகளில் செலவுகள்">See costs in Reports</T>
+              </Link>
+            </div>
+            <div className="grid g3">
+              <div className="stat">
+                <div className="l">
+                  <T ta={spend.metaAccount.liveBalance > 0 || spend.prepaidFunds > 0 ? "மீதமுள்ள இருப்பு" : "இருப்பு"}>
+                    {spend.metaAccount.liveBalance > 0 || spend.prepaidFunds > 0 ? "Balance left" : "Balance"}
+                  </T>
+                </div>
+                <div className="v">{spend.metaAccount.liveBalance > 0 || spend.prepaidFunds > 0 ? inr(spend.remainingBalance) : "—"}</div>
+              </div>
+              <div className="stat">
+                <div className="l"><T ta="இந்த மாதம்">This month</T></div>
+                <div className="v">{inr(spend.totalMonthSpentWithGst)}</div>
+                <div className="d muted">
+                  <T ta={spend.liveSyncedFromMeta ? "GST உடன்" : "GST உடன் (மதிப்பீடு)"}>
+                    with GST{spend.liveSyncedFromMeta ? "" : " (estimate)"}
+                  </T>
+                </div>
+              </div>
+              <div className="stat">
+                <div className="l"><T ta="மீதமுள்ள இலவச பதில்கள்">Free replies left</T></div>
+                <div className="v">{spend.serviceQuota.freeRemaining.toLocaleString("en-IN")}</div>
+                <div className="d muted">
+                  <T ta={`${spend.serviceQuota.totalFreeLimit.toLocaleString("en-IN")}-ல்`}>
+                    of {spend.serviceQuota.totalFreeLimit.toLocaleString("en-IN")}
+                  </T>
+                </div>
+              </div>
+            </div>
+            {spend.metaAccount.billingUrl && (
+              <div className="tools" style={{ marginTop: 14 }}>
+                {scope.canManage && (
+                  <a className="btn primary sm" href={spend.metaAccount.billingUrl} target="_blank" rel="noopener noreferrer">
+                    <T ta="Meta-வில் ரீசார்ஜ் செய்">Recharge on Meta</T>
+                  </a>
                 )}
-              </Card>
+                <a className="btn sm" href={spend.metaAccount.billingUrl} target="_blank" rel="noopener noreferrer">
+                  <T ta="Meta விலைப்பட்டியல்களைப் பதிவிறக்கு">Download Meta invoices</T>
+                </a>
+                <a className="btn sm ghost" href="https://business.facebook.com/commerce" target="_blank" rel="noopener noreferrer">
+                  <T ta="Meta-வில் பட்டியல்">Catalogue on Meta</T>
+                </a>
+              </div>
             )}
-            {cid && (
-              <Card className="card-3d">
-                <CardHeader tone="brand" icon={<Building3D />} title="Business details" description={user.client?.name} />
-                <dl className="grid grid-cols-3 divide-x divide-line">
-                  {[
-                    ["Customers", customers],
-                    ["Products", products],
-                    ["Orders", ordersCount],
-                  ].map(([label, v]) => (
-                    <div key={label as string} className="px-4 py-3 sm:px-5">
-                      <dt className="text-xs text-muted">{label}</dt>
-                      <dd className="tabular font-display text-xl font-semibold text-ink">{v == null ? "—" : Number(v).toLocaleString("en-IN")}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </Card>
-            )}
-          </div>
-          {account}
+          </section>
+        )}
+
+        <div className="grid g2" style={{ alignItems: "start" }}>
+          {langCard}
+          {lookCard}
         </div>
-      </>
+
+        {accountCard}
+
+        {cid && (
+          <section className="card">
+            <div className="hd">
+              <div>
+                <h2><T ta="WhatsApp எண்கள்">WhatsApp numbers</T></h2>
+                <p><T ta="தரம் மதிப்பீடு உங்கள் செய்திகளைப் பற்றி வாடிக்கையாளர்கள் எவ்வாறு உணர்கிறார்கள் என்பதைக் காட்டுகிறது.">Quality rating shows how customers feel about your messages.</T></p>
+              </div>
+            </div>
+            <div className="list">
+              {numbers.map((n) => {
+                const qy = quality(n.qualityRating);
+                return (
+                  <div key={n.id} className="row">
+                    <div className="grow">
+                      <div className="t">
+                        {n.verifiedName || n.label}
+                        {n.isDefault && (
+                          <span className="muted small">
+                            {" "}· <T ta="முதன்மை எண்">main number</T>
+                          </span>
+                        )}
+                      </div>
+                      <div className="muted small">
+                        {n.displayPhone ?? <T ta="எண் இன்னும் காட்டப்படவில்லை">Number not shown yet</T>}
+                        {n.limit != null ? (
+                          <>
+                            {" "}· <T ta={`ஒரு நாளைக்கு ${n.limit.toLocaleString("en-IN")} வாடிக்கையாளர்கள் வரை`}>{`up to ${n.limit.toLocaleString("en-IN")} customers a day`}</T>
+                          </>
+                        ) : ""}
+                      </div>
+                    </div>
+                    <span className={`pill ${qy.tone}`}><T ta={qy.labelTa}>{qy.label}</T></span>
+                  </div>
+                );
+              })}
+              {numbers.length === 0 && (
+                <p className="muted small">
+                  <T ta="இன்னும் WhatsApp எண் இணைக்கப்படவில்லை. உங்கள் தபால் நிர்வாகி இதைச் சேர்ப்பார்.">No WhatsApp number connected yet. Your Thabaal admin adds it.</T>
+                </p>
+              )}
+            </div>
+          </section>
+        )}
+
+        {cid && (
+          <section className="card">
+            <div className="hd">
+              <div>
+                <h2><T ta="வணிக விவரங்கள்">Business details</T></h2>
+                <p>{client?.name}</p>
+              </div>
+            </div>
+            <div className="grid g3" style={{ marginBottom: 12 }}>
+              {[
+                { label: "Customers", labelTa: "வாடிக்கையாளர்கள்", v: customers },
+                { label: "Orders", labelTa: "ஆர்டர்கள்", v: ordersCount },
+                { label: "Products", labelTa: "பொருட்கள்", v: products },
+              ].map(({ label, labelTa, v }) => (
+                <div key={label} className="stat">
+                  <div className="l"><T ta={labelTa}>{label}</T></div>
+                  <div className="v">{v == null ? "—" : Number(v).toLocaleString("en-IN")}</div>
+                </div>
+              ))}
+            </div>
+            <div className="list">
+              <div className="row">
+                <div className="grow muted"><T ta="இணையதளம்">Website</T></div>
+                <span>{client?.website || "—"}</span>
+              </div>
+              <div className="row">
+                <div className="grow muted"><T ta="தொலைபேசி எண்">Phone</T></div>
+                <span>{client?.supportPhone || "—"}</span>
+              </div>
+            </div>
+          </section>
+        )}
+      </div>,
     );
   }
 
   const cfg = waConfig();
   const settings = await getSettings();
+  // An admin looking at one client can set that client's order steps here too.
+  const adminScope = await getScope();
+  const pickedFlow = adminScope.clientId ? (await db.client.findUnique({ where: { id: adminScope.clientId }, select: { orderFlow: true } }))?.orderFlow : undefined;
   const h = await headers();
   const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
 
-  return (
+  return frame(
     <>
-      <PageHeader
-        title="Settings"
-        description="Your login, look and WhatsApp numbers."
-        actions={
-          <>
-            <Link href="/dashboard/templates" className={buttonClass("secondary") + " lg:hidden"}><SquarePen aria-hidden className="size-4" /> Templates</Link>
-            <Link href="/dashboard/clients" className={buttonClass("secondary")}><Building2 aria-hidden className="size-4" /> Clients</Link>
-          </>
-        }
-      />
       <ProviderSwitch provider={settings.provider} metaLive={cfg.live} localReady={!!wahaConfig(settings)} />
       <div className="mt-4 grid items-start gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-2">
         <LocalSessionPanel
@@ -215,11 +372,17 @@ export default async function SettingsPage() {
             </div>
           </Card>
           <div className="space-y-4 sm:space-y-6">
-            {look}
-            {account}
+            {langCard}
+            {lookCard}
+            {accountCard}
           </div>
         </div>
       </div>
+      {adminScope.clientId && pickedFlow !== undefined && (
+        <div className="mt-4 sm:mt-6">
+          <OrderStepsForm current={readFlow(pickedFlow)} canChange />
+        </div>
+      )}
       <Card id="appearance" className="card-3d mt-4 scroll-mt-20 sm:mt-6">
         <CardHeader
           tone="violet"
@@ -232,6 +395,9 @@ export default async function SettingsPage() {
           <AppearanceEditor mode="portal" initial={portalDefault(settings.appearance)} />
         </div>
       </Card>
-    </>
+    </>,
+    <Link className="btn" href="/dashboard/clients">
+      <Building2 aria-hidden className="ic" style={{ width: 15, height: 15 }} /> Clients
+    </Link>,
   );
 }

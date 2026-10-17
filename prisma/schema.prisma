@@ -54,6 +54,8 @@ model Client {
   defaultImageUrl     String?
   /// City the business delivers from; customer regions are "<city> city" / "Outside <city>". Null means Madurai (clients set up before this).
   homeCity            String?
+  /// Order steps the client picked in Settings (lib/order-flow.ts): pickup, deliver, courier or service. Null = deliver.
+  orderFlow           String?
   /// Kind of business (lib/business-types.ts): retail, restaurant, service, wholesale or other. Null = not chosen yet.
   businessType        String?
   /// Extra fields this client keeps on customers and orders: [{ key, label, type, options?, on }] (lib/custom-fields.ts).
@@ -205,6 +207,7 @@ model Customer {
   replies          Reply[]
   orders           Order[]
   calls            Call[]
+  loyaltyEntries   LoyaltyEntry[]
 
   @@unique([clientId, phone])
   @@index([phone])
@@ -442,6 +445,8 @@ model Order {
   total              Float       @default(0)
   currency           String      @default("INR")
   status             OrderStatus @default(NEW)
+  /// When the order was marked packed (the "Packed" step); status stays CONFIRMED or PAID until it is dispatched.
+  packedAt           DateTime?
   /// Our own notes: payment mode, delivery slot, address.
   internalNote       String?
   /// Values of the client's custom order fields, by key (lib/custom-fields.ts).
@@ -584,6 +589,27 @@ model WalletEntry {
 }
 
 /// Failed password logins, for slowing down guessing (lib/login-guard.ts). Old rows are pruned.
+/// Loyalty points given, taken back or used on a bill by hand (Customers › Loyalty), with the reason and who did it.
+/// Points earned and used on orders come from the orders themselves; these are the hand changes for the history.
+model LoyaltyEntry {
+  id         String   @id @default(cuid())
+  clientId   String
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  /// Points added (positive) or taken off (negative).
+  delta      Int
+  /// "give", "take" or "redeem"
+  kind       String
+  reason     String
+  byName     String?
+  /// Whether the customer was told on WhatsApp.
+  told       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([clientId, createdAt])
+  @@index([customerId])
+}
+
 model LoginAttempt {
   id        String   @id @default(cuid())
   /// "email:<address>" or "ip:<address>"

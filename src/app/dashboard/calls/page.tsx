@@ -1,27 +1,20 @@
-import { PhoneCall, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
-import { Phone3D } from "@/components/icons-3d";
-import { Badge, Card, CardHeader, EmptyState, IconCube, PageHeader, Stat } from "@/components/ui";
-import { cn } from "@/lib/cn";
+import { PhoneCall, PhoneIncoming, PhoneMissed, PhoneOff } from "@/components/icons";
+import { Stat } from "@/components/ui";
 import { db } from "@/lib/db";
-import { fmtDate, fmtNumber } from "@/lib/format";
+import { fmtDate } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { getScope, owned } from "@/lib/session";
+import { PortalPage, Pill, T, type PillTone } from "../portal-ui";
+import { CHATS_SUB, CHATS_SUB_TA, InboxTabs } from "../replies/inbox-tabs";
 
 export const metadata: Metadata = { title: "Calls" };
 export const dynamic = "force-dynamic";
 
-const STATUS = {
-  RINGING: { tone: "amber", label: "Ringing", icon: PhoneIncoming },
-  ANSWERED: { tone: "green", label: "On call", icon: PhoneCall },
-  ENDED: { tone: "gray", label: "Answered", icon: PhoneCall },
-  MISSED: { tone: "red", label: "Missed", icon: PhoneMissed },
-  REJECTED: { tone: "gray", label: "Declined", icon: PhoneOff },
-} as const;
+const dur = (s: number) => (s >= 60 ? `${Math.floor(s / 60)} m ${s % 60} s` : `${s} s`);
 
-const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-
+/** Chats › Calls: WhatsApp voice calls from the call log (portal design). */
 export default async function CallsPage() {
   const scope = await getScope();
   const calls = await db.call.findMany({
@@ -31,88 +24,125 @@ export default async function CallsPage() {
     take: 200,
   });
 
-  const connectedCount = calls.filter((c) => c.status === "ENDED" || c.status === "ANSWERED").length;
-  const missedCount = calls.filter((c) => c.status === "MISSED" || c.status === "REJECTED").length;
-  const outgoingCount = calls.filter((c) => c.direction === "OUTGOING").length;
+  const answered = calls.filter((c) => c.status === "ENDED" || c.status === "ANSWERED");
+  const connected = answered.length;
+  const answeredIn = answered.filter((c) => c.direction !== "OUTGOING").length;
+  const missed = calls.filter((c) => c.status === "MISSED").length;
+  const declined = calls.filter((c) => c.status === "REJECTED").length;
+
+  const result = (c: (typeof calls)[number]): { label: string; tone: PillTone } => {
+    const out = c.direction === "OUTGOING";
+    switch (c.status) {
+      case "RINGING":
+        return { label: "Ringing", tone: "warn" };
+      case "ANSWERED":
+        return { label: "On call", tone: "ok" };
+      case "ENDED":
+        return { label: out ? "Connected" : "Answered", tone: "ok" };
+      case "MISSED":
+        return { label: out ? "No answer" : "Missed", tone: "bad" };
+      default:
+        return { label: "Declined", tone: "mute" };
+    }
+  };
 
   return (
-    <>
-      <PageHeader
-        title="Calls"
-        description="WhatsApp voice calls with customers. Keep the portal open in a tab: incoming calls ring here. To call a customer, open their page and use Call on WhatsApp."
-      />
+    <PortalPage title="Chats" titleTa="அரட்டை" sub={CHATS_SUB} subTa={CHATS_SUB_TA}>
+      <InboxTabs active="calls" />
 
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <Stat label="Total calls" value={fmtNumber(calls.length)} sub="Recent call log" icon={<Phone3D />} tone="info" />
+      <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
         <Stat
           label="Connected"
-          value={fmtNumber(connectedCount)}
-          sub="Answered on WhatsApp"
-          icon={<PhoneIncoming />}
+          value={connected}
+          sub="Total voice calls"
+          icon={<PhoneCall className="size-4" />}
           tone="brand"
-          meter={calls.length > 0 ? Math.round((connectedCount / calls.length) * 100) : 0}
         />
         <Stat
-          label="Missed / Declined"
-          value={fmtNumber(missedCount)}
-          sub={missedCount > 0 ? "Follow up with customer" : "No missed calls"}
-          icon={<PhoneMissed />}
-          tone={missedCount > 0 ? "rose" : "gold"}
+          label="Answered"
+          value={answeredIn}
+          sub="Inbound calls picked up"
+          icon={<PhoneIncoming className="size-4" />}
+          tone="info"
         />
-        <Stat label="Outgoing" value={fmtNumber(outgoingCount)} sub="Placed from the portal" icon={<PhoneOutgoing />} tone="violet" />
+        <Stat
+          label="Missed"
+          value={missed}
+          sub={missed > 0 ? "Call these back" : "No missed calls"}
+          icon={<PhoneMissed className="size-4" />}
+          tone={missed > 0 ? "rose" : "brand"}
+        />
+        <Stat
+          label="Declined"
+          value={declined}
+          sub="Rejected or busy"
+          icon={<PhoneOff className="size-4" />}
+          tone="amber"
+        />
       </div>
 
-      {calls.length ? (
-        <Card className="card-3d overflow-hidden">
-          <CardHeader tone="brand" icon={<Phone3D />} title="Call history" description="Tap a customer to open their profile and conversation" />
-          <ul className="divide-y divide-line">
-            {calls.map((c) => {
-              const s = STATUS[c.status];
-              const outgoing = c.direction === "OUTGOING";
-              const Icon = outgoing && c.status !== "MISSED" ? PhoneOutgoing : s.icon;
-              const label = outgoing ? { RINGING: "Ringing", ANSWERED: "On call", ENDED: "Connected", MISSED: "No answer", REJECTED: "Declined" }[c.status] : s.label;
-              return (
-                <li key={c.id} className={cn("relative flex items-start gap-3 px-4 py-3.5 sm:px-5", c.customer && "transition-colors hover:bg-subtle active:bg-sunken")}>
-                  <IconCube tone={c.status === "MISSED" ? "rose" : "brand"} size="md">
-                    <Icon />
-                  </IconCube>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
+      <div className="card">
+        <div className="hd">
+          <div>
+            <h2><T ta="அழைப்புப் பதிவு">Call log</T></h2>
+            <p>Incoming calls ring here. To call a customer, open their chat and tap “Call on WhatsApp”.</p>
+          </div>
+        </div>
+        {calls.length ? (
+          <div className="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th>Customer</th>
+                  <th>When</th>
+                  <th>Direction</th>
+                  <th>Result</th>
+                  <th>Duration</th>
+                  <th>Answered by</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {calls.map((c) => {
+                  const r = result(c);
+                  const out = c.direction === "OUTGOING";
+                  const callBack = c.customer && (c.status === "MISSED" || c.status === "REJECTED");
+                  return (
+                    <tr key={c.id}>
+                      <td>
                         {c.customer ? (
-                          <Link href={`/dashboard/customers/${c.customer.id}`} className="font-semibold text-ink after:absolute after:inset-0 hover:underline">
+                          <Link href={`/dashboard/customers/${c.customer.id}`} style={{ fontWeight: 600, textDecoration: "none" }}>
                             {c.customer.name}
                           </Link>
                         ) : (
-                          <span className="font-semibold text-ink">{c.callerName || "Unknown caller"}</span>
+                          <b>{c.callerName || "Unknown caller"}</b>
                         )}
-                        <p className="tabular text-xs text-muted">{formatPhone(c.fromPhone)}</p>
-                      </div>
-                      <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                        <Badge tone={s.tone} dot>{label}</Badge>
-                        {outgoing && <Badge tone="blue">Outgoing</Badge>}
-                      </div>
-                    </div>
-                    <p className="tabular mt-1 text-xs text-muted">
-                      {fmtDate(c.startedAt, "EEE d MMM, h:mm a")}
-                      {c.duration != null && c.status === "ENDED" && <> · {mmss(c.duration)}</>}
-                      {c.answeredBy && <> · {outgoing ? "called" : "answered"} by {c.answeredBy}</>}
-                      {c.sender && <> · {outgoing ? "from" : "to"} {c.sender.label}</>}
-                    </p>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-      ) : (
-        <Card className="card-3d">
-          <EmptyState icon={<Phone3D className="size-5" />} title="No calls yet">
-            When a customer calls your WhatsApp number, it rings in every open portal tab and shows up here.
-          </EmptyState>
-        </Card>
-      )}
-    </>
+                        <div className="muted small">{formatPhone(c.fromPhone)}</div>
+                      </td>
+                      <td className="muted small">{fmtDate(c.startedAt, "d MMM, h:mm a")}</td>
+                      <td>{out ? "Outgoing" : "Incoming"}</td>
+                      <td>
+                        <Pill tone={r.tone}>{r.label}</Pill>
+                      </td>
+                      <td>{c.duration != null && c.status === "ENDED" ? dur(c.duration) : "–"}</td>
+                      <td>{c.answeredBy || "–"}</td>
+                      <td>
+                        {callBack && (
+                          <Link className="btn sm" href={`/dashboard/customers/${c.customer!.id}#call`}>
+                            Call back
+                          </Link>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="muted">When a customer calls your WhatsApp number, it rings in every open portal tab and shows up here.</p>
+        )}
+      </div>
+    </PortalPage>
   );
 }
-

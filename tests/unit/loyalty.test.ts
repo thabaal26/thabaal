@@ -73,6 +73,15 @@ describe("loyalty points", () => {
     assert.equal(getOrderPricing(items, null, { customShippingFee: 60, discount: 25 }).total, 725);
   });
 
+  test("a stored order with free delivery reads back at its stored total (no ₹60 added)", () => {
+    const items = [{ price: 690, quantity: 1 }];
+    // Saved from Edit items with the shipping charge set to ₹0: stored total = items.
+    const p = getOrderPricing(items, 690, { applyDefaultWhenEqual: true });
+    assert.deepEqual(p, { subtotal: 690, shipping: 0, discount: 0, total: 690 });
+    // The amount asked for and the amount payments are checked against are the same number.
+    assert.equal(p.total, 690);
+  });
+
   test("the vip tag is added once a customer reaches 250 points", () => {
     assert.deepEqual(applyManualLoyaltyDelta(["regular"], 100, 260), ["regular", "loyalty-bonus:100", "vip"]);
     assert.deepEqual(applyManualLoyaltyDelta(["regular"], 100, 200), ["regular", "loyalty-bonus:100"]);

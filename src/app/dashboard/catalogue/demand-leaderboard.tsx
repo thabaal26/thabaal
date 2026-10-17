@@ -16,13 +16,12 @@ import {
 import { Rupee3D, ShoppingBag3D, Sparkles3D, Trophy3D } from "@/components/icons-3d";
 import { Badge, Button, Card } from "@/components/ui";
 import { cn } from "@/lib/cn";
-import type { CatalogDemandSummary, ProductDemandStats } from "@/lib/catalog-demand";
+import type { CatalogDemandSummary } from "@/lib/catalog-demand";
 
 type SortMode = "CARTS" | "VIEWS" | "UNITS" | "CONVERSION" | "REVENUE";
 
 export function DemandLeaderboard({
   summary,
-  commerceManagerUrl: _commerceManagerUrl,
 }: {
   summary: CatalogDemandSummary;
   commerceManagerUrl?: string | null;

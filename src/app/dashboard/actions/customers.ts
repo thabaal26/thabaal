@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { normalizePhone } from "@/lib/phone";
 import { defaultRegion, homeCityOf, regionsFor } from "@/lib/regions";
 import { cleanValues, readFields, readValues } from "@/lib/custom-fields";
-import { owned, requireManager } from "@/lib/session";
+import { owned, requireManager, requireUser } from "@/lib/session";
 import type { ActionResult } from "./templates";
 
 const parseTags = (s: string) => [...new Set(s.split(/[,;|]/).map((t) => t.trim().toLowerCase()).filter(Boolean))];
@@ -233,6 +233,11 @@ export async function setOptOut(id: string, optedOut: boolean): Promise<ActionRe
 export async function deleteCustomer(id: string): Promise<ActionResult> {
   const s = await requireManager();
   if ("denied" in s) return { ok: false, message: s.denied };
+  // Orders are deleted with the customer (cascade), so a customer with orders is kept: their payments, refunds
+  // and reports must stay on record. Opting out stops all messages instead.
+  const orders = await db.order.count({ where: { customerId: id, ...owned(s) } });
+  if (orders > 0)
+    return { ok: false, message: `This customer has ${orders} order${orders === 1 ? "" : "s"}, so they're kept for your payment records. Use "Opt out" to stop all messages to them.` };
   const r = await db.customer.deleteMany({ where: { id, ...owned(s) } });
   if (!r.count) return { ok: false, message: "Customer not found." };
   revalidatePath("/dashboard/customers");
@@ -240,15 +245,24 @@ export async function deleteCustomer(id: string): Promise<ActionResult> {
 }
 
 /** Awards bonus loyalty points (positive delta) or redeems loyalty points (negative delta) for a specific customer. */
-export async function adjustLoyaltyPoints(id: string, delta: number): Promise<ActionResult> {
+export async function adjustLoyaltyPoints(
+  id: string,
+  delta: number,
+  opts: { kind?: "give" | "take" | "redeem"; reason?: string; told?: boolean } = {},
+): Promise<ActionResult> {
   const s = await requireManager();
   if ("denied" in s) return { ok: false, message: s.denied };
   if (!Number.isFinite(delta) || delta === 0) return { ok: false, message: "Enter a valid points change." };
+  const kind = opts.kind ?? (delta > 0 ? "give" : "take");
+  // On a bill, points go in ₹25 steps (50 points), at most ₹250 (500 points), as on orders.
+  if (kind === "redeem" && (delta >= 0 || -delta % 50 !== 0 || -delta > 500))
+    return { ok: false, message: "Use points for a bill in steps of 50 (₹25), up to 500 points (₹250)." };
 
   const c = await db.customer.findFirst({
     where: { id, ...owned(s) },
     select: {
       id: true,
+      clientId: true,
       name: true,
       tags: true,
       purchases: true,
@@ -263,16 +277,35 @@ export async function adjustLoyaltyPoints(id: string, delta: number): Promise<Ac
   if (delta < 0 && -delta > balance) {
     return { ok: false, message: `${c.name} has only ${balance} points, so ${Math.abs(Math.round(delta))} can't be redeemed.` };
   }
+  if (kind === "redeem" && balance < 50) return { ok: false, message: `${c.name} needs at least 50 points to use them on a bill.` };
 
   const nextTags = applyManualLoyaltyDelta(c.tags, delta, balance + Math.round(delta));
   const manualAfter = parseManualLoyaltyPoints(nextTags);
   await db.customer.update({ where: { id: c.id }, data: { tags: nextTags } });
+  // The history line (Customers › Loyalty › Point history); the balance above stands even if this can't be saved.
+  const user = await requireUser();
+  await db.loyaltyEntry
+    .create({
+      data: {
+        clientId: c.clientId,
+        customerId: c.id,
+        delta: Math.round(delta),
+        kind,
+        reason: (opts.reason?.trim() || (kind === "redeem" ? "Walk-in bill" : "Other")).slice(0, 120),
+        byName: user.name || user.email,
+        told: Boolean(opts.told),
+      },
+    })
+    .catch((e) => console.error("Could not save the points history line", e));
 
   revalidatePath(`/dashboard/customers/${c.id}`);
   revalidatePath("/dashboard/customers");
   revalidatePath("/dashboard");
 
   const sign = delta > 0 ? `+${Math.round(delta)}` : `${Math.round(delta)}`;
+  if (kind === "redeem")
+    return { ok: true, message: `Used ${Math.abs(Math.round(delta))} points of ${c.name}'s for ₹${Math.round(Math.abs(delta) * 0.5)} off the bill.` };
+  if (kind === "take") return { ok: true, message: `Took back ${Math.abs(Math.round(delta))} points from ${c.name}.` };
   return {
     ok: true,
     message:
@@ -282,3 +315,17 @@ export async function adjustLoyaltyPoints(id: string, delta: number): Promise<Ac
   };
 }
 
+
+/** Adds one tag to the chosen customers (Customers › select › Add a tag / Make a campaign for these). */
+export async function tagCustomers(ids: string[], rawTag: string): Promise<ActionResult & { tag?: string }> {
+  const s = await requireManager();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const tag = rawTag.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9:_-]/g, "").slice(0, 40);
+  if (!tag) return { ok: false, message: "Type a tag, e.g. diwali-offer." };
+  const pick = [...new Set(ids)].slice(0, 5000);
+  const found = await db.customer.findMany({ where: { id: { in: pick }, ...owned(s) }, select: { id: true, tags: true } });
+  const todo = found.filter((c) => !c.tags.includes(tag));
+  await db.$transaction(todo.map((c) => db.customer.update({ where: { id: c.id }, data: { tags: { push: tag } } })));
+  revalidatePath("/dashboard/customers");
+  return { ok: true, tag, message: `Tag “${tag}” added to ${todo.length} customer${todo.length === 1 ? "" : "s"}${found.length > todo.length ? ` (${found.length - todo.length} already had it)` : ""}.` };
+}

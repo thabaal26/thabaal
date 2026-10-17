@@ -89,7 +89,13 @@ export async function setOrderPoints(orderId: string, amount: number | "max"): P
   if (wanted === current) return { ok: true, message: wanted ? `${rupees(wanted)} of points is already on this order.` : "No points are used on this order.", applied: current };
 
   const total = r2(subtotal + shipping - wanted);
-  await db.order.update({ where: { id: order.id }, data: { pointsRedeemed: wanted * 2, total } });
+  // Only if no money arrived and nobody changed the points since this was read (a payment landing at the same
+  // moment must not have the total changed under it).
+  const saved = await db.order.updateMany({
+    where: { id: order.id, paidAt: null, paidAmount: order.paidAmount, pointsRedeemed: order.pointsRedeemed, total: order.total },
+    data: { pointsRedeemed: wanted * 2, total },
+  });
+  if (saved.count === 0) return { ok: false, message: "This order changed a moment ago (a payment or another change). Check it and try again.", applied: current };
 
   const resend = order.paymentRequestedAt ? " Send the payment request again so they pay the new total." : "";
   return {
