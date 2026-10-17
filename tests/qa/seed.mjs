@@ -14,6 +14,9 @@ export async function seedQa(db = new PrismaClient()) {
     data: { name: "QA Test Shop", homeCity: "Madurai", businessType: "retail", orderPrefix: "QA", orderSeq: 1000, paymentConfig: "qa_test_upi", tagline: "Cold pressed oils (QA)" },
   });
   const other = await db.client.create({ data: { name: "QA Other Shop", homeCity: "Chennai", businessType: "retail", orderPrefix: "QO", orderSeq: 1000 } });
+  // Each shop's own WhatsApp number (fake ids, no token: nothing can be sent), so webhooks know which business they're for.
+  await db.whatsAppNumber.create({ data: { clientId: shop.id, label: "QA main", phoneNumberId: "qa-pnid-1", businessAccountId: "qa-waba-1", displayPhone: "+91 99900 01999", isDefault: true } });
+  await db.whatsAppNumber.create({ data: { clientId: other.id, label: "QO main", phoneNumberId: "qo-pnid-1", businessAccountId: "qo-waba-1", displayPhone: "+91 99900 09998", isDefault: true } });
 
   const user = (email, name, role, access, clientId) => db.user.create({ data: { email, name, passwordHash: "x", role, access, clientId } });
   const admin = await user("admin@qa.test", "QA Admin", "ADMIN", "MANAGER", null);

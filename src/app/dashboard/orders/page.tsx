@@ -122,7 +122,7 @@ export default async function OrdersPage({
         orders={orders}
         catalogProducts={catalogProducts}
         client={{
-          name: clientData?.name ?? "Thenan Oils",
+          name: clientData?.name ?? "All businesses",
           orderFlow,
           paymentConfig: Boolean(clientData?.paymentConfig),
         }}

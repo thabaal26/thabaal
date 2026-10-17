@@ -156,7 +156,9 @@ async function applyPayment(s: PaymentUpdate, phoneNumberId: string | undefined,
   // The order must belong to the business whose number received the payment.
   let order = reference
     ? await db.order.findFirst({
-        where: { ...orderWhereRef(reference), ...(receiver && { clientId: receiver.clientId }) },
+        // A number Thabaal doesn't know only reaches businesses without numbers of their own (like customers above),
+        // so another business's order reference is never paid from it.
+        where: { ...orderWhereRef(reference), ...(receiver ? { clientId: receiver.clientId } : { client: { numbers: { none: {} } } }) },
         select: { id: true, number: true, ref: true, total: true, currency: true },
       })
     : null;
