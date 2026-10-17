@@ -219,6 +219,10 @@
 
 .tl-footer { background: var(--bg); border-top: 1px solid var(--line); padding: 22px 0 calc(22px + env(safe-area-inset-bottom)); font-size: 13px; color: var(--muted); }
 .tl-footer-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; }
+.tl-footer-links { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); align-items: center; }
+.tl-footer-links nav { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+.tl-footer-links a { color: var(--muted); text-decoration: none; display: inline-flex; align-items: center; min-height: 40px; }
+.tl-footer-links a:hover { color: var(--fg, inherit); text-decoration: underline; }
 
 /* "Explore" link at the foot of the sign-in column. */
 .thabaal-explore {

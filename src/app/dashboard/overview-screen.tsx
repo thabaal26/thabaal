@@ -2151,6 +2151,7 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
       <div className="mb-6 sm:mb-8">
         <HomeTiers
           greetingText={greetingText}
+          businessName={cid ? scope.clientName : null}
           ordersOn={ordersOn}
           repliesOn={repliesOn}
           campaignsOn={campaignsOn}

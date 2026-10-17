@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import { LoginForm } from "./login-form";
 import { LoginIllustration } from "./login-illustration";
-import { LandingSections } from "./landing-sections";
+import { LandingSections, LegalLinks } from "./landing-sections";
 import { MascotIntro } from "./mascot-intro";
 import { ScrollDownPrompt } from "./scroll-prompt";
 import "./thabaal-login.css";
@@ -149,6 +149,9 @@ export function ThabaalSignIn() {
 
           {/* Credential Form */}
           <LoginForm lang={lang} />
+
+          {/* Privacy, terms and what Thabaal is: reachable without signing in (Google's OAuth review needs them). */}
+          <LegalLinks lang={lang} className="thabaal-legal" />
         </section>
 
         {/* RIGHT COLUMN: ANIMATED SKY WITH BIRD & TOGGLE */}

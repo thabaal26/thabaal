@@ -28,6 +28,8 @@ export type HomeCampaignRow = { id: string; name: string; when: string; status: 
 
 export type HomeTiersProps = {
   greetingText: string;
+  /** The business being looked at ("Good evening, Thenan Oils"); empty in an admin's all-businesses view. */
+  businessName?: string | null;
   ordersOn: boolean;
   repliesOn: boolean;
   campaignsOn: boolean;
@@ -179,8 +181,8 @@ export function HomeTiers(p: HomeTiersProps) {
 
   return (
     <PortalPage
-      title={p.greetingText}
-      titleTa={GREETING_TA[p.greetingText] ?? "வணக்கம்"}
+      title={p.businessName ? `${p.greetingText}, ${p.businessName}` : p.greetingText}
+      titleTa={`${GREETING_TA[p.greetingText] ?? "வணக்கம்"}${p.businessName ? `, ${p.businessName}` : ""}`}
       sub="Here is today, in plain words."
       subTa="இன்றைய நிலை, எளிய வார்த்தைகளில்."
       actions={

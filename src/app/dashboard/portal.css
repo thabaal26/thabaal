@@ -118,8 +118,19 @@ html.dark .thabaal-portal{
 .thabaal-portal .todo .big{font:600 26px var(--display);font-variant-numeric:tabular-nums}
 .thabaal-portal .todo .go{margin-left:auto;white-space:nowrap;font-weight:700;display:flex;gap:6px;align-items:center}
 /* Long labels (Tamil) on narrow phones: the text column shrinks and wraps, and the link drops to its own line, right-aligned. */
-.thabaal-portal .todo{flex-wrap:wrap}
-.thabaal-portal .todo>span:nth-child(2){flex:1 1 9rem;min-width:0;overflow-wrap:anywhere}
+/* "Things that need you" tiles: figure, words and action on one row when the tile is wide enough; in a narrow tile
+   (phones, three tiles side by side, longer Tamil words) the figure and action stay on top, the words go below. */
+.thabaal-portal .todo{display:grid;grid-template-columns:auto minmax(0,1fr) auto;column-gap:14px;row-gap:6px;container-type:inline-size}
+.thabaal-portal .todo>.big{grid-column:1;grid-row:1}
+.thabaal-portal .todo>span:nth-child(2){grid-column:2;grid-row:1;min-width:0}
+.thabaal-portal .todo>.go{grid-column:3;grid-row:1;margin-left:0;justify-self:end}
+@container (max-width: 380px){
+  .thabaal-portal .todo>span:nth-child(2){grid-column:1 / -1;grid-row:2}
+}
+/* Too narrow even for the figure and the action side by side: the action goes last, under the words. */
+@container (max-width: 250px){
+  .thabaal-portal .todo>.go{grid-column:1 / -1;grid-row:3;justify-self:start}
+}
 .thabaal-portal .field:not(input,select,textarea,button){display:flex;flex-direction:column;gap:6px}
 .thabaal-portal .field label{font-weight:600;font-size:13.5px}
 .thabaal-portal .formgrid{display:grid;gap:14px;grid-template-columns:repeat(2,minmax(0,1fr))}
