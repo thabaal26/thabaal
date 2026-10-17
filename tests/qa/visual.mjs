@@ -85,7 +85,7 @@ for (const theme of THEMES)
           const out = { wide: document.documentElement.scrollWidth, vw, off: [], clipped: [], small: [], english: [] };
           const visible = (el, r) => r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== "hidden";
           const inScroller = (el) => {
-            for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) if (/(auto|scroll)/.test(getComputedStyle(a).overflowX)) return true;
+            for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) if (/(auto|scroll|hidden|clip)/.test(getComputedStyle(a).overflowX)) return true;
             return false;
           };
           for (const el of document.querySelectorAll("body *")) {

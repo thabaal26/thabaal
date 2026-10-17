@@ -219,7 +219,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
                 </div>
               )}
               {/* 40px tap targets on phones; the light/dark switch lives in Settings there, to leave room for the name. */}
-              <LanguageSwitch size="sm" className="h-10 [&>button]:min-h-9" />
+              <LanguageSwitch size="sm" className="h-11 [&>button]:min-h-10 [&>button]:min-w-10" />
               <ThemeToggle className="max-sm:hidden" />
               {notificationsOn && <NotificationBell className="max-sm:size-10" />}
               <SettingsLink />

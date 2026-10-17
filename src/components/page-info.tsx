@@ -68,7 +68,7 @@ export function PageInfo({
             aria-controls={id}
             aria-label={open ? (isTa ? "பக்க விளக்கத்தை மறைக்க" : "Hide page description") : (isTa ? "இந்த பக்கத்தைப் பற்றி" : "About this page")}
             onClick={() => setOpen(!open)}
-            className={cn("-my-1 -mr-1 grid size-8 shrink-0 place-items-center rounded-full transition active:bg-sunken sm:hidden print:hidden", open ? "text-brand-deep" : "text-muted")}
+            className={cn("-my-2 -mr-2 grid size-10 shrink-0 place-items-center rounded-full transition active:bg-sunken sm:hidden print:hidden", open ? "text-brand-deep" : "text-muted")}
           >
             <Info aria-hidden className="size-4" />
           </button>

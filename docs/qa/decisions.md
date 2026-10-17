@@ -44,3 +44,13 @@ Each decision taken without the owner, and why.
 13. **Plain class helpers moved out of the client module.** `components/ui.tsx` became `"use client"` (for Tamil
     labels), which made every server page that called `buttonClass()` crash in production (customer profiles,
     Messages, and Home/Settings for admins). The helpers now live in `components/ui-classes.ts`.
+14. **Deleting a customer keeps payment records.** Orders are deleted with their customer (database cascade), so a
+    customer with orders can't be deleted any more; "Opt out" stops all messages instead. Customers without orders can
+    be deleted from their profile.
+15. **Kept: the demo catalogue** (`lib/catalog.ts` DEFAULT_PRODUCTS: Basmati rice, Toor dal…) shown to a business that
+    hasn't connected WhatsApp yet. It is intentional demo mode, not leftover data. Note for the owner: edits made in demo
+    mode are saved to a file, which doesn't persist on Vercel (suggestions.md).
+16. **The existing pull request #1 (Madhu_changes → main) is used** rather than opening a second one for the same
+    branch; the QA report is posted on it as a comment. It is not merged.
+17. **Tap targets:** the crawler flags under 32px on phones and the visual run under 40px (the brief's rule).
+    Table checkboxes and inline text links inside sentences are left at their size.

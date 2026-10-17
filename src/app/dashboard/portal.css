@@ -246,3 +246,4 @@ html.dark .thabaal-portal .ui-card,html.dark .thabaal-portal .card-3d{border-col
   .thabaal-portal .btn.sm{min-height:40px}
   .thabaal-portal .seg button{min-height:40px}
 }
+@media (max-width:639px){.thabaal-portal details.more>summary{min-height:40px;display:flex;align-items:center}}

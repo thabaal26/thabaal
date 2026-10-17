@@ -937,8 +937,8 @@ export function OrderCard({
           disabled={pending}
           onClick={handlePrimaryClick}
           style={{
-            minHeight: 38,
-            height: 38,
+            minHeight: 40,
+            height: 40,
             padding: "0 18px",
             borderRadius: 10,
             fontSize: 14,
@@ -955,8 +955,8 @@ export function OrderCard({
           className="btn sm ghost"
           href={`/dashboard/replies?q=${encodeURIComponent(o.customer.phone || o.customer.name)}`}
           style={{
-            minHeight: 38,
-            height: 38,
+            minHeight: 40,
+            height: 40,
             padding: "0 12px",
             fontSize: 13.5,
             fontWeight: 600,
@@ -978,8 +978,8 @@ export function OrderCard({
           target="_blank"
           rel="noopener"
           style={{
-            minHeight: 38,
-            height: 38,
+            minHeight: 40,
+            height: 40,
             padding: "0 12px",
             fontSize: 13.5,
             fontWeight: 600,
@@ -996,8 +996,8 @@ export function OrderCard({
           className="btn sm ghost"
           onClick={() => setShowTimeline(!showTimeline)}
           style={{
-            minHeight: 38,
-            height: 38,
+            minHeight: 40,
+            height: 40,
             padding: "0 12px",
             fontSize: 13.5,
             fontWeight: 600,
@@ -1049,7 +1049,7 @@ export function OrderCard({
             className="btn sm primary"
             disabled={pending}
             onClick={handleSaveAddress}
-            style={{ minHeight: 38, height: 38, padding: "0 14px", borderRadius: 8 }}
+            style={{ minHeight: 40, height: 40, padding: "0 14px", borderRadius: 8 }}
           >
             Save
           </button>
@@ -1057,7 +1057,7 @@ export function OrderCard({
             type="button"
             className="btn sm"
             onClick={() => setEditingAddress(false)}
-            style={{ minHeight: 38, height: 38, padding: "0 12px", borderRadius: 8 }}
+            style={{ minHeight: 40, height: 40, padding: "0 12px", borderRadius: 8 }}
           >
             Cancel
           </button>

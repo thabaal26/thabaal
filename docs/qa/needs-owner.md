@@ -10,3 +10,13 @@ Items the unattended run did not decide or could not do safely. Each says what w
    orders can record a refund or undo a staff-recorded payment. Undo removes the payment record, so a staff member
    could hide cash taken. Suggested: managers only for Undo payment and Record refund. Not changed, as it changes how
    shops work.
+3. **Click through the Vercel preview once.** The preview of Madhu_changes
+   (https://thabaal-git-madhuchanges-thabaal26-4140.vercel.app) is behind Vercel sign-in, so it couldn't be opened
+   from here; Vercel reports the build as Ready. Open it while signed in to Vercel and look at Home, Orders and a
+   customer page (the pages that crashed before this run). Don't record test payments there: the preview may use the
+   live database.
+4. **Merge pull request #1 when happy** (https://github.com/thabaal26/thabaal/pull/1). It was opened earlier for this
+   branch; the QA report is posted on it as a comment. Nothing was merged. CodeRabbit isn't installed on the
+   repository, so there were no CodeRabbit comments to answer.
+5. **Demo catalogue:** a business that hasn't connected WhatsApp sees made-up products (Basmati rice, Toor dal…) on
+   Products. That's intended demo mode; decide whether real clients should see an empty "connect WhatsApp" page instead.
