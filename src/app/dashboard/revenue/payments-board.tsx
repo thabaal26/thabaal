@@ -461,7 +461,22 @@ export function TxnTable({ rows }: { rows: (TxnRow & { when: string })[] }) {
                     <b>{r.name}</b>
                   </td>
                   <td>{r.kind === "in" ? (isTa ? "வந்த பணம்" : "Money in") : r.kind === "refund" ? (isTa ? "திருப்பிச் செலுத்தியது" : "Refund") : isTa ? "தோல்வி" : "Payment"}</td>
-                  <td>{r.way}</td>
+                  <td>
+                    <div>{r.way}</div>
+                    {r.reference && (
+                      <div
+                        style={{
+                          fontSize: 11,
+                          fontFamily: "var(--mono, ui-monospace, monospace)",
+                          color: "var(--muted)",
+                          marginTop: 2,
+                        }}
+                        title="Reference / UTR"
+                      >
+                        {r.reference}
+                      </div>
+                    )}
+                  </td>
                   <td className="num">{r.kind === "refund" ? `−${inr(r.amount)}` : inr(r.amount)}</td>
                   <td>
                     <Pill tone={tone(r.kind)}>{r.status}</Pill>

@@ -118,6 +118,14 @@ export function OrderCard({
   const [editOpen, setEditOpen] = useState(false);
   const [showItems, setShowItems] = useState(false);
   const [itemsCopied, setItemsCopied] = useState(false);
+  const [refCopied, setRefCopied] = useState(false);
+
+  const handleCopyRef = () => {
+    if (!o.paymentTxnId) return;
+    navigator.clipboard?.writeText(o.paymentTxnId);
+    setRefCopied(true);
+    setTimeout(() => setRefCopied(false), 1800);
+  };
   const [editLines, setEditLines] = useState<EditableOrderLine[]>(() =>
     items.length > 0
       ? items.map((i) => ({
@@ -161,10 +169,9 @@ export function OrderCard({
   // Payment pill & text
   let payPill: { tone: "ok" | "warn" | "info" | "mute" | "bad"; label: string };
   let payText: string;
-  const refSuffix = o.paymentTxnId ? ` · ${isTa ? "குறிப்பு" : "Ref"}: ${o.paymentTxnId}` : "";
   if (isPaid) {
     payPill = { tone: "ok", label: isTa ? "செலுத்தப்பட்டது" : "Paid" };
-    payText = `${isTa ? `${inr(pricing.total)} பெறப்பட்டது` : `${inr(pricing.total)} received`}${refSuffix}`;
+    payText = isTa ? `${inr(pricing.total)} பெறப்பட்டது` : `${inr(pricing.total)} received`;
   } else if (isCod) {
     payPill = { tone: "info", label: isTa ? "டெலிவரியின் போது பணம்" : "Cash on delivery" };
     payText = isTa ? `டெலிவரியின் போது ${inr(pricing.total)} பெறவும்` : `Collect ${inr(pricing.total)} on delivery`;
@@ -665,9 +672,68 @@ export function OrderCard({
       )}
 
       {/* 3. Payment bar */}
-      <div className="tools" style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+      <div
+        style={{
+          marginTop: 10,
+          marginBottom: 4,
+          display: "flex",
+          gap: "8px 12px",
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
         <span className={`pill ${payPill.tone}`}>{payPill.label}</span>
-        <span className="muted small" style={{ fontSize: 13.5, fontWeight: 500 }}>{payText}</span>
+        <span className="muted small" style={{ fontSize: 13.5, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4 }}>
+          {isPaid ? (
+            <>
+              <b style={{ color: "var(--fg)", fontWeight: 600 }}>{inr(pricing.total)}</b>{" "}
+              <span>{isTa ? "பெறப்பட்டது" : "received"}</span>
+            </>
+          ) : (
+            payText
+          )}
+        </span>
+
+        {/* Dedicated UPI Reference Pill with 1-tap copy and clean visual breathing room */}
+        {isPaid && o.paymentTxnId && (
+          <button
+            type="button"
+            onClick={handleCopyRef}
+            title={isTa ? "UPI குறிப்பு எண்ணை நகலெடு" : "Click to copy UPI reference"}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "2.5px 8px",
+              borderRadius: 6,
+              background: refCopied ? "var(--ok-soft, rgba(16,185,129,0.12))" : "var(--soft)",
+              border: `1px solid ${refCopied ? "var(--ok, #10b981)" : "var(--line)"}`,
+              color: refCopied ? "var(--ok)" : "var(--fg)",
+              fontSize: 12,
+              fontFamily: "var(--mono, ui-monospace, monospace)",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+            }}
+          >
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: "var(--muted)",
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+              }}
+            >
+              UPI
+            </span>
+            <span style={{ fontWeight: 500, letterSpacing: "0.02em" }}>{o.paymentTxnId}</span>
+            <span style={{ fontSize: 11, color: refCopied ? "var(--ok)" : "var(--muted)", marginLeft: 1 }}>
+              {refCopied ? "✓" : "📋"}
+            </span>
+          </button>
+        )}
+
         {isLate && <span className="pill bad">Late {lateText}</span>}
       </div>
 
@@ -1184,9 +1250,20 @@ export function OrderCard({
                 <b>{o.paymentMethod ? o.paymentMethod.toUpperCase() : "Online"}</b>
               </div>
               {o.paymentTxnId && (
-                <div className="row">
+                <div className="row" style={{ alignItems: "center" }}>
                   <div className="grow muted"><T ta="UPI / குறிப்பு எண்">UPI / Ref number</T></div>
-                  <b style={{ fontFamily: "var(--mono, monospace)", fontSize: 13 }}>{o.paymentTxnId}</b>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <b style={{ fontFamily: "var(--mono, monospace)", fontSize: 13 }}>{o.paymentTxnId}</b>
+                    <button
+                      type="button"
+                      className="linkb"
+                      onClick={handleCopyRef}
+                      style={{ fontSize: 12, fontWeight: 600 }}
+                      title="Copy UPI reference"
+                    >
+                      {refCopied ? (isTa ? "✓ நகலெடுக்கப்பட்டது" : "✓ Copied") : (isTa ? "நகலெடு" : "Copy")}
+                    </button>
+                  </div>
                 </div>
               )}
               <div className="row">
