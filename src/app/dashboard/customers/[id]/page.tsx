@@ -24,6 +24,7 @@ import { sendCatalogue } from "../../actions/catalog";
 import { requestCallPermission } from "../../actions/calls";
 import { setOptOut } from "../../actions/customers";
 import { DeleteCustomerButton, EditCustomerButton } from "../customer-tools";
+import { T } from "../../portal-ui";
 import { CallButton } from "./call-button";
 import { PausedOffersNote } from "./paused-offers-note";
 import { PurchaseJourney } from "./purchase-journey";
@@ -88,7 +89,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
   const more = [
     scope.canOperate && windowEnd && !c.optedOut && (
       <ActionButton key="cat" action={sendCatalogue.bind(null, c.id)} size="md" title="Free while the customer's 24-hour window is open">
-        <ShoppingBag aria-hidden className="size-4" /> Send catalogue
+        <ShoppingBag aria-hidden className="size-4" /> <T ta="பட்டியலை அனுப்பு">Send catalogue</T>
       </ActionButton>
     ),
     scope.canOperate && !callAllowed && (
@@ -98,12 +99,12 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
         size="md"
         title={c.callAskedAt ? `Last asked ${fmtDate(c.callAskedAt, "d MMM, h:mm a")}` : "Sends WhatsApp's \"allow calls?\" prompt"}
       >
-        {c.callAskedAt ? "Ask to call again" : "Ask to call"}
+        {c.callAskedAt ? <T ta="மீண்டும் அழைக்க அனுமதி கேள்">Ask to call again</T> : <T ta="அழைக்க அனுமதி கேள்">Ask to call</T>}
       </ActionButton>
     ),
     scope.canManage && (
       <ActionButton key="opt" action={setOptOut.bind(null, c.id, !c.optedOut)} size="md">
-        {c.optedOut ? "Opt back in" : "Opt out"}
+        {c.optedOut ? <T ta="மீண்டும் செய்திகளை அனுமதி">Opt back in</T> : <T ta="செய்திகளை நிறுத்து">Opt out</T>}
       </ActionButton>
     ),
     scope.canManage && c.orders.length === 0 && <DeleteCustomerButton key="del" id={c.id} name={c.name} />,

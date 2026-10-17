@@ -5,6 +5,7 @@ import Link from "@/components/intent-link";
 import QR from "qrcode";
 import { Card, CardHeader, EmptyState, PageHeader, PickClientNotice } from "@/components/ui";
 import { buttonClass } from "@/components/ui-classes";
+import { T } from "../../portal-ui";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { fmtNumber } from "@/lib/format";
@@ -84,7 +85,7 @@ export default async function GrowPage({ searchParams }: PageProps<"/dashboard/c
           </nav>
           <form className="flex gap-2 border-t border-line p-4 sm:p-5">
             <input name="source" defaultValue={SOURCES.some((s) => s.key === source) ? "" : source} placeholder="Or name your own, e.g. diwali-stall" aria-label="Name your own place" className="field" maxLength={30} />
-            <button className={cn(buttonClass("secondary"), "shrink-0")}>Make code</button>
+            <button className={cn(buttonClass("secondary"), "shrink-0")}><T ta="குறியீடு உருவாக்கு">Make code</T></button>
           </form>
           <div className="space-y-2 border-t border-line p-4 text-sm text-ink-2 sm:p-5">
             <p className="font-medium text-ink">What customers see</p>

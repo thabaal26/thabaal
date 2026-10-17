@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { fmtDate } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { getScope, owned } from "@/lib/session";
-import { PortalPage, Pill, type PillTone } from "../portal-ui";
+import { PortalPage, Pill, T, type PillTone } from "../portal-ui";
 import { CHATS_SUB, CHATS_SUB_TA, InboxTabs } from "../replies/inbox-tabs";
 
 export const metadata: Metadata = { title: "Calls" };
@@ -84,7 +84,7 @@ export default async function CallsPage() {
       <div className="card">
         <div className="hd">
           <div>
-            <h2>Call log</h2>
+            <h2><T ta="அழைப்புப் பதிவு">Call log</T></h2>
             <p>Incoming calls ring here. To call a customer, open their chat and tap “Call on WhatsApp”.</p>
           </div>
         </div>

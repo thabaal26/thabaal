@@ -6,7 +6,7 @@ import { fmtNumber } from "@/lib/format";
 import { getScope, ownedMessages } from "@/lib/session";
 import { handleAllReplies } from "../actions/replies";
 import { CHATS_SUB, CHATS_SUB_TA, InboxTabs } from "./inbox-tabs";
-import { PAction, PortalPage } from "../portal-ui";
+import { PAction, PortalPage, T } from "../portal-ui";
 import { ReplyInbox } from "./reply-inbox";
 
 export const metadata: Metadata = { title: "Chats" };
@@ -164,7 +164,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
         ))}
         {scope.canOperate && openThreadsCount > 0 && (
           <PAction action={handleAllReplies} className="sm ghost" style={{ marginLeft: "auto" }} confirm="Mark every open customer conversation as handled?">
-            Mark all handled
+            <T ta="அனைத்தையும் முடிந்ததாகக் குறி">Mark all handled</T>
           </PAction>
         )}
       </div>

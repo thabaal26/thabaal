@@ -80,20 +80,18 @@ function formatWindowPill(lastReplyAt: Date | undefined, isTamil = false) {
 }
 
 /** Live countdown hook that ticks every 30 seconds for accurate WhatsApp window display. */
+// The minutes left are only worked out in the browser: computed during the server render too, they could differ
+// by a minute from the browser's first render and break hydration (React error 418).
 function useWindowCountdown(lastInboundAt: Date | undefined, isTamil = false) {
-  const [prevInbound, setPrevInbound] = useState(lastInboundAt);
-  const [pill, setPill] = useState(() => formatWindowPill(lastInboundAt, isTamil));
-
-  if (lastInboundAt !== prevInbound) {
-    setPrevInbound(lastInboundAt);
-    setPill(formatWindowPill(lastInboundAt, isTamil));
-  }
-
+  const [pill, setPill] = useState<string | null>(null);
   useEffect(() => {
-    const timer = setInterval(() => {
-      setPill(formatWindowPill(lastInboundAt, isTamil));
-    }, 30000);
-    return () => clearInterval(timer);
+    const tick = () => setPill(formatWindowPill(lastInboundAt, isTamil));
+    const first = setTimeout(tick, 0);
+    const timer = setInterval(tick, 30000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+    };
   }, [lastInboundAt, isTamil]);
   return pill;
 }
@@ -128,7 +126,7 @@ export function ReplyInbox({
   const selected = replies.find((x) => x.id === selectedId || x.customer.id === selectedId) ?? replies[0];
   const latestInboundAt = thread.find((e) => e.type === "in")?.at ?? selected?.receivedAt;
   const windowTimeRemaining = useWindowCountdown(latestInboundAt, isTamil);
-  const windowOpen = Boolean(windowTimeRemaining);
+  const windowOpen = Boolean(replyWindowEnd(latestInboundAt));
   const hrefFor = (customerId: string) => `/dashboard/replies?${new URLSearchParams({ ...(show && { show: String(show) }), r: customerId })}`;
   const unpaidOrder = (r: InboxReply) => r.customer.orders?.[0] ?? null;
 
@@ -222,8 +220,11 @@ export function ReplyInbox({
               <p>{currentPurchasesSubtitle}</p>
             </div>
             <div className="tools">
-              {windowTimeRemaining ? (
-                <span className="pill ok">{isTamil ? `இலவச பதில் · ${windowTimeRemaining}` : `Free replies · ${windowTimeRemaining}`}</span>
+              {windowOpen ? (
+                <span className="pill ok">
+                  {isTamil ? "இலவச பதில்" : "Free replies"}
+                  {windowTimeRemaining ? ` · ${windowTimeRemaining}` : ""}
+                </span>
               ) : (
                 <span className="pill warn">{isTamil ? "இலவச பதில் நேரம் முடிந்தது" : "Free replies closed"}</span>
               )}

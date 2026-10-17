@@ -16,7 +16,7 @@ import {
   type ExportableOrderRow,
   type ExportablePickItem,
 } from "./print-button";
-import { PortalPage, Seg } from "../../portal-ui";
+import { PortalPage, Seg, T } from "../../portal-ui";
 import { OrdersTabs } from "../orders-tabs";
 
 export const metadata: Metadata = { title: "Packing list" };
@@ -225,7 +225,7 @@ export default async function PackingPage({ searchParams }: PageProps<"/dashboar
         <div className="card" style={{ alignSelf: "start" }}>
           <div className="hd">
             <div>
-              <h2>Pull from stock</h2>
+              <h2><T ta="இருப்பிலிருந்து எடுக்க">Pull from stock</T></h2>
               <p>One total for all waiting orders.</p>
             </div>
           </div>

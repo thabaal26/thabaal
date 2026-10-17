@@ -11,7 +11,7 @@ import { getScope, owned } from "@/lib/session";
 import { CATEGORY_INFO, renderFor, SAMPLE_CUSTOMER, type Category, type TemplateButton, type VarMap } from "@/lib/template";
 import { deleteTemplate, syncTemplates } from "../actions/templates";
 
-import { AutoSelect, PAction, PortalPage } from "../portal-ui";
+import { AutoSelect, PAction, PortalPage, T } from "../portal-ui";
 
 export const metadata: Metadata = { title: "Templates" };
 export const dynamic = "force-dynamic";
@@ -144,7 +144,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
         {canCreate && (
           <div className="tools" style={{ marginLeft: "auto" }}>
             <PAction action={syncTemplates} title="Fetch the latest templates and statuses from Meta">
-              <RefreshCw aria-hidden className="ic" style={{ width: 15, height: 15 }} /> Sync with Meta
+              <RefreshCw aria-hidden className="ic" style={{ width: 15, height: 15 }} /> <T ta="Meta-வுடன் ஒத்திசை">Sync with Meta</T>
             </PAction>
             <Link className="btn primary sm" href="/dashboard/templates/new">
               <Plus aria-hidden className="ic" style={{ width: 15, height: 15 }} /> New template
