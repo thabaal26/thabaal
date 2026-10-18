@@ -64,13 +64,40 @@ earlier work; this file is its memory. Read all of it before doing anything.
 
 ## 3. State at handoff
 
-- **`main` = `Madhu_changes`** = the "UPI reference (UTR) kept apart…" commit (see `git log -1`), deployed to
-  production. Working tree clean apart from the untracked scripts (rule 3).
+- **`main` = `Madhu_changes`** = the latest commit (see `git log -1`), deployed to production. Working tree clean
+  apart from the untracked scripts (rule 3).
 - Full QA run (13-phase master prompt) done: reports in `docs/qa/` — `PROJECT_INVENTORY.md`, `TEST_PLAN.md`,
   `TEST_CASES.csv` (349/349 PASS), `RESPONSIVE_UI_AUDIT.md`, `BUG_REPORT.md` (BUG-01…16, CR-01, DEC-01…04, EXT-01/02),
   `INTEGRATION_REPORT.md`, `PERFORMANCE_REPORT.md`, `FINAL_QA_REPORT.md`, plus `tamil-gaps.tsv`.
 - Live tests finished: order RG-1028 (paid ₹1 by UPI, confirmed in the chat, packed, dispatched, delivered); the TEST
   campaign and TEST audience were deleted.
+
+### Done on 19 Oct (latest first)
+
+01. **Payments › Payment settings rebuilt to the design (thabaal-portal.html), every element working.**
+- Settings live in `Client.paySettings` (JSON) and `Order.paymentReminder2At`: SQL
+  `prisma/sql/2026-10-19-payment-settings.sql` (listed in db-additive). Helpers: `src/lib/pay-settings.ts` (types,
+  defaults, `upiLink`, `codBlocked`) and `src/lib/pay-settings-server.ts` (`paySettingsFor`). Actions:
+  `src/app/dashboard/actions/pay-settings.ts`. Screen: `src/app/dashboard/revenue/pay-settings-form.tsx`.
+- **Pay inside WhatsApp** switch (+ payment configuration name and template status). **UPI QR or payment link**:
+  UPI ID, name, QR upload (`/api/upload`), "Send a test link" (₹1 link to Settings › Business phone, needs that
+  number's 24-hour window; the link also shows on screen). Orders from chat (no catalogue) get the UPI link + QR
+  when UPI is on; catalogue carts use Review and pay. UPI links go only inside the 24-hour window.
+- **Cash on delivery** switch, highest COD amount, allowed areas: enforced in `createOrder`, `setPaymentMethod`, the
+  order card buttons (hidden when off) and the webhook (a customer's "COD" outside the rules gets a polite no). The
+  Cash / COD tab hides when COD is off.
+- **Bank account** (managers only): bank, last 4 digits only, settlement. **Reminder rules**: 1-day reminder,
+  last 3-day reminder, then the request is marked expired a day later ("Failed or expired"); receipt switch gates
+  the thank-you message. Old 6-hour reminder replaced.
+- Settings › How customers pay now shows the real on/off state (it had a hard-coded "On" for UPI).
+- Webhook fix: a customer's message now matches the order last asked for payment (`nulls: "last"`); before, an order
+  never asked for payment could win.
+- Buttons: the Settings "Open payment settings" link is a primary (mango) button as in the design; every other
+  filled button in the design was already filled in the app.
+- Tests: `tests/qa/payments.mjs` checks 17 (COD rules on a customer's "COD") and 18 (reminder switches, expiry).
+  payments 18/18, payments-ui 14/14, crud 12/12.
+- Next (asked 19 Oct): Campaigns › Automations: one "Reorder reminders" row (no separate Refill), Win-back joined
+  into the same list with a switch, and every switch there saved for real (it was screen-only).
 
 ### Done on 18 Oct (latest first)
 

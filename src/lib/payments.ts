@@ -6,12 +6,14 @@ import { pushOrderToSheet } from "./google-sheets-live";
 import { getOrderPricing, itemsText, itemsWithNames, money, orderRef } from "./orders";
 import { pointsDiscount } from "./order-pricing";
 import { logPaymentEvent, utrOf } from "./payment-events";
+import { upiLink, type PaySettings } from "./pay-settings";
+import { paySettingsFor } from "./pay-settings-server";
 import { dueOf, receivedOf } from "./payment-state";
 import { getSettings } from "./provider";
 import { replyWindowEnd } from "./replies";
 import { senderFor } from "./senders";
 import { renderFor, type TemplateButton, type VarMap } from "./template";
-import { MetaError, sendInteractiveButtons, sendOrderStatus, sendPaymentRequest, sendPaymentTemplate, sendTextMessage } from "./whatsapp";
+import { MetaError, sendInteractiveButtons, sendMediaMessage, sendOrderStatus, sendPaymentRequest, sendPaymentTemplate, sendTextMessage } from "./whatsapp";
 
 // WhatsApp payments for orders: the "Review and pay" request, reminders, confirmation and the order card
 // in the customer's chat. Shared by the webhook, the Orders page and the scheduler.
@@ -19,10 +21,19 @@ import { MetaError, sendInteractiveButtons, sendOrderStatus, sendPaymentRequest,
 /** Our own "order details" template, preferred once approved for requests after the customer's 24-hour window. */
 export const PAYMENT_TEMPLATE = "payment_request";
 
-/** An unpaid request gets one reminder after this long, if the order is still open. */
-const REMIND_AFTER_MS = 6 * 3_600_000;
-/** Orders older than this aren't chased any more. */
-const REMIND_WITHIN_MS = 3 * 86_400_000;
+const DAY_MS = 86_400_000;
+/** Payment settings › Reminder rules: a reminder a day after the request, a last one after 3 days, expired a day later. */
+const FIRST_REMINDER_MS = DAY_MS;
+const LAST_REMINDER_MS = 3 * DAY_MS;
+const EXPIRE_AFTER_LAST_MS = DAY_MS;
+/** Requests older than this aren't chased any more (e.g. after the reminders were switched off for a while). */
+const REMIND_WITHIN_MS = 6 * DAY_MS;
+export const EXPIRED_REASON = "Expired: not paid after the reminders";
+
+/** "first", "last" or none: which reminder this is. */
+type Reminder = boolean | "last";
+/** The field stamped when a request or reminder goes out. */
+type SentData = { paymentRequestedAt?: Date; paymentReminderAt?: Date; paymentReminder2At?: Date };
 
 /**
  * Parses amount from Meta payment objects.
@@ -83,12 +94,15 @@ const firstName = (name: string) => name.trim().split(/\s+/)[0] || "there";
  * Sends the "Review and pay" message for an order, paid by UPI through the client's payment configuration.
  * Callers check the user may act on the order; this checks the order can be paid.
  */
-export async function sendPaymentRequestFor(orderId: string, opts: { reminder?: boolean } = {}): Promise<{ ok: boolean; message: string }> {
+export async function sendPaymentRequestFor(orderId: string, opts: { reminder?: Reminder } = {}): Promise<{ ok: boolean; message: string }> {
   const order = await db.order.findUnique({ where: { id: orderId }, include: { customer: true, client: { select: { name: true, paymentConfig: true } } } });
   if (!order) return { ok: false, message: "Order not found." };
   if (order.paidAt || ["PAID", "DISPATCHED", "DELIVERED"].includes(order.status)) return { ok: false, message: "This order is already paid." };
   if (order.status === "CANCELLED") return { ok: false, message: "This order is cancelled." };
-  if (!order.client.paymentConfig) return { ok: false, message: "Set your payment configuration name at the top of Orders first." };
+  // Catalogue carts use WhatsApp's "Review and pay"; orders from chat use the UPI link when it's on (Payment settings).
+  const pay = await paySettingsFor(order.clientId);
+  const useUpi = pay.upi && (!pay.waPay || !order.catalogId);
+  if (!pay.waPay && !useUpi) return { ok: false, message: "Turn on Pay inside WhatsApp or the UPI link in Payments › Payment settings first." };
   if (order.total <= 0) return { ok: false, message: "This order has no total. Add prices before asking for payment." };
   const c = order.customer;
   if (c.optedOut) return { ok: false, message: "This customer opted out of messages." };
@@ -106,7 +120,7 @@ export async function sendPaymentRequestFor(orderId: string, opts: { reminder?: 
   const oneLine = pricing.discount > 0 || balanceOnly;
   const payment = {
     referenceId: ref,
-    configuration: order.client.paymentConfig,
+    configuration: pay.paymentConfig ?? "",
     items: oneLine
       ? [{ id: "order", name: balanceOnly ? `Balance for order ${ref}` : `Order ${ref} after loyalty points`, quantity: 1, price: due }]
       : items.map((i) => ({ id: i.id, name: i.name ?? i.id, quantity: i.quantity, price: i.price })),
@@ -120,16 +134,24 @@ export async function sendPaymentRequestFor(orderId: string, opts: { reminder?: 
       ? `Items: ${itemsText(items)} (${money(pricing.subtotal, order.currency)})${pricing.shipping > 0 ? `\nShipping: ${money(pricing.shipping, order.currency)}` : ""}${pointsLine}\nTotal: ${money(pricing.total, order.currency)}`
       : `Items: ${itemsText(items)}\nTotal: ${money(pricing.total, order.currency)}`) + balanceLines;
   const isReplacement = Boolean(order.internalNote?.includes("Replaced unpaid cart"));
-  const text = opts.reminder
-    ? `Hello ${firstName(c.name)}, a reminder that your ${order.client.name} order ${ref} is waiting for payment.\n\n${breakdownLines}\n\nTap "Review and pay" to pay by UPI, and we will pack it right away.`
-    : isReplacement
-      ? `Hello ${firstName(c.name)}, here is your updated ${order.client.name} order ${ref} (replacing your earlier cart).\n\n${breakdownLines}\n\nTap "Review and pay" to pay by UPI.`
-      : `Hello ${firstName(c.name)}, here is your ${order.client.name} order ${ref}.\n\n${breakdownLines}\n\nTap "Review and pay" to pay by UPI.`;
+  const head =
+    opts.reminder === "last"
+      ? `Hello ${firstName(c.name)}, a last reminder that your ${order.client.name} order ${ref} is still waiting for payment.`
+      : opts.reminder
+        ? `Hello ${firstName(c.name)}, a reminder that your ${order.client.name} order ${ref} is waiting for payment.`
+        : isReplacement
+          ? `Hello ${firstName(c.name)}, here is your updated ${order.client.name} order ${ref} (replacing your earlier cart).`
+          : `Hello ${firstName(c.name)}, here is your ${order.client.name} order ${ref}.`;
+  const sentData: SentData = opts.reminder === "last" ? { paymentReminder2At: new Date() } : opts.reminder ? { paymentReminderAt: new Date() } : { paymentRequestedAt: new Date() };
+  const sentWord = opts.reminder ? "reminder" : "request";
   const { open, number, cfg } = await replyContext(c);
 
+  if (useUpi) return sendUpiRequest({ order, settings: pay.settings, due, head, breakdownLines, open, number, cfg, sentData, sentWord, reminder: opts.reminder });
+
+  const text = `${head}\n\n${breakdownLines}\n\nTap "Review and pay" to pay by UPI${opts.reminder ? ", and we will pack it right away" : ""}.`;
   try {
     let res: { id: string; simulated: boolean };
-    let templateName = opts.reminder ? "Payment reminder" : "Payment request";
+    let templateName = opts.reminder === "last" ? "Last payment reminder" : opts.reminder ? "Payment reminder" : "Payment request";
     if (open) {
       res = await withCatalogFallback(payment, (p) => sendPaymentRequest(cfg, c.phone, text, p));
     } else {
@@ -142,8 +164,43 @@ export async function sendPaymentRequestFor(orderId: string, opts: { reminder?: 
       templateName = t.name;
     }
     await logMessage(c.id, templateName, text, res, number?.id ?? null);
-    await db.order.update({ where: { id: order.id }, data: opts.reminder ? { paymentReminderAt: new Date() } : { paymentRequestedAt: new Date() } });
-    return { ok: true, message: res.simulated ? "Simulated payment request logged (demo mode)." : `Payment ${opts.reminder ? "reminder" : "request"} sent to ${c.name}.` };
+    await db.order.update({ where: { id: order.id }, data: sentData });
+    return { ok: true, message: res.simulated ? "Simulated payment request logged (demo mode)." : `Payment ${sentWord} sent to ${c.name}.` };
+  } catch (e) {
+    return { ok: false, message: explainSendError(e).error };
+  }
+}
+
+/**
+ * Payment settings › UPI link: the order's amount with the shop's UPI ID, a tap-to-pay UPI link and the QR picture
+ * when one was uploaded. Only inside the customer's 24-hour window (WhatsApp allows no free-form message after it).
+ */
+async function sendUpiRequest(p: {
+  order: { id: string; number: number; ref: string | null; currency: string; customer: { id: string; name: string; phone: string } };
+  settings: PaySettings;
+  due: number;
+  head: string;
+  breakdownLines: string;
+  open: boolean;
+  number: { id: string } | null | undefined;
+  cfg: Awaited<ReturnType<typeof senderFor>>["cfg"];
+  sentData: SentData;
+  sentWord: string;
+  reminder?: Reminder;
+}): Promise<{ ok: boolean; message: string }> {
+  const c = p.order.customer;
+  if (!p.open)
+    return { ok: false, message: `${c.name}'s 24-hour WhatsApp window has closed, so the UPI link can't be sent now. It goes once they message you, or turn on Pay inside WhatsApp, which can use an approved template.` };
+  const ref = orderRef(p.order);
+  const link = upiLink(p.settings, p.due, `Order ${ref}`);
+  const payee = p.settings.upiName ? `${p.settings.upiId} (${p.settings.upiName})` : p.settings.upiId;
+  const text = `${p.head}\n\n${p.breakdownLines}\n\nPlease pay ${money(p.due, p.order.currency)} by UPI to ${payee}${p.settings.upiQrUrl ? ", or scan the QR code" : ""}.\nTap to pay: ${link}\n\nAfter paying, reply with the 12-digit UPI reference or a screenshot.`.slice(0, 1024);
+  try {
+    const res = p.settings.upiQrUrl ? await sendMediaMessage(p.cfg, c.phone, p.settings.upiQrUrl, text) : await sendTextMessage(p.cfg, c.phone, text);
+    const label = p.reminder === "last" ? "Last UPI payment reminder" : p.reminder ? "UPI payment reminder" : "UPI payment link";
+    await logMessage(c.id, label, text, res, p.number?.id ?? null);
+    await db.order.update({ where: { id: p.order.id }, data: p.sentData });
+    return { ok: true, message: res.simulated ? "Simulated UPI link logged (demo mode)." : `UPI payment ${p.sentWord} sent to ${c.name}.` };
   } catch (e) {
     return { ok: false, message: explainSendError(e).error };
   }
@@ -152,8 +209,8 @@ export async function sendPaymentRequestFor(orderId: string, opts: { reminder?: 
 /** A cart just arrived from the catalogue: ask for payment straight away when payments are set up. */
 export async function autoRequestPayment(order: { id: string; clientId: string; total: number }) {
   if (order.total <= 0) return;
-  const client = await db.client.findUnique({ where: { id: order.clientId }, select: { paymentConfig: true } });
-  if (!client?.paymentConfig) return;
+  const pay = await paySettingsFor(order.clientId);
+  if (!pay.waPay && !pay.upi) return;
   const r = await sendPaymentRequestFor(order.id);
   if (!r.ok) console.warn(`Automatic payment request for order ${order.id} not sent: ${r.message}`);
 }
@@ -255,6 +312,8 @@ async function confirmPaymentOnce(orderId: string, txnId: string | null | undefi
     await logPaymentEvent({ clientId: order.clientId, orderId: order.id, source: "staff", status: "recorded", transactionId: txnId ?? null, utr: rec.utr ?? utrOf(txnId) ?? order.paymentUtr, amount, currency: order.currency, note: `${rec.source === "verified" ? "Checked and confirmed" : "Recorded"} by staff${method ? ` (${method})` : ""}` });
   pushOrderToSheet(order.id, "ORDER_UPDATE", full ? "Payment received" : "Part payment received");
   if (!full || rec.quiet) return true;
+  // Payment settings › Reminder rules › "Send a receipt when paid" off: no thank-you message.
+  if (!(await paySettingsFor(order.clientId)).settings.receipt) return true;
 
   const c = order.customer;
   const ref = orderRef(order);
@@ -313,7 +372,8 @@ export async function recordPaymentFailure(orderId: string, reason: string) {
   });
   if (order && !order.customer.optedOut) {
     const first = order.customer.name.trim().split(/\s+/)[0] || "there";
-    const text = `Hello ${first}, your payment of ${money(dueOf(order), order.currency)} for order ${orderRef(order)} could not be completed (${reason}). Tap the payment link above to try again, or reply "COD" to pay in cash upon delivery.`;
+    const codOn = (await paySettingsFor(order.clientId)).settings.codOn;
+    const text = `Hello ${first}, your payment of ${money(dueOf(order), order.currency)} for order ${orderRef(order)} could not be completed (${reason}). Tap the payment link above to try again${codOn ? ', or reply "COD" to pay in cash upon delivery' : ""}.`;
     await textInWindow(order.customer, text, "Payment failed").catch(() => false);
   }
 }
@@ -399,29 +459,64 @@ export async function cancelSupersededOrdersForCustomer(
   return cancelledIds;
 }
 
-/** Scheduler: one reminder for payment requests still unpaid after a few hours. */
+/**
+ * Scheduler, following Payment settings › Reminder rules for each client: a reminder a day after the payment
+ * request, a last one after 3 days, and a day after that the request is marked expired (Failed or expired).
+ */
 export async function remindUnpaidOrders(now = new Date(), limit = 20) {
-  const due = await db.order.findMany({
-    where: {
-      status: { in: ["NEW", "CONFIRMED"] },
-      paidAt: null,
-      paymentReminderAt: null,
-      // No reminder for cash on delivery, or for someone who says they've paid (staff are checking).
-      paymentClaimedAt: null,
-      OR: [{ paymentMethod: null }, { paymentMethod: { not: "cod" } }],
-      paymentRequestedAt: { lte: new Date(now.getTime() - REMIND_AFTER_MS), gte: new Date(now.getTime() - REMIND_WITHIN_MS) },
-    },
-    select: { id: true },
+  const t = now.getTime();
+  const open = {
+    status: { in: ["NEW", "CONFIRMED"] as ("NEW" | "CONFIRMED")[] },
+    paidAt: null,
+    // No reminder for cash on delivery, or for someone who says they've paid (staff are checking).
+    paymentClaimedAt: null,
+    OR: [{ paymentMethod: null }, { paymentMethod: { not: "cod" } }],
+  };
+  const rules = new Map<string, PaySettings>();
+  const rulesFor = async (clientId: string) => {
+    if (!rules.has(clientId)) rules.set(clientId, (await paySettingsFor(clientId)).settings);
+    return rules.get(clientId)!;
+  };
+
+  const first = await db.order.findMany({
+    where: { ...open, paymentReminderAt: null, paymentReminder2At: null, paymentRequestedAt: { lte: new Date(t - FIRST_REMINDER_MS), gt: new Date(t - LAST_REMINDER_MS) } },
+    select: { id: true, clientId: true },
     orderBy: { paymentRequestedAt: "asc" },
     take: limit,
   });
-  for (const { id } of due) {
-    const r = await sendPaymentRequestFor(id, { reminder: true });
-    // Don't retry a reminder that can't go out (no template, opted out): mark it handled.
-    if (!r.ok) {
-      console.warn(`Payment reminder for order ${id} not sent: ${r.message}`);
-      await db.order.update({ where: { id }, data: { paymentReminderAt: now } });
+  const last = await db.order.findMany({
+    where: { ...open, paymentReminder2At: null, paymentFailedAt: null, paymentRequestedAt: { lte: new Date(t - LAST_REMINDER_MS), gte: new Date(t - REMIND_WITHIN_MS) } },
+    select: { id: true, clientId: true },
+    orderBy: { paymentRequestedAt: "asc" },
+    take: limit,
+  });
+  for (const [list, kind, field] of [
+    [first, true, "paymentReminderAt"],
+    [last, "last", "paymentReminder2At"],
+  ] as const) {
+    for (const o of list) {
+      const r = await rulesFor(o.clientId);
+      if (kind === true ? !r.remind1 : !r.remind3) continue;
+      const res = await sendPaymentRequestFor(o.id, { reminder: kind });
+      // Don't retry a reminder that can't go out (window closed, no template, opted out): mark it handled.
+      if (!res.ok) {
+        console.warn(`Payment reminder for order ${o.id} not sent: ${res.message}`);
+        await db.order.update({ where: { id: o.id }, data: { [field]: now } });
+      }
     }
+  }
+
+  // A day after the last reminder, a request still unpaid is marked expired.
+  const stale = await db.order.findMany({
+    where: { ...open, paymentFailedAt: null, paymentReminder2At: { lte: new Date(t - EXPIRE_AFTER_LAST_MS) } },
+    select: { id: true, clientId: true },
+    take: limit,
+  });
+  for (const o of stale) {
+    if (!(await rulesFor(o.clientId)).remind3) continue;
+    await db.order.updateMany({ where: { id: o.id, paidAt: null, paymentFailedAt: null }, data: { paymentFailedAt: now, paymentFailReason: EXPIRED_REASON } });
+    await logPaymentEvent({ clientId: o.clientId, orderId: o.id, source: "system", status: "expired", note: EXPIRED_REASON });
+    pushOrderToSheet(o.id, "ORDER_UPDATE", "Payment request expired");
   }
 }
 

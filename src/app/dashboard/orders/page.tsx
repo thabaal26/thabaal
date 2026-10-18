@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getCatalogWithProducts } from "@/lib/catalog";
 import { db } from "@/lib/db";
+import { readPaySettings } from "@/lib/pay-settings";
 import { getScope, owned } from "@/lib/session";
 import { PortalPage } from "../portal-ui";
 import { OrdersView } from "./orders-view";
@@ -42,7 +43,7 @@ export default async function OrdersPage({
             client: { select: { name: true } },
           },
         },
-        client: { select: { name: true, paymentConfig: true, orderFlow: true } },
+        client: { select: { name: true, paymentConfig: true, orderFlow: true, paySettings: true } },
       },
       orderBy: { createdAt: "desc" },
       take: 400,
@@ -113,6 +114,8 @@ export default async function OrdersPage({
     client: {
       paymentConfig: o.client?.paymentConfig ?? null,
       orderFlow: o.client?.orderFlow ?? null,
+      // Payment settings › Cash on delivery: the COD buttons show only while it's on.
+      codOn: readPaySettings(o.client?.paySettings, o.client?.paymentConfig).codOn,
     },
   }));
 

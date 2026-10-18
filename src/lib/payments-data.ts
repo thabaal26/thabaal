@@ -6,6 +6,7 @@ import { APP_TZ } from "./format";
 import { getOrderPricing, pointsDiscount } from "./order-pricing";
 import { orderRef, type OrderItem } from "./orders";
 import { dueOf, methodOf, paymentState, receivedOf, type PayState } from "./payment-state";
+import { paySettingsFor } from "./pay-settings-server";
 
 /*
  * Payments page (portal design): money to collect, money received, cash on delivery and every
@@ -90,7 +91,7 @@ export async function paymentsData(clientId: string, period: "t" | "w" | "m") {
     customer: { select: { name: true } },
   } as const;
 
-  const [open, paid, events, client] = await Promise.all([
+  const [open, paid, events, pay] = await Promise.all([
     // Owed: not cancelled, money not (fully) in, from the last 60 days.
     db.order.findMany({
       where: { clientId, status: { in: ["NEW", "CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"] }, paidAt: null, createdAt: { gte: new Date(now.getTime() - 60 * DAY) } },
@@ -106,7 +107,7 @@ export async function paymentsData(clientId: string, period: "t" | "w" | "m") {
       orderBy: { updatedAt: "desc" },
       take: 600,
     }),
-    db.client.findUnique({ where: { id: clientId }, select: { paymentConfig: true } }),
+    paySettingsFor(clientId),
   ]);
 
   const shown = (o: { items: unknown; total: number; pointsRedeemed?: number | null }) =>
@@ -131,7 +132,7 @@ export async function paymentsData(clientId: string, period: "t" | "w" | "m") {
         requested: Boolean(o.paymentRequestedAt),
         // A request older than a day with no money, or a failed payment, is late.
         late: state === "failed" || (state === "requested" && now.getTime() - since.getTime() > DAY),
-        canRequest: Boolean(client?.paymentConfig) && !cod && o.total > 0,
+        canRequest: (pay.waPay || pay.upi) && !cod && o.total > 0,
       };
     })
     .filter((r) => r.due > 0);
@@ -180,7 +181,7 @@ export async function paymentsData(clientId: string, period: "t" | "w" | "m") {
     txns,
     cashDay: [...cashToday.values()].sort((a, b) => b.amount - a.amount),
     receivedToday,
-    hasPaymentConfig: Boolean(client?.paymentConfig),
+    hasPaymentConfig: pay.waPay || pay.upi,
   };
 }
 

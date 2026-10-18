@@ -3,7 +3,7 @@
 //   node tests/qa/payments.mjs        (start a fresh QA app first: every run expects the seeded data)
 import fs from "node:fs";
 import { createHmac } from "node:crypto";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 
 const S = JSON.parse(fs.readFileSync(".git/qa-state.json", "utf8"));
 if (!/localhost|127\.0\.0\.1/.test(S.base) || !/localhost|127\.0\.0\.1/.test(S.dbUrl)) throw new Error("QA only: base and database must be local");
@@ -225,6 +225,66 @@ await check(16, "A UTR the customer types is saved as the UPI reference and logg
   expect(s === 200 && !a.paidAt && a.paymentClaimedAt && a.paymentUtr === "412345678902", `${snap(a)}, utr ${a.paymentUtr ?? "-"}`);
   expect(ev.some((e) => e.source === "customer_text" && e.utr === "412345678902"), `events: ${JSON.stringify(ev.map((e) => [e.source, e.status, e.utr]))}`);
   return `${snap(a)}, utr ${a.paymentUtr}`;
+});
+
+// Payment settings (Client.paySettings) are set straight in the QA database for these and put back after.
+const qaClientId = (await order("newUnpaid")).clientId;
+const setPay = (v) => db.client.update({ where: { id: qaClientId }, data: { paySettings: v ?? Prisma.DbNull } });
+async function customerSays(o, text) {
+  const cust = await db.customer.findUniqueOrThrow({ where: { id: o.customerId } });
+  return post(
+    envelope({
+      contacts: [{ wa_id: cust.phone, profile: { name: cust.name } }],
+      messages: [{ from: cust.phone, id: `wamid.QAT${Date.now()}${Math.random().toString(36).slice(2, 6)}`, timestamp: String(Math.floor(Date.now() / 1000)), type: "text", text: { body: text } }],
+    }),
+  );
+}
+const cron = () => fetch(`${S.base}/api/cron`, { headers: { authorization: `Bearer ${S.cronSecret}` } }).then((r) => r.status);
+
+// 17. Cash on delivery follows Payment settings: off, over the limit, then allowed.
+await check(17, "A customer's 'COD' is refused when COD is off or over the limit, and accepted when allowed", async () => {
+  try {
+    const o1 = await freshOrder("U");
+    await setPay({ codOn: false });
+    await customerSays(o1, `I will pay cash on delivery for ${o1.ref}`);
+    const a1 = await db.order.findUniqueOrThrow({ where: { id: o1.id } });
+    await setPay({ codOn: true, codMax: 100 });
+    await customerSays(o1, `COD please for ${o1.ref}`);
+    const a2 = await db.order.findUniqueOrThrow({ where: { id: o1.id } });
+    await setPay({ codOn: true });
+    await customerSays(o1, `COD please for ${o1.ref}`);
+    const a3 = await db.order.findUniqueOrThrow({ where: { id: o1.id } });
+    expect(a1.paymentMethod == null && a2.paymentMethod == null && a3.paymentMethod === "cod", `off: ${a1.paymentMethod ?? "-"}, over limit: ${a2.paymentMethod ?? "-"}, allowed: ${a3.paymentMethod ?? "-"}`);
+    return "off → refused, ₹250 over ₹100 limit → refused, allowed → cash on delivery";
+  } finally {
+    await setPay(null);
+  }
+});
+
+// 18. Reminder rules: the 1-day reminder follows its switch; a request past the last reminder is marked expired.
+await check(18, "Payment reminders follow the Reminder rules switches, and a stale request is marked expired", async () => {
+  const day = 86_400_000;
+  try {
+    const off = await freshOrder("U");
+    await db.order.update({ where: { id: off.id }, data: { paymentRequestedAt: new Date(Date.now() - 2 * day) } });
+    await setPay({ remind1: false, remind3: false });
+    const s1 = await cron();
+    const a1 = await db.order.findUniqueOrThrow({ where: { id: off.id } });
+    await setPay({ remind1: true, remind3: true });
+    const s2 = await cron();
+    const a2 = await db.order.findUniqueOrThrow({ where: { id: off.id } });
+    const old = await freshOrder("T");
+    await db.order.update({ where: { id: old.id }, data: { paymentRequestedAt: new Date(Date.now() - 5 * day), paymentReminderAt: new Date(Date.now() - 4 * day), paymentReminder2At: new Date(Date.now() - 2 * day) } });
+    const s3 = await cron();
+    const a3 = await db.order.findUniqueOrThrow({ where: { id: old.id } });
+    expect(s1 === 200 && s2 === 200 && s3 === 200, `cron HTTP ${s1}/${s2}/${s3}`);
+    expect(!a1.paymentReminderAt, "the 1-day reminder ran while switched off");
+    expect(a2.paymentReminderAt, "the 1-day reminder didn't run once switched on");
+    expect(a3.paymentFailedAt && /expired/i.test(a3.paymentFailReason ?? ""), `stale request: ${snap(a3)}`);
+    return `off: untouched; on: reminder handled; stale: ${a3.paymentFailReason}`;
+  } finally {
+    await setPay(null);
+  }
 });
 
 await db.$disconnect();

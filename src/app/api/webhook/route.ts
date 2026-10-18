@@ -10,6 +10,8 @@ import { money, orderRef, orderWhereRef, recordOrder } from "@/lib/orders";
 import { ORDER_REF_RE } from "@/lib/order-ref";
 import { metaReplyContent, receivingNumber, recordReply } from "@/lib/replies";
 import { autoRedeemPoints } from "@/lib/loyalty-redeem";
+import { codBlocked } from "@/lib/pay-settings";
+import { paySettingsFor } from "@/lib/pay-settings-server";
 import { autoRequestPayment, cancelSupersededOrdersForCustomer, confirmPayment, parseMetaAmount, recordPaymentClaim, recordPaymentFailure, sendCodConfirmationPrompt, textInWindow, updateOrderCard } from "@/lib/payments";
 import { autoReplyToButton, autoSendCatalogue, catalogueTrigger, firstMessageToday } from "@/lib/catalog";
 import { mapMetaStatus } from "@/lib/whatsapp";
@@ -245,7 +247,9 @@ async function detectAndApplyUpiPayment(
       id: true,
       orders: {
         where: { paidAt: null, status: { in: ["NEW", "CONFIRMED"] } },
-        orderBy: [{ paymentRequestedAt: "desc" }, { createdAt: "desc" }],
+        // The order last asked for payment first (orders never asked come after, newest first). Postgres puts empty
+        // dates first in a descending sort, so without nulls: "last" an unrequested order would win.
+        orderBy: [{ paymentRequestedAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
         take: 5,
         select: { id: true, number: true, ref: true, total: true, currency: true, paymentRequestedAt: true, createdAt: true },
       },
@@ -335,6 +339,13 @@ async function detectAndApplyUpiPayment(
 
   // The customer asks to pay cash on delivery: set it on the order and send 1-click confirmation prompt.
   if (m.type === "text" && COD_ASK_RE.test(base.text) && !NO_COD_RE.test(base.text)) {
+    // Payment settings › Cash on delivery: off, over the limit or outside the allowed areas → a polite no.
+    const asked = await db.order.findUnique({ where: { id: targetOrder.id }, select: { total: true, clientId: true, customer: true } });
+    const blocked = asked ? codBlocked((await paySettingsFor(asked.clientId)).settings, asked.total, asked.customer) : null;
+    if (asked && blocked) {
+      await textInWindow(asked.customer, `Sorry, cash on delivery isn't available for order ${ref}. Please pay using the payment link we sent, and we will pack it right away.`, "COD not available").catch(() => false);
+      return { text: `${base.text} · Asked for cash on delivery on ${ref}; not allowed (${blocked})`, kind: base.kind, media: base.media, handledAsPayment: false };
+    }
     await db.order.updateMany({ where: { id: targetOrder.id, paymentMethod: null }, data: { paymentMethod: "cod" } });
     await sendCodConfirmationPrompt(targetOrder.id).catch(() => {});
     return { text: `${base.text} · Asked for cash on delivery on ${ref} (confirmation prompt sent)`, kind: base.kind, media: base.media, handledAsPayment: false };

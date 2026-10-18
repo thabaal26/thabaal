@@ -7,6 +7,8 @@ import { db } from "@/lib/db";
 import { pushOrderToSheet } from "@/lib/google-sheets-live";
 import { DEFAULT_SHIPPING_FEE, getOrderPricing, itemsText, itemsWithNames, money, nextOrderRef, orderRef, syncCustomerOrderedProducts, type OrderItem } from "@/lib/orders";
 import { confirmPayment, sendPaymentRequestFor, updateOrderCard } from "@/lib/payments";
+import { codBlocked } from "@/lib/pay-settings";
+import { paySettingsFor } from "@/lib/pay-settings-server";
 import { utrOf } from "@/lib/payment-events";
 import { dueOf, methodOf, receivedOf } from "@/lib/payment-state";
 import { autoRedeemPoints, keptPointsDiscount, setOrderPoints } from "@/lib/loyalty-redeem";
@@ -602,7 +604,7 @@ export async function createOrder(input: {
     .filter((i) => i.name);
   if (!lines.length) return { ok: false, message: "Add at least one item." };
 
-  const client = await db.client.findUnique({ where: { id: s.clientId }, select: { name: true, paymentConfig: true } });
+  const pay = await paySettingsFor(s.clientId);
 
   // Parse delivery address and area
   const rawAddr = (input.address?.trim() || input.note?.trim() || "").slice(0, 500);
@@ -622,6 +624,13 @@ export async function createOrder(input: {
     select: { id: true, name: true, location: true, locationRaw: true, region: true },
   });
   if (!existing && !name) return { ok: false, message: "This is a new customer: enter their name so they can be saved." };
+  // Payment settings › Cash on delivery: on, under the limit and in an allowed area (checked before anything is saved).
+  if (input.paymentMode === "cod") {
+    const fee = input.shippingFee !== undefined ? Math.max(0, Number(input.shippingFee) || 0) : DEFAULT_SHIPPING_FEE;
+    const estimate = getOrderPricing(lines.map((i, k) => ({ id: i.id || `m${k}`, name: i.name, quantity: i.quantity, price: i.price, currency: "INR" })), null, { customShippingFee: fee }).total;
+    const blocked = codBlocked(pay.settings, estimate, existing ? { ...existing, ...(resolvedRegion && { region: resolvedRegion }), ...(rawAddr && { locationRaw: rawAddr }) } : { region: resolvedRegion, location: resolvedArea, locationRaw: rawAddr });
+    if (blocked) return { ok: false, message: blocked };
+  }
 
   let customer: { id: string; name: string };
   if (existing) {
@@ -694,7 +703,7 @@ export async function createOrder(input: {
 
   const mode = input.paymentMode ?? (input.requestPaymentNow ? "request" : "later");
   let paymentNote = "";
-  if (mode === "request" && total > 0 && client?.paymentConfig) {
+  if (mode === "request" && total > 0 && (pay.waPay || pay.upi)) {
     const payRes = await sendPaymentRequestFor(order.id);
     paymentNote = payRes.ok ? " Sent WhatsApp payment request." : ` (${payRes.message})`;
   } else if ((mode === "paid_cash" || mode === "paid_upi") && total > 0) {

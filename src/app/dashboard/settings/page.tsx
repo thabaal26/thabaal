@@ -20,6 +20,7 @@ import { LocalSessionPanel, ProviderSwitch } from "./provider-panel";
 import { PasswordForm } from "./password-form";
 import { OrderStepsForm } from "./order-steps-form";
 import { readFlow } from "@/lib/order-flow";
+import { readPaySettings, upiReady, waPayOn } from "@/lib/pay-settings";
 import { AppearanceEditor } from "../appearance-editor";
 import { portalDefault } from "@/lib/appearance";
 import { spendSummary } from "@/lib/spend";
@@ -111,7 +112,7 @@ export default async function SettingsPage() {
             .then((c) => c?.products.length ?? null)
             .catch(() => null),
           db.order.count({ where: { clientId: cid } }),
-          db.client.findUnique({ where: { id: cid }, select: { name: true, website: true, supportPhone: true, paymentConfig: true, billingMode: true, orderFlow: true } }),
+          db.client.findUnique({ where: { id: cid }, select: { name: true, website: true, supportPhone: true, paymentConfig: true, paySettings: true, billingMode: true, orderFlow: true } }),
           spendSummary(cid).catch(() => null),
         ])
       : [[], 0, null, 0, null, null];
@@ -120,6 +121,12 @@ export default async function SettingsPage() {
       : r === "YELLOW" ? { tone: "warn", label: "Medium quality", labelTa: "நடுத்தர தரம்" }
       : r === "RED" ? { tone: "bad", label: "Low quality", labelTa: "குறைந்த தரம்" }
       : { tone: "mute", label: "Not rated yet", labelTa: "இன்னும் மதிப்பிடப்படவில்லை" }
+    );
+    const pay = readPaySettings(client?.paySettings, client?.paymentConfig);
+    const onOff = (on: boolean) => (
+      <span className={`pill ${on ? "ok" : "mute"}`}>
+        <T ta={on ? "இயக்கத்தில்" : "முடக்கம்"}>{on ? "On" : "Off"}</T>
+      </span>
     );
     return frame(
       <div className="stack">
@@ -130,26 +137,32 @@ export default async function SettingsPage() {
                 <h2><T ta="வாடிக்கையாளர்கள் எவ்வாறு செலுத்துகிறார்கள்">How customers pay</T></h2>
                 <p><T ta="WhatsApp கொடுப்பனவுகள், UPI மற்றும் டெலிவரி ரொக்கம் (COD).">WhatsApp payments, UPI and cash on delivery.</T></p>
               </div>
-              <Link className="btn sm" href="/dashboard/revenue?tab=set">
+              <Link className="btn sm primary" href="/dashboard/revenue?tab=set">
                 <T ta="பண அமைப்புகளைத் திற">Open payment settings</T>
               </Link>
             </div>
             <div className="list">
               <div className="row">
                 <div className="grow t"><T ta="WhatsApp-லேயே செலுத்தவும்">Pay inside WhatsApp</T></div>
-                <span className={`pill ${client?.paymentConfig ? "ok" : "mute"}`}>
-                  <T ta={client?.paymentConfig ? "இயக்கத்தில் உள்ளது" : "முடக்கப்பட்டுள்ளது"}>
-                    {client?.paymentConfig ? "On" : "Off"}
-                  </T>
-                </span>
+                {onOff(waPayOn(pay, client?.paymentConfig))}
               </div>
               <div className="row">
-                <div className="grow t"><T ta="UPI அல்லது வங்கி (உங்களால் செலுத்தப்பட்டதாக குறிக்கப்படும்)">UPI or bank (marked paid by you)</T></div>
-                <span className="pill ok"><T ta="இயக்கத்தில் உள்ளது">On</T></span>
+                <div className="grow">
+                  <div className="t"><T ta="UPI QR அல்லது பேமெண்ட் இணைப்பு">UPI QR or payment link</T></div>
+                  {upiReady(pay) && <div className="muted small">{pay.upiId}</div>}
+                </div>
+                {onOff(upiReady(pay))}
               </div>
               <div className="row">
-                <div className="grow t"><T ta="டெலிவரி ரொக்கம் (COD)">Cash on delivery</T></div>
-                <span className="muted small"><T ta="ஒவ்வொரு ஆர்டருக்கும் தேர்வு செய்யப்படும்">Chosen per order</T></span>
+                <div className="grow">
+                  <div className="t"><T ta="டெலிவரி ரொக்கம் (COD)">Cash on delivery</T></div>
+                  {pay.codOn && (pay.codMax != null || pay.codAreas) && (
+                    <div className="muted small">
+                      {[pay.codMax != null ? `Up to ₹${pay.codMax.toLocaleString("en-IN")}` : "", pay.codAreas].filter(Boolean).join(" · ")}
+                    </div>
+                  )}
+                </div>
+                {onOff(pay.codOn)}
               </div>
             </div>
           </section>

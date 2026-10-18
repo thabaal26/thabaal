@@ -7,6 +7,8 @@ import { money, orderRef } from "@/lib/orders";
 import { canUndoPayment, dueOf, isPaymentMethod, methodLabel, receivedOf } from "@/lib/payment-state";
 import { confirmPayment, textInWindow } from "@/lib/payments";
 import { logPaymentEvent, paymentEventsFor, utrOf } from "@/lib/payment-events";
+import { codBlocked } from "@/lib/pay-settings";
+import { paySettingsFor } from "@/lib/pay-settings-server";
 import { paymentRef } from "@/lib/plain-error";
 import { requireOrderAccess } from "@/lib/session";
 import { notifyOrder } from "./orders";
@@ -116,6 +118,11 @@ export async function setPaymentMethod(id: string, method: "cod" | "upi", opts: 
   const o = r.order;
   if (dueOf(o) <= 0) return { ok: false, message: "This order is already paid." };
   if (o.status === "CANCELLED") return { ok: false, message: "This order is cancelled." };
+  if (method === "cod") {
+    const [pay, customer] = await Promise.all([paySettingsFor(o.clientId), db.customer.findUnique({ where: { id: o.customerId }, select: { region: true, location: true, locationRaw: true } })]);
+    const blocked = codBlocked(pay.settings, dueOf(o), customer);
+    if (blocked) return { ok: false, message: blocked };
+  }
   await db.order.update({
     where: { id: o.id },
     data: {

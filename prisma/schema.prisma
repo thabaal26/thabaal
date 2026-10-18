@@ -99,6 +99,8 @@ model Client {
   paymentConfig       String?
   /// Use a customer's loyalty points automatically on each new order (cart or hand-entered), before payment is asked.
   loyaltyAutoRedeem   Boolean           @default(false)
+  /// Payments › Payment settings (lib/pay-settings.ts): pay in WhatsApp, UPI, cash on delivery, bank (last 4 only), reminders.
+  paySettings         Json?
   /// Portal sections disabled for this client by the portal owner (e.g. ["orders", "catalogue", "calls"]). Empty means all sections enabled.
   disabledSections    String[]          @default([])
   /// Icon set for this client's portal: "hugeicons" (default) or "lucide".
@@ -464,6 +466,8 @@ model Order {
   paymentRequestedAt DateTime?
   /// One automatic reminder when the payment request is still unpaid after a few hours.
   paymentReminderAt  DateTime?
+  /// When the last (3-day) payment reminder went; the order is marked expired a day after it if still unpaid.
+  paymentReminder2At DateTime?
   paidAt             DateTime?
   paymentTxnId       String?
   /// The bank's 12-digit UPI reference (UTR), apart from paymentTxnId so neither overwrites the other

@@ -6,10 +6,12 @@ import { fmtDate } from "@/lib/format";
 import { PAYMENT_TEMPLATE, paymentTemplateFor } from "@/lib/payments";
 import { paymentsData, WAY_COLOR, WAY_LABEL, WAY_LABEL_TA, type Way } from "@/lib/payments-data";
 import { getScope } from "@/lib/session";
+import { getCatalogWithProducts } from "@/lib/catalog";
+import { paySettingsFor } from "@/lib/pay-settings-server";
 import { LoyaltyRedeemSetting } from "../orders/loyalty-points-ui";
-import { PaymentForm } from "../orders/payment-form";
 import { inr } from "../portal-format";
 import { LinkTabs, PortalPage, Seg, T } from "../portal-ui";
+import { BankAccount, HowCustomersPay, ReminderRules } from "./pay-settings-form";
 import { CollectList, CsvButton, ReceiptButton, RecordByNumber, TxnTable } from "./payments-board";
 import Link from "@/components/intent-link";
 
@@ -45,7 +47,15 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
     const q = new URLSearchParams(Object.entries({ tab: tab === "collect" ? undefined : tab, per: per === "t" ? undefined : per, way: way || undefined, ...patch }).filter(([, v]) => v) as [string, string][]);
     return `/dashboard/revenue${q.size ? `?${q}` : ""}`;
   };
-  const tabs = <LinkTabs label="Payments views" current={tab} tabs={TABS.map((t) => ({ ...t, href: t.id === "collect" ? "/dashboard/revenue" : `/dashboard/revenue?tab=${t.id}` }))} />;
+  // The Cash / COD tab shows only while cash on delivery is on (Payment settings).
+  const tabsFor = (codOn: boolean) => (
+    <LinkTabs
+      label="Payments views"
+      current={tab}
+      tabs={TABS.filter((t) => codOn || t.id !== "cod" || tab === "cod").map((t) => ({ ...t, href: t.id === "collect" ? "/dashboard/revenue" : `/dashboard/revenue?tab=${t.id}` }))}
+    />
+  );
+  const tabs = tabsFor(true);
 
   if (!scope.clientId)
     return (
@@ -56,7 +66,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
     );
   const clientId = scope.clientId;
 
-  const d = await paymentsData(clientId, per);
+  const [d, pay] = await Promise.all([paymentsData(clientId, per), paySettingsFor(clientId)]);
   const now = new Date().getTime();
   const toCollect = d.collect.filter((r) => !r.cod).reduce((n, r) => n + r.due, 0);
   const codPending = d.collect.filter((r) => r.cod).reduce((n, r) => n + r.due, 0);
@@ -197,6 +207,16 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         </div>
       </>
     );
+  } else if (tab === "cod" && !pay.settings.codOn) {
+    body = (
+      <div className="note">
+        <T ta="டெலிவரியின் போது பணம் (COD) முடக்கப்பட்டுள்ளது. ">Cash on delivery is off. </T>
+        <Link href="/dashboard/revenue?tab=set">
+          <b><T ta="பண அமைப்புகளில் இயக்கவும்">Turn it on in Payment settings</T></b>
+        </Link>
+        .
+      </div>
+    );
   } else if (tab === "cod") {
     const cod = d.collect.filter((r) => r.cod);
     const dayTotal = d.cashDay.reduce((n, r) => n + r.amount, 0);
@@ -249,32 +269,26 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   } else if (tab === "all") {
     body = <TxnTable rows={d.txns.map((t) => ({ ...t, when: fmtDate(new Date(t.atMs), "d MMM, h:mm a") }))} canOperate={scope.canOperate} />;
   } else if (tab === "set") {
-    const [client, ownPaymentTemplate, paymentTemplate] = await Promise.all([
-      db.client.findUnique({ where: { id: clientId }, select: { paymentConfig: true, loyaltyAutoRedeem: true } }),
+    const [client, ownPaymentTemplate, paymentTemplate, catalogue] = await Promise.all([
+      db.client.findUnique({ where: { id: clientId }, select: { loyaltyAutoRedeem: true } }),
       db.template.findFirst({ where: { clientId, name: PAYMENT_TEMPLATE }, select: { status: true } }),
       paymentTemplateFor(clientId),
+      // Whether a catalogue is connected; null when Meta couldn't be asked (the badge is then left out).
+      getCatalogWithProducts(clientId)
+        .then((c) => Boolean(c.catalogId))
+        .catch(() => null),
     ]);
     body = (
       <div className="stack">
-        <section className="card">
-          <div className="hd">
-            <div>
-              <h2><T ta="வாடிக்கையாளர்கள் பணம் செலுத்தும் முறை">How customers pay</T></h2>
-              <p><T ta="WhatsApp மூலம் செலுத்துதல், UPI இணைப்பு அல்லது ரொக்கம்.">Pay inside WhatsApp, a UPI link or QR, or cash on delivery. Orders and Payments change to match.</T></p>
-            </div>
-          </div>
-          {scope.canManage && client ? (
-            <PaymentForm config={client.paymentConfig} own={{ name: PAYMENT_TEMPLATE, status: ownPaymentTemplate?.status ?? null }} using={paymentTemplate?.name ?? null} />
-          ) : (
-            <p className="muted small"><T ta="அமைப்புகளை மாற்ற நிர்வாகியிடம் கேட்கவும்.">Ask your admin to change payment settings.</T></p>
-          )}
-          <div className="note small" style={{ marginTop: 14 }}>
-            <b><T ta="ஆர்டர் வழிமுறை: ">How an order flows: </T></b>
-            <T ta="சலுகை செய்தி › Order now › பட்டியல் › கார்ட் › Review and pay › பணம் செலுத்தப்பட்டது. WhatsApp கட்டணம் இல்லாத ஆர்டர்கள் UPI அல்லது ரொக்கம் மூலம் முடியும்.">
-              offer message › Order now › catalogue › cart › Review and pay › paid. Orders without WhatsApp payments go through a UPI link or QR, or cash on delivery, and you mark them paid.
-            </T>
-          </div>
-        </section>
+        <HowCustomersPay
+          settings={pay.settings}
+          paymentConfig={pay.paymentConfig}
+          catalogue={catalogue}
+          canManage={scope.canManage}
+          payTemplate={{ using: paymentTemplate?.name ?? null, ownName: PAYMENT_TEMPLATE, ownStatus: ownPaymentTemplate?.status ?? null }}
+        />
+        {scope.canManage && <BankAccount settings={pay.settings} />}
+        <ReminderRules settings={pay.settings} canManage={scope.canManage} />
         {scope.canManage && client && (
           <section className="card">
             <div className="hd">
@@ -286,40 +300,6 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
             <LoyaltyRedeemSetting on={client.loyaltyAutoRedeem} />
           </section>
         )}
-        <section className="card">
-          <div className="hd">
-            <div>
-              <h2><T ta="நினைவூட்டல்கள்">Reminders</T></h2>
-              <p><T ta="தபால் உங்களுக்காகப் பணத்தை வசூலிக்க நினைவூட்டும்.">thabaal chases the money for you.</T></p>
-            </div>
-          </div>
-          <div className="list">
-            <div className="row">
-              <div className="grow">
-                <div className="t"><T ta="தானியங்கி நினைவூட்டல்">One automatic reminder</T></div>
-                <div className="muted small">
-                  <T ta="WhatsApp கட்டணக் கோரிக்கை சில மணிநேரங்களாக செலுத்தப்படாமல் இருந்தால், வாடிக்கையாளருக்கு தானாக ஒரு பணிவான நினைவூட்டல் அனுப்பப்படும்.">
-                    When a WhatsApp payment request is still unpaid after a few hours, the customer gets one polite reminder.
-                  </T>
-                </div>
-              </div>
-              <span className="pill ok"><T ta="இயங்குகிறது">On</T></span>
-            </div>
-            <div className="row">
-              <div className="grow">
-                <div className="t"><T ta="அனைவருக்கும் நினைவூட்டல் அனுப்பு">Remind everyone now</T></div>
-                <div className="muted small">
-                  <T ta="வசூலிக்க › அனைவருக்கும் நினைவூட்டு மூலம் காத்திருக்கும் அனைவருக்கும் கோரிக்கை மீண்டும் அனுப்பப்படும்.">
-                    To collect › Remind everyone sends the request again to everyone waiting.
-                  </T>
-                </div>
-              </div>
-              <Link className="btn sm" href="/dashboard/revenue">
-                <T ta="திற">Open</T>
-              </Link>
-            </div>
-          </div>
-        </section>
       </div>
     );
   } else {
@@ -329,7 +309,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   return (
     <PortalPage title="Payments" titleTa="பணம்" sub={SUB} subTa={SUB_TA} actions={scope.canOperate ? <RecordByNumber rows={d.collect} /> : undefined}>
       {kpis}
-      {tabs}
+      {tabsFor(pay.settings.codOn)}
       {body}
     </PortalPage>
   );

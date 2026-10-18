@@ -84,7 +84,7 @@ export type OrderCardData = {
     locationRaw?: string | null;
     client?: { name: string };
   };
-  client?: { paymentConfig?: string | null; orderFlow?: string | null };
+  client?: { paymentConfig?: string | null; orderFlow?: string | null; codOn?: boolean };
 };
 
 /** Payment history rows in plain words (lib/payment-events.ts). */
@@ -94,6 +94,7 @@ const HISTORY_SOURCE: Record<string, string> = {
   customer_text: "Customer's message",
   screenshot: "Customer's screenshot",
   staff: "Staff",
+  system: "Reminder rules",
 };
 const HISTORY_STATUS: Record<string, string> = {
   paid: "paid",
@@ -102,6 +103,7 @@ const HISTORY_STATUS: Record<string, string> = {
   claimed: "says paid",
   duplicate: "reference already used",
   recorded: "recorded",
+  expired: "request expired",
   reference_added: "reference added",
 };
 
@@ -1202,7 +1204,7 @@ export function OrderCard({
             </button>
           )}
 
-          {o.status === "NEW" && !isCod && (
+          {o.status === "NEW" && !isCod && o.client?.codOn !== false && (
             <button
               type="button"
               className="btn sm"
@@ -1217,7 +1219,7 @@ export function OrderCard({
             </button>
           )}
 
-          {o.status === "CONFIRMED" && !isPaid && !isCod && (
+          {o.status === "CONFIRMED" && !isPaid && !isCod && o.client?.codOn !== false && (
             <button
               type="button"
               className="btn sm"

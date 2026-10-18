@@ -15,6 +15,7 @@ const FILES = [
   "prisma/sql/2026-10-18-order-template-names.sql",
   "prisma/sql/2026-10-18-app-host-links.sql",
   "prisma/sql/2026-10-18-payment-events.sql",
+  "prisma/sql/2026-10-19-payment-settings.sql",
 ];
 
 if (process.env.VERCEL !== "1") {
