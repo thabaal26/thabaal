@@ -140,7 +140,10 @@ html.dark .thabaal-portal{
 @container (max-width: 250px){
   .thabaal-portal .todo>.go{grid-column:1 / -1;grid-row:3;justify-self:start}
 }
+/* A label + input group. The app-wide .field (globals.css) is an input's look; on a group it drew a box round
+   the whole group, and its min-height let a dialog squash the group and cut off its text. */
 .thabaal-portal .field:not(input,select,textarea,button){display:flex;flex-direction:column;gap:6px}
+.thabaal-portal div.field{border:0;padding:0;background:none;box-shadow:none;border-radius:0;min-height:0;flex-shrink:0}
 .thabaal-portal .field label{font-weight:600;font-size:13.5px}
 .thabaal-portal .formgrid{display:grid;gap:14px;grid-template-columns:repeat(2,minmax(0,1fr))}
 .thabaal-portal .msg{font-size:13px;font-weight:600;min-height:0}
@@ -173,6 +176,7 @@ html.dark .thabaal-portal .phone{background:#0E2535;color:#FFF9F0}
 .thabaal-portal .qr{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
 .thabaal-portal .qr span{background:#fff;color:#1A6FB5;border-radius:8px;padding:5px 10px;font-weight:600;font-size:13px;box-shadow:0 1px 1px rgba(0,0,0,.08)}
 .thabaal-portal .dlg{padding:22px;display:flex;flex-direction:column;gap:14px;max-height:85vh;overflow:auto}
+.thabaal-portal .dlg>*{flex-shrink:0}
 .thabaal-portal .dlg .acts{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
 .thabaal-portal .drawer{position:fixed;top:0;right:0;bottom:0;width:min(420px,100vw);background:var(--card);border-left:1.5px solid var(--line);box-shadow:-20px 0 50px -30px rgba(0,0,0,.5);z-index:50;transform:translateX(105%);transition:transform .25s;display:flex;flex-direction:column;padding:20px 20px 24px;gap:14px;overflow:auto}
 .thabaal-portal .drawer.open{transform:none}
