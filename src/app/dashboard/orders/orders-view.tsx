@@ -70,7 +70,8 @@ export function OrdersView({
   const [activeTab] = useState<"orders" | "pack">("orders");
   const [show, setShow] = useState<string>(initialShow);
   const [payFilter, setPayFilter] = useState<string>(initialPay);
-  const [srcFilter, setSrcFilter] = useState<string>(initialSrc);
+  // "chat" was an old option that matched the same orders as "catalogue"; old links fall back to everything.
+  const [srcFilter, setSrcFilter] = useState<string>(initialSrc === "chat" ? "all" : initialSrc);
   const [query, setQuery] = useState<string>(initialQ);
   const [exportOpen, setExportOpen] = useState(false);
 
@@ -153,9 +154,11 @@ export function OrdersView({
     if (payFilter === "cod" && !isOrderCod(o)) return false;
 
     // Source dropdown filter
-    if (srcFilter === "cat" && !o.waMessageId) return false;
-    if (srcFilter === "camp" && (!o.waMessageId || !o.internalNote || !/campaign/i.test(o.internalNote))) return false;
-    if (srcFilter === "chat" && !o.waMessageId) return false;
+    // Same three sources the order card shows: a WhatsApp cart is "Campaign" when it came after a campaign
+    // message, otherwise "Catalogue"; anything without a WhatsApp cart was entered by hand.
+    const fromCampaign = !!o.waMessageId && !!o.internalNote && /campaign/i.test(o.internalNote);
+    if (srcFilter === "cat" && (!o.waMessageId || fromCampaign)) return false;
+    if (srcFilter === "camp" && !fromCampaign) return false;
     if (srcFilter === "manual" && o.waMessageId) return false;
 
     // Search query filter
@@ -447,7 +450,6 @@ export function OrdersView({
               <option value="all">{isTa ? "வகை: அனைத்தும்" : "From: everywhere"}</option>
               <option value="cat">{isTa ? "வகை: பட்டியல்" : "From: catalogue"}</option>
               <option value="camp">{isTa ? "வகை: பிரச்சாரம்" : "From: campaign"}</option>
-              <option value="chat">{isTa ? "வகை: உரையாடல்" : "From: chat"}</option>
               <option value="manual">{isTa ? "வகை: கைமுறை பதிவு" : "From: manual entry"}</option>
             </select>
 

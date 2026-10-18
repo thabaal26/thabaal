@@ -147,7 +147,7 @@
 .tl-out { align-self: flex-end; background: #d9fdd3; border-top-right-radius: 4px; }
 [data-theme="night"] .tl-in { background: #202c33; color: #e9edef; }
 [data-theme="night"] .tl-out { background: #005c4b; color: #e9edef; }
-.tl-msg time { align-self: flex-end; font-size: 11px; color: #667781; display: inline-flex; gap: 3px; align-items: center; }
+.tl-msg time { align-self: flex-end; font-size: 11px; color: #54656F; display: inline-flex; gap: 3px; align-items: center; }
 [data-theme="night"] .tl-msg time { color: #8696a0; }
 .tl-ticks { width: 16px; height: 10px; color: #53bdeb; }
 .tl-cart { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 8px; background: rgb(0 0 0 / .05); }

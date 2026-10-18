@@ -661,7 +661,7 @@ export function OrderCard({
             <span style={{ color: "var(--muted)", fontSize: 13.5, lineHeight: 1.45 }}>
               {firstItemLabel}
               {remainingCount > 0 && (
-                <span style={{ opacity: 0.85, fontWeight: 500, marginLeft: 4 }}>
+                <span style={{ fontWeight: 500, marginLeft: 4 }}>
                   + {remainingCount} more
                 </span>
               )}

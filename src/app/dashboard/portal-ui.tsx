@@ -228,7 +228,7 @@ export function LinkTabs({ tabs, current, label }: { tabs: { id: string; label: 
   return (
     <nav className="tabs" aria-label={label}>
       {tabs.map((t) => (
-        <Link key={t.id} href={t.href} aria-current={t.id === current ? "page" : undefined} aria-selected={t.id === current}>
+        <Link key={t.id} href={t.href} aria-current={t.id === current ? "page" : undefined}>
           <T ta={t.ta}>{t.label}</T>
           {t.count ? <small style={{ marginLeft: 6, opacity: 0.7 }}>{t.count}</small> : null}
         </Link>

@@ -127,7 +127,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
 
       <div className="chips" style={{ marginBottom: 12, alignItems: "center" }}>
         {[{ key: "", label: "All", n: total }, ...(Object.keys(CATEGORY_INFO) as Category[]).map((c) => ({ key: c, label: CATEGORY_INFO[c].label, n: counts.find((x) => x.category === c)?._count ?? 0 }))].map((tab) => (
-          <Link key={tab.key} className="chip" href={qsFor({ category: tab.key || undefined })} aria-pressed={(active ?? "") === tab.key} scroll={false}>
+          <Link key={tab.key} className="chip" href={qsFor({ category: tab.key || undefined })} aria-current={(active ?? "") === tab.key ? "true" : undefined} scroll={false}>
             {tab.label} <small>{tab.n}</small>
           </Link>
         ))}

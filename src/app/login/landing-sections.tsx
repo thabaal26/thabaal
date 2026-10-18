@@ -362,7 +362,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
             </p>
             <Talk lang={lang} />
           </div>
-          <div className="tl-table-wrap">
+          <div className="tl-table-wrap" tabIndex={0} role="region" aria-label={ta ? "Meta கட்டண அட்டவணை" : "Meta rates table"}>
             <table className="tl-rates">
               <caption>{ta ? "இந்திய எண்களுக்கு Meta கட்டணம், ஒரு செய்திக்கு (அக்டோபர் 2026, GST தவிர)" : "Meta's rates for Indian numbers, per delivered message (October 2026, before GST)"}</caption>
               <thead>

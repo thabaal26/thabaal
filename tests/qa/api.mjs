@@ -177,16 +177,15 @@ await check("API-23", "Google sign-in: not configured → clear error; callback 
 
 // ── Uploads ──
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
-const upload = (token, bytes, type, name) => {
-  const fd = new FormData();
-  fd.append("file", new Blob([bytes], { type }), name);
-  return get("/api/upload", token ? cookie(token) : {}, { method: "POST", body: fd });
-};
+// The route takes the raw file as the body, its type in Content-Type and its name in ?filename= (as the editor sends it).
+const upload = (token, bytes, type, name) =>
+  get(`/api/upload?filename=${encodeURIComponent(name)}`, { "content-type": type, ...(token ? cookie(token) : {}) }, { method: "POST", body: bytes });
 await check("API-24", "upload: no login or viewer → refused, nothing stored", async () => {
   const n0 = await db.uploadedImage?.count?.().catch(() => null);
   const a = await upload(null, PNG, "image/png", "a.png");
   const b = await upload(S.tokens.viewer, PNG, "image/png", "a.png");
-  expect(a.status !== 200 && b.status === 403, `no login ${a.status}, viewer ${b.status}`);
+  expect([401, 403].includes(a.status) || [302, 303, 307].includes(a.status), `no login got ${a.status}`);
+  expect(b.status === 403, `viewer got ${b.status}`);
   const n1 = await db.uploadedImage?.count?.().catch(() => null);
   if (n0 != null) expect(n0 === n1, "a refused upload was stored");
 });

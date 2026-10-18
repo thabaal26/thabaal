@@ -22,6 +22,13 @@ const nextConfig: NextConfig = {
         source: "/icons/:kind(sets|art)/:path*",
         headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
       },
+      {
+        // Uploaded files are served on this site's own address, so they get the strictest policy: nothing in them
+        // may run or load anything. (The route sets this too, but the rule above would overwrite it; the last
+        // matching rule wins.)
+        source: "/api/upload/:id",
+        headers: [{ key: "Content-Security-Policy", value: "default-src 'none'; sandbox" }],
+      },
     ];
   },
 };

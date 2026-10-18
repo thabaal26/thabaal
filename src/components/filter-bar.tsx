@@ -374,7 +374,7 @@ export function FilterBar({
                         </span>
                         <span className="min-w-0 flex-1 truncate">{p.label}</span>
                         {p.hint && (
-                          <span className={cn("shrink-0 text-[11px]", active ? "text-brand-deep/80" : "text-muted")}>
+                          <span className={cn("shrink-0 text-[11px]", active ? "text-brand-deep" : "text-muted")}>
                             {p.hint}
                           </span>
                         )}

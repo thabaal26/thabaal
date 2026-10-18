@@ -64,7 +64,7 @@ for (const size of SIZES) {
       const res = await p.evaluate(async () => {
         // eslint-disable-next-line no-undef
         const r = await axe.run(document, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] }, resultTypes: ["violations"] });
-        return r.violations.map((v) => ({ id: v.id, impact: v.impact, help: v.help, count: v.nodes.length, targets: v.nodes.slice(0, 4).map((n) => n.target.join(" ")) }));
+        return r.violations.map((v) => ({ id: v.id, impact: v.impact, help: v.help, count: v.nodes.length, targets: v.nodes.slice(0, 4).map((n) => n.target.join(" ")), notes: v.nodes.slice(0, 4).map((n) => (n.any[0] ?? n.all[0] ?? n.none[0])?.message ?? "") }));
       });
       entry.violations = res;
       // Keyboard: the first 15 Tab stops each show a visible focus indicator and none is hidden off-screen.
@@ -114,19 +114,22 @@ for (const size of SIZES) {
   const p = await ctx.newPage();
   await p.goto(BASE + "/dashboard/orders", { waitUntil: "networkidle" });
   const opened = await p
-    .getByRole("button", { name: /new order/i })
+    .getByRole("button", { name: /^\s*new order\s*$/i })
     .first()
     .click({ timeout: 5000 })
     .then(() => p.waitForSelector('[role="dialog"], dialog[open]', { timeout: 5000 }))
     .then(() => true)
     .catch(() => false);
   let closed = false;
+  let focusBack = false;
   if (opened) {
     await p.keyboard.press("Escape");
     closed = await p.waitForSelector('[role="dialog"], dialog[open]', { state: "detached", timeout: 3000 }).then(() => true).catch(async () => !(await p.$('[role="dialog"]:visible, dialog[open]')));
+    // Focus goes back to the button that opened it.
+    if (closed) focusBack = await p.evaluate(() => /new\s*order/i.test(document.activeElement?.textContent ?? ""));
   }
-  report.push({ route: "/dashboard/orders (New order dialog)", size: "1366x768", violations: [], keyboard: opened ? (closed ? [] : ["Escape does not close the dialog"]) : ["dialog did not open"] });
-  console.log(`dialog Escape: opened ${opened}, closed ${closed}`);
+  report.push({ route: "/dashboard/orders (New order dialog)", size: "1366x768", violations: [], keyboard: opened ? (closed ? (focusBack ? [] : ["focus does not return to the opener"]) : ["Escape does not close the dialog"]) : ["dialog did not open"] });
+  console.log(`dialog Escape: opened ${opened}, closed ${closed}, focus back ${focusBack}`);
   await ctx.close();
 }
 await b.close();

@@ -80,7 +80,7 @@ export default function GuidePage() {
               <p>The long menu became 10 pages. Nothing was removed.</p>
             </div>
           </div>
-          <div className="tw">
+          <div className="tw" tabIndex={0} role="region" aria-label="Old sections and new pages">
             <table>
               <thead>
                 <tr>
@@ -119,7 +119,7 @@ export default function GuidePage() {
               <p><T ta="உரிமையாளர் பார்ப்பது, நடக்கும் வரிசையில்.">What the owner sees, in the order things happen.</T></p>
             </div>
           </div>
-          <div className="tw">
+          <div className="tw" tabIndex={0} role="region" aria-label="Buttons on each order">
             <table>
               <thead>
                 <tr>

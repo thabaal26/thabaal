@@ -75,8 +75,9 @@ html.dark .thabaal-portal{
 .thabaal-portal .tabs button[aria-selected=true]{color:var(--fg);border-bottom-color:var(--mango)}
 .thabaal-portal .chips{display:flex;gap:8px;flex-wrap:wrap}
 .thabaal-portal .chip{border:1.5px solid var(--line);background:var(--card);border-radius:999px;padding:6px 13px;font-size:13.5px;font-weight:600;cursor:pointer;color:var(--muted)}
-.thabaal-portal .chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.thabaal-portal .chip small{opacity:.7;margin-left:4px;font-weight:600}
+/* A chip is a button (aria-pressed) or, when it changes the address, a link (aria-current): links can't be "pressed". */
+.thabaal-portal .chip[aria-pressed=true],.thabaal-portal a.chip[aria-current]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.thabaal-portal .chip small{margin-left:4px;font-weight:600}
 .thabaal-portal .seg{display:inline-flex;border:1.5px solid var(--line);border-radius:12px;padding:3px;background:var(--card)}
 .thabaal-portal .seg button{border:0;background:none;padding:6px 12px;border-radius:9px;font-weight:600;font-size:13.5px;color:var(--muted);cursor:pointer}
 .thabaal-portal .seg button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
@@ -223,7 +224,7 @@ html.dark .thabaal-portal .phone{background:#0E2535;color:#FFF9F0}
 @media(max-width:640px){.thabaal-portal .fpan{left:auto;right:0}}
 /* ── App additions (not in the static design): links that behave like the design's buttons ── */
 .thabaal-portal .tabs a{border:0;background:none;padding:10px 14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1.5px;white-space:nowrap;font-size:15px;text-decoration:none}
-.thabaal-portal .tabs a[aria-selected=true]{color:var(--fg);border-bottom-color:var(--mango)}
+.thabaal-portal .tabs a[aria-selected=true],.thabaal-portal .tabs a[aria-current]{color:var(--fg);border-bottom-color:var(--mango)}
 .thabaal-portal .cl a{display:flex;flex-direction:column;gap:2px;text-align:left;border-bottom:1px solid var(--line);padding:12px;text-decoration:none;color:inherit}
 .thabaal-portal .cl a[aria-current=true]{background:var(--soft)}
 .thabaal-portal .cl a:hover{background:var(--soft)}

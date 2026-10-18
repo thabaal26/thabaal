@@ -13,7 +13,7 @@
   --btn-fg: #fff;
   --btn-hover-bg: #FDB913;
   --btn-hover-fg: #062548;
-  --link: #e0900a;
+  --link: #A35F00; /* 5.0:1 on white */
   --ease: cubic-bezier(.4, 0, .2, 1);
 }
 

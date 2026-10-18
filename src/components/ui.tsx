@@ -473,7 +473,7 @@ export function FilterChips({ label, items, className }: { label: string; items:
               {t.count !== undefined && (
                 <span
                   className={cn(
-                    "tabular text-[12px] font-bold opacity-75",
+                    "tabular text-[12px] font-bold",
                     t.active ? "text-canvas" : "text-muted",
                   )}
                 >

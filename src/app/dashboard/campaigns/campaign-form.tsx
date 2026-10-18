@@ -333,7 +333,7 @@ export function CampaignForm({
                         <Icon aria-hidden className="size-3.5 sm:size-4 shrink-0" />
                         <span className="truncate">{tr(m.title)}</span>
                       </span>
-                      <span className={cn("mt-0.5 text-2xs leading-tight sm:text-xs", on ? "text-brand-deep/80" : "text-muted")}>
+                      <span className={cn("mt-0.5 text-2xs leading-tight sm:text-xs", on ? "text-brand-deep" : "text-muted")}>
                         {tr(m.hint)}
                       </span>
                     </button>

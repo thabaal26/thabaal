@@ -100,7 +100,7 @@ export function Picker({
         id={id}
         disabled={disabled}
         aria-haspopup="dialog"
-        aria-label={ariaLabel ?? title}
+        aria-label={trigger ? (ariaLabel ?? title) : `${ariaLabel ?? title}: ${selected?.label ?? placeholder}`}
         onClick={() => setOpen(true)}
         className={trigger ? cn("text-left", className) : cn("field flex items-center justify-between gap-2 text-left", className)}
       >

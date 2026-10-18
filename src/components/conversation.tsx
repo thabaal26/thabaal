@@ -31,13 +31,13 @@ function Ticks({ status }: { status: string }) {
     status === "READ" ? (
       <CheckCheck aria-hidden className="size-3.5 text-[#53BDEB]" />
     ) : status === "DELIVERED" ? (
-      <CheckCheck aria-hidden className="size-3.5 text-[#667781] dark:text-[#8696A0]" />
+      <CheckCheck aria-hidden className="size-3.5 text-[#54656F] dark:text-[#8696A0]" />
     ) : status === "SENT" ? (
-      <Check aria-hidden className="size-3.5 text-[#667781] dark:text-[#8696A0]" />
+      <Check aria-hidden className="size-3.5 text-[#54656F] dark:text-[#8696A0]" />
     ) : status === "FAILED" ? (
       <CircleAlert aria-hidden className="size-3.5 text-danger" />
     ) : (
-      <Clock aria-hidden className="size-3 text-[#667781] dark:text-[#8696A0]" />
+      <Clock aria-hidden className="size-3 text-[#54656F] dark:text-[#8696A0]" />
     );
   return (
     <span className={cn("inline-flex items-center gap-1", status === "FAILED" && "font-medium text-danger")}>
@@ -90,10 +90,10 @@ export function Conversation({ entries, className, plain }: { entries: Conversat
           ) : r.entry.type === "in" ? (
             <li key={r.key} className="flex">
               <div className="max-w-[min(90%,36rem)] rounded-[12px] bg-panel px-3 py-2 text-[13.5px] text-ink shadow-[0_1px_1px_rgba(16,40,59,0.06)] sm:rounded-[14px] sm:px-4 sm:py-2.5 sm:text-[15px]">
-                {r.entry.kind === "button" && <p className="mb-1 flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400"><T>Tapped a button</T></p>}
+                {r.entry.kind === "button" && <p className="mb-1 flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400"><T>Tapped a button</T></p>}
                 {r.entry.kind === "order" && (
                   r.entry.text.toLowerCase().includes("upi payment") || r.entry.text.toLowerCase().includes("payment completed") ? (
-                    <p className="mb-1 flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                    <p className="mb-1 flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400">
                       <CheckCircle2 className="size-3.5" /> WhatsApp UPI Payment
                     </p>
                   ) : (
@@ -104,7 +104,7 @@ export function Conversation({ entries, className, plain }: { entries: Conversat
                 )}
                 {r.entry.text && <p className="whitespace-pre-wrap [overflow-wrap:anywhere] leading-relaxed">{r.entry.text}</p>}
                 {r.entry.mediaId && <ReplyMedia id={r.entry.id} type={r.entry.mediaType} />}
-                <p className="tabular mt-1 text-right text-[11px] text-[#667781] dark:text-[#8696A0]">
+                <p className="tabular mt-1 text-right text-[11px] text-[#54656F] dark:text-[#8696A0]">
                   {r.entry.via && <T ta={`${r.entry.via}-க்கு · `}>{`to ${r.entry.via} · `}</T>}
                   <time dateTime={r.entry.at.toISOString()}>{fmtDate(r.entry.at, "h:mm a")}</time>
                 </p>
@@ -147,7 +147,7 @@ export function Conversation({ entries, className, plain }: { entries: Conversat
                   );
                 })()}
                 {r.entry.error && <p className="mt-1 text-xs text-danger">{plainError(r.entry.error)}</p>}
-                <p className="tabular mt-1 flex flex-wrap items-center justify-end gap-1.5 text-[11px] text-[#667781] dark:text-[#8696A0]">
+                <p className="tabular mt-1 flex flex-wrap items-center justify-end gap-1.5 text-[11px] text-[#54656F] dark:text-[#8696A0]">
                   {r.entry.via && <span><T ta={`${r.entry.via}-லிருந்து ·`}>{`from ${r.entry.via} ·`}</T></span>}
                   <time dateTime={r.entry.at.toISOString()}>{fmtDate(r.entry.at, "h:mm a")}</time>
                   <Ticks status={r.entry.status} />

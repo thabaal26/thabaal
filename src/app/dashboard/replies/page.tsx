@@ -159,7 +159,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
 
       <div className="chips" style={{ marginBottom: 14, alignItems: "center" }}>
         {TABS.map((t) => (
-          <Link key={t.key} href={t.key ? `/dashboard/replies?show=${t.key}` : "/dashboard/replies"} className="chip" aria-pressed={show === t.key} scroll={false}>
+          <Link key={t.key} href={t.key ? `/dashboard/replies?show=${t.key}` : "/dashboard/replies"} className="chip" aria-current={show === t.key ? "true" : undefined} scroll={false}>
             {t.label} <small>{fmtNumber(tabCount[t.key])}</small>
           </Link>
         ))}

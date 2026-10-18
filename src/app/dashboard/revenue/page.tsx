@@ -115,11 +115,11 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         <div className="toolbar">
           <Seg label="Period" value={per} options={PERIODS.map((p) => ({ ...p, href: href({ per: p.id === "t" ? undefined : p.id }) }))} />
           <div className="chips" style={{ marginLeft: 8 }}>
-            <Link className="chip" href={href({ way: undefined })} aria-pressed={!way} scroll={false}>
+            <Link className="chip" href={href({ way: undefined })} aria-current={!way ? "true" : undefined} scroll={false}>
               <T ta="அனைத்து வழிகள்">All ways</T>
             </Link>
             {ways.map((w) => (
-              <Link key={w} className="chip" href={href({ way: w })} aria-pressed={way === w} scroll={false}>
+              <Link key={w} className="chip" href={href({ way: w })} aria-current={way === w ? "true" : undefined} scroll={false}>
                 <T ta={WAY_LABEL_TA[w]}>{WAY_LABEL[w]}</T>
               </Link>
             ))}
