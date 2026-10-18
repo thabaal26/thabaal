@@ -70,7 +70,7 @@ export function ProviderSwitch({ provider, metaLive, localReady }: { provider: P
               <div className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-2.5 font-medium text-ink">
                   <span aria-hidden className={cn("grid size-8 place-items-center rounded-control", active ? "bg-brand text-on-brand" : "bg-sunken text-ink-2")}>
-                    <o.icon className="size-4" />
+                    <o.icon className="size-4 shrink-0" />
                   </span>
                   {o.title}
                 </span>
@@ -176,7 +176,7 @@ export function LocalSessionPanel({ url, hasKey, session, active }: { url: strin
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="ghost" icon onClick={refresh} title="Refresh status" aria-label="Refresh status"><RefreshCw aria-hidden className="size-4" /></Button>
+            <Button size="sm" variant="ghost" icon onClick={refresh} title="Refresh status" aria-label="Refresh status"><RefreshCw aria-hidden className="size-4 shrink-0" /></Button>
             {state && !["WORKING", "NOT_CONFIGURED", "SCAN_QR_CODE", "STARTING"].includes(state.status) && (
               <Button
                 size="sm"
@@ -186,7 +186,7 @@ export function LocalSessionPanel({ url, hasKey, session, active }: { url: strin
                   await refresh();
                 })}
               >
-                <QrCode aria-hidden className="size-4" /> Link phone
+                <QrCode aria-hidden className="size-4 shrink-0" /> Link phone
               </Button>
             )}
             {state?.status === "WORKING" && (
@@ -202,7 +202,7 @@ export function LocalSessionPanel({ url, hasKey, session, active }: { url: strin
                   });
                 }}
               >
-                <LogOut aria-hidden className="size-4" /> Unlink phone
+                <LogOut aria-hidden className="size-4 shrink-0" /> Unlink phone
               </Button>
             )}
           </div>

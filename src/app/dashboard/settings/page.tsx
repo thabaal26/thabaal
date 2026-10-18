@@ -65,7 +65,7 @@ export default async function SettingsPage() {
         </div>
         <form action={logout}>
           <button className="btn sm">
-            <LogOut aria-hidden className="ic" style={{ width: 15, height: 15 }} /> <T ta="வெளியேறு">Sign out</T>
+            <LogOut aria-hidden className="ic shrink-0" style={{ width: 15, height: 15 }} /> <T ta="வெளியேறு">Sign out</T>
           </button>
         </form>
       </div>
@@ -417,7 +417,7 @@ export default async function SettingsPage() {
       </Card>
     </>,
     <Link className="btn" href="/dashboard/clients">
-      <Building2 aria-hidden className="ic" style={{ width: 15, height: 15 }} /> Clients
+      <Building2 aria-hidden className="ic shrink-0" style={{ width: 15, height: 15 }} /> Clients
     </Link>,
   );
 }
