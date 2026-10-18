@@ -94,11 +94,11 @@ export function Conversation({ entries, className, plain }: { entries: Conversat
                 {r.entry.kind === "order" && (
                   r.entry.text.toLowerCase().includes("upi payment") || r.entry.text.toLowerCase().includes("payment completed") ? (
                     <p className="mb-1 flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                      <CheckCircle2 className="size-3.5" /> WhatsApp UPI Payment
+                      <CheckCircle2 className="size-3.5 shrink-0" /> WhatsApp UPI Payment
                     </p>
                   ) : (
                     <p className="mb-1 flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400">
-                      <ShoppingBag className="size-3.5" /> <T>Catalogue Order Cart</T>
+                      <ShoppingBag className="size-3.5 shrink-0" /> <T>Catalogue Order Cart</T>
                     </p>
                   )
                 )}

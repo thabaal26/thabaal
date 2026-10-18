@@ -53,7 +53,7 @@ export function WhatsAppBubble({
           const Icon = ICON[b.type];
           return (
             <div key={i} className="flex items-center justify-center gap-1.5 border-t border-line py-2 text-sm font-medium text-wa-link">
-              <Icon aria-hidden className="size-3.5" />
+              <Icon aria-hidden className="size-3.5 shrink-0" />
               {b.text || "Button"}
             </div>
           );

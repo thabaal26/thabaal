@@ -244,27 +244,27 @@ export function CallWidget() {
               <p className="mt-0.5 truncate text-lg font-semibold">{live.who}</p>
               <div className="mt-4 flex gap-2">
                 <button onClick={toggleMute} aria-pressed={muted} className={cn("flex h-11 flex-1 items-center justify-center gap-2 rounded-control text-sm font-medium transition active:scale-[0.98]", muted ? "bg-warning-on-dark text-night" : "bg-white/10 hover:bg-white/15")}>
-                  {muted ? <MicOff className="size-4" /> : <Mic className="size-4" />} {muted ? "Unmute" : "Mute"}
+                  {muted ? <MicOff className="size-4 shrink-0" /> : <Mic className="size-4 shrink-0" />} {muted ? "Unmute" : "Mute"}
                 </button>
                 <button disabled={busy} onClick={end} className="flex h-11 flex-1 items-center justify-center gap-2 rounded-control bg-danger-solid text-sm font-medium transition active:scale-[0.98] disabled:opacity-50">
-                  <PhoneOff className="size-4" /> {live.since ? "Hang up" : "Cancel"}
+                  <PhoneOff className="size-4 shrink-0" /> {live.since ? "Hang up" : "Cancel"}
                 </button>
               </div>
             </>
           ) : incoming ? (
             <>
               <p className="flex items-center gap-2 text-xs text-glow">
-                <Phone className="size-3.5 animate-ring" /> Incoming WhatsApp call
+                <Phone className="size-3.5 shrink-0 animate-ring" /> Incoming WhatsApp call
               </p>
               <p className="mt-0.5 truncate text-lg font-semibold">{who(incoming)}</p>
               <p className="tabular text-xs text-white/70">{formatPhone(incoming.fromPhone)}</p>
               <div className="mt-4 flex gap-2">
                 <button disabled={busy} onClick={() => decline(incoming)} className="flex h-11 flex-1 items-center justify-center gap-2 rounded-control bg-danger-solid text-sm font-medium transition active:scale-[0.98] disabled:opacity-50">
-                  <PhoneOff className="size-4" /> Decline
+                  <PhoneOff className="size-4 shrink-0" /> Decline
                 </button>
                 <button disabled={busy} onClick={() => answer(incoming)} className="relative flex h-11 flex-1 items-center justify-center gap-2 rounded-control bg-call-answer text-sm font-semibold text-night transition active:scale-[0.98] disabled:opacity-50">
                   {!busy && <span aria-hidden className="absolute inset-0 animate-ping rounded-control bg-call-answer/40" />}
-                  <Phone className="size-4" /> {busy ? "Connecting…" : "Answer"}
+                  <Phone className="size-4 shrink-0" /> {busy ? "Connecting…" : "Answer"}
                 </button>
               </div>
             </>

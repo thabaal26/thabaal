@@ -87,12 +87,12 @@ export function ThemeToggle({ onDark, className }: { onDark?: boolean; className
       title={`Look: ${LABEL[mode]}. Switch to ${LABEL[nextMode].toLowerCase()}`}
       aria-label={`Look: ${LABEL[mode]}. Switch to ${LABEL[nextMode].toLowerCase()}`}
       className={cn(
-        "grid size-9 shrink-0 place-items-center rounded-control transition active:scale-95",
+        "grid size-9 shrink-0 place-items-center rounded-control transition active:scale-95 sm:size-11 sm:pointer-fine:size-9",
         onDark ? "text-white/80 hover:bg-white/10 hover:text-white" : "text-ink-2 hover:bg-sunken hover:text-ink",
         className,
       )}
     >
-      <Icon aria-hidden className="size-[18px]" />
+      <Icon aria-hidden className="size-[18px] shrink-0" />
     </button>
   );
 }
@@ -120,7 +120,7 @@ export function ThemeChoice() {
             mode === id ? "bg-ink text-canvas" : "text-muted hover:text-ink",
           )}
         >
-          <Icon aria-hidden className="size-4" /> {tr(label)}
+          <Icon aria-hidden className="size-4 shrink-0" /> {tr(label)}
         </button>
       ))}
     </div>

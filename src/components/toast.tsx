@@ -49,7 +49,7 @@ export function Toaster() {
     <div
       role="status"
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-0 top-[calc(0.75rem+env(safe-area-inset-top))] z-[60] flex flex-col items-center gap-2 px-4 sm:items-end sm:px-6 lg:bottom-6 lg:top-auto print:hidden"
+      className="pointer-events-none fixed inset-x-0 top-[calc(0.75rem+env(safe-area-inset-top))] z-[70] flex flex-col items-center gap-2 px-4 sm:items-end sm:px-6 lg:bottom-6 lg:top-auto print:hidden"
     >
       {items.map((t) => (
         <div key={t.id} className="surface-dark pointer-events-auto flex w-full max-w-sm animate-toast items-start gap-3 rounded-card bg-night py-3 pl-4 pr-2 text-sm text-white shadow-pop">

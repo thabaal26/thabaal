@@ -41,7 +41,7 @@ function KindIcon({ type }: { type: NotificationItem["type"] }) {
   const k = KIND[type] ?? KIND.alert;
   return (
     <span aria-hidden className={cn("grid size-8 shrink-0 place-items-center rounded-control", k.tile)}>
-      <k.icon className="size-4" />
+      <k.icon className="size-4 shrink-0" />
     </span>
   );
 }
@@ -333,7 +333,7 @@ export function NotificationProvider({
                     className="inline-flex min-h-11 items-center gap-1 rounded-control bg-brand px-2.5 text-xs font-semibold text-on-brand transition hover:bg-brand-deep active:scale-95 sm:min-h-7"
                   >
                     <span>View</span>
-                    <ExternalLink className="size-3" />
+                    <ExternalLink className="size-3 shrink-0" />
                   </Link>
                   <button
                     type="button"
@@ -350,7 +350,7 @@ export function NotificationProvider({
                 aria-label="Close notification"
                 className="grid size-7 shrink-0 place-items-center rounded-control text-muted hover:bg-canvas hover:text-ink"
               >
-                <X className="size-3.5" />
+                <X className="size-3.5 shrink-0" />
               </button>
             </div>
           ))}
@@ -469,7 +469,7 @@ function NotificationDrawer() {
               onClick={markAllRead}
               className="inline-flex min-h-11 items-center gap-1 text-xs font-medium text-brand-deep hover:underline sm:min-h-7"
             >
-              <CheckCheck className="size-3.5" /> Mark all read
+              <CheckCheck className="size-3.5 shrink-0" /> Mark all read
             </button>
           )}
         </div>
@@ -526,7 +526,7 @@ function NotificationDrawer() {
             className="inline-flex min-h-11 items-center gap-1.5 text-xs font-semibold text-brand-deep hover:underline sm:min-h-7"
           >
             <span>Open full notifications page</span>
-            <ExternalLink className="size-3.5" />
+            <ExternalLink className="size-3.5 shrink-0" />
           </Link>
         </div>
       </div>
