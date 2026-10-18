@@ -37,7 +37,7 @@ export function ChatList({
       {items.length > 6 && (
         <div style={{ padding: 12, borderBottom: "1px solid var(--line)" }}>
           <div className="search" style={{ maxWidth: "none" }}>
-            <Search aria-hidden />
+            <Search aria-hidden className="shrink-0" />
             <input type="search" aria-label="Search chats" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name or message" />
           </div>
         </div>

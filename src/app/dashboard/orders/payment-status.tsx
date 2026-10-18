@@ -53,7 +53,7 @@ export function PaymentSummary({ o, className }: { o: PaymentView; className?: s
   return (
     <div className={cn("tools", className)} style={{ marginTop: 12 }}>
       <span className={`pill ${PILL[tone]}`}>
-        <Icon aria-hidden className="ic" style={{ width: 13, height: 13 }} />
+        <Icon aria-hidden className="ic shrink-0" style={{ width: 13, height: 13 }} />
         {state === "cod_due" ? "Cash on delivery" : STATE_LABEL[state]}
       </span>
       {(detail || partRefund) && (

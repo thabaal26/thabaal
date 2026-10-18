@@ -104,7 +104,7 @@ export function OrderItemsEditor({
             onClick={() => setShowQuickPick((v) => !v)}
             className="inline-flex items-center gap-1 text-xs font-medium text-brand-deep hover:underline"
           >
-            <Store aria-hidden className="size-3.5" />
+            <Store aria-hidden className="size-3.5 shrink-0" />
             {showQuickPick ? "Hide quick pick" : `Quick pick (${inStockProducts.length})`}
           </button>
         )}
@@ -208,12 +208,12 @@ export function OrderItemsEditor({
                   >
                     {isCustom ? (
                       <>
-                        <Store aria-hidden className="size-3.5" />
+                        <Store aria-hidden className="size-3.5 shrink-0" />
                         <span className="max-sm:sr-only">Catalogue</span>
                       </>
                     ) : (
                       <>
-                        <PencilLine aria-hidden className="size-3.5" />
+                        <PencilLine aria-hidden className="size-3.5 shrink-0" />
                         <span className="max-sm:sr-only">Custom</span>
                       </>
                     )}
@@ -227,7 +227,7 @@ export function OrderItemsEditor({
                   className="grid size-10 shrink-0 place-items-center rounded-control text-muted transition hover:bg-canvas hover:text-danger disabled:cursor-not-allowed disabled:opacity-40"
                   onClick={() => onChange(lines.filter((_, i) => i !== k))}
                 >
-                  <Trash2 aria-hidden className="size-4" />
+                  <Trash2 aria-hidden className="size-4 shrink-0" />
                 </button>
               </div>
 
@@ -297,7 +297,7 @@ export function OrderItemsEditor({
           className="text-brand-deep"
           onClick={() => onChange([...lines, blankOrderLine()])}
         >
-          <Plus aria-hidden className="size-4" /> Add catalogue item
+          <Plus aria-hidden className="size-4 shrink-0" /> Add catalogue item
         </Button>
         {hasCatalog && (
           <Button
@@ -307,7 +307,7 @@ export function OrderItemsEditor({
             className="text-ink-2"
             onClick={() => onChange([...lines, { ...blankOrderLine(), custom: true }])}
           >
-            <PencilLine aria-hidden className="size-3.5" /> Add custom item
+            <PencilLine aria-hidden className="size-3.5 shrink-0" /> Add custom item
           </Button>
         )}
       </div>

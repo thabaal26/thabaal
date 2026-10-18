@@ -289,7 +289,7 @@ export function RefundSheet({
           Tell the customer on WhatsApp
         </label>
         <Button type="submit" className="w-full" loading={pending} disabled={!(n > 0)}>
-          <Undo2 aria-hidden className="size-4" /> Record refund {n > 0 ? rupees(n) : ""}
+          <Undo2 aria-hidden className="size-4 shrink-0" /> Record refund {n > 0 ? rupees(n) : ""}
         </Button>
       </form>
     </Sheet>

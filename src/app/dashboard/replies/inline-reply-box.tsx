@@ -57,7 +57,7 @@ export function InlineReplyBox({
         </div>
         <div className="tools" style={{ marginTop: 12 }}>
           <Link className="btn primary sm" href={`/dashboard/customers/${customerId}#reply`}>
-            <MessageCircle aria-hidden className="ic" style={{ width: 15, height: 15 }} /> {isTamil ? "டெம்ப்ளேட் அனுப்பு" : "Send template"}
+            <MessageCircle aria-hidden className="ic shrink-0" style={{ width: 15, height: 15 }} /> {isTamil ? "டெம்ப்ளேட் அனுப்பு" : "Send template"}
           </Link>
           {more}
         </div>
@@ -187,7 +187,7 @@ export function InlineReplyBox({
                 setShowMedia(false);
               }}
             >
-              <X aria-hidden className="ic" style={{ width: 15, height: 15 }} />
+              <X aria-hidden className="ic shrink-0" style={{ width: 15, height: 15 }} />
             </button>
           </div>
         )}
@@ -226,7 +226,7 @@ export function InlineReplyBox({
           <option value="Tamil">தமிழ்</option>
         </select>
         <button type="button" className="btn sm" disabled={aiLoading} onClick={runAiSuggest}>
-          <Sparkles aria-hidden className="ic" style={{ width: 15, height: 15 }} />
+          <Sparkles aria-hidden className="ic shrink-0" style={{ width: 15, height: 15 }} />
           {aiLoading ? (isTamil ? "யோசிக்கிறது…" : "Thinking…") : (isTamil ? "AI பதில் பரிந்துரை" : "Suggest a reply")}
         </button>
       </div>
@@ -247,7 +247,7 @@ export function InlineReplyBox({
           <div className="tools" style={{ marginTop: 8 }}>
             {more}
             <Link className="btn sm" href={`/dashboard/customers/${customerId}#reply`}>
-              <MessageCircle aria-hidden className="ic" style={{ width: 15, height: 15 }} /> {isTamil ? "டெம்ப்ளேட் அனுப்பு" : "Send template"}
+              <MessageCircle aria-hidden className="ic shrink-0" style={{ width: 15, height: 15 }} /> {isTamil ? "டெம்ப்ளேட் அனுப்பு" : "Send template"}
             </Link>
             <button
               type="button"
@@ -257,7 +257,7 @@ export function InlineReplyBox({
                 setShowMore(false);
               }}
             >
-              <ImagePlus aria-hidden className="ic" style={{ width: 15, height: 15 }} /> {isTamil ? "படம் அல்லது PDF இணைக்க" : "Attach photo or PDF"}
+              <ImagePlus aria-hidden className="ic shrink-0" style={{ width: 15, height: 15 }} /> {isTamil ? "படம் அல்லது PDF இணைக்க" : "Attach photo or PDF"}
             </button>
           </div>
         </details>

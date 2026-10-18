@@ -138,12 +138,12 @@ export function OrderAddressControl({
           >
             {effectiveAddress ? (
               <>
-                <PencilLine aria-hidden className="size-3" />
+                <PencilLine aria-hidden className="size-3 shrink-0" />
                 <span><T>Edit</T></span>
               </>
             ) : (
               <>
-                <Plus aria-hidden className="size-3" />
+                <Plus aria-hidden className="size-3 shrink-0" />
                 <span><T>Add address</T></span>
               </>
             )}
@@ -181,12 +181,12 @@ export function OrderAddressControl({
           <div className="space-y-2 rounded-card border border-line bg-subtle/50 p-3">
             <div className="flex items-center justify-between gap-2">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-ink">
-                <Sparkles aria-hidden className="size-3.5 text-brand-deep" />
+                <Sparkles aria-hidden className="size-3.5 shrink-0 text-brand-deep" />
                 <span>Auto-detect from WhatsApp chat</span>
               </p>
               {loadingChat && (
                 <span className="inline-flex items-center gap-1 text-2xs text-muted">
-                  <Loader2 aria-hidden className="size-3 animate-spin" /> Scanning chat…
+                  <Loader2 aria-hidden className="size-3 shrink-0 animate-spin" /> Scanning chat…
                 </span>
               )}
             </div>
@@ -211,7 +211,7 @@ export function OrderAddressControl({
                       )}
                     >
                       <span className="min-w-0 flex-1">
-                        <MessageSquareQuote aria-hidden className="mr-1 inline size-3.5 text-brand-deep" />
+                        <MessageSquareQuote aria-hidden className="mr-1 inline size-3.5 shrink-0 text-brand-deep" />
                         <span className="font-medium">{c.fullAddress}</span>
                         {c.area && (
                           <span className="ml-1.5 inline-block rounded bg-sunken px-1.5 py-0.5 text-2xs font-semibold text-ink-2">
@@ -222,7 +222,7 @@ export function OrderAddressControl({
                       <span className="shrink-0 font-semibold text-brand-deep">
                         {selected ? (
                           <span className="inline-flex items-center gap-0.5 text-success">
-                            <Check className="size-3.5" /> Using
+                            <Check className="size-3.5 shrink-0" /> Using
                           </span>
                         ) : (
                           "Use address"

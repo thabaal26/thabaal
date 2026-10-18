@@ -106,28 +106,28 @@ export function PriorityBoard({ items, nowMs, canOperate }: { items: BoardItem[]
         label="Value in open carts"
         value={inr(cartValue)}
         sub="Open checkout value"
-        icon={<ShoppingBag className="size-4" />}
+        icon={<ShoppingBag className="size-4 shrink-0" />}
         tone="brand"
       />
       <Stat
         label="Closing within 3 hours"
         value={closing}
         sub={closing > 0 ? "Free reply window ends soon" : "No window closing soon"}
-        icon={<Clock className="size-4" />}
+        icon={<Clock className="size-4 shrink-0" />}
         tone={closing > 0 ? "rose" : "brand"}
       />
       <Stat
         label="Window already closed"
         value={closed}
         sub="Needs template to reply"
-        icon={<AlertCircle className="size-4" />}
+        icon={<AlertCircle className="size-4 shrink-0" />}
         tone="amber"
       />
       <Stat
         label="Longest wait"
         value={longest}
         sub="Customer waiting time"
-        icon={<Hourglass className="size-4" />}
+        icon={<Hourglass className="size-4 shrink-0" />}
         tone="info"
       />
     </div>
@@ -162,7 +162,7 @@ export function PriorityBoard({ items, nowMs, canOperate }: { items: BoardItem[]
             ‹ Back to priority
           </button>
           <div className="search" style={{ marginLeft: 8 }}>
-            <Search aria-hidden />
+            <Search aria-hidden className="shrink-0" />
             <input type="search" placeholder="Search name or message" aria-label="Search chats" value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
           <Seg

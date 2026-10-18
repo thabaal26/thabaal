@@ -650,7 +650,7 @@ export function PrintButton({
           disabled={busy !== null}
           title="Export or print shown orders"
         >
-          {busy ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+          {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : <Download className="size-4 shrink-0" />}
           <span>Export</span>
         </Button>
         {openMenu && (
@@ -662,7 +662,7 @@ export function PrintButton({
                 onClick={handlePdf}
                 className="flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left text-xs font-medium text-ink transition hover:bg-sunken"
               >
-                <Printer className="size-4 text-brand-deep" />
+                <Printer className="size-4 shrink-0 text-brand-deep" />
                 <span><T>Print / Save PDF</T></span>
               </button>
               {orders.length > 0 && (
@@ -672,7 +672,7 @@ export function PrintButton({
                     onClick={handleImage}
                     className="flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left text-xs font-medium text-ink transition hover:bg-sunken"
                   >
-                    <ImageIcon className="size-4 text-ink-2" />
+                    <ImageIcon className="size-4 shrink-0 text-ink-2" />
                     <span><T>Image (PNG)</T></span>
                   </button>
                   <button
@@ -680,7 +680,7 @@ export function PrintButton({
                     onClick={handleExcel}
                     className="flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left text-xs font-medium text-ink transition hover:bg-sunken"
                   >
-                    <FileSpreadsheet className="size-4 text-ink-2" />
+                    <FileSpreadsheet className="size-4 shrink-0 text-ink-2" />
                     <span><T>Excel (.xls)</T></span>
                   </button>
                   <button
@@ -688,7 +688,7 @@ export function PrintButton({
                     onClick={handleCsv}
                     className="flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left text-xs font-medium text-ink transition hover:bg-sunken"
                   >
-                    <Download className="size-4 text-ink-2" />
+                    <Download className="size-4 shrink-0 text-ink-2" />
                     <span><T>CSV Spreadsheet</T></span>
                   </button>
                 </>
@@ -709,7 +709,7 @@ export function PrintButton({
         disabled={busy !== null}
         title="Print or save as PDF"
       >
-        {busy === "pdf" ? <Loader2 className="size-4 animate-spin" /> : <Printer className="size-4" />}
+        {busy === "pdf" ? <Loader2 className="size-4 shrink-0 animate-spin" /> : <Printer className="size-4 shrink-0" />}
         <span><T>Print / PDF</T></span>
       </Button>
 
@@ -722,7 +722,7 @@ export function PrintButton({
             disabled={busy !== null}
             title="Download high-resolution PNG image to share on WhatsApp"
           >
-            {busy === "img" ? <Loader2 className="size-4 animate-spin" /> : <ImageIcon className="size-4" />}
+            {busy === "img" ? <Loader2 className="size-4 shrink-0 animate-spin" /> : <ImageIcon className="size-4 shrink-0" />}
             <span><T>Image (PNG)</T></span>
           </Button>
 
@@ -733,7 +733,7 @@ export function PrintButton({
             disabled={busy !== null}
             title="Download formatted Excel (.xls) sheet"
           >
-            {busy === "xls" ? <Loader2 className="size-4 animate-spin" /> : <FileSpreadsheet className="size-4" />}
+            {busy === "xls" ? <Loader2 className="size-4 shrink-0 animate-spin" /> : <FileSpreadsheet className="size-4 shrink-0" />}
             <span><T>Excel (.xls)</T></span>
           </Button>
 
@@ -744,7 +744,7 @@ export function PrintButton({
             disabled={busy !== null}
             title="Download raw CSV spreadsheet"
           >
-            {busy === "csv" ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+            {busy === "csv" ? <Loader2 className="size-4 shrink-0 animate-spin" /> : <Download className="size-4 shrink-0" />}
             <span className="max-sm:sr-only">CSV</span>
           </Button>
         </>
@@ -770,7 +770,7 @@ export function SingleSlipExportButtons({ order }: { order: ExportableOrderRow }
         title={`Download ${order.orderRef} slip as PNG image for WhatsApp`}
         className="inline-flex min-h-10 items-center gap-1 rounded-control bg-panel px-3 py-1 text-2xs font-semibold text-ink-2 ring-1 ring-line transition hover:bg-sunken hover:text-ink sm:min-h-0 sm:px-2"
       >
-        <ImageIcon aria-hidden className="size-3" />
+        <ImageIcon aria-hidden className="size-3 shrink-0" />
         <span>PNG</span>
       </button>
       <button
@@ -781,7 +781,7 @@ export function SingleSlipExportButtons({ order }: { order: ExportableOrderRow }
         title={`Print or save ${order.orderRef} slip as PDF`}
         className="inline-flex min-h-10 items-center gap-1 rounded-control bg-panel px-3 py-1 text-2xs font-semibold text-ink-2 ring-1 ring-line transition hover:bg-sunken hover:text-ink sm:min-h-0 sm:px-2"
       >
-        <FileText aria-hidden className="size-3" />
+        <FileText aria-hidden className="size-3 shrink-0" />
         <span>PDF</span>
       </button>
     </div>

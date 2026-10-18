@@ -175,7 +175,7 @@ export function NewOrder({
   return (
     <>
       <Button onClick={() => setOpen(true)} className="max-sm:px-3.5">
-        <Plus aria-hidden className="size-4" />{" "}
+        <Plus aria-hidden className="size-4 shrink-0" />{" "}
         <span>
           New<span className="max-sm:sr-only"> order</span>
         </span>
@@ -234,7 +234,7 @@ export function NewOrder({
           <div className="rounded-card border border-brand/30 bg-brand-soft/20 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-brand-deep">
-                <Sparkles aria-hidden className="size-3.5" />
+                <Sparkles aria-hidden className="size-3.5 shrink-0" />
                 <span>AI WhatsApp Text-to-Order &amp; Address Parser</span>
               </p>
               <button
@@ -261,7 +261,7 @@ export function NewOrder({
                   disabled={!rawWhatsAppText.trim()}
                   onClick={handleAiExtract}
                 >
-                  <Sparkles aria-hidden className="size-3.5" /> Auto-Fill Customer, Items &amp; Pincode
+                  <Sparkles aria-hidden className="size-3.5 shrink-0" /> Auto-Fill Customer, Items &amp; Pincode
                 </Button>
               </div>
             ) : (
@@ -314,12 +314,12 @@ export function NewOrder({
             <div aria-live="polite" className="min-h-6 text-sm">
               {found?.state === "checking" && (
                 <span className="inline-flex items-center gap-1.5 text-muted">
-                  <Loader2 aria-hidden className="size-3.5 animate-spin" /> Checking customer & recent WhatsApp chat…
+                  <Loader2 aria-hidden className="size-3.5 shrink-0 animate-spin" /> Checking customer & recent WhatsApp chat…
                 </span>
               )}
               {found?.state === "existing" && (
                 <span className="inline-flex flex-wrap items-center gap-1.5 text-ink-2">
-                  <UserCheck aria-hidden className="size-4 text-success" /> Existing customer:
+                  <UserCheck aria-hidden className="size-4 shrink-0 text-success" /> Existing customer:
                   <Link
                     href={`/dashboard/customers/${found.id}`}
                     className="font-medium text-ink underline-offset-2 hover:underline"
@@ -328,7 +328,7 @@ export function NewOrder({
                   </Link>
                   {found.location && (
                     <Badge tone="brand">
-                      <MapPin aria-hidden className="mr-0.5 inline size-3" /> {found.location}
+                      <MapPin aria-hidden className="mr-0.5 inline size-3 shrink-0" /> {found.location}
                     </Badge>
                   )}
                   {found.optedOut && <Badge tone="red">Opted out of messages</Badge>}
@@ -336,7 +336,7 @@ export function NewOrder({
               )}
               {isNew && (
                 <span className="inline-flex items-center gap-1.5 text-ink-2">
-                  <UserPlus aria-hidden className="size-4 text-info" /> New customer: they&apos;ll be added to Customers with this order & address.
+                  <UserPlus aria-hidden className="size-4 shrink-0 text-info" /> New customer: they&apos;ll be added to Customers with this order & address.
                 </span>
               )}
             </div>
@@ -353,7 +353,7 @@ export function NewOrder({
           <div className="space-y-3 rounded-card border border-line bg-subtle/50 p-3.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-1.5 text-sm font-semibold text-ink">
-                <MapPin aria-hidden className="size-4 text-brand-deep" />
+                <MapPin aria-hidden className="size-4 shrink-0 text-brand-deep" />
                 <span>Delivery Address & Area</span>
               </div>
               {addressSource === "saved" && (
@@ -386,7 +386,7 @@ export function NewOrder({
                         className="flex w-full items-start justify-between gap-2 rounded-control border border-line bg-panel px-2.5 py-2 text-left text-xs text-ink transition hover:border-brand"
                       >
                         <span className="min-w-0 flex-1">
-                          <MessageSquareQuote aria-hidden className="mr-1 inline size-3.5 text-muted" />
+                          <MessageSquareQuote aria-hidden className="mr-1 inline size-3.5 shrink-0 text-muted" />
                           <span className="font-medium">{cand.fullAddress}</span>
                           {cand.area && (
                             <span className="ml-1.5 inline-block rounded bg-sunken px-1.5 py-0.5 text-2xs font-semibold text-ink-2">
@@ -397,7 +397,7 @@ export function NewOrder({
                         <span className="shrink-0 font-semibold text-brand-deep">
                           {active ? (
                             <span className="inline-flex items-center gap-0.5 text-success">
-                              <Check className="size-3.5" /> Selected
+                              <Check className="size-3.5 shrink-0" /> Selected
                             </span>
                           ) : (
                             "Use"

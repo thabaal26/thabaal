@@ -220,7 +220,7 @@ export function ReplyInbox({
             {isSyncing ? (isTamil ? "இணைக்கிறது…" : "Syncing…") : (isTamil ? "நேரலை" : "Live")}
           </span>
           <button type="button" className="btn sm ghost" onClick={refreshChats} disabled={isSyncing} aria-label={isTamil ? "புதுப்பிக்க" : "Refresh chats"} title={isTamil ? "புதுப்பிக்க" : "Refresh chats"}>
-            <RotateCw aria-hidden className="ic" style={{ width: 15, height: 15 }} />
+            <RotateCw aria-hidden className="ic shrink-0" style={{ width: 15, height: 15 }} />
           </button>
         </div>
         <ChatList items={chatListItems} selectedCustomerId={selected?.customer.id} onSelectCustomer={() => setMobileView("chat")} />
@@ -232,7 +232,7 @@ export function ReplyInbox({
           <div className="hd">
             <div>
               <button type="button" className="btn sm show-sm" onClick={() => setMobileView("list")} style={{ marginBottom: 8 }}>
-                <ArrowLeft aria-hidden className="ic" style={{ width: 15, height: 15 }} /> {isTamil ? "அனைத்து உரையாடல்கள்" : "All chats"}
+                <ArrowLeft aria-hidden className="ic shrink-0" style={{ width: 15, height: 15 }} /> {isTamil ? "அனைத்து உரையாடல்கள்" : "All chats"}
               </button>
               <h2 data-data>{selected.customer.name}</h2>
               <p>{currentPurchasesSubtitle}</p>
@@ -250,7 +250,7 @@ export function ReplyInbox({
                 {isTamil ? "விவரக்குறிப்பு" : "Profile"}
               </Link>
               <Link className="btn sm" href={`/dashboard/customers/${selected.customer.id}#call`}>
-                <Phone aria-hidden className="ic" style={{ width: 15, height: 15 }} /> {isTamil ? "அழைக்க" : "Call"}
+                <Phone aria-hidden className="ic shrink-0" style={{ width: 15, height: 15 }} /> {isTamil ? "அழைக்க" : "Call"}
               </Link>
             </div>
           </div>
@@ -273,11 +273,11 @@ export function ReplyInbox({
                   <PAction action={setReplyHandled.bind(null, selected.id, !selected.handled)}>
                     {selected.handled ? (
                       <>
-                        <RotateCcw aria-hidden className="ic" style={{ width: 15, height: 15 }} /> {isTamil ? "மீண்டும் திற" : "Reopen chat"}
+                        <RotateCcw aria-hidden className="ic shrink-0" style={{ width: 15, height: 15 }} /> {isTamil ? "மீண்டும் திற" : "Reopen chat"}
                       </>
                     ) : (
                       <>
-                        <CheckCheck aria-hidden className="ic" style={{ width: 15, height: 15 }} /> {isTamil ? "பார்த்ததாகக் குறி" : "Mark handled"}
+                        <CheckCheck aria-hidden className="ic shrink-0" style={{ width: 15, height: 15 }} /> {isTamil ? "பார்த்ததாகக் குறி" : "Mark handled"}
                       </>
                     )}
                   </PAction>
@@ -285,13 +285,13 @@ export function ReplyInbox({
                     // Opens Record payment: amount, how, and the UPI reference (UTR) from the UPI app, which
                     // WhatsApp's UPI mode never sends. The customer gets "Payment received" and a thank-you.
                     <button type="button" className={`btn sm${claimed ? " primary" : ""}`} onClick={() => setPaying(true)} title={`${orderRef(currentUnpaid)} · ${money(currentUnpaid.total, currentUnpaid.currency)}`}>
-                      <CheckCircle2 aria-hidden className="ic" style={{ width: 15, height: 15 }} />{" "}
+                      <CheckCircle2 aria-hidden className="ic shrink-0" style={{ width: 15, height: 15 }} />{" "}
                       {claimed ? (isTamil ? "பணம் வந்தது, உறுதிசெய்" : "Payment received: confirm") : isTamil ? "ஆர்டருக்கு பணம் வந்தது" : "Mark order paid"}
                     </button>
                   )}
                   {windowOpen && (
                     <PAction action={sendCatalogue.bind(null, selected.customer.id)}>
-                      <ShoppingBag aria-hidden className="ic" style={{ width: 15, height: 15 }} /> {isTamil ? "பொருட்கள் பட்டியல் அனுப்பு" : "Send catalogue"}
+                      <ShoppingBag aria-hidden className="ic shrink-0" style={{ width: 15, height: 15 }} /> {isTamil ? "பொருட்கள் பட்டியல் அனுப்பு" : "Send catalogue"}
                     </PAction>
                   )}
                 </>

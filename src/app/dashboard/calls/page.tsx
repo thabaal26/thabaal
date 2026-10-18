@@ -55,28 +55,28 @@ export default async function CallsPage() {
           label="Connected"
           value={connected}
           sub="Total voice calls"
-          icon={<PhoneCall className="size-4" />}
+          icon={<PhoneCall className="size-4 shrink-0" />}
           tone="brand"
         />
         <Stat
           label="Answered"
           value={answeredIn}
           sub="Inbound calls picked up"
-          icon={<PhoneIncoming className="size-4" />}
+          icon={<PhoneIncoming className="size-4 shrink-0" />}
           tone="info"
         />
         <Stat
           label="Missed"
           value={missed}
           sub={missed > 0 ? "Call these back" : "No missed calls"}
-          icon={<PhoneMissed className="size-4" />}
+          icon={<PhoneMissed className="size-4 shrink-0" />}
           tone={missed > 0 ? "rose" : "brand"}
         />
         <Stat
           label="Declined"
           value={declined}
           sub="Rejected or busy"
-          icon={<PhoneOff className="size-4" />}
+          icon={<PhoneOff className="size-4 shrink-0" />}
           tone="amber"
         />
       </div>

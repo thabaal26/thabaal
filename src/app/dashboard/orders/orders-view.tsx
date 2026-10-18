@@ -405,7 +405,7 @@ export function OrdersView({
               value={newCount}
               sub={isTa ? "பணம் இணைப்பு அனுப்பவும்" : "Send the payment link"}
               subTa="பணம் இணைப்பு அனுப்பவும்"
-              icon={<ShoppingBag className="size-4" />}
+              icon={<ShoppingBag className="size-4 shrink-0" />}
               tone="brand"
               onClick={() => setShow("new")}
             />
@@ -415,7 +415,7 @@ export function OrdersView({
               value={inr(waitingSum)}
               sub={isTa ? "இன்னும் வரவில்லை" : "Not received yet"}
               subTa="இன்னும் வரவில்லை"
-              icon={<Clock className="size-4" />}
+              icon={<Clock className="size-4 shrink-0" />}
               tone="amber"
               onClick={() => {
                 setShow("all");
@@ -428,7 +428,7 @@ export function OrdersView({
               value={toPackCount}
               sub={isTa ? "உறுதியான ஆர்டர்கள்" : "Confirmed orders"}
               subTa="உறுதியான ஆர்டர்கள்"
-              icon={<Package className="size-4" />}
+              icon={<Package className="size-4 shrink-0" />}
               tone="info"
               onClick={() => setShow("topack")}
             />
@@ -438,7 +438,7 @@ export function OrdersView({
               value={dispatchedCount}
               sub={hasDispatch ? (isTa ? "டெலிவரிக்கு சென்றவை" : "Out for delivery") : (isTa ? "இன்று முடித்தவை" : "Completed today")}
               subTa={hasDispatch ? "டெலிவரிக்கு சென்றவை" : "இன்று முடித்தவை"}
-              icon={<PackageCheck className="size-4" />}
+              icon={<PackageCheck className="size-4 shrink-0" />}
               tone="violet"
               onClick={() => setShow("dispatched")}
             />
