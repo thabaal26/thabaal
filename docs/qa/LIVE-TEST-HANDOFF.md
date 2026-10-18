@@ -74,6 +74,16 @@ earlier work; this file is its memory. Read all of it before doing anything.
 
 ### Done on 19 Oct (latest first)
 
+02. **Campaigns › Automations: one real list.** The old list was screen-only (switches changed nothing). Now
+  `src/app/dashboard/campaigns/automations.tsx`: Payment reminder (= Payments › Reminder rules › 1 day), **Reorder
+  reminders** (the one reorder/refill setting: `refillDays` + template, fields in its row; the separate Refill row
+  and card are gone), **Win-back** joined into the same list with a switch (on = a template is set; days and
+  template in its row; off still tags "lapsed"), Pay inside WhatsApp (`setWhatsappPay`), and the always-on rows.
+  Removed `orders/refill-form.tsx`, `campaigns/winback-form.tsx`, `orders/winback-form.tsx`.
+  QA: payments 18/18, payments-ui 14/14, crud 12/12, crawl-desktop 677 visits / 0 issues.
+  Note: the previous commit (Payment settings, `4f010a6`) went out with a wrong message ("Dashboard speed…", an old
+  message file); its content is the Payment settings work described in item 01. Not rewritten (no force-push).
+
 01. **Payments › Payment settings rebuilt to the design (thabaal-portal.html), every element working.**
 - Settings live in `Client.paySettings` (JSON) and `Order.paymentReminder2At`: SQL
   `prisma/sql/2026-10-19-payment-settings.sql` (listed in db-additive). Helpers: `src/lib/pay-settings.ts` (types,
@@ -96,8 +106,7 @@ earlier work; this file is its memory. Read all of it before doing anything.
   filled button in the design was already filled in the app.
 - Tests: `tests/qa/payments.mjs` checks 17 (COD rules on a customer's "COD") and 18 (reminder switches, expiry).
   payments 18/18, payments-ui 14/14, crud 12/12.
-- Next (asked 19 Oct): Campaigns › Automations: one "Reorder reminders" row (no separate Refill), Win-back joined
-  into the same list with a switch, and every switch there saved for real (it was screen-only).
+
 
 ### Done on 18 Oct (latest first)
 

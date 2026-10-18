@@ -7,8 +7,8 @@ import { computeNextRun, DAYS } from "@/lib/schedule";
 import { getScope, owned } from "@/lib/session";
 import { INDIA_GST_RATE, RATES, spendSummary } from "@/lib/spend";
 import { campaignAudienceWhere } from "@/lib/audiences";
-import { RefillForm } from "../orders/refill-form";
-import { WinbackForm } from "./winback-form";
+import { readPaySettings, waPayOn } from "@/lib/pay-settings";
+import { Automations } from "./automations";
 import { CampaignsDashboard, type CampaignItem } from "./campaigns-dashboard";
 
 export const metadata: Metadata = { title: "Campaigns" };
@@ -49,7 +49,7 @@ export default async function CampaignsPage() {
     scope.clientId && scope.canManage
       ? db.client.findUnique({
           where: { id: scope.clientId },
-          select: { refillDays: true, refillTemplateId: true, lapsedDays: true, winbackTemplateId: true },
+          select: { refillDays: true, refillTemplateId: true, lapsedDays: true, winbackTemplateId: true, paySettings: true, paymentConfig: true },
         })
       : null,
     scope.clientId && scope.canManage
@@ -193,10 +193,23 @@ export default async function CampaignsPage() {
       canManage={Boolean(canCreate)}
     >
       {clientData ? (
-        <div id="reorder-settings" className="grid g2" style={{ alignItems: "start" }}>
-          <RefillForm days={clientData.refillDays} templateId={clientData.refillTemplateId} templates={templates} />
-          <WinbackForm days={clientData.lapsedDays} templateId={clientData.winbackTemplateId} templates={templates} lapsed={lapsed} />
-        </div>
+        <Automations
+          canManage={scope.canManage}
+          data={(() => {
+            const pay = readPaySettings(clientData.paySettings, clientData.paymentConfig);
+            return {
+              payReminder: pay.remind1,
+              waPay: waPayOn(pay, clientData.paymentConfig),
+              hasPayConfig: Boolean(clientData.paymentConfig),
+              reorderDays: clientData.refillDays,
+              reorderTemplateId: clientData.refillTemplateId,
+              lapsedDays: clientData.lapsedDays,
+              winbackTemplateId: clientData.winbackTemplateId,
+              lapsed,
+              templates,
+            };
+          })()}
+        />
       ) : (
         <p className="muted">Ask your admin to change automatic messages.</p>
       )}

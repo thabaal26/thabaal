@@ -237,29 +237,6 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
     setPvModal(c);
   };
 
-  // Automations list from prototype
-  const [automations, setAutomations] = useState([
-    { name: "Order updates", desc: "Confirmed, paid, dispatched, delivered and cancelled messages.", cat: "Utility", val: 1 },
-    { name: "Payment reminder", desc: "If a customer has not paid after 1 day, send one gentle reminder with the link.", cat: "Utility", val: 1 },
-    { name: "Refill reminders", desc: "30 days after an order, once, unless they already reordered.", cat: "Marketing", val: 1 },
-    { name: "Win-back", desc: "One message to customers who have not bought for 56 days.", cat: "Marketing", val: 0 },
-    { name: "Replies to button taps", desc: "Customers who tap “Send price list” or “Order now” get the answer straight away.", cat: "Free", val: 1 },
-    { name: "Pay inside WhatsApp (UPI)", desc: "Customers pay with GPay, PhonePe, Paytm or BHIM. Paid orders are marked and a receipt is sent.", cat: "Utility", val: 1 },
-    { name: "Login codes", desc: "Codes sent when someone signs in.", cat: "Authentication", val: 2 },
-    { name: "Stop promotions", desc: "Customers who reply STOP are removed from offers. Always on.", cat: "Free", val: 2 },
-  ]);
-
-  const toggleAutomation = (idx: number) => {
-    setAutomations((prev) =>
-      prev.map((a, i) => {
-        if (i !== idx || a.val === 2) return a;
-        const nextVal = a.val === 1 ? 0 : 1;
-        showToast(`${a.name} ${nextVal ? "turned on" : "turned off"}`);
-        return { ...a, val: nextVal };
-      }),
-    );
-  };
-
   const filteredItems = items.filter((x) => {
     const matchesTab = tab === "all" || x.s === tab;
     const matchesSearch = !search || x.n.toLowerCase().includes(search.toLowerCase());
@@ -680,35 +657,8 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
               ? "இவற்றை ஒருமுறை அமைத்தால் போதும். பிரச்சாரங்கள் இல்லாமலேயே தானாக இயங்கும்."
               : "Set these once. They run on their own, with no campaign to start."}
           </p>
-          <div className="card" suppressHydrationWarning>
-            <div className="list" id="au" suppressHydrationWarning>
-              {automations.map((a, i) => (
-                <div key={a.name} className="row" suppressHydrationWarning>
-                  <div className="grow">
-                    <div className="t">
-                      {a.name} <span className="pill mute" style={{ marginLeft: 6 }}>{a.cat}</span>
-                    </div>
-                    <div className="muted small">{a.desc}</div>
-                  </div>
-                  {a.val === 2 ? (
-                    <span className="pill ok">{isTamil ? "எப்போதும் இயங்கும்" : "Always on"}</span>
-                  ) : (
-                    <button
-                      type="button"
-                      className="sw"
-                      role="switch"
-                      aria-checked={a.val === 1}
-                      aria-label={a.name}
-                      onClick={() => toggleAutomation(i)}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Live Reorder & Winback config */}
-          {children && <div style={{ marginTop: 16 }}>{children}</div>}
+          {/* The automations list (automations.tsx), every switch saved for real. */}
+          {children}
         </section>
       )}
 

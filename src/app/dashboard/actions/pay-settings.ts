@@ -122,3 +122,13 @@ export async function sendUpiTestLink(input: { upiId: string; upiName: string })
   if (!sent) return { ok: false, message: `Send any WhatsApp message to your shop from +${phone} first (WhatsApp allows replies for 24 hours), then tap "Send a test link" again.`, link };
   return { ok: true, message: `Test link sent to +${phone}.`, link };
 }
+
+/** Campaigns › Automations: the "Pay inside WhatsApp" switch alone (needs the payment configuration name). */
+export async function setWhatsappPay(on: boolean): Promise<SendResult> {
+  const s = await requireManager(true);
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const { settings, paymentConfig } = await current(s.clientId);
+  if (on && !paymentConfig) return { ok: false, message: "Add the payment configuration name in Payments › Payment settings first." };
+  await store(s.clientId, { ...settings, whatsappPay: Boolean(on) });
+  return { ok: true, message: `Pay inside WhatsApp is ${on ? "on" : "off"}.` };
+}
