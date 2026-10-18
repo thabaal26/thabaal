@@ -147,6 +147,20 @@ P2 medium · P3 low. Owner decisions and outside issues are in §2 and §3.
 - Hard-coded `C:/Program Files/…/chrome.exe` in 9 scripts and a PowerShell-only runner.
 - **Fix:** `CHROME_PATH` (Windows path stays the default), `tests/qa/run-all.mjs` for any OS.
 
+### CR-01 · Owner request (18 Oct, 14:01) · Alerts only in Notifications; payment checks in the chat
+- **Home:** the banners under the greeting (payments to look at, failed messages, held messages, paused campaigns,
+  scheduler, blocked templates) are removed, with the queries that fed them.
+- **Notifications page and bell:** now list payment checks per order, refunds owed, paused sending, blocked
+  campaigns, the scheduler (admin) and held messages, besides chats, orders, calls and failed messages. Before,
+  everything except failed messages existed only on Home.
+- **Chats:** when the open order has a payment claim (the customer says they paid, or WhatsApp showed a payment
+  bubble Meta can't read) the header reads "Says paid ₹… · check your UPI app, then confirm" and the button reads
+  "Payment received: confirm". Confirming runs the same path as an automatic payment: Paid, the WhatsApp order card
+  updated to "Payment received", a thank-you message, and every page updated.
+- **Why payments didn't confirm by themselves:** see INTEGRATION_REPORT §4 item 3 (UPI Intent mode sends no payment
+  status; a payment gateway configuration does).
+- **Regression:** crawl (Home and Notifications as 5 roles), layout, a11y, CRUD, payments-ui on the rebuilt app.
+
 ## 2. Found, not changed: needs the owner's decision
 
 | ID | Sev | What | Why not changed |

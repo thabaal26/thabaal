@@ -62,6 +62,9 @@ Totals in `TEST_CASES.csv` (from the generator): see §8.
 
 Full write-ups with cause, fix and regression test: [`BUG_REPORT.md`](BUG_REPORT.md).
 
+Also done on the owner's request (CR-01): alerts moved from Home to Notifications, and payment checks shown and
+confirmable in the chat.
+
 ## 5. Integrations
 
 Inside Thabaal every path was tested for real (forms → actions → database → pages, roles, isolation, scheduler
@@ -85,7 +88,8 @@ or less on a slowed phone, with no layout shift beyond 0.066. [`PERFORMANCE_REPO
 | Live templates with an unmapped `{{2}}`+ will now refuse to send until a value is set | — | owner: set values in Templates if a campaign uses one |
 | ~125 Tamil strings still in English ([`tamil-gaps.tsv`](tamil-gaps.tsv)) | P3 | next pass |
 | Unpaid totals' scopes unlabelled (DEC-02); `portal.css` generator out of date (DEC-04) | P3 | next pass |
-| Live order RG-1028: owner paid ₹1; Meta sent no paid event, so it waits for "Payment received" after the owner checks the UPI app | — | owner |
+| Live order RG-1028: owner paid ₹1; Meta sent no paid event (UPI Intent mode), so it waits for "Payment received: confirm" after the owner checks the UPI app | — | owner |
+| Automatic payment confirmation needs Thenan's WhatsApp payment configuration on a gateway (Razorpay/PayU/Billdesk/Zaakpay); Thabaal already handles those events | P2 | owner (WhatsApp Manager) |
 
 ## 8. Untested
 

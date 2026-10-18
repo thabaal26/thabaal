@@ -27,7 +27,7 @@ No mocked call is reported as a live result.
 | Meta webhook on live | same | Live: RG-1028 cart arrived 07:32; statuses for today's sends arrived (failed with 130429); payments for RG-1019/1020 on 11 Oct | Real | working |
 | **Meta Cloud API sending** | templates, replies, order updates, payment requests | QA: no token, so every send is refused with a clear message (by design, nothing reaches Meta). Live: TEST campaign "Send now" 08:38 and scheduled 10:00 were accepted by Meta, then failed by Meta with 130429 | Not reached in QA / Real on live | Thabaal side correct; see EXT-01 |
 | **WhatsApp payments (UPI)** | payment link (order_details), paid/failed webhooks | payments + payments-ui suites (26 cases) | Replay | pass |
-| Live UPI payment | RG-1028 ₹61 | waiting for the owner to pay | Real | **NOT RUN** (needs the owner) |
+| Live UPI payment | RG-1028 (shipping set to ₹0 at the owner's request: ₹1), new payment link sent 11:11 | Owner paid ₹1 at 11:12. Meta sent only the UPI app's "Sent to … · Completed" bubble (type unsupported), no payment status event, so the order became "Customer says paid · check" | Real | **PASS as designed** for UPI Intent mode; automatic Paid needs a payment-gateway configuration (§4) |
 | **Meta catalogue** | products, images, send catalogue | QA shows the demo catalogue; CRUD of products via the demo store | Not reached | demo path passes |
 | **WAHA** (WhatsApp Web) | alternative provider | API-07: key required | Replay | pass |
 | **Google Sheets** (Apps Script) | push order/campaign rows | unit tests run with a fake webhook URL: each push fails and is logged, and the order tests around it still pass | Not reached | failure handled |
@@ -53,6 +53,12 @@ No mocked call is reported as a live result.
 1. **Meta 130429 on the Thenan number** (EXT-01): three sends to the same number failed today. Check the number's
    messaging limit and quality in WhatsApp Manager before the next real campaign.
 2. **AI drafts** were not exercised (no keys in QA).
-3. **Live payment** RG-1028 is still unpaid; the paid-webhook path is proven by replay, not by a real UPI payment today.
+3. **No automatic "Paid" on live.** Meta's India payments docs: in **UPI Intent** mode (a plain UPI ID) WhatsApp sends
+   no payment status webhooks; only **Payment Gateway deep integration** (Razorpay, PayU, Billdesk, Zaakpay) does.
+   Today's live payment matched UPI Intent exactly. Thabaal already handles the gateway events (paid, part paid,
+   failed, duplicates: 14 replay tests), including the WhatsApp order-card update and the thank-you message. To make
+   payments confirm themselves, switch Thenan's payment configuration in WhatsApp Manager to a supported gateway.
+   Until then, staff confirm from the order card or the chat ("Payment received: confirm"), which sends the same
+   confirmation to the customer.
 4. **Preview deployments run the additive SQL** against the preview database, which may be the live one
    (`needs-owner.md` item 3); the SQL is additive and safe to repeat.
