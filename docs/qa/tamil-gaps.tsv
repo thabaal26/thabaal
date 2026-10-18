@@ -1,0 +1,131 @@
+# English left on screen in Tamil mode (QA scan, 18 Oct 2026, 390x844, after the phrase fixes)
+# count<TAB>text<TAB>pages. Names, addresses, chat text, order items and QA data removed.
+2	Paid / COD	/orders /settings
+1	Spent on WhatsApp in	/
+1	Incl. GST	/
+1	free replies left this month.	/
+1	Nothing scheduled.	/
+1	No reminders going out	/
+1	Reorder settings	/
+1	Reply to 4 chats	/
+1	Chase unpaid carts	/
+1	Orders to pack	/
+1	What should I do first?	/
+1	What is selling best?	/
+1	Who should I win back?	/
+1	Madurai city	/customers
+1	How tier and buying status are decided	/customers
+1	Tier — how much they spend	/customers
+1	Top 10% · ₹3,450+ and 3 or more orders	/customers
+1	Everyone else who has bought	/customers
+1	First order, within 30 days	/customers
+1	Only confirmed or paid orders count. Worked out fresh every time you open this page.	/customers
+1	How they are buying — their own rhythm	/customers
+1	Ordered within their usual gap	/customers
+1	1.5 to 3 times their usual gap	/customers
+1	More than 3 times the gap, or 180 days	/customers
+1	Each customer is judged against their own gap between orders (30 days until they have two 	/customers
+1	Commerce Manager	/catalogue
+1	1 need fixing	/templates
+1	Status: all	/templates
+1	In review	/templates
+1	Rejected or paused	/templates
+1	Language: all	/templates
+1	Format: all	/templates
+1	Image or media	/templates
+1	Interactive (buttons)	/templates
+1	Newest first	/templates
+1	Recently changed	/templates
+1	New template	/templates
+1	Default image	/templates
+1	Image templates without their own picture fail until you set one. Upload a JPG or PNG.	/templates
+1	Upload default image	/templates
+1	Rejected body	/templates
+1	not in a campaign yet	/templates
+1	Promotional content in utility category	/templates
+1	Marketing · en · Text · Rejected	/templates
+1	Marketing · en · Text · Draft	/templates
+1	Payment request	/templates
+1	Utility · en · Text · Approved	/templates
+1	Order confirmation	/templates
+1	used in 1 campaign	/templates
+1	Marketing · en · Text · Approved	/templates
+1	In 1 campaign	/templates
+1	Not scheduled	/campaigns
+1	All who can be reached	/campaigns
+1	Show all sends (8)	/messages
+1	4 reached phones	/messages
+1	2 opened on WhatsApp	/messages
+1	Message undeliverable	/messages
+1	Test send	/messages
+1	Meta API	/messages
+1	Open full chat (	/messages
+1	Latest message	/messages
+1	WhatsApp UPI Payment	/replies
+1	Friday after 9 pm	/report
+1	Sunday after 9 pm	/report
+1	+7 vs last month	/report
+1	40 of 100 buyers	/report
+1	Unpaid carts	/report
+1	Send reminder	/report
+1	Refill due	/report
+1	Not bought in 60 days	/report
+1	Win them back	/report
+1	Bought once only	/report
+1	Ask for second order	/report
+1	Groundnut oil 1L · 2 carts	/report
+1	Groundnut oil 1L	/report
+1	Top seller by volume. Great anchor product for your next broadcast.	/report
+1	Make a campaign	/report
+1	Counter or pickup	/settings
+1	The customer takes it at the shop. Two taps and done.	/settings
+1	I deliver myself	/settings
+1	You pack and your own person drops it.	/settings
+1	I send by courier	/settings
+1	You pack and hand it to a courier with a tracking number.	/settings
+1	Service or booking	/settings
+1	Salon, repairs, tailoring. Nothing to pack or send.	/settings
+1	manager@qa.test	/settings
+1	Current password	/settings
+1	New password	/settings
+1	Type it again	/settings
+1	8 or more characters.	/settings
+1	Automatic refill reminders are off.	/refills
+1	Pick a reminder template and the number of days in	/refills
+1	Campaigns › Automatic messages	/refills
+1	. Until then you can remind customers one by one here	/refills
+1	once a template is chosen	/refills
+1	Due this week	/refills
+1	about ₹0 in reorders	/refills
+1	about ₹0 not yet reordered	/refills
+1	Typical reorder	/refills
+1	from 4 repeat buyers	/refills
+1	no order in 60+ days · win back	/refills
+1	Next 2 weeks	/refills
+1	past due	/refills
+1	Total voice calls	/calls
+1	Inbound calls picked up	/calls
+1	No missed calls	/calls
+1	Rejected or busy	/calls
+1	Incoming calls ring here. To call a customer, open their chat and tap “Call on WhatsApp”.	/calls
+1	When a customer calls your WhatsApp number, it rings in every open portal tab and shows up	/calls
+1	Today at a glance: 3 things to do, key numbers, wallet, next campaign, daily brief.	/guide
+1	Open chats, priority board, calls.	/guide
+1	Track, pack, dispatch and deliver.	/guide
+1	To collect, received, cash/COD, all transactions, payment settings.	/guide
+1	All customers, groups to reach, loyalty, refills.	/guide
+1	Catalogue, how products sell, combo ideas.	/guide
+1	All, scheduled, running, completed, drafts, paused and automations.	/guide
+1	Meta templates with Marketing, Utility and Authentication filters.	/guide
+1	Overview, campaigns, customers and products.	/guide
+1	Password, look, language, WhatsApp numbers, business details.	/guide
+1	Where did the old sections go?	/guide
+1	The long menu became 10 pages. Nothing was removed.	/guide
+1	Old place	/guide
+1	Order is…	/guide
+1	What happens	/guide
+1	Menu: 10 pages in 6 groups	/guide
+1	Each page has one job, with tabs for the rest	/guide
+1	One yellow button for the main action. Red only for problems, green only for “done”	/guide
+1	Rare actions (edit, cancel, undo) sit under “More”	/guide
+1	Costs, charts and Meta rules moved out of the home page	/guide

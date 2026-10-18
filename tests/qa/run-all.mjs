@@ -57,6 +57,8 @@ const steps = [
   ["crawl-phone", "node tests/qa/crawl.mjs phone"],
   ["visual", "node tests/qa/visual.mjs"],
   ["layout", "node tests/qa/layout.mjs"],
+  ["sweep-phone", "node tests/qa/sweep.mjs size=390x844"],
+  ["sweep", "node tests/qa/sweep.mjs"],
   ["a11y", "node tests/qa/a11y.mjs"],
   ["perf", "node tests/qa/perf.mjs"],
 ];

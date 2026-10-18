@@ -91,8 +91,9 @@ P2 medium · P3 low. Owner decisions and outside issues are in §2 and §3.
 ### BUG-11 · P2 · Functional / data · Reports invented a "return per ₹1" when no message cost was recorded
 - **Routes:** `/dashboard/report` (verdict card, "Return per ₹1" tile, Spend tab, campaign table), Campaigns cards,
   the Reports text export.
-- **Reproduce:** a period with paid orders but ₹0 recorded message cost (Thenan is billed by Meta directly, so this
-  is its normal case). Seen in the QA screenshots: "You spent ₹0 on messages and received ₹9,200 in paid orders.
+- **Reproduce:** a period with paid orders but ₹0 recorded message cost (for example a week with only free replies,
+  or a business whose message costs aren't recorded yet). Live Thenan this month has ₹30 recorded, so its ₹95 is a
+  real ratio. Seen in the QA screenshots: "You spent ₹0 on messages and received ₹9,200 in paid orders.
   Every ₹1 spent brought back ₹9,200", headed "WhatsApp is working well this month."
 - **Root cause:** `reports-data.ts` used the sales total as the ratio when cost was 0 (`cost > 0 ? sales / cost :
   sales`), in three places; the verdict was then judged on that number. The campaign summary divided by zero.
@@ -101,6 +102,17 @@ P2 medium · P3 low. Owner decisions and outside issues are in §2 and §3.
   export says "not worked out". Real ratios are unchanged when a cost exists.
 - **Found by:** reviewing the visual-matrix screenshots by eye (no automated rule catches a wrong number that
   looks valid). **Regression test:** visual + crawl on the rebuilt app; Reports checked on live after deploy.
+
+### BUG-12 · P3 · Tamil · Interface text left in English in Tamil mode (partly fixed, rest listed)
+- **Found by:** a new scan that opens 15 pages in Tamil at 390×844 and lists every on-screen phrase of two or more
+  English words (the visual suite only checks headings and buttons). First scan: 262 phrases, most of them real data
+  (names, addresses, chat text, order items), which correctly stays as written.
+- **Fixed:** 63 tile, filter and note phrases added to `src/lib/i18n/phrases-ta.ts` (tiles look phrases up there), and
+  the Templates explainer paragraph. Second scan: 232 phrases, with every tile label translated.
+- **Still open (P3):** about 125 strings written directly into page code, which don't go through the phrase lookup:
+  Templates filter options and default-image card, the Customers "how tiers work" note, Reports suggestions, Settings
+  order-step choices, Home assistant questions, Message log labels, English dates on Notifications. Each needs a
+  `<T ta="…">` or `L()` at its source. Full list: [`tamil-gaps.tsv`](tamil-gaps.tsv).
 
 ### BUG-09 · P3 · Code quality · Lint warning
 - Unused `eslint-disable` in `src/app/app-icon.tsx`, removed. `eslint .` is now 0 errors, 0 warnings.

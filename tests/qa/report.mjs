@@ -252,19 +252,30 @@ for (const [id, file, label] of [["SWEEP-phone", ".git/qa-sweep-390.json", "390Ã
     add({ id, category: "Interaction sweep", module: "every page", scenario: `Press every button at ${label}`, status: "NOT RUN" });
     continue;
   }
-  const list = Array.isArray(j) ? j : (j.results ?? []);
-  const bad = list.filter((r) => (r.issues ?? r.problems ?? []).length || r.error);
-  add({
-    id,
-    category: "Interaction sweep",
-    module: "every page",
-    scenario: `Press every button at ${label}; each dialog opens inside the screen and closes`,
-    steps: `node tests/qa/sweep.mjs${label.startsWith("390") ? " size=390x844" : ""}`,
-    expected: "no page error; dialogs fit and close",
-    actual: `${list.length} presses${bad.length ? `, ${bad.length} with findings` : ", 0 findings"}`,
-    status: bad.length ? "FAIL" : "PASS",
-    evidence: file,
-  });
+  // One row per page: every button pressed, each dialog screenshotted and layout-checked, then closed.
+  for (const pg of j) {
+    const clicks = pg.clicks ?? [];
+    const problems = [
+      ...(pg.pageErrs ?? []).map((e) => `page error: ${e}`),
+      ...(pg.linkProblems ?? []).map((e) => `bad link: ${e}`),
+      ...(pg.pageLayout ?? []).map((e) => `layout: ${e}`),
+      ...clicks.filter((c) => c.errors || c.server).map((c) => `${c.label}: ${(c.errors ?? c.server)[0]}`),
+      ...clicks.filter((c) => /Problem|failed/.test(c.result) && !/expected in QA/.test(c.result)).map((c) => `${c.label}: ${c.result}`),
+      ...clicks.filter((c) => c.layout).map((c) => `${c.label} dialog: ${c.layout[0]}`),
+    ];
+    const quiet = clicks.filter((c) => /NO VISIBLE EFFECT/.test(c.result)).length;
+    add({
+      id: `${id}-${pg.path.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").slice(0, 40)}`,
+      category: "Interaction sweep",
+      module: pg.path,
+      scenario: `Press every button at ${label}; dialogs open inside the screen, are layout-checked and close`,
+      steps: `node tests/qa/sweep.mjs${label.startsWith("390") ? " size=390x844" : ""}`,
+      expected: "no page/server error, no failed action, dialogs fit",
+      actual: `${clicks.length} buttons${problems.length ? `; ${problems.slice(0, 2).join("; ")}` : ", no problems"}${quiet ? `; ${quiet} with no visible effect (reviewed)` : ""}`,
+      status: problems.length ? "FAIL" : "PASS",
+      evidence: file,
+    });
+  }
 }
 
 const csvCell = (v) => {
