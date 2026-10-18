@@ -18,6 +18,7 @@ export function ActionButton({
   title,
   className,
   "aria-label": ariaLabel,
+  afterOk,
 }: {
   action: () => Promise<Result>;
   children: ReactNode;
@@ -27,6 +28,8 @@ export function ActionButton({
   title?: string;
   className?: string;
   "aria-label"?: string;
+  /** Where to go once the action succeeded, e.g. back to the list after deleting the thing this page shows. */
+  afterOk?: string;
 }) {
   const [pending, start] = useTransition();
   const busy = useRef(false);
@@ -45,8 +48,10 @@ export function ActionButton({
         try {
           if (confirm && !(await confirmAction(confirm))) return;
           start(async () => {
-            toastResult(await safeAction(action));
-            router.refresh();
+            const res = await safeAction(action);
+            toastResult(res);
+            if (res.ok && afterOk) router.push(afterOk);
+            else router.refresh();
           });
         } finally {
           busy.current = false;

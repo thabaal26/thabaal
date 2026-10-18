@@ -45,7 +45,7 @@ Every row in [`TEST_CASES.csv`](TEST_CASES.csv) comes from a result file a suite
 generator gave 247 cases: 207 PASS, 35 FAIL (accessibility and the upload header), 5 NOT RUN. The visual matrix and
 performance rows come from the build before the last two changes (dialogs, CR-01); everything else from the final build.
 
-## 4. Defects fixed in this run (14)
+## 4. Defects fixed in this run (15)
 
 | ID | Sev | Defect |
 |---|---|---|
@@ -61,6 +61,7 @@ performance rows come from the build before the last two changes (dialogs, CR-01
 | BUG-14 | P1 | A template's `{{2}}`+ with no value set was filled with the customer's name in campaign and test sends; now refused with a clear reason, and campaigns can't be saved on such a template |
 | BUG-12 | P3 | Tamil mode: 63 tile/filter phrases in English (rest listed) |
 | BUG-05 | P3 | Sideways-scrolling tables not reachable by keyboard |
+| BUG-15 | P3 | Deleting a campaign from its page left a 404 |
 | BUG-09/10 | P3 | Lint warning; QA suites only ran on Windows |
 
 Full write-ups with cause, fix and regression test: [`BUG_REPORT.md`](BUG_REPORT.md).
@@ -91,7 +92,7 @@ or less on a slowed phone, with no layout shift beyond 0.066. [`PERFORMANCE_REPO
 | Live templates with an unmapped `{{2}}`+ will now refuse to send until a value is set | — | owner: set values in Templates if a campaign uses one |
 | ~125 Tamil strings still in English ([`tamil-gaps.tsv`](tamil-gaps.tsv)) | P3 | next pass |
 | Unpaid totals' scopes unlabelled (DEC-02); `portal.css` generator out of date (DEC-04) | P3 | next pass |
-| Live order RG-1028: owner paid ₹1; Meta sent no paid event (UPI Intent mode), so it waits for "Payment received: confirm" after the owner checks the UPI app | — | owner |
+| Live order RG-1028: done. Owner paid ₹1 (UPI Intent: no Meta event), confirmed with the chat's "Payment received: confirm" at 16:03 (thank-you sent), then packed, dispatched with a WhatsApp update, delivered; the Timeline shows a time for every step | — | done |
 | Automatic payment confirmation needs Thenan's WhatsApp payment configuration on a gateway (Razorpay/PayU/Billdesk/Zaakpay); Thabaal already handles those events | P2 | owner (WhatsApp Manager) |
 
 ## 8. Untested
@@ -102,5 +103,7 @@ screen readers (axe rules only); live-site field performance.
 
 ## 9. Release recommendation
 
-Release `Madhu_changes` to `main`. The fixes are covered by passing suites, the build and GitHub Checks are green,
+Released to `main` on 18 Oct (production deploy confirmed on www.thabaal.in). TEST campaign and TEST audience deleted after the live tests.
+
+Original recommendation: release `Madhu_changes` to `main`. The fixes are covered by passing suites, the build and GitHub Checks are green,
 and nothing open is a release blocker. Do the owner items in §7 next, starting with the "Confirmed sales" rule.

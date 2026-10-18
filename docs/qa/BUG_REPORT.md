@@ -140,6 +140,12 @@ P2 medium · P3 low. Owner decisions and outside issues are in §2 and §3.
   placeholder no longer shows a sample person ("Priya Sharma").
 - **Regression test:** `tests/qa/a11y.mjs` (dialog opens with the visible button, Escape closes, focus returns).
 
+### BUG-15 · P3 · Functional · Deleting a campaign from its own page left a 404
+- **Found:** live, 18 Oct 17:40, while deleting the TEST campaign: the toast said "Campaign deleted" and the page
+  refreshed itself into "404: This page could not be found."
+- **Fix:** `ActionButton` takes `afterOk` (go there when the action succeeded); the campaign page's Delete goes back to
+  `/dashboard/campaigns`. Customer delete already did this; no other detail page has a Delete.
+
 ### BUG-09 · P3 · Code quality · Lint warning
 - Unused `eslint-disable` in `src/app/app-icon.tsx`, removed. `eslint .` is now 0 errors, 0 warnings.
 

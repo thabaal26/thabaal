@@ -106,7 +106,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
                 <ActionButton action={sendCampaignTest.bind(null, c.id)} size="md" title={`Send one copy to your own numbers (customers tagged "${TEST_TAG}")`}>
                   <FlaskConical aria-hidden className="size-4" /> Send test to me
                 </ActionButton>
-                <ActionButton action={deleteCampaign.bind(null, c.id)} variant="danger" size="md" confirm="Delete this campaign? Messages already sent stay in the log.">
+                <ActionButton action={deleteCampaign.bind(null, c.id)} variant="danger" size="md" confirm="Delete this campaign? Messages already sent stay in the log." afterOk="/dashboard/campaigns">
                   <Trash2 aria-hidden className="size-4" /> Delete
                 </ActionButton>
               </OverflowMenu>
