@@ -146,6 +146,21 @@ P2 medium · P3 low. Owner decisions and outside issues are in §2 and §3.
 - **Fix:** `ActionButton` takes `afterOk` (go there when the action succeeded); the campaign page's Delete goes back to
   `/dashboard/campaigns`. Customer delete already did this; no other detail page has a Delete.
 
+### BUG-16 · P2 · Functional / data · UPI payments showed no reference, or a WhatsApp message id as the reference
+- **Found:** owner, 18 Oct, Payments › All transactions: RG-1028 (UPI, confirmed in the chat) had no reference,
+  RG-1020 showed `wamid.HBgM…` running out of its column, RG-1019 showed `WA-UPI`.
+- **Cause:** in WhatsApp's UPI Intent mode Meta sends no transaction id. The webhook fell back to the message id or
+  `WA-UPI` and saved that as the payment's reference; Payments showed `paymentTxnId` raw. Confirming from the chat
+  marked the order paid with no way to type the UTR.
+- **Fix:** `paymentRef()` hides message ids and `WA-UPI` everywhere Payments shows a reference (and the `UTR-` prefix of
+  a UTR the customer sent in chat). "Add UTR" on Money in rows and receipts (not cash) saves a reference once
+  (`savePaymentReference`: own business, money received, 6–40 letters/numbers, never replaces a real one, note on the
+  order). The chat's "Payment received: confirm" now opens Record payment, with the UTR field (prefilled when the
+  customer sent one). The CSV export has a Reference column.
+- **Regression:** `tests/unit/payment-ref.test.ts` (3); `payments-ui.mjs` 26 (wamid hidden, Add UTR saves once) and
+  27 (chat confirm records Paid with the UTR).
+- **Live data:** RG-1019, RG-1020 and RG-1028 now show "Add UTR"; type each UTR from the UPI app or bank statement.
+
 ### BUG-09 · P3 · Code quality · Lint warning
 - Unused `eslint-disable` in `src/app/app-icon.tsx`, removed. `eslint .` is now 0 errors, 0 warnings.
 

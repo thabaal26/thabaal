@@ -1,3 +1,4 @@
+import { paymentRef } from "@/lib/plain-error";
 import "server-only";
 import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { db } from "./db";
@@ -52,7 +53,7 @@ export type CollectRow = {
 
 export type ReceivedRow = { id: string; ref: string; customerId: string; name: string; amount: number; way: Way; atMs: number; collectedBy: string | null; reference: string | null };
 
-export type TxnRow = { key: string; ref: string; name: string; kind: "in" | "refund" | "fail"; way: string; amount: number; atMs: number; status: string; reference?: string | null };
+export type TxnRow = { key: string; orderId: string; ref: string; name: string; kind: "in" | "refund" | "fail"; way: string; amount: number; atMs: number; status: string; reference?: string | null };
 
 export type CashDayRow = { by: string; orders: number; amount: number };
 
@@ -143,7 +144,7 @@ export async function paymentsData(clientId: string, period: "t" | "w" | "m") {
     way: wayOf(methodOf(o), o.paymentSource),
     atMs: (o.paidAt ?? o.createdAt).getTime(),
     collectedBy: o.collectedBy,
-    reference: o.paymentTxnId,
+    reference: paymentRef(o.paymentTxnId),
   }));
 
   const txns: TxnRow[] = [];
@@ -151,11 +152,11 @@ export async function paymentsData(clientId: string, period: "t" | "w" | "m") {
     const name = o.customer.name;
     const ref = orderRef(o);
     if (o.paidAt && o.paidAt >= ninety)
-      txns.push({ key: `${o.id}-in`, ref, name, kind: "in", way: WAY_LABEL[wayOf(methodOf(o), o.paymentSource)], amount: receivedOf(o), atMs: o.paidAt.getTime(), status: "Received", reference: o.paymentTxnId });
+      txns.push({ key: `${o.id}-in`, orderId: o.id, ref, name, kind: "in", way: WAY_LABEL[wayOf(methodOf(o), o.paymentSource)], amount: receivedOf(o), atMs: o.paidAt.getTime(), status: "Received", reference: paymentRef(o.paymentTxnId) });
     if (o.refundedAt && o.refundedAt >= ninety)
-      txns.push({ key: `${o.id}-refund`, ref, name, kind: "refund", way: "Refund", amount: o.refundAmount ?? receivedOf(o), atMs: o.refundedAt.getTime(), status: "Refunded", reference: o.paymentTxnId });
+      txns.push({ key: `${o.id}-refund`, orderId: o.id, ref, name, kind: "refund", way: "Refund", amount: o.refundAmount ?? receivedOf(o), atMs: o.refundedAt.getTime(), status: "Refunded", reference: paymentRef(o.paymentTxnId) });
     if (o.paymentFailedAt && o.paymentFailedAt >= ninety)
-      txns.push({ key: `${o.id}-fail`, ref, name, kind: "fail", way: "WhatsApp pay", amount: shown(o), atMs: o.paymentFailedAt.getTime(), status: o.paymentFailReason ?? "Failed", reference: o.paymentTxnId });
+      txns.push({ key: `${o.id}-fail`, orderId: o.id, ref, name, kind: "fail", way: "WhatsApp pay", amount: shown(o), atMs: o.paymentFailedAt.getTime(), status: o.paymentFailReason ?? "Failed", reference: paymentRef(o.paymentTxnId) });
   }
   txns.sort((a, b) => b.atMs - a.atMs);
 

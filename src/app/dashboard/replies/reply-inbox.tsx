@@ -9,11 +9,12 @@ import { cn } from "@/lib/cn";
 import { fmtDate } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { sendCatalogue } from "../actions/catalog";
-import { setOrderStatus } from "../actions/orders";
 import { setReplyHandled } from "../actions/replies";
 import { InlineReplyBox } from "./inline-reply-box";
 import { ChatList, type ChatListItem } from "./chat-list";
 import { PAction } from "../portal-ui";
+import { RecordPaymentSheet } from "../orders/payment-ui";
+import { paymentRef } from "@/lib/plain-error";
 import { useLanguage } from "@/lib/i18n/context";
 
 export type InboxReply = {
@@ -34,7 +35,17 @@ export type InboxReply = {
     phone: string;
     purchases: string | null;
     client: { name: string };
-    orders?: { id: string; number: number; ref: string | null; total: number; currency: string; paymentClaimedAt?: Date | string | null }[];
+    orders?: {
+      id: string;
+      number: number;
+      ref: string | null;
+      total: number;
+      currency: string;
+      paymentClaimedAt?: Date | string | null;
+      paidAmount?: number | null;
+      paymentMethod?: string | null;
+      paymentTxnId?: string | null;
+    }[];
   };
   sender: { label: string } | null;
 };
@@ -122,6 +133,7 @@ export function ReplyInbox({
   const [isSyncing, setIsSyncing] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [mobileView, setMobileView] = useState<"list" | "chat">("chat");
+  const [paying, setPaying] = useState(false);
 
   const selected = replies.find((x) => x.id === selectedId || x.customer.id === selectedId) ?? replies[0];
   const latestInboundAt = thread.find((e) => e.type === "in")?.at ?? selected?.receivedAt;
@@ -270,13 +282,12 @@ export function ReplyInbox({
                     )}
                   </PAction>
                   {currentUnpaid && (
-                    <PAction
-                      action={setOrderStatus.bind(null, currentUnpaid.id, "PAID")}
-                      confirm={isTamil ? `ஆர்டர் ${orderRef(currentUnpaid)} கட்டணம் செலுத்தப்பட்டதாகக் குறிக்கவா (${money(currentUnpaid.total, currentUnpaid.currency)})?` : `Mark order ${orderRef(currentUnpaid)} as paid (${money(currentUnpaid.total, currentUnpaid.currency)})? ${selected.customer.name} gets "Payment received" on their WhatsApp order and a thank-you message.`}
-                    >
+                    // Opens Record payment: amount, how, and the UPI reference (UTR) from the UPI app, which
+                    // WhatsApp's UPI mode never sends. The customer gets "Payment received" and a thank-you.
+                    <button type="button" className={`btn sm${claimed ? " primary" : ""}`} onClick={() => setPaying(true)} title={`${orderRef(currentUnpaid)} · ${money(currentUnpaid.total, currentUnpaid.currency)}`}>
                       <CheckCircle2 aria-hidden className="ic" style={{ width: 15, height: 15 }} />{" "}
                       {claimed ? (isTamil ? "பணம் வந்தது, உறுதிசெய்" : "Payment received: confirm") : isTamil ? "ஆர்டருக்கு பணம் வந்தது" : "Mark order paid"}
-                    </PAction>
+                    </button>
                   )}
                   {windowOpen && (
                     <PAction action={sendCatalogue.bind(null, selected.customer.id)}>
@@ -292,6 +303,18 @@ export function ReplyInbox({
         <div className="card muted" style={{ display: "grid", placeItems: "center" }}>
           {isTamil ? "திறக்க இடதுபுறத்தில் உள்ள உரையாடலைத் தேர்வு செய்யவும்." : "Pick a chat on the left to open it."}
         </div>
+      )}
+      {paying && currentUnpaid && selected && (
+        <RecordPaymentSheet
+          open
+          onClose={() => setPaying(false)}
+          id={currentUnpaid.id}
+          who={selected.customer.name}
+          due={Math.max(0, currentUnpaid.total - (currentUnpaid.paidAmount ?? 0))}
+          received={currentUnpaid.paidAmount ?? 0}
+          cod={currentUnpaid.paymentMethod === "cod"}
+          reference={paymentRef(currentUnpaid.paymentTxnId)}
+        />
       )}
     </div>
   );

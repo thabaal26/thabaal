@@ -36,6 +36,8 @@ export function templateLabel(name: string | null | undefined): string {
 export function paymentRef(ref: string | null | undefined): string | null {
   if (!ref) return null;
   const r = ref.trim();
-  if (!r || /^wamid\./i.test(r) || r.length > 40) return null;
-  return r;
+  // WhatsApp message ids and the "WA-UPI" placeholder (a payment bubble without a transaction id) aren't references.
+  if (!r || /^wamid\./i.test(r) || /^WA-UPI$/i.test(r) || r.length > 40) return null;
+  // A UTR the customer sent in chat is stored as "UTR-<number>"; show just the number.
+  return r.replace(/^UTR-/i, "");
 }

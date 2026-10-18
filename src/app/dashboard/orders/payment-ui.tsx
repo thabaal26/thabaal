@@ -112,6 +112,7 @@ export function RecordPaymentSheet({
   due,
   received,
   cod,
+  reference: knownRef,
 }: {
   open: boolean;
   onClose: () => void;
@@ -121,12 +122,14 @@ export function RecordPaymentSheet({
   /** Already received, as this screen shows it; the server refuses if it changed meanwhile (no double counting). */
   received?: number;
   cod: boolean;
+  /** A reference already known (e.g. a UTR the customer sent in chat), filled in for checking. */
+  reference?: string | null;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [method, setMethod] = useState<Method>(cod ? "cod" : "upi");
   const [amount, setAmount] = useState(String(due));
-  const [reference, setReference] = useState("");
+  const [reference, setReference] = useState(knownRef ?? "");
   const [by, setBy] = useState("");
   const [tell, setTell] = useState(true);
   const [seen, setSeen] = useState(open);
@@ -135,7 +138,7 @@ export function RecordPaymentSheet({
     if (open) {
       setMethod(cod ? "cod" : "upi");
       setAmount(String(due));
-      setReference("");
+      setReference(knownRef ?? "");
       setBy("");
       setTell(true);
     }

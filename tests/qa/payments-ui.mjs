@@ -282,6 +282,52 @@ await check(19, "Payment request: opted-out customer and closed 24-hour window g
   return `"${t1}" / "${t2.slice(0, 110)}"`;
 });
 
+// 26. UPI reference on Payments: WhatsApp's UPI mode gives no transaction id, so a message id or "WA-UPI" was saved and
+// shown as the reference. Neither is shown now, and staff can add the UTR from the UPI app once.
+await check(26, "Payments › All: no WhatsApp message id shown as the reference; 'Add UTR' saves it once", async () => {
+  const cust = await db.customer.findFirstOrThrow({ where: { clientId: S.shopId, name: "Muthu Selvam" } });
+  const ref = `QA-U${run}`;
+  await db.order.create({
+    data: { ref, clientId: S.shopId, customerId: cust.id, items: [{ id: "QA-001", name: "Groundnut oil 1L", quantity: 1, price: 360 }], total: 360, status: "PAID", paidAt: new Date(), paidAmount: 360, paymentMethod: "upi", paymentSource: "staff", paymentTxnId: `wamid.HBgMQATEST${run}` },
+  });
+  await p.goto(`${BASE}/dashboard/revenue?tab=all`, { waitUntil: "networkidle" });
+  const row = p.locator("tr", { hasText: ref }).first();
+  await row.waitFor({ timeout: 15000 });
+  expect(!/wamid/.test(await row.textContent()), "wamid still shown as the reference");
+  await row.getByRole("button", { name: "Add UTR" }).click();
+  await row.getByLabel("UPI reference (UTR)").fill("4123 4567 8901");
+  await row.getByRole("button", { name: "Save" }).click();
+  await waitToast(/Saved reference 412345678901/);
+  const after = await get(ref);
+  expect(after.paymentTxnId === "412345678901", `saved ${after.paymentTxnId}`);
+  await p.reload({ waitUntil: "networkidle" });
+  const row2 = p.locator("tr", { hasText: ref }).first();
+  expect(/412345678901/.test(await row2.textContent()) && (await row2.getByRole("button", { name: "Add UTR" }).count()) === 0, "UTR not shown, or Add UTR still offered");
+  return `wamid hidden; UTR saved and shown: ${after.paymentTxnId}`;
+});
+
+// 27. Chat: "Payment received: confirm" opens Record payment with the UTR field; recording sets Paid with the reference.
+await check(27, "Chat confirm opens Record payment; recording with the UTR marks it paid and keeps the UTR", async () => {
+  const cust = await db.customer.create({ data: { clientId: S.shopId, name: `QA Chat Pay ${run}`, phone: `9199900088${run}` } });
+  const reply = await db.reply.create({ data: { customerId: cust.id, text: "Paid ₹360 by UPI", kind: "text" } });
+  const ref = `QA-C${run}`;
+  await db.order.create({
+    data: { ref, clientId: S.shopId, customerId: reply.customerId, items: [{ id: "QA-001", name: "Groundnut oil 1L", quantity: 1, price: 360 }], total: 360, status: "CONFIRMED", paymentClaimedAt: new Date(), paymentRequestedAt: new Date() },
+  });
+  await p.goto(`${BASE}/dashboard/replies?r=${reply.customerId}`, { waitUntil: "networkidle" });
+  const more = p.locator("details.more").first();
+  if ((await more.getAttribute("open")) === null) await more.locator("summary").click();
+  await p.getByRole("button", { name: "Payment received: confirm" }).click();
+  const sh = sheet("Record payment");
+  await sh.waitFor();
+  await sh.getByPlaceholder(/UTR|reference/i).first().fill("512345678902");
+  await sh.locator("button[type=submit]").click();
+  await waitToast(/is paid/);
+  const after = await get(ref);
+  expect(after.paidAt && after.status === "PAID" && after.paymentTxnId === "512345678902", snap(after) + `, txn ${after.paymentTxnId}`);
+  return `${snap(after)}, txn ${after.paymentTxnId}`;
+});
+
 // 25. Session expired mid-action → sign-in, nothing saved.
 await check(25, "Session expired mid-action: sent to sign in, nothing saved", async () => {
   const s2 = await openRecordPayment(`QA-8${run}`);

@@ -9,7 +9,7 @@ import { safeAction, toastResult } from "@/components/toast";
 import type { CollectRow, ReceivedRow, TxnRow } from "@/lib/payments-data";
 import { useLanguage } from "@/lib/i18n/context";
 import { requestPayment } from "../actions/orders";
-import { setPaymentMethod, verifyPaymentClaim } from "../actions/payments";
+import { savePaymentReference, setPaymentMethod, verifyPaymentClaim } from "../actions/payments";
 import { RecordPaymentSheet } from "../orders/payment-ui";
 import { inr } from "../portal-format";
 import { Chips, PAction, Pill, type PillTone } from "../portal-ui";
@@ -309,8 +309,62 @@ export function RecordByNumber({ rows }: { rows: CollectRow[] }) {
   );
 }
 
+/**
+ * "Add UTR" for money received without a reference: WhatsApp's UPI mode never sends one, so staff copy it from the
+ * UPI app or bank statement. Saving once is enough; a saved reference can't be changed here.
+ */
+export function AddReference({ orderId, compact = false }: { orderId: string; compact?: boolean }) {
+  const { isTa } = useLanguage();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [val, setVal] = useState("");
+  const [pending, start] = useTransition();
+  if (!open)
+    return (
+      <button type="button" className="btn sm" style={compact ? { marginTop: 4, padding: "2px 8px", fontSize: 12 } : undefined} onClick={() => setOpen(true)}>
+        {isTa ? "UTR சேர்" : "Add UTR"}
+      </button>
+    );
+  const save = () =>
+    start(async () => {
+      const r = await safeAction(() => savePaymentReference(orderId, val));
+      toastResult(r);
+      if (r.ok) {
+        setOpen(false);
+        router.refresh();
+      }
+    });
+  return (
+    <form
+      style={{ display: "flex", gap: 6, marginTop: 4, alignItems: "center", flexWrap: "wrap" }}
+      onSubmit={(e) => {
+        e.preventDefault();
+        save();
+      }}
+    >
+      <input
+        autoFocus
+        inputMode="text"
+        autoComplete="off"
+        maxLength={40}
+        placeholder={isTa ? "12 இலக்க UTR" : "12-digit UTR"}
+        aria-label={isTa ? "UPI குறிப்பு எண் (UTR)" : "UPI reference (UTR)"}
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        style={{ width: 150, fontFamily: "var(--mono, ui-monospace, monospace)" }}
+      />
+      <button type="submit" className="btn sm primary" disabled={pending || val.trim().length < 6}>
+        {pending ? (isTa ? "சேமிக்கிறது…" : "Saving…") : isTa ? "சேமி" : "Save"}
+      </button>
+      <button type="button" className="btn sm" onClick={() => setOpen(false)}>
+        {isTa ? "ரத்து" : "Cancel"}
+      </button>
+    </form>
+  );
+}
+
 /** One payment's receipt in the design's dialog. */
-export function ReceiptButton({ row, way, when }: { row: ReceivedRow; way: string; when: string }) {
+export function ReceiptButton({ row, way, when, canOperate = false }: { row: ReceivedRow; way: string; when: string; canOperate?: boolean }) {
   const { isTa } = useLanguage();
   const dlg = useRef<HTMLDialogElement>(null);
   return (
@@ -334,11 +388,19 @@ export function ReceiptButton({ row, way, when }: { row: ReceivedRow; way: strin
               <div className="grow muted">{isTa ? "செலுத்திய முறை" : "Paid by"}</div>
               <b>{way}</b>
             </div>
-            {row.reference && (
+            {row.reference ? (
               <div className="row">
                 <div className="grow muted">{isTa ? "குறிப்பு எண்" : "Reference"}</div>
-                <b>{row.reference}</b>
+                <b style={{ fontFamily: "var(--mono, ui-monospace, monospace)" }}>{row.reference}</b>
               </div>
+            ) : (
+              canOperate &&
+              row.way !== "cash" && (
+                <div className="row">
+                  <div className="grow muted">{isTa ? "குறிப்பு எண்" : "Reference"}</div>
+                  <AddReference orderId={row.id} />
+                </div>
+              )
             )}
             {row.collectedBy && (
               <div className="row">
@@ -398,7 +460,7 @@ export function CsvButton({ name, rows, label }: { name: string; rows: (string |
 }
 
 /** Payments › All transactions: money in, refunds and failed payments, searchable. */
-export function TxnTable({ rows }: { rows: (TxnRow & { when: string })[] }) {
+export function TxnTable({ rows, canOperate = false }: { rows: (TxnRow & { when: string })[]; canOperate?: boolean }) {
   const { isTa } = useLanguage();
   const [f, setF] = useState("all");
   const [q, setQ] = useState("");
@@ -433,8 +495,8 @@ export function TxnTable({ rows }: { rows: (TxnRow & { when: string })[] }) {
           name="transactions"
           label={isTa ? "ஏற்றுமதி" : "Export"}
           rows={[
-            [isTa ? "தேதி" : "Date", isTa ? "ஆர்டர்" : "Order", isTa ? "வாடிக்கையாளர்" : "Customer", isTa ? "வகை" : "Kind", isTa ? "முறை" : "Way", isTa ? "தொகை" : "Amount", isTa ? "நிலை" : "Status"],
-            ...list.map((r) => [r.when, r.ref, r.name, r.kind === "in" ? (isTa ? "வந்த பணம்" : "Money in") : r.kind === "refund" ? (isTa ? "திருப்பிச் செலுத்தியது" : "Refund") : isTa ? "தோல்வி" : "Failed", r.way, r.amount, r.status]),
+            [isTa ? "தேதி" : "Date", isTa ? "ஆர்டர்" : "Order", isTa ? "வாடிக்கையாளர்" : "Customer", isTa ? "வகை" : "Kind", isTa ? "முறை" : "Way", isTa ? "குறிப்பு எண்" : "Reference", isTa ? "தொகை" : "Amount", isTa ? "நிலை" : "Status"],
+            ...list.map((r) => [r.when, r.ref, r.name, r.kind === "in" ? (isTa ? "வந்த பணம்" : "Money in") : r.kind === "refund" ? (isTa ? "திருப்பிச் செலுத்தியது" : "Refund") : isTa ? "தோல்வி" : "Failed", r.way, r.reference ?? "", r.amount, r.status]),
           ]}
         />
       </div>
@@ -463,18 +525,21 @@ export function TxnTable({ rows }: { rows: (TxnRow & { when: string })[] }) {
                   <td>{r.kind === "in" ? (isTa ? "வந்த பணம்" : "Money in") : r.kind === "refund" ? (isTa ? "திருப்பிச் செலுத்தியது" : "Refund") : isTa ? "தோல்வி" : "Payment"}</td>
                   <td>
                     <div>{r.way}</div>
-                    {r.reference && (
+                    {r.reference ? (
                       <div
                         style={{
                           fontSize: 11,
                           fontFamily: "var(--mono, ui-monospace, monospace)",
                           color: "var(--muted)",
                           marginTop: 2,
+                          overflowWrap: "anywhere",
                         }}
                         title="Reference / UTR"
                       >
                         {r.reference}
                       </div>
+                    ) : (
+                      canOperate && r.kind === "in" && r.way !== "Cash" && <AddReference orderId={r.orderId} compact />
                     )}
                   </td>
                   <td className="num">{r.kind === "refund" ? `−${inr(r.amount)}` : inr(r.amount)}</td>

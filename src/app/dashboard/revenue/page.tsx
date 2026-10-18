@@ -180,7 +180,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                     </td>
                     <td className="num">{inr(r.amount)}</td>
                     <td>
-                      <ReceiptButton row={r} way={WAY_LABEL[r.way]} when={fmtDate(new Date(r.atMs), "EEE d MMM, h:mm a")} />
+                      <ReceiptButton row={r} way={WAY_LABEL[r.way]} when={fmtDate(new Date(r.atMs), "EEE d MMM, h:mm a")} canOperate={scope.canOperate} />
                     </td>
                   </tr>
                 ))}
@@ -247,7 +247,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
       </>
     );
   } else if (tab === "all") {
-    body = <TxnTable rows={d.txns.map((t) => ({ ...t, when: fmtDate(new Date(t.atMs), "d MMM, h:mm a") }))} />;
+    body = <TxnTable rows={d.txns.map((t) => ({ ...t, when: fmtDate(new Date(t.atMs), "d MMM, h:mm a") }))} canOperate={scope.canOperate} />;
   } else if (tab === "set") {
     const [client, ownPaymentTemplate, paymentTemplate] = await Promise.all([
       db.client.findUnique({ where: { id: clientId }, select: { paymentConfig: true, loyaltyAutoRedeem: true } }),

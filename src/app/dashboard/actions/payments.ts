@@ -6,6 +6,7 @@ import { pushOrderToSheet } from "@/lib/google-sheets-live";
 import { money, orderRef } from "@/lib/orders";
 import { canUndoPayment, dueOf, isPaymentMethod, methodLabel, receivedOf } from "@/lib/payment-state";
 import { confirmPayment, textInWindow } from "@/lib/payments";
+import { paymentRef } from "@/lib/plain-error";
 import { requireOrderAccess } from "@/lib/session";
 import { notifyOrder } from "./orders";
 import type { SendResult } from "./send-helpers";
@@ -70,6 +71,23 @@ export async function recordPayment(
       ? `Recorded ${money(amount, o.currency)} by ${methodLabel(input.method, true)}. ${orderRef(o)} is paid${input.tell === false ? "" : " and the customer was thanked"}.`
       : `Recorded ${money(amount, o.currency)} by ${methodLabel(input.method, true)}. ${money(due - amount, o.currency)} still due.`,
   );
+}
+
+/**
+ * Adds the UPI reference (UTR) to money already received without one: a payment confirmed after checking the UPI app
+ * (WhatsApp's UPI mode never sends the reference), or one recorded before the UTR was at hand. A real reference
+ * already saved is never replaced.
+ */
+export async function savePaymentReference(id: string, reference: string): Promise<SendResult> {
+  const r = await ownOrder(id);
+  if (!r.order) return { ok: false, message: r.denied };
+  const o = r.order;
+  const ref = reference.trim().replace(/\s+/g, "");
+  if (!/^[A-Za-z0-9-]{6,40}$/.test(ref)) return { ok: false, message: "Type the reference as it shows in the UPI app: 6 to 40 letters or numbers (a UTR is 12 digits)." };
+  if (!(receivedOf(o) > 0)) return { ok: false, message: "No money is recorded on this order yet. Record the payment, with its reference, first." };
+  if (paymentRef(o.paymentTxnId)) return { ok: false, message: `This payment already has reference ${paymentRef(o.paymentTxnId)}.` };
+  await db.order.update({ where: { id: o.id }, data: { paymentTxnId: ref, internalNote: addNote(o.internalNote, `${stamp()}: UPI reference ${ref} added`) } });
+  return done(`Saved reference ${ref} for ${orderRef(o)}.`);
 }
 
 /**
