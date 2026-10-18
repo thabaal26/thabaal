@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState, useTransition } from "react";
+import { useModalKeys } from "@/components/use-modal";
 import Link from "@/components/intent-link";
 import { useRouter } from "next/navigation";
 import { toastResult } from "@/components/toast";
@@ -81,6 +82,8 @@ export function OrdersView({
 
   // New order modal state
   const [newOrderOpen, setNewOrderOpen] = useState(false);
+  // The New order form is a dialog: focus goes into it, Escape closes it, and focus returns to the button.
+  useModalKeys(newOrderOpen, () => setNewOrderOpen(false), "neworder");
   const [newCustName, setNewCustName] = useState("");
   const [newCustPhone, setNewCustPhone] = useState("");
   const [newAddress, setNewAddress] = useState("");
@@ -514,6 +517,7 @@ export function OrdersView({
               type="button"
               className="btn primary"
               style={{ marginLeft: "auto" }}
+              aria-haspopup="dialog"
               onClick={() => setNewOrderOpen(true)}
             >
               <svg className="ic" viewBox="0 0 24 24" aria-hidden="true">
@@ -845,10 +849,14 @@ export function OrdersView({
         >
           <form
             className="dlg card"
+            id="neworder"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="neworder-title"
             style={{ width: "min(520px, calc(100vw - 32px))" }}
             onSubmit={handleSaveNewOrder}
           >
-            <h2>New order</h2>
+            <h2 id="neworder-title">New order</h2>
             <p className="muted">For phone or walk-in orders.</p>
 
             <div className="field">
@@ -858,7 +866,7 @@ export function OrdersView({
                 type="text"
                 value={newCustName}
                 onChange={(e) => setNewCustName(e.target.value)}
-                placeholder="Priya Sharma"
+                placeholder="Name as the customer gives it"
                 required
               />
             </div>

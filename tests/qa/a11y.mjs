@@ -114,16 +114,17 @@ for (const size of SIZES) {
   await p.goto(BASE + "/dashboard/orders", { waitUntil: "networkidle" });
   const opened = await p
     .getByRole("button", { name: /^\s*new order\s*$/i })
+    .filter({ visible: true })
     .first()
     .click({ timeout: 5000 })
-    .then(() => p.waitForSelector('[role="dialog"], dialog[open]', { timeout: 5000 }))
+    .then(() => p.waitForSelector('[aria-modal="true"], dialog[open]', { timeout: 5000 }))
     .then(() => true)
     .catch(() => false);
   let closed = false;
   let focusBack = false;
   if (opened) {
     await p.keyboard.press("Escape");
-    closed = await p.waitForSelector('[role="dialog"], dialog[open]', { state: "detached", timeout: 3000 }).then(() => true).catch(async () => !(await p.$('[role="dialog"]:visible, dialog[open]')));
+    closed = await p.waitForSelector('[aria-modal="true"], dialog[open]', { state: "detached", timeout: 3000 }).then(() => true).catch(() => false);
     // Focus goes back to the button that opened it.
     if (closed) focusBack = await p.evaluate(() => /new\s*order/i.test(document.activeElement?.textContent ?? ""));
   }

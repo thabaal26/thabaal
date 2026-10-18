@@ -114,6 +114,32 @@ P2 medium · P3 low. Owner decisions and outside issues are in §2 and §3.
   order-step choices, Home assistant questions, Message log labels, English dates on Notifications. Each needs a
   `<T ta="…">` or `L()` at its source. Full list: [`tamil-gaps.tsv`](tamil-gaps.tsv).
 
+### BUG-14 · P1 · Functional · A template's {{2}}, {{3}}… with no value set were sent as the customer's name
+- **Routes:** campaigns (scheduled and Send now), test sends, Customers › send a template; previews everywhere.
+- **Reproduce:** sync a template from Meta whose body has `{{2}}`/`{{3}}` (sync only maps `{{1}}`), e.g. "Hello
+  {{1}}, thank you for your order. Items: {{2}}. Total: Rs {{3}}." The preview read "Items: Priya Devi. Total: Rs
+  Priya Devi" (seen in the Tamil scan); a campaign or test send would have sent the same to every customer.
+- **Root cause:** `resolveVar` (`src/lib/template.ts`) treats a missing mapping as "customer's name", right for
+  `{{1}}`, wrong for any other placeholder.
+- **Fix:** `unmappedVars()` lists placeholders after `{{1}}` with no value. Previews show them as `{{2}}`; `deliver()`
+  (`src/lib/provider.ts`) refuses to send with "… has no value set for {{2}}, {{3}}. Set it in Templates, then send
+  again." (the dispatcher records that on the message); `saveCampaign` refuses such a template. `{{1}}` is unchanged.
+  Order updates and payment requests are unaffected (they pass their own values).
+- **Owner note:** a live template that relies on the old behaviour will now stop with that message until its values
+  are set in Templates.
+- **Regression test:** `tests/unit/template-vars.test.ts` (5 tests).
+
+### BUG-13 · P2 · Accessibility · New order, Dispatch and Receipt overlays didn't behave as dialogs
+- **Routes:** `/dashboard/orders` (New order), every order card (Dispatch, Receipt).
+- **Reproduce:** Tab to "New order", press Enter, press Escape: the form stays open; screen readers aren't told a
+  dialog opened; focus stays on the page behind. Found by the a11y suite's dialog check (it found no dialog to test).
+- **Root cause:** these three are plain `div` overlays from the portal design, unlike the app's `Sheet` and native
+  `<dialog>` panels, which handle this already.
+- **Fix:** shared `useModalKeys` hook (`src/components/use-modal.ts`): focus to the first field, Escape closes, focus
+  returns to the opener; panels get `role="dialog"`, `aria-modal` and a label. The New order name field's
+  placeholder no longer shows a sample person ("Priya Sharma").
+- **Regression test:** `tests/qa/a11y.mjs` (dialog opens with the visible button, Escape closes, focus returns).
+
 ### BUG-09 · P3 · Code quality · Lint warning
 - Unused `eslint-disable` in `src/app/app-icon.tsx`, removed. `eslint .` is now 0 errors, 0 warnings.
 

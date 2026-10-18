@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState, useTransition } from "react";
+import { useModalKeys } from "@/components/use-modal";
 import Link from "@/components/intent-link";
 import { useRouter } from "next/navigation";
 import { confirmAction } from "@/components/confirm";
@@ -131,6 +132,9 @@ export function OrderCard({
   const [refundOpen, setRefundOpen] = useState(false);
 
   const [receiptOpen, setReceiptOpen] = useState(false);
+  // Both overlays behave as dialogs from the keyboard: focus in, Escape out, focus back to the button.
+  useModalKeys(dispatchOpen, () => setDispatchOpen(false), `dsp-${o.id}`);
+  useModalKeys(receiptOpen, () => setReceiptOpen(false), `rec-${o.id}`);
   const [editOpen, setEditOpen] = useState(false);
   const [showItems, setShowItems] = useState(false);
   const [itemsCopied, setItemsCopied] = useState(false);
@@ -1406,11 +1410,15 @@ export function OrderCard({
           }}
         >
           <form
+            id={`dsp-${o.id}`}
             className="dlg card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={`dsp-${o.id}-title`}
             style={{ width: "min(520px, calc(100vw - 32px))" }}
             onSubmit={submitDispatch}
           >
-            <h2>{o.status === "DISPATCHED" ? <T ta="டிராக்கிங் புதுப்பி">Update tracking</T> : <T ta="ஆர்டர் அனுப்புக">Dispatch order</T>} #{refText}</h2>
+            <h2 id={`dsp-${o.id}-title`}>{o.status === "DISPATCHED" ? <T ta="டிராக்கிங் புதுப்பி">Update tracking</T> : <T ta="ஆர்டர் அனுப்புக">Dispatch order</T>} #{refText}</h2>
             <div className="field">
               <label htmlFor="dsw"><T ta="டெலிவரி செய்யும் முறை">Delivery method</T></label>
               <select
@@ -1510,8 +1518,8 @@ export function OrderCard({
             if (e.target === e.currentTarget) setReceiptOpen(false);
           }}
         >
-          <div className="dlg card" style={{ width: "min(520px, calc(100vw - 32px))" }}>
-            <h2><T ta="ரசீது">Receipt</T> #{refText}</h2>
+          <div id={`rec-${o.id}`} className="dlg card" role="dialog" aria-modal="true" aria-labelledby={`rec-${o.id}-title`} tabIndex={-1} style={{ width: "min(520px, calc(100vw - 32px))" }}>
+            <h2 id={`rec-${o.id}-title`}><T ta="ரசீது">Receipt</T> #{refText}</h2>
             <div className="list">
               <div className="row">
                 <div className="grow muted"><T ta="ஆர்டர்">Order</T></div>
