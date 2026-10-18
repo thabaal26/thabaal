@@ -38,7 +38,7 @@ export function DeleteCustomerButton({ id, name }: { id: string; name: string })
         });
       }}
     >
-      <Trash2 aria-hidden className="size-4" /> Delete customer
+      <Trash2 aria-hidden className="size-4 shrink-0" /> Delete customer
     </Button>
   );
 }
@@ -82,16 +82,16 @@ export function CustomerActions({
     <>
       {exportHref && (
         <a href={exportHref} download className={cn(buttonClass("secondary"), "max-sm:hidden")} title={exportLabel}>
-          <Download aria-hidden className="size-4" /> {ta ? "CSV ஏற்றுமதி" : "Export CSV"}
+          <Download aria-hidden className="size-4 shrink-0" /> {ta ? "CSV ஏற்றுமதி" : "Export CSV"}
         </a>
       )}
       {manage && (
         <>
           <Button variant="secondary" className="max-sm:hidden" onClick={() => setOpen("import")}>
-            <FileUp aria-hidden className="size-4" /> {ta ? "CSV இறக்குமதி" : "Import CSV"}
+            <FileUp aria-hidden className="size-4 shrink-0" /> {ta ? "CSV இறக்குமதி" : "Import CSV"}
           </Button>
           <Button onClick={() => setOpen("add")} className="max-sm:px-3.5">
-            <UserPlus aria-hidden className="size-4" />{" "}
+            <UserPlus aria-hidden className="size-4 shrink-0" />{" "}
             {ta ? (
               <span>சேர்<span className="max-sm:sr-only"> வாடிக்கையாளர்</span></span>
             ) : (
@@ -102,7 +102,7 @@ export function CustomerActions({
       )}
       {(links.length > 0 || manage || exportHref) && (
         <Button variant="secondary" icon aria-label="More customer tools" onClick={() => setOpen("more")}>
-          <MoreHorizontal aria-hidden className="size-5" />
+          <MoreHorizontal aria-hidden className="size-5 shrink-0" />
         </Button>
       )}
 
@@ -111,16 +111,16 @@ export function CustomerActions({
           {links.map(({ href, label, icon: Icon }) => (
             <li key={href}>
               <Link href={href} className="flex min-h-12 items-center gap-3 rounded-control px-3 text-md font-medium text-ink transition active:bg-sunken">
-                <Icon aria-hidden className="size-5 text-brand-deep" />
+                <Icon aria-hidden className="size-5 shrink-0 text-brand-deep" />
                 <span className="flex-1">{label}</span>
-                <ChevronRight aria-hidden className="size-4 text-muted" />
+                <ChevronRight aria-hidden className="size-4 shrink-0 text-muted" />
               </Link>
             </li>
           ))}
           {exportHref && (
             <li>
               <a href={exportHref} download onClick={() => setOpen(null)} className="flex min-h-12 items-center gap-3 rounded-control px-3 text-md font-medium text-ink transition active:bg-sunken">
-                <Download aria-hidden className="size-5 text-brand-deep" />
+                <Download aria-hidden className="size-5 shrink-0 text-brand-deep" />
                 <span className="flex-1">
                   Export CSV
                   <span className="block text-xs font-normal text-muted">{exportLabel}</span>
@@ -131,9 +131,9 @@ export function CustomerActions({
           {manage && (
             <li>
               <button type="button" onClick={() => setOpen("import")} className="flex min-h-12 w-full items-center gap-3 rounded-control px-3 text-left text-md font-medium text-ink transition active:bg-sunken">
-                <FileUp aria-hidden className="size-5 text-brand-deep" />
+                <FileUp aria-hidden className="size-5 shrink-0 text-brand-deep" />
                 <span className="flex-1">Import CSV</span>
-                <ChevronRight aria-hidden className="size-4 text-muted" />
+                <ChevronRight aria-hidden className="size-4 shrink-0 text-muted" />
               </button>
             </li>
           )}
@@ -267,7 +267,7 @@ export function EditCustomerButton({ customer, regions, fields = [] }: { custome
   return (
     <>
       <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
-        <Pencil aria-hidden className="size-3.5" /> Edit details
+        <Pencil aria-hidden className="size-3.5 shrink-0" /> Edit details
       </Button>
       <Sheet open={open} onClose={() => setOpen(false)} title={`Edit ${customer.name}`}>
         <CustomerForm id={customer.id} initial={customer} regions={regions} fields={fields} done={() => setOpen(false)} />
@@ -390,7 +390,7 @@ function PendingRowItem({ row }: { row: PendingCustomerRow }) {
             })
           }
         >
-          <X aria-hidden className="size-3.5" /> Dismiss
+          <X aria-hidden className="size-3.5 shrink-0" /> Dismiss
         </Button>
         <Button
           type="button"
@@ -410,7 +410,7 @@ function PendingRowItem({ row }: { row: PendingCustomerRow }) {
             })
           }
         >
-          <Check aria-hidden className="size-3.5" /> Add to directory
+          <Check aria-hidden className="size-3.5 shrink-0" /> Add to directory
         </Button>
       </div>
     </li>
@@ -437,7 +437,7 @@ function ImportForm({ done }: { done: () => void }) {
       }}
     >
       <label className="flex cursor-pointer flex-col items-center gap-2 rounded-card border-2 border-dashed border-line-strong/60 px-4 py-8 text-center transition hover:border-brand hover:bg-brand-soft/30 has-focus-visible:border-brand-deep">
-        <FileUp aria-hidden className="size-6 text-brand-deep" />
+        <FileUp aria-hidden className="size-6 shrink-0 text-brand-deep" />
         <span className="text-sm font-medium text-ink">{file ? file.name : "Choose a .csv file"}</span>
         <span className="text-xs text-muted">Columns: <code>name, phone, tags</code>. Existing numbers are updated, not duplicated.</span>
         <input type="file" accept=".csv,text/csv" className="sr-only" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
@@ -479,12 +479,12 @@ export function CustomerMenu({ name, optedOut, toggle, remove }: { name: string;
   return (
     <>
       <Button variant="ghost" icon onClick={() => setOpen(true)} aria-label={`Actions for ${name}`}>
-        <MoreHorizontal aria-hidden className="size-5" />
+        <MoreHorizontal aria-hidden className="size-5 shrink-0" />
       </Button>
       <Sheet open={open} onClose={() => setOpen(false)} title={name}>
         <div className="space-y-2">
           <Button variant="secondary" className="w-full justify-start" disabled={pending} loading={busy === "toggle"} onClick={() => run("toggle", toggle)}>
-            {optedOut ? <UserCheck aria-hidden className="size-4" /> : <Ban aria-hidden className="size-4" />}
+            {optedOut ? <UserCheck aria-hidden className="size-4 shrink-0" /> : <Ban aria-hidden className="size-4 shrink-0" />}
             {optedOut ? "Opt back in to campaigns" : "Opt out of campaigns"}
           </Button>
           <Button
@@ -494,7 +494,7 @@ export function CustomerMenu({ name, optedOut, toggle, remove }: { name: string;
             loading={busy === "remove"}
             onClick={async () => (await confirmAction(`Delete ${name} and their message history?`)) && run("remove", remove)}
           >
-            <Trash2 aria-hidden className="size-4" /> Delete customer
+            <Trash2 aria-hidden className="size-4 shrink-0" /> Delete customer
           </Button>
         </div>
       </Sheet>

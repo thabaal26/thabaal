@@ -70,13 +70,13 @@ export function FieldsEditor({ initial }: { initial: CustomField[] }) {
             )}
           </label>
           <Button type="button" variant="ghost" size="sm" aria-label={`Remove ${r.label || "field"}`} onClick={() => setRows(rows.filter((_, k) => k !== i))}>
-            <Trash2 aria-hidden className="size-4" />
+            <Trash2 aria-hidden className="size-4 shrink-0" />
           </Button>
         </div>
       ))}
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="secondary" size="sm" onClick={() => setRows([...rows, { key: "", label: "", type: "text", options: "", on: "customer", saved: false }])}>
-          <Plus aria-hidden className="size-4" /> Add field
+          <Plus aria-hidden className="size-4 shrink-0" /> Add field
         </Button>
         <Button type="button" size="sm" loading={pending} onClick={save}>
           Save fields

@@ -96,7 +96,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
   const more = [
     scope.canOperate && windowEnd && !c.optedOut && (
       <ActionButton key="cat" action={sendCatalogue.bind(null, c.id)} size="md" title="Free while the customer's 24-hour window is open">
-        <ShoppingBag aria-hidden className="size-4" /> <T ta="பட்டியலை அனுப்பு">Send catalogue</T>
+        <ShoppingBag aria-hidden className="size-4 shrink-0" /> <T ta="பட்டியலை அனுப்பு">Send catalogue</T>
       </ActionButton>
     ),
     scope.canOperate && !callAllowed && (
@@ -128,7 +128,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
         actions={
           <>
             <a href={`https://wa.me/${c.phone}`} target="_blank" rel="noreferrer" className={buttonClass("primary")}>
-              <MessageCircle aria-hidden className="size-4" />
+              <MessageCircle aria-hidden className="size-4 shrink-0" />
               <span>
                 <span className="max-sm:sr-only"><T ta="செய்தி அனுப்பு · ">Message on </T></span>WhatsApp
               </span>
@@ -161,21 +161,21 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                 label="Orders"
                 value={fmtNumber(bought.length)}
                 sub="Standing orders"
-                icon={<ShoppingBag className="size-4" />}
+                icon={<ShoppingBag className="size-4 shrink-0" />}
                 tone="brand"
               />
               <Stat
                 label="Spend"
                 value={money(spent)}
                 sub="Total paid"
-                icon={<IndianRupee className="size-4" />}
+                icon={<IndianRupee className="size-4 shrink-0" />}
                 tone="info"
               />
               <Stat
                 label="Average order"
                 value={bought.length ? money(spent / bought.length) : "—"}
                 sub="Per order"
-                icon={<ArrowUpRight className="size-4" />}
+                icon={<ArrowUpRight className="size-4 shrink-0" />}
                 tone="violet"
               />
               <Stat
@@ -183,7 +183,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                 value={last ? fmtDate(last, "d MMM") : <T>Never</T>}
                 sub={unpaid > 0 ? `Unpaid cart ${money(unpaid)}` : "All paid"}
                 subTa={unpaid > 0 ? `நிலுவை கார்ட் ${money(unpaid)}` : undefined}
-                icon={<Clock className="size-4" />}
+                icon={<Clock className="size-4 shrink-0" />}
                 tone={unpaid > 0 ? "amber" : "gold"}
               />
             </div>

@@ -417,14 +417,14 @@ export function LoyaltyPanel({ rows, canManage, history = [] }: { rows: Customer
           label={isTamil ? "வாடிக்கையாளர்களிடம் உள்ள புள்ளிகள்" : "Points with customers"}
           value={total.toLocaleString("en-IN")}
           sub={isTamil ? `மதிப்பு சுமார் ${inr(worth)}` : `You owe about ${inr(worth)}`}
-          icon={<Sparkles className="size-4" />}
+          icon={<Sparkles className="size-4 shrink-0" />}
           tone="gold"
         />
         <Stat
           label={isTamil ? "பயன்படுத்தத் தயார்" : "Ready to redeem"}
           value={ready.length}
           sub={isTamil ? "50 அல்லது அதற்கு மேற்பட்ட புள்ளிகள்" : "Have 50 points or more"}
-          icon={<CheckCircle2 className="size-4" />}
+          icon={<CheckCircle2 className="size-4 shrink-0" />}
           tone="brand"
           meter={members.length > 0 ? Math.round((ready.length / members.length) * 100) : 0}
         />
@@ -432,14 +432,14 @@ export function LoyaltyPanel({ rows, canManage, history = [] }: { rows: Customer
           label={isTamil ? "புள்ளிகள் பெற்றோர்" : "Customers earning"}
           value={members.filter((m) => m.points > 0).length}
           sub={isTamil ? `பட்டியலில் உள்ள ${rows.length} பேரில்` : `Of ${rows.length} on your list`}
-          icon={<Users className="size-4" />}
+          icon={<Users className="size-4 shrink-0" />}
           tone="info"
         />
         <Stat
           label={isTamil ? "அதிகபட்ச புள்ளிகள்" : "Top balance"}
           value={(members[0]?.points ?? 0).toLocaleString("en-IN")}
           sub={members[0]?.name ?? (isTamil ? "யாருமில்லை" : "Nobody yet")}
-          icon={<Trophy className="size-4" />}
+          icon={<Trophy className="size-4 shrink-0" />}
           tone="violet"
         />
       </div>

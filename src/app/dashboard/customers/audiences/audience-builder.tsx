@@ -105,7 +105,7 @@ export function AudienceBuilder({ regions }: { regions: string[] }) {
         {/* Free AI Natural-Language Audience Builder */}
         <div className="rounded-control border border-brand/30 bg-brand-soft/20 p-3">
           <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-brand-deep">
-            <Sparkles aria-hidden className="size-3.5" />
+            <Sparkles aria-hidden className="size-3.5 shrink-0" />
             <span>{tr("Describe your target audience in plain English (Free AI)")}</span>
           </p>
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -122,7 +122,7 @@ export function AudienceBuilder({ regions }: { regions: string[] }) {
               placeholder={isTa ? "உ.தா. கடந்த 30 நாளில் ஆர்டர் செய்த மதுரை வாடிக்கையாளர்கள், அல்லது இதுவரை ஆர்டர் செய்யாதவர்கள்…" : "e.g. Customers in Madurai who ordered in the last 30 days, or people who never ordered…"}
             />
             <Button type="button" size="sm" loading={aiLoading} disabled={!aiPrompt.trim()} onClick={applyAiFilter}>
-              <Sparkles aria-hidden className="size-3.5" /> Build Filter
+              <Sparkles aria-hidden className="size-3.5 shrink-0" /> Build Filter
             </Button>
           </div>
           {aiExplanation && <p className="mt-1.5 text-xs text-ink-2">{aiExplanation}</p>}

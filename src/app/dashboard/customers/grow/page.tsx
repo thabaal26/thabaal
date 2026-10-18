@@ -44,7 +44,7 @@ export default async function GrowPage({ searchParams }: PageProps<"/dashboard/c
     return (
       <>
         <PageHeader title="Get more customers" back={back} />
-        <Card className="card-3d"><EmptyState icon={<QrCode className="size-5" />} title="Add a WhatsApp number first">Opt-in codes open a chat with your number. Add one on the Clients page.</EmptyState></Card>
+        <Card className="card-3d"><EmptyState icon={<QrCode className="size-5 shrink-0" />} title="Add a WhatsApp number first">Opt-in codes open a chat with your number. Add one on the Clients page.</EmptyState></Card>
       </>
     );
   }
@@ -104,7 +104,7 @@ export default async function GrowPage({ searchParams }: PageProps<"/dashboard/c
             {/* Generated locally from our own link, so the markup is safe to inline. */}
             <div role="img" aria-label={`QR code that opens WhatsApp to join (${source})`} className="mx-auto aspect-square w-full max-w-64 rounded-card bg-white p-3 ring-1 ring-line" dangerouslySetInnerHTML={{ __html: svg }} />
             <a href={png} download={`join-${source}-qr.png`} className={cn(buttonClass("primary"), "w-full")}>
-              <Download aria-hidden className="size-4" /> Download QR (PNG)
+              <Download aria-hidden className="size-4 shrink-0" /> Download QR (PNG)
             </a>
             <div>
               <label htmlFor="optin-link" className="mb-1.5 block text-sm font-medium text-ink-2">Link for website, Instagram bio or SMS</label>

@@ -10,7 +10,7 @@ export function CallButton({ customerId, name, primary }: { customerId: string; 
   const { isTa } = useTr();
   return (
     <Button type="button" variant={primary ? "primary" : "secondary"} onClick={() => placeCall({ customerId, name })}>
-      <Phone aria-hidden className="size-4" />{" "}
+      <Phone aria-hidden className="size-4 shrink-0" />{" "}
       {isTa ? (
         <span>
           <span className="max-sm:sr-only">WhatsApp-ல் </span>அழை

@@ -334,7 +334,7 @@ export function PurchaseJourney({
             <div>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-deep">
-                  <Sparkles aria-hidden className="size-4" />{" "}
+                  <Sparkles aria-hidden className="size-4 shrink-0" />{" "}
                   <T ta={`${customer?.name.split(/\s+/)[0] ?? "இந்த வாடிக்கையாளர்"}-க்குப் பரிந்துரைக்கும் சலுகை`}>
                     {`Recommended offer for ${customer?.name.split(/\s+/)[0] ?? "this customer"}`}
                   </T>
@@ -355,7 +355,7 @@ export function PurchaseJourney({
                   rel="noreferrer"
                   className={buttonClass("primary", "sm")}
                 >
-                  <MessageCircle aria-hidden className="size-3.5" /> <T>Send offer on WhatsApp</T>
+                  <MessageCircle aria-hidden className="size-3.5 shrink-0" /> <T>Send offer on WhatsApp</T>
                 </a>
               </div>
             )}
@@ -370,7 +370,7 @@ export function PurchaseJourney({
           <div className="rounded-control border border-line bg-canvas/40 p-3 sm:p-3.5">
             <div className="mb-2.5 flex items-center justify-between gap-2">
               <h4 className="flex items-center gap-1.5 text-xs font-semibold text-ink sm:text-sm">
-                <PackageCheck aria-hidden className="size-4 text-success" /> <T>Mostly bought products</T>
+                <PackageCheck aria-hidden className="size-4 shrink-0 text-success" /> <T>Mostly bought products</T>
               </h4>
               {mostlyBought.length > 0 && (
                 <span className="text-[11px] text-muted">
@@ -421,7 +421,7 @@ export function PurchaseJourney({
           <div className="rounded-control border border-line bg-canvas/40 p-3 sm:p-3.5">
             <div className="mb-2.5 flex items-center justify-between gap-2">
               <h4 className="flex items-center gap-1.5 text-xs font-semibold text-ink sm:text-sm">
-                <TriangleAlert aria-hidden className="size-4 text-warning" /> <T>Mostly dropped / hesitated</T>
+                <TriangleAlert aria-hidden className="size-4 shrink-0 text-warning" /> <T>Mostly dropped / hesitated</T>
               </h4>
               {mostlyDropped.length > 0 && (
                 <span className="text-[11px] text-muted">
@@ -433,7 +433,7 @@ export function PurchaseJourney({
             {unpaidItems.length > 0 && (
               <div className="mb-2.5 rounded-md border border-warning-border/60 bg-warning-bg/40 p-2.5 text-xs">
                 <p className="flex items-center gap-1.5 font-semibold text-ink">
-                  <ShoppingCart aria-hidden className="size-3.5 text-warning" /> <T>Waiting in unpaid cart right now:</T>
+                  <ShoppingCart aria-hidden className="size-3.5 shrink-0 text-warning" /> <T>Waiting in unpaid cart right now:</T>
                 </p>
                 <ul className="mt-1 space-y-0.5 text-ink-2">
                   {unpaidItems.map((u, i) => (
@@ -471,7 +471,7 @@ export function PurchaseJourney({
               </ul>
             ) : (
               <p className="py-3 text-xs text-muted">
-                <Sparkles aria-hidden className="mr-1 inline size-3.5 text-brand" />
+                <Sparkles aria-hidden className="mr-1 inline size-3.5 shrink-0 text-brand" />
                 <T>Zero dropped or cancelled carts — this customer is decisive when ordering.</T>
               </p>
             )}

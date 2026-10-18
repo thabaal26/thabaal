@@ -106,11 +106,11 @@ export function SheetForm({ customersUrl, ordersUrl }: { customersUrl: string; o
         >
           {useSeparate ? (
             <>
-              Switch back to single Share link <ChevronUp className="size-3" />
+              Switch back to single Share link <ChevronUp className="size-3 shrink-0" />
             </>
           ) : (
             <>
-              Need separate links for Customers & Orders? <ChevronDown className="size-3" />
+              Need separate links for Customers & Orders? <ChevronDown className="size-3 shrink-0" />
             </>
           )}
         </button>
@@ -128,7 +128,7 @@ export function SheetForm({ customersUrl, ordersUrl }: { customersUrl: string; o
           title={!hasAnyLink ? "Save a sheet link first" : undefined}
           onClick={() => run("sync", syncNow)}
         >
-          <RefreshCw aria-hidden className="size-4" /> Sync now
+          <RefreshCw aria-hidden className="size-4 shrink-0" /> Sync now
         </Button>
       </div>
     </form>

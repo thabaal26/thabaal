@@ -99,7 +99,7 @@ async function LiveUpdatesCard({ clientId, canManage, linked }: { clientId: stri
         {canManage && <SheetHookForm linked={linked} source={s.source} hasSecret={s.hasSecret} />}
         {s.state === "on" && (
           <ActionButton action={testSheetConnection} size="md">
-            <Send aria-hidden className="size-4" /> Send test to the sheet
+            <Send aria-hidden className="size-4 shrink-0" /> Send test to the sheet
           </ActionButton>
         )}
       </div>

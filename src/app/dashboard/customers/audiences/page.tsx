@@ -50,7 +50,7 @@ export default async function AudiencesPage() {
               ))}
             </ul>
           ) : (
-            <EmptyState icon={<UsersRound className="size-5" />} title="No audiences yet">Build one with the filters, or start from a preset.</EmptyState>
+            <EmptyState icon={<UsersRound className="size-5 shrink-0" />} title="No audiences yet">Build one with the filters, or start from a preset.</EmptyState>
           )}
         </Card>
       </div>

@@ -98,7 +98,7 @@ export function SendPanel({
         {canSend && (
           <div className="space-y-4">
             <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
-              <Send aria-hidden className="size-4 text-brand-deep" /> {tr("Send a template")}
+              <Send aria-hidden className="size-4 shrink-0 text-brand-deep" /> {tr("Send a template")}
             </p>
             {blocked ? (
               <Callout tone="warning">{blocked}</Callout>
@@ -141,7 +141,7 @@ export function SendPanel({
                   </div>
                 )}
                 <Button className="w-full" disabled={!templateId} loading={sending} onClick={() => send(false)}>
-                  <Send aria-hidden className="size-4" /> {isTa ? `${customer.name.split(" ")[0]}-க்கு அனுப்பு` : `Send to ${customer.name.split(" ")[0]}`}
+                  <Send aria-hidden className="size-4 shrink-0" /> {isTa ? `${customer.name.split(" ")[0]}-க்கு அனுப்பு` : `Send to ${customer.name.split(" ")[0]}`}
                 </Button>
               </>
             ) : (
@@ -153,7 +153,7 @@ export function SendPanel({
         <div className="scroll-mt-24 space-y-3" id="reply">
           <div className="flex items-center justify-between gap-2">
             <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
-              <MessageSquareText aria-hidden className="size-4 text-brand-deep" /> {tr("Type a reply")}
+              <MessageSquareText aria-hidden className="size-4 shrink-0 text-brand-deep" /> {tr("Type a reply")}
             </p>
             {windowOpen && (
               <button
@@ -161,7 +161,7 @@ export function SendPanel({
                 onClick={() => setShowMediaInput((v) => !v)}
                 className="inline-flex min-h-10 items-center gap-1 text-xs font-medium text-brand-deep hover:underline sm:min-h-0"
               >
-                <ImagePlus aria-hidden className="size-3.5" />
+                <ImagePlus aria-hidden className="size-3.5 shrink-0" />
                 {tr(showMediaInput || mediaUrl ? "Hide attachment" : "Attach photo / PDF")}
               </button>
             )}
@@ -170,7 +170,7 @@ export function SendPanel({
             <>
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-deep">
-                  <Sparkles aria-hidden className="size-3.5" /> {tr("Free AI Draft:")}
+                  <Sparkles aria-hidden className="size-3.5 shrink-0" /> {tr("Free AI Draft:")}
                 </span>
                 <button
                   type="button"
@@ -224,7 +224,7 @@ export function SendPanel({
                         onClick={() => setMediaUrl("")}
                         className="grid size-10 place-items-center rounded-control text-muted hover:bg-canvas hover:text-ink sm:size-8"
                       >
-                        <X className="size-4" />
+                        <X className="size-4 shrink-0" />
                       </button>
                     )}
                   </div>
@@ -270,7 +270,7 @@ export function SendPanel({
                   })
                 }
               >
-                <Send aria-hidden className="size-4" /> Send reply
+                <Send aria-hidden className="size-4 shrink-0" /> Send reply
               </Button>
             </>
           ) : (
