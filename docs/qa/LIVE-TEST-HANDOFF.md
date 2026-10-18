@@ -1,6 +1,6 @@
 # Thabaal: handoff for the next session
 
-Updated 18 Oct 2026, 19:40 IST. A new session (possibly on another Claude account) starts with **no memory** of
+Updated 18 Oct 2026, 20:05 IST. A new session (possibly on another Claude account) starts with **no memory** of
 earlier work; this file is its memory. Read all of it before doing anything.
 **Update this file after every task** (the owner's standing instruction): what changed, the commit, and what's left.
 
@@ -64,17 +64,17 @@ earlier work; this file is its memory. Read all of it before doing anything.
 
 ## 3. State at handoff
 
-- **`main` = `Madhu_changes` = `1ab4003`**, deployed to production (Vercel READY). See "In progress" below for
-  uncommitted work.
+- **`main` = `Madhu_changes`** = the "UPI reference (UTR) kept apart…" commit (see `git log -1`), deployed to
+  production. Working tree clean apart from the untracked scripts (rule 3).
 - Full QA run (13-phase master prompt) done: reports in `docs/qa/` — `PROJECT_INVENTORY.md`, `TEST_PLAN.md`,
   `TEST_CASES.csv` (349/349 PASS), `RESPONSIVE_UI_AUDIT.md`, `BUG_REPORT.md` (BUG-01…16, CR-01, DEC-01…04, EXT-01/02),
   `INTEGRATION_REPORT.md`, `PERFORMANCE_REPORT.md`, `FINAL_QA_REPORT.md`, plus `tamil-gaps.tsv`.
 - Live tests finished: order RG-1028 (paid ₹1 by UPI, confirmed in the chat, packed, dispatched, delivered); the TEST
   campaign and TEST audience were deleted.
 
-### In progress (uncommitted on the owner's PC, 19:40)
+### Done on 18 Oct (latest first)
 
-**UPI reference (UTR) and payment history** — the owner asked to save the UTR and every payment message.
+00. **UPI reference (UTR) and payment history** (owner asked to save the UTR and every payment message):
 - New: `Order.paymentUtr` (the bank's 12-digit UTR, apart from `paymentTxnId` so neither overwrites the other) and
   table `PaymentEvent` (every payment message: WhatsApp payment updates and UPI bubbles with Meta's full message in
   `raw`, a UTR or screenshot from the customer, staff entries). SQL: `prisma/sql/2026-10-18-payment-events.sql`
@@ -87,14 +87,12 @@ earlier work; this file is its memory. Read all of it before doing anything.
 - Screens: receipt shows "UPI reference (UTR)" and "Transaction ID" separately plus a "Payment history" list;
   payment line, Payments › Received / All transactions show both (`paymentRefs()` in `plain-error.ts`); order search
   finds a UTR.
-- Tests: `tests/qa/payments.mjs` checks 15 (paid webhook keeps txn id + UTR + full message) and 16 (customer's typed
-  UTR saved and logged, order not marked paid). 15 passed; 16 failed only because the test order's ref wasn't in the
-  `AB-1234` format (the webhook matched another order) — fixed to numeric refs, **re-run** `run-all.ps1 -NoBuild
-  -Skip crawl-desktop,crawl-phone,visual`, then commit (stage by name: the files above + `prisma/schema.prisma`,
-  `scripts/db-additive.mjs`, `src/app/dashboard/orders/{order-card,payment-status,page,orders-view}.tsx`,
-  `src/lib/payments-data.ts`, `src/lib/plain-error.ts`, `tests/qa/payments.mjs`, this file) and push.
-
-### Done on 18 Oct (latest first)
+- Tests: `tests/qa/payments.mjs` new checks 15 (paid webhook keeps txn id + UTR + full message) and 16 (customer's
+  typed UTR saved and logged, order not marked paid); `payments-ui` check 26 now expects the UTR in `paymentUtr`.
+  Results: payments 16/16, payments-ui 14/14, crud 12/12. Note: payments-ui check 3 needs the payments suite to run
+  first (it sets QA-1012's claim), so don't run payments-ui alone.
+- Live note: with UPI Intent Meta still sends no UTR; the UTR fills in when the customer types it, staff add it, or
+  if a payment gateway is configured later. Every WhatsApp payment message is now kept in `PaymentEvent.raw`.
 
 0. **Evening fixes (owner's screenshots), commits `f975be5`, `1ab4003`:**
    - New order dialog: field groups were drawn as boxes and squashed (the app-wide `.field` input class matched the

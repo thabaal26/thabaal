@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, useTransition } from "react";
+import { Fragment, useEffect, useState, useTransition } from "react";
 import { useModalKeys } from "@/components/use-modal";
 import Link from "@/components/intent-link";
 import { useRouter } from "next/navigation";
@@ -34,7 +34,7 @@ import {
   setOrderStatus,
   updateOrderItems,
 } from "../actions/orders";
-import { deliverCod, setPaymentMethod, undoPayment, verifyPaymentClaim } from "../actions/payments";
+import { deliverCod, paymentHistory, setPaymentMethod, undoPayment, verifyPaymentClaim } from "../actions/payments";
 import { RecordPaymentSheet, RefundSheet } from "./payment-ui";
 import {
   blankOrderLine,
@@ -60,6 +60,7 @@ export type OrderCardData = {
   waMessageId?: string | null;
   paidAt: Date | string | null;
   paymentTxnId: string | null;
+  paymentUtr?: string | null;
   paymentRequestedAt: Date | string | null;
   paymentReminderAt?: Date | string | null;
   paymentMethod?: string | null;
@@ -84,6 +85,24 @@ export type OrderCardData = {
     client?: { name: string };
   };
   client?: { paymentConfig?: string | null; orderFlow?: string | null };
+};
+
+/** Payment history rows in plain words (lib/payment-events.ts). */
+const HISTORY_SOURCE: Record<string, string> = {
+  meta_status: "WhatsApp payment",
+  meta_bubble: "WhatsApp UPI message",
+  customer_text: "Customer's message",
+  screenshot: "Customer's screenshot",
+  staff: "Staff",
+};
+const HISTORY_STATUS: Record<string, string> = {
+  paid: "paid",
+  failed: "failed",
+  pending: "pending",
+  claimed: "says paid",
+  duplicate: "reference already used",
+  recorded: "recorded",
+  reference_added: "reference added",
 };
 
 export function OrderCard({
@@ -132,6 +151,18 @@ export function OrderCard({
   const [refundOpen, setRefundOpen] = useState(false);
 
   const [receiptOpen, setReceiptOpen] = useState(false);
+  // The receipt's payment history (what WhatsApp, the customer and staff reported), loaded when it opens.
+  const [history, setHistory] = useState<Awaited<ReturnType<typeof paymentHistory>> | null>(null);
+  useEffect(() => {
+    if (!receiptOpen) return;
+    let live = true;
+    paymentHistory(o.id)
+      .then((h) => live && setHistory(h))
+      .catch(() => live && setHistory([]));
+    return () => {
+      live = false;
+    };
+  }, [receiptOpen, o.id]);
   // Both overlays behave as dialogs from the keyboard: focus in, Escape out, focus back to the button.
   useModalKeys(dispatchOpen, () => setDispatchOpen(false), `dsp-${o.id}`);
   useModalKeys(receiptOpen, () => setReceiptOpen(false), `rec-${o.id}`);
@@ -1533,9 +1564,15 @@ export function OrderCard({
                 <div className="grow muted"><T ta="செலுத்திய முறை">Paid by</T></div>
                 <b>{o.paymentMethod ? o.paymentMethod.toUpperCase() : "Online"}</b>
               </div>
-              {o.paymentTxnId && (
+              {o.paymentUtr && (
                 <div className="row" style={{ alignItems: "center" }}>
-                  <div className="grow muted"><T ta="UPI / குறிப்பு எண்">UPI / Ref number</T></div>
+                  <div className="grow muted"><T ta="UPI குறிப்பு எண் (UTR)">UPI reference (UTR)</T></div>
+                  <b style={{ fontFamily: "var(--mono, monospace)", fontSize: 13 }}>{o.paymentUtr}</b>
+                </div>
+              )}
+              {o.paymentTxnId && o.paymentTxnId.replace(/^UTR-/i, "") !== o.paymentUtr && (
+                <div className="row" style={{ alignItems: "center" }}>
+                  <div className="grow muted"><T ta="பரிவர்த்தனை எண்">Transaction ID</T></div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <b style={{ fontFamily: "var(--mono, monospace)", fontSize: 13 }}>{o.paymentTxnId}</b>
                     <button
@@ -1578,6 +1615,28 @@ export function OrderCard({
                 </div>
               )}
             </div>
+            {history && history.length > 0 && (
+              <details>
+                <summary className="muted small" style={{ cursor: "pointer" }}>
+                  <T ta="பணம் வரலாறு">Payment history</T> ({history.length})
+                </summary>
+                <div className="list" style={{ marginTop: 6 }}>
+                  {history.map((h) => (
+                    <div key={h.id} className="row" style={{ alignItems: "flex-start" }}>
+                      <div className="grow">
+                        <div className="t" style={{ fontSize: 13.5 }}>
+                          {HISTORY_SOURCE[h.source] ?? h.source} · {HISTORY_STATUS[h.status] ?? h.status}
+                          {h.amount != null ? ` · ${inr(h.amount)}` : ""}
+                        </div>
+                        <div className="muted small">
+                          {[fmtDate(new Date(h.createdAt), "d MMM, h:mm a"), h.utr && `UTR ${h.utr}`, h.transactionId && `Txn ${h.transactionId}`, h.note].filter(Boolean).join(" · ")}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
             <div className="acts">
               <button
                 type="button"
@@ -1591,7 +1650,7 @@ export function OrderCard({
                 href={
                   o.customer.phone
                     ? `https://wa.me/${o.customer.phone.replace(/\D/g, "")}?text=${encodeURIComponent(
-                        `Receipt for Order #${refText}: ${inr(received)} received${due > 0 && o.status !== "CANCELLED" ? `, ${inr(due)} still due` : ""}${o.paymentTxnId ? ` (Ref: ${o.paymentTxnId})` : ""}. Thank you!`,
+                        `Receipt for Order #${refText}: ${inr(received)} received${due > 0 && o.status !== "CANCELLED" ? `, ${inr(due)} still due` : ""}${o.paymentUtr ? ` (UPI ref: ${o.paymentUtr})` : o.paymentTxnId ? ` (Ref: ${o.paymentTxnId.replace(/^UTR-/i, "")})` : ""}. Thank you!`,
                       )}`
                     : undefined
                 }

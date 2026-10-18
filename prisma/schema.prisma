@@ -466,6 +466,10 @@ model Order {
   paymentReminderAt  DateTime?
   paidAt             DateTime?
   paymentTxnId       String?
+  /// The bank's 12-digit UPI reference (UTR), apart from paymentTxnId so neither overwrites the other
+  /// (prisma/sql/2026-10-18-payment-events.sql).
+  paymentUtr         String?
+  paymentEvents      PaymentEvent[]
   /// How the customer pays: upi_whatsapp ("Review and pay"), upi (another UPI app or the shop's QR), cod, cash,
   /// bank, card or other. Null until someone decides (a WhatsApp cart defaults to UPI when payments are on).
   paymentMethod      String?
@@ -613,6 +617,29 @@ model LoyaltyEntry {
 
   @@index([clientId, createdAt])
   @@index([customerId])
+}
+
+/// Every payment message received or recorded for an order, with Meta's full message: the audit trail.
+model PaymentEvent {
+  id            String   @id @default(cuid())
+  clientId      String?
+  orderId       String?
+  order         Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  /// meta_status, meta_bubble, customer_text, screenshot, staff.
+  source        String
+  /// paid, failed, pending, claimed, recorded, reference_added.
+  status        String
+  transactionId String?
+  utr           String?
+  amount        Float?
+  currency      String?
+  note          String?
+  raw           Json?
+  createdAt     DateTime @default(now())
+
+  @@index([orderId, createdAt])
+  @@index([clientId, createdAt])
+  @@index([utr])
 }
 
 model LoginAttempt {

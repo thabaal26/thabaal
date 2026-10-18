@@ -13,6 +13,7 @@ import { autoRedeemPoints } from "@/lib/loyalty-redeem";
 import { autoRequestPayment, cancelSupersededOrdersForCustomer, confirmPayment, parseMetaAmount, recordPaymentClaim, recordPaymentFailure, sendCodConfirmationPrompt, textInWindow, updateOrderCard } from "@/lib/payments";
 import { autoReplyToButton, autoSendCatalogue, catalogueTrigger, firstMessageToday } from "@/lib/catalog";
 import { mapMetaStatus } from "@/lib/whatsapp";
+import { findUtr, logPaymentEvent } from "@/lib/payment-events";
 import { JOIN_RE, joinFromWhatsApp } from "@/lib/optin";
 import { chargeMessage } from "@/lib/wallet";
 
@@ -146,13 +147,29 @@ async function applyPayment(s: PaymentUpdate, phoneNumberId: string | undefined,
     s.status === "paid" ||
     s.status === "completed";
   const failed = !paid && (txn?.status === "failed" || s.status === "failed" || Boolean(txn?.error) || Boolean(s.errors?.length));
+  const reference = s.payment?.reference_id;
+  const { number: receiver, customers } = await receivingNumber(phoneNumberId);
+  // Every payment update is kept with Meta's full message (and the bank reference, if Meta sent one).
+  const utr = findUtr(s);
+  const logEvent = (orderId: string | null, note?: string) =>
+    logPaymentEvent({
+      clientId: receiver?.clientId ?? null,
+      orderId,
+      source: "meta_status",
+      status: paid ? "paid" : failed ? "failed" : String(txn?.status ?? s.status ?? "pending"),
+      transactionId: txn?.id ?? null,
+      utr,
+      amount: parseMetaAmount(s.payment?.amount),
+      currency: s.payment?.currency ?? null,
+      note: note ?? (reference ? `Order ${reference}` : null),
+      raw: s,
+    });
   if (!paid && !failed) {
     // pending / processing: the final update follows.
     console.warn("WhatsApp payment not completed yet", JSON.stringify(s));
+    await logEvent(null);
     return;
   }
-  const reference = s.payment?.reference_id;
-  const { number: receiver, customers } = await receivingNumber(phoneNumberId);
   // The order must belong to the business whose number received the payment.
   let order = reference
     ? await db.order.findFirst({
@@ -172,12 +189,14 @@ async function applyPayment(s: PaymentUpdate, phoneNumberId: string | undefined,
       });
     }
   }
+  await logEvent(order?.id ?? null, order ? undefined : `No matching order for ${reference ?? "this payment"}`);
   if (!order) return;
   if (failed) {
     const reason = txn?.error?.reason ?? txn?.error?.message ?? s.errors?.[0]?.error_data?.details ?? s.errors?.[0]?.title ?? "The UPI payment didn't go through";
     await recordPaymentFailure(order.id, String(reason));
     return;
   }
+  if (utr) await db.order.updateMany({ where: { id: order.id, paymentUtr: null }, data: { paymentUtr: utr } }).catch(() => {});
   // Meta sends the amount in paise-like units: value / offset (divisor 100) or value / 10^offset (exponent 2).
   const amount = parseMetaAmount(s.payment?.amount);
   if (amount != null && !(amount > 0)) {
@@ -195,7 +214,7 @@ async function applyPayment(s: PaymentUpdate, phoneNumberId: string | undefined,
     return;
   }
   // confirmPayment keeps a smaller amount as a part payment, so the order is only "Paid" when the full total arrived.
-  await confirmPayment(order.id, txn?.id ?? s.id ?? null, { method: "upi_whatsapp", source: "meta", amount });
+  await confirmPayment(order.id, txn?.id ?? s.id ?? null, { method: "upi_whatsapp", source: "meta", amount, utr });
 }
 
 
@@ -274,6 +293,18 @@ async function detectAndApplyUpiPayment(
   if (isNativePaymentBubble) {
     const txnId = m.payment?.transaction?.id ?? m.id ?? "WA-UPI";
     const amount = parseMetaAmount(m.payment?.amount);
+    const bubbleUtr = findUtr(m);
+    await logPaymentEvent({
+      orderId: targetOrder.id,
+      source: "meta_bubble",
+      status: notSucceeded(m.payment?.transaction?.status) ? "failed" : amount != null && amount > 0 && signed ? "paid" : "claimed",
+      transactionId: m.payment?.transaction?.id ?? null,
+      utr: bubbleUtr,
+      amount,
+      currency: m.payment?.currency ?? null,
+      raw: m,
+    });
+    if (bubbleUtr) await db.order.updateMany({ where: { id: targetOrder.id, paymentUtr: null }, data: { paymentUtr: bubbleUtr } }).catch(() => {});
     // Only a bubble that says how much was paid is recorded straight away (a smaller amount stays part paid);
     // without an amount, staff check the UPI app first, like any other "I paid".
     if (notSucceeded(m.payment?.transaction?.status)) {
@@ -286,7 +317,7 @@ async function detectAndApplyUpiPayment(
       await recordPaymentClaim(targetOrder.id, note, String(txnId)).catch(() => {});
       return { text: `UPI payment on WhatsApp for ${ref} (${totalFormatted}) · check the amount`, kind: "order", media: base.media, handledAsPayment: true };
     }
-    await confirmPayment(targetOrder.id, String(txnId), { method: "upi_whatsapp", source: "meta", amount }).catch((e) => console.error("Auto confirmPayment on UPI bubble failed", e));
+    await confirmPayment(targetOrder.id, String(txnId), { method: "upi_whatsapp", source: "meta", amount, utr: bubbleUtr }).catch((e) => console.error("Auto confirmPayment on UPI bubble failed", e));
     return {
       text: `UPI payment completed on WhatsApp (${money(amount, targetOrder.currency)} for ${ref})`,
       kind: "order",
@@ -320,6 +351,7 @@ async function detectAndApplyUpiPayment(
         const dupOrder = await db.order.findFirst({
           where: {
             OR: [
+              { paymentUtr: utrMatch[1] },
               { paymentTxnId: { contains: utrMatch[1] } },
               { paymentClaimNote: { contains: utrMatch[1] } },
             ],
@@ -344,6 +376,7 @@ async function detectAndApplyUpiPayment(
         }
 
         await recordPaymentClaim(targetOrder.id, `UPI reference ${utrMatch[1]} sent by the customer`, `UTR-${utrMatch[1]}`).catch(() => {});
+        await logPaymentEvent({ orderId: targetOrder.id, source: "customer_text", status: "claimed", utr: utrMatch[1], note: base.text.slice(0, 300) });
         return { text: `${base.text} · Says paid ${ref} (${totalFormatted}), UPI ref ${utrMatch[1]} · check`, kind: "order", media: base.media, handledAsPayment: true };
       }
       await recordPaymentClaim(targetOrder.id, `Customer wrote: "${base.text.slice(0, 200)}"`).catch(() => {});
@@ -363,6 +396,7 @@ async function detectAndApplyUpiPayment(
         const dupOrder = await db.order.findFirst({
           where: {
             OR: [
+              { paymentUtr: utrMatch[1] },
               { paymentTxnId: { contains: utrMatch[1] } },
               { paymentClaimNote: { contains: utrMatch[1] } },
             ],
@@ -385,6 +419,7 @@ async function detectAndApplyUpiPayment(
             : `Payment screenshot: "${caption.slice(0, 200)}"`,
         utrMatch ? (isDup ? `DUP-${utrMatch[1]}` : `UTR-${utrMatch[1]}`) : null,
       ).catch(() => {});
+      await logPaymentEvent({ orderId: targetOrder.id, source: "screenshot", status: isDup ? "duplicate" : "claimed", utr: utrMatch && !isDup ? utrMatch[1] : null, note: caption.slice(0, 300) });
       return {
         text: isDup
           ? `⚠️ DUPLICATE UPI screenshot (${totalFormatted} for ${ref}, ref ${utrMatch![1]} used on ${dupRefStr})`

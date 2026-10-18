@@ -6,6 +6,7 @@ import { pushOrderToSheet } from "@/lib/google-sheets-live";
 import { money, orderRef } from "@/lib/orders";
 import { canUndoPayment, dueOf, isPaymentMethod, methodLabel, receivedOf } from "@/lib/payment-state";
 import { confirmPayment, textInWindow } from "@/lib/payments";
+import { logPaymentEvent, paymentEventsFor, utrOf } from "@/lib/payment-events";
 import { paymentRef } from "@/lib/plain-error";
 import { requireOrderAccess } from "@/lib/session";
 import { notifyOrder } from "./orders";
@@ -63,6 +64,7 @@ export async function recordPayment(
     collectedBy: input.collectedBy?.trim() || null,
     quiet: input.tell === false,
     seenReceived: input.seenReceived ?? null,
+    utr: utrOf(ref),
   });
   if (!saved) return done(`${orderRef(o)} is already paid or was updated a moment ago. Nothing new was recorded.`, false);
   const full = amount + 0.5 >= due;
@@ -71,6 +73,14 @@ export async function recordPayment(
       ? `Recorded ${money(amount, o.currency)} by ${methodLabel(input.method, true)}. ${orderRef(o)} is paid${input.tell === false ? "" : " and the customer was thanked"}.`
       : `Recorded ${money(amount, o.currency)} by ${methodLabel(input.method, true)}. ${money(due - amount, o.currency)} still due.`,
   );
+}
+
+/** An order's payment history for its receipt: what WhatsApp, the customer and staff reported, newest first. */
+export async function paymentHistory(id: string) {
+  const r = await ownOrder(id);
+  if (!r.order) return [];
+  const rows = await paymentEventsFor(r.order.id);
+  return rows.map((e) => ({ ...e, createdAt: e.createdAt.toISOString() }));
 }
 
 /**
@@ -85,8 +95,14 @@ export async function savePaymentReference(id: string, reference: string): Promi
   const ref = reference.trim().replace(/\s+/g, "");
   if (!/^[A-Za-z0-9-]{6,40}$/.test(ref)) return { ok: false, message: "Type the reference as it shows in the UPI app: 6 to 40 letters or numbers (a UTR is 12 digits)." };
   if (!(receivedOf(o) > 0)) return { ok: false, message: "No money is recorded on this order yet. Record the payment, with its reference, first." };
-  if (paymentRef(o.paymentTxnId)) return { ok: false, message: `This payment already has reference ${paymentRef(o.paymentTxnId)}.` };
-  await db.order.update({ where: { id: o.id }, data: { paymentTxnId: ref, internalNote: addNote(o.internalNote, `${stamp()}: UPI reference ${ref} added`) } });
+  const utr = utrOf(ref);
+  // A UTR goes in its own field, so Meta's transaction id (if any) stays; another reference fills the empty slot.
+  if (utr ? o.paymentUtr : paymentRef(o.paymentTxnId)) return { ok: false, message: `This payment already has reference ${utr ? o.paymentUtr : paymentRef(o.paymentTxnId)}.` };
+  await db.order.update({
+    where: { id: o.id },
+    data: { ...(utr ? { paymentUtr: utr } : { paymentTxnId: ref }), internalNote: addNote(o.internalNote, `${stamp()}: UPI reference ${ref} added`) },
+  });
+  await logPaymentEvent({ clientId: o.clientId, orderId: o.id, source: "staff", status: "reference_added", transactionId: utr ? null : ref, utr, note: "Reference added by staff" });
   return done(`Saved reference ${ref} for ${orderRef(o)}.`);
 }
 
@@ -151,7 +167,7 @@ export async function verifyPaymentClaim(id: string, received: boolean): Promise
     data: {
       paymentClaimedAt: null,
       paymentClaimNote: null,
-      ...(o.paymentTxnId?.startsWith("UTR-") && { paymentTxnId: null }),
+      ...(o.paymentTxnId?.startsWith("UTR-") && { paymentTxnId: null, paymentUtr: null }),
       internalNote: addNote(o.internalNote, `${stamp()}: customer said paid${o.paymentTxnId?.startsWith("UTR-") ? ` (${o.paymentTxnId})` : ""}, not found in account`),
     },
   });
@@ -213,6 +229,7 @@ export async function undoPayment(id: string): Promise<SendResult> {
       paidAmount: null,
       paymentSource: null,
       paymentTxnId: null,
+      paymentUtr: null,
       collectedBy: null,
       ...(o.status === "PAID" && { status: "CONFIRMED" as const }),
       internalNote: addNote(o.internalNote, `${stamp()}: payment of ${money(receivedOf(o), o.currency)} undone`),

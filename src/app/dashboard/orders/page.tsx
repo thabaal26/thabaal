@@ -86,6 +86,7 @@ export default async function OrdersPage({
     waMessageId: o.waMessageId,
     paidAt: o.paidAt,
     paymentTxnId: o.paymentTxnId,
+    paymentUtr: o.paymentUtr,
     paymentRequestedAt: o.paymentRequestedAt,
     paymentReminderAt: o.paymentReminderAt,
     paymentMethod: o.paymentMethod,

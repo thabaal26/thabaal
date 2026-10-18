@@ -33,6 +33,13 @@ export function templateLabel(name: string | null | undefined): string {
 }
 
 /** A payment reference worth showing (a UPI or bank ref), or null for internal ids such as WhatsApp message ids. */
+/** Both payment references in one line: the bank's UPI reference (UTR) first, then any other transaction reference. */
+export function paymentRefs(txnId: string | null | undefined, utr: string | null | undefined): string | null {
+  const txn = paymentRef(txnId);
+  const parts = [utr ? `UTR ${utr}` : null, txn && txn !== utr ? (utr ? `Txn ${txn}` : txn) : null].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
+}
+
 export function paymentRef(ref: string | null | undefined): string | null {
   if (!ref) return null;
   const r = ref.trim();

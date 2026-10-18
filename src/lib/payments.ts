@@ -5,6 +5,7 @@ import { headerImageFor } from "./media";
 import { pushOrderToSheet } from "./google-sheets-live";
 import { getOrderPricing, itemsText, itemsWithNames, money, orderRef } from "./orders";
 import { pointsDiscount } from "./order-pricing";
+import { logPaymentEvent, utrOf } from "./payment-events";
 import { dueOf, receivedOf } from "./payment-state";
 import { getSettings } from "./provider";
 import { replyWindowEnd } from "./replies";
@@ -169,6 +170,8 @@ export type PaymentRecord = {
   quiet?: boolean;
   /** What staff saw as already received when they recorded it; if that changed meanwhile, nothing is recorded. */
   seenReceived?: number | null;
+  /** The bank's 12-digit UPI reference, when known; saved apart from the transaction reference. */
+  utr?: string | null;
 };
 
 /**
@@ -225,6 +228,7 @@ async function confirmPaymentOnce(orderId: string, txnId: string | null | undefi
       paymentMethod: method,
       paymentSource: rec.source ?? "meta",
       ...(txnId && { paymentTxnId: txnId }),
+      ...((rec.utr ?? utrOf(txnId)) && { paymentUtr: rec.utr ?? utrOf(txnId) }),
       ...(rec.collectedBy && { collectedBy: rec.collectedBy.slice(0, 80) }),
       paymentClaimedAt: null,
       paymentFailedAt: null,
@@ -246,6 +250,9 @@ async function confirmPaymentOnce(orderId: string, txnId: string | null | undefi
     },
   });
   if (saved.count === 0) return attempt < 2 ? confirmPaymentOnce(orderId, txnId, rec, attempt + 1) : false;
+  // Meta's own messages are logged where they arrive (with the full message); this records staff entries.
+  if (rec.source === "staff" || rec.source === "verified")
+    await logPaymentEvent({ clientId: order.clientId, orderId: order.id, source: "staff", status: "recorded", transactionId: txnId ?? null, utr: rec.utr ?? utrOf(txnId) ?? order.paymentUtr, amount, currency: order.currency, note: `${rec.source === "verified" ? "Checked and confirmed" : "Recorded"} by staff${method ? ` (${method})` : ""}` });
   pushOrderToSheet(order.id, "ORDER_UPDATE", full ? "Payment received" : "Part payment received");
   if (!full || rec.quiet) return true;
 
@@ -276,9 +283,11 @@ async function confirmPaymentOnce(orderId: string, txnId: string | null | undefi
 export async function recordPaymentClaim(orderId: string, note: string, reference?: string | null) {
   const order = await db.order.findUnique({ where: { id: orderId }, select: { id: true, paidAt: true, paymentClaimNote: true } });
   if (!order || order.paidAt) return false;
+  // A UTR the customer sent is kept in its own field too (a duplicate one isn't: it belongs to another order).
+  const utr = reference && !/^DUP-/i.test(reference) ? utrOf(reference) : null;
   await db.order.update({
     where: { id: order.id },
-    data: { paymentClaimedAt: new Date(), paymentClaimNote: note.slice(0, 300), ...(reference && { paymentTxnId: reference.slice(0, 60) }) },
+    data: { paymentClaimedAt: new Date(), paymentClaimNote: note.slice(0, 300), ...(reference && { paymentTxnId: reference.slice(0, 60) }), ...(utr && { paymentUtr: utr }) },
   });
   pushOrderToSheet(order.id, "ORDER_UPDATE", "Customer says paid");
   return true;

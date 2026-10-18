@@ -192,7 +192,7 @@ export function OrdersView({
     // Search query filter
     if (qClean) {
       const itemsStr = (o.items as OrderItem[]).map((i) => i.name ?? i.id).join(" ");
-      const combined = `${o.number} ${orderRef(o)} ${o.customer.name} ${o.customer.phone} ${itemsStr} ${o.note ?? ""} ${o.internalNote ?? ""}`.toLowerCase();
+      const combined = `${o.number} ${orderRef(o)} ${o.customer.name} ${o.customer.phone} ${itemsStr} ${o.note ?? ""} ${o.internalNote ?? ""} ${o.paymentUtr ?? ""} ${o.paymentTxnId ?? ""}`.toLowerCase();
       if (!combined.includes(qClean)) return false;
     }
 

@@ -299,11 +299,12 @@ await check(26, "Payments › All: no WhatsApp message id shown as the reference
   await row.getByRole("button", { name: "Save" }).click();
   await waitToast(/Saved reference 412345678901/);
   const after = await get(ref);
-  expect(after.paymentTxnId === "412345678901", `saved ${after.paymentTxnId}`);
+  // A UTR goes in its own field (paymentUtr); the transaction reference is left as it was.
+  expect(after.paymentUtr === "412345678901", `saved utr ${after.paymentUtr ?? "-"}, txn ${after.paymentTxnId}`);
   await p.reload({ waitUntil: "networkidle" });
   const row2 = p.locator("tr", { hasText: ref }).first();
   expect(/412345678901/.test(await row2.textContent()) && (await row2.getByRole("button", { name: "Add UTR" }).count()) === 0, "UTR not shown, or Add UTR still offered");
-  return `wamid hidden; UTR saved and shown: ${after.paymentTxnId}`;
+  return `wamid hidden; UTR saved and shown: ${after.paymentUtr}`;
 });
 
 // 27. Chat: "Payment received: confirm" opens Record payment with the UTR field; recording sets Paid with the reference.

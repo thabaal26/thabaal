@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { pushOrderToSheet } from "@/lib/google-sheets-live";
 import { DEFAULT_SHIPPING_FEE, getOrderPricing, itemsText, itemsWithNames, money, nextOrderRef, orderRef, syncCustomerOrderedProducts, type OrderItem } from "@/lib/orders";
 import { confirmPayment, sendPaymentRequestFor, updateOrderCard } from "@/lib/payments";
+import { utrOf } from "@/lib/payment-events";
 import { dueOf, methodOf, receivedOf } from "@/lib/payment-state";
 import { autoRedeemPoints, keptPointsDiscount, setOrderPoints } from "@/lib/loyalty-redeem";
 import { pointsDiscount } from "@/lib/order-pricing";
@@ -698,7 +699,7 @@ export async function createOrder(input: {
     paymentNote = payRes.ok ? " Sent WhatsApp payment request." : ` (${payRes.message})`;
   } else if ((mode === "paid_cash" || mode === "paid_upi") && total > 0) {
     const method = mode === "paid_cash" ? "cash" : "upi";
-    await confirmPayment(order.id, input.paymentRef?.trim().slice(0, 60) || null, { method, source: "staff" });
+    await confirmPayment(order.id, input.paymentRef?.trim().slice(0, 60) || null, { method, source: "staff", utr: utrOf(input.paymentRef) });
     paymentNote = ` Recorded as paid (${mode === "paid_cash" ? "cash" : "UPI"}).`;
   } else if (mode === "cod") {
     paymentNote = ` Cash on delivery: collect ${money(total, "INR")}.`;

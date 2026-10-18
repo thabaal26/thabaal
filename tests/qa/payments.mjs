@@ -191,6 +191,42 @@ await check(14, "A payment bubble whose transaction failed is not counted as pai
   return snap(a);
 });
 
+// A fresh unpaid order for the reference checks below (so earlier checks can't have touched it).
+async function freshOrder(tag) {
+  const base = await order("newUnpaid");
+  return db.order.create({
+    data: { clientId: base.clientId, customerId: base.customerId, items: base.items, total: 250, status: "CONFIRMED", ref: `QA-${tag === "U" ? 7 : 8}${String(Date.now() % 100000).padStart(5, "0")}`, paymentRequestedAt: new Date() },
+  });
+}
+
+// 15. The bank reference (UTR) is kept apart from Meta's transaction id, and Meta's full message is logged.
+await check(15, "A paid WhatsApp payment keeps Meta's transaction id, the UTR (when sent) and the full message", async () => {
+  const o = await freshOrder("U");
+  const body = paymentStatus({ ref: o.ref, rupees: 250, txnId: "QATXN-UTR-1" });
+  body.entry[0].changes[0].value.statuses[0].payment.transaction.utr = "412345678901";
+  const s = await post(body);
+  const a = await db.order.findUniqueOrThrow({ where: { id: o.id } });
+  const ev = await db.paymentEvent.findMany({ where: { orderId: o.id } });
+  expect(s === 200 && a.paidAt && a.paymentTxnId === "QATXN-UTR-1" && a.paymentUtr === "412345678901", `${snap(a)}, utr ${a.paymentUtr ?? "-"}`);
+  expect(ev.some((e) => e.source === "meta_status" && e.status === "paid" && e.utr === "412345678901" && e.raw), `events: ${JSON.stringify(ev.map((e) => [e.source, e.status, e.utr]))}`);
+  return `${snap(a)}, utr ${a.paymentUtr}; ${ev.length} event(s) logged with the full message`;
+});
+
+await check(16, "A UTR the customer types is saved as the UPI reference and logged, without marking the order paid", async () => {
+  const o = await freshOrder("T");
+  const cust = await db.customer.findUniqueOrThrow({ where: { id: o.customerId } });
+  const body = envelope({
+    contacts: [{ wa_id: cust.phone, profile: { name: cust.name } }],
+    messages: [{ from: cust.phone, id: `wamid.QAUTR${Date.now()}`, timestamp: String(Math.floor(Date.now() / 1000)), type: "text", text: { body: `Paid for ${o.ref}, UTR 412345678902` } }],
+  });
+  const s = await post(body);
+  const a = await db.order.findUniqueOrThrow({ where: { id: o.id } });
+  const ev = await db.paymentEvent.findMany({ where: { orderId: o.id } });
+  expect(s === 200 && !a.paidAt && a.paymentClaimedAt && a.paymentUtr === "412345678902", `${snap(a)}, utr ${a.paymentUtr ?? "-"}`);
+  expect(ev.some((e) => e.source === "customer_text" && e.utr === "412345678902"), `events: ${JSON.stringify(ev.map((e) => [e.source, e.status, e.utr]))}`);
+  return `${snap(a)}, utr ${a.paymentUtr}`;
+});
+
 await db.$disconnect();
 fs.mkdirSync("docs/qa", { recursive: true });
 fs.writeFileSync(".git/qa-payments.json", JSON.stringify(results, null, 1));
