@@ -126,7 +126,7 @@ async function AllWallets() {
             </tbody>
           </Table>
         ) : (
-          <EmptyState icon={<Wallet className="size-5" />} title="No wallet clients yet">
+          <EmptyState icon={<Wallet className="size-5 shrink-0" />} title="No wallet clients yet">
             Pick a client in the sidebar, open Wallet and choose &ldquo;Thabaal wallet&rdquo;. Clients who pay Meta directly don&apos;t need one.
           </EmptyState>
         )}
