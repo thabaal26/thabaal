@@ -40,7 +40,6 @@ export function AppIcon({ size, maskable = false }: { size: number; maskable?: b
       }}
     >
       {markUri ? (
-        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={markUri}
           alt="Thabaal"

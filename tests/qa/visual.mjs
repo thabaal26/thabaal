@@ -51,7 +51,7 @@ const LANGS = arg("langs", "en,ta");
 const OUT = ".qa-shots";
 
 const slug = (r) => r.replace(/^\/dashboard\/?/, "").replace(/[?=&/]+/g, "_").replace(/_+$/, "") || "home";
-const b = await chromium.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe" });
+const b = await chromium.launch({ executablePath: process.env.CHROME_PATH ?? "C:/Program Files/Google/Chrome/Application/chrome.exe" });
 const report = [];
 for (const theme of THEMES)
   for (const lang of LANGS) {

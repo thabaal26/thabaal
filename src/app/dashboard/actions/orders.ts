@@ -860,7 +860,10 @@ export async function createOrderTemplates(imageUrl?: string): Promise<SendResul
 
   const failed: string[] = [];
   for (const t of missing) {
-    const variables = Object.fromEntries(t.samples.map((v, k) => [String(k + 1), { source: "static" as const, value: v }]));
+    // {{1}} is always the customer's first name; the rest keep Meta's review examples (order sends fill them in).
+    const variables = Object.fromEntries(
+      t.samples.map((v, k) => [String(k + 1), k === 0 ? { source: "first_name" as const } : { source: "static" as const, value: v }]),
+    );
     const r = await saveTemplate(null, {
       name: t.name, language: "en", category: "UTILITY", headerType: image ? "IMAGE" : "NONE", headerText: "", headerMediaUrl: image ?? "",
       body: t.body, footer: "", buttons: [], variables, codeExpiryMins: null, securityNote: false,

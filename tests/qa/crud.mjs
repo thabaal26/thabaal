@@ -24,7 +24,7 @@ async function check(area, name, fn) {
   }
 }
 
-const browser = await chromium.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe" });
+const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH ?? "C:/Program Files/Google/Chrome/Application/chrome.exe" });
 async function as(role) {
   const ctx = await browser.newContext({ viewport: { width: 1366, height: 860 } });
   await ctx.addCookies([{ name: "wp_session", value: S.tokens[role], url: BASE }]);

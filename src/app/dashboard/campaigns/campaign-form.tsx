@@ -11,6 +11,7 @@ import { Picker } from "@/components/picker";
 import { safeAction, toastResult } from "@/components/toast";
 import { Button, Callout, Card, CardHeader, CheckRow, Field, Segmented } from "@/components/ui";
 import { cn } from "@/lib/cn";
+import { templateLabel } from "@/lib/plain-error";
 import { useTr } from "@/lib/i18n/context";
 import { dayName, DAYS, describeScheduleSummary, effectiveInterval, estimateDuration, formatMinutes, SCHEDULER_TICK_MINUTES, TIME_PRESETS, WEEKLY_PAIRS } from "@/lib/schedule";
 import { AUDIENCE_PREFIX, decodeTags, describeTags, encodeTags, TAGS_PREFIX, type TagPick } from "@/lib/audience-tags";
@@ -194,9 +195,9 @@ export function CampaignForm({
                 value={chosen ? c.templateId : ""}
                 onChange={(templateId) => set({ templateId })}
                 placeholder={usable.length ? "Choose a template…" : "No templates for this number yet"}
-                options={usable.map((t) => ({
+                options={[...usable].sort((a, b) => Number(b.category === "MARKETING") - Number(a.category === "MARKETING")).map((t) => ({
                   value: t.id,
-                  label: t.name,
+                  label: templateLabel(t.name),
                   hint: `${tr(`${t.category.charAt(0)}${t.category.slice(1).toLowerCase()}`)}${t.status !== "APPROVED" ? (isTa ? " · இன்னும் அனுமதிக்கப்படவில்லை" : " · not approved yet") : isTa ? " · அனுமதிக்கப்பட்டது" : " · approved"}`,
                 }))}
               />

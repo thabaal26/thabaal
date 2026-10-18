@@ -40,7 +40,7 @@ const SIZES = [
   ...(size !== "desktop" ? [{ name: "phone", viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true }] : []),
 ];
 
-const b = await chromium.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe" });
+const b = await chromium.launch({ executablePath: process.env.CHROME_PATH ?? "C:/Program Files/Google/Chrome/Application/chrome.exe" });
 const rows = [];
 for (const sz of SIZES) {
   const ctx = await b.newContext({ viewport: sz.viewport, deviceScaleFactor: sz.deviceScaleFactor, isMobile: sz.isMobile, hasTouch: sz.hasTouch });

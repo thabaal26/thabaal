@@ -29,7 +29,12 @@ export default async function NewCampaignPage({ searchParams }: { searchParams: 
         numbers={numbers}
         initial={{
           name: tag ? `For ${tag.replace(/^aud:/, "saved group ")}` : "",
-          templateId: templates.find((t) => t.status === "APPROVED" && (!defaultAccount || !t.businessAccountId || t.businessAccountId === defaultAccount))?.id ?? "",
+          // Campaigns are promotions: start on the first approved Marketing template (not an order update such as
+          // "order cancelled"), falling back to any approved one.
+          templateId: (() => {
+            const forNumber = templates.filter((t) => t.status === "APPROVED" && (!defaultAccount || !t.businessAccountId || t.businessAccountId === defaultAccount));
+            return (forNumber.find((t) => t.category === "MARKETING") ?? forNumber[0])?.id ?? "";
+          })(),
           senderId: "",
           audienceTag: tag,
           scheduleType: "WEEKLY",

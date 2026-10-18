@@ -44,7 +44,7 @@ function collect(root) {
   return { headings: count(out.headings), controls: count(out.controls) };
 }
 
-const b = await chromium.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe" });
+const b = await chromium.launch({ executablePath: process.env.CHROME_PATH ?? "C:/Program Files/Google/Chrome/Application/chrome.exe" });
 const result = {};
 const ctxS = await b.newContext({ viewport: { width: 1366, height: 900 } });
 const s = await ctxS.newPage();

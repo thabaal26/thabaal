@@ -35,7 +35,7 @@ async function check(no, name, fn) {
   }
 }
 
-const browser = await chromium.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe" });
+const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH ?? "C:/Program Files/Google/Chrome/Application/chrome.exe" });
 const ctx = await browser.newContext({ viewport: { width: 1366, height: 860 } });
 await ctx.addCookies([{ name: "wp_session", value: S.tokens.manager, url: BASE }]);
 const p = await ctx.newPage();

@@ -51,7 +51,7 @@ const DEFAULT_PAGES = [
 const PAGES = arg("pages", "") ? arg("pages", "").split(",") : DEFAULT_PAGES;
 const SKIP = /sign out|log ?out|வெளியேறு|^EN$|தமிழ்|switch to (dark|light)|Look:|language|மொழி|Dismiss|Notifications/i;
 
-const b = await chromium.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe" });
+const b = await chromium.launch({ executablePath: process.env.CHROME_PATH ?? "C:/Program Files/Google/Chrome/Application/chrome.exe" });
 const [VW, VH] = arg("size", "1366x900").split("x").map(Number);
 const ctx = await b.newContext({ viewport: { width: VW, height: VH } });
 const SHOTS = `.qa-shots/sweep/${VW}`;

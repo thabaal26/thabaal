@@ -21,7 +21,7 @@ const BROKEN = [/\bundefined\b/, /\bNaN\b/, /\[object Object\]/, /\bnull\b(?! *[
 const OTHER_SHOP = ["ZzOther", "QO-1001", "QA Other Shop"];
 const QA_SHOP = ["Meena Raj", "QA-1001", "Karthik S", "QA Test Shop"];
 
-const b = await chromium.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe" });
+const b = await chromium.launch({ executablePath: process.env.CHROME_PATH ?? "C:/Program Files/Google/Chrome/Application/chrome.exe" });
 const report = [];
 for (const role of roles) {
   const ctx = await b.newContext({ viewport: vp });

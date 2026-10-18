@@ -29,7 +29,7 @@ const PAGES = [
 ].filter(([p]) => !ONLY || ONLY.split(",").includes(p));
 
 const OUT = ".qa-shots/parity";
-const b = await chromium.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe" });
+const b = await chromium.launch({ executablePath: process.env.CHROME_PATH ?? "C:/Program Files/Google/Chrome/Application/chrome.exe" });
 const report = [];
 
 async function tabsOf(p, sel) {

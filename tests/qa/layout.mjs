@@ -14,7 +14,8 @@ const arg = (k, d) => (process.argv.find((a) => a.startsWith(k + "="))?.slice(k.
 
 const SIZES = arg(
   "sizes",
-  "320x640,360x740,375x667,390x844,414x896,430x932,600x960,768x1024,820x1180,1024x768,1280x800,1366x768,1440x900,1536x864,1920x1080,2560x1440",
+  // The 14 viewports of the QA brief, plus a tall tablet, a 1536 laptop and a 2560 monitor.
+  "320x568,360x800,375x812,390x844,414x896,430x932,600x960,768x1024,820x1180,1024x768,1280x720,1366x768,1440x900,1536x864,1600x900,1920x1080,2560x1440",
 ).map((s) => {
   const [w, h] = s.split("x").map(Number);
   return { name: s, width: w, height: h };
@@ -22,7 +23,7 @@ const SIZES = arg(
 const THEMES = arg("themes", "light");
 const LANGS = arg("langs", "en");
 
-const b = await chromium.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe" });
+const b = await chromium.launch({ executablePath: process.env.CHROME_PATH ?? "C:/Program Files/Google/Chrome/Application/chrome.exe" });
 const report = [];
 for (const theme of THEMES)
   for (const lang of LANGS) {
