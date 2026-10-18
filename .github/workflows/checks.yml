@@ -14,6 +14,8 @@ concurrency:
 
 jobs:
   checks:
+    # Same commits are pushed to both remotes; run the checks once, on the repo Vercel deploys from.
+    if: github.repository == 'thabaal26/thabaal'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     services:

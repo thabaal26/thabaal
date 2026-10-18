@@ -11,6 +11,9 @@ on:
 
 jobs:
   tick:
+    # Only the repo Vercel deploys from runs the scheduler, so the mirror (Rensog878/campaign)
+    # doesn't fail every 5 minutes or call /api/cron a second time.
+    if: github.repository == 'thabaal26/thabaal'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
