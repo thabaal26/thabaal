@@ -34,7 +34,7 @@ export type InboxReply = {
     phone: string;
     purchases: string | null;
     client: { name: string };
-    orders?: { id: string; number: number; ref: string | null; total: number; currency: string }[];
+    orders?: { id: string; number: number; ref: string | null; total: number; currency: string; paymentClaimedAt?: Date | string | null }[];
   };
   sender: { label: string } | null;
 };
@@ -131,8 +131,14 @@ export function ReplyInbox({
   const unpaidOrder = (r: InboxReply) => r.customer.orders?.[0] ?? null;
 
   const currentUnpaid = selected ? unpaidOrder(selected) : null;
+  // The customer says they paid, or WhatsApp showed a payment bubble Meta can't read: say so right in the chat.
+  const claimed = Boolean(currentUnpaid?.paymentClaimedAt);
   const currentPurchasesSubtitle = selected
-    ? currentUnpaid
+    ? currentUnpaid && claimed
+      ? isTamil
+        ? `பணம் செலுத்தியதாகக் கூறுகிறார் ₹${Math.round(currentUnpaid.total).toLocaleString("en-IN")} · UPI-ல் சரிபார்க்கவும்`
+        : `Says paid ₹${Math.round(currentUnpaid.total).toLocaleString("en-IN")} · check your UPI app, then confirm`
+      : currentUnpaid
       ? isTamil
         ? `நிலுவை ₹${Math.round(currentUnpaid.total).toLocaleString("en-IN")} · ${formatPurchasesCount(selected.customer.purchases, isTamil)}`
         : `Unpaid ₹${Math.round(currentUnpaid.total).toLocaleString("en-IN")} · ${formatPurchasesCount(selected.customer.purchases)}`
@@ -266,9 +272,10 @@ export function ReplyInbox({
                   {currentUnpaid && (
                     <PAction
                       action={setOrderStatus.bind(null, currentUnpaid.id, "PAID")}
-                      confirm={isTamil ? `ஆர்டர் ${orderRef(currentUnpaid)} கட்டணம் செலுத்தப்பட்டதாகக் குறிக்கவா (${money(currentUnpaid.total, currentUnpaid.currency)})?` : `Mark order ${orderRef(currentUnpaid)} as paid (${money(currentUnpaid.total, currentUnpaid.currency)})?`}
+                      confirm={isTamil ? `ஆர்டர் ${orderRef(currentUnpaid)} கட்டணம் செலுத்தப்பட்டதாகக் குறிக்கவா (${money(currentUnpaid.total, currentUnpaid.currency)})?` : `Mark order ${orderRef(currentUnpaid)} as paid (${money(currentUnpaid.total, currentUnpaid.currency)})? ${selected.customer.name} gets "Payment received" on their WhatsApp order and a thank-you message.`}
                     >
-                      <CheckCircle2 aria-hidden className="ic" style={{ width: 15, height: 15 }} /> {isTamil ? "ஆர்டருக்கு பணம் வந்தது" : "Mark order paid"}
+                      <CheckCircle2 aria-hidden className="ic" style={{ width: 15, height: 15 }} />{" "}
+                      {claimed ? (isTamil ? "பணம் வந்தது, உறுதிசெய்" : "Payment received: confirm") : isTamil ? "ஆர்டருக்கு பணம் வந்தது" : "Mark order paid"}
                     </PAction>
                   )}
                   {windowOpen && (

@@ -11,13 +11,15 @@ import { daysAgo, fmtDate, fmtNumber } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { getScope, owned, ownedMessages } from "@/lib/session";
 import { plainError } from "@/lib/plain-error";
+import { codesOf, PAUSING_KINDS } from "@/lib/meta-errors";
+import { HELD_CODES } from "@/lib/held";
 
 export const metadata: Metadata = { title: "Notifications" };
 export const dynamic = "force-dynamic";
 
 type NotificationRow = {
   id: string;
-  type: "reply" | "order" | "call" | "alert";
+  type: "reply" | "order" | "call" | "alert" | "payment";
   title: string;
   customerName?: string;
   phone?: string;
@@ -43,6 +45,7 @@ const KIND: Record<NotificationRow["type"], { icon: typeof ShoppingBag3D; tone: 
   reply: { icon: Inbox3D, tone: "brand", action: "Reply" },
   call: { icon: Phone3D, tone: "violet", action: "View call" },
   alert: { icon: Alert3D, tone: "rose", action: "View log" },
+  payment: { icon: ShoppingBag3D, tone: "amber", action: "Check payment" },
 };
 
 export default async function NotificationsPage({
@@ -57,6 +60,29 @@ export default async function NotificationsPage({
   const mine = owned(scope);
   const myMessages = ownedMessages(scope);
   const oneDayAgo = daysAgo(1);
+
+  // Everything that needs someone lives here (Home no longer repeats these as banners).
+  const [claims, refundsDue, heldToday, paused, blocked, settings] = await Promise.all([
+    // A customer says they paid (or WhatsApp showed a payment bubble Meta can't read): check the money, then confirm.
+    db.order.findMany({
+      where: { ...mine, paidAt: null, paymentClaimedAt: { not: null }, status: { not: "CANCELLED" } },
+      include: { customer: { select: { name: true, phone: true } } },
+      orderBy: { paymentClaimedAt: "desc" },
+      take: 20,
+    }).catch(() => []),
+    db.order.count({ where: { ...mine, status: "CANCELLED", refundedAt: null, OR: [{ paidAt: { not: null } }, { paidAmount: { gt: 0 } }] } }).catch(() => 0),
+    db.message.count({ where: { ...myMessages, status: "FAILED", failedAt: { gte: oneDayAgo }, errorCode: { in: HELD_CODES } } }).catch(() => 0),
+    db.message.findFirst({
+      where: { ...myMessages, status: "QUEUED", OR: [{ errorCode: { in: codesOf(PAUSING_KINDS) } }, { errorCode: { gte: 200, lte: 299 } }] },
+      orderBy: { createdAt: "desc" },
+      select: { error: true, createdAt: true, run: { select: { campaign: { select: { id: true, name: true } } } } },
+    }).catch(() => null),
+    db.campaign.findMany({
+      where: { ...mine, active: true, template: { status: { in: ["PAUSED", "DISABLED", "REJECTED"] } } },
+      select: { id: true, name: true, updatedAt: true, template: { select: { status: true } } },
+    }).catch(() => []),
+    scope.isAdmin ? db.setting.findUnique({ where: { id: 1 }, select: { lastDispatchAt: true } }).catch(() => null) : null,
+  ]);
 
   const [replies, orders, calls, failures] = await Promise.all([
     db.reply.findMany({
@@ -137,6 +163,73 @@ export default async function NotificationsPage({
     });
   }
 
+  for (const o of claims)
+    items.push({
+      id: `claim-${o.id}`,
+      type: "payment",
+      title: `Check payment for #${orderRef(o)}: ${o.customer.name}`,
+      customerName: o.customer.name,
+      phone: o.customer.phone,
+      description: `${o.paymentClaimNote || "Customer says they paid"} · ₹${fmtNumber(o.total)}`,
+      date: o.paymentClaimedAt ?? o.createdAt,
+      href: `/dashboard/orders?q=${orderRef(o)}`,
+      unread: true,
+      urgent: true,
+    });
+  if (refundsDue > 0)
+    items.push({
+      id: "refunds-due",
+      type: "payment",
+      title: `${refundsDue} cancelled order${refundsDue === 1 ? "" : "s"} still ${refundsDue === 1 ? "owes" : "owe"} a refund`,
+      description: "Record the refund on the order once the money is sent back.",
+      date: new Date(),
+      href: "/dashboard/orders?show=refund",
+      unread: true,
+    });
+  if (paused)
+    items.push({
+      id: "sending-paused",
+      type: "alert",
+      title: "Campaigns are paused: WhatsApp can't send right now",
+      description: `${scope.isAdmin ? plainError(paused.error) : "There's a problem with the WhatsApp account setup"}. Queued messages are kept and go out once it's fixed.`,
+      date: paused.createdAt,
+      href: paused.run ? `/dashboard/campaigns/${paused.run.campaign.id}` : "/dashboard/campaigns",
+      unread: true,
+      urgent: true,
+    });
+  for (const c of blocked)
+    items.push({
+      id: `blocked-${c.id}`,
+      type: "alert",
+      title: `Campaign "${c.name}" can't send: Meta ${c.template.status === "PAUSED" ? "paused" : c.template.status === "DISABLED" ? "disabled" : "rejected"} its template`,
+      description: "Edit the template so it's more useful to customers, or switch the campaign to another approved template.",
+      date: c.updatedAt,
+      href: `/dashboard/campaigns/${c.id}`,
+      unread: true,
+      urgent: true,
+    });
+  if (scope.isAdmin && (!settings?.lastDispatchAt || settings.lastDispatchAt < daysAgo(20 / (24 * 60))))
+    items.push({
+      id: "scheduler-quiet",
+      type: "alert",
+      title: `The scheduler hasn't run ${settings?.lastDispatchAt ? `since ${fmtDate(settings.lastDispatchAt, "d MMM, h:mm a")}` : "yet"}`,
+      description: 'Scheduled campaigns won\'t start until it does. Check the "Campaign scheduler" workflow in GitHub → Actions.',
+      date: settings?.lastDispatchAt ?? new Date(),
+      href: "/dashboard/campaigns",
+      unread: true,
+      urgent: true,
+    });
+  if (heldToday > 0)
+    items.push({
+      id: "held-today",
+      type: "alert",
+      title: `Meta held back ${heldToday} marketing message${heldToday === 1 ? "" : "s"} in the last 24 hours. No action needed.`,
+      description: "Those customers recently got a lot of marketing on WhatsApp. Held messages aren't charged and are retried automatically after a few days.",
+      date: new Date(),
+      href: "/dashboard/messages?status=FAILED",
+      unread: false,
+    });
+
   // One failure: one row naming the customer. Several: one summary row (no repeat rows for the same failures).
   if (failures.length > 1) {
     const errorCounts = new Map<string, number>();
@@ -179,7 +272,7 @@ export default async function NotificationsPage({
   items.sort((a, b) => b.date.getTime() - a.date.getTime());
 
   const unreadCount = items.filter((i) => i.unread).length;
-  const orderCount = items.filter((i) => i.type === "order").length;
+  const orderCount = items.filter((i) => i.type === "order" || i.type === "payment").length;
   const replyCount = items.filter((i) => i.type === "reply").length;
   const callCount = items.filter((i) => i.type === "call").length;
   const alertCount = items.filter((i) => i.type === "alert").length;
@@ -195,7 +288,7 @@ export default async function NotificationsPage({
 
   const filtered = items.filter((i) => {
     if (show === "unread") return i.unread;
-    if (show === "orders") return i.type === "order";
+    if (show === "orders") return i.type === "order" || i.type === "payment";
     if (show === "replies") return i.type === "reply";
     if (show === "calls") return i.type === "call";
     if (show === "alerts") return i.type === "alert";

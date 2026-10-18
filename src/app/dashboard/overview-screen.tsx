@@ -1,23 +1,20 @@
 import { orderRef } from "@/lib/order-ref";
-import { CheckCheck, Clock, Send, TriangleAlert } from "@/components/icons";
+import { CheckCheck, Send } from "@/components/icons";
 import Link from "@/components/intent-link";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { ActionButton } from "@/components/action-button";
 import { Calendar3D, Clock3D, Eye3D, Messages3D, Rupee3D, Send3D, ShoppingBag3D, Sparkles3D, Template3D } from "@/components/icons-3d";
-import { Avatar, Badge, Callout, Card, CardHeader, EmptyState, Meter, StatusBadge } from "@/components/ui";
+import { Avatar, Badge, Card, CardHeader, EmptyState, Meter, StatusBadge } from "@/components/ui";
 import { buttonClass } from "@/components/ui-classes";
 import { detectCategory, getCatalogWithProducts } from "@/lib/catalog";
 import { isSectionEnabled } from "@/lib/client-sections";
 import { db } from "@/lib/db";
 import { APP_TZ, daysAgo, fmtDate, fmtNumber, pct } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
-import { getSettings } from "@/lib/provider";
 import { estimateDuration, formatMinutes } from "@/lib/schedule";
 import { homeCityOf, regionsFor } from "@/lib/regions";
 import { getScope, owned, ownedMessages } from "@/lib/session";
 import { numberHealth } from "@/lib/limits";
-import { codesOf, PAUSING_KINDS } from "@/lib/meta-errors";
-import { HELD_CODES } from "@/lib/held";
 import { analyzeCartMentality } from "@/lib/cart-mentality";
 import { computeCustomerLoyalty } from "@/lib/loyalty";
 import { refillForecast } from "@/lib/refill-forecast";
@@ -25,7 +22,7 @@ import type { OrderItem } from "@/lib/orders";
 import { cancelRun, runDispatcherNow } from "./actions/campaigns";
 import { HomeTiers, type HomeCampaignRow, type HomeKpi } from "./home-tiers";
 import { HomeWallet } from "./home-wallet";
-import { plainError, templateLabel } from "@/lib/plain-error";
+import { templateLabel } from "@/lib/plain-error";
 import { AreaChips } from "./area-chips";
 import {
   AllProductsIntelligenceCard,
@@ -132,12 +129,9 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
 
   // One round for every independent read (several sequential rounds before).
   const [
-    [client, reachable, msgByCustomer, repliersMonth, health, blocked, areaRows],
-    [customers, optedOut, prevStatus, msgSeries, activeRuns, upcoming, recentRaw, failures, settings, ordersRaw, replySeries, repliers, prevReplies, funnelRows, heat, todayMsgs, todayReplies],
-    [paymentsToCheckCount, refundsDueCount],
+    [client, reachable, msgByCustomer, repliersMonth, health, areaRows],
+    [customers, optedOut, prevStatus, msgSeries, activeRuns, upcoming, recentRaw, ordersRaw, replySeries, repliers, prevReplies, funnelRows, heat, todayMsgs, todayReplies],
     [catalogueMsgs, periodReplies, unhandledGroup, toPackGroups, catalogRes, customerLifecycleRows],
-    heldToday,
-    paused,
     runProgress,
     refillForecastRes,
   ] = await Promise.all([
@@ -164,11 +158,6 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
           WHERE c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[])) AND r."receivedAt" >= ${monthAgo}`
       : [],
     cid ? numberHealth(cid) : [],
-    // Active campaigns whose template Meta paused, disabled or rejected can't send.
-    db.campaign.findMany({
-      where: { ...mine, active: true, template: { status: { in: ["PAUSED", "DISABLED", "REJECTED"] } } },
-      select: { id: true, name: true, template: { select: { name: true, status: true, statusReason: true } } },
-    }),
     cid ? db.customer.groupBy({ by: ["region", "location"], where: { clientId: cid, optedOut: false, ...(allowed && { id: { in: allowed } }) }, _count: true }) : [],
     ]),
     Promise.all([
@@ -192,15 +181,6 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
         take: 5,
       }),
       db.message.findMany({ where: { ...myMessages, status: { not: "QUEUED" } }, include: { customer: true }, orderBy: { createdAt: "desc" }, take: 40 }),
-      // Failures in the last day, grouped by reason, so problems show up without opening the log.
-      db.message.groupBy({
-        by: ["error"],
-        where: { ...myMessages, status: "FAILED", failedAt: { gte: daysAgo(1) }, OR: [{ errorCode: null }, { errorCode: { notIn: HELD_CODES } }] },
-        _count: true,
-        orderBy: { _count: { error: "desc" } },
-        take: 3,
-      }),
-      getSettings(),
       // All orders of this period and the comparison stretch (including NEW unpaid carts and CANCELLED carts for cart-abandonment analytics).
       db.order
         .findMany({
@@ -282,11 +262,6 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
         WHERE r."receivedAt" >= ${todayStart} AND (${cid}::text IS NULL OR c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[])))
         GROUP BY 1`,
     ]),
-    // Payments that need a person: a customer says they paid, or a cancelled order still owes a refund.
-    Promise.all([
-    db.order.count({ where: { ...mineOrders, paidAt: null, paymentClaimedAt: { not: null }, status: { not: "CANCELLED" } } }).catch(() => 0),
-    db.order.count({ where: { ...mineOrders, status: "CANCELLED", refundedAt: null, OR: [{ paidAt: { not: null } }, { paidAmount: { gt: 0 } }] } }).catch(() => 0),
-    ]),
     // Extra business-scenario queries: catalogue/price-list sends, period replies with customer info, unhandled chats, full product catalog, all-time product buyers, and customer lifecycle cohorts.
     Promise.all([
     db.message
@@ -337,15 +312,6 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
           .catch(() => [])
       : Promise.resolve([]),
     ]),
-    // Messages Meta held back (too much marketing to that person) are retried automatically and not
-    // charged: worth knowing, but nothing to fix, so they don't count as something needing attention.
-    db.message.count({ where: { ...myMessages, status: "FAILED", failedAt: { gte: daysAgo(1) }, errorCode: { in: HELD_CODES } } }),
-    // A campaign paused because the token, app permissions or Meta account stopped every send.
-    db.message.findFirst({
-      where: { ...myMessages, status: "QUEUED", OR: [{ errorCode: { in: codesOf(PAUSING_KINDS) } }, { errorCode: { gte: 200, lte: 299 } }] },
-      orderBy: { createdAt: "desc" },
-      select: { error: true, run: { select: { campaign: { select: { id: true, name: true } } } } },
-    }),
     // Progress of the campaigns sending right now (same runs as activeRuns above).
     db.message.groupBy({
       by: ["runId", "status"],
@@ -363,10 +329,6 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
   const toPackCod = toPackGroups.filter((g) => g.status === "CONFIRMED" && isCod(g.paymentMethod)).reduce((n, g) => n + g._count, 0);
   const toPackOther = toDispatchCount - toPackPaid - toPackCod;
 
-  const failedToday = failures.reduce((n, f) => n + f._count, 0);
-  // GitHub runs the scheduler every 5 minutes, sometimes late; 20 minutes of silence means it stopped.
-  const schedulerQuiet = scope.isAdmin && (!settings.lastDispatchAt || settings.lastDispatchAt < daysAgo(20 / (24 * 60)));
-  const issues = [paused, schedulerQuiet, failedToday > 0, blocked.length > 0].filter(Boolean).length;
 
 
   // A product filter narrows every order to the picked products' lines (and drops the rest).
@@ -2064,87 +2026,8 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
     refillsWeek.length ? { label: "Reorders due", href: "/dashboard/refills" } : null,
   ].filter((a): a is { label: string; href: string } => Boolean(a)).slice(0, 3);
 
-  // Warnings that need someone, shown right under the greeting.
-  const alerts = (
-    <>
-        {ordersOn && (paymentsToCheckCount > 0 || refundsDueCount > 0) && (
-          <Callout tone="warning" icon={<Clock />} className="mb-5" title="Payments to look at">
-            {paymentsToCheckCount > 0 && (
-              <>
-                <Link href="/dashboard/orders?show=verify">{plural(paymentsToCheckCount, "customer")} {paymentsToCheckCount === 1 ? "says" : "say"} they paid</Link>: check the money came in, then mark the order paid.{" "}
-              </>
-            )}
-            {refundsDueCount > 0 && (
-              <>
-                <Link href="/dashboard/orders?show=refund">{plural(refundsDueCount, "cancelled order")}</Link> still {refundsDueCount === 1 ? "owes" : "owe"} a refund.
-              </>
-            )}
-          </Callout>
-        )}
-  
-        {heldToday > 0 && (
-          <Callout tone="info" icon={<Clock />} className="mb-5" title={`Meta held back ${fmtNumber(heldToday)} marketing message${heldToday === 1 ? "" : "s"} in the last 24 hours. No action needed.`}>
-            Those customers recently got a lot of marketing from businesses on WhatsApp, so Meta paused delivery to them. Held messages aren&apos;t charged, and campaign messages are
-            retried automatically after a few days.{" "}
-            <Link href="/dashboard/messages?status=FAILED">See them in the log</Link>
-          </Callout>
-        )}
-  
-        {issues > 0 && (
-          <div className="mb-5 space-y-3">
-            {paused && (
-              <Callout role="alert" tone="danger" icon={<TriangleAlert />} title="Campaigns are paused: WhatsApp can't send right now">
-                {scope.isAdmin ? (
-                  <>
-                    {plainError(paused.error)}. Queued messages are kept and go out automatically once it&apos;s fixed
-                    {paused.run && (
-                      <>
-                        {" "}(first seen on <Link href={`/dashboard/campaigns/${paused.run.campaign.id}`}>{paused.run.campaign.name}</Link>)
-                      </>
-                    )}
-                    .
-                  </>
-                ) : (
-                  <>There&apos;s a problem with the WhatsApp account setup. Queued messages are kept and go out once your admin fixes it.</>
-                )}
-              </Callout>
-            )}
-            {schedulerQuiet && (
-              <Callout tone="warning" icon={<Clock />} title={`The scheduler hasn't run ${settings.lastDispatchAt ? `since ${fmtDate(settings.lastDispatchAt, "d MMM, h:mm a")}` : "yet"}.`}>
-                Scheduled campaigns won&apos;t start until it does. Check the &quot;Campaign scheduler&quot; workflow in GitHub → Actions.
-              </Callout>
-            )}
-            {failedToday > 0 && (
-              <Callout tone="danger" icon={<TriangleAlert />} title={`${fmtNumber(failedToday)} message${failedToday === 1 ? "" : "s"} failed in the last 24 hours.`}>
-                <ul className="mt-0.5 list-disc pl-5">
-                  {failures.map((x) => (
-                    <li key={x.error ?? "unknown"}>
-                      {plainError(x.error) || "Unknown error"} ({x._count})
-                    </li>
-                  ))}
-                </ul>
-                <Link href="/dashboard/messages?status=FAILED" className="mt-1 inline-flex min-h-11 items-center sm:min-h-0">
-                  See failed messages
-                </Link>
-              </Callout>
-            )}
-            {blocked.length > 0 && (
-              <Callout role="alert" tone="danger" icon={<TriangleAlert />} title={`${blocked.length === 1 ? "A campaign can't send" : `${blocked.length} campaigns can't send`}: Meta stopped the template`}>
-                <ul className="space-y-1">
-                  {blocked.map((c) => (
-                    <li key={c.id}>
-                      <Link href={`/dashboard/campaigns/${c.id}`}>{c.name}</Link>: its message template is{" "}
-                      {c.template.status === "PAUSED" ? "paused by Meta for low quality" : c.template.status === "DISABLED" ? "disabled by Meta" : "rejected"}.
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-1 text-xs">Edit the template so it&apos;s more useful to customers, or switch the campaign to another approved template.</p>
-              </Callout>
-            )}
-          </div>
-        )}
-    </>
-  );
+  // Payment checks, refunds, failed or held messages, paused campaigns and scheduler problems are listed in
+  // Notifications (and counted on the bell), not repeated as banners on Home.
 
   return (
     <>
@@ -2171,7 +2054,6 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
           brief={brief}
           briefActions={briefActions}
           actions={adminActions || null}
-          alerts={alerts}
         />
       </div>
 

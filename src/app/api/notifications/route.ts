@@ -238,6 +238,29 @@ export async function GET() {
     });
   }
 
+  // Payments to check: a customer says they paid, or WhatsApp showed a payment bubble Meta can't read.
+  if (ordersOn) {
+    const claims = await db.order
+      .findMany({
+        where: { ...mine, paidAt: null, paymentClaimedAt: { not: null }, status: { not: "CANCELLED" } },
+        include: { customer: { select: { name: true } } },
+        orderBy: { paymentClaimedAt: "desc" },
+        take: 10,
+      })
+      .catch(() => []);
+    for (const o of claims)
+      items.push({
+        id: `claim-${o.id}`,
+        type: "order",
+        title: `Check payment for #${orderRef(o)}: ${o.customer.name}`,
+        description: `${o.paymentClaimNote || "Customer says they paid"} · ₹${fmtNumber(o.total)}`,
+        timestamp: (o.paymentClaimedAt ?? o.createdAt).toISOString(),
+        href: `/dashboard/orders?q=${orderRef(o)}`,
+        unread: true,
+        urgent: true,
+      });
+  }
+
   // Sort by newest first
   items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
