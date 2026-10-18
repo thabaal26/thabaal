@@ -320,7 +320,7 @@ await check(27, "Chat confirm opens Record payment; recording with the UTR marks
   await p.getByRole("button", { name: "Payment received: confirm" }).click();
   const sh = sheet("Record payment");
   await sh.waitFor();
-  await sh.getByPlaceholder(/UTR|reference/i).first().fill("512345678902");
+  await sh.getByPlaceholder("12-digit number", { exact: true }).fill("512345678902");
   await sh.locator("button[type=submit]").click();
   await waitToast(/is paid/);
   const after = await get(ref);
