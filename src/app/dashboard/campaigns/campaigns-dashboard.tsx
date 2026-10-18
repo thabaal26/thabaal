@@ -254,7 +254,7 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
       actions={
         canManage ? (
           <Link className="btn primary" href="/dashboard/campaigns/new">
-            <Plus aria-hidden className="ic" /> {isTamil ? "புதிய பிரச்சாரம்" : "New campaign"}
+            <Plus aria-hidden className="ic shrink-0" /> {isTamil ? "புதிய பிரச்சாரம்" : "New campaign"}
           </Link>
         ) : undefined
       }
@@ -265,28 +265,28 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
           label={isTamil ? "இம்மாதம் அனுப்பியவை" : "Sent this month"}
           value={kpi.sent.toLocaleString("en-IN")}
           sub={isTamil ? "பிரச்சாரச் செய்திகள்" : "Broadcast messages"}
-          icon={<Send className="size-4" />}
+          icon={<Send className="size-4 shrink-0" />}
           tone="info"
         />
         <Stat
           label={isTamil ? "செலவான தொகை" : "Money spent"}
           value={R(kpi.spent)}
           sub={isTamil ? "Meta கட்டணங்கள்" : "Meta message charges"}
-          icon={<IndianRupee className="size-4" />}
+          icon={<IndianRupee className="size-4 shrink-0" />}
           tone="amber"
         />
         <Stat
           label={isTamil ? "பிரச்சார விற்பனை" : "Sales from campaigns"}
           value={R(kpi.sales)}
           sub={isTamil ? "பணம் வந்த ஆர்டர்கள்" : "Paid orders"}
-          icon={<ShoppingBag className="size-4" />}
+          icon={<ShoppingBag className="size-4 shrink-0" />}
           tone="brand"
         />
         <Stat
           label={isTamil ? "ஒவ்வொரு ₹1-க்கும் வருவாய்" : "Back for every ₹1"}
           value={kpi.spent > 0 ? R(kpi.back) : "—"}
           sub={isTamil ? "விற்பனைத் தொகை" : "Sales, not profit"}
-          icon={<ArrowUpRight className="size-4" />}
+          icon={<ArrowUpRight className="size-4 shrink-0" />}
           tone="violet"
         />
       </div>
@@ -642,7 +642,7 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                 </p>
                 {canManage && !items.length && (
                   <Link className="btn primary" href="/dashboard/campaigns/new" style={{ display: "inline-flex", margin: "0 auto" }}>
-                    <Plus aria-hidden className="ic" /> {isTamil ? "புதிய பிரச்சாரம்" : "New campaign"}
+                    <Plus aria-hidden className="ic shrink-0" /> {isTamil ? "புதிய பிரச்சாரம்" : "New campaign"}
                   </Link>
                 )}
               </section>

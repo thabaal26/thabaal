@@ -49,28 +49,28 @@ export default async function RefillsPage() {
           label="Due this week"
           value={week.length}
           sub={`about ${inr(week.reduce((n, d) => n + d.avgOrder, 0))} in reorders`}
-          icon={<Calendar className="size-4" />}
+          icon={<Calendar className="size-4 shrink-0" />}
           tone="info"
         />
         <Stat
           label="Overdue"
           value={overdue.length}
           sub={`about ${inr(overdue.reduce((n, d) => n + d.avgOrder, 0))} not yet reordered`}
-          icon={<Clock className="size-4" />}
+          icon={<Clock className="size-4 shrink-0" />}
           tone={overdue.length ? "rose" : "brand"}
         />
         <Stat
           label="Typical reorder"
           value={`${typical} days`}
           sub={own.length ? `from ${own.length} repeat buyer${own.length === 1 ? "" : "s"}` : "default setting"}
-          icon={<Repeat className="size-4" />}
+          icon={<Repeat className="size-4 shrink-0" />}
           tone="brand"
         />
         <Stat
           label="Lapsed"
           value={f.lapsedCount}
           sub={`no order in ${f.lapsedDays}+ days · win back`}
-          icon={<AlertCircle className="size-4" />}
+          icon={<AlertCircle className="size-4 shrink-0" />}
           tone="amber"
           href="/dashboard/customers?tab=groups"
         />

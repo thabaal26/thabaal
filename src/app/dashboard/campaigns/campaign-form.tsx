@@ -239,7 +239,7 @@ export function CampaignForm({
                               onClick={() => choosePick({ ...pick, tags: pick.tags.filter((x) => x !== tag) })}
                               className="grid size-7 place-items-center rounded-full transition hover:bg-brand/15 active:bg-brand/20 pointer-coarse:size-9"
                             >
-                              <X aria-hidden className="size-3.5" />
+                              <X aria-hidden className="size-3.5 shrink-0" />
                             </button>
                           </span>
                         </li>

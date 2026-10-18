@@ -89,25 +89,25 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
           scope.canManage && (
             <>
               <ActionButton action={runCampaignNow.bind(null, c.id)} size="md" confirm={sendConfirm}>
-                <Send aria-hidden className="size-4" /> Send now
+                <Send aria-hidden className="size-4 shrink-0" /> Send now
               </ActionButton>
               <ActionButton action={toggleCampaign.bind(null, c.id, !c.active)} size="md">
                 {c.active ? (
                   <>
-                    <Pause aria-hidden className="size-4" /> Pause
+                    <Pause aria-hidden className="size-4 shrink-0" /> Pause
                   </>
                 ) : (
                   <>
-                    <Play aria-hidden className="size-4" /> Resume
+                    <Play aria-hidden className="size-4 shrink-0" /> Resume
                   </>
                 )}
               </ActionButton>
               <OverflowMenu title={c.name} label="More campaign actions">
                 <ActionButton action={sendCampaignTest.bind(null, c.id)} size="md" title={`Send one copy to your own numbers (customers tagged "${TEST_TAG}")`}>
-                  <FlaskConical aria-hidden className="size-4" /> Send test to me
+                  <FlaskConical aria-hidden className="size-4 shrink-0" /> Send test to me
                 </ActionButton>
                 <ActionButton action={deleteCampaign.bind(null, c.id)} variant="danger" size="md" confirm="Delete this campaign? Messages already sent stay in the log." afterOk="/dashboard/campaigns">
-                  <Trash2 aria-hidden className="size-4" /> Delete
+                  <Trash2 aria-hidden className="size-4 shrink-0" /> Delete
                 </ActionButton>
               </OverflowMenu>
             </>
@@ -246,7 +246,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
                         </ActionButton>
                       ) : (
                         <Link href={`/dashboard/messages?campaign=${c.id}`} className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-brand-deep">
-                          View messages <ChevronRight aria-hidden className="size-4" />
+                          View messages <ChevronRight aria-hidden className="size-4 shrink-0" />
                         </Link>
                       )}
                     </div>

@@ -107,7 +107,7 @@ export function RefillBoard({ rows, today, canSend, templateName }: { rows: Refi
       <Card className="card-3d mt-4 sm:mt-5">
         <CardHeader
           tone="gold"
-          icon={<BellRing className="size-5" />}
+          icon={<BellRing className="size-5 shrink-0" />}
           title={active ? `${active.label} · ${active.sub}` : "Due in the next two weeks"}
           description={active ? `${fmtNumber(list.length)} customer${list.length === 1 ? "" : "s"}` : "Most urgent first · overdue at the top"}
           action={
@@ -167,7 +167,7 @@ function RefillRow({ r, canSend, templateName }: { r: RefillDue; canSend: boolea
           <span className={cn("text-xs font-semibold", tone)}>{dueText(r.daysLeft)}</span>
           {r.openCart && (
             <Badge tone="amber">
-              <ShoppingCart aria-hidden className="mr-1 inline size-3" />
+              <ShoppingCart aria-hidden className="mr-1 inline size-3 shrink-0" />
               {r.openCart.ref} unpaid · {formatValue(r.openCart.total, "inr")}
             </Badge>
           )}
@@ -183,12 +183,12 @@ function RefillRow({ r, canSend, templateName }: { r: RefillDue; canSend: boolea
       <div className="flex shrink-0 flex-wrap gap-2">
         {r.windowOpen && (
           <Link href={`/dashboard/customers/${r.customerId}`} className="inline-flex min-h-9 items-center gap-1.5 rounded-control border border-line px-3 text-xs font-semibold text-ink-2 hover:bg-subtle">
-            <MessageCircle aria-hidden className="size-3.5" /> Reply free
+            <MessageCircle aria-hidden className="size-3.5 shrink-0" /> Reply free
           </Link>
         )}
         {r.openCart && (
           <Link href="/dashboard/orders?show=unpaid" className="inline-flex min-h-9 items-center gap-1.5 rounded-control border border-warning-border bg-warning-bg px-3 text-xs font-semibold text-warning hover:brightness-95">
-            <ShoppingCart aria-hidden className="size-3.5" /> Follow up cart
+            <ShoppingCart aria-hidden className="size-3.5 shrink-0" /> Follow up cart
           </Link>
         )}
         {canSend && (
@@ -200,7 +200,7 @@ function RefillRow({ r, canSend, templateName }: { r: RefillDue; canSend: boolea
             title={templateName ? `Sends “${templateName}”` : "Choose a reorder template on the Campaigns page first"}
             onClick={send}
           >
-            {reminded ? <Check aria-hidden className="size-3.5" /> : <BellRing aria-hidden className="size-3.5" />}
+            {reminded ? <Check aria-hidden className="size-3.5 shrink-0" /> : <BellRing aria-hidden className="size-3.5 shrink-0" />}
             {reminded ? "Send again" : "Remind"}
           </Button>
         )}

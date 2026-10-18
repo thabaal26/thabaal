@@ -111,7 +111,7 @@ export function FailureSummaryView({
                   action={retryHeldBackNow.bind(null, campaignId)}
                   confirm={`Send the ${held.waiting} held-back message${held.waiting === 1 ? "" : "s"} again now? Meta suggests waiting a few days; retrying early often gets held back again, and each customer only gets one retry.`}
                 >
-                  <RotateCcw aria-hidden className="size-4" /> Retry now
+                  <RotateCcw aria-hidden className="size-4 shrink-0" /> Retry now
                 </ActionButton>
               )}
             </div>
