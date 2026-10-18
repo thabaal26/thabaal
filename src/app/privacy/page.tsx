@@ -73,7 +73,7 @@ export default function PrivacyPage() {
             {/* eslint-disable-next-line @next/next/no-img-element -- small static logo */}
             <img src="/brands/thabaal/thabaal-logo-en-sm.png" alt="Thabaal" width={108} height={36} className="h-9 w-auto" />
           </Link>
-          <Link href="/login" className="text-sm font-medium text-brand-deep hover:underline">
+          <Link href="/login" className="inline-flex min-h-10 items-center sm:min-h-0 text-sm font-medium text-brand-deep hover:underline">
             Sign in
           </Link>
         </div>
@@ -97,7 +97,7 @@ export default function PrivacyPage() {
           <ol className="mt-2 grid list-decimal gap-x-6 gap-y-1 pl-5 text-sm text-ink-2 sm:grid-cols-2">
             {SECTIONS.map(([id, label]) => (
               <li key={id}>
-                <a href={`#${id}`} className="hover:text-brand-deep hover:underline">
+                <a href={`#${id}`} className="inline-flex min-h-10 items-center sm:min-h-0 hover:text-brand-deep hover:underline">
                   {label}
                 </a>
               </li>
@@ -394,10 +394,10 @@ export default function PrivacyPage() {
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs text-muted sm:px-6">
           <span>© {new Date().getFullYear()} Thabaal · A message with momentum</span>
           <span className="flex gap-4">
-            <Link href="/terms" className="hover:text-ink">
+            <Link href="/terms" className="inline-flex min-h-10 items-center sm:min-h-0 hover:text-ink">
               Terms
             </Link>
-            <Link href="/login" className="hover:text-ink">
+            <Link href="/login" className="inline-flex min-h-10 items-center sm:min-h-0 hover:text-ink">
               thabaal.in
             </Link>
           </span>

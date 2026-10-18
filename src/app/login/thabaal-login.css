@@ -1093,3 +1093,9 @@
     width: min(46cqw, 145px);
   }
 }
+
+/* Phones: the language switch and "Forgot password?" are at least 40px tall, an easy finger target. */
+@media (max-width: 639px) {
+  .thabaal-lang-pill button { min-height: 40px; }
+  .thabaal-row a { display: inline-flex; align-items: center; min-height: 40px; }
+}
