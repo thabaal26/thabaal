@@ -10,7 +10,7 @@ starts with **no memory** of that session; this file is its full memory. Read al
 > Continue the Thabaal live testing work. First read
 > `C:\Users\step1\OneDrive\Desktop\cupnsaucer\whatsapp-portal\docs\qa\LIVE-TEST-HANDOFF.md` completely and follow
 > its rules (section 2) and "What to do next" (section 9) in order. Start by rebuilding, running QA and committing
-> the uncommitted work on Madhu_changes, then push to both remotes and to main. Then finish the live order RG-1028
+> the uncommitted work on Madhu_changes, then push to thabaal26/thabaal (`thabaal` remote) and to main. Then finish the live order RG-1028
 > and campaign tests with my number +918778613372 only, and delete the TEST records at the end.
 
 ---
@@ -26,7 +26,7 @@ starts with **no memory** of that session; this file is its full memory. Read al
 | Live site | https://www.thabaal.in (also thabaal.in, thabaal.vercel.app) |
 | Live account | Business login thenanoils@gmail.com. The owner signs in himself; **never type its password**. He posted it in chat earlier: recommend he changes it. |
 | Branches | Work on **`Madhu_changes`**. `main` deploys to production. Backup of the old main: `main-backup-2026-10-18`, on both remotes. |
-| Remotes | `origin` = github.com/Rensog878/campaign, `thabaal` = github.com/thabaal26/thabaal (Vercel builds from this one) |
+| Remotes | **Work only on `thabaal` = github.com/thabaal26/thabaal** (Vercel builds from it). `origin` = github.com/Rensog878/campaign is no longer used (owner, 18 Oct): don't push there. |
 | Vercel | Project `prj_89U5Kwo3j38CwoE0lq2LpyeZ93lY` ("thabaal"), team `team_WugRuRff1CHm2SVoDrBFSW5u`, account **thabaal26** (username thabaal26-4140). With the Vercel connector, `list_deployments`, `get_deployment` and `create_deployment` work without a teamId. Build logs and runtime errors return 403. |
 | Build command | `node scripts/db-additive.mjs && prisma generate && next build`. db-additive runs the listed SQL files against the live database on Vercel builds only. |
 
@@ -41,9 +41,8 @@ starts with **no memory** of that session; this file is its full memory. Read al
 
 ## 2. Rules (must follow)
 
-1. **Push to both remotes.**
-   - `git push origin Madhu_changes` and `git push thabaal Madhu_changes`.
-   - For main: `git push origin Madhu_changes:main` and `git push thabaal Madhu_changes:main`. Fast-forward only, **never force-push**.
+1. **Push to thabaal26/thabaal only** (the `thabaal` remote). Never push to `origin` (Rensog878/campaign).
+   - `git push thabaal Madhu_changes`, then main: `git push thabaal Madhu_changes:main`. Fast-forward only, **never force-push**.
 2. **Commit identity and message.** Commit as `git -c user.name="Rensog878" -c user.email="stephane17081999@gmail.com" commit -m "..."`. End every message with:
    ```
    Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
@@ -292,7 +291,7 @@ The QA shop has no WhatsApp connection on purpose, so nothing reaches Meta.
    - Stage by name: the 37 modified files from `git status`, plus `scripts/db-additive.mjs`, `prisma/sql/2026-10-18-order-step-times.sql`, `src/lib/preview-customer.ts`, `tests/qa/layout-check.mjs`, `tests/qa/layout.mjs` and `docs/qa/LIVE-TEST-HANDOFF.md`.
    - **Do not stage** `scripts/vercel_env_output.txt`, `scripts/inspect_templates.js`, `scripts/check_*.mjs`, `.tmp-ui/` or `public/uploads/`.
    - Suggested message: "Live test fixes: no dummy data, order step times, working order filters, layout at every size".
-3. **Push** `Madhu_changes` to `origin` and `thabaal`. Then fast-forward main on both: `git push origin Madhu_changes:main`, `git push thabaal Madhu_changes:main`.
+3. **Push** to thabaal26/thabaal only: `git push thabaal Madhu_changes`, then `git push thabaal Madhu_changes:main`.
 4. **Watch the deploy** with `mcp__Vercel__list_deployments` (projectId above).
    - If it shows ERROR, redeploy: `create_deployment` with `requestBody: { name: "thabaal", deploymentId: "<failed id>", target: "production" }`.
    - Once READY, check on live:
