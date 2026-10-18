@@ -3,28 +3,16 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { db } from "./db";
 import type { MetaComponent } from "./template";
+import { APP_ORIGIN, currentAppUrl } from "./app-host";
 import { getStoredPublicImage, storePublicImage } from "./uploaded-image";
 
-const CANONICAL_HOST = "campaign-seven-ruddy.vercel.app";
-
-/** Full https link for a path like /brands/thenan/banner.jpg, and rewrites stale preview domains. */
+/** Full https link for a path like /brands/thenan/banner.jpg; links on the portal's old addresses move to the current one. */
 export function absoluteUrl(rawPath: string | null | undefined) {
   if (!rawPath) return null;
   const trimmed = rawPath.trim();
   if (!trimmed) return null;
-  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL ?? CANONICAL_HOST;
-  if (/^https?:\/\//i.test(trimmed)) {
-    try {
-      const u = new URL(trimmed);
-      if (u.hostname === "whatsapp-portal-six.vercel.app" || u.hostname === "localhost") {
-        return `https://${host}${u.pathname}${u.search}`;
-      }
-      return trimmed;
-    } catch {
-      return trimmed;
-    }
-  }
-  return trimmed.startsWith("/") && host ? `https://${host}${trimmed}` : null;
+  if (/^https?:\/\//i.test(trimmed)) return currentAppUrl(trimmed);
+  return trimmed.startsWith("/") ? `${APP_ORIGIN}${trimmed}` : null;
 }
 
 /**

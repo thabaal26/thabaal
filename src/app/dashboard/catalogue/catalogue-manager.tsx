@@ -566,7 +566,7 @@ export function CatalogueManager({
           <form id="add-product" onSubmit={handleCreate} className="space-y-4">
             <PhotoField value={addImageUrl} onChange={setAddImageUrl} removable isTa={isTa} />
             <Field id="newName" label={isTa ? "பொருளின் பெயர்" : "Product name"} required>
-              <input name="newName" maxLength={100} className="field" placeholder={isTa ? "எ.கா. செக்கு நல்லெண்ணெய் 1L" : "E.g. Basmati rice 5kg"} />
+              <input name="newName" maxLength={100} className="field" placeholder={isTa ? "எ.கா. செக்கு நல்லெண்ணெய் 1L" : "E.g. Cold-pressed gingelly oil 1L"} />
             </Field>
             <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
               <Field id="sku" label="SKU" hint={isTa ? "தனி குறியீடு" : "unique code"} required>

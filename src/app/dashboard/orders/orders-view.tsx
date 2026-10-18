@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, useTransition } from "react";
+import { Fragment, useEffect, useState, useTransition } from "react";
 import { useModalKeys } from "@/components/use-modal";
 import Link from "@/components/intent-link";
 import { useRouter } from "next/navigation";
@@ -11,7 +11,7 @@ import { T, useLang } from "../portal-ui";
 import { DEFAULT_FLOW, flowHas, flowSteps, readFlow, stepLabel, type OrderFlowKey } from "@/lib/order-flow";
 import { getOrderPricing, pointsDiscount } from "@/lib/order-pricing";
 import { orderRef, type OrderItem } from "@/lib/order-ref";
-import { createOrder } from "../actions/orders";
+import { createOrder, lookupOrderCustomer } from "../actions/orders";
 import { OrderCard, type OrderCardData } from "./order-card";
 import type { CatalogProductOption } from "./order-items-editor";
 import { Clock, Package, PackageCheck, ShoppingBag } from "@/components/icons";
@@ -87,6 +87,31 @@ export function OrdersView({
   const [newCustName, setNewCustName] = useState("");
   const [newCustPhone, setNewCustPhone] = useState("");
   const [newAddress, setNewAddress] = useState("");
+  // The number decides who the order is for: an existing customer (name and address filled in from
+  // their record or WhatsApp chat) or a new one, who is saved as a customer when the order is saved.
+  const [who, setWho] = useState<{ digits: string; state: "checking" | "new" | "existing"; name?: string } | null>(null);
+  const newDigits = newCustPhone.replace(/\D/g, "");
+  useEffect(() => {
+    if (newDigits.length < 10) return;
+    let live = true;
+    const t = setTimeout(async () => {
+      setWho({ digits: newDigits, state: "checking" });
+      const r = await lookupOrderCustomer(newDigits).catch(() => ({ valid: false as const }));
+      if (!live) return;
+      if (!r.valid) return setWho(null);
+      if (!r.existing) return setWho({ digits: newDigits, state: "new" });
+      const ex = r.existing;
+      setWho({ digits: newDigits, state: "existing", name: ex.name });
+      if (!/^\+?\d+$/.test(ex.name.trim())) setNewCustName((prev) => (prev.trim() ? prev : ex.name));
+      const addr = ex.locationRaw?.trim() || ex.location?.trim() || ex.chatAddresses[0]?.fullAddress || "";
+      if (addr) setNewAddress((prev) => (prev.trim() ? prev : addr));
+    }, 350);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [newDigits]);
+  const whoNow = who && who.digits === newDigits && newDigits.length >= 10 ? who : null;
   const [newItems, setNewItems] = useState<{ name: string; price: number; qty: number }[]>([]);
   const [selectedProdIdx, setSelectedProdIdx] = useState<string>("0");
   const [customItemName, setCustomItemName] = useState("");
@@ -299,8 +324,13 @@ export function OrdersView({
   const handleSaveNewOrder = (e: React.FormEvent) => {
     e.preventDefault();
     const phoneClean = newCustPhone.replace(/\D/g, "");
-    if (!newCustName.trim() || phoneClean.length !== 10) {
-      setNewOrderError("Problem: add the customer name and a 10-digit number.");
+    // 10 digits, or with the country code (91…); the server normalises it.
+    if (phoneClean.length < 10 || phoneClean.length > 13) {
+      setNewOrderError("Problem: add the customer's WhatsApp number (10 digits).");
+      return;
+    }
+    if (!newCustName.trim() && whoNow?.state !== "existing") {
+      setNewOrderError("Problem: this is a new customer, so add their name.");
       return;
     }
     if (newItems.length === 0) {
@@ -326,6 +356,7 @@ export function OrdersView({
         setNewCustName("");
         setNewCustPhone("");
         setNewAddress("");
+        setWho(null);
         setNewItems([]);
         setNewOrderError("");
         router.refresh();
@@ -860,27 +891,38 @@ export function OrdersView({
             <p className="muted">For phone or walk-in orders.</p>
 
             <div className="field">
-              <label htmlFor="noc">Customer name</label>
-              <input
-                id="noc"
-                type="text"
-                value={newCustName}
-                onChange={(e) => setNewCustName(e.target.value)}
-                placeholder="Name as the customer gives it"
-                required
-              />
-            </div>
-
-            <div className="field">
               <label htmlFor="nop">WhatsApp number</label>
               <input
                 id="nop"
                 type="tel"
-                inputMode="numeric"
+                inputMode="tel"
+                autoComplete="tel"
                 placeholder="98765 43210"
                 value={newCustPhone}
                 onChange={(e) => setNewCustPhone(e.target.value)}
+                aria-describedby="nowho"
+                autoFocus
                 required
+              />
+              <p id="nowho" className="muted small" role="status" aria-live="polite" style={{ minHeight: 18 }}>
+                {whoNow?.state === "checking" && (isTa ? "தேடுகிறது…" : "Looking up this number…")}
+                {whoNow?.state === "existing" &&
+                  (isTa ? `ஏற்கனவே உள்ள வாடிக்கையாளர்: ${whoNow.name}. பெயரும் முகவரியும் நிரப்பப்பட்டன.` : `Existing customer: ${whoNow.name}. Name and address filled in.`)}
+                {whoNow?.state === "new" &&
+                  (isTa ? "புதிய எண்: ஆர்டரைச் சேமிக்கும்போது வாடிக்கையாளராகச் சேர்க்கப்படுவார்." : "New number: they're added as a customer when you save the order.")}
+              </p>
+            </div>
+
+            <div className="field">
+              <label htmlFor="noc">Customer name</label>
+              <input
+                id="noc"
+                type="text"
+                autoComplete="name"
+                value={newCustName}
+                onChange={(e) => setNewCustName(e.target.value)}
+                placeholder="Name as the customer gives it"
+                required={whoNow?.state !== "existing"}
               />
             </div>
 

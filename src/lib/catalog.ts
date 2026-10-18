@@ -5,6 +5,7 @@ import { explainSendError } from "@/app/dashboard/actions/send-helpers";
 import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { revalidateTag, unstable_cache } from "next/cache";
 import { cache } from "react";
+import { APP_HOST, currentAppUrl, isOldAppUrl } from "./app-host";
 import { db } from "./db";
 import { APP_TZ } from "./format";
 import { getSettings } from "./provider";
@@ -297,7 +298,7 @@ function toDetail(p: MetaProduct): CatalogProductDetail {
     currency: "INR",
     inStock: p.availability !== "out of stock",
     description: p.description ?? null,
-    imageUrl: p.image_url ?? null,
+    imageUrl: currentAppUrl(p.image_url ?? null),
     category: detectCategory(name, p.product_type),
     whatsappStatus: waReview ?? null,
   };
@@ -341,8 +342,33 @@ async function runBatch(cfg: WaConfig, catalogId: string, request: { method: "CR
   return { ok: true as const, pending: true };
 }
 
-/** Meta downloads product photos itself, so only a public https link can be sent. */
-const publicImage = (url: string | null | undefined) => (url && /^https:\/\//i.test(url) ? url : null);
+/** Meta downloads product photos itself, so only a public https link can be sent (on the portal's current address). */
+const publicImage = (url: string | null | undefined) => {
+  const u = currentAppUrl(url);
+  return u && /^https:\/\//i.test(u) ? u : null;
+};
+
+/**
+ * Product photos saved in Meta while the portal ran on an old address: point them at the current address
+ * (same file). One batch request to Meta after a catalogue read, at most once per product per server instance;
+ * Meta applies it in the background and the next read shows the new links.
+ */
+const relinked = new Set<string>();
+async function relinkOldPhotos(cfg: WaConfig, catalogId: string, products: MetaProduct[]) {
+  const stale = products.filter((p) => p.retailer_id && isOldAppUrl(p.image_url) && !relinked.has(`${catalogId}:${p.retailer_id}`));
+  if (!stale.length) return;
+  for (const p of stale) relinked.add(`${catalogId}:${p.retailer_id}`);
+  try {
+    await metaPost(cfg, `${catalogId}/items_batch`, {
+      item_type: "PRODUCT_ITEM",
+      allow_upsert: false,
+      requests: stale.map((p) => ({ method: "UPDATE", data: { id: p.retailer_id, image_link: currentAppUrl(p.image_url) } })),
+    });
+  } catch (e) {
+    for (const p of stale) relinked.delete(`${catalogId}:${p.retailer_id}`);
+    console.warn(`Could not move product photo links to ${APP_HOST}:`, e instanceof Error ? e.message : e);
+  }
+}
 
 /* Catalogue snapshot for product lists, filters and charts: live from Meta, kept in Next's shared data
    cache for a minute (every page and every server instance reuses it instead of waiting on Meta), and
@@ -366,13 +392,18 @@ async function readLiveCatalog(clientId: string): Promise<{ catalogId: string | 
   const catalogId = await catalogIdFor(cfg);
   if (!catalogId) return { catalogId: null, products: [] };
   const out: CatalogProductDetail[] = [];
+  const raw: MetaProduct[] = [];
   let path: string | null = `${catalogId}/products?fields=id,retailer_id,name,price,availability,description,image_url,capability_to_review_status,product_type&limit=100`;
   while (path) {
     const page: { data: MetaProduct[]; paging?: { next?: string } } = await metaGet(cfg, path);
-    for (const p of page.data ?? []) out.push(toDetail(p));
+    for (const p of page.data ?? []) {
+      raw.push(p);
+      out.push(toDetail(p));
+    }
     path = page.paging?.next ? page.paging.next.replace(/^https:\/\/graph\.facebook\.com\/v[\d.]+\//, "") : null;
   }
   out.sort((a, b) => a.retailerId.localeCompare(b.retailerId, undefined, { numeric: true }));
+  await relinkOldPhotos(cfg, catalogId, raw);
   return { catalogId, products: out };
 }
 

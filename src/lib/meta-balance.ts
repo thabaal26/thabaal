@@ -96,10 +96,40 @@ export async function recordMetaAccountAlert(params: {
   return alert;
 }
 
+/** Meta account events in plain words. Routine set-up events (null) aren't shown to the shop at all. */
+const META_EVENTS: Record<string, { title: string; detail: string } | null> = {
+  WEBHOOK_CONFIG_UPDATED: null,
+  MM_LITE_TERMS_SIGNED: null,
+  PARTNER_ADDED: null,
+  AUTH_INTL_PRICE_ELIGIBILITY_UPDATE: null,
+  BUSINESS_PRIMARY_LOCATION_COUNTRY_UPDATE: null,
+  VERIFIED_ACCOUNT: { title: "WhatsApp account verified", detail: "Meta verified your WhatsApp Business account." },
+  PARTNER_REMOVED: { title: "Thabaal removed from your WhatsApp account", detail: "Messages can't be sent until it is added again in Meta Business settings." },
+  ACCOUNT_DELETED: { title: "WhatsApp account deleted", detail: "Meta deleted this WhatsApp Business account. Messages can't be sent." },
+  DISABLED_UPDATE: { title: "WhatsApp account disabled", detail: "Meta disabled this WhatsApp Business account. Check Meta Business Support." },
+  ACCOUNT_VIOLATION: { title: "Meta flagged a policy problem", detail: "Meta says some messages broke WhatsApp rules. Check Meta Business Support." },
+  ACCOUNT_RESTRICTION: { title: "WhatsApp sending restricted", detail: "Meta has limited what this account can send for now. Check Meta Business Support." },
+  ACCOUNT_UPDATE: { title: "WhatsApp account updated", detail: "Meta changed something on your WhatsApp Business account." },
+};
+
+/** A stored alert in plain words (older rows saved Meta's raw event and JSON); null for routine events. */
+function plainAlert(a: MetaAccountAlert): MetaAccountAlert | null {
+  const raw = `${a.title} ${a.detail}`;
+  const code = raw.match(/"event"\s*:\s*"([A-Z_]+)"/)?.[1] ?? a.title.replace(/^Meta account (?:update|alert):\s*/i, "").trim().replace(/\s+/g, "_").toUpperCase();
+  if (code in META_EVENTS) {
+    const m = META_EVENTS[code];
+    return m ? { ...a, title: m.title, detail: m.detail } : null;
+  }
+  // Unknown event: keep Meta's own words, never a JSON dump.
+  const detail = /^[\s\S]*?[{[]/.test(a.detail) && /[{}]/.test(a.detail) ? "Meta sent an update about your WhatsApp account. Details are in Meta Business Support." : a.detail;
+  const what = code.replace(/_/g, " ").toLowerCase();
+  return { ...a, title: `WhatsApp account ${a.field === "account_alerts" ? "alert" : "update"}: ${what}`, detail };
+}
+
 export function getMetaAccountAlerts(clientId?: string | null): MetaAccountAlert[] {
   void ensureAlertsTable();
-  if (!clientId) return recentAccountAlerts;
-  return recentAccountAlerts.filter((a) => !a.clientId || a.clientId === clientId);
+  const mine = clientId ? recentAccountAlerts.filter((a) => !a.clientId || a.clientId === clientId) : recentAccountAlerts;
+  return mine.map(plainAlert).filter((a): a is MetaAccountAlert => a !== null);
 }
 
 /** The WhatsApp Business Account a client sends from: its default number's, else the one saved on the client. */

@@ -1,6 +1,7 @@
 import "server-only";
 import crypto from "node:crypto";
 import { put } from "@vercel/blob";
+import { APP_ORIGIN } from "./app-host";
 import { db } from "./db";
 
 let tableEnsured = false;
@@ -73,11 +74,9 @@ export async function storePublicImage(opts: {
     ON CONFLICT ("id") DO UPDATE SET "mimeType" = EXCLUDED."mimeType", "data" = EXCLUDED."data"
   `;
 
-  const base =
-    opts.origin?.replace(/\/$/, "") ||
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "") ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
-    "https://www.thabaal.in";
+  // Always the portal's public address (never a preview or old deployment URL), so the link keeps working.
+  void opts.origin;
+  const base = APP_ORIGIN;
 
   return `${base}/api/upload/${id}`;
 }

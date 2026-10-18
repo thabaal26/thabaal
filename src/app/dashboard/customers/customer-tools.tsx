@@ -223,9 +223,10 @@ function CustomerForm({
       <Field id="p" label="WhatsApp number" hint="10-digit numbers get +91" required>
         <input type="tel" inputMode="tel" autoComplete="tel" className="field" placeholder="+91 98765 43210" value={v.phone} onChange={(e) => setV({ ...v, phone: e.target.value })} />
       </Field>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Field id="loc" label="Area / locality" hint="e.g. Anna Nagar, T. Nagar">
-          <input className="field" placeholder="Anna Nagar" value={v.location} onChange={(e) => setV({ ...v, location: e.target.value })} />
+      {/* Side-by-side fields keep their boxes on one line: short labels, hints in the placeholder, bottoms aligned. */}
+      <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2">
+        <Field id="loc" label="Area / locality">
+          <input className="field" placeholder="e.g. Anna Nagar" value={v.location} onChange={(e) => setV({ ...v, location: e.target.value })} />
         </Field>
         <Field id="reg" label="Delivery region">
           <select className="field" value={v.region} onChange={(e) => setV({ ...v, region: e.target.value })}>
@@ -241,7 +242,7 @@ function CustomerForm({
         <input className="field" placeholder="Door no, street, landmark…" value={v.locationRaw} onChange={(e) => setV({ ...v, locationRaw: e.target.value })} />
       </Field>
       <Field id="purch" label="What they bought" hint="optional">
-        <input className="field" placeholder="Basmati rice (5kg), Coffee powder (500g)" value={v.purchases} onChange={(e) => setV({ ...v, purchases: e.target.value })} />
+        <input className="field" placeholder="Products they usually buy" value={v.purchases} onChange={(e) => setV({ ...v, purchases: e.target.value })} />
       </Field>
       <CustomFieldInputs fields={fields} values={v.extra} onChange={(extra) => setV({ ...v, extra })} idPrefix={id ? `cf-${id}` : "cf-new"} />
       <Field id="t" label="Tags" hint="comma separated, optional">

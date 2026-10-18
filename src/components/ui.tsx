@@ -237,8 +237,9 @@ export function Button({
 export function Label({ children, hint, htmlFor, required }: { children: ReactNode; hint?: ReactNode; htmlFor?: string; required?: boolean }) {
   const { isTa, trn } = useTr();
   return (
-    <label htmlFor={htmlFor} className="mb-1.5 flex items-baseline justify-between gap-x-2 text-[13.5px] font-semibold text-ink">
-      <span className="min-w-0">
+    // A long hint moves under the label instead of squeezing it onto two lines.
+    <label htmlFor={htmlFor} className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-2 text-[13.5px] font-semibold text-ink">
+      <span className="min-w-0 whitespace-nowrap">
         {trn(children)}
         {required && <span aria-hidden className="ml-0.5 text-danger">*</span>}
         {required && <span className="sr-only">{isTa ? " (கட்டாயம்)" : " (required)"}</span>}
