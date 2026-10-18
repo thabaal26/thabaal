@@ -25,12 +25,12 @@ Every row in [`TEST_CASES.csv`](TEST_CASES.csv) comes from a result file a suite
 | Lint (`eslint .`, 455 files) | 0 errors, 0 warnings |
 | Production build (`next build`) | pass |
 | Dependency audit, production packages | 0 vulnerabilities (5 high in lint-only tooling, not shipped) |
-| Unit + database tests (`tests/run.mjs`) | **81/81** (76 existing + 5 new) |
+| Unit + database tests (`tests/run.mjs`) | **84/84** (76 existing + 8 new) |
 | Cross-business HTTP isolation | **14/14** |
 | Server actions with a permission check | **115/115** |
 | API, sessions, uploads, database trigger (new `api.mjs`) | **32/32** |
 | Payment webhooks (signed replays) | **14/14** |
-| Payment buttons in the browser | **12/12** |
+| Payment buttons in the browser | **14/14** (with BUG-16's two) |
 | Create / edit / delete with permissions | **12/12** |
 | Stored XSS in 7 fields × 11 pages × 2 sizes (new) | **22/22** |
 | Crawl, 5 roles, desktop + phone | **1,302 page visits, 0 problems** |
@@ -45,7 +45,7 @@ Every row in [`TEST_CASES.csv`](TEST_CASES.csv) comes from a result file a suite
 generator gave 247 cases: 207 PASS, 35 FAIL (accessibility and the upload header), 5 NOT RUN. The visual matrix and
 performance rows come from the build before the last two changes (dialogs, CR-01); everything else from the final build.
 
-## 4. Defects fixed in this run (15)
+## 4. Defects fixed in this run (16)
 
 | ID | Sev | Defect |
 |---|---|---|
@@ -62,6 +62,7 @@ performance rows come from the build before the last two changes (dialogs, CR-01
 | BUG-12 | P3 | Tamil mode: 63 tile/filter phrases in English (rest listed) |
 | BUG-05 | P3 | Sideways-scrolling tables not reachable by keyboard |
 | BUG-15 | P3 | Deleting a campaign from its page left a 404 |
+| BUG-16 | P2 | UPI payments showed a WhatsApp message id or no reference; now hidden, with "Add UTR" and the UTR field on chat confirm |
 | BUG-09/10 | P3 | Lint warning; QA suites only ran on Windows |
 
 Full write-ups with cause, fix and regression test: [`BUG_REPORT.md`](BUG_REPORT.md).
