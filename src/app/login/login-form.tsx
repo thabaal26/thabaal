@@ -172,9 +172,9 @@ export function LoginForm({ lang = "en" }: LoginFormProps) {
             aria-label={isTamil ? (showPassword ? "கடவுச்சொல்லை மறை" : "கடவுச்சொல்லைக் காட்டு") : showPassword ? "Hide password" : "Show password"}
           >
             {showPassword ? (
-              <EyeOff className="size-4.5 text-[#5d6e86]" />
+              <EyeOff className="size-4.5 shrink-0 text-[#5d6e86]" />
             ) : (
-              <Eye className="size-4.5 text-[#5d6e86]" />
+              <Eye className="size-4.5 shrink-0 text-[#5d6e86]" />
             )}
           </button>
         </div>
