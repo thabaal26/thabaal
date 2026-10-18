@@ -54,7 +54,7 @@ export function TemplateSearchInput({
     <div className="relative flex items-center min-w-[200px] sm:w-64 md:w-72">
       <Search
         aria-hidden
-        className={`pointer-events-none absolute left-3 size-4 text-muted transition-colors ${
+        className={`pointer-events-none absolute left-3 size-4 shrink-0 text-muted transition-colors ${
           isPending ? "animate-pulse text-brand" : ""
         }`}
       />
@@ -81,7 +81,7 @@ export function TemplateSearchInput({
           aria-label="Clear search"
           className="absolute right-2.5 grid size-5 place-items-center rounded-full text-muted hover:bg-line/40 hover:text-ink transition"
         >
-          <X aria-hidden className="size-3" />
+          <X aria-hidden className="size-3 shrink-0" />
         </button>
       )}
     </div>

@@ -50,7 +50,7 @@ export function DefaultImage({ url, fallback }: { url: string | null; fallback: 
           </p>
         </div>
         <label className={cn(buttonClass("secondary"), "cursor-pointer has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-brand-deep", busy && "pointer-events-none opacity-60")}>
-          {busy ? <Spinner /> : <Upload aria-hidden className="size-4" />}
+          {busy ? <Spinner /> : <Upload aria-hidden className="size-4 shrink-0" />}
           {url ? "Replace" : "Upload default image"}
           <input type="file" accept="image/jpeg,image/png" className="sr-only" onChange={(e) => { upload(e.target.files?.[0]); e.target.value = ""; }} />
         </label>

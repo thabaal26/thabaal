@@ -336,7 +336,7 @@ export function TemplateEditor({
                     }}
                   />
                   <Button type="button" size="md" loading={aiGenerating} onClick={() => runAiTemplate("generate")}>
-                    <Sparkles aria-hidden className="size-4" /> Generate Draft
+                    <Sparkles aria-hidden className="size-4 shrink-0" /> Generate Draft
                   </Button>
                 </div>
 
@@ -399,7 +399,7 @@ export function TemplateEditor({
                         </div>
                         <div className="flex flex-wrap gap-2">
                           <label className={cn(buttonClass("secondary", "sm"), "cursor-pointer has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-brand-deep", uploading && "pointer-events-none opacity-60")}>
-                            {uploading ? <Spinner /> : <Upload aria-hidden className="size-4" />}
+                            {uploading ? <Spinner /> : <Upload aria-hidden className="size-4 shrink-0" />}
                             {tr(uploading ? "Uploading…" : t.headerMediaUrl ? "Replace image" : "Upload image")}
                             <input type="file" accept="image/jpeg,image/png" className="sr-only" onChange={(e) => { uploadImage(e.target.files?.[0]); e.target.value = ""; }} />
                           </label>
@@ -429,12 +429,12 @@ export function TemplateEditor({
                         { m: "~", I: Strikethrough, l: "Strikethrough" },
                       ].map(({ m, I, l }) => (
                         <button key={l} type="button" title={tr(l)} aria-label={tr(l)} onClick={() => wrap(m)} className="grid size-11 shrink-0 place-items-center rounded-control text-ink-2 transition hover:bg-panel active:bg-panel sm:size-8 sm:pointer-coarse:size-11">
-                          <I aria-hidden className="size-4" />
+                          <I aria-hidden className="size-4 shrink-0" />
                         </button>
                       ))}
                       <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-line-strong/40" />
                       <button type="button" onClick={insertVariable} className="flex h-11 shrink-0 items-center gap-1.5 rounded-control px-2.5 text-sm font-medium text-brand-deep transition hover:bg-panel active:bg-panel sm:h-8 sm:pointer-coarse:h-11">
-                        <Braces aria-hidden className="size-4" /> {tr("Add variable")}
+                        <Braces aria-hidden className="size-4 shrink-0" /> {tr("Add variable")}
                       </button>
                     </div>
                     <textarea
@@ -517,7 +517,7 @@ export function TemplateEditor({
                                 : set({ buttons: [...t.buttons, { type, text: "" }] })
                           }
                         >
-                          <Plus aria-hidden className="size-3.5" /> {l}
+                          <Plus aria-hidden className="size-3.5 shrink-0" /> {l}
                         </Button>
                       );
                     })}
@@ -533,7 +533,7 @@ export function TemplateEditor({
                       </Badge>
                       <input className="field @max-lg:col-span-2" maxLength={25} placeholder={tr("Button label")} aria-label={`Button ${i + 1} label`} value={b.text} onChange={(e) => setButton(i, { text: e.target.value })} />
                       {b.type === "URL" ? (
-                        <input className="field @max-lg:col-span-2" inputMode="url" placeholder="https://…" aria-label={`Button ${i + 1} link`} value={b.url ?? ""} onChange={(e) => setButton(i, { url: e.target.value })} />
+                         <input className="field @max-lg:col-span-2" inputMode="url" placeholder="https://…" aria-label={`Button ${i + 1} link`} value={b.url ?? ""} onChange={(e) => setButton(i, { url: e.target.value })} />
                       ) : b.type === "PHONE_NUMBER" ? (
                         <input className="field @max-lg:col-span-2" type="tel" inputMode="tel" placeholder="+91 98765 43210" aria-label={`Button ${i + 1} phone number`} value={b.phone ?? ""} onChange={(e) => setButton(i, { phone: e.target.value })} />
                       ) : b.type === "CATALOG" ? (
@@ -542,7 +542,7 @@ export function TemplateEditor({
                         <span className="@max-lg:hidden" />
                       )}
                       <button type="button" title="Remove" aria-label={`Remove button ${i + 1}`} onClick={() => set({ buttons: t.buttons.filter((_, j) => j !== i) })} className="col-start-2 row-start-1 grid size-11 place-items-center justify-self-end rounded-control text-muted transition hover:bg-danger-bg hover:text-danger @lg:col-start-auto @lg:row-start-auto sm:size-8 sm:pointer-coarse:size-11">
-                        <Trash2 aria-hidden className="size-4" />
+                        <Trash2 aria-hidden className="size-4 shrink-0" />
                       </button>
                     </div>
                   ))}
@@ -607,7 +607,7 @@ export function TemplateEditor({
                 loading={testing}
                 onClick={() => startTest(async () => toastResult(await sendTestMessage(id, testPhone)))}
               >
-                <Send aria-hidden className="size-4" />
+                <Send aria-hidden className="size-4 shrink-0" />
               </Button>
             </div>
           </Card>
@@ -618,7 +618,7 @@ export function TemplateEditor({
       {/* Phones: save and preview stay under the thumb instead of at the end of a long form. */}
       <MobileActionBar>
         <Button variant="secondary" className="flex-1" onClick={() => setPreviewOpen(true)}>
-          <Eye aria-hidden className="size-4" /> Preview
+          <Eye aria-hidden className="size-4 shrink-0" /> Preview
         </Button>
         <Button className="!flex-[1.4]" disabled={errors.length > 0} loading={pending} onClick={save}>
           {errors.length ? (isTa ? `${errors.length} பிழை சரிசெய்` : `Fix ${errors.length} issue${errors.length > 1 ? "s" : ""}`) : id ? "Save changes" : "Create template"}

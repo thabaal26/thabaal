@@ -91,7 +91,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
           label="Total templates"
           value={fmtNumber(total)}
           sub="Synced with Meta"
-          icon={<FileText className="size-4" />}
+          icon={<FileText className="size-4 shrink-0" />}
           tone="info"
           href="/dashboard/templates"
         />
@@ -99,7 +99,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
           label="Approved"
           value={fmtNumber(byStatus("APPROVED"))}
           sub="Ready to send"
-          icon={<CheckCircle2 className="size-4" />}
+          icon={<CheckCircle2 className="size-4 shrink-0" />}
           tone="brand"
           meter={total > 0 ? Math.round((byStatus("APPROVED") / total) * 100) : 0}
         />
@@ -107,7 +107,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
           label="Marketing"
           value={fmtNumber(counts.find((c) => c.category === "MARKETING")?._count ?? 0)}
           sub="Promotions & offers"
-          icon={<Megaphone className="size-4" />}
+          icon={<Megaphone className="size-4 shrink-0" />}
           tone="violet"
           href={qsFor({ category: "MARKETING" })}
         />
@@ -115,7 +115,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
           label="In review / Draft"
           value={fmtNumber(byStatus("PENDING", "DRAFT"))}
           sub={byStatus("REJECTED", "PAUSED", "DISABLED") > 0 ? `${byStatus("REJECTED", "PAUSED", "DISABLED")} need fixing` : "Waiting on Meta"}
-          icon={<Clock className="size-4" />}
+          icon={<Clock className="size-4 shrink-0" />}
           tone="amber"
         />
       </div>
@@ -139,7 +139,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
       <form className="toolbar" role="search">
         {active && <input type="hidden" name="category" value={active} />}
         <div className="search">
-          <Search aria-hidden />
+          <Search aria-hidden className="shrink-0" />
           <input type="search" name="q" defaultValue={query} placeholder="Search template name or words inside" aria-label="Search templates" />
         </div>
         <AutoSelect name="st" label="Status" value={st} options={[{ value: "", label: "Status: all" }, { value: "approved", label: "Approved" }, { value: "review", label: "In review" }, { value: "rejected", label: "Rejected or paused" }, { value: "draft", label: "Draft" }]} />
@@ -149,10 +149,10 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
         {canCreate && (
           <div className="tools" style={{ marginLeft: "auto" }}>
             <PAction action={syncTemplates} title="Fetch the latest templates and statuses from Meta">
-              <RefreshCw aria-hidden className="ic" style={{ width: 15, height: 15 }} /> <T ta="Meta-வுடன் ஒத்திசை">Sync with Meta</T>
+              <RefreshCw aria-hidden className="ic shrink-0" style={{ width: 15, height: 15 }} /> <T ta="Meta-வுடன் ஒத்திசை">Sync with Meta</T>
             </PAction>
             <Link className="btn primary sm" href="/dashboard/templates/new">
-              <Plus aria-hidden className="ic" style={{ width: 15, height: 15 }} /> New template
+              <Plus aria-hidden className="ic shrink-0" style={{ width: 15, height: 15 }} /> New template
             </Link>
           </div>
         )}
