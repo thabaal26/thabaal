@@ -64,7 +64,7 @@ export function CollectList({ rows, nowMs, canOperate, intro = true }: { rows: C
       )}
       <div className="toolbar">
         <div className="search">
-          <Search aria-hidden />
+          <Search aria-hidden className="shrink-0" />
           <input
             id="payment-search"
             name="q"
@@ -471,7 +471,7 @@ export function TxnTable({ rows, canOperate = false }: { rows: (TxnRow & { when:
     <>
       <div className="toolbar">
         <div className="search">
-          <Search aria-hidden />
+          <Search aria-hidden className="shrink-0" />
           <input
             type="search"
             placeholder={isTa ? "வாடிக்கையாளர், ஆர்டர் அல்லது தொகையைத் தேடுங்கள்…" : "Search customer, order or amount"}

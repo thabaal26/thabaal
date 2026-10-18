@@ -79,7 +79,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         label="Received today"
         value={inr(d.receivedToday)}
         sub="Money in your account"
-        icon={<IndianRupee className="size-4" />}
+        icon={<IndianRupee className="size-4 shrink-0" />}
         tone="brand"
         href="/dashboard/revenue?tab=got"
       />
@@ -87,7 +87,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         label="Money to collect"
         value={inr(toCollect)}
         sub={claimed ? `${claimed} say they paid · check` : "Not paid yet"}
-        icon={<Clock className="size-4" />}
+        icon={<Clock className="size-4 shrink-0" />}
         tone="amber"
         href="/dashboard/revenue?tab=collect"
       />
@@ -95,7 +95,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         label="COD pending"
         value={inr(codPending)}
         sub="Collect during delivery"
-        icon={<Banknote className="size-4" />}
+        icon={<Banknote className="size-4 shrink-0" />}
         tone="info"
         href="/dashboard/revenue?tab=cod"
       />
@@ -103,7 +103,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         label="Failed or expired"
         value={failed}
         sub={failed ? "Needs your attention" : "Nothing stuck"}
-        icon={<AlertCircle className="size-4" />}
+        icon={<AlertCircle className="size-4 shrink-0" />}
         tone={failed ? "rose" : "brand"}
         href="/dashboard/revenue?tab=collect"
       />
