@@ -752,16 +752,16 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
     <>
       {campaignsOn && (
         <ActionButton action={runDispatcherNow} size="md" title="Process due campaigns and batches now">
-          <Send className="size-4" /> Run scheduler
+          <Send className="size-4 shrink-0" /> Run scheduler
         </ActionButton>
       )}
       {campaignsOn ? (
         <Link href="/dashboard/campaigns/new" className={buttonClass("primary")}>
-          <Calendar3D className="size-4" /> New campaign
+          <Calendar3D className="size-4 shrink-0" /> New campaign
         </Link>
       ) : templatesOn ? (
         <Link href="/dashboard/templates" className={buttonClass("primary")}>
-          <Template3D className="size-4" /> Templates
+          <Template3D className="size-4 shrink-0" /> Templates
         </Link>
       ) : null}
     </>

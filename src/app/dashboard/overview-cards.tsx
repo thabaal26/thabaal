@@ -169,7 +169,7 @@ export function ActivityCard({ labels, tooltipLabels, series, every, title, desc
   return (
     <Card className="card-3d h-full">
       <CardHeader
-        icon={<BarChart3 className="size-5" />}
+        icon={<BarChart3 className="size-5 shrink-0" />}
         title={title}
         description={description}
         action={
@@ -221,7 +221,7 @@ export function DeliveryCard({ read, delivered, sent, failed }: { read: number; 
   return (
     <Card className="card-3d h-full">
       <CardHeader
-        icon={<Gauge className="size-5" />}
+        icon={<Gauge className="size-5 shrink-0" />}
         title="Message delivery health"
         description="How many WhatsApp messages reached and were read by customers"
       />
@@ -453,7 +453,7 @@ export function NumberLimitsCard({ numbers }: { numbers: Health }) {
   const checked = numbers.map((n) => n.statusCheckedAt).filter((d): d is Date => Boolean(d)).sort((a, b) => a.getTime() - b.getTime())[0];
   return (
     <Card className="card-3d flex h-full flex-col">
-      <CardHeader icon={<Gauge className="size-5" />} title="Daily sending limit" description="Different people messaged in the last 24 hours" />
+      <CardHeader icon={<Gauge className="size-5 shrink-0" />} title="Daily sending limit" description="Different people messaged in the last 24 hours" />
       {head && (
         <div className="border-b border-line px-3.5 py-3 sm:px-5 sm:py-4">
           <LimitRing used={head.used} limit={head.limit} left={head.left} label="Business limit" />
@@ -472,7 +472,7 @@ export function NumberLimitsCard({ numbers }: { numbers: Health }) {
             </div>
             {n.qualityRating === "RED" && (
               <p className="inline-flex items-center gap-1 text-xs text-danger">
-                <ShieldAlert aria-hidden className="size-3.5" /> Campaigns paused to protect this number
+                <ShieldAlert aria-hidden className="size-3.5 shrink-0" /> Campaigns paused to protect this number
               </p>
             )}
             {n.dailyCap != null && <LimitRing used={n.used} limit={n.limit} left={n.left} label={`${n.label} warm-up cap`} />}
@@ -501,7 +501,7 @@ export function BestTimeCard({ cells, days }: { cells: { d: number; b: number; n
   return (
     <Card className="card-3d h-full">
       <CardHeader
-        icon={<Clock className="size-5" />}
+        icon={<Clock className="size-5 shrink-0" />}
         title="Best time to reach customers"
         description={`When customers wrote back, last ${days} days`}
         action={
@@ -548,7 +548,7 @@ export function TopProductsCard({ items, rangeLabel }: { items: ProductDemandRow
   return (
     <Card className="card-3d h-full">
       <CardHeader
-        icon={<Trophy className="size-5" />}
+        icon={<Trophy className="size-5 shrink-0" />}
         title="Product demand: bought vs. left in cart"
         description={`Paid/confirmed sales vs. items added to cart & unpaid (${rangeLabel.toLowerCase()})`}
         action={

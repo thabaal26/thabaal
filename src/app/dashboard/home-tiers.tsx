@@ -190,7 +190,7 @@ export function HomeTiers(p: HomeTiersProps) {
           {p.actions}
           {p.ordersOn && (
             <Link className="btn primary" href="/dashboard/orders?new=1">
-              <Plus aria-hidden className="ic" />
+              <Plus aria-hidden className="ic shrink-0" />
               <T ta="புதிய ஆர்டர்">New order</T>
             </Link>
           )}
@@ -234,13 +234,13 @@ export function HomeTiers(p: HomeTiersProps) {
               const dl = delta(k);
               const labelLower = k.label.toLowerCase();
               const icon = labelLower.includes("sale") ? (
-                <IndianRupee className="size-4" />
+                <IndianRupee className="size-4 shrink-0" />
               ) : labelLower.includes("order") ? (
-                <ShoppingBag className="size-4" />
+                <ShoppingBag className="size-4 shrink-0" />
               ) : labelLower.includes("chat") || labelLower.includes("repl") ? (
-                <MessageCircle className="size-4" />
+                <MessageCircle className="size-4 shrink-0" />
               ) : (
-                <Repeat className="size-4" />
+                <Repeat className="size-4 shrink-0" />
               );
               const tone = labelLower.includes("sale")
                 ? "brand"

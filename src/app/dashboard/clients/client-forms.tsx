@@ -70,7 +70,7 @@ export function NewClientForm() {
   return (
     <>
       <Button onClick={() => setOpen(true)}>
-        <Plus aria-hidden className="size-4" /> New client
+        <Plus aria-hidden className="size-4 shrink-0" /> New client
       </Button>
       <Sheet open={open} onClose={() => setOpen(false)} title="New client">
         <form
@@ -167,7 +167,7 @@ export function AddLoginForm({ clientId }: { clientId: string }) {
   return (
     <details className="group mt-3">
       <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-control text-sm font-medium text-brand-deep hover:underline sm:min-h-8 [&::-webkit-details-marker]:hidden">
-        <Plus aria-hidden className="size-4" /> Add login
+        <Plus aria-hidden className="size-4 shrink-0" /> Add login
       </summary>
       <form
         className="mt-2 grid grid-cols-1 gap-4 rounded-card border border-line p-3 sm:grid-cols-2"
@@ -237,7 +237,7 @@ export function ResetPasswordButton({ userId, email }: { userId: string; email: 
         if (pw) submit(() => resetUserPassword(userId, pw));
       }}
     >
-      <KeyRound aria-hidden className="size-4" /> Reset
+      <KeyRound aria-hidden className="size-4 shrink-0" /> Reset
     </Button>
   );
 }
@@ -288,7 +288,7 @@ export function AddNumberForm({ clientId, hasToken }: { clientId: string; hasTok
   return (
     <details className="group mt-3">
       <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-control text-sm font-medium text-brand-deep hover:underline sm:min-h-8 [&::-webkit-details-marker]:hidden">
-        <Plus aria-hidden className="size-4" /> Add a WhatsApp number
+        <Plus aria-hidden className="size-4 shrink-0" /> Add a WhatsApp number
       </summary>
       <div className="mt-2 space-y-3 rounded-card border border-line p-3">
         <div>

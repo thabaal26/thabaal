@@ -33,7 +33,7 @@ export function SpendCard({ clientId, canManage, className }: { clientId: string
   return (
     <Card className={cn("card-3d", className)}>
       <CardHeader
-        icon={<Wallet className="size-5" />}
+        icon={<Wallet className="size-5 shrink-0" />}
         title={<T ta="Meta WhatsApp செலவு மற்றும் வாலட் தகவல்">Meta WhatsApp spend & wallet telemetry</T>}
         description={
           <Suspense fallback={<T ta="Meta-விலிருந்து செலவு விவரங்கள் பெறப்படுகின்றன…">Loading spend from Meta…</T>}>
@@ -81,7 +81,7 @@ async function SpendActions({ clientId }: { clientId: string }) {
         </Badge>
       )}
       <a href={acc.billingUrl} target="_blank" rel="noopener noreferrer" className={buttonClass("ghost", "sm")}>
-        <T ta="கட்டண மையம்">Billing Hub</T> <ExternalLink aria-hidden className="size-3.5" />
+        <T ta="கட்டண மையம்">Billing Hub</T> <ExternalLink aria-hidden className="size-3.5 shrink-0" />
         <span className="sr-only">(opens Meta Business Suite)</span>
       </a>
     </div>
@@ -262,7 +262,7 @@ async function SpendBody({ clientId, canManage }: { clientId: string; canManage:
                         </div>
                         {canManage && (
                           <ActionButton action={deleteTopUp.bind(null, t.id)} variant="ghost" size="sm" confirm="Remove this top-up record?" title="Remove top-up">
-                            <Trash2 aria-hidden className="size-3.5 text-muted hover:text-danger" />
+                            <Trash2 aria-hidden className="size-3.5 shrink-0 text-muted hover:text-danger" />
                             <span className="sr-only">Remove top-up</span>
                           </ActionButton>
                         )}

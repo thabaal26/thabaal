@@ -64,7 +64,7 @@ export default function GuidePage() {
               return (
                 <Link key={p.href} className="todo" href={p.href} style={{ flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
                   <span style={{ display: "flex", gap: 8, alignItems: "center", font: "600 18px var(--display)" }}>
-                    <Icon aria-hidden className="ic" /> {p.title}
+                    <Icon aria-hidden className="ic shrink-0" /> {p.title}
                   </span>
                   <span className="muted small">{p.desc}</span>
                 </Link>

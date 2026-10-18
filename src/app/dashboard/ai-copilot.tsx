@@ -66,7 +66,7 @@ export function AiBusinessCopilot({
           <div className="tools" style={{ marginTop: 12 }}>
             {actions.map((a) => (
               <Link key={a.href + a.label} href={a.href} className="btn sm">
-                {a.label} <ArrowUpRight aria-hidden className="ic" style={{ width: 14, height: 14 }} />
+                {a.label} <ArrowUpRight aria-hidden className="ic shrink-0" style={{ width: 14, height: 14 }} />
               </Link>
             ))}
           </div>
@@ -110,7 +110,7 @@ export function AiBusinessCopilot({
           onChange={(e) => setQuestion(e.target.value)}
         />
         <button type="submit" className="btn primary" disabled={!question.trim() || pending}>
-          <Sparkles aria-hidden className="ic" /> Ask
+          <Sparkles aria-hidden className="ic shrink-0" /> Ask
         </button>
       </form>
     </section>
