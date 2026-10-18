@@ -62,7 +62,7 @@ export default async function CataloguePage({ searchParams }: PageProps<"/dashbo
       actions={
         commerceManagerUrl ? (
           <a className="btn" href={commerceManagerUrl} target="_blank" rel="noreferrer">
-            <ExternalLink aria-hidden className="ic" style={{ width: 15, height: 15 }} /> Commerce Manager
+            <ExternalLink aria-hidden className="ic shrink-0" style={{ width: 15, height: 15 }} /> Commerce Manager
           </a>
         ) : undefined
       }
@@ -90,14 +90,14 @@ export default async function CataloguePage({ searchParams }: PageProps<"/dashbo
               label="Products"
               value={fmtNumber(total)}
               sub="In the catalogue"
-              icon={<Package className="size-4" />}
+              icon={<Package className="size-4 shrink-0" />}
               tone="info"
             />
             <Stat
               label="In stock"
               value={fmtNumber(inStock)}
               sub="Customers can order these"
-              icon={<CheckCircle2 className="size-4" />}
+              icon={<CheckCircle2 className="size-4 shrink-0" />}
               tone="brand"
               meter={total > 0 ? Math.round((inStock / total) * 100) : 0}
             />
@@ -105,14 +105,14 @@ export default async function CataloguePage({ searchParams }: PageProps<"/dashbo
               label="Out of stock"
               value={fmtNumber(outOfStock)}
               sub="Hidden from new orders"
-              icon={<AlertCircle className="size-4" />}
+              icon={<AlertCircle className="size-4 shrink-0" />}
               tone={outOfStock > 0 ? "amber" : "gold"}
             />
             <Stat
               label="Waiting for Meta"
               value={fmtNumber(pending)}
               sub="Not in WhatsApp yet"
-              icon={<Clock className="size-4" />}
+              icon={<Clock className="size-4 shrink-0" />}
               tone={pending > 0 ? "amber" : "brand"}
             />
           </div>

@@ -82,14 +82,14 @@ export function ProductsPerf({ products, nowMs, paidSales, unpaidCarts, cartToPa
           label={isTa ? "விற்பனை தொகை" : "Paid sales"}
           value={inr(paidSales)}
           sub={isTa ? "பொருட்களின் விற்பனை" : "From catalogue products"}
-          icon={<IndianRupee className="size-4" />}
+          icon={<IndianRupee className="size-4 shrink-0" />}
           tone="brand"
         />
         <Stat
           label={isTa ? "கார்ட்டில் நிலுவை" : "Waiting in unpaid carts"}
           value={inr(unpaidCarts)}
           sub={isTa ? "மீட்டெடுக்கக்கூடியவை" : "Still recoverable"}
-          icon={<Clock className="size-4" />}
+          icon={<Clock className="size-4 shrink-0" />}
           tone="amber"
           href="/dashboard/orders?show=unpaid"
         />
@@ -97,7 +97,7 @@ export function ProductsPerf({ products, nowMs, paidSales, unpaidCarts, cartToPa
           label={isTa ? "செலுத்தப்பட்ட கார்ட்டுகள்" : "Carts that got paid"}
           value={`${Math.round(cartToPaid)}%`}
           sub={isTa ? "ஆர்டரான விகிதம்" : "Of carts sent from WhatsApp"}
-          icon={<CheckCircle2 className="size-4" />}
+          icon={<CheckCircle2 className="size-4 shrink-0" />}
           tone="info"
           meter={Math.round(cartToPaid)}
         />

@@ -105,7 +105,7 @@ export function DemandLeaderboard({
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-subtle/50 px-4 py-3.5 sm:px-5">
           <div className="flex items-center gap-2.5">
             <div className="flex size-9 items-center justify-center rounded-control bg-brand/10 text-brand ring-1 ring-brand/20">
-              <Sparkles aria-hidden className="size-4.5" />
+              <Sparkles aria-hidden className="size-4.5 shrink-0" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -133,7 +133,7 @@ export function DemandLeaderboard({
               className="h-8 gap-1.5 text-xs font-semibold border-line text-ink hover:border-brand/40 hover:bg-subtle"
               title="View live in-portal WhatsApp catalog impressions, product views, and shopper conversion funnel"
             >
-              <Eye aria-hidden className="size-3.5 text-brand" />
+              <Eye aria-hidden className="size-3.5 shrink-0 text-brand" />
               <span>Catalog Impressions</span>
               <span className="rounded-full bg-brand/10 px-1.5 py-0.5 text-3xs font-bold text-brand">
                 {summary.totalImpressions.toLocaleString("en-IN")}
@@ -146,7 +146,7 @@ export function DemandLeaderboard({
               aria-expanded={isOpen}
               className="h-8 gap-1 text-xs"
             >
-              {isOpen ? <ChevronUp aria-hidden className="size-3.5" /> : <ChevronDown aria-hidden className="size-3.5" />}
+              {isOpen ? <ChevronUp aria-hidden className="size-3.5 shrink-0" /> : <ChevronDown aria-hidden className="size-3.5 shrink-0" />}
               {isOpen ? "Collapse" : "Expand"}
             </Button>
           </div>
@@ -159,7 +159,7 @@ export function DemandLeaderboard({
             <div className="rounded-control border border-line bg-panel p-3 shadow-2xs">
               <div className="flex items-center justify-between text-muted">
                 <span className="text-xs font-medium">WhatsApp Carts</span>
-                <ShoppingBag3D className="size-4" />
+                <ShoppingBag3D className="size-4 shrink-0" />
               </div>
               <p className="mt-1.5 text-xl font-bold tracking-tight text-ink">
                 {summary.totalCartsAnalyzed}{" "}
@@ -173,7 +173,7 @@ export function DemandLeaderboard({
             <div className="rounded-control border border-line bg-panel p-3 shadow-2xs">
               <div className="flex items-center justify-between text-muted">
                 <span className="text-xs font-medium">#1 Most In-Demand</span>
-                <Sparkles3D className="size-4" />
+                <Sparkles3D className="size-4 shrink-0" />
               </div>
               <p className="mt-1.5 truncate text-base font-bold tracking-tight text-ink" title={summary.topDemanded?.name}>
                 {summary.topDemanded ? summary.topDemanded.name : "None yet"}
@@ -186,7 +186,7 @@ export function DemandLeaderboard({
             <div className="rounded-control border border-line bg-panel p-3 shadow-2xs">
               <div className="flex items-center justify-between text-muted">
                 <span className="text-xs font-medium">Top Revenue Driver</span>
-                <Rupee3D className="size-4" />
+                <Rupee3D className="size-4 shrink-0" />
               </div>
               <p className="mt-1.5 truncate text-base font-bold tracking-tight text-ink" title={summary.topRevenue?.name}>
                 {summary.topRevenue ? summary.topRevenue.name : "None yet"}
@@ -199,7 +199,7 @@ export function DemandLeaderboard({
             <div className="rounded-control border border-line bg-panel p-3 shadow-2xs">
               <div className="flex items-center justify-between text-muted">
                 <span className="text-xs font-medium">Top Converting</span>
-                <Trophy3D className="size-4" />
+                <Trophy3D className="size-4 shrink-0" />
               </div>
               <p className="mt-1.5 truncate text-base font-bold tracking-tight text-ink" title={summary.topConverting?.name}>
                 {summary.topConverting ? summary.topConverting.name : "None yet"}
@@ -213,7 +213,7 @@ export function DemandLeaderboard({
           {/* Filtering and Sort Controls */}
           <div className="mb-3.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative flex-1 sm:max-w-xs">
-              <Search aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted" />
+              <Search aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 shrink-0 -translate-y-1/2 text-muted" />
               <input
                 type="search"
                 value={search}
@@ -250,7 +250,7 @@ export function DemandLeaderboard({
                     : "border-line bg-panel text-ink-2 hover:border-line-strong hover:bg-subtle",
                 )}
               >
-                <Eye aria-hidden className="size-3" />
+                <Eye aria-hidden className="size-3 shrink-0" />
                 <span>Views</span>
               </button>
 
@@ -318,7 +318,7 @@ export function DemandLeaderboard({
                     <th className="py-2.5 px-3 font-medium">Product</th>
                     <th className="py-2.5 px-3 font-medium text-right">
                       <span className="inline-flex items-center gap-1">
-                        <Eye aria-hidden className="size-3 text-muted" />
+                        <Eye aria-hidden className="size-3 shrink-0 text-muted" />
                         <span>Views</span>
                       </span>
                     </th>
@@ -357,7 +357,7 @@ export function DemandLeaderboard({
                                   <img src={item.imageUrl} alt="" className="size-full object-cover" />
                                 ) : (
                                   <div className="grid size-full place-items-center text-faint">
-                                    <Package aria-hidden className="size-4" />
+                                    <Package aria-hidden className="size-4 shrink-0" />
                                   </div>
                                 )}
                               </div>
@@ -753,7 +753,7 @@ export function DemandLeaderboard({
                             <img src={p.imageUrl} alt="" className="size-full object-cover" />
                           ) : (
                             <div className="grid size-full place-items-center text-muted">
-                              <Package className="size-3.5" />
+                              <Package className="size-3.5 shrink-0" />
                             </div>
                           )}
                         </div>
@@ -792,7 +792,7 @@ export function DemandLeaderboard({
             {/* Smart In-Portal Insights */}
             <div className="rounded-xl border border-brand/20 bg-brand/5 p-4">
               <div className="flex items-center gap-2 text-brand font-bold text-xs">
-                <Sparkles className="size-4" />
+                <Sparkles className="size-4 shrink-0" />
                 <span>Thabaal AI Commerce Insights</span>
               </div>
               <ul className="mt-2 space-y-1.5 text-xs text-ink-2">

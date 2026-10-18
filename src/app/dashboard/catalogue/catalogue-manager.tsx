@@ -58,12 +58,12 @@ function PhotoField({ value, onChange, removable, isTa = false }: { value: strin
             <img src={value} alt="Product photo preview" className="size-full object-cover" />
           ) : (
             <div className="grid size-full place-items-center text-faint">
-              <ImageIcon aria-hidden className="size-7" />
+              <ImageIcon aria-hidden className="size-7 shrink-0" />
             </div>
           )}
           {uploading && (
             <div className="absolute inset-0 grid place-items-center bg-night/50 text-white">
-              <Loader2 aria-hidden className="size-5 animate-spin" />
+              <Loader2 aria-hidden className="size-5 shrink-0 animate-spin" />
               <span className="sr-only">{isTa ? "பதிவேற்றப்படுகிறது" : "Uploading"}</span>
             </div>
           )}
@@ -72,7 +72,7 @@ function PhotoField({ value, onChange, removable, isTa = false }: { value: strin
           <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={upload} className="hidden" />
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="secondary" size="sm" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
-              {uploading ? <Loader2 aria-hidden className="animate-spin" /> : <Upload aria-hidden />}
+              {uploading ? <Loader2 aria-hidden className="shrink-0 animate-spin" /> : <Upload aria-hidden className="shrink-0" />}
               {uploading ? (isTa ? "பதிவேற்றப்படுகிறது…" : "Uploading…") : value ? (isTa ? "படத்தை மாற்று" : "Replace photo") : (isTa ? "படம் பதிவேற்று" : "Upload photo")}
             </Button>
             {value && removable && (
@@ -368,7 +368,7 @@ export function CatalogueManager({
           </button>
           {canAdd && (
             <button type="button" className="btn sm primary" onClick={() => setAdding(true)}>
-              <Plus aria-hidden className="ic" style={{ width: 15, height: 15 }} /> {isTa ? "பொருள் சேர்" : "Add product"}
+              <Plus aria-hidden className="ic shrink-0" style={{ width: 15, height: 15 }} /> {isTa ? "பொருள் சேர்" : "Add product"}
             </button>
           )}
         </div>
@@ -417,7 +417,7 @@ export function CatalogueManager({
                           <img src={item.imageUrl} alt="" width={40} height={40} style={{ width: 40, height: 40, borderRadius: 10, objectFit: "cover", flex: "none" }} />
                         ) : (
                           <span className="note" style={{ width: 40, height: 40, padding: 0, display: "grid", placeItems: "center", flex: "none" }}>
-                            <Package aria-hidden className="ic" style={{ width: 16, height: 16 }} />
+                            <Package aria-hidden className="ic shrink-0" style={{ width: 16, height: 16 }} />
                           </span>
                         )}
                         <div>
@@ -481,7 +481,7 @@ export function CatalogueManager({
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
             {canManage && isLive && (
               <Button type="button" variant="ghost" onClick={handleDelete} disabled={saving} className="text-danger hover:bg-danger-bg hover:text-danger sm:mr-auto">
-                <Trash2 aria-hidden /> {isTa ? "நீக்கு" : "Delete"}
+                <Trash2 aria-hidden className="shrink-0" /> {isTa ? "நீக்கு" : "Delete"}
               </Button>
             )}
             <Button type="button" variant="secondary" onClick={() => setEditing(null)} disabled={saving} className="sm:ml-auto">
