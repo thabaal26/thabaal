@@ -344,6 +344,49 @@ await check(25, "Session expired mid-action: sent to sign in, nothing saved", as
   return `landed on ${url.replace(BASE, "")}; ${snap(after)}`;
 });
 
+// 30. Order steps: received › payment processing › payment verification › confirmed. No packing or dispatch
+//     before the payment is verified; cash on delivery skips the payment steps.
+await check(30, "Order steps: no confirm or dispatch before payment is verified; COD skips the payment steps", async () => {
+  const base = await get("QA-1012");
+  const mk = (ref, data = {}) =>
+    db.order.create({ data: { ref, clientId: base.clientId, customerId: base.customerId, items: [{ id: "QA-001", name: "Groundnut oil 1L", quantity: 1, price: 360 }], total: 420, status: "NEW", ...data } });
+  const mainBtn = async (c) => (await c.locator("button.btn.primary").first().textContent())?.trim();
+  const onSteps = async (c) => (await c.locator(".steps b.on").allTextContents()).join(" › ");
+
+  const r1 = `QA-F1${run}`;
+  await mk(r1);
+  let c = await card(r1);
+  const b1 = await mainBtn(c);
+  const s1 = await onSteps(c);
+  await moreActions(c);
+  const earlyDispatch = await c.getByRole("button", { name: "Dispatch order" }).count();
+  expect(b1 === "Send payment link" && s1 === "Order received" && earlyDispatch === 0, `received: button "${b1}", steps "${s1}", dispatch shown ${earlyDispatch}`);
+
+  await db.order.update({ where: { ref: r1 }, data: { paymentRequestedAt: new Date() } });
+  c = await card(r1);
+  const b2 = await mainBtn(c);
+  expect(b2 === "Send reminder" && (await onSteps(c)) === "Order received › Payment processing", `payment: "${b2}", "${await onSteps(c)}"`);
+
+  await db.order.update({ where: { ref: r1 }, data: { paymentClaimedAt: new Date(), paymentClaimNote: "Customer sent a screenshot" } });
+  c = await card(r1);
+  const b3 = await mainBtn(c);
+  expect(b3 === "Payment received" && /Payment verification$/.test(await onSteps(c)), `verify: "${b3}", "${await onSteps(c)}"`);
+  await c.getByRole("button", { name: "Payment received" }).first().click();
+  await waitToast(/checked and recorded/);
+  const paid = await get(r1);
+  c = await card(r1);
+  const b4 = await mainBtn(c);
+  expect(paid.status === "PAID" && paid.paidAt && b4 === "Pack order" && /Order confirmed$/.test(await onSteps(c)), `after verify: ${snap(paid)}, button "${b4}", "${await onSteps(c)}"`);
+
+  const r2 = `QA-F2${run}`;
+  await mk(r2, { paymentMethod: "cod" });
+  c = await card(r2);
+  const b5 = await mainBtn(c);
+  const s5 = (await c.locator(".steps b").allTextContents()).join(" › ");
+  expect(b5 === "Confirm COD order" && !/Payment processing/.test(s5), `cod: "${b5}", steps "${s5}"`);
+  return `received → "${b1}"; payment → "${b2}"; verify → "${b3}"; verified → ${paid.status}, "${b4}"; COD → "${b5}" with steps ${s5}`;
+});
+
 await browser.close();
 await db.$disconnect();
 fs.writeFileSync(".git/qa-payments-ui.json", JSON.stringify(results, null, 1));

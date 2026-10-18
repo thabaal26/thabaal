@@ -21,7 +21,7 @@ import { isTemplatePicture, orderTemplateNames, picturePrefixFor } from "@/lib/o
 import { cleanValues, readFields, readValues } from "@/lib/custom-fields";
 import { senderFor } from "@/lib/senders";
 import { requireManager, requireOrderAccess } from "@/lib/session";
-import { FLOW_KEYS, ORDER_FLOWS, type OrderFlowKey } from "@/lib/order-flow";
+import { FLOW_KEYS, ORDER_FLOWS, stepBlocked, type OrderFlowKey } from "@/lib/order-flow";
 import { sendText } from "@/lib/waha";
 import { sendTemplateMessage, sendTextMessage } from "@/lib/whatsapp";
 import { explainSendError, type SendResult } from "./send-helpers";
@@ -91,6 +91,11 @@ export async function setOrderStatus(id: string, status: OrderStatus): Promise<S
     revalidatePath("/dashboard", "layout");
     return { ok: true, message: "Marked paid and thanked the customer." };
   }
+  // Order steps: confirmed only once payment is verified (or COD confirmed); dispatch and finish only after that.
+  if (status === "CONFIRMED" || status === "DISPATCHED" || status === "DELIVERED") {
+    const blocked = stepBlocked(order, status);
+    if (blocked) return { ok: false, message: blocked };
+  }
   // Reopening starts the order over, so it isn't still shown as packed.
   await db.order.update({ where: { id: order.id }, data: { status, ...(status === "NEW" ? { packedAt: null } : {}) } });
   pushOrderToSheet(order.id, "ORDER_UPDATE");
@@ -104,6 +109,12 @@ export async function setOrderStatus(id: string, status: OrderStatus): Promise<S
 export async function setOrderPacked(id: string, packed: boolean): Promise<SendResult> {
   const s = await requireOrderAccess();
   if ("denied" in s) return { ok: false, message: s.denied };
+  if (packed) {
+    const o = await db.order.findFirst({ where: { id, ...(s.clientId ? { clientId: s.clientId } : {}) } });
+    if (!o) return { ok: false, message: "Order not found." };
+    const blocked = stepBlocked(o, "PACKED");
+    if (blocked) return { ok: false, message: blocked };
+  }
   const r = await db.order.updateMany({
     where: { id, ...(s.clientId ? { clientId: s.clientId } : {}), status: { in: ["NEW", "CONFIRMED", "PAID"] } },
     data: { packedAt: packed ? new Date() : null },
@@ -163,6 +174,10 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
     include: { customer: true, client: { select: { name: true } } },
   });
   if (!order) return { ok: false, message: "Order not found." };
+  // Order steps: no confirmation before the payment is verified (cash on delivery excepted), and no dispatch or
+  // delivery before the order is confirmed.
+  const blocked = stepBlocked(order, kind === "confirm" ? "CONFIRMED" : kind === "dispatch" ? "DISPATCHED" : "DELIVERED");
+  if (blocked) return { ok: false, message: blocked };
   const c = order.customer;
   if (c.optedOut) return { ok: false, message: "This customer opted out of messages." };
 
@@ -202,7 +217,7 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
           : "";
   const text =
     kind === "confirm"
-      ? `Hello ${first}, thank you for your order with ${order.client.name}.\n\n${confirmPricingText}${payLine ? `\n${payLine}` : ""}\n\nWe will confirm your delivery slot shortly.`
+      ? `Hello ${first}, your ${order.client.name} order ${ref} is confirmed.\n\n${confirmPricingText}${payLine ? `\n${payLine}` : ""}\n\nWe will message you with the next update.`
       : kind === "dispatch"
         ? `Hello ${first}, your ${order.client.name} order ${ref} is on its way and will reach you by ${details.eta?.trim() || "soon"}.${contact ? `\n\n${contact}` : ""}${payLine ? `\n\n${payLine}` : ""}\n\nFor any help, reply to this message.`
         : `Hello ${first}, your ${order.client.name} order ${ref} has been delivered.${payLine ? ` ${payLine}` : ""} Thank you for shopping with us!\n\nIf anything is not right, reply to this message.`;

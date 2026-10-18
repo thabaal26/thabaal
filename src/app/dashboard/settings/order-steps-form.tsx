@@ -7,13 +7,6 @@ import { FLOW_KEYS, ORDER_FLOWS, type OrderFlowKey } from "@/lib/order-flow";
 import { useLanguage } from "@/lib/i18n/context";
 import { saveOrderFlow } from "../actions/orders";
 
-const STEP_LABELS_TA: Record<string, string> = {
-  Confirmed: "உறுதியானது",
-  Paid: "பணம் வந்தது",
-  Dispatched: "அனுப்பப்பட்டது",
-  Delivered: "டெலிவரி ஆனது",
-};
-
 /** Settings → Order steps: pick the flow that matches the shop; the preview shows the steps every order gets. */
 export function OrderStepsForm({ current, canChange }: { current: OrderFlowKey; canChange: boolean }) {
   const router = useRouter();
@@ -68,7 +61,7 @@ export function OrderStepsForm({ current, canChange }: { current: OrderFlowKey; 
           {ORDER_FLOWS[flow].steps.map((s, i) => (
             <span key={s.key} style={{ display: "contents" }}>
               {i > 0 && " › "}
-              <b className="on">{isTa ? (STEP_LABELS_TA[s.label] ?? s.label) : s.label}</b>
+              <b className="on">{isTa ? s.ta : s.label}</b>
             </span>
           ))}
         </div>

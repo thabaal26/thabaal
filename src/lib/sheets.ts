@@ -222,6 +222,8 @@ const ORDER_COLS = {
 
 const STATUS_WORDS: Record<string, "NEW" | "CONFIRMED" | "PAID" | "DISPATCHED" | "DELIVERED" | "CANCELLED"> = {
   new: "NEW", confirmed: "CONFIRMED", paid: "PAID", packed: "CONFIRMED", dispatched: "DISPATCHED", shipped: "DISPATCHED", delivered: "DELIVERED", cancelled: "CANCELLED", canceled: "CANCELLED",
+  // The step words the live sheet now shows (lib/order-flow.ts).
+  "order received": "NEW", "payment processing": "NEW", "payment verification": "NEW", "order confirmed": "CONFIRMED",
 };
 
 async function syncOrders(clientId: string, rows: string[][]) {

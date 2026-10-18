@@ -280,7 +280,14 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
       .catch(() => []),
     db.reply.groupBy({ by: ["customerId"], where: { ...myMessages, handled: false }, _count: true, _min: { receivedAt: true } }).catch(() => []),
     // Orders to pack, split by how they're paid (Home shows "2 paid · 1 cash on delivery").
-    db.order.groupBy({ by: ["status", "paymentMethod"], where: { ...mineOrders, status: { in: ["CONFIRMED", "PAID"] } }, _count: true }).catch(() => []),
+    // Order steps: only confirmed orders are packed (paid, or cash on delivery confirmed), and not yet packed.
+    db.order
+      .groupBy({
+        by: ["status", "paymentMethod"],
+        where: { ...mineOrders, status: { in: ["NEW", "CONFIRMED", "PAID"] }, packedAt: null, OR: [{ paidAt: { not: null } }, { status: "PAID" }, { status: "CONFIRMED", paymentMethod: "cod" }] },
+        _count: true,
+      })
+      .catch(() => []),
     cid ? getCatalogWithProducts(cid).catch(() => null) : Promise.resolve(null),
     cid
       ? db
@@ -323,11 +330,10 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
   ]);
 
   const toDispatchCount = toPackGroups.reduce((n, g) => n + g._count, 0);
-  // Paid = marked paid; cash on delivery = confirmed with COD/cash; the rest are confirmed, payment not yet in.
-  const isCod = (m: string | null) => m === "cod" || m === "cash";
-  const toPackPaid = toPackGroups.filter((g) => g.status === "PAID").reduce((n, g) => n + g._count, 0);
-  const toPackCod = toPackGroups.filter((g) => g.status === "CONFIRMED" && isCod(g.paymentMethod)).reduce((n, g) => n + g._count, 0);
-  const toPackOther = toDispatchCount - toPackPaid - toPackCod;
+  // Only confirmed orders are counted: cash on delivery confirmed, or paid (everything else in the list).
+  const toPackCod = toPackGroups.filter((g) => g.status === "CONFIRMED" && g.paymentMethod === "cod").reduce((n, g) => n + g._count, 0);
+  const toPackPaid = toDispatchCount - toPackCod;
+  const toPackOther = 0;
 
 
 

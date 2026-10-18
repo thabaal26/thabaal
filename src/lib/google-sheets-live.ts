@@ -5,6 +5,7 @@ import { db } from "./db";
 import { APP_TZ } from "./format";
 import { itemsText, orderRef, type OrderItem } from "./orders";
 import { methodLabel, methodOf } from "./payment-state";
+import { orderStage } from "./order-flow";
 
 // The client's Google Sheet live log (deploy/google-sheets/Code.gs): each event lands in its own tab.
 
@@ -147,7 +148,16 @@ export function pushToGoogleSheet(clientId: string | null | undefined, event: Sh
   });
 }
 
-const STATUS_WORD: Record<string, string> = { NEW: "New", CONFIRMED: "Confirmed", PAID: "Paid", DISPATCHED: "Dispatched", DELIVERED: "Delivered", CANCELLED: "Cancelled" };
+/** The order's step in the sheet, the same words as Orders (lib/order-flow.ts). */
+const STATUS_WORD: Record<string, string> = {
+  RECEIVED: "Order received",
+  PAYMENT: "Payment processing",
+  VERIFY: "Payment verification",
+  CONFIRMED: "Order confirmed",
+  DISPATCHED: "Dispatched",
+  DELIVERED: "Delivered",
+  CANCELLED: "Cancelled",
+};
 
 /**
  * The order's full, current row for the sheet's Live Orders tab (one row per order, updated in place)
@@ -161,7 +171,8 @@ export function pushOrderToSheet(orderId: string, event: "NEW_ORDER" | "ORDER_UP
     if (!o) return;
     const { hook } = await resolveHook(o.clientId);
     if (!hook) return;
-    const status = STATUS_WORD[o.status] ?? o.status;
+    const stage = orderStage(o);
+    const status = STATUS_WORD[stage] ?? stage;
     await send(hook, event, {
       orderId: orderRef(o),
       created: formatInTimeZone(o.createdAt, APP_TZ, "yyyy-MM-dd HH:mm:ss"),

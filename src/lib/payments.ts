@@ -318,9 +318,12 @@ async function confirmPaymentOnce(orderId: string, txnId: string | null | undefi
   const c = order.customer;
   const ref = orderRef(order);
   const how = method === "cod" || method === "cash" ? " in cash" : method === "bank" ? " by bank transfer" : "";
-  const next = order.status === "DISPATCHED" || order.status === "DELIVERED" ? "" : " We are packing your order and will message you when it is dispatched.";
-  const text = `Hello ${firstName(c.name)}, we have received your payment of ${money(received, order.currency)}${how} for order ${ref}. Thank you!${next}`;
-  const cardUpdated = await updateOrderCard(order, "processing", text, "Payment received").catch((e) => {
+  // Order steps: a verified payment is what confirms the order, so this one message is both receipt and confirmation.
+  const later = order.status === "DISPATCHED" || order.status === "DELIVERED";
+  const text = later
+    ? `Hello ${firstName(c.name)}, we have received your payment of ${money(received, order.currency)}${how} for order ${ref}. Thank you!`
+    : `Hello ${firstName(c.name)}, we have received your payment of ${money(received, order.currency)}${how} for order ${ref}, and your order is confirmed. Thank you! We will message you with the next update.`;
+  const cardUpdated = await updateOrderCard(order, "processing", text, later ? "Payment received" : "Order confirmed").catch((e) => {
     console.error("Could not send order_status payment confirmation, falling back to text", e);
     return false;
   });

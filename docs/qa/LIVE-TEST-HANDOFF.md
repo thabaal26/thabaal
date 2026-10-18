@@ -74,6 +74,27 @@ earlier work; this file is its memory. Read all of it before doing anything.
 
 ### Done on 19 Oct (latest first)
 
+03. **Order flow corrected (owner's rule): Order received › Payment processing › Payment verification › Order
+  confirmed › Dispatched › Delivered.** Owner's choices: COD skips the payment steps (received › confirmed when the
+  customer or staff confirms COD › dispatched › delivered, cash recorded at delivery); packing is a tick inside
+  "Order confirmed"; an order is confirmed only after its payment is verified (no early confirm).
+- `src/lib/order-flow.ts` is the single source: `orderStage()` works the step out from status + payment fields
+  (no new statuses, no data migration: existing orders fall into the right step), `stepBlocked()` is the shared
+  server rule. Flows in Settings › Order steps keep their names (pickup: "Ready for pickup" › "Collected";
+  service: "Booking confirmed" › "Done").
+- Server (`actions/orders.ts`): `notifyOrder` confirm/dispatch/deliver, `setOrderStatus` CONFIRMED/DISPATCHED/
+  DELIVERED and `setOrderPacked` refuse unpaid non-COD orders with a plain reason. Confirmation text now says "your
+  order is confirmed". `confirmPayment` (lib/payments.ts): the receipt after a verified payment says "your order is
+  confirmed" (the WhatsApp order card shows "Order confirmed").
+- Screens: order card (stepper, next-step button, timeline with payment link / verification / UTR, extra buttons),
+  Orders list (cards, chips Received / Payment processing / Payment verification / Order confirmed / Packed /
+  Dispatched / Delivered / Cancelled, steps line), Settings › Order steps (Tamil names), Home "to pack" counts only
+  confirmed and unpacked orders, Google Sheet live status shows the step words (sheet sync reads them back),
+  Guide updated. Removed the unused `orders/order-actions.tsx`.
+- Note: reports count CONFIRMED as a sale (DEC-01). Going forward CONFIRMED only happens for COD or paid orders;
+  older unpaid "Confirmed" orders now show as Payment processing / Order received.
+- Tests: `payments-ui.mjs` check 30 (steps, buttons, no early dispatch, verify → confirmed, COD skips payment).
+
 02. **Campaigns › Automations: one real list.** The old list was screen-only (switches changed nothing). Now
   `src/app/dashboard/campaigns/automations.tsx`: Payment reminder (= Payments › Reminder rules › 1 day), **Reorder
   reminders** (the one reorder/refill setting: `refillDays` + template, fields in its row; the separate Refill row

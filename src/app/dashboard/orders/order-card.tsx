@@ -19,8 +19,11 @@ import { orderRef, type OrderItem } from "@/lib/order-ref";
 import {
   DEFAULT_FLOW,
   flowHas,
+  flowPacks,
   flowSteps,
-  reachedIndex,
+  isConfirmedOrLater,
+  orderStage,
+  RANK,
   stageRank,
   stepLabel,
   type OrderFlowKey,
@@ -266,15 +269,19 @@ export function OrderCard({
     o.paymentMethod === "cod" ||
     (o.internalNote && /cod|cash on delivery/i.test(o.internalNote));
 
-  // Determine stage & steps
-  const rank = stageRank({ status: o.status, packedAt: o.packedAt ? new Date(o.packedAt) : null, paid: isPaid, cod: Boolean(isCod) });
-  const steps = flowSteps(flow);
-  const reached = reachedIndex(flow, rank);
+  // Where the order is (lib/order-flow.ts): received › payment processing › payment verification › confirmed ›
+  // dispatched › delivered. Confirmed only once payment is verified; cash on delivery skips the payment steps.
+  const stage = orderStage(o);
+  const rank = stageRank(o);
+  const confirmed = isConfirmedOrLater(o);
+  const preDispatch = o.status === "NEW" || o.status === "CONFIRMED" || o.status === "PAID";
+  const steps = flowSteps(flow).filter((s) => !(isCod && !isPaid && (s.key === "PAYMENT" || s.key === "VERIFY")));
+  const reached = steps.reduce((at, s, i) => (RANK[s.key] <= rank ? i : at), -1);
 
-  const hasConfirm = flowHas(flow, "CONFIRMED");
-  const hasPack = flowHas(flow, "PACKED");
+  const hasPack = flowPacks(flow);
   const hasDispatch = flowHas(flow, "DISPATCHED");
   const finishLabel = stepLabel(flow, "DELIVERED") ?? "Delivered";
+  const confirmLabel = stepLabel(flow, "CONFIRMED") ?? "Order confirmed";
 
   // Source pill
   const source = o.waMessageId
@@ -350,65 +357,27 @@ export function OrderCard({
   if (missingAddress) missingBadges.push("Address needed");
   if (missingPhone) missingBadges.push("Phone number missing");
 
-  // Determine primary action
+  // The main button is always the next step of the flow.
   let primaryAction: { key: string; label: string };
-  if (o.status === "NEW") {
-    primaryAction = hasConfirm
-      ? { key: "confirm", label: "Confirm order" }
-      : isPaid || isCod
-        ? hasPack && !o.packedAt
-          ? { key: "pack", label: "Pack order" }
-          : hasDispatch
-            ? { key: "dispatch", label: "Dispatch order" }
-            : { key: "deliver", label: `Mark ${finishLabel.toLowerCase()}` }
-        : o.paymentRequestedAt
-          ? { key: "remind", label: "Send reminder" }
-          : { key: "link", label: "Send payment link" };
-  } else if (o.status === "CONFIRMED") {
-    if (isPaid || isCod) {
-      if (hasPack && !o.packedAt) {
-        primaryAction = { key: "pack", label: "Pack order" };
-      } else if (hasDispatch) {
-        primaryAction = {
-          key: "dispatch",
-          label: flow === "courier" ? "Ship order" : "Dispatch order",
-        };
-      } else {
-        primaryAction = { key: "deliver", label: `Mark ${finishLabel.toLowerCase()}` };
-      }
-    } else {
-      primaryAction = o.paymentRequestedAt
-        ? { key: "remind", label: "Send reminder" }
-        : { key: "link", label: "Send payment link" };
-    }
-  } else if (o.status === "PAID") {
-    if (hasPack && !o.packedAt) {
-      primaryAction = { key: "pack", label: "Pack order" };
-    } else if (hasDispatch) {
-      primaryAction = {
-        key: "dispatch",
-        label: flow === "courier" ? "Ship order" : "Dispatch order",
-      };
-    } else {
-      primaryAction = { key: "deliver", label: `Mark ${finishLabel.toLowerCase()}` };
-    }
-  } else if (o.status === "DISPATCHED") {
-    if (isCod && !isPaid) {
-      primaryAction = { key: "codin", label: `Delivered, cash received ${inr(due)}` };
-    } else {
-      primaryAction = { key: "deliver", label: `Mark ${finishLabel.toLowerCase()}` };
-    }
-  } else if (o.status === "DELIVERED") {
-    primaryAction = { key: "receipt", label: "View receipt" };
-  } else {
-    primaryAction = { key: "restore", label: "Restore order" };
-  }
-  // The customer says they paid: checking the UPI app comes before reminding them again.
-  if (payState === "claimed" && (o.status === "NEW" || o.status === "CONFIRMED")) primaryAction = { key: "verify", label: "Payment received" };
+  if (o.status === "CANCELLED") primaryAction = { key: "restore", label: "Restore order" };
+  else if (o.status === "DELIVERED") primaryAction = { key: "receipt", label: "View receipt" };
+  else if (o.status === "DISPATCHED")
+    primaryAction = isCod && !isPaid ? { key: "codin", label: `Delivered, cash received ${inr(due)}` } : { key: "deliver", label: `Mark ${finishLabel.toLowerCase()}` };
+  else if (confirmed)
+    primaryAction =
+      hasPack && !o.packedAt
+        ? { key: "pack", label: "Pack order" }
+        : hasDispatch
+          ? { key: "dispatch", label: flow === "courier" ? "Ship order" : "Dispatch order" }
+          : { key: "deliver", label: `Mark ${finishLabel.toLowerCase()}` };
+  else if (stage === "VERIFY") primaryAction = { key: "verify", label: "Payment received" };
+  else if (isCod) primaryAction = { key: "confirm", label: "Confirm COD order" };
+  else if (stage === "PAYMENT") primaryAction = { key: "remind", label: "Send reminder" };
+  else primaryAction = { key: "link", label: "Send payment link" };
 
   const PRIMARY_ACTION_TA: Record<string, string> = {
     verify: "பணம் வந்தது",
-    confirm: "ஆர்டரை உறுதி செய்",
+    confirm: "COD ஆர்டரை உறுதி செய்",
     pack: "பேக் செய்",
     dispatch: flow === "courier" ? "கொரியரில் அனுப்பு" : "டெலிவரிக்கு அனுப்பு",
     deliver: "டெலிவரி ஆனதாகக் குறி",
@@ -619,32 +588,39 @@ export function OrderCard({
     });
   };
   // The "packed" stage: ready to go out, so the dispatch details come next.
-  const packedStage = hasDispatch && (o.status === "CONFIRMED" || o.status === "PAID") && primaryAction.key === "dispatch";
-  const readyStage = (o.status === "CONFIRMED" || o.status === "PAID") && (isPaid || isCod) && !packedStage;
+  const packedStage = hasDispatch && confirmed && preDispatch && primaryAction.key === "dispatch";
+  const readyStage = confirmed && preDispatch && !packedStage;
 
-  // Timeline events matching prototype
+  // Timeline: one line per step, with when it happened.
+  const payRef = o.paymentUtr ? `UTR ${o.paymentUtr}` : o.paymentTxnId ? `Ref: ${o.paymentTxnId}` : "";
   const timelineEvents: [string, string | null][] = [
-    ["Order placed", when(o.createdAt)],
+    ["Order received", when(o.createdAt)],
     ...(o.status === "CANCELLED"
       ? [["Cancelled", o.internalNote ? `Cancelled · ${o.internalNote}` : "Cancelled"] as [string, string | null]]
       : [
-          ...(hasConfirm ? [["Confirmed", rank >= 1 ? when(o.confirmedAt) ?? "Done" : null] as [string, string | null]] : []),
-          ...(o.paymentRequestedAt
-            ? [["Payment link sent", when(o.paymentRequestedAt)] as [string, string | null]]
-            : []),
-          [
-            isCod ? "Cash on delivery chosen" : "Payment received",
-            o.paidAt
-              ? `${when(o.paidAt)}${o.paymentTxnId ? ` · Ref: ${o.paymentTxnId}` : ""}`
-              : isCod
-              ? "Collect on delivery"
-              : null,
-          ] as [string, string | null],
-          ...(hasPack ? [["Packed", o.packedAt ? when(o.packedAt) : rank >= 3 ? "Done" : null] as [string, string | null]] : []),
+          ...(isCod && !isPaid
+            ? [["Cash on delivery", "No online payment; collect the cash on delivery"] as [string, string | null]]
+            : [
+                [
+                  "Payment processing",
+                  o.paymentRequestedAt ? `Payment link sent ${when(o.paymentRequestedAt)}` : isPaid || (o.paidAmount ?? 0) > 0 ? "Paid directly" : null,
+                ] as [string, string | null],
+                [
+                  "Payment verification",
+                  isPaid
+                    ? [when(o.paidAt), payRef].filter(Boolean).join(" · ") || "Done"
+                    : o.paymentClaimedAt
+                      ? `Customer says paid ${when(o.paymentClaimedAt) ?? ""} · check your account`.replace("  ", " ")
+                      : null,
+                ] as [string, string | null],
+              ]),
+          [confirmLabel, confirmed ? (when(isPaid ? (o.paidAt ?? o.confirmedAt) : o.confirmedAt) ?? "Done") : null] as [string, string | null],
+          ...(hasPack ? [["Packed", o.packedAt ? when(o.packedAt) : rank >= RANK.DISPATCHED ? "Done" : null] as [string, string | null]] : []),
           ...(hasDispatch
-            ? [[stepLabel(flow, "DISPATCHED") ?? "Dispatched", rank >= 4 ? when(o.dispatchedAt) ?? "Done" : null] as [string, string | null]]
+            ? [[stepLabel(flow, "DISPATCHED") ?? "Dispatched", rank >= RANK.DISPATCHED ? when(o.dispatchedAt) ?? "Done" : null] as [string, string | null]]
             : []),
-          [finishLabel, rank >= 5 ? when(o.deliveredAt) ?? "Done" : null] as [string, string | null],
+          [finishLabel, rank >= RANK.DELIVERED ? when(o.deliveredAt) ?? "Done" : null] as [string, string | null],
+          ...(isCod && isPaid ? [["Cash received", [when(o.paidAt), o.collectedBy].filter(Boolean).join(" · ")] as [string, string | null]] : []),
         ]),
     ...(o.refundedAt ? [["Refunded", when(o.refundedAt)] as [string, string | null]] : []),
   ];
@@ -929,7 +905,7 @@ export function OrderCard({
           {steps.map((f, i) => (
             <Fragment key={f.key}>
               {i > 0 && <span style={{ opacity: 0.45, margin: "0 3px", fontSize: 13, userSelect: "none" }}>›</span>}
-              <b className={i <= reached ? "on" : undefined}>{f.label}</b>
+              <b className={i <= reached ? "on" : undefined}>{isTa ? f.ta : f.label}</b>
             </Fragment>
           ))}
         </div>
@@ -1204,7 +1180,7 @@ export function OrderCard({
             </button>
           )}
 
-          {o.status === "NEW" && !isCod && o.client?.codOn !== false && (
+          {preDispatch && !confirmed && !isCod && o.status === "NEW" && o.client?.codOn !== false && (
             <button
               type="button"
               className="btn sm"
@@ -1286,7 +1262,7 @@ export function OrderCard({
             </button>
           )}
 
-          {hasDispatch && (o.status === "CONFIRMED" || o.status === "PAID") && !packedStage && (
+          {hasDispatch && confirmed && preDispatch && !packedStage && (
             <button
               type="button"
               className="btn sm"

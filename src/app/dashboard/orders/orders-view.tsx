@@ -8,7 +8,7 @@ import { toastResult } from "@/components/toast";
 import { fmtDate } from "@/lib/format";
 import { inr } from "../portal-format";
 import { T, useLang } from "../portal-ui";
-import { DEFAULT_FLOW, flowHas, flowSteps, readFlow, stepLabel, type OrderFlowKey } from "@/lib/order-flow";
+import { DEFAULT_FLOW, flowHas, flowPacks, flowSteps, isCodOrder, isConfirmedOrLater, isPaidOrder, orderStage, readFlow, stepLabel, type OrderFlowKey } from "@/lib/order-flow";
 import { getOrderPricing, pointsDiscount } from "@/lib/order-pricing";
 import { orderRef, type OrderItem } from "@/lib/order-ref";
 import { createOrder, lookupOrderCustomer } from "../actions/orders";
@@ -45,9 +45,9 @@ export type OrdersViewProps = {
 /** Lists other pages link to; shown as a removable chip so it's clear the list is narrowed. */
 const SPECIAL_SHOW: Record<string, [string, string]> = {
   unpaid: ["Not paid yet", "பணம் வராதவை"],
-  verify: ["Payments to check", "சரிபார்க்க வேண்டிய பணம்"],
   refund: ["Refunds due", "திருப்பித் தர வேண்டியவை"],
   topack: ["To pack", "பேக் செய்ய வேண்டியவை"],
+  paid: ["Paid or COD", "பணம் / COD"],
 };
 
 export function OrdersView({
@@ -122,22 +122,24 @@ export function OrdersView({
 
   const flow = readFlow(client.orderFlow ?? DEFAULT_FLOW);
   const steps = flowSteps(flow);
-  const hasConfirm = flowHas(flow, "CONFIRMED");
-  const hasPack = flowHas(flow, "PACKED");
+  const hasPack = flowPacks(flow);
   const hasDispatch = flowHas(flow, "DISPATCHED");
   const finishLabel = stepLabel(flow, "DELIVERED") ?? "Delivered";
+  const confirmLabel = stepLabel(flow, "CONFIRMED") ?? "Order confirmed";
 
-  // Counts across all orders
-  const isOrderPaid = (o: OrderCardData) => o.status === "PAID" || o.paidAt !== null;
-  const isOrderCod = (o: OrderCardData) =>
-    !isOrderPaid(o) &&
-    (o.paymentMethod === "cod" || (o.internalNote && /cod|cash on delivery/i.test(o.internalNote)));
+  // Steps: received › payment processing › payment verification › confirmed › dispatched › delivered.
+  const isOrderPaid = (o: OrderCardData) => isPaidOrder(o);
+  const isOrderCod = (o: OrderCardData) => isCodOrder(o);
+  const stageIs = (o: OrderCardData, st: string) => orderStage(o) === st;
+  const preDispatch = (o: OrderCardData) => o.status === "NEW" || o.status === "CONFIRMED" || o.status === "PAID";
+  const toPack = (o: OrderCardData) => isConfirmedOrLater(o) && preDispatch(o) && !o.packedAt;
 
   const allCount = initialOrders.length;
-  const newCount = initialOrders.filter((o) => o.status === "NEW").length;
-  const confirmedCount = initialOrders.filter((o) => o.status === "CONFIRMED").length;
-  const paidCount = initialOrders.filter((o) => isOrderPaid(o) || isOrderCod(o)).length;
-  const packedCount = initialOrders.filter((o) => o.packedAt != null && o.status !== "CANCELLED").length;
+  const newCount = initialOrders.filter((o) => stageIs(o, "RECEIVED")).length;
+  const paymentCount = initialOrders.filter((o) => stageIs(o, "PAYMENT")).length;
+  const verifyCount = initialOrders.filter((o) => stageIs(o, "VERIFY")).length;
+  const confirmedCount = initialOrders.filter((o) => stageIs(o, "CONFIRMED")).length;
+  const packedCount = initialOrders.filter((o) => o.packedAt != null && preDispatch(o)).length;
   const dispatchedCount = initialOrders.filter((o) => o.status === "DISPATCHED").length;
   const deliveredCount = initialOrders.filter((o) => o.status === "DELIVERED").length;
   const cancelledCount = initialOrders.filter((o) => o.status === "CANCELLED").length;
@@ -153,26 +155,25 @@ export function OrdersView({
     return sum + p.total;
   }, 0);
 
-  const toPackCount = initialOrders.filter(
-    (o) => (o.status === "CONFIRMED" || o.status === "PAID") && !o.packedAt,
-  ).length;
+  const toPackCount = initialOrders.filter(toPack).length;
 
   // Filtered orders for "orders" panel
   const qClean = query.trim().toLowerCase();
   const filteredOrders = initialOrders.filter((o) => {
-    // Tab filter
-    if (show === "new" && o.status !== "NEW") return false;
-    if (show === "confirmed" && o.status !== "CONFIRMED") return false;
+    // Step filter
+    if (show === "new" && !stageIs(o, "RECEIVED")) return false;
+    if (show === "payment" && !stageIs(o, "PAYMENT")) return false;
+    if (show === "verify" && !stageIs(o, "VERIFY")) return false;
+    if (show === "confirmed" && !stageIs(o, "CONFIRMED")) return false;
     if (show === "paid" && !isOrderPaid(o) && !isOrderCod(o)) return false;
-    // "To pack" (from the To pack card and Home): confirmed or paid, not packed yet. Same rule as toPackCount.
-    if (show === "topack" && !((o.status === "CONFIRMED" || o.status === "PAID") && !o.packedAt)) return false;
-    if (show === "packed" && (o.packedAt == null || o.status === "CANCELLED")) return false;
+    // "To pack" (from the To pack card and Home): confirmed (paid or COD confirmed), not packed yet.
+    if (show === "topack" && !toPack(o)) return false;
+    if (show === "packed" && !(o.packedAt != null && preDispatch(o))) return false;
     if (show === "dispatched" && o.status !== "DISPATCHED") return false;
     if (show === "done" && o.status !== "DELIVERED") return false;
     if (show === "cancelled" && o.status !== "CANCELLED") return false;
-    // Lists other pages link to (Home, Reports, Products): not paid yet, payments to check, refunds due.
+    // Lists other pages link to (Home, Reports, Products): not paid yet, refunds due.
     if (show === "unpaid" && !(o.status !== "CANCELLED" && !isOrderPaid(o) && !isOrderCod(o))) return false;
-    if (show === "verify" && !(o.paymentClaimedAt && !isOrderPaid(o) && o.status !== "CANCELLED")) return false;
     if (show === "refund" && !(o.status === "CANCELLED" && isOrderPaid(o) && !o.refundedAt)) return false;
 
     // Payment dropdown filter
@@ -201,7 +202,7 @@ export function OrdersView({
 
   // Packing list orders (confirmed or paid orders waiting for dispatch)
   const waitingPackOrders = initialOrders.filter(
-    (o) => (o.status === "CONFIRMED" || o.status === "PAID" || o.packedAt != null) && o.status !== "DISPATCHED" && o.status !== "DELIVERED" && o.status !== "CANCELLED",
+    (o) => isConfirmedOrLater(o) && preDispatch(o),
   );
 
   const packFiltered = waitingPackOrders
@@ -399,11 +400,11 @@ export function OrdersView({
           {/* Top KPI 4-Card Strip */}
           <div className="grid g4 keep2" id="ok" style={{ marginBottom: 18, gap: 16 }}>
             <Stat
-              label={isTa ? "புதிய ஆர்டர்கள்" : "New orders"}
-              labelTa="புதிய ஆர்டர்கள்"
+              label={isTa ? "வந்த ஆர்டர்கள்" : "Orders received"}
+              labelTa="வந்த ஆர்டர்கள்"
               value={newCount}
-              sub={hasConfirm ? (isTa ? "முதலில் உறுதிப்படுத்தவும்" : "Confirm these first") : (isTa ? "பணம் வசூலிக்கவும்" : "Take payment")}
-              subTa={hasConfirm ? "முதலில் உறுதிப்படுத்தவும்" : "பணம் வசூலிக்கவும்"}
+              sub={isTa ? "பணம் இணைப்பு அனுப்பவும்" : "Send the payment link"}
+              subTa="பணம் இணைப்பு அனுப்பவும்"
               icon={<ShoppingBag className="size-4" />}
               tone="brand"
               onClick={() => setShow("new")}
@@ -425,8 +426,8 @@ export function OrdersView({
               label={hasPack ? (isTa ? "பேக் செய்ய வேண்டியவை" : "To pack") : (isTa ? "முடிக்க வேண்டியவை" : "To finish")}
               labelTa={hasPack ? "பேக் செய்ய வேண்டியவை" : "முடிக்க வேண்டியவை"}
               value={toPackCount}
-              sub={isTa ? "பணம் அல்லது COD" : "Paid or COD"}
-              subTa="பணம் அல்லது COD"
+              sub={isTa ? "உறுதியான ஆர்டர்கள்" : "Confirmed orders"}
+              subTa="உறுதியான ஆர்டர்கள்"
               icon={<Package className="size-4" />}
               tone="info"
               onClick={() => setShow("topack")}
@@ -579,25 +580,31 @@ export function OrdersView({
               aria-pressed={show === "new"}
               onClick={() => setShow("new")}
             >
-              <T ta="புதியவை">New</T> <small>{newCount}</small>
+              <T ta="வந்தவை">Received</T> <small>{newCount}</small>
             </button>
-            {hasConfirm && (
-              <button
-                type="button"
-                className="chip"
-                aria-pressed={show === "confirmed"}
-                onClick={() => setShow("confirmed")}
-              >
-                <T ta="உறுதியானவை">Confirmed</T> <small>{confirmedCount}</small>
-              </button>
-            )}
             <button
               type="button"
               className="chip"
-              aria-pressed={show === "paid"}
-              onClick={() => setShow("paid")}
+              aria-pressed={show === "payment"}
+              onClick={() => setShow("payment")}
             >
-              <T ta="பணம் / COD">Paid / COD</T> <small>{paidCount}</small>
+              <T ta="பணம் செலுத்துதல்">Payment processing</T> <small>{paymentCount}</small>
+            </button>
+            <button
+              type="button"
+              className="chip"
+              aria-pressed={show === "verify"}
+              onClick={() => setShow("verify")}
+            >
+              <T ta="பணம் சரிபார்ப்பு">Payment verification</T> <small>{verifyCount}</small>
+            </button>
+            <button
+              type="button"
+              className="chip"
+              aria-pressed={show === "confirmed"}
+              onClick={() => setShow("confirmed")}
+            >
+              <T ta="உறுதியானவை">{confirmLabel}</T> <small>{confirmedCount}</small>
             </button>
             {hasPack && (
               <button
@@ -651,22 +658,12 @@ export function OrdersView({
           >
             <span><T ta="நிலைகள்:">Steps:</T></span>
             <span id="flowline" style={{ fontWeight: 500 }}>
-              {steps.map((f, i) => {
-                const taMap: Record<string, string> = {
-                  "Placed": "ஆர்டர் வந்தது",
-                  "Confirmed": "உறுதியானது",
-                  "Paid": "பணம் வந்தது",
-                  "Packed": "பேக் செய்யப்பட்டது",
-                  "Dispatched": "அனுப்பப்பட்டது",
-                  "Delivered": "டெலிவரி ஆனது",
-                };
-                return (
-                  <Fragment key={f.key}>
-                    {i > 0 && <span style={{ opacity: 0.45, margin: "0 4px", userSelect: "none" }}>›</span>}
-                    <span><T ta={taMap[f.label] ?? f.label}>{f.label}</T></span>
-                  </Fragment>
-                );
-              })}
+              {steps.map((f, i) => (
+                <Fragment key={f.key}>
+                  {i > 0 && <span style={{ opacity: 0.45, margin: "0 4px", userSelect: "none" }}>›</span>}
+                  <span>{isTa ? f.ta : f.label}</span>
+                </Fragment>
+              ))}
             </span>
             <span style={{ opacity: 0.5 }}>·</span>
             <Link href="/dashboard/settings#order-steps" className="linkb" style={{ fontSize: 13, fontWeight: 600 }}>

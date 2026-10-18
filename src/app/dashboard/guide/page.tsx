@@ -43,10 +43,10 @@ const MOVES: [string, string, string?][] = [
 ];
 
 const BUTTONS: [string, string, string][] = [
-  ["New", "Confirm & message customer · Cash on delivery & confirm · Request payment", "The order moves to Confirmed; cash on delivery also confirms it."],
-  ["Confirmed, not paid", "Request payment (UPI) · Dispatch · Cash on delivery", "A WhatsApp payment turns the order paid by itself."],
-  ["Customer says they paid", "Payment received · Not received", "One tap after seeing the money in your bank or UPI app."],
-  ["Paid or cash on delivery", "Dispatch & message customer", "Asks for the delivery time and person, and can send a tracking link."],
+  ["Order received", "Send payment link · Confirm as cash on delivery", "The payment link moves it to Payment processing; cash on delivery skips the payment steps."],
+  ["Payment processing", "Send reminder · Mark paid", "A WhatsApp payment is verified by itself and confirms the order."],
+  ["Payment verification", "Payment received · Not received", "The customer says they paid: check your bank or UPI app. Payment received confirms the order and sends the receipt."],
+  ["Order confirmed", "Pack order · Dispatch & message customer", "Only paid orders (or confirmed cash on delivery) can be packed and dispatched."],
   ["Dispatched", "Delivered & thank customer · Delivered & cash collected", "Cash on delivery closes here."],
   ["Any open order", "Open chat · Call · Timeline · More: edit items, team note, record payment, refund, cancel", "Rare actions stay under More actions."],
 ];
