@@ -121,8 +121,10 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
       </div>
 
       <p className="muted" style={{ marginBottom: 12 }}>
-        WhatsApp only lets you send messages built from approved templates. The kind you choose decides the price: <b>Marketing</b> costs the most, <b>Utility</b> costs less, <b>Authentication</b> is for
-        one-time codes.
+        <T ta="அங்கீகரிக்கப்பட்ட டெம்ப்ளேட்களால் மட்டுமே வாட்ஸ்அப்பில் செய்தி அனுப்ப முடியும். நீங்கள் தேர்ந்தெடுக்கும் வகையே விலையைத் தீர்மானிக்கும்: Marketing அதிகச் செலவு, Utility குறைவு, Authentication ஒருமுறை குறியீடுகளுக்கு.">
+          WhatsApp only lets you send messages built from approved templates. The kind you choose decides the price: <b>Marketing</b> costs the most, <b>Utility</b> costs less, <b>Authentication</b> is for
+          one-time codes.
+        </T>
       </p>
 
       <div className="chips" style={{ marginBottom: 12, alignItems: "center" }}>

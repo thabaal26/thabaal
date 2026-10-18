@@ -9,6 +9,7 @@ import { retryHeldBack } from "@/lib/held";
 import { campaignAudienceWhere } from "@/lib/audiences";
 import { decodeTags, TAGS_PREFIX } from "@/lib/audience-tags";
 import { getSettings, templateSendable } from "@/lib/provider";
+import { unmappedVars, type VarMap } from "@/lib/template";
 import { isQuietTime } from "@/lib/rules";
 import { computeNextRun, TEST_TAG } from "@/lib/schedule";
 import { senderFor } from "@/lib/senders";
@@ -47,6 +48,10 @@ export async function saveCampaign(id: string | null, input: CampaignInput): Pro
   const template = await db.template.findUnique({ where: { id: input.templateId, clientId } });
   if (!template) errors.push("Choose a template.");
   else if (template.category === "AUTHENTICATION") errors.push("Authentication templates can't be used in campaigns.");
+  else {
+    const missing = unmappedVars({ category: template.category, body: template.body, variables: template.variables as VarMap });
+    if (missing.length) errors.push(`"${template.name}" has no value set for ${missing.map((n) => `{{${n}}}`).join(", ")}. Set it in Templates first, or every customer would get their name there.`);
+  }
   const { number: sender } = await senderFor(clientId, input.senderId || null);
   if (input.senderId && sender?.id !== input.senderId) errors.push("Choose a number to send from.");
   if (template && sender && template.businessAccountId && template.businessAccountId !== sender.businessAccountId)

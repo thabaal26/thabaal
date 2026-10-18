@@ -2,7 +2,7 @@ import "server-only";
 import { headerImageFor } from "./media";
 import type { Setting, Template } from "@prisma/client";
 import { db } from "./db";
-import { placeholders, renderFor, resolveVar, toPlainText, type TemplateButton, type VarMap } from "./template";
+import { placeholders, renderFor, resolveVar, toPlainText, unmappedVars, type TemplateButton, type VarMap } from "./template";
 import { getSession, sendImage, sendText, type WahaConfig } from "./waha";
 import { NOT_CONNECTED, sendTemplateMessage, waConfig, type WaConfig } from "./whatsapp";
 
@@ -53,6 +53,9 @@ export async function deliver(
   const isAuth = t.category === "AUTHENTICATION";
   const resolvedOtp = isAuth ? (otpCode?.trim() || String(Math.floor(100000 + Math.random() * 900000))) : null;
   const varMap = (t.variables ?? {}) as VarMap;
+  // Never send a guessed value: a {{2}} with nothing set would otherwise go out as the customer's name.
+  const missing = unmappedVars({ category: t.category, body: t.body, variables: varMap });
+  if (missing.length) throw new Error(`"${t.name}" has no value set for ${missing.map((n) => `{{${n}}}`).join(", ")}. Set it in Templates, then send again.`);
   const r = renderFor({ ...t, headerText: t.headerText ?? "", footer: t.footer ?? "", variables: varMap }, customer);
   const provider = s.provider as ProviderName;
   // A template without its own picture uses the client's default image.

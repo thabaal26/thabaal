@@ -146,14 +146,16 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
 
   const d: PeriodFigures = per === "m" ? data.overview.m : data.overview.w;
   const r = d.returnRatio;
-  const good = r >= 10;
-  const okv = r >= 3;
+  // Without a recorded message cost there is no return per ₹1: show a dash and say so, not a made-up ratio.
+  const noCost = d.cost <= 0;
+  const good = !noCost && r >= 10;
+  const okv = !noCost && r >= 3;
 
   const k = [
     [tr("WhatsApp cost", "வாட்ஸ்அப் கட்டணம்"), R(d.cost), tr("Meta message charges", "மெட்டா மெசேஜ் கட்டணம்"), <IndianRupee key="c" className="size-4" />],
     [tr("Paid sales", "செலுத்தப்பட்ட விற்பனை"), R(d.sales), tr("From customers you messaged", "மெசேஜ் அனுப்பிய வாடிக்கையாளர்களிடமிருந்து"), <ShoppingBag key="s" className="size-4" />],
     [tr("Money waiting", "நிலுவை பணம்"), R(d.wait), tr("Ordered, not yet paid", "ஆர்டர் செய்யப்பட்டது, பணம் செலுத்தப்படவில்லை"), <Clock key="w" className="size-4" />],
-    [tr("Return per ₹1", "ரூ.1-க்கு வருமானம்"), R(r), tr("Sales, not profit", "விற்பனை, லாபம் அல்ல"), <ArrowUpRight key="r" className="size-4" />],
+    [tr("Return per ₹1", "ரூ.1-க்கு வருமானம்"), noCost ? "—" : R(r), noCost ? tr("No message cost recorded", "செய்திக் கட்டணம் பதிவாகவில்லை") : tr("Sales, not profit", "விற்பனை, லாபம் அல்ல"), <ArrowUpRight key="r" className="size-4" />],
   ] as const;
 
   const J = [
@@ -198,19 +200,23 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
         className="card"
         style={{
           marginBottom: 16,
-          borderLeft: `6px solid ${good ? "var(--ok)" : okv ? "var(--bar2)" : "var(--bad)"}`,
+          borderLeft: `6px solid ${good ? "var(--ok)" : okv || noCost ? "var(--bar2)" : "var(--bad)"}`,
         }}
       >
         <div className="hd" style={{ marginBottom: 6 }}>
           <div>
             <h2 style={{ fontSize: 22 }} id="verd">
               {tr(
-                good
+                noCost
+                  ? `Sales came in ${per === "m" ? "this month" : "this week"}; no message cost recorded.`
+                  : good
                   ? `WhatsApp is working well ${per === "m" ? "this month" : "this week"}.`
                   : okv
                   ? `WhatsApp is doing alright ${per === "m" ? "this month" : "this week"}.`
                   : `WhatsApp is not paying back ${per === "m" ? "this month" : "this week"}.`,
-                good
+                noCost
+                  ? `${per === "m" ? "இந்த மாதம்" : "இந்த வாரம்"} விற்பனை வந்தது; செய்திக் கட்டணம் பதிவாகவில்லை.`
+                  : good
                   ? `${per === "m" ? "இந்த மாதம்" : "இந்த வாரம்"} வாட்ஸ்அப் சிறப்பாக செயல்படுகிறது.`
                   : okv
                   ? `${per === "m" ? "இந்த மாதம்" : "இந்த வாரம்"} வாட்ஸ்அப் சராசரியாக உள்ளது.`
@@ -238,10 +244,15 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
           </div>
         </div>
         <p id="verds">
-          {tr(
-            `You spent ${R(d.cost)} on messages and received ${R(d.sales)} in paid orders. Every ₹1 spent brought back ${R(r)} in sales.`,
-            `செய்திகளுக்கு ${R(d.cost)} செலவழித்து ${R(d.sales)} மதிப்புள்ள செலுத்தப்பட்ட ஆர்டர்களைப் பெற்றுள்ளீர்கள். செலவழித்த ஒவ்வொரு ₹1-க்கும் ${R(r)} விற்பனை வந்துள்ளது.`
-          )}
+          {noCost
+            ? tr(
+                `You received ${R(d.sales)} in paid orders. No message cost is recorded for this period, so a return per ₹1 can't be worked out.`,
+                `${R(d.sales)} மதிப்புள்ள செலுத்தப்பட்ட ஆர்டர்கள் வந்துள்ளன. இந்தக் காலத்துக்குச் செய்திக் கட்டணம் பதிவாகவில்லை, அதனால் ₹1-க்கு வருமானத்தைக் கணக்கிட முடியாது.`
+              )
+            : tr(
+                `You spent ${R(d.cost)} on messages and received ${R(d.sales)} in paid orders. Every ₹1 spent brought back ${R(r)} in sales.`,
+                `செய்திகளுக்கு ${R(d.cost)} செலவழித்து ${R(d.sales)} மதிப்புள்ள செலுத்தப்பட்ட ஆர்டர்களைப் பெற்றுள்ளீர்கள். செலவழித்த ஒவ்வொரு ₹1-க்கும் ${R(r)} விற்பனை வந்துள்ளது.`
+              )}
         </p>
       </div>
 
@@ -426,7 +437,7 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
                 </div>
                 <div className="stat">
                   <div className="l">{tr("Return per ₹1", "ரூ.1-க்கு வருமானம்")}</div>
-                  <div className="v">{R(spend.returnPerRupee)}</div>
+                  <div className="v">{spend.thisMonth > 0 ? R(spend.returnPerRupee) : "—"}</div>
                   <div className="d up">{tr("in sales", "விற்பனையில்")}</div>
                 </div>
               </div>
@@ -619,7 +630,7 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
                       <td className="num">{R(c.spent)}</td>
                       <td className="num">{R(c.sales)}</td>
                       <td className="num">
-                        <b>{R(c.returnRatio)}</b>
+                        <b>{c.spent > 0 ? R(c.returnRatio) : "—"}</b>
                       </td>
                       <td>
                         <span className={`pill ${c.verdict}`}>{c.verdictLabel}</span>

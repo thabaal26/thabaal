@@ -60,7 +60,8 @@ try {
   execSync("npx prisma db push --skip-generate --accept-data-loss", { stdio: "inherit", env });
   run("npx tsx --conditions=react-server --test tests/unit/*.test.ts");
   if (http) {
-    const app = spawn("npx", ["next", "start", "-p", "3200"], { env: { ...env, NODE_ENV: "production" }, stdio: "inherit", shell: true });
+    // Its own process group off Windows, so stopping it also stops the Next.js server the shell started.
+    const app = spawn("npx", ["next", "start", "-p", "3200"], { env: { ...env, NODE_ENV: "production" }, stdio: "inherit", shell: true, detached: process.platform !== "win32" });
     try {
       for (let i = 0; i < 60; i++) {
         try {
@@ -71,7 +72,11 @@ try {
       run("node tests/http/isolation.mjs");
       if (process.argv.includes("--rehearsal")) run("node tests/http/rehearsal.mjs");
     } finally {
-      app.kill();
+      if (process.platform !== "win32") {
+        try {
+          process.kill(-app.pid, "SIGTERM");
+        } catch {}
+      } else app.kill();
       if (process.platform === "win32") {
         try {
           execSync(`for /f "tokens=5" %a in ('netstat -ano ^| findstr :3200 ^| findstr LISTENING') do taskkill /F /PID %a`, { stdio: "ignore", shell: "cmd.exe" });

@@ -84,7 +84,7 @@ function sum(c: CampaignItem, isTamil = false) {
       `${c.sent.toLocaleString("en-IN")} வாடிக்கையாளர்களை சென்றடைந்தது. ` +
       `${Math.round((c.sent * c.seen) / 100).toLocaleString("en-IN")} பேர் படித்தனர். ` +
       `${c.ord} ஆர்டர்கள் மூலம் ${R(c.sale)} விற்பனை வந்தது. ` +
-      `செலவு ${R(c.sp)}. ஒவ்வொரு ₹1 செலவுக்கும் ${R(r)} விற்பனை.`
+      (c.sp > 0 ? `செலவு ${R(c.sp)}. ஒவ்வொரு ₹1 செலவுக்கும் ${R(r)} விற்பனை.` : "செய்திக் கட்டணம் இன்னும் பதிவாகவில்லை.")
     );
   }
   return (
@@ -96,11 +96,7 @@ function sum(c: CampaignItem, isTamil = false) {
     c.ord +
     " paid orders brought " +
     R(c.sale) +
-    ". You spent " +
-    R(c.sp) +
-    ". Every ₹1 spent brought " +
-    R(r) +
-    " in sales."
+    (c.sp > 0 ? ". You spent " + R(c.sp) + ". Every ₹1 spent brought " + R(r) + " in sales." : ". No message cost recorded yet.")
   );
 }
 

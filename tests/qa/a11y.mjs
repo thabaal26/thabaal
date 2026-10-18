@@ -62,7 +62,6 @@ for (const size of SIZES) {
       await p.waitForTimeout(300);
       await p.addScriptTag({ content: AXE });
       const res = await p.evaluate(async () => {
-        // eslint-disable-next-line no-undef
         const r = await axe.run(document, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] }, resultTypes: ["violations"] });
         return r.violations.map((v) => ({ id: v.id, impact: v.impact, help: v.help, count: v.nodes.length, targets: v.nodes.slice(0, 4).map((n) => n.target.join(" ")), notes: v.nodes.slice(0, 4).map((n) => (n.any[0] ?? n.all[0] ?? n.none[0])?.message ?? "") }));
       });

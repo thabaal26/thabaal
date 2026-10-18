@@ -232,6 +232,37 @@ await check("API-30", "unknown API route → 404, not a crash", async () => {
   expect(r.status === 404, `got ${r.status}`);
 });
 
+// ── Database: the Postgres trigger that stamps order step times (prisma/sql/2026-10-18-order-step-times.sql) ──
+await check("DB-01", "order step times: stamped on the way forward, cleared when an order moves back", async () => {
+  const o = await db.order.findFirst({ where: { clientId: S.shopId, status: "NEW" } });
+  expect(o, "no NEW order in the QA shop");
+  const at = async () => db.order.findUnique({ where: { id: o.id }, select: { confirmedAt: true, dispatchedAt: true, deliveredAt: true } });
+  const shape = (r) => [r.confirmedAt ? "c" : "-", r.dispatchedAt ? "d" : "-", r.deliveredAt ? "v" : "-"].join("");
+  const seen = [];
+  try {
+    for (const status of ["CONFIRMED", "DISPATCHED", "DELIVERED", "CONFIRMED", "NEW"]) {
+      await db.order.update({ where: { id: o.id }, data: { status } });
+      seen.push(`${status}:${shape(await at())}`);
+    }
+  } finally {
+    await db.order.update({ where: { id: o.id }, data: { status: o.status, confirmedAt: o.confirmedAt, dispatchedAt: o.dispatchedAt, deliveredAt: o.deliveredAt } });
+  }
+  expect(seen.join(" ") === "CONFIRMED:c-- DISPATCHED:cd- DELIVERED:cdv CONFIRMED:c-- NEW:---", `got ${seen.join(" ")}`);
+  return seen.join(" ");
+});
+await check("DB-02", "order references are unique (the database refuses a second order with the same ref)", async () => {
+  const o = await db.order.findFirst({ where: { clientId: S.shopId, ref: { not: null } } });
+  expect(o, "no order with a ref");
+  const dup = await db.order.create({ data: { clientId: S.shopId, customerId: o.customerId, ref: o.ref, total: 1, items: [] } }).then(
+    async (x) => {
+      await db.order.delete({ where: { id: x.id } });
+      return "created";
+    },
+    (e) => e.code ?? "error",
+  );
+  expect(dup === "P2002", `duplicate ref → ${dup}`);
+});
+
 await db.$disconnect();
 fs.writeFileSync(".git/qa-api.json", JSON.stringify(results, null, 1));
 const pass = results.filter((r) => r.status === "PASS").length;

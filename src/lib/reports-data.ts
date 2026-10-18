@@ -91,7 +91,7 @@ export type ReportCampaignRow = {
   spent: number;
   sales: number;
   returnRatio: number;
-  verdict: "ok" | "warn" | "bad";
+  verdict: "ok" | "warn" | "bad" | "mute";
   verdictLabel: string;
 };
 
@@ -256,13 +256,16 @@ async function computePeriodFigures(
   }
 
   cost = Math.round(cost * 100) / 100;
-  const returnRatio = cost > 0 ? Math.round((sales / cost) * 100) / 100 : sales;
+  // No recorded message cost: there is no return per ₹1 to show (it used to fall back to the sales total).
+  const returnRatio = cost > 0 ? Math.round((sales / cost) * 100) / 100 : 0;
 
   const hasActivity = sent > 0 || orders.length > 0;
-  const verdictGood = hasActivity && returnRatio >= 10;
-  const verdictOk = hasActivity && returnRatio >= 3;
+  const verdictGood = hasActivity && cost > 0 && returnRatio >= 10;
+  const verdictOk = hasActivity && cost > 0 && returnRatio >= 3;
   const verdictTitle = !hasActivity
     ? `No message activity yet ${periodName}.`
+    : cost <= 0
+    ? `Sales came in ${periodName}; no message cost recorded.`
     : verdictGood
     ? `WhatsApp is working well ${periodName}.`
     : verdictOk
@@ -271,6 +274,8 @@ async function computePeriodFigures(
 
   const verdictSub = !hasActivity
     ? `Broadcast campaigns and customer orders will calculate your live return on message spend here.`
+    : cost <= 0
+    ? `You received ${fmtInr(sales)} in paid orders. No message cost is recorded for this period, so a return per ₹1 can't be worked out.`
     : `You spent ${fmtInr(cost)} on messages and received ${fmtInr(
         sales,
       )} in paid orders. Every ₹1 spent brought back ${fmtInr(returnRatio)} in sales.`;
@@ -409,7 +414,7 @@ export async function getComprehensiveReportData(clientId: string): Promise<Comp
   const lastMonthSpent = spend ? spend.previous.reduce((sum, r) => sum + r.cost, 0) : 0;
   const freeRemaining = spend?.serviceQuota?.freeRemaining ?? 1000;
   const freeTotal = spend?.serviceQuota?.totalFreeLimit ?? 1000;
-  const returnPerRupee = thisMonthSpent > 0 ? Math.round((pMonth.sales / thisMonthSpent) * 10) / 10 : pMonth.sales;
+  const returnPerRupee = thisMonthSpent > 0 ? Math.round((pMonth.sales / thisMonthSpent) * 10) / 10 : 0;
 
   // Daily spend series (last 14 days)
   const daysList: string[] = [];
@@ -526,9 +531,9 @@ export async function getComprehensiveReportData(clientId: string): Promise<Comp
   // 3. Campaigns Performance
   const campaigns: ReportCampaignRow[] = campaignsRaw.map((c) => {
     const spent = Math.round(c.sent * 0.8631);
-    const returnRatio = spent > 0 ? Math.round((c.revenue / spent) * 100) / 100 : c.revenue;
-    const verdict = returnRatio >= 10 ? "ok" : returnRatio >= 3 ? "warn" : "bad";
-    const verdictLabel = returnRatio >= 10 ? "Working well" : returnRatio >= 3 ? "OK" : "Stop";
+    const returnRatio = spent > 0 ? Math.round((c.revenue / spent) * 100) / 100 : 0;
+    const verdict = spent <= 0 ? "mute" : returnRatio >= 10 ? "ok" : returnRatio >= 3 ? "warn" : "bad";
+    const verdictLabel = spent <= 0 ? "Not sent yet" : returnRatio >= 10 ? "Working well" : returnRatio >= 3 ? "OK" : "Stop";
     return {
       id: c.id,
       name: c.name,
@@ -797,7 +802,7 @@ export async function getComprehensiveReportData(clientId: string): Promise<Comp
     `*WhatsApp Business Report · ${rangeStr}*`,
     `Verdict: ${pMonth.verdictTitle}`,
     `Paid sales: ${fmtInr(pMonth.sales)} from ${pMonth.paid} orders`,
-    `WhatsApp spend: ${fmtInr(pMonth.cost)} · Return: ₹${pMonth.returnRatio} per ₹1`,
+    `WhatsApp spend: ${fmtInr(pMonth.cost)} · Return: ${pMonth.cost > 0 ? `₹${pMonth.returnRatio} per ₹1` : "not worked out (no message cost recorded)"}`,
     `Messages sent: ${pMonth.sent} · Reached: ${pMonth.reached} · Read: ${pMonth.read}`,
     `Customer replies: ${pMonth.rep} · Unpaid waiting: ${fmtInr(pMonth.wait)}`,
     productRows[0] ? `Top product: ${productRows[0].name} (${fmtInr(productRows[0].sales)})` : "",

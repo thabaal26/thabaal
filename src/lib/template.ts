@@ -108,6 +108,15 @@ type Renderable = Pick<
   "category" | "headerType" | "headerText" | "body" | "footer" | "variables" | "codeExpiryMins" | "securityNote"
 >;
 
+/**
+ * Placeholders after {{1}} that have no value set. {{1}} falls back to the customer's name (every synced template
+ * gets that mapping); anything else would otherwise be filled with the name too ("Items: Priya. Total: Rs Priya").
+ */
+export function unmappedVars(t: Pick<Renderable, "category" | "body" | "variables">): number[] {
+  if (t.category === "AUTHENTICATION") return [];
+  return placeholders(t.body).filter((n) => n !== 1 && !t.variables?.[String(n)]);
+}
+
 /** Text a customer sees plus the parameter lists the Cloud API expects. */
 export function renderFor(t: Renderable, c: CustomerLike, otp = "482913") {
   if (t.category === "AUTHENTICATION") {
@@ -117,7 +126,9 @@ export function renderFor(t: Renderable, c: CustomerLike, otp = "482913") {
     return { header: "", body, footer, bodyParams: [otp], headerParams: [] as string[] };
   }
   const nums = placeholders(t.body);
-  const bodyParams = nums.map((n) => resolveVar(t.variables[String(n)], c).trim() || "there");
+  const missing = unmappedVars(t);
+  // An unmapped {{n}} shows as itself in previews; sending one is refused (lib/provider.ts) rather than guessed.
+  const bodyParams = nums.map((n) => (missing.includes(n) ? `{{${n}}}` : resolveVar(t.variables[String(n)], c).trim() || "there"));
   const headerParams =
     t.headerType === "TEXT" && placeholders(t.headerText).length ? [resolveVar(t.variables.h1, c).trim() || "Customer"] : [];
   return {
