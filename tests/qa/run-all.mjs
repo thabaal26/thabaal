@@ -45,6 +45,8 @@ if (!ready) {
   process.exit(1);
 }
 console.log("QA app ready");
+// The sweep signs in through the form, so the QA logins need their password (qa-test-123).
+sh("node tests/qa/qa-login.mjs", ".git/qa-login.log");
 
 const steps = [
   ["action-guards", "node tests/qa/action-guards.mjs"],
