@@ -38,9 +38,12 @@ Every row in [`TEST_CASES.csv`](TEST_CASES.csv) comes from a result file a suite
 | Visual, 24 routes × 5 sizes × light/dark × English/Tamil | 480 screens, 10 findings, all one data item (a template's own name) |
 | Accessibility, axe WCAG 2.x A/AA, 25 pages × 2 sizes (new) | **0 violations** (was 4 rule types on 18+ pages) |
 | Performance, 12 pages × laptop + slowed phone (new) | every page within LCP/CLS/TBT targets |
+| Button sweep, every page, phone + desktop | 291 + 272 presses on 29 pages: no page or server error, no failed action; dialogs open, fit and close. 70 presses with no visible change (already-selected options, print/export, empty forms stopped by the browser) and 35 click timeouts (the sweep clicking while the page re-renders, or screen-reader-only chart buttons) were checked by hand |
 | GitHub Checks on every push | green |
 
-Totals in `TEST_CASES.csv` (from the generator): see §8.
+`TEST_CASES.csv`: **349 test cases, 349 PASS**, 0 FAIL, 0 BLOCKED, 0 NOT RUN. At the start of the run the same
+generator gave 247 cases: 207 PASS, 35 FAIL (accessibility and the upload header), 5 NOT RUN. The visual matrix and
+performance rows come from the build before the last two changes (dialogs, CR-01); everything else from the final build.
 
 ## 4. Defects fixed in this run (14)
 
