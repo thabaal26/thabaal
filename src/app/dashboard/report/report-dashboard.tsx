@@ -152,10 +152,10 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
   const okv = !noCost && r >= 3;
 
   const k = [
-    [tr("WhatsApp cost", "வாட்ஸ்அப் கட்டணம்"), R(d.cost), tr("Meta message charges", "மெட்டா மெசேஜ் கட்டணம்"), <IndianRupee key="c" className="size-4" />],
-    [tr("Paid sales", "செலுத்தப்பட்ட விற்பனை"), R(d.sales), tr("From customers you messaged", "மெசேஜ் அனுப்பிய வாடிக்கையாளர்களிடமிருந்து"), <ShoppingBag key="s" className="size-4" />],
-    [tr("Money waiting", "நிலுவை பணம்"), R(d.wait), tr("Ordered, not yet paid", "ஆர்டர் செய்யப்பட்டது, பணம் செலுத்தப்படவில்லை"), <Clock key="w" className="size-4" />],
-    [tr("Return per ₹1", "ரூ.1-க்கு வருமானம்"), noCost ? "—" : R(r), noCost ? tr("No message cost recorded", "செய்திக் கட்டணம் பதிவாகவில்லை") : tr("Sales, not profit", "விற்பனை, லாபம் அல்ல"), <ArrowUpRight key="r" className="size-4" />],
+    [tr("WhatsApp cost", "வாட்ஸ்அப் கட்டணம்"), R(d.cost), tr("Meta message charges", "மெட்டா மெசேஜ் கட்டணம்"), <IndianRupee key="c" className="size-4 shrink-0" />],
+    [tr("Paid sales", "செலுத்தப்பட்ட விற்பனை"), R(d.sales), tr("From customers you messaged", "மெசேஜ் அனுப்பிய வாடிக்கையாளர்களிடமிருந்து"), <ShoppingBag key="s" className="size-4 shrink-0" />],
+    [tr("Money waiting", "நிலுவை பணம்"), R(d.wait), tr("Ordered, not yet paid", "ஆர்டர் செய்யப்பட்டது, பணம் செலுத்தப்படவில்லை"), <Clock key="w" className="size-4 shrink-0" />],
+    [tr("Return per ₹1", "ரூ.1-க்கு வருமானம்"), noCost ? "—" : R(r), noCost ? tr("No message cost recorded", "செய்திக் கட்டணம் பதிவாகவில்லை") : tr("Sales, not profit", "விற்பனை, லாபம் அல்ல"), <ArrowUpRight key="r" className="size-4 shrink-0" />],
   ] as const;
 
   const J = [
