@@ -1,7 +1,8 @@
 # Thabaal: handoff for the next session
 
-Updated 18 Oct 2026, 18:35 IST. A new session (possibly on another Claude account) starts with **no memory** of
+Updated 18 Oct 2026, 19:40 IST. A new session (possibly on another Claude account) starts with **no memory** of
 earlier work; this file is its memory. Read all of it before doing anything.
+**Update this file after every task** (the owner's standing instruction): what changed, the commit, and what's left.
 
 ---
 
@@ -57,20 +58,56 @@ earlier work; this file is its memory. Read all of it before doing anything.
 9. **Ask before destructive live actions** (deleting records, sending messages, payments). The owner prefers direct
    execution otherwise.
 10. **Copy:** plain, specific words on screen (no slogans or filler); real data everywhere (no dummy values).
+11. **After every task, update this file** (section 3) and push it with the task's commit.
 
 ---
 
 ## 3. State at handoff
 
-- **`main` = `Madhu_changes` = `624710e`**, deployed to production and verified; GitHub Checks green. Working tree clean.
+- **`main` = `Madhu_changes` = `1ab4003`**, deployed to production (Vercel READY). See "In progress" below for
+  uncommitted work.
 - Full QA run (13-phase master prompt) done: reports in `docs/qa/` — `PROJECT_INVENTORY.md`, `TEST_PLAN.md`,
   `TEST_CASES.csv` (349/349 PASS), `RESPONSIVE_UI_AUDIT.md`, `BUG_REPORT.md` (BUG-01…16, CR-01, DEC-01…04, EXT-01/02),
   `INTEGRATION_REPORT.md`, `PERFORMANCE_REPORT.md`, `FINAL_QA_REPORT.md`, plus `tamil-gaps.tsv`.
 - Live tests finished: order RG-1028 (paid ₹1 by UPI, confirmed in the chat, packed, dispatched, delivered); the TEST
   campaign and TEST audience were deleted.
 
+### In progress (uncommitted on the owner's PC, 19:40)
+
+**UPI reference (UTR) and payment history** — the owner asked to save the UTR and every payment message.
+- New: `Order.paymentUtr` (the bank's 12-digit UTR, apart from `paymentTxnId` so neither overwrites the other) and
+  table `PaymentEvent` (every payment message: WhatsApp payment updates and UPI bubbles with Meta's full message in
+  `raw`, a UTR or screenshot from the customer, staff entries). SQL: `prisma/sql/2026-10-18-payment-events.sql`
+  (listed in db-additive); schema updated; `src/lib/payment-events.ts` (`findUtr`, `utrOf`, `logPaymentEvent`).
+- Webhook (`src/app/api/webhook/route.ts`): logs every payment status (paid, failed, pending) and bubble; saves a UTR
+  if Meta's message has one (gateway setups); UTR duplicates also checked on `paymentUtr`.
+- `src/lib/payments.ts`: `confirmPayment` takes `utr`; claims with "UTR-…" fill `paymentUtr`; staff entries logged.
+- Staff actions (`actions/payments.ts`, `actions/orders.ts`): a 12-digit reference is saved as the UTR; "Add UTR"
+  fills `paymentUtr`; undo / "not found" clear it. New `paymentHistory(orderId)` server action.
+- Screens: receipt shows "UPI reference (UTR)" and "Transaction ID" separately plus a "Payment history" list;
+  payment line, Payments › Received / All transactions show both (`paymentRefs()` in `plain-error.ts`); order search
+  finds a UTR.
+- Tests: `tests/qa/payments.mjs` checks 15 (paid webhook keeps txn id + UTR + full message) and 16 (customer's typed
+  UTR saved and logged, order not marked paid). 15 passed; 16 failed only because the test order's ref wasn't in the
+  `AB-1234` format (the webhook matched another order) — fixed to numeric refs, **re-run** `run-all.ps1 -NoBuild
+  -Skip crawl-desktop,crawl-phone,visual`, then commit (stage by name: the files above + `prisma/schema.prisma`,
+  `scripts/db-additive.mjs`, `src/app/dashboard/orders/{order-card,payment-status,page,orders-view}.tsx`,
+  `src/lib/payments-data.ts`, `src/lib/plain-error.ts`, `tests/qa/payments.mjs`, this file) and push.
+
 ### Done on 18 Oct (latest first)
 
+0. **Evening fixes (owner's screenshots), commits `f975be5`, `1ab4003`:**
+   - New order dialog: field groups were drawn as boxes and squashed (the app-wide `.field` input class matched the
+     label+input groups); now plain stacks (`portal.css`).
+   - New order: the WhatsApp number comes first and is looked up as it's typed (`lookupOrderCustomer`): an existing
+     customer's name and address fill in; a new number is saved as a customer with the order. +91 numbers accepted.
+   - Product photos pointed at the old `campaign-seven-ruddy.vercel.app`: links are now made on `www.thabaal.in`
+     (`src/lib/app-host.ts`); Meta catalogue photo links are moved in one batch after a catalogue read
+     (`relinkOldPhotos` in `src/lib/catalog.ts`); saved logo/banner/template links fixed by
+     `prisma/sql/2026-10-18-app-host-links.sql`. **Check:** Products › Edit any product shows a www.thabaal.in link.
+   - Meta account alerts in plain words; routine ones (WEBHOOK_CONFIG_UPDATED) hidden (`src/lib/meta-balance.ts`).
+   - Add customer: Area and Delivery region aligned (`Label` hint wraps under the label); dummy placeholders removed.
+   - QA: payments 14/14, payments-ui 14/14, crud 12/12, crawl desktop 672 visits 0 issues.
 1. **BUG-16, UPI references** (`8520817`):
    - Payments no longer shows WhatsApp message ids (`wamid…`) or `WA-UPI` as a reference (`paymentRef()` in
      `src/lib/plain-error.ts`).
