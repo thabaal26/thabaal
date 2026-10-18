@@ -8,6 +8,7 @@ import Link from "@/components/intent-link";
 import { safeAction, toastResult } from "@/components/toast";
 import type { CustomerRow, Status, Tier } from "@/lib/customers-data";
 import { useLanguage } from "@/lib/i18n/context";
+import { formatPhone } from "@/lib/phone";
 import type { PointEvent } from "@/lib/loyalty-history";
 import { adjustLoyaltyPoints, tagCustomers } from "../actions/customers";
 import { replyToCustomer } from "../actions/send";
@@ -281,7 +282,7 @@ export function CustomerTable({ rows, canManage }: { rows: CustomerRow[]; canMan
                       {c.name}
                     </Link>
                     <div className="muted small">
-                      {c.phone}
+                      {formatPhone(c.phone)}
                       {c.cart > 0 && <> · {isTamil ? `கார்ட் ${inr(c.cart)} நிலுவை` : `Cart ${inr(c.cart)} unpaid`}</>}
                       {c.optedOut && <> · {isTamil ? "விலகியவர்" : "opted out"}</>}
                       {c.unreachable && <> · {isTamil ? "செய்தி செல்லவில்லை" : "can't receive"}</>}
@@ -698,7 +699,7 @@ export function LoyaltyPanel({ rows, canManage, history = [] }: { rows: Customer
           <div className="hd">
             <div>
               <h2>{isTamil ? "புள்ளிகள் செயல்படும் விதம்" : "How points work"}</h2>
-              <p>{isTamil ? "எளிமையான முறையில் அனைவருக்கும் பொருந்தும் விதிகள்." : "The rule thabaal uses for every customer, in plain words."}</p>
+              <p>{isTamil ? "ஒவ்வொரு ஆர்டரிலும் புள்ளிகள், பில்லில் தள்ளுபடி. அனைவருக்கும் ஒரே விதி." : "Earn on every order, save on the next bill. The same rules for everyone."}</p>
             </div>
           </div>
           <div className="list">

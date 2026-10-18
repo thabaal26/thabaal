@@ -22,6 +22,7 @@ import {
   type TemplateButton,
   type TemplateDraft,
   type VarSource,
+  type CustomerLike,
 } from "@/lib/template";
 import { Picker } from "@/components/picker";
 import { useTr } from "@/lib/i18n/context";
@@ -63,6 +64,7 @@ export function TemplateEditor({
   statusReason,
   businessName,
   accounts = [],
+  previewFor = SAMPLE_CUSTOMER,
 }: {
   id: string | null;
   initial: TemplateDraft;
@@ -71,6 +73,8 @@ export function TemplateEditor({
   businessName: string;
   /** The client's WhatsApp Business Accounts; a new template picks one when there are several. */
   accounts?: { id: string; label: string }[];
+  /** A real customer of the business to preview for (lib/preview-customer.ts). */
+  previewFor?: CustomerLike;
 }) {
   const { tr, isTa } = useTr();
   const [t, setT] = useState<TemplateDraft>(initial);
@@ -147,7 +151,7 @@ export function TemplateEditor({
     }
   }
   const errors = useMemo(() => validateDraft(t), [t]);
-  const preview = renderFor(t, SAMPLE_CUSTOMER);
+  const preview = renderFor(t, previewFor);
   const bodyVars = placeholders(t.body);
   const headerVar = t.headerType === "TEXT" && placeholders(t.headerText).length > 0;
 
@@ -200,8 +204,10 @@ export function TemplateEditor({
   }
 
   return (
-    <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
-      <div className="space-y-4 sm:space-y-6">
+    // Form and preview side by side only when the form still has room (with the menu open, from 1280px);
+    // the form's own rows follow the form's width (container queries), not the screen's.
+    <div className="grid items-start gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:grid-cols-[minmax(0,1fr)_24rem]">
+      <div className="@container min-w-0 space-y-4 sm:space-y-6">
         {status && (status === "REJECTED" || statusReason) && (
           <Callout tone="danger" role="alert" icon={<TriangleAlert />} title={status === "REJECTED" ? "Meta rejected this template" : "Meta returned an error"}>
             {statusReason && <p>{statusReason}</p>}
@@ -214,7 +220,7 @@ export function TemplateEditor({
           <div className="space-y-5 p-4 sm:p-5">
             <fieldset>
               <legend className="mb-1.5 text-sm font-medium text-ink-2">{tr("Category")}</legend>
-              <div role="radiogroup" aria-label={tr("Category")} className="grid gap-2 sm:grid-cols-3">
+              <div role="radiogroup" aria-label={tr("Category")} className="grid gap-2 @lg:grid-cols-3">
                 {(Object.keys(CATEGORY_INFO) as Category[]).map((c) => (
                   <button
                     key={c}
@@ -235,7 +241,7 @@ export function TemplateEditor({
                 ))}
               </div>
             </fieldset>
-            <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_13rem]">
+            <div className="grid gap-4 @md:grid-cols-[minmax(0,1fr)_13rem]">
               {accounts.length > 1 && (
                 <div className="sm:col-span-2">
                   <Label htmlFor="waba" hint="approved per WhatsApp account">WhatsApp account</Label>
@@ -286,7 +292,7 @@ export function TemplateEditor({
             <CardHeader tone="info" icon={<Send3D />} title="Passcode message" description="Meta writes the text for authentication templates. You choose these options." />
             <div className="space-y-4 p-4 sm:p-5">
               <CheckRow label={<>Add &ldquo;For your security, do not share this code.&rdquo;</>} checked={t.securityNote} onChange={(e) => set({ securityNote: e.target.checked })} />
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 @md:grid-cols-2">
                 <Field id="exp" label="Code expires after (minutes)" hint="1–90, optional">
                   <input type="number" inputMode="numeric" min={1} max={90} className="field tabular" value={t.codeExpiryMins ?? ""} onChange={(e) => set({ codeExpiryMins: e.target.value ? Number(e.target.value) : null })} />
                 </Field>
@@ -319,7 +325,7 @@ export function TemplateEditor({
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <input
                     className="field flex-1 text-sm"
-                    placeholder={isTa ? "உங்கள் செய்தியை விவரியுங்கள் (உ.தா. தீபாவளி பட்டுப் புடவை 20% தள்ளுபடி)…" : "Describe your message (e.g., Diwali silk saree 20% off, or ST Courier dispatch update)…"}
+                    placeholder={isTa ? "உங்கள் செய்தியை விவரியுங்கள் (உ.தா. தீபாவளி சலுகை, அல்லது ஆர்டர் அனுப்பப்பட்டது)…" : "Describe your message (e.g. a Deepavali offer, or an order dispatched update)…"}
                     value={aiPrompt}
                     onChange={(e) => setAiPrompt(e.target.value)}
                     onKeyDown={(e) => {
@@ -457,7 +463,7 @@ export function TemplateEditor({
                   {[...(headerVar ? ["h1"] : []), ...bodyVars.map(String)].map((key) => {
                     const v = t.variables[key] ?? { source: "name" };
                     return (
-                      <div key={key} className="grid items-center gap-2 px-4 py-3 sm:grid-cols-[7rem_1fr_1fr] sm:gap-3 sm:px-5">
+                      <div key={key} className="grid items-center gap-2 px-4 py-3 @md:grid-cols-[7rem_1fr_1fr] @md:gap-3 sm:px-5">
                         <span className="font-mono text-sm font-medium text-ink-2">{key === "h1" ? (isTa ? "தலைப்பு {{1}}" : "Header {{1}}") : `{{${key}}}`}</span>
                         <Picker
                           title={isTa ? `${key === "h1" ? "தலைப்பு மாறியில்" : `{{${key}}}-ல்`} என்ன நிரப்ப வேண்டும்` : `What fills ${key === "h1" ? "the header variable" : `{{${key}}}`}`}
@@ -521,21 +527,21 @@ export function TemplateEditor({
               {t.buttons.length ? (
                 <div className="divide-y divide-line">
                   {t.buttons.map((b, i) => (
-                    <div key={i} className="grid grid-cols-[1fr_auto] items-center gap-2 px-4 py-3 sm:grid-cols-[6rem_1fr_1.3fr_auto] sm:px-5">
+                    <div key={i} className="grid grid-cols-[1fr_auto] items-center gap-2 px-4 py-3 @lg:grid-cols-[6rem_1fr_1.3fr_auto] sm:px-5">
                       <Badge tone={b.type === "URL" ? "blue" : b.type === "PHONE_NUMBER" || b.type === "CATALOG" || b.type === "ORDER_DETAILS" ? "green" : "gray"}>
                         {b.type === "URL" ? "Link" : b.type === "PHONE_NUMBER" ? "Call" : b.type === "CATALOG" ? "Catalogue" : b.type === "ORDER_DETAILS" ? "Review & pay" : "Reply"}
                       </Badge>
-                      <input className="field max-sm:col-span-2" maxLength={25} placeholder={tr("Button label")} aria-label={`Button ${i + 1} label`} value={b.text} onChange={(e) => setButton(i, { text: e.target.value })} />
+                      <input className="field @max-lg:col-span-2" maxLength={25} placeholder={tr("Button label")} aria-label={`Button ${i + 1} label`} value={b.text} onChange={(e) => setButton(i, { text: e.target.value })} />
                       {b.type === "URL" ? (
-                        <input className="field max-sm:col-span-2" inputMode="url" placeholder="https://…" aria-label={`Button ${i + 1} link`} value={b.url ?? ""} onChange={(e) => setButton(i, { url: e.target.value })} />
+                        <input className="field @max-lg:col-span-2" inputMode="url" placeholder="https://…" aria-label={`Button ${i + 1} link`} value={b.url ?? ""} onChange={(e) => setButton(i, { url: e.target.value })} />
                       ) : b.type === "PHONE_NUMBER" ? (
-                        <input className="field max-sm:col-span-2" type="tel" inputMode="tel" placeholder="+91 98765 43210" aria-label={`Button ${i + 1} phone number`} value={b.phone ?? ""} onChange={(e) => setButton(i, { phone: e.target.value })} />
+                        <input className="field @max-lg:col-span-2" type="tel" inputMode="tel" placeholder="+91 98765 43210" aria-label={`Button ${i + 1} phone number`} value={b.phone ?? ""} onChange={(e) => setButton(i, { phone: e.target.value })} />
                       ) : b.type === "CATALOG" ? (
-                        <input className="field max-sm:col-span-2 font-mono text-xs" placeholder="Thumbnail SKU (optional, e.g. SKU-006)" aria-label="Catalogue thumbnail product SKU" value={b.thumbnailProductId ?? ""} onChange={(e) => setButton(i, { thumbnailProductId: e.target.value })} />
+                        <input className="field @max-lg:col-span-2 font-mono text-xs" placeholder="Thumbnail SKU (optional, e.g. SKU-006)" aria-label="Catalogue thumbnail product SKU" value={b.thumbnailProductId ?? ""} onChange={(e) => setButton(i, { thumbnailProductId: e.target.value })} />
                       ) : (
-                        <span className="max-sm:hidden" />
+                        <span className="@max-lg:hidden" />
                       )}
-                      <button type="button" title="Remove" aria-label={`Remove button ${i + 1}`} onClick={() => set({ buttons: t.buttons.filter((_, j) => j !== i) })} className="col-start-2 row-start-1 grid size-11 place-items-center justify-self-end rounded-control text-muted transition hover:bg-danger-bg hover:text-danger sm:col-start-auto sm:row-start-auto sm:size-8 sm:pointer-coarse:size-11">
+                      <button type="button" title="Remove" aria-label={`Remove button ${i + 1}`} onClick={() => set({ buttons: t.buttons.filter((_, j) => j !== i) })} className="col-start-2 row-start-1 grid size-11 place-items-center justify-self-end rounded-control text-muted transition hover:bg-danger-bg hover:text-danger @lg:col-start-auto @lg:row-start-auto sm:size-8 sm:pointer-coarse:size-11">
                         <Trash2 aria-hidden className="size-4" />
                       </button>
                     </div>
@@ -549,7 +555,7 @@ export function TemplateEditor({
         )}
       </div>
 
-      <aside aria-label="Preview and save" className="space-y-4 lg:sticky lg:top-8">
+      <aside aria-label="Preview and save" className="space-y-4 xl:sticky xl:top-8">
         <div className="hidden space-y-4 lg:block">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">{tr("Live preview")}</h2>
@@ -564,7 +570,7 @@ export function TemplateEditor({
             buttons={t.buttons}
           />
         </PhoneFrame>
-          <p className="text-center text-xs text-muted">{isTa ? `${SAMPLE_CUSTOMER.name}-க்கான முன்னோட்டம்` : `Previewed for ${SAMPLE_CUSTOMER.name}`}</p>
+          <p className="text-center text-xs text-muted">{isTa ? `${previewFor.name}-க்கான முன்னோட்டம்` : `Previewed for ${previewFor.name}`}</p>
         </div>
 
         {errors.length > 0 && (
@@ -628,7 +634,7 @@ export function TemplateEditor({
             buttons={t.buttons}
           />
         </PhoneFrame>
-        <p className="mt-3 text-center text-xs text-muted">{isTa ? `${SAMPLE_CUSTOMER.name}-க்கான முன்னோட்டம்` : `Previewed for ${SAMPLE_CUSTOMER.name}`}</p>
+        <p className="mt-3 text-center text-xs text-muted">{isTa ? `${previewFor.name}-க்கான முன்னோட்டம்` : `Previewed for ${previewFor.name}`}</p>
       </Sheet>
     </div>
   );

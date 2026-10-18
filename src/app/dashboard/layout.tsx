@@ -14,7 +14,7 @@ import { WalletBanner } from "./wallet/wallet-banner";
 import { NotificationBell, NotificationProvider } from "@/components/notification-center";
 import { ShellProvider } from "@/components/shell-tools";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { LanguageSwitch } from "@/lib/i18n/language-switch";
+import { LanguageSwitch, LanguageToggle } from "@/lib/i18n/language-switch";
 import { AppearanceSync } from "@/components/appearance-sync";
 import { IconSetLink } from "@/components/icon-set-link";
 import { InlineScript } from "@/components/inline-script";
@@ -229,13 +229,15 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
                   <span className="block text-2xs leading-tight">{status}</span>
                 </HeaderClientSwitcher>
               ) : (
-                <div className="min-w-0 flex-1 text-right">
+                // Under 360px there's no room for a readable name next to the controls; the page title has it.
+                <div className="min-w-0 flex-1 text-right [@media(max-width:359px)]:invisible">
                   <p className="truncate text-xs font-semibold leading-tight text-ink">{name}</p>
                   {status && <div className="flex justify-end text-2xs leading-tight">{status}</div>}
                 </div>
               )}
               {/* 40px tap targets on phones; the light/dark switch lives in Settings there, to leave room for the name. */}
-              <LanguageSwitch size="sm" className="h-11 [&>button]:min-h-10 [&>button]:min-w-10" />
+              <LanguageSwitch size="sm" className="h-11 shrink-0 max-sm:hidden [&>button]:min-h-10 [&>button]:min-w-10" />
+              <LanguageToggle className="sm:hidden" />
               <ThemeToggle className="max-sm:hidden" />
               {notificationsOn && <NotificationBell className="max-sm:size-10" />}
               <SettingsLink />

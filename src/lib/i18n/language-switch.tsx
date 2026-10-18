@@ -56,3 +56,23 @@ export function LanguageSwitch({
     </div>
   );
 }
+
+/** One button that switches to the other language: the phone top bar's version, leaving room for the business name. */
+export function LanguageToggle({ className }: { className?: string }) {
+  const { lang, setLang } = useLanguage();
+  const next = lang === "en" ? "ta" : "en";
+  return (
+    <button
+      type="button"
+      onClick={() => setLang(next)}
+      aria-label={next === "ta" ? "தமிழுக்கு மாற்று (Switch to Tamil)" : "Switch to English (ஆங்கிலத்துக்கு மாற்று)"}
+      lang={next}
+      className={cn(
+        "inline-flex h-10 min-w-10 shrink-0 items-center justify-center rounded-full border border-line bg-subtle/80 px-2.5 text-2xs font-semibold text-ink transition active:scale-95",
+        className,
+      )}
+    >
+      {next === "ta" ? "தமிழ்" : "EN"}
+    </button>
+  );
+}

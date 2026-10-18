@@ -25,7 +25,8 @@ export default async function OrdersPage({
   const initialShow = typeof sp.show === "string" ? sp.show : "all";
   const initialPay = typeof sp.pay === "string" ? sp.pay : "all";
   const initialSrc = typeof sp.src === "string" ? sp.src : "all";
-  const initialQ = typeof sp.q === "string" ? sp.q : "";
+  // Product pages link here with ?product=<name>; it searches the order lines for that product.
+  const initialQ = typeof sp.q === "string" ? sp.q : typeof sp.product === "string" ? sp.product : "";
 
   const [rawOrders, clientData, catalogData] = await Promise.all([
     db.order.findMany({
@@ -79,6 +80,9 @@ export default async function OrdersPage({
     internalNote: o.internalNote,
     createdAt: o.createdAt,
     packedAt: o.packedAt,
+    confirmedAt: o.confirmedAt,
+    dispatchedAt: o.dispatchedAt,
+    deliveredAt: o.deliveredAt,
     waMessageId: o.waMessageId,
     paidAt: o.paidAt,
     paymentTxnId: o.paymentTxnId,

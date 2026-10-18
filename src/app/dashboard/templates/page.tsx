@@ -9,7 +9,8 @@ import { db } from "@/lib/db";
 import { fmtNumber } from "@/lib/format";
 import { templateLabel } from "@/lib/plain-error";
 import { getScope, owned } from "@/lib/session";
-import { CATEGORY_INFO, renderFor, SAMPLE_CUSTOMER, type Category, type TemplateButton, type VarMap } from "@/lib/template";
+import { previewCustomer } from "@/lib/preview-customer";
+import { CATEGORY_INFO, renderFor, type Category, type TemplateButton, type VarMap } from "@/lib/template";
 import { deleteTemplate, syncTemplates } from "../actions/templates";
 
 import { AutoSelect, PAction, PortalPage, T } from "../portal-ui";
@@ -28,6 +29,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
   const query = typeof q === "string" ? q.trim() : "";
   const scope = await getScope();
   const canCreate = scope.canManage && scope.clientId;
+  const previewFor = await previewCustomer(scope.clientId);
 
   const qFilter = query
     ? {
@@ -163,7 +165,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
       {templates.length ? (
         <div className="grid g3">
           {templates.map((t) => {
-            const r = renderFor({ ...t, headerText: t.headerText ?? "", footer: t.footer ?? "", variables: t.variables as VarMap }, SAMPLE_CUSTOMER);
+            const r = renderFor({ ...t, headerText: t.headerText ?? "", footer: t.footer ?? "", variables: t.variables as VarMap }, previewFor);
             const sp2 = statusPill(t.status);
             const broken = ["REJECTED", "PAUSED", "DISABLED"].includes(t.status);
             return (

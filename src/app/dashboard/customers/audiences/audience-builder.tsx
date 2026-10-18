@@ -119,7 +119,7 @@ export function AudienceBuilder({ regions }: { regions: string[] }) {
                   applyAiFilter();
                 }
               }}
-              placeholder={isTa ? "உ.தா. பட்டுப் புடவை வாங்கிய மதுரை வாடிக்கையாளர்கள், அல்லது ஆர்டர் செய்யாத சென்னை வாடிக்கையாளர்கள்…" : "e.g. Customers in Madurai who bought silk sarees, or Leads in Chennai who never ordered…"}
+              placeholder={isTa ? "உ.தா. கடந்த 30 நாளில் ஆர்டர் செய்த மதுரை வாடிக்கையாளர்கள், அல்லது இதுவரை ஆர்டர் செய்யாதவர்கள்…" : "e.g. Customers in Madurai who ordered in the last 30 days, or people who never ordered…"}
             />
             <Button type="button" size="sm" loading={aiLoading} disabled={!aiPrompt.trim()} onClick={applyAiFilter}>
               <Sparkles aria-hidden className="size-3.5" /> Build Filter
@@ -160,7 +160,7 @@ export function AudienceBuilder({ regions }: { regions: string[] }) {
             <input className="field" value={area} placeholder="Anna Nagar" onChange={(e) => setArea(e.target.value)} />
           </Field>
           <Field id="a-bought" label="Bought">
-            <input className="field" value={bought} placeholder="rice, coffee, saree…" onChange={(e) => setBought(e.target.value)} />
+            <input className="field" value={bought} placeholder={tr("Product name, e.g. from your catalogue")} onChange={(e) => setBought(e.target.value)} />
           </Field>
           <div>
             <label htmlFor="a-orders" className="mb-1.5 block text-sm font-medium text-ink-2">{tr("Orders")}</label>
@@ -179,10 +179,10 @@ export function AudienceBuilder({ regions }: { regions: string[] }) {
         </div>
         <div className="flex flex-col gap-3 rounded-card bg-sunken p-3 sm:flex-row sm:items-end">
           <Field id="a-name" label="Audience name" required className="flex-1">
-            <input className="field" value={name} placeholder="Repeat buyers in Chennai" onChange={(e) => setName(e.target.value)} />
+            <input className="field" value={name} placeholder={tr("e.g. Repeat buyers in Madurai")} onChange={(e) => setName(e.target.value)} />
           </Field>
           <p className="tabular flex min-h-10 items-center gap-1 text-sm sm:pb-0" aria-live="polite">
-            {count === null ? <Spinner className="text-muted" /> : <b className="text-ink">{count.toLocaleString("en-IN")}</b>} {tr("customers now")}
+            {count === null ? <Spinner className="text-muted" /> : <b className="text-ink">{count.toLocaleString("en-IN")}</b>} {count === 1 ? tr("customer now") : tr("customers now")}
           </p>
           <Button type="submit" loading={pending}>Save audience</Button>
         </div>

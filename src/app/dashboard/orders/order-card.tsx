@@ -53,6 +53,9 @@ export type OrderCardData = {
   internalNote: string | null;
   createdAt: Date | string;
   packedAt?: Date | string | null;
+  confirmedAt?: Date | string | null;
+  dispatchedAt?: Date | string | null;
+  deliveredAt?: Date | string | null;
   waMessageId?: string | null;
   paidAt: Date | string | null;
   paymentTxnId: string | null;
@@ -588,7 +591,7 @@ export function OrderCard({
     ...(o.status === "CANCELLED"
       ? [["Cancelled", o.internalNote ? `Cancelled · ${o.internalNote}` : "Cancelled"] as [string, string | null]]
       : [
-          ...(hasConfirm ? [["Confirmed", rank >= 1 ? "Done" : null] as [string, string | null]] : []),
+          ...(hasConfirm ? [["Confirmed", rank >= 1 ? when(o.confirmedAt) ?? "Done" : null] as [string, string | null]] : []),
           ...(o.paymentRequestedAt
             ? [["Payment link sent", when(o.paymentRequestedAt)] as [string, string | null]]
             : []),
@@ -602,9 +605,9 @@ export function OrderCard({
           ] as [string, string | null],
           ...(hasPack ? [["Packed", o.packedAt ? when(o.packedAt) : rank >= 3 ? "Done" : null] as [string, string | null]] : []),
           ...(hasDispatch
-            ? [[stepLabel(flow, "DISPATCHED") ?? "Dispatched", rank >= 4 ? "Done" : null] as [string, string | null]]
+            ? [[stepLabel(flow, "DISPATCHED") ?? "Dispatched", rank >= 4 ? when(o.dispatchedAt) ?? "Done" : null] as [string, string | null]]
             : []),
-          [finishLabel, rank >= 5 ? "Done" : null] as [string, string | null],
+          [finishLabel, rank >= 5 ? when(o.deliveredAt) ?? "Done" : null] as [string, string | null],
         ]),
     ...(o.refundedAt ? [["Refunded", when(o.refundedAt)] as [string, string | null]] : []),
   ];

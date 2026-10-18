@@ -6,6 +6,7 @@ import { buttonClass } from "@/components/ui-classes";
 import { Disclosure } from "@/components/viz";
 import { cn } from "@/lib/cn";
 import { fmtDate, fmtNumber } from "@/lib/format";
+import { formatPhone } from "@/lib/phone";
 import { senderFor } from "@/lib/senders";
 import { CATEGORY_LABEL, RATES, spendSummary, total } from "@/lib/spend";
 import { deleteTopUp } from "./actions/spend";
@@ -236,7 +237,7 @@ async function SpendBody({ clientId, canManage }: { clientId: string; canManage:
                   <ul className="divide-y divide-line rounded-control border border-line bg-subtle/30 px-3 text-xs">
                     {s.byPhone.map((p) => (
                       <li key={p.phone} className="flex items-center justify-between gap-2 py-2">
-                        <span className="tabular font-medium text-ink">+{p.phone}</span>
+                        <span className="tabular font-medium text-ink">{formatPhone(p.phone)}</span>
                         <span className="tabular text-muted">
                           {fmtNumber(p.charged)} <T ta="கட்டணம்">paid</T>{p.free ? ` · ${fmtNumber(p.free)} இலவசம்` : ""} · <b className="font-semibold text-ink">{rupees(p.cost)}</b>
                         </span>

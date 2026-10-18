@@ -364,27 +364,44 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
                   </a>
                 </div>
               </div>
-              <div className="stat">
-                <div className="l">{tr("Balance", "இருப்பு")}</div>
-                <div className="v">{R(wallet.balance)}</div>
-              </div>
-              <div className="bar" style={{ margin: "12px 0" }}>
-                <i
-                  style={{
-                    width: `${Math.min(100, Math.max(10, Math.round((wallet.balance / 2000) * 100)))}%`,
-                    background: "var(--bar3)",
-                  }}
-                ></i>
-              </div>
-              <p className="small">
-                <span className={`pill ${wallet.isLow ? "warn" : "ok"}`}>
-                  {wallet.isLow ? tr("Low balance", "குறைந்த இருப்பு") : tr("Healthy balance", "போதுமான இருப்பு")}
-                </span>{" "}
-                {tr(
-                  `You can send about ${wallet.marketingMsgsLeft.toLocaleString("en-IN")} marketing or ${wallet.utilityMsgsLeft.toLocaleString("en-IN")} utility messages. Top up soon.`,
-                  `சுமார் ${wallet.marketingMsgsLeft.toLocaleString("en-IN")} விளம்பர அல்லது ${wallet.utilityMsgsLeft.toLocaleString("en-IN")} சேவை செய்திகளை அனுப்பலாம். விரைவில் ரீசார்ஜ் செய்யவும்.`
-                )}
-              </p>
+              {wallet.synced ? (
+                <>
+                  <div className="stat">
+                    <div className="l">{tr("Balance", "இருப்பு")}</div>
+                    <div className="v">{R(wallet.balance)}</div>
+                  </div>
+                  <div className="bar" style={{ margin: "12px 0" }}>
+                    <i
+                      style={{
+                        width: `${Math.min(100, Math.max(4, Math.round((wallet.balance / 2000) * 100)))}%`,
+                        background: wallet.isLow ? "var(--bar3)" : "var(--bar2)",
+                      }}
+                    ></i>
+                  </div>
+                  <p className="small">
+                    <span className={`pill ${wallet.isLow ? "warn" : "ok"}`}>
+                      {wallet.isLow ? tr("Low balance", "குறைந்த இருப்பு") : tr("Healthy balance", "போதுமான இருப்பு")}
+                    </span>{" "}
+                    {tr(
+                      `Enough for about ${wallet.marketingMsgsLeft.toLocaleString("en-IN")} marketing or ${wallet.utilityMsgsLeft.toLocaleString("en-IN")} utility messages.${wallet.isLow ? " Top up soon." : ""}`,
+                      `சுமார் ${wallet.marketingMsgsLeft.toLocaleString("en-IN")} விளம்பர அல்லது ${wallet.utilityMsgsLeft.toLocaleString("en-IN")} சேவை செய்திகளுக்குப் போதுமானது.${wallet.isLow ? " விரைவில் ரீசார்ஜ் செய்யவும்." : ""}`
+                    )}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="stat">
+                    <div className="l">{tr("Spent this month", "இந்த மாதச் செலவு")}</div>
+                    <div className="v">{R(spend.thisMonthGst)}</div>
+                  </div>
+                  <p className="small muted" style={{ marginTop: 10 }}>
+                    {tr(
+                      "Meta bills you directly for these messages. Your balance, payment method and invoices are on Meta.",
+                      "இந்தச் செய்திகளுக்கு Meta நேரடியாக வசூலிக்கிறது. இருப்பு, கட்டண முறை, விலைப்பட்டியல்கள் Meta-வில் உள்ளன."
+                    )}
+                  </p>
+                </>
+              )}
             </div>
 
             {/* Spend */}
@@ -478,8 +495,8 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
               </div>
               <p className="muted small" style={{ marginTop: 10 }}>
                 {tr(
-                  `Highest day: ₹${daily.highestDay}. Cost per delivered message: ₹${daily.costPerDelivered}.`,
-                  `அதிகபட்ச நாள் செலவு: ₹${daily.highestDay}. வழங்கப்பட்ட ஒரு செய்தியின் செலவு: ₹${daily.costPerDelivered}.`
+                  `Highest day: ₹${daily.highestDay}.${daily.costPerDelivered > 0 ? ` Cost per delivered message: ₹${daily.costPerDelivered}.` : ""}`,
+                  `அதிகபட்ச நாள் செலவு: ₹${daily.highestDay}.${daily.costPerDelivered > 0 ? ` வழங்கப்பட்ட ஒரு செய்தியின் செலவு: ₹${daily.costPerDelivered}.` : ""}`
                 )}
               </p>
             </div>
@@ -549,7 +566,7 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
 
           <details className="card more" style={{ marginTop: 16 }}>
             <summary>
-              <b style={{ font: "600 18px var(--display)" }}>{tr("How WhatsApp charges, in plain words", "WhatsApp எவ்வாறு கட்டணம் வசூலிக்கிறது - எளிய விளக்கம்")}</b>
+              <b style={{ font: "600 18px var(--display)" }}>{tr("How WhatsApp charges for messages", "WhatsApp செய்திகளுக்கான கட்டண முறை")}</b>
             </summary>
             <div className="stack" style={{ marginTop: 12 }}>
               <p>{tr("Replies to a customer within 24 hours of their message are free (first 1,000 a month).", "வாடிக்கையாளர் செய்தி அனுப்பிய 24 மணி நேரத்திற்குள் அனுப்பும் பதில்கள் இலவசம் (மாதம் முதல் 1,000 உரையாடல்கள் வரை).")}</p>

@@ -6,6 +6,7 @@ import { useState } from "react";
 import { ActionButton } from "@/components/action-button";
 import { ChartBar3D, Sparkles3D, Trophy3D } from "@/components/icons-3d";
 import { Badge, Card, CardHeader, type Tone } from "@/components/ui";
+import { formatPhone } from "@/lib/phone";
 import { buttonClass } from "@/components/ui-classes";
 import { ActionLine, DonutPanel, ProgressRings, StackedRows, StatChip, type ChartColor, type Slice } from "@/components/viz";
 import { cssColor } from "@/lib/chart-theme";
@@ -954,7 +955,7 @@ export function TopFrequentCustomersCard({ data }: { data: TopFrequentCustomersD
                     <Badge tone={activeCustomer.loyalty.tierTone}>{activeCustomer.loyalty.tierLabel}</Badge>
                   </div>
                   <p className="tabular mt-0.5 text-xs text-muted">
-                    +{activeCustomer.phone}
+                    {formatPhone(activeCustomer.phone)}
                     {activeCustomer.location ? ` · ${activeCustomer.location}` : ""}
                     {activeCustomer.lastOrderLabel ? ` · Last order ${activeCustomer.lastOrderLabel}` : ""}
                   </p>

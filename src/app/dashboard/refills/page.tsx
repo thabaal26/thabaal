@@ -62,7 +62,7 @@ export default async function RefillsPage() {
         <Stat
           label="Typical reorder"
           value={`${typical} days`}
-          sub={own.length ? `from ${own.length} repeat buyers` : "default setting"}
+          sub={own.length ? `from ${own.length} repeat buyer${own.length === 1 ? "" : "s"}` : "default setting"}
           icon={<Repeat className="size-4" />}
           tone="brand"
         />

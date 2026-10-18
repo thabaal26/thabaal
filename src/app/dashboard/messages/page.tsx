@@ -143,7 +143,7 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
         <Stat
           label="Failed"
           value={fmtNumber(failedCount)}
-          sub={failedCount > 0 ? "Tap Failed chip to inspect" : "Zero delivery errors"}
+          sub={failedCount > 0 ? "Tap Failed to see why" : "No delivery errors"}
           icon={<Alert3D />}
           tone={failedCount > 0 ? "amber" : "gold"}
         />

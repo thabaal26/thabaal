@@ -2071,7 +2071,7 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
           <Callout tone="warning" icon={<Clock />} className="mb-5" title="Payments to look at">
             {paymentsToCheckCount > 0 && (
               <>
-                <Link href="/dashboard/orders?show=verify">{plural(paymentsToCheckCount, "customer")} say they paid</Link>: check the money came in, then mark the order paid.{" "}
+                <Link href="/dashboard/orders?show=verify">{plural(paymentsToCheckCount, "customer")} {paymentsToCheckCount === 1 ? "says" : "say"} they paid</Link>: check the money came in, then mark the order paid.{" "}
               </>
             )}
             {refundsDueCount > 0 && (

@@ -4,8 +4,9 @@ import { Card, PageHeader, StatusBadge } from "@/components/ui";
 import { WhatsAppBubble } from "@/components/whatsapp-preview";
 import { db } from "@/lib/db";
 import { fmtDate, templateDateLabel } from "@/lib/format";
+import { previewCustomer } from "@/lib/preview-customer";
 import { getScope, owned } from "@/lib/session";
-import { renderFor, SAMPLE_CUSTOMER, type TemplateButton, type VarMap } from "@/lib/template";
+import { renderFor, type TemplateButton, type VarMap } from "@/lib/template";
 import { TemplateEditor } from "../template-editor";
 
 export const metadata: Metadata = { title: "Edit template" };
@@ -18,9 +19,10 @@ export default async function EditTemplatePage({ params }: PageProps<"/dashboard
   if (!t) notFound();
 
   const back = { href: "/dashboard/templates", label: "Templates" };
+  const previewFor = await previewCustomer(t.clientId);
 
   if (!scope.canManage) {
-    const r = renderFor({ ...t, headerText: t.headerText ?? "", footer: t.footer ?? "", variables: t.variables as VarMap }, SAMPLE_CUSTOMER);
+    const r = renderFor({ ...t, headerText: t.headerText ?? "", footer: t.footer ?? "", variables: t.variables as VarMap }, previewFor);
     return (
       <>
         <PageHeader
@@ -59,6 +61,7 @@ export default async function EditTemplatePage({ params }: PageProps<"/dashboard
         status={t.status}
         statusReason={t.statusReason}
         businessName={t.client.name}
+        previewFor={previewFor}
         initial={{
           name: t.name,
           language: t.language,

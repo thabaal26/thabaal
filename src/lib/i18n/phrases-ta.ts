@@ -150,6 +150,7 @@ export const PHRASES_TA: Record<string, string> = {
   minutes: "நிமிடங்கள்",
   "Each send": "ஒவ்வொரு அனுப்புதலும்",
   customers: "வாடிக்கையாளர்கள்",
+  customer: "வாடிக்கையாளர்",
   "No customers match yet": "இன்னும் எந்த வாடிக்கையாளரும் பொருந்தவில்லை",
   "Campaign active": "பிரச்சாரம் செயலில்",
   "Paused campaigns keep their settings but don't send.": "நிறுத்திய பிரச்சாரங்கள் அமைப்புகளை வைத்திருக்கும், ஆனால் அனுப்பாது.",
@@ -187,10 +188,13 @@ export const PHRASES_TA: Record<string, string> = {
   "No order for… days": "… நாட்களாக ஆர்டர் இல்லாதவர்கள்",
   "Audience name": "பிரிவின் பெயர்",
   "customers now": "வாடிக்கையாளர்கள் இப்போது",
+  "customer now": "வாடிக்கையாளர் இப்போது",
+  "Product name, e.g. from your catalogue": "பொருளின் பெயர், உ.தா. உங்கள் பட்டியலிலிருந்து",
+  "e.g. Repeat buyers in Madurai": "உ.தா. மதுரையில் மீண்டும் வாங்குபவர்கள்",
   "Save audience": "பிரிவைச் சேமி",
   "Saved audiences": "சேமித்த பிரிவுகள்",
   "No audiences yet": "இன்னும் பிரிவுகள் இல்லை",
-  "Build one on the left, or start from a preset.": "இடப்பக்கம் ஒன்றை உருவாக்குங்கள், அல்லது தயார் பட்டியலிலிருந்து தொடங்குங்கள்.",
+  "Build one with the filters, or start from a preset.": "வடிகட்டிகளைக் கொண்டு ஒன்றை உருவாக்குங்கள், அல்லது தயார் பட்டியலிலிருந்து தொடங்குங்கள்.",
   "Saved groups of customers, like repeat buyers with no order for 30 days. Pick one under Send to in a campaign; it's counted again every time the campaign runs.":
     "சேமித்த வாடிக்கையாளர் குழுக்கள் — உதாரணமாக 30 நாட்களாக ஆர்டர் செய்யாத மீண்டும் வாங்குபவர்கள். பிரச்சாரத்தில் 'யாருக்கு அனுப்ப' பகுதியில் ஒன்றைத் தேர்வு செய்யுங்கள்; பிரச்சாரம் ஓடும் ஒவ்வொரு முறையும் மீண்டும் எண்ணப்படும்.",
 

@@ -176,7 +176,7 @@ function RefillRow({ r, canSend, templateName }: { r: RefillDue; canSend: boolea
         <p className="mt-0.5 truncate text-sm text-ink-2">{r.items.length ? r.items.join(" · ") : "Items not recorded"}</p>
         <p className="tabular mt-0.5 text-2xs text-muted">
           Every ~{r.cycleDays} days{r.cycleSource === "own" ? ` (their pattern, ${r.orders} orders)` : " (default)"} · last {r.lastOrderRef} on {fmtDate(r.lastOrderAt, "d MMM")} ·
-          usually {formatValue(r.avgOrder, "inr")}
+          usually {formatValue(Math.round(r.avgOrder), "inr")}
           {r.area ? ` · ${r.area}` : ""}
         </p>
       </div>

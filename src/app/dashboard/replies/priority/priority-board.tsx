@@ -62,7 +62,7 @@ function Row({ it, lane, nowMs, canOperate }: { it: BoardItem; lane: BoardItem["
         </Link>
         <div className="muted small">{detail(it)}</div>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto", flexWrap: "nowrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto", flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "100%" }}>
       <span className="muted small" style={{ whiteSpace: "nowrap" }}>{waitText(mins)}</span>
       <Link className={`btn sm${lane === "money" ? " primary" : ""}`} href={`/dashboard/replies?r=${it.customerId}`}>
         Reply
@@ -112,7 +112,7 @@ export function PriorityBoard({ items, nowMs, canOperate }: { items: BoardItem[]
       <Stat
         label="Closing within 3 hours"
         value={closing}
-        sub={closing > 0 ? "Free reply window ends soon" : "Windows healthy"}
+        sub={closing > 0 ? "Free reply window ends soon" : "No window closing soon"}
         icon={<Clock className="size-4" />}
         tone={closing > 0 ? "rose" : "brand"}
       />

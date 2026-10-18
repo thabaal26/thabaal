@@ -183,8 +183,8 @@ export function HomeTiers(p: HomeTiersProps) {
     <PortalPage
       title={p.businessName ? `${p.greetingText}, ${p.businessName}` : p.greetingText}
       titleTa={`${GREETING_TA[p.greetingText] ?? "வணக்கம்"}${p.businessName ? `, ${p.businessName}` : ""}`}
-      sub="Here is today, in plain words."
-      subTa="இன்றைய நிலை, எளிய வார்த்தைகளில்."
+      sub="Orders, payments and chats that need you today."
+      subTa="இன்று உங்கள் கவனம் தேவைப்படும் ஆர்டர்கள், பணம் மற்றும் உரையாடல்கள்."
       actions={
         <>
           {p.actions}
@@ -308,7 +308,7 @@ export function HomeTiers(p: HomeTiersProps) {
                     <div className="grow">
                       <div className="t"><T ta="மறு ஆர்டர் நினைவூட்டல்">Reorder reminder</T></div>
                       <div className="muted small">
-                        {p.reminderDays ? `${p.reminderDays} days after an order · Automatic` : "Off"}
+                        {p.reminderDays ? `${p.reminderDays} days after an order · Automatic` : "No reminders going out"}
                         {p.refillsDueCount > 0 ? ` · ${p.refillsDueCount} due this week` : ""}
                       </div>
                     </div>

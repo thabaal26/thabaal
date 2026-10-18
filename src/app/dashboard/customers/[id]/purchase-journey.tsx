@@ -224,9 +224,9 @@ export function PurchaseJourney({
 
       {/* Loyalty Points, RFM Breakdown & Smart Offer Suggestion */}
       <div className="border-b border-line bg-brand-soft/30 p-3 sm:p-4">
-        <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-12">
+        <div className="grid grid-cols-1 gap-3.5 xl:grid-cols-12">
           {/* Left: Loyalty Points Balance & Manual Point Controls */}
-          <div className="rounded-control border border-line bg-panel p-3 sm:p-3.5 lg:col-span-6">
+          <div className="min-w-0 rounded-control border border-line bg-panel p-3 sm:p-3.5 xl:col-span-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Trophy3D className="size-5 shrink-0" />
@@ -330,7 +330,7 @@ export function PurchaseJourney({
           </div>
 
           {/* Right: Smart Offer Recommendation for this customer */}
-          <div className="flex flex-col justify-between rounded-control border border-brand/30 bg-panel p-3 sm:p-3.5 lg:col-span-6">
+          <div className="flex min-w-0 flex-col justify-between rounded-control border border-brand/30 bg-panel p-3 sm:p-3.5 xl:col-span-6">
             <div>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-deep">

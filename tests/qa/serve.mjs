@@ -53,6 +53,8 @@ await pg.start();
 await pg.dropDatabase("thabaal_qa").catch(() => {});
 await pg.createDatabase("thabaal_qa");
 execSync("npx prisma db push --skip-generate --accept-data-loss", { stdio: "inherit", env: QA_ENV });
+// Database triggers aren't in the Prisma schema; add them as the live build does.
+execSync("npx prisma db execute --file prisma/sql/2026-10-18-order-step-times.sql --schema prisma/schema.prisma", { stdio: "inherit", env: QA_ENV });
 
 process.env.AUTH_SECRET = QA_ENV.AUTH_SECRET;
 process.env.DATABASE_URL = url;

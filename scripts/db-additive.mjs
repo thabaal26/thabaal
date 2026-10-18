@@ -11,6 +11,7 @@ const FILES = [
   "prisma/sql/2026-10-16-indexes.sql",
   "prisma/sql/2026-10-16-order-steps.sql",
   "prisma/sql/2026-10-17-loyalty-entries.sql",
+  "prisma/sql/2026-10-18-order-step-times.sql",
 ];
 
 if (process.env.VERCEL !== "1") {
@@ -21,8 +22,18 @@ if (!process.env.DATABASE_URL) {
   console.error("db-additive: DATABASE_URL is not available during the build; add it for the Build step in Vercel");
   process.exit(1);
 }
+// A pooled database can drop a connection now and then; each file is safe to run again, so retry twice.
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 for (const file of FILES) {
-  console.log(`db-additive: running ${file}`);
-  execSync(`npx prisma db execute --file ${file} --schema prisma/schema.prisma`, { stdio: "inherit" });
+  for (let attempt = 1; ; attempt++) {
+    console.log(`db-additive: running ${file}${attempt > 1 ? ` (try ${attempt})` : ""}`);
+    try {
+      execSync(`npx prisma db execute --file ${file} --schema prisma/schema.prisma`, { stdio: "inherit" });
+      break;
+    } catch (e) {
+      if (attempt >= 3) throw e;
+      await sleep(4000 * attempt);
+    }
+  }
 }
 console.log("db-additive: done");

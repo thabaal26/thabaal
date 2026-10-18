@@ -41,6 +41,14 @@ export type OrdersViewProps = {
   initialTab?: "orders" | "pack";
 };
 
+/** Lists other pages link to; shown as a removable chip so it's clear the list is narrowed. */
+const SPECIAL_SHOW: Record<string, [string, string]> = {
+  unpaid: ["Not paid yet", "பணம் வராதவை"],
+  verify: ["Payments to check", "சரிபார்க்க வேண்டிய பணம்"],
+  refund: ["Refunds due", "திருப்பித் தர வேண்டியவை"],
+  topack: ["To pack", "பேக் செய்ய வேண்டியவை"],
+};
+
 export function OrdersView({
   orders: initialOrders,
   catalogProducts,
@@ -133,6 +141,10 @@ export function OrdersView({
     if (show === "dispatched" && o.status !== "DISPATCHED") return false;
     if (show === "done" && o.status !== "DELIVERED") return false;
     if (show === "cancelled" && o.status !== "CANCELLED") return false;
+    // Lists other pages link to (Home, Reports, Products): not paid yet, payments to check, refunds due.
+    if (show === "unpaid" && !(o.status !== "CANCELLED" && !isOrderPaid(o) && !isOrderCod(o))) return false;
+    if (show === "verify" && !(o.paymentClaimedAt && !isOrderPaid(o) && o.status !== "CANCELLED")) return false;
+    if (show === "refund" && !(o.status === "CANCELLED" && isOrderPaid(o) && !o.refundedAt)) return false;
 
     // Payment dropdown filter
     if (payFilter === "none" && (isOrderPaid(o) || o.paymentRequestedAt != null)) return false;
@@ -511,6 +523,11 @@ export function OrdersView({
 
           {/* Filter Chips */}
           <div className="chips" id="oc" style={{ marginBottom: 14 }}>
+            {SPECIAL_SHOW[show] && (
+              <button type="button" className="chip" aria-pressed onClick={() => setShow("all")} aria-label={isTa ? "இந்த வடிகட்டியை நீக்கு" : "Clear this filter"}>
+                {isTa ? SPECIAL_SHOW[show][1] : SPECIAL_SHOW[show][0]} <small>{filteredOrders.length}</small> <span aria-hidden>×</span>
+              </button>
+            )}
             <button
               type="button"
               className="chip"
@@ -541,7 +558,7 @@ export function OrdersView({
               type="button"
               className="chip"
               aria-pressed={show === "paid"}
-              onClick={() => setShow("topack")}
+              onClick={() => setShow("paid")}
             >
               <T ta="பணம் / COD">Paid / COD</T> <small>{paidCount}</small>
             </button>

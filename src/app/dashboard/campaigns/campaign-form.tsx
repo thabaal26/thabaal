@@ -224,7 +224,7 @@ export function CampaignForm({
                     placeholder={tagOptions.length ? "Choose one or more tags…" : "No tags yet"}
                     value={pick.tags}
                     onChange={(tags) => choosePick({ ...pick, tags })}
-                    options={tagOptions.map((t) => ({ value: t.tag, label: t.label, hint: `${t.n.toLocaleString("en-IN")} ${tr("customers")}` }))}
+                    options={tagOptions.map((t) => ({ value: t.tag, label: t.label, hint: `${t.n.toLocaleString("en-IN")} ${tr(t.n === 1 ? "customer" : "customers")}` }))}
                   />
                   {pick.tags.length > 0 && (
                     <ul aria-label="Chosen tags" className="flex flex-wrap gap-1.5">
@@ -268,7 +268,7 @@ export function CampaignForm({
                   title="Saved audience"
                   value={c.audienceTag}
                   onChange={(audienceTag) => set({ audienceTag })}
-                  options={savedOptions.map((t) => ({ value: t.tag, label: t.label.replace(/^★\s*/, ""), hint: `${t.n.toLocaleString("en-IN")} ${tr("customers")}${t.hint ? ` · ${t.hint}` : ""}` }))}
+                  options={savedOptions.map((t) => ({ value: t.tag, label: t.label.replace(/^★\s*/, ""), hint: `${t.n.toLocaleString("en-IN")} ${tr(t.n === 1 ? "customer" : "customers")}${t.hint ? ` · ${t.hint}` : ""}` }))}
                 />
               )}
 
@@ -651,7 +651,7 @@ export function CampaignForm({
           <div className="surface-dark bg-night p-5 text-white">
             <p className="text-xs font-semibold uppercase tracking-wider text-white/70">{tr("Each send")}</p>
             <p className="tabular mt-2 text-3xl font-semibold">
-              {sizeKnown ? size.toLocaleString("en-IN") : "…"} <span className="text-base font-normal text-white/75">{tr("customers")}</span>
+              {sizeKnown ? size.toLocaleString("en-IN") : "…"} <span className="text-base font-normal text-white/75">{tr(size === 1 ? "customer" : "customers")}</span>
             </p>
             <p className="mt-1 text-sm text-white/80">
               {!sizeKnown
@@ -722,7 +722,7 @@ export function CampaignForm({
       </aside>
       <MobileActionBar>
         <div className="min-w-0 flex-1 leading-tight">
-          <p className="tabular truncate text-sm font-semibold">{sizeKnown ? `${size.toLocaleString("en-IN")} ${tr("customers")}` : tr("Counting…")}</p>
+          <p className="tabular truncate text-sm font-semibold">{sizeKnown ? `${size.toLocaleString("en-IN")} ${tr(size === 1 ? "customer" : "customers")}` : tr("Counting…")}</p>
           <p className="truncate text-xs text-muted">
             {!sizeKnown
               ? isTa

@@ -54,7 +54,7 @@ const BUTTONS: [string, string, string][] = [
 /** What changed: a map from the old menu to the new pages (portal design). */
 export default function GuidePage() {
   return (
-    <PortalPage title="What changed" titleTa="என்ன மாறியது" sub="A map from the old menu to the new pages." subTa="பழைய மெனுவிலிருந்து புதிய பக்கங்களுக்கு வழிகாட்டி.">
+    <PortalPage title="What changed" titleTa="என்ன மாறியது" sub="Where every feature lives in the new menu." subTa="ஒவ்வொரு வசதியும் புதிய மெனுவில் எங்கே உள்ளது.">
       <div className="stack">
         <section>
           <h2 style={{ marginBottom: 12 }}><T>All pages</T></h2>

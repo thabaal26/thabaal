@@ -44,6 +44,8 @@ export type ReportOverview = {
   m: PeriodFigures;
   w: PeriodFigures;
   wallet: {
+    /** False when no Meta prepaid balance is known (the business pays Meta by card): show spend, not a ₹0 balance. */
+    synced: boolean;
     balance: number;
     isLow: boolean;
     marketingMsgsLeft: number;
@@ -395,8 +397,10 @@ export async function getComprehensiveReportData(clientId: string): Promise<Comp
   ]);
 
   // 2. Wallet & Spend Telemetry
-  const walletBalance = spend?.remainingBalance ?? Math.max(0, 1500 - (spend?.totalMonthSpent ?? 0));
-  const isWalletLow = walletBalance < 500;
+  // Real figures only: a balance when Meta's prepaid balance is known (as on Home), otherwise none.
+  const walletSynced = !!spend && (spend.metaAccount.liveBalance > 0 || spend.prepaidFunds > 0);
+  const walletBalance = walletSynced ? spend!.remainingBalance : 0;
+  const isWalletLow = walletSynced && spend!.prepaidFunds > 0 && walletBalance / spend!.prepaidFunds < 0.2;
   const mktMsgsLeft = Math.floor(walletBalance / RATES.marketing);
   const utMsgsLeft = Math.floor(walletBalance / RATES.utility);
 
@@ -469,7 +473,8 @@ export async function getComprehensiveReportData(clientId: string): Promise<Comp
     freeList.push(dFree);
   }
 
-  const costPerDelivered = totalDeliveredMsgs > 0 ? Math.round((totalSpentRecent / totalDeliveredMsgs) * 100) / 100 : 0.86;
+  // 0 = nothing delivered yet (the page then leaves the figure out rather than show a made-up rate).
+  const costPerDelivered = totalDeliveredMsgs > 0 ? Math.round((totalSpentRecent / totalDeliveredMsgs) * 100) / 100 : 0;
 
   // Limits
   const mainNum = numbers[0];
@@ -480,13 +485,14 @@ export async function getComprehensiveReportData(clientId: string): Promise<Comp
   };
 
   // Where the money goes breakdown
-  const mktSum = spend?.current?.find((c) => c.category === "marketing")?.cost ?? pMonth.cost * 0.75;
-  const utSum = spend?.current?.find((c) => c.category === "utility")?.cost ?? pMonth.cost * 0.25;
+  const mktSum = spend?.current?.find((c) => c.category === "marketing")?.cost ?? 0;
+  const utSum = spend?.current?.find((c) => c.category === "utility")?.cost ?? 0;
 
   const overview: ReportOverview = {
     m: pMonth,
     w: pWeek,
     wallet: {
+      synced: walletSynced,
       balance: walletBalance,
       isLow: isWalletLow,
       marketingMsgsLeft: mktMsgsLeft,

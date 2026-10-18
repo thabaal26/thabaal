@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { PageHeader, PickClientNotice } from "@/components/ui";
 import { db } from "@/lib/db";
+import { previewCustomer } from "@/lib/preview-customer";
 import { clientAccounts } from "@/lib/senders";
 import { getScope, owned } from "@/lib/session";
 import type { TemplateButton, VarMap } from "@/lib/template";
@@ -16,6 +17,7 @@ export default async function NewTemplatePage({ searchParams }: PageProps<"/dash
   const accounts = (await clientAccounts(scope.clientId)).map((a) => ({ id: a.businessAccountId, label: `${a.labels.join(", ")} · account ${a.businessAccountId}` }));
   // "Duplicate" on a template card: start from a copy of that template, under a new name.
   const from = (await searchParams).from;
+  const previewFor = await previewCustomer(scope.clientId);
   const src = typeof from === "string" ? await db.template.findFirst({ where: { id: from, ...owned(scope), clientId: scope.clientId } }) : null;
   if (src) {
     return (
@@ -23,6 +25,7 @@ export default async function NewTemplatePage({ searchParams }: PageProps<"/dash
         <PageHeader title="Duplicate template" back={{ href: "/dashboard/templates", label: "Templates" }} description={`A copy of ${src.name}. Give it a new name, change what you need and send it to Meta.`} />
         <TemplateEditor
           id={null}
+          previewFor={previewFor}
           businessName={scope.clientName ?? process.env.BUSINESS_NAME ?? "Your Business"}
           accounts={accounts}
           initial={{
@@ -49,19 +52,21 @@ export default async function NewTemplatePage({ searchParams }: PageProps<"/dash
       <PageHeader title="New template" back={{ href: "/dashboard/templates", label: "Templates" }} description="Pick a category, write the message and preview it exactly as customers will see it." />
       <TemplateEditor
         id={null}
+        previewFor={previewFor}
         businessName={scope.clientName ?? process.env.BUSINESS_NAME ?? "Your Business"}
         accounts={accounts}
         initial={{
           name: "",
           language: "en",
           category: "MARKETING",
-          headerType: "TEXT",
-          headerText: "This week's special ☕",
+          // A blank message to write (the boxes show what goes where); no made-up offer to delete first.
+          headerType: "NONE",
+          headerText: "",
           headerMediaUrl: "",
-          body: "Hi {{1}}, enjoy *{{2}}* on your next visit. Show this message at the counter before Sunday.",
+          body: "",
           footer: "Reply STOP to unsubscribe",
-          buttons: [{ type: "QUICK_REPLY", text: "Interested" }],
-          variables: { "1": { source: "first_name" }, "2": { source: "static", value: "20% off" } },
+          buttons: [],
+          variables: {},
           codeExpiryMins: 10,
           securityNote: true,
           businessAccountId: accounts[0]?.id ?? null,

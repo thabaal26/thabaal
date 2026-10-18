@@ -162,7 +162,7 @@ export default async function SettingsPage() {
             <div className="hd">
               <div>
                 <h2><T ta="WhatsApp கட்டண விவரங்கள்">WhatsApp billing</T></h2>
-                <p><T ta="செய்திகளுக்கு Meta உங்களிடம் வசூலிப்பது. எளிய விவரம் அறிக்கைகளில் உள்ளது.">What Meta charges you for messages. The simple version is in Reports.</T></p>
+                <p><T ta="செய்திகளுக்கு Meta வசூலிப்பது. நாள் வாரியான விவரம் அறிக்கைகளில் உள்ளது.">What Meta charges for your messages. The day-by-day breakdown is in Reports.</T></p>
               </div>
               <Link className="btn" href="/dashboard/report">
                 <T ta="அறிக்கைகளில் செலவுகள்">See costs in Reports</T>
@@ -175,7 +175,14 @@ export default async function SettingsPage() {
                     {spend.metaAccount.liveBalance > 0 || spend.prepaidFunds > 0 ? "Balance left" : "Balance"}
                   </T>
                 </div>
-                <div className="v">{spend.metaAccount.liveBalance > 0 || spend.prepaidFunds > 0 ? inr(spend.remainingBalance) : "—"}</div>
+                {spend.metaAccount.liveBalance > 0 || spend.prepaidFunds > 0 ? (
+                  <div className="v">{inr(spend.remainingBalance)}</div>
+                ) : (
+                  <>
+                    <div className="v" style={{ fontSize: 18 }}><T ta="Meta-வில்">On Meta</T></div>
+                    <div className="d muted"><T ta="Meta நேரடியாக வசூலிக்கிறது">Meta bills you directly</T></div>
+                  </>
+                )}
               </div>
               <div className="stat">
                 <div className="l"><T ta="இந்த மாதம்">This month</T></div>

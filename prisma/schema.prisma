@@ -447,6 +447,11 @@ model Order {
   status             OrderStatus @default(NEW)
   /// When the order was marked packed (the "Packed" step); status stays CONFIRMED or PAID until it is dispatched.
   packedAt           DateTime?
+  /// When the order reached each step; stamped by a database trigger on status changes
+  /// (prisma/sql/2026-10-18-order-step-times.sql). Null on orders from before it.
+  confirmedAt        DateTime?
+  dispatchedAt       DateTime?
+  deliveredAt        DateTime?
   /// Our own notes: payment mode, delivery slot, address.
   internalNote       String?
   /// Values of the client's custom order fields, by key (lib/custom-fields.ts).

@@ -50,7 +50,7 @@ export function AiBusinessCopilot({
             <T ta="உங்கள் தினசரி சுருக்கம்">Your daily brief</T>
           </h2>
           <p>
-            <T ta="இன்றைக்கான எளிய ஆலோசனை, உங்கள் நேரடி எண்களிலிருந்து.">Plain-language advice for today, from your live numbers.</T>
+            <T ta="இன்று முதலில் செய்ய வேண்டியவை, உங்கள் நேரடி எண்களிலிருந்து.">What to do first today, worked out from your live numbers.</T>
           </p>
         </div>
       </div>

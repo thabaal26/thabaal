@@ -137,7 +137,8 @@ export default async function NotificationsPage({
     });
   }
 
-  if (failures.length > 0) {
+  // One failure: one row naming the customer. Several: one summary row (no repeat rows for the same failures).
+  if (failures.length > 1) {
     const errorCounts = new Map<string, number>();
     for (const f of failures) {
       const err = plainError(f.error) || "Delivery failed";
@@ -146,12 +147,13 @@ export default async function NotificationsPage({
     const errSummary = Array.from(errorCounts.entries())
       .map(([err, count]) => (count > 1 ? `${err} (${count})` : err))
       .join("; ");
+    const names = [...new Set(failures.map((f) => f.customer.name))];
 
     items.push({
       id: `fail-summary-${failures[0].id}`,
       type: "alert",
       title: `${failures.length} message${failures.length === 1 ? "" : "s"} failed in the last 24 hours`,
-      description: errSummary,
+      description: `${names.slice(0, 3).join(", ")}${names.length > 3 ? ` and ${names.length - 3} more` : ""} · ${errSummary}`,
       date: failures[0].failedAt ?? failures[0].createdAt,
       href: "/dashboard/messages?status=FAILED",
       unread: true,
@@ -159,7 +161,7 @@ export default async function NotificationsPage({
     });
   }
 
-  for (const f of failures) {
+  if (failures.length === 1) for (const f of failures) {
     items.push({
       id: `fail-${f.id}`,
       type: "alert",
@@ -169,6 +171,7 @@ export default async function NotificationsPage({
       date: f.failedAt ?? f.createdAt,
       href: "/dashboard/messages?status=FAILED",
       unread: true,
+      urgent: true,
     });
   }
 
@@ -287,7 +290,7 @@ export default async function NotificationsPage({
                                 {item.title}
                               </Link>
                             </p>
-                            {item.urgent && <Badge tone="amber" dot>Ringing</Badge>}
+                            {item.urgent && <Badge tone="amber" dot>{item.type === "call" ? "Ringing" : "Needs attention"}</Badge>}
                             {item.unread && <span className="sr-only">(unread)</span>}
                           </div>
                           <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted sm:line-clamp-1">{item.description}</p>

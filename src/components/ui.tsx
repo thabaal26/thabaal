@@ -173,9 +173,10 @@ export function CardHeader({
   const renderedDesc = isTa ? (descriptionTa ?? trn(description)) : description;
   return (
     <div
-      className="relative flex flex-wrap items-start justify-between gap-x-2.5 gap-y-1.5 px-4 pb-1 pt-4 sm:flex-nowrap sm:gap-4 sm:px-5 sm:pt-5"
+      className="relative flex flex-wrap items-start justify-between gap-x-2.5 gap-y-2 px-4 pb-1 pt-4 sm:gap-x-4 sm:px-5 sm:pt-5"
     >
-      <div className={cn("flex min-w-0 flex-1 basis-36 gap-2.5 sm:basis-40 sm:gap-3", renderedDesc ? "items-start" : "items-center")}>
+      {/* The title keeps at least ~14rem; a wide row of actions moves under it instead of squeezing it to one letter a line. */}
+      <div className={cn("flex min-w-[min(9rem,100%)] flex-1 basis-36 gap-2.5 sm:min-w-[min(14rem,100%)] sm:basis-56 sm:gap-3", renderedDesc ? "items-start" : "items-center")}>
         {icon && (
           <span aria-hidden className="shrink-0 text-muted mt-0.5 [&_svg]:size-[18px] sm:[&_svg]:size-5 [&_svg]:stroke-[1.8] flex items-center justify-center">
             {icon}

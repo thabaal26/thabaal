@@ -158,7 +158,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
               <dt className="text-xs text-muted">Sent to</dt>
               <dd className="mt-1">
                 {c.audienceTag ? <Badge>{audienceName}</Badge> : "All customers"}{" "}
-                <span className="text-xs text-muted">· {fmtNumber(audienceSize)} customers</span>
+                <span className="text-xs text-muted">· {fmtNumber(audienceSize)} customer{audienceSize === 1 ? "" : "s"}</span>
               </dd>
             </div>
             {numbers.length > 0 && (

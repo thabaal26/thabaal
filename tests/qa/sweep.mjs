@@ -2,9 +2,12 @@
 // the app's own confirm dialogs, and records what happened: a dialog/sheet, a toast (ok or "Problem"), a page change,
 // nothing at all (a dead button), script errors and server errors. Links are checked by loading their targets.
 // QA database only — it changes QA data (orders get confirmed, cancelled…); restart the QA app to reset.
-//   node tests/qa/sweep.mjs [pages=/dashboard,/dashboard/orders] [max=40]
+// Every dialog or sheet a click opens is also screenshotted (.qa-shots/sweep/) and checked for layout problems
+// (layout-check.mjs: overlap, squeezed text, content touching edges, wider than the screen), then closed.
+//   node tests/qa/sweep.mjs [pages=/dashboard,/dashboard/orders] [max=40] [size=390x844]
 import fs from "node:fs";
 import { createRequire } from "node:module";
+import { layoutIssues } from "./layout-check.mjs";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PW_CORE ?? "C:/Users/step1/pwtmp/node_modules/playwright-core");
@@ -49,7 +52,11 @@ const PAGES = arg("pages", "") ? arg("pages", "").split(",") : DEFAULT_PAGES;
 const SKIP = /sign out|log ?out|வெளியேறு|^EN$|தமிழ்|switch to (dark|light)|Look:|language|மொழி|Dismiss|Notifications/i;
 
 const b = await chromium.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe" });
-const ctx = await b.newContext({ viewport: { width: 1366, height: 900 } });
+const [VW, VH] = arg("size", "1366x900").split("x").map(Number);
+const ctx = await b.newContext({ viewport: { width: VW, height: VH } });
+const SHOTS = `.qa-shots/sweep/${VW}`;
+fs.mkdirSync(SHOTS, { recursive: true });
+let shotN = 0;
 const p = await ctx.newPage();
 let errs = [];
 let bad = [];
@@ -94,6 +101,7 @@ for (const path of PAGES) {
   bad = [];
   await p.goto(BASE + path, { waitUntil: "networkidle" }).catch(() => {});
   const pageErrs = [...errs];
+  const pageLayout = await p.evaluate(layoutIssues, {}).catch(() => []);
   await openAll();
   const labels = (await p.evaluate(labelsJs)).filter((l) => !SKIP.test(l)).slice(0, MAX);
   const links = await p.evaluate(linksJs);
@@ -139,6 +147,13 @@ for (const path of PAGES) {
     await p.waitForTimeout(900);
     const after = await snap();
     const dialog = await p.locator("[role=dialog], dialog[open]").count();
+    let layout;
+    if (dialog) {
+      layout = await p.evaluate(layoutIssues, { scope: "[role=dialog], [role=alertdialog], dialog[open]" }).catch(() => []);
+      const file = `${SHOTS}/${String(++shotN).padStart(3, "0")}-${path.replace(/\W+/g, "_")}-${label.replace(/\W+/g, "_").slice(0, 30)}.png`;
+      await p.screenshot({ path: file }).catch(() => {});
+      if (!layout.length) layout = undefined;
+    }
     const result = [
       confirmed && "confirmed",
       dialog && "opened dialog",
@@ -153,11 +168,16 @@ for (const path of PAGES) {
       result: (result || "changed the page") + (after.toasts.some((t) => /Problem/.test(t)) && after.toasts.every((t) => !/Problem/.test(t) || EXPECTED.test(t)) ? " [expected in QA]" : ""),
       errors: errs.length ? errs : undefined,
       server: bad.length ? bad : undefined,
+      layout,
     });
     if (dialog) await p.keyboard.press("Escape").catch(() => {});
   }
-  results.push({ path, pageErrs, linkProblems, clicks });
-  fs.writeFileSync(".git/qa-sweep.json", JSON.stringify(results, null, 1));
-  console.log(`${path}: ${clicks.length} clicks, ${clicks.filter((c) => /NO VISIBLE|Problem|failed|errors/.test(c.result) || c.errors || c.server).length} to look at, ${linkProblems.length} bad links`);
+  results.push({ path, pageErrs, pageLayout, linkProblems, clicks });
+  fs.writeFileSync(`.git/qa-sweep-${VW}.json`, JSON.stringify(results, null, 1));
+  const look = clicks.filter((c) => /NO VISIBLE|Problem|failed|errors/.test(c.result) || c.errors || c.server);
+  console.log(`${path}: ${clicks.length} clicks, ${look.length} to look at, ${linkProblems.length} bad links, ${pageLayout.length} page layout, ${clicks.filter((c) => c.layout).length} dialogs with layout problems`);
+  for (const c of look) console.log(`   ! ${c.label}: ${c.result}${c.errors ? ` errors: ${c.errors[0]}` : ""}${c.server ? ` server: ${c.server[0]}` : ""}`);
+  for (const i of pageLayout) console.log(`   ~ page: ${i}`);
+  for (const c of clicks.filter((c) => c.layout)) console.log(`   ~ ${c.label}: ${c.layout.join(" | ")}`);
 }
 await b.close();

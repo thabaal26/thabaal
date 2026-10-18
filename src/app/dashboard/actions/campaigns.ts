@@ -129,7 +129,7 @@ export async function runCampaignNow(id: string): Promise<ActionResult> {
   const run = await startRun(c, new Date());
   await dispatch();
   refresh();
-  return { ok: true, message: `Started: ${run.total} customers queued, ${c.batchSize} every ${c.intervalMinutes} min.` };
+  return { ok: true, message: `Started: ${run.total} customer${run.total === 1 ? "" : "s"} queued, ${c.batchSize} every ${c.intervalMinutes} min.` };
 }
 
 /**
