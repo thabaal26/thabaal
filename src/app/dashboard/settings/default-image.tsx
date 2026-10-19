@@ -37,7 +37,7 @@ export function DefaultImage({ url, fallback }: { url: string | null; fallback: 
       <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:p-5">
         <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-control bg-sunken ring-1 ring-line">
           {/* eslint-disable-next-line @next/next/no-img-element -- any uploaded or branding image */}
-          {shown ? <img src={shown} alt="Default image" width={64} height={64} className="size-full object-cover" /> : <ImageIcon aria-label="No default image" className="size-5 text-muted" />}
+          {shown ? <img src={shown} alt="Default image" width={64} height={64} className="size-full object-cover" /> : <ImageIcon aria-label="No default image" className="size-5 shrink-0 text-muted" />}
         </div>
         <div className="min-w-0 flex-1 text-sm">
           <p className="font-medium text-ink">Default image</p>

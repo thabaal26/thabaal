@@ -65,7 +65,7 @@ export function SheetForm({ customersUrl, ordersUrl }: { customersUrl: string; o
                   setO(e.target.value);
                 }}
               />
-              <LinkIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+              <LinkIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 shrink-0 text-muted" />
             </div>
           </Field>
           <p className="flex items-center gap-1.5 pt-0.5 text-xs text-muted">
