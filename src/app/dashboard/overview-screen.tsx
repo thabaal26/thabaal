@@ -23,6 +23,7 @@ import { cancelRun, runDispatcherNow } from "./actions/campaigns";
 import { HomeTiers, type HomeCampaignRow, type HomeKpi } from "./home-tiers";
 import { HomeWallet } from "./home-wallet";
 import { templateLabel } from "@/lib/plain-error";
+import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 import { AreaChips } from "./area-chips";
 import {
   AllProductsIntelligenceCard,
@@ -1905,67 +1906,85 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
 
       {view === "products" && ordersOn && (
         <div className="space-y-3.5 sm:space-y-5">
-          <AllProductsIntelligenceCard data={allProductsData} />
-          <div className="grid grid-cols-1 gap-3.5 sm:gap-5 xl:grid-cols-2">
-            <TopProductsCard items={topProducts} rangeLabel={period.label} />
-            {byProduct.length > 0 && <ProductCampaignGraphCard rows={byProduct} />}
-          </div>
+          <ScrollReveal duration={550}>
+            <AllProductsIntelligenceCard data={allProductsData} />
+          </ScrollReveal>
+          <StaggerGroup className="grid grid-cols-1 gap-3.5 sm:gap-5 xl:grid-cols-2">
+            <StaggerItem index={0} className="h-full">
+              <TopProductsCard items={topProducts} rangeLabel={period.label} />
+            </StaggerItem>
+            {byProduct.length > 0 && (
+              <StaggerItem index={1} className="h-full">
+                <ProductCampaignGraphCard rows={byProduct} />
+              </StaggerItem>
+            )}
+          </StaggerGroup>
         </div>
       )}
 
       {view === "carts" && ordersOn && (
         <div className="space-y-3.5 sm:space-y-5">
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
-            <KpiTile
-              label="Carts placed"
-              value={curAllOrders.length}
-              format="count"
-              sub={`₹${Math.round(revenue + unpaidCartRevenue + cancelledCartRevenue).toLocaleString("en-IN")} total value · ${new Set(curAllOrders.map((o) => o.customerId)).size} buyers`}
-              icon={ShoppingBag3D}
-              color={C.brand}
-              spark={cartSpark}
-              delta={{ cur: curAllOrders.length, prev: prevAllOrders.length, kind: "pct" }}
-              vs={prevLabel}
-              href="/dashboard/orders?show=all"
-            />
-            <KpiTile
-              label="Paid orders"
-              value={curOrders.length}
-              format="count"
-              sub={`${curAllOrders.length ? Math.round((curOrders.length / curAllOrders.length) * 100) : 0}% converted · ₹${Math.round(revenue).toLocaleString("en-IN")}`}
-              icon={Rupee3D}
-              color={C.gold}
-              spark={revenueSpark}
-              delta={{ cur: revenue, prev: prevRevenue, kind: "pct" }}
-              vs={prevLabel}
-              href="/dashboard/orders?show=paid"
-            />
-            <KpiTile
-              label="Unpaid carts waiting"
-              value={curUnpaidCarts.length}
-              format="count"
-              sub={`₹${Math.round(unpaidCartRevenue).toLocaleString("en-IN")} awaiting payment`}
-              icon={Clock3D}
-              color={C.glow}
-              spark={unpaidSpark}
-              delta={{ cur: curUnpaidCarts.length, prev: prevUnpaidCarts.length, kind: "pct", goodWhenUp: false }}
-              vs={prevLabel}
-              href="/dashboard/orders?show=unpaid"
-            />
-            <KpiTile
-              label="Replaced / cancelled"
-              value={curCancelledCarts.length}
-              format="count"
-              sub={`₹${Math.round(cancelledCartRevenue).toLocaleString("en-IN")} revised away`}
-              icon={Sparkles3D}
-              color={C.failed}
-              spark={cancelledSpark}
-              delta={{ cur: curCancelledCarts.length, prev: prevCancelledCarts.length, kind: "pct", goodWhenUp: false }}
-              vs={prevLabel}
-              href="/dashboard/orders?show=cancelled"
-            />
-          </div>
-          <CartMentalityCard data={cartMentalityData} />
+          <StaggerGroup className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
+            <StaggerItem index={0} className="h-full">
+              <KpiTile
+                label="Carts placed"
+                value={curAllOrders.length}
+                format="count"
+                sub={`₹${Math.round(revenue + unpaidCartRevenue + cancelledCartRevenue).toLocaleString("en-IN")} total value · ${new Set(curAllOrders.map((o) => o.customerId)).size} buyers`}
+                icon={ShoppingBag3D}
+                color={C.brand}
+                spark={cartSpark}
+                delta={{ cur: curAllOrders.length, prev: prevAllOrders.length, kind: "pct" }}
+                vs={prevLabel}
+                href="/dashboard/orders?show=all"
+              />
+            </StaggerItem>
+            <StaggerItem index={1} className="h-full">
+              <KpiTile
+                label="Paid orders"
+                value={curOrders.length}
+                format="count"
+                sub={`${curAllOrders.length ? Math.round((curOrders.length / curAllOrders.length) * 100) : 0}% converted · ₹${Math.round(revenue).toLocaleString("en-IN")}`}
+                icon={Rupee3D}
+                color={C.gold}
+                spark={revenueSpark}
+                delta={{ cur: revenue, prev: prevRevenue, kind: "pct" }}
+                vs={prevLabel}
+                href="/dashboard/orders?show=paid"
+              />
+            </StaggerItem>
+            <StaggerItem index={2} className="h-full">
+              <KpiTile
+                label="Unpaid carts waiting"
+                value={curUnpaidCarts.length}
+                format="count"
+                sub={`₹${Math.round(unpaidCartRevenue).toLocaleString("en-IN")} awaiting payment`}
+                icon={Clock3D}
+                color={C.glow}
+                spark={unpaidSpark}
+                delta={{ cur: curUnpaidCarts.length, prev: prevUnpaidCarts.length, kind: "pct", goodWhenUp: false }}
+                vs={prevLabel}
+                href="/dashboard/orders?show=unpaid"
+              />
+            </StaggerItem>
+            <StaggerItem index={3} className="h-full">
+              <KpiTile
+                label="Replaced / cancelled"
+                value={curCancelledCarts.length}
+                format="count"
+                sub={`₹${Math.round(cancelledCartRevenue).toLocaleString("en-IN")} revised away`}
+                icon={Sparkles3D}
+                color={C.failed}
+                spark={cancelledSpark}
+                delta={{ cur: curCancelledCarts.length, prev: prevCancelledCarts.length, kind: "pct", goodWhenUp: false }}
+                vs={prevLabel}
+                href="/dashboard/orders?show=cancelled"
+              />
+            </StaggerItem>
+          </StaggerGroup>
+          <ScrollReveal duration={550}>
+            <CartMentalityCard data={cartMentalityData} />
+          </ScrollReveal>
         </div>
       )}
       </div>

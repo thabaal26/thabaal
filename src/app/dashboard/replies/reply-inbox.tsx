@@ -16,6 +16,7 @@ import { PAction } from "../portal-ui";
 import { RecordPaymentSheet } from "../orders/payment-ui";
 import { paymentRef } from "@/lib/plain-error";
 import { useLanguage } from "@/lib/i18n/context";
+import { ScrollReveal } from "@/components/motion";
 
 export type InboxReply = {
   id: string;
@@ -209,7 +210,7 @@ export function ReplyInbox({
   });
 
   return (
-    <div className="convo">
+    <ScrollReveal className="convo" duration={450}>
       {/* Left: the chat list */}
       <div className={cn("card", mobileView === "chat" && "hide-sm")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", maxHeight: "calc(100dvh - 15rem)", minHeight: 420 }}>
         <div className="row" style={{ padding: "10px 12px", borderBottom: "1px solid var(--line)" }}>
@@ -316,6 +317,6 @@ export function ReplyInbox({
           reference={paymentRef(currentUnpaid.paymentTxnId)}
         />
       )}
-    </div>
+    </ScrollReveal>
   );
 }

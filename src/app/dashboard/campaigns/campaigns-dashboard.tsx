@@ -5,6 +5,7 @@ import { confirmAction } from "@/components/confirm";
 import React, { useState, useEffect, useTransition } from "react";
 import Link from "@/components/intent-link";
 import { ArrowUpRight, IndianRupee, Plus, Send, ShoppingBag } from "@/components/icons";
+import { StaggerGroup, StaggerItem } from "@/components/motion";
 import { Stat } from "@/components/ui";
 import { PortalPage, T } from "../portal-ui";
 import { deleteCampaign, duplicateCampaign, toggleCampaign } from "../actions/campaigns";
@@ -260,36 +261,44 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
       }
     >
       {/* 4-KPI Stat Strip */}
-      <div className="grid g4 keep2" suppressHydrationWarning style={{ marginBottom: 16 }}>
-        <Stat
-          label={isTamil ? "இம்மாதம் அனுப்பியவை" : "Sent this month"}
-          value={kpi.sent.toLocaleString("en-IN")}
-          sub={isTamil ? "பிரச்சாரச் செய்திகள்" : "Broadcast messages"}
-          icon={<Send className="size-4 shrink-0" />}
-          tone="info"
-        />
-        <Stat
-          label={isTamil ? "செலவான தொகை" : "Money spent"}
-          value={R(kpi.spent)}
-          sub={isTamil ? "Meta கட்டணங்கள்" : "Meta message charges"}
-          icon={<IndianRupee className="size-4 shrink-0" />}
-          tone="amber"
-        />
-        <Stat
-          label={isTamil ? "பிரச்சார விற்பனை" : "Sales from campaigns"}
-          value={R(kpi.sales)}
-          sub={isTamil ? "பணம் வந்த ஆர்டர்கள்" : "Paid orders"}
-          icon={<ShoppingBag className="size-4 shrink-0" />}
-          tone="brand"
-        />
-        <Stat
-          label={isTamil ? "ஒவ்வொரு ₹1-க்கும் வருவாய்" : "Back for every ₹1"}
-          value={kpi.spent > 0 ? R(kpi.back) : "—"}
-          sub={isTamil ? "விற்பனைத் தொகை" : "Sales, not profit"}
-          icon={<ArrowUpRight className="size-4 shrink-0" />}
-          tone="violet"
-        />
-      </div>
+      <StaggerGroup className="grid g4 keep2" suppressHydrationWarning style={{ marginBottom: 16 }}>
+        <StaggerItem index={0} className="h-full">
+          <Stat
+            label={isTamil ? "இம்மாதம் அனுப்பியவை" : "Sent this month"}
+            value={kpi.sent.toLocaleString("en-IN")}
+            sub={isTamil ? "பிரச்சாரச் செய்திகள்" : "Broadcast messages"}
+            icon={<Send className="size-4 shrink-0" />}
+            tone="info"
+          />
+        </StaggerItem>
+        <StaggerItem index={1} className="h-full">
+          <Stat
+            label={isTamil ? "செலவான தொகை" : "Money spent"}
+            value={R(kpi.spent)}
+            sub={isTamil ? "Meta கட்டணங்கள்" : "Meta message charges"}
+            icon={<IndianRupee className="size-4 shrink-0" />}
+            tone="amber"
+          />
+        </StaggerItem>
+        <StaggerItem index={2} className="h-full">
+          <Stat
+            label={isTamil ? "பிரச்சார விற்பனை" : "Sales from campaigns"}
+            value={R(kpi.sales)}
+            sub={isTamil ? "பணம் வந்த ஆர்டர்கள்" : "Paid orders"}
+            icon={<ShoppingBag className="size-4 shrink-0" />}
+            tone="brand"
+          />
+        </StaggerItem>
+        <StaggerItem index={3} className="h-full">
+          <Stat
+            label={isTamil ? "ஒவ்வொரு ₹1-க்கும் வருவாய்" : "Back for every ₹1"}
+            value={kpi.spent > 0 ? R(kpi.back) : "—"}
+            sub={isTamil ? "விற்பனைத் தொகை" : "Sales, not profit"}
+            icon={<ArrowUpRight className="size-4 shrink-0" />}
+            tone="violet"
+          />
+        </StaggerItem>
+      </StaggerGroup>
 
       {/* Tabs */}
       <div className="tabs" data-tabs role="tablist" aria-label={isTamil ? "பிரச்சார பார்வைகள்" : "Campaign views"} suppressHydrationWarning>
@@ -372,12 +381,13 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
           )}
 
           {/* Campaign cards stack */}
-          <div className="stack" id={`l-${tab}`}>
-            {filteredItems.map((c) => {
+          <StaggerGroup className="stack" id={`l-${tab}`}>
+            {filteredItems.map((c, idx) => {
               const v = ver(c, isTamil);
               const pct = c.cnt > 0 ? Math.round((c.sent / c.cnt) * 100) : 0;
               return (
-                <article key={c.id} className="card">
+                <StaggerItem key={c.id} index={idx}>
+                  <article className="card">
                   {/* Card Header */}
                   <div className="hd" style={{ marginBottom: 8 }}>
                     <div>
@@ -613,8 +623,9 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                     )}
                   </div>
                 </article>
-              );
-            })}
+              </StaggerItem>
+            );
+          })}
 
             {filteredItems.length === 0 && (
               <section className="card" style={{ padding: "36px 20px", textAlign: "center" }}>
@@ -647,7 +658,7 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                 )}
               </section>
             )}
-          </div>
+          </StaggerGroup>
         </section>
       ) : (
         /* Automations Tab */

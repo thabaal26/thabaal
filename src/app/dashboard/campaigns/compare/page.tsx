@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
 import { ChartBar3D, Trophy3D } from "@/components/icons-3d";
+import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, PickClientNotice } from "@/components/ui";
 import { BarList, ProgressRings } from "@/components/viz";
 import { campaignResults, type CampaignResult } from "@/lib/business-reports";
@@ -139,12 +140,19 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
         </div>
       )}
 
-      <div className={cn("grid grid-cols-1 gap-3.5 sm:gap-5", b && "xl:grid-cols-2")}>
-        <Side c={a} other={b} />
-        {b && <Side c={b} other={a} />}
-      </div>
+      <StaggerGroup className={cn("grid grid-cols-1 gap-3.5 sm:gap-5", b && "xl:grid-cols-2")}>
+        <StaggerItem>
+          <Side c={a} other={b} />
+        </StaggerItem>
+        {b && (
+          <StaggerItem>
+            <Side c={b} other={a} />
+          </StaggerItem>
+        )}
+      </StaggerGroup>
 
-      <Card className="card-3d mt-3.5 sm:mt-5">
+      <ScrollReveal>
+        <Card className="card-3d mt-3.5 sm:mt-5">
         <CardHeader tone="info" icon={<ChartBar3D />} title="Every campaign" description={`Last ${days} days · rates are a share of messages delivered · pick two to compare`} />
 
         {/* Mobile compact list (zero horizontal swipe) */}
@@ -265,20 +273,23 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
           </table>
         </div>
       </Card>
+      </ScrollReveal>
 
-      <Card className="card-3d mt-3.5 sm:mt-5">
-        <CardHeader tone="gold" icon={<Trophy3D />} title="Sales after each campaign" description="Paid within 7 days of the message" />
-        <div className="p-3 sm:p-5">
-          <BarList
-            format="inr"
-            color="emerald"
-            items={[...all]
-              .sort((x, y) => y.revenue - x.revenue)
-              .slice(0, 10)
-              .map((c) => ({ key: c.id, label: c.name, value: c.revenue, href: `/dashboard/campaigns/${c.id}`, sub: `${fmtNumber(c.bought)} paid of ${fmtNumber(c.sent)} messaged` }))}
-          />
-        </div>
-      </Card>
+      <ScrollReveal>
+        <Card className="card-3d mt-3.5 sm:mt-5">
+          <CardHeader tone="gold" icon={<Trophy3D />} title="Sales after each campaign" description="Paid within 7 days of the message" />
+          <div className="p-3 sm:p-5">
+            <BarList
+              format="inr"
+              color="emerald"
+              items={[...all]
+                .sort((x, y) => y.revenue - x.revenue)
+                .slice(0, 10)
+                .map((c) => ({ key: c.id, label: c.name, value: c.revenue, href: `/dashboard/campaigns/${c.id}`, sub: `${fmtNumber(c.bought)} paid of ${fmtNumber(c.sent)} messaged` }))}
+            />
+          </div>
+        </Card>
+      </ScrollReveal>
     </>
   );
 }

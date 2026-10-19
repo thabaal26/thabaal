@@ -1,0 +1,34 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Thabaal Universal Motion & Hardware-Acceleration Styles
+   ───────────────────────────────────────────────────────────────────────── */
+
+.thabaal-reveal,
+.thabaal-stagger-item,
+.thabaal-section-reveal {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform-style: preserve-3d;
+}
+
+.thabaal-parallax-layer {
+  pointer-events: auto;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Strict prefers-reduced-motion protection (Law 5 & Accessibility) */
+@media (prefers-reduced-motion: reduce) {
+  .thabaal-reveal,
+  .thabaal-stagger-item,
+  .thabaal-section-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+    will-change: auto !important;
+  }
+
+  .thabaal-parallax-layer {
+    transform: none !important;
+    will-change: auto !important;
+  }
+}

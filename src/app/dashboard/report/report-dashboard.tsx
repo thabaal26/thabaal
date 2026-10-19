@@ -6,6 +6,7 @@ import Link from "@/components/intent-link";
 import { PageTools } from "@/components/shell-tools";
 import { LangButton, useLang } from "../portal-ui";
 import type { ComprehensiveReportData, PeriodFigures, PeriodKey } from "@/lib/reports-data";
+import { ScrollReveal, SectionReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 import "./reports.css";
 
 function R(n: number) {
@@ -196,8 +197,10 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
         </header>
 
       {/* Top Verdict Card */}
-      <div
+      <ScrollReveal
+        as="div"
         className="card"
+        duration={450}
         style={{
           marginBottom: 16,
           borderLeft: `6px solid ${good ? "var(--ok)" : okv || noCost ? "var(--bar2)" : "var(--bad)"}`,
@@ -254,21 +257,23 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
                 `செய்திகளுக்கு ${R(d.cost)} செலவழித்து ${R(d.sales)} மதிப்புள்ள செலுத்தப்பட்ட ஆர்டர்களைப் பெற்றுள்ளீர்கள். செலவழித்த ஒவ்வொரு ₹1-க்கும் ${R(r)} விற்பனை வந்துள்ளது.`
               )}
         </p>
-      </div>
+      </ScrollReveal>
 
       {/* 4-KPI Grid */}
-      <div className="grid g4 keep2" id="rk" style={{ marginBottom: 16 }}>
-        {k.map((x) => (
-          <div key={x[0]} className="card stat">
-            <div className="l">
-              <span>{x[0]}</span>
-              {x[3]}
+      <StaggerGroup className="grid g4 keep2" id="rk" style={{ marginBottom: 16 }}>
+        {k.map((x, i) => (
+          <StaggerItem key={x[0]} index={i} className="h-full">
+            <div className="card stat">
+              <div className="l">
+                <span>{x[0]}</span>
+                {x[3]}
+              </div>
+              <div className="v">{x[1]}</div>
+              <div className="d muted">{x[2]}</div>
             </div>
-            <div className="v">{x[1]}</div>
-            <div className="d muted">{x[2]}</div>
-          </div>
+          </StaggerItem>
         ))}
-      </div>
+      </StaggerGroup>
 
       {/* Main Tabs */}
       <div className="tabs" data-tabs role="tablist">
@@ -313,7 +318,7 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
       {/* SECTION 1: OVERVIEW */}
       <section data-panel="ov" hidden={tab !== "ov"}>
         {/* From message to money */}
-        <div className="card">
+        <ScrollReveal as="div" className="card" duration={400}>
           <div className="hd">
             <div>
               <h2>{tr("From message to money", "செய்தியிலிருந்து விற்பனை வரை")}</h2>
@@ -341,111 +346,119 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
               );
             })}
           </div>
-        </div>
+        </ScrollReveal>
 
         {/* What you should do now */}
-        <h2 style={{ font: "600 19px var(--title)", margin: "18px 0 10px" }}>{tr("What you should do now", "அடுத்து நீங்கள் செய்ய வேண்டியவை")}</h2>
-        <div className="grid g3" id="acts">
-          {A.map((a) => (
-            <div key={a[0]} className="card">
-              <div className="muted small">{a[0]}</div>
-              <div className="v" style={{ font: "600 22px var(--display)", margin: "6px 0" }}>
-                {a[1]}
+        <ScrollReveal duration={400}>
+          <h2 style={{ font: "600 19px var(--title)", margin: "18px 0 10px" }}>{tr("What you should do now", "அடுத்து நீங்கள் செய்ய வேண்டியவை")}</h2>
+        </ScrollReveal>
+        <StaggerGroup className="grid g3" id="acts">
+          {A.map((a, i) => (
+            <StaggerItem key={a[0]} index={i} className="h-full">
+              <div className="card">
+                <div className="muted small">{a[0]}</div>
+                <div className="v" style={{ font: "600 22px var(--display)", margin: "6px 0" }}>
+                  {a[1]}
+                </div>
+                <Link className="btn primary sm" href={a[3]}>
+                  {a[2]}
+                </Link>
               </div>
-              <Link className="btn primary sm" href={a[3]}>
-                {a[2]}
-              </Link>
-            </div>
+            </StaggerItem>
           ))}
-        </div>
+        </StaggerGroup>
 
         {/* Costblock: Wallet, Spend, Daily spend, Limits */}
         <div id="costblock" style={{ marginTop: 16 }}>
-          <div className="grid g2" style={{ marginBottom: 16 }}>
+          <StaggerGroup className="grid g2" style={{ marginBottom: 16 }}>
             {/* Wallet */}
-            <div className="card">
-              <div className="hd">
-                <h2>{tr("Wallet", "வாலட்")}</h2>
-                <div className="tools">
-                  <a className="btn sm primary" href="https://business.facebook.com/" target="_blank" rel="noopener noreferrer">
-                    {tr("Recharge", "ரீசார்ஜ்")}
-                  </a>
-                  <a className="btn sm" href="https://business.facebook.com/" target="_blank" rel="noopener noreferrer">
-                    {tr("Billing on Meta", "Meta-வில் கட்டண விவரம்")}
-                  </a>
+            <StaggerItem index={0} className="h-full">
+              <div className="card h-full">
+                <div className="hd">
+                  <h2>{tr("Wallet", "வாலட்")}</h2>
+                  <div className="tools">
+                    <a className="btn sm primary" href="https://business.facebook.com/" target="_blank" rel="noopener noreferrer">
+                      {tr("Recharge", "ரீசார்ஜ்")}
+                    </a>
+                    <a className="btn sm" href="https://business.facebook.com/" target="_blank" rel="noopener noreferrer">
+                      {tr("Billing on Meta", "Meta-வில் கட்டண விவரம்")}
+                    </a>
+                  </div>
                 </div>
+                {wallet.synced ? (
+                  <>
+                    <div className="stat">
+                      <div className="l">{tr("Balance", "இருப்பு")}</div>
+                      <div className="v">{R(wallet.balance)}</div>
+                    </div>
+                    <div className="bar" style={{ margin: "12px 0" }}>
+                      <i
+                        style={{
+                          width: `${Math.min(100, Math.max(4, Math.round((wallet.balance / 2000) * 100)))}%`,
+                          background: wallet.isLow ? "var(--bar3)" : "var(--bar2)",
+                        }}
+                      ></i>
+                    </div>
+                    <p className="small">
+                      <span className={`pill ${wallet.isLow ? "warn" : "ok"}`}>
+                        {wallet.isLow ? tr("Low balance", "குறைந்த இருப்பு") : tr("Healthy balance", "போதுமான இருப்பு")}
+                      </span>{" "}
+                      {tr(
+                        `Enough for about ${wallet.marketingMsgsLeft.toLocaleString("en-IN")} marketing or ${wallet.utilityMsgsLeft.toLocaleString("en-IN")} utility messages.${wallet.isLow ? " Top up soon." : ""}`,
+                        `சுமார் ${wallet.marketingMsgsLeft.toLocaleString("en-IN")} விளம்பர அல்லது ${wallet.utilityMsgsLeft.toLocaleString("en-IN")} சேவை செய்திகளுக்குப் போதுமானது.${wallet.isLow ? " விரைவில் ரீசார்ஜ் செய்யவும்." : ""}`
+                      )}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="stat">
+                      <div className="l">{tr("Spent this month", "இந்த மாதச் செலவு")}</div>
+                      <div className="v">{R(spend.thisMonthGst)}</div>
+                    </div>
+                    <p className="small muted" style={{ marginTop: 10 }}>
+                      {tr(
+                        "Meta bills you directly for these messages. Your balance, payment method and invoices are on Meta.",
+                        "இந்தச் செய்திகளுக்கு Meta நேரடியாக வசூலிக்கிறது. இருப்பு, கட்டண முறை, விலைப்பட்டியல்கள் Meta-வில் உள்ளன."
+                      )}
+                    </p>
+                  </>
+                )}
               </div>
-              {wallet.synced ? (
-                <>
-                  <div className="stat">
-                    <div className="l">{tr("Balance", "இருப்பு")}</div>
-                    <div className="v">{R(wallet.balance)}</div>
-                  </div>
-                  <div className="bar" style={{ margin: "12px 0" }}>
-                    <i
-                      style={{
-                        width: `${Math.min(100, Math.max(4, Math.round((wallet.balance / 2000) * 100)))}%`,
-                        background: wallet.isLow ? "var(--bar3)" : "var(--bar2)",
-                      }}
-                    ></i>
-                  </div>
-                  <p className="small">
-                    <span className={`pill ${wallet.isLow ? "warn" : "ok"}`}>
-                      {wallet.isLow ? tr("Low balance", "குறைந்த இருப்பு") : tr("Healthy balance", "போதுமான இருப்பு")}
-                    </span>{" "}
-                    {tr(
-                      `Enough for about ${wallet.marketingMsgsLeft.toLocaleString("en-IN")} marketing or ${wallet.utilityMsgsLeft.toLocaleString("en-IN")} utility messages.${wallet.isLow ? " Top up soon." : ""}`,
-                      `சுமார் ${wallet.marketingMsgsLeft.toLocaleString("en-IN")} விளம்பர அல்லது ${wallet.utilityMsgsLeft.toLocaleString("en-IN")} சேவை செய்திகளுக்குப் போதுமானது.${wallet.isLow ? " விரைவில் ரீசார்ஜ் செய்யவும்." : ""}`
-                    )}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="stat">
-                    <div className="l">{tr("Spent this month", "இந்த மாதச் செலவு")}</div>
-                    <div className="v">{R(spend.thisMonthGst)}</div>
-                  </div>
-                  <p className="small muted" style={{ marginTop: 10 }}>
-                    {tr(
-                      "Meta bills you directly for these messages. Your balance, payment method and invoices are on Meta.",
-                      "இந்தச் செய்திகளுக்கு Meta நேரடியாக வசூலிக்கிறது. இருப்பு, கட்டண முறை, விலைப்பட்டியல்கள் Meta-வில் உள்ளன."
-                    )}
-                  </p>
-                </>
-              )}
-            </div>
+            </StaggerItem>
 
             {/* Spend */}
-            <div className="card">
-              <div className="hd">
-                <h2>{tr("Spend", "செலவு")}</h2>
+            <StaggerItem index={1} className="h-full">
+              <div className="card h-full">
+                <div className="hd">
+                  <h2>{tr("Spend", "செலவு")}</h2>
+                </div>
+                <div className="grid g2">
+                  <div className="stat">
+                    <div className="l">{tr("This month", "இந்த மாதம்")}</div>
+                    <div className="v">{R(spend.thisMonth)}</div>
+                    <div className="d muted">{R(spend.thisMonthGst)} {tr("with GST", "GST உடன்")}</div>
+                  </div>
+                  <div className="stat">
+                    <div className="l">{tr("Last month", "கடந்த மாதம்")}</div>
+                    <div className="v">{R(spend.lastMonth)}</div>
+                  </div>
+                  <div className="stat">
+                    <div className="l">{tr("Free replies left", "மீதமுள்ள இலவச பதில்கள்")}</div>
+                    <div className="v">{spend.freeRepliesLeft.toLocaleString("en-IN")}</div>
+                    <div className="d muted">{tr(`of ${spend.freeRepliesTotal.toLocaleString("en-IN")} this month`, `இந்த மாத மொத்த ${spend.freeRepliesTotal.toLocaleString("en-IN")}-ல்`)}</div>
+                  </div>
+                  <div className="stat">
+                    <div className="l">{tr("Return per ₹1", "ரூ.1-க்கு வருமானம்")}</div>
+                    <div className="v">{spend.thisMonth > 0 ? R(spend.returnPerRupee) : "—"}</div>
+                    <div className="d up">{tr("in sales", "விற்பனையில்")}</div>
+                  </div>
+                </div>
               </div>
-              <div className="grid g2">
-                <div className="stat">
-                  <div className="l">{tr("This month", "இந்த மாதம்")}</div>
-                  <div className="v">{R(spend.thisMonth)}</div>
-                  <div className="d muted">{R(spend.thisMonthGst)} {tr("with GST", "GST உடன்")}</div>
-                </div>
-                <div className="stat">
-                  <div className="l">{tr("Last month", "கடந்த மாதம்")}</div>
-                  <div className="v">{R(spend.lastMonth)}</div>
-                </div>
-                <div className="stat">
-                  <div className="l">{tr("Free replies left", "மீதமுள்ள இலவச பதில்கள்")}</div>
-                  <div className="v">{spend.freeRepliesLeft.toLocaleString("en-IN")}</div>
-                  <div className="d muted">{tr(`of ${spend.freeRepliesTotal.toLocaleString("en-IN")} this month`, `இந்த மாத மொத்த ${spend.freeRepliesTotal.toLocaleString("en-IN")}-ல்`)}</div>
-                </div>
-                <div className="stat">
-                  <div className="l">{tr("Return per ₹1", "ரூ.1-க்கு வருமானம்")}</div>
-                  <div className="v">{spend.thisMonth > 0 ? R(spend.returnPerRupee) : "—"}</div>
-                  <div className="d up">{tr("in sales", "விற்பனையில்")}</div>
-                </div>
-              </div>
-            </div>
-          </div>
+            </StaggerItem>
+          </StaggerGroup>
 
           {/* Daily spend split */}
-          <div className="grid split">
+          <ScrollReveal as="div" className="grid split" duration={450}>
             <div className="card">
               <div className="hd">
                 <h2>{tr("Daily spend", "தினசரி செலவு")}</h2>
@@ -573,22 +586,24 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
                 </p>
               </div>
             </div>
-          </div>
+          </ScrollReveal>
 
-          <details className="card more" style={{ marginTop: 16 }}>
-            <summary>
-              <b style={{ font: "600 18px var(--display)" }}>{tr("How WhatsApp charges for messages", "WhatsApp செய்திகளுக்கான கட்டண முறை")}</b>
-            </summary>
-            <div className="stack" style={{ marginTop: 12 }}>
-              <p>{tr("Replies to a customer within 24 hours of their message are free (first 1,000 a month).", "வாடிக்கையாளர் செய்தி அனுப்பிய 24 மணி நேரத்திற்குள் அனுப்பும் பதில்கள் இலவசம் (மாதம் முதல் 1,000 உரையாடல்கள் வரை).")}</p>
-              <p>{tr("Utility messages (order updates) cost less than marketing messages (offers).", "பயன்பாட்டுச் செய்திகள் (ஆர்டர் தகவல்கள்) விளம்பரச் செய்திகளை விட குறைந்த கட்டணம் கொண்டவை.")}</p>
-              <p>{tr("Replies to customers who came from your ads are free for 72 hours.", "விளம்பரங்கள் மூலம் வந்த வாடிக்கையாளர்களுக்கு 72 மணி நேரம் வரை பதிலளிக்க இலவசம்.")}</p>
-              <p>{tr("You pay only for messages that are delivered.", "வாடிக்கையாளருக்குச் சென்றடைந்த செய்திகளுக்கு மட்டுமே நீங்கள் கட்டணம் செலுத்துகிறீர்கள்.")}</p>
-              <div className="note">
-                <b>{tr("Save money:", "பணத்தை மிச்சப்படுத்த:")}</b> {tr("send offers to people who recently replied, and keep order updates as utility messages.", "சமீபத்தில் பதிலளித்தவர்களுக்கு சலுகைகளை அனுப்பவும், ஆர்டர் தகவல்களை பயன்பாட்டுச் செய்திகளாகவே வைக்கவும்.")}
+          <ScrollReveal duration={400}>
+            <details className="card more" style={{ marginTop: 16 }}>
+              <summary>
+                <b style={{ font: "600 18px var(--display)" }}>{tr("How WhatsApp charges for messages", "WhatsApp செய்திகளுக்கான கட்டண முறை")}</b>
+              </summary>
+              <div className="stack" style={{ marginTop: 12 }}>
+                <p>{tr("Replies to a customer within 24 hours of their message are free (first 1,000 a month).", "வாடிக்கையாளர் செய்தி அனுப்பிய 24 மணி நேரத்திற்குள் அனுப்பும் பதில்கள் இலவசம் (மாதம் முதல் 1,000 உரையாடல்கள் வரை).")}</p>
+                <p>{tr("Utility messages (order updates) cost less than marketing messages (offers).", "பயன்பாட்டுச் செய்திகள் (ஆர்டர் தகவல்கள்) விளம்பரச் செய்திகளை விட குறைந்த கட்டணம் கொண்டவை.")}</p>
+                <p>{tr("Replies to customers who came from your ads are free for 72 hours.", "விளம்பரங்கள் மூலம் வந்த வாடிக்கையாளர்களுக்கு 72 மணி நேரம் வரை பதிலளிக்க இலவசம்.")}</p>
+                <p>{tr("You pay only for messages that are delivered.", "வாடிக்கையாளருக்குச் சென்றடைந்த செய்திகளுக்கு மட்டுமே நீங்கள் கட்டணம் செலுத்துகிறீர்கள்.")}</p>
+                <div className="note">
+                  <b>{tr("Save money:", "பணத்தை மிச்சப்படுத்த:")}</b> {tr("send offers to people who recently replied, and keep order updates as utility messages.", "சமீபத்தில் பதிலளித்தவர்களுக்கு சலுகைகளை அனுப்பவும், ஆர்டர் தகவல்களை பயன்பாட்டுச் செய்திகளாகவே வைக்கவும்.")}
+                </div>
               </div>
-            </div>
-          </details>
+            </details>
+          </ScrollReveal>
         </div>
       </section>
 
@@ -600,7 +615,7 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
             "எந்த பிரச்சாரம் சிறந்த பலன் தந்தது? செலவழித்த ஒவ்வொரு ₹1-க்கும் கிடைத்த வருமானத்தின் அடிப்படையில் வரிசைப்படுத்தப்பட்டுள்ளது."
           )}
         </p>
-        <div className="card" style={{ padding: 0 }}>
+        <ScrollReveal as="div" className="card" style={{ padding: 0 }} duration={400}>
           <div className="tw">
             <table>
               <thead>
@@ -650,137 +665,153 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
               </tbody>
             </table>
           </div>
-        </div>
+        </ScrollReveal>
 
-        <div className="grid g2" style={{ marginTop: 16 }}>
-          <div className="card">
-            <h2 style={{ marginBottom: 10 }}>{tr("Best day and time", "சிறந்த நாள் மற்றும் நேரம்")}</h2>
-            <p className="muted small" style={{ marginBottom: 10 }}>
-              {tr("Based on when your customers read and replied.", "வாடிக்கையாளர்கள் எப்போது பார்த்தார்கள், பதிலளித்தார்கள் என்பதன் அடிப்படையில்.")}
-            </p>
-            <div className="list">
-              {data.campaigns.bestTimes.length ? (
-                data.campaigns.bestTimes.map((bt) => (
-                  <div key={bt.slot} className="row">
-                    <div className="grow">{bt.slot}</div>
-                    <span className={`pill ${bt.badgeType}`}>{bt.badge}</span>
-                  </div>
-                ))
-              ) : (
-                <p className="muted small">{tr("Not enough customer reply activity yet.", "இன்னும் போதுமான வாடிக்கையாளர் பதில் விவரங்கள் இல்லை.")}</p>
-              )}
+        <StaggerGroup className="grid g2" style={{ marginTop: 16 }}>
+          <StaggerItem index={0} className="h-full">
+            <div className="card h-full">
+              <h2 style={{ marginBottom: 10 }}>{tr("Best day and time", "சிறந்த நாள் மற்றும் நேரம்")}</h2>
+              <p className="muted small" style={{ marginBottom: 10 }}>
+                {tr("Based on when your customers read and replied.", "வாடிக்கையாளர்கள் எப்போது பார்த்தார்கள், பதிலளித்தார்கள் என்பதன் அடிப்படையில்.")}
+              </p>
+              <div className="list">
+                {data.campaigns.bestTimes.length ? (
+                  data.campaigns.bestTimes.map((bt) => (
+                    <div key={bt.slot} className="row">
+                      <div className="grow">{bt.slot}</div>
+                      <span className={`pill ${bt.badgeType}`}>{bt.badge}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="muted small">{tr("Not enough customer reply activity yet.", "இன்னும் போதுமான வாடிக்கையாளர் பதில் விவரங்கள் இல்லை.")}</p>
+                )}
+              </div>
             </div>
-          </div>
+          </StaggerItem>
 
-          <div className="card">
-            <h2 style={{ marginBottom: 10 }}>{tr("What to repeat", "மீண்டும் செய்ய வேண்டியவை")}</h2>
-            <div className="list">
-              {data.campaigns.whatToRepeat.length ? (
-                data.campaigns.whatToRepeat.map((rpt, idx) => (
-                  <div key={idx} className="row">
-                    <div className="grow">{rpt.title}</div>
-                    {rpt.isPill ? (
-                      <span className={`pill ${rpt.pillType || "bad"}`}>{rpt.actionText}</span>
-                    ) : (
-                      <Link className="btn sm" href={rpt.actionHref || "/dashboard/campaigns/new"}>
-                        {rpt.actionText}
-                      </Link>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <p className="muted small">{tr("Run your first broadcast campaign to see performance insights.", "செயல்திறன் நுண்ணறிவுகளைப் பார்க்க உங்கள் முதல் பிரச்சாரத்தை இயக்கவும்.")}</p>
-              )}
+          <StaggerItem index={1} className="h-full">
+            <div className="card h-full">
+              <h2 style={{ marginBottom: 10 }}>{tr("What to repeat", "மீண்டும் செய்ய வேண்டியவை")}</h2>
+              <div className="list">
+                {data.campaigns.whatToRepeat.length ? (
+                  data.campaigns.whatToRepeat.map((rpt, idx) => (
+                    <div key={idx} className="row">
+                      <div className="grow">{rpt.title}</div>
+                      {rpt.isPill ? (
+                        <span className={`pill ${rpt.pillType || "bad"}`}>{rpt.actionText}</span>
+                      ) : (
+                        <Link className="btn sm" href={rpt.actionHref || "/dashboard/campaigns/new"}>
+                          {rpt.actionText}
+                        </Link>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <p className="muted small">{tr("Run your first broadcast campaign to see performance insights.", "செயல்திறன் நுண்ணறிவுகளைப் பார்க்க உங்கள் முதல் பிரச்சாரத்தை இயக்கவும்.")}</p>
+                )}
+              </div>
             </div>
-          </div>
-        </div>
+          </StaggerItem>
+        </StaggerGroup>
       </section>
 
       {/* SECTION 3: CUSTOMERS */}
       <section data-panel="cust" hidden={tab !== "cust"}>
-        <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
-          <div className="card stat">
-            <div className="l">
-              <span>{tr("Bought this month", "இந்த மாதம் வாங்கியவர்கள்")}</span>
-              <ShoppingBag className="size-4" />
+        <StaggerGroup className="grid g4 keep2" style={{ marginBottom: 16 }}>
+          <StaggerItem index={0} className="h-full">
+            <div className="card stat h-full">
+              <div className="l">
+                <span>{tr("Bought this month", "இந்த மாதம் வாங்கியவர்கள்")}</span>
+                <ShoppingBag className="size-4" />
+              </div>
+              <div className="v">{data.customers.boughtThisMonth.toLocaleString("en-IN")}</div>
+              <div className="d up">{data.customers.boughtDiff}</div>
             </div>
-            <div className="v">{data.customers.boughtThisMonth.toLocaleString("en-IN")}</div>
-            <div className="d up">{data.customers.boughtDiff}</div>
-          </div>
-          <div className="card stat">
-            <div className="l">
-              <span>{tr("New customers", "புதிய வாடிக்கையாளர்கள்")}</span>
-              <Users className="size-4" />
+          </StaggerItem>
+          <StaggerItem index={1} className="h-full">
+            <div className="card stat h-full">
+              <div className="l">
+                <span>{tr("New customers", "புதிய வாடிக்கையாளர்கள்")}</span>
+                <Users className="size-4" />
+              </div>
+              <div className="v">{data.customers.newCustomers.toLocaleString("en-IN")}</div>
             </div>
-            <div className="v">{data.customers.newCustomers.toLocaleString("en-IN")}</div>
-          </div>
-          <div className="card stat">
-            <div className="l">
-              <span>{tr("Came back", "மீண்டும் வந்தவர்கள்")}</span>
-              <Repeat className="size-4" />
+          </StaggerItem>
+          <StaggerItem index={2} className="h-full">
+            <div className="card stat h-full">
+              <div className="l">
+                <span>{tr("Came back", "மீண்டும் வந்தவர்கள்")}</span>
+                <Repeat className="size-4" />
+              </div>
+              <div className="v">{data.customers.cameBack.toLocaleString("en-IN")}</div>
+              <div className="d muted">{data.customers.repeatRatioLabel}</div>
             </div>
-            <div className="v">{data.customers.cameBack.toLocaleString("en-IN")}</div>
-            <div className="d muted">{data.customers.repeatRatioLabel}</div>
-          </div>
-          <div className="card stat">
-            <div className="l">
-              <span>{tr("Have not bought in 60 days", "60 நாட்களாக வாங்காதவர்கள்")}</span>
-              <AlertCircle className="size-4" />
+          </StaggerItem>
+          <StaggerItem index={3} className="h-full">
+            <div className="card stat h-full">
+              <div className="l">
+                <span>{tr("Have not bought in 60 days", "60 நாட்களாக வாங்காதவர்கள்")}</span>
+                <AlertCircle className="size-4" />
+              </div>
+              <div className="v">{data.customers.lapsed60Days.toLocaleString("en-IN")}</div>
             </div>
-            <div className="v">{data.customers.lapsed60Days.toLocaleString("en-IN")}</div>
-          </div>
-        </div>
+          </StaggerItem>
+        </StaggerGroup>
 
-        <div className="grid g2">
-          <div className="card">
-            <div className="hd">
-              <div>
-                <h2>{tr("Who needs a follow-up", "யாருக்கு நினைவூட்டல் தேவை")}</h2>
-                <p>{tr("Each group has a message ready.", "ஒவ்வொரு குழுவிற்கும் செய்தி தயாராக உள்ளது.")}</p>
+        <StaggerGroup className="grid g2">
+          <StaggerItem index={0} className="h-full">
+            <div className="card h-full">
+              <div className="hd">
+                <div>
+                  <h2>{tr("Who needs a follow-up", "யாருக்கு நினைவூட்டல் தேவை")}</h2>
+                  <p>{tr("Each group has a message ready.", "ஒவ்வொரு குழுவிற்கும் செய்தி தயாராக உள்ளது.")}</p>
+                </div>
+              </div>
+              <div className="list" id="cs2">
+                {data.customers.followUps.map((fu) => (
+                  <div key={fu.title} className="row">
+                    <div className="grow">
+                      <div className="t">{fu.title}</div>
+                      <div className="muted small">{fu.sub}</div>
+                    </div>
+                    <Link className="btn sm" href={fu.href}>
+                      {fu.action}
+                    </Link>
+                  </div>
+                ))}
               </div>
             </div>
-            <div className="list" id="cs2">
-              {data.customers.followUps.map((fu) => (
-                <div key={fu.title} className="row">
-                  <div className="grow">
-                    <div className="t">{fu.title}</div>
-                    <div className="muted small">{fu.sub}</div>
-                  </div>
-                  <Link className="btn sm" href={fu.href}>
-                    {fu.action}
-                  </Link>
-                </div>
-              ))}
-            </div>
-          </div>
+          </StaggerItem>
 
-          <div className="card">
-            <div className="hd">
-              <h2>{tr("Where your customers are", "உங்கள் வாடிக்கையாளர்கள் இருக்கும் பகுதிகள்")}</h2>
-            </div>
-            <div className="list">
-              {data.customers.locations.map((loc) => (
-                <div key={loc.name} className="row">
-                  <div className="grow">
-                    {loc.name}
-                    <div className="bar" style={{ marginTop: 6 }}>
-                      <i style={{ width: `${loc.pct}%`, background: "var(--bar)" }}></i>
+          <StaggerItem index={1} className="h-full">
+            <div className="card h-full">
+              <div className="hd">
+                <h2>{tr("Where your customers are", "உங்கள் வாடிக்கையாளர்கள் இருக்கும் பகுதிகள்")}</h2>
+              </div>
+              <div className="list">
+                {data.customers.locations.map((loc) => (
+                  <div key={loc.name} className="row">
+                    <div className="grow">
+                      {loc.name}
+                      <div className="bar" style={{ marginTop: 6 }}>
+                        <i style={{ width: `${loc.pct}%`, background: "var(--bar)" }}></i>
+                      </div>
                     </div>
+                    <b>{loc.count.toLocaleString("en-IN")}</b>
                   </div>
-                  <b>{loc.count.toLocaleString("en-IN")}</b>
-                </div>
-              ))}
+                ))}
+              </div>
+              <p className="muted small" style={{ marginTop: 10 }}>
+                {data.customers.topLocationInsight}
+              </p>
             </div>
-            <p className="muted small" style={{ marginTop: 10 }}>
-              {data.customers.topLocationInsight}
-            </p>
-          </div>
-        </div>
+          </StaggerItem>
+        </StaggerGroup>
       </section>
 
       {/* SECTION 4: PRODUCTS */}
       <section data-panel="prod" hidden={tab !== "prod"}>
-        <div className="card" style={{ padding: 0, marginBottom: 16 }}>
+        <ScrollReveal as="div" className="card" style={{ padding: 0, marginBottom: 16 }} duration={400}>
           <div className="tw">
             <table>
               <thead>
@@ -809,54 +840,58 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
               </tbody>
             </table>
           </div>
-        </div>
+        </ScrollReveal>
 
-        <div className="grid g2">
-          <div className="card">
-            <h2 style={{ marginBottom: 10 }}>{tr("Stuck in carts", "கார்ட்டுகளில் தேங்கியுள்ளவை")}</h2>
-            <p className="muted small" style={{ marginBottom: 10 }}>
-              {tr(
-                `Customers added these and did not pay. Worth ${R(data.products.stuckInCarts.totalWaiting)} in total.`,
-                `வாடிக்கையாளர்கள் இவற்றைச் சேர்த்துவிட்டு பணம் செலுத்தவில்லை. மொத்த மதிப்பு ${R(data.products.stuckInCarts.totalWaiting)}.`
-              )}
-            </p>
-            <div className="list">
-              {data.products.stuckInCarts.items.length ? (
-                data.products.stuckInCarts.items.map((it, idx) => (
-                  <div key={idx} className="row">
-                    <div className="grow">{it.text}</div>
-                    <Link className="btn sm" href={it.href}>
-                      {tr("Chase payment", "பணம் பெற நினைவூட்டு")}
-                    </Link>
-                  </div>
-                ))
-              ) : (
-                <p className="muted small">{tr("No items currently stuck in unpaid carts.", "தற்போது செலுத்தப்படாத கார்ட்டுகளில் எந்தப் பொருளும் இல்லை.")}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="card">
-            <h2 style={{ marginBottom: 10 }}>{tr("Worth promoting", "விளம்பரப்படுத்த தகுதியானவை")}</h2>
-            <div className="list">
-              {data.products.worthPromoting.length ? (
-                data.products.worthPromoting.map((wp, idx) => (
-                  <div key={idx} className="row">
-                    <div className="grow">
-                      <div className="t">{wp.title}</div>
-                      <div className="muted small">{wp.desc}</div>
+        <StaggerGroup className="grid g2">
+          <StaggerItem index={0} className="h-full">
+            <div className="card h-full">
+              <h2 style={{ marginBottom: 10 }}>{tr("Stuck in carts", "கார்ட்டுகளில் தேங்கியுள்ளவை")}</h2>
+              <p className="muted small" style={{ marginBottom: 10 }}>
+                {tr(
+                  `Customers added these and did not pay. Worth ${R(data.products.stuckInCarts.totalWaiting)} in total.`,
+                  `வாடிக்கையாளர்கள் இவற்றைச் சேர்த்துவிட்டு பணம் செலுத்தவில்லை. மொத்த மதிப்பு ${R(data.products.stuckInCarts.totalWaiting)}.`
+                )}
+              </p>
+              <div className="list">
+                {data.products.stuckInCarts.items.length ? (
+                  data.products.stuckInCarts.items.map((it, idx) => (
+                    <div key={idx} className="row">
+                      <div className="grow">{it.text}</div>
+                      <Link className="btn sm" href={it.href}>
+                        {tr("Chase payment", "பணம் பெற நினைவூட்டு")}
+                      </Link>
                     </div>
-                    <Link className={`btn sm ${wp.primary ? "primary" : ""}`} href={wp.actionHref}>
-                      {wp.actionText}
-                    </Link>
-                  </div>
-                ))
-              ) : (
-                <p className="muted small">{tr("Add products to your catalogue to get promotional recommendations.", "விளம்பர பரிந்துரைகளைப் பெற உங்கள் பட்டியலில் பொருட்களைச் சேர்க்கவும்.")}</p>
-              )}
+                  ))
+                ) : (
+                  <p className="muted small">{tr("No items currently stuck in unpaid carts.", "தற்போது செலுத்தப்படாத கார்ட்டுகளில் எந்தப் பொருளும் இல்லை.")}</p>
+                )}
+              </div>
             </div>
-          </div>
-        </div>
+          </StaggerItem>
+
+          <StaggerItem index={1} className="h-full">
+            <div className="card h-full">
+              <h2 style={{ marginBottom: 10 }}>{tr("Worth promoting", "விளம்பரப்படுத்த தகுதியானவை")}</h2>
+              <div className="list">
+                {data.products.worthPromoting.length ? (
+                  data.products.worthPromoting.map((wp, idx) => (
+                    <div key={idx} className="row">
+                      <div className="grow">
+                        <div className="t">{wp.title}</div>
+                        <div className="muted small">{wp.desc}</div>
+                      </div>
+                      <Link className={`btn sm ${wp.primary ? "primary" : ""}`} href={wp.actionHref}>
+                        {wp.actionText}
+                      </Link>
+                    </div>
+                  ))
+                ) : (
+                  <p className="muted small">{tr("Add products to your catalogue to get promotional recommendations.", "விளம்பர பரிந்துரைகளைப் பெற உங்கள் பட்டியலில் பொருட்களைச் சேர்க்கவும்.")}</p>
+                )}
+              </div>
+            </div>
+          </StaggerItem>
+        </StaggerGroup>
       </section>
       </div>
     </div>

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { ScrollReveal } from "@/components/motion";
 import Link from "@/components/intent-link";
 import { safeAction, toastResult } from "@/components/toast";
 import { useLanguage } from "@/lib/i18n/context";
@@ -100,7 +101,7 @@ export function Automations({ data, canManage }: { data: AutomationsData; canMan
   );
 
   return (
-    <div className="card">
+    <ScrollReveal as="div" className="card" duration={400}>
       <div className="list" id="au">
         <div className="row">
           <div className="grow">
@@ -283,6 +284,6 @@ export function Automations({ data, canManage }: { data: AutomationsData; canMan
           {ALWAYS}
         </div>
       </div>
-    </div>
+    </ScrollReveal>
   );
 }

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
 import { Building3D, Calendar3D, Phone3D, Users3D } from "@/components/icons-3d";
+import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, QualityBadge, Stat } from "@/components/ui";
 import { CLIENT_PLAN_PRESETS, CLIENT_SECTIONS, detectPlanPreset } from "@/lib/client-sections";
 import { db } from "@/lib/db";
@@ -48,36 +49,44 @@ export default async function ClientsPage() {
         actions={<NewClientForm />}
       />
 
-      <section aria-label="Clients summary" className="mb-4 grid grid-cols-2 gap-2.5 sm:mb-5 sm:gap-3.5 lg:grid-cols-4">
-        <Stat
-          label="Active businesses"
-          value={fmtNumber(clients.length)}
-          sub={`${fmtNumber(totalUsers)} staff & manager logins`}
-          icon={<Building3D />}
-          tone="gold"
-        />
-        <Stat
-          label="Total customers"
-          value={fmtNumber(totalCustomers)}
-          sub="Across all client accounts"
-          icon={<Users3D />}
-          tone="brand"
-        />
-        <Stat
-          label="WhatsApp numbers"
-          value={fmtNumber(totalNumbers)}
-          sub="Connected sender lines"
-          icon={<Phone3D />}
-          tone="info"
-        />
-        <Stat
-          label="Client campaigns"
-          value={fmtNumber(totalCampaigns)}
-          sub="Scheduled & one-off"
-          icon={<Calendar3D />}
-          tone="violet"
-        />
-      </section>
+      <StaggerGroup aria-label="Clients summary" className="mb-4 grid grid-cols-2 gap-2.5 sm:mb-5 sm:gap-3.5 lg:grid-cols-4">
+        <StaggerItem>
+          <Stat
+            label="Active businesses"
+            value={fmtNumber(clients.length)}
+            sub={`${fmtNumber(totalUsers)} staff & manager logins`}
+            icon={<Building3D />}
+            tone="gold"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <Stat
+            label="Total customers"
+            value={fmtNumber(totalCustomers)}
+            sub="Across all client accounts"
+            icon={<Users3D />}
+            tone="brand"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <Stat
+            label="WhatsApp numbers"
+            value={fmtNumber(totalNumbers)}
+            sub="Connected sender lines"
+            icon={<Phone3D />}
+            tone="info"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <Stat
+            label="Client campaigns"
+            value={fmtNumber(totalCampaigns)}
+            sub="Scheduled & one-off"
+            icon={<Calendar3D />}
+            tone="violet"
+          />
+        </StaggerItem>
+      </StaggerGroup>
 
       {clients.length ? (
         <div className="space-y-4 sm:space-y-6">
@@ -89,7 +98,8 @@ export default async function ClientsPage() {
             const presetMeta = CLIENT_PLAN_PRESETS.find((p) => p.id === presetId);
             const enabledCount = CLIENT_SECTIONS.length - disabledSections.length;
             return (
-              <Card key={c.id} className="card-3d transition-all duration-200">
+              <ScrollReveal key={c.id}>
+                <Card className="card-3d transition-all duration-200">
                 <CardHeader
                   tone="gold"
                   title={
@@ -249,8 +259,9 @@ export default async function ClientsPage() {
                   </section>
                 </div>
               </Card>
-            );
-          })}
+            </ScrollReveal>
+          );
+        })}
         </div>
       ) : (
         <Card className="card-3d">

@@ -4,6 +4,7 @@ import { ChevronRight } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
 import { Alert3D, Bell3D, Inbox3D, Phone3D, ShoppingBag3D } from "@/components/icons-3d";
+import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 import { Badge, Card, EmptyState, FilterChips, type HeaderTone, IconCube, PageHeader, Stat } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
@@ -327,86 +328,96 @@ export default async function NotificationsPage({
         }
       />
 
-      <section aria-label="Activity summary" className="mb-4 grid grid-cols-2 gap-2.5 sm:mb-5 sm:gap-3.5 lg:grid-cols-4">
-        <Stat
-          label="Unread items"
-          value={fmtNumber(unreadCount)}
-          sub={unreadCount > 0 ? "Needs staff action" : "All caught up"}
-          icon={<Bell3D className="size-4" />}
-          tone={unreadCount > 0 ? "amber" : "brand"}
-        />
-        <Stat
-          label="Order events"
-          value={fmtNumber(orderCount)}
-          sub="Recent order activity"
-          icon={<ShoppingBag3D className="size-4" />}
-          tone="info"
-        />
-        <Stat
-          label="Customer replies"
-          value={fmtNumber(replyCount)}
-          sub="Recent WhatsApp messages"
-          icon={<Inbox3D className="size-4" />}
-          tone="brand"
-        />
-        <Stat
-          label="Calls & alerts"
-          value={fmtNumber(callCount + alertCount)}
-          sub={alertCount > 0 ? `${fmtNumber(alertCount)} delivery alerts` : "Last 24 hours"}
-          icon={<Phone3D className="size-4" />}
-          tone={alertCount > 0 ? "amber" : "violet"}
-        />
-      </section>
+      <StaggerGroup aria-label="Activity summary" className="mb-4 grid grid-cols-2 gap-2.5 sm:mb-5 sm:gap-3.5 lg:grid-cols-4">
+        <StaggerItem>
+          <Stat
+            label="Unread items"
+            value={fmtNumber(unreadCount)}
+            sub={unreadCount > 0 ? "Needs staff action" : "All caught up"}
+            icon={<Bell3D className="size-4" />}
+            tone={unreadCount > 0 ? "amber" : "brand"}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <Stat
+            label="Order events"
+            value={fmtNumber(orderCount)}
+            sub="Recent order activity"
+            icon={<ShoppingBag3D className="size-4" />}
+            tone="info"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <Stat
+            label="Customer replies"
+            value={fmtNumber(replyCount)}
+            sub="Recent WhatsApp messages"
+            icon={<Inbox3D className="size-4" />}
+            tone="brand"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <Stat
+            label="Calls & alerts"
+            value={fmtNumber(callCount + alertCount)}
+            sub={alertCount > 0 ? `${fmtNumber(alertCount)} delivery alerts` : "Last 24 hours"}
+            icon={<Phone3D className="size-4" />}
+            tone={alertCount > 0 ? "amber" : "violet"}
+          />
+        </StaggerItem>
+      </StaggerGroup>
 
       {filtered.length > 0 ? (
         <div className="space-y-5">
           {days.map((day) => (
-            <section key={day.key} aria-labelledby={`day-${day.key}`}>
-              <h2 id={`day-${day.key}`} className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-muted">
-                <T>{day.label}</T>
-              </h2>
-              <Card className="card-3d overflow-hidden">
-                <ul className="divide-y divide-line">
-                  {day.items.map((item) => {
-                    const k = KIND[item.type];
-                    return (
-                      <li key={item.id} className="group relative flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-subtle sm:items-center sm:px-5">
-                        {item.unread && <span aria-hidden className="absolute inset-y-3 left-0 w-[3px] rounded-r-full bg-brand" />}
-                        <IconCube tone={k.tone} size="md">
-                          <k.icon className="size-[18px]" />
-                        </IconCube>
+            <ScrollReveal key={day.key}>
+              <section aria-labelledby={`day-${day.key}`}>
+                <h2 id={`day-${day.key}`} className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-muted">
+                  <T>{day.label}</T>
+                </h2>
+                <Card className="card-3d overflow-hidden">
+                  <ul className="divide-y divide-line">
+                    {day.items.map((item) => {
+                      const k = KIND[item.type];
+                      return (
+                        <li key={item.id} className="group relative flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-subtle sm:items-center sm:px-5">
+                          {item.unread && <span aria-hidden className="absolute inset-y-3 left-0 w-[3px] rounded-r-full bg-brand" />}
+                          <IconCube tone={k.tone} size="md">
+                            <k.icon className="size-[18px]" />
+                          </IconCube>
 
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className={cn("min-w-0 truncate text-sm", item.unread ? "font-semibold text-ink" : "font-medium text-ink-2")}>
-                              <Link href={item.href} className="-my-2.5 inline-block py-2.5 outline-none after:absolute after:inset-0 focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-brand sm:my-0 sm:py-0">
-                                {item.title}
-                              </Link>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className={cn("min-w-0 truncate text-sm", item.unread ? "font-semibold text-ink" : "font-medium text-ink-2")}>
+                                <Link href={item.href} className="-my-2.5 inline-block py-2.5 outline-none after:absolute after:inset-0 focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-brand sm:my-0 sm:py-0">
+                                  {item.title}
+                                </Link>
+                              </p>
+                              {item.urgent && <Badge tone="amber" dot>{item.type === "call" ? "Ringing" : "Needs attention"}</Badge>}
+                              {item.unread && <span className="sr-only">(unread)</span>}
+                            </div>
+                            <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted sm:line-clamp-1">{item.description}</p>
+                            <p className="tabular mt-1 text-xs text-muted sm:hidden">
+                              {fmtDate(item.date, "h:mm a")}
+                              {item.phone && ` · ${formatPhone(item.phone)}`}
                             </p>
-                            {item.urgent && <Badge tone="amber" dot>{item.type === "call" ? "Ringing" : "Needs attention"}</Badge>}
-                            {item.unread && <span className="sr-only">(unread)</span>}
                           </div>
-                          <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted sm:line-clamp-1">{item.description}</p>
-                          <p className="tabular mt-1 text-xs text-muted sm:hidden">
-                            {fmtDate(item.date, "h:mm a")}
-                            {item.phone && ` · ${formatPhone(item.phone)}`}
-                          </p>
-                        </div>
 
-                        <div className="hidden shrink-0 text-right sm:block">
-                          <p className="tabular text-xs text-muted">{fmtDate(item.date, "h:mm a")}</p>
-                          {item.phone && <p className="tabular text-xs text-muted">{formatPhone(item.phone)}</p>}
-                        </div>
-                        <span className="hidden w-24 shrink-0 items-center justify-end gap-1 text-xs font-medium text-brand-deep md:flex">
-                          {k.action} <ChevronRight aria-hidden className="size-3.5 transition-transform group-hover:translate-x-0.5" />
-                        </span>
-                        <ChevronRight aria-hidden className="mt-2 size-4 shrink-0 text-faint md:hidden" />
-                      </li>
-                    );
-                  })}
-                </ul>
-              </Card>
-            </section>
+                          <div className="hidden shrink-0 text-right sm:block">
+                            <p className="tabular text-xs text-muted">{fmtDate(item.date, "h:mm a")}</p>
+                            {item.phone && <p className="tabular text-xs text-muted">{formatPhone(item.phone)}</p>}
+                          </div>
+                          <span className="hidden w-24 shrink-0 items-center justify-end gap-1 text-xs font-medium text-brand-deep md:flex">
+                            {k.action} <ChevronRight aria-hidden className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+                          </span>
+                          <ChevronRight aria-hidden className="mt-2 size-4 shrink-0 text-faint md:hidden" />
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </Card>
+              </section>
+            </ScrollReveal>
           ))}
         </div>
       ) : (

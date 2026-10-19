@@ -13,6 +13,7 @@ import { savePaymentReference, setPaymentMethod, verifyPaymentClaim } from "../a
 import { RecordPaymentSheet } from "../orders/payment-ui";
 import { inr } from "../portal-format";
 import { Chips, PAction, Pill, type PillTone } from "../portal-ui";
+import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 
 const STATE: Record<string, { tone: PillTone; label: string; labelTa: string; group: string }> = {
   requested: { tone: "warn", label: "Payment waiting", labelTa: "பணம் நிலுவையில் உள்ளது", group: "unpaid" },
@@ -62,7 +63,7 @@ export function CollectList({ rows, nowMs, canOperate, intro = true }: { rows: C
           {isTa ? "இன்னும் பணம் வராத ஆர்டர்கள். பழைய ஆர்டர்களுக்கு முதலில் நினைவூட்டுங்கள்." : "Orders where the money has not come in yet. Chase the oldest first."}
         </p>
       )}
-      <div className="toolbar">
+      <ScrollReveal duration={400} className="toolbar">
         <div className="search">
           <Search aria-hidden className="shrink-0" />
           <input
@@ -77,13 +78,14 @@ export function CollectList({ rows, nowMs, canOperate, intro = true }: { rows: C
         </div>
         <Chips label={isTa ? "பண நிலை" : "Payment state"} value={filter} onChange={setFilter} options={opts.map((o) => ({ ...o, n: count(o.id) }))} />
         {canOperate && remindable.length > 0 && <RemindAll ids={remindable.map((r) => r.id)} isTa={isTa} />}
-      </div>
+      </ScrollReveal>
 
-      <div className="stack">
-        {list.map((r) => {
+      <StaggerGroup className="stack">
+        {list.map((r, i) => {
           const st = STATE[r.state] ?? STATE.unpaid;
           return (
-            <article key={r.id} className="card">
+            <StaggerItem key={r.id} index={i}>
+              <article className="card">
               <div className="hd" style={{ marginBottom: 6 }}>
                 <div>
                   <h2 data-data style={{ fontSize: 17 }}>
@@ -178,20 +180,23 @@ export function CollectList({ rows, nowMs, canOperate, intro = true }: { rows: C
                 </div>
               )}
             </article>
+            </StaggerItem>
           );
         })}
         {list.length === 0 && (
-          <p className="muted">
-            {rows.length
-              ? isTa
-                ? "எதுவும் பொருந்தவில்லை."
-                : "Nothing matches."
-              : isTa
-                ? "வசூலிக்க வேண்டிய தொகை எதுவும் இல்லை. நன்று."
-                : "Nothing to collect. Good work."}
-          </p>
+          <ScrollReveal duration={400}>
+            <p className="muted">
+              {rows.length
+                ? isTa
+                  ? "எதுவும் பொருந்தவில்லை."
+                  : "Nothing matches."
+                : isTa
+                  ? "வசூலிக்க வேண்டிய தொகை எதுவும் இல்லை. நன்று."
+                  : "Nothing to collect. Good work."}
+            </p>
+          </ScrollReveal>
         )}
-      </div>
+      </StaggerGroup>
 
       {paying && <RecordPaymentSheet open onClose={() => setPaying(null)} id={paying.id} who={paying.name} due={paying.due} cod={paying.cod} />}
     </>

@@ -1,6 +1,7 @@
 import { BarChart3, FileText, Home, IndianRupee, Megaphone, MessageCircle, Package, Settings, Tag, Users } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
+import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 import { PortalPage, T } from "../portal-ui";
 
 export const metadata: Metadata = { title: "What changed" };
@@ -58,101 +59,109 @@ export default function GuidePage() {
       <div className="stack">
         <section>
           <h2 style={{ marginBottom: 12 }}><T>All pages</T></h2>
-          <div className="grid g3">
+          <StaggerGroup className="grid g3">
             {PAGES.map((p) => {
               const Icon = p.icon;
               return (
-                <Link key={p.href} className="todo" href={p.href} style={{ flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
-                  <span style={{ display: "flex", gap: 8, alignItems: "center", font: "600 18px var(--display)" }}>
-                    <Icon aria-hidden className="ic shrink-0" /> {p.title}
-                  </span>
-                  <span className="muted small">{p.desc}</span>
-                </Link>
+                <StaggerItem key={p.href}>
+                  <Link className="todo" href={p.href} style={{ flexDirection: "column", alignItems: "flex-start", gap: 6, height: "100%" }}>
+                    <span style={{ display: "flex", gap: 8, alignItems: "center", font: "600 18px var(--display)" }}>
+                      <Icon aria-hidden className="ic shrink-0" /> {p.title}
+                    </span>
+                    <span className="muted small">{p.desc}</span>
+                  </Link>
+                </StaggerItem>
               );
             })}
-          </div>
+          </StaggerGroup>
         </section>
 
-        <section className="card">
-          <div className="hd">
-            <div>
-              <h2>Where did the old sections go?</h2>
-              <p>The long menu became 10 pages. Nothing was removed.</p>
+        <ScrollReveal>
+          <section className="card">
+            <div className="hd">
+              <div>
+                <h2>Where did the old sections go?</h2>
+                <p>The long menu became 10 pages. Nothing was removed.</p>
+              </div>
             </div>
-          </div>
-          <div className="tw" tabIndex={0} role="region" aria-label="Old sections and new pages">
-            <table>
-              <thead>
-                <tr>
-                  <th>Old place</th>
-                  <th>Now</th>
-                </tr>
-              </thead>
-              <tbody>
-                {MOVES.map(([old, now, href]) => (
-                  <tr key={old}>
-                    <td>
-                      <b>{old}</b>
-                    </td>
-                    <td>
-                      {now}
-                      {href && (
-                        <>
-                          {" "}
-                          <Link className="linkb" href={href}>
-                            Open
-                          </Link>
-                        </>
-                      )}
-                    </td>
+            <div className="tw" tabIndex={0} role="region" aria-label="Old sections and new pages">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Old place</th>
+                    <th>Now</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section className="card">
-          <div className="hd">
-            <div>
-              <h2><T>Buttons on each order</T></h2>
-              <p><T ta="உரிமையாளர் பார்ப்பது, நடக்கும் வரிசையில்.">What the owner sees, in the order things happen.</T></p>
+                </thead>
+                <tbody>
+                  {MOVES.map(([old, now, href]) => (
+                    <tr key={old}>
+                      <td>
+                        <b>{old}</b>
+                      </td>
+                      <td>
+                        {now}
+                        {href && (
+                          <>
+                            {" "}
+                            <Link className="linkb" href={href}>
+                              Open
+                            </Link>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
-          <div className="tw" tabIndex={0} role="region" aria-label="Buttons on each order">
-            <table>
-              <thead>
-                <tr>
-                  <th>Order is…</th>
-                  <th>Buttons</th>
-                  <th>What happens</th>
-                </tr>
-              </thead>
-              <tbody>
-                {BUTTONS.map(([state, buttons, what]) => (
-                  <tr key={state}>
-                    <td>
-                      <b>{state}</b>
-                    </td>
-                    <td>{buttons}</td>
-                    <td className="muted">{what}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+          </section>
+        </ScrollReveal>
 
-        <section className="card">
-          <h2 style={{ marginBottom: 10 }}><T>What got simpler</T></h2>
-          <ul>
-            <li>Menu: 10 pages in 6 groups</li>
-            <li>Each page has one job, with tabs for the rest</li>
-            <li>One yellow button for the main action. Red only for problems, green only for “done”</li>
-            <li>Rare actions (edit, cancel, undo) sit under “More”</li>
-            <li>Costs, charts and Meta rules moved out of the home page</li>
-          </ul>
-        </section>
+        <ScrollReveal>
+          <section className="card">
+            <div className="hd">
+              <div>
+                <h2><T>Buttons on each order</T></h2>
+                <p><T ta="உரிமையாளர் பார்ப்பது, நடக்கும் வரிசையில்.">What the owner sees, in the order things happen.</T></p>
+              </div>
+            </div>
+            <div className="tw" tabIndex={0} role="region" aria-label="Buttons on each order">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Order is…</th>
+                    <th>Buttons</th>
+                    <th>What happens</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {BUTTONS.map(([state, buttons, what]) => (
+                    <tr key={state}>
+                      <td>
+                        <b>{state}</b>
+                      </td>
+                      <td>{buttons}</td>
+                      <td className="muted">{what}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </ScrollReveal>
+
+        <ScrollReveal>
+          <section className="card">
+            <h2 style={{ marginBottom: 10 }}><T>What got simpler</T></h2>
+            <ul>
+              <li>Menu: 10 pages in 6 groups</li>
+              <li>Each page has one job, with tabs for the rest</li>
+              <li>One yellow button for the main action. Red only for problems, green only for “done”</li>
+              <li>Rare actions (edit, cancel, undo) sit under “More”</li>
+              <li>Costs, charts and Meta rules moved out of the home page</li>
+            </ul>
+          </section>
+        </ScrollReveal>
       </div>
     </PortalPage>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { Image as ImageIcon, Loader2, Package, Plus, Search, Trash2, Upload } from "@/components/icons";
+import { ScrollReveal } from "@/components/motion";
 import Link from "@/components/intent-link";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
@@ -391,7 +392,7 @@ export function CatalogueManager({
         </div>
       )}
 
-      <div className="card" style={{ padding: 0 }}>
+      <ScrollReveal as="div" className="card" style={{ padding: 0 }} duration={400}>
         <div className="tw">
           <table>
             <thead>
@@ -469,7 +470,7 @@ export function CatalogueManager({
             {products.length ? (isTa ? "பொருட்கள் எதுவும் பொருந்தவில்லை." : "No products match.") : (isTa ? "இன்னும் பொருட்கள் எதுவும் இல்லை." : "No products yet.")}
           </p>
         )}
-      </div>
+      </ScrollReveal>
 
       <Sheet
         open={!!editing}

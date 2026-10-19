@@ -1,4 +1,5 @@
 import { ArrowUpRight, Clock, IndianRupee, MapPin, MessageCircle, ShoppingBag } from "@/components/icons";
+import { StaggerGroup, StaggerItem } from "@/components/motion";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
 import { notFound } from "next/navigation";
@@ -156,37 +157,45 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
         const unpaid = c.orders.filter((o) => !o.paidAt && (o.status === "NEW" || o.status === "CONFIRMED")).reduce((n, o) => n + o.total, 0);
         return (
           <>
-            <div className="grid g4 keep2">
-              <Stat
-                label="Orders"
-                value={fmtNumber(bought.length)}
-                sub="Standing orders"
-                icon={<ShoppingBag className="size-4 shrink-0" />}
-                tone="brand"
-              />
-              <Stat
-                label="Spend"
-                value={money(spent)}
-                sub="Total paid"
-                icon={<IndianRupee className="size-4 shrink-0" />}
-                tone="info"
-              />
-              <Stat
-                label="Average order"
-                value={bought.length ? money(spent / bought.length) : "—"}
-                sub="Per order"
-                icon={<ArrowUpRight className="size-4 shrink-0" />}
-                tone="violet"
-              />
-              <Stat
-                label="Last order"
-                value={last ? fmtDate(last, "d MMM") : <T>Never</T>}
-                sub={unpaid > 0 ? `Unpaid cart ${money(unpaid)}` : "All paid"}
-                subTa={unpaid > 0 ? `நிலுவை கார்ட் ${money(unpaid)}` : undefined}
-                icon={<Clock className="size-4 shrink-0" />}
-                tone={unpaid > 0 ? "amber" : "gold"}
-              />
-            </div>
+            <StaggerGroup className="grid g4 keep2">
+              <StaggerItem index={0} className="h-full">
+                <Stat
+                  label="Orders"
+                  value={fmtNumber(bought.length)}
+                  sub="Standing orders"
+                  icon={<ShoppingBag className="size-4 shrink-0" />}
+                  tone="brand"
+                />
+              </StaggerItem>
+              <StaggerItem index={1} className="h-full">
+                <Stat
+                  label="Spend"
+                  value={money(spent)}
+                  sub="Total paid"
+                  icon={<IndianRupee className="size-4 shrink-0" />}
+                  tone="info"
+                />
+              </StaggerItem>
+              <StaggerItem index={2} className="h-full">
+                <Stat
+                  label="Average order"
+                  value={bought.length ? money(spent / bought.length) : "—"}
+                  sub="Per order"
+                  icon={<ArrowUpRight className="size-4 shrink-0" />}
+                  tone="violet"
+                />
+              </StaggerItem>
+              <StaggerItem index={3} className="h-full">
+                <Stat
+                  label="Last order"
+                  value={last ? fmtDate(last, "d MMM") : <T>Never</T>}
+                  sub={unpaid > 0 ? `Unpaid cart ${money(unpaid)}` : "All paid"}
+                  subTa={unpaid > 0 ? `நிலுவை கார்ட் ${money(unpaid)}` : undefined}
+                  icon={<Clock className="size-4 shrink-0" />}
+                  tone={unpaid > 0 ? "amber" : "gold"}
+                />
+              </StaggerItem>
+            </StaggerGroup>
             <p className="muted small" style={{ marginTop: 8 }}>
               <T
                 ta={`${fmtNumber(sent.length)} பிரச்சாரச் செய்திகள் பெற்றார் · ${pct(read, delivered)}% படித்தார் · ${fmtNumber(c.replies.length)} பதில்கள்${c.replies[0] ? ` (கடைசியாக ${fmtDate(c.replies[0].receivedAt, "d MMM")})` : ""}${c.optedOut ? " · பிரச்சாரங்களை நிறுத்தியவர்" : ""}`}
@@ -286,7 +295,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                           <li key={o.id} className="py-2">
                             <div className="flex justify-between gap-2 text-xs text-muted">
                               <span>
-                                <strong className="font-mono text-ink-2">{orderRef(o)}</strong> · {fmtDate(o.createdAt, "d MMM yyyy")} · {o.status.toLowerCase()}
+                                <strong className="font-mono text-ink-2">{orderRef(o)}</strong> · {fmtDate(o.createdAt, "d MMM yyyy, h:mm a")} · {o.status.toLowerCase()}
                               </span>
                               <span className="tabular font-semibold text-ink">{money(o.total, o.currency)}</span>
                             </div>

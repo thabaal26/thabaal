@@ -1,4 +1,5 @@
 import { AlertCircle, CheckCircle2, Clock, ExternalLink, Package } from "@/components/icons";
+import { StaggerGroup, StaggerItem } from "@/components/motion";
 import type { Metadata } from "next";
 import { PickClientNotice, Stat } from "@/components/ui";
 import { getCatalogWithProducts } from "@/lib/catalog";
@@ -85,37 +86,45 @@ export default async function CataloguePage({ searchParams }: PageProps<"/dashbo
         />
       ) : (
         <>
-          <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
-            <Stat
-              label="Products"
-              value={fmtNumber(total)}
-              sub="In the catalogue"
-              icon={<Package className="size-4 shrink-0" />}
-              tone="info"
-            />
-            <Stat
-              label="In stock"
-              value={fmtNumber(inStock)}
-              sub="Customers can order these"
-              icon={<CheckCircle2 className="size-4 shrink-0" />}
-              tone="brand"
-              meter={total > 0 ? Math.round((inStock / total) * 100) : 0}
-            />
-            <Stat
-              label="Out of stock"
-              value={fmtNumber(outOfStock)}
-              sub="Hidden from new orders"
-              icon={<AlertCircle className="size-4 shrink-0" />}
-              tone={outOfStock > 0 ? "amber" : "gold"}
-            />
-            <Stat
-              label="Waiting for Meta"
-              value={fmtNumber(pending)}
-              sub="Not in WhatsApp yet"
-              icon={<Clock className="size-4 shrink-0" />}
-              tone={pending > 0 ? "amber" : "brand"}
-            />
-          </div>
+          <StaggerGroup className="grid g4 keep2" style={{ marginBottom: 16 }}>
+            <StaggerItem index={0} className="h-full">
+              <Stat
+                label="Products"
+                value={fmtNumber(total)}
+                sub="In the catalogue"
+                icon={<Package className="size-4 shrink-0" />}
+                tone="info"
+              />
+            </StaggerItem>
+            <StaggerItem index={1} className="h-full">
+              <Stat
+                label="In stock"
+                value={fmtNumber(inStock)}
+                sub="Customers can order these"
+                icon={<CheckCircle2 className="size-4 shrink-0" />}
+                tone="brand"
+                meter={total > 0 ? Math.round((inStock / total) * 100) : 0}
+              />
+            </StaggerItem>
+            <StaggerItem index={2} className="h-full">
+              <Stat
+                label="Out of stock"
+                value={fmtNumber(outOfStock)}
+                sub="Hidden from new orders"
+                icon={<AlertCircle className="size-4 shrink-0" />}
+                tone={outOfStock > 0 ? "amber" : "gold"}
+              />
+            </StaggerItem>
+            <StaggerItem index={3} className="h-full">
+              <Stat
+                label="Waiting for Meta"
+                value={fmtNumber(pending)}
+                sub="Not in WhatsApp yet"
+                icon={<Clock className="size-4 shrink-0" />}
+                tone={pending > 0 ? "amber" : "brand"}
+              />
+            </StaggerItem>
+          </StaggerGroup>
           {isLive && (
             <div className="row" style={{ marginBottom: 14, padding: "10px 14px", background: "var(--soft)", borderRadius: 12 }}>
               <span className="live">

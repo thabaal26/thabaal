@@ -1,4 +1,5 @@
 import { CheckCircle2, Clock, FileText, Megaphone, Plus, RefreshCw, Search } from "@/components/icons";
+import { StaggerGroup, StaggerItem } from "@/components/motion";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
 import { Stat } from "@/components/ui";
@@ -85,39 +86,47 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
 
   return (
     <PortalPage title="Templates" titleTa="டெம்ப்ளேட்" sub="Meta-approved messages you can send. Marketing, Utility and Authentication." subTa="நீங்கள் அனுப்பக்கூடிய மெட்டா அங்கீகரித்த செய்திகள்.">
-      <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
-        <Stat
-          label="Total templates"
-          value={fmtNumber(total)}
-          sub="Synced with Meta"
-          icon={<FileText className="size-4 shrink-0" />}
-          tone="info"
-          href="/dashboard/templates"
-        />
-        <Stat
-          label="Approved"
-          value={fmtNumber(byStatus("APPROVED"))}
-          sub="Ready to send"
-          icon={<CheckCircle2 className="size-4 shrink-0" />}
-          tone="brand"
-          meter={total > 0 ? Math.round((byStatus("APPROVED") / total) * 100) : 0}
-        />
-        <Stat
-          label="Marketing"
-          value={fmtNumber(counts.find((c) => c.category === "MARKETING")?._count ?? 0)}
-          sub="Promotions & offers"
-          icon={<Megaphone className="size-4 shrink-0" />}
-          tone="violet"
-          href={qsFor({ category: "MARKETING" })}
-        />
-        <Stat
-          label="In review / Draft"
-          value={fmtNumber(byStatus("PENDING", "DRAFT"))}
-          sub={byStatus("REJECTED", "PAUSED", "DISABLED") > 0 ? `${byStatus("REJECTED", "PAUSED", "DISABLED")} need fixing` : "Waiting on Meta"}
-          icon={<Clock className="size-4 shrink-0" />}
-          tone="amber"
-        />
-      </div>
+      <StaggerGroup className="grid g4 keep2" style={{ marginBottom: 16 }}>
+        <StaggerItem index={0} className="h-full">
+          <Stat
+            label="Total templates"
+            value={fmtNumber(total)}
+            sub="Synced with Meta"
+            icon={<FileText className="size-4 shrink-0" />}
+            tone="info"
+            href="/dashboard/templates"
+          />
+        </StaggerItem>
+        <StaggerItem index={1} className="h-full">
+          <Stat
+            label="Approved"
+            value={fmtNumber(byStatus("APPROVED"))}
+            sub="Ready to send"
+            icon={<CheckCircle2 className="size-4 shrink-0" />}
+            tone="brand"
+            meter={total > 0 ? Math.round((byStatus("APPROVED") / total) * 100) : 0}
+          />
+        </StaggerItem>
+        <StaggerItem index={2} className="h-full">
+          <Stat
+            label="Marketing"
+            value={fmtNumber(counts.find((c) => c.category === "MARKETING")?._count ?? 0)}
+            sub="Promotions & offers"
+            icon={<Megaphone className="size-4 shrink-0" />}
+            tone="violet"
+            href={qsFor({ category: "MARKETING" })}
+          />
+        </StaggerItem>
+        <StaggerItem index={3} className="h-full">
+          <Stat
+            label="In review / Draft"
+            value={fmtNumber(byStatus("PENDING", "DRAFT"))}
+            sub={byStatus("REJECTED", "PAUSED", "DISABLED") > 0 ? `${byStatus("REJECTED", "PAUSED", "DISABLED")} need fixing` : "Waiting on Meta"}
+            icon={<Clock className="size-4 shrink-0" />}
+            tone="amber"
+          />
+        </StaggerItem>
+      </StaggerGroup>
 
       <p className="muted" style={{ marginBottom: 12 }}>
         <T ta="அங்கீகரிக்கப்பட்ட டெம்ப்ளேட்களால் மட்டுமே வாட்ஸ்அப்பில் செய்தி அனுப்ப முடியும். நீங்கள் தேர்ந்தெடுக்கும் வகையே விலையைத் தீர்மானிக்கும்: Marketing அதிகச் செலவு, Utility குறைவு, Authentication ஒருமுறை குறியீடுகளுக்கு.">
@@ -160,13 +169,13 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
       {/* The default picture for image templates is account setup: Settings › Data and connections. */}
 
       {templates.length ? (
-        <div className="grid g3">
-          {templates.map((t) => {
+        <StaggerGroup className="grid g3">
+          {templates.map((t, idx) => {
             const r = renderFor({ ...t, headerText: t.headerText ?? "", footer: t.footer ?? "", variables: t.variables as VarMap }, previewFor);
             const sp2 = statusPill(t.status);
             const broken = ["REJECTED", "PAUSED", "DISABLED"].includes(t.status);
             return (
-              <div key={t.id} className="card" style={{ display: "flex", flexDirection: "column" }}>
+              <StaggerItem key={t.id} index={idx} className="card h-full" style={{ display: "flex", flexDirection: "column" }}>
                 <div className="hd" style={{ marginBottom: 10, flexWrap: "nowrap" }}>
                   <Link href={`/dashboard/templates/${t.id}`} title={t.name} style={{ fontWeight: 700, textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {templateLabel(t.name)}
@@ -240,10 +249,10 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
                     </PAction>
                   )}
                 </div>
-              </div>
+              </StaggerItem>
             );
           })}
-        </div>
+        </StaggerGroup>
       ) : (
         <section className="card">
           <h2>{query ? `No templates matching “${query}”` : "No templates match"}</h2>

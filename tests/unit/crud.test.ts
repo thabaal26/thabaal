@@ -12,20 +12,19 @@ describe("Template & Catalogue CRUD for QA Test Shop", () => {
   let clientId: string;
 
   before(async () => {
-    let client = await db.client.findFirst({ where: { name: "QA Test Shop" } });
-    if (!client) {
-      client = await db.client.create({
-        data: {
-          name: "QA Test Shop",
-          brandPrimary: "#0D9488",
-          brandAccent: "#14B8A6",
-          homeCity: "Madurai",
-          orderFlow: "deliver",
-          businessType: "retail",
-          billingMode: "direct",
-        },
-      });
-    }
+    const client = await db.client.upsert({
+      where: { name: "QA Test Shop" },
+      update: {},
+      create: {
+        name: "QA Test Shop",
+        brandPrimary: "#0D9488",
+        brandAccent: "#14B8A6",
+        homeCity: "Madurai",
+        orderFlow: "deliver",
+        businessType: "retail",
+        billingMode: "direct",
+      },
+    });
     clientId = client.id;
   });
 

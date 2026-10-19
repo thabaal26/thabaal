@@ -2,6 +2,7 @@
 @import "tailwindcss";
 @import "./icons.generated.css";
 @import "./appearance.css";
+@import "./motion.css";
 
 /* Dark mode follows the .dark class on <html> (set before paint from the saved choice or the system setting). */
 @custom-variant dark (&:where(.dark, .dark *));

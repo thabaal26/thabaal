@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useSyncExternalStore } from "react";
+import { ParallaxLayer } from "@/components/motion";
 
 interface LoginIllustrationProps {
   isNight?: boolean;
@@ -46,8 +47,10 @@ export function LoginIllustration({ isNight = false, onToggleTheme, lang = "en" 
       <div className="thabaal-sky night" />
 
       {/* 2. CELESTIAL BODIES */}
-      <div className="thabaal-sun" />
-      <div className="thabaal-moon" />
+      <ParallaxLayer speed={-0.12} clamped={35}>
+        <div className="thabaal-sun" />
+        <div className="thabaal-moon" />
+      </ParallaxLayer>
 
       {/* 3. TWINKLING STARS (Night Mode) */}
       <div className="thabaal-stars">
@@ -133,7 +136,7 @@ export function LoginIllustration({ isNight = false, onToggleTheme, lang = "en" 
       </div>
 
       {/* 6. CENTER FLYING THABAAL CARRIER BIRD */}
-      <div className="thabaal-birdpos" aria-hidden="true">
+      <ParallaxLayer speed={-0.16} clamped={40} className="thabaal-birdpos" aria-hidden="true">
         <div className="thabaal-birdfloat">
           <i className="thabaal-streak" />
           <i className="thabaal-streak" />
@@ -157,7 +160,7 @@ export function LoginIllustration({ isNight = false, onToggleTheme, lang = "en" 
             />
           </div>
         </div>
-      </div>
+      </ParallaxLayer>
 
       {/* 7. SLIDING THEME TOGGLE (Positioned at Top-Right as in Laptop Photo) */}
       {onToggleTheme && (

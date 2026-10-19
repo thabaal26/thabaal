@@ -7,6 +7,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { MobileActionBar } from "@/components/mobile-action-bar";
 import { Sheet } from "@/components/sheet";
 import { safeAction, toastResult } from "@/components/toast";
+import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 import { Badge, Button, Callout, Card, CardHeader, CheckRow, Field, Label, Segmented, Spinner, StatusBadge } from "@/components/ui";
 import { buttonClass } from "@/components/ui-classes";
 import { PhoneFrame, WhatsAppBubble } from "@/components/whatsapp-preview";
@@ -206,8 +207,8 @@ export function TemplateEditor({
   return (
     // Form and preview side by side only when the form still has room (with the menu open, from 1280px);
     // the form's own rows follow the form's width (container queries), not the screen's.
-    <div className="grid items-start gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:grid-cols-[minmax(0,1fr)_24rem]">
-      <div className="@container min-w-0 space-y-4 sm:space-y-6">
+    <StaggerGroup className="grid items-start gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:grid-cols-[minmax(0,1fr)_24rem]">
+      <StaggerItem className="@container min-w-0 space-y-4 sm:space-y-6">
         {status && (status === "REJECTED" || statusReason) && (
           <Callout tone="danger" role="alert" icon={<TriangleAlert />} title={status === "REJECTED" ? "Meta rejected this template" : "Meta returned an error"}>
             {statusReason && <p>{statusReason}</p>}
@@ -553,9 +554,9 @@ export function TemplateEditor({
             </Card>
           </>
         )}
-      </div>
+      </StaggerItem>
 
-      <aside aria-label="Preview and save" className="space-y-4 xl:sticky xl:top-8">
+      <StaggerItem as="aside" aria-label="Preview and save" className="space-y-4 xl:sticky xl:top-8">
         <div className="hidden space-y-4 lg:block">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">{tr("Live preview")}</h2>
@@ -612,7 +613,7 @@ export function TemplateEditor({
             </div>
           </Card>
         )}
-      </aside>
+      </StaggerItem>
 
 
       {/* Phones: save and preview stay under the thumb instead of at the end of a long form. */}
@@ -636,6 +637,6 @@ export function TemplateEditor({
         </PhoneFrame>
         <p className="mt-3 text-center text-xs text-muted">{isTa ? `${previewFor.name}-க்கான முன்னோட்டம்` : `Previewed for ${previewFor.name}`}</p>
       </Sheet>
-    </div>
+    </StaggerGroup>
   );
 }

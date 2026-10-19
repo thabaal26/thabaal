@@ -1,6 +1,7 @@
 import { Radio, Send } from "@/components/icons";
 import type { Metadata } from "next";
 import { ActionButton } from "@/components/action-button";
+import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 import { Badge, Callout, Card, CardHeader, PageHeader, PickClientNotice } from "@/components/ui";
 import { sheetHookStatus } from "@/lib/google-sheets-live";
 import { testSheetConnection } from "../../actions/sheets";
@@ -123,8 +124,8 @@ export default async function SheetPage() {
         back={back}
         description="Keep customers and orders in a Google Sheet; the portal reads it every 30 minutes. New rows become customers and orders here, ready for campaigns and dispatch."
       />
-      <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
-        <div className="space-y-4 sm:space-y-6">
+      <StaggerGroup className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
+        <StaggerItem className="space-y-4 sm:space-y-6">
           <Card className="card-3d">
             <CardHeader
               tone="brand"
@@ -153,8 +154,8 @@ export default async function SheetPage() {
               <p>• &quot;Opted out: yes&quot; stops messages; the sheet can&apos;t opt someone back in.</p>
             </div>
           </Card>
-        </div>
-        <div className="space-y-4 sm:space-y-6">
+        </StaggerItem>
+        <StaggerItem className="space-y-4 sm:space-y-6">
           <Card className="card-3d">
             <CardHeader tone="violet" title="Customers tab columns" description="Any order; extra columns are ignored." />
             <div className="p-4 sm:p-5"><Columns rows={CUSTOMER_COLUMNS} /></div>
@@ -163,8 +164,8 @@ export default async function SheetPage() {
             <CardHeader tone="gold" title="Orders tab columns" />
             <div className="p-4 sm:p-5"><Columns rows={ORDER_COLUMNS} /></div>
           </Card>
-        </div>
-      </div>
+        </StaggerItem>
+      </StaggerGroup>
     </>
   );
 }

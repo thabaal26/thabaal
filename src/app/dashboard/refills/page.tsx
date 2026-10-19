@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
 import { AlertCircle, Calendar, Clock, Repeat } from "@/components/icons";
+import { StaggerGroup, StaggerItem } from "@/components/motion";
 import { PickClientNotice, Stat } from "@/components/ui";
 import { refillForecast } from "@/lib/refill-forecast";
 import { getScope } from "@/lib/session";
@@ -44,37 +45,45 @@ export default async function RefillsPage() {
         </div>
       )}
 
-      <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
-        <Stat
-          label="Due this week"
-          value={week.length}
-          sub={`about ${inr(week.reduce((n, d) => n + d.avgOrder, 0))} in reorders`}
-          icon={<Calendar className="size-4 shrink-0" />}
-          tone="info"
-        />
-        <Stat
-          label="Overdue"
-          value={overdue.length}
-          sub={`about ${inr(overdue.reduce((n, d) => n + d.avgOrder, 0))} not yet reordered`}
-          icon={<Clock className="size-4 shrink-0" />}
-          tone={overdue.length ? "rose" : "brand"}
-        />
-        <Stat
-          label="Typical reorder"
-          value={`${typical} days`}
-          sub={own.length ? `from ${own.length} repeat buyer${own.length === 1 ? "" : "s"}` : "default setting"}
-          icon={<Repeat className="size-4 shrink-0" />}
-          tone="brand"
-        />
-        <Stat
-          label="Lapsed"
-          value={f.lapsedCount}
-          sub={`no order in ${f.lapsedDays}+ days · win back`}
-          icon={<AlertCircle className="size-4 shrink-0" />}
-          tone="amber"
-          href="/dashboard/customers?tab=groups"
-        />
-      </div>
+      <StaggerGroup className="grid g4 keep2" style={{ marginBottom: 16 }}>
+        <StaggerItem index={0} className="h-full">
+          <Stat
+            label="Due this week"
+            value={week.length}
+            sub={`about ${inr(week.reduce((n, d) => n + d.avgOrder, 0))} in reorders`}
+            icon={<Calendar className="size-4 shrink-0" />}
+            tone="info"
+          />
+        </StaggerItem>
+        <StaggerItem index={1} className="h-full">
+          <Stat
+            label="Overdue"
+            value={overdue.length}
+            sub={`about ${inr(overdue.reduce((n, d) => n + d.avgOrder, 0))} not yet reordered`}
+            icon={<Clock className="size-4 shrink-0" />}
+            tone={overdue.length ? "rose" : "brand"}
+          />
+        </StaggerItem>
+        <StaggerItem index={2} className="h-full">
+          <Stat
+            label="Typical reorder"
+            value={`${typical} days`}
+            sub={own.length ? `from ${own.length} repeat buyer${own.length === 1 ? "" : "s"}` : "default setting"}
+            icon={<Repeat className="size-4 shrink-0" />}
+            tone="brand"
+          />
+        </StaggerItem>
+        <StaggerItem index={3} className="h-full">
+          <Stat
+            label="Lapsed"
+            value={f.lapsedCount}
+            sub={`no order in ${f.lapsedDays}+ days · win back`}
+            icon={<AlertCircle className="size-4 shrink-0" />}
+            tone="amber"
+            href="/dashboard/customers?tab=groups"
+          />
+        </StaggerItem>
+      </StaggerGroup>
 
       {f.due.length ? (
         <RefillBoard rows={f.due} today={now} canSend={scope.canManage} templateName={f.refillTemplateName} />

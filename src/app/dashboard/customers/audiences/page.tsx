@@ -2,6 +2,7 @@ import { UsersRound } from "@/components/icons";
 import { Target3D } from "@/components/icons-3d";
 import type { Metadata } from "next";
 import { ActionButton } from "@/components/action-button";
+import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 import { Card, CardHeader, EmptyState, PageHeader, PickClientNotice } from "@/components/ui";
 import { audienceWhere, describeFilter, type AudienceFilter } from "@/lib/audiences";
 import { db } from "@/lib/db";
@@ -32,28 +33,32 @@ export default async function AudiencesPage() {
         back={back}
         description="Saved groups of customers, like repeat buyers with no order for 30 days. Pick one under Send to in a campaign; it's counted again every time the campaign runs."
       />
-      <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-        <AudienceBuilder regions={regionRows.map((r) => r.region!).sort()} />
-        <Card className="card-3d lg:sticky lg:top-8">
-          <CardHeader tone="violet" icon={<Target3D />} title="Saved audiences" />
-          {saved.length ? (
-            <ul className="divide-y divide-line">
-              {saved.map((a, k) => (
-                <li key={a.id} className="flex items-start gap-3 px-4 py-3 sm:px-5">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-ink">{a.name}</p>
-                    <p className="text-xs text-muted">{describeFilter(a.filter as AudienceFilter)}</p>
-                  </div>
-                  <span className="tabular shrink-0 pt-0.5 text-sm font-medium" title="Customers now">{fmtNumber(counts[k])}</span>
-                  <ActionButton action={deleteAudience.bind(null, a.id)} variant="ghost" size="sm" confirm={`Delete "${a.name}"?`} aria-label={`Delete ${a.name}`}>Delete</ActionButton>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyState icon={<UsersRound className="size-5 shrink-0" />} title="No audiences yet">Build one with the filters, or start from a preset.</EmptyState>
-          )}
-        </Card>
-      </div>
+      <StaggerGroup className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <StaggerItem>
+          <AudienceBuilder regions={regionRows.map((r) => r.region!).sort()} />
+        </StaggerItem>
+        <StaggerItem>
+          <Card className="card-3d lg:sticky lg:top-8">
+            <CardHeader tone="violet" icon={<Target3D />} title="Saved audiences" />
+            {saved.length ? (
+              <ul className="divide-y divide-line">
+                {saved.map((a, k) => (
+                  <li key={a.id} className="flex items-start gap-3 px-4 py-3 sm:px-5">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-ink">{a.name}</p>
+                      <p className="text-xs text-muted">{describeFilter(a.filter as AudienceFilter)}</p>
+                    </div>
+                    <span className="tabular shrink-0 pt-0.5 text-sm font-medium" title="Customers now">{fmtNumber(counts[k])}</span>
+                    <ActionButton action={deleteAudience.bind(null, a.id)} variant="ghost" size="sm" confirm={`Delete "${a.name}"?`} aria-label={`Delete ${a.name}`}>Delete</ActionButton>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState icon={<UsersRound className="size-5 shrink-0" />} title="No audiences yet">Build one with the filters, or start from a preset.</EmptyState>
+            )}
+          </Card>
+        </StaggerItem>
+      </StaggerGroup>
     </>
   );
 }

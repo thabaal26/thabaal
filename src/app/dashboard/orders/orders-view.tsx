@@ -11,12 +11,13 @@ import { T, useLang } from "../portal-ui";
 import { DEFAULT_FLOW, flowHas, flowPacks, flowSteps, isCodOrder, isConfirmedOrLater, isPaidOrder, orderStage, readFlow, stepLabel, type OrderFlowKey } from "@/lib/order-flow";
 import { getOrderPricing, pointsDiscount } from "@/lib/order-pricing";
 import { orderRef, type OrderItem } from "@/lib/order-ref";
-import { dayStartIST } from "@/lib/filters";
+import { dayStartIST, resolvePeriod, type RangeKey } from "@/lib/filters";
 import { createOrder, lookupOrderCustomer } from "../actions/orders";
 import { OrderCard, type OrderCardData } from "./order-card";
 import type { CatalogProductOption } from "./order-items-editor";
 import { Clock, Package, PackageCheck, ShoppingBag } from "@/components/icons";
 import { Stat } from "@/components/ui";
+import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 import {
   downloadOrdersCsv,
   downloadOrdersExcel,
@@ -79,6 +80,40 @@ export function OrdersView({
   const [dateFilter, setDateFilter] = useState<string>(initialDate);
   const [query, setQuery] = useState<string>(initialQ);
   const [exportOpen, setExportOpen] = useState(false);
+
+  // Sync prop changes from external router navigation
+  useEffect(() => {
+    if (initialDate && initialDate !== dateFilter) setDateFilter(initialDate);
+  }, [initialDate]);
+  useEffect(() => {
+    if (initialShow && initialShow !== show) setShow(initialShow);
+  }, [initialShow]);
+
+  // Keep URL search params in sync with active filters without full page reload
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (show && show !== "all") params.set("show", show);
+    else params.delete("show");
+
+    if (payFilter && payFilter !== "all") params.set("pay", payFilter);
+    else params.delete("pay");
+
+    if (srcFilter && srcFilter !== "all") params.set("src", srcFilter);
+    else params.delete("src");
+
+    if (dateFilter && dateFilter !== "all") params.set("range", dateFilter);
+    else params.delete("range");
+
+    if (query.trim()) params.set("q", query.trim());
+    else params.delete("q");
+
+    const qs = params.toString();
+    const target = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    if (window.location.pathname + window.location.search !== target) {
+      window.history.replaceState(null, "", target);
+    }
+  }, [show, payFilter, srcFilter, dateFilter, query]);
 
   // Packing list state
   const [packFilter, setPackFilter] = useState<"all" | "paid" | "cod">("all");
@@ -144,36 +179,27 @@ export function OrdersView({
     const d = new Date(createdAt);
     if (isNaN(d.getTime())) return true;
     const now = new Date();
-    const today = dayStartIST(now);
-    const orderDay = dayStartIST(d);
-    const orderTime = d.getTime();
-
-    switch (range) {
-      case "today":
-        return orderDay.getTime() === today.getTime();
-      case "yesterday": {
-        const yesterday = new Date(today.getTime() - 86400000);
-        return orderDay.getTime() === yesterday.getTime();
-      }
-      case "7d": {
-        const sevenDaysAgo = new Date(today.getTime() - 6 * 86400000);
-        return orderTime >= sevenDaysAgo.getTime();
-      }
-      case "30d": {
-        const thirtyDaysAgo = new Date(today.getTime() - 29 * 86400000);
-        return orderTime >= thirtyDaysAgo.getTime();
-      }
-      case "month": {
-        const monthStart = dayStartIST(new Date(now.getFullYear(), now.getMonth(), 1));
-        return orderTime >= monthStart.getTime();
-      }
-      case "lastmonth": {
-        const lastMonthStart = dayStartIST(new Date(now.getFullYear(), now.getMonth() - 1, 1));
-        const thisMonthStart = dayStartIST(new Date(now.getFullYear(), now.getMonth(), 1));
-        return orderTime >= lastMonthStart.getTime() && orderTime < thisMonthStart.getTime();
-      }
-      default:
-        return true;
+    try {
+      const period = resolvePeriod(
+        {
+          range: range as RangeKey,
+          from: "",
+          to: "",
+          products: [],
+          customers: [],
+          tags: [],
+          area: "",
+          campaign: "",
+        },
+        now,
+      );
+      const orderTime = d.getTime();
+      return (
+        orderTime >= period.start.getTime() &&
+        (period.toNow ? orderTime <= period.end.getTime() : orderTime < period.end.getTime())
+      );
+    } catch {
+      return true;
     }
   };
 
@@ -253,7 +279,7 @@ export function OrdersView({
   });
 
   // Packing list orders (confirmed or paid orders waiting for dispatch)
-  const waitingPackOrders = initialOrders.filter(
+  const waitingPackOrders = baseFilteredOrders.filter(
     (o) => isConfirmedOrLater(o) && preDispatch(o),
   );
 
@@ -450,54 +476,62 @@ export function OrdersView({
       {activeTab === "orders" && (
         <section data-panel="orders">
           {/* Top KPI 4-Card Strip */}
-          <div className="grid g4 keep2" id="ok" style={{ marginBottom: 18, gap: 16 }}>
-            <Stat
-              label={isTa ? "வந்த ஆர்டர்கள்" : "Orders received"}
-              labelTa="வந்த ஆர்டர்கள்"
-              value={newCount}
-              sub={isTa ? "பணம் இணைப்பு அனுப்பவும்" : "Send the payment link"}
-              subTa="பணம் இணைப்பு அனுப்பவும்"
-              icon={<ShoppingBag className="size-4 shrink-0" />}
-              tone="brand"
-              onClick={() => setShow("new")}
-            />
-            <Stat
-              label={isTa ? "பணம் வர வேண்டியவை" : "Payment waiting"}
-              labelTa="பணம் வர வேண்டியவை"
-              value={inr(waitingSum)}
-              sub={isTa ? "இன்னும் வரவில்லை" : "Not received yet"}
-              subTa="இன்னும் வரவில்லை"
-              icon={<Clock className="size-4 shrink-0" />}
-              tone="amber"
-              onClick={() => {
-                setShow("all");
-                setPayFilter("none");
-              }}
-            />
-            <Stat
-              label={hasPack ? (isTa ? "பேக் செய்ய வேண்டியவை" : "To pack") : (isTa ? "முடிக்க வேண்டியவை" : "To finish")}
-              labelTa={hasPack ? "பேக் செய்ய வேண்டியவை" : "முடிக்க வேண்டியவை"}
-              value={toPackCount}
-              sub={isTa ? "உறுதியான ஆர்டர்கள்" : "Confirmed orders"}
-              subTa="உறுதியான ஆர்டர்கள்"
-              icon={<Package className="size-4 shrink-0" />}
-              tone="info"
-              onClick={() => setShow("topack")}
-            />
-            <Stat
-              label={hasDispatch ? (isTa ? "அனுப்பப்பட்டவை" : "Dispatched") : (isTa ? "இன்று முடித்தவை" : "Finished today")}
-              labelTa={hasDispatch ? "அனுப்பப்பட்டவை" : "இன்று முடித்தவை"}
-              value={dispatchedCount}
-              sub={hasDispatch ? (isTa ? "டெலிவரிக்கு சென்றவை" : "Out for delivery") : (isTa ? "இன்று முடித்தவை" : "Completed today")}
-              subTa={hasDispatch ? "டெலிவரிக்கு சென்றவை" : "இன்று முடித்தவை"}
-              icon={<PackageCheck className="size-4 shrink-0" />}
-              tone="violet"
-              onClick={() => setShow("dispatched")}
-            />
-          </div>
+          <StaggerGroup className="grid g4 keep2" id="ok" style={{ marginBottom: 18, gap: 16 }}>
+            <StaggerItem index={0} className="h-full">
+              <Stat
+                label={isTa ? "வந்த ஆர்டர்கள்" : "Orders received"}
+                labelTa="வந்த ஆர்டர்கள்"
+                value={newCount}
+                sub={isTa ? "பணம் இணைப்பு அனுப்பவும்" : "Send the payment link"}
+                subTa="பணம் இணைப்பு அனுப்பவும்"
+                icon={<ShoppingBag className="size-4 shrink-0" />}
+                tone="brand"
+                onClick={() => setShow("new")}
+              />
+            </StaggerItem>
+            <StaggerItem index={1} className="h-full">
+              <Stat
+                label={isTa ? "பணம் வர வேண்டியவை" : "Payment waiting"}
+                labelTa="பணம் வர வேண்டியவை"
+                value={inr(waitingSum)}
+                sub={isTa ? "இன்னும் வரவில்லை" : "Not received yet"}
+                subTa="இன்னும் வரவில்லை"
+                icon={<Clock className="size-4 shrink-0" />}
+                tone="amber"
+                onClick={() => {
+                  setShow("all");
+                  setPayFilter("none");
+                }}
+              />
+            </StaggerItem>
+            <StaggerItem index={2} className="h-full">
+              <Stat
+                label={hasPack ? (isTa ? "பேக் செய்ய வேண்டியவை" : "To pack") : (isTa ? "முடிக்க வேண்டியவை" : "To finish")}
+                labelTa={hasPack ? "பேக் செய்ய வேண்டியவை" : "முடிக்க வேண்டியவை"}
+                value={toPackCount}
+                sub={isTa ? "உறுதியான ஆர்டர்கள்" : "Confirmed orders"}
+                subTa="உறுதியான ஆர்டர்கள்"
+                icon={<Package className="size-4 shrink-0" />}
+                tone="info"
+                onClick={() => setShow("topack")}
+              />
+            </StaggerItem>
+            <StaggerItem index={3} className="h-full">
+              <Stat
+                label={hasDispatch ? (isTa ? "அனுப்பப்பட்டவை" : "Dispatched") : (isTa ? "இன்று முடித்தவை" : "Finished today")}
+                labelTa={hasDispatch ? "அனுப்பப்பட்டவை" : "இன்று முடித்தவை"}
+                value={dispatchedCount}
+                sub={hasDispatch ? (isTa ? "டெலிவரிக்கு சென்றவை" : "Out for delivery") : (isTa ? "இன்று முடித்தவை" : "Completed today")}
+                subTa={hasDispatch ? "டெலிவரிக்கு சென்றவை" : "இன்று முடித்தவை"}
+                icon={<PackageCheck className="size-4 shrink-0" />}
+                tone="violet"
+                onClick={() => setShow("dispatched")}
+              />
+            </StaggerItem>
+          </StaggerGroup>
 
           {/* Toolbar */}
-          <div className="toolbar">
+          <ScrollReveal duration={400} className="toolbar">
             <div className="search">
               <svg viewBox="0 0 24 24">
                 <circle cx="11" cy="11" r="7" />
@@ -525,7 +559,9 @@ export function OrdersView({
               <option value="today">{isTa ? "தேதி: இன்று" : "Date: today"}</option>
               <option value="yesterday">{isTa ? "தேதி: நேற்று" : "Date: yesterday"}</option>
               <option value="7d">{isTa ? "தேதி: கடந்த 7 நாட்கள்" : "Date: last 7 days"}</option>
+              <option value="14d">{isTa ? "தேதி: கடந்த 14 நாட்கள்" : "Date: last 14 days"}</option>
               <option value="30d">{isTa ? "தேதி: கடந்த 30 நாட்கள்" : "Date: last 30 days"}</option>
+              <option value="90d">{isTa ? "தேதி: கடந்த 90 நாட்கள்" : "Date: last 90 days"}</option>
               <option value="month">{isTa ? "தேதி: இந்த மாதம்" : "Date: this month"}</option>
               <option value="lastmonth">{isTa ? "தேதி: கடந்த மாதம்" : "Date: last month"}</option>
             </select>
@@ -626,7 +662,7 @@ export function OrdersView({
               </svg>
               <T ta="புதிய ஆர்டர்">New order</T>
             </button>
-          </div>
+          </ScrollReveal>
 
           {/* Filter Chips */}
           <div className="chips" id="oc" style={{ marginBottom: 14 }}>
@@ -649,8 +685,12 @@ export function OrdersView({
                   ? isTa ? "தேதி: நேற்று" : "Date: Yesterday"
                   : dateFilter === "7d"
                   ? isTa ? "தேதி: கடந்த 7 நாட்கள்" : "Date: Last 7 days"
+                  : dateFilter === "14d"
+                  ? isTa ? "தேதி: கடந்த 14 நாட்கள்" : "Date: Last 14 days"
                   : dateFilter === "30d"
                   ? isTa ? "தேதி: கடந்த 30 நாட்கள்" : "Date: Last 30 days"
+                  : dateFilter === "90d"
+                  ? isTa ? "தேதி: கடந்த 90 நாட்கள்" : "Date: Last 90 days"
                   : dateFilter === "month"
                   ? isTa ? "தேதி: இந்த மாதம்" : "Date: This month"
                   : dateFilter === "lastmonth"
@@ -764,24 +804,27 @@ export function OrdersView({
           </div>
 
           {/* Orders Stack */}
-          <div className="stack" id="ol">
-            {filteredOrders.map((o) => (
-              <OrderCard
-                key={o.id}
-                order={o}
-                items={(o.items as OrderItem[]) ?? []}
-                showClient={!scopeClientId}
-                canEdit={canEdit}
-                catalogProducts={catalogProducts}
-                flow={flow}
-              />
+          <StaggerGroup className="stack" id="ol">
+            {filteredOrders.map((o, i) => (
+              <StaggerItem key={o.id} index={i}>
+                <OrderCard
+                  order={o}
+                  items={(o.items as OrderItem[]) ?? []}
+                  showClient={!scopeClientId}
+                  canEdit={canEdit}
+                  catalogProducts={catalogProducts}
+                  flow={flow}
+                />
+              </StaggerItem>
             ))}
-          </div>
+          </StaggerGroup>
 
           {filteredOrders.length === 0 && (
-            <p className="muted" id="oe">
-              <T ta="பொருத்தமான ஆர்டர்கள் எதுவும் இல்லை.">No orders match.</T>
-            </p>
+            <ScrollReveal duration={400}>
+              <p className="muted" id="oe">
+                <T ta="பொருத்தமான ஆர்டர்கள் எதுவும் இல்லை.">No orders match.</T>
+              </p>
+            </ScrollReveal>
           )}
         </section>
       )}

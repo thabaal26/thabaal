@@ -1,3 +1,4 @@
+import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 import { AlertCircle, CheckCircle2, MapPin, Users } from "@/components/icons";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
@@ -120,53 +121,55 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
             Get more customers (QR code)
           </Link>
         </p>
-        <div className="stack">
+        <StaggerGroup className="stack">
           {groups.map((g, i) => (
-            <details key={g.title} className="card more" style={{ margin: 0 }} open={i === 0}>
-              <summary style={{ gap: 10, flexWrap: "wrap" }}>
-                <b style={{ font: "600 18px var(--display)" }}>{g.title}</b>
-                <span className="pill info">
-                  {g.list.length} customer{g.list.length === 1 ? "" : "s"}
-                </span>
-                {g.money ? <span className="pill bad">{inr(g.money)}</span> : null}
-              </summary>
-              <div className="grid g2" style={{ marginTop: 14 }}>
-                <div>
-                  <p>{g.what}</p>
-                  <p className="muted small" style={{ marginTop: 4 }}>
-                    Why: {g.why}
-                  </p>
-                  <ol style={{ margin: "10px 0 0", paddingLeft: 20 }}>
-                    {g.steps.map((s) => (
-                      <li key={s}>{s}</li>
-                    ))}
-                  </ol>
-                  {g.list.length > 0 && (
-                    <p className="muted small" style={{ marginTop: 10 }}>
-                      {g.list
-                        .slice(0, 6)
-                        .map((c) => c.name)
-                        .join(", ")}
-                      {g.list.length > 6 ? ` and ${g.list.length - 6} more` : ""}
+            <StaggerItem key={g.title} index={i}>
+              <details className="card more" style={{ margin: 0 }} open={i === 0}>
+                <summary style={{ gap: 10, flexWrap: "wrap" }}>
+                  <b style={{ font: "600 18px var(--display)" }}>{g.title}</b>
+                  <span className="pill info">
+                    {g.list.length} customer{g.list.length === 1 ? "" : "s"}
+                  </span>
+                  {g.money ? <span className="pill bad">{inr(g.money)}</span> : null}
+                </summary>
+                <div className="grid g2" style={{ marginTop: 14 }}>
+                  <div>
+                    <p>{g.what}</p>
+                    <p className="muted small" style={{ marginTop: 4 }}>
+                      Why: {g.why}
                     </p>
-                  )}
-                </div>
-                <div>
-                  <div className="phone">
-                    <div className="bubble">{g.msg}</div>
+                    <ol style={{ margin: "10px 0 0", paddingLeft: 20 }}>
+                      {g.steps.map((s) => (
+                        <li key={s}>{s}</li>
+                      ))}
+                    </ol>
+                    {g.list.length > 0 && (
+                      <p className="muted small" style={{ marginTop: 10 }}>
+                        {g.list
+                          .slice(0, 6)
+                          .map((c) => c.name)
+                          .join(", ")}
+                        {g.list.length > 6 ? ` and ${g.list.length - 6} more` : ""}
+                      </p>
+                    )}
                   </div>
-                  <div className="tools" style={{ marginTop: 10 }}>
-                    <CopyText text={g.msg} />
-                    <Link className="btn sm" href={g.href}>
-                      Open
-                    </Link>
-                    {scope.canManage && g.list.length > 0 && <GroupCampaign ids={g.list.map((c) => c.id)} tag={g.tag} />}
+                  <div>
+                    <div className="phone">
+                      <div className="bubble">{g.msg}</div>
+                    </div>
+                    <div className="tools" style={{ marginTop: 10 }}>
+                      <CopyText text={g.msg} />
+                      <Link className="btn sm" href={g.href}>
+                        Open
+                      </Link>
+                      {scope.canManage && g.list.length > 0 && <GroupCampaign ids={g.list.map((c) => c.id)} tag={g.tag} />}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </details>
+              </details>
+            </StaggerItem>
           ))}
-        </div>
+        </StaggerGroup>
       </>
     );
   } else if (tab === "loyalty") {
@@ -182,37 +185,45 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
     body = (
       <>
         {scope.canManage && pendingRows.length > 0 && <PendingCustomersBanner rows={pendingRows} />}
-        <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
-          <Stat
-            label="Customers"
-            value={total.toLocaleString("en-IN")}
-            sub={`${(total - optedOut).toLocaleString("en-IN")} reachable`}
-            icon={<Users className="size-4" />}
-            tone="info"
-          />
-          <Stat
-            label="Can receive WhatsApp"
-            value={(total - optedOut).toLocaleString("en-IN")}
-            sub="Opted in for campaigns"
-            icon={<CheckCircle2 className="size-4" />}
-            tone="brand"
-            meter={total > 0 ? Math.round(((total - optedOut) / total) * 100) : 0}
-          />
-          <Stat
-            label="Opted out"
-            value={optedOut.toLocaleString("en-IN")}
-            sub="Replied STOP or unreachable"
-            icon={<AlertCircle className="size-4" />}
-            tone={optedOut > 0 ? "amber" : "gold"}
-          />
-          <Stat
-            label={home}
-            value={atHome.toLocaleString("en-IN")}
-            sub={`${(total - atHome).toLocaleString("en-IN")} elsewhere`}
-            icon={<MapPin className="size-4" />}
-            tone="violet"
-          />
-        </div>
+        <StaggerGroup className="grid g4 keep2" style={{ marginBottom: 16 }}>
+          <StaggerItem index={0} className="h-full">
+            <Stat
+              label="Customers"
+              value={total.toLocaleString("en-IN")}
+              sub={`${(total - optedOut).toLocaleString("en-IN")} reachable`}
+              icon={<Users className="size-4" />}
+              tone="info"
+            />
+          </StaggerItem>
+          <StaggerItem index={1} className="h-full">
+            <Stat
+              label="Can receive WhatsApp"
+              value={(total - optedOut).toLocaleString("en-IN")}
+              sub="Opted in for campaigns"
+              icon={<CheckCircle2 className="size-4" />}
+              tone="brand"
+              meter={total > 0 ? Math.round(((total - optedOut) / total) * 100) : 0}
+            />
+          </StaggerItem>
+          <StaggerItem index={2} className="h-full">
+            <Stat
+              label="Opted out"
+              value={optedOut.toLocaleString("en-IN")}
+              sub="Replied STOP or unreachable"
+              icon={<AlertCircle className="size-4" />}
+              tone={optedOut > 0 ? "amber" : "gold"}
+            />
+          </StaggerItem>
+          <StaggerItem index={3} className="h-full">
+            <Stat
+              label={home}
+              value={atHome.toLocaleString("en-IN")}
+              sub={`${(total - atHome).toLocaleString("en-IN")} elsewhere`}
+              icon={<MapPin className="size-4" />}
+              tone="violet"
+            />
+          </StaggerItem>
+        </StaggerGroup>
         {badPhones > 0 && (
           <div className="note" style={{ marginBottom: 14 }}>
             <b>
@@ -232,52 +243,54 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
           />
         </div>
         <CustomerTable rows={rows} canManage={scope.canManage} />
-        <details className="card more" style={{ marginTop: 14 }}>
-          <summary>
-            <b style={{ font: "600 17px var(--display)" }}>How tier and buying status are decided</b>
-          </summary>
-          <div className="grid g2" style={{ marginTop: 12 }}>
-            <div>
-              <h3 style={{ font: "600 15px var(--display)", marginBottom: 8 }}>Tier — how much they spend</h3>
-              <div className="list">
-                {[
-                  ["Platinum", `Top 10% · ${inr(Number.isFinite(platinumCut) ? platinumCut : 0)}+ and 3 or more orders`, "ok"],
-                  ["Gold", `Next 20% · ${inr(Number.isFinite(goldCut) ? goldCut : 0)}+`, "warn"],
-                  ["Silver", "Everyone else who has bought", "mute"],
-                  ["New", "First order, within 30 days", "info"],
-                ].map(([t, d, tone]) => (
-                  <div key={t} className="row">
-                    <span className={`pill ${tone}`}>{t}</span>
-                    <div className="grow muted small">{d}</div>
-                    <b>{count(t)}</b>
-                  </div>
-                ))}
+        <ScrollReveal duration={400}>
+          <details className="card more" style={{ marginTop: 14 }}>
+            <summary>
+              <b style={{ font: "600 17px var(--display)" }}>How tier and buying status are decided</b>
+            </summary>
+            <div className="grid g2" style={{ marginTop: 12 }}>
+              <div>
+                <h3 style={{ font: "600 15px var(--display)", marginBottom: 8 }}>Tier — how much they spend</h3>
+                <div className="list">
+                  {[
+                    ["Platinum", `Top 10% · ${inr(Number.isFinite(platinumCut) ? platinumCut : 0)}+ and 3 or more orders`, "ok"],
+                    ["Gold", `Next 20% · ${inr(Number.isFinite(goldCut) ? goldCut : 0)}+`, "warn"],
+                    ["Silver", "Everyone else who has bought", "mute"],
+                    ["New", "First order, within 30 days", "info"],
+                  ].map(([t, d, tone]) => (
+                    <div key={t} className="row">
+                      <span className={`pill ${tone}`}>{t}</span>
+                      <div className="grow muted small">{d}</div>
+                      <b>{count(t)}</b>
+                    </div>
+                  ))}
+                </div>
+                <p className="muted small" style={{ marginTop: 8 }}>
+                  Only confirmed or paid orders count. Worked out fresh every time you open this page.
+                </p>
               </div>
-              <p className="muted small" style={{ marginTop: 8 }}>
-                Only confirmed or paid orders count. Worked out fresh every time you open this page.
-              </p>
-            </div>
-            <div>
-              <h3 style={{ font: "600 15px var(--display)", marginBottom: 8 }}>How they are buying — their own rhythm</h3>
-              <div className="list">
-                {[
-                  ["Active", "Ordered within their usual gap", "ok"],
-                  ["Slipping", "1.5 to 3 times their usual gap", "warn"],
-                  ["Lost", "More than 3 times the gap, or 180 days", "bad"],
-                ].map(([t, d, tone]) => (
-                  <div key={t} className="row">
-                    <span className={`pill ${tone}`}>{t}</span>
-                    <div className="grow muted small">{d}</div>
-                    <b>{countS(t)}</b>
-                  </div>
-                ))}
+              <div>
+                <h3 style={{ font: "600 15px var(--display)", marginBottom: 8 }}>How they are buying — their own rhythm</h3>
+                <div className="list">
+                  {[
+                    ["Active", "Ordered within their usual gap", "ok"],
+                    ["Slipping", "1.5 to 3 times their usual gap", "warn"],
+                    ["Lost", "More than 3 times the gap, or 180 days", "bad"],
+                  ].map(([t, d, tone]) => (
+                    <div key={t} className="row">
+                      <span className={`pill ${tone}`}>{t}</span>
+                      <div className="grow muted small">{d}</div>
+                      <b>{countS(t)}</b>
+                    </div>
+                  ))}
+                </div>
+                <p className="muted small" style={{ marginTop: 8 }}>
+                  Each customer is judged against their own gap between orders (30 days until they have two orders), not a fixed number of days.
+                </p>
               </div>
-              <p className="muted small" style={{ marginTop: 8 }}>
-                Each customer is judged against their own gap between orders (30 days until they have two orders), not a fixed number of days.
-              </p>
             </div>
-          </div>
-        </details>
+          </details>
+        </ScrollReveal>
       </>
     );
   }

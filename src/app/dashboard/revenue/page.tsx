@@ -14,6 +14,7 @@ import { LinkTabs, PortalPage, Seg, T } from "../portal-ui";
 import { BankAccount, HowCustomersPay, ReminderRules } from "./pay-settings-form";
 import { CollectList, CsvButton, ReceiptButton, RecordByNumber, TxnTable } from "./payments-board";
 import Link from "@/components/intent-link";
+import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 
 export const metadata: Metadata = { title: "Payments" };
 export const dynamic = "force-dynamic";
@@ -74,40 +75,48 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   const claimed = d.collect.filter((r) => r.state === "claimed").length;
 
   const kpis = (
-    <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
-      <Stat
-        label="Received today"
-        value={inr(d.receivedToday)}
-        sub="Money in your account"
-        icon={<IndianRupee className="size-4 shrink-0" />}
-        tone="brand"
-        href="/dashboard/revenue?tab=got"
-      />
-      <Stat
-        label="Money to collect"
-        value={inr(toCollect)}
-        sub={claimed ? `${claimed} say they paid · check` : "Not paid yet"}
-        icon={<Clock className="size-4 shrink-0" />}
-        tone="amber"
-        href="/dashboard/revenue?tab=collect"
-      />
-      <Stat
-        label="COD pending"
-        value={inr(codPending)}
-        sub="Collect during delivery"
-        icon={<Banknote className="size-4 shrink-0" />}
-        tone="info"
-        href="/dashboard/revenue?tab=cod"
-      />
-      <Stat
-        label="Failed or expired"
-        value={failed}
-        sub={failed ? "Needs your attention" : "Nothing stuck"}
-        icon={<AlertCircle className="size-4 shrink-0" />}
-        tone={failed ? "rose" : "brand"}
-        href="/dashboard/revenue?tab=collect"
-      />
-    </div>
+    <StaggerGroup className="grid g4 keep2" style={{ marginBottom: 16 }}>
+      <StaggerItem index={0} className="h-full">
+        <Stat
+          label="Received today"
+          value={inr(d.receivedToday)}
+          sub="Money in your account"
+          icon={<IndianRupee className="size-4 shrink-0" />}
+          tone="brand"
+          href="/dashboard/revenue?tab=got"
+        />
+      </StaggerItem>
+      <StaggerItem index={1} className="h-full">
+        <Stat
+          label="Money to collect"
+          value={inr(toCollect)}
+          sub={claimed ? `${claimed} say they paid · check` : "Not paid yet"}
+          icon={<Clock className="size-4 shrink-0" />}
+          tone="amber"
+          href="/dashboard/revenue?tab=collect"
+        />
+      </StaggerItem>
+      <StaggerItem index={2} className="h-full">
+        <Stat
+          label="COD pending"
+          value={inr(codPending)}
+          sub="Collect during delivery"
+          icon={<Banknote className="size-4 shrink-0" />}
+          tone="info"
+          href="/dashboard/revenue?tab=cod"
+        />
+      </StaggerItem>
+      <StaggerItem index={3} className="h-full">
+        <Stat
+          label="Failed or expired"
+          value={failed}
+          sub={failed ? "Needs your attention" : "Nothing stuck"}
+          icon={<AlertCircle className="size-4 shrink-0" />}
+          tone={failed ? "rose" : "brand"}
+          href="/dashboard/revenue?tab=collect"
+        />
+      </StaggerItem>
+    </StaggerGroup>
   );
 
   let body: React.ReactNode = null;
@@ -310,7 +319,9 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
     <PortalPage title="Payments" titleTa="பணம்" sub={SUB} subTa={SUB_TA} actions={scope.canOperate ? <RecordByNumber rows={d.collect} /> : undefined}>
       {kpis}
       {tabsFor(pay.settings.codOn)}
-      {body}
+      <ScrollReveal duration={450}>
+        {body}
+      </ScrollReveal>
     </PortalPage>
   );
 }

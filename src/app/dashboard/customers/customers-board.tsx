@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Search, Sparkles, Trophy, Users } from "@/components/icons";
+import { ScrollReveal } from "@/components/motion";
 import { Stat } from "@/components/ui";
 import Link from "@/components/intent-link";
 import { safeAction, toastResult } from "@/components/toast";
@@ -233,7 +234,7 @@ export function CustomerTable({ rows, canManage }: { rows: CustomerRow[]; canMan
         </div>
       )}
 
-      <div className="card" style={{ padding: 0 }}>
+      <ScrollReveal as="div" className="card" style={{ padding: 0 }} duration={400}>
         <div className="tw">
           <table>
             <thead>
@@ -313,7 +314,7 @@ export function CustomerTable({ rows, canManage }: { rows: CustomerRow[]; canMan
             </button>
           </div>
         )}
-      </div>
+      </ScrollReveal>
     </>
   );
 }
@@ -623,7 +624,7 @@ export function LoyaltyPanel({ rows, canManage, history = [] }: { rows: Customer
               ]}
             />
           </div>
-          <div className="card" style={{ padding: 0 }}>
+          <ScrollReveal as="div" className="card" style={{ padding: 0 }} duration={400}>
             <div className="tw">
               <table>
                 <thead>
@@ -685,7 +686,7 @@ export function LoyaltyPanel({ rows, canManage, history = [] }: { rows: Customer
                 {isTamil ? "பொருத்தமான வாடிக்கையாளர்கள் இல்லை." : "No customers match."}
               </p>
             )}
-          </div>
+          </ScrollReveal>
           <p className="muted small" style={{ marginTop: 10 }}>
             {isTamil
               ? "ஆர்டர்களிலிருந்து தானாகவே புள்ளிகள் சேரும். இருப்பை திருத்த அல்லது போனஸ் வழங்க மட்டும் மாற்றுக என்பதைப் பயன்படுத்தவும்."
@@ -695,7 +696,7 @@ export function LoyaltyPanel({ rows, canManage, history = [] }: { rows: Customer
       )}
 
       {view === "set" && (
-        <div className="card">
+        <ScrollReveal as="div" className="card" duration={400}>
           <div className="hd">
             <div>
               <h2>{isTamil ? "புள்ளிகள் செயல்படும் விதம்" : "How points work"}</h2>
@@ -729,7 +730,7 @@ export function LoyaltyPanel({ rows, canManage, history = [] }: { rows: Customer
               ? "கட்டண அமைப்புகளில் தானியங்கிப் பயன்பாட்டை இயக்கலாம். ஒவ்வொரு ஆர்டரிலும் தள்ளுபடியை சேர்க்கவோ நீக்கவோ முடியும்."
               : "Turn on automatic use at checkout in Payments › Payment settings. On each order, the points control lets you apply or remove a discount."}
           </p>
-        </div>
+        </ScrollReveal>
       )}
 
       {view === "log" && (
@@ -745,7 +746,7 @@ export function LoyaltyPanel({ rows, canManage, history = [] }: { rows: Customer
               {isTamil ? "CSV பதிவிறக்கு" : "Export CSV"}
             </button>
           </div>
-          <div className="card" style={{ padding: 0 }}>
+          <ScrollReveal as="div" className="card" style={{ padding: 0 }} duration={400}>
             <div className="tw">
               <table>
                 <thead>
@@ -784,7 +785,7 @@ export function LoyaltyPanel({ rows, canManage, history = [] }: { rows: Customer
                 {isTamil ? "இன்னும் எதுவும் இல்லை." : "Nothing here yet."}
               </p>
             )}
-          </div>
+          </ScrollReveal>
           <p className="muted small" style={{ marginTop: 10 }}>
             {isTamil
               ? "ஆர்டர்களில் பெற்ற மற்றும் பயன்படுத்திய புள்ளிகள், கையால் செய்த மாற்றங்கள் அனைத்தும் இங்கே காரணத்துடன் உள்ளன."

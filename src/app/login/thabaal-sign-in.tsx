@@ -8,6 +8,7 @@ import { LandingSections } from "./landing-sections";
 import { MascotIntro } from "./mascot-intro";
 import { ScrollDownPrompt } from "./scroll-prompt";
 import { SiteHeader } from "./site-header";
+import { ScrollReveal } from "@/components/motion";
 import "./thabaal-login.css";
 
 function getThemeSnapshot(): "day" | "night" {
@@ -109,49 +110,51 @@ export function ThabaalSignIn() {
         {/* LEFT COLUMN: SIGN IN FORM */}
         <section className="thabaal-left">
           {/* Brand Wordmark with Mascot Bird Perched on Top */}
-          <div className="thabaal-brand">
-            {/* English and Tamil wordmarks, each in a day and a night colour; CSS shows the right one. */}
-            <div
-              className="words"
-              role="img"
-              aria-label={lang === "ta" ? "தபால்" : "thabaal"}
-            >
-              <Image
-                src="/brands/thabaal/w-day.png"
-                className="w-day w-en"
-                alt=""
-                width={320}
-                height={90}
-                priority
-              />
-              <Image
-                src="/brands/thabaal/w-night.png"
-                className="w-night w-en"
-                alt=""
-                width={320}
-                height={90}
-                priority
-              />
-              <Image
-                src="/brands/thabaal/w-ta-day.png"
-                className="w-day w-ta"
-                alt=""
-                width={320}
-                height={90}
-                priority
-              />
-              <Image
-                src="/brands/thabaal/w-ta-night.png"
-                className="w-night w-ta"
-                alt=""
-                width={320}
-                height={90}
-                priority
-              />
-              {/* Mascot bird sitting directly on top of the wordmark's last letter */}
-              <MascotIntro lang={lang} />
+          <ScrollReveal direction="down" duration={500} className="w-full">
+            <div className="thabaal-brand">
+              {/* English and Tamil wordmarks, each in a day and a night colour; CSS shows the right one. */}
+              <div
+                className="words"
+                role="img"
+                aria-label={lang === "ta" ? "தபால்" : "thabaal"}
+              >
+                <Image
+                  src="/brands/thabaal/w-day.png"
+                  className="w-day w-en"
+                  alt=""
+                  width={320}
+                  height={90}
+                  priority
+                />
+                <Image
+                  src="/brands/thabaal/w-night.png"
+                  className="w-night w-en"
+                  alt=""
+                  width={320}
+                  height={90}
+                  priority
+                />
+                <Image
+                  src="/brands/thabaal/w-ta-day.png"
+                  className="w-day w-ta"
+                  alt=""
+                  width={320}
+                  height={90}
+                  priority
+                />
+                <Image
+                  src="/brands/thabaal/w-ta-night.png"
+                  className="w-night w-ta"
+                  alt=""
+                  width={320}
+                  height={90}
+                  priority
+                />
+                {/* Mascot bird sitting directly on top of the wordmark's last letter */}
+                <MascotIntro lang={lang} />
+              </div>
             </div>
-          </div>
+          </ScrollReveal>
 
           {/* Credential Form. Privacy, terms and the rest are in the page footer below (one place, not two). */}
           <LoginForm lang={lang} />

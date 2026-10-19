@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { ScrollReveal } from "@/components/motion";
 
 /*
  * Thabaal's privacy policy (public: no login needed, so Meta's app review and anyone else can read
@@ -47,12 +48,12 @@ const SECTIONS = [
 
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
-    <section id={id} className="scroll-mt-6 border-t border-line pt-7 sm:pt-9">
+    <ScrollReveal as="section" id={id} direction="up" duration={450} className="scroll-mt-6 border-t border-line pt-7 sm:pt-9">
       <h2 className="text-lg font-semibold text-ink sm:text-xl">{title}</h2>
       <div className="mt-3 space-y-3 text-[0.9375rem] leading-relaxed text-ink-2 [&_li]:pl-1 [&_strong]:font-semibold [&_strong]:text-ink [&_ul]:list-disc [&_ul]:space-y-1.5 [&_ul]:pl-5">
         {children}
       </div>
-    </section>
+    </ScrollReveal>
   );
 }
 
@@ -80,30 +81,36 @@ export default function PrivacyPage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 pb-16 pt-8 sm:px-6 sm:pt-12">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted">Legal</p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">Privacy Policy</h1>
-        <p className="mt-2 text-sm text-muted">Last updated: {LAST_UPDATED}</p>
+        <ScrollReveal direction="up" duration={500}>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted">Legal</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">Privacy Policy</h1>
+          <p className="mt-2 text-sm text-muted">Last updated: {LAST_UPDATED}</p>
+        </ScrollReveal>
 
-        <div className="mt-6 rounded-card border border-line bg-panel p-4 text-[0.9375rem] leading-relaxed text-ink-2 sm:p-5">
-          <p>
-            <strong className="text-ink">In short:</strong> Thabaal helps businesses talk to their customers on WhatsApp: campaigns, replies, orders, payments and calls. We
-            only use personal data to run that service for the business that collected it. We don&apos;t sell it, we don&apos;t use it for advertising, and customers can stop
-            messages at any time by replying <strong className="text-ink">STOP</strong>.
-          </p>
-        </div>
+        <ScrollReveal direction="up" delay={80} duration={500} className="mt-6">
+          <div className="rounded-card border border-line bg-panel p-4 text-[0.9375rem] leading-relaxed text-ink-2 sm:p-5">
+            <p>
+              <strong className="text-ink">In short:</strong> Thabaal helps businesses talk to their customers on WhatsApp: campaigns, replies, orders, payments and calls. We
+              only use personal data to run that service for the business that collected it. We don&apos;t sell it, we don&apos;t use it for advertising, and customers can stop
+              messages at any time by replying <strong className="text-ink">STOP</strong>.
+            </p>
+          </div>
+        </ScrollReveal>
 
-        <nav aria-label="On this page" className="mt-6 rounded-card border border-line bg-panel p-4 sm:p-5">
-          <p className="text-sm font-semibold text-ink">On this page</p>
-          <ol className="mt-2 grid list-decimal gap-x-6 gap-y-1 pl-5 text-sm text-ink-2 sm:grid-cols-2">
-            {SECTIONS.map(([id, label]) => (
-              <li key={id}>
-                <a href={`#${id}`} className="inline-flex min-h-10 items-center sm:min-h-0 hover:text-brand-deep hover:underline">
-                  {label}
-                </a>
-              </li>
-            ))}
-          </ol>
-        </nav>
+        <ScrollReveal direction="up" delay={140} duration={500} className="mt-6">
+          <nav aria-label="On this page" className="rounded-card border border-line bg-panel p-4 sm:p-5">
+            <p className="text-sm font-semibold text-ink">On this page</p>
+            <ol className="mt-2 grid list-decimal gap-x-6 gap-y-1 pl-5 text-sm text-ink-2 sm:grid-cols-2">
+              {SECTIONS.map(([id, label]) => (
+                <li key={id}>
+                  <a href={`#${id}`} className="inline-flex min-h-10 items-center sm:min-h-0 hover:text-brand-deep hover:underline">
+                    {label}
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </nav>
+        </ScrollReveal>
 
         <div className="mt-8 space-y-8 sm:space-y-10">
           <Section id="who-we-are" title="1. Who we are">

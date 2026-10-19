@@ -1,6 +1,7 @@
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import type { Metadata } from "next";
 import { Wallet } from "@/components/icons";
+import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 import { Calendar3D, Messages3D, Rupee3D, Settings3D, Users3D, Wallet3D } from "@/components/icons-3d";
 import { Badge, Callout, Card, CardHeader, EmptyState, PageHeader, Stat, Table, Td, Th } from "@/components/ui";
 import { db } from "@/lib/db";
@@ -52,12 +53,20 @@ async function AllWallets() {
     <>
       <PageHeader title="Wallets" description="Clients billed through the Thabaal wallet: Thabaal pays Meta, and each delivered message is taken from the client's balance." />
 
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <Stat label="Held in wallets" value={rupees(total)} sub={`${clients.length} wallet client${clients.length === 1 ? "" : "s"}`} tone="brand" />
-        <Stat label="Charged this month" value={rupees(monthTotal)} sub="Delivered messages, GST included" tone="info" />
-        <Stat label="Recharges to check" value={String(pending.length)} sub={pending.length ? `${rupees(pendingTotal)} waiting` : "Nothing waiting"} tone={pending.length ? "amber" : "brand"} />
-        <Stat label="Keep Meta above" value={rupees(Math.max(0, total))} sub="Meta's prepaid balance must cover every wallet" tone="violet" />
-      </div>
+      <StaggerGroup className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <StaggerItem index={0} className="h-full">
+          <Stat label="Held in wallets" value={rupees(total)} sub={`${clients.length} wallet client${clients.length === 1 ? "" : "s"}`} tone="brand" />
+        </StaggerItem>
+        <StaggerItem index={1} className="h-full">
+          <Stat label="Charged this month" value={rupees(monthTotal)} sub="Delivered messages, GST included" tone="info" />
+        </StaggerItem>
+        <StaggerItem index={2} className="h-full">
+          <Stat label="Recharges to check" value={String(pending.length)} sub={pending.length ? `${rupees(pendingTotal)} waiting` : "Nothing waiting"} tone={pending.length ? "amber" : "brand"} />
+        </StaggerItem>
+        <StaggerItem index={3} className="h-full">
+          <Stat label="Keep Meta above" value={rupees(Math.max(0, total))} sub="Meta's prepaid balance must cover every wallet" tone="violet" />
+        </StaggerItem>
+      </StaggerGroup>
 
       <Card className="card-3d mb-5">
         <CardHeader tone="amber" icon={<Wallet3D />} title="Recharges to check" description="Approve only after the money shows in your bank or UPI app. Match the amount and transaction ID." />
@@ -198,118 +207,136 @@ async function ClientWallet({ clientId, isAdmin, canManage }: { clientId: string
         </Callout>
       ) : null}
 
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <Stat label="Balance" value={rupees(balance)} sub={pendingCount ? `${pendingCount} recharge${pendingCount === 1 ? "" : "s"} being checked` : "Available now"} tone={balance <= 0 ? "rose" : low ? "amber" : "brand"} />
-        <Stat label="Spent this month" value={rupees(monthSpent)} sub={`${monthAgg._count.toLocaleString("en-IN")} charged messages`} tone="info" />
-        <Stat label="Marketing message" value={`₹${chargeFor(rates.marketing).toFixed(4)}`} sub="each, GST included" tone="violet" />
-        <Stat label="Utility message" value={`₹${chargeFor(rates.utility).toFixed(4)}`} sub="each, GST included" tone="violet" />
-      </div>
+      <StaggerGroup className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <StaggerItem>
+          <Stat label="Balance" value={rupees(balance)} sub={pendingCount ? `${pendingCount} recharge${pendingCount === 1 ? "" : "s"} being checked` : "Available now"} tone={balance <= 0 ? "rose" : low ? "amber" : "brand"} />
+        </StaggerItem>
+        <StaggerItem>
+          <Stat label="Spent this month" value={rupees(monthSpent)} sub={`${monthAgg._count.toLocaleString("en-IN")} charged messages`} tone="info" />
+        </StaggerItem>
+        <StaggerItem>
+          <Stat label="Marketing message" value={`₹${chargeFor(rates.marketing).toFixed(4)}`} sub="each, GST included" tone="violet" />
+        </StaggerItem>
+        <StaggerItem>
+          <Stat label="Utility message" value={`₹${chargeFor(rates.utility).toFixed(4)}`} sub="each, GST included" tone="violet" />
+        </StaggerItem>
+      </StaggerGroup>
 
       {canManage && (
-        <Card className="card-3d mb-5">
-          <CardHeader tone="brand" icon={<Rupee3D />} title="Add money" description="Pay by UPI, then send the transaction ID. The money is added once Thabaal confirms it." />
-          <div className="p-4 sm:p-5">
-            <RechargeForm upiId={settings?.walletUpiId ?? null} payee={settings?.walletPayee ?? null} clientName={client.name} />
-          </div>
-        </Card>
+        <ScrollReveal>
+          <Card className="card-3d mb-5">
+            <CardHeader tone="brand" icon={<Rupee3D />} title="Add money" description="Pay by UPI, then send the transaction ID. The money is added once Thabaal confirms it." />
+            <div className="p-4 sm:p-5">
+              <RechargeForm upiId={settings?.walletUpiId ?? null} payee={settings?.walletPayee ?? null} clientName={client.name} />
+            </div>
+          </Card>
+        </ScrollReveal>
       )}
 
       {isAdmin && (
-        <Card className="card-3d mb-5">
-          <CardHeader tone="violet" icon={<Settings3D />} title="Add, refund or correct" description="Money received another way (cash, bank transfer), a refund, or a correction. Every change is kept in the history." />
-          <div className="p-4 sm:p-5">
-            <AdjustForm clientId={client.id} />
-          </div>
-        </Card>
+        <ScrollReveal>
+          <Card className="card-3d mb-5">
+            <CardHeader tone="violet" icon={<Settings3D />} title="Add, refund or correct" description="Money received another way (cash, bank transfer), a refund, or a correction. Every change is kept in the history." />
+            <div className="p-4 sm:p-5">
+              <AdjustForm clientId={client.id} />
+            </div>
+          </Card>
+        </ScrollReveal>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Card className="card-3d">
-          <CardHeader tone="brand" icon={<Calendar3D />} title="Recharges and changes" />
-          {money.length ? (
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Date</Th>
-                  <Th>What</Th>
-                  <Th numeric>Amount</Th>
-                  <Th>Status</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {money.map((e) => (
-                  <tr key={e.id}>
-                    <Td className="text-xs text-muted">{fmtDate(e.createdAt, "d MMM yyyy")}</Td>
-                    <Td>
-                      {KIND_LABEL[e.kind] ?? e.kind}
-                      {(e.utr || e.note) && <span className="block text-xs text-muted">{[e.utr, e.note].filter(Boolean).join(" · ")}</span>}
-                    </Td>
-                    <Td numeric className={`whitespace-nowrap ${e.amount < 0 ? "text-danger" : "text-ink"}`}>
-                      {e.amount > 0 ? "+" : ""}
-                      {rupees(e.amount)}
-                    </Td>
-                    <Td>
-                      {e.kind === "RECHARGE" && e.status === "PENDING" && isAdmin ? <DecideRecharge id={e.id} label={rupees(e.amount)} /> : <StatusTag status={e.status} />}
-                    </Td>
+      <StaggerGroup className="grid gap-5 lg:grid-cols-2">
+        <StaggerItem>
+          <Card className="card-3d h-full">
+            <CardHeader tone="brand" icon={<Calendar3D />} title="Recharges and changes" />
+            {money.length ? (
+              <Table>
+                <thead>
+                  <tr>
+                    <Th>Date</Th>
+                    <Th>What</Th>
+                    <Th numeric>Amount</Th>
+                    <Th>Status</Th>
                   </tr>
-                ))}
-              </tbody>
-            </Table>
-          ) : (
-            <p className="px-5 py-4 text-sm text-muted">No recharges yet.</p>
-          )}
-        </Card>
+                </thead>
+                <tbody>
+                  {money.map((e) => (
+                    <tr key={e.id}>
+                      <Td className="text-xs text-muted">{fmtDate(e.createdAt, "d MMM yyyy")}</Td>
+                      <Td>
+                        {KIND_LABEL[e.kind] ?? e.kind}
+                        {(e.utr || e.note) && <span className="block text-xs text-muted">{[e.utr, e.note].filter(Boolean).join(" · ")}</span>}
+                      </Td>
+                      <Td numeric className={`whitespace-nowrap ${e.amount < 0 ? "text-danger" : "text-ink"}`}>
+                        {e.amount > 0 ? "+" : ""}
+                        {rupees(e.amount)}
+                      </Td>
+                      <Td>
+                        {e.kind === "RECHARGE" && e.status === "PENDING" && isAdmin ? <DecideRecharge id={e.id} label={rupees(e.amount)} /> : <StatusTag status={e.status} />}
+                      </Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            ) : (
+              <p className="px-5 py-4 text-sm text-muted">No recharges yet.</p>
+            )}
+          </Card>
+        </StaggerItem>
 
-        <Card className="card-3d">
-          <CardHeader tone="info" icon={<Messages3D />} title="Message charges, last 30 days" description="Only messages Meta charged for: delivered, and not free." />
-          {daily.length ? (
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Day</Th>
-                  <Th>Type</Th>
-                  <Th numeric>Messages</Th>
-                  <Th numeric>Charged</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {daily.map((d) => (
-                  <tr key={`${d.day.toISOString()}-${d.category}`}>
-                    <Td className="text-xs text-muted">{formatInTimeZone(d.day, "UTC", "d MMM")}</Td>
-                    <Td className="capitalize">{d.category ?? "Other"}</Td>
-                    <Td numeric>{Number(d.n).toLocaleString("en-IN")}</Td>
-                    <Td numeric>{rupees(-Number(d.total))}</Td>
+        <StaggerItem>
+          <Card className="card-3d h-full">
+            <CardHeader tone="info" icon={<Messages3D />} title="Message charges, last 30 days" description="Only messages Meta charged for: delivered, and not free." />
+            {daily.length ? (
+              <Table>
+                <thead>
+                  <tr>
+                    <Th>Day</Th>
+                    <Th>Type</Th>
+                    <Th numeric>Messages</Th>
+                    <Th numeric>Charged</Th>
                   </tr>
-                ))}
-              </tbody>
-            </Table>
-          ) : (
-            <p className="px-5 py-4 text-sm text-muted">No charged messages in the last 30 days.</p>
-          )}
-        </Card>
-      </div>
+                </thead>
+                <tbody>
+                  {daily.map((d) => (
+                    <tr key={`${d.day.toISOString()}-${d.category}`}>
+                      <Td className="text-xs text-muted">{formatInTimeZone(d.day, "UTC", "d MMM")}</Td>
+                      <Td className="capitalize">{d.category ?? "Other"}</Td>
+                      <Td numeric>{Number(d.n).toLocaleString("en-IN")}</Td>
+                      <Td numeric>{rupees(-Number(d.total))}</Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            ) : (
+              <p className="px-5 py-4 text-sm text-muted">No charged messages in the last 30 days.</p>
+            )}
+          </Card>
+        </StaggerItem>
+      </StaggerGroup>
 
-      <Card className="card-3d mt-5">
-        <CardHeader tone="violet" icon={<Rupee3D />} title="Your rates" description="Per delivered message. Meta's free messages (most replies within 24 hours) cost nothing." />
-        <Table>
-          <thead>
-            <tr>
-              <Th>Message type</Th>
-              <Th numeric>Rate</Th>
-              <Th numeric>With 18% GST</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {WALLET_CATEGORIES.map((c: WalletCategory) => (
-              <tr key={c}>
-                <Td>{CATEGORY_NAMES[c]}</Td>
-                <Td numeric>₹{rates[c]}</Td>
-                <Td numeric>₹{chargeFor(rates[c]).toFixed(4)}</Td>
+      <ScrollReveal>
+        <Card className="card-3d mt-5">
+          <CardHeader tone="violet" icon={<Rupee3D />} title="Your rates" description="Per delivered message. Meta's free messages (most replies within 24 hours) cost nothing." />
+          <Table>
+            <thead>
+              <tr>
+                <Th>Message type</Th>
+                <Th numeric>Rate</Th>
+                <Th numeric>With 18% GST</Th>
               </tr>
-            ))}
-          </tbody>
-        </Table>
-      </Card>
+            </thead>
+            <tbody>
+              {WALLET_CATEGORIES.map((c: WalletCategory) => (
+                <tr key={c}>
+                  <Td>{CATEGORY_NAMES[c]}</Td>
+                  <Td numeric>₹{rates[c]}</Td>
+                  <Td numeric>₹{chargeFor(rates[c]).toFixed(4)}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </Card>
+      </ScrollReveal>
 
       {settingsForm}
     </>

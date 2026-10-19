@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import Link from "@/components/intent-link";
 import { Alert3D, Eye3D, Messages3D } from "@/components/icons-3d";
 import { Picker } from "@/components/picker";
+import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 import { Avatar, Badge, Card, DistributionBar, EmptyState, FilterChips, PageHeader, Stat, StatusBadge, Table, Td, Th } from "@/components/ui";
 import { buttonClass, rowClass } from "@/components/ui-classes";
 import { cn } from "@/lib/cn";
@@ -116,40 +117,49 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
         }
       />
 
-      <section aria-label="Delivery summary" className="mb-4 grid grid-cols-2 gap-2.5 sm:mb-5 sm:gap-3.5 lg:grid-cols-4">
-        <Stat
-          label="Total logged"
-          value={fmtNumber(allCount)}
-          sub={queuedCount > 0 ? `${fmtNumber(queuedCount)} queued right now` : "Across filtered range"}
-          icon={<Messages3D />}
-          tone="brand"
-        />
-        <Stat
-          label="Delivered"
-          value={`${pct(deliveredTotal, sentTotal)}%`}
-          sub={`${fmtNumber(deliveredTotal)} reached phones`}
-          icon={<CheckCheck className="size-4" />}
-          tone="info"
-          meter={pct(deliveredTotal, sentTotal)}
-        />
-        <Stat
-          label="Read rate"
-          value={`${pct(readCount, deliveredTotal)}%`}
-          sub={`${fmtNumber(readCount)} opened on WhatsApp`}
-          icon={<Eye3D />}
-          tone="violet"
-          meter={pct(readCount, deliveredTotal)}
-        />
-        <Stat
-          label="Failed"
-          value={fmtNumber(failedCount)}
-          sub={failedCount > 0 ? "Tap Failed to see why" : "No delivery errors"}
-          icon={<Alert3D />}
-          tone={failedCount > 0 ? "amber" : "gold"}
-        />
-      </section>
+      <StaggerGroup aria-label="Delivery summary" className="mb-4 grid grid-cols-2 gap-2.5 sm:mb-5 sm:gap-3.5 lg:grid-cols-4">
+        <StaggerItem>
+          <Stat
+            label="Total logged"
+            value={fmtNumber(allCount)}
+            sub={queuedCount > 0 ? `${fmtNumber(queuedCount)} queued right now` : "Across filtered range"}
+            icon={<Messages3D />}
+            tone="brand"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <Stat
+            label="Delivered"
+            value={`${pct(deliveredTotal, sentTotal)}%`}
+            sub={`${fmtNumber(deliveredTotal)} reached phones`}
+            icon={<CheckCheck className="size-4" />}
+            tone="info"
+            meter={pct(deliveredTotal, sentTotal)}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <Stat
+            label="Read rate"
+            value={`${pct(readCount, deliveredTotal)}%`}
+            sub={`${fmtNumber(readCount)} opened on WhatsApp`}
+            icon={<Eye3D />}
+            tone="violet"
+            meter={pct(readCount, deliveredTotal)}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <Stat
+            label="Failed"
+            value={fmtNumber(failedCount)}
+            sub={failedCount > 0 ? "Tap Failed to see why" : "No delivery errors"}
+            icon={<Alert3D />}
+            tone={failedCount > 0 ? "amber" : "gold"}
+          />
+        </StaggerItem>
+      </StaggerGroup>
 
-      <Card className="card-3d">
+      <ScrollReveal>
+        <Card className="card-3d">
         {allCount > 0 && (
           <div className="border-b border-line bg-subtle/40 px-4 py-3">
             <DistributionBar
@@ -348,6 +358,7 @@ export default async function MessagesPage({ searchParams }: PageProps<"/dashboa
           </nav>
         )}
       </Card>
+      </ScrollReveal>
     </>
   );
 }

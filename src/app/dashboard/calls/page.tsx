@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
 import { PhoneCall, PhoneIncoming, PhoneMissed, PhoneOff } from "@/components/icons";
+import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 import { Stat } from "@/components/ui";
 import { db } from "@/lib/db";
 import { fmtDate } from "@/lib/format";
@@ -50,99 +51,109 @@ export default async function CallsPage() {
     <PortalPage title="Chats" titleTa="அரட்டை" sub={CHATS_SUB} subTa={CHATS_SUB_TA}>
       <InboxTabs active="calls" />
 
-      <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
-        <Stat
-          label="Connected"
-          value={connected}
-          sub="Total voice calls"
-          icon={<PhoneCall className="size-4 shrink-0" />}
-          tone="brand"
-        />
-        <Stat
-          label="Answered"
-          value={answeredIn}
-          sub="Inbound calls picked up"
-          icon={<PhoneIncoming className="size-4 shrink-0" />}
-          tone="info"
-        />
-        <Stat
-          label="Missed"
-          value={missed}
-          sub={missed > 0 ? "Call these back" : "No missed calls"}
-          icon={<PhoneMissed className="size-4 shrink-0" />}
-          tone={missed > 0 ? "rose" : "brand"}
-        />
-        <Stat
-          label="Declined"
-          value={declined}
-          sub="Rejected or busy"
-          icon={<PhoneOff className="size-4 shrink-0" />}
-          tone="amber"
-        />
-      </div>
+      <StaggerGroup className="grid g4 keep2" style={{ marginBottom: 16 }}>
+        <StaggerItem>
+          <Stat
+            label="Connected"
+            value={connected}
+            sub="Total voice calls"
+            icon={<PhoneCall className="size-4 shrink-0" />}
+            tone="brand"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <Stat
+            label="Answered"
+            value={answeredIn}
+            sub="Inbound calls picked up"
+            icon={<PhoneIncoming className="size-4 shrink-0" />}
+            tone="info"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <Stat
+            label="Missed"
+            value={missed}
+            sub={missed > 0 ? "Call these back" : "No missed calls"}
+            icon={<PhoneMissed className="size-4 shrink-0" />}
+            tone={missed > 0 ? "rose" : "brand"}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <Stat
+            label="Declined"
+            value={declined}
+            sub="Rejected or busy"
+            icon={<PhoneOff className="size-4 shrink-0" />}
+            tone="amber"
+          />
+        </StaggerItem>
+      </StaggerGroup>
 
-      <div className="card">
-        <div className="hd">
-          <div>
-            <h2><T ta="அழைப்புப் பதிவு">Call log</T></h2>
-            <p>Incoming calls ring here. To call a customer, open their chat and tap “Call on WhatsApp”.</p>
+      <ScrollReveal>
+        <div className="card">
+          <div className="hd">
+            <div>
+              <h2><T ta="அழைப்புப் பதிவு">Call log</T></h2>
+              <p>Incoming calls ring here. To call a customer, open their chat and tap “Call on WhatsApp”.</p>
+            </div>
           </div>
+          {calls.length ? (
+            <div className="tw">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Customer</th>
+                    <th>When</th>
+                    <th>Direction</th>
+                    <th>Result</th>
+                    <th>Duration</th>
+                    <th>Answered by</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {calls.map((c) => {
+                    const r = result(c);
+                    const out = c.direction === "OUTGOING";
+                    const callBack = c.customer && (c.status === "MISSED" || c.status === "REJECTED");
+                    return (
+                      <tr key={c.id}>
+                        <td>
+                          {c.customer ? (
+                            <Link href={`/dashboard/customers/${c.customer.id}`} style={{ fontWeight: 600, textDecoration: "none" }}>
+                              {c.customer.name}
+                            </Link>
+                          ) : (
+                            <b>{c.callerName || "Unknown caller"}</b>
+                          )}
+                          <div className="muted small">{formatPhone(c.fromPhone)}</div>
+                        </td>
+                        <td className="muted small">{fmtDate(c.startedAt, "d MMM, h:mm a")}</td>
+                        <td>{out ? "Outgoing" : "Incoming"}</td>
+                        <td>
+                          <Pill tone={r.tone}>{r.label}</Pill>
+                        </td>
+                        <td>{c.duration != null && c.status === "ENDED" ? dur(c.duration) : "–"}</td>
+                        <td>{c.answeredBy || "–"}</td>
+                        <td>
+                          {callBack && (
+                            <Link className="btn sm" href={`/dashboard/customers/${c.customer!.id}#call`}>
+                              Call back
+                            </Link>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="muted">When a customer calls your WhatsApp number, it rings in every open portal tab and shows up here.</p>
+          )}
         </div>
-        {calls.length ? (
-          <div className="tw">
-            <table>
-              <thead>
-                <tr>
-                  <th>Customer</th>
-                  <th>When</th>
-                  <th>Direction</th>
-                  <th>Result</th>
-                  <th>Duration</th>
-                  <th>Answered by</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {calls.map((c) => {
-                  const r = result(c);
-                  const out = c.direction === "OUTGOING";
-                  const callBack = c.customer && (c.status === "MISSED" || c.status === "REJECTED");
-                  return (
-                    <tr key={c.id}>
-                      <td>
-                        {c.customer ? (
-                          <Link href={`/dashboard/customers/${c.customer.id}`} style={{ fontWeight: 600, textDecoration: "none" }}>
-                            {c.customer.name}
-                          </Link>
-                        ) : (
-                          <b>{c.callerName || "Unknown caller"}</b>
-                        )}
-                        <div className="muted small">{formatPhone(c.fromPhone)}</div>
-                      </td>
-                      <td className="muted small">{fmtDate(c.startedAt, "d MMM, h:mm a")}</td>
-                      <td>{out ? "Outgoing" : "Incoming"}</td>
-                      <td>
-                        <Pill tone={r.tone}>{r.label}</Pill>
-                      </td>
-                      <td>{c.duration != null && c.status === "ENDED" ? dur(c.duration) : "–"}</td>
-                      <td>{c.answeredBy || "–"}</td>
-                      <td>
-                        {callBack && (
-                          <Link className="btn sm" href={`/dashboard/customers/${c.customer!.id}#call`}>
-                            Call back
-                          </Link>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="muted">When a customer calls your WhatsApp number, it rings in every open portal tab and shows up here.</p>
-        )}
-      </div>
+      </ScrollReveal>
     </PortalPage>
   );
 }

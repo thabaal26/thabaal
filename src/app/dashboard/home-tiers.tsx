@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { IndianRupee, MessageCircle, Plus, Repeat, ShoppingBag } from "@/components/icons";
 import { Stat } from "@/components/ui";
 import Link from "@/components/intent-link";
+import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 import { AiBusinessCopilot } from "./ai-copilot";
 import { inr } from "./portal-format";
 import { Pill, PortalPage, Seg, Spark, T } from "./portal-ui";
@@ -201,7 +202,7 @@ export function HomeTiers(p: HomeTiersProps) {
         {p.alerts && <div className="stack">{p.alerts}</div>}
 
         {todos.length > 0 && (
-          <section className="card">
+          <ScrollReveal as="section" className="card" duration={500}>
             <div className="hd">
               <div>
                 <h2>
@@ -220,17 +221,25 @@ export function HomeTiers(p: HomeTiersProps) {
                 </p>
               </div>
             </div>
-            <div className={`grid ${todos.length === 3 ? "g3" : todos.length === 2 ? "g2" : "gx"}`}>{todos.map((t) => t.node)}</div>
-          </section>
+            <StaggerGroup className={`grid ${todos.length === 3 ? "g3" : todos.length === 2 ? "g2" : "gx"}`}>
+              {todos.map((t, i) => (
+                <StaggerItem key={t.key} index={i} className="h-full">
+                  {t.node}
+                </StaggerItem>
+              ))}
+            </StaggerGroup>
+          </ScrollReveal>
         )}
 
         <section>
-          <div className="hd">
-            <h2><T ta="வணிகம் எப்படி போகிறது">How the business is doing</T></h2>
-            <Seg label="Period" value={activeRange} options={RANGES.map((r) => ({ ...r, href: r.id === "7d" ? "/dashboard" : `/dashboard?range=${r.id}` }))} />
-          </div>
-          <div className="grid g4 keep2">
-            {p.kpis.map((k) => {
+          <ScrollReveal duration={450}>
+            <div className="hd">
+              <h2><T ta="வணிகம் எப்படி போகிறது">How the business is doing</T></h2>
+              <Seg label="Period" value={activeRange} options={RANGES.map((r) => ({ ...r, href: r.id === "7d" ? "/dashboard" : `/dashboard?range=${r.id}` }))} />
+            </div>
+          </ScrollReveal>
+          <StaggerGroup className="grid g4 keep2">
+            {p.kpis.map((k, i) => {
               const dl = delta(k);
               const labelLower = k.label.toLowerCase();
               const icon = labelLower.includes("sale") ? (
@@ -251,25 +260,26 @@ export function HomeTiers(p: HomeTiersProps) {
                 : "gold";
 
               return (
-                <Stat
-                  key={k.label}
-                  label={k.label}
-                  value={k.value}
-                  sub={
-                    <div>
-                      <div className={`d ${dl.tone}`}>{dl.text}</div>
-                      <div style={{ marginTop: 8 }}>
-                        <Spark data={k.spark} down={dl.tone === "down"} />
+                <StaggerItem key={k.label} index={i} className="h-full">
+                  <Stat
+                    label={k.label}
+                    value={k.value}
+                    sub={
+                      <div>
+                        <div className={`d ${dl.tone}`}>{dl.text}</div>
+                        <div style={{ marginTop: 8 }}>
+                          <Spark data={k.spark} down={dl.tone === "down"} />
+                        </div>
                       </div>
-                    </div>
-                  }
-                  icon={icon}
-                  tone={tone}
-                  href={k.href}
-                />
+                    }
+                    icon={icon}
+                    tone={tone}
+                    href={k.href}
+                  />
+                </StaggerItem>
               );
             })}
-          </div>
+          </StaggerGroup>
           <p className="muted small" style={{ marginTop: 8 }}>
             <T ta={`முந்தைய ${rangeWordTa} உடன் ஒப்பிடப்பட்டது.`}>{`Compared with the previous ${rangeWord}.`}</T>{" "}
             <Link href="/dashboard/report" className="linkb">
@@ -279,9 +289,13 @@ export function HomeTiers(p: HomeTiersProps) {
         </section>
 
         <div className="grid g2">
-          {p.wallet}
+          {p.wallet && (
+            <ScrollReveal duration={500} className="h-full">
+              {p.wallet}
+            </ScrollReveal>
+          )}
           {p.campaignsOn && (
-            <section className="card">
+            <ScrollReveal as="section" className="card h-full" duration={500} delay={80}>
               <div className="hd">
                 <h2><T ta="அடுத்த பிரச்சாரம்">Next campaign</T></h2>
                 <Link className="btn sm" href="/dashboard/campaigns"><T ta="அனைத்து பிரச்சாரங்கள்">All campaigns</T></Link>
@@ -334,11 +348,13 @@ export function HomeTiers(p: HomeTiersProps) {
                   </Link>
                 )}
               </div>
-            </section>
+            </ScrollReveal>
           )}
         </div>
 
-        <AiBusinessCopilot initialBrief={p.brief} initialActions={p.briefActions} />
+        <ScrollReveal duration={500} delay={100}>
+          <AiBusinessCopilot initialBrief={p.brief} initialActions={p.briefActions} />
+        </ScrollReveal>
       </div>
     </PortalPage>
   );

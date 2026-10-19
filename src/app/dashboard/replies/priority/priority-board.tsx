@@ -9,6 +9,7 @@ import { requestPayment } from "../../actions/orders";
 import { handleRepliesOf, setReplyHandled } from "../../actions/replies";
 import { inr } from "../../portal-format";
 import { PAction, Pill, Seg, type PillTone } from "../../portal-ui";
+import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 
 /** One open conversation on the board (dates as epoch ms so they cross from the server). */
 export type BoardItem = {
@@ -101,36 +102,44 @@ export function PriorityBoard({ items, nowMs, canOperate }: { items: BoardItem[]
   const longest = !Number.isFinite(oldest) ? "—" : oldestMins < 60 ? `${oldestMins} m` : oldestMins < 2880 ? `${Math.floor(oldestMins / 60)} h ${oldestMins % 60} m` : `${Math.floor(oldestMins / 1440)} days`;
 
   const stats = (
-    <div className="grid g4 keep2" style={{ marginBottom: 16 }}>
-      <Stat
-        label="Value in open carts"
-        value={inr(cartValue)}
-        sub="Open checkout value"
-        icon={<ShoppingBag className="size-4 shrink-0" />}
-        tone="brand"
-      />
-      <Stat
-        label="Closing within 3 hours"
-        value={closing}
-        sub={closing > 0 ? "Free reply window ends soon" : "No window closing soon"}
-        icon={<Clock className="size-4 shrink-0" />}
-        tone={closing > 0 ? "rose" : "brand"}
-      />
-      <Stat
-        label="Window already closed"
-        value={closed}
-        sub="Needs template to reply"
-        icon={<AlertCircle className="size-4 shrink-0" />}
-        tone="amber"
-      />
-      <Stat
-        label="Longest wait"
-        value={longest}
-        sub="Customer waiting time"
-        icon={<Hourglass className="size-4 shrink-0" />}
-        tone="info"
-      />
-    </div>
+    <StaggerGroup className="grid g4 keep2" style={{ marginBottom: 16 }}>
+      <StaggerItem index={0} className="h-full">
+        <Stat
+          label="Value in open carts"
+          value={inr(cartValue)}
+          sub="Open checkout value"
+          icon={<ShoppingBag className="size-4 shrink-0" />}
+          tone="brand"
+        />
+      </StaggerItem>
+      <StaggerItem index={1} className="h-full">
+        <Stat
+          label="Closing within 3 hours"
+          value={closing}
+          sub={closing > 0 ? "Free reply window ends soon" : "No window closing soon"}
+          icon={<Clock className="size-4 shrink-0" />}
+          tone={closing > 0 ? "rose" : "brand"}
+        />
+      </StaggerItem>
+      <StaggerItem index={2} className="h-full">
+        <Stat
+          label="Window already closed"
+          value={closed}
+          sub="Needs template to reply"
+          icon={<AlertCircle className="size-4 shrink-0" />}
+          tone="amber"
+        />
+      </StaggerItem>
+      <StaggerItem index={3} className="h-full">
+        <Stat
+          label="Longest wait"
+          value={longest}
+          sub="Customer waiting time"
+          icon={<Hourglass className="size-4 shrink-0" />}
+          tone="info"
+        />
+      </StaggerItem>
+    </StaggerGroup>
   );
 
   if (items.length === 0) {
@@ -157,7 +166,7 @@ export function PriorityBoard({ items, nowMs, canOperate }: { items: BoardItem[]
     return (
       <>
         {stats}
-        <div className="toolbar">
+        <ScrollReveal duration={400} className="toolbar">
           <button type="button" className="btn" onClick={() => setOpen(null)}>
             ‹ Back to priority
           </button>
@@ -179,8 +188,8 @@ export function PriorityBoard({ items, nowMs, canOperate }: { items: BoardItem[]
               Mark all as handled
             </PAction>
           )}
-        </div>
-        <div className="card">
+        </ScrollReveal>
+        <ScrollReveal duration={450} className="card">
           <div className="hd">
             <div>
               <h2>{g.h}</h2>
@@ -198,7 +207,7 @@ export function PriorityBoard({ items, nowMs, canOperate }: { items: BoardItem[]
               </p>
             )}
           </div>
-        </div>
+        </ScrollReveal>
       </>
     );
   }
@@ -206,44 +215,46 @@ export function PriorityBoard({ items, nowMs, canOperate }: { items: BoardItem[]
   return (
     <>
       {stats}
-      <div className="grid g2">
-        {GROUPS.map((grp) => {
+      <StaggerGroup className="grid g2">
+        {GROUPS.map((grp, i) => {
           const rows = byLane(grp.k).sort((a, b) => a.waitingSinceMs - b.waitingSinceMs);
           return (
-            <div key={grp.k} className="card">
-              <div className="hd">
-                <h2>{grp.h}</h2>
-                <Pill tone={grp.pill}>
-                  {rows.length} chat{rows.length === 1 ? "" : "s"}
-                </Pill>
+            <StaggerItem key={grp.k} index={i} className="h-full">
+              <div className="card h-full">
+                <div className="hd">
+                  <h2>{grp.h}</h2>
+                  <Pill tone={grp.pill}>
+                    {rows.length} chat{rows.length === 1 ? "" : "s"}
+                  </Pill>
+                </div>
+                <div className="list">
+                  {rows.slice(0, 2).map((it) => (
+                    <Row key={it.customerId} it={it} lane={grp.k} nowMs={nowMs} canOperate={canOperate} />
+                  ))}
+                  {rows.length === 0 && <p className="muted small">Nothing here.</p>}
+                </div>
+                {rows.length > 2 ? (
+                  <button
+                    type="button"
+                    className="btn"
+                    style={{ width: "100%", marginTop: 12 }}
+                    onClick={() => {
+                      setOpen(grp.k);
+                      setQ("");
+                    }}
+                  >
+                    Show all {rows.length} ›
+                  </button>
+                ) : rows.length > 0 ? (
+                  <p className="muted small" style={{ marginTop: 12 }}>
+                    That is everyone in this group.
+                  </p>
+                ) : null}
               </div>
-              <div className="list">
-                {rows.slice(0, 2).map((it) => (
-                  <Row key={it.customerId} it={it} lane={grp.k} nowMs={nowMs} canOperate={canOperate} />
-                ))}
-                {rows.length === 0 && <p className="muted small">Nothing here.</p>}
-              </div>
-              {rows.length > 2 ? (
-                <button
-                  type="button"
-                  className="btn"
-                  style={{ width: "100%", marginTop: 12 }}
-                  onClick={() => {
-                    setOpen(grp.k);
-                    setQ("");
-                  }}
-                >
-                  Show all {rows.length} ›
-                </button>
-              ) : rows.length > 0 ? (
-                <p className="muted small" style={{ marginTop: 12 }}>
-                  That is everyone in this group.
-                </p>
-              ) : null}
-            </div>
+            </StaggerItem>
           );
         })}
-      </div>
+      </StaggerGroup>
     </>
   );
 }

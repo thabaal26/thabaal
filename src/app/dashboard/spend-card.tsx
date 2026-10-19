@@ -3,6 +3,7 @@ import { cache, Suspense } from "react";
 import { ActionButton } from "@/components/action-button";
 import { Badge, Card, CardHeader, Skeleton } from "@/components/ui";
 import { buttonClass } from "@/components/ui-classes";
+import { ScrollReveal } from "@/components/motion";
 import { Disclosure } from "@/components/viz";
 import { cn } from "@/lib/cn";
 import { fmtDate, fmtNumber } from "@/lib/format";
@@ -31,25 +32,27 @@ const loadSpend = cache(async (clientId: string) => {
  */
 export function SpendCard({ clientId, canManage, className }: { clientId: string; canManage: boolean; className?: string }) {
   return (
-    <Card className={cn("card-3d", className)}>
-      <CardHeader
-        icon={<Wallet className="size-5 shrink-0" />}
-        title={<T ta="Meta WhatsApp செலவு மற்றும் வாலட் தகவல்">Meta WhatsApp spend & wallet telemetry</T>}
-        description={
-          <Suspense fallback={<T ta="Meta-விலிருந்து செலவு விவரங்கள் பெறப்படுகின்றன…">Loading spend from Meta…</T>}>
-            <SpendDescription clientId={clientId} />
-          </Suspense>
-        }
-        action={
-          <Suspense fallback={null}>
-            <SpendActions clientId={clientId} />
-          </Suspense>
-        }
-      />
-      <Suspense fallback={<SpendBodySkeleton />}>
-        <SpendBody clientId={clientId} canManage={canManage} />
-      </Suspense>
-    </Card>
+    <ScrollReveal duration={550} className={className}>
+      <Card className="card-3d">
+        <CardHeader
+          icon={<Wallet className="size-5 shrink-0" />}
+          title={<T ta="Meta WhatsApp செலவு மற்றும் வாலட் தகவல்">Meta WhatsApp spend & wallet telemetry</T>}
+          description={
+            <Suspense fallback={<T ta="Meta-விலிருந்து செலவு விவரங்கள் பெறப்படுகின்றன…">Loading spend from Meta…</T>}>
+              <SpendDescription clientId={clientId} />
+            </Suspense>
+          }
+          action={
+            <Suspense fallback={null}>
+              <SpendActions clientId={clientId} />
+            </Suspense>
+          }
+        />
+        <Suspense fallback={<SpendBodySkeleton />}>
+          <SpendBody clientId={clientId} canManage={canManage} />
+        </Suspense>
+      </Card>
+    </ScrollReveal>
   );
 }
 

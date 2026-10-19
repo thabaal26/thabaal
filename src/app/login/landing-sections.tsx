@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { ScrollReveal, StaggerGroup, StaggerItem, SectionReveal } from "@/components/motion";
 import "./landing.css";
 
 type Lang = "en" | "ta";
@@ -117,25 +118,25 @@ export function LandingSections({ lang }: { lang: Lang }) {
     <div className="tl-root" id="explore">
       {/* ── 1. PROOF STRIP ── */}
       <section className="proof-strip">
-        <div className="landing-container proof-row">
+        <ScrollReveal direction="up" distance={16} duration={450} className="landing-container proof-row">
           <span className="proof-text">
             {ta
               ? "தமிழ்நாடு வணிகங்களுக்காக உருவாக்கப்பட்டது. மார்க்கெட்டிங் படிப்பு தேவையில்லை."
               : "Made for the way business happens in Tamil Nadu. No marketing degree needed."}
           </span>
-          <div className="proof-tags" role="list">
-            <span className="proof-tag" role="listitem">Retail</span>
-            <span className="proof-tag" role="listitem">Food</span>
-            <span className="proof-tag" role="listitem">Services</span>
-            <span className="proof-tag" role="listitem">D2C</span>
-          </div>
-        </div>
+          <StaggerGroup as="div" className="proof-tags" role="list">
+            <StaggerItem as="span" className="proof-tag" role="listitem">Retail</StaggerItem>
+            <StaggerItem as="span" className="proof-tag" role="listitem">Food</StaggerItem>
+            <StaggerItem as="span" className="proof-tag" role="listitem">Services</StaggerItem>
+            <StaggerItem as="span" className="proof-tag" role="listitem">D2C</StaggerItem>
+          </StaggerGroup>
+        </ScrollReveal>
       </section>
 
       {/* ── 2. ONE SIMPLE WORKSPACE (4 Cards) ── */}
-      <section className="workspace-section" id="features">
+      <SectionReveal className="workspace-section" id="features">
         <div className="landing-container">
-          <div className="section-head">
+          <ScrollReveal direction="up" className="section-head">
             <div className="eyebrow">{ta ? "எளிய ஒரே பணியிடம்" : "One simple workspace"}</div>
             <h2>{ta ? "உங்கள் செய்தி விற்பனையாக மாறத் தேவையான அனைத்தும்." : "Everything your message needs to become a sale."}</h2>
             <p>
@@ -143,11 +144,11 @@ export function LandingSections({ lang }: { lang: Lang }) {
                 ? "அனுப்புதல், படித்தல், பதிலளித்தல், ஆர்டர் மற்றும் பணம் வசூலித்தல் என தனித்தனியாக இருக்கும் படிகளை தபால் ஒன்றாக இணைக்கிறது."
                 : "Thabaal connects the small steps that normally sit in different places: sending, reading, replying, ordering and collecting payment."}
             </p>
-          </div>
+          </ScrollReveal>
 
-          <div className="feature-grid">
+          <StaggerGroup as="div" className="feature-grid">
             {/* Card 1: Broadcast */}
-            <article className="feature-card feature-card-mint">
+            <StaggerItem as="article" className="feature-card feature-card-mint">
               <div className="feature-icon" aria-hidden="true">✦</div>
               <h3>{ta ? "பிரச்சாரம்" : "Broadcast"}</h3>
               <p>
@@ -155,10 +156,10 @@ export function LandingSections({ lang }: { lang: Lang }) {
                   ? "சரியான வாடிக்கையாளர்களுக்கு சலுகை, அறிவிப்பு அல்லது நினைவூட்டலை சில தட்டல்களில் அனுப்புங்கள்."
                   : "Send an offer, announcement or reminder to the right customers in a few taps."}
               </p>
-            </article>
+            </StaggerItem>
 
             {/* Card 2: Delivery & reads */}
-            <article className="feature-card feature-card-cream">
+            <StaggerItem as="article" className="feature-card feature-card-cream">
               <div className="feature-icon" aria-hidden="true">◉</div>
               <h3>{ta ? "சென்றதும் படித்ததும்" : "Delivery & reads"}</h3>
               <p>
@@ -166,10 +167,10 @@ export function LandingSections({ lang }: { lang: Lang }) {
                   ? "எத்தனை வாடிக்கையாளர்கள் செய்தியைப் பெற்றார்கள், திறந்தார்கள் என்பதைத் துல்லியமாகத் தெரிந்து கொள்ளுங்கள்."
                   : "Know how many customers actually received and opened your message."}
               </p>
-            </article>
+            </StaggerItem>
 
             {/* Card 3: Orders & payments */}
-            <article className="feature-card feature-card-lavender">
+            <StaggerItem as="article" className="feature-card feature-card-lavender">
               <div className="feature-icon" aria-hidden="true">₹</div>
               <h3>{ta ? "ஆர்டர்களும் பணமும்" : "Orders & payments"}</h3>
               <p>
@@ -177,10 +178,10 @@ export function LandingSections({ lang }: { lang: Lang }) {
                   ? "புதிய ஆர்டர்கள், வர வேண்டிய பணம், ரொக்கம் மற்றும் பெற்ற பணத்தை ஒரே இடத்திலிருந்து கண்காணிக்கவும்."
                   : "Track new orders, payment waiting, COD and money received from one place."}
               </p>
-            </article>
+            </StaggerItem>
 
             {/* Card 4: Repeat sales */}
-            <article className="feature-card feature-card-pink">
+            <StaggerItem as="article" className="feature-card feature-card-pink">
               <div className="feature-icon" aria-hidden="true">↻</div>
               <h3>{ta ? "மீண்டும் விற்பனை" : "Repeat sales"}</h3>
               <p>
@@ -188,15 +189,15 @@ export function LandingSections({ lang }: { lang: Lang }) {
                   ? "மீண்டும் வாங்கக்கூடிய வாடிக்கையாளர்களைக் கண்டறிந்து, சரியான நேரத்தில் செய்தி அனுப்பி மீண்டும் வரவழையுங்கள்."
                   : "Find customers who may reorder and bring them back with a timely message."}
               </p>
-            </article>
-          </div>
+            </StaggerItem>
+          </StaggerGroup>
         </div>
-      </section>
+      </SectionReveal>
 
       {/* ── 3. NO CONFUSING CHARTS (Interactive Tab Switcher) ── */}
-      <section className="demo-section" id="reports">
+      <SectionReveal className="demo-section" id="reports">
         <div className="landing-container">
-          <div className="section-head">
+          <ScrollReveal direction="up" className="section-head">
             <div className="eyebrow eyebrow-yellow">{ta ? "குழப்பமான வரைபடங்கள் இல்லை" : "No confusing charts"}</div>
             <h2>{ta ? "ஒரே கேள்வி: WhatsApp வியாபாரம் கொண்டு வந்ததா?" : "Ask one question: did WhatsApp bring business?"}</h2>
             <p>
@@ -204,11 +205,11 @@ export function LandingSections({ lang }: { lang: Lang }) {
                 ? "எளிய கண்ணோட்டம், பிரச்சார முடிவு, பேமெண்ட் பார்வை என மாற்றிப் பாருங்கள். ஒவ்வொரு எண்ணுடனும் அடுத்த செயல் தெளிவுபடுத்தப்படும்."
                 : "Switch between a simple overview, campaign result and payment view. Every number comes with a plain-language action."}
             </p>
-          </div>
+          </ScrollReveal>
 
           <div className="demo-layout">
             {/* Left Tabs */}
-            <div className="demo-tabs" role="tablist" aria-label={ta ? "டாஷ்போர்டு மாதிரிக் காட்சிகள்" : "Dashboard preview tabs"}>
+            <ScrollReveal direction="left" delay={80} className="demo-tabs" role="tablist" aria-label={ta ? "டாஷ்போர்டு மாதிரிக் காட்சிகள்" : "Dashboard preview tabs"}>
               <button
                 type="button"
                 className={`demo-tab ${activeDemo === "overview" ? "active" : ""}`}
@@ -241,10 +242,10 @@ export function LandingSections({ lang }: { lang: Lang }) {
                 <strong>{ta ? "பணம்" : "Payments"}</strong>
                 <span>{ta ? "வர வேண்டிய பணம் என்ன" : "What money is waiting"}</span>
               </button>
-            </div>
+            </ScrollReveal>
 
             {/* Right Result Panel with Smooth Transition */}
-            <div className="demo-panel" role="tabpanel" key={activeDemo}>
+            <ScrollReveal direction="right" delay={120} className="demo-panel" role="tabpanel" key={activeDemo}>
               <div className="demo-panel-top">
                 <div>
                   <h3>{demo.title[lang]}</h3>
@@ -253,14 +254,14 @@ export function LandingSections({ lang }: { lang: Lang }) {
                 <span className="demo-period">{demo.period[lang]}</span>
               </div>
 
-              <div className="demo-metrics">
+              <StaggerGroup className="demo-metrics">
                 {demo.metrics.map((m, idx) => (
-                  <div key={idx} className={`demo-metric demo-metric-${m.tone ?? "default"}`}>
+                  <StaggerItem key={idx} className={`demo-metric demo-metric-${m.tone ?? "default"}`}>
                     <small>{m.label[lang]}</small>
                     <strong>{m.value}</strong>
-                  </div>
+                  </StaggerItem>
                 ))}
-              </div>
+              </StaggerGroup>
 
               <div className="demo-message">
                 <div className="demo-message-icon" aria-hidden="true">→</div>
@@ -269,15 +270,15 @@ export function LandingSections({ lang }: { lang: Lang }) {
                   <span>{ta ? "தபால் அடுத்த படியை எப்போதும் தெளிவாகக் காட்டும்." : "Thabaal keeps the next step visible."}</span>
                 </div>
               </div>
-            </div>
+            </ScrollReveal>
           </div>
         </div>
-      </section>
+      </SectionReveal>
 
       {/* ── 4. HOW IT WORKS (3 Steps) ── */}
-      <section className="steps-section" id="how-it-works">
+      <SectionReveal className="steps-section" id="how-it-works">
         <div className="landing-container">
-          <div className="section-head">
+          <ScrollReveal direction="up" className="section-head">
             <div className="eyebrow">{ta ? "எப்படி செயல்படுகிறது" : "How it works"}</div>
             <h2>{ta ? "யோசனை முதல் வாடிக்கையாளர் பதில் வரை மூன்றே படிகள்." : "From idea to customer reply in three steps."}</h2>
             <p>
@@ -285,10 +286,10 @@ export function LandingSections({ lang }: { lang: Lang }) {
                 ? "தபால் எளிய மொழியையும் தெளிவான பொத்தான்களையும் தருகிறது; கடை உரிமையாளர் விரைவாக தன் வேலைக்குத் திரும்பலாம்."
                 : "Thabaal keeps the language familiar and the next button obvious, so the owner can get back to the shop floor."}
             </p>
-          </div>
+          </ScrollReveal>
 
-          <div className="steps-grid">
-            <article className="step-card">
+          <StaggerGroup as="div" className="steps-grid">
+            <StaggerItem as="article" className="step-card">
               <div className="step-badge">1</div>
               <span className="step-arrow" aria-hidden="true">→</span>
               <h3>{ta ? "மக்களைத் தேர்ந்தெடுங்கள்" : "Choose your people"}</h3>
@@ -297,9 +298,9 @@ export function LandingSections({ lang }: { lang: Lang }) {
                   ? "அனைவரையும், குறிப்பிட்ட பகுதி வாடிக்கையாளர்களை, ஒரு டேக் அல்லது குறிப்பிட்ட பொருளை வாங்கியவர்களைத் தேர்வு செய்யுங்கள்."
                   : "Pick everyone, a customer area, a tag, or people who bought a particular product."}
               </p>
-            </article>
+            </StaggerItem>
 
-            <article className="step-card">
+            <StaggerItem as="article" className="step-card">
               <div className="step-badge">2</div>
               <span className="step-arrow" aria-hidden="true">→</span>
               <h3>{ta ? "செய்தியை அனுப்புங்கள்" : "Send your message"}</h3>
@@ -308,9 +309,9 @@ export function LandingSections({ lang }: { lang: Lang }) {
                   ? "WhatsApp ஒப்புதல் பெற்ற டெம்ப்ளேட்டைப் பயன்படுத்தி, சலுகையைச் சேர்த்து உடனே அல்லது நிதானமான வேகத்தில் அனுப்புங்கள்."
                   : "Use a WhatsApp-approved template, add your offer and choose now, later or a gentle sending speed."}
               </p>
-            </article>
+            </StaggerItem>
 
-            <article className="step-card">
+            <StaggerItem as="article" className="step-card">
               <div className="step-badge">3</div>
               <span className="step-check" aria-hidden="true">✓</span>
               <h3>{ta ? "பதில்களைப் பாருங்கள்" : "See what came back"}</h3>
@@ -319,16 +320,16 @@ export function LandingSections({ lang }: { lang: Lang }) {
                   ? "சென்றது, படித்தது, பதில்கள், ஆர்டர்கள், பணத்தைப் பார்த்து, பரிந்துரைக்கப்பட்ட அடுத்த செயலைச் செய்யுங்கள்."
                   : "Follow delivery, reads, replies, orders and payments — then take the next suggested action."}
               </p>
-            </article>
-          </div>
+            </StaggerItem>
+          </StaggerGroup>
         </div>
-      </section>
+      </SectionReveal>
 
       {/* ── 5. A FAMILIAR WAY TO WORK (Quote + Personas) ── */}
-      <section className="use-case-section">
+      <SectionReveal className="use-case-section">
         <div className="landing-container use-case-grid">
           {/* Left Quote Card */}
-          <div className="use-case-main">
+          <ScrollReveal direction="left" className="use-case-main">
             <div className="eyebrow eyebrow-yellow">{ta ? "பழகிய வேலை முறை" : "A familiar way to work"}</div>
             <h3>
               {ta
@@ -344,11 +345,11 @@ export function LandingSections({ lang }: { lang: Lang }) {
               <b>{ta ? "தீபாவளி சலுகை அனுப்பப்பட்டது!" : "Diwali offer sent!"}</b>
               <small>{ta ? "820 பேருக்குச் சென்றது · 610 படித்தனர் · 28 ஆர்டர்கள்" : "820 reached · 610 read · 28 orders"}</small>
             </div>
-          </div>
+          </ScrollReveal>
 
           {/* Right 4 Personas */}
-          <div className="use-case-list">
-            <div className="use-case-item">
+          <StaggerGroup as="div" className="use-case-list">
+            <StaggerItem className="use-case-item">
               <b>01</b>
               <div>
                 <h4>{ta ? "கடை உரிமையாளருக்கு" : "For the shop owner"}</h4>
@@ -358,9 +359,9 @@ export function LandingSections({ lang }: { lang: Lang }) {
                     : "Send new arrivals, festival offers and stock updates to regular customers."}
                 </p>
               </div>
-            </div>
+            </StaggerItem>
 
-            <div className="use-case-item">
+            <StaggerItem className="use-case-item">
               <b>02</b>
               <div>
                 <h4>{ta ? "உணவகங்களுக்கு" : "For the restaurant"}</h4>
@@ -370,9 +371,9 @@ export function LandingSections({ lang }: { lang: Lang }) {
                     : "Fill slow hours, share today’s menu and bring back people who ordered before."}
                 </p>
               </div>
-            </div>
+            </StaggerItem>
 
-            <div className="use-case-item">
+            <StaggerItem className="use-case-item">
               <b>03</b>
               <div>
                 <h4>{ta ? "சேவை வணிகங்களுக்கு" : "For the service business"}</h4>
@@ -382,9 +383,9 @@ export function LandingSections({ lang }: { lang: Lang }) {
                     : "Remind customers about appointments, renewals and the next service date."}
                 </p>
               </div>
-            </div>
+            </StaggerItem>
 
-            <div className="use-case-item">
+            <StaggerItem className="use-case-item">
               <b>04</b>
               <div>
                 <h4>{ta ? "வளரும் பிராண்டுகளுக்கு" : "For the growing brand"}</h4>
@@ -394,15 +395,15 @@ export function LandingSections({ lang }: { lang: Lang }) {
                     : "Turn campaign spending into a clear sales story your team can understand."}
                 </p>
               </div>
-            </div>
-          </div>
+            </StaggerItem>
+          </StaggerGroup>
         </div>
-      </section>
+      </SectionReveal>
 
       {/* ── 6. PRICING (4 Plan Cards) ── */}
-      <section className="pricing-section" id="pricing">
+      <SectionReveal className="pricing-section" id="pricing">
         <div className="landing-container">
-          <div className="section-head">
+          <ScrollReveal direction="up" className="section-head">
             <div className="eyebrow">{ta ? "கட்டணம்" : "Pricing"}</div>
             <h2>{ta ? "உங்கள் அடுத்த கட்டத்திற்கு ஏற்ற திட்டத்தைத் தேர்வு செய்யுங்கள்." : "Pick the plan that fits your next stage."}</h2>
             <p className="pricing-note">
@@ -410,11 +411,11 @@ export function LandingSections({ lang }: { lang: Lang }) {
                 ? "கட்டண விவரங்கள் இறுதி செய்யப்படுகின்றன. திட்டப் பெயர்கள், வரம்புகள் மற்றும் செய்திச் செலவுகளுக்காக இவை ஒதுக்கப்பட்டுள்ளன."
                 : "Pricing is being finalised. These four spaces are intentionally left open for the final plan names, limits and WhatsApp message costs."}
             </p>
-          </div>
+          </ScrollReveal>
 
-          <div className="pricing-grid">
+          <StaggerGroup as="div" className="pricing-grid">
             {/* Plan 01 */}
-            <article className="price-card">
+            <StaggerItem as="article" className="price-card">
               <div className="plan-name">Plan 01</div>
               <p className="plan-note">{ta ? "தபாலை முயற்சித்துப் பார்க்க" : "For trying Thabaal"}</p>
               <div className="price-placeholder">{ta ? "விலை விரைவில்" : "Pricing coming soon"}</div>
@@ -423,10 +424,10 @@ export function LandingSections({ lang }: { lang: Lang }) {
                 <li>{ta ? "அடிப்படை டெலிவரி பார்வை" : "Basic delivery view"}</li>
                 <li>{ta ? "தொடக்க வாடிக்கையாளர் பட்டியல்" : "Starter customer list"}</li>
               </ul>
-            </article>
+            </StaggerItem>
 
             {/* Plan 02: Featured */}
-            <article className="price-card price-card-featured">
+            <StaggerItem as="article" className="price-card price-card-featured">
               <div className="plan-name">Plan 02</div>
               <p className="plan-note">{ta ? "தொடர்ச்சியான வாராந்திர மார்க்கெட்டிங்கிற்கு" : "For consistent weekly marketing"}</p>
               <div className="price-placeholder">{ta ? "விலை விரைவில்" : "Pricing coming soon"}</div>
@@ -435,10 +436,10 @@ export function LandingSections({ lang }: { lang: Lang }) {
                 <li>{ta ? "ஆர்டர்களும் பணமும்" : "Orders and payments"}</li>
                 <li>{ta ? "எளிய பிரச்சார அறிக்கைகள்" : "Simple campaign reports"}</li>
               </ul>
-            </article>
+            </StaggerItem>
 
             {/* Plan 03 */}
-            <article className="price-card">
+            <StaggerItem as="article" className="price-card">
               <div className="plan-name">Plan 03</div>
               <p className="plan-note">{ta ? "வளரும் வாடிக்கையாளர் தளத்திற்கு" : "For a growing customer base"}</p>
               <div className="price-placeholder">{ta ? "விலை விரைவில்" : "Pricing coming soon"}</div>
@@ -447,10 +448,10 @@ export function LandingSections({ lang }: { lang: Lang }) {
                 <li>{ta ? "மீண்டும் விற்பனை கருவிகள்" : "Repeat-sale tools"}</li>
                 <li>{ta ? "முன்னேறிய பிரச்சார பார்வைகள்" : "Advanced campaign views"}</li>
               </ul>
-            </article>
+            </StaggerItem>
 
             {/* Plan 04 */}
-            <article className="price-card">
+            <StaggerItem as="article" className="price-card">
               <div className="plan-name">Plan 04</div>
               <p className="plan-note">{ta ? "குழுக்கள் மற்றும் அதிக அளவுக்கு" : "For teams and larger volume"}</p>
               <div className="price-placeholder">{ta ? "விலை விரைவில்" : "Pricing coming soon"}</div>
@@ -459,16 +460,16 @@ export function LandingSections({ lang }: { lang: Lang }) {
                 <li>{ta ? "முன்னுரிமை ஆதரவு" : "Priority support"}</li>
                 <li>{ta ? "தனிப்பயன் வணிகத் தேவைகள்" : "Custom business needs"}</li>
               </ul>
-            </article>
-          </div>
+            </StaggerItem>
+          </StaggerGroup>
         </div>
-      </section>
+      </SectionReveal>
 
       {/* ── 7. QUESTIONS OWNERS ASK (FAQ Accordion) ── */}
-      <section className="faq-section" id="faq">
+      <SectionReveal className="faq-section" id="faq">
         <div className="landing-container faq-grid">
           {/* Left Column */}
-          <div className="faq-aside">
+          <ScrollReveal direction="left" className="faq-aside">
             <div className="eyebrow">{ta ? "உரிமையாளர்கள் கேட்கும் கேள்விகள்" : "Questions owners ask"}</div>
             <h2>{ta ? "முதல் படியை எளிதாக்குங்கள்." : "Keep the first step easy."}</h2>
             <p>
@@ -479,14 +480,14 @@ export function LandingSections({ lang }: { lang: Lang }) {
             <a href={TALK} target={WA ? "_blank" : undefined} rel="noopener" className="landing-btn landing-btn-dark">
               {ta ? "தபாலுடன் பேசுங்கள்" : "Talk to Thabaal"} <span aria-hidden="true">↗</span>
             </a>
-          </div>
+          </ScrollReveal>
 
           {/* Right Column: Accordion */}
-          <div className="faq-list">
+          <StaggerGroup as="div" className="faq-list">
             {FAQ_ITEMS.map((item, idx) => {
               const isOpen = openFaq === idx;
               return (
-                <div key={idx} className={`faq-item ${isOpen ? "open" : ""}`}>
+                <StaggerItem key={idx} className={`faq-item ${isOpen ? "open" : ""}`}>
                   <button
                     type="button"
                     className="faq-question"
@@ -501,16 +502,16 @@ export function LandingSections({ lang }: { lang: Lang }) {
                       <p>{item.a[lang]}</p>
                     </div>
                   </div>
-                </div>
+                </StaggerItem>
               );
             })}
-          </div>
+          </StaggerGroup>
         </div>
-      </section>
+      </SectionReveal>
 
       {/* ── 8. FINAL CTA BANNER ── */}
-      <section className="final-cta-section" id="start">
-        <div className="landing-container final-cta-inner">
+      <SectionReveal className="final-cta-section" id="start">
+        <ScrollReveal direction="up" className="landing-container final-cta-inner">
           <div className="final-cta-copy">
             <h2>{ta ? "உங்கள் செய்திக்கு இன்னும் அதிக வீச்சைத் தாருங்கள்." : "Give your message a little more reach."}</h2>
             <p>{ta ? "எளிய டெமோவுடன் தொடங்குங்கள். திட்டத்தை பின்னர் முடிவு செய்யுங்கள்." : "Start with a simple demo. Decide the plan later."}</p>
@@ -518,11 +519,11 @@ export function LandingSections({ lang }: { lang: Lang }) {
           <a href="#top" className="landing-btn landing-btn-dark">
             {ta ? "இலவச டெமோ தொடங்குங்கள்" : "Create a free demo"} <span aria-hidden="true">↗</span>
           </a>
-        </div>
-      </section>
+        </ScrollReveal>
+      </SectionReveal>
 
       {/* ── 9. FULL BRAND FOOTER ── */}
-      <footer className="landing-footer" role="contentinfo">
+      <ScrollReveal as="footer" className="landing-footer" role="contentinfo" distance={18} duration={500}>
         <div className="landing-container">
           <div className="footer-top">
             <div className="footer-brand">
@@ -555,7 +556,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
             <span>{ta ? "எளிய முறையில் WhatsApp மார்க்கெட்டிங்." : "WhatsApp marketing made simple."}</span>
           </div>
         </div>
-      </footer>
+      </ScrollReveal>
     </div>
   );
 }
