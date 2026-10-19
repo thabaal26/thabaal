@@ -19,6 +19,10 @@ import { waConfig } from "@/lib/whatsapp";
 import { LocalSessionPanel, ProviderSwitch } from "./provider-panel";
 import { PasswordForm } from "./password-form";
 import { OrderStepsForm } from "./order-steps-form";
+import { PaymentSetupForm } from "./payment-setup-form";
+import { DefaultImage } from "./default-image";
+import { readFields } from "@/lib/custom-fields";
+import { PAYMENT_TEMPLATE, paymentTemplateFor } from "@/lib/payments";
 import { readFlow } from "@/lib/order-flow";
 import { readPaySettings, upiReady, waPayOn } from "@/lib/pay-settings";
 import { AppearanceEditor } from "../appearance-editor";
@@ -104,7 +108,7 @@ export default async function SettingsPage() {
   if (user.role !== "ADMIN") {
     const cid = user.clientId;
     const scope = await getScope();
-    const [numbers, customers, products, ordersCount, client, spend] = cid
+    const [numbers, customers, products, ordersCount, client, spend, ownPayTemplate, payTemplate] = cid
       ? await Promise.all([
           numberHealth(cid).catch(() => []),
           db.customer.count({ where: { clientId: cid, optedOut: false } }),
@@ -112,10 +116,12 @@ export default async function SettingsPage() {
             .then((c) => c?.products.length ?? null)
             .catch(() => null),
           db.order.count({ where: { clientId: cid } }),
-          db.client.findUnique({ where: { id: cid }, select: { name: true, website: true, supportPhone: true, paymentConfig: true, paySettings: true, billingMode: true, orderFlow: true } }),
+          db.client.findUnique({ where: { id: cid }, select: { name: true, website: true, supportPhone: true, paymentConfig: true, paySettings: true, billingMode: true, orderFlow: true, sheetCustomersUrl: true, sheetOrdersUrl: true, sheetSyncedAt: true, sheetHookUrl: true, customFields: true, defaultImageUrl: true, bannerUrl: true } }),
           spendSummary(cid).catch(() => null),
+          db.template.findFirst({ where: { clientId: cid, name: PAYMENT_TEMPLATE }, select: { status: true } }),
+          paymentTemplateFor(cid),
         ])
-      : [[], 0, null, 0, null, null];
+      : [[], 0, null, 0, null, null, null, null];
     const quality = (r: string | null | undefined) => (
       r === "GREEN" ? { tone: "ok", label: "High quality", labelTa: "உயர்ந்த தரம்" }
       : r === "YELLOW" ? { tone: "warn", label: "Medium quality", labelTa: "நடுத்தர தரம்" }
@@ -166,6 +172,68 @@ export default async function SettingsPage() {
               </div>
             </div>
           </section>
+        )}
+
+        {cid && client && (
+          <PaymentSetupForm
+            config={client.paymentConfig}
+            canChange={scope.canManage}
+            template={{ using: payTemplate?.name ?? null, ownName: PAYMENT_TEMPLATE, ownStatus: ownPayTemplate?.status ?? null }}
+          />
+        )}
+
+        {cid && client && (
+          <section id="data" className="card" style={{ scrollMarginTop: 80 }}>
+            <div className="hd">
+              <div>
+                <h2><T ta="தரவு மற்றும் இணைப்புகள்">Data and connections</T></h2>
+                <p>
+                  <T ta="Google Sheet ஒத்திசைவு, வாடிக்கையாளர் மற்றும் ஆர்டர்களின் கூடுதல் விவரங்கள், டெம்ப்ளேட்களின் இயல்புப் படம்.">
+                    Google Sheet sync, extra details on customers and orders, and the default picture for templates.
+                  </T>
+                </p>
+              </div>
+            </div>
+            <div className="list">
+              <div className="row">
+                <div className="grow">
+                  <div className="t"><T ta="Google Sheet ஒத்திசைவு">Google Sheet sync</T></div>
+                  <div className="muted small">
+                    {client.sheetCustomersUrl || client.sheetOrdersUrl
+                      ? `Connected${client.sheetSyncedAt ? ` · last read ${fmtDate(client.sheetSyncedAt, "d MMM, h:mm a")}` : ""}${client.sheetHookUrl ? " · live log on" : ""}`
+                      : client.sheetHookUrl
+                        ? "Live log on · no sheet to read yet"
+                        : "Not connected"}
+                  </div>
+                </div>
+                <Link className="btn sm" href="/dashboard/settings/sheet">
+                  <T ta="திற">Open</T>
+                </Link>
+              </div>
+              {scope.canManage && (
+                <div className="row">
+                  <div className="grow">
+                    <div className="t"><T ta="கூடுதல் விவரங்கள் (Custom fields)">Custom fields</T></div>
+                    <div className="muted small">
+                      {(() => {
+                        const n = readFields(client.customFields).length;
+                        return n ? `${n} field${n === 1 ? "" : "s"} on customers and orders` : "None yet: add details like GST number or order type";
+                      })()}
+                    </div>
+                  </div>
+                  <Link className="btn sm" href="/dashboard/settings/fields">
+                    <T ta="திற">Open</T>
+                  </Link>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {cid && client && scope.canManage && (
+          <div id="default-picture" style={{ scrollMarginTop: 80 }}>
+            <DefaultImage url={client.defaultImageUrl} fallback={client.bannerUrl} />
+          </div>
         )}
 
         {cid && client && <OrderStepsForm current={readFlow(client.orderFlow)} canChange={scope.canManage} />}

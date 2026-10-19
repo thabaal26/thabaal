@@ -21,7 +21,7 @@ const CLIENTS = [
   { name: "Spice Route Kitchen", city: "Coimbatore", type: "restaurant", prefix: "SRK", field: "Food preference", wallet: false },
   { name: "Glow Salon", city: "Bangalore", type: "service", prefix: "GS", field: "Preferred time", wallet: false },
 ];
-const PAGES = ["/dashboard", "/dashboard/customers", "/dashboard/customers/fields", "/dashboard/orders", "/dashboard/replies", "/dashboard/campaigns", "/dashboard/campaigns/new", "/dashboard/templates", "/dashboard/catalogue", "/dashboard/wallet", "/dashboard/report", "/dashboard/settings"];
+const PAGES = ["/dashboard", "/dashboard/customers", "/dashboard/settings/fields", "/dashboard/orders", "/dashboard/replies", "/dashboard/campaigns", "/dashboard/campaigns/new", "/dashboard/templates", "/dashboard/catalogue", "/dashboard/wallet", "/dashboard/report", "/dashboard/settings"];
 
 const admin = await db.user.create({ data: { email: "admin@rehearsal.test", name: "Rehearsal Admin", passwordHash: "x", role: "ADMIN", access: "MANAGER" } });
 const token = await new SignJWT({ sub: admin.id, sv: 0 }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("1h").sign(new TextEncoder().encode(process.env.AUTH_SECRET));
@@ -69,7 +69,7 @@ try {
     await p.goto(BASE + "/dashboard", { waitUntil: "networkidle" });
     check(`${c.name}: shows "WhatsApp not connected" until its own number is added`, (await text(p)).includes("WhatsApp not connected"));
     // 4. Its business type's starter fields are there.
-    await p.goto(BASE + "/dashboard/customers/fields", { waitUntil: "networkidle" });
+    await p.goto(BASE + "/dashboard/settings/fields", { waitUntil: "networkidle" });
     check(`${c.name}: starter field "${c.field}" ready`, (await p.locator(`input[value="${c.field}"]`).count()) > 0 || (await text(p)).includes(c.field));
     // 5. Catalogue: a clear setup message, never someone else's products.
     await p.goto(BASE + "/dashboard/catalogue", { waitUntil: "networkidle" });

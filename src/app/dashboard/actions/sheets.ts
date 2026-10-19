@@ -56,7 +56,7 @@ export async function saveSheetHook(link: string, secret: string, clearSecret = 
       ...(!url ? { sheetHookSecret: null } : key ? { sheetHookSecret: key } : clearSecret ? { sheetHookSecret: null } : {}),
     },
   });
-  revalidatePath("/dashboard/customers/sheet");
+  revalidatePath("/dashboard/settings/sheet");
   if (!url) return { ok: true, message: "Live-log sheet unlinked. Events from this business no longer go to any sheet." };
   return { ok: true, message: key ? "Sheet linked with the new secret. Put the same secret in the script (Project Settings → Script properties → SECRET), then send a test." : "Sheet link saved." };
 }

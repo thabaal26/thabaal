@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Ban, Check, ChevronRight, Download, FileUp, MoreHorizontal, Pencil, QrCode, Sheet as SheetIcon, Trash2, UserCheck, UserPlus, UsersRound, X } from "@/components/icons";
+import { AlertCircle, Ban, Check, ChevronRight, Download, FileUp, MoreHorizontal, Pencil, QrCode, Trash2, UserCheck, UserPlus, UsersRound, X } from "@/components/icons";
 import Link from "@/components/intent-link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -45,9 +45,8 @@ export function DeleteCustomerButton({ id, name }: { id: string; name: string })
 
 const LINKS = [
   { href: "/dashboard/customers/grow", label: "Get more customers", icon: QrCode, manager: false },
-  { href: "/dashboard/customers/sheet", label: "Google Sheet", icon: SheetIcon, manager: false },
   { href: "/dashboard/customers/audiences", label: "Audiences", icon: UsersRound, manager: true },
-  { href: "/dashboard/customers/fields", label: "Custom fields", icon: Pencil, manager: true },
+  // Google Sheet sync and Custom fields are account setup: Settings › Data and connections.
 ];
 
 /**
