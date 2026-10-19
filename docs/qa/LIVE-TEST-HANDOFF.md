@@ -74,6 +74,24 @@ earlier work; this file is its memory. Read all of it before doing anything.
 
 ### Done on 19 Oct (latest first)
 
+05. **Account setup moved into Settings (owner asked: client setup belongs in Settings).**
+- Settings › **WhatsApp payments setup** (`settings/payment-setup-form.tsx`): payment configuration name, Review and
+  pay template status, "Create template". Payments › Payment settings keeps only the Pay inside WhatsApp switch
+  with a "Change in Settings" link; the switch needs the name saved first.
+- Settings › **Data and connections**: Google Sheet sync (page moved to `/dashboard/settings/sheet`) and Custom
+  fields (`/dashboard/settings/fields`); the old `/dashboard/customers/sheet` and `/customers/fields` addresses
+  redirect. Removed from the Customers "⋯" menu.
+- Settings › **Default image** for image templates (moved from Templates).
+- Audit result: everything else outside Settings is daily work. Left on purpose: Payments › Payment settings
+  (bank, reminders, COD: the design puts them there), Campaigns › Automations (owner's choice), Wallet billing
+  (Thabaal admin only), Customers › Get more customers and Audiences (growth tools).
+
+04. **`UI_fix` branch (someone else's UI pass, 14 commits on top of main).** Owner: **don't work on `UI_fix` until
+  told.** Its own commit made React log "Encountered a script tag" (theme script inside `<body>`); fixed in
+  `e5fcf2c` (script back in `<head>`), which is on `thabaal/UI_fix`. Local runs failing with a Prisma error: the
+  local `.env` points at an older Neon database that lacks every column since 18 Oct (live uses another one).
+  A stash "wip_before_ui_fix" (not ours) is still in the stash list.
+
 03. **Order flow corrected (owner's rule): Order received › Payment processing › Payment verification › Order
   confirmed › Dispatched › Delivered.** Owner's choices: COD skips the payment steps (received › confirmed when the
   customer or staff confirms COD › dispatched › delivered, cash recorded at delivery); packing is a tick inside

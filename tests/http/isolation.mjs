@@ -35,7 +35,7 @@ async function seed(tag, city) {
 }
 
 const PAGES = [
-  "/dashboard", "/dashboard/customers", "/dashboard/customers/audiences", "/dashboard/customers/fields", "/dashboard/customers/sheet",
+  "/dashboard", "/dashboard/customers", "/dashboard/customers/audiences", "/dashboard/settings/fields", "/dashboard/settings/sheet",
   "/dashboard/orders", "/dashboard/orders/packing", "/dashboard/replies", "/dashboard/replies/priority", "/dashboard/messages",
   "/dashboard/notifications", "/dashboard/campaigns", "/dashboard/campaigns/new", "/dashboard/campaigns/compare", "/dashboard/templates",
   "/dashboard/catalogue", "/dashboard/refills", "/dashboard/report", "/dashboard/revenue", "/dashboard/wallet", "/dashboard/calls",

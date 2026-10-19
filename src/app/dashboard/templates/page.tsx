@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "@/components/intent-link";
 import { Stat } from "@/components/ui";
 import { WhatsAppBubble } from "@/components/whatsapp-preview";
-import { DefaultImage } from "./default-image";
+
 import { TemplatePreview } from "./template-preview";
 import { db } from "@/lib/db";
 import { fmtNumber } from "@/lib/format";
@@ -53,7 +53,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
       ? [{ updatedAt: "desc" as const }, { createdAt: "desc" as const }]
       : [{ createdAt: "desc" as const }, { id: "desc" as const }];
 
-  const [templatesAll, counts, statusCounts, brand] = await Promise.all([
+  const [templatesAll, counts, statusCounts] = await Promise.all([
     db.template.findMany({
       where: { ...owned(scope), ...(active ? { category: active } : {}), ...qFilter, ...stFilter, ...lgFilter, ...fmFilter },
       include: { _count: { select: { campaigns: true } }, client: { select: { name: true, defaultImageUrl: true, bannerUrl: true } } },
@@ -62,7 +62,6 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
     db.template.groupBy({ by: ["category"], where: owned(scope), _count: true }),
     // For the totals: every template's status, whatever the filters.
     db.template.groupBy({ by: ["status"], where: owned(scope), _count: true }),
-    scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { defaultImageUrl: true, bannerUrl: true } }) : null,
   ]);
   // Format "Text" / "Interactive" depends on the buttons, so it's applied here.
   const hasButtons = (t: { buttons: unknown }) => Array.isArray(t.buttons) && t.buttons.length > 0;
@@ -158,11 +157,7 @@ export default async function TemplatesPage({ searchParams }: PageProps<"/dashbo
         )}
       </form>
 
-      {scope.canManage && brand && (
-        <div style={{ marginBottom: 16 }}>
-          <DefaultImage url={brand.defaultImageUrl} fallback={brand.bannerUrl} />
-        </div>
-      )}
+      {/* The default picture for image templates is account setup: Settings › Data and connections. */}
 
       {templates.length ? (
         <div className="grid g3">
