@@ -11,6 +11,7 @@ import { T, useLang } from "../portal-ui";
 import { DEFAULT_FLOW, flowHas, flowPacks, flowSteps, isCodOrder, isConfirmedOrLater, isPaidOrder, orderStage, readFlow, stepLabel, type OrderFlowKey } from "@/lib/order-flow";
 import { getOrderPricing, pointsDiscount } from "@/lib/order-pricing";
 import { orderRef, type OrderItem } from "@/lib/order-ref";
+import { dayStartIST } from "@/lib/filters";
 import { createOrder, lookupOrderCustomer } from "../actions/orders";
 import { OrderCard, type OrderCardData } from "./order-card";
 import type { CatalogProductOption } from "./order-items-editor";
@@ -38,6 +39,7 @@ export type OrdersViewProps = {
   initialShow?: string;
   initialPay?: string;
   initialSrc?: string;
+  initialDate?: string;
   initialQ?: string;
   initialTab?: "orders" | "pack";
 };
@@ -59,6 +61,7 @@ export function OrdersView({
   initialShow = "all",
   initialPay = "all",
   initialSrc = "all",
+  initialDate = "all",
   initialQ = "",
   initialTab = "orders",
 }: OrdersViewProps) {
@@ -73,6 +76,7 @@ export function OrdersView({
   const [payFilter, setPayFilter] = useState<string>(initialPay);
   // "chat" was an old option that matched the same orders as "catalogue"; old links fall back to everything.
   const [srcFilter, setSrcFilter] = useState<string>(initialSrc === "chat" ? "all" : initialSrc);
+  const [dateFilter, setDateFilter] = useState<string>(initialDate);
   const [query, setQuery] = useState<string>(initialQ);
   const [exportOpen, setExportOpen] = useState(false);
 
@@ -134,17 +138,81 @@ export function OrdersView({
   const preDispatch = (o: OrderCardData) => o.status === "NEW" || o.status === "CONFIRMED" || o.status === "PAID";
   const toPack = (o: OrderCardData) => isConfirmedOrLater(o) && preDispatch(o) && !o.packedAt;
 
-  const allCount = initialOrders.length;
-  const newCount = initialOrders.filter((o) => stageIs(o, "RECEIVED")).length;
-  const paymentCount = initialOrders.filter((o) => stageIs(o, "PAYMENT")).length;
-  const verifyCount = initialOrders.filter((o) => stageIs(o, "VERIFY")).length;
-  const confirmedCount = initialOrders.filter((o) => stageIs(o, "CONFIRMED")).length;
-  const packedCount = initialOrders.filter((o) => o.packedAt != null && preDispatch(o)).length;
-  const dispatchedCount = initialOrders.filter((o) => o.status === "DISPATCHED").length;
-  const deliveredCount = initialOrders.filter((o) => o.status === "DELIVERED").length;
-  const cancelledCount = initialOrders.filter((o) => o.status === "CANCELLED").length;
+  // Date filter helper (matches against order received timestamp o.createdAt in Asia/Kolkata)
+  const isDateMatch = (createdAt: Date | string, range: string) => {
+    if (!range || range === "all") return true;
+    const d = new Date(createdAt);
+    if (isNaN(d.getTime())) return true;
+    const now = new Date();
+    const today = dayStartIST(now);
+    const orderDay = dayStartIST(d);
+    const orderTime = d.getTime();
 
-  const unpaidOrders = initialOrders.filter(
+    switch (range) {
+      case "today":
+        return orderDay.getTime() === today.getTime();
+      case "yesterday": {
+        const yesterday = new Date(today.getTime() - 86400000);
+        return orderDay.getTime() === yesterday.getTime();
+      }
+      case "7d": {
+        const sevenDaysAgo = new Date(today.getTime() - 6 * 86400000);
+        return orderTime >= sevenDaysAgo.getTime();
+      }
+      case "30d": {
+        const thirtyDaysAgo = new Date(today.getTime() - 29 * 86400000);
+        return orderTime >= thirtyDaysAgo.getTime();
+      }
+      case "month": {
+        const monthStart = dayStartIST(new Date(now.getFullYear(), now.getMonth(), 1));
+        return orderTime >= monthStart.getTime();
+      }
+      case "lastmonth": {
+        const lastMonthStart = dayStartIST(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+        const thisMonthStart = dayStartIST(new Date(now.getFullYear(), now.getMonth(), 1));
+        return orderTime >= lastMonthStart.getTime() && orderTime < thisMonthStart.getTime();
+      }
+      default:
+        return true;
+    }
+  };
+
+  // Filtered orders for "orders" panel
+  const qClean = query.trim().toLowerCase();
+
+  // 1. Base filtered orders (respects Date received, Source, and Search query)
+  // This ensures top stats and chip counts respect the active date, source, and search filters!
+  const baseFilteredOrders = initialOrders.filter((o) => {
+    // Date filter: when order was received
+    if (!isDateMatch(o.createdAt, dateFilter)) return false;
+
+    // Source filter
+    const fromCampaign = !!o.waMessageId && !!o.internalNote && /campaign/i.test(o.internalNote);
+    if (srcFilter === "cat" && (!o.waMessageId || fromCampaign)) return false;
+    if (srcFilter === "camp" && !fromCampaign) return false;
+    if (srcFilter === "manual" && o.waMessageId) return false;
+
+    // Search query filter
+    if (qClean) {
+      const itemsStr = (o.items as OrderItem[]).map((i) => i.name ?? i.id).join(" ");
+      const combined = `${o.number} ${orderRef(o)} ${o.customer.name} ${o.customer.phone} ${itemsStr} ${o.note ?? ""} ${o.internalNote ?? ""} ${o.paymentUtr ?? ""} ${o.paymentTxnId ?? ""}`.toLowerCase();
+      if (!combined.includes(qClean)) return false;
+    }
+
+    return true;
+  });
+
+  const allCount = baseFilteredOrders.length;
+  const newCount = baseFilteredOrders.filter((o) => stageIs(o, "RECEIVED")).length;
+  const paymentCount = baseFilteredOrders.filter((o) => stageIs(o, "PAYMENT")).length;
+  const verifyCount = baseFilteredOrders.filter((o) => stageIs(o, "VERIFY")).length;
+  const confirmedCount = baseFilteredOrders.filter((o) => stageIs(o, "CONFIRMED")).length;
+  const packedCount = baseFilteredOrders.filter((o) => o.packedAt != null && preDispatch(o)).length;
+  const dispatchedCount = baseFilteredOrders.filter((o) => o.status === "DISPATCHED").length;
+  const deliveredCount = baseFilteredOrders.filter((o) => o.status === "DELIVERED").length;
+  const cancelledCount = baseFilteredOrders.filter((o) => o.status === "CANCELLED").length;
+
+  const unpaidOrders = baseFilteredOrders.filter(
     (o) => o.status !== "CANCELLED" && !isOrderPaid(o) && !isOrderCod(o),
   );
   const waitingSum = unpaidOrders.reduce((sum, o) => {
@@ -155,11 +223,10 @@ export function OrdersView({
     return sum + p.total;
   }, 0);
 
-  const toPackCount = initialOrders.filter(toPack).length;
+  const toPackCount = baseFilteredOrders.filter(toPack).length;
 
-  // Filtered orders for "orders" panel
-  const qClean = query.trim().toLowerCase();
-  const filteredOrders = initialOrders.filter((o) => {
+  // 2. Final filtered orders (also applies Status tab 'show' and Payment dropdown 'payFilter')
+  const filteredOrders = baseFilteredOrders.filter((o) => {
     // Step filter
     if (show === "new" && !stageIs(o, "RECEIVED")) return false;
     if (show === "payment" && !stageIs(o, "PAYMENT")) return false;
@@ -181,21 +248,6 @@ export function OrdersView({
     if (payFilter === "sent" && (isOrderPaid(o) || o.paymentRequestedAt == null)) return false;
     if (payFilter === "paid" && !isOrderPaid(o)) return false;
     if (payFilter === "cod" && !isOrderCod(o)) return false;
-
-    // Source dropdown filter
-    // Same three sources the order card shows: a WhatsApp cart is "Campaign" when it came after a campaign
-    // message, otherwise "Catalogue"; anything without a WhatsApp cart was entered by hand.
-    const fromCampaign = !!o.waMessageId && !!o.internalNote && /campaign/i.test(o.internalNote);
-    if (srcFilter === "cat" && (!o.waMessageId || fromCampaign)) return false;
-    if (srcFilter === "camp" && !fromCampaign) return false;
-    if (srcFilter === "manual" && o.waMessageId) return false;
-
-    // Search query filter
-    if (qClean) {
-      const itemsStr = (o.items as OrderItem[]).map((i) => i.name ?? i.id).join(" ");
-      const combined = `${o.number} ${orderRef(o)} ${o.customer.name} ${o.customer.phone} ${itemsStr} ${o.note ?? ""} ${o.internalNote ?? ""} ${o.paymentUtr ?? ""} ${o.paymentTxnId ?? ""}`.toLowerCase();
-      if (!combined.includes(qClean)) return false;
-    }
 
     return true;
   });
@@ -461,6 +513,23 @@ export function OrdersView({
               />
             </div>
 
+            {/* Date filter dropdown */}
+            <select
+              id="fd"
+              aria-label={isTa ? "ஆர்டர் வந்த தேதி" : "Order received date"}
+              style={{ width: "auto" }}
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+            >
+              <option value="all">{isTa ? "தேதி: அனைத்தும்" : "Date: all time"}</option>
+              <option value="today">{isTa ? "தேதி: இன்று" : "Date: today"}</option>
+              <option value="yesterday">{isTa ? "தேதி: நேற்று" : "Date: yesterday"}</option>
+              <option value="7d">{isTa ? "தேதி: கடந்த 7 நாட்கள்" : "Date: last 7 days"}</option>
+              <option value="30d">{isTa ? "தேதி: கடந்த 30 நாட்கள்" : "Date: last 30 days"}</option>
+              <option value="month">{isTa ? "தேதி: இந்த மாதம்" : "Date: this month"}</option>
+              <option value="lastmonth">{isTa ? "தேதி: கடந்த மாதம்" : "Date: last month"}</option>
+            </select>
+
             <select
               id="fp"
               aria-label="Payment status"
@@ -564,6 +633,29 @@ export function OrdersView({
             {SPECIAL_SHOW[show] && (
               <button type="button" className="chip" aria-pressed onClick={() => setShow("all")} aria-label={isTa ? "இந்த வடிகட்டியை நீக்கு" : "Clear this filter"}>
                 {isTa ? SPECIAL_SHOW[show][1] : SPECIAL_SHOW[show][0]} <small>{filteredOrders.length}</small> <span aria-hidden>×</span>
+              </button>
+            )}
+            {dateFilter !== "all" && (
+              <button
+                type="button"
+                className="chip"
+                aria-pressed
+                onClick={() => setDateFilter("all")}
+                aria-label={isTa ? "தேதி வடிகட்டியை நீக்கு" : "Clear date filter"}
+              >
+                {dateFilter === "today"
+                  ? isTa ? "தேதி: இன்று" : "Date: Today"
+                  : dateFilter === "yesterday"
+                  ? isTa ? "தேதி: நேற்று" : "Date: Yesterday"
+                  : dateFilter === "7d"
+                  ? isTa ? "தேதி: கடந்த 7 நாட்கள்" : "Date: Last 7 days"
+                  : dateFilter === "30d"
+                  ? isTa ? "தேதி: கடந்த 30 நாட்கள்" : "Date: Last 30 days"
+                  : dateFilter === "month"
+                  ? isTa ? "தேதி: இந்த மாதம்" : "Date: This month"
+                  : dateFilter === "lastmonth"
+                  ? isTa ? "தேதி: கடந்த மாதம்" : "Date: Last month"
+                  : `Date: ${dateFilter}`} <span aria-hidden>×</span>
               </button>
             )}
             <button

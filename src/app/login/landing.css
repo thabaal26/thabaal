@@ -71,6 +71,12 @@
   transition: transform 0.2s ease;
 }
 
+.site-header-brand img {
+  height: 38px;
+  width: auto;
+  object-fit: contain;
+}
+
 .site-header-brand:hover {
   transform: scale(1.02);
 }
@@ -1152,9 +1158,11 @@
 }
 
 .footer-brand .footer-logo {
-  width: 140px;
-  height: auto;
+  height: 42px;
+  width: auto;
+  max-width: 170px;
   display: block;
+  object-fit: contain;
 }
 
 .footer-brand p {

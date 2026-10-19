@@ -26,6 +26,7 @@ export default async function OrdersPage({
   const initialShow = typeof sp.show === "string" ? sp.show : "all";
   const initialPay = typeof sp.pay === "string" ? sp.pay : "all";
   const initialSrc = typeof sp.src === "string" ? sp.src : "all";
+  const initialDate = typeof sp.range === "string" ? sp.range : typeof sp.date === "string" ? sp.date : "all";
   // Product pages link here with ?product=<name>; it searches the order lines for that product.
   const initialQ = typeof sp.q === "string" ? sp.q : typeof sp.product === "string" ? sp.product : "";
 
@@ -140,6 +141,7 @@ export default async function OrdersPage({
         initialShow={initialShow}
         initialPay={initialPay}
         initialSrc={initialSrc}
+        initialDate={initialDate}
         initialQ={initialQ}
       />
     </PortalPage>

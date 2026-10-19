@@ -13,6 +13,7 @@ import { fmtDate } from "@/lib/format";
 import { canUndoPayment, dueOf, paymentState, receivedOf, slipPay } from "@/lib/payment-state";
 import { openPrintablePdfWindow } from "./packing/print-button";
 import { inr } from "../portal-format";
+import { Clock } from "@/components/icons";
 import { T, useLang } from "../portal-ui";
 import { getOrderPricing, pointsDiscount } from "@/lib/order-pricing";
 import { orderRef, type OrderItem } from "@/lib/order-ref";
@@ -594,7 +595,7 @@ export function OrderCard({
   // Timeline: one line per step, with when it happened.
   const payRef = o.paymentUtr ? `UTR ${o.paymentUtr}` : o.paymentTxnId ? `Ref: ${o.paymentTxnId}` : "";
   const timelineEvents: [string, string | null][] = [
-    ["Order received", when(o.createdAt)],
+    ["Order received", fmtDate(new Date(o.createdAt), "EEE, d MMM yyyy, h:mm a")],
     ...(o.status === "CANCELLED"
       ? [["Cancelled", o.internalNote ? `Cancelled · ${o.internalNote}` : "Cancelled"] as [string, string | null]]
       : [
@@ -668,6 +669,27 @@ export function OrderCard({
               </span>
             )}
           </h2>
+
+          {/* Received date & time timestamp */}
+          <div
+            style={{
+              marginTop: 4,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 12.5,
+              color: "var(--muted)",
+            }}
+          >
+            <Clock className="size-3.5 shrink-0 opacity-70" />
+            <span>{isTa ? "ஆர்டர் வந்தது:" : "Received:"}</span>
+            <time
+              dateTime={new Date(o.createdAt).toISOString()}
+              style={{ fontWeight: 600, color: "var(--fg)" }}
+            >
+              {fmtDate(new Date(o.createdAt), "EEE, d MMM yyyy, h:mm a")}
+            </time>
+          </div>
 
           {/* Items shortlist & drop button */}
           <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -905,7 +927,14 @@ export function OrderCard({
           {steps.map((f, i) => (
             <Fragment key={f.key}>
               {i > 0 && <span style={{ opacity: 0.45, margin: "0 3px", fontSize: 13, userSelect: "none" }}>›</span>}
-              <b className={i <= reached ? "on" : undefined}>{isTa ? f.ta : f.label}</b>
+              <b className={i <= reached ? "on" : undefined}>
+                {isTa ? f.ta : f.label}
+                {f.key === "RECEIVED" && (
+                  <span style={{ fontWeight: 400, opacity: 0.75, marginLeft: 4, fontSize: 11.5 }}>
+                    ({fmtDate(new Date(o.createdAt), "d MMM, h:mm a")})
+                  </span>
+                )}
+              </b>
             </Fragment>
           ))}
         </div>

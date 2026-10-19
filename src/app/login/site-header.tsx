@@ -20,21 +20,21 @@ export function SiteHeader({ lang, onToggleLang, onSelectLang }: SiteHeaderProps
   return (
     <header className="site-header" role="banner">
       <div className="site-header-container">
-        {/* Brand Logo */}
+        {/* Brand Logo with Carrier Bird */}
         <a href="#top" className="site-header-brand" aria-label={ta ? "தபால் முகப்பு" : "Thabaal home"}>
           <Image
-            src="/brands/thabaal/w-day.png"
+            src={ta ? "/brands/thabaal/thabaal-logo-ta.png" : "/brands/thabaal/thabaal-logo-en.png"}
             alt="Thabaal"
-            width={136}
-            height={38}
+            width={154}
+            height={52}
             className="site-header-logo-day"
             priority
           />
           <Image
-            src="/brands/thabaal/w-night.png"
+            src={ta ? "/brands/thabaal/thabaal-logo-ta-dark.png" : "/brands/thabaal/thabaal-logo-en-dark.png"}
             alt="Thabaal"
-            width={136}
-            height={38}
+            width={154}
+            height={52}
             className="site-header-logo-night"
             priority
           />

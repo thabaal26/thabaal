@@ -527,10 +527,10 @@ export function LandingSections({ lang }: { lang: Lang }) {
           <div className="footer-top">
             <div className="footer-brand">
               <Image
-                src="/brands/thabaal/w-night.png"
+                src={ta ? "/brands/thabaal/thabaal-logo-ta-dark.png" : "/brands/thabaal/thabaal-logo-en-dark.png"}
                 alt="Thabaal"
-                width={140}
-                height={39}
+                width={154}
+                height={52}
                 className="footer-logo"
               />
               <p>
