@@ -1,34 +1,97 @@
 /* ─────────────────────────────────────────────────────────────────────────
-   Thabaal Universal Motion & Hardware-Acceleration Styles
+   Thabaal Universal Motion & Hardware-Acceleration Styles (60–120 FPS Native)
+   Compositor-only transitions without 3D context bloat or main-thread locking
    ───────────────────────────────────────────────────────────────────────── */
 
-.thabaal-reveal,
-.thabaal-stagger-item,
+.thabaal-stagger-group {
+  contain: layout style;
+}
+
+.thabaal-stagger-item {
+  contain: layout style;
+  opacity: 0;
+  transform: translate3d(0, var(--stagger-dist, 14px), 0) scale(0.99);
+  transition: opacity var(--stagger-dur, 420ms) cubic-bezier(0.22, 1, 0.36, 1),
+              transform var(--stagger-dur, 420ms) cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--stagger-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+/* Initial state if already marked done or if motion is disabled */
+.thabaal-stagger-group[data-stagger-group="active"] .thabaal-stagger-item,
+.thabaal-stagger-item[data-stagger-item="active"] {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+/* Post-reveal: Clean up all transforms and will-change to release GPU memory & prevent clipping */
+.thabaal-stagger-group[data-stagger-group="done"] .thabaal-stagger-item,
+.thabaal-stagger-item[data-stagger-item="done"] {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+  will-change: auto !important;
+}
+
+/* Single ScrollReveal */
+.thabaal-reveal {
+  contain: layout style;
+  opacity: 0;
+  transition: opacity var(--reveal-dur, 450ms) cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms),
+              transform var(--reveal-dur, 450ms) cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+.thabaal-reveal[data-reveal="active"] {
+  opacity: 1 !important;
+  transform: translate3d(0, 0, 0) !important;
+}
+
+.thabaal-reveal[data-reveal="done"] {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+  will-change: auto !important;
+}
+
+/* Section Reveal */
 .thabaal-section-reveal {
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  transform-style: preserve-3d;
+  contain: layout style;
+  opacity: 0;
+  transform: translate3d(0, var(--section-dist, 20px), 0) scale(0.99);
+  transition: opacity var(--section-dur, 550ms) cubic-bezier(0.16, 1, 0.3, 1) var(--section-delay, 0ms),
+              transform var(--section-dur, 550ms) cubic-bezier(0.16, 1, 0.3, 1) var(--section-delay, 0ms);
+  will-change: opacity, transform;
 }
 
+.thabaal-section-reveal[data-section="active"] {
+  opacity: 1 !important;
+  transform: translate3d(0, 0, 0) scale(1) !important;
+}
+
+.thabaal-section-reveal[data-section="done"] {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+  will-change: auto !important;
+}
+
+/* Parallax Layer */
 .thabaal-parallax-layer {
+  contain: layout style;
   pointer-events: auto;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
+  will-change: transform;
 }
 
-/* Strict prefers-reduced-motion protection (Law 5 & Accessibility) */
+/* Strict prefers-reduced-motion protection */
 @media (prefers-reduced-motion: reduce) {
   .thabaal-reveal,
   .thabaal-stagger-item,
-  .thabaal-section-reveal {
+  .thabaal-section-reveal,
+  .thabaal-parallax-layer {
     opacity: 1 !important;
     transform: none !important;
     transition: none !important;
-    will-change: auto !important;
-  }
-
-  .thabaal-parallax-layer {
-    transform: none !important;
     will-change: auto !important;
   }
 }

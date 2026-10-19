@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 
 /**
  * Hook to detect if the user has requested reduced motion.
@@ -45,19 +45,31 @@ export function useIsMobile(): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Shared Batched rAF Scroll Engine for Parallax (Single Listener for all layers)
+// 60–120 FPS High-Performance Cached Parallax Engine (Zero Layout Thrashing)
 // ---------------------------------------------------------------------------
 
 type ParallaxSubscriber = {
   element: HTMLElement;
   speed: number;
   clamped: number;
+  cachedDocTop: number;
+  cachedHeight: number;
 };
 
 const subscribers = new Set<ParallaxSubscriber>();
 let rafId: number | null = null;
 let listenerAttached = false;
 let isScrollTicking = false;
+
+function refreshSubscriberMetrics() {
+  if (typeof window === "undefined") return;
+  const scrollY = window.scrollY || window.pageYOffset || 0;
+  subscribers.forEach((sub) => {
+    const rect = sub.element.getBoundingClientRect();
+    sub.cachedDocTop = rect.top + scrollY;
+    sub.cachedHeight = rect.height;
+  });
+}
 
 function onGlobalScroll() {
   if (isScrollTicking) return;
@@ -69,18 +81,20 @@ function onGlobalScroll() {
 }
 
 function updateAllParallaxLayers() {
-  if (subscribers.size === 0) return;
+  if (subscribers.size === 0 || typeof window === "undefined") return;
   const vh = window.innerHeight || 800;
   const isMobile = window.innerWidth < 768;
   const mobileScale = isMobile ? 0.45 : 1.0;
+  const scrollY = window.scrollY || window.pageYOffset || 0;
 
-  subscribers.forEach(({ element, speed, clamped }) => {
-    const rect = element.getBoundingClientRect();
-    // Only calculate and transform if the layer is within or near the viewport
-    if (rect.bottom < -100 || rect.top > vh + 100) return;
+  subscribers.forEach(({ element, speed, clamped, cachedDocTop, cachedHeight }) => {
+    // Pure arithmetic calculation using cached document position - ZERO layout thrashing!
+    const elementViewportTop = cachedDocTop - scrollY;
+    // Skip calculations if well outside the viewport
+    if (elementViewportTop + cachedHeight < -80 || elementViewportTop > vh + 80) return;
 
     // Center offset relative to viewport center
-    const centerOffset = rect.top + rect.height / 2 - vh / 2;
+    const centerOffset = elementViewportTop + cachedHeight / 2 - vh / 2;
     const rawOffset = centerOffset * speed * mobileScale;
     const maxOffset = clamped * mobileScale;
     const safeOffset = Math.max(-maxOffset, Math.min(maxOffset, rawOffset));
@@ -90,25 +104,43 @@ function updateAllParallaxLayers() {
 }
 
 export function registerParallaxLayer(element: HTMLElement, speed: number, clamped: number): () => void {
-  const sub: ParallaxSubscriber = { element, speed, clamped };
+  const sub: ParallaxSubscriber = {
+    element,
+    speed,
+    clamped,
+    cachedDocTop: 0,
+    cachedHeight: 0,
+  };
   subscribers.add(sub);
 
+  const measureAndScroll = () => {
+    refreshSubscriberMetrics();
+    onGlobalScroll();
+  };
+
   if (!listenerAttached && typeof window !== "undefined") {
-    // Law 8: Use capture + passive to catch scrolls on window OR internal containers
-    window.addEventListener("scroll", onGlobalScroll, { passive: true, capture: true });
-    window.addEventListener("resize", onGlobalScroll, { passive: true });
+    window.addEventListener("scroll", onGlobalScroll, { passive: true });
+    window.addEventListener("resize", measureAndScroll, { passive: true });
     listenerAttached = true;
   }
 
-  // Trigger initial frame
-  onGlobalScroll();
+  // Measure asynchronously on next animation frame (NEVER synchronously during React mount!)
+  if (typeof window !== "undefined") {
+    requestAnimationFrame(() => {
+      const scrollY = window.scrollY || window.pageYOffset || 0;
+      const rect = element.getBoundingClientRect();
+      sub.cachedDocTop = rect.top + scrollY;
+      sub.cachedHeight = rect.height;
+      onGlobalScroll();
+    });
+  }
 
   return () => {
     subscribers.delete(sub);
     element.style.transform = "";
     if (subscribers.size === 0 && listenerAttached) {
-      window.removeEventListener("scroll", onGlobalScroll, { capture: true });
-      window.removeEventListener("resize", onGlobalScroll);
+      window.removeEventListener("scroll", onGlobalScroll);
+      window.removeEventListener("resize", measureAndScroll);
       listenerAttached = false;
       if (rafId) {
         cancelAnimationFrame(rafId);

@@ -399,7 +399,8 @@ tbody > tr {
   contain-intrinsic-size: auto 56px;
 }
 
-.chat-wall ol > li {
+.chat-wall ol > li,
+.stack > * {
   contain: layout style;
 }
 

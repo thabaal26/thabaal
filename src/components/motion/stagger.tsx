@@ -4,7 +4,7 @@ import React, { createContext, useContext, useEffect, useRef, useState, ElementT
 import { useReducedMotion, useIsMobile } from "./use-motion";
 
 interface StaggerContextType {
-  isTriggered: boolean;
+  motionState: "idle" | "active" | "done";
   staggerMs: number;
   maxDelayMs: number;
   registerItem: () => number;
@@ -26,8 +26,8 @@ export function StaggerGroup({
   as: Component = "div",
   staggerMs,
   maxDelayMs = 450,
-  threshold = 0.1,
-  rootMargin = "0px 0px -30px 0px",
+  threshold = 0.05,
+  rootMargin = "0px 0px -20px 0px",
   disabled = false,
   className = "",
   style,
@@ -37,14 +37,15 @@ export function StaggerGroup({
   const reducedMotion = useReducedMotion();
   const isMobile = useIsMobile();
   const containerRef = useRef<HTMLElement | null>(null);
-  const [isTriggered, setIsTriggered] = useState(() => disabled || reducedMotion);
+  const [motionState, setMotionState] = useState<"idle" | "active" | "done">(() =>
+    disabled || reducedMotion ? "done" : "idle"
+  );
 
-  const defaultStagger = isMobile ? 45 : 75;
+  const defaultStagger = isMobile ? 35 : 55;
   const effectiveStaggerMs = staggerMs !== undefined ? staggerMs : defaultStagger;
 
   // Counter to automatically assign sequential indices to child StaggerItems
   const itemCounterRef = useRef(0);
-  // Reset counter on re-render so indices remain deterministic
   itemCounterRef.current = 0;
 
   const registerItem = () => {
@@ -55,35 +56,31 @@ export function StaggerGroup({
 
   useEffect(() => {
     if (disabled || reducedMotion) {
-      setIsTriggered(true);
+      setMotionState("done");
       return;
     }
 
     const node = containerRef.current;
     if (!node) return;
 
-    // Fail-safe guarantee (Law 5): Content is never stuck hidden
+    // Fail-safe guarantee: Content is never stuck hidden
     const failSafeTimer = setTimeout(() => {
-      setIsTriggered(true);
-    }, 1200);
+      setMotionState("done");
+    }, 950);
 
-    // Immediate viewport check
-    const rect = node.getBoundingClientRect();
-    const inViewport =
-      rect.top < (window.innerHeight || document.documentElement.clientHeight) &&
-      rect.bottom > 0;
-
-    if (inViewport) {
-      setIsTriggered(true);
-      clearTimeout(failSafeTimer);
-      return;
-    }
+    let doneTimer: NodeJS.Timeout | null = null;
 
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
-          setIsTriggered(true);
+          setMotionState("active");
           observer.disconnect();
+
+          // After max delay + animation duration, switch to "done"
+          // This cleans up all transitions/transforms so dropdowns and popups work 100% without clipping!
+          doneTimer = setTimeout(() => {
+            setMotionState("done");
+          }, maxDelayMs + 450);
         }
       },
       { threshold, rootMargin }
@@ -93,14 +90,15 @@ export function StaggerGroup({
 
     return () => {
       clearTimeout(failSafeTimer);
+      if (doneTimer) clearTimeout(doneTimer);
       observer.disconnect();
     };
-  }, [disabled, reducedMotion, threshold, rootMargin]);
+  }, [disabled, reducedMotion, threshold, rootMargin, maxDelayMs]);
 
   return (
     <StaggerContext.Provider
       value={{
-        isTriggered,
+        motionState,
         staggerMs: effectiveStaggerMs,
         maxDelayMs,
         registerItem,
@@ -108,6 +106,7 @@ export function StaggerGroup({
     >
       <Component
         ref={containerRef as any}
+        data-stagger-group={motionState}
         className={`thabaal-stagger-group ${className}`}
         style={style}
         {...rest}
@@ -129,7 +128,7 @@ export interface StaggerItemProps extends React.HTMLAttributes<HTMLElement> {
 export function StaggerItem({
   as: Component = "div",
   index: explicitIndex,
-  duration = 500,
+  duration = 420,
   distance,
   className = "",
   style,
@@ -139,72 +138,34 @@ export function StaggerItem({
   const context = useContext(StaggerContext);
   const reducedMotion = useReducedMotion();
   const isMobile = useIsMobile();
-  const [assignedIndex] = useState(() =>
-    explicitIndex !== undefined ? explicitIndex : (context ? context.registerItem() : 0)
-  );
+  const indexRef = useRef<number | null>(null);
 
-  const idx = explicitIndex !== undefined ? explicitIndex : assignedIndex;
-  const isTriggered = context ? context.isTriggered : true;
-  const staggerMs = context ? context.staggerMs : (isMobile ? 45 : 75);
+  if (indexRef.current === null) {
+    indexRef.current = explicitIndex !== undefined ? explicitIndex : (context ? context.registerItem() : 0);
+  }
+
+  const idx = explicitIndex !== undefined ? explicitIndex : (indexRef.current ?? 0);
+  const staggerMs = context ? context.staggerMs : (isMobile ? 35 : 55);
   const maxDelay = context ? context.maxDelayMs : 450;
+  const delay = Math.min(idx * staggerMs, maxDelay);
+  const effectiveDistance = distance !== undefined ? distance : (isMobile ? 10 : 16);
 
-  const defaultDistance = isMobile ? 12 : 18;
-  const effectiveDistance = distance !== undefined ? distance : defaultDistance;
+  const motionState = context ? context.motionState : (reducedMotion ? "done" : "active");
+  const isDone = motionState === "done" || reducedMotion;
 
-  // Calculate capped delay
-  const computedDelay = Math.min(idx * staggerMs, maxDelay);
-
-  // Status: "idle" -> "animating" -> "done"
-  const [status, setStatus] = useState<"idle" | "animating" | "done">(() =>
-    reducedMotion ? "done" : "idle"
-  );
-
-  useEffect(() => {
-    if (reducedMotion) {
-      setStatus("done");
-      return;
-    }
-
-    if (isTriggered) {
-      const enterTimer = setTimeout(() => {
-        setStatus("animating");
-      }, computedDelay);
-
-      const cleanupTimer = setTimeout(() => {
-        // Law 7: Clean up transform once animation finishes so dropdowns & popovers are never clipped
-        setStatus("done");
-      }, computedDelay + duration + 50);
-
-      return () => {
-        clearTimeout(enterTimer);
-        clearTimeout(cleanupTimer);
-      };
-    }
-  }, [isTriggered, computedDelay, duration, reducedMotion]);
-
-  const isIdle = status === "idle";
-  const isAnimating = status === "animating";
-  const isDone = status === "done";
-
-  const getTransform = () => {
-    if (isDone || reducedMotion) return "none";
-    if (isAnimating) return "translate3d(0, 0, 0) scale(1)";
-    return `translate3d(0, ${effectiveDistance}px, 0) scale(0.985)`;
-  };
-
+  // GPU compositor friendly styles using CSS custom properties - 0 React re-renders!
   const computedStyle: React.CSSProperties = {
     ...style,
-    opacity: isIdle ? 0 : 1,
-    transform: getTransform(),
-    transition: isDone
-      ? style?.transition || "none"
-      : `opacity ${duration}ms cubic-bezier(0.22, 1, 0.36, 1), transform ${duration}ms cubic-bezier(0.22, 1, 0.36, 1)`,
-    willChange: isAnimating ? "opacity, transform" : style?.willChange || "auto",
+    ["--stagger-delay" as string]: `${delay}ms`,
+    ["--stagger-dur" as string]: `${duration}ms`,
+    ["--stagger-dist" as string]: `${effectiveDistance}px`,
+    ...(isDone ? { transform: "none", willChange: "auto", transition: style?.transition || "none" } : {}),
   };
 
   return (
     <Component
       className={`thabaal-stagger-item ${className}`}
+      data-stagger-item={motionState}
       style={computedStyle}
       {...rest}
     >

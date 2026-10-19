@@ -1305,6 +1305,19 @@
   }
 }
 
+/* ── 60–120 FPS High-Refresh Scroll Optimization & Virtualization ── */
+.workspace-section,
+.demo-section,
+.steps-section,
+.use-case-section,
+.pricing-section,
+.faq-section,
+.final-cta-section {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 650px;
+  contain: layout style;
+}
+
 /* ── Motion Safety ── */
 @media (prefers-reduced-motion: reduce) {
   .feature-card,

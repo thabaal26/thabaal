@@ -22,10 +22,10 @@ export function ScrollReveal({
   as: Component = "div",
   direction = "up",
   distance,
-  duration = 550,
+  duration = 420,
   delay = 0,
-  threshold = 0.12,
-  rootMargin = "0px 0px -30px 0px",
+  threshold = 0.05,
+  rootMargin = "0px 0px -20px 0px",
   once = true,
   disabled = false,
   className = "",
@@ -37,69 +37,41 @@ export function ScrollReveal({
   const isMobile = useIsMobile();
   const ref = useRef<HTMLElement | null>(null);
 
-  // Status: "idle" (hidden) -> "animating" -> "done" (cleared)
-  const [status, setStatus] = useState<"idle" | "animating" | "done">(() =>
+  const [motionState, setMotionState] = useState<"idle" | "active" | "done">(() =>
     disabled || reducedMotion ? "done" : "idle"
   );
 
-  const defaultDistance = isMobile ? 12 : 22;
+  const defaultDistance = isMobile ? 10 : 16;
   const effectiveDistance = distance !== undefined ? distance : defaultDistance;
 
   useEffect(() => {
     if (disabled || reducedMotion) {
-      setStatus("done");
+      setMotionState("done");
       return;
     }
 
     const node = ref.current;
     if (!node) return;
 
-    // Fail-safe visibility guarantee (Law 5): Content is never stuck hidden past 1200ms
+    // Fail-safe visibility guarantee: Never stuck hidden past 800ms
     const failSafeTimer = setTimeout(() => {
-      setStatus((s) => (s === "idle" ? "done" : s));
-    }, Math.max(1200, delay + duration + 400));
+      setMotionState("done");
+    }, Math.max(800, delay + duration + 300));
 
-    // Immediate viewport check on mount (Law 5)
-    const rect = node.getBoundingClientRect();
-    const inViewport =
-      rect.top < (window.innerHeight || document.documentElement.clientHeight) &&
-      rect.bottom > 0;
+    let doneTimer: NodeJS.Timeout | null = null;
 
-    if (inViewport) {
-      const enterTimer = setTimeout(() => {
-        setStatus("animating");
-      }, delay);
-
-      const cleanupTimer = setTimeout(() => {
-        setStatus("done");
-      }, delay + duration + 60);
-
-      return () => {
-        clearTimeout(failSafeTimer);
-        clearTimeout(enterTimer);
-        clearTimeout(cleanupTimer);
-      };
-    }
-
-    // IntersectionObserver for elements scrolled into view
     const observer = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
         if (entry.isIntersecting) {
-          const enterTimer = setTimeout(() => {
-            setStatus("animating");
-          }, delay);
+          setMotionState("active");
+          if (once) observer.disconnect();
 
-          const cleanupTimer = setTimeout(() => {
-            setStatus("done");
-            if (once) observer.disconnect();
-          }, delay + duration + 60);
-
-          if (once) {
-            observer.unobserve(entry.target);
-          }
+          doneTimer = setTimeout(() => {
+            setMotionState("done");
+          }, delay + duration + 30);
         } else if (!once) {
-          setStatus("idle");
+          setMotionState("idle");
         }
       },
       { threshold, rootMargin }
@@ -109,15 +81,13 @@ export function ScrollReveal({
 
     return () => {
       clearTimeout(failSafeTimer);
+      if (doneTimer) clearTimeout(doneTimer);
       observer.disconnect();
     };
   }, [disabled, reducedMotion, delay, duration, threshold, rootMargin, once]);
 
   // Compute transform offset based on direction
-  const getTransform = () => {
-    if (status === "done" || disabled || reducedMotion) return "none";
-    if (status === "animating") return "translate3d(0, 0, 0)";
-
+  const getInitialTransform = () => {
     switch (direction) {
       case "up":
         return `translate3d(0, ${effectiveDistance}px, 0)`;
@@ -133,24 +103,25 @@ export function ScrollReveal({
     }
   };
 
-  const isIdle = status === "idle";
-  const isAnimating = status === "animating";
-  const isDone = status === "done";
+  const isDone = motionState === "done" || disabled || reducedMotion;
+  const isActive = motionState === "active";
 
-  // Law 7: When done, transform and willChange are completely cleared to prevent stacking context bugs
   const computedStyle: React.CSSProperties = {
     ...style,
-    opacity: isIdle ? 0 : 1,
-    transform: getTransform(),
+    ["--reveal-dur" as string]: `${duration}ms`,
+    ["--reveal-delay" as string]: `${delay}ms`,
+    opacity: motionState === "idle" ? 0 : 1,
+    transform: isDone ? "none" : isActive ? "translate3d(0, 0, 0)" : getInitialTransform(),
     transition: isDone
       ? style?.transition || "none"
-      : `opacity ${duration}ms cubic-bezier(0.22, 1, 0.36, 1), transform ${duration}ms cubic-bezier(0.22, 1, 0.36, 1)`,
-    willChange: isAnimating ? "opacity, transform" : style?.willChange || "auto",
+      : `opacity ${duration}ms cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms, transform ${duration}ms cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms`,
+    willChange: isActive ? "opacity, transform" : style?.willChange || "auto",
   };
 
   return (
     <Component
       ref={ref as any}
+      data-reveal={motionState}
       className={`thabaal-reveal ${className}`}
       style={computedStyle}
       {...rest}
