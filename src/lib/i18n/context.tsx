@@ -56,10 +56,10 @@ interface LanguageContextType {
   t: (section: keyof typeof DICTIONARY, key: string, fallback?: string) => string;
 }
 
-const LanguageContext = createContext<LanguageContextType | null>(null);
+export const LanguageContext = createContext<LanguageContextType | null>(null);
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const lang = useSyncExternalStore(subscribeLang, getLangSnapshot, () => "en" as const);
+export function LanguageProvider({ initialLang = "en", children }: { initialLang?: Lang; children: ReactNode }) {
+  const lang = useSyncExternalStore(subscribeLang, getLangSnapshot, () => initialLang);
   const isTamil = lang === "ta";
   const isTa = isTamil;
 

@@ -24,8 +24,8 @@ function messagesLeftText(n: number) {
 
 function Header() {
   return (
-    <div className="hd">
-      <h2>
+    <div className="hd" suppressHydrationWarning>
+      <h2 suppressHydrationWarning>
         <T ta="வாட்ஸ்அப் வாலட்">WhatsApp wallet</T>
       </h2>
       <Link className="btn sm" href="/dashboard/report">
@@ -96,9 +96,9 @@ async function WalletBody({ clientId, isWallet, lowAlert, canManage }: { clientI
         </>
       ) : (
         <>
-          <div className="stat">
-            <div className="l">Spent on WhatsApp in {s.monthLabel}</div>
-            <div className="v">{money(s.totalMonthSpentWithGst)}</div>
+          <div className="stat" suppressHydrationWarning>
+            <div className="l" suppressHydrationWarning>Spent on WhatsApp in {s.monthLabel}</div>
+            <div className="v" suppressHydrationWarning>{money(s.totalMonthSpentWithGst)}</div>
           </div>
           <p className="muted small" style={{ marginTop: 10 }}>
             Incl. GST{s.liveSyncedFromMeta ? ", from Meta" : " (estimate)"}. {q.freeRemaining.toLocaleString("en-IN")} of {q.totalFreeLimit.toLocaleString("en-IN")} free replies left this month.
@@ -118,7 +118,7 @@ async function WalletBody({ clientId, isWallet, lowAlert, canManage }: { clientI
 
 function Unavailable() {
   return (
-    <section className="card">
+    <section className="card" suppressHydrationWarning>
       <Header />
       <p className="muted small">WhatsApp wallet couldn&apos;t be loaded just now.</p>
     </section>
@@ -127,9 +127,9 @@ function Unavailable() {
 
 function Loading() {
   return (
-    <section className="card" aria-busy="true">
+    <section className="card" aria-busy="true" suppressHydrationWarning>
       <Header />
-      <div className="stat">
+      <div className="stat" suppressHydrationWarning>
         <div className="l">Balance</div>
         <div className="v muted">…</div>
       </div>

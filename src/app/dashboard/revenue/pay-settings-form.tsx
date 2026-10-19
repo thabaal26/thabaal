@@ -95,8 +95,8 @@ export function HowCustomersPay({
   const off = !canManage || pending;
 
   return (
-    <section className="card">
-      <div className="hd">
+    <section className="card" suppressHydrationWarning>
+      <div className="hd" suppressHydrationWarning>
         <div>
           <h2><T ta="வாடிக்கையாளர்கள் பணம் செலுத்தும் முறை">How customers pay</T></h2>
           <p><T ta="நீங்கள் பயன்படுத்துவதை இயக்கவும். ஆர்டர்களும் பணமும் அதற்கேற்ப மாறும்.">Turn on what you use. Orders and Payments change to match.</T></p>
@@ -273,8 +273,8 @@ export function BankAccount({ settings }: { settings: PaySettings }) {
   const has = Boolean(settings.bankName || settings.bankLast4);
   const settleTa = SETTLEMENTS.find((s) => s.id === settings.settlement)?.ta;
   return (
-    <section className="card">
-      <div className="hd">
+    <section className="card" suppressHydrationWarning>
+      <div className="hd" suppressHydrationWarning>
         <div>
           <h2><T ta="வங்கிக் கணக்கு">Bank account</T></h2>
           <p><T ta="உங்கள் UPI பணம் வரும் இடம். நீங்கள் மட்டுமே இதைப் பார்க்க முடியும்.">Where your UPI money lands. Only you see this.</T></p>
@@ -363,8 +363,8 @@ export function ReminderRules({ settings, canManage }: { settings: PaySettings; 
   const [busy, setBusy] = useState<string | null>(null);
   const [, start] = useTransition();
   return (
-    <section className="card">
-      <div className="hd">
+    <section className="card" suppressHydrationWarning>
+      <div className="hd" suppressHydrationWarning>
         <div>
           <h2><T ta="நினைவூட்டல் விதிகள்">Reminder rules</T></h2>
           <p><T ta="ஒருமுறை அமைத்தால் போதும். தபால் உங்களுக்காகப் பணத்தை வசூலிக்க நினைவூட்டும்.">Set once. thabaal chases the money for you.</T></p>

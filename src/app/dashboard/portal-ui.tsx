@@ -7,12 +7,13 @@
  */
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useRef, useSyncExternalStore, useTransition, type ReactNode } from "react";
+import { useCallback, useContext, useRef, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { confirmAction } from "@/components/confirm";
 import { safeAction, toastResult } from "@/components/toast";
 import Link from "@/components/intent-link";
 import { PageTools } from "@/components/shell-tools";
 import { trNode } from "@/lib/i18n/phrases-ta";
+import { LanguageContext } from "@/lib/i18n/context";
 import "./portal.css";
 
 /* ── Language: the same choice as the sign-in page ("thabaal-lang"), per device ── */
@@ -38,7 +39,9 @@ function subscribeLang(cb: () => void) {
 }
 
 export function useLang(): Lang {
-  return useSyncExternalStore(subscribeLang, readLang, () => "en");
+  const ctx = useContext(LanguageContext);
+  const fallback = useSyncExternalStore(subscribeLang, readLang, () => "en");
+  return (ctx?.lang ?? fallback) as Lang;
 }
 
 export function setLang(l: Lang) {

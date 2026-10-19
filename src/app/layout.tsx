@@ -45,26 +45,24 @@ export const viewport: Viewport = {
 import { cookies } from "next/headers";
 import { LanguageProvider } from "@/lib/i18n/context";
 
-const INIT_SCRIPT = `${THEME_SCRIPT}\n(function(){try{var l=localStorage.getItem("thabaal-lang");if(l==="ta"||l==="en"){document.documentElement.lang=l;}}catch(e){}})();`;
+const INIT_SCRIPT = `${THEME_SCRIPT}\n(function(){try{var l=localStorage.getItem("thabaal-lang");if(l==="ta"||l==="en"){document.documentElement.lang=l;}}catch(e){}\ntry{var origSet=Element.prototype.setAttribute;Element.prototype.setAttribute=function(n,v){if(typeof n==="string"&&(n.indexOf("bis_")===0||n==="data-darkreader-inline-stroke"||n==="data-darkreader-inline-fill"))return;return origSet.apply(this,arguments);};}catch(e){}\ntry{var mo=new MutationObserver(function(muts){for(var i=0;i<muts.length;i++){var m=muts[i];if(m.type==="attributes"&&m.attributeName&&m.attributeName.indexOf("bis_")===0){m.target.removeAttribute(m.attributeName);}}});mo.observe(document.documentElement,{attributes:true,subtree:true,attributeFilter:["bis_skin_checked","bis_register"]});}catch(e){}})();`;
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  let lang = "en";
+  let lang: "en" | "ta" = "en";
   try {
     const store = await cookies();
     const c = store.get("thabaal-lang")?.value;
-    if (c === "ta" || c === "en") lang = c;
+    if (c === "ta" || c === "en") lang = c as "en" | "ta";
   } catch {}
 
   return (
     <html lang={lang} suppressHydrationWarning className={`${dmSans.variable} ${geistSans.variable} ${geistMono.variable} ${tamil.variable} ${nunito.variable} ${inter.variable} ${poppins.variable} h-full antialiased`}>
       <head>
-        {/* Sets light or dark and the page language before the first paint, from the saved choice or the device.
-            A plain inline script in <head>: React 19 renders it from the server only, so it never warns. A
-            <Script> or <script> inside <body> is rendered by a React component and logs "Encountered a script tag". */}
+        {/* Sets light or dark, page language, and strips extension-injected attributes (bis_skin_checked) before first paint. */}
         <script id="thabaal-init" dangerouslySetInnerHTML={{ __html: INIT_SCRIPT }} />
       </head>
       <body className="min-h-full font-sans" suppressHydrationWarning>
-        <LanguageProvider>
+        <LanguageProvider initialLang={lang}>
           {children}
         </LanguageProvider>
         <Toaster />

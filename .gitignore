@@ -50,3 +50,6 @@ next-env.d.ts
 # QA run (tests/qa/serve.mjs)
 /.qadb/
 /.qa-shots/
+
+/.tmp-*/
+/.tmp-ui/
