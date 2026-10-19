@@ -7,6 +7,7 @@ import { LoginIllustration } from "./login-illustration";
 import { LandingSections } from "./landing-sections";
 import { MascotIntro } from "./mascot-intro";
 import { ScrollDownPrompt } from "./scroll-prompt";
+import { SiteHeader } from "./site-header";
 import "./thabaal-login.css";
 
 function getThemeSnapshot(): "day" | "night" {
@@ -72,6 +73,11 @@ export function ThabaalSignIn() {
       data-lang={lang}
       lang={lang}
     >
+      <SiteHeader
+        lang={lang}
+        onToggleLang={() => setLang(lang === "en" ? "ta" : "en")}
+        onSelectLang={setLang}
+      />
       <div className="thabaal-page" id="top">
         {/* Language Switcher Pill (Top-Left of Screen / Sky on mobile) */}
         <div
