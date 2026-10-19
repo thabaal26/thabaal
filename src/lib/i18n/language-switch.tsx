@@ -65,7 +65,7 @@ export function LanguageToggle({ className }: { className?: string }) {
     <button
       type="button"
       onClick={() => setLang(next)}
-      aria-label={next === "ta" ? "தமிழுக்கு மாற்று (Switch to Tamil)" : "Switch to English (ஆங்கிலத்துக்கு மாற்று)"}
+      aria-label={next === "ta" ? "தமிழ் - தமிழுக்கு மாற்று (Switch to Tamil)" : "EN - Switch to English (ஆங்கிலத்துக்கு மாற்று)"}
       lang={next}
       className={cn(
         "inline-flex h-10 min-w-10 shrink-0 items-center justify-center rounded-full border border-line bg-subtle/80 px-2.5 text-2xs font-semibold text-ink transition active:scale-95",
