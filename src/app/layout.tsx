@@ -43,7 +43,6 @@ export const viewport: Viewport = {
 };
 
 import { cookies } from "next/headers";
-import Script from "next/script";
 import { LanguageProvider } from "@/lib/i18n/context";
 
 const INIT_SCRIPT = `${THEME_SCRIPT}\n(function(){try{var l=localStorage.getItem("thabaal-lang");if(l==="ta"||l==="en"){document.documentElement.lang=l;}}catch(e){}})();`;
@@ -58,8 +57,13 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
 
   return (
     <html lang={lang} suppressHydrationWarning className={`${dmSans.variable} ${geistSans.variable} ${geistMono.variable} ${tamil.variable} ${nunito.variable} ${inter.variable} ${poppins.variable} h-full antialiased`}>
+      <head>
+        {/* Sets light or dark and the page language before the first paint, from the saved choice or the device.
+            A plain inline script in <head>: React 19 renders it from the server only, so it never warns. A
+            <Script> or <script> inside <body> is rendered by a React component and logs "Encountered a script tag". */}
+        <script id="thabaal-init" dangerouslySetInnerHTML={{ __html: INIT_SCRIPT }} />
+      </head>
       <body className="min-h-full font-sans" suppressHydrationWarning>
-        <Script id="thabaal-init" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: INIT_SCRIPT }} />
         <LanguageProvider>
           {children}
         </LanguageProvider>
