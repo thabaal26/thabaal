@@ -5,7 +5,7 @@ import { useRef, useState, useTransition } from "react";
 import { safeAction, toastResult } from "@/components/toast";
 import { useLanguage } from "@/lib/i18n/context";
 import { SETTLEMENTS, type PaySettings } from "@/lib/pay-settings";
-import { createPaymentTemplate } from "../actions/orders";
+import Link from "@/components/intent-link";
 import { saveBankDetails, savePaySettings, saveReminderRule, saveUpiQr, sendUpiTestLink, type HowPayInput } from "../actions/pay-settings";
 import { T } from "../portal-ui";
 
@@ -36,7 +36,6 @@ export function HowCustomersPay({
   const [busy, setBusy] = useState<string | null>(null);
   const [f, setF] = useState<HowPayInput>({
     whatsappPay: settings.whatsappPay,
-    paymentConfig: paymentConfig ?? "",
     upiOn: settings.upiOn,
     upiId: settings.upiId,
     upiName: settings.upiName,
@@ -89,7 +88,6 @@ export function HowCustomersPay({
   }
 
   const dirty =
-    f.paymentConfig.trim() !== (paymentConfig ?? "") ||
     f.upiId.trim() !== settings.upiId ||
     f.upiName.trim() !== settings.upiName ||
     f.codMax.trim() !== (settings.codMax != null ? String(settings.codMax) : "") ||
@@ -125,55 +123,31 @@ export function HowCustomersPay({
                 Customers who order from your catalogue get a Review and pay button. The order turns paid by itself.
               </T>
             </div>
-            {f.whatsappPay && (
-              <div className="formgrid" style={{ marginTop: 10 }}>
-                <div className="field">
-                  <label htmlFor="ps-config"><T ta="பேமெண்ட் கான்ஃபிகரேஷன் பெயர்">Payment configuration name</T></label>
-                  <input id="ps-config" type="text" autoComplete="off" placeholder={isTa ? "எ.கா. shopname_upi" : "e.g. shopname_upi"} value={f.paymentConfig} disabled={off} onChange={(e) => set({ paymentConfig: e.target.value })} />
-                  <span className="muted small">
-                    <T ta="WhatsApp Manager › Payment configurations-இல் உள்ளபடியே.">Exactly as WhatsApp Manager › Payment configurations shows it.</T>{" "}
-                    <a href="https://business.facebook.com/wa/manage/payments/" target="_blank" rel="noreferrer noopener" className="link">
-                      <T ta="திற">Open</T>
-                    </a>
-                  </span>
-                </div>
-              </div>
-            )}
-            {f.whatsappPay && (
-              <div className="tools" style={{ marginTop: 10 }}>
-                {payTemplate.using ? (
-                  <span className="pill ok">
-                    <T ta={`டெம்ப்ளேட் தயார்: ${payTemplate.using}`}>{`Template ready: ${payTemplate.using}`}</T>
-                  </span>
-                ) : (
-                  <span className="pill warn">
-                    <T ta="அங்கீகரிக்கப்பட்ட டெம்ப்ளேட் இல்லை: 24 மணி நேரத்திற்குப் பிறகு அனுப்ப முடியாது">No approved template yet: requests can’t go after the 24-hour window</T>
-                  </span>
-                )}
-                {canManage && !payTemplate.ownStatus && (
-                  <button
-                    type="button"
-                    className="btn sm"
-                    disabled={pending}
-                    onClick={() =>
-                      start(async () => {
-                        toastResult(await safeAction(() => createPaymentTemplate()));
-                        router.refresh();
-                      })
-                    }
-                  >
-                    <T ta={`“${payTemplate.ownName}” டெம்ப்ளேட்டை உருவாக்கு`}>{`Create “${payTemplate.ownName}” template`}</T>
-                  </button>
-                )}
-                {payTemplate.ownStatus && payTemplate.using !== payTemplate.ownName && (
-                  <span className="muted small">
-                    {payTemplate.ownStatus === "APPROVED"
-                      ? `${payTemplate.ownName} is approved but has no Review and pay button`
-                      : `${payTemplate.ownName}: ${payTemplate.ownStatus.toLowerCase().replace(/_/g, " ")}`}
-                  </span>
-                )}
-              </div>
-            )}
+            {/* The configuration name and template are account setup: Settings › WhatsApp payments setup. */}
+            <div className="muted small" style={{ marginTop: 6 }}>
+              {paymentConfig ? (
+                <>
+                  <T ta={`பேமெண்ட் கான்ஃபிகரேஷன்: ${paymentConfig}`}>{`Payment configuration: ${paymentConfig}`}</T>
+                  {payTemplate.using ? null : (
+                    <>
+                      {" · "}
+                      <T ta="அங்கீகரிக்கப்பட்ட டெம்ப்ளேட் இல்லை">no approved template yet</T>
+                    </>
+                  )}
+                  {" · "}
+                  <Link className="link" href="/dashboard/settings#payment-setup">
+                    <T ta="அமைப்புகளில் மாற்று">Change in Settings</T>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <T ta="பேமெண்ட் கான்ஃபிகரேஷன் இன்னும் சேர்க்கப்படவில்லை.">No payment configuration yet.</T>{" "}
+                  <Link className="link" href="/dashboard/settings#payment-setup">
+                    <T ta="அமைப்புகளில் சேர்க்கவும்">Set it up in Settings</T>
+                  </Link>
+                </>
+              )}
+            </div>
           </div>
           <Sw on={f.whatsappPay} label={isTa ? "WhatsApp-லேயே பணம் செலுத்துதல்" : "Pay inside WhatsApp"} busy={busy === "whatsappPay" || off} onChange={(on) => flip("whatsappPay", on)} />
         </div>

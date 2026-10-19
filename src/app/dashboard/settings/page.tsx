@@ -19,6 +19,8 @@ import { waConfig } from "@/lib/whatsapp";
 import { LocalSessionPanel, ProviderSwitch } from "./provider-panel";
 import { PasswordForm } from "./password-form";
 import { OrderStepsForm } from "./order-steps-form";
+import { PaymentSetupForm } from "./payment-setup-form";
+import { PAYMENT_TEMPLATE, paymentTemplateFor } from "@/lib/payments";
 import { readFlow } from "@/lib/order-flow";
 import { readPaySettings, upiReady, waPayOn } from "@/lib/pay-settings";
 import { AppearanceEditor } from "../appearance-editor";
@@ -104,7 +106,7 @@ export default async function SettingsPage() {
   if (user.role !== "ADMIN") {
     const cid = user.clientId;
     const scope = await getScope();
-    const [numbers, customers, products, ordersCount, client, spend] = cid
+    const [numbers, customers, products, ordersCount, client, spend, ownPayTemplate, payTemplate] = cid
       ? await Promise.all([
           numberHealth(cid).catch(() => []),
           db.customer.count({ where: { clientId: cid, optedOut: false } }),
@@ -114,8 +116,10 @@ export default async function SettingsPage() {
           db.order.count({ where: { clientId: cid } }),
           db.client.findUnique({ where: { id: cid }, select: { name: true, website: true, supportPhone: true, paymentConfig: true, paySettings: true, billingMode: true, orderFlow: true } }),
           spendSummary(cid).catch(() => null),
+          db.template.findFirst({ where: { clientId: cid, name: PAYMENT_TEMPLATE }, select: { status: true } }),
+          paymentTemplateFor(cid),
         ])
-      : [[], 0, null, 0, null, null];
+      : [[], 0, null, 0, null, null, null, null];
     const quality = (r: string | null | undefined) => (
       r === "GREEN" ? { tone: "ok", label: "High quality", labelTa: "உயர்ந்த தரம்" }
       : r === "YELLOW" ? { tone: "warn", label: "Medium quality", labelTa: "நடுத்தர தரம்" }
@@ -166,6 +170,14 @@ export default async function SettingsPage() {
               </div>
             </div>
           </section>
+        )}
+
+        {cid && client && (
+          <PaymentSetupForm
+            config={client.paymentConfig}
+            canChange={scope.canManage}
+            template={{ using: payTemplate?.name ?? null, ownName: PAYMENT_TEMPLATE, ownStatus: ownPayTemplate?.status ?? null }}
+          />
         )}
 
         {cid && client && <OrderStepsForm current={readFlow(client.orderFlow)} canChange={scope.canManage} />}

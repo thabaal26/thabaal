@@ -25,7 +25,6 @@ async function store(clientId: string, next: PaySettings, extra: Prisma.ClientUp
 
 export type HowPayInput = {
   whatsappPay: boolean;
-  paymentConfig: string;
   upiOn: boolean;
   upiId: string;
   upiName: string;
@@ -38,11 +37,10 @@ export type HowPayInput = {
 export async function savePaySettings(input: HowPayInput, changed?: "whatsappPay" | "upiOn" | "codOn"): Promise<SendResult> {
   const s = await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
-  const { settings } = await current(s.clientId);
+  const { settings, paymentConfig } = await current(s.clientId);
 
-  const config = input.paymentConfig.trim();
-  if (config && !/^[\w.-]{1,60}$/.test(config)) return { ok: false, message: "Use the payment configuration name exactly as WhatsApp Manager shows it." };
-  if (input.whatsappPay && !config) return { ok: false, message: "Pay inside WhatsApp needs the payment configuration name from WhatsApp Manager › Payment configurations." };
+  // The configuration name itself is saved in Settings › WhatsApp payments setup (savePaymentConfig).
+  if (input.whatsappPay && !paymentConfig) return { ok: false, message: "Add the payment configuration name in Settings › WhatsApp payments setup first." };
 
   const upiId = input.upiId.trim();
   const upiName = input.upiName.trim().slice(0, 60);
@@ -54,7 +52,7 @@ export async function savePaySettings(input: HowPayInput, changed?: "whatsappPay
   const codMax = maxText ? Math.round(Number(maxText)) : null;
   if (maxText && (!Number.isFinite(codMax) || (codMax ?? 0) <= 0)) return { ok: false, message: "Highest COD order: enter an amount in rupees, or leave it empty for no limit." };
 
-  await store(s.clientId, { ...settings, whatsappPay: input.whatsappPay, upiOn: input.upiOn, upiId, upiName, codOn: input.codOn, codMax, codAreas: input.codAreas.trim().slice(0, 300) }, { paymentConfig: config || null });
+  await store(s.clientId, { ...settings, whatsappPay: input.whatsappPay, upiOn: input.upiOn, upiId, upiName, codOn: input.codOn, codMax, codAreas: input.codAreas.trim().slice(0, 300) });
   const msg =
     changed === "whatsappPay"
       ? `Pay inside WhatsApp is ${input.whatsappPay ? "on" : "off"}.`
@@ -128,7 +126,7 @@ export async function setWhatsappPay(on: boolean): Promise<SendResult> {
   const s = await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
   const { settings, paymentConfig } = await current(s.clientId);
-  if (on && !paymentConfig) return { ok: false, message: "Add the payment configuration name in Payments › Payment settings first." };
+  if (on && !paymentConfig) return { ok: false, message: "Add the payment configuration name in Settings › WhatsApp payments setup first." };
   await store(s.clientId, { ...settings, whatsappPay: Boolean(on) });
   return { ok: true, message: `Pay inside WhatsApp is ${on ? "on" : "off"}.` };
 }

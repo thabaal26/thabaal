@@ -344,7 +344,7 @@ export async function savePaymentConfig(name: string): Promise<SendResult> {
   const value = name.trim();
   if (value && !/^[\w.-]{1,60}$/.test(value)) return { ok: false, message: "Use the configuration name exactly as WhatsApp Manager shows it." };
   await db.client.update({ where: { id: s.clientId }, data: { paymentConfig: value || null } });
-  revalidatePath("/dashboard/orders");
+  revalidatePath("/dashboard", "layout");
   return { ok: true, message: value ? `Payment requests on, using "${value}".` : "Payment requests turned off." };
 }
 
