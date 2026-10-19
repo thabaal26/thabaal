@@ -31,7 +31,7 @@ export async function proxy(request: NextRequest) {
     if (token) res.cookies.delete(COOKIE); // expired or forged: clear it so /login doesn't bounce back
     return res;
   }
-  if (pathname === "/login" && ok) {
+  if (pathname === "/login" && ok && !request.nextUrl.searchParams.has("preview")) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
   if (pathname === "/login" && token) {
