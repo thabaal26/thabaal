@@ -198,11 +198,11 @@ export function LoginForm({ lang = "en" }: LoginFormProps) {
               : "Login"}
         </button>
 
-        {/* Sign up */}
-        <p className="thabaal-signup">
+        {/* Sign up / Request Access */}
+        <p className="thabaal-signup auth-foot">
           {isTamil ? "கணக்கு இல்லையா? " : "Don't have an account? "}
-          <a href="mailto:access@thabaal.com?subject=Thabaal%20Access%20Request">
-            {isTamil ? "பதிவு செய்க" : "Sign up"}
+          <a href="#start">
+            {isTamil ? "அணுகலைக் கோருங்கள்" : "Request access"}
           </a>
         </p>
       </form>
