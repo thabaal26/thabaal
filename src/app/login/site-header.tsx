@@ -85,13 +85,18 @@ export function SiteHeader({ lang, onToggleLang, onSelectLang }: SiteHeaderProps
             {ta ? "English / தமிழ்" : "தமிழ் / EN"}
           </button>
 
-          {/* Download Brochure CTA (Replaces Log In button) */}
+          {/* Book a demo CTA */}
+          <a href={DEMO_URL} {...DEMO_TARGET} className="site-header-btn site-header-btn-primary">
+            {ta ? "டெமோ பதிவு செய்யுங்கள்" : "Book a demo"}
+          </a>
+
+          {/* Download Brochure CTA (Dark button, placed after Book a Demo) */}
           <a
             href="/docs/Thabaal_Brochure_221026.pdf"
             download="Thabaal_Brochure_221026.pdf"
             target="_blank"
             rel="noopener noreferrer"
-            className="site-header-btn site-header-btn-secondary"
+            className="site-header-btn site-header-btn-dark"
             aria-label={ta ? "பிரோஷர் பதிவிறக்குங்கள்" : "Download brochure"}
           >
             <svg
@@ -111,11 +116,6 @@ export function SiteHeader({ lang, onToggleLang, onSelectLang }: SiteHeaderProps
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
             {ta ? "பிரோஷர் பதிவிறக்கு" : "Download brochure"}
-          </a>
-
-          {/* Book a demo CTA */}
-          <a href={DEMO_URL} {...DEMO_TARGET} className="site-header-btn site-header-btn-primary">
-            {ta ? "டெமோ பதிவு செய்யுங்கள்" : "Book a demo"}
           </a>
 
           {/* Mobile Menu Hamburger Button */}
