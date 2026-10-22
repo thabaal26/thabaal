@@ -80,33 +80,6 @@ export function ThabaalSignIn() {
         onSelectLang={setLang}
       />
       <div className="thabaal-page" id="top">
-        {/* Language Switcher Pill (Top-Left of Screen / Sky on mobile) */}
-        <div
-          className="thabaal-lang-pill"
-          role="group"
-          aria-label={lang === "ta" ? "மொழி" : "Language"}
-        >
-          <span className="thabaal-lang-slider" aria-hidden="true" />
-          <button
-            type="button"
-            onClick={() => setLang("en")}
-            className={lang === "en" ? "active" : ""}
-            aria-pressed={lang === "en"}
-            lang="en"
-          >
-            EN
-          </button>
-          <button
-            type="button"
-            onClick={() => setLang("ta")}
-            className={lang === "ta" ? "active" : ""}
-            aria-pressed={lang === "ta"}
-            lang="ta"
-          >
-            தமிழ்
-          </button>
-        </div>
-
         {/* LEFT COLUMN: SIGN IN FORM */}
         <section className="thabaal-left">
           {/* Brand Wordmark with Mascot Bird Perched on Top */}
