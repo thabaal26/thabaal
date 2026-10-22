@@ -5,6 +5,7 @@ import { ThabaalSignIn } from "./thabaal-sign-in";
 export const metadata: Metadata = {
   title: "Sign in · Thabaal (தபால்)",
   description: "A message with momentum. Sign in to Thabaal to launch campaigns, manage customer messaging and track orders.",
+  robots: { index: true, follow: true },
 };
 
 export default function LoginPage() {

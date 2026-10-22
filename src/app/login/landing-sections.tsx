@@ -583,7 +583,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
   const ta = lang === "ta";
   const [activeDemo, setActiveDemo] = useState<"overview" | "campaign" | "payments">("overview");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>("quarterly");
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [pricingTab, setPricingTab] = useState<"plans" | "features" | "addons" | "compare">("plans");
 
   const demo = DEMO_DATA[activeDemo];

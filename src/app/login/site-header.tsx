@@ -70,7 +70,7 @@ export function SiteHeader({ lang, onToggleLang, onSelectLang }: SiteHeaderProps
             type="button"
             onClick={onToggleLang}
             className="site-header-lang-btn"
-            aria-label={ta ? "Switch to English" : "தமிழுக்கு மாற்றவும்"}
+            aria-label={ta ? "English / தமிழ் — Switch to English" : "தமிழ் / EN — தமிழுக்கு மாற்றவும்"}
           >
             {ta ? "English / தமிழ்" : "தமிழ் / EN"}
           </button>
