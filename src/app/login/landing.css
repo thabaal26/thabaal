@@ -151,6 +151,20 @@
   transform: translateY(-1px);
 }
 
+.site-header-nav-download {
+  display: none !important;
+}
+
+@media (max-width: 920px) {
+  .site-header-nav-download {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    font-weight: 800;
+    color: var(--yellow) !important;
+  }
+}
+
 [data-theme="night"] .site-header-nav a:hover {
   color: #ffffff;
 }

@@ -61,6 +61,16 @@ export function SiteHeader({ lang, onToggleLang, onSelectLang }: SiteHeaderProps
           <a href="#pricing" onClick={closeMenu}>
             {ta ? "கட்டணம்" : "Pricing"}
           </a>
+          <a
+            href="/docs/Thabaal_Brochure_221026.pdf"
+            download="Thabaal_Brochure_221026.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={closeMenu}
+            className="site-header-nav-download"
+          >
+            {ta ? "📥 பிரோஷர் பதிவிறக்கு (PDF)" : "📥 Download brochure (PDF)"}
+          </a>
         </nav>
 
         {/* Right Actions */}
@@ -75,9 +85,32 @@ export function SiteHeader({ lang, onToggleLang, onSelectLang }: SiteHeaderProps
             {ta ? "English / தமிழ்" : "தமிழ் / EN"}
           </button>
 
-          {/* Log in CTA (scrolls to top auth card) */}
-          <a href="#top" className="site-header-btn site-header-btn-secondary">
-            {ta ? "உள்நுழைக" : "Log in"}
+          {/* Download Brochure CTA (Replaces Log In button) */}
+          <a
+            href="/docs/Thabaal_Brochure_221026.pdf"
+            download="Thabaal_Brochure_221026.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="site-header-btn site-header-btn-secondary"
+            aria-label={ta ? "பிரோஷர் பதிவிறக்குங்கள்" : "Download brochure"}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              style={{ marginRight: 6 }}
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            {ta ? "பிரோஷர் பதிவிறக்கு" : "Download brochure"}
           </a>
 
           {/* Book a demo CTA */}
