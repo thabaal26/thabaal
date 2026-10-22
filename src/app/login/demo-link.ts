@@ -1,6 +1,6 @@
 /** Where "Book a demo" goes: the sales WhatsApp chat, else a sales email, else the sign-in card. */
-const WA = (process.env.NEXT_PUBLIC_SALES_WHATSAPP ?? "").replace(/\D/g, "");
-const MAIL = process.env.NEXT_PUBLIC_SALES_EMAIL ?? "";
+const WA = (process.env.NEXT_PUBLIC_SALES_WHATSAPP ?? "916379140626").replace(/\D/g, "");
+const MAIL = process.env.NEXT_PUBLIC_SALES_EMAIL ?? "thabaal26@gmail.com";
 
 export const DEMO_URL = WA
   ? `https://wa.me/${WA}?text=${encodeURIComponent("Hi Thabaal, I'd like a demo for my business.")}`

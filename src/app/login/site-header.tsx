@@ -47,13 +47,16 @@ export function SiteHeader({ lang, onToggleLang, onSelectLang }: SiteHeaderProps
           aria-label={ta ? "தள வழிசெலுத்தல்" : "Site navigation"}
         >
           <a href="#features" onClick={closeMenu}>
-            {ta ? "தபால் என்ன செய்யும்" : "What Thabaal does"}
-          </a>
-          <a href="#how-it-works" onClick={closeMenu}>
-            {ta ? "எப்படி செயல்படுகிறது" : "How it works"}
+            {ta ? "தபால் ஏன்" : "Why Thabaal"}
           </a>
           <a href="#reports" onClick={closeMenu}>
-            {ta ? "அறிக்கைகள்" : "Reports"}
+            {ta ? "அறிக்கைகள்" : "Analytics"}
+          </a>
+          <a href="#how-it-works" onClick={closeMenu}>
+            {ta ? "ஆர்டர்கள்" : "Orders"}
+          </a>
+          <a href="#templates" onClick={closeMenu}>
+            {ta ? "டெம்ப்ளேட்டுகள்" : "Templates"}
           </a>
           <a href="#pricing" onClick={closeMenu}>
             {ta ? "கட்டணம்" : "Pricing"}
