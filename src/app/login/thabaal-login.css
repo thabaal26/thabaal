@@ -31,10 +31,28 @@
   --link: #FDB913;
 }
 
+:root {
+  --site-header-h: 72px;
+}
+
+@media (max-height: 720px) {
+  :root {
+    --site-header-h: 54px;
+  }
+}
+
+@media (max-width: 900px) {
+  :root {
+    --site-header-h: 63px;
+  }
+}
+
 .thabaal-page {
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: stretch;
+  min-height: calc(100vh - var(--site-header-h, 72px));
+  min-height: calc(100dvh - var(--site-header-h, 72px));
   width: 100%;
   font-family: var(--font-dm-sans), "DM Sans", var(--font-tamil), ui-rounded, system-ui, -apple-system, sans-serif;
   background: var(--bg);
@@ -940,7 +958,8 @@
   .thabaal-page {
     grid-template-columns: 1fr;
     grid-template-rows: auto 1fr;
-    min-height: 100dvh;
+    min-height: calc(100vh - var(--site-header-h, 63px));
+    min-height: calc(100dvh - var(--site-header-h, 63px));
   }
   .thabaal-right {
     order: -1;
