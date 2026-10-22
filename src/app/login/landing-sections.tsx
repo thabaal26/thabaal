@@ -4,17 +4,12 @@ import { useState } from "react";
 import Image from "next/image";
 import { ScrollReveal, StaggerGroup, StaggerItem, SectionReveal } from "@/components/motion";
 import "./landing.css";
+import { DEMO_TARGET, DEMO_URL } from "./demo-link";
 
 type Lang = "en" | "ta";
 type T = { en: string; ta: string };
 
-const WA = (process.env.NEXT_PUBLIC_SALES_WHATSAPP ?? "").replace(/\D/g, "");
-const MAIL = process.env.NEXT_PUBLIC_SALES_EMAIL ?? "";
-const TALK = WA
-  ? `https://wa.me/${WA}?text=${encodeURIComponent("Hi Thabaal, I'd like a demo for my business.")}`
-  : MAIL
-    ? `mailto:${MAIL}?subject=${encodeURIComponent("Thabaal demo")}`
-    : "#top";
+const TALK = DEMO_URL;
 
 interface DemoDataset {
   title: T;
@@ -477,7 +472,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
                 ? "முதல் பிரச்சாரத்தைத் தொடங்குவதற்கு முன் எழும் சந்தேகங்களைத் தீர்த்துத் தயக்கமின்றி தொடங்குங்கள்."
                 : "Use this section to remove hesitation before someone creates their first campaign."}
             </p>
-            <a href={TALK} target={WA ? "_blank" : undefined} rel="noopener" className="landing-btn landing-btn-dark">
+            <a href={TALK} {...DEMO_TARGET} className="landing-btn landing-btn-dark">
               {ta ? "தபாலுடன் பேசுங்கள்" : "Talk to Thabaal"} <span aria-hidden="true">↗</span>
             </a>
           </ScrollReveal>

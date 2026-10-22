@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { DEMO_TARGET, DEMO_URL } from "./demo-link";
 
 type Lang = "en" | "ta";
 
@@ -76,9 +77,9 @@ export function SiteHeader({ lang, onToggleLang, onSelectLang }: SiteHeaderProps
             {ta ? "உள்நுழைக" : "Log in"}
           </a>
 
-          {/* Start Free CTA */}
-          <a href="#top" className="site-header-btn site-header-btn-primary">
-            {ta ? "இலவசமாகத் தொடங்கு" : "Start free"}
+          {/* Book a demo CTA */}
+          <a href={DEMO_URL} {...DEMO_TARGET} className="site-header-btn site-header-btn-primary">
+            {ta ? "டெமோ பதிவு செய்யுங்கள்" : "Book a demo"}
           </a>
 
           {/* Mobile Menu Hamburger Button */}
