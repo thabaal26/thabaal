@@ -34,8 +34,7 @@
 .thabaal-page {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  min-height: 100vh;
-  min-height: 100dvh;
+  align-items: stretch;
   width: 100%;
   font-family: var(--font-dm-sans), "DM Sans", var(--font-tamil), ui-rounded, system-ui, -apple-system, sans-serif;
   background: var(--bg);
@@ -431,7 +430,6 @@
   position: relative;
   overflow: hidden;
   container-type: inline-size;
-  min-height: calc(100vh - 32px);
   margin: 16px;
   border-radius: 32px;
   contain: layout paint style;
