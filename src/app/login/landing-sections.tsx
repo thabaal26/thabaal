@@ -33,65 +33,65 @@ const PRICING_PLANS: PricingPlan[] = [
     id: "starter",
     name: {
       en: "Starter",
-      ta: "ஸ்டார்ட்டர்",
+      ta: "ஸ்டார்ட்டர் (Starter)",
     },
     tagline: {
-      en: "For solopreneurs, local retail shops, and new D2C brands.",
-      ta: "சிறு வணிகர்கள், சில்லறை கடைகள் மற்றும் புதிய D2C பிராண்டுகளுக்கு.",
+      en: "Start campaigns and keep customer orders together.",
+      ta: "பிரச்சாரங்களைத் தொடங்கி வாடிக்கையாளர் ஆர்டர்களை ஒன்றாக வையுங்கள்.",
     },
     specs: {
       en: [
-        "1 Official WhatsApp Number",
-        "3 Team Logins Included",
-        "Unlimited Customer Contacts",
-        "2-Way Google Sheets Sync",
+        "2 WhatsApp numbers",
+        "1 Staff login",
+        "5 Campaigns per month*",
+        "10 Active approved templates*",
       ],
       ta: [
-        "1 அதிகாரப்பூர்வ வாட்ஸ்அப் எண்",
-        "3 பணியாளர் கணக்குகள்",
-        "வரம்பற்ற வாடிக்கையாளர் பதிவுகள்",
-        "2-வழி கூகுள் ஷீட்ஸ் இணைப்பு",
+        "2 வாட்ஸ்அப் எண்கள்",
+        "1 பணியாளர் கணக்கு",
+        "மாதம் 5 பிரச்சாரங்கள்*",
+        "10 அனுமதிக்கப்பட்ட டெம்ப்ளேட்கள்*",
       ],
     },
     pricing: {
       monthly: {
-        monthlyRate: "1,999",
+        monthlyRate: "1,199",
         billedNote: {
-          en: "Billed monthly · GST included",
-          ta: "மாதாந்திர கட்டணம் · GST சேர்க்கப்பட்டுள்ளது",
+          en: "INR 1,199 per month, GST included",
+          ta: "மாதம் ₹1,199, GST உட்பட",
         },
       },
       quarterly: {
-        monthlyRate: "1,699",
+        monthlyRate: "1,079",
         billedNote: {
-          en: "Billed ₹5,097 every 3 months (Save 15%)",
-          ta: "காலாண்டு கட்டணம் ₹5,097 (15% சேமிப்பு)",
+          en: "Quarterly total: INR 3,237 (Save 10%)",
+          ta: "காலாண்டு மொத்தம்: ₹3,237 (10% சேமிப்பு)",
         },
       },
       yearly: {
-        monthlyRate: "1,499",
+        monthlyRate: "959",
         billedNote: {
-          en: "Billed ₹17,988 yearly (Save 25% · 2 Months Free)",
-          ta: "வருடாந்திர கட்டணம் ₹17,988 (2 மாதங்கள் இலவசம்)",
+          en: "Yearly total: INR 11,510 (Save 20%)",
+          ta: "வருடாந்திர மொத்தம்: ₹11,510 (20% சேமிப்பு)",
         },
       },
     },
     features: {
       en: [
-        "WhatsApp Catalogue & Cart Sync",
-        "Native Review & Pay UPI (0% commission)",
-        "Basic 10-State Payment Tracker",
-        "Ban-Safety Pacing & IST Quiet Hours",
-        "1,000 AI Smart Replies / month",
-        "Email & WhatsApp Support (24-48h)",
+        "Unlimited customer records, tags & segments",
+        "WhatsApp catalogue and order board",
+        "UPI payment requests",
+        "Overview business reports",
+        "Official WhatsApp setup & onboarding",
+        "Ticket support",
       ],
       ta: [
-        "வாட்ஸ்அப் கேட்லாக் & கார்ட் ஒத்திசைவு",
-        "நேரடி Review & Pay UPI (0% கமிஷன்)",
-        "10-நிலை பேமெண்ட் கண்காணிப்பு",
-        "பாதுகாப்பான மெசேஜிங் & அமைதி நேரங்கள்",
-        "மாதம் 1,000 AI ஸ்மார்ட் பதில்கள்",
-        "மின்னஞ்சல் & வாட்ஸ்அப் ஆதரவு (24-48h)",
+        "வரம்பற்ற வாடிக்கையாளர் பதிவுகள், குறிச்சொற்கள் & பிரிவுகள்",
+        "வாட்ஸ்அப் கேட்லாக் மற்றும் ஆர்டர் போர்டு",
+        "UPI பேமெண்ட் கோரிக்கைகள்",
+        "வணிக மேலோட்ட அறிக்கைகள் (Overview)",
+        "அதிகாரப்பூர்வ வாட்ஸ்அப் அமைப்பு & பயிற்சி",
+        "டிக்கெட் ஆதரவு",
       ],
     },
     cta: {
@@ -100,79 +100,75 @@ const PRICING_PLANS: PricingPlan[] = [
     },
   },
   {
-    id: "pro-commerce",
+    id: "growth",
     name: {
-      en: "Pro Commerce",
-      ta: "ப்ரோ காமர்ஸ்",
+      en: "Growth",
+      ta: "வளர்ச்சி (Growth)",
     },
     popular: true,
     badge: {
-      en: "MOST POPULAR ★",
-      ta: "அதிகம் விரும்பப்படுவது ★",
+      en: "RECOMMENDED · MOST POPULAR",
+      ta: "பரிந்துரைக்கப்படுகிறது · அதிகம் தேர்வு",
     },
     tagline: {
-      en: "For growing D2C brands & retail stores needing automated repeat sales.",
-      ta: "விற்பனையை பெருக்க விரும்பும் வளரும் D2C பிராண்டுகள் மற்றும் கடைகளுக்கு.",
+      en: "Follow up on orders and understand repeat customers.",
+      ta: "ஆர்டர்களைப் பின்தொடர்ந்து வாடிக்கையாளர்களை மீண்டும் வரவழையுங்கள்.",
     },
     specs: {
       en: [
-        "2 Active WhatsApp Numbers",
-        "6 Team Logins Included",
-        "Everything in Starter, plus:",
-        "Priority SLA Support (< 4h)",
+        "3 WhatsApp numbers",
+        "3 Staff logins",
+        "20 Campaigns per month*",
+        "50 Active approved templates*",
       ],
       ta: [
-        "2 வாட்ஸ்அப் எண்கள்",
-        "6 பணியாளர் கணக்குகள்",
-        "ஸ்டார்ட்டரில் உள்ள அனைத்தும் +",
-        "முன்னுரிமை ஆதரவு (< 4h)",
+        "3 வாட்ஸ்அப் எண்கள்",
+        "3 பணியாளர் கணக்குகள்",
+        "மாதம் 20 பிரச்சாரங்கள்*",
+        "50 அனுமதிக்கப்பட்ட டெம்ப்ளேட்கள்*",
       ],
     },
     pricing: {
       monthly: {
-        monthlyRate: "4,999",
+        monthlyRate: "2,999",
         billedNote: {
-          en: "Billed monthly · GST included",
-          ta: "மாதாந்திர கட்டணம் · GST சேர்க்கப்பட்டுள்ளது",
+          en: "INR 2,999 per month, GST included",
+          ta: "மாதம் ₹2,999, GST உட்பட",
         },
       },
       quarterly: {
-        monthlyRate: "4,249",
+        monthlyRate: "2,699",
         billedNote: {
-          en: "Billed ₹12,747 every 3 months (Save 15%)",
-          ta: "காலாண்டு கட்டணம் ₹12,747 (15% சேமிப்பு)",
+          en: "Quarterly total: INR 8,097 (Save 10%)",
+          ta: "காலாண்டு மொத்தம்: ₹8,097 (10% சேமிப்பு)",
         },
       },
       yearly: {
-        monthlyRate: "3,749",
+        monthlyRate: "2,399",
         billedNote: {
-          en: "Billed ₹44,988 yearly (Save 25% · 2 Months Free)",
-          ta: "வருடாந்திர கட்டணம் ₹44,988 (2 மாதங்கள் இலவசம்)",
+          en: "Yearly total: INR 28,790 (Save 20%)",
+          ta: "வருடாந்திர மொத்தம்: ₹28,790 (20% சேமிப்பு)",
         },
       },
     },
     features: {
       en: [
-        "AI Payment Auto-Claim (UTR & screenshot OCR)",
-        "Cart Mentality & Hesitation Radar",
-        "Automated 6-Hour Unpaid Cart Nudges",
-        "Full Loyalty Points & 4 VIP Tiers (Bronze–Platinum)",
-        "3D RFM Segmentation & 1-tap wa.me Offers",
-        "Predictive Reorders (Refill Forecast)",
-        "Browser WebRTC WhatsApp Voice Calling",
-        "Vernacular AI Copilot (Tamil, English, Tanglish)",
-        "5,000 AI Operations / month",
+        "Everything in Starter, plus:",
+        "Auto payment requests + reminders + COD tracking",
+        "Packing lists and order slips (print/image)",
+        "Loyalty points, tiers and checkout",
+        "Refill reminders and win-back messages",
+        "Overview + Customers business reports",
+        "Ticket + Email priority support",
       ],
       ta: [
-        "AI பேமெண்ட் தானியங்கி உறுதி (UTR & OCR)",
-        "கார்ட் வாங்குதல் நடத்தை & விடுபட்ட கார்ட் ரேடார்",
-        "6 மணி நேர தானியங்கி நினைவூட்டல்",
-        "முழு லாயல்டி புள்ளிகள் & 4 VIP நிலைகள்",
-        "3D RFM வாடிக்கையாளர் பிரிப்பு & wa.me சலுகைகள்",
-        "மறுஆர்டர் கணிப்பு & நினைவூட்டல் ஆட்டோமேஷன்",
-        "உலாவி நேரடி வாட்ஸ்அப் வாய்ஸ் கால்கள்",
-        "தமிழ் & ஆங்கில AI ஸ்மார்ட் கோபைலட்",
-        "மாதம் 5,000 AI பணிகள்",
+        "ஸ்டார்ட்டரில் உள்ள அனைத்தும் +",
+        "தானியங்கி பேமெண்ட் கோரிக்கைகள் + நினைவூட்டல் + COD",
+        "பேக்கிங் பட்டியல் & ஆர்டர் ஸ்லிப்கள் (பிரிண்ட்/படம்)",
+        "லாயல்டி புள்ளிகள், அடுக்குகள் & செக்அவுட்",
+        "மறுஆர்டர் நினைவூட்டல் & வாடிக்கையாளர் மீட்பு",
+        "மேலோட்டம் + வாடிக்கையாளர் அறிக்கைகள்",
+        "டிக்கெட் + மின்னஞ்சல் முன்னுரிமை ஆதரவு",
       ],
     },
     cta: {
@@ -181,77 +177,283 @@ const PRICING_PLANS: PricingPlan[] = [
     },
   },
   {
-    id: "business-scale",
+    id: "business",
     name: {
-      en: "Business Scale",
-      ta: "பிசினஸ் ஸ்கேல்",
+      en: "Business",
+      ta: "பிசினஸ் (Business)",
     },
     tagline: {
-      en: "For multi-branch retail, FMCG distributors & high-volume broadcasts.",
-      ta: "பல கிளைகள் கொண்ட நிறுவனங்கள், விநியோகஸ்தர்கள் & பெரிய பிராண்டுகளுக்கு.",
+      en: "Give a larger team complete reports and more capacity.",
+      ta: "முழு குழுவிற்கும் முழுமையான அறிக்கைகளையும் கூடுதல் திறனையும் கொடுங்கள்.",
     },
     specs: {
       en: [
-        "5 Active WhatsApp Numbers",
-        "12 Team Logins Included",
-        "Everything in Pro Commerce, plus:",
-        "Dedicated Account Manager (< 1h)",
+        "5 WhatsApp numbers",
+        "5 Staff logins",
+        "50 Campaigns per month*",
+        "100 Active approved templates*",
       ],
       ta: [
         "5 வாட்ஸ்அப் எண்கள்",
-        "12 பணியாளர் கணக்குகள்",
-        "ப்ரோ காமர்ஸில் உள்ள அனைத்தும் +",
-        "தனி கணக்கு மேலாளர் (< 1h)",
+        "5 பணியாளர் கணக்குகள்",
+        "மாதம் 50 பிரச்சாரங்கள்*",
+        "100 அனுமதிக்கப்பட்ட டெம்ப்ளேட்கள்*",
       ],
     },
     pricing: {
       monthly: {
-        monthlyRate: "11,999",
+        monthlyRate: "4,999",
         billedNote: {
-          en: "Billed monthly · GST included",
-          ta: "மாதாந்திர கட்டணம் · GST சேர்க்கப்பட்டுள்ளது",
+          en: "INR 4,999 per month, GST included",
+          ta: "மாதம் ₹4,999, GST உட்பட",
         },
       },
       quarterly: {
-        monthlyRate: "10,199",
+        monthlyRate: "4,499",
         billedNote: {
-          en: "Billed ₹30,597 every 3 months (Save 15%)",
-          ta: "காலாண்டு கட்டணம் ₹30,597 (15% சேமிப்பு)",
+          en: "Quarterly total: INR 13,497 (Save 10%)",
+          ta: "காலாண்டு மொத்தம்: ₹13,497 (10% சேமிப்பு)",
         },
       },
       yearly: {
-        monthlyRate: "8,999",
+        monthlyRate: "3,999",
         billedNote: {
-          en: "Billed ₹107,988 yearly (Save 25% · 2 Months Free)",
-          ta: "வருடாந்திர கட்டணம் ₹107,988 (2 மாதங்கள் இலவசம்)",
+          en: "Yearly total: INR 47,990 (Save 20%)",
+          ta: "வருடாந்திர மொத்தம்: ₹47,990 (20% சேமிப்பு)",
         },
       },
     },
     features: {
       en: [
-        "High-Throughput Queue (4,000 messages / min)",
-        "Multi-Location Branch Order Routing",
-        "Custom Fulfilment Steppers & Thermal Slips",
-        "Bulk Packing Slips & Label Print Export",
-        "Full REST API & Bi-directional Webhooks",
-        "Unlimited AI Copilot Operations",
-        "Dedicated Account Manager (< 1h response)",
-        "Custom Onboarding & Team Training",
+        "Everything in Growth, plus:",
+        "Complete reports: Overview, Campaigns, Customers + Products",
+        "Excel / Google Sheets business-data export",
+        "Browser WebRTC WhatsApp calling",
+        "Logo, colours and custom order fields",
+        "Ticket + Email + Call direct support",
       ],
       ta: [
-        "அதிவேக செய்தி வரிசை (நிமிடத்திற்கு 4,000 செய்திகள்)",
-        "பல கிளைகளுக்கான ஆர்டர் ரூட்டிங்",
-        "தனிப்பயன் டெலிவரி நிலைகள் & தெர்மல் ஸ்லிப்",
-        "மொத்த பேக்கிங் ஸ்லிப் & லேபிள் பிரிண்ட்",
-        "முழுமையான REST API & வெப்ஹூக்ஸ்",
-        "வரம்பற்ற AI பணிகள்",
-        "அர்ப்பணிக்கப்பட்ட நேரடி ஆதரவு (< 1 மணி நேரம்)",
-        "நேரடி பயிற்சி & வணிக அமைப்பு உதவி",
+        "வளர்ச்சித் திட்டத்தில் உள்ள அனைத்தும் +",
+        "முழுமையான அறிக்கைகள்: மேலோட்டம், பிரச்சாரங்கள், வாடிக்கையாளர்கள் + தயாரிப்புகள்",
+        "எக்செல் / கூகுள் ஷீட்ஸ் வணிகத் தரவு ஏற்றுமதி",
+        "உலாவி நேரடி வாட்ஸ்அப் வாய்ஸ் கால்கள்",
+        "லோகோ, வண்ணங்கள் & தனிப்பயன் ஆர்டர் புலங்கள்",
+        "டிக்கெட் + மின்னஞ்சல் + தொலைபேசி நேரடி ஆதரவு",
       ],
     },
     cta: {
       en: "Contact sales ↗",
       ta: "தொடர்பு கொள்ள ↗",
+    },
+  },
+];
+
+/* ── Full Feature Comparison Rows (Matching Page 2 of Official Pricing PDF) ── */
+interface FeatureRow {
+  name: T;
+  starter: string;
+  growth: string;
+  business: string;
+}
+
+const FEATURE_COMPARISON: FeatureRow[] = [
+  {
+    name: { en: "WhatsApp numbers", ta: "வாட்ஸ்அப் எண்கள்" },
+    starter: "2",
+    growth: "3",
+    business: "5",
+  },
+  {
+    name: { en: "Staff logins", ta: "பணியாளர் கணக்குகள்" },
+    starter: "1",
+    growth: "3",
+    business: "5",
+  },
+  {
+    name: { en: "Campaigns per month*", ta: "மாதம் பிரச்சாரங்கள்*" },
+    starter: "5",
+    growth: "20",
+    business: "50",
+  },
+  {
+    name: { en: "Active approved templates*", ta: "அனுமதிக்கப்பட்ட டெம்ப்ளேட்கள்*" },
+    starter: "10",
+    growth: "50",
+    business: "100",
+  },
+  {
+    name: { en: "Customer records, tags, areas and segments", ta: "வாடிக்கையாளர் பதிவுகள், குறிச்சொற்கள் & பிரிவுகள்" },
+    starter: "Unlimited",
+    growth: "Unlimited",
+    business: "Unlimited",
+  },
+  {
+    name: { en: "WhatsApp catalogue and order board", ta: "வாட்ஸ்அப் கேட்லாக் மற்றும் ஆர்டர் போர்டு" },
+    starter: "Included",
+    growth: "Included",
+    business: "Included",
+  },
+  {
+    name: { en: "UPI payment requests", ta: "UPI பேமெண்ட் கோரிக்கைகள்" },
+    starter: "Included",
+    growth: "Included",
+    business: "Included",
+  },
+  {
+    name: { en: "Auto payment requests + reminders + COD tracking", ta: "தானியங்கி பேமெண்ட் கோரிக்கைகள் + நினைவூட்டல் + COD" },
+    starter: "—",
+    growth: "Included",
+    business: "Included",
+  },
+  {
+    name: { en: "Packing lists and order slips (print/image)", ta: "பேக்கிங் பட்டியல் & ஆர்டர் ஸ்லிப்கள் (பிரிண்ட்/படம்)" },
+    starter: "—",
+    growth: "Included",
+    business: "Included",
+  },
+  {
+    name: { en: "Loyalty points, tiers and checkout", ta: "லாயல்டி புள்ளிகள், அடுக்குகள் & செக்அவுட்" },
+    starter: "—",
+    growth: "Included",
+    business: "Included",
+  },
+  {
+    name: { en: "Refill reminders and win-back messages", ta: "மறுஆர்டர் நினைவூட்டல் & வாடிக்கையாளர் மீட்பு" },
+    starter: "—",
+    growth: "Included",
+    business: "Included",
+  },
+  {
+    name: { en: "Business reports", ta: "வணிக அறிக்கைகள்" },
+    starter: "Overview only",
+    growth: "Overview + Customers",
+    business: "Overview, Campaigns, Customers + Products",
+  },
+  {
+    name: { en: "Excel / Google Sheets business-data export", ta: "Excel / Google Sheets வணிகத் தரவு ஏற்றுமதி" },
+    starter: "—",
+    growth: "—",
+    business: "Included",
+  },
+  {
+    name: { en: "WhatsApp calling (WebRTC)", ta: "உலாவி நேரடி வாட்ஸ்அப் வாய்ஸ் கால்கள்" },
+    starter: "—",
+    growth: "—",
+    business: "Included",
+  },
+  {
+    name: { en: "Logo, colours and custom order fields", ta: "லோகோ, வண்ணங்கள் & தனிப்பயன் ஆர்டர் புலங்கள்" },
+    starter: "—",
+    growth: "—",
+    business: "Included",
+  },
+  {
+    name: { en: "Support system", ta: "ஆதரவு அமைப்பு" },
+    starter: "Ticket",
+    growth: "Ticket + email",
+    business: "Ticket + email + call",
+  },
+];
+
+/* ── Competitor Comparison Rows (Matching Page 4 of Official Pricing PDF) ── */
+interface CompetitorRow {
+  platform: string;
+  isThabaal?: boolean;
+  price: T;
+  focus: T;
+  comparison: T;
+}
+
+const COMPETITOR_COMPARISON: CompetitorRow[] = [
+  {
+    platform: "Thabaal",
+    isThabaal: true,
+    price: {
+      en: "INR 1,199 / 2,999 / 4,999 monthly, GST included",
+      ta: "மாதம் ₹1,199 / ₹2,999 / ₹4,999, GST உட்பட",
+    },
+    focus: {
+      en: "Campaigns, catalogue, orders, payments and tiered reports.",
+      ta: "பிரச்சாரங்கள், கேட்லாக், ஆர்டர்கள், பேமெண்ட் & அடுக்கு அறிக்கைகள்.",
+    },
+    comparison: {
+      en: "2 / 3 / 5 numbers; simple local-business workflow.",
+      ta: "2 / 3 / 5 எண்கள்; எளிய தமிழ்நாடு வணிக வேலைப்பாய்வு.",
+    },
+  },
+  {
+    platform: "AiSensy",
+    price: {
+      en: "Basic INR 1,500; Pro INR 3,200 monthly",
+      ta: "பேஸிக் ₹1,500; ப்ரோ ₹3,200 மாதம்",
+    },
+    focus: {
+      en: "Broadcasts, shared inbox, retargeting and AI options.",
+      ta: "அறிவிப்புகள், பகிரப்பட்ட இன்பாக்ஸ் மற்றும் AI தேர்வுகள்.",
+    },
+    comparison: {
+      en: "Thabaal starts lower and includes order/payment tracking.",
+      ta: "தபால் குறைந்த கட்டணத்தில் ஆர்டர் & பேமெண்ட் கண்காணிப்பை வழங்குகிறது.",
+    },
+  },
+  {
+    platform: "Gallabox",
+    price: {
+      en: "Basic INR 2,399 monthly, billed annually",
+      ta: "பேஸிக் ₹2,399 மாதம், வருடாந்திர கட்டணம்",
+    },
+    focus: {
+      en: "WhatsApp plus Instagram/web, catalogue and AI tools.",
+      ta: "வாட்ஸ்அப் + இன்ஸ்டாகிராம்/வெப், கேட்லாக் மற்றும் AI கருவிகள்.",
+    },
+    comparison: {
+      en: "Compare billing term, users and order reporting.",
+      ta: "கட்டணக் காலம், பயனர்கள் மற்றும் ஆர்டர் அறிக்கைகளை ஒப்பிடுங்கள்.",
+    },
+  },
+  {
+    platform: "Wati",
+    price: {
+      en: "Regional pricing changes; check current quote",
+      ta: "பிராந்திய விலை மாற்றம்; தற்போதைய மதிப்பீட்டைப் பார்க்கவும்",
+    },
+    focus: {
+      en: "Campaigns, AI, automations and multiple channels.",
+      ta: "பிரச்சாரங்கள், AI, ஆட்டோமேஷன் மற்றும் பல சேனல்கள்.",
+    },
+    comparison: {
+      en: "Thabaal keeps plan limits and order reporting straightforward.",
+      ta: "தபால் திட்ட வரம்புகளையும் ஆர்டர் அறிக்கைகளையும் வெளிப்படையாக வைக்கிறது.",
+    },
+  },
+  {
+    platform: "Interakt",
+    price: {
+      en: "Get current India price",
+      ta: "தற்போதைய இந்திய விலையைப் பெறவும்",
+    },
+    focus: {
+      en: "WhatsApp/Instagram marketing, automation and CRM.",
+      ta: "வாட்ஸ்அப்/இன்ஸ்டாகிராம் மார்க்கெட்டிங் மற்றும் CRM.",
+    },
+    comparison: {
+      en: "Thabaal emphasises order-to-payment visibility.",
+      ta: "தபால் ஆர்டர் முதல் பேமெண்ட் வரையிலான நேரடி கண்காணிப்பை முன்னிறுத்துகிறது.",
+    },
+  },
+  {
+    platform: "DoubleTick",
+    price: {
+      en: "Plans listed; request a current quote",
+      ta: "திட்டங்கள் பட்டியலிடப்பட்டுள்ளன; விலை கேட்க வேண்டும்",
+    },
+    focus: {
+      en: "WhatsApp customer experience, sales tools and AI agents.",
+      ta: "வாட்ஸ்அப் வாடிக்கையாளர் அனுபவம் மற்றும் விற்பனைக் கருவிகள்.",
+    },
+    comparison: {
+      en: "Thabaal offers clear INR tiers and support by plan.",
+      ta: "தபால் தெளிவான ரூபாய் விலையையும் திட்ட ஆதரவையும் வழங்குகிறது.",
     },
   },
 ];
@@ -382,6 +584,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
   const [activeDemo, setActiveDemo] = useState<"overview" | "campaign" | "payments">("overview");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("quarterly");
+  const [pricingTab, setPricingTab] = useState<"plans" | "features" | "addons" | "compare">("plans");
 
   const demo = DEMO_DATA[activeDemo];
 
@@ -722,155 +925,450 @@ export function LandingSections({ lang }: { lang: Lang }) {
         </div>
       </SectionReveal>
 
-      {/* ── 6. PRICING (Official 3-Tier Matrix + Pricing Assurance Box) ── */}
+      {/* ── 6. PRICING (Official 22 OCT 2026 Matrix with Tabs for Plans, Features, Add-ons, Compare) ── */}
       <SectionReveal className="pricing pricing-section" id="pricing">
         <div className="landing-container">
           <ScrollReveal direction="up" className="section-head">
-            <div className="eyebrow">{ta ? "கட்டணம்" : "Pricing"}</div>
+            <div className="eyebrow">
+              {ta ? "கட்டணத் திட்டங்கள் | 22 அக்டோபர் 2026" : "PRICING PLAN | 22 OCT 2026"}
+            </div>
             <h2>
-              {ta
-                ? "உங்கள் மென்பொருள் கட்டணம் தனி. மெட்டாவின் செய்திக் கட்டணம் அதிகாரப்பூர்வ விலையிலேயே இருக்கும்."
-                : "Your software plan is separate. Meta’s message rate stays Meta’s rate."}
+              {ta ? "எளிய திட்டங்கள். தெளிவான வணிக மதிப்பு." : "Simple plans. Clear business value."}
             </h2>
             <p className="pricing-note">
               {ta
-                ? "வளரும் வணிகங்களுக்கான எளிய, வெளிப்படையான கட்டணத் திட்டங்கள். அனைத்து விலைகளிலும் GST சேர்க்கப்பட்டுள்ளது · ₹0 செய்திக் கூடுதல் கட்டணம்."
-                : "Simple, transparent plans designed for growing businesses. All prices include GST · ₹0 message markup."}
+                ? "வாட்ஸ்அப்பில் விற்கும் மற்றும் சேவை வழங்கும் தமிழ்நாடு வணிகங்களுக்காக உருவாக்கப்பட்டது. மூன்று திட்டங்களின் விலைகளிலும் GST சேர்க்கப்பட்டுள்ளது."
+                : "Built for Tamil Nadu businesses selling and serving on WhatsApp. All three plan prices include GST."}
             </p>
 
-            {/* Billing Frequency Switcher Toggle */}
+            {/* 4 Navigation Tabs: Plans, Features, Add-ons, Compare */}
             <div style={{ display: "flex", justifyContent: "center" }}>
-              <div className="billing-term-toggle" role="tablist" aria-label={ta ? "கட்டணக் காலம்" : "Billing cycle"}>
+              <div className="pricing-tab-nav" role="tablist" aria-label={ta ? "கட்டணப் பிரிவுகள்" : "Pricing views"}>
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={billingCycle === "monthly"}
-                  className={billingCycle === "monthly" ? "active" : ""}
-                  onClick={() => setBillingCycle("monthly")}
+                  aria-selected={pricingTab === "plans"}
+                  className={pricingTab === "plans" ? "active" : ""}
+                  onClick={() => setPricingTab("plans")}
                 >
-                  {ta ? "மாதாந்திரம்" : "Monthly"}
+                  {ta ? "திட்டங்கள்" : "Plans"}
                 </button>
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={billingCycle === "quarterly"}
-                  className={billingCycle === "quarterly" ? "active" : ""}
-                  onClick={() => setBillingCycle("quarterly")}
+                  aria-selected={pricingTab === "features"}
+                  className={pricingTab === "features" ? "active" : ""}
+                  onClick={() => setPricingTab("features")}
                 >
-                  {ta ? "காலாண்டு (15% சேமிப்பு)" : "Quarterly (Save 15%)"}
+                  {ta ? "அனைத்து வசதிகள்" : "Features"}
                 </button>
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={billingCycle === "yearly"}
-                  className={billingCycle === "yearly" ? "active" : ""}
-                  onClick={() => setBillingCycle("yearly")}
+                  aria-selected={pricingTab === "addons"}
+                  className={pricingTab === "addons" ? "active" : ""}
+                  onClick={() => setPricingTab("addons")}
                 >
-                  {ta ? "வருடாந்திரம் (2 மாதங்கள் இலவசம்)" : "Yearly (2 Months Free)"}
+                  {ta ? "கூடுதல் சேவைகள்" : "Add-ons"}
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={pricingTab === "compare"}
+                  className={pricingTab === "compare" ? "active" : ""}
+                  onClick={() => setPricingTab("compare")}
+                >
+                  {ta ? "ஒப்பீடு" : "Compare"}
                 </button>
               </div>
             </div>
           </ScrollReveal>
 
-          {/* Green Pricing Assurance Callout Box */}
-          <div className="pricing-assurance" style={{ marginTop: "24px" }}>
-            <b>₹</b>
-            <div>
-              <strong>
-                {ta ? "வாட்ஸ்அப் செய்திக் கட்டணம் மெட்டாவின் அதிகாரப்பூர்வ விலையிலேயே கணக்கிடப்படுகிறது." : "WhatsApp message charges are passed through at Meta’s official rates."}
-              </strong>
-              <p>
-                {ta
-                  ? "அந்த செய்திக் கட்டணங்களில் தபால் கூடுதல் லாபம் சேர்ப்பதில்லை. மெட்டாவின் கட்டணங்கள் செய்தி வகை மற்றும் பெறும் நாட்டைப் பொறுத்தது; "
-                  : "Thabaal does not add a markup to those message rates. Meta’s rates depend on the message category and recipient market; "}
-                <a href="https://business.whatsapp.com/products/platform-pricing" target="_blank" rel="noopener noreferrer">
-                  {ta ? "மெட்டாவின் அதிகாரப்பூர்வ விலையைப் பார்க்கவும்" : "see Meta’s published pricing"}
-                </a>.
-              </p>
-            </div>
-          </div>
+          {/* TAB 1: PLANS */}
+          {pricingTab === "plans" && (
+            <>
+              {/* Billing Frequency Switcher Toggle */}
+              <div style={{ display: "flex", justifyContent: "center", marginTop: "24px" }}>
+                <div className="billing-term-toggle" role="tablist" aria-label={ta ? "கட்டணக் காலம்" : "Billing cycle"}>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={billingCycle === "monthly"}
+                    className={billingCycle === "monthly" ? "active" : ""}
+                    onClick={() => setBillingCycle("monthly")}
+                  >
+                    {ta ? "மாதாந்திரம்" : "Monthly"}
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={billingCycle === "quarterly"}
+                    className={billingCycle === "quarterly" ? "active" : ""}
+                    onClick={() => setBillingCycle("quarterly")}
+                  >
+                    {ta ? "காலாண்டு (10% சேமிப்பு)" : "Quarterly (Save 10%)"}
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={billingCycle === "yearly"}
+                    className={billingCycle === "yearly" ? "active" : ""}
+                    onClick={() => setBillingCycle("yearly")}
+                  >
+                    {ta ? "வருடாந்திரம் (20% சேமிப்பு)" : "Yearly (Save 20%)"}
+                  </button>
+                </div>
+              </div>
 
-          {/* Official 3-Tier Pricing Grid */}
-          <div className="pricing-tiers-grid">
-            {PRICING_PLANS.map((plan) => {
-              const isPopular = plan.popular;
-              const priceInfo = plan.pricing[billingCycle];
+              {/* Green Pricing Assurance Callout Box */}
+              <div className="pricing-assurance" style={{ marginTop: "24px" }}>
+                <b>₹</b>
+                <div>
+                  <strong>
+                    {ta
+                      ? "வாட்ஸ்அப் செய்திக் கட்டணம் மெட்டாவின் அதிகாரப்பூர்வ விலையிலேயே கணக்கிடப்படுகிறது."
+                      : "WhatsApp message charges are passed through at Meta’s official rates."}
+                  </strong>
+                  <p>
+                    {ta
+                      ? "அந்த செய்திக் கட்டணங்களில் தபால் கூடுதல் லாபம் சேர்ப்பதில்லை. மெட்டாவின் கட்டணங்கள் செய்தி வகை மற்றும் பெறும் நாட்டைப் பொறுத்தது; "
+                      : "Thabaal does not add a markup to those message rates. Meta’s rates depend on the message category and recipient market; "}
+                    <a href="https://business.whatsapp.com/products/platform-pricing" target="_blank" rel="noopener noreferrer">
+                      {ta ? "மெட்டாவின் அதிகாரப்பூர்வ விலையைப் பார்க்கவும்" : "see Meta’s published pricing"}
+                    </a>.
+                  </p>
+                </div>
+              </div>
 
-              return (
-                <article
-                  key={plan.id}
-                  className={`tier-card ${isPopular ? "tier-card-popular" : ""}`}
-                >
-                  {isPopular && (
-                    <span className="tier-popular-pill">
-                      {ta ? plan.badge?.ta : plan.badge?.en}
-                    </span>
-                  )}
+              {/* Official 3-Tier Pricing Grid */}
+              <div className="pricing-tiers-grid">
+                {PRICING_PLANS.map((plan) => {
+                  const isPopular = plan.popular;
+                  const priceInfo = plan.pricing[billingCycle];
 
-                  <div>
-                    <div className="tier-head">
-                      <h3>{ta ? plan.name.ta : plan.name.en}</h3>
-                      <p className="tier-tagline">{ta ? plan.tagline.ta : plan.tagline.en}</p>
-                    </div>
-
-                    <div className="tier-price-box">
-                      <span className="tier-currency">₹</span>
-                      <span className="tier-amount">{priceInfo.monthlyRate}</span>
-                      <span className="tier-per">/ {ta ? "மாதம்" : "mo"}</span>
-                    </div>
-
-                    <div className="tier-billed-note">
-                      {ta ? priceInfo.billedNote.ta : priceInfo.billedNote.en}
-                    </div>
-
-                    <div className="tier-specs">
-                      {(ta ? plan.specs.ta : plan.specs.en).map((spec, i) => (
-                        <div key={i}>• {spec}</div>
-                      ))}
-                    </div>
-
-                    <ul className="tier-features">
-                      {(ta ? plan.features.ta : plan.features.en).map((feat, i) => (
-                        <li key={i}>
-                          <span className="tier-check" aria-hidden="true">✔</span>
-                          <span>{feat}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div className="tier-cta-box">
-                    <a
-                      className={`btn tier-btn ${isPopular ? "landing-btn-yellow" : "btn-dark"}`}
-                      href="#start"
+                  return (
+                    <article
+                      key={plan.id}
+                      className={`tier-card ${isPopular ? "tier-card-popular" : ""}`}
                     >
-                      {ta ? plan.cta.ta : plan.cta.en}
-                    </a>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+                      {isPopular && (
+                        <span className="tier-popular-pill">
+                          {ta ? plan.badge?.ta : plan.badge?.en}
+                        </span>
+                      )}
 
-          {/* Add-ons Transparency Strip */}
-          <div className="pricing-addons-strip">
-            <div className="addon-item">
-              <strong>{ta ? "கூடுதல் பணியாளர் கணக்கு" : "Extra Staff Seat"}</strong>
-              <span>{ta ? "₹499 / மாதம் (தேவைக்கேற்ப சேர்க்கலாம்)" : "₹499 / seat / mo (Scale as team grows)"}</span>
+                      <div>
+                        <div className="tier-head">
+                          <h3>{ta ? plan.name.ta : plan.name.en}</h3>
+                          <p className="tier-tagline">{ta ? plan.tagline.ta : plan.tagline.en}</p>
+                        </div>
+
+                        <div className="tier-price-box">
+                          <span className="tier-currency">₹</span>
+                          <span className="tier-amount">{priceInfo.monthlyRate}</span>
+                          <span className="tier-per">/ {ta ? "மாதம்" : "mo"}</span>
+                        </div>
+
+                        <div className="tier-billed-note">
+                          {ta ? priceInfo.billedNote.ta : priceInfo.billedNote.en}
+                        </div>
+
+                        <div className="tier-specs">
+                          {(ta ? plan.specs.ta : plan.specs.en).map((spec, i) => (
+                            <div key={i}>• {spec}</div>
+                          ))}
+                        </div>
+
+                        <ul className="tier-features">
+                          {(ta ? plan.features.ta : plan.features.en).map((feat, i) => (
+                            <li key={i}>
+                              <span className="tier-check" aria-hidden="true">✔</span>
+                              <span>{feat}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="tier-cta-box">
+                        <a
+                          className={`btn tier-btn ${isPopular ? "landing-btn-yellow" : "btn-dark"}`}
+                          href="#start"
+                        >
+                          {ta ? plan.cta.ta : plan.cta.en}
+                        </a>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+
+              {/* Trust Strip */}
+              <div className="pricing-trust-strip">
+                <span>
+                  <i>✓</i> {ta ? "₹0 செய்திக் கூடுதல் கட்டணம் · அதிகாரப்பூர்வ மெட்டா விலை மட்டுமே" : "₹0 message markup · Direct official Meta rate"}
+                </span>
+                <span>
+                  <i>✓</i> {ta ? "வரம்பற்ற வாடிக்கையாளர் தொடர்புகள் · தொடர்புகளுக்கு வரம்பில்லை" : "Unlimited customer reach · No contact list caps"}
+                </span>
+              </div>
+
+              {/* How Billing Works Box */}
+              <div className="how-billing-works-box">
+                <h4>{ta ? "கட்டணம் எவ்வாறு செயல்படுகிறது?" : "How billing works"}</h4>
+                <div className="how-billing-grid">
+                  <div className="how-billing-item">
+                    <strong>{ta ? "தபால் மென்பொருள் சந்தா" : "Thabaal software subscription"}</strong>
+                    <p>
+                      {ta
+                        ? "மாதாந்திர, காலாண்டு (-10%) அல்லது வருடாந்திர (-20%) கட்டணம். இயங்குதள வசதிகள், கேட்லாக், ஆர்டர்கள், அறிக்கைகள் மற்றும் உங்கள் திட்டத்திற்குரிய எண்கள் & பணியாளர் கணக்குகளை உள்ளடக்கியது. அனைத்து திட்டங்களிலும் GST சேர்க்கப்பட்டுள்ளது."
+                        : "Billed monthly, quarterly (-10%) or yearly (-20%). Covers platform access, catalogue, orders, reports, and your plan’s included numbers and logins. All plan prices include GST."}
+                    </p>
+                  </div>
+                  <div className="how-billing-item">
+                    <strong>{ta ? "மெட்டாவின் செய்திக் கட்டணம்" : "Meta WhatsApp message charges"}</strong>
+                    <p>
+                      {ta
+                        ? "செய்திகளுக்கு மெட்டா நிர்ணயிக்கும் அதிகாரப்பூர்வ கட்டணத்தை மட்டுமே செலுத்துவீர்கள் (Utility ~₹0.11-₹0.14, Marketing ~₹0.78-₹0.88). தபால் ஒரு பைசா கூட கூடுதல் கட்டணம் வசூலிப்பதில்லை."
+                        : "You pay Meta directly at their official rates (Utility ~₹0.11-₹0.14, Marketing ~₹0.78-₹0.88). Thabaal adds exactly ₹0 markup on any message."}
+                    </p>
+                  </div>
+                  <div className="how-billing-item">
+                    <strong>{ta ? "தொடர்பு வரம்புகள் இல்லை" : "No contact list caps or penalties"}</strong>
+                    <p>
+                      {ta
+                        ? "அனைத்து திட்டங்களிலும் வரம்பற்ற வாடிக்கையாளர் தொடர்புகள், குறிச்சொற்கள் மற்றும் பகுப்புகள். உங்கள் வாடிக்கையாளர் பட்டியல் வளர்வதால் கூடுதல் கட்டணம் இல்லை."
+                        : "Unlimited customer database contacts, tags, and segments across all plans. You never get penalized for growing your customer audience."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* TAB 2: FULL FEATURES COMPARISON TABLE */}
+          {pricingTab === "features" && (
+            <div className="pricing-feature-table-card">
+              <div className="pricing-table-container">
+                <table className="pricing-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: "38%" }}>{ta ? "அம்சம்" : "Feature"}</th>
+                      <th style={{ width: "20%" }}>{ta ? "ஸ்டார்ட்டர் (₹1,199/மா)" : "Starter (₹1,199/mo)"}</th>
+                      <th className="col-featured" style={{ width: "22%" }}>
+                        {ta ? "வளர்ச்சி (₹2,999/மா) ★" : "Growth (₹2,999/mo) ★"}
+                      </th>
+                      <th style={{ width: "20%" }}>{ta ? "பிசினஸ் (₹4,999/மா)" : "Business (₹4,999/mo)"}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {FEATURE_COMPARISON.map((row, idx) => {
+                      const renderVal = (val: string) => {
+                        if (val === "Included") {
+                          return <span className="included-badge">✔ {ta ? "சேர்க்கப்பட்டுள்ளது" : "Included"}</span>;
+                        }
+                        if (val === "—") {
+                          return <span className="dash-badge">—</span>;
+                        }
+                        if (val === "Unlimited") {
+                          return <strong>{ta ? "வரம்பற்றது" : "Unlimited"}</strong>;
+                        }
+                        return val;
+                      };
+
+                      return (
+                        <tr key={idx}>
+                          <td><strong>{ta ? row.name.ta : row.name.en}</strong></td>
+                          <td>{renderVal(row.starter)}</td>
+                          <td className="col-featured">{renderVal(row.growth)}</td>
+                          <td>{renderVal(row.business)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="table-footnote-box">
+                <div style={{ marginBottom: "10px" }}>
+                  <strong>* {ta ? "பிரச்சாரங்கள் மற்றும் டெம்ப்ளேட்கள் நியாயமான பயன்பாடு:" : "Campaign and template fair usage:"}</strong>{" "}
+                  {ta
+                    ? "சிறு வணிக பயன்பாட்டிற்கு உகந்த அளவில் நிர்ணயிக்கப்பட்டுள்ளது. கூடுதல் தேவை இருப்பின் கோரிக்கையின் பேரில் வழங்கலாம்."
+                    : "Campaigns and templates are sized for typical small-business usage. If you need higher limits, they are available on request."}
+                </div>
+                <div>
+                  <strong>{ta ? "அறிக்கைகளைப் புரிந்து கொள்ளும் வழிகாட்டி:" : "How to read the reports:"}</strong>{" "}
+                  <b>Overview</b> ({ta ? "சென்றடைந்தது, செயலிலுள்ள ஆர்டர்கள், இன்றைய விற்பனை" : "reach, active orders, today's sales"}),{" "}
+                  <b>Customers</b> ({ta ? "மறுஆர்டர் வாடிக்கையாளர்கள், பகுதி வாரியாக, லாயல்டி நிலை" : "repeat buyers, area breakdown, loyalty tiers"}),{" "}
+                  <b>Campaigns</b> ({ta ? "பிரச்சார வருவாய், ஆர்டர் மாற்றங்கள்" : "broadcast revenue, click-to-order conversions"}),{" "}
+                  <b>Products</b> ({ta ? "அதிகம் விற்றவை, கைவிடப்பட்ட கார்ட்கள், மறுஆர்டர் சுழற்சி" : "best-sellers, cart drops, reorder cycle"}).
+                </div>
+              </div>
             </div>
-            <div className="addon-item">
-              <strong>{ta ? "கூடுதல் வாட்ஸ்அப் எண்" : "Extra WhatsApp Number"}</strong>
-              <span>{ta ? "₹599 / மாதம் (கிளைகள் & உதவி எண்கள்)" : "₹599 / number / mo (Branch & support lines)"}</span>
-            </div>
-            <div className="addon-item addon-highlight">
-              <strong>{ta ? "நேரடி அமைப்பு உதவி (Onboarding)" : "Done-for-You Setup & Onboarding"}</strong>
-              <span>{ta ? "காலாண்டு & வருடாந்திர திட்டங்களில் இலவசம் (மாதாந்திரம் ₹1,999)" : "Free on Quarterly & Yearly (₹1,999 on Monthly)"}</span>
-            </div>
-            <div className="addon-item">
-              <strong>{ta ? "மெட்டாவின் செய்திக் கட்டணம்" : "Meta Message Charges"}</strong>
-              <span>{ta ? "₹0 கூடுதல் கட்டணம் (அதிகாரப்பூர்வ நேரடி விலை)" : "₹0 Thabaal markup (100% direct official rate)"}</span>
-            </div>
-          </div>
+          )}
+
+          {/* TAB 3: ADD-ONS & CUSTOM WORK */}
+          {pricingTab === "addons" && (
+            <>
+              {/* Add-ons Transparency Strip */}
+              <div className="pricing-addons-strip" style={{ marginTop: "28px" }}>
+                <div className="addon-item">
+                  <strong>{ta ? "கூடுதல் பணியாளர் கணக்கு" : "Extra Staff Seat"}</strong>
+                  <span>{ta ? "₹499 / மாதம் (விற்பனை மற்றும் ஆதரவுக் குழுக்களுக்கு)" : "INR 499 / seat / mo (Scale as team grows)"}</span>
+                </div>
+                <div className="addon-item">
+                  <strong>{ta ? "கூடுதல் வாட்ஸ்அப் எண்" : "Extra WhatsApp Number"}</strong>
+                  <span>{ta ? "₹599 / மாதம் (கிளைகள், துறைகள் & பிரச்சார எண்கள்)" : "INR 599 / number / mo (Branch & support lines)"}</span>
+                </div>
+                <div className="addon-item addon-highlight">
+                  <strong>{ta ? "நேரடி அமைப்பு உதவி (Done-for-You)" : "Done-for-You Setup & Onboarding"}</strong>
+                  <span>{ta ? "காலாண்டு & வருடாந்திர திட்டங்களில் இலவசம் (மாதாந்திரம் ₹299)" : "Free on Quarterly & Yearly (INR 299 one-time on Monthly)"}</span>
+                </div>
+                <div className="addon-item">
+                  <strong>{ta ? "மெட்டாவின் செய்திக் கட்டணம்" : "Meta Message Charges"}</strong>
+                  <span>{ta ? "₹0 கூடுதல் கட்டணம் (100% அதிகாரப்பூர்வ நேரடி விலை)" : "₹0 Thabaal markup (100% direct official rate)"}</span>
+                </div>
+              </div>
+
+              {/* Custom Work Proposal Hero Card */}
+              <div className="custom-work-hero-box">
+                <h4>{ta ? "தனிப்பயன் வணிகத் தீர்வுகள் & Enterprise" : "Custom work proposal"}</h4>
+                <p>
+                  {ta
+                    ? "பிரத்யேக கட்டமைப்பு, Tally / Zoho ERP இணைப்பு, அல்லது சிறப்பு அறிக்கைகள் தேவைப்படும் பெரிய வணிகங்களுக்கான தீர்வுகள்."
+                    : "For businesses that need tailored setup, custom ERP/Tally integrations, higher multi-team throughput, or specialized reporting."}
+                </p>
+
+                <div className="custom-work-pillars-grid">
+                  <div className="custom-pillar">
+                    <strong>1. {ta ? "கூடுதல் திறன் (More capacity)" : "More capacity"}</strong>
+                    <span>
+                      {ta
+                        ? "அதிக அளவிலான செய்திகள், 10+ வாட்ஸ்அப் எண்கள், பிரத்யேக சர்வர் வரிசைப்படுத்தல் மற்றும் அதிவேக அனுப்புதல்."
+                        : "High-volume broadcasts, 10+ WhatsApp numbers, dedicated message throughput, and high-speed queuing."}
+                    </span>
+                  </div>
+                  <div className="custom-pillar">
+                    <strong>2. {ta ? "வணிகத்திற்கேற்ற கட்டமைப்பு (Business-specific setup)" : "Business-specific setup"}</strong>
+                    <span>
+                      {ta
+                        ? "தனிப்பயன் ஆர்டர் நிலைகள், கிளை வழியமைப்புகள், பிராந்திய மொழி ஆதரவு மற்றும் தனிப்பயன் தகவல் சேகரிப்பு."
+                        : "Tailored order workflows, branch routing, custom product variants, and multi-language support."}
+                    </span>
+                  </div>
+                  <div className="custom-pillar">
+                    <strong>3. {ta ? "இணைக்கப்பட்ட மென்பொருட்கள் (Connected systems)" : "Connected systems"}</strong>
+                    <span>
+                      {ta
+                        ? "Tally, Zoho, SAP அல்லது சொந்த பில்லிங் சாப்ட்வேருடன் நேரடி இருவழி இணைப்பு மற்றும் இன்வென்டரி ஒத்திசைவு."
+                        : "Two-way integration with Tally, Zoho, SAP, custom POS, or proprietary inventory databases."}
+                    </span>
+                  </div>
+                  <div className="custom-pillar">
+                    <strong>4. {ta ? "தனிப்பயன் அறிக்கைகள் (Tailored reporting)" : "Tailored reporting"}</strong>
+                    <span>
+                      {ta
+                        ? "பிரத்யேக விற்பனை அளவீடுகள், தானியங்கி PDF/Excel அறிக்கைகள், தலைமை நிர்வாக டாஷ்போர்டு மற்றும் நேரடித் தரவு ஏற்றுமதி."
+                        : "Custom sales attribution metrics, scheduled automated PDF/Excel digests, and executive dashboards."}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="custom-work-footer">
+                  <div>
+                    <span>{ta ? "எங்கள் தொழில்நுட்பக் குழுவுடன் நேரடியாகப் பேசுங்கள்:" : "Speak directly with our technical team:"} </span>
+                    <a href="tel:+916379140626">+91 63791 40626</a>
+                    <span style={{ margin: "0 8px", opacity: 0.5 }}>|</span>
+                    <a href="mailto:thabaal26@gmail.com">thabaal26@gmail.com</a>
+                  </div>
+                  <a className="btn landing-btn-yellow btn-small" href="tel:+916379140626">
+                    {ta ? "அழைக்கவும் ↗" : "Talk to our team ↗"}
+                  </a>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* TAB 4: COMPETITOR COMPARISON & THE THABAAL STORY */}
+          {pricingTab === "compare" && (
+            <>
+              <div className="pricing-feature-table-card">
+                <div className="pricing-table-container">
+                  <table className="pricing-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: "18%" }}>{ta ? "தளம்" : "Platform"}</th>
+                        <th style={{ width: "26%" }}>{ta ? "விலை" : "Price"}</th>
+                        <th style={{ width: "28%" }}>{ta ? "முக்கிய நோக்கம்" : "Primary focus"}</th>
+                        <th style={{ width: "28%" }}>{ta ? "தபால் ஒப்பீடு" : "Thabaal comparison"}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {COMPETITOR_COMPARISON.map((row, idx) => (
+                        <tr
+                          key={idx}
+                          style={row.isThabaal ? { background: "rgba(253, 185, 19, 0.08)", fontWeight: 700 } : undefined}
+                        >
+                          <td>
+                            <strong>
+                              {row.platform} {row.isThabaal && <span style={{ color: "#d97706" }}>★</span>}
+                            </strong>
+                          </td>
+                          <td style={row.isThabaal ? { color: "var(--navy)", fontWeight: 800 } : undefined}>
+                            {ta ? row.price.ta : row.price.en}
+                          </td>
+                          <td>{ta ? row.focus.ta : row.focus.en}</td>
+                          <td style={row.isThabaal ? { color: "#059669", fontWeight: 700 } : undefined}>
+                            {ta ? row.comparison.ta : row.comparison.en}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="table-footnote-box">
+                  {ta
+                    ? "விலை மற்றும் அம்சங்கள் 2026 பொதுத் தகவல்களின் அடிப்படையில் தொகுக்கப்பட்டவை. பிற தளங்களின் விலை மாற்றங்களுக்கு உட்பட்டது."
+                    : "Prices and features benchmarked from publicly available platform data as of 2026. Competitor terms and regional rates may change."}
+                </div>
+              </div>
+
+              {/* The Thabaal story for a Tamil Nadu business owner */}
+              <div className="how-billing-works-box" style={{ marginTop: "28px" }}>
+                <h4>
+                  {ta
+                    ? "தமிழ்நாடு வணிக உரிமையாளருக்கான தபால் கதை"
+                    : "The Thabaal story for a Tamil Nadu business owner"}
+                </h4>
+                <div className="how-billing-grid">
+                  <div className="how-billing-item">
+                    <strong>1. {ta ? "வெளிப்படையான விலை" : "Honest, all-inclusive pricing"}</strong>
+                    <p>
+                      {ta
+                        ? "அனைத்து விலைகளும் ரூபாயில் GST உட்பட தெளிவாகக் காட்டப்படும். மறைமுகக் கட்டணங்கள் இல்லை; மெட்டாவின் செய்திக் கட்டணத்தில் ₹0 கூடுதல் லாபம்."
+                        : "All three plans are quoted in INR with GST included. No surprise conversion rates, and ₹0 markup on official Meta charges."}
+                    </p>
+                  </div>
+                  <div className="how-billing-item">
+                    <strong>2. {ta ? "வணிக இயக்கம் மையத்தில்" : "Commerce at the center"}</strong>
+                    <p>
+                      {ta
+                        ? "வெறும் தகவலனுப்புதல் மட்டுமின்றி கேட்லாக், ஆர்டர் போர்டு, UPI பேமெண்ட் மற்றும் பேக்கிங் பட்டியல் அனைத்தும் ஒரே தளத்தில் இணைக்கப்பட்டுள்ளது."
+                        : "Not just broadcast messaging. Catalogue sync, live order pipeline, UPI payment collection, and packing lists in one unified workflow."}
+                    </p>
+                  </div>
+                  <div className="how-billing-item">
+                    <strong>3. {ta ? "பல எண்கள் & உள்ளூர் ஆதரவு" : "Multi-number & local support"}</strong>
+                    <p>
+                      {ta
+                        ? "2, 3 அல்லது 5 எண்கள் திட்டத்திலேயே வழங்கப்படுகிறது. தமிழ் & ஆங்கில இருமொழி இடைமுகம், நேரடி தொலைபேசி மற்றும் வாட்ஸ்அப் ஆதரவு."
+                        : "2, 3, or 5 WhatsApp numbers included per tier so branches and teams operate cleanly. Full bilingual Tamil & English with direct support."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Enterprise & White-Label Callout Banner */}
           <div className="enterprise-callout">
