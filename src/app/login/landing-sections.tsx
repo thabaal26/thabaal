@@ -563,8 +563,8 @@ export function LandingSections({ lang }: { lang: Lang }) {
                     onClick={() => toggleFaq(idx)}
                     aria-expanded={isOpen}
                   >
-                    <span>{item.q[lang]}</span>
-                    <span aria-hidden="true">+</span>
+                    <span className="faq-q-text">{item.q[lang]}</span>
+                    <span className="faq-toggle-icon" aria-hidden="true">+</span>
                   </button>
                   <div className="faq-answer">
                     <p>{item.a[lang]}</p>
