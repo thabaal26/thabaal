@@ -63,6 +63,19 @@
   gap: 24px;
 }
 
+@media (max-height: 720px) {
+  .site-header-container {
+    min-height: 54px;
+  }
+  .site-header-brand img {
+    height: 32px;
+  }
+  .site-header-btn {
+    padding: 7px 14px;
+    font-size: 13px;
+  }
+}
+
 .site-header-brand {
   display: inline-flex;
   align-items: center;
@@ -254,7 +267,7 @@
 
 /* ── 1. Proof Strip (Exact Standalone HTML Match) ── */
 .proof-strip {
-  padding: 24px 0;
+  padding: 14px 0;
   border-bottom: 1px solid #edbe25;
   background: var(--yellow);
   color: var(--navy);
@@ -271,10 +284,24 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: clamp(16px, 2vw, 24px);
   color: var(--navy);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
+  line-height: 1.4;
+  width: min(1280px, calc(100% - 40px));
+  margin: 0 auto;
+}
+
+.proof-row > div:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  [data-lang="en"] .proof-row > div:first-child {
+    white-space: nowrap;
+  }
 }
 
 .proof-row strong {
@@ -289,19 +316,30 @@
 
 .proof-tags {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.proof-tags::-webkit-scrollbar {
+  display: none;
 }
 
 .proof-tag {
-  padding: 8px 14px;
+  padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(6, 36, 69, 0.12);
   font-weight: 800;
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--navy);
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
