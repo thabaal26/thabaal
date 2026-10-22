@@ -896,12 +896,14 @@ export function LandingSections({ lang }: { lang: Lang }) {
               <span>{ta ? "3 · நிலையை சரிபார்க்கவும்" : "3 · Check status"}</span>
               <span>{ta ? "4 · ஒப்புதல் பெற்றதும் அனுப்பவும்" : "4 · Send if approved"}</span>
             </div>
-            <p style={{ fontSize: "12px", marginTop: "19px", color: "var(--muted)" }}>
+            <p className="template-disclaimer">
               {ta ? "டெம்ப்ளேட் ஒப்புதலை மெட்டா மட்டுமே தீர்மானிக்கிறது; தபால் உத்தரவாதம் அளிக்காது." : "Template approval is decided by Meta, not guaranteed by Thabaal."}
             </p>
-            <a className="btn btn-dark btn-small" href={MAILTO_TEMPLATE}>
-              {ta ? "டெம்ப்ளேட் செயல்முறை பார்க்க ↗" : "See template demo ↗"}
-            </a>
+            <div className="template-cta-wrap">
+              <a className="btn btn-dark btn-small" href={MAILTO_TEMPLATE}>
+                {ta ? "டெம்ப்ளேட் செயல்முறை பார்க்க ↗" : "See template demo ↗"}
+              </a>
+            </div>
           </div>
 
           <div className="template-preview" aria-label={ta ? "மாதிரி செய்தி அட்டை" : "Illustrative message template card"}>
