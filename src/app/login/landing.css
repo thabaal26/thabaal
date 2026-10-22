@@ -2718,11 +2718,40 @@
   font-size: 13.5px;
 }
 
-.custom-work-footer a {
+.custom-work-footer a:not(.btn) {
   color: var(--yellow);
   font-weight: 800;
   text-decoration: underline;
   text-underline-offset: 3px;
+  transition: opacity 0.2s ease;
+}
+
+.custom-work-footer a:not(.btn):hover {
+  opacity: 0.85;
+}
+
+.custom-work-footer a.btn,
+.custom-work-footer .btn {
+  color: var(--navy) !important;
+  background: var(--yellow) !important;
+  text-decoration: none !important;
+  font-weight: 800;
+  padding: 9px 20px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  box-shadow: 0 2px 10px rgba(253, 185, 19, 0.35);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.custom-work-footer a.btn:hover,
+.custom-work-footer .btn:hover {
+  color: var(--navy) !important;
+  text-decoration: none !important;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(253, 185, 19, 0.45);
 }
 
 /* ── Responsive adjustments for new modules ── */
