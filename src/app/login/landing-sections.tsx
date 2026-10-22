@@ -928,7 +928,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
       {/* ── 6. PRICING (Official 22 OCT 2026 Matrix with Tabs for Plans, Features, Add-ons, Compare) ── */}
       <SectionReveal className="pricing pricing-section" id="pricing">
         <div className="landing-container">
-          <ScrollReveal direction="up" className="section-head">
+          <ScrollReveal direction="up" className="section-head pricing-head">
             <div className="eyebrow">
               {ta ? "கட்டணத் திட்டங்கள் | 22 அக்டோபர் 2026" : "PRICING PLAN | 22 OCT 2026"}
             </div>
@@ -940,88 +940,93 @@ export function LandingSections({ lang }: { lang: Lang }) {
                 ? "வாட்ஸ்அப்பில் விற்கும் மற்றும் சேவை வழங்கும் தமிழ்நாடு வணிகங்களுக்காக உருவாக்கப்பட்டது. மூன்று திட்டங்களின் விலைகளிலும் GST சேர்க்கப்பட்டுள்ளது."
                 : "Built for Tamil Nadu businesses selling and serving on WhatsApp. All three plan prices include GST."}
             </p>
+          </ScrollReveal>
 
-            {/* 4 Navigation Tabs: Plans, Features, Add-ons, Compare */}
-            <div style={{ display: "flex", justifyContent: "center" }}>
-              <div className="pricing-tab-nav" role="tablist" aria-label={ta ? "கட்டணப் பிரிவுகள்" : "Pricing views"}>
+          {/* Unified Controls Bar: Navigation Tabs (Left) + Billing Term Toggle (Right) */}
+          <div className="pricing-controls-row">
+            {/* Left: 4 Content Navigation Tabs with Text-Tab / Underline Indicator */}
+            <nav className="pricing-nav-tabs" role="tablist" aria-label={ta ? "கட்டணப் பிரிவுகள்" : "Pricing views"}>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={pricingTab === "plans"}
+                className={`pricing-nav-tab ${pricingTab === "plans" ? "active" : ""}`}
+                onClick={() => setPricingTab("plans")}
+              >
+                <span>{ta ? "திட்டங்கள்" : "Plans"}</span>
+                {pricingTab === "plans" && <span className="pricing-nav-indicator" />}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={pricingTab === "features"}
+                className={`pricing-nav-tab ${pricingTab === "features" ? "active" : ""}`}
+                onClick={() => setPricingTab("features")}
+              >
+                <span>{ta ? "அனைத்து வசதிகள்" : "Features"}</span>
+                {pricingTab === "features" && <span className="pricing-nav-indicator" />}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={pricingTab === "addons"}
+                className={`pricing-nav-tab ${pricingTab === "addons" ? "active" : ""}`}
+                onClick={() => setPricingTab("addons")}
+              >
+                <span>{ta ? "கூடுதல் சேவைகள்" : "Add-ons"}</span>
+                {pricingTab === "addons" && <span className="pricing-nav-indicator" />}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={pricingTab === "compare"}
+                className={`pricing-nav-tab ${pricingTab === "compare" ? "active" : ""}`}
+                onClick={() => setPricingTab("compare")}
+              >
+                <span>{ta ? "ஒப்பீடு" : "Compare"}</span>
+                {pricingTab === "compare" && <span className="pricing-nav-indicator" />}
+              </button>
+            </nav>
+
+            {/* Right: Billing Frequency Switcher Toggle (Compact Segmented Pill) */}
+            {pricingTab === "plans" && (
+              <div className="billing-term-toggle" role="tablist" aria-label={ta ? "கட்டணக் காலம்" : "Billing cycle"}>
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={pricingTab === "plans"}
-                  className={pricingTab === "plans" ? "active" : ""}
-                  onClick={() => setPricingTab("plans")}
+                  aria-selected={billingCycle === "monthly"}
+                  className={billingCycle === "monthly" ? "active" : ""}
+                  onClick={() => setBillingCycle("monthly")}
                 >
-                  {ta ? "திட்டங்கள்" : "Plans"}
+                  {ta ? "மாதாந்திரம்" : "Monthly"}
                 </button>
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={pricingTab === "features"}
-                  className={pricingTab === "features" ? "active" : ""}
-                  onClick={() => setPricingTab("features")}
+                  aria-selected={billingCycle === "quarterly"}
+                  className={billingCycle === "quarterly" ? "active" : ""}
+                  onClick={() => setBillingCycle("quarterly")}
                 >
-                  {ta ? "அனைத்து வசதிகள்" : "Features"}
+                  {ta ? "காலாண்டு (10% சேமிப்பு)" : "Quarterly (Save 10%)"}
                 </button>
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={pricingTab === "addons"}
-                  className={pricingTab === "addons" ? "active" : ""}
-                  onClick={() => setPricingTab("addons")}
+                  aria-selected={billingCycle === "yearly"}
+                  className={billingCycle === "yearly" ? "active" : ""}
+                  onClick={() => setBillingCycle("yearly")}
                 >
-                  {ta ? "கூடுதல் சேவைகள்" : "Add-ons"}
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={pricingTab === "compare"}
-                  className={pricingTab === "compare" ? "active" : ""}
-                  onClick={() => setPricingTab("compare")}
-                >
-                  {ta ? "ஒப்பீடு" : "Compare"}
+                  {ta ? "வருடாந்திரம் (20% சேமிப்பு)" : "Yearly (Save 20%)"}
                 </button>
               </div>
-            </div>
-          </ScrollReveal>
+            )}
+          </div>
 
           {/* TAB 1: PLANS */}
           {pricingTab === "plans" && (
             <>
-              {/* Billing Frequency Switcher Toggle */}
-              <div style={{ display: "flex", justifyContent: "center", marginTop: "24px" }}>
-                <div className="billing-term-toggle" role="tablist" aria-label={ta ? "கட்டணக் காலம்" : "Billing cycle"}>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={billingCycle === "monthly"}
-                    className={billingCycle === "monthly" ? "active" : ""}
-                    onClick={() => setBillingCycle("monthly")}
-                  >
-                    {ta ? "மாதாந்திரம்" : "Monthly"}
-                  </button>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={billingCycle === "quarterly"}
-                    className={billingCycle === "quarterly" ? "active" : ""}
-                    onClick={() => setBillingCycle("quarterly")}
-                  >
-                    {ta ? "காலாண்டு (10% சேமிப்பு)" : "Quarterly (Save 10%)"}
-                  </button>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={billingCycle === "yearly"}
-                    className={billingCycle === "yearly" ? "active" : ""}
-                    onClick={() => setBillingCycle("yearly")}
-                  >
-                    {ta ? "வருடாந்திரம் (20% சேமிப்பு)" : "Yearly (Save 20%)"}
-                  </button>
-                </div>
-              </div>
-
               {/* Green Pricing Assurance Callout Box */}
-              <div className="pricing-assurance" style={{ marginTop: "24px" }}>
+              <div className="pricing-assurance">
                 <b>₹</b>
                 <div>
                   <strong>
