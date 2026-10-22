@@ -328,93 +328,263 @@
   max-width: 64ch;
 }
 
-/* ── 1. Proof Strip (Exact Standalone HTML Match) ── */
-.proof-strip {
-  padding: 14px 0;
-  border-bottom: 1px solid #edbe25;
-  background: var(--yellow);
-  color: var(--navy);
-  transition: background 0.3s ease, border-color 0.3s ease;
+/* ── 1. Flight Path Signature Ribbon (Design 2 — Iconic Flow) ── */
+.business-ribbon {
+  position: relative;
+  width: 100%;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 30%, rgba(24, 67, 108, 0.32) 0%, transparent 75%),
+    linear-gradient(115deg, #061C36 0%, #082747 52%, #061F3D 100%);
+  color: #ffffff;
+  padding: clamp(34px, 3.8vw, 44px) 0 clamp(36px, 4vw, 48px);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: clip;
 }
 
-[data-theme="night"] .proof-strip {
-  background: var(--yellow);
-  border-color: #edbe25;
-  color: var(--navy);
+[data-theme="night"] .business-ribbon {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 30%, rgba(20, 55, 90, 0.35) 0%, transparent 75%),
+    linear-gradient(115deg, #05162a 0%, #071f3d 52%, #05182e 100%);
+  border-top-color: rgba(35, 58, 95, 0.6);
+  border-bottom-color: rgba(35, 58, 95, 0.6);
 }
 
-.proof-row {
+/* Atmospheric Clouds at Edges */
+.ribbon__clouds {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.ribbon__cloud {
+  position: absolute;
+  color: #234870;
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+.ribbon__cloud--left {
+  left: clamp(-40px, -2vw, -10px);
+  bottom: -12px;
+  width: clamp(180px, 18vw, 250px);
+  height: auto;
+}
+
+.ribbon__cloud--right {
+  right: clamp(-40px, -2vw, -10px);
+  bottom: -14px;
+  width: clamp(170px, 17vw, 240px);
+  height: auto;
+}
+
+/* Container & Centered Flow */
+.ribbon__container {
+  position: relative;
+  z-index: 2;
+  width: min(1120px, calc(100% - 48px));
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+/* 1. Upper Brand Mark */
+.ribbon__brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  filter: drop-shadow(0 4px 14px rgba(255, 191, 24, 0.32));
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ribbon__brand-mark:hover {
+  transform: scale(1.05);
+}
+
+/* 2. Centered Typography */
+.ribbon__copy-group {
+  max-width: 820px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.ribbon__title {
+  margin: 0;
+  font-size: clamp(17px, 1.5vw, 22px);
+  line-height: 1.38;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: #ffffff;
+  text-align: center;
+}
+
+.ribbon__description {
+  margin: 8px auto 0;
+  max-width: 680px;
+  font-size: clamp(13px, 1.05vw, 15px);
+  line-height: 1.6;
+  font-weight: 400;
+  color: #c8d6e7;
+  text-align: center;
+}
+
+/* 3. Flight Path Graphic & Terminal Bird */
+.ribbon__flight-path-wrap {
+  position: relative;
+  width: min(760px, 94%);
+  height: 52px;
+  margin: 16px auto 18px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: clamp(16px, 2vw, 24px);
-  color: var(--navy);
-  font-size: 13px;
+  justify-content: center;
+}
+
+.ribbon__flight-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.ribbon__flight-line {
+  opacity: 0.92;
+}
+
+.ribbon__endpoint-bird {
+  position: absolute;
+  right: clamp(2px, 2%, 14px);
+  top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(-10deg);
+  filter: drop-shadow(0 2px 8px rgba(255, 191, 24, 0.4));
+  pointer-events: none;
+}
+
+.ribbon__mini-bird {
+  width: 26px;
+  height: auto;
+  display: block;
+}
+
+/* 4. Category Pills */
+.ribbon__categories {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.ribbon__category {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 20px;
+  border-radius: 9999px;
+  background: #123454;
+  border: 1px solid #35516f;
+  color: #ffffff;
+  font-size: 13.5px;
   font-weight: 600;
-  line-height: 1.4;
-  width: min(1280px, calc(100% - 40px));
-  margin: 0 auto;
+  line-height: 1.3;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
 }
 
-.proof-row > div:first-child {
-  flex: 1 1 auto;
-  min-width: 0;
+.ribbon__category:hover {
+  background: #1b456e;
+  border-color: #4a729c;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
 }
 
-@media (min-width: 1024px) {
-  [data-lang="en"] .proof-row > div:first-child {
-    white-space: nowrap;
+/* Responsive constraints */
+@media (max-width: 960px) {
+  .business-ribbon {
+    padding: clamp(28px, 3.5vw, 36px) 0 clamp(30px, 3.8vw, 38px);
+  }
+
+  .ribbon__container {
+    width: min(calc(100% - 36px), 1120px);
+  }
+
+  .ribbon__flight-path-wrap {
+    height: 48px;
+    margin: 14px auto 16px;
+  }
+
+  .ribbon__endpoint-bird {
+    right: 4px;
+    top: 3px;
   }
 }
 
-.proof-row strong {
-  color: var(--navy);
-  font-weight: 800;
+@media (max-width: 640px) {
+  .business-ribbon {
+    padding: 24px 0 26px;
+  }
+
+  .ribbon__container {
+    width: calc(100% - 28px);
+  }
+
+  .ribbon__brand-mark {
+    margin-bottom: 12px;
+  }
+
+  .ribbon__flight-path-wrap {
+    height: 44px;
+    margin: 12px auto 14px;
+  }
+
+  .ribbon__endpoint-bird {
+    right: 2px;
+    top: 2px;
+  }
+
+  .ribbon__mini-bird {
+    width: 22px;
+  }
+
+  .ribbon__categories {
+    gap: 8px;
+  }
+
+  .ribbon__category {
+    padding: 6px 15px;
+    font-size: 12.5px;
+  }
+
+  .ribbon__cloud--left,
+  .ribbon__cloud--right {
+    opacity: 0.12;
+    width: 140px;
+  }
 }
 
-[data-theme="night"] .proof-row,
-[data-theme="night"] .proof-row strong {
-  color: var(--navy);
+@media (max-width: 420px) {
+  .ribbon__category {
+    padding: 5.5px 13px;
+    font-size: 12px;
+  }
 }
 
-.proof-tags {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.proof-tags::-webkit-scrollbar {
-  display: none;
-}
-
-.proof-tag {
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(6, 36, 69, 0.12);
-  font-weight: 800;
-  font-size: 12px;
-  color: var(--navy);
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: transform 0.2s ease, border-color 0.2s ease;
-}
-
-[data-theme="night"] .proof-tag {
-  background: rgba(255, 255, 255, 0.9);
-  color: var(--navy);
-  border-color: rgba(6, 36, 69, 0.15);
-}
-
-.proof-tag:hover {
-  transform: translateY(-1px);
-  border-color: var(--navy);
+@media (prefers-reduced-motion: reduce) {
+  .ribbon__category,
+  .ribbon__brand-mark {
+    transition: none;
+    transform: none;
+  }
 }
 
 /* ── 2. One Simple Workspace (4 Cards) ── */
@@ -1386,10 +1556,6 @@
     font-size: 12px;
   }
 
-  .proof-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
 
   .feature-grid,
   .steps-grid,
@@ -4158,11 +4324,6 @@ footer#login {
     align-items: flex-start;
   }
 
-  .proof-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 14px;
-  }
 
   .order-path {
     grid-template-columns: 1fr;
