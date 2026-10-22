@@ -1527,46 +1527,205 @@ export function LandingSections({ lang }: { lang: Lang }) {
         </div>
       </section>
 
-      {/* ── 9. FULL BRAND FOOTER (Exact Match HTML #login with Official Logo Plate) ── */}
-      <footer id="login">
-        <div className="landing-container">
-          <div className="footer-top">
-            <div className="footer-brand">
-              <span className="footer-logo-plate">
+      {/* ── 9. FULL BRAND FOOTER — ILLUSTRATED WAVE & BRAND STORY ── */}
+      <footer id="login" className="thabaal-footer" aria-label={ta ? "தள அடிக்குறிப்பு" : "Site footer"}>
+        {/* Layer A — Clean Light Content Area */}
+        <div className="footer-content-area">
+          <div className="landing-container footer-content-grid">
+            {/* Column 1 — Brand */}
+            <div className="footer-col footer-col--brand">
+              <a href="#" className="footer-logo-link" aria-label="Thabaal Home">
                 <Image
                   src={ta ? "/brands/thabaal/thabaal-logo-ta.png" : "/brands/thabaal/thabaal-logo-en.png"}
                   alt="Thabaal"
                   width={154}
                   height={52}
-                  className="footer-logo"
-                  style={{ width: "170px", height: "auto" }}
+                  className="footer-logo footer-logo--day"
+                  style={{ width: "160px", height: "auto" }}
                 />
-              </span>
-              <p>
+                <Image
+                  src={ta ? "/brands/thabaal/thabaal-logo-ta-dark.png" : "/brands/thabaal/thabaal-logo-en-dark.png"}
+                  alt="Thabaal"
+                  width={154}
+                  height={52}
+                  className="footer-logo footer-logo--night"
+                  style={{ width: "160px", height: "auto" }}
+                />
+              </a>
+              <p className="footer-brand-desc">
                 {ta
                   ? "வாட்ஸ்அப் மார்க்கெட்டிங், தெளிவான அறிக்கைகள், கேட்லாக் ஆர்டர்கள் மற்றும் டெம்ப்ளேட் கண்காணிப்பு — அனைத்தும் ஒரே எளிய தளத்தில்."
                   : "WhatsApp marketing, clearer analytics, catalogue orders and template visibility in one simple place."}
               </p>
-              <p>
-                <a href={TEL_PHONE}>63791 40626</a>
-                <br />
-                <a href="mailto:thabaal26@gmail.com">thabaal26@gmail.com</a>
-              </p>
             </div>
 
-            <nav className="footer-links" aria-label={ta ? "அடிக்குறிப்பு இணைப்புகள்" : "Footer links"}>
-              <a href="#features">{ta ? "தபால் ஏன்" : "Why Thabaal"}</a>
-              <a href="#reports">{ta ? "அறிக்கைகள்" : "Analytics"}</a>
-              <a href="#how-it-works">{ta ? "ஆர்டர்கள்" : "Orders"}</a>
-              <a href="#templates">{ta ? "டெம்ப்ளேட்டுகள்" : "Templates"}</a>
-              <a href="#pricing">{ta ? "கட்டணம்" : "Pricing"}</a>
-              <a href={MAILTO_DEMO}>{ta ? "டெமோ பதிவு செய்க" : "Book a demo"}</a>
-            </nav>
-          </div>
+            {/* Column 2 — Navigation */}
+            <div className="footer-col footer-col--nav">
+              <h4 className="footer-col-title">{ta ? "பிரிவுகள்" : "Navigation"}</h4>
+              <nav className="footer-nav-list" aria-label={ta ? "அடிக்குறிப்பு வழிசெலுத்தல்" : "Footer navigation"}>
+                <a href="#features" className="footer-nav-link">{ta ? "தபால் ஏன்" : "Why Thabaal"}</a>
+                <a href="#reports" className="footer-nav-link">{ta ? "அறிக்கைகள்" : "Analytics"}</a>
+                <a href="#how-it-works" className="footer-nav-link">{ta ? "ஆர்டர்கள்" : "Orders"}</a>
+                <a href="#templates" className="footer-nav-link">{ta ? "டெம்ப்ளேட்டுகள்" : "Templates"}</a>
+                <a href="#pricing" className="footer-nav-link">{ta ? "கட்டணம்" : "Pricing"}</a>
+                <a href={MAILTO_DEMO} className="footer-nav-link footer-nav-link--accent">{ta ? "டெமோ பதிவு செய்க" : "Book a demo"}</a>
+              </nav>
+            </div>
 
-          <div className="footer-bottom">
-            <span>© 2026 Thabaal. {ta ? "வளரும் வணிகங்களுக்காக உருவாக்கப்பட்டது." : "Built for growing businesses."}</span>
-            <span>{ta ? "வாட்ஸ்அப் மார்க்கெட்டிங் இனி எளிது." : "WhatsApp marketing made simple."}</span>
+            {/* Column 3 — Contact */}
+            <div className="footer-col footer-col--contact">
+              <h4 className="footer-col-title">{ta ? "தொடர்புக்கு" : "Contact"}</h4>
+              <div className="footer-contact-list">
+                <a href={TEL_PHONE} className="footer-contact-item">
+                  <span className="footer-contact-icon" aria-hidden="true">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                    </svg>
+                  </span>
+                  <span>63791 40626</span>
+                </a>
+                <a href="mailto:thabaal26@gmail.com" className="footer-contact-item">
+                  <span className="footer-contact-icon" aria-hidden="true">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect width="20" height="16" x="2" y="4" rx="2" />
+                      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                    </svg>
+                  </span>
+                  <span>thabaal26@gmail.com</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Layer B — Illustrated Wave & Tamil Nadu Landscape Area */}
+        <div className="footer-wave-wrap" aria-hidden="true">
+          <svg
+            viewBox="0 0 1440 220"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className="footer-wave-svg"
+            preserveAspectRatio="none"
+          >
+            {/* 1. Atmospheric Clouds */}
+            <g className="footer-wave__clouds" opacity="0.32">
+              <path
+                d="M 180 50 C 176 44 180 39 178 32 C 176 22 184 11 195 8 C 202 -3 218 -8 230 -2 C 236 1 238 5 239 10 C 243 7 250 7 255 10 C 263 15 265 24 264 31 C 263 34 262 38 266 38 C 271 38 274 35 280 37 C 287 39 295 39 309 39 C 330 39 348 39 362 40 C 370 41 373 47 367 50 Z"
+                fill="currentColor"
+              />
+              <path
+                d="M 960 45 C 956 40 958 35 958 30 C 958 19 969 12 980 13 C 985 2 1002 -3 1016 2 C 1024 6 1028 12 1028 17 C 1037 16 1045 20 1046 28 C 1047 32 1046 34 1050 35 C 1057 35 1067 35 1083 36 C 1107 37 1129 37 1142 38 C 1149 39 1149 45 1142 45 Z"
+                fill="currentColor"
+              />
+            </g>
+
+            {/* 2. Abstract Tamil Nadu Landscape Silhouette (Palmyra Palms & Distant Architecture) */}
+            <g className="footer-wave__landscape" opacity="0.28" fill="currentColor">
+              {/* Left Palm Cluster (Iconic Palmyra Tree) */}
+              <g transform="translate(100, 48)">
+                <path d="M 18 80 Q 20 40 22 8 L 24 8 Q 22 40 20 80 Z" />
+                <path d="M 23 8 Q 10 -4 0 2 Q 10 6 22 8 Z" />
+                <path d="M 23 8 Q 14 -12 8 -8 Q 16 2 23 8 Z" />
+                <path d="M 23 8 Q 23 -16 23 -14 Q 23 -2 23 8 Z" />
+                <path d="M 23 8 Q 32 -12 38 -8 Q 30 2 23 8 Z" />
+                <path d="M 23 8 Q 36 -4 46 2 Q 36 6 23 8 Z" />
+                <path d="M 23 8 Q 34 16 42 22 Q 32 18 23 8 Z" />
+                <path d="M 23 8 Q 12 16 4 22 Q 14 18 23 8 Z" />
+              </g>
+              <g transform="translate(155, 62) scale(0.75)">
+                <path d="M 18 80 Q 19 40 21 8 L 23 8 Q 21 40 19 80 Z" />
+                <path d="M 22 8 Q 10 -4 0 2 Q 10 6 21 8 Z" />
+                <path d="M 22 8 Q 14 -12 8 -8 Q 16 2 22 8 Z" />
+                <path d="M 22 8 Q 22 -16 22 -14 Q 22 -2 22 8 Z" />
+                <path d="M 22 8 Q 31 -12 37 -8 Q 29 2 22 8 Z" />
+                <path d="M 22 8 Q 35 -4 45 2 Q 35 6 22 8 Z" />
+              </g>
+
+              {/* Distant Gopuram / Dravidian Skyline Profile */}
+              <g transform="translate(480, 52)">
+                <path d="M 0 75 L 8 46 L 14 46 L 17 28 L 21 28 L 23 14 L 27 14 L 28 4 L 30 0 L 32 4 L 33 14 L 37 14 L 39 28 L 43 28 L 46 46 L 52 46 L 60 75 Z" />
+                <circle cx="30" cy="-3" r="2.5" />
+                <circle cx="25" cy="-1" r="1.5" />
+                <circle cx="35" cy="-1" r="1.5" />
+              </g>
+
+              {/* Distant Horizon Rolling Profiles */}
+              <path d="M 320 120 Q 400 92 480 120 T 640 118 Q 720 95 800 118 T 960 122 L 960 145 L 320 145 Z" opacity="0.5" />
+
+              {/* Right Palm Cluster */}
+              <g transform="translate(1310, 56) scale(0.85)">
+                <path d="M 18 80 Q 19 40 21 8 L 23 8 Q 21 40 19 80 Z" />
+                <path d="M 22 8 Q 10 -4 0 2 Q 10 6 21 8 Z" />
+                <path d="M 22 8 Q 14 -12 8 -8 Q 16 2 22 8 Z" />
+                <path d="M 22 8 Q 22 -16 22 -14 Q 22 -2 22 8 Z" />
+                <path d="M 22 8 Q 31 -12 37 -8 Q 29 2 22 8 Z" />
+                <path d="M 22 8 Q 35 -4 45 2 Q 35 6 22 8 Z" />
+              </g>
+              <g transform="translate(1360, 68) scale(0.68)">
+                <path d="M 18 80 Q 19 40 21 8 L 23 8 Q 21 40 19 80 Z" />
+                <path d="M 22 8 Q 10 -4 0 2 Q 10 6 21 8 Z" />
+                <path d="M 22 8 Q 14 -12 8 -8 Q 16 2 22 8 Z" />
+                <path d="M 22 8 Q 22 -16 22 -14 Q 22 -2 22 8 Z" />
+                <path d="M 22 8 Q 31 -12 37 -8 Q 29 2 22 8 Z" />
+                <path d="M 22 8 Q 35 -4 45 2 Q 35 6 22 8 Z" />
+              </g>
+            </g>
+
+            {/* 3. Layered Navy Waves */}
+            {/* Wave 1: Back Wave */}
+            <path
+              className="footer-wave__path footer-wave__path--back"
+              d="M 0 102 C 220 134, 420 74, 680 104 C 940 132, 1180 84, 1440 112 L 1440 220 L 0 220 Z"
+            />
+            {/* Wave 2: Mid Wave */}
+            <path
+              className="footer-wave__path footer-wave__path--mid"
+              d="M 0 130 C 260 94, 540 156, 820 120 C 1080 88, 1280 144, 1440 126 L 1440 220 L 0 220 Z"
+            />
+            {/* Wave 3: Front Wave (Seamlessly merges with bottom bar) */}
+            <path
+              className="footer-wave__path footer-wave__path--front"
+              d="M 0 158 C 260 184, 520 132, 800 164 C 1080 192, 1300 148, 1440 166 L 1440 220 L 0 220 Z"
+            />
+
+            {/* 4. Signature Golden Dotted Flight Path */}
+            <path
+              d="M 60 126 C 220 74, 420 148, 660 106 C 880 72, 1080 122, 1220 86 C 1270 72, 1295 56, 1290 40 C 1282 25, 1262 30, 1260 48 C 1258 64, 1282 68, 1315 54 L 1335 46"
+              stroke="#FFBF18"
+              strokeWidth="2.4"
+              strokeDasharray="6 7"
+              strokeLinecap="round"
+              className="footer-wave__flight-line"
+            />
+            {/* Golden Route Markers */}
+            <circle cx="60" cy="126" r="3.5" fill="#FFBF18" />
+            <circle cx="360" cy="116" r="2.8" fill="#FFBF18" />
+            <circle cx="720" cy="98" r="2.8" fill="#FFBF18" />
+            <circle cx="1060" cy="108" r="2.8" fill="#FFBF18" />
+          </svg>
+
+          {/* 5. Authentic Thabaal Bird Motif at Flight Path Endpoint */}
+          <div className="footer-wave__endpoint-bird">
+            <Image
+              src="/brands/thabaal/mark.png"
+              alt=""
+              width={30}
+              height={17}
+              className="footer-wave__mini-bird"
+              aria-hidden="true"
+            />
+          </div>
+        </div>
+
+        {/* Layer C — Deep-Navy Bottom Bar */}
+        <div className="footer-bottom-bar">
+          <div className="landing-container footer-bottom-inner">
+            <span className="footer-copyright">
+              © 2026 Thabaal. {ta ? "வளரும் வணிகங்களுக்காக உருவாக்கப்பட்டது." : "Built for growing businesses."}
+            </span>
+            <span className="footer-tagline">
+              {ta ? "வாட்ஸ்அப் மார்க்கெட்டிங் இனி எளிது." : "WhatsApp marketing made simple."}
+            </span>
           </div>
         </div>
       </footer>
