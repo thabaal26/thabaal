@@ -1346,201 +1346,9 @@
    New Exact Standalone & Brochure Modules Styling (60-120 FPS Fluid Motion)
    ========================================================================== */
 
-/* ── 1. USP Grid (Why Thabaal) ── */
-.usp-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 22px;
-}
-
-.usp-card {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  min-height: 440px;
-  padding: 34px 30px;
-  border-radius: var(--radius-lg);
-  border: 1px solid rgba(6, 36, 69, 0.08);
-  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s ease;
-  will-change: transform;
-}
-
-.usp-card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 20px 42px rgba(6, 36, 69, 0.12);
-}
-
-.usp-card-gold {
-  background: var(--cream);
-  color: var(--navy);
-  border-color: rgba(253, 185, 19, 0.4);
-}
-
-.usp-card-navy {
-  background: var(--navy);
-  color: white;
-  border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 16px 36px rgba(6, 36, 69, 0.2);
-}
-
-.usp-card-navy h3 {
-  color: white !important;
-}
-
-.usp-card-navy p {
-  color: rgba(255, 255, 255, 0.78) !important;
-}
-
-.usp-card-lavender {
-  background: var(--lavender);
-  color: var(--navy);
-  border-color: rgba(147, 51, 234, 0.18);
-}
-
-[data-theme="night"] .usp-card-gold {
-  background: #14284b;
-  color: #ffffff;
-  border-color: #2a4779;
-}
-
-[data-theme="night"] .usp-card-lavender {
-  background: #1b2046;
-  color: #ffffff;
-  border-color: #3b3a72;
-}
-
-.usp-tag {
-  display: inline-block;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: rgba(6, 36, 69, 0.08);
-  color: var(--navy);
-  margin-bottom: 20px;
-  width: fit-content;
-}
-
-[data-theme="night"] .usp-tag {
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
-}
-
-.usp-tag-accent {
-  background: rgba(253, 185, 19, 0.2);
-  color: var(--yellow);
-}
-
-.usp-card h3 {
-  font-size: clamp(20px, 2vw, 24px);
-  font-weight: 800;
-  line-height: 1.2;
-  margin: 0 0 12px;
-  color: var(--navy);
-}
-
-.usp-card p {
-  font-size: 14.5px;
-  line-height: 1.6;
-  color: var(--muted);
-  margin: 0 0 24px;
-}
-
-.usp-stat-badge {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  margin: 18px 0;
-}
-
-.usp-rupee {
-  font-size: clamp(48px, 5vw, 68px);
-  font-weight: 900;
-  color: var(--navy);
-  line-height: 1;
-}
-
-[data-theme="night"] .usp-rupee {
-  color: #ffffff;
-}
-
-.usp-stat-label {
-  font-size: 16px;
-  font-weight: 800;
-  color: var(--navy-2);
-}
-
-[data-theme="night"] .usp-stat-label {
-  color: var(--yellow);
-}
-
-.usp-checklist {
-  display: grid;
-  gap: 10px;
-  margin: 18px 0;
-}
-
-.usp-check-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.08);
-  font-size: 13.5px;
-  font-weight: 700;
-  color: white;
-}
-
-.usp-check-num {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--yellow);
-  color: var(--navy);
-  display: grid;
-  place-items: center;
-  font-size: 11px;
-  font-weight: 900;
-}
-
-.usp-template-preview {
-  padding: 16px;
-  border-radius: 14px;
-  background: white;
-  border: 1px solid rgba(6, 36, 69, 0.08);
-  box-shadow: 0 4px 14px rgba(6, 36, 69, 0.06);
-  margin: 18px 0;
-}
-
-[data-theme="night"] .usp-template-preview {
-  background: #0d1e38;
-  border-color: #233a5f;
-}
-
-.usp-template-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-}
-
-.usp-approved-pill {
-  font-size: 11px;
-  font-weight: 800;
-  color: #0d8349;
-  background: #dcfce7;
-  padding: 4px 8px;
-  border-radius: 999px;
-}
-
-.usp-foot-note {
-  font-size: 11.5px;
-  color: var(--muted);
-  opacity: 0.85;
-}
+/* ── 1. USP Grid (Why Thabaal) ──
+   See comprehensive rules under "USP Grid (Three Reasons to Choose Thabaal)" below.
+*/
 
 /* ── 2. Analytics & Reports Questions & Subgrid ── */
 .demo-questions-row {
@@ -2530,192 +2338,205 @@
 /* ── USP Grid (Three Reasons to Choose Thabaal) ── */
 .usp-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 18px;
 }
 
 .usp-card {
   position: relative;
+  min-height: 365px;
+  overflow: hidden;
+  padding: 30px;
+  border-radius: 25px;
+  border: 1px solid rgba(6, 36, 69, 0.08);
+  box-shadow: 0 18px 44px rgba(6, 36, 69, 0.08);
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
   display: flex;
   flex-direction: column;
-  padding: 32px 26px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--line);
-  background: white;
-  box-shadow: var(--shadow-sm);
-  transition: transform 0.28s ease, box-shadow 0.28s ease;
-}
-
-[data-theme="night"] .usp-card {
-  background: #0d1e38;
-  border-color: #233a5f;
+  justify-content: space-between;
 }
 
 .usp-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-md);
+  transform: translateY(-6px);
+  box-shadow: 0 24px 55px rgba(6, 36, 69, 0.14);
 }
 
 .usp-card.cost {
-  background: #fffcf2;
-  border-color: #f7e6a7;
-}
-
-[data-theme="night"] .usp-card.cost {
-  background: #141f33;
-  border-color: #3b3a24;
+  background: linear-gradient(155deg, #fff2bd, #fff9e8 70%);
 }
 
 .usp-card.insight {
-  background: #f7fbff;
-  border-color: #cfe2f7;
-}
-
-[data-theme="night"] .usp-card.insight {
-  background: #0a1b33;
-  border-color: #1a3a60;
+  background: var(--navy);
+  color: white;
 }
 
 .usp-card.templates {
-  background: #f5fdf9;
-  border-color: #c9eedc;
+  background: linear-gradient(155deg, #e7dcff, #f8f2ff 75%);
+}
+
+[data-theme="night"] .usp-card.cost {
+  background: linear-gradient(155deg, #2b250d, #1a1708 70%);
+  border-color: rgba(253, 185, 19, 0.25);
+}
+
+[data-theme="night"] .usp-card.insight {
+  background: #061833;
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 [data-theme="night"] .usp-card.templates {
-  background: #0b221d;
-  border-color: #174737;
+  background: linear-gradient(155deg, #1b1633, #130f24 75%);
+  border-color: rgba(147, 51, 234, 0.25);
 }
 
 .usp-kicker {
-  display: inline-block;
-  margin-bottom: 14px;
-  font-size: 11.5px;
-  font-weight: 800;
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(6, 36, 69, 0.08);
+  color: var(--navy);
+  font-size: 11px;
+  font-weight: 900;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--navy);
+  width: fit-content;
+  margin-bottom: 0;
 }
 
-[data-theme="night"] .usp-kicker {
+.usp-card.insight .usp-kicker {
+  background: rgba(255, 255, 255, 0.14);
   color: var(--yellow);
 }
 
-.usp-card h3 {
-  margin: 0 0 12px;
-  color: var(--navy);
-  font-size: 22px;
-  font-weight: 800;
-  line-height: 1.2;
+[data-theme="night"] .usp-card.cost .usp-kicker {
+  background: rgba(253, 185, 19, 0.18);
+  color: var(--yellow);
 }
 
-[data-theme="night"] .usp-card h3 {
+[data-theme="night"] .usp-card.templates .usp-kicker {
+  background: rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+}
+
+.usp-card h3 {
+  margin: 20px 0 10px;
+  color: var(--navy);
+  font-size: clamp(24px, 2.4vw, 31px);
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+  font-weight: 800;
+}
+
+.usp-card.insight h3 {
+  color: white !important;
+}
+
+[data-theme="night"] .usp-card.cost h3 {
+  color: #ffffff;
+}
+
+[data-theme="night"] .usp-card.templates h3 {
   color: #ffffff;
 }
 
 .usp-card p {
-  margin: 0 0 20px;
+  max-width: 340px;
+  margin: 0;
   color: var(--muted);
   font-size: 14px;
   line-height: 1.6;
 }
 
-[data-theme="night"] .usp-card p {
-  color: #9cb1cb;
+.usp-card.insight p {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+
+[data-theme="night"] .usp-card.cost p {
+  color: #d1d5db;
+}
+
+[data-theme="night"] .usp-card.templates p {
+  color: #d1d5db;
 }
 
 .zero-mark {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  font-size: 38px;
-  font-weight: 900;
+  display: block;
+  margin-top: 25px;
   color: var(--navy);
-  margin-bottom: 14px;
+  font-size: clamp(82px, 10vw, 138px);
+  font-weight: 950;
+  line-height: 0.9;
+  letter-spacing: -0.1em;
+}
+
+.zero-mark small {
+  font-size: 16px;
+  letter-spacing: -0.02em;
+  vertical-align: middle;
+  font-weight: 800;
+  color: var(--navy);
 }
 
 [data-theme="night"] .zero-mark {
   color: #ffffff;
 }
 
-.zero-mark small {
-  font-size: 14px;
-  color: var(--muted);
-  font-weight: 700;
-}
-
-.usp-foot {
-  margin-top: auto;
-  padding-top: 16px;
-  border-top: 1px solid rgba(6, 36, 69, 0.08);
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.5;
-}
-
-[data-theme="night"] .usp-foot {
-  border-top-color: rgba(255, 255, 255, 0.1);
-  color: #8da4c4;
-}
-
-.usp-foot a {
-  color: var(--navy);
-  font-weight: 700;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-[data-theme="night"] .usp-foot a {
-  color: var(--yellow);
+[data-theme="night"] .zero-mark small {
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .mini-cycle {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-top: 28px;
 }
 
 .mini-cycle span {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--navy);
-}
-
-[data-theme="night"] .mini-cycle span {
-  color: #e2e8f0;
+  gap: 9px;
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.09);
+  color: white !important;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .mini-cycle b {
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
+  width: 23px;
+  height: 23px;
+  border-radius: 7px;
   background: var(--yellow);
   color: var(--navy);
   font-size: 11px;
+  font-weight: 900;
+  flex: none;
 }
 
 .mini-template {
-  padding: 14px 16px;
-  border-radius: 14px;
+  margin-top: 25px;
+  padding: 14px;
+  border-radius: 16px;
   background: white;
-  border: 1px solid var(--line);
-  margin-bottom: 16px;
+  box-shadow: 0 12px 25px rgba(6, 36, 69, 0.09);
+  border: 1px solid rgba(6, 36, 69, 0.06);
 }
 
 [data-theme="night"] .mini-template {
-  background: #08162b;
-  border-color: #233a5f;
+  background: #0d1e38;
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.3);
 }
 
 .mini-template strong {
   display: block;
-  font-size: 13.5px;
   color: var(--navy);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 [data-theme="night"] .mini-template strong {
@@ -2724,20 +2545,52 @@
 
 .mini-template small {
   display: block;
+  margin-top: 3px;
   color: var(--muted);
   font-size: 11px;
-  margin: 3px 0 6px;
+}
+
+[data-theme="night"] .mini-template small {
+  color: #9cb1cb;
 }
 
 .mini-template em {
-  display: inline-block;
-  font-style: normal;
-  padding: 3px 8px;
+  display: inline-flex;
+  margin-top: 12px;
+  padding: 5px 8px;
   border-radius: 999px;
   background: var(--mint);
   color: #087a4e;
   font-size: 10px;
-  font-weight: 800;
+  font-style: normal;
+  font-weight: 900;
+}
+
+[data-theme="night"] .mini-template em {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
+
+.usp-foot {
+  margin-top: 24px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.usp-foot a {
+  color: var(--navy);
+  font-weight: 900;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+[data-theme="night"] .usp-foot {
+  color: #9cb1cb;
+}
+
+[data-theme="night"] .usp-foot a {
+  color: var(--yellow);
 }
 
 /* ── Analytics & Reports Section (#reports) ── */
