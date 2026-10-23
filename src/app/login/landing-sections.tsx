@@ -1527,7 +1527,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
         </div>
       </section>
 
-      {/* ── 9. FULL BRAND FOOTER — ILLUSTRATED WAVE & BRAND STORY ── */}
+      {/* ── 9. FULL BRAND FOOTER — ILLUSTRATED WAVE & BRAND STORY (COMPACT) ── */}
       <footer id="login" className="thabaal-footer" aria-label={ta ? "தள அடிக்குறிப்பு" : "Site footer"}>
         {/* Layer A — Clean Light Content Area */}
         <div className="footer-content-area">
@@ -1541,7 +1541,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
                   width={154}
                   height={52}
                   className="footer-logo footer-logo--day"
-                  style={{ width: "160px", height: "auto" }}
+                  style={{ width: "138px", height: "auto" }}
                 />
                 <Image
                   src={ta ? "/brands/thabaal/thabaal-logo-ta-dark.png" : "/brands/thabaal/thabaal-logo-en-dark.png"}
@@ -1549,7 +1549,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
                   width={154}
                   height={52}
                   className="footer-logo footer-logo--night"
-                  style={{ width: "160px", height: "auto" }}
+                  style={{ width: "138px", height: "auto" }}
                 />
               </a>
               <p className="footer-brand-desc">
@@ -1559,7 +1559,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
               </p>
             </div>
 
-            {/* Column 2 — Navigation */}
+            {/* Column 2 — Navigation (2-Column Compact Grid) */}
             <div className="footer-col footer-col--nav">
               <h4 className="footer-col-title">{ta ? "பிரிவுகள்" : "Navigation"}</h4>
               <nav className="footer-nav-list" aria-label={ta ? "அடிக்குறிப்பு வழிசெலுத்தல்" : "Footer navigation"}>
@@ -1578,7 +1578,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
               <div className="footer-contact-list">
                 <a href={TEL_PHONE} className="footer-contact-item">
                   <span className="footer-contact-icon" aria-hidden="true">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
                     </svg>
                   </span>
@@ -1586,7 +1586,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
                 </a>
                 <a href="mailto:thabaal26@gmail.com" className="footer-contact-item">
                   <span className="footer-contact-icon" aria-hidden="true">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                       <rect width="20" height="16" x="2" y="4" rx="2" />
                       <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
                     </svg>
@@ -1598,10 +1598,10 @@ export function LandingSections({ lang }: { lang: Lang }) {
           </div>
         </div>
 
-        {/* Layer B — Illustrated Wave & Tamil Nadu Landscape Area */}
+        {/* Layer B — Illustrated Wave & Tamil Nadu Landscape Area (Shallow Band) */}
         <div className="footer-wave-wrap" aria-hidden="true">
           <svg
-            viewBox="0 0 1440 220"
+            viewBox="0 0 1440 95"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
             className="footer-wave-svg"
@@ -1610,19 +1610,19 @@ export function LandingSections({ lang }: { lang: Lang }) {
             {/* 1. Atmospheric Clouds */}
             <g className="footer-wave__clouds" opacity="0.32">
               <path
-                d="M 180 50 C 176 44 180 39 178 32 C 176 22 184 11 195 8 C 202 -3 218 -8 230 -2 C 236 1 238 5 239 10 C 243 7 250 7 255 10 C 263 15 265 24 264 31 C 263 34 262 38 266 38 C 271 38 274 35 280 37 C 287 39 295 39 309 39 C 330 39 348 39 362 40 C 370 41 373 47 367 50 Z"
+                d="M 160 22 C 158 18 160 15 159 11 C 158 5 163 1 170 0 C 174 -4 183 -6 190 -3 C 193 -1 194 1 195 4 C 197 2 201 2 204 4 C 209 6 210 11 209 15 C 209 17 208 19 211 19 C 214 19 216 17 220 18 C 224 19 229 19 237 19 C 250 19 261 19 269 20 C 274 20 276 23 272 25 Z"
                 fill="currentColor"
               />
               <path
-                d="M 960 45 C 956 40 958 35 958 30 C 958 19 969 12 980 13 C 985 2 1002 -3 1016 2 C 1024 6 1028 12 1028 17 C 1037 16 1045 20 1046 28 C 1047 32 1046 34 1050 35 C 1057 35 1067 35 1083 36 C 1107 37 1129 37 1142 38 C 1149 39 1149 45 1142 45 Z"
+                d="M 980 20 C 978 17 979 14 979 12 C 979 6 985 2 991 3 C 994 -2 1003 -4 1010 -1 C 1014 1 1016 4 1016 7 C 1021 6 1025 8 1026 12 C 1027 14 1026 15 1028 16 C 1032 16 1037 16 1045 16 C 1058 17 1069 17 1076 17 C 1080 18 1080 21 1076 21 Z"
                 fill="currentColor"
               />
             </g>
 
-            {/* 2. Abstract Tamil Nadu Landscape Silhouette (Palmyra Palms & Distant Architecture) */}
-            <g className="footer-wave__landscape" opacity="0.28" fill="currentColor">
+            {/* 2. Abstract Tamil Nadu Landscape Silhouette (Palmyra Palms & Distant Gopuram) */}
+            <g className="footer-wave__landscape" opacity="0.26" fill="currentColor">
               {/* Left Palm Cluster (Iconic Palmyra Tree) */}
-              <g transform="translate(100, 48)">
+              <g transform="translate(100, 16) scale(0.48)">
                 <path d="M 18 80 Q 20 40 22 8 L 24 8 Q 22 40 20 80 Z" />
                 <path d="M 23 8 Q 10 -4 0 2 Q 10 6 22 8 Z" />
                 <path d="M 23 8 Q 14 -12 8 -8 Q 16 2 23 8 Z" />
@@ -1632,7 +1632,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
                 <path d="M 23 8 Q 34 16 42 22 Q 32 18 23 8 Z" />
                 <path d="M 23 8 Q 12 16 4 22 Q 14 18 23 8 Z" />
               </g>
-              <g transform="translate(155, 62) scale(0.75)">
+              <g transform="translate(132, 23) scale(0.36)">
                 <path d="M 18 80 Q 19 40 21 8 L 23 8 Q 21 40 19 80 Z" />
                 <path d="M 22 8 Q 10 -4 0 2 Q 10 6 21 8 Z" />
                 <path d="M 22 8 Q 14 -12 8 -8 Q 16 2 22 8 Z" />
@@ -1642,7 +1642,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
               </g>
 
               {/* Distant Gopuram / Dravidian Skyline Profile */}
-              <g transform="translate(480, 52)">
+              <g transform="translate(480, 18) scale(0.46)">
                 <path d="M 0 75 L 8 46 L 14 46 L 17 28 L 21 28 L 23 14 L 27 14 L 28 4 L 30 0 L 32 4 L 33 14 L 37 14 L 39 28 L 43 28 L 46 46 L 52 46 L 60 75 Z" />
                 <circle cx="30" cy="-3" r="2.5" />
                 <circle cx="25" cy="-1" r="1.5" />
@@ -1650,10 +1650,10 @@ export function LandingSections({ lang }: { lang: Lang }) {
               </g>
 
               {/* Distant Horizon Rolling Profiles */}
-              <path d="M 320 120 Q 400 92 480 120 T 640 118 Q 720 95 800 118 T 960 122 L 960 145 L 320 145 Z" opacity="0.5" />
+              <path d="M 320 54 Q 400 42 480 54 T 640 53 Q 720 43 800 53 T 960 55 L 960 65 L 320 65 Z" opacity="0.4" />
 
               {/* Right Palm Cluster */}
-              <g transform="translate(1310, 56) scale(0.85)">
+              <g transform="translate(1320, 20) scale(0.42)">
                 <path d="M 18 80 Q 19 40 21 8 L 23 8 Q 21 40 19 80 Z" />
                 <path d="M 22 8 Q 10 -4 0 2 Q 10 6 21 8 Z" />
                 <path d="M 22 8 Q 14 -12 8 -8 Q 16 2 22 8 Z" />
@@ -1661,7 +1661,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
                 <path d="M 22 8 Q 31 -12 37 -8 Q 29 2 22 8 Z" />
                 <path d="M 22 8 Q 35 -4 45 2 Q 35 6 22 8 Z" />
               </g>
-              <g transform="translate(1360, 68) scale(0.68)">
+              <g transform="translate(1350, 26) scale(0.34)">
                 <path d="M 18 80 Q 19 40 21 8 L 23 8 Q 21 40 19 80 Z" />
                 <path d="M 22 8 Q 10 -4 0 2 Q 10 6 21 8 Z" />
                 <path d="M 22 8 Q 14 -12 8 -8 Q 16 2 22 8 Z" />
@@ -1675,33 +1675,33 @@ export function LandingSections({ lang }: { lang: Lang }) {
             {/* Wave 1: Back Wave */}
             <path
               className="footer-wave__path footer-wave__path--back"
-              d="M 0 102 C 220 134, 420 74, 680 104 C 940 132, 1180 84, 1440 112 L 1440 220 L 0 220 Z"
+              d="M 0 42 C 220 56, 420 30, 680 43 C 940 56, 1180 34, 1440 46 L 1440 95 L 0 95 Z"
             />
             {/* Wave 2: Mid Wave */}
             <path
               className="footer-wave__path footer-wave__path--mid"
-              d="M 0 130 C 260 94, 540 156, 820 120 C 1080 88, 1280 144, 1440 126 L 1440 220 L 0 220 Z"
+              d="M 0 54 C 260 38, 540 66, 820 49 C 1080 36, 1280 60, 1440 52 L 1440 95 L 0 95 Z"
             />
             {/* Wave 3: Front Wave (Seamlessly merges with bottom bar) */}
             <path
               className="footer-wave__path footer-wave__path--front"
-              d="M 0 158 C 260 184, 520 132, 800 164 C 1080 192, 1300 148, 1440 166 L 1440 220 L 0 220 Z"
+              d="M 0 66 C 260 78, 520 54, 800 69 C 1080 82, 1300 62, 1440 70 L 1440 95 L 0 95 Z"
             />
 
             {/* 4. Signature Golden Dotted Flight Path */}
             <path
-              d="M 60 126 C 220 74, 420 148, 660 106 C 880 72, 1080 122, 1220 86 C 1270 72, 1295 56, 1290 40 C 1282 25, 1262 30, 1260 48 C 1258 64, 1282 68, 1315 54 L 1335 46"
+              d="M 60 52 C 220 28, 420 62, 660 44 C 880 28, 1080 50, 1220 35 C 1265 29, 1288 22, 1285 14 C 1280 7, 1262 10, 1260 18 C 1258 25, 1278 28, 1308 22 L 1326 18"
               stroke="#FFBF18"
-              strokeWidth="2.4"
-              strokeDasharray="6 7"
+              strokeWidth="2"
+              strokeDasharray="5 6"
               strokeLinecap="round"
               className="footer-wave__flight-line"
             />
             {/* Golden Route Markers */}
-            <circle cx="60" cy="126" r="3.5" fill="#FFBF18" />
-            <circle cx="360" cy="116" r="2.8" fill="#FFBF18" />
-            <circle cx="720" cy="98" r="2.8" fill="#FFBF18" />
-            <circle cx="1060" cy="108" r="2.8" fill="#FFBF18" />
+            <circle cx="60" cy="52" r="2.8" fill="#FFBF18" />
+            <circle cx="360" cy="48" r="2.2" fill="#FFBF18" />
+            <circle cx="720" cy="40" r="2.2" fill="#FFBF18" />
+            <circle cx="1060" cy="44" r="2.2" fill="#FFBF18" />
           </svg>
 
           {/* 5. Authentic Thabaal Bird Motif at Flight Path Endpoint */}
@@ -1709,8 +1709,8 @@ export function LandingSections({ lang }: { lang: Lang }) {
             <Image
               src="/brands/thabaal/mark.png"
               alt=""
-              width={30}
-              height={17}
+              width={24}
+              height={13}
               className="footer-wave__mini-bird"
               aria-hidden="true"
             />

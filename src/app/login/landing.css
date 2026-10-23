@@ -4211,7 +4211,7 @@
   flex-wrap: wrap;
 }
 
-/* ── Full Brand Footer — Illustrated Wave & Brand Story ── */
+/* ── Full Brand Footer — Illustrated Wave & Brand Story (Compact) ── */
 .thabaal-footer {
   position: relative;
   background: #f8fafc;
@@ -4226,15 +4226,15 @@
   border-top-color: rgba(35, 58, 95, 0.7);
 }
 
-/* Layer A: Clean Light Content Area */
+/* Layer A: Clean Light Content Area (Compact Spacing) */
 .footer-content-area {
-  padding: clamp(48px, 5.5vw, 68px) 0 clamp(24px, 3vw, 36px);
+  padding: clamp(26px, 2.8vw, 32px) 0 6px;
 }
 
 .footer-content-grid {
   display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr;
-  gap: clamp(32px, 4vw, 56px);
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.05fr) minmax(0, 0.85fr);
+  gap: clamp(24px, 3.2vw, 44px);
   align-items: flex-start;
 }
 
@@ -4266,10 +4266,11 @@
 }
 
 .footer-brand-desc {
-  margin: 16px 0 0;
-  font-size: 14px;
-  line-height: 1.62;
+  margin: 10px 0 0;
+  font-size: 13.5px;
+  line-height: 1.52;
   color: #475569;
+  max-width: 340px;
 }
 
 [data-theme="night"] .footer-brand-desc {
@@ -4279,32 +4280,34 @@
 /* Column Titles */
 .footer-col-title {
   display: block;
-  font-size: 13px;
+  font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--navy, #062445);
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 
 [data-theme="night"] .footer-col-title {
   color: #f1f5f9;
 }
 
-/* Column 2: Navigation Links */
+/* Column 2: Navigation Links (2-Column Compact Grid) */
 .footer-nav-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 20px;
+  row-gap: 8px;
 }
 
 .footer-nav-link {
-  font-size: 14.5px;
+  font-size: 13.5px;
   font-weight: 500;
   color: #334155;
   text-decoration: none;
-  transition: color 0.2s ease, transform 0.2s ease;
+  transition: color 0.18s ease, transform 0.18s ease;
   width: fit-content;
+  line-height: 1.4;
 }
 
 .footer-nav-link:hover {
@@ -4337,19 +4340,20 @@
 .footer-contact-list {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 9px;
 }
 
 .footer-contact-item {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  font-size: 14.5px;
+  gap: 8px;
+  font-size: 13.5px;
   font-weight: 500;
   color: #334155;
   text-decoration: none;
-  transition: color 0.2s ease, transform 0.2s ease;
+  transition: color 0.18s ease, transform 0.18s ease;
   width: fit-content;
+  line-height: 1.4;
 }
 
 .footer-contact-item:hover {
@@ -4358,16 +4362,16 @@
 }
 
 .footer-contact-icon {
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
-  border-radius: 8px;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 6px;
   background: rgba(8, 39, 71, 0.06);
   color: var(--navy, #062445);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition: background 0.18s ease, color 0.18s ease;
 }
 
 .footer-contact-item:hover .footer-contact-icon {
@@ -4393,12 +4397,12 @@
   color: #062445;
 }
 
-/* Layer B: Illustrated Wave & Landscape */
+/* Layer B: Illustrated Wave & Landscape (Shallow Band) */
 .footer-wave-wrap {
   position: relative;
   width: 100%;
-  height: clamp(170px, 15vw, 230px);
-  margin-top: 10px;
+  height: clamp(75px, 6.5vw, 95px);
+  margin-top: 6px;
   overflow: visible;
   line-height: 0;
 }
@@ -4457,18 +4461,18 @@
 /* Endpoint Bird */
 .footer-wave__endpoint-bird {
   position: absolute;
-  right: clamp(14px, 6.2%, 84px);
-  top: clamp(20px, 18%, 44px);
+  right: clamp(14px, 6.5%, 82px);
+  top: clamp(8px, 11%, 18px);
   display: flex;
   align-items: center;
   justify-content: center;
-  transform: rotate(-10deg);
-  filter: drop-shadow(0 2px 8px rgba(255, 191, 24, 0.45));
+  transform: rotate(-8deg);
+  filter: drop-shadow(0 2px 6px rgba(255, 191, 24, 0.4));
   pointer-events: none;
 }
 
 .footer-wave__mini-bird {
-  width: 28px;
+  width: 24px;
   height: auto;
   display: block;
 }
@@ -4477,9 +4481,9 @@
 .footer-bottom-bar {
   background: #061c36;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 20px 0 26px;
+  padding: 13px 0 15px;
   color: #94a3b8;
-  font-size: 13px;
+  font-size: 12.5px;
 }
 
 [data-theme="night"] .footer-bottom-bar {
@@ -4492,14 +4496,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  gap: 16px;
 }
 
 /* Responsive Rules for Footer */
 @media (max-width: 960px) {
   .footer-content-grid {
     grid-template-columns: 1fr 1fr;
-    gap: 36px;
+    gap: 24px;
   }
 
   .footer-col--brand {
@@ -4508,43 +4512,57 @@
   }
 
   .footer-wave-wrap {
-    height: 160px;
+    height: 80px;
   }
 
   .footer-wave__endpoint-bird {
-    right: 24px;
-    top: 24px;
+    right: 20px;
+    top: 12px;
   }
 }
 
 @media (max-width: 640px) {
   .footer-content-area {
-    padding: 38px 0 20px;
+    padding: 24px 0 12px;
   }
 
   .footer-content-grid {
     grid-template-columns: 1fr;
-    gap: 28px;
+    gap: 20px;
+  }
+
+  .footer-brand-desc {
+    margin-top: 8px;
+    max-width: 100%;
+  }
+
+  .footer-nav-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 16px;
   }
 
   .footer-wave-wrap {
-    height: 130px;
-    margin-top: 6px;
+    height: 65px;
+    margin-top: 4px;
   }
 
   .footer-wave__endpoint-bird {
-    right: 14px;
-    top: 18px;
+    right: 12px;
+    top: 8px;
   }
 
   .footer-wave__mini-bird {
-    width: 24px;
+    width: 20px;
+  }
+
+  .footer-bottom-bar {
+    padding: 12px 0 14px;
   }
 
   .footer-bottom-inner {
     flex-direction: column;
     align-items: flex-start;
-    gap: 8px;
+    gap: 6px;
   }
 }
 
