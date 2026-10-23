@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { ScrollReveal, StaggerGroup, StaggerItem, SectionReveal } from "@/components/motion";
 import "./landing.css";
 import { DEMO_TARGET, DEMO_URL } from "./demo-link";
 import { HeritageFooter } from "./heritage-footer";
@@ -613,7 +612,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
           </svg>
         </div>
 
-        <ScrollReveal direction="up" distance={14} duration={400} className="ribbon__container">
+        <div className="ribbon__container">
           {/* 1. Authentic Upper Brand Bird Mark */}
           <div className="ribbon__brand-mark" aria-hidden="true">
             <Image
@@ -681,13 +680,13 @@ export function LandingSections({ lang }: { lang: Lang }) {
             <span className="ribbon__category" role="listitem">{ta ? "சேவைகள்" : "Services"}</span>
             <span className="ribbon__category" role="listitem">{ta ? "D2C" : "D2C"}</span>
           </div>
-        </ScrollReveal>
+        </div>
       </section>
 
       {/* ── 2. THREE REASONS TO CHOOSE THABAAL (Exact Match HTML #features) ── */}
-      <SectionReveal className="workspace-section" id="features">
+      <section className="workspace-section" id="features">
         <div className="landing-container">
-          <ScrollReveal direction="up" className="section-head">
+          <div className="section-head">
             <div className="eyebrow">{ta ? "தபாலைத் தேர்வு செய்ய 3 காரணங்கள்" : "Three reasons to choose Thabaal"}</div>
             <h2>{ta ? "வாட்ஸ்அப் மார்க்கெட்டிங் வெறும் “சென்ட்” பொத்தானோடு முடிந்துவிடக்கூடாது." : "WhatsApp marketing should do more than press “send.”"}</h2>
             <p>
@@ -695,11 +694,11 @@ export function LandingSections({ lang }: { lang: Lang }) {
                 ? "செய்திச் செலவுகளைத் துல்லியமாக அறிந்து, வாடிக்கையாளர்கள் என்ன செய்தார்கள் என்பதைப் புரிந்து, யோசனையிலிருந்து மெட்டா ஒப்புதல் வரை தெளிவுடன் செயல்படுங்கள்."
                 : "Know what your messages cost, understand what customers did next, and move from a message idea to Meta review with less guesswork."}
             </p>
-          </ScrollReveal>
+          </div>
 
-          <StaggerGroup as="div" className="usp-grid">
+          <div className="usp-grid">
             {/* Card 1: Honest Message Costs */}
-            <StaggerItem as="article" className="usp-card cost">
+            <article className="usp-card cost">
               <span className="usp-kicker">{ta ? "01 · வெளிப்படையான செய்திக் கட்டணம்" : "01 · Honest message costs"}</span>
               <h3>{ta ? "மெட்டாவின் செய்திக் கட்டணத்தில் ஒரு பைசா கூட கூடுதல் இல்லை." : "Not one paisa extra on Meta’s message rate."}</h3>
               <p>
@@ -716,10 +715,10 @@ export function LandingSections({ lang }: { lang: Lang }) {
                   {ta ? "அதிகாரப்பூர்வ விலையைப் பார்க்க ↗" : "View official rates ↗"}
                 </a>
               </div>
-            </StaggerItem>
+            </article>
 
             {/* Card 2: Marketing Analytics */}
-            <StaggerItem as="article" className="usp-card insight">
+            <article className="usp-card insight">
               <span className="usp-kicker">{ta ? "02 · மார்க்கெட்டிங் அறிக்கைகள்" : "02 · Marketing analytics"}</span>
               <h3>{ta ? "ஒவ்வொரு பிரச்சாரத்தின் பின்னாலும் இருக்கும் வணிக வெற்றியைப் பாருங்கள்." : "See the business story behind every campaign."}</h3>
               <p>
@@ -732,10 +731,10 @@ export function LandingSections({ lang }: { lang: Lang }) {
                 <span><b>2</b> {ta ? "ஆர்டர்கள் வந்தனவா?" : "Did they place orders?"}</span>
                 <span><b>3</b> {ta ? "செலவு பயனுள்ளதா?" : "Was the spend worthwhile?"}</span>
               </div>
-            </StaggerItem>
+            </article>
 
             {/* Card 3: Template Confidence */}
-            <StaggerItem as="article" className="usp-card templates">
+            <article className="usp-card templates">
               <span className="usp-kicker">{ta ? "03 · டெம்ப்ளேட் தெளிவு" : "03 · Template confidence"}</span>
               <h3>{ta ? "அனுப்ப எது தயார் என்பதைத் தெளிவாகத் தெரிந்துகொள்ளுங்கள்." : "Know what is ready to send."}</h3>
               <p>
@@ -751,15 +750,15 @@ export function LandingSections({ lang }: { lang: Lang }) {
               <div className="usp-foot">
                 {ta ? "டெம்ப்ளேட் ஒப்புதலை மெட்டா மட்டுமே தீர்மானிக்கிறது." : "Meta decides whether a template is approved."}
               </div>
-            </StaggerItem>
-          </StaggerGroup>
+            </article>
+          </div>
         </div>
-      </SectionReveal>
+      </section>
 
       {/* ── 3. ANALYTICS & REPORTS (Exact Match HTML #reports) ── */}
-      <SectionReveal className="demo-section" id="reports">
+      <section className="demo-section" id="reports">
         <div className="landing-container">
-          <ScrollReveal direction="up" className="section-head">
+          <div className="section-head">
             <div className="eyebrow eyebrow-yellow">{ta ? "வணிக உரிமையாளர்களுக்கான அறிக்கைகள்" : "Analytics made for business owners"}</div>
             <h2>{ta ? "உங்கள் மார்க்கெட்டிங் உண்மையான வணிகத்தைக் கொண்டு வந்ததா?" : "Did your marketing bring real business?"}</h2>
             <p>
@@ -767,7 +766,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
                 ? "குழப்பமான வரைபடங்களுக்குப் பதிலாக, செய்திகள் சென்றடைந்தது முதல் வாடிக்கையாளர் பதில், ஆர்டர்கள், வந்த விற்பனை வரை வணிகப் பயணத்தை தபால் எளிதாக்குகிறது. அடுத்த பிரச்சாரத்தை புத்திசாலித்தனமாகத் திட்டமிட செலவையும் செயலையும் ஒப்பிட்டுப் பாருங்கள்."
                 : "Instead of a wall of charts, Thabaal helps you follow the business cycle: messages reached customers, customers showed interest, orders came in, and sales were recorded. Compare that activity with what you spent to plan the next campaign more wisely."}
             </p>
-          </ScrollReveal>
+          </div>
 
           <div className="analytics-questions">
             <span>{ta ? "மக்கள் பார்த்தார்களா?" : "Did people see it?"}</span>
@@ -874,12 +873,12 @@ export function LandingSections({ lang }: { lang: Lang }) {
             </div>
           </div>
         </div>
-      </SectionReveal>
+      </section>
 
       {/* ── 4. ORDERS & CATALOGUE (Exact Match HTML #how-it-works) ── */}
-      <SectionReveal className="steps-section" id="how-it-works">
+      <section className="steps-section" id="how-it-works">
         <div className="landing-container">
-          <ScrollReveal direction="up" className="section-head">
+          <div className="section-head">
             <div className="eyebrow">{ta ? "வெறும் அறிவிப்புகளுக்கு அப்பால்" : "Beyond broadcasting"}</div>
             <h2>{ta ? "உங்கள் பொருட்கள் ஆர்டர்களாக மாறலாம். உங்கள் ஆர்டர்கள் எங்கும் மறையக்கூடாது." : "Your products can lead to orders. Your orders should never disappear."}</h2>
             <p>
@@ -887,7 +886,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
                 ? "உங்கள் வணிகக் கேட்லாக்கில் உள்ள பொருட்களையும், வாடிக்கையாளர்கள் வைக்கும் ஆர்டர்களையும் தபால் ஒன்றாக இணைக்கிறது; பேமெண்ட், பேக்கிங் மற்றும் டெலிவரியை ஒரே இடத்தில் கண்காணிக்கலாம்."
                 : "Thabaal brings together the products you publish in your business catalogue and the orders customers place, so your team can follow each order through payment, packing and delivery."}
             </p>
-          </ScrollReveal>
+          </div>
 
           <div className="order-story">
             <div className="order-story-copy">
@@ -947,10 +946,10 @@ export function LandingSections({ lang }: { lang: Lang }) {
             </div>
           </div>
         </div>
-      </SectionReveal>
+      </section>
 
       {/* ── 5. TEMPLATES (Exact Match HTML #templates) ── */}
-      <SectionReveal className="use-case-section" id="templates">
+      <section className="use-case-section" id="templates">
         <div className="landing-container template-feature">
           <div className="template-copy">
             <div className="eyebrow eyebrow-yellow">{ta ? "சந்தேகமின்றி டெம்ப்ளேட்டுகள்" : "Templates, without the uncertainty"}</div>
@@ -995,12 +994,12 @@ export function LandingSections({ lang }: { lang: Lang }) {
             </div>
           </div>
         </div>
-      </SectionReveal>
+      </section>
 
       {/* ── 6. PRICING (Official 22 OCT 2026 Matrix with Tabs for Plans, Features, Add-ons, Compare) ── */}
-      <SectionReveal className="pricing pricing-section" id="pricing">
+      <section className="pricing pricing-section" id="pricing">
         <div className="landing-container">
-          <ScrollReveal direction="up" className="section-head pricing-head">
+          <div className="section-head pricing-head">
             <div className="eyebrow">
               {ta ? "கட்டணத் திட்டங்கள் | 22 அக்டோபர் 2026" : "PRICING PLAN | 22 OCT 2026"}
             </div>
@@ -1012,7 +1011,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
                 ? "வாட்ஸ்அப்பில் விற்கும் மற்றும் சேவை வழங்கும் தமிழ்நாடு வணிகங்களுக்காக உருவாக்கப்பட்டது. மூன்று திட்டங்களின் விலைகளிலும் GST சேர்க்கப்பட்டுள்ளது."
                 : "Built for Tamil Nadu businesses selling and serving on WhatsApp. All three plan prices include GST."}
             </p>
-          </ScrollReveal>
+          </div>
 
           {/* Unified Controls Bar: Navigation Tabs (Left) + Billing Term Toggle (Right) */}
           <div className="pricing-controls-row">
@@ -1464,10 +1463,10 @@ export function LandingSections({ lang }: { lang: Lang }) {
             </a>
           </div>
         </div>
-      </SectionReveal>
+      </section>
 
       {/* ── 7. QUESTIONS OWNERS ASK (Exact Match HTML #faq) ── */}
-      <SectionReveal className="faq-section" id="faq">
+      <section className="faq-section" id="faq">
         <div className="landing-container faq-grid">
           {/* Left Column */}
           <div>
@@ -1506,7 +1505,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
             })}
           </div>
         </div>
-      </SectionReveal>
+      </section>
 
       {/* ── 8. FINAL CTA BANNER (Exact Match HTML #start) ── */}
       <section className="final-cta" id="start">

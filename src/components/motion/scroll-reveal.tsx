@@ -110,8 +110,8 @@ export function ScrollReveal({
     ...style,
     ["--reveal-dur" as string]: `${duration}ms`,
     ["--reveal-delay" as string]: `${delay}ms`,
-    opacity: motionState === "idle" ? 0 : 1,
-    transform: isDone ? "none" : isActive ? "translate3d(0, 0, 0)" : getInitialTransform(),
+    opacity: 1,
+    transform: isDone ? "none" : isActive ? "translate3d(0, 0, 0)" : "none",
     transition: isDone
       ? style?.transition || "none"
       : `opacity ${duration}ms cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms, transform ${duration}ms cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms`,
