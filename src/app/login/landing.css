@@ -51,6 +51,13 @@ html {
   }
 }
 
+/* ── Landing Page Root Container ── */
+.tl-root {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
 /* ── Anchor Scroll Clearance for Sticky Header ──
    The sticky header is ~68-72px tall.
    Sections have padding-top: 96px.
@@ -4275,25 +4282,14 @@ html {
   position: relative;
   background: #f8fafc;
   color: var(--navy, #062445);
-  border-top: 1px solid rgba(226, 232, 240, 0.9);
+  border-top: none;
   overflow: clip;
 }
 
 [data-theme="night"] .thabaal-footer {
   background: #07172b;
   color: #ffffff;
-  border-top-color: rgba(35, 58, 95, 0.7);
-}
-
-/* Top Hairline Gradient Accent Stripe (Brand Yellow to Mint) */
-.heritage-footer__top-stripe {
-  width: 100%;
-  height: 3px;
-  background: linear-gradient(90deg, #FDB913 0%, #FFE066 35%, #10B981 70%, #059669 100%);
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 10;
+  border-top: none;
 }
 
 /* Layer A: Clean Light Content Area (Compact Spacing) */

@@ -82,9 +82,6 @@ export function HeritageFooter({ lang }: HeritageFooterProps) {
       onMouseLeave={handleMouseLeave}
       aria-label={ta ? "தள அடிக்குறிப்பு" : "Site footer"}
     >
-      {/* Top Hairline Gradient Accent Stripe (Brand Yellow to Mint) */}
-      <div className="heritage-footer__top-stripe" aria-hidden="true" />
-
       {/* Layer A — Clean Light Content Area */}
       <div className="footer-content-area">
         <div className="landing-container footer-content-grid">
