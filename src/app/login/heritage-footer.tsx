@@ -171,18 +171,34 @@ export function HeritageFooter({ lang }: HeritageFooterProps) {
       {/* Layer B — Interactive Tamil Nadu Heritage Illustration & Temple Trail */}
       <div className="heritage-landscape-wrap" aria-hidden="true">
         <svg
-          viewBox="0 0 1440 120"
+          viewBox="0 0 1440 220"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
           className="heritage-svg"
           preserveAspectRatio="none"
         >
           <defs>
-            {/* Sunrise Glow */}
+            {/* Soft Atmospheric Sky Gradient (Day) */}
+            <linearGradient id="heritageSkyDay" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#F8FAFC" />
+              <stop offset="50%" stopColor="#EDF4FC" />
+              <stop offset="85%" stopColor="#FFF4DE" />
+              <stop offset="100%" stopColor="#E2EEF9" />
+            </linearGradient>
+
+            {/* Deep Twilight Sky Gradient (Night) */}
+            <linearGradient id="heritageSkyNight" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#071526" />
+              <stop offset="60%" stopColor="#0E233D" />
+              <stop offset="100%" stopColor="#153258" />
+            </linearGradient>
+
+            {/* Sunrise Warm Radial Glow */}
             <radialGradient id="sunGlow" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#FDB913" stopOpacity="0.85" />
-              <stop offset="45%" stopColor="#FFE58B" stopOpacity="0.45" />
-              <stop offset="100%" stopColor="#FFF9E6" stopOpacity="0" />
+              <stop offset="0%" stopColor="#FFC72C" stopOpacity="0.95" />
+              <stop offset="35%" stopColor="#FDB913" stopOpacity="0.75" />
+              <stop offset="70%" stopColor="#FFE58F" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
             </radialGradient>
 
             {/* Night Moon Glow */}
@@ -194,156 +210,224 @@ export function HeritageFooter({ lang }: HeritageFooterProps) {
 
             {/* Coastal Water Gradient */}
             <linearGradient id="coastalWater" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#60A5FA" stopOpacity="0.25" />
-              <stop offset="100%" stopColor="#1E3A8A" stopOpacity="0.6" />
+              <stop offset="0%" stopColor="#BAD7F2" stopOpacity="0.45" />
+              <stop offset="60%" stopColor="#4A7BB0" stopOpacity="0.6" />
+              <stop offset="100%" stopColor="#1E3E66" stopOpacity="0.8" />
             </linearGradient>
 
             {/* Water Sun Reflection Shimmer */}
             <linearGradient id="waterShimmer" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#FFBF18" stopOpacity="0.45" />
-              <stop offset="100%" stopColor="#FFBF18" stopOpacity="0.05" />
+              <stop offset="0%" stopColor="#FFC72C" stopOpacity="0.65" />
+              <stop offset="100%" stopColor="#FFC72C" stopOpacity="0.05" />
             </linearGradient>
           </defs>
+
+          {/* 0. Soft Sky Background Surface */}
+          <rect x="0" y="0" width="1440" height="220" fill="url(#heritageSkyDay)" className="heritage-sky-bg" />
 
           {/* 1. Sky & Celestial Atmosphere (Layer with slowest parallax) */}
           <g className="heritage-layer heritage-layer--sky">
             {/* Rising Morning Sun (disc & soft radiating halo behind mandapam) */}
-            <circle cx="875" cy="68" r="42" fill="url(#sunGlow)" className="heritage-sun heritage-sun--day" />
-            <circle cx="875" cy="68" r="22" fill="#FDB913" opacity="0.6" className="heritage-sun heritage-sun--day" />
-            <circle cx="875" cy="68" r="28" fill="url(#nightMoonGlow)" className="heritage-sun heritage-sun--night" />
+            <circle cx="830" cy="110" r="56" fill="url(#sunGlow)" className="heritage-sun heritage-sun--day" />
+            <circle cx="830" cy="110" r="32" fill="#FDB913" opacity="0.85" className="heritage-sun heritage-sun--day" />
+            <circle cx="830" cy="110" r="18" fill="#FFE58F" opacity="0.95" className="heritage-sun heritage-sun--day" />
+            <circle cx="830" cy="110" r="32" fill="url(#nightMoonGlow)" className="heritage-sun heritage-sun--night" />
 
-            {/* Soft billowy atmospheric clouds */}
-            <g className="heritage-clouds" opacity="0.4">
+            {/* Soft billowy atmospheric cumulus clouds */}
+            <g className="heritage-clouds" opacity="0.62">
               <path
-                d="M 120 40 C 115 32 125 24 135 25 C 142 16 158 15 168 22 C 176 18 186 21 190 28 C 198 27 206 32 206 39 C 206 44 195 48 180 48 L 130 48 C 122 48 118 45 120 40 Z"
-                fill="currentColor"
+                d="M 60 90 C 50 68, 76 50, 102 54 C 118 34, 156 32, 182 48 C 202 40, 228 46, 238 64 C 254 62, 272 74, 272 90 L 60 90 Z"
+                fill="#d8e5f2"
               />
               <path
-                d="M 680 34 C 676 28 684 21 692 22 C 698 15 712 14 720 19 C 727 16 735 18 738 24 C 744 23 750 27 750 33 C 750 38 742 41 730 41 L 688 41 C 682 41 678 38 680 34 Z"
-                fill="currentColor"
+                d="M 620 108 C 606 94, 626 76, 646 78 C 664 60, 696 58, 714 74 C 732 64, 756 72, 766 88 L 620 108 Z"
+                fill="#e6f0f8"
               />
               <path
-                d="M 1120 38 C 1114 30 1126 20 1138 22 C 1146 12 1165 11 1176 18 C 1185 14 1198 17 1202 25 C 1212 24 1220 29 1220 37 C 1220 43 1210 47 1195 47 L 1132 47 C 1123 47 1118 44 1120 38 Z"
-                fill="currentColor"
+                d="M 1060 120 C 1046 92, 1084 66, 1120 70 C 1144 38, 1198 32, 1232 56 C 1262 44, 1304 54, 1318 82 C 1348 76, 1378 92, 1378 122 L 1060 120 Z"
+                fill="#d8e5f2"
               />
             </g>
 
             {/* Distant flock of birds soaring gracefully across the morning sky */}
-            <g className="heritage-sky-birds" opacity="0.32" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round">
-              <path d="M 512 26 Q 515 22 518 26 Q 521 22 524 26" />
-              <path d="M 526 21 Q 529 17 532 21 Q 535 17 538 21" />
-              <path d="M 540 27 Q 543 23 546 27 Q 549 23 552 27" />
-              <path d="M 972 28 Q 975 24 978 28 Q 981 24 984 28" />
-              <path d="M 986 23 Q 989 19 992 23 Q 995 19 998 23" />
+            <g className="heritage-sky-birds" opacity="0.4" stroke="#2d527c" strokeWidth="1.5" fill="none" strokeLinecap="round">
+              <path d="M 510 50 Q 514 44 518 50 Q 522 44 526 50" />
+              <path d="M 528 42 Q 532 36 536 42 Q 540 36 544 42" />
+              <path d="M 546 52 Q 550 46 554 52 Q 558 46 562 52" />
+              <path d="M 964 56 Q 968 50 972 56 Q 976 50 980 56" />
+              <path d="M 982 48 Q 986 42 990 48 Q 994 42 998 48" />
             </g>
           </g>
 
           {/* 2. Distant Western Ghats / Nilgiris Hill Ridges */}
           <g className="heritage-layer heritage-layer--hills">
-            {/* Distant ridge 1 */}
             <path
-              d="M 0 64 Q 180 48 380 60 T 760 50 Q 940 44 1120 58 T 1440 52 L 1440 120 L 0 120 Z"
-              fill="currentColor"
+              d="M 0 118 Q 220 90 460 110 T 920 94 Q 1180 84 1440 106 L 1440 220 L 0 220 Z"
+              fill="#bfd7ee"
               className="heritage-hill heritage-hill--back"
-              opacity="0.3"
+              opacity="0.5"
             />
-            {/* Mid-distance ridge 2 */}
             <path
-              d="M 0 70 Q 220 56 460 68 T 920 60 Q 1160 54 1440 66 L 1440 120 L 0 120 Z"
-              fill="currentColor"
+              d="M 0 130 Q 240 108 520 124 T 1000 110 Q 1240 100 1440 120 L 1440 220 L 0 220 Z"
+              fill="#94bbdc"
               className="heritage-hill heritage-hill--mid"
-              opacity="0.4"
+              opacity="0.6"
             />
           </g>
 
           {/* 3. Heritage Architecture, Monuments & Flora Trail */}
           <g className="heritage-layer heritage-layer--monuments">
             {/* Coastal Water Reflection Strip */}
-            <rect x="0" y="74" width="1440" height="46" fill="url(#coastalWater)" />
+            <rect x="0" y="132" width="1440" height="88" fill="url(#coastalWater)" />
             {/* Sun shimmer on water */}
-            <ellipse cx="875" cy="80" rx="95" ry="5" fill="url(#waterShimmer)" />
+            <ellipse cx="830" cy="144" rx="110" ry="8" fill="url(#waterShimmer)" />
 
             {/* ── Left Headland: Coastal Village Cottage with lit windows ── */}
-            <g className="heritage-monument heritage-cottage" opacity="0.85">
-              {/* Cottage Base & Roof */}
-              <path d="M 82 82 L 82 74 L 110 74 L 110 82 Z" fill="#1b3552" />
-              <path d="M 78 74 L 96 66 L 114 74 Z" fill="#244569" />
-              {/* Warm lit yellow windows (cottage interior light) */}
-              <rect x="86" y="76" width="5" height="4" rx="0.5" fill="#FDB913" />
-              <rect x="94" y="76" width="5" height="4" rx="0.5" fill="#FDB913" />
-              <rect x="102" y="76" width="4" height="4" rx="0.5" fill="#FDB913" />
+            <g className="heritage-monument heritage-cottage" opacity="0.95">
+              {/* Cottage Base & Walls */}
+              <path d="M 76 175 L 76 148 L 128 148 L 128 175 Z" fill="#132d4b" />
+              {/* Tiled Sloping Roof with overhang */}
+              <path d="M 70 148 L 102 130 L 134 148 Z" fill="#1e446d" />
+              <line x1="70" y1="148" x2="134" y2="148" stroke="#081b2e" strokeWidth="2" />
+              {/* 3 Warm lit yellow windows (cottage interior light) */}
+              <rect x="83" y="153" width="8" height="7" rx="1" fill="#FFC72C" />
+              <rect x="96" y="153" width="8" height="7" rx="1" fill="#FFC72C" />
+              <rect x="109" y="153" width="8" height="7" rx="1" fill="#FFC72C" />
+              <line x1="87" y1="153" x2="87" y2="160" stroke="#996300" strokeWidth="0.8" />
+              <line x1="100" y1="153" x2="100" y2="160" stroke="#996300" strokeWidth="0.8" />
+              <line x1="113" y1="153" x2="113" y2="160" stroke="#996300" strokeWidth="0.8" />
             </g>
 
-            {/* ── Monument A: Majestic Grand Dravidian Gopuram (Primary Anchor) ── */}
-            <g className="heritage-monument heritage-gopuram heritage-gopuram--main" tabIndex={0} role="img" aria-label="Dravidian Temple Gopuram">
-              {/* Adhisthana / Temple Base & Arched Gateway Portal */}
-              <path d="M 188 82 L 188 72 L 236 72 L 236 82 Z" fill="#152d47" />
-              <path d="M 207 82 L 207 74 Q 212 72 217 74 L 217 82 Z" fill="#081829" />
+            {/* ── Monument A: Majestic Grand Dravidian Gopuram (Hero — Madurai/Thanjavur Style) ── */}
+            <g className="heritage-monument heritage-gopuram heritage-gopuram--main" tabIndex={0} role="img" aria-label="Grand Dravidian Temple Gopuram">
+              {/* Adhisthana / Foundation Plinth */}
+              <path d="M 158 175 L 158 152 L 278 152 L 278 175 Z" fill="#0d2644" />
+              <line x1="156" y1="152" x2="280" y2="152" stroke="#255182" strokeWidth="2" />
+              {/* Arched Dwarapala Gateway Portal with inner depth */}
+              <path d="M 206 175 L 206 154 Q 218 144 230 154 L 230 175 Z" fill="#051322" />
+              <path d="M 210 175 L 210 156 Q 218 148 226 156 L 226 175 Z" fill="#020912" />
+
               {/* Tier 1 */}
-              <path d="M 189 72 L 193 63 L 231 63 L 235 72 Z" fill="#1b3856" />
-              <line x1="187" y1="63" x2="237" y2="63" stroke="#2b4c73" strokeWidth="1" />
+              <path d="M 164 152 L 170 135 L 266 135 L 272 152 Z" fill="#13365d" />
+              <line x1="162" y1="135" x2="274" y2="135" stroke="#2c5d94" strokeWidth="1.8" />
+              <rect x="186" y="139" width="7" height="9" rx="1.5" fill="#081d33" />
+              <rect x="214" y="138" width="8" height="10" rx="1.5" fill="#081d33" />
+              <rect x="243" y="139" width="7" height="9" rx="1.5" fill="#081d33" />
+
               {/* Tier 2 */}
-              <path d="M 194 63 L 198 54 L 226 54 L 230 63 Z" fill="#1e3e60" />
-              <line x1="192" y1="54" x2="232" y2="54" stroke="#2b4c73" strokeWidth="1" />
+              <path d="M 171 135 L 177 118 L 259 118 L 265 135 Z" fill="#173e6b" />
+              <line x1="169" y1="118" x2="267" y2="118" stroke="#2c5d94" strokeWidth="1.8" />
+              <rect x="191" y="122" width="6" height="8" rx="1.2" fill="#081d33" />
+              <rect x="215" y="121" width="6" height="9" rx="1.2" fill="#081d33" />
+              <rect x="239" y="122" width="6" height="8" rx="1.2" fill="#081d33" />
+
               {/* Tier 3 */}
-              <path d="M 199 54 L 203 45 L 221 45 L 225 54 Z" fill="#22446a" />
-              <line x1="197" y1="45" x2="227" y2="45" stroke="#2b4c73" strokeWidth="1" />
+              <path d="M 178 118 L 184 102 L 252 102 L 258 118 Z" fill="#1b4679" />
+              <line x1="176" y1="102" x2="260" y2="102" stroke="#2c5d94" strokeWidth="1.8" />
+              <rect x="196" y="106" width="5" height="7" rx="1" fill="#081d33" />
+              <rect x="215.5" y="105" width="5" height="8" rx="1" fill="#081d33" />
+              <rect x="235" y="106" width="5" height="7" rx="1" fill="#081d33" />
+
               {/* Tier 4 */}
-              <path d="M 204 45 L 207 37 L 217 37 L 220 45 Z" fill="#264b75" />
-              <line x1="202" y1="37" x2="222" y2="37" stroke="#2b4c73" strokeWidth="1" />
+              <path d="M 185 102 L 190 86 L 246 86 L 251 102 Z" fill="#1f4e87" />
+              <line x1="183" y1="86" x2="253" y2="86" stroke="#2c5d94" strokeWidth="1.8" />
+              <rect x="201" y="90" width="4.5" height="6.5" rx="0.8" fill="#081d33" />
+              <rect x="216" y="89" width="4.5" height="7" rx="0.8" fill="#081d33" />
+              <rect x="231" y="90" width="4.5" height="6.5" rx="0.8" fill="#081d33" />
+
+              {/* Tier 5 */}
+              <path d="M 191 86 L 196 70 L 240 70 L 245 86 Z" fill="#245796" />
+              <line x1="189" y1="70" x2="247" y2="70" stroke="#2c5d94" strokeWidth="1.8" />
+              <rect x="206" y="74" width="4" height="6" rx="0.6" fill="#081d33" />
+              <rect x="216.5" y="73" width="4" height="6.5" rx="0.6" fill="#081d33" />
+              <rect x="227" y="74" width="4" height="6" rx="0.6" fill="#081d33" />
+
+              {/* Tier 6 */}
+              <path d="M 197 70 L 201 55 L 235 55 L 239 70 Z" fill="#2962a6" />
+              <line x1="195" y1="55" x2="241" y2="55" stroke="#2c5d94" strokeWidth="1.8" />
+
               {/* Sala Barrel Shikhara Roof Crest */}
-              <path d="M 206 37 C 206 30 218 30 218 37 Z" fill="#2c5380" />
-              {/* 5 Traditional Golden Kalasam Finials */}
-              <path d="M 212 30 L 212 25 Q 212 23 212 22" stroke="#FFBF18" strokeWidth="1.2" strokeLinecap="round" />
-              <circle cx="212" cy="22" r="1.2" fill="#FFBF18" />
-              <path d="M 208.5 32 L 208.5 27" stroke="#FFBF18" strokeWidth="0.9" strokeLinecap="round" />
-              <circle cx="208.5" cy="26" r="0.9" fill="#FFBF18" />
-              <path d="M 215.5 32 L 215.5 27" stroke="#FFBF18" strokeWidth="0.9" strokeLinecap="round" />
-              <circle cx="215.5" cy="26" r="0.9" fill="#FFBF18" />
-              {/* Niches / Carved details */}
-              <rect x="210" y="65" width="4" height="5" rx="0.5" fill="#0c2033" />
-              <rect x="210.5" y="56" width="3" height="4" rx="0.5" fill="#0c2033" />
-              <rect x="211" y="47" width="2" height="3" rx="0.5" fill="#0c2033" />
+              <path d="M 194 55 C 194 39, 242 39, 242 55 Z" fill="#306eb8" />
+              <line x1="193" y1="55" x2="243" y2="55" stroke="#12355b" strokeWidth="1.6" />
+
+              {/* 7 Refined Golden Kalasam Finials */}
+              <path d="M 218 41 L 218 26" stroke="#FFC72C" strokeWidth="2.2" strokeLinecap="round" />
+              <circle cx="218" cy="25" r="2.6" fill="#FFC72C" />
+
+              <path d="M 211 42 L 211 30" stroke="#FFC72C" strokeWidth="1.7" strokeLinecap="round" />
+              <circle cx="211" cy="29" r="2" fill="#FFC72C" />
+              <path d="M 225 42 L 225 30" stroke="#FFC72C" strokeWidth="1.7" strokeLinecap="round" />
+              <circle cx="225" cy="29" r="2" fill="#FFC72C" />
+
+              <path d="M 205 44 L 205 34" stroke="#FFC72C" strokeWidth="1.4" strokeLinecap="round" />
+              <circle cx="205" cy="33" r="1.7" fill="#FFC72C" />
+              <path d="M 231 44 L 231 34" stroke="#FFC72C" strokeWidth="1.4" strokeLinecap="round" />
+              <circle cx="231" cy="33" r="1.7" fill="#FFC72C" />
+
+              <path d="M 200 47 L 200 39" stroke="#FFC72C" strokeWidth="1.2" strokeLinecap="round" />
+              <circle cx="200" cy="38" r="1.4" fill="#FFC72C" />
+              <path d="M 236 47 L 236 39" stroke="#FFC72C" strokeWidth="1.2" strokeLinecap="round" />
+              <circle cx="236" cy="38" r="1.4" fill="#FFC72C" />
             </g>
 
             {/* ── Monument B: Second Gopuram (Mid-Distance Architectural Rhythm) ── */}
             <g className="heritage-monument heritage-gopuram heritage-gopuram--second" tabIndex={0} role="img" aria-label="Second Temple Gopuram">
-              <path d="M 314 82 L 314 74 L 350 74 L 350 82 Z" fill="#152d47" />
-              <path d="M 329 82 L 329 76 Q 332 74 335 76 L 335 82 Z" fill="#081829" />
-              <path d="M 316 74 L 319 65 L 345 65 L 348 74 Z" fill="#1b3856" />
-              <path d="M 320 65 L 323 57 L 341 57 L 344 65 Z" fill="#1e3e60" />
-              <path d="M 324 57 L 327 48 L 337 48 L 340 57 Z" fill="#22446a" />
-              <path d="M 327 48 C 327 42 337 42 337 48 Z" fill="#2c5380" />
-              {/* Kalasams */}
-              <path d="M 332 42 L 332 37" stroke="#FFBF18" strokeWidth="1.1" strokeLinecap="round" />
-              <circle cx="332" cy="36" r="1.1" fill="#FFBF18" />
-              <path d="M 329 44 L 329 40" stroke="#FFBF18" strokeWidth="0.8" strokeLinecap="round" />
-              <path d="M 335 44 L 335 40" stroke="#FFBF18" strokeWidth="0.8" strokeLinecap="round" />
+              <path d="M 300 175 L 300 155 L 374 155 L 374 175 Z" fill="#0f2b4a" />
+              <line x1="298" y1="155" x2="376" y2="155" stroke="#255182" strokeWidth="1.6" />
+              <path d="M 331 175 L 331 159 Q 337 154 343 159 L 343 175 Z" fill="#061626" />
+
+              <path d="M 303 155 L 308 139 L 366 139 L 371 155 Z" fill="#14375f" />
+              <line x1="301" y1="139" x2="373" y2="139" stroke="#255182" strokeWidth="1.6" />
+              <rect x="333" y="143" width="7" height="8" rx="1" fill="#081d33" />
+
+              <path d="M 310 139 L 315 123 L 359 123 L 364 139 Z" fill="#183f6b" />
+              <line x1="308" y1="123" x2="366" y2="123" stroke="#255182" strokeWidth="1.6" />
+              <rect x="334" y="127" width="5.5" height="7" rx="0.8" fill="#081d33" />
+
+              <path d="M 317 123 L 322 107 L 352 107 L 357 123 Z" fill="#1d4879" />
+              <line x1="315" y1="107" x2="359" y2="107" stroke="#255182" strokeWidth="1.6" />
+
+              <path d="M 323 107 L 327 91 L 347 91 L 351 107 Z" fill="#225289" />
+              <line x1="321" y1="91" x2="353" y2="91" stroke="#255182" strokeWidth="1.6" />
+
+              {/* Shikhara & 5 Kalasams */}
+              <path d="M 323 91 C 323 78, 351 78, 351 91 Z" fill="#295f9c" />
+              <line x1="337" y1="80" x2="337" y2="68" stroke="#FFC72C" strokeWidth="1.8" strokeLinecap="round" />
+              <circle cx="337" cy="67" r="2.1" fill="#FFC72C" />
+              <line x1="331" y1="82" x2="331" y2="72" stroke="#FFC72C" strokeWidth="1.4" strokeLinecap="round" />
+              <circle cx="331" cy="71" r="1.6" fill="#FFC72C" />
+              <line x1="343" y1="82" x2="343" y2="72" stroke="#FFC72C" strokeWidth="1.4" strokeLinecap="round" />
+              <circle cx="343" cy="71" r="1.6" fill="#FFC72C" />
+              <line x1="326" y1="85" x2="326" y2="77" stroke="#FFC72C" strokeWidth="1.1" strokeLinecap="round" />
+              <circle cx="326" cy="76" r="1.3" fill="#FFC72C" />
+              <line x1="348" y1="85" x2="348" y2="77" stroke="#FFC72C" strokeWidth="1.1" strokeLinecap="round" />
+              <circle cx="348" cy="76" r="1.3" fill="#FFC72C" />
             </g>
 
             {/* ── Monument C: Distant Third Gopuram (Center Horizon) ── */}
             <g className="heritage-monument heritage-gopuram heritage-gopuram--distant">
-              <path d="M 596 82 L 596 75 L 626 75 L 626 82 Z" fill="#152d47" opacity="0.85" />
-              <path d="M 598 75 L 601 67 L 621 67 L 624 75 Z" fill="#1b3856" opacity="0.85" />
-              <path d="M 602 67 L 605 59 L 617 59 L 620 67 Z" fill="#1e3e60" opacity="0.85" />
-              <path d="M 606 59 C 606 53 616 53 616 59 Z" fill="#2c5380" opacity="0.85" />
-              <path d="M 611 53 L 611 48" stroke="#FFBF18" strokeWidth="1" strokeLinecap="round" opacity="0.9" />
-              <circle cx="611" cy="47" r="0.9" fill="#FFBF18" />
+              <path d="M 558 175 L 558 159 L 626 159 L 626 175 Z" fill="#153356" opacity="0.9" />
+              <path d="M 561 159 L 566 145 L 618 145 L 623 159 Z" fill="#193b63" opacity="0.9" />
+              <path d="M 567 145 L 572 131 L 612 131 L 617 145 Z" fill="#1d4470" opacity="0.9" />
+              <path d="M 574 131 L 578 117 L 606 117 L 610 131 Z" fill="#224e80" opacity="0.9" />
+              <path d="M 576 117 C 576 107, 608 107, 608 117 Z" fill="#275990" opacity="0.9" />
+              <line x1="592" y1="109" x2="592" y2="97" stroke="#FFC72C" strokeWidth="1.5" strokeLinecap="round" opacity="0.95" />
+              <circle cx="592" cy="96" r="1.7" fill="#FFC72C" />
             </g>
 
             {/* ── Monument D: Traditional Pillared Mandapam (Colonnade / Hall of 1000 Pillars) ── */}
             <g className="heritage-monument heritage-mandapam" tabIndex={0} role="img" aria-label="Heritage Pillared Mandapam">
-              {/* Stone Cornice / Beam */}
-              <rect x="756" y="68" width="134" height="3" fill="#1b3552" />
-              <rect x="758" y="65" width="130" height="3" fill="#23466d" />
-              {/* Row of 16 Stone Pillars */}
-              {[...Array(16)].map((_, i) => {
-                const px = 760 + i * 8.4;
+              {/* Upper Parapet & Cornice Slab */}
+              <rect x="726" y="126" width="198" height="5" rx="0.5" fill="#1b3d63" />
+              <rect x="730" y="121" width="190" height="5" fill="#254d77" />
+              {/* Row of 20 Classical Stone Pillars */}
+              {[...Array(20)].map((_, i) => {
+                const px = 734 + i * 9.6;
                 return (
                   <g key={`pillar-${i}`}>
-                    <line x1={px} y1={71} x2={px} y2={82} stroke="#1b3552" strokeWidth="1.6" />
-                    <circle cx={px} cy={71} r="1.1" fill="#2c5380" />
-                    <rect x={px - 1.2} y={80.5} width="2.4" height="1.5" fill="#112438" />
+                    <line x1={px} y1={131} x2={px} y2={175} stroke="#132f4e" strokeWidth="2.5" />
+                    <rect x={px - 2} y={131} width="4" height="2" fill="#2d5885" />
+                    <rect x={px - 1.8} y={173} width="3.6" height="2" fill="#091b2e" />
                   </g>
                 );
               })}
@@ -352,91 +436,131 @@ export function HeritageFooter({ lang }: HeritageFooterProps) {
             {/* ── Monument E: Coastal Lighthouse on Rocky Shoreline ── */}
             <g className="heritage-monument heritage-lighthouse" tabIndex={0} role="img" aria-label="Coastal Lighthouse">
               {/* Rocky Promontory */}
-              <path d="M 1032 84 Q 1048 77 1064 84 Z" fill="#0f253d" />
-              {/* Tapering Lighthouse Tower */}
-              <path d="M 1044 82 L 1046 50 L 1052 50 L 1054 82 Z" fill="#1a3759" />
+              <path d="M 1010 178 Q 1035 165 1060 178 Z" fill="#0b2036" />
+              {/* Tapered Lighthouse Tower */}
+              <path d="M 1027 174 L 1030 80 L 1040 80 L 1043 174 Z" fill="#193b61" />
               {/* Balcony Gallery */}
-              <line x1="1043" y1="50" x2="1055" y2="50" stroke="#FFBF18" strokeWidth="1" />
+              <line x1="1025" y1="80" x2="1045" y2="80" stroke="#FFC72C" strokeWidth="2" />
               {/* Lantern Room */}
-              <rect x="1046" y="44" width="6" height="6" fill="#FDB913" opacity="0.9" />
+              <rect x="1029" y="70" width="12" height="10" rx="1" fill="#FFC72C" opacity="0.95" />
               {/* Dome & Light Beacon */}
-              <path d="M 1045 44 C 1045 40 1053 40 1053 44 Z" fill="#0f253d" />
-              <line x1="1049" y1="40" x2="1049" y2="37" stroke="#FDB913" strokeWidth="1" strokeLinecap="round" />
+              <path d="M 1028 70 C 1028 62, 1042 62, 1042 70 Z" fill="#0e2640" />
+              <line x1="1035" y1="62" x2="1035" y2="56" stroke="#FFC72C" strokeWidth="1.5" strokeLinecap="round" />
             </g>
 
             {/* ── Monument F: Traditional Tamil Catamaran / Fishing Boat (`Pattai`) ── */}
             <g className="heritage-monument heritage-boat" tabIndex={0} role="img" aria-label="Tamil Fishing Boat">
-              {/* Hull */}
-              <path d="M 1242 80 C 1252 86, 1278 86, 1294 79 C 1282 84, 1258 84, 1242 80 Z" fill="#11263d" />
-              <path d="M 1240 79 L 1296 78 L 1290 82 L 1244 82 Z" fill="#1a3759" />
-              {/* Mast & Rigging */}
-              <line x1="1268" y1="80" x2="1268" y2="58" stroke="#081829" strokeWidth="1.2" />
-              <line x1="1250" y1="79" x2="1268" y2="58" stroke="#475569" strokeWidth="0.7" opacity="0.6" />
-              <line x1="1288" y1="78" x2="1268" y2="58" stroke="#475569" strokeWidth="0.7" opacity="0.6" />
-              {/* Angled Billowing Sail */}
-              <path d="M 1268 60 Q 1282 66 1284 76 L 1268 76 Z" fill="#f8fafc" opacity="0.85" />
-              <path d="M 1267 62 Q 1256 68 1252 76 L 1267 76 Z" fill="#e2e8f0" opacity="0.75" />
+              {/* Slender Hull with Curved Bow and Stern */}
+              <path d="M 1245 162 C 1268 174, 1318 174, 1340 160 C 1320 168, 1275 168, 1245 162 Z" fill="#0a1e33" />
+              <path d="M 1242 161 L 1342 159 L 1334 166 L 1248 166 Z" fill="#16385d" />
+              {/* Tall Mast & Rigging */}
+              <line x1="1290" y1="162" x2="1290" y2="94" stroke="#061524" strokeWidth="2.2" />
+              <line x1="1255" y1="160" x2="1290" y2="94" stroke="#475569" strokeWidth="1" opacity="0.65" />
+              <line x1="1325" y1="159" x2="1290" y2="94" stroke="#475569" strokeWidth="1" opacity="0.65" />
+              {/* Angled Billowing Triangular Sails */}
+              <path d="M 1290 98 Q 1320 114 1324 156 L 1290 156 Z" fill="#ffffff" opacity="0.95" stroke="#cbd5e1" strokeWidth="0.8" />
+              <path d="M 1288 102 Q 1262 118 1256 156 L 1288 156 Z" fill="#e6edf5" opacity="0.88" stroke="#cbd5e1" strokeWidth="0.8" />
+              {/* Two Fishermen Silhouettes */}
+              <circle cx="1278" cy="153" r="2.2" fill="#061524" />
+              <path d="M 1276 155 L 1280 155 L 1281 161 L 1275 161 Z" fill="#061524" />
+              <circle cx="1302" cy="154" r="2.2" fill="#061524" />
+              <path d="M 1300 156 L 1304 156 L 1305 161 L 1299 161 Z" fill="#061524" />
             </g>
 
             {/* ── Lush Tamil Nadu Flora: Iconic Palmyra Palms & Coconut Groves ── */}
             {/* Leftmost iconic Palmyra palm cluster (State tree of Tamil Nadu) */}
-            <g className="heritage-flora heritage-palms--left" fill="#0a1d33">
+            <g className="heritage-flora heritage-palms--left" fill="#081e35">
               {/* Tall Palmyra Palm 1 */}
-              <path d="M 16 82 Q 18 52 20 22 L 22 22 Q 20 52 18 82 Z" />
-              <g transform="translate(20, 22) scale(0.62)">
-                <path d="M 0 0 Q -16 -12 -24 -6 Q -12 4 0 0 Z" />
-                <path d="M 0 0 Q -20 -22 -16 -20 Q -4 2 0 0 Z" />
-                <path d="M 0 0 Q 0 -28 2 -26 Q 2 -2 0 0 Z" />
-                <path d="M 0 0 Q 20 -22 16 -20 Q 4 2 0 0 Z" />
-                <path d="M 0 0 Q 24 -12 28 -6 Q 14 4 0 0 Z" />
-                <path d="M 0 0 Q 22 12 26 18 Q 12 12 0 0 Z" />
-                <path d="M 0 0 Q -22 12 -26 18 Q -12 12 0 0 Z" />
+              <path d="M 22 175 Q 25 110 28 40 L 31 40 Q 28 110 25 175 Z" />
+              {/* Rich fan fronds */}
+              <g transform="translate(29, 40)">
+                <path d="M 0 0 C -12 -10, -28 -14, -34 -4 C -28 6, -14 4, 0 0 Z" />
+                <path d="M 0 0 C -18 -20, -28 -32, -18 -30 C -8 -18, -4 -6, 0 0 Z" />
+                <path d="M 0 0 C -6 -24, 0 -38, 6 -36 C 8 -22, 4 -8, 0 0 Z" />
+                <path d="M 0 0 C 12 -22, 26 -30, 26 -22 C 16 -12, 8 -4, 0 0 Z" />
+                <path d="M 0 0 C 22 -14, 34 -12, 34 -2 C 24 6, 14 4, 0 0 Z" />
+                <path d="M 0 0 C 20 8, 30 18, 26 22 C 16 16, 8 8, 0 0 Z" />
+                <path d="M 0 0 C -16 8, -26 18, -24 22 C -14 16, -6 8, 0 0 Z" />
               </g>
-              {/* Palmyra Palm 2 */}
-              <path d="M 38 82 Q 40 56 42 32 L 44 32 Q 42 56 40 82 Z" />
-              <g transform="translate(42, 32) scale(0.52)">
-                <path d="M 0 0 Q -15 -10 -22 -5 Q -10 3 0 0 Z" />
-                <path d="M 0 0 Q -18 -18 -14 -16 Q -3 2 0 0 Z" />
-                <path d="M 0 0 Q 0 -24 2 -22 Q 2 -2 0 0 Z" />
-                <path d="M 0 0 Q 18 -18 14 -16 Q 3 2 0 0 Z" />
-                <path d="M 0 0 Q 22 -10 26 -5 Q 12 3 0 0 Z" />
+
+              {/* Tall Palmyra Palm 2 */}
+              <path d="M 52 175 Q 55 118 58 58 L 61 58 Q 58 118 55 175 Z" />
+              <g transform="translate(59, 58) scale(0.82)">
+                <path d="M 0 0 C -12 -10, -26 -12, -30 -4 C -24 5, -12 4, 0 0 Z" />
+                <path d="M 0 0 C -16 -18, -24 -28, -16 -26 C -7 -16, -3 -5, 0 0 Z" />
+                <path d="M 0 0 C -5 -22, 0 -34, 5 -32 C 7 -20, 3 -7, 0 0 Z" />
+                <path d="M 0 0 C 10 -20, 22 -26, 22 -20 C 14 -10, 7 -3, 0 0 Z" />
+                <path d="M 0 0 C 18 -12, 28 -10, 28 -2 C 20 5, 12 3, 0 0 Z" />
               </g>
+
               {/* Coastal Bush / Shrub Silhouette */}
-              <path d="M 0 82 C 10 75 25 76 35 80 C 45 74 60 75 72 82 Z" fill="#081829" />
+              <path d="M 0 175 C 16 162 38 164 54 171 C 70 160 92 162 110 175 Z" fill="#061729" />
             </g>
 
             {/* Interspersed Palms across the Trail */}
-            <g className="heritage-flora heritage-palms--trail" fill="#0f2640" opacity="0.9">
+            <g className="heritage-flora heritage-palms--trail" fill="#0d2540" opacity="0.95">
               {/* Near Main Gopuram */}
-              <path d="M 152 82 Q 154 62 156 44 L 157.5 44 Q 155.5 62 153.5 82 Z" />
-              <circle cx="156" cy="44" r="8" opacity="0.75" />
+              <path d="M 146 175 Q 149 132 152 90 L 154 90 Q 151 132 148 175 Z" />
+              <g transform="translate(153, 90) scale(0.55)">
+                <path d="M 0 0 C -16 -12, -26 -8, -20 2 C -10 6, -4 2, 0 0 Z" />
+                <path d="M 0 0 C -14 -22, -6 -28, 2 -18 C 6 -8, 2 -2, 0 0 Z" />
+                <path d="M 0 0 C 12 -22, 22 -16, 18 -4 C 10 4, 4 2, 0 0 Z" />
+                <path d="M 0 0 C 18 -6, 26 2, 18 10 C 10 8, 4 4, 0 0 Z" />
+              </g>
+
               {/* Between Gopurams */}
-              <path d="M 275 82 Q 276 66 277 52 L 278.5 52 Q 277.5 66 276.5 82 Z" />
-              <circle cx="277" cy="52" r="7" opacity="0.7" />
+              <path d="M 288 175 Q 290 138 292 102 L 294 102 Q 292 138 290 175 Z" />
+              <g transform="translate(293, 102) scale(0.5)">
+                <path d="M 0 0 C -16 -12, -26 -8, -20 2 C -10 6, -4 2, 0 0 Z" />
+                <path d="M 0 0 C -14 -22, -6 -28, 2 -18 C 6 -8, 2 -2, 0 0 Z" />
+                <path d="M 0 0 C 12 -22, 22 -16, 18 -4 C 10 4, 4 2, 0 0 Z" />
+              </g>
+
               {/* Center Palms */}
-              <path d="M 440 82 Q 441 68 442 56 L 443.5 56 Q 442.5 68 441.5 82 Z" />
-              <circle cx="442" cy="56" r="6.5" opacity="0.65" />
-              <path d="M 515 82 Q 516 68 517 54 L 518.5 54 Q 517.5 68 516.5 82 Z" />
-              <circle cx="517" cy="54" r="6" opacity="0.65" />
-              <path d="M 680 82 Q 681 70 682 58 L 683.5 58 Q 682.5 70 681.5 82 Z" />
-              <circle cx="682" cy="58" r="6" opacity="0.65" />
+              <path d="M 440 175 Q 442 140 444 108 L 446 108 Q 444 140 442 175 Z" />
+              <g transform="translate(445, 108) scale(0.48)">
+                <path d="M 0 0 C -14 -10, -22 -6, -18 2 C -8 5, -3 2, 0 0 Z" />
+                <path d="M 0 0 C -10 -18, -4 -24, 2 -16 C 5 -7, 2 -2, 0 0 Z" />
+                <path d="M 0 0 C 10 -18, 18 -12, 16 -4 C 8 3, 3 2, 0 0 Z" />
+              </g>
+
+              <path d="M 500 175 Q 502 138 504 104 L 506 104 Q 504 138 502 175 Z" />
+              <g transform="translate(505, 104) scale(0.45)">
+                <path d="M 0 0 C -14 -10, -22 -6, -18 2 C -8 5, -3 2, 0 0 Z" />
+                <path d="M 0 0 C 10 -18, 18 -12, 16 -4 C 8 3, 3 2, 0 0 Z" />
+              </g>
+
+              <path d="M 668 175 Q 670 142 672 112 L 674 112 Q 672 142 670 175 Z" />
+              <g transform="translate(673, 112) scale(0.46)">
+                <path d="M 0 0 C -14 -10, -22 -6, -18 2 C -8 5, -3 2, 0 0 Z" />
+                <path d="M 0 0 C 10 -18, 18 -12, 16 -4 C 8 3, 3 2, 0 0 Z" />
+              </g>
+
               {/* Near Mandapam */}
-              <path d="M 925 82 Q 926 70 927 58 L 928.5 58 Q 927.5 70 926.5 82 Z" />
-              <circle cx="927" cy="58" r="6.5" opacity="0.65" />
+              <path d="M 948 175 Q 950 142 952 112 L 954 112 Q 952 142 950 175 Z" />
+              <g transform="translate(953, 112) scale(0.5)">
+                <path d="M 0 0 C -14 -10, -24 -6, -18 2 C -8 5, -3 2, 0 0 Z" />
+                <path d="M 0 0 C 12 -18, 20 -12, 16 -4 C 8 3, 3 2, 0 0 Z" />
+              </g>
             </g>
 
             {/* Right Headland Palms */}
-            <g className="heritage-flora heritage-palms--right" fill="#081829">
-              <path d="M 1410 82 Q 1408 54 1406 28 L 1408 28 Q 1410 54 1412 82 Z" />
-              <g transform="translate(1407, 28) scale(0.55)">
-                <path d="M 0 0 Q -18 -12 -24 -6 Q -12 4 0 0 Z" />
-                <path d="M 0 0 Q -18 -22 -14 -18 Q -3 2 0 0 Z" />
-                <path d="M 0 0 Q 0 -26 2 -24 Q 2 -2 0 0 Z" />
-                <path d="M 0 0 Q 18 -22 14 -18 Q 3 2 0 0 Z" />
-                <path d="M 0 0 Q 22 -12 26 -6 Q 12 4 0 0 Z" />
+            <g className="heritage-flora heritage-palms--right" fill="#081d33">
+              <path d="M 1395 175 Q 1392 116 1389 44 L 1392 44 Q 1395 116 1398 175 Z" />
+              <g transform="translate(1390, 44) scale(0.92)">
+                <path d="M 0 0 C -12 -10, -28 -14, -34 -4 C -28 6, -14 4, 0 0 Z" />
+                <path d="M 0 0 C -18 -20, -28 -32, -18 -30 C -8 -18, -4 -6, 0 0 Z" />
+                <path d="M 0 0 C -6 -24, 0 -38, 6 -36 C 8 -22, 4 -8, 0 0 Z" />
+                <path d="M 0 0 C 12 -22, 26 -30, 26 -22 C 16 -12, 8 -4, 0 0 Z" />
+                <path d="M 0 0 C 22 -14, 34 -12, 34 -2 C 24 6, 14 4, 0 0 Z" />
               </g>
-              <path d="M 1432 82 Q 1430 58 1428 36 L 1430 36 Q 1432 58 1434 82 Z" />
-              <path d="M 1375 82 C 1390 76 1415 75 1440 79 L 1440 82 Z" fill="#0a1d33" />
+
+              <path d="M 1428 175 Q 1425 124 1422 64 L 1425 64 Q 1428 124 1431 175 Z" />
+              <g transform="translate(1424, 64) scale(0.76)">
+                <path d="M 0 0 C -12 -10, -26 -12, -30 -4 C -24 5, -12 4, 0 0 Z" />
+                <path d="M 0 0 C 10 -20, 22 -26, 22 -20 C 14 -10, 7 -3, 0 0 Z" />
+              </g>
+              <path d="M 1345 175 C 1370 164 1405 162 1440 168 L 1440 175 Z" fill="#061729" />
             </g>
           </g>
 
@@ -445,29 +569,29 @@ export function HeritageFooter({ lang }: HeritageFooterProps) {
             {/* Wave 1: Back Wave */}
             <path
               className="heritage-wave heritage-wave--back"
-              d="M 0 68 C 220 80, 440 56, 700 70 C 960 84, 1200 62, 1440 74 L 1440 120 L 0 120 Z"
+              d="M 0 142 C 240 126, 480 156, 740 134 C 1000 156, 1200 130, 1440 144 L 1440 220 L 0 220 Z"
             />
             {/* Wave 2: Mid Wave */}
             <path
               className="heritage-wave heritage-wave--mid"
-              d="M 0 78 C 260 64, 540 90, 820 74 C 1080 60, 1280 82, 1440 76 L 1440 120 L 0 120 Z"
+              d="M 0 158 C 260 176, 520 142, 800 168 C 1040 142, 1220 166, 1440 154 L 1440 220 L 0 220 Z"
             />
-            {/* Wave 3: Front Wave (Merges seamlessly with bottom bar) */}
+            {/* Wave 3: Front Wave (Dips gently around boat so hull is clearly seen, merges seamlessly with bottom bar) */}
             <path
               className="heritage-wave heritage-wave--front"
-              d="M 0 88 C 240 98, 520 78, 800 92 C 1080 102, 1300 84, 1440 90 L 1440 120 L 0 120 Z"
+              d="M 0 174 C 280 192, 580 162, 880 186 C 1080 166, 1200 174, 1240 168 C 1285 162, 1335 162, 1370 156 C 1410 160, 1430 166, 1440 168 L 1440 220 L 0 220 Z"
             />
           </g>
 
-          {/* 5. Signature Golden Dotted Flight Path with Loop-the-Loop */}
+          {/* 5. Signature Golden Dotted Flight Path with Smooth Loop-the-Loop */}
           <g className="heritage-layer heritage-layer--flightpath">
-            {/* The Golden Path */}
+            {/* The Golden Path: Smooth undulating curves, circular loop, and clean exit to bird */}
             <path
               id="heritageFlightPath"
               className="heritage-flight-line"
-              d="M 70 89 C 220 70, 430 96, 680 82 C 900 68, 1100 88, 1220 76 C 1255 72, 1276 65, 1285 52 C 1295 36, 1280 20, 1262 25 C 1245 31, 1244 48, 1262 58 C 1280 68, 1312 66, 1345 52 L 1368 40"
-              stroke="#FFBF18"
-              strokeWidth="2.4"
+              d="M 60 168 C 160 154, 240 166, 320 166 C 400 166, 460 162, 530 162 C 610 162, 670 165, 740 164 C 820 163, 900 162, 970 162 C 1030 162, 1080 154, 1130 138 C 1155 124, 1172 102, 1186 78 C 1198 58, 1218 64, 1218 84 C 1218 102, 1198 112, 1182 106 C 1168 100, 1172 84, 1188 80 C 1212 74, 1246 60, 1274 46"
+              stroke="#FFC72C"
+              strokeWidth="2.6"
               strokeDasharray="6 7"
               strokeLinecap="round"
             />
@@ -475,33 +599,38 @@ export function HeritageFooter({ lang }: HeritageFooterProps) {
             {/* Glowing Golden Route Marker Pins */}
             <g className="heritage-route-pins">
               {/* Pin 1 */}
-              <circle cx="70" cy="89" r="5" fill="#FFBF18" opacity="0.3" className="heritage-pin-halo" />
-              <circle cx="70" cy="89" r="3" fill="#FFBF18" />
+              <circle cx="60" cy="168" r="6.5" fill="#FFC72C" opacity="0.32" className="heritage-pin-halo" />
+              <circle cx="60" cy="168" r="3.6" fill="#FFC72C" />
               {/* Pin 2 */}
-              <circle cx="430" cy="94" r="2.4" fill="#FFBF18" />
+              <circle cx="320" cy="166" r="3.4" fill="#FFC72C" />
               {/* Pin 3 */}
-              <circle cx="680" cy="82" r="4.5" fill="#FFBF18" opacity="0.3" className="heritage-pin-halo" />
-              <circle cx="680" cy="82" r="2.8" fill="#FFBF18" />
+              <circle cx="530" cy="162" r="5.5" fill="#FFC72C" opacity="0.32" className="heritage-pin-halo" />
+              <circle cx="530" cy="162" r="3.6" fill="#FFC72C" />
               {/* Pin 4 */}
-              <circle cx="980" cy="74" r="2.4" fill="#FFBF18" />
+              <circle cx="740" cy="164" r="3.4" fill="#FFC72C" />
               {/* Pin 5 */}
-              <circle cx="1220" cy="76" r="4.5" fill="#FFBF18" opacity="0.3" className="heritage-pin-halo" />
-              <circle cx="1220" cy="76" r="2.8" fill="#FFBF18" />
+              <circle cx="970" cy="162" r="5.5" fill="#FFC72C" opacity="0.32" className="heritage-pin-halo" />
+              <circle cx="970" cy="162" r="3.6" fill="#FFC72C" />
+            </g>
+
+            {/* 6. Authentic Official Thabaal Carrier Bird Motif perched directly at Path Endpoint */}
+            <g
+              className="heritage-endpoint-bird-svg"
+              transform="translate(1274, 25) rotate(-14 26 15)"
+              role="img"
+              aria-label="Thabaal Carrier Bird"
+            >
+              <image
+                href="/brands/thabaal/mark.png"
+                x="0"
+                y="0"
+                width="54"
+                height="30"
+                preserveAspectRatio="xMidYMid meet"
+              />
             </g>
           </g>
         </svg>
-
-        {/* 6. Authentic Official Thabaal Carrier Bird Motif perched at Path Endpoint */}
-        <div className="heritage-endpoint-bird" aria-hidden="true">
-          <Image
-            src="/brands/thabaal/mark.png"
-            alt=""
-            width={28}
-            height={15}
-            className="heritage-mini-bird"
-            priority
-          />
-        </div>
       </div>
 
       {/* Layer C — Deep-Navy Bottom Bar */}
