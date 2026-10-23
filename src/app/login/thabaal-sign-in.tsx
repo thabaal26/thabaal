@@ -8,7 +8,6 @@ import { LandingSections } from "./landing-sections";
 import { MascotIntro } from "./mascot-intro";
 import { ScrollDownPrompt } from "./scroll-prompt";
 import { SiteHeader } from "./site-header";
-import { ScrollReveal } from "@/components/motion";
 import "./thabaal-login.css";
 
 function getThemeSnapshot(): "day" | "night" {
@@ -83,7 +82,7 @@ export function ThabaalSignIn() {
         {/* LEFT COLUMN: SIGN IN FORM */}
         <section className="thabaal-left">
           {/* Brand Wordmark with Mascot Bird Perched on Top */}
-          <ScrollReveal direction="down" duration={500} className="w-full">
+          <div className="w-full">
             <div className="thabaal-brand">
               {/* English and Tamil wordmarks, each in a day and a night colour; CSS shows the right one. */}
               <div
@@ -127,7 +126,7 @@ export function ThabaalSignIn() {
                 <MascotIntro lang={lang} />
               </div>
             </div>
-          </ScrollReveal>
+          </div>
 
           {/* Credential Form. Privacy, terms and the rest are in the page footer below (one place, not two). */}
           <LoginForm lang={lang} />

@@ -2,7 +2,6 @@
 
 import { Eye, EyeOff } from "@/components/icons";
 import { useState, useEffect, useActionState } from "react";
-import { ScrollReveal } from "@/components/motion";
 import { login } from "./actions";
 
 interface LoginFormProps {
@@ -78,7 +77,7 @@ export function LoginForm({ lang = "en" }: LoginFormProps) {
   const error = formError || oauthError;
 
   return (
-    <ScrollReveal as="div" className="thabaal-formwrap" direction="up" distance={20} duration={550}>
+    <div className="thabaal-formwrap">
       <form
         action={(formData) => {
           setOauthError(null);
@@ -206,6 +205,6 @@ export function LoginForm({ lang = "en" }: LoginFormProps) {
           </a>
         </p>
       </form>
-    </ScrollReveal>
+    </div>
   );
 }
