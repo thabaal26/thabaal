@@ -599,16 +599,16 @@ export function LandingSections({ lang }: { lang: Lang }) {
       <section className="business-ribbon" aria-label={ta ? "வணிக வழிகாட்டி" : "Business positioning"}>
         {/* Understated atmospheric clouds framing the edges */}
         <div className="ribbon__clouds" aria-hidden="true">
-          <svg className="ribbon__cloud ribbon__cloud--left" viewBox="0 0 300 100" focusable="false">
+          <svg className="ribbon__cloud ribbon__cloud--left" viewBox="0 0 360 120" preserveAspectRatio="none" focusable="false">
             <path
               fill="currentColor"
-              d="M14 94C10 86 16 80 13 70C10 56 22 40 38 36C48 20 70 12 86 20C94 24 98 30 99 38C104 33 114 33 122 38C133 45 136 58 134 68C133 73 132 78 138 78C145 78 150 74 158 77C168 80 180 80 200 80C230 80 256 80 276 81C288 82 292 90 284 94Z"
+              d="M 0 120 L 0 80 C 15 55, 55 45, 80 62 C 105 32, 160 20, 195 48 C 225 35, 265 42, 280 68 C 298 64, 325 74, 335 94 C 345 105, 355 115, 360 120 Z"
             />
           </svg>
-          <svg className="ribbon__cloud ribbon__cloud--right" viewBox="0 0 300 100" focusable="false">
+          <svg className="ribbon__cloud ribbon__cloud--right" viewBox="0 0 360 120" preserveAspectRatio="none" focusable="false">
             <path
               fill="currentColor"
-              d="M16 94C10 88 14 80 14 72C14 56 30 46 46 48C54 32 78 24 98 32C110 37 116 46 116 54C128 52 140 58 142 70C143 76 142 78 148 79C158 80 172 80 196 81C230 82 262 82 280 84C290 86 290 94 280 94Z"
+              d="M 360 120 L 360 78 C 342 54, 305 46, 280 64 C 255 30, 198 18, 162 46 C 132 32, 92 40, 78 66 C 58 62, 32 72, 22 92 C 12 104, 4 114, 0 120 Z"
             />
           </svg>
         </div>
@@ -619,9 +619,10 @@ export function LandingSections({ lang }: { lang: Lang }) {
             <Image
               src="/brands/thabaal/mark.png"
               alt="Thabaal"
-              width={52}
-              height={29}
+              width={46}
+              height={26}
               priority
+              style={{ width: "46px", height: "auto" }}
             />
           </div>
 
@@ -640,7 +641,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
           {/* 3. Dotted Yellow Flight Path with Terminal Endpoint Bird */}
           <div className="ribbon__flight-path-wrap" aria-hidden="true">
             <svg
-              viewBox="0 0 760 56"
+              viewBox="0 0 760 64"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
               className="ribbon__flight-svg"
@@ -648,26 +649,27 @@ export function LandingSections({ lang }: { lang: Lang }) {
               focusable="false"
             >
               <path
-                d="M 24 32 C 140 14, 230 46, 380 28 S 530 10, 630 32 C 670 40, 700 36, 708 22 C 714 10, 698 4, 686 12 C 676 18, 686 28, 718 20 L 734 16"
+                d="M 20 46 C 80 36, 145 32, 210 36 C 280 40, 340 44, 400 42 C 470 39, 525 28, 580 27 C 618 26, 642 42, 668 47 C 688 51, 706 43, 712 30 C 716 16, 702 8, 688 8 C 672 8, 664 22, 674 34 C 682 44, 702 40, 724 30 L 738 22"
                 stroke="#FFBF18"
-                strokeWidth="2"
+                strokeWidth="2.2"
                 strokeDasharray="6 7"
                 strokeLinecap="round"
                 className="ribbon__flight-line"
               />
-              <circle cx="24" cy="32" r="3.2" fill="#FFBF18" />
-              <circle cx="220" cy="26" r="2.5" fill="#FFBF18" />
-              <circle cx="380" cy="28" r="2.5" fill="#FFBF18" />
-              <circle cx="550" cy="22" r="2.5" fill="#FFBF18" />
+              <circle cx="20" cy="46" r="3.4" fill="#FFBF18" />
+              <circle cx="210" cy="36" r="3.2" fill="#FFBF18" />
+              <circle cx="400" cy="42" r="3.2" fill="#FFBF18" />
+              <circle cx="580" cy="27" r="3.2" fill="#FFBF18" />
             </svg>
             <div className="ribbon__endpoint-bird">
               <Image
                 src="/brands/thabaal/mark.png"
                 alt=""
-                width={26}
-                height={14}
+                width={28}
+                height={16}
                 className="ribbon__mini-bird"
                 aria-hidden="true"
+                style={{ width: "28px", height: "auto" }}
               />
             </div>
           </div>
