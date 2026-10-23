@@ -18,11 +18,37 @@ export function SiteHeader({ lang, onToggleLang, onSelectLang }: SiteHeaderProps
 
   const closeMenu = () => setMobileMenuOpen(false);
 
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
+    closeMenu();
+    const target = document.getElementById(targetId);
+    if (target) {
+      e.preventDefault();
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (window.location.hash !== `#${targetId}`) {
+        history.pushState(null, "", `#${targetId}`);
+      }
+    }
+  };
+
+  const handleTopClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    closeMenu();
+    e.preventDefault();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (window.location.hash) {
+      history.pushState(null, "", window.location.pathname + window.location.search);
+    }
+  };
+
   return (
     <header className="site-header" role="banner">
       <div className="site-header-container">
         {/* Brand Logo with Carrier Bird */}
-        <a href="#top" className="site-header-brand" aria-label={ta ? "தபால் முகப்பு" : "Thabaal home"}>
+        <a
+          href="#top"
+          onClick={handleTopClick}
+          className="site-header-brand"
+          aria-label={ta ? "தபால் முகப்பு" : "Thabaal home"}
+        >
           <Image
             src={ta ? "/brands/thabaal/thabaal-logo-ta.png" : "/brands/thabaal/thabaal-logo-en.png"}
             alt="Thabaal"
@@ -46,19 +72,19 @@ export function SiteHeader({ lang, onToggleLang, onSelectLang }: SiteHeaderProps
           className={`site-header-nav ${mobileMenuOpen ? "open" : ""}`}
           aria-label={ta ? "தள வழிசெலுத்தல்" : "Site navigation"}
         >
-          <a href="#features" onClick={closeMenu}>
+          <a href="#features" onClick={(e) => handleNavClick(e, "features")}>
             {ta ? "தபால் ஏன்" : "Why Thabaal"}
           </a>
-          <a href="#reports" onClick={closeMenu}>
+          <a href="#reports" onClick={(e) => handleNavClick(e, "reports")}>
             {ta ? "அறிக்கைகள்" : "Analytics"}
           </a>
-          <a href="#how-it-works" onClick={closeMenu}>
+          <a href="#how-it-works" onClick={(e) => handleNavClick(e, "how-it-works")}>
             {ta ? "ஆர்டர்கள்" : "Orders"}
           </a>
-          <a href="#templates" onClick={closeMenu}>
+          <a href="#templates" onClick={(e) => handleNavClick(e, "templates")}>
             {ta ? "டெம்ப்ளேட்டுகள்" : "Templates"}
           </a>
-          <a href="#pricing" onClick={closeMenu}>
+          <a href="#pricing" onClick={(e) => handleNavClick(e, "pricing")}>
             {ta ? "கட்டணம்" : "Pricing"}
           </a>
           <a

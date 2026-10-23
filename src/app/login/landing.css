@@ -36,8 +36,33 @@
   margin: 0 auto;
 }
 
-/* ── Anchor Scroll Clearance for Sticky Header ── */
+/* ── Landing Page Root Scroll Settings ──
+   Eliminates duplicate scroll-padding offset collision with globals.css (5rem)
+   so section anchors align with pixel precision under the sticky header.
+── */
+html {
+  scroll-padding-top: 0 !important;
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Anchor Scroll Clearance for Sticky Header ──
+   The sticky header is ~68-72px tall.
+   Sections have padding-top: 96px.
+   With scroll-margin-top: 4px, the content starts comfortably ~28px below the sticky header.
+   This eliminates the ~180px blank dead void, displaying the full headline, subtitle,
+   and interactive cards/tabs within the viewport without requiring extra manual scrolling.
+── */
 #top,
+#explore {
+  scroll-margin-top: 0;
+}
+
 #features,
 #reports,
 #how-it-works,
@@ -45,14 +70,13 @@
 #pricing,
 #faq,
 #start,
-#explore,
 .workspace-section,
 .demo-section,
 .steps-section,
 .use-case-section,
 .pricing-section,
 .faq-section {
-  scroll-margin-top: clamp(68px, 8vh, 88px);
+  scroll-margin-top: 4px;
 }
 
 /* ── Sticky Site Header ── */
