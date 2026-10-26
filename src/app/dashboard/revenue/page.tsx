@@ -40,7 +40,7 @@ const SUB_TA = "வந்த பணம், வர வேண்டிய பண�
 
 /** Payments (portal design): to collect, received, cash on delivery, every transaction, settings. */
 export default async function PaymentsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const locked = await planGate();
+  const locked = await planGate("orders");
   if (locked) return locked;
   const sp = await searchParams;
   const scope = await getScope();

@@ -2,14 +2,25 @@
 // Home, My account and Settings never call this, so the owner can always reach the payment and their details.
 
 import Link from "@/components/intent-link";
+import { redirect } from "next/navigation";
 import { PLANS, inr } from "@/lib/account-plans";
+import { isSectionEnabled, type ClientSectionId } from "@/lib/client-sections";
+import { db } from "@/lib/db";
 import { clientAccess } from "@/lib/plan-access";
 import { getScope } from "@/lib/session";
 import "./account/account.css";
 
-/** Returns the lock screen when the signed-in business is locked, otherwise null (render the page). */
-export async function planGate() {
+/**
+ * Returns the lock screen when the signed-in business is locked, otherwise null (render the page).
+ * With `section`, a business that has that section switched off (Clients › sections, e.g. a marketing-only
+ * business without Orders) is sent to Home, so the page can't be opened by typing its address.
+ */
+export async function planGate(section?: ClientSectionId) {
   const scope = await getScope();
+  if (section && scope.clientId) {
+    const c = await db.client.findUnique({ where: { id: scope.clientId }, select: { disabledSections: true } });
+    if (!isSectionEnabled(c?.disabledSections, section)) redirect("/dashboard");
+  }
   if (!scope.planLocked || !scope.clientId) return null;
   const access = await clientAccess(scope.clientId);
   const plan = PLANS.find((p) => p.k === access.plan);

@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: "Products" };
 export const dynamic = "force-dynamic";
 
 export default async function CataloguePage({ searchParams }: PageProps<"/dashboard/catalogue">) {
-  const locked = await planGate();
+  const locked = await planGate("catalogue");
   if (locked) return locked;
   const scope = await getScope();
   if (!scope.clientId) {

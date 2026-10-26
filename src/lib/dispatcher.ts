@@ -298,6 +298,9 @@ export async function dispatch() {
     console.error("Could not read plan locks", e);
     return new Set<string>();
   });
+  // Marketing-only businesses (Orders switched off): no order-based messages (reorder, unpaid-order, win-back).
+  const noOrders = new Set(paused);
+  for (const c of await db.client.findMany({ where: { disabledSections: { has: "orders" } }, select: { id: true } }).catch(() => [])) noOrders.add(c.id);
   const campaignsStarted = await startDueCampaigns(now, paused);
   await refreshStaleNumbers().catch((e) => console.error("Could not refresh number status", e));
   const runs = await db.campaignRun.findMany({
@@ -321,12 +324,12 @@ export async function dispatch() {
   }
   // Messages Meta held back a few days ago get their one retry.
   if (Date.now() < deadline) await retryHeldBack({ now, deadline }).catch((e) => console.error("Held-back retries failed", e));
-  if (Date.now() < deadline) await sendRefillReminders(now, paused).catch((e) => console.error("Refill reminders failed", e));
+  if (Date.now() < deadline) await sendRefillReminders(now, noOrders).catch((e) => console.error("Refill reminders failed", e));
   if (Date.now() < deadline) await syncDueSheets(now).catch((e) => console.error("Sheet sync failed", e));
   if (Date.now() < deadline) await backfillOrderNames().catch((e) => console.error("Order name backfill failed", e));
-  if (Date.now() < deadline) await remindUnpaidOrders(now, 20, paused).catch((e) => console.error("Payment reminders failed", e));
+  if (Date.now() < deadline) await remindUnpaidOrders(now, 20, noOrders).catch((e) => console.error("Payment reminders failed", e));
   if (Date.now() < deadline) await refreshLifecycleTags().catch((e) => console.error("Lifecycle tags failed", e));
-  if (Date.now() < deadline) await sendWinbacks(now, paused).catch((e) => console.error("Win-back failed", e));
+  if (Date.now() < deadline) await sendWinbacks(now, noOrders).catch((e) => console.error("Win-back failed", e));
   await db.setting.upsert({ where: { id: 1 }, update: { lastDispatchAt: now }, create: { id: 1, lastDispatchAt: now } });
   return { campaignsStarted, runsProcessed: runs.length, sent, failed, ms: Date.now() - startedAt };
 }

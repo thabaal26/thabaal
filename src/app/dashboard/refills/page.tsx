@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 /** Customers › Refills: when each buyer is likely to run out, from how often they reorder. */
 export default async function RefillsPage() {
-  const locked = await planGate();
+  const locked = await planGate("orders");
   if (locked) return locked;
   const scope = await getScope();
   if (!scope.clientId)

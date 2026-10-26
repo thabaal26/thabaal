@@ -18,7 +18,7 @@ const dur = (s: number) => (s >= 60 ? `${Math.floor(s / 60)} m ${s % 60} s` : `$
 
 /** Chats › Calls: WhatsApp voice calls from the call log (portal design). */
 export default async function CallsPage() {
-  const locked = await planGate();
+  const locked = await planGate("calls");
   if (locked) return locked;
   const scope = await getScope();
   const calls = await db.call.findMany({

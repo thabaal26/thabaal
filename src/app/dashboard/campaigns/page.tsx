@@ -80,6 +80,10 @@ export default async function CampaignsPage() {
   const reach = (clientId: string) => audiences.find((a) => a.clientId === clientId)?._count ?? 0;
   const byId = new Map(results.map((r) => [r.id, r]));
   const canCreate = scope.canManage && scope.clientId;
+  // Every automation here is order-based, so a marketing-only business (Orders off) doesn't get the tab.
+  const ordersOn = scope.clientId
+    ? !(await db.client.findUnique({ where: { id: scope.clientId }, select: { disabledSections: true } }))?.disabledSections.includes("orders")
+    : true;
 
   const stateOf = (c: (typeof campaigns)[number]): State => {
     const last = c.runs[0];
@@ -194,6 +198,7 @@ export default async function CampaignsPage() {
       }}
       campaigns={liveItems}
       canManage={Boolean(canCreate)}
+      showAutomations={ordersOn}
     >
       {clientData ? (
         <Automations

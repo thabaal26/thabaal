@@ -74,6 +74,13 @@ earlier work; this file is its memory. Read all of it before doing anything.
 
 ### Done on 26 Oct, branch `HomeNewUi` only (owner: "work only in HomeNewUi, don't push to main")
 
+07. **Marketing-only businesses (first one: Habbat).** Uses the existing per-business switch: Clients › sections ›
+    preset "Templates & Campaigns (No Orders)" (`client-sections.ts`; hides Orders, Products, Calls, and Payments and
+    Refills with Orders). Added: `planGate(section)` sends a business with that section off to Home, so orders,
+    revenue, refills, catalogue (+ combos) and calls can't be opened by typing their addresses; the scheduler
+    (`dispatcher.ts`) skips reorder, unpaid-order and win-back messages for them; the Campaigns › Automations tab
+    (all order-based) is hidden; Home wording says "Chats and campaigns". Tested locally with Habbat
+    (owner@habbat.test). To create Habbat for real: admin › Clients › new business "Habbat" with that preset.
 06. **Custom work requests are emailed to thabaal26@gmail.com (Resend).** `src/lib/email.ts` posts to the Resend
     API with `fetch` (no new package). `submitCustomWorkRequest` (actions/account.ts) still saves the request, then
     emails it, with reply-to set to the client's email. Add-on and "Stop or pause" requests use the same action, so

@@ -43,6 +43,8 @@ export type CampaignsDashboardProps = {
   campaigns: CampaignItem[];
   canManage: boolean;
   children?: React.ReactNode;
+  /** False for a marketing-only business: every automation is order-based, so the tab is hidden. */
+  showAutomations?: boolean;
 };
 
 const TAB_DEFS = [
@@ -101,7 +103,8 @@ function sum(c: CampaignItem, isTamil = false) {
   );
 }
 
-export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage, children }: CampaignsDashboardProps) {
+export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage, children, showAutomations = true }: CampaignsDashboardProps) {
+  const tabDefs = showAutomations ? TAB_DEFS : TAB_DEFS.filter((t) => t.id !== "auto");
   const router = useRouter();
   const { isTamil } = useLanguage();
   const [items, setItems] = useState<CampaignItem[]>(initialCampaigns);
@@ -125,14 +128,14 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
   useEffect(() => {
     const handleHash = () => {
       const h = window.location.hash.replace("#", "").toLowerCase() as TabId;
-      if (TAB_DEFS.some((t) => t.id === h)) {
+      if (TAB_DEFS.some((t) => t.id === h) && (showAutomations || h !== "auto")) {
         setTab(h);
       }
     };
     handleHash();
     window.addEventListener("hashchange", handleHash);
     return () => window.removeEventListener("hashchange", handleHash);
-  }, []);
+  }, [showAutomations]);
 
   const switchTab = (t: TabId) => {
     setTab(t);
@@ -302,7 +305,7 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
 
       {/* Tabs */}
       <div className="tabs" data-tabs role="tablist" aria-label={isTamil ? "பிரச்சார பார்வைகள்" : "Campaign views"} suppressHydrationWarning>
-        {TAB_DEFS.map((t) => (
+        {tabDefs.map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => switchTab(t.id)}>
             <T ta={t.ta}>{t.label}</T>
           </button>

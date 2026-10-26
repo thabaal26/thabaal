@@ -18,7 +18,7 @@ export default async function OrdersPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const locked = await planGate();
+  const locked = await planGate("orders");
   if (locked) return locked;
   const sp = await searchParams;
   const scope = await getScope();
