@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "@/components/intent-link";
 import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 import { PortalPage, T } from "../portal-ui";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "What changed" };
 
@@ -53,7 +54,9 @@ const BUTTONS: [string, string, string][] = [
 ];
 
 /** What changed: a map from the old menu to the new pages (portal design). */
-export default function GuidePage() {
+export default async function GuidePage() {
+  const locked = await planGate();
+  if (locked) return locked;
   return (
     <PortalPage title="What changed" titleTa="என்ன மாறியது" sub="Where every feature lives in the new menu." subTa="ஒவ்வொரு வசதியும் புதிய மெனுவில் எங்கே உள்ளது.">
       <div className="stack">

@@ -340,7 +340,7 @@ export async function sendTestMessage(id: string, rawPhone: string): Promise<Act
 
 /** The client's default image, used by image templates that have none of their own. Empty clears it. */
 export async function setDefaultImage(url: string): Promise<ActionResult> {
-  const s = await requireManager(true);
+  const s = await requireManager(true, { evenIfLocked: true });
   if ("denied" in s) return { ok: false, message: s.denied };
   const u = url.trim();
   if (u && !/^https:\/\/\S+$/.test(u)) return { ok: false, message: "Use a public https:// image link." };

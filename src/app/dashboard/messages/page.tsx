@@ -17,6 +17,7 @@ import { activeCount as filterCount, filterQuery, keepFilters, readFilters, reso
 import { filterOptions, messageScope } from "@/lib/filter-scope";
 import { getScope, owned, ownedMessages } from "@/lib/session";
 import { plainError, templateLabel } from "@/lib/plain-error";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 
 const MESSAGE_FILTERS: FilterSection[] = ["period"];
@@ -32,6 +33,8 @@ function linkTo(filters: FilterState, p: Params, patch: Partial<Params>) {
 }
 
 export default async function MessagesPage({ searchParams }: PageProps<"/dashboard/messages">) {
+  const locked = await planGate();
+  if (locked) return locked;
   const raw = await searchParams;
   const p: Params = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v]));
   const page = Math.max(1, Number(p.page) || 1);

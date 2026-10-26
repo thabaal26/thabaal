@@ -10,11 +10,14 @@ import { fmtNumber } from "@/lib/format";
 import { getScope } from "@/lib/session";
 import { deleteAudience } from "../../actions/audiences";
 import { AudienceBuilder } from "./audience-builder";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Audiences" };
 export const dynamic = "force-dynamic";
 
 export default async function AudiencesPage() {
+  const locked = await planGate();
+  if (locked) return locked;
   const scope = await getScope();
   const back = { href: "/dashboard/customers", label: "Customers" };
   if (!scope.clientId || !scope.canManage) return <><PageHeader title="Audiences" back={back} /><PickClientNotice what="audiences" /></>;

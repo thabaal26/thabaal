@@ -24,11 +24,14 @@ import { CampaignForm } from "../campaign-form";
 import { FailureSummary } from "../failure-summary";
 import { campaignFormData } from "../form-data";
 import { templateLabel } from "@/lib/plain-error";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Campaign" };
 export const dynamic = "force-dynamic";
 
 export default async function CampaignPage({ params }: PageProps<"/dashboard/campaigns/[id]">) {
+  const locked = await planGate();
+  if (locked) return locked;
   const { id } = await params;
   const scope = await getScope();
   const c = await db.campaign.findFirst({

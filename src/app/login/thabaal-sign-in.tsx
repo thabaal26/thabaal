@@ -8,7 +8,6 @@ import { LandingSections } from "./landing-sections";
 import { MascotIntro } from "./mascot-intro";
 import { ScrollDownPrompt } from "./scroll-prompt";
 import { SiteHeader } from "./site-header";
-import { ScrollReveal } from "@/components/motion";
 import "./thabaal-login.css";
 
 function getThemeSnapshot(): "day" | "night" {
@@ -80,37 +79,10 @@ export function ThabaalSignIn() {
         onSelectLang={setLang}
       />
       <div className="thabaal-page" id="top">
-        {/* Language Switcher Pill (Top-Left of Screen / Sky on mobile) */}
-        <div
-          className="thabaal-lang-pill"
-          role="group"
-          aria-label={lang === "ta" ? "மொழி" : "Language"}
-        >
-          <span className="thabaal-lang-slider" aria-hidden="true" />
-          <button
-            type="button"
-            onClick={() => setLang("en")}
-            className={lang === "en" ? "active" : ""}
-            aria-pressed={lang === "en"}
-            lang="en"
-          >
-            EN
-          </button>
-          <button
-            type="button"
-            onClick={() => setLang("ta")}
-            className={lang === "ta" ? "active" : ""}
-            aria-pressed={lang === "ta"}
-            lang="ta"
-          >
-            தமிழ்
-          </button>
-        </div>
-
         {/* LEFT COLUMN: SIGN IN FORM */}
         <section className="thabaal-left">
           {/* Brand Wordmark with Mascot Bird Perched on Top */}
-          <ScrollReveal direction="down" duration={500} className="w-full">
+          <div className="w-full">
             <div className="thabaal-brand">
               {/* English and Tamil wordmarks, each in a day and a night colour; CSS shows the right one. */}
               <div
@@ -154,7 +126,7 @@ export function ThabaalSignIn() {
                 <MascotIntro lang={lang} />
               </div>
             </div>
-          </ScrollReveal>
+          </div>
 
           {/* Credential Form. Privacy, terms and the rest are in the page footer below (one place, not two). */}
           <LoginForm lang={lang} />

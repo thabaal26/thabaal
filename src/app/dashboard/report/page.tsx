@@ -3,11 +3,14 @@ import { PageHeader, PickClientNotice } from "@/components/ui";
 import { getScope } from "@/lib/session";
 import { getComprehensiveReportData } from "@/lib/reports-data";
 import { ReportDashboard } from "./report-dashboard";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Reports" };
 export const dynamic = "force-dynamic";
 
 export default async function ReportPage() {
+  const locked = await planGate();
+  if (locked) return locked;
   const scope = await getScope();
   if (!scope.clientId) {
     return (

@@ -15,11 +15,14 @@ import { CATEGORY_INFO, renderFor, type Category, type TemplateButton, type VarM
 import { deleteTemplate, syncTemplates } from "../actions/templates";
 
 import { AutoSelect, PAction, PortalPage, T } from "../portal-ui";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Templates" };
 export const dynamic = "force-dynamic";
 
 export default async function TemplatesPage({ searchParams }: PageProps<"/dashboard/templates">) {
+  const locked = await planGate();
+  if (locked) return locked;
   const sp = await searchParams;
   const { category, q } = sp;
   const sort = typeof sp.sort === "string" ? sp.sort : "latest";

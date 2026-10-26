@@ -184,8 +184,8 @@ export function HomeTiers(p: HomeTiersProps) {
     <PortalPage
       title={p.businessName ? `${p.greetingText}, ${p.businessName}` : p.greetingText}
       titleTa={`${GREETING_TA[p.greetingText] ?? "வணக்கம்"}${p.businessName ? `, ${p.businessName}` : ""}`}
-      sub="Orders, payments and chats that need you today."
-      subTa="இன்று உங்கள் கவனம் தேவைப்படும் ஆர்டர்கள், பணம் மற்றும் உரையாடல்கள்."
+      sub={p.ordersOn ? "Orders, payments and chats that need you today." : "Chats and campaigns that need you today."}
+      subTa={p.ordersOn ? "இன்று உங்கள் கவனம் தேவைப்படும் ஆர்டர்கள், பணம் மற்றும் உரையாடல்கள்." : "இன்று உங்கள் கவனம் தேவைப்படும் உரையாடல்கள் மற்றும் பிரச்சாரங்கள்."}
       actions={
         <>
           {p.actions}
@@ -214,7 +214,7 @@ export function HomeTiers(p: HomeTiersProps) {
                 </h2>
                 <p>
                   {needing === 0 ? (
-                    <T ta="அனைத்தும் முடிந்தது. புதிய ஆர்டர்களும் உரையாடல்களும் இங்கு காட்டப்படும்.">All caught up. New orders and chats will show here.</T>
+                    p.ordersOn ? <T ta="அனைத்தும் முடிந்தது. புதிய ஆர்டர்களும் உரையாடல்களும் இங்கு காட்டப்படும்.">All caught up. New orders and chats will show here.</T> : <T ta="அனைத்தும் முடிந்தது. புதிய உரையாடல்கள் இங்கு காட்டப்படும்.">All caught up. New chats will show here.</T>
                   ) : (
                     <T ta="இங்கிருந்து தொடங்குங்கள். மற்றவை காத்திருக்கலாம்.">Start here. Everything else can wait.</T>
                   )}

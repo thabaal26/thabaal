@@ -8,7 +8,7 @@ import type { ActionResult } from "./templates";
 
 /** Saves the extra fields this client keeps on customers and orders. */
 export async function saveCustomFields(fields: CustomField[]): Promise<ActionResult> {
-  const s = await requireManager(true);
+  const s = await requireManager(true, { evenIfLocked: true });
   if ("denied" in s) return { ok: false, message: s.denied };
   const clean = readFields(fields);
   if (clean.length !== fields.filter((f) => f.label?.trim()).length) {

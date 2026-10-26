@@ -11,11 +11,14 @@ import { CatalogueManager } from "./catalogue-manager";
 import { PortalPage, T } from "../portal-ui";
 import { ProductsPerf } from "./products-perf";
 import { ProductsTabs } from "./products-tabs";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Products" };
 export const dynamic = "force-dynamic";
 
 export default async function CataloguePage({ searchParams }: PageProps<"/dashboard/catalogue">) {
+  const locked = await planGate("catalogue");
+  if (locked) return locked;
   const scope = await getScope();
   if (!scope.clientId) {
     return (

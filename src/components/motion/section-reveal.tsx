@@ -83,12 +83,12 @@ export function SectionReveal({
     ["--section-dur" as string]: `${duration}ms`,
     ["--section-delay" as string]: `${delay}ms`,
     ["--section-dist" as string]: `${settleY}px`,
-    opacity: motionState === "idle" ? 0 : 1,
+    opacity: 1,
     transform: isDone
       ? "none"
       : isActive
       ? "translate3d(0, 0, 0) scale(1)"
-      : `translate3d(0, ${settleY}px, 0) scale(0.99)`,
+      : "none",
     transition: isDone
       ? style?.transition || "none"
       : `opacity ${duration}ms cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms, transform ${duration}ms cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms`,

@@ -16,7 +16,7 @@ const GRACE_DAYS = 7;
  * Refill reminders: a set number of days after an order, send the client's chosen template once.
  * Skips customers who opted out, can't receive messages, or ordered again since.
  */
-export async function sendRefillReminders(now = new Date()) {
+export async function sendRefillReminders(now = new Date(), paused: ReadonlySet<string> = new Set()) {
   const clients = await db.client.findMany({
     where: { refillDays: { gt: 0 }, refillTemplateId: { not: null } },
     select: { id: true, refillDays: true, refillTemplateId: true, quietFrom: true, quietTo: true },
@@ -25,6 +25,7 @@ export async function sendRefillReminders(now = new Date()) {
   let sent = 0;
 
   for (const client of clients) {
+    if (paused.has(client.id)) continue; // plan not paid: reminders wait
     const template = await db.template.findUnique({ where: { id: client.refillTemplateId! } });
     if (!template || !templateSendable(settings, template)) continue;
     if (template.category === "MARKETING" && quietUntil(client, now)) continue;

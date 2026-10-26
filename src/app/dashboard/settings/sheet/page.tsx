@@ -139,7 +139,7 @@ export default async function SheetPage() {
             )}
             <SheetForm customersUrl={client?.sheetCustomersUrl ?? ""} ordersUrl={client?.sheetOrdersUrl ?? ""} />
           </Card>
-          <LiveUpdatesCard clientId={scope.clientId} canManage={scope.canManage} linked={client?.sheetHookUrl ?? ""} />
+          <LiveUpdatesCard clientId={scope.clientId} canManage={scope.manager} linked={client?.sheetHookUrl ?? ""} />
           <Card className="card-3d">
             <CardHeader tone="info" title="How to set it up" />
             <ol className="list-decimal space-y-2 p-4 pl-9 text-sm text-ink-2 sm:p-5 sm:pl-10">

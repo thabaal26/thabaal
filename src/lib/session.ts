@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { db } from "./db";
+import { clientAccess } from "./plan-access";
 
 const COOKIE = "wp_session";
 const MAX_AGE = 60 * 60 * 24 * 7; // 7 days
@@ -78,10 +79,15 @@ export const CLIENT_COOKIE = "wp_client";
 
 export type Scope = {
   isAdmin: boolean;
-  /** Campaigns, templates, customers, automations: admins and client managers. */
+  /** Campaigns, templates, customers, automations: admins and client managers. False while the business is locked. */
   canManage: boolean;
-  /** Orders, dispatch, replies: everyone but viewers. */
+  /** Orders, dispatch, replies: everyone but viewers. False while the business is locked. */
   canOperate: boolean;
+  /** The business hasn't paid (lib/plan-access.ts): only Home, My account and Settings open. Never for admins. */
+  planLocked: boolean;
+  /** The login's own rights, even while locked: for My account and Settings, which stay open. */
+  manager: boolean;
+  operator: boolean;
   /** null only for an admin viewing all clients */
   clientId: string | null;
   clientName: string | null;
@@ -98,15 +104,32 @@ export const getScope = cache(async (): Promise<Scope> => {
     requireUser(),
     picked ? db.client.findUnique({ where: { id: picked }, select: { id: true, name: true } }) : null,
   ]);
-  if (user.role === "CLIENT")
+  if (user.role === "CLIENT") {
+    const manager = user.access === "MANAGER";
+    const operator = user.access !== "VIEWER";
+    // Unpaid business: everything that changes data is closed, except what My account and Settings allow.
+    const planLocked = user.clientId ? (await clientAccess(user.clientId)).locked : false;
     return {
       isAdmin: false,
-      canManage: user.access === "MANAGER",
-      canOperate: user.access !== "VIEWER",
+      canManage: manager && !planLocked,
+      canOperate: operator && !planLocked,
+      planLocked,
+      manager,
+      operator,
       clientId: user.clientId,
       clientName: user.client?.name ?? null,
     };
-  return { isAdmin: true, canManage: true, canOperate: true, clientId: pickedClient?.id ?? null, clientName: pickedClient?.name ?? null };
+  }
+  return {
+    isAdmin: true,
+    canManage: true,
+    canOperate: true,
+    planLocked: false,
+    manager: true,
+    operator: true,
+    clientId: pickedClient?.id ?? null,
+    clientName: pickedClient?.name ?? null,
+  };
 });
 
 /** Prisma filter for models that carry clientId (Customer, Template, Campaign, PendingCustomer). */
@@ -130,10 +153,16 @@ type Denied = { denied: string };
  * For day-to-day order work (confirm, dispatch, deliver, notes, new orders): the client's own
  * staff do this, so client logins may, limited to their own client. Admins may too.
  */
-export async function requireOrderAccess(): Promise<Scope | Denied> {
+export const PLAN_LOCKED_MESSAGE = "thabaal is paused until your plan payment is verified. Pay in My account.";
+
+/** Options for the few actions that belong to My account or Settings, which stay open while a business is locked. */
+type LockOpts = { evenIfLocked?: boolean };
+
+export async function requireOrderAccess(opts: LockOpts = {}): Promise<Scope | Denied> {
   const s = await getScope();
   if (!s.isAdmin && !s.clientId) return { denied: "Your account isn't linked to a business." };
-  if (!s.canOperate) return { denied: "Your login can view but not change anything." };
+  if (s.planLocked && !opts.evenIfLocked) return { denied: PLAN_LOCKED_MESSAGE };
+  if (!(opts.evenIfLocked ? s.operator : s.canOperate)) return { denied: "Your login can view but not change anything." };
   return s;
 }
 
@@ -143,10 +172,11 @@ export async function requireOrderAccess(): Promise<Scope | Denied> {
  * Actions that look a record up by id must still check it belongs to them with `mine()`.
  */
 export async function requireManager(): Promise<Scope | Denied>;
-export async function requireManager(needClient: true): Promise<(Scope & { clientId: string }) | Denied>;
-export async function requireManager(needClient = false): Promise<Scope | Denied> {
+export async function requireManager(needClient: true, opts?: LockOpts): Promise<(Scope & { clientId: string }) | Denied>;
+export async function requireManager(needClient = false, opts: LockOpts = {}): Promise<Scope | Denied> {
   const s = await getScope();
-  if (!s.canManage) return { denied: "Your login can't change campaigns, templates or customers. Ask the business owner." };
+  if (s.planLocked && !opts.evenIfLocked) return { denied: PLAN_LOCKED_MESSAGE };
+  if (!(opts.evenIfLocked ? s.manager : s.canManage)) return { denied: "Your login can't change campaigns, templates or customers. Ask the business owner." };
   if (needClient && !s.clientId) return { denied: "Pick a client in the sidebar first." };
   return s;
 }

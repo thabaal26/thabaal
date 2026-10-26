@@ -181,7 +181,7 @@ export default async function SettingsPage() {
           <ScrollReveal>
             <PaymentSetupForm
               config={client.paymentConfig}
-              canChange={scope.canManage}
+              canChange={scope.manager}
               template={{ using: payTemplate?.name ?? null, ownName: PAYMENT_TEMPLATE, ownStatus: ownPayTemplate?.status ?? null }}
             />
           </ScrollReveal>
@@ -216,7 +216,7 @@ export default async function SettingsPage() {
                     <T ta="திற">Open</T>
                   </Link>
                 </div>
-                {scope.canManage && (
+                {scope.manager && (
                   <div className="row">
                     <div className="grow">
                       <div className="t"><T ta="கூடுதல் விவரங்கள் (Custom fields)">Custom fields</T></div>
@@ -237,7 +237,7 @@ export default async function SettingsPage() {
           </ScrollReveal>
         )}
 
-        {cid && client && scope.canManage && (
+        {cid && client && scope.manager && (
           <ScrollReveal id="default-picture" style={{ scrollMarginTop: 80 }}>
             <DefaultImage url={client.defaultImageUrl} fallback={client.bannerUrl} />
           </ScrollReveal>
@@ -245,7 +245,7 @@ export default async function SettingsPage() {
 
         {cid && client && (
           <ScrollReveal>
-            <OrderStepsForm current={readFlow(client.orderFlow)} canChange={scope.canManage} />
+            <OrderStepsForm current={readFlow(client.orderFlow)} canChange={scope.manager} />
           </ScrollReveal>
         )}
 
@@ -298,7 +298,7 @@ export default async function SettingsPage() {
               </div>
               {spend.metaAccount.billingUrl && (
                 <div className="tools" style={{ marginTop: 14 }}>
-                  {scope.canManage && (
+                  {scope.manager && (
                     <a className="btn primary sm" href={spend.metaAccount.billingUrl} target="_blank" rel="noopener noreferrer">
                       <T ta="Meta-வில் ரீசார்ஜ் செய்">Recharge on Meta</T>
                     </a>

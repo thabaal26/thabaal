@@ -15,8 +15,8 @@ const round = "grid size-10 place-items-center rounded-full border-[1.5px] borde
 
 /**
  * Computers: the bell and the light/dark switch at the right of every page title (phones have
- * them in the top bar). Renders nothing outside the dashboard frame. The language button goes between the bell
- * and the light/dark switch, in the design's order.
+ * them in the top bar). Inside the dashboard frame the language button is left out: the side menu already has the
+ * language switch at these widths (owner asked for one switch, not two). Outside the frame, `lang` is shown alone.
  */
 export function PageTools({ lang }: { lang?: ReactNode }) {
   const shell = useContext(ShellContext);
@@ -24,7 +24,6 @@ export function PageTools({ lang }: { lang?: ReactNode }) {
   return (
     <div className="hidden shrink-0 items-center gap-2 lg:flex print:hidden">
       {shell.notifications && <NotificationBell className={round} />}
-      {lang}
       <ThemeToggle className={round} />
     </div>
   );

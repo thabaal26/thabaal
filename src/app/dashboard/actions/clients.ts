@@ -11,6 +11,7 @@ import { CLIENT_COOKIE, requireAdmin } from "@/lib/session";
 import { HEX } from "@/lib/theme";
 import { enableMetaCalling, listPhoneNumbers, syncMetaBusinessProfile, waConfig } from "@/lib/whatsapp";
 import { refreshNumberStatus } from "@/lib/limits";
+import { planCapacityBlock } from "@/lib/subscription";
 import type { ActionResult } from "./templates";
 
 const refresh = () => revalidatePath("/dashboard", "layout");
@@ -45,7 +46,7 @@ export async function createClient(name: string, disabledSections?: string[], ho
   // The business type starts the client with the extra fields that kind of business usually keeps.
   const type = businessTypeOf(businessType);
   const c = await db.client.create({
-    data: { name: clean, disabledSections: sanitized, homeCity: city, businessType: type?.id ?? null, ...(type?.starterFields.length && { customFields: type.starterFields }) },
+    data: { name: clean, planRequired: true, disabledSections: sanitized, homeCity: city, businessType: type?.id ?? null, ...(type?.starterFields.length && { customFields: type.starterFields }) },
   });
   const prefix = await ensureOrderPrefix(c.id).catch(() => null);
   refresh();
@@ -140,6 +141,8 @@ export async function addClientNumber(
   const waba = input.businessAccountId.trim();
   const label = input.label.trim();
   if (!label) return { ok: false, message: "Give the number a short name, e.g. Main or Madurai." };
+  const planBlock = await planCapacityBlock(clientId, "num");
+  if (planBlock) return { ok: false, message: planBlock };
   const ownToken = input.token?.trim() || null;
   const t = await tokenFor(clientId, ownToken ?? undefined);
   if (!t) return { ok: false, message: "Save an access token first." };
@@ -331,6 +334,8 @@ export async function createClientUser(clientId: string, input: { name: string; 
   if (input.password.length < 8) return { ok: false, message: "Password must be at least 8 characters." };
   if (!(await db.client.findUnique({ where: { id: clientId } }))) return { ok: false, message: "Client not found." };
   if (await db.user.findUnique({ where: { email } })) return { ok: false, message: `${email} already has an account.` };
+  const planBlock = await planCapacityBlock(clientId, "staff");
+  if (planBlock) return { ok: false, message: planBlock };
   await db.user.create({
     data: { name: input.name.trim(), email, role: "CLIENT", access: ACCESS.includes(input.access as Access) ? input.access : "STAFF", clientId, passwordHash: await bcrypt.hash(input.password, 12) },
   });

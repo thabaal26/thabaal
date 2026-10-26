@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "Custom fields" };
 
 export default async function CustomFieldsPage() {
   const scope = await getScope();
-  if (!scope.clientId || !scope.canManage) redirect("/dashboard/settings");
+  if (!scope.clientId || !scope.manager) redirect("/dashboard/settings");
   const client = await db.client.findUnique({ where: { id: scope.clientId }, select: { customFields: true, businessType: true } });
   const type = businessTypeOf(client?.businessType);
   return (

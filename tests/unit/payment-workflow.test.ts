@@ -22,19 +22,23 @@ describe("Payment Workflow & Security Invariants", () => {
   before(async () => {
     let client = await db.client.findFirst({ where: { name: "QA Test Shop" } });
     if (!client) {
-      client = await db.client.create({
-        data: {
-          name: "QA Test Shop",
-          brandPrimary: "#0D9488",
-          brandAccent: "#14B8A6",
-          homeCity: "Madurai",
-          orderFlow: "deliver",
-          businessType: "retail",
-          billingMode: "direct",
-        },
-      });
+      try {
+        client = await db.client.create({
+          data: {
+            name: "QA Test Shop",
+            brandPrimary: "#0D9488",
+            brandAccent: "#14B8A6",
+            homeCity: "Madurai",
+            orderFlow: "deliver",
+            businessType: "retail",
+            billingMode: "direct",
+          },
+        });
+      } catch {
+        client = await db.client.findFirst({ where: { name: "QA Test Shop" } });
+      }
     }
-    clientId = client.id;
+    clientId = client!.id;
 
     let customer = await db.customer.findFirst({
       where: { clientId, phone: "919999999999" },

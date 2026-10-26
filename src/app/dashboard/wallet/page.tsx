@@ -10,6 +10,7 @@ import { getScope } from "@/lib/session";
 import { walletBalance, walletBalances } from "@/lib/wallet";
 import { CATEGORY_NAMES, chargeFor, ratesFor, rupees, WALLET_CATEGORIES, type WalletCategory } from "@/lib/wallet-rates";
 import { AdjustForm, DecideRecharge, PaymentSettingsForm, RechargeForm, WalletSettingsForm } from "./wallet-forms";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Wallet" };
 
@@ -31,6 +32,8 @@ function StatusTag({ status }: { status: string }) {
 }
 
 export default async function WalletPage() {
+  const locked = await planGate();
+  if (locked) return locked;
   const scope = await getScope();
   return scope.clientId ? <ClientWallet clientId={scope.clientId} isAdmin={scope.isAdmin} canManage={scope.canManage} /> : <AllWallets />;
 }

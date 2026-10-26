@@ -72,6 +72,61 @@ earlier work; this file is its memory. Read all of it before doing anything.
 - Live tests finished: order RG-1028 (paid ₹1 by UPI, confirmed in the chat, packed, dispatched, delivered); the TEST
   campaign and TEST audience were deleted.
 
+### Done on 26 Oct, branch `HomeNewUi` only (owner: "work only in HomeNewUi, don't push to main")
+
+07. **Marketing-only businesses (first one: Habbat).** Uses the existing per-business switch: Clients › sections ›
+    preset "Templates & Campaigns (No Orders)" (`client-sections.ts`; hides Orders, Products, Calls, and Payments and
+    Refills with Orders). Added: `planGate(section)` sends a business with that section off to Home, so orders,
+    revenue, refills, catalogue (+ combos) and calls can't be opened by typing their addresses; the scheduler
+    (`dispatcher.ts`) skips reorder, unpaid-order and win-back messages for them; the Campaigns › Automations tab
+    (all order-based) is hidden; Home wording says "Chats and campaigns". Tested locally with Habbat
+    (owner@habbat.test). To create Habbat for real: admin › Clients › new business "Habbat" with that preset.
+06. **Custom work requests are emailed to thabaal26@gmail.com (Resend).** `src/lib/email.ts` posts to the Resend
+    API with `fetch` (no new package). `submitCustomWorkRequest` (actions/account.ts) still saves the request, then
+    emails it, with reply-to set to the client's email. Add-on and "Stop or pause" requests use the same action, so
+    they email too. Needs `RESEND_API_KEY` in `.env` and on Vercel (names in `.env.example`). Without a verified
+    domain, Resend only delivers to the address the Resend account was made with, so make that account with
+    thabaal26@gmail.com, or verify a domain and set `RESEND_FROM`. If sending fails, the client is told the request
+    is saved and to WhatsApp 6379140626.
+05. **Plan lock: unpaid businesses see only Home, My account and Settings.** States in `subscription-core.ts`
+    `accessState`: ok · due (≤ `WARN_DAYS` 5 left, nothing paid after) · overdue (ended < `GRACE_DAYS` 2 ago, still
+    open) · locked · new (never paid and `Client.planRequired`) · unmanaged (never paid, not required: unchanged).
+- New column `Client.planRequired` (`prisma/sql/2026-10-26-plan-required.sql`): new businesses true; existing ones
+  false until the admin records their paid period and switches it on (My account › admin panel).
+- `getScope` (session.ts) sets `planLocked` for client logins and turns `canManage/canOperate` off, so every write
+  action refuses; My account and Settings actions pass `{ evenIfLocked: true }` and pages there use
+  `scope.manager/operator`. Closed pages call `planGate()` (`dashboard/plan-lock.tsx`) and show the lock box; exports
+  and media return 403. Menus show a padlock. A pending UTR never unlocks.
+- Scheduler (`dispatcher.ts`): campaigns, refill reminders, win-backs and unpaid-order reminders skip locked
+  businesses (`lockedClientIds`). Incoming WhatsApp messages still arrive.
+- Banners: `plan-due-bar.tsx` (every page but My account) and My account's own; lock box on My account with
+  "Not now". Admin preview switcher (Paid / Due soon / Overdue / Locked / Never paid) on My account, admin only.
+
+04. My account › Payments: "Recharge on Meta" is now green (`.btn.ok` in `portal.css`, from the `--ok` tokens, so it
+    follows light/dark) to set it apart from thabaal's own buttons.
+
+03. Language button removed from the page header on computers (`components/shell-tools.tsx` `PageTools`): the side
+    menu's language switch is the only one at that width. Phones keep theirs in the top bar.
+
+02. **My account › plan payments: a plan changes only through a verified payment, and an early payment waits.**
+- New table `PlanPurchase` (`prisma/sql/2026-10-26-plan-purchases.sql`, listed in `scripts/db-additive.mjs`).
+  Rules in `src/lib/subscription-core.ts` (pure) and `src/lib/subscription.ts` (database, with a row lock on the
+  client for every change). The active plan is never stored: it is the VERIFIED row with startsAt <= now < endsAt.
+- Client: plan buttons open confirm → UPI QR → send UTR. That creates a PENDING row and nothing else. One payment
+  at a time (pending, or a verified period not started yet, blocks another). The client can withdraw a pending one.
+- Admin (`/dashboard/account`, panel "Thabaal admin: plan payments"; with no client picked it lists all): verify or
+  turn down. Verify sets startsAt = end of the last verified period (or now), endsAt = start + 1/3/12 calendar months
+  in IST (month-end clamps). Verifying twice changes nothing; a UTR can be used once (`paymentRef` unique).
+  A business with no verified period needs the admin to tick "start now" or record its existing paid period first.
+- Limits: `planCapacityBlock` stops adding numbers/staff over the plan (or after it ended) for businesses that have a
+  verified period; businesses with none are unchanged. Campaign/template caps are still display-only.
+- Removed: plan/payment state in `Client.appearance`, the sample invoices, the hard-coded renewal date and the demo
+  simulator. Tests: `tests/unit/subscription.test.ts`.
+- **Not done**: no live data yet. Existing clients need their current paid period recorded by the admin before their
+  next payment is verified. No trusted automatic payment signal exists for Thabaal's own fees.
+
+01. Next.js upgraded to 16.4.1 (Oct 14 security fixes), commit `490373a`.
+
 ### Done on 19 Oct (latest first)
 
 05. **Account setup moved into Settings (owner asked: client setup belongs in Settings).**

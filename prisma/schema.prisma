@@ -67,6 +67,11 @@ model Client {
   /// Warn the client when their wallet falls below this many rupees.
   walletLowAlert      Float             @default(200)
   walletEntries       WalletEntry[]
+  /// Thabaal plan periods bought by this client (lib/subscription.ts).
+  planPurchases       PlanPurchase[]
+  /// Must have a paid plan to use thabaal (lib/plan-access.ts). New businesses start true; businesses set up before
+  /// plans were tracked stay false until Thabaal records their paid period and switches it on (My account, admin panel).
+  planRequired        Boolean           @default(false)
   tagline             String?
   website             String?
   supportPhone        String?
@@ -572,6 +577,47 @@ model TopUp {
   createdAt DateTime @default(now())
 
   @@index([clientId, createdAt])
+}
+
+/// One paid Thabaal plan period for a client (lib/subscription.ts). A row starts PENDING when the client
+/// sends a UPI reference; only a Thabaal admin (or a future trusted payment callback) moves it to VERIFIED,
+/// which fixes startsAt/endsAt on the server. The active plan is never stored: it is the VERIFIED row with
+/// startsAt <= now < endsAt, worked out on every read, so nothing has to "activate" it and an ended period
+/// stops counting on its own.
+model PlanPurchase {
+  id          String    @id @default(cuid())
+  clientId    String
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  /// starter | growth | business (lib/account-plans.ts)
+  plan        String
+  /// m (1 month) | q (3 months) | y (12 months)
+  cycle       String
+  /// Price of the plan for that cycle when it was bought, in paise.
+  amountPaise Int
+  /// PENDING (reference sent, waiting to be checked) | VERIFIED | REJECTED | CANCELLED
+  status      String    @default("PENDING")
+  /// UPI (client sent a reference) | ADMIN_RECORD (a period paid before this screen existed, entered by Thabaal)
+  method      String    @default("UPI")
+  /// The UPI reference (UTR) as the client typed it. Kept on rejected rows for the record.
+  utr         String?
+  /// "UPI:<UTR>" while the row is pending or verified, so one payment can't be used twice; cleared on reject/cancel.
+  paymentRef  String?   @unique
+  /// What the client said about the payment (app, date). Information only, never proof.
+  payApp      String?
+  paidOn      String?
+  /// Fixed when verified: the start is the end of the client's last verified period, or the moment of verification.
+  startsAt    DateTime?
+  endsAt      DateTime?
+  billNo      String?   @unique
+  submittedBy String?
+  decidedBy   String?
+  decidedAt   DateTime?
+  note        String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([clientId, status])
+  @@index([clientId, endsAt])
 }
 
 /// The Thabaal wallet ledger (lib/wallet.ts). Balance = sum of DONE amounts. Credits are positive,

@@ -8,6 +8,7 @@ import { OrdersView } from "./orders-view";
 import { DEFAULT_FLOW, readFlow, type OrderFlowKey } from "@/lib/order-flow";
 import type { CatalogProductOption } from "./order-items-editor";
 import type { OrderItem } from "@/lib/orders";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Orders" };
 export const dynamic = "force-dynamic";
@@ -17,6 +18,8 @@ export default async function OrdersPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  const locked = await planGate("orders");
+  if (locked) return locked;
   const sp = await searchParams;
   const scope = await getScope();
   const mine = owned(scope);

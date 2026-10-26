@@ -8,11 +8,14 @@ import { previewCustomer } from "@/lib/preview-customer";
 import { getScope, owned } from "@/lib/session";
 import { renderFor, type TemplateButton, type VarMap } from "@/lib/template";
 import { TemplateEditor } from "../template-editor";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Edit template" };
 export const dynamic = "force-dynamic";
 
 export default async function EditTemplatePage({ params }: PageProps<"/dashboard/templates/[id]">) {
+  const locked = await planGate();
+  if (locked) return locked;
   const { id } = await params;
   const scope = await getScope();
   const t = await db.template.findFirst({ where: { id, ...owned(scope) }, include: { client: { select: { name: true } } } });

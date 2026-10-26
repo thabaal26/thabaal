@@ -5,11 +5,14 @@ import { daysAgo } from "@/lib/format";
 import { getScope } from "@/lib/session";
 import { CampaignForm } from "../campaign-form";
 import { campaignFormData } from "../form-data";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "New campaign" };
 export const dynamic = "force-dynamic";
 
 export default async function NewCampaignPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const locked = await planGate();
+  if (locked) return locked;
   // ?tag=… (from Customers › selected customers, or a group to reach) picks that audience.
   const sp = await searchParams;
   const tag = typeof sp.tag === "string" ? sp.tag.trim().slice(0, 80) : "";

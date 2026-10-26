@@ -9,6 +9,7 @@ import { formatPhone } from "@/lib/phone";
 import { getScope, owned } from "@/lib/session";
 import { PortalPage, Pill, T, type PillTone } from "../portal-ui";
 import { CHATS_SUB, CHATS_SUB_TA, InboxTabs } from "../replies/inbox-tabs";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Calls" };
 export const dynamic = "force-dynamic";
@@ -17,6 +18,8 @@ const dur = (s: number) => (s >= 60 ? `${Math.floor(s / 60)} m ${s % 60} s` : `$
 
 /** Chats › Calls: WhatsApp voice calls from the call log (portal design). */
 export default async function CallsPage() {
+  const locked = await planGate("calls");
+  if (locked) return locked;
   const scope = await getScope();
   const calls = await db.call.findMany({
     where: owned(scope),

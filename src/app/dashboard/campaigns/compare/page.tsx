@@ -9,6 +9,7 @@ import { formatValue } from "@/lib/chart-math";
 import { cn } from "@/lib/cn";
 import { fmtDate, fmtNumber, pct } from "@/lib/format";
 import { getScope } from "@/lib/session";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Compare campaigns" };
 export const dynamic = "force-dynamic";
@@ -74,6 +75,8 @@ function Side({ c, other }: { c: CampaignResult; other?: CampaignResult }) {
 }
 
 export default async function ComparePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const locked = await planGate();
+  if (locked) return locked;
   const sp = await searchParams;
   const scope = await getScope();
   const header = (

@@ -12,6 +12,7 @@ import {
   Package,
   Settings,
   Tag,
+  User,
   Users,
   Wallet,
   type IconComponent,
@@ -21,6 +22,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Sheet } from "@/components/sheet";
 import { isHrefEnabled } from "@/lib/client-sections";
+import { openWhenLocked } from "@/lib/plan-lock-paths";
 import { cn } from "@/lib/cn";
 import { T } from "./portal-ui";
 
@@ -51,6 +53,7 @@ export const NAV: NavItem[] = [
 
   { href: "/dashboard/report", label: "Reports", short: "Reports", icon: BarChart3, group: "Understand", ta: "அறிக்கைகள்" },
 
+  { href: "/dashboard/account", label: "My account", short: "Account", icon: User, group: "Account", ta: "என் கணக்கு" },
   { href: "/dashboard/settings", label: "Settings", short: "Settings", icon: Settings, group: "Account", ta: "அமைப்புகள்" },
 ];
 
@@ -100,6 +103,16 @@ const countFor = (href: string, c: Counts) =>
         ? { n: c.paymentsToCheck, label: "payments to check" }
         : null;
 
+/** A small padlock beside sections closed while the plan is unpaid. */
+function LockMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className={cn("size-4 shrink-0", className)} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </svg>
+  );
+}
+
 function menuItems(isAdmin: boolean, showWallet: boolean, disabledSections?: readonly string[]) {
   return [...NAV.filter((n) => isHrefEnabled(n.href, disabledSections)), ...(isAdmin || showWallet ? WALLET_NAV : []), ...(isAdmin ? ADMIN_NAV : [])];
 }
@@ -112,7 +125,8 @@ export function SideNav({
   newOrders,
   unreadNotifications,
   paymentsToCheck,
-}: { isAdmin: boolean; showWallet?: boolean; disabledSections?: readonly string[] } & Counts) {
+  planLocked = false,
+}: { isAdmin: boolean; showWallet?: boolean; disabledSections?: readonly string[]; planLocked?: boolean } & Counts) {
   const path = usePathname();
   const router = useRouter();
   const items = menuItems(isAdmin, showWallet, disabledSections);
@@ -136,15 +150,18 @@ export function SideNav({
               .map((item) => {
                 const { href, label, icon: Icon } = item;
                 const active = isActive(path, item);
-                const count = countFor(href, { openReplies, newOrders, unreadNotifications, paymentsToCheck });
+                const closed = planLocked && !openWhenLocked(href);
+                const count = closed ? null : countFor(href, { openReplies, newOrders, unreadNotifications, paymentsToCheck });
                 return (
                   <li key={href}>
                     <Link
                       href={href}
                       aria-current={active ? "page" : undefined}
+                      title={closed ? "Paused until your plan payment is verified" : undefined}
                       className={cn(
                         "group relative flex h-10 items-center gap-2.5 rounded-xl px-2.5 text-[14.5px] transition-all duration-200 ease-out active:scale-[0.98]",
                         active ? "bg-brand font-semibold text-on-brand shadow-xs shadow-brand/25" : "font-medium text-ink hover:bg-brand-soft hover:translate-x-0.5",
+                        closed && !active && "opacity-55",
                       )}
                     >
                       <Icon aria-hidden className={cn("size-[19px] shrink-0 transition-colors", active ? "text-on-brand" : "text-muted group-hover:text-ink")} />
@@ -152,6 +169,12 @@ export function SideNav({
                         <T ta={item.ta}>{label}</T>
                       </span>
                       {count && <CountBadge n={count.n} label={count.label} className={active ? "bg-on-brand text-brand" : "bg-danger-solid text-white"} />}
+                      {closed && (
+                        <>
+                          <LockMark className={active ? "text-on-brand" : "text-muted"} />
+                          <span className="sr-only">(paused until the plan is paid)</span>
+                        </>
+                      )}
                     </Link>
                   </li>
                 );
@@ -173,7 +196,8 @@ export function BottomNav({
   newOrders,
   unreadNotifications,
   paymentsToCheck,
-}: { isAdmin: boolean; showWallet?: boolean; role: NavRole; disabledSections?: readonly string[] } & Counts) {
+  planLocked = false,
+}: { isAdmin: boolean; showWallet?: boolean; role: NavRole; disabledSections?: readonly string[]; planLocked?: boolean } & Counts) {
   const path = usePathname();
   // Remembers the page "More" was opened on, so the sheet closes by itself once a tapped page opens.
   const [openedOn, setOpenedOn] = useState<string | null>(null);
@@ -189,7 +213,7 @@ export function BottomNav({
   const more = all.filter((n) => !tabs.includes(n.href));
   const moreActive = more.some((n) => isActive(path, n));
   // Counts for sections that live under "More" show on the More tab too.
-  const hiddenCount = more.reduce((sum, n) => sum + (countFor(n.href, { openReplies, newOrders, unreadNotifications, paymentsToCheck })?.n ?? 0), 0);
+  const hiddenCount = more.reduce((sum, n) => sum + (planLocked && !openWhenLocked(n.href) ? 0 : countFor(n.href, { openReplies, newOrders, unreadNotifications, paymentsToCheck })?.n ?? 0), 0);
 
   const tabClass = (active: boolean) =>
     cn(
@@ -204,12 +228,14 @@ export function BottomNav({
         {tabItems.map((item) => {
           const { href, short, icon: Icon } = item;
           const active = isActive(path, item);
-          const count = countFor(href, { openReplies, newOrders, unreadNotifications, paymentsToCheck });
+          const closed = planLocked && !openWhenLocked(href);
+          const count = closed ? null : countFor(href, { openReplies, newOrders, unreadNotifications, paymentsToCheck });
           return (
             <li key={href} className="min-w-0">
-              <Link href={href} aria-current={active ? "page" : undefined} className={tabClass(active)}>
+              <Link href={href} aria-current={active ? "page" : undefined} className={cn(tabClass(active), closed && !active && "opacity-55")}>
                 <span className="relative">
                   <Icon aria-hidden className={cn("size-5 transition-all duration-200 ease-out", active ? "text-ink dark:text-brand scale-110" : "text-muted scale-100")} />
+                  {closed && <LockMark className="absolute -right-2 -top-1.5 size-3 text-muted" />}
                   {count?.n ? (
                     <span className={dot}>
                       {count.n > 99 ? "99+" : count.n}
@@ -250,7 +276,11 @@ export function BottomNav({
                 >
                   <Icon aria-hidden className={cn("size-5 shrink-0", active ? "text-ink" : "text-muted")} />
                   <span className="min-w-0 flex-1 truncate"><T ta={item.ta}>{label}</T></span>
-                  {count && <CountBadge n={count.n} label={count.label} className="bg-danger-solid text-white" />}
+                  {planLocked && !openWhenLocked(href) ? (
+                    <LockMark className="text-muted" />
+                  ) : (
+                    count && <CountBadge n={count.n} label={count.label} className="bg-danger-solid text-white" />
+                  )}
                 </Link>
               </li>
             );

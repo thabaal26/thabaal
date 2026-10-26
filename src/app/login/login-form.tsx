@@ -2,7 +2,6 @@
 
 import { Eye, EyeOff } from "@/components/icons";
 import { useState, useEffect, useActionState } from "react";
-import { ScrollReveal } from "@/components/motion";
 import { login } from "./actions";
 
 interface LoginFormProps {
@@ -78,7 +77,7 @@ export function LoginForm({ lang = "en" }: LoginFormProps) {
   const error = formError || oauthError;
 
   return (
-    <ScrollReveal as="div" className="thabaal-formwrap" direction="up" distance={20} duration={550}>
+    <div className="thabaal-formwrap">
       <form
         action={(formData) => {
           setOauthError(null);
@@ -198,14 +197,14 @@ export function LoginForm({ lang = "en" }: LoginFormProps) {
               : "Login"}
         </button>
 
-        {/* Sign up */}
-        <p className="thabaal-signup">
+        {/* Sign up / Request Access */}
+        <p className="thabaal-signup auth-foot">
           {isTamil ? "கணக்கு இல்லையா? " : "Don't have an account? "}
-          <a href="mailto:access@thabaal.com?subject=Thabaal%20Access%20Request">
-            {isTamil ? "பதிவு செய்க" : "Sign up"}
+          <a href="#start">
+            {isTamil ? "அணுகலைக் கோருங்கள்" : "Request access"}
           </a>
         </p>
       </form>
-    </ScrollReveal>
+    </div>
   );
 }

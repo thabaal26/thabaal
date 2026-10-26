@@ -126,7 +126,7 @@ export async function setOrderPacked(id: string, packed: boolean): Promise<SendR
 
 /** Settings → Order steps: the stages this client's orders go through. */
 export async function saveOrderFlow(flow: string): Promise<SendResult> {
-  const s = await requireManager(true);
+  const s = await requireManager(true, { evenIfLocked: true });
   if ("denied" in s) return { ok: false, message: s.denied };
   if (!FLOW_KEYS.includes(flow as OrderFlowKey)) return { ok: false, message: "Pick one of the order steps." };
   await db.client.update({ where: { id: s.clientId }, data: { orderFlow: flow } });
@@ -339,7 +339,7 @@ export async function saveLoyaltyAutoRedeem(on: boolean): Promise<SendResult> {
 
 /** The payment configuration name from WhatsApp Manager → Payment configurations; empty turns payment requests off. */
 export async function savePaymentConfig(name: string): Promise<SendResult> {
-  const s = await requireManager(true);
+  const s = await requireManager(true, { evenIfLocked: true });
   if ("denied" in s) return { ok: false, message: s.denied };
   const value = name.trim();
   if (value && !/^[\w.-]{1,60}$/.test(value)) return { ok: false, message: "Use the configuration name exactly as WhatsApp Manager shows it." };
@@ -903,7 +903,7 @@ export async function createOrderTemplates(imageUrl?: string): Promise<SendResul
 
 /** Creates the `payment_request` utility template with an ORDER_DETAILS ("Review and pay") button and submits it to Meta. */
 export async function createPaymentTemplate(): Promise<SendResult> {
-  const s = await requireManager(true);
+  const s = await requireManager(true, { evenIfLocked: true });
   if ("denied" in s) return { ok: false, message: s.denied };
   const existing = await db.template.findFirst({ where: { clientId: s.clientId, name: "payment_request" }, select: { id: true, status: true } });
   if (existing) {

@@ -10,6 +10,7 @@ import { campaignAudienceWhere } from "@/lib/audiences";
 import { readPaySettings, waPayOn } from "@/lib/pay-settings";
 import { Automations } from "./automations";
 import { CampaignsDashboard, type CampaignItem } from "./campaigns-dashboard";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Campaigns" };
 export const dynamic = "force-dynamic";
@@ -30,6 +31,8 @@ const WAITING: Record<string, string> = {
 const PER_MSG = RATES.marketing * (1 + INDIA_GST_RATE);
 
 export default async function CampaignsPage() {
+  const locked = await planGate();
+  if (locked) return locked;
   const scope = await getScope();
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -77,6 +80,10 @@ export default async function CampaignsPage() {
   const reach = (clientId: string) => audiences.find((a) => a.clientId === clientId)?._count ?? 0;
   const byId = new Map(results.map((r) => [r.id, r]));
   const canCreate = scope.canManage && scope.clientId;
+  // Every automation here is order-based, so a marketing-only business (Orders off) doesn't get the tab.
+  const ordersOn = scope.clientId
+    ? !(await db.client.findUnique({ where: { id: scope.clientId }, select: { disabledSections: true } }))?.disabledSections.includes("orders")
+    : true;
 
   const stateOf = (c: (typeof campaigns)[number]): State => {
     const last = c.runs[0];
@@ -191,6 +198,7 @@ export default async function CampaignsPage() {
       }}
       campaigns={liveItems}
       canManage={Boolean(canCreate)}
+      showAutomations={ordersOn}
     >
       {clientData ? (
         <Automations

@@ -15,6 +15,7 @@ import { BankAccount, HowCustomersPay, ReminderRules } from "./pay-settings-form
 import { CollectList, CsvButton, ReceiptButton, RecordByNumber, TxnTable } from "./payments-board";
 import Link from "@/components/intent-link";
 import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Payments" };
 export const dynamic = "force-dynamic";
@@ -39,6 +40,8 @@ const SUB_TA = "வந்த பணம், வர வேண்டிய பண�
 
 /** Payments (portal design): to collect, received, cash on delivery, every transaction, settings. */
 export default async function PaymentsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const locked = await planGate("orders");
+  if (locked) return locked;
   const sp = await searchParams;
   const scope = await getScope();
   const tab: TabId = TABS.some((t) => t.id === sp.tab) ? (sp.tab as TabId) : "collect";
