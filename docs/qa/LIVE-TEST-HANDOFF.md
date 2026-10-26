@@ -74,6 +74,14 @@ earlier work; this file is its memory. Read all of it before doing anything.
 
 ### Done on 26 Oct, branch `HomeNewUi` only (owner: "work only in HomeNewUi, don't push to main")
 
+10. **Habbat end-to-end test (no failures; report in `docs/qa/HABBAT-E2E-REPORT.md`).** Live data checks 20/20
+    (read-only), unit 104/104, cross-business isolation 14/14, production build and type check clean, all 32 pages
+    open, sign-in/out, customers, order `#HABB-1001`, campaign builder, Tamil/English, phone layout. Not testable:
+    live sign-in as the Habbat login (owner does it), Vercel status (no access), any WhatsApp send (Habbat has no
+    number or templates yet). Open decisions before handing the login over: connect Habbat's WhatsApp number and add
+    templates; the app shows 10 made-up grocery products to any business with no Meta catalogue (add Habbat's menu or
+    switch Products/Orders off); confirm guest consent before the first campaign; 682 "Guest" names; change the
+    starting password; renew the plan by 26 Nov.
 09. **Habbat set-up: own customer list, Growth plan, logo (RUN ON THE LIVE DATABASE 26 Oct, 23:35 IST).**
     Live result (Neon, new database): Habbat now has 1,168 customers, all tagged `habbat-guests`, none under any other
     business (Thenan Oils 528, Cup N Saucer 1, QA Test Shop 1 unchanged); one VERIFIED monthly Growth period
