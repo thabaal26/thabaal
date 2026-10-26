@@ -72,6 +72,27 @@ earlier work; this file is its memory. Read all of it before doing anything.
 - Live tests finished: order RG-1028 (paid ₹1 by UPI, confirmed in the chat, packed, dispatched, delivered); the TEST
   campaign and TEST audience were deleted.
 
+### Done on 26 Oct, branch `HomeNewUi` only (owner: "work only in HomeNewUi, don't push to main")
+
+02. **My account › plan payments: a plan changes only through a verified payment, and an early payment waits.**
+- New table `PlanPurchase` (`prisma/sql/2026-10-26-plan-purchases.sql`, listed in `scripts/db-additive.mjs`).
+  Rules in `src/lib/subscription-core.ts` (pure) and `src/lib/subscription.ts` (database, with a row lock on the
+  client for every change). The active plan is never stored: it is the VERIFIED row with startsAt <= now < endsAt.
+- Client: plan buttons open confirm → UPI QR → send UTR. That creates a PENDING row and nothing else. One payment
+  at a time (pending, or a verified period not started yet, blocks another). The client can withdraw a pending one.
+- Admin (`/dashboard/account`, panel "Thabaal admin: plan payments"; with no client picked it lists all): verify or
+  turn down. Verify sets startsAt = end of the last verified period (or now), endsAt = start + 1/3/12 calendar months
+  in IST (month-end clamps). Verifying twice changes nothing; a UTR can be used once (`paymentRef` unique).
+  A business with no verified period needs the admin to tick "start now" or record its existing paid period first.
+- Limits: `planCapacityBlock` stops adding numbers/staff over the plan (or after it ended) for businesses that have a
+  verified period; businesses with none are unchanged. Campaign/template caps are still display-only.
+- Removed: plan/payment state in `Client.appearance`, the sample invoices, the hard-coded renewal date and the demo
+  simulator. Tests: `tests/unit/subscription.test.ts`.
+- **Not done**: no live data yet. Existing clients need their current paid period recorded by the admin before their
+  next payment is verified. No trusted automatic payment signal exists for Thabaal's own fees.
+
+01. Next.js upgraded to 16.4.1 (Oct 14 security fixes), commit `490373a`.
+
 ### Done on 19 Oct (latest first)
 
 05. **Account setup moved into Settings (owner asked: client setup belongs in Settings).**

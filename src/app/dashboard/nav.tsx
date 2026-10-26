@@ -12,6 +12,7 @@ import {
   Package,
   Settings,
   Tag,
+  User,
   Users,
   Wallet,
   type IconComponent,
@@ -51,6 +52,7 @@ export const NAV: NavItem[] = [
 
   { href: "/dashboard/report", label: "Reports", short: "Reports", icon: BarChart3, group: "Understand", ta: "அறிக்கைகள்" },
 
+  { href: "/dashboard/account", label: "My account", short: "Account", icon: User, group: "Account", ta: "என் கணக்கு" },
   { href: "/dashboard/settings", label: "Settings", short: "Settings", icon: Settings, group: "Account", ta: "அமைப்புகள்" },
 ];
 
