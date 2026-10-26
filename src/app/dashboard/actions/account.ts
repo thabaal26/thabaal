@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { createSession, getScope, requireManager, requireUser, revokeSessions } from "@/lib/session";
 import type { ActionResult } from "./templates";
 import type { BillingProfile } from "@/lib/account-plans";
+import { sendEmail } from "@/lib/email";
 import {
   cancelPlanPayment,
   recordExistingPeriod,
@@ -109,8 +110,34 @@ export async function submitCustomWorkRequest(data: {
       }
     }
 
+    // Email it to Thabaal's inbox (lib/email.ts). The request is saved either way.
+    const [user, client] = await Promise.all([
+      requireUser(),
+      scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { name: true, appearance: true } }) : null,
+    ]);
+    const profile = (client?.appearance as { billingProfile?: { email?: string } } | null)?.billingProfile;
+    const mail = await sendEmail({
+      subject: `thabaal request: ${data.category} · ${client?.name ?? "no business"}`,
+      replyTo: profile?.email || user.email,
+      rows: [
+        ["Business", client?.name ?? "-"],
+        ["Asked by", `${user.name ?? ""} <${user.email}>`],
+        ["What they need", data.category],
+        ["In their words", data.description.trim()],
+        ["How soon", data.urgency],
+        ["Number to call", data.phone],
+        ["Sent", new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })],
+      ],
+    });
+    if (!mail.ok) console.error("[custom work] email to Thabaal failed:", mail.error);
+
     revalidatePath("/dashboard/account");
-    return { ok: true, message: "Request sent. We will call you within 2 working days." };
+    return {
+      ok: true,
+      message: mail.ok
+        ? "Request sent to thabaal. We will call you within 2 working days."
+        : "Request saved. We could not email it just now, so please also WhatsApp us on 6379140626.",
+    };
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : "Failed to submit request." };
   }

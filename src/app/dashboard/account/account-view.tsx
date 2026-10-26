@@ -236,7 +236,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
       return;
     }
     const res = await sendRequest(cwCategory, cwDescription.trim(), cwUrgency, cwPhone);
-    notify(res.ok ? "Request sent. We will call you within 2 working days." : (res.message ?? "Could not send the request."), res.ok);
+    notify(res.message ?? (res.ok ? "Request sent." : "Could not send the request."), res.ok);
     if (res.ok) {
       setCwModalOpen(false);
       setCwDescription("");

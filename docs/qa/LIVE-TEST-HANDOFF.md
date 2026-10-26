@@ -74,6 +74,13 @@ earlier work; this file is its memory. Read all of it before doing anything.
 
 ### Done on 26 Oct, branch `HomeNewUi` only (owner: "work only in HomeNewUi, don't push to main")
 
+06. **Custom work requests are emailed to thabaal26@gmail.com (Resend).** `src/lib/email.ts` posts to the Resend
+    API with `fetch` (no new package). `submitCustomWorkRequest` (actions/account.ts) still saves the request, then
+    emails it, with reply-to set to the client's email. Add-on and "Stop or pause" requests use the same action, so
+    they email too. Needs `RESEND_API_KEY` in `.env` and on Vercel (names in `.env.example`). Without a verified
+    domain, Resend only delivers to the address the Resend account was made with, so make that account with
+    thabaal26@gmail.com, or verify a domain and set `RESEND_FROM`. If sending fails, the client is told the request
+    is saved and to WhatsApp 6379140626.
 05. **Plan lock: unpaid businesses see only Home, My account and Settings.** States in `subscription-core.ts`
     `accessState`: ok · due (≤ `WARN_DAYS` 5 left, nothing paid after) · overdue (ended < `GRACE_DAYS` 2 ago, still
     open) · locked · new (never paid and `Client.planRequired`) · unmanaged (never paid, not required: unchanged).
