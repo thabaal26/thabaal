@@ -74,6 +74,9 @@ earlier work; this file is its memory. Read all of it before doing anything.
 
 ### Done on 26 Oct, branch `HomeNewUi` only (owner: "work only in HomeNewUi, don't push to main")
 
+04. My account › Payments: "Recharge on Meta" is now green (`.btn.ok` in `portal.css`, from the `--ok` tokens, so it
+    follows light/dark) to set it apart from thabaal's own buttons.
+
 03. Language button removed from the page header on computers (`components/shell-tools.tsx` `PageTools`): the side
     menu's language switch is the only one at that width. Phones keep theirs in the top bar.
 

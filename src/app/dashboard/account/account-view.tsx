@@ -1003,7 +1003,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                 <Link className="btn sm" href="/dashboard/report">
                   <T ta="அறிக்கைகளில் செலவைப் பார்க்கவும்">See costs in Reports</T>
                 </Link>
-                <a className="btn sm" href="https://business.facebook.com/" target="_blank" rel="noopener noreferrer">
+                <a className="btn sm ok" href="https://business.facebook.com/" target="_blank" rel="noopener noreferrer">
                   <T ta="மெட்டாவில் ரீசார்ஜ் செய்யவும்">Recharge on Meta</T>
                   <ExternalLink className="size-3.5" />
                 </a>
