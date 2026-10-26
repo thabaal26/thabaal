@@ -74,6 +74,9 @@ earlier work; this file is its memory. Read all of it before doing anything.
 
 ### Done on 26 Oct, branch `HomeNewUi` only (owner: "work only in HomeNewUi, don't push to main")
 
+03. Language button removed from the page header on computers (`components/shell-tools.tsx` `PageTools`): the side
+    menu's language switch is the only one at that width. Phones keep theirs in the top bar.
+
 02. **My account › plan payments: a plan changes only through a verified payment, and an early payment waits.**
 - New table `PlanPurchase` (`prisma/sql/2026-10-26-plan-purchases.sql`, listed in `scripts/db-additive.mjs`).
   Rules in `src/lib/subscription-core.ts` (pure) and `src/lib/subscription.ts` (database, with a row lock on the
