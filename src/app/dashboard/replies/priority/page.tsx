@@ -4,12 +4,15 @@ import { getScope, ownedMessages } from "@/lib/session";
 import { PortalPage } from "../../portal-ui";
 import { CHATS_SUB, CHATS_SUB_TA, InboxTabs } from "../inbox-tabs";
 import { PriorityBoard, type BoardItem } from "./priority-board";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Priority inbox" };
 export const dynamic = "force-dynamic";
 
 /** Chats › Priority: open conversations grouped by what's at stake (portal design). */
 export default async function PriorityInboxPage() {
+  const locked = await planGate();
+  if (locked) return locked;
   const scope = await getScope();
   const now = new Date();
   const items = await inboxPriority(ownedMessages(scope), now);

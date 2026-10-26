@@ -11,6 +11,8 @@ export async function GET(req: NextRequest) {
   const userId = await readSessionUserId((await cookies()).get(SESSION_COOKIE)?.value);
   if (!userId) return new NextResponse("Unauthorized", { status: 401 });
   const scope = await getScope();
+  // Unpaid business: closed until the plan payment is verified (lib/plan-access.ts).
+  if (scope.planLocked) return new NextResponse("thabaal is paused until your plan payment is verified.", { status: 403 });
 
   const params: Record<string, string | string[]> = {};
   for (const [k, v] of req.nextUrl.searchParams) params[k] = k in params ? [...[params[k]].flat(), v] : v;

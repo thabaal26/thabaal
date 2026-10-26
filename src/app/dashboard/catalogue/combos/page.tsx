@@ -6,11 +6,14 @@ import { getScope } from "@/lib/session";
 import { PortalPage } from "../../portal-ui";
 import { ProductsTabs } from "../products-tabs";
 import { CombosView } from "./combos-view";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Combo ideas" };
 export const dynamic = "force-dynamic";
 
 export default async function CombosPage() {
+  const locked = await planGate();
+  if (locked) return locked;
   const scope = await getScope();
   const frame = (children: React.ReactNode) => (
     <PortalPage

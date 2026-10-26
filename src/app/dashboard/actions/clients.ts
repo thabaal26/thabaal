@@ -46,7 +46,7 @@ export async function createClient(name: string, disabledSections?: string[], ho
   // The business type starts the client with the extra fields that kind of business usually keeps.
   const type = businessTypeOf(businessType);
   const c = await db.client.create({
-    data: { name: clean, disabledSections: sanitized, homeCity: city, businessType: type?.id ?? null, ...(type?.starterFields.length && { customFields: type.starterFields }) },
+    data: { name: clean, planRequired: true, disabledSections: sanitized, homeCity: city, businessType: type?.id ?? null, ...(type?.starterFields.length && { customFields: type.starterFields }) },
   });
   const prefix = await ensureOrderPrefix(c.id).catch(() => null);
   refresh();

@@ -245,3 +245,16 @@ export async function planCapacityBlock(clientId: string, kind: "num" | "staff",
   const limit = eff.plan.lim[kind];
   return used >= limit ? `The ${eff.plan.n} plan allows ${limit} ${what}, and all are in use.` : null;
 }
+
+/** Thabaal decides whether a business must have a paid plan to use thabaal (new businesses start with yes). */
+export async function setPlanRequired(actor: Actor, clientId: string, required: boolean): Promise<SubResult> {
+  if (!actor.isAdmin) return { ok: false, code: "forbidden", message: "Only Thabaal can change this." };
+  const r = await db.client.updateMany({ where: { id: clientId }, data: { planRequired: required } });
+  if (!r.count) return { ok: false, code: "not_found", message: "Business not found." };
+  return {
+    ok: true,
+    message: required
+      ? "This business now needs a paid plan. Without one, only Home, My account and Settings open."
+      : "This business no longer needs a paid plan to use thabaal.",
+  };
+}

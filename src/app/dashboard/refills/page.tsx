@@ -9,12 +9,15 @@ import { CustomersTabs, CUSTOMERS_SUB, CUSTOMERS_SUB_TA } from "../customers/cus
 import { inr } from "../portal-format";
 import { PortalPage } from "../portal-ui";
 import { RefillBoard } from "./refill-board";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Refills" };
 export const dynamic = "force-dynamic";
 
 /** Customers › Refills: when each buyer is likely to run out, from how often they reorder. */
 export default async function RefillsPage() {
+  const locked = await planGate();
+  if (locked) return locked;
   const scope = await getScope();
   if (!scope.clientId)
     return (

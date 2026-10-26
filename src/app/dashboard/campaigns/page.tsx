@@ -10,6 +10,7 @@ import { campaignAudienceWhere } from "@/lib/audiences";
 import { readPaySettings, waPayOn } from "@/lib/pay-settings";
 import { Automations } from "./automations";
 import { CampaignsDashboard, type CampaignItem } from "./campaigns-dashboard";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Campaigns" };
 export const dynamic = "force-dynamic";
@@ -30,6 +31,8 @@ const WAITING: Record<string, string> = {
 const PER_MSG = RATES.marketing * (1 + INDIA_GST_RATE);
 
 export default async function CampaignsPage() {
+  const locked = await planGate();
+  if (locked) return locked;
   const scope = await getScope();
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);

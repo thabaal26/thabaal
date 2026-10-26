@@ -49,7 +49,7 @@ const PER_TICK = 30;
 const PER_DAY = 200; // spreads a big first batch of lapsed customers over several days
 
 /** Sends the client's win-back template once to each lapsed customer. */
-export async function sendWinbacks(now = new Date()) {
+export async function sendWinbacks(now = new Date(), paused: ReadonlySet<string> = new Set()) {
   const clients = await db.client.findMany({
     where: { winbackTemplateId: { not: null } },
     select: { id: true, winbackTemplateId: true, quietFrom: true, quietTo: true },
@@ -57,6 +57,7 @@ export async function sendWinbacks(now = new Date()) {
   const settings = await getSettings();
   let sent = 0;
   for (const client of clients) {
+    if (paused.has(client.id)) continue; // plan not paid: win-backs wait
     const template = await db.template.findUnique({ where: { id: client.winbackTemplateId! } });
     if (!template || !templateSendable(settings, template)) continue;
     if (template.category === "MARKETING" && quietUntil(client, now)) continue;

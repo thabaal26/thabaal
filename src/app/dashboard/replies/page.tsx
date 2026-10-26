@@ -8,6 +8,7 @@ import { handleAllReplies } from "../actions/replies";
 import { CHATS_SUB, CHATS_SUB_TA, InboxTabs } from "./inbox-tabs";
 import { PAction, PortalPage, T } from "../portal-ui";
 import { ReplyInbox } from "./reply-inbox";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Chats" };
 export const dynamic = "force-dynamic";
@@ -20,6 +21,8 @@ const TABS = [
 ] as const;
 
 export default async function RepliesPage({ searchParams }: PageProps<"/dashboard/replies">) {
+  const locked = await planGate();
+  if (locked) return locked;
   const { show: rawShow = "", r: picked } = await searchParams;
   // Older links say show=all for everything.
   const show = rawShow === "all" ? "" : rawShow;

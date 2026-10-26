@@ -148,3 +148,60 @@ export function timeLeftLabel(end: Date, now: Date): string {
   if (days === 0) return hours <= 1 ? "Less than 2 hours left" : `${hours} hours left`;
   return `${days} day${days === 1 ? "" : "s"}${hours ? ` ${hours} hour${hours === 1 ? "" : "s"}` : ""} left`;
 }
+
+// ---- Access: what a business can use right now, from its verified periods ----------------------------------
+//
+//   ok        a paid period covers now (or the next one is already paid)
+//   due       a paid period covers now, it ends within WARN_DAYS, and nothing after it is paid yet
+//   overdue   the last paid period ended less than GRACE_DAYS ago: everything still works, with a red warning
+//   locked    the last paid period ended GRACE_DAYS or more ago: only Home, My account and Settings open
+//   new       the business must pay before starting (planRequired) and has never paid
+//   unmanaged set up before plans were tracked and not yet switched to "requires a plan": nothing changes
+//
+// A payment reference waiting to be checked never unlocks anything: only a verified payment does.
+
+/** Days before the end of a paid period when the owner is warned. */
+export const WARN_DAYS = 5;
+/** Days after a paid period ends before the business is locked. */
+export const GRACE_DAYS = 2;
+
+export type AccessState = "ok" | "due" | "overdue" | "locked" | "new" | "unmanaged";
+
+export type AccessInfo = {
+  state: AccessState;
+  /** True when everything except Home, My account and Settings is closed. */
+  locked: boolean;
+  /** Whole days left until the paid period ends (due), or days since it ended (overdue, locked). */
+  days: number;
+  /** End of the period in force (ok, due) or of the last one (overdue, locked). */
+  endsAt: Date | null;
+  /** The plan and cycle to renew: the one in force or the last one. Null when the business never paid. */
+  plan: string | null;
+  cycle: string | null;
+};
+
+export const LOCKED_STATES: readonly AccessState[] = ["locked", "new"];
+
+export function accessState(rows: PurchaseLike[], planRequired: boolean, now: Date): AccessInfo {
+  const s = summarize(rows, now);
+  if (s.active) {
+    const ms = s.active.endsAt.getTime() - now.getTime();
+    const days = Math.ceil(ms / DAY_MS);
+    const due = !s.scheduled && ms <= WARN_DAYS * DAY_MS;
+    return { state: due ? "due" : "ok", locked: false, days, endsAt: s.active.endsAt, plan: s.active.plan, cycle: s.active.cycle };
+  }
+  if (s.status === "expired") {
+    const last = s.lastEnded;
+    // A verified period booked for later with a gap before it: closed until it starts.
+    if (!last) return { state: "locked", locked: true, days: 0, endsAt: null, plan: s.scheduled?.plan ?? null, cycle: s.scheduled?.cycle ?? null };
+    const since = now.getTime() - last.endsAt.getTime();
+    const days = Math.floor(since / DAY_MS);
+    const overdue = since < GRACE_DAYS * DAY_MS;
+    return { state: overdue ? "overdue" : "locked", locked: !overdue, days, endsAt: last.endsAt, plan: last.plan, cycle: last.cycle };
+  }
+  return planRequired
+    ? { state: "new", locked: true, days: 0, endsAt: null, plan: null, cycle: null }
+    : { state: "unmanaged", locked: false, days: 0, endsAt: null, plan: null, cycle: null };
+}
+
+export { openWhenLocked } from "./plan-lock-paths";

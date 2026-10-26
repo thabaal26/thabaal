@@ -14,6 +14,7 @@ import { getScope, owned, ownedMessages } from "@/lib/session";
 import { plainError } from "@/lib/plain-error";
 import { codesOf, PAUSING_KINDS } from "@/lib/meta-errors";
 import { HELD_CODES } from "@/lib/held";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Notifications" };
 export const dynamic = "force-dynamic";
@@ -54,6 +55,8 @@ export default async function NotificationsPage({
 }: {
   searchParams: Promise<{ show?: string }>;
 }) {
+  const locked = await planGate();
+  if (locked) return locked;
   const sp = await searchParams;
   const show = typeof sp.show === "string" ? sp.show : "";
 

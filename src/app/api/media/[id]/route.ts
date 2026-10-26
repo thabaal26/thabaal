@@ -14,6 +14,8 @@ const VERSION = process.env.META_GRAPH_VERSION ?? "v23.0";
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const scope = await getScope();
+  // Unpaid business: closed until the plan payment is verified (lib/plan-access.ts).
+  if (scope.planLocked) return new NextResponse("thabaal is paused until your plan payment is verified.", { status: 403 });
   const reply = await db.reply.findFirst({
     where: { id, mediaId: { not: null }, customer: owned(scope) },
     select: { mediaId: true, sender: true, customer: { select: { client: { select: { waToken: true } } } } },

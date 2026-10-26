@@ -466,7 +466,7 @@ export async function cancelSupersededOrdersForCustomer(
  * Scheduler, following Payment settings › Reminder rules for each client: a reminder a day after the payment
  * request, a last one after 3 days, and a day after that the request is marked expired (Failed or expired).
  */
-export async function remindUnpaidOrders(now = new Date(), limit = 20) {
+export async function remindUnpaidOrders(now = new Date(), limit = 20, paused: ReadonlySet<string> = new Set()) {
   const t = now.getTime();
   const open = {
     status: { in: ["NEW", "CONFIRMED"] as ("NEW" | "CONFIRMED")[] },
@@ -474,6 +474,8 @@ export async function remindUnpaidOrders(now = new Date(), limit = 20) {
     // No reminder for cash on delivery, or for someone who says they've paid (staff are checking).
     paymentClaimedAt: null,
     OR: [{ paymentMethod: null }, { paymentMethod: { not: "cod" } }],
+    // Businesses locked for an unpaid plan: reminders wait until they pay.
+    ...(paused.size ? { clientId: { notIn: [...paused] } } : {}),
   };
   const rules = new Map<string, PaySettings>();
   const rulesFor = async (clientId: string) => {

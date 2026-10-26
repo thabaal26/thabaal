@@ -23,6 +23,7 @@ import {
   numberToWordsINR,
 } from "@/lib/account-plans";
 import { saveBillingDetails, sendPlanPayment, submitCustomWorkRequest, withdrawPlanPayment } from "../actions/account";
+import type { AccessState } from "@/lib/subscription-core";
 import type { BillingView, HistoryRow } from "./billing-types";
 import "./account.css";
 
@@ -51,6 +52,15 @@ export type AccountViewProps = {
 const CYCLE_LENGTH: Record<BillingCycle, string> = { m: "1 month", q: "3 months", y: "12 months" };
 const planOf = (k: string | null | undefined) => PLANS.find((p) => p.k === k) ?? null;
 
+const ACCESS_LABEL: Record<AccessState, string> = {
+  ok: "paid",
+  due: "due soon",
+  overdue: "overdue",
+  locked: "locked",
+  new: "never paid",
+  unmanaged: "no plan required yet",
+};
+
 const PHASE: Record<HistoryRow["phase"], { label: string; tone: "ok" | "warn" | "bad" | "info" | "mute" }> = {
   awaiting_verification: { label: "Awaiting verification", tone: "warn" },
   scheduled: { label: "Paid · starts later", tone: "info" },
@@ -66,7 +76,9 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
   const [busy, startBusy] = useTransition();
 
   // Active Tab: 'sub' (My plan) | 'plans' (Change plan) | 'pay' (Payments) | 'acct' (Business & help)
-  const [activeTab, setActiveTab] = useState<"sub" | "plans" | "pay" | "acct">("sub");
+  // Arriving from a closed section's lock screen (?pay=now or ?pay=ref) opens the payment steps straight away.
+  const canAutoPay = billing.autoPay !== null && billing.canPay && !billing.block;
+  const [activeTab, setActiveTab] = useState<"sub" | "plans" | "pay" | "acct">(canAutoPay && !billing.renew ? "plans" : "sub");
 
   // The plan in force now comes only from a verified period covering this moment (server). Clicking a plan
   // never changes it: it opens the purchase steps below, which end in a payment waiting to be verified.
@@ -85,8 +97,8 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
   const [cwList, setCwList] = useState(initialCW);
 
   // Purchase steps: 1 confirm what is bought and when it starts, 2 pay by UPI, 3 send the UPI reference.
-  const [buy, setBuy] = useState<{ plan: PlanKey; cycle: BillingCycle } | null>(null);
-  const [buyStep, setBuyStep] = useState<1 | 2 | 3>(1);
+  const [buy, setBuy] = useState<{ plan: PlanKey; cycle: BillingCycle } | null>(canAutoPay && billing.renew ? billing.renew : null);
+  const [buyStep, setBuyStep] = useState<1 | 2 | 3>(billing.autoPay === "ref" ? 3 : 1);
   const [utrNumber, setUtrNumber] = useState("");
   const [payDate, setPayDate] = useState(billing.todayLabel);
   const [payApp, setPayApp] = useState("GPay");
@@ -127,11 +139,35 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
   };
   const closeBuy = () => setBuy(null);
 
-  /** Pay for the next period of the plan in force (or pick one when there is none). */
+  /** Pay for the next period of the plan in force, or the last one (or pick one when there is none). */
+  const renew = billing.renew;
   const payNext = () => {
-    if (active) openBuy(active.plan, active.cycle);
+    if (renew) openBuy(renew.plan, renew.cycle);
     else setActiveTab("plans");
   };
+
+  // Where the account stands for access (server: lib/subscription-core.ts accessState). Thabaal admins can preview
+  // what the owner sees in each state; the preview only changes this page, never the business's real access.
+  const [sim, setSim] = useState<AccessState | "">("");
+  const shown: AccessState = sim || billing.access.state;
+  const [lockDismissed, setLockDismissed] = useState(canAutoPay);
+  const lockShown = (shown === "locked" || shown === "new") && (sim !== "" || !lockDismissed);
+  const renewPlan = planOf(renew?.plan) ?? (sim ? planOf("growth") : null);
+  const renewCycle: BillingCycle = renew?.cycle ?? "m";
+  const renewPrice = renewPlan ? renewPlan.p[renewCycle] : null;
+  const dueDays = sim === "due" ? 3 : billing.access.days;
+
+  /** "I have already paid": straight to the step that takes the UPI reference. */
+  const alreadyPaid = () => {
+    if (!renew) {
+      setActiveTab("plans");
+      notify("Pick the plan you paid for, then send the reference.");
+      return;
+    }
+    openBuy(renew.plan, renew.cycle);
+    setBuyStep(3);
+  };
+
 
   // Send the UPI reference: recorded as waiting to be checked. The plan doesn't change.
   const handlePaymentSubmit = (e: React.FormEvent) => {
@@ -148,6 +184,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
       if (res.ok) {
         setBuy(null);
         setActiveTab("sub");
+        window.scrollTo({ top: 0, behavior: "smooth" });
         router.refresh();
       }
     });
@@ -298,19 +335,48 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
           </div>
         </div>
       )}
-      {billing.status === "expired" && !billing.scheduled && (
-        <div className="duebar bad">
+      {shown === "due" && (
+        <div className="duebar warn">
           <div className="grow">
-            <b>Your {endedPlan?.n} plan ended on {billing.lastEnded?.endsLabel}.</b> Pay for a new period; it starts as soon as Thabaal verifies the payment.
+            <b>
+              Payment due in {dueDays} day{dueDays === 1 ? "" : "s"}.
+            </b>{" "}
+            Pay now so nothing stops. The new period starts exactly when this one ends{active ? ` (${active.endsLabel})` : ""}.
           </div>
-          {billing.canPay && !billing.block && (
-            <button type="button" className="btn sm primary" onClick={() => (endedPlan && billing.lastEnded ? openBuy(endedPlan.k, billing.lastEnded.cycle) : setActiveTab("plans"))}>
-              Renew {endedPlan?.n}
+          {billing.canPay && !billing.block && renewPrice !== null && (
+            <button type="button" className="btn sm primary" onClick={payNext}>
+              Pay {inr(renewPrice)}
             </button>
           )}
         </div>
       )}
-      {billing.status === "none" && !billing.pending && (
+      {shown === "overdue" && (
+        <div className="duebar bad">
+          <div className="grow">
+            <b>Payment is overdue.</b> thabaal will pause{billing.access.locksOnLabel && !sim ? ` on ${billing.access.locksOnLabel}` : ""} until this
+            period&apos;s payment is received.
+          </div>
+          {billing.canPay && !billing.block && renewPrice !== null && (
+            <button type="button" className="btn sm primary" onClick={payNext}>
+              Pay {inr(renewPrice)}
+            </button>
+          )}
+        </div>
+      )}
+      {(shown === "locked" || shown === "new") && (
+        <div className="duebar bad">
+          <div className="grow">
+            <b>{shown === "new" ? "Pay to start using thabaal." : "thabaal is paused."}</b> Only Home, My account and Settings open until your
+            payment is verified. Nothing is deleted.
+          </div>
+          {billing.canPay && !billing.block && (
+            <button type="button" className="btn sm primary" onClick={payNext}>
+              {renewPrice !== null ? `Pay ${inr(renewPrice)}` : "Choose a plan"}
+            </button>
+          )}
+        </div>
+      )}
+      {shown === "unmanaged" && !billing.pending && (
         <div className="duebar info">
           <div className="grow">
             <b>No paid plan is on record for this business yet.</b> Choose a plan and pay by UPI. It starts when Thabaal verifies the payment.
@@ -322,18 +388,78 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
           )}
         </div>
       )}
-      {active && !billing.scheduled && !billing.pending && active.leftDays < 7 && (
-        <div className="duebar warn">
-          <div className="grow">
-            <b>Your plan ends {active.endsLabel}</b> ({active.leftLabel}). Pay now: the new period starts exactly when this one ends, so you lose no days.
+
+      {/* Locked or never paid: the same box the closed sections show (plan-lock.tsx), with the payment steps here. */}
+      {lockShown && (
+        <div className="lockwrap" role="dialog" aria-modal="true" aria-labelledby="ac-lock-title">
+          <div className="lockbox">
+            <div className="ic" aria-hidden>
+              !
+            </div>
+            <h2 id="ac-lock-title">{shown === "new" ? "Pay to start using thabaal" : "Your plan payment is due"}</h2>
+            <p className="muted">
+              {shown === "new"
+                ? "Your account is ready. Make the first payment and everything opens up as soon as thabaal verifies it."
+                : "We have not received this period's payment, so thabaal is paused. Pay now and it opens again as soon as we confirm."}
+            </p>
+            <div className="amt">{renewPrice !== null ? inr(renewPrice) : `From ${inr(PLANS[0].p.m)}`}</div>
+            <div className="muted small">{renewPlan ? `${renewPlan.n} plan` : "a month"}</div>
+            {billing.pending && !sim ? (
+              <p className="small" style={{ marginTop: 16 }}>
+                <b>We are checking your payment</b> (UPI reference {billing.pending.utr}). thabaal opens as soon as it is verified, usually within one
+                working day.
+              </p>
+            ) : null}
+            <div className="acts">
+              {(sim || (!billing.pending && billing.canPay)) && (
+                <>
+                  <button
+                    type="button"
+                    className="btn primary"
+                    onClick={() => {
+                      if (sim) return notify("Preview only: this opens the UPI payment for the shop owner.");
+                      setLockDismissed(true);
+                      payNext();
+                    }}
+                  >
+                    Pay now by UPI
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => {
+                      if (sim) return notify("Preview only: this asks the shop owner for the UPI reference.");
+                      setLockDismissed(true);
+                      alreadyPaid();
+                    }}
+                  >
+                    I have already paid
+                  </button>
+                </>
+              )}
+              {!sim && !billing.pending && !billing.canPay && <p className="muted small">Ask the business owner to pay for the plan.</p>}
+              <a className="btn ghost" href="https://wa.me/916379140626?text=Hi%20thabaal%2C%20I%20need%20help%20with%20my%20payment" target="_blank" rel="noopener noreferrer">
+                WhatsApp thabaal · 6379140626
+              </a>
+              {sim ? (
+                <button type="button" className="btn ghost" onClick={() => setSim("")}>
+                  Close preview and go back
+                </button>
+              ) : (
+                <button type="button" className="btn ghost" onClick={() => setLockDismissed(true)}>
+                  Not now, show my account
+                </button>
+              )}
+            </div>
+            <p className="fine">
+              Nothing is deleted. Your customers, orders and products are safe and come back the moment the payment is confirmed.
+              <br />
+              Messages keep arriving on WhatsApp while thabaal is paused, so pay soon to avoid missing orders.
+            </p>
           </div>
-          {billing.canPay && (
-            <button type="button" className="btn sm primary" onClick={payNext}>
-              Pay {inr(curPlan?.p[active.cycle] ?? 0)}
-            </button>
-          )}
         </div>
       )}
+
       {/* Tabs List */}
       <div className="tabs" role="tablist">
         <button
@@ -375,6 +501,43 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
       {/* ========================================================================= */}
       {activeTab === "sub" && (
         <section>
+          {/* Thabaal admin only: see this page as the shop owner would in each state. Changes nothing for real. */}
+          {billing.isAdmin && (
+            <div className="card" style={{ marginBottom: 16, borderLeft: "6px solid var(--bar2)" }}>
+              <div className="hd" style={{ marginBottom: 0, flexWrap: "wrap", gap: 12 }}>
+                <div>
+                  <h2 style={{ fontSize: 17 }}>Preview: what the shop owner sees</h2>
+                  <p className="muted small">
+                    Thabaal admin only. It changes this page for you, not the business&apos;s real access (now: {ACCESS_LABEL[billing.access.state]}).
+                  </p>
+                </div>
+                <div className="seg" role="group" aria-label="Preview the account state">
+                  {(
+                    [
+                      ["ok", "Paid"],
+                      ["due", "Due soon"],
+                      ["overdue", "Overdue"],
+                      ["locked", "Locked"],
+                      ["new", "Never paid"],
+                    ] as [AccessState, string][]
+                  ).map(([v, label]) => (
+                    <button
+                      key={v}
+                      type="button"
+                      aria-pressed={shown === v}
+                      onClick={() => {
+                        setSim(v);
+                        notify(`Preview: ${label.toLowerCase()}`);
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Usage capacity alert */}
           {isStaffFull && limits && (
             <div className="alert">
@@ -486,7 +649,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                     {pendingPlan.n} · {CYCLE_NAMES[billing.pending.cycle].en} · reference {billing.pending.utr}
                   </div>
                   <div className="l">
-                    {billing.nextStartLabel ? `If verified, starts ${billing.nextStartLabel}` : "If verified, starts when it is verified"}
+                    {billing.nextStartLabel ? `If verified, starts ${billing.nextStartLabel}` : "Starts when Thabaal verifies it"}
                   </div>
                 </div>
               ) : active && curPlan ? (
@@ -1443,7 +1606,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                 <div className="hd" style={{ marginBottom: 12 }}>
                   <h2 style={{ fontSize: 20 }}>
                     {!currentPlanKey
-                      ? `Start ${buyPlan.n}`
+                      ? `Choose ${buyPlan.n}`
                       : buyPlan.k === currentPlanKey
                         ? buy.cycle === currentCycle
                           ? `Pay for your next ${buyPlan.n} period`

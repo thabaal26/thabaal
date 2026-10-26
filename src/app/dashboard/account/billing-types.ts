@@ -2,7 +2,7 @@
 // rows: every date and label here comes from stored timestamps, never from the browser.
 
 import type { BillingCycle, PlanKey } from "@/lib/account-plans";
-import type { PurchasePhase } from "@/lib/subscription-core";
+import type { AccessState, PurchasePhase } from "@/lib/subscription-core";
 
 export type PeriodView = {
   id: string;
@@ -46,6 +46,20 @@ export type BillingView = {
   history: HistoryRow[];
   canPay: boolean;
   todayLabel: string;
+  /** What the business can use now (lib/subscription-core.ts accessState). */
+  access: {
+    state: AccessState;
+    /** Days left (ok, due) or days since the plan ended (overdue, locked). */
+    days: number;
+    /** When an overdue business will be locked. */
+    locksOnLabel: string | null;
+  };
+  /** The plan and cycle "Pay now" renews: the one in force, or the last one. Null when never paid. */
+  renew: { plan: PlanKey; cycle: BillingCycle } | null;
+  /** Thabaal admin: sees the preview switcher. */
+  isAdmin: boolean;
+  /** Arrived from a closed section's lock screen: open the payment steps ("now") or the reference step ("ref"). */
+  autoPay: "now" | "ref" | null;
 };
 
 export type AdminPendingRow = {

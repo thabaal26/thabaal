@@ -10,6 +10,7 @@ import { marketingPaused, retryHeldBack } from "./held";
 import { explainError, metaError, PAUSING_KINDS } from "./meta-errors";
 import { applyFailure, quietUntil, recentlyMarketed } from "./rules";
 import { sendRefillReminders } from "./refill";
+import { lockedClientIds } from "./plan-access";
 import { syncDueSheets } from "./sheets";
 import { campaignAudienceWhere } from "./audiences";
 import { refreshLifecycleTags, sendWinbacks } from "./lifecycle";
@@ -46,9 +47,10 @@ export async function startRun(campaign: Campaign & { template: { name: string }
   return run;
 }
 
-async function startDueCampaigns(now: Date) {
+async function startDueCampaigns(now: Date, paused: ReadonlySet<string>) {
   const due = await db.campaign.findMany({
-    where: { active: true, nextRunAt: { lte: now } },
+    // Businesses locked for an unpaid plan: their scheduled campaigns wait (and start once they pay).
+    where: { active: true, nextRunAt: { lte: now }, clientId: { notIn: [...paused] } },
     include: { template: { select: { name: true } } },
   });
   let started = 0;
@@ -291,10 +293,19 @@ export async function dispatch() {
   const deadline = startedAt + TIME_BUDGET_MS;
   const now = new Date();
 
-  const campaignsStarted = await startDueCampaigns(now);
+  // Businesses locked for an unpaid plan (lib/plan-access.ts): nothing goes out for them until they pay.
+  const paused = await lockedClientIds(now).catch((e) => {
+    console.error("Could not read plan locks", e);
+    return new Set<string>();
+  });
+  const campaignsStarted = await startDueCampaigns(now, paused);
   await refreshStaleNumbers().catch((e) => console.error("Could not refresh number status", e));
   const runs = await db.campaignRun.findMany({
-    where: { status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET", "WAITING_FUNDS"] }, nextBatchAt: { lte: now } },
+    where: {
+      status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET", "WAITING_FUNDS"] },
+      nextBatchAt: { lte: now },
+      campaign: { clientId: { notIn: [...paused] } },
+    },
     select: { id: true },
     orderBy: { nextBatchAt: "asc" },
     take: 20,
@@ -310,12 +321,12 @@ export async function dispatch() {
   }
   // Messages Meta held back a few days ago get their one retry.
   if (Date.now() < deadline) await retryHeldBack({ now, deadline }).catch((e) => console.error("Held-back retries failed", e));
-  if (Date.now() < deadline) await sendRefillReminders(now).catch((e) => console.error("Refill reminders failed", e));
+  if (Date.now() < deadline) await sendRefillReminders(now, paused).catch((e) => console.error("Refill reminders failed", e));
   if (Date.now() < deadline) await syncDueSheets(now).catch((e) => console.error("Sheet sync failed", e));
   if (Date.now() < deadline) await backfillOrderNames().catch((e) => console.error("Order name backfill failed", e));
-  if (Date.now() < deadline) await remindUnpaidOrders(now).catch((e) => console.error("Payment reminders failed", e));
+  if (Date.now() < deadline) await remindUnpaidOrders(now, 20, paused).catch((e) => console.error("Payment reminders failed", e));
   if (Date.now() < deadline) await refreshLifecycleTags().catch((e) => console.error("Lifecycle tags failed", e));
-  if (Date.now() < deadline) await sendWinbacks(now).catch((e) => console.error("Win-back failed", e));
+  if (Date.now() < deadline) await sendWinbacks(now, paused).catch((e) => console.error("Win-back failed", e));
   await db.setting.upsert({ where: { id: 1 }, update: { lastDispatchAt: now }, create: { id: 1, lastDispatchAt: now } });
   return { campaignsStarted, runsProcessed: runs.length, sent, failed, ms: Date.now() - startedAt };
 }

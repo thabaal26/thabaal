@@ -17,12 +17,15 @@ import { CustomerActions, PendingCustomersBanner } from "./customer-tools";
 import { CustomersTabs, CUSTOMERS_SUB, CUSTOMERS_SUB_TA } from "./customers-tabs";
 import { CustomerTable, LoyaltyPanel } from "./customers-board";
 import { GroupCampaign } from "./group-campaign";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Customers" };
 export const dynamic = "force-dynamic";
 
 /** Customers (portal design): all customers, groups to reach, loyalty. Refills is its own page. */
 export default async function CustomersPage({ searchParams }: PageProps<"/dashboard/customers">) {
+  const locked = await planGate();
+  if (locked) return locked;
   const sp = await searchParams;
   const tab = sp.tab === "groups" || sp.tag === "lapsed" ? "groups" : sp.tab === "loyalty" || sp.tag === "loyalty" ? "loyalty" : "all";
   const scope = await getScope();

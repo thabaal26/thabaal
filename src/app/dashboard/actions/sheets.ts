@@ -9,7 +9,7 @@ import type { SendResult } from "./send-helpers";
 
 /** Saves the Customers and Orders tab links and syncs right away, so mistakes show up immediately. */
 export async function saveSheetLinks(customersUrl: string, ordersUrl?: string): Promise<SendResult> {
-  const s = await requireOrderAccess();
+  const s = await requireOrderAccess({ evenIfLocked: true });
   if ("denied" in s) return { ok: false, message: s.denied };
   if (!s.clientId) return { ok: false, message: "Pick a client in the sidebar first." };
   const cUrl = customersUrl.trim();
@@ -31,7 +31,7 @@ export async function saveSheetLinks(customersUrl: string, ordersUrl?: string): 
 
 /** Sends one test event to the live-log sheet and reports the script's answer. */
 export async function testSheetConnection(): Promise<SendResult> {
-  const s = await requireOrderAccess();
+  const s = await requireOrderAccess({ evenIfLocked: true });
   if ("denied" in s) return { ok: false, message: s.denied };
   if (!s.clientId) return { ok: false, message: "Pick a client in the sidebar first." };
   return testSheetPush(s.clientId);
@@ -42,7 +42,7 @@ export async function testSheetConnection(): Promise<SendResult> {
  * An empty secret keeps the saved one; `clearSecret` removes it. An empty link unlinks the sheet.
  */
 export async function saveSheetHook(link: string, secret: string, clearSecret = false): Promise<SendResult> {
-  const s = await requireManager(true);
+  const s = await requireManager(true, { evenIfLocked: true });
   if ("denied" in s) return { ok: false, message: s.denied };
   const raw = link.trim();
   const url = raw ? parseSheetHook(raw) : null;
@@ -62,7 +62,7 @@ export async function saveSheetHook(link: string, secret: string, clearSecret = 
 }
 
 export async function syncNow(): Promise<SendResult> {
-  const s = await requireOrderAccess();
+  const s = await requireOrderAccess({ evenIfLocked: true });
   if ("denied" in s) return { ok: false, message: s.denied };
   if (!s.clientId) return { ok: false, message: "Pick a client in the sidebar first." };
   const r = await syncSheet(s.clientId);

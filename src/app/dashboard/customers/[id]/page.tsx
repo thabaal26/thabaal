@@ -30,12 +30,15 @@ import { CallButton } from "./call-button";
 import { PausedOffersNote } from "./paused-offers-note";
 import { PurchaseJourney } from "./purchase-journey";
 import { SendPanel } from "./send-panel";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Customer" };
 export const dynamic = "force-dynamic";
 
 
 export default async function CustomerPage({ params }: PageProps<"/dashboard/customers/[id]">) {
+  const locked = await planGate();
+  if (locked) return locked;
   const { id } = await params;
   const scope = await getScope();
   const c = await db.customer.findFirst({

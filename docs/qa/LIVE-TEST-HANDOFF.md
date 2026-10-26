@@ -74,6 +74,20 @@ earlier work; this file is its memory. Read all of it before doing anything.
 
 ### Done on 26 Oct, branch `HomeNewUi` only (owner: "work only in HomeNewUi, don't push to main")
 
+05. **Plan lock: unpaid businesses see only Home, My account and Settings.** States in `subscription-core.ts`
+    `accessState`: ok · due (≤ `WARN_DAYS` 5 left, nothing paid after) · overdue (ended < `GRACE_DAYS` 2 ago, still
+    open) · locked · new (never paid and `Client.planRequired`) · unmanaged (never paid, not required: unchanged).
+- New column `Client.planRequired` (`prisma/sql/2026-10-26-plan-required.sql`): new businesses true; existing ones
+  false until the admin records their paid period and switches it on (My account › admin panel).
+- `getScope` (session.ts) sets `planLocked` for client logins and turns `canManage/canOperate` off, so every write
+  action refuses; My account and Settings actions pass `{ evenIfLocked: true }` and pages there use
+  `scope.manager/operator`. Closed pages call `planGate()` (`dashboard/plan-lock.tsx`) and show the lock box; exports
+  and media return 403. Menus show a padlock. A pending UTR never unlocks.
+- Scheduler (`dispatcher.ts`): campaigns, refill reminders, win-backs and unpaid-order reminders skip locked
+  businesses (`lockedClientIds`). Incoming WhatsApp messages still arrive.
+- Banners: `plan-due-bar.tsx` (every page but My account) and My account's own; lock box on My account with
+  "Not now". Admin preview switcher (Paid / Due soon / Overdue / Locked / Never paid) on My account, admin only.
+
 04. My account › Payments: "Recharge on Meta" is now green (`.btn.ok` in `portal.css`, from the `--ok` tokens, so it
     follows light/dark) to set it apart from thabaal's own buttons.
 

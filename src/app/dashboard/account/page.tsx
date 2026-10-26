@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { APP_TZ } from "@/lib/format";
 import { getScope, requireUser } from "@/lib/session";
 import type { BillingCycle, BillingProfile, PlanKey } from "@/lib/account-plans";
-import { CYCLES, nextStart, periodEnd, phaseOf, purchaseBlock, summarize, timeLeft, timeLeftLabel } from "@/lib/subscription-core";
+import { accessState, CYCLES, DAY_MS, GRACE_DAYS, nextStart, periodEnd, phaseOf, purchaseBlock, summarize, timeLeft, timeLeftLabel } from "@/lib/subscription-core";
 import { PortalPage } from "../portal-ui";
 import { AccountView } from "./account-view";
 import { AdminPlanPanel } from "./admin-plan-panel";
@@ -66,7 +66,7 @@ async function adminQueue(now: Date, clientId: string | null): Promise<AdminPend
   });
 }
 
-export default async function AccountPage() {
+export default async function AccountPage({ searchParams }: { searchParams: Promise<{ pay?: string }> }) {
   const [user, scope] = await Promise.all([requireUser(), getScope()]);
   const now = new Date();
   const clientId = scope.clientId;
@@ -85,7 +85,7 @@ export default async function AccountPage() {
   }
 
   const [client, rows, numbers, staff, campaignsCount, templatesCount] = await Promise.all([
-    db.client.findUnique({ where: { id: clientId }, select: { name: true, appearance: true, supportPhone: true, homeCity: true } }),
+    db.client.findUnique({ where: { id: clientId }, select: { name: true, appearance: true, supportPhone: true, homeCity: true, planRequired: true } }),
     db.planPurchase.findMany({ where: { clientId }, orderBy: { createdAt: "desc" } }),
     db.whatsAppNumber.count({ where: { clientId } }),
     db.user.count({ where: { clientId } }),
@@ -94,6 +94,9 @@ export default async function AccountPage() {
   ]);
 
   const s = summarize(rows, now);
+  const access = accessState(rows, client?.planRequired ?? false, now);
+  const renewFrom = s.active ?? s.lastEnded;
+  const pay = (await searchParams).pay;
   const fixedStart = s.paidThrough && s.paidThrough > now ? nextStart(rows, now) : null;
   const billing: BillingView = {
     status: s.status,
@@ -134,8 +137,16 @@ export default async function AccountPage() {
         note: r.note,
       }),
     ),
-    canPay: scope.canManage,
+    canPay: scope.manager,
     todayLabel: dayLabel(now),
+    access: {
+      state: access.state,
+      days: access.days,
+      locksOnLabel: access.state === "overdue" && access.endsAt ? label(new Date(access.endsAt.getTime() + GRACE_DAYS * DAY_MS)) : null,
+    },
+    renew: renewFrom ? { plan: renewFrom.plan as PlanKey, cycle: renewFrom.cycle as BillingCycle } : null,
+    isAdmin: scope.isAdmin,
+    autoPay: pay === "now" || pay === "ref" ? pay : null,
   };
 
   const appearance =
@@ -171,6 +182,8 @@ export default async function AccountPage() {
             clientId={clientId}
             clientName={client?.name ?? null}
             hasHistory={rows.some((r) => r.status === "VERIFIED")}
+            planRequired={client?.planRequired ?? false}
+            accessLabel={access.state}
           />
         ) : null
       }

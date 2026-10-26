@@ -14,7 +14,8 @@ import {
   verifyPlanPayment,
   type Actor,
 } from "../../src/lib/subscription";
-import { periodEnd, summarize, timeLeft } from "../../src/lib/subscription-core";
+import { accessState, openWhenLocked, periodEnd, summarize, timeLeft, type PurchaseLike } from "../../src/lib/subscription-core";
+import { clientAccess, lockedClientIds } from "../../src/lib/plan-access";
 
 const TZ = "Asia/Kolkata";
 const ist = (s: string) => fromZonedTime(s, TZ);
@@ -243,5 +244,78 @@ describe("plan payments", () => {
     assert.match((await planCapacityBlock(c.id, "num", ist("2026-12-01T00:00:00"))) ?? "", /plan ended/);
     const legacy = await newClient("legacy");
     assert.equal(await planCapacityBlock(legacy.id, "staff", NOW), null);
+  });
+});
+
+describe("access: due soon, overdue, locked, never paid", () => {
+  const period = (startIso: string, endIso: string, extra: Partial<PurchaseLike> = {}): PurchaseLike => ({
+    id: Math.random().toString(36).slice(2),
+    plan: "growth",
+    cycle: "m",
+    status: "VERIFIED",
+    startsAt: ist(startIso),
+    endsAt: ist(endIso),
+    createdAt: ist(startIso),
+    ...extra,
+  });
+  const growth = [period("2026-10-12T00:00:00", "2026-11-12T00:00:00")];
+
+  test("paid with more than 5 days left is ok; 5 days or fewer is due", () => {
+    assert.equal(accessState(growth, true, NOW).state, "ok");
+    const due = accessState(growth, true, ist("2026-11-08T12:00:00"));
+    assert.equal(due.state, "due");
+    assert.equal(due.days, 4);
+    assert.equal(due.locked, false);
+  });
+
+  test("due is not shown when the next period is already paid", () => {
+    const rows = [...growth, period("2026-11-12T00:00:00", "2026-12-12T00:00:00")];
+    assert.equal(accessState(rows, true, ist("2026-11-10T00:00:00")).state, "ok");
+  });
+
+  test("after the end: overdue for the grace days, then locked", () => {
+    const over = accessState(growth, true, ist("2026-11-13T00:00:00"));
+    assert.equal(over.state, "overdue");
+    assert.equal(over.locked, false);
+    const locked = accessState(growth, true, ist("2026-11-14T00:00:00"));
+    assert.equal(locked.state, "locked");
+    assert.equal(locked.locked, true);
+    assert.equal(locked.plan, "growth");
+  });
+
+  test("a payment waiting to be checked never unlocks", () => {
+    const rows = [...growth, { ...period("2026-11-20T00:00:00", "2026-11-20T00:00:00"), status: "PENDING", startsAt: null, endsAt: null }];
+    assert.equal(accessState(rows, true, ist("2026-11-20T00:00:00")).locked, true);
+  });
+
+  test("never paid: locked only when the business needs a plan", () => {
+    assert.equal(accessState([], true, NOW).state, "new");
+    assert.equal(accessState([], true, NOW).locked, true);
+    assert.equal(accessState([], false, NOW).state, "unmanaged");
+    assert.equal(accessState([], false, NOW).locked, false);
+  });
+
+  test("only Home, My account and Settings stay open", () => {
+    for (const p of ["/dashboard", "/dashboard/", "/dashboard/account", "/dashboard/account?pay=now", "/dashboard/settings", "/dashboard/settings/sheet"]) assert.equal(openWhenLocked(p), true, p);
+    for (const p of ["/dashboard/orders", "/dashboard/campaigns/new", "/dashboard/customers/abc", "/dashboard/accounts", "/dashboard/report", "/dashboard/guide"]) assert.equal(openWhenLocked(p), false, p);
+  });
+
+  test("locked businesses are found for the scheduler; old untracked ones are not", async () => {
+    const paid = await growthClient("lock-paid");
+    const neverPaid = await db.client.create({ data: { name: `Sub lock-new ${Date.now()} ${++seq}`, planRequired: true } });
+    const legacy = await newClient("lock-legacy");
+    const later = ist("2026-11-20T00:00:00");
+    const lockedNow = await lockedClientIds(NOW);
+    assert.equal(lockedNow.has(paid.id), false);
+    assert.equal(lockedNow.has(neverPaid.id), true);
+    assert.equal(lockedNow.has(legacy.id), false);
+    const lockedLater = await lockedClientIds(later);
+    assert.equal(lockedLater.has(paid.id), true, "Growth ended 12 Nov, past the grace days");
+    // Verifying a payment opens it again.
+    const sent = await submitPlanPayment(manager(paid.id), { clientId: paid.id, plan: "growth", cycle: "m", utr: utr() }, later);
+    assert.equal((await clientAccess(paid.id, later)).locked, true, "still locked while the payment is checked");
+    await verifyPlanPayment(admin, sent.id!, {}, later);
+    assert.equal((await clientAccess(paid.id, later)).locked, false);
+    assert.equal((await lockedClientIds(later)).has(paid.id), false);
   });
 });

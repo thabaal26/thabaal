@@ -19,6 +19,9 @@ import { AppearanceSync } from "@/components/appearance-sync";
 import { IconSetLink } from "@/components/icon-set-link";
 import { InlineScript } from "@/components/inline-script";
 import "./portal.css";
+import { PlanDueBar } from "./plan-due-bar";
+import { clientAccess } from "@/lib/plan-access";
+import { PLANS, inr } from "@/lib/account-plans";
 import { appearanceAttrs, appearanceDataset, appearanceScript, resolveAppearance } from "@/lib/appearance";
 
 /** The client whose look the dashboard wears: a client login's own, or the one an admin picked.
@@ -130,6 +133,11 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
       .catch(() => 0),
   ]);
 
+  // Plan payment state for the notice above each page (lib/plan-access.ts).
+  const access = scope.clientId ? await clientAccess(scope.clientId).catch(() => null) : null;
+  const renewPlan = access ? PLANS.find((p) => p.k === access.plan) : undefined;
+  const renewAmount = renewPlan ? inr(renewPlan.p[access?.cycle === "q" || access?.cycle === "y" ? access.cycle : "m"]) : null;
+
   const disabledSections = client?.disabledSections ?? [];
   const ordersOn = isSectionEnabled(disabledSections, "orders");
   const repliesOn = isSectionEnabled(disabledSections, "replies");
@@ -149,7 +157,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
   // A client without its own number: say so plainly (to the client too), never "demo mode".
   const notConnected = settings.provider === "META" && Boolean(client) && Boolean(sender?.cfg.notConnected);
 
-  const role: NavRole = !scope.isAdmin && scope.canOperate && !scope.canManage ? "staff" : "manager";
+  const role: NavRole = !scope.isAdmin && scope.operator && !scope.manager ? "staff" : "manager";
 
   // The real connection state, in plain words. Setup details are the admin's to fix.
   const dotLine = (tone: "ok" | "warn", text: string) => (
@@ -193,6 +201,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
             )}
             <div className="thin-scroll min-h-0 flex-1 overflow-y-auto px-3 py-3">
               <SideNav
+                planLocked={scope.planLocked}
                 isAdmin={scope.isAdmin}
                 showWallet={client?.billingMode === "wallet"}
                 disabledSections={disabledSections}
@@ -253,6 +262,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
               <div className="thabaal-portal">
                 <div className="wrapin">
                   {client?.billingMode === "wallet" && <WalletBanner clientId={client.id} lowAlert={client.walletLowAlert} />}
+                  {access && <PlanDueBar state={access.state} days={access.days} amount={renewAmount} isAdmin={scope.isAdmin} />}
                   {children}
                 </div>
               </div>
@@ -260,6 +270,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           </div>
           {callsOn && scope.canOperate && <CallWidget />}
           <BottomNav
+            planLocked={scope.planLocked}
             isAdmin={scope.isAdmin}
             showWallet={client?.billingMode === "wallet"}
             role={role}

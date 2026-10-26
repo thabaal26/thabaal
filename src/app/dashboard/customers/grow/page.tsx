@@ -13,6 +13,7 @@ import { fmtNumber } from "@/lib/format";
 import { joinLink, joinText } from "@/lib/optin";
 import { clientNumbers, numberLabel } from "@/lib/senders";
 import { getScope } from "@/lib/session";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Get more customers" };
 export const dynamic = "force-dynamic";
@@ -27,6 +28,8 @@ const SOURCES = [
 ];
 
 export default async function GrowPage({ searchParams }: PageProps<"/dashboard/customers/grow">) {
+  const locked = await planGate();
+  if (locked) return locked;
   const scope = await getScope();
   if (!scope.clientId) return <><PageHeader title="Get more customers" /><PickClientNotice what="opt-in QR codes" /></>;
   const raw = await searchParams;

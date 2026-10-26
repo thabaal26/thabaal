@@ -7,10 +7,13 @@ import { clientAccounts } from "@/lib/senders";
 import { getScope, owned } from "@/lib/session";
 import type { TemplateButton, VarMap } from "@/lib/template";
 import { TemplateEditor } from "../template-editor";
+import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "New template" };
 
 export default async function NewTemplatePage({ searchParams }: PageProps<"/dashboard/templates/new">) {
+  const locked = await planGate();
+  if (locked) return locked;
   const scope = await getScope();
   if (!scope.canManage) redirect("/dashboard/templates");
   if (!scope.clientId) return <><PageHeader title="New template" back={{ href: "/dashboard/templates", label: "Templates" }} /><PickClientNotice what="template" /></>;

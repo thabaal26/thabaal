@@ -7,8 +7,9 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "@/components/toast";
 import { CYCLE_NAMES, PLANS, inr, type BillingCycle, type PlanKey } from "@/lib/account-plans";
-import { confirmPlanPayment, declinePlanPayment, recordPaidPeriod } from "../actions/account";
+import { confirmPlanPayment, declinePlanPayment, recordPaidPeriod, requirePaidPlan } from "../actions/account";
 import { Pill } from "../portal-ui";
+import type { AccessState } from "@/lib/subscription-core";
 import type { AdminPendingRow } from "./billing-types";
 
 const planName = (k: string) => PLANS.find((p) => p.k === k)?.n ?? k;
@@ -150,16 +151,61 @@ function RecordPeriod({ clientId }: { clientId: string }) {
   );
 }
 
+const ACCESS_TEXT: Record<AccessState, string> = {
+  ok: "Paid: everything open",
+  due: "Paid, ending soon: everything open",
+  overdue: "Overdue: everything open for now, locks soon",
+  locked: "Locked: only Home, My account and Settings open",
+  new: "Never paid: only Home, My account and Settings open",
+  unmanaged: "No plan required yet: everything open",
+};
+
+/** Switch: must this business have a paid plan? New businesses start on; older ones stay off until switched on. */
+function PlanRequiredSwitch({ clientId, required, access }: { clientId: string; required: boolean; access: AccessState }) {
+  const router = useRouter();
+  const [busy, start] = useTransition();
+  return (
+    <div className="row" style={{ flexWrap: "wrap", gap: 12, marginTop: 6 }}>
+      <div className="grow" style={{ minWidth: 220 }}>
+        <div className="t">Needs a paid plan to use thabaal</div>
+        <div className="muted small">
+          Now: <b>{ACCESS_TEXT[access]}</b>. When on, a business with no paid period, or whose plan ended
+          more than the grace days ago, is locked to Home, My account and Settings. Record their paid period first if they already paid.
+        </div>
+      </div>
+      <button
+        type="button"
+        className="sw"
+        role="switch"
+        aria-checked={required}
+        aria-label="Needs a paid plan to use thabaal"
+        disabled={busy}
+        onClick={() =>
+          start(async () => {
+            const r = await requirePaidPlan(clientId, !required);
+            toast(r.ok, r.message);
+            if (r.ok) router.refresh();
+          })
+        }
+      />
+    </div>
+  );
+}
+
 export function AdminPlanPanel({
   rows,
   clientId,
   clientName,
   hasHistory,
+  planRequired = false,
+  accessLabel,
 }: {
   rows: AdminPendingRow[];
   clientId: string | null;
   clientName: string | null;
   hasHistory: boolean;
+  planRequired?: boolean;
+  accessLabel?: AccessState;
 }) {
   return (
     <div className="card" style={{ marginBottom: 16, borderLeft: "6px solid var(--bar2)" }}>
@@ -180,6 +226,7 @@ export function AdminPlanPanel({
           ))}
         </div>
       )}
+      {clientId && accessLabel && <PlanRequiredSwitch clientId={clientId} required={planRequired} access={accessLabel} />}
       {clientId ? (
         <details style={{ marginTop: 14 }} open={!hasHistory && rows.some((r) => !r.hasHistory)}>
           <summary className="small" style={{ cursor: "pointer", fontWeight: 600 }}>

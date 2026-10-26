@@ -10,6 +10,7 @@ import {
   cancelPlanPayment,
   recordExistingPeriod,
   rejectPlanPayment,
+  setPlanRequired,
   submitPlanPayment,
   verifyPlanPayment,
   type Actor,
@@ -30,7 +31,7 @@ export async function changePassword(current: string, next: string): Promise<Act
 
 export async function saveBillingDetails(data: BillingProfile): Promise<ActionResult> {
   try {
-    const scope = await requireManager(true);
+    const scope = await requireManager(true, { evenIfLocked: true });
     if ("denied" in scope) return { ok: false, message: scope.denied };
 
     const client = await db.client.findUnique({ where: { id: scope.clientId } });
@@ -118,7 +119,7 @@ export async function submitCustomWorkRequest(data: {
 /** Who is acting, from the session: never from anything the browser sends. */
 async function actor(): Promise<Actor> {
   const [scope, user] = await Promise.all([getScope(), requireUser()]);
-  return { isAdmin: scope.isAdmin, clientId: scope.clientId, canManage: scope.canManage, name: user.name || user.email };
+  return { isAdmin: scope.isAdmin, clientId: scope.clientId, canManage: scope.manager, name: user.name || user.email };
 }
 
 function done(r: SubResult): SubResult {
@@ -157,4 +158,9 @@ export async function declinePlanPayment(id: string, reason: string): Promise<Su
 /** Thabaal only: record a period a business paid for before plan payments were tracked. */
 export async function recordPaidPeriod(input: { clientId: string; plan: string; cycle: string; startDate: string; note?: string }): Promise<SubResult> {
   return done(await recordExistingPeriod(await actor(), input));
+}
+
+/** Thabaal only: whether this business must have a paid plan to use thabaal. */
+export async function requirePaidPlan(clientId: string, required: boolean): Promise<SubResult> {
+  return done(await setPlanRequired(await actor(), clientId, required));
 }
