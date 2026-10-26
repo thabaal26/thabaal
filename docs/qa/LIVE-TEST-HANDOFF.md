@@ -74,7 +74,11 @@ earlier work; this file is its memory. Read all of it before doing anything.
 
 ### Done on 26 Oct, branch `HomeNewUi` only (owner: "work only in HomeNewUi, don't push to main")
 
-09. **Habbat set-up: own customer list, Growth plan, logo (script only, NOT yet run on the live database).**
+09. **Habbat set-up: own customer list, Growth plan, logo (RUN ON THE LIVE DATABASE 26 Oct, 23:35 IST).**
+    Live result (Neon, new database): Habbat now has 1,168 customers, all tagged `habbat-guests`, none under any other
+    business (Thenan Oils 528, Cup N Saucer 1, QA Test Shop 1 unchanged); one VERIFIED monthly Growth period
+    (ADMIN_RECORD) ending 26 Nov 2026; `logoUrl` set; the one Habbat login is `habbat@gmail.com` (CLIENT/MANAGER).
+    Renew the plan before 26 Nov (My account › admin panel › record or confirm the next period).
     Every business already has its own customers (`Customer` is unique per `clientId`), so "a separate list synced
     with the Habbat login" means loading the guests under Habbat's `clientId`; any Habbat login then sees them and no
     other business does. `scripts/habbat-setup.ts` does it in one go and reuses the app's own `normalizePhone` and
