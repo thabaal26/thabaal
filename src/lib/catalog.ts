@@ -241,10 +241,16 @@ function saveOverride(clientId: string, productId: string, updates: Partial<Cata
   }
 }
 
+/**
+ * The made-up grocery items are shown only when DEMO_CATALOGUE=1 (for trying the portal). Without it a business
+ * that has no connected catalogue sees an empty list, never products it doesn't sell.
+ */
+const showDemoProducts = () => process.env.DEMO_CATALOGUE === "1";
+
 /** The demo catalogue (sends simulated) with any edits made in demo mode. */
 function demoProducts(clientId: string) {
   const overrides = getOverrides(clientId);
-  const base = DEFAULT_PRODUCTS.map((p) => {
+  const base = (showDemoProducts() ? DEFAULT_PRODUCTS : []).map((p) => {
     const ovr = overrides[p.id] || overrides[p.retailerId];
     return ovr ? { ...p, ...ovr } : p;
   }).filter((p) => !(p as { deleted?: boolean }).deleted);
@@ -602,7 +608,7 @@ export async function deleteCatalogProductItem(clientId: string, retailerId: str
 
 /** Every product in the catalogue linked to this WhatsApp Business Account, with its display price. */
 export async function listCatalogProducts(cfg: WaConfig): Promise<CatalogProduct[]> {
-  if (!cfg.live) return DEFAULT_PRODUCTS.map((p) => ({ retailerId: p.retailerId, name: p.name, price: p.price, inStock: p.inStock }));
+  if (!cfg.live) return (showDemoProducts() ? DEFAULT_PRODUCTS : []).map((p) => ({ retailerId: p.retailerId, name: p.name, price: p.price, inStock: p.inStock }));
   const catalogs = await metaGet<{ data: { id: string }[] }>(cfg, `${cfg.wabaId}/product_catalogs?fields=id`).catch(() => ({ data: [] }));
   const catalogId = catalogs.data?.[0]?.id;
   if (!catalogId) return []; // a live account without a catalogue has no products (never the demo list)

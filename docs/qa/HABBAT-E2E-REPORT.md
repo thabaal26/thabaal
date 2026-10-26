@@ -39,7 +39,7 @@ campaigns or taking real orders yet (see "Before the client logs in").
 1. **WhatsApp number and templates.** Settings says "No WhatsApp number connected yet. Your Thabaal admin adds it"
    (Clients page). Campaigns, chat replies and payment links stay unusable until a number is connected and templates
    are created and approved by Meta.
-2. **Demo products.** A business with no connected Meta catalogue is shown the app's 10 made-up grocery items
+2. **Demo products (fixed in code, live after the next deploy to `main`).** A business with no connected Meta catalogue is shown the app's 10 made-up grocery items
    (Basmati rice, Toor dal, bath towel...) on Products and in the New order form, with no "demo" label, and
    Settings counts them as 10 products. For a restaurant this looks wrong. Either add Habbat's real menu items, or
    switch Products (and Orders) off again for Habbat in Clients > sections.

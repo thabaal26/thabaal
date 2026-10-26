@@ -74,6 +74,13 @@ earlier work; this file is its memory. Read all of it before doing anything.
 
 ### Done on 26 Oct, branch `HomeNewUi` only (owner: "work only in HomeNewUi, don't push to main")
 
+11. **Demo products removed.** The made-up grocery items (`DEFAULT_PRODUCTS` in `catalog.ts`: Basmati rice, Toor dal,
+    towel...) were shown to every business with no connected Meta catalogue, including Habbat, on Products, the New
+    order form and the price-list message. They now show only when `DEMO_CATALOGUE=1` is set (documented in
+    `.env.example`, off by default), so an unconnected business sees an empty Products page ("No catalogue connected
+    yet") and the New order form offers "Something else (type it)". Products a business added itself in demo mode are
+    still listed; with a connected catalogue nothing changes (Meta stays the only source). Checked on the preview with
+    the test database; type check and unit checks pass. Needs deploy to `main` to take effect on the live site.
 10. **Habbat end-to-end test (no failures; report in `docs/qa/HABBAT-E2E-REPORT.md`).** Live data checks 20/20
     (read-only), unit 104/104, cross-business isolation 14/14, production build and type check clean, all 32 pages
     open, sign-in/out, customers, order `#HABB-1001`, campaign builder, Tamil/English, phone layout. Not testable:
