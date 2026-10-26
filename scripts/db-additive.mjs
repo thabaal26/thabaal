@@ -24,10 +24,34 @@ if (process.env.VERCEL !== "1") {
   console.log("db-additive: not a Vercel build, skipped");
   process.exit(0);
 }
+if (process.env.SKIP_DB_ADDITIVE === "1" || process.env.SKIP_DB_MIGRATIONS === "1") {
+  console.log("db-additive: skipped via SKIP_DB_ADDITIVE=1");
+  process.exit(0);
+}
 if (!process.env.DATABASE_URL) {
   console.error("db-additive: DATABASE_URL is not available during the build; add it for the Build step in Vercel");
   process.exit(1);
 }
+
+// Ensure directUrl fallback if DATABASE_URL_UNPOOLED is unset
+if (!process.env.DATABASE_URL_UNPOOLED) {
+  process.env.DATABASE_URL_UNPOOLED = process.env.DATABASE_URL;
+}
+
+const hostMatch = (process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL || "").match(/@([^:\/?]+)/);
+const host = hostMatch ? hostMatch[1] : "unknown";
+console.log(`db-additive: target database host: ${host}`);
+
+if (host.includes("ep-small-resonance")) {
+  console.error("================================================================================");
+  console.error("❌ CRITICAL CONFIGURATION ERROR:");
+  console.error("Vercel Environment Variable DATABASE_URL / DATABASE_URL_UNPOOLED is pointing to");
+  console.error("decommissioned Neon host 'ep-small-resonance-b7zydh3h'!");
+  console.error("Please update DATABASE_URL and DATABASE_URL_UNPOOLED in:");
+  console.error("Vercel -> Project Settings -> Environment Variables");
+  console.error("================================================================================");
+}
+
 // A pooled database can drop a connection now and then; each file is safe to run again, so retry twice.
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 for (const file of FILES) {
@@ -37,7 +61,13 @@ for (const file of FILES) {
       execSync(`npx prisma db execute --file ${file} --schema prisma/schema.prisma`, { stdio: "inherit" });
       break;
     } catch (e) {
-      if (attempt >= 3) throw e;
+      if (attempt >= 3) {
+        if (process.env.IGNORE_DB_ADDITIVE_ERROR === "1") {
+          console.warn(`db-additive: warning - failed executing ${file}, continuing because IGNORE_DB_ADDITIVE_ERROR=1`);
+          break;
+        }
+        throw e;
+      }
       await sleep(4000 * attempt);
     }
   }
