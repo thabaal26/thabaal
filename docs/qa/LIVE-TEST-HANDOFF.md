@@ -79,6 +79,10 @@ earlier work; this file is its memory. Read all of it before doing anything.
     business (Thenan Oils 528, Cup N Saucer 1, QA Test Shop 1 unchanged); one VERIFIED monthly Growth period
     (ADMIN_RECORD) ending 26 Nov 2026; `logoUrl` set; the one Habbat login is `habbat@gmail.com` (CLIENT/MANAGER).
     Renew the plan before 26 Nov (My account › admin panel › record or confirm the next period).
+    At 23:50 IST the owner asked for ALL sections on for Habbat: its `disabledSections` on the live database was set
+    from `[orders, catalogue, calls]` to `[]` (data change only, no code). Habbat has no win-back template and no
+    customer tagged `lapsed`, so no automatic messages go to the imported guests; the marketing-only behaviour in
+    item 07 stays in the code for any business that is switched back to a preset.
     Every business already has its own customers (`Customer` is unique per `clientId`), so "a separate list synced
     with the Habbat login" means loading the guests under Habbat's `clientId`; any Habbat login then sees them and no
     other business does. `scripts/habbat-setup.ts` does it in one go and reuses the app's own `normalizePhone` and
