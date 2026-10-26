@@ -27,6 +27,26 @@ if (process.env.SKIP_DB_ADDITIVE === "1" || process.env.SKIP_DB_MIGRATIONS === "
   console.log("db-additive: skipped via SKIP_DB_ADDITIVE=1");
   process.exit(0);
 }
+
+// Automatically map NEW_DATABASE_* (provisioned by Vercel Neon integration) if DATABASE_URL is missing or stale
+const activeUrl =
+  process.env.NEW_DATABASE_DATABASE_URL ||
+  process.env.NEW_DATABASE_POSTGRES_PRISMA_URL ||
+  process.env.NEW_DATABASE_POSTGRES_URL;
+const activeUnpooled =
+  process.env.NEW_DATABASE_DATABASE_URL_UNPOOLED ||
+  process.env.NEW_DATABASE_POSTGRES_URL_NON_POOLING ||
+  activeUrl;
+
+if (activeUrl && (!process.env.DATABASE_URL || process.env.DATABASE_URL.includes("ep-small-resonance"))) {
+  console.log("db-additive: auto-mapping DATABASE_URL to NEW_DATABASE_DATABASE_URL");
+  process.env.DATABASE_URL = activeUrl;
+}
+if (activeUnpooled && (!process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL_UNPOOLED.includes("ep-small-resonance"))) {
+  console.log("db-additive: auto-mapping DATABASE_URL_UNPOOLED to NEW_DATABASE_DATABASE_URL_UNPOOLED");
+  process.env.DATABASE_URL_UNPOOLED = activeUnpooled;
+}
+
 if (!process.env.DATABASE_URL) {
   console.error("db-additive: DATABASE_URL is not available during the build; add it for the Build step in Vercel");
   process.exit(1);

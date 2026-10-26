@@ -43,8 +43,22 @@ const isTransient = (e: unknown) => {
   return (code && TRANSIENT.has(code)) || /Server has closed the connection|Can't reach database server|Connection terminated|ECONNRESET/i.test(err?.message ?? "");
 };
 
+function getEffectiveDbUrl(): string | undefined {
+  const newDbUrl =
+    process.env.NEW_DATABASE_DATABASE_URL ||
+    process.env.NEW_DATABASE_POSTGRES_PRISMA_URL ||
+    process.env.NEW_DATABASE_POSTGRES_URL;
+
+  if (newDbUrl && (!process.env.DATABASE_URL || process.env.DATABASE_URL.includes("ep-small-resonance"))) {
+    process.env.DATABASE_URL = newDbUrl;
+    return newDbUrl;
+  }
+  return process.env.DATABASE_URL;
+}
+
 function makeClient() {
-  return new PrismaClient()
+  const url = getEffectiveDbUrl();
+  return new PrismaClient(url ? { datasources: { db: { url } } } : undefined)
     .$extends({
       query: {
         async $allOperations({ operation, args, query }) {
