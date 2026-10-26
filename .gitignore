@@ -57,3 +57,6 @@ next-env.d.ts
 # Local tools & scripts
 cloudflared.exe
 run-dev.bat
+
+# Customer lists we import for businesses: personal data, never committed
+/private-data/
