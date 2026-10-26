@@ -74,6 +74,22 @@ earlier work; this file is its memory. Read all of it before doing anything.
 
 ### Done on 26 Oct, branch `HomeNewUi` only (owner: "work only in HomeNewUi, don't push to main")
 
+09. **Habbat set-up: own customer list, Growth plan, logo (script only, NOT yet run on the live database).**
+    Every business already has its own customers (`Customer` is unique per `clientId`), so "a separate list synced
+    with the Habbat login" means loading the guests under Habbat's `clientId`; any Habbat login then sees them and no
+    other business does. `scripts/habbat-setup.ts` does it in one go and reuses the app's own `normalizePhone` and
+    `recordExistingPeriod`: imports the guest CSV (1,168 unique mobile numbers; 682 have no name, stored as "Guest";
+    8 addresses kept in `locationRaw`; tag `habbat-guests`), records one monthly Growth period from today (the same as
+    the admin "record paid period" panel), sets `logoUrl` to `/brands/habbat/mark.png` if none is set (square crop of
+    the flower; the full logo is `/brands/habbat/logo.jpg`). Safe to repeat: existing customers and an active plan are
+    left alone. Rehearsal by default; `--apply` writes; a non-local database also needs `--live`. Prints counts only.
+    The contacts CSV lives in `private-data/` (git-ignored; never commit it). Rehearsed twice on the throwaway test
+    database and checked in the preview as the Habbat test login: 1,168 customers, Growth active to 26 Nov, no Orders
+    or Products menus. The live run is done by the owner, so the live database address is never shown to Claude:
+    `npx tsx --env-file=.env scripts/habbat-setup.ts --client Habbat --csv private-data/habbat-contacts.csv` first
+    (rehearsal), then the same with `--apply --live`. The opt-in source says the numbers came from a restaurant guest
+    list, not a marketing sign-up: get Habbat's confirmation that guests agreed to WhatsApp messages before the first
+    campaign (Meta requires it). One 10-digit number that is not a mobile (does not start 6-9) was left out.
 08. **My account redesigned (UI only; no logic, actions or prices changed).** `account-view.tsx` is wrapped in
     `<div className="acct">` and `account.css` has a new scoped block at the end: wider page (1160px), calmer cards,
     icon usage meters with %, Growth highlighted on Change plan (first on phones), comparison table and payments
