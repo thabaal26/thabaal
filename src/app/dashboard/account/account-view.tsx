@@ -3,7 +3,7 @@
 import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "@/components/intent-link";
-import { Copy, ExternalLink, Inbox, MessageCircle, Printer, X } from "@/components/icons";
+import { Copy, ExternalLink, FileText, Inbox, Megaphone, MessageCircle, Printer, Users, X } from "@/components/icons";
 import { toast } from "@/components/toast";
 import { PortalPage, Pill, T } from "../portal-ui";
 import {
@@ -298,6 +298,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
         ) : null
       }
     >
+      <div className="acct">
       {adminPanel}
 
       {/* Where the account stands: every line here comes from stored, verified dates. */}
@@ -700,15 +701,19 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
             </div>
             <div className="grid g2">
               {[
-                { label: "WhatsApp numbers", labelTa: "வாட்ஸ்அப் எண்கள்", used: usage.numbers, limit: limits?.num ?? null },
-                { label: "Staff logins", labelTa: "ஊழியர் கணக்குகள்", used: usage.staff, limit: limits?.staff ?? null },
-                { label: "Campaigns this month", labelTa: "மாதப் பிரச்சாரங்கள்", used: usage.campaigns, limit: limits?.camp ?? null },
-                { label: "Active templates", labelTa: "செயலில் உள்ள டெம்ப்ளேட்கள்", used: usage.templates, limit: limits?.tmpl ?? null },
+                { label: "WhatsApp numbers", labelTa: "வாட்ஸ்அப் எண்கள்", used: usage.numbers, limit: limits?.num ?? null, Icon: MessageCircle, k: "wa" },
+                { label: "Staff logins", labelTa: "ஊழியர் கணக்குகள்", used: usage.staff, limit: limits?.staff ?? null, Icon: Users, k: "staff" },
+                { label: "Campaigns this month", labelTa: "மாதப் பிரச்சாரங்கள்", used: usage.campaigns, limit: limits?.camp ?? null, Icon: Megaphone, k: "camp" },
+                { label: "Active templates", labelTa: "செயலில் உள்ள டெம்ப்ளேட்கள்", used: usage.templates, limit: limits?.tmpl ?? null, Icon: FileText, k: "tmpl" },
               ].map((m, idx) => {
                 const pct = m.limit ? Math.min(100, Math.round((m.used / m.limit) * 100)) : 0;
                 const tone = pct >= 100 ? "hot" : pct >= 80 ? "mid" : "";
                 return (
                   <div key={idx} className={`meter ${tone}`}>
+                    <span className={`mic ${m.k}`} aria-hidden>
+                      <m.Icon className="size-5" />
+                    </span>
+                    <div className="mbody">
                     <div className="top2">
                       <span>
                         <T ta={m.labelTa}>{m.label}</T>
@@ -718,6 +723,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                     <div className="bar">
                       <i style={{ width: `${pct}%` }} />
                     </div>
+                    {m.limit ? <div className="mpct small muted">{pct}%</div> : null}
                     {pct >= 100 ? (
                       <div className="small" style={{ color: "var(--bad)", marginTop: 4 }}>
                         <T ta="முழுதும் முடிந்தது. கூடுதல் சேர்க்கவும் அல்லது பெரிய திட்டத்திற்கு மாறவும்.">Full. Add more or move to a bigger plan.</T>
@@ -727,6 +733,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                         <T ta="கிட்டத்தட்ட முடிவடைகிறது">Almost full</T>
                       </div>
                     ) : null}
+                    </div>
                   </div>
                 );
               })}
@@ -1477,7 +1484,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                       </div>
                     </div>
                     <a
-                      className="btn sm"
+                      className="btn sm ok"
                       href="https://wa.me/916379140626?text=Hi%20thabaal%2C%20I%20need%20help%20with%20my%20account"
                       target="_blank"
                       rel="noopener noreferrer"
@@ -2066,6 +2073,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
           </div>
         </div>
       )}
+      </div>
     </PortalPage>
   );
 }

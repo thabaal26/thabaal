@@ -74,6 +74,13 @@ earlier work; this file is its memory. Read all of it before doing anything.
 
 ### Done on 26 Oct, branch `HomeNewUi` only (owner: "work only in HomeNewUi, don't push to main")
 
+08. **My account redesigned (UI only; no logic, actions or prices changed).** `account-view.tsx` is wrapped in
+    `<div className="acct">` and `account.css` has a new scoped block at the end: wider page (1160px), calmer cards,
+    icon usage meters with %, Growth highlighted on Change plan (first on phones), comparison table and payments
+    table that read on phones, boxed inputs (typeless inputs had no border before). Button roles: yellow = the one
+    main action, navy = page-level action (header) and plan buttons, green = positive/outside links (WhatsApp,
+    Recharge on Meta, your current plan), outlined = everything else and notices, red = Stop or pause. Checked on a
+    separate preview copy against the throwaway test database (not the owner's dev server).
 07. **Marketing-only businesses (first one: Habbat).** Uses the existing per-business switch: Clients › sections ›
     preset "Templates & Campaigns (No Orders)" (`client-sections.ts`; hides Orders, Products, Calls, and Payments and
     Refills with Orders). Added: `planGate(section)` sends a business with that section off to Home, so orders,
