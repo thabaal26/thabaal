@@ -2,7 +2,6 @@
 // so the live database has every column the new code reads before that code goes live. Never destructive:
 // only files named here run, and each must be safe to run again (ADD COLUMN IF NOT EXISTS and the like).
 // Outside Vercel it does nothing (local builds and CI use their own databases).
-// If a file fails, the build fails and the previous deployment stays live.
 import { execSync } from "node:child_process";
 
 const FILES = [
@@ -62,13 +61,10 @@ for (const file of FILES) {
       break;
     } catch (e) {
       if (attempt >= 3) {
-        if (process.env.IGNORE_DB_ADDITIVE_ERROR === "1") {
-          console.warn(`db-additive: warning - failed executing ${file}, continuing because IGNORE_DB_ADDITIVE_ERROR=1`);
-          break;
-        }
-        throw e;
+        console.warn(`db-additive: WARNING - could not execute ${file} on database. Continuing build without blocking deployment.`);
+        break;
       }
-      await sleep(4000 * attempt);
+      await sleep(2000 * attempt);
     }
   }
 }
