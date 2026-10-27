@@ -5,6 +5,7 @@ import { APP_TZ } from "@/lib/format";
 import { getScope, requireUser } from "@/lib/session";
 import type { BillingCycle, BillingProfile, PlanKey } from "@/lib/account-plans";
 import { accessState, CYCLES, DAY_MS, GRACE_DAYS, nextStart, periodEnd, phaseOf, purchaseBlock, summarize, timeLeft, timeLeftLabel } from "@/lib/subscription-core";
+import { ConnectWhatsApp } from "../connect-whatsapp";
 import { PortalPage } from "../portal-ui";
 import { AccountView } from "./account-view";
 import { adminQueue } from "@/lib/admin-queue";
@@ -137,6 +138,8 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const customWorkRequests = Array.isArray(appearance.customWorkRequests) ? (appearance.customWorkRequests as never) : [];
 
   return (
+    <>
+    <ConnectWhatsApp />
     <AccountView
       billing={billing}
       usage={{ numbers, staff, campaigns: campaignsCount, templates: templatesCount }}
@@ -155,5 +158,6 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         ) : null
       }
     />
+    </>
   );
 }
