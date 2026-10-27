@@ -4,6 +4,7 @@ import { Wallet } from "@/components/icons";
 import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 import { Calendar3D, Messages3D, Rupee3D, Settings3D, Users3D, Wallet3D } from "@/components/icons-3d";
 import { Badge, Callout, Card, CardHeader, EmptyState, PageHeader, Stat, Table, Td, Th } from "@/components/ui";
+import { SUPPLIER_INFO } from "@/lib/account-plans";
 import { db } from "@/lib/db";
 import { APP_TZ, fmtDate } from "@/lib/format";
 import { getScope } from "@/lib/session";
@@ -147,7 +148,7 @@ async function AllWallets() {
       <Card className="card-3d">
         <CardHeader tone="violet" icon={<Rupee3D />} title="Payment details" description="Where clients pay their recharges. GST stays off until Thabaal's GSTIN is active." />
         <div className="p-4 sm:p-5">
-          <PaymentSettingsForm initial={{ upiId: settings?.walletUpiId ?? "", payee: settings?.walletPayee ?? "", gstEnabled: settings?.gstEnabled ?? false, gstin: settings?.gstin ?? "" }} />
+          <PaymentSettingsForm initial={{ upiId: settings?.walletUpiId || SUPPLIER_INFO.vpa, payee: settings?.walletPayee || SUPPLIER_INFO.legal, gstEnabled: settings?.gstEnabled ?? false, gstin: settings?.gstin ?? "" }} />
         </div>
       </Card>
     </>
@@ -230,7 +231,7 @@ async function ClientWallet({ clientId, isAdmin, canManage }: { clientId: string
           <Card className="card-3d mb-5">
             <CardHeader tone="brand" icon={<Rupee3D />} title="Add money" description="Pay by UPI, then send the transaction ID. The money is added once Thabaal confirms it." />
             <div className="p-4 sm:p-5">
-              <RechargeForm upiId={settings?.walletUpiId ?? null} payee={settings?.walletPayee ?? null} clientName={client.name} />
+              <RechargeForm upiId={settings?.walletUpiId || SUPPLIER_INFO.vpa} payee={settings?.walletPayee || SUPPLIER_INFO.legal} clientName={client.name} />
             </div>
           </Card>
         </ScrollReveal>
