@@ -27,6 +27,10 @@ export function SiteHeader({ lang, onToggleLang, onSelectLang }: SiteHeaderProps
       if (window.location.hash !== `#${targetId}`) {
         history.pushState(null, "", `#${targetId}`);
       }
+    } else {
+      // This page (sign-up) has no such section: open it on the sign-in page, which has them all.
+      e.preventDefault();
+      window.location.assign(`/login#${targetId}`);
     }
   };
 

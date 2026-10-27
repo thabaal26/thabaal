@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { clearLoginFailures, clientIp, loginBlockedFor, recordLoginFailure } from "@/lib/login-guard";
+import { clientAccess } from "@/lib/plan-access";
 import { createSession, destroySession } from "@/lib/session";
 
 export async function login(_: { error?: string; email?: string } | undefined, form: FormData) {
@@ -25,6 +26,11 @@ export async function login(_: { error?: string; email?: string } | undefined, f
 
   await clearLoginFailures(email);
   await createSession(user.id);
+  // A business that has never paid goes straight to choosing a package; everyone else lands on Home.
+  if (user.clientId && user.access === "MANAGER") {
+    const access = await clientAccess(user.clientId).catch(() => null);
+    if (access?.state === "new" && !access.pending) redirect("/dashboard/account?pay=now");
+  }
   redirect("/dashboard");
 }
 

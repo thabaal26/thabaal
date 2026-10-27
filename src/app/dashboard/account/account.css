@@ -694,3 +694,17 @@ html.dark .thabaal-portal select option {
    context. The plan dialogs and the access lock then sit under the phone header and bottom bar instead
    of over them. Let the fade release when it ends so the dialogs cover the whole screen. */
 .stagger > .thabaal-portal:has(.acct) { animation-fill-mode: backwards; }
+
+/* First-time path on the Change plan tab: choose a package, pay by UPI, account activated. */
+.thabaal-portal .acct .firststeps { list-style: none; margin: 0 0 18px; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.thabaal-portal .acct .firststeps li { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--card); color: var(--muted); }
+.thabaal-portal .acct .firststeps li b { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; background: var(--line); color: var(--fg); }
+.thabaal-portal .acct .firststeps li span { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-weight: 600; font-size: 14px; }
+.thabaal-portal .acct .firststeps li small { font-weight: 400; font-size: 12.5px; color: var(--muted); }
+.thabaal-portal .acct .firststeps li.on { border-color: var(--mango); color: var(--fg); box-shadow: 0 0 0 3px rgba(255, 195, 41, 0.18); }
+.thabaal-portal .acct .firststeps li.on b { background: var(--mango); color: #10283b; }
+.thabaal-portal .acct .firststeps li.done { color: var(--fg); }
+.thabaal-portal .acct .firststeps li.done b { background: var(--ok); color: var(--bg); }
+@media (max-width: 640px) {
+  .thabaal-portal .acct .firststeps { grid-template-columns: 1fr; gap: 8px; }
+}

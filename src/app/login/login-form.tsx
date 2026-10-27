@@ -200,8 +200,8 @@ export function LoginForm({ lang = "en" }: LoginFormProps) {
         {/* Sign up / Request Access */}
         <p className="thabaal-signup auth-foot">
           {isTamil ? "கணக்கு இல்லையா? " : "Don't have an account? "}
-          <a href="#start">
-            {isTamil ? "அணுகலைக் கோருங்கள்" : "Request access"}
+          <a href="/signup">
+            {isTamil ? "கணக்கை உருவாக்குங்கள்" : "Create account"}
           </a>
         </p>
       </form>
