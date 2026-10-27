@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { closeSignup, fetchCustomerToken, getSignup, subscribeToAccount } from "@/lib/meta-signup";
-import { requireAdmin } from "@/lib/session";
+import { closeSignup, fetchCustomerToken, getSignup, recordConnectStart, subscribeToAccount } from "@/lib/meta-signup";
+import { getScope, requireAdmin } from "@/lib/session";
 import { listPhoneNumbers, waConfig } from "@/lib/whatsapp";
 import { addClientNumber } from "./clients";
 import type { ActionResult } from "./templates";
@@ -75,6 +75,14 @@ export async function attachMetaSignup(signupId: string, clientId: string): Prom
       (subscribed ? "" : " Meta did not confirm the webhook subscription; use Refresh on their Clients card, and check that messages arrive.") +
       (problems.length ? ` Not added: ${problems.join(" ")}` : ""),
   };
+}
+
+/** A business owner or manager pressed "Connect your WhatsApp": remembered so Thabaal can match the new account to it. */
+export async function startMetaConnect(): Promise<ActionResult> {
+  const scope = await getScope();
+  if (!scope.clientId || !(scope.isAdmin || scope.manager)) return { ok: false };
+  await recordConnectStart(scope.clientId);
+  return { ok: true };
 }
 
 /** Thabaal admin: hide a WhatsApp account that isn't one of our businesses. It can't be attached afterwards. */

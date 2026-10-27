@@ -41,6 +41,45 @@ async function ensureTable() {
   ensured = true;
 }
 
+/** Thabaal's Meta-hosted Embedded Signup page (app and login configuration ids are public). META_SIGNUP_URL overrides it. */
+const DEFAULT_SIGNUP_URL =
+  "https://business.facebook.com/messaging/whatsapp/onboard/?app_id=1122787110109595&config_id=1151273253893793&extras=%7B%22sessionInfoVersion%22%3A%223%22%2C%22version%22%3A%22v4%22%7D";
+export const metaSignupUrl = () => {
+  const u = process.env.META_SIGNUP_URL?.trim();
+  return u && /^https:\/\/business\.facebook\.com\//.test(u) ? u : DEFAULT_SIGNUP_URL;
+};
+
+let connectEnsured = false;
+async function ensureConnectTable() {
+  if (connectEnsured) return;
+  await db.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "PortalMetaConnect" ("clientId" TEXT NOT NULL, "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+  connectEnsured = true;
+}
+
+/** A business pressed "Connect your WhatsApp": remembered so the new account can be matched to it. Never throws. */
+export async function recordConnectStart(clientId: string): Promise<void> {
+  try {
+    await ensureConnectTable();
+    await db.$executeRaw`INSERT INTO "PortalMetaConnect" ("clientId") VALUES (${clientId})`;
+  } catch {
+    // matching is a convenience only
+  }
+}
+
+/** Businesses that pressed Connect in the last few hours, newest first, once each. */
+export async function recentConnectStarts(hours = 6): Promise<{ clientId: string; at: string }[]> {
+  try {
+    await ensureConnectTable();
+    return await db.$queryRaw<{ clientId: string; at: string }[]>`
+      SELECT "clientId", MAX("createdAt")::text AS "at" FROM "PortalMetaConnect"
+      WHERE "createdAt" > NOW() - make_interval(hours => ${hours}::int)
+      GROUP BY "clientId" ORDER BY MAX("createdAt") DESC LIMIT 10
+    `;
+  } catch {
+    return [];
+  }
+}
+
 /** What a PARTNER_ADDED event says, or null for any other event. Meta's own field names; ids must be plain digits. */
 export function parsePartnerAdded(entryId: unknown, value: unknown): { wabaId: string; ownerBusinessId: string | null } | null {
   const v = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;

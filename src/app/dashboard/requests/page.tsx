@@ -9,7 +9,7 @@ import { APP_TZ } from "@/lib/format";
 import { getScope } from "@/lib/session";
 import { PendingRow } from "../account/admin-plan-panel";
 import { Pill, PortalPage } from "../portal-ui";
-import { listSignups } from "@/lib/meta-signup";
+import { listSignups, recentConnectStarts } from "@/lib/meta-signup";
 import { AttachSignup } from "./attach-signup";
 import { OpenBusiness } from "./open-business";
 
@@ -32,9 +32,10 @@ export default async function RequestsPage() {
   const now = new Date();
   const metaReady = Boolean(process.env.META_SYSTEM_USER_TOKEN?.trim() && process.env.META_APP_SECRET?.trim());
   const since = new Date(now.getTime() - NEW_DAYS * 86_400_000);
-  const [queue, signups, choices, fresh, decided] = await Promise.all([
+  const [queue, signups, starts, choices, fresh, decided] = await Promise.all([
     adminQueue(now, null),
     listSignups(),
+    recentConnectStarts(),
     db.client.findMany({ select: { id: true, name: true, _count: { select: { numbers: true } } }, orderBy: { name: "asc" } }),
     db.client.findMany({
       where: { createdAt: { gte: since } },
@@ -56,6 +57,10 @@ export default async function RequestsPage() {
       include: { client: { select: { name: true } } },
     }),
   ]);
+
+  // Businesses that pressed "Connect your WhatsApp" lately and still have no number: a likely owner for a new account.
+  const waiting = starts.map((s) => choices.find((c) => c.id === s.clientId)).filter((c): c is (typeof choices)[number] => Boolean(c && c._count.numbers === 0));
+  const suggestedId = waiting.length === 1 ? waiting[0].id : undefined;
 
   return (
     <PortalPage title="Requests" titleTa="கோரிக்கைகள்" sub="Payments to check and new businesses. New payments are also emailed to your inbox." subTa="சரிபார்க்க வேண்டிய பணம் மற்றும் புதிய வணிகங்கள். புதிய பணம் உங்கள் மின்னஞ்சலுக்கும் வரும்.">
@@ -98,6 +103,13 @@ export default async function RequestsPage() {
             Attach is switched off until <b>META_SYSTEM_USER_TOKEN</b> (Thabaal&apos;s system user token from Meta) is added in Vercel. New accounts are still listed here.
           </p>
         )}
+        {waiting.length > 0 && (
+          <p className="muted small" style={{ marginBottom: 8 }}>
+            {waiting.length
+              ? `Pressed Connect in the last 6 hours (not connected yet): ${waiting.map((c) => c.name).join(", ")}.${suggestedId ? " Picked for you below." : ""}`
+              : ""}
+          </p>
+        )}
         {signups.length > 0 ? (
           <div className="list">
             {signups.map((s) => {
@@ -114,7 +126,7 @@ export default async function RequestsPage() {
                     </div>
                   </div>
                   {s.status === "NEW" ? (
-                    <AttachSignup signupId={s.id} choices={choices.map((c) => ({ id: c.id, name: c.name, numbers: c._count.numbers }))} ready={metaReady} />
+                    <AttachSignup signupId={s.id} choices={choices.map((c) => ({ id: c.id, name: c.name, numbers: c._count.numbers }))} ready={metaReady} suggestedId={suggestedId} />
                   ) : (
                     <Pill tone={s.status === "ATTACHED" ? "ok" : "mute"}>{s.status === "ATTACHED" ? "Attached" : "Hidden"}</Pill>
                   )}

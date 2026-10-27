@@ -9,10 +9,10 @@ import { attachMetaSignup, ignoreMetaSignup } from "../actions/meta-signup";
 
 export type AttachChoice = { id: string; name: string; numbers: number };
 
-export function AttachSignup({ signupId, choices, ready }: { signupId: string; choices: AttachChoice[]; ready: boolean }) {
+export function AttachSignup({ signupId, choices, ready, suggestedId }: { signupId: string; choices: AttachChoice[]; ready: boolean; suggestedId?: string }) {
   const router = useRouter();
   const [busy, start] = useTransition();
-  const [clientId, setClientId] = useState("");
+  const [clientId, setClientId] = useState(suggestedId ?? "");
 
   const run = (fn: () => Promise<{ ok: boolean; message?: string }>) =>
     start(async () => {
