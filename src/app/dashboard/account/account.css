@@ -576,7 +576,7 @@ html.dark .thabaal-portal select option {
 .thabaal-portal .acct .hero > .card { display: flex; flex-direction: column; }
 .thabaal-portal .acct .hero > .card .tools { margin-top: auto; }
 .thabaal-portal .acct .plan-h .pn { font-size: 30px; }
-.thabaal-portal .acct .due { border-radius: 20px; padding: 24px; position: relative; overflow: hidden; background: linear-gradient(150deg, #10283b 0%, #17405c 100%); }
+.thabaal-portal .acct .due { border-radius: 20px; padding: 24px; justify-content: center; gap: 20px; position: relative; overflow: hidden; background: linear-gradient(150deg, #10283b 0%, #17405c 100%); }
 .thabaal-portal .acct .due::after { content: ""; position: absolute; right: -40px; top: -40px; width: 150px; height: 150px; border-radius: 50%; background: rgba(255, 195, 41, 0.12); pointer-events: none; }
 .thabaal-portal .acct .due .v { font-size: 34px; }
 .thabaal-portal .acct .due .btn.primary { background: #fff9f0; border-color: #fff9f0; color: #10283b; box-shadow: none; }
@@ -605,7 +605,10 @@ html.dark .thabaal-portal select option {
 .thabaal-portal .acct .plan .pr { font-size: 38px; }
 .thabaal-portal .acct .plan.pop { border-color: var(--mango); box-shadow: 0 0 0 4px rgba(255, 195, 41, 0.22), 0 24px 44px -28px rgba(16, 40, 59, 0.5); }
 .thabaal-portal .acct .plan.cur { border-color: var(--ok); box-shadow: 0 0 0 4px var(--ok-bg); }
-.thabaal-portal .acct .plan .tag { top: -13px; left: 22px; }
+.thabaal-portal .acct .plan .tag { top: -13px; left: 22px; z-index: 1; }
+/* The badge sits on the card's top border, so it must be solid: a see-through badge lets the border run through its text. */
+.thabaal-portal .acct .plan.cur .tag { background: var(--ok); border-color: var(--ok); color: var(--bg); box-shadow: 0 0 0 3px var(--card); }
+.thabaal-portal .acct .plan.pop .tag { background: var(--mango); border-color: var(--mango); color: #10283b; box-shadow: 0 0 0 3px var(--card); }
 .thabaal-portal .acct .plan ul { gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
 .thabaal-portal .acct .plan li { gap: 10px; align-items: flex-start; }
 .thabaal-portal .acct .plan li::before { content: "✓"; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ok-bg); color: var(--ok); font-size: 12px; margin-top: 1px; }
@@ -684,4 +687,24 @@ html.dark .thabaal-portal select option {
   .thabaal-portal .acct .tw table:not(.cmp) { min-width: 620px; }
   .thabaal-portal .acct .tw td, .thabaal-portal .acct .tw th { padding: 14px 14px; }
   .thabaal-portal .acct .tw { -webkit-overflow-scrolling: touch; }
-}.thabaal-portal .acct .tw td:nth-child(3) { white-space: nowrap; }
+}
+.thabaal-portal .acct .tw td:nth-child(3) { white-space: nowrap; }
+
+/* The page's fade-in keeps its last frame (fill-mode: both), which leaves this section as a stacking
+   context. The plan dialogs and the access lock then sit under the phone header and bottom bar instead
+   of over them. Let the fade release when it ends so the dialogs cover the whole screen. */
+.stagger > .thabaal-portal:has(.acct) { animation-fill-mode: backwards; }
+
+/* First-time path on the Change plan tab: choose a package, pay by UPI, account activated. */
+.thabaal-portal .acct .firststeps { list-style: none; margin: 0 0 18px; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.thabaal-portal .acct .firststeps li { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--card); color: var(--muted); }
+.thabaal-portal .acct .firststeps li b { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; background: var(--line); color: var(--fg); }
+.thabaal-portal .acct .firststeps li span { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-weight: 600; font-size: 14px; }
+.thabaal-portal .acct .firststeps li small { font-weight: 400; font-size: 12.5px; color: var(--muted); }
+.thabaal-portal .acct .firststeps li.on { border-color: var(--mango); color: var(--fg); box-shadow: 0 0 0 3px rgba(255, 195, 41, 0.18); }
+.thabaal-portal .acct .firststeps li.on b { background: var(--mango); color: #10283b; }
+.thabaal-portal .acct .firststeps li.done { color: var(--fg); }
+.thabaal-portal .acct .firststeps li.done b { background: var(--ok); color: var(--bg); }
+@media (max-width: 640px) {
+  .thabaal-portal .acct .firststeps { grid-template-columns: 1fr; gap: 8px; }
+}

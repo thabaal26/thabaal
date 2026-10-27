@@ -871,6 +871,38 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
       {/* ========================================================================= */}
       {activeTab === "plans" && (
         <section>
+          {/* A business that has never paid sees the whole path: package, UPI payment, then activation. */}
+          {!billing.active && !billing.lastEnded && !billing.scheduled && (
+            <ol className="firststeps" aria-label="How to start">
+              <li className={billing.pending ? "done" : "on"}>
+                <b>1</b>
+                <span>
+                  <T ta="தொகுப்பைத் தேர்வுசெய்க">Choose a package</T>
+                  <small>
+                    <T ta="மாதம், 3 மாதம் அல்லது 12 மாதம்">Monthly, 3 months or 12 months</T>
+                  </small>
+                </span>
+              </li>
+              <li className={billing.pending ? "done" : ""}>
+                <b>2</b>
+                <span>
+                  <T ta="UPI மூலம் செலுத்துங்கள்">Pay by UPI</T>
+                  <small>
+                    <T ta="QR ஸ்கேன் செய்து, UTR எண்ணை அனுப்புங்கள்">Scan the QR, then send the UTR number</T>
+                  </small>
+                </span>
+              </li>
+              <li className={billing.pending ? "on" : ""}>
+                <b>3</b>
+                <span>
+                  <T ta="கணக்கு செயல்படும்">Account activated</T>
+                  <small>
+                    <T ta="தபால் கட்டணத்தைச் சரிபார்த்தவுடன்">As soon as Thabaal verifies your payment</T>
+                  </small>
+                </span>
+              </li>
+            </ol>
+          )}
           <div className="tools" style={{ justifyContent: "space-between", marginBottom: 16 }}>
             <div>
               <div className="t" style={{ fontWeight: 600 }}>

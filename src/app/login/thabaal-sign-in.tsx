@@ -3,6 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import { LoginForm } from "./login-form";
+import { SignupForm } from "./signup-form";
 import { LoginIllustration } from "./login-illustration";
 import { LandingSections } from "./landing-sections";
 import { MascotIntro } from "./mascot-intro";
@@ -34,7 +35,7 @@ function getLangSnapshot(): "en" | "ta" {
   }
 }
 
-export function ThabaalSignIn() {
+export function ThabaalSignIn({ mode = "login" }: { mode?: "login" | "signup" }) {
   const syncedTheme = useSyncExternalStore(
     subscribeTheme,
     getThemeSnapshot,
@@ -129,7 +130,7 @@ export function ThabaalSignIn() {
           </div>
 
           {/* Credential Form. Privacy, terms and the rest are in the page footer below (one place, not two). */}
-          <LoginForm lang={lang} />
+          {mode === "signup" ? <SignupForm lang={lang} /> : <LoginForm lang={lang} />}
         </section>
 
         {/* RIGHT COLUMN: ANIMATED SKY WITH BIRD & TOGGLE */}
@@ -141,10 +142,10 @@ export function ThabaalSignIn() {
       </div>
 
       {/* Floating Attention "Scroll down to view" prompt with pulsing circle bar */}
-      <ScrollDownPrompt lang={lang} />
+      {mode === "login" && <ScrollDownPrompt lang={lang} />}
 
       {/* What Thabaal does: features, the order journey, pricing and questions, below the sign-in. */}
-      <LandingSections lang={lang} />
+      {mode === "login" && <LandingSections lang={lang} />}
     </main>
   );
 }

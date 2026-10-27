@@ -34,7 +34,10 @@ export async function proxy(request: NextRequest) {
   if (pathname === "/login" && ok && !request.nextUrl.searchParams.has("preview")) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
-  if (pathname === "/login" && token) {
+  if (pathname === "/signup" && ok) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+  if ((pathname === "/login" || pathname === "/signup") && token) {
     const res = NextResponse.next();
     res.cookies.delete(COOKIE);
     return res;
@@ -42,4 +45,4 @@ export async function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/dashboard/:path*", "/login"] };
+export const config = { matcher: ["/dashboard/:path*", "/login", "/signup"] };
