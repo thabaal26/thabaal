@@ -4,6 +4,7 @@ import { cache } from "react";
 import { CallWidget } from "@/components/call-widget";
 import { isSectionEnabled } from "@/lib/client-sections";
 import { db } from "@/lib/db";
+import { pendingSignupCount } from "@/lib/meta-signup";
 import { getScope, owned, ownedMessages, requireUser } from "@/lib/session";
 import { getSettings, isSimulated } from "@/lib/provider";
 import { senderFor } from "@/lib/senders";
@@ -132,7 +133,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
       })
       .catch(() => 0),
     // Thabaal only: plan payments clients sent for checking that nobody has verified yet (the Requests page).
-    scope.isAdmin ? db.planPurchase.count({ where: { status: "PENDING" } }).catch(() => 0) : 0,
+    scope.isAdmin ? Promise.all([db.planPurchase.count({ where: { status: "PENDING" } }).catch(() => 0), pendingSignupCount()]).then(([a, b]) => a + b) : 0,
   ]);
 
   // Plan payment state for the notice above each page (lib/plan-access.ts).

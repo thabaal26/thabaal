@@ -9,6 +9,8 @@ import { APP_TZ } from "@/lib/format";
 import { getScope } from "@/lib/session";
 import { PendingRow } from "../account/admin-plan-panel";
 import { Pill, PortalPage } from "../portal-ui";
+import { listSignups } from "@/lib/meta-signup";
+import { AttachSignup } from "./attach-signup";
 import { OpenBusiness } from "./open-business";
 
 export const metadata: Metadata = { title: "Requests" };
@@ -28,9 +30,12 @@ export default async function RequestsPage() {
   if (!scope.isAdmin) redirect("/dashboard");
 
   const now = new Date();
+  const metaReady = Boolean(process.env.META_SYSTEM_USER_TOKEN?.trim() && process.env.META_APP_SECRET?.trim());
   const since = new Date(now.getTime() - NEW_DAYS * 86_400_000);
-  const [queue, fresh, decided] = await Promise.all([
+  const [queue, signups, choices, fresh, decided] = await Promise.all([
     adminQueue(now, null),
+    listSignups(),
+    db.client.findMany({ select: { id: true, name: true, _count: { select: { numbers: true } } }, orderBy: { name: "asc" } }),
     db.client.findMany({
       where: { createdAt: { gte: since } },
       orderBy: { createdAt: "desc" },
@@ -72,6 +77,53 @@ export default async function RequestsPage() {
           </div>
         ) : (
           <p className="muted small">When a business presses &ldquo;Send for checking&rdquo;, it appears here straight away.</p>
+        )}
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="hd">
+          <div>
+            <h2 style={{ fontSize: 17 }}>New WhatsApp accounts</h2>
+            <p className="muted small">
+              Businesses that finished Meta&apos;s sign-up link and shared their WhatsApp account with Thabaal. Attach each one to its business. A
+              business that already has a number connected can&apos;t be picked.
+            </p>
+          </div>
+          <Pill tone={signups.some((s) => s.status === "NEW") ? "warn" : "ok"}>
+            {signups.some((s) => s.status === "NEW") ? `${signups.filter((s) => s.status === "NEW").length} waiting` : "Nothing waiting"}
+          </Pill>
+        </div>
+        {!metaReady && (
+          <p className="muted small" style={{ marginBottom: 8 }}>
+            Attach is switched off until <b>META_SYSTEM_USER_TOKEN</b> (Thabaal&apos;s system user token from Meta) is added in Vercel. New accounts are still listed here.
+          </p>
+        )}
+        {signups.length > 0 ? (
+          <div className="list">
+            {signups.map((s) => {
+              const who = choices.find((c) => c.id === s.clientId)?.name;
+              return (
+                <div key={s.id} className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+                  <div className="grow" style={{ minWidth: 220 }}>
+                    <div className="t">
+                      <b>WhatsApp account {s.wabaId}</b>
+                    </div>
+                    <div className="muted small">
+                      Customer business {s.ownerBusinessId ?? "unknown"} · received {when(new Date(s.createdAt))}
+                      {s.status === "ATTACHED" ? ` · attached to ${who ?? "a business"}` : s.status === "IGNORED" ? " · hidden" : ""}
+                    </div>
+                  </div>
+                  {s.status === "NEW" ? (
+                    <AttachSignup signupId={s.id} choices={choices.map((c) => ({ id: c.id, name: c.name, numbers: c._count.numbers }))} ready={metaReady} />
+                  ) : (
+                    <Pill tone={s.status === "ATTACHED" ? "ok" : "mute"}>{s.status === "ATTACHED" ? "Attached" : "Hidden"}</Pill>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="muted small">When a business completes the Meta sign-up link, its WhatsApp account appears here.</p>
         )}
       </div>
 
