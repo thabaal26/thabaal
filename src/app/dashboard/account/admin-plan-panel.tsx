@@ -14,7 +14,7 @@ import type { AdminPendingRow } from "./billing-types";
 
 const planName = (k: string) => PLANS.find((p) => p.k === k)?.n ?? k;
 
-function PendingRow({ row, showClient }: { row: AdminPendingRow; showClient: boolean }) {
+export function PendingRow({ row, showClient }: { row: AdminPendingRow; showClient: boolean }) {
   const router = useRouter();
   const [busy, start] = useTransition();
   const [startNow, setStartNow] = useState(false);

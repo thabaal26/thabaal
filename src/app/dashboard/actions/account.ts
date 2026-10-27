@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { createSession, getScope, requireManager, requireUser, revokeSessions } from "@/lib/session";
 import type { ActionResult } from "./templates";
-import type { BillingProfile } from "@/lib/account-plans";
+import { CYCLE_NAMES, type BillingProfile } from "@/lib/account-plans";
+import { isCycle, planDef } from "@/lib/subscription-core";
 import { sendEmail } from "@/lib/email";
 import {
   cancelPlanPayment,
@@ -164,7 +165,46 @@ function done(r: SubResult): SubResult {
 export async function sendPlanPayment(input: { plan: string; cycle: string; utr: string; payApp?: string; paidOn?: string }): Promise<SubResult> {
   const a = await actor();
   if (!a.clientId) return { ok: false, message: a.isAdmin ? "Pick a client in the sidebar first." : "Your login isn't linked to a business." };
-  return done(await submitPlanPayment(a, { ...input, clientId: a.clientId }));
+  const result = await submitPlanPayment(a, { ...input, clientId: a.clientId });
+  if (result.ok && result.id) await emailPlanPaymentToThabaal(result.id, a.clientId);
+  return done(result);
+}
+
+/**
+ * Tells Thabaal's inbox that a client sent a UPI payment to check. The payment is already saved as waiting, so
+ * a failed email never fails the client's submission: it is logged, and the payment still shows in the admin panel.
+ */
+async function emailPlanPaymentToThabaal(purchaseId: string, clientId: string) {
+  try {
+    const [row, client, user] = await Promise.all([
+      db.planPurchase.findUnique({ where: { id: purchaseId } }),
+      db.client.findUnique({ where: { id: clientId }, select: { name: true, appearance: true } }),
+      requireUser(),
+    ]);
+    if (!row) return;
+    const profile = (client?.appearance as { billingProfile?: { email?: string; mobile?: string } } | null)?.billingProfile;
+    const plan = planDef(row.plan)?.n ?? row.plan;
+    const cycle = isCycle(row.cycle) ? CYCLE_NAMES[row.cycle].en : row.cycle;
+    const mail = await sendEmail({
+      subject: `Plan payment to verify: ${client?.name ?? "business"} - ${plan} ${cycle} - Rs ${(row.amountPaise / 100).toLocaleString("en-IN")}`,
+      replyTo: profile?.email || user.email,
+      rows: [
+        ["Business", client?.name ?? "-"],
+        ["Plan", `${plan} (${cycle})`],
+        ["Amount to receive", `Rs ${(row.amountPaise / 100).toLocaleString("en-IN")}`],
+        ["UPI reference (UTR)", row.utr ?? "-"],
+        ["Paid on", row.paidOn ?? "-"],
+        ["Paid with", row.payApp ?? "-"],
+        ["Sent by", `${user.name ?? ""} <${user.email}>`],
+        ["Mobile", profile?.mobile ?? "-"],
+        ["Sent", new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })],
+        ["What to do", "Match the UTR and amount with your bank entry, then open https://www.thabaal.in/dashboard/requests and press \"Money received: verify\"."],
+      ],
+    });
+    if (!mail.ok) console.error("[plan payment] email to Thabaal failed:", mail.error);
+  } catch (err) {
+    console.error("[plan payment] email to Thabaal failed:", err instanceof Error ? err.message : err);
+  }
 }
 
 /** Withdraw a payment reference that hasn't been checked yet. */

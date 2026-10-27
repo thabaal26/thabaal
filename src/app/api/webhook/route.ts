@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { pushOrderToSheet, pushToGoogleSheet } from "@/lib/google-sheets-live";
 import { refreshNumberStatus } from "@/lib/limits";
 import { recordMetaAccountAlert } from "@/lib/meta-balance";
+import { recordMetaSignup } from "@/lib/meta-signup";
 import { explainError } from "@/lib/meta-errors";
 import { applyFailure } from "@/lib/rules";
 import { money, orderRef, orderWhereRef, recordOrder } from "@/lib/orders";
@@ -693,6 +694,8 @@ export async function POST(req: NextRequest) {
         console.warn(`WhatsApp ${change.field}`, JSON.stringify(v));
         const wabaId = String(entry.id ?? "");
         await recordMetaAccountAlert({ wabaId, field: change.field, value: v });
+        // A business finished Meta's hosted sign-up: keep it for Thabaal to attach on the Requests page. Never throws.
+        if (change.field === "account_update") await recordMetaSignup(entry.id, v);
         if (wabaId) {
           const numbers = await db.whatsAppNumber.findMany({
             where: { businessAccountId: wabaId },
