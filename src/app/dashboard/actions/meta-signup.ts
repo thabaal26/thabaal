@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { sendEmail } from "@/lib/email";
 import { closeSignup, fetchCustomerToken, getSignup, recordConnectStart, subscribeToAccount } from "@/lib/meta-signup";
 import { getScope, requireAdmin } from "@/lib/session";
 import { listPhoneNumbers, waConfig } from "@/lib/whatsapp";
@@ -67,6 +68,7 @@ export async function attachMetaSignup(signupId: string, clientId: string): Prom
   // 4. Webhooks for this account (best effort), then close the request.
   const subscribed = await subscribeToAccount(signup.wabaId, got.token);
   await closeSignup(signup.id, "ATTACHED", client.id, `${added.length} number(s) added`);
+  await emailAttached(client.id, client.name, added);
   refresh();
   return {
     ok: true,
@@ -75,6 +77,44 @@ export async function attachMetaSignup(signupId: string, clientId: string): Prom
       (subscribed ? "" : " Meta did not confirm the webhook subscription; use Refresh on their Clients card, and check that messages arrive.") +
       (problems.length ? ` Not added: ${problems.join(" ")}` : ""),
   };
+}
+
+/**
+ * After an account is attached: tell Thabaal, and tell the business's managers. Never throws and never blocks the attach.
+ * Resend's default sender only delivers to Thabaal's own address, so the customer's mail needs RESEND_FROM on a verified
+ * domain; until then it simply fails quietly and is logged.
+ */
+async function emailAttached(clientId: string, name: string, numbers: string[]): Promise<void> {
+  try {
+    const list = numbers.join(", ");
+    const mine = await sendEmail({
+      subject: `WhatsApp connected: ${name}`,
+      rows: [
+        ["Business", name],
+        ["Numbers", list],
+        ["Attached", new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })],
+        ["Next", "Check that messages arrive, and ask them to complete Meta business verification for higher limits."],
+      ],
+    });
+    if (!mine.ok) console.error("[meta attach] email to Thabaal failed:", mine.error);
+
+    const managers = await db.user.findMany({ where: { clientId, role: "CLIENT", access: "MANAGER" }, select: { email: true } });
+    for (const m of managers) {
+      const sent = await sendEmail({
+        to: m.email,
+        subject: `Your WhatsApp number is connected to thabaal`,
+        rows: [
+          ["Business", name],
+          ["Number", list],
+          ["What now", "Open https://www.thabaal.in/dashboard and start with your customers, chats and campaigns."],
+          ["Good to know", "Until your business is verified with Meta, your daily messaging limit stays low. Reply to this email and Thabaal will help you with the verification."],
+        ],
+      });
+      if (!sent.ok) console.error("[meta attach] email to customer failed:", sent.error);
+    }
+  } catch (err) {
+    console.error("[meta attach] email failed:", err instanceof Error ? err.message : err);
+  }
 }
 
 /** A business owner or manager pressed "Connect your WhatsApp": remembered so Thabaal can match the new account to it. */

@@ -2,9 +2,11 @@
 
 // Opens Meta's hosted WhatsApp sign-up in a new tab, and tells Thabaal which business pressed it.
 
+import { useRouter } from "next/navigation";
 import { startMetaConnect } from "./actions/meta-signup";
 
-export function ConnectLink({ url }: { url: string }) {
+export function ConnectLink({ url, label = "Connect your WhatsApp" }: { url: string; label?: string }) {
+  const router = useRouter();
   return (
     <a
       className="btn primary"
@@ -12,10 +14,13 @@ export function ConnectLink({ url }: { url: string }) {
       target="_blank"
       rel="noopener noreferrer"
       onClick={() => {
-        void startMetaConnect().catch(() => null);
+        // Remember the press, then refresh so the card switches to "Finish on Meta's page".
+        void startMetaConnect()
+          .then(() => router.refresh())
+          .catch(() => null);
       }}
     >
-      Connect your WhatsApp
+      {label}
     </a>
   );
 }

@@ -696,7 +696,7 @@ html.dark .thabaal-portal select option {
 .stagger > .thabaal-portal:has(.acct) { animation-fill-mode: backwards; }
 
 /* First-time path on the Change plan tab: choose a package, pay by UPI, account activated. */
-.thabaal-portal .acct .firststeps { list-style: none; margin: 0 0 18px; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.thabaal-portal .acct .firststeps { list-style: none; margin: 0 0 18px; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
 .thabaal-portal .acct .firststeps li { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--card); color: var(--muted); }
 .thabaal-portal .acct .firststeps li b { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; background: var(--line); color: var(--fg); }
 .thabaal-portal .acct .firststeps li span { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-weight: 600; font-size: 14px; }
