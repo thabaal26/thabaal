@@ -4,7 +4,10 @@ import { describe, test, before } from "node:test";
 import { db } from "../../src/lib/db";
 import {
   appSecretProof,
+  attachedRecently,
   closeSignup,
+  connectStartedRecently,
+  recordConnectStart,
   fetchCustomerToken,
   getSignup,
   listSignups,
@@ -105,5 +108,26 @@ describe("Meta hosted sign-up: fetching the customer's token", () => {
     assert.equal(await subscribeToAccount("5550001111", TOKEN, (async () => json({ success: true })) as never), true);
     assert.equal(await subscribeToAccount("5550001111", TOKEN, (async () => json({ error: { message: "x" } }, 400)) as never), false);
     assert.equal(await subscribeToAccount("5550001111", TOKEN, (async () => { throw new Error("offline"); }) as never), false);
+  });
+});
+
+describe("Meta hosted sign-up: what a business's card shows", () => {
+  test("remembers a press of Connect and a recent attach, per business", async () => {
+    const a = await db.client.upsert({ where: { name: "Meta Card Test A" }, update: {}, create: { name: "Meta Card Test A" } });
+    const b = await db.client.upsert({ where: { name: "Meta Card Test B" }, update: {}, create: { name: "Meta Card Test B" } });
+    await db.$executeRawUnsafe(`DROP TABLE IF EXISTS "PortalMetaConnect"`);
+
+    assert.equal(await connectStartedRecently(a.id), false);
+    await recordConnectStart(a.id);
+    assert.equal(await connectStartedRecently(a.id), true);
+    assert.equal(await connectStartedRecently(b.id), false, "another business's press does not count");
+    assert.equal(await connectStartedRecently(a.id, 0), false, "outside the window");
+
+    assert.equal(await attachedRecently(a.id), false);
+    await recordMetaSignup("5550003333", { event: "PARTNER_ADDED", waba_info: { waba_id: "5550003333", owner_business_id: "7770003333" } });
+    const s = (await listSignups()).find((x) => x.wabaId === "5550003333")!;
+    assert.equal(await closeSignup(s.id, "ATTACHED", a.id, "test"), true);
+    assert.equal(await attachedRecently(a.id), true);
+    assert.equal(await attachedRecently(b.id), false);
   });
 });

@@ -901,6 +901,15 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                   </small>
                 </span>
               </li>
+              <li>
+                <b>4</b>
+                <span>
+                  <T ta="WhatsApp இணைக்கவும்">Connect your WhatsApp</T>
+                  <small>
+                    <T ta="Facebook மூலம் உள்நுழைந்து உங்கள் எண்ணைச் சேர்க்கவும்">Sign in with Facebook and add your number</T>
+                  </small>
+                </span>
+              </li>
             </ol>
           )}
           <div className="tools" style={{ justifyContent: "space-between", marginBottom: 16 }}>

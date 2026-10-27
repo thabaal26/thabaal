@@ -80,6 +80,34 @@ export async function recentConnectStarts(hours = 6): Promise<{ clientId: string
   }
 }
 
+/** Did this business press "Connect your WhatsApp" lately? (Used to show "finish on Meta's page" on its card.) */
+export async function connectStartedRecently(clientId: string, hours = 24): Promise<boolean> {
+  try {
+    await ensureConnectTable();
+    const rows = await db.$queryRaw<{ n: number }[]>`
+      SELECT COUNT(*)::int AS n FROM "PortalMetaConnect"
+      WHERE "clientId" = ${clientId} AND "createdAt" > NOW() - make_interval(hours => ${hours}::int)
+    `;
+    return (rows[0]?.n ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
+/** Was a WhatsApp account attached to this business in the last few days? (Used to show "Connected" for a while.) */
+export async function attachedRecently(clientId: string, days = 7): Promise<boolean> {
+  try {
+    await ensureTable();
+    const rows = await db.$queryRaw<{ n: number }[]>`
+      SELECT COUNT(*)::int AS n FROM "PortalMetaSignup"
+      WHERE "clientId" = ${clientId} AND "status" = 'ATTACHED' AND "decidedAt" > NOW() - make_interval(days => ${days}::int)
+    `;
+    return (rows[0]?.n ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
 /** What a PARTNER_ADDED event says, or null for any other event. Meta's own field names; ids must be plain digits. */
 export function parsePartnerAdded(entryId: unknown, value: unknown): { wabaId: string; ownerBusinessId: string | null } | null {
   const v = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
