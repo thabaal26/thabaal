@@ -198,7 +198,7 @@ async function emailPlanPaymentToThabaal(purchaseId: string, clientId: string) {
         ["Sent by", `${user.name ?? ""} <${user.email}>`],
         ["Mobile", profile?.mobile ?? "-"],
         ["Sent", new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })],
-        ["What to do", "Match the UTR and amount in the bank entry, then open the client's My account > Money received and press Verify."],
+        ["What to do", "Match the UTR and amount with your bank entry, then open https://www.thabaal.in/dashboard/requests and press \"Money received: verify\"."],
       ],
     });
     if (!mail.ok) console.error("[plan payment] email to Thabaal failed:", mail.error);

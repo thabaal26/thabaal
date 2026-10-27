@@ -111,7 +111,7 @@ function ClientMark({ logoUrl, name }: { logoUrl?: string | null; name: string }
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
   await requireUser();
   const scope = await getScope();
-  const [settings, client, sender, clients, rawOpenReplies, rawOrdersToHandle, rawPaymentsToCheck] = await Promise.all([
+  const [settings, client, sender, clients, rawOpenReplies, rawOrdersToHandle, rawPaymentsToCheck, requestsToCheck] = await Promise.all([
     getSettings(),
     brandedClient(),
     scope.clientId ? senderFor(scope.clientId) : null,
@@ -131,6 +131,8 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
         },
       })
       .catch(() => 0),
+    // Thabaal only: plan payments clients sent for checking that nobody has verified yet (the Requests page).
+    scope.isAdmin ? db.planPurchase.count({ where: { status: "PENDING" } }).catch(() => 0) : 0,
   ]);
 
   // Plan payment state for the notice above each page (lib/plan-access.ts).
@@ -209,6 +211,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
                 newOrders={ordersToHandle}
                 unreadNotifications={unreadNotifications}
                 paymentsToCheck={paymentsToCheck}
+                requestsToCheck={requestsToCheck}
               />
               <Link href="/dashboard/guide" className="mt-4 block px-3 text-[12.5px] text-muted underline-offset-4 hover:text-ink hover:underline">
                 What changed in this menu
@@ -279,6 +282,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
             newOrders={ordersToHandle}
             unreadNotifications={unreadNotifications}
             paymentsToCheck={paymentsToCheck}
+            requestsToCheck={requestsToCheck}
           />
         </div>
       </ShellProvider>

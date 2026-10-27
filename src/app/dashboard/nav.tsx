@@ -5,6 +5,7 @@ import {
   Building2,
   FileText,
   Home,
+  Inbox,
   IndianRupee,
   Megaphone,
   Menu,
@@ -57,7 +58,10 @@ export const NAV: NavItem[] = [
   { href: "/dashboard/settings", label: "Settings", short: "Settings", icon: Settings, group: "Account", ta: "அமைப்புகள்" },
 ];
 
-const ADMIN_NAV: NavItem[] = [{ href: "/dashboard/clients", label: "Clients", short: "Clients", icon: Building2, group: "Account", ta: "நிறுவனங்கள்" }];
+const ADMIN_NAV: NavItem[] = [
+  { href: "/dashboard/requests", label: "Requests", short: "Requests", icon: Inbox, group: "Account", ta: "கோரிக்கைகள்" },
+  { href: "/dashboard/clients", label: "Clients", short: "Clients", icon: Building2, group: "Account", ta: "நிறுவனங்கள்" },
+];
 
 /** Thabaal wallet: admins, and clients billed through the wallet. */
 const WALLET_NAV: NavItem[] = [{ href: "/dashboard/wallet", label: "Wallet", short: "Wallet", icon: Wallet, group: "Account", ta: "வாலட்" }];
@@ -73,7 +77,7 @@ const PHONE_TABS = {
 };
 
 export type NavRole = keyof typeof PHONE_TABS;
-type Counts = { openReplies?: number; newOrders?: number; unreadNotifications?: number; paymentsToCheck?: number };
+type Counts = { openReplies?: number; newOrders?: number; unreadNotifications?: number; paymentsToCheck?: number; requestsToCheck?: number };
 
 /** The design's Tamil group headings. */
 const GROUP_TA: Record<string, string> = { Today: "இன்று", "Daily work": "தினசரி வேலை", Money: "பணம்", Grow: "வளர்ச்சி", Understand: "புரிந்துகொள்ள", Account: "கணக்கு" };
@@ -101,7 +105,9 @@ const countFor = (href: string, c: Counts) =>
       ? { n: c.newOrders, label: "orders to handle" }
       : href === "/dashboard/revenue"
         ? { n: c.paymentsToCheck, label: "payments to check" }
-        : null;
+        : href === "/dashboard/requests"
+          ? { n: c.requestsToCheck, label: "requests to check" }
+          : null;
 
 /** A small padlock beside sections closed while the plan is unpaid. */
 function LockMark({ className }: { className?: string }) {
@@ -125,6 +131,7 @@ export function SideNav({
   newOrders,
   unreadNotifications,
   paymentsToCheck,
+  requestsToCheck,
   planLocked = false,
 }: { isAdmin: boolean; showWallet?: boolean; disabledSections?: readonly string[]; planLocked?: boolean } & Counts) {
   const path = usePathname();
@@ -151,7 +158,7 @@ export function SideNav({
                 const { href, label, icon: Icon } = item;
                 const active = isActive(path, item);
                 const closed = planLocked && !openWhenLocked(href);
-                const count = closed ? null : countFor(href, { openReplies, newOrders, unreadNotifications, paymentsToCheck });
+                const count = closed ? null : countFor(href, { openReplies, newOrders, unreadNotifications, paymentsToCheck, requestsToCheck });
                 return (
                   <li key={href}>
                     <Link
@@ -196,6 +203,7 @@ export function BottomNav({
   newOrders,
   unreadNotifications,
   paymentsToCheck,
+  requestsToCheck,
   planLocked = false,
 }: { isAdmin: boolean; showWallet?: boolean; role: NavRole; disabledSections?: readonly string[]; planLocked?: boolean } & Counts) {
   const path = usePathname();
@@ -213,7 +221,7 @@ export function BottomNav({
   const more = all.filter((n) => !tabs.includes(n.href));
   const moreActive = more.some((n) => isActive(path, n));
   // Counts for sections that live under "More" show on the More tab too.
-  const hiddenCount = more.reduce((sum, n) => sum + (planLocked && !openWhenLocked(n.href) ? 0 : countFor(n.href, { openReplies, newOrders, unreadNotifications, paymentsToCheck })?.n ?? 0), 0);
+  const hiddenCount = more.reduce((sum, n) => sum + (planLocked && !openWhenLocked(n.href) ? 0 : countFor(n.href, { openReplies, newOrders, unreadNotifications, paymentsToCheck, requestsToCheck })?.n ?? 0), 0);
 
   const tabClass = (active: boolean) =>
     cn(
@@ -229,7 +237,7 @@ export function BottomNav({
           const { href, short, icon: Icon } = item;
           const active = isActive(path, item);
           const closed = planLocked && !openWhenLocked(href);
-          const count = closed ? null : countFor(href, { openReplies, newOrders, unreadNotifications, paymentsToCheck });
+          const count = closed ? null : countFor(href, { openReplies, newOrders, unreadNotifications, paymentsToCheck, requestsToCheck });
           return (
             <li key={href} className="min-w-0">
               <Link href={href} aria-current={active ? "page" : undefined} className={cn(tabClass(active), closed && !active && "opacity-55")}>
@@ -263,7 +271,7 @@ export function BottomNav({
           {more.map((item) => {
             const { href, label, icon: Icon } = item;
             const active = isActive(path, item);
-            const count = countFor(href, { openReplies, newOrders, unreadNotifications, paymentsToCheck });
+            const count = countFor(href, { openReplies, newOrders, unreadNotifications, paymentsToCheck, requestsToCheck });
             return (
               <li key={href}>
                 <Link
