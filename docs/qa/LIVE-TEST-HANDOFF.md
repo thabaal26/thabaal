@@ -74,7 +74,30 @@ earlier work; this file is its memory. Read all of it before doing anything.
 
 ### Done on 26 Oct, branch `HomeNewUi` only (owner: "work only in HomeNewUi, don't push to main")
 
-09. **Habbat set-up: own customer list, Growth plan, logo (script only, NOT yet run on the live database).**
+11. **Demo products removed.** The made-up grocery items (`DEFAULT_PRODUCTS` in `catalog.ts`: Basmati rice, Toor dal,
+    towel...) were shown to every business with no connected Meta catalogue, including Habbat, on Products, the New
+    order form and the price-list message. They now show only when `DEMO_CATALOGUE=1` is set (documented in
+    `.env.example`, off by default), so an unconnected business sees an empty Products page ("No catalogue connected
+    yet") and the New order form offers "Something else (type it)". Products a business added itself in demo mode are
+    still listed; with a connected catalogue nothing changes (Meta stays the only source). Checked on the preview with
+    the test database; type check and unit checks pass. Needs deploy to `main` to take effect on the live site.
+10. **Habbat end-to-end test (no failures; report in `docs/qa/HABBAT-E2E-REPORT.md`).** Live data checks 20/20
+    (read-only), unit 104/104, cross-business isolation 14/14, production build and type check clean, all 32 pages
+    open, sign-in/out, customers, order `#HABB-1001`, campaign builder, Tamil/English, phone layout. Not testable:
+    live sign-in as the Habbat login (owner does it), Vercel status (no access), any WhatsApp send (Habbat has no
+    number or templates yet). Open decisions before handing the login over: connect Habbat's WhatsApp number and add
+    templates; the app shows 10 made-up grocery products to any business with no Meta catalogue (add Habbat's menu or
+    switch Products/Orders off); confirm guest consent before the first campaign; 682 "Guest" names; change the
+    starting password; renew the plan by 26 Nov.
+09. **Habbat set-up: own customer list, Growth plan, logo (RUN ON THE LIVE DATABASE 26 Oct, 23:35 IST).**
+    Live result (Neon, new database): Habbat now has 1,168 customers, all tagged `habbat-guests`, none under any other
+    business (Thenan Oils 528, Cup N Saucer 1, QA Test Shop 1 unchanged); one VERIFIED monthly Growth period
+    (ADMIN_RECORD) ending 26 Nov 2026; `logoUrl` set; the one Habbat login is `habbat@gmail.com` (CLIENT/MANAGER).
+    Renew the plan before 26 Nov (My account › admin panel › record or confirm the next period).
+    At 23:50 IST the owner asked for ALL sections on for Habbat: its `disabledSections` on the live database was set
+    from `[orders, catalogue, calls]` to `[]` (data change only, no code). Habbat has no win-back template and no
+    customer tagged `lapsed`, so no automatic messages go to the imported guests; the marketing-only behaviour in
+    item 07 stays in the code for any business that is switched back to a preset.
     Every business already has its own customers (`Customer` is unique per `clientId`), so "a separate list synced
     with the Habbat login" means loading the guests under Habbat's `clientId`; any Habbat login then sees them and no
     other business does. `scripts/habbat-setup.ts` does it in one go and reuses the app's own `normalizePhone` and
