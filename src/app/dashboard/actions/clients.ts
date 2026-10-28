@@ -363,6 +363,31 @@ export async function deleteClientUser(userId: string): Promise<ActionResult> {
   return { ok: true, message: `${u.email} can no longer sign in.` };
 }
 
+/**
+ * Deletes a business and everything it owns: logins, WhatsApp numbers, customers, templates, campaigns,
+ * messages, orders, wallet and plan records. The admin must type the business name exactly to confirm.
+ */
+export async function deleteClient(clientId: string, typedName: string): Promise<ActionResult> {
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const c = await db.client.findUnique({ where: { id: clientId }, select: { id: true, name: true } });
+  if (!c) return { ok: false, message: "Client not found." };
+  if (typedName.trim() !== c.name) return { ok: false, message: `Nothing deleted. Type the business name exactly (${c.name}) to delete it.` };
+  await db.$transaction([
+    // Rows that point at the client without a database link, so the client's own delete can't reach them.
+    db.call.deleteMany({ where: { clientId } }),
+    db.loyaltyEntry.deleteMany({ where: { clientId } }),
+    db.paymentEvent.deleteMany({ where: { clientId } }),
+    // Campaigns go first: a campaign blocks deleting the template it uses.
+    db.campaign.deleteMany({ where: { clientId } }),
+    db.client.delete({ where: { id: clientId } }),
+  ]);
+  const jar = await cookies();
+  if (jar.get(CLIENT_COOKIE)?.value === clientId) jar.delete(CLIENT_COOKIE);
+  refresh();
+  return { ok: true, message: `${c.name} and all its data were deleted.` };
+}
+
 /** What a client login may do: Manager (everything for their business), Staff (orders, replies) or Viewer. */
 export async function setUserAccess(userId: string, access: Access): Promise<ActionResult> {
   const s = await requireAdmin();

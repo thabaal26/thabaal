@@ -22,6 +22,7 @@ import {
   addClientNumber,
   createClient,
   createClientUser,
+  deleteClient,
   findAccountNumbers,
   refreshClientNumbers,
   setDailyCap,
@@ -219,6 +220,31 @@ export function AccessSelect({ userId, access }: { userId: string; access: "MANA
       <option value="STAFF">Staff</option>
       <option value="VIEWER">Viewer</option>
     </select>
+  );
+}
+
+/** Deletes the whole business after the admin types its name; the name check is repeated on the server. */
+export function DeleteClientButton({ clientId, name }: { clientId: string; name: string }) {
+  const { pending, submit } = useSubmit();
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      loading={pending}
+      title="Delete this business"
+      aria-label={`Delete ${name}`}
+      onClick={async () => {
+        const typed = await promptText(
+          `This permanently deletes ${name} and all its data: logins, WhatsApp numbers, customers, templates, campaigns, messages, orders, wallet and plan records. It can't be undone.\n\nType the business name to confirm:`,
+          { label: "Business name", type: "text" },
+          { title: `Delete ${name}?`, confirmLabel: "Delete business", danger: true },
+        );
+        if (typed !== null) submit(() => deleteClient(clientId, typed));
+      }}
+    >
+      Delete
+    </Button>
   );
 }
 
