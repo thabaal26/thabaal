@@ -6,6 +6,7 @@ import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { revalidateTag, unstable_cache } from "next/cache";
 import { cache } from "react";
 import { APP_HOST, currentAppUrl, isOldAppUrl } from "./app-host";
+import { chooseCatalogId } from "./catalog-pick";
 import { db } from "./db";
 import { APP_TZ } from "./format";
 import { getSettings } from "./provider";
@@ -267,10 +268,30 @@ function demoProducts(clientId: string) {
   return [...base, ...addedMap.values()];
 }
 
-/** The catalogue connected to this WhatsApp Business Account, or null when none is. */
+/**
+ * The catalogue this WhatsApp Business Account works with, or null when none is reachable.
+ * First the catalogue Meta lists as connected; when that list is empty (Meta can return it empty even though
+ * the catalogue is connected in WhatsApp Manager), the only catalogue owned by the same business.
+ */
 async function catalogIdFor(cfg: WaConfig): Promise<string | null> {
-  const catalogs = await metaGet<{ data: { id: string }[] }>(cfg, `${cfg.wabaId}/product_catalogs?fields=id`);
-  return catalogs.data?.[0]?.id ?? null;
+  const connected = await metaGet<{ data?: { id: string }[] }>(cfg, `${cfg.wabaId}/product_catalogs?fields=id`);
+  const connectedIds = (connected.data ?? []).map((c) => c.id).filter(Boolean);
+  if (connectedIds.length > 0) return chooseCatalogId(connectedIds, []);
+  return chooseCatalogId([], await ownedCatalogIds(cfg));
+}
+
+/** Catalogues owned by the business that owns this WhatsApp account; empty when they can't be read. */
+async function ownedCatalogIds(cfg: WaConfig): Promise<string[]> {
+  try {
+    const waba = await metaGet<{ owner_business_info?: { id?: string } }>(cfg, `${cfg.wabaId}?fields=owner_business_info`);
+    const businessId = waba.owner_business_info?.id;
+    if (!businessId) return [];
+    const owned = await metaGet<{ data?: { id: string }[] }>(cfg, `${businessId}/owned_product_catalogs?fields=id&limit=5`);
+    return (owned.data ?? []).map((c) => c.id).filter(Boolean);
+  } catch (e) {
+    console.warn("Could not read the business's catalogues:", e);
+    return [];
+  }
 }
 
 type MetaProduct = {
@@ -609,8 +630,7 @@ export async function deleteCatalogProductItem(clientId: string, retailerId: str
 /** Every product in the catalogue linked to this WhatsApp Business Account, with its display price. */
 export async function listCatalogProducts(cfg: WaConfig): Promise<CatalogProduct[]> {
   if (!cfg.live) return (showDemoProducts() ? DEFAULT_PRODUCTS : []).map((p) => ({ retailerId: p.retailerId, name: p.name, price: p.price, inStock: p.inStock }));
-  const catalogs = await metaGet<{ data: { id: string }[] }>(cfg, `${cfg.wabaId}/product_catalogs?fields=id`).catch(() => ({ data: [] }));
-  const catalogId = catalogs.data?.[0]?.id;
+  const catalogId = await catalogIdFor(cfg).catch(() => null);
   if (!catalogId) return []; // a live account without a catalogue has no products (never the demo list)
   const out: CatalogProduct[] = [];
   let path: string | null = `${catalogId}/products?fields=retailer_id,name,price,availability&limit=100`;
