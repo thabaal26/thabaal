@@ -14,7 +14,7 @@ import { cleanOverrides, legacyOverrides, portalDefault } from "@/lib/appearance
 import { getSettings } from "@/lib/provider";
 import { ClientAppearance } from "../appearance-editor";
 import { deleteClientUser } from "../actions/clients";
-import { AccessSelect, AddLoginForm, AddNumberForm, BrandingForm, ClientSectionsForm, NewClientForm, NumberActions, RefreshNumbersButton, ResetPasswordButton, SendingRulesForm, TokenForm } from "./client-forms";
+import { AccessSelect, AddLoginForm, AddNumberForm, BrandingForm, ClientSectionsForm, DeleteClientButton, NewClientForm, NumberActions, RefreshNumbersButton, ResetPasswordButton, SendingRulesForm, TokenForm } from "./client-forms";
 
 export const metadata: Metadata = { title: "Clients" };
 export const dynamic = "force-dynamic";
@@ -126,6 +126,7 @@ export default async function ClientsPage() {
                       ) : (
                         <Badge tone="amber" dot>Uses default number</Badge>
                       )}
+                      <DeleteClientButton clientId={c.id} name={c.name} />
                     </div>
                   }
                 />
