@@ -5,7 +5,6 @@ import {
   Building2,
   FileText,
   Home,
-  Inbox,
   IndianRupee,
   Megaphone,
   Menu,
@@ -58,10 +57,8 @@ export const NAV: NavItem[] = [
   { href: "/dashboard/settings", label: "Settings", short: "Settings", icon: Settings, group: "Account", ta: "அமைப்புகள்" },
 ];
 
-const ADMIN_NAV: NavItem[] = [
-  { href: "/dashboard/requests", label: "Requests", short: "Requests", icon: Inbox, group: "Account", ta: "கோரிக்கைகள்" },
-  { href: "/dashboard/clients", label: "Clients", short: "Clients", icon: Building2, group: "Account", ta: "நிறுவனங்கள்" },
-];
+/** Thabaal's own work (clients, plan payments, requests) lives in the admin panel. */
+const ADMIN_NAV: NavItem[] = [{ href: "/admin", label: "Admin panel", short: "Admin", icon: Building2, group: "Account", ta: "நிர்வாகம்" }];
 
 /** Thabaal wallet: admins, and clients billed through the wallet. */
 const WALLET_NAV: NavItem[] = [{ href: "/dashboard/wallet", label: "Wallet", short: "Wallet", icon: Wallet, group: "Account", ta: "வாலட்" }];
@@ -105,7 +102,7 @@ const countFor = (href: string, c: Counts) =>
       ? { n: c.newOrders, label: "orders to handle" }
       : href === "/dashboard/revenue"
         ? { n: c.paymentsToCheck, label: "payments to check" }
-        : href === "/dashboard/requests"
+        : href === "/admin"
           ? { n: c.requestsToCheck, label: "requests to check" }
           : null;
 

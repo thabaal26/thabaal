@@ -76,9 +76,16 @@ export const requireUser = cache(async () => {
 export const SESSION_COOKIE = COOKIE;
 /** Admin-only: which client the admin is looking at. Absent means all clients. */
 export const CLIENT_COOKIE = "wp_client";
+/**
+ * CLIENT_COOKIE value "view:<clientId>": the admin panel's "Help a client" view. The admin sees that business's
+ * app exactly as its owner does (no admin menus) and nothing in it can be changed: every write is refused.
+ */
+export const VIEW_PREFIX = "view:";
 
 export type Scope = {
   isAdmin: boolean;
+  /** An admin looking at one business read-only ("Help a client"): no admin powers and no writes. */
+  viewOnly: boolean;
   /** Campaigns, templates, customers, automations: admins and client managers. False while the business is locked. */
   canManage: boolean;
   /** Orders, dispatch, replies: everyone but viewers. False while the business is locked. */
@@ -99,11 +106,28 @@ export type Scope = {
  */
 export const getScope = cache(async (): Promise<Scope> => {
   // An admin's picked client is looked up alongside the user rather than after it (client logins ignore it).
-  const picked = (await cookies()).get(CLIENT_COOKIE)?.value;
+  const raw = (await cookies()).get(CLIENT_COOKIE)?.value;
+  const viewing = raw?.startsWith(VIEW_PREFIX) ?? false;
+  const picked = viewing ? raw!.slice(VIEW_PREFIX.length) : raw;
   const [user, pickedClient] = await Promise.all([
     requireUser(),
     picked ? db.client.findUnique({ where: { id: picked }, select: { id: true, name: true } }) : null,
   ]);
+  if (user.role === "ADMIN" && viewing && pickedClient) {
+    // Read-only, as the owner sees it: their plan lock applies, and no admin menus or writes.
+    const planLocked = (await clientAccess(pickedClient.id)).locked;
+    return {
+      isAdmin: false,
+      viewOnly: true,
+      canManage: false,
+      canOperate: false,
+      planLocked,
+      manager: false,
+      operator: false,
+      clientId: pickedClient.id,
+      clientName: pickedClient.name,
+    };
+  }
   if (user.role === "CLIENT") {
     const manager = user.access === "MANAGER";
     const operator = user.access !== "VIEWER";
@@ -111,6 +135,7 @@ export const getScope = cache(async (): Promise<Scope> => {
     const planLocked = user.clientId ? (await clientAccess(user.clientId)).locked : false;
     return {
       isAdmin: false,
+      viewOnly: false,
       canManage: manager && !planLocked,
       canOperate: operator && !planLocked,
       planLocked,
@@ -122,6 +147,7 @@ export const getScope = cache(async (): Promise<Scope> => {
   }
   return {
     isAdmin: true,
+    viewOnly: false,
     canManage: true,
     canOperate: true,
     planLocked: false,
@@ -189,8 +215,17 @@ export function mine(s: Scope, clientId: string) {
 export async function requireAdmin(): Promise<Scope | Denied>;
 export async function requireAdmin(needClient: true): Promise<(Scope & { clientId: string }) | Denied>;
 export async function requireAdmin(needClient = false): Promise<Scope | Denied> {
-  const s = await getScope();
-  if (!s.isAdmin) return { denied: "Your account can view campaigns but not change them." };
-  if (needClient && !s.clientId) return { denied: "Pick a client in the sidebar first." };
-  return s;
+  // Decided by the login itself, not the view: an admin who has a business open read-only (Help a client)
+  // can still act in the admin panel, but that read-only view never shows these admin controls.
+  const [s, user] = await Promise.all([getScope(), requireUser()]);
+  if (user.role !== "ADMIN") return { denied: "Your account can view campaigns but not change them." };
+  if (needClient && (!s.clientId || s.viewOnly)) return { denied: "Pick a client in the sidebar first." };
+  return { ...s, isAdmin: true };
+}
+
+/** For admin panel pages: the signed-in admin, or off to their own dashboard / the sign-in page. */
+export async function requireAdminPage() {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") redirect("/dashboard");
+  return user;
 }

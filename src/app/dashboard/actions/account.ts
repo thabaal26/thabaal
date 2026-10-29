@@ -72,6 +72,7 @@ export async function submitCustomWorkRequest(data: {
 }): Promise<ActionResult> {
   try {
     const scope = await getScope();
+    if (scope.viewOnly) return { ok: false, message: "This is a read-only view. Nothing can be sent from here." };
     if (!data.description.trim()) {
       return { ok: false, message: "Please explain what you need in your own words." };
     }
@@ -144,16 +145,20 @@ export async function submitCustomWorkRequest(data: {
   }
 }
 
-/** Who is acting, from the session: never from anything the browser sends. */
+/**
+ * Who is acting, from the session: never from anything the browser sends. Admin rights come from the login, so
+ * the admin panel works while a business is open read-only elsewhere; that read-only view itself manages nothing.
+ */
 async function actor(): Promise<Actor> {
   const [scope, user] = await Promise.all([getScope(), requireUser()]);
-  return { isAdmin: scope.isAdmin, clientId: scope.clientId, canManage: scope.manager, name: user.name || user.email };
+  return { isAdmin: user.role === "ADMIN", clientId: scope.clientId, canManage: scope.manager, name: user.name || user.email };
 }
 
 function done(r: SubResult): SubResult {
   if (r.ok) {
     revalidatePath("/dashboard/account");
     revalidatePath("/dashboard", "layout");
+    revalidatePath("/admin", "layout");
   }
   return r;
 }
@@ -198,7 +203,7 @@ async function emailPlanPaymentToThabaal(purchaseId: string, clientId: string) {
         ["Sent by", `${user.name ?? ""} <${user.email}>`],
         ["Mobile", profile?.mobile ?? "-"],
         ["Sent", new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })],
-        ["What to do", "Match the UTR and amount with your bank entry, then open https://www.thabaal.in/dashboard/requests and press \"Money received: verify\"."],
+        ["What to do", "Match the UTR and amount with your bank entry, then open https://www.thabaal.in/admin/payments and press \"Money received: verify\"."],
       ],
     });
     if (!mail.ok) console.error("[plan payment] email to Thabaal failed:", mail.error);

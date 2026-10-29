@@ -1,0 +1,623 @@
+/*
+ * Thabaal admin panel: the approved admin design (thabaal-admin.html), on top of portal.css.
+ * The wrapper carries both .thabaal-portal (shared design: cards, rows, pills, buttons, colours, dark mode)
+ * and .thabaal-admin (the admin shell and the admin-only pieces below). Everything here is scoped to it.
+ */
+
+/* ---- shell: fixed left menu, one calm column of cards ---- */
+.thabaal-admin {
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.5 var(--ui);
+}
+.thabaal-admin .app {
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  min-height: 100dvh;
+}
+.thabaal-admin .side {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  overflow: auto;
+  padding: 20px 14px;
+  border-right: 1.5px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  background: var(--bg);
+}
+.thabaal-admin .logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px;
+  text-decoration: none;
+  color: var(--fg);
+}
+.thabaal-admin .logo img {
+  width: 40px;
+  height: auto;
+}
+.thabaal-admin .logo b {
+  font: 600 22px var(--display);
+  letter-spacing: -0.3px;
+}
+.thabaal-admin .logo .tag {
+  display: inline-block;
+  margin-left: 2px;
+  font: 700 10px/1.6 var(--ui);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+.thabaal-admin .anav {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.thabaal-admin .anav h4 {
+  margin: 0 0 4px;
+  padding: 0 10px;
+  font: 600 11px var(--ui);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.thabaal-admin .anav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  text-decoration: none;
+  font-weight: 500;
+  color: var(--fg);
+}
+.thabaal-admin .anav a svg,
+.thabaal-admin .ic {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+.thabaal-admin .anav a:hover {
+  background: var(--soft);
+}
+.thabaal-admin .anav a[aria-current="page"] {
+  background: var(--mango);
+  color: #10283b;
+  font-weight: 600;
+}
+.thabaal-admin .anav .n {
+  margin-left: auto;
+  background: var(--bad);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 1px 7px;
+  min-width: 20px;
+  text-align: center;
+}
+.thabaal-admin .anav a[aria-current="page"] .n {
+  background: #10283b;
+  color: #ffc329;
+}
+.thabaal-admin .anav .soon {
+  margin-left: auto;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--muted);
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  padding: 0 7px;
+}
+.thabaal-admin .side .foot {
+  margin-top: auto;
+  font-size: 12.5px;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 8px;
+}
+.thabaal-admin .live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.thabaal-admin .live i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #20c985;
+}
+.thabaal-admin .main {
+  min-width: 0;
+  padding: 22px max(20px, 4vw) 60px;
+}
+.thabaal-admin .wrapin {
+  max-width: 1080px;
+  margin: 0 auto;
+}
+.thabaal-admin .atop {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.thabaal-admin .atop h1 {
+  font: 600 clamp(26px, 3vw, 34px) / 1.1 var(--display);
+  margin: 0;
+}
+.thabaal-admin .atop .sub {
+  color: var(--muted);
+  margin-top: 6px;
+  max-width: 40em;
+}
+.thabaal-admin .atop .tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.thabaal-admin .viewing {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-radius: 14px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  background: var(--warn-bg);
+  border: 1.5px solid var(--bar2);
+}
+.thabaal-admin .viewing .grow {
+  flex: 1;
+  min-width: 200px;
+}
+
+/* ---- KPI cards ---- */
+.thabaal-admin .kpi {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.thabaal-admin .kpi .card {
+  padding: 16px 18px;
+}
+.thabaal-admin .kpi .l {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.thabaal-admin .kpi .v {
+  font: 600 clamp(23px, 2.5vw, 30px) / 1.1 var(--display);
+  margin-top: 5px;
+  font-variant-numeric: tabular-nums;
+}
+.thabaal-admin .kpi .d {
+  font-size: 12.5px;
+  margin-top: 3px;
+  font-weight: 600;
+}
+.thabaal-admin .kpi .d.up {
+  color: var(--ok);
+}
+.thabaal-admin .kpi .d.dn {
+  color: var(--bad);
+}
+.thabaal-admin .kpi .d.mute {
+  color: var(--muted);
+  font-weight: 500;
+}
+.thabaal-admin .kpi .sp {
+  margin-top: 8px;
+  height: 34px;
+}
+
+/* ---- layout grids ---- */
+.thabaal-admin .g6 {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1.6fr 1fr;
+}
+.thabaal-admin .g2x {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.thabaal-admin .mb16 {
+  margin-bottom: 16px;
+}
+
+/* ---- horizontal bars, donut ---- */
+.thabaal-admin .hb {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.thabaal-admin .hb .r {
+  display: grid;
+  grid-template-columns: 132px 1fr 84px;
+  gap: 10px;
+  align-items: center;
+  font-size: 13.5px;
+}
+.thabaal-admin .hb .r > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.thabaal-admin .hb .t {
+  background: var(--soft);
+  border-radius: 999px;
+  height: 16px;
+  overflow: hidden;
+}
+.thabaal-admin .hb .t i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+.thabaal-admin .hb b {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.thabaal-admin .don {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.thabaal-admin .don .lg {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 13.5px;
+  flex: 1;
+  min-width: 150px;
+}
+.thabaal-admin .don .lg div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.thabaal-admin .don .lg i {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  flex: none;
+}
+.thabaal-admin .don .lg b {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.thabaal-admin svg.chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.thabaal-admin svg.chart text {
+  fill: var(--muted);
+  font: 12px var(--ui);
+}
+.thabaal-admin svg.chart .vlab {
+  fill: var(--fg);
+}
+
+/* ---- data tables ---- */
+.thabaal-admin .tw {
+  overflow-x: auto;
+}
+.thabaal-admin table.dt {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+.thabaal-admin table.dt th {
+  position: sticky;
+  top: 0;
+  background: var(--card);
+  text-align: left;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  padding: 10px 12px;
+  border-bottom: 1.5px solid var(--line);
+  white-space: nowrap;
+  z-index: 1;
+}
+.thabaal-admin table.dt td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+.thabaal-admin table.dt tbody tr:last-child td {
+  border-bottom: 0;
+}
+.thabaal-admin table.dt tbody tr.go {
+  cursor: pointer;
+}
+.thabaal-admin table.dt tbody tr.go:hover {
+  background: var(--soft);
+}
+.thabaal-admin table.dt .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.thabaal-admin .who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+}
+.thabaal-admin .av {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--soft);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 13px var(--display);
+  flex: none;
+  border: 1.5px solid var(--line);
+}
+.thabaal-admin .who .n {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.thabaal-admin .who .s {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.thabaal-admin .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: none;
+}
+.thabaal-admin .mini {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--soft);
+  overflow: hidden;
+  min-width: 60px;
+}
+.thabaal-admin .mini i {
+  display: block;
+  height: 100%;
+}
+.thabaal-admin .filters {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.thabaal-admin .filters select {
+  width: auto;
+  min-width: 168px;
+  flex: 0 0 auto;
+}
+.thabaal-admin .filters .q {
+  flex: 1 1 240px;
+  min-width: 200px;
+}
+
+/* ---- timeline, funnel, heat ---- */
+.thabaal-admin .tl {
+  border-left: 2px solid var(--line);
+  margin-left: 7px;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.thabaal-admin .tl .e {
+  position: relative;
+}
+.thabaal-admin .tl .e::before {
+  content: "";
+  position: absolute;
+  left: -23px;
+  top: 5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--bar2);
+  border: 2px solid var(--card);
+}
+.thabaal-admin .tl .e.ok::before {
+  background: var(--ok);
+}
+.thabaal-admin .tl .e.bad::before {
+  background: var(--bad);
+}
+.thabaal-admin .tl .d {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.thabaal-admin .funnel {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.thabaal-admin .funnel .s {
+  background: var(--bar);
+  color: var(--bg);
+  border-radius: 10px;
+  padding: 9px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.thabaal-admin .funnel .s span {
+  margin-left: auto;
+  opacity: 0.85;
+  font-weight: 500;
+}
+.thabaal-admin .heat {
+  display: grid;
+  grid-template-columns: repeat(14, 1fr);
+  gap: 4px;
+}
+.thabaal-admin .heat i {
+  aspect-ratio: 1;
+  border-radius: 4px;
+  background: var(--soft);
+  display: block;
+}
+.thabaal-admin .heatlab {
+  display: grid;
+  grid-template-columns: repeat(14, 1fr);
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--muted);
+  text-align: center;
+  margin-top: 4px;
+}
+
+/* ---- tabs (client-side) ---- */
+.thabaal-admin .atabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1.5px solid var(--line);
+  margin: 0 0 20px;
+  overflow-x: auto;
+}
+.thabaal-admin .atabs button {
+  border: 0;
+  background: none;
+  padding: 10px 14px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1.5px;
+  white-space: nowrap;
+  font-size: 15px;
+}
+.thabaal-admin .atabs button[aria-selected="true"] {
+  color: var(--fg);
+  border-bottom-color: var(--mango);
+}
+.thabaal-admin .atabs button .n {
+  margin-left: 6px;
+  background: var(--bad);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 11px;
+  padding: 0 6px;
+}
+
+/* ---- "coming next" notice ---- */
+.thabaal-admin .next {
+  border: 1.5px dashed var(--line);
+  border-radius: 16px;
+  padding: 16px 18px;
+  background: var(--soft);
+}
+.thabaal-admin .next h3 {
+  font: 600 16px var(--display);
+  margin: 0 0 4px;
+}
+.thabaal-admin .next ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+/* ---- setup tools on a client page (app components, Tailwind-styled) ---- */
+.thabaal-admin .setup section + section {
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+  margin-top: 18px;
+}
+.thabaal-admin .setup h3 {
+  font: 700 12px var(--ui);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+@media (max-width: 1100px) {
+  .thabaal-admin .kpi {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .thabaal-admin .g6 {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 900px) {
+  .thabaal-admin .app {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .thabaal-admin .side {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1.5px solid var(--line);
+    padding: 12px 12px 8px;
+    gap: 8px;
+  }
+  .thabaal-admin .anav {
+    flex-direction: row;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+  }
+  .thabaal-admin .anav > div {
+    display: flex;
+    gap: 4px;
+  }
+  .thabaal-admin .anav h4,
+  .thabaal-admin .side .foot {
+    display: none;
+  }
+  .thabaal-admin .anav a {
+    white-space: nowrap;
+    padding: 8px 12px;
+    border: 1.5px solid var(--line);
+    border-radius: 999px;
+  }
+  .thabaal-admin .g2x {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .thabaal-admin .main {
+    padding: 16px 16px 50px;
+  }
+}
+@media (max-width: 760px) {
+  .thabaal-admin .hb .r {
+    grid-template-columns: 96px 1fr 70px;
+  }
+}

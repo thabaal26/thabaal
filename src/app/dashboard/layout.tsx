@@ -21,6 +21,7 @@ import { IconSetLink } from "@/components/icon-set-link";
 import { InlineScript } from "@/components/inline-script";
 import "./portal.css";
 import { PlanDueBar } from "./plan-due-bar";
+import { ViewOnlyBar } from "./view-only-bar";
 import { clientAccess } from "@/lib/plan-access";
 import { PLANS, inr } from "@/lib/account-plans";
 import { appearanceAttrs, appearanceDataset, appearanceScript, resolveAppearance } from "@/lib/appearance";
@@ -265,6 +266,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
               {/* Every page sits in the portal design (portal.css); pages built from it add their own frame. */}
               <div className="thabaal-portal">
                 <div className="wrapin">
+                  {scope.viewOnly && <ViewOnlyBar name={scope.clientName ?? "this business"} />}
                   {client?.billingMode === "wallet" && <WalletBanner clientId={client.id} lowAlert={client.walletLowAlert} />}
                   {access && <PlanDueBar state={access.state} days={access.days} amount={renewAmount} isAdmin={scope.isAdmin} />}
                   {children}

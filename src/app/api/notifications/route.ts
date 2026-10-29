@@ -203,7 +203,7 @@ export async function GET() {
           ? `${n.displayPhone || n.label} is paused to protect the number.`
           : `${n.displayPhone || n.label} quality dropped to yellow — monitor recent campaigns.`,
         timestamp: (n.statusCheckedAt ?? n.createdAt).toISOString(),
-        href: "/dashboard/clients",
+        href: "/admin/clients",
         unread: true,
         urgent: n.qualityRating === "RED",
       });

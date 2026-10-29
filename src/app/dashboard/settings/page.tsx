@@ -499,7 +499,7 @@ export default async function SettingsPage() {
             icon={<Sparkles3D />}
             title="Appearance"
             description="The portal's default look: icons, tiles, cards, buttons and charts. Each client can have its own look on the Clients page."
-            action={<Link href="/dashboard/clients" className={buttonClass("secondary", "sm")}>Per client</Link>}
+            action={<Link href="/admin/clients" className={buttonClass("secondary", "sm")}>Per client</Link>}
           />
           <div className="p-3.5 sm:p-5">
             <AppearanceEditor mode="portal" initial={portalDefault(settings.appearance)} />
@@ -507,7 +507,7 @@ export default async function SettingsPage() {
         </Card>
       </ScrollReveal>
     </>,
-    <Link className="btn" href="/dashboard/clients">
+    <Link className="btn" href="/admin/clients">
       <Building2 aria-hidden className="ic shrink-0" style={{ width: 15, height: 15 }} /> Clients
     </Link>,
   );

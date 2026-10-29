@@ -7,16 +7,22 @@ import { cookies } from "next/headers";
 import { businessTypeOf } from "@/lib/business-types";
 import { db } from "@/lib/db";
 import { CLIENT_SECTIONS, sanitizeDisabledSections } from "@/lib/client-sections";
-import { CLIENT_COOKIE, requireAdmin } from "@/lib/session";
+import { CLIENT_COOKIE, VIEW_PREFIX, requireAdmin } from "@/lib/session";
 import { HEX } from "@/lib/theme";
 import { enableMetaCalling, listPhoneNumbers, syncMetaBusinessProfile, waConfig } from "@/lib/whatsapp";
 import { refreshNumberStatus } from "@/lib/limits";
 import { planCapacityBlock } from "@/lib/subscription";
 import type { ActionResult } from "./templates";
 
-const refresh = () => revalidatePath("/dashboard", "layout");
+// These tools are used from the client dashboard and from the admin panel's client page.
+const refresh = () => {
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/admin", "layout");
+};
 
-/** Admin's client switcher. An empty id shows every client. */
+const PICK_COOKIE = { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 365 } as const;
+
+/** Admin's client switcher. An empty id shows every client. Also ends a read-only "Help a client" view. */
 export async function setActiveClient(clientId: string): Promise<ActionResult> {
   const s = await requireAdmin();
   if ("denied" in s) return { ok: false, message: s.denied };
@@ -24,8 +30,29 @@ export async function setActiveClient(clientId: string): Promise<ActionResult> {
   if (!clientId) jar.delete(CLIENT_COOKIE);
   else {
     if (!(await db.client.findUnique({ where: { id: clientId } }))) return { ok: false, message: "Client not found." };
-    jar.set(CLIENT_COOKIE, clientId, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 365 });
+    jar.set(CLIENT_COOKIE, clientId, PICK_COOKIE);
   }
+  refresh();
+  return { ok: true };
+}
+
+/** Admin panel › Help a client: open this business's app read-only, exactly as its owner sees it. */
+export async function viewClientAs(clientId: string): Promise<ActionResult> {
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  if (!clientId || !(await db.client.findUnique({ where: { id: clientId }, select: { id: true } }))) return { ok: false, message: "Client not found." };
+  // Short-lived on purpose: a forgotten view ends by itself.
+  (await cookies()).set(CLIENT_COOKIE, VIEW_PREFIX + clientId, { ...PICK_COOKIE, maxAge: 60 * 60 * 8 });
+  refresh();
+  return { ok: true };
+}
+
+/** Ends the read-only view and returns the admin to all clients. */
+export async function leaveClientView(): Promise<ActionResult> {
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const jar = await cookies();
+  if (jar.get(CLIENT_COOKIE)?.value?.startsWith(VIEW_PREFIX)) jar.delete(CLIENT_COOKIE);
   refresh();
   return { ok: true };
 }
@@ -383,7 +410,8 @@ export async function deleteClient(clientId: string, typedName: string): Promise
     db.client.delete({ where: { id: clientId } }),
   ]);
   const jar = await cookies();
-  if (jar.get(CLIENT_COOKIE)?.value === clientId) jar.delete(CLIENT_COOKIE);
+  const picked = jar.get(CLIENT_COOKIE)?.value;
+  if (picked === clientId || picked === VIEW_PREFIX + clientId) jar.delete(CLIENT_COOKIE);
   refresh();
   return { ok: true, message: `${c.name} and all its data were deleted.` };
 }

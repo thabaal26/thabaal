@@ -23,10 +23,11 @@ export async function proxy(request: NextRequest) {
   // A button pressed after the session expired: let the server action answer. It checks the session itself
   // (requireUser) and sends the browser to /login in a way Next understands; a plain redirect here made the
   // action fail with "couldn't reach Thabaal" instead. Actions can be posted to any path, so this opens nothing.
-  if (pathname.startsWith("/dashboard") && !ok && request.method === "POST" && request.headers.has("next-action")) {
+  const app = pathname.startsWith("/dashboard") || pathname === "/admin" || pathname.startsWith("/admin/");
+  if (app && !ok && request.method === "POST" && request.headers.has("next-action")) {
     return NextResponse.next();
   }
-  if (pathname.startsWith("/dashboard") && !ok) {
+  if (app && !ok) {
     const res = NextResponse.redirect(new URL("/login", request.url));
     if (token) res.cookies.delete(COOKIE); // expired or forged: clear it so /login doesn't bounce back
     return res;
@@ -45,4 +46,4 @@ export async function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/dashboard/:path*", "/login", "/signup"] };
+export const config = { matcher: ["/dashboard/:path*", "/admin/:path*", "/login", "/signup"] };
