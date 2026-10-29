@@ -489,22 +489,42 @@ const DEMO_DATA: Record<"overview" | "campaign" | "payments", DemoDataset> = {
 const FAQ_ITEMS: { q: T; a: T }[] = [
   {
     q: {
-      en: "How do analytics help my business?",
-      ta: "அறிக்கைகள் எனது வணிகத்திற்கு எவ்வாறு உதவுகின்றன?",
+      en: "How much does Thabaal cost?",
+      ta: "தபாலின் கட்டணம் எவ்வளவு?",
     },
     a: {
-      en: "They put message reach, customer response, orders, recorded sales and message spend in one understandable view. Use that picture to improve your next offer and decide where to spend—not as a guarantee that every sale came from a message.",
-      ta: "செய்தி சென்றடைந்தது, வாடிக்கையாளர் பதில்கள், ஆர்டர்கள், விற்பனை மற்றும் செய்திச் செலவு ஆகியவற்றை ஒரே எளிய பார்வையில் வைக்கின்றன. அடுத்த சலுகையை மேம்படுத்தவும், எங்கு செலவிட வேண்டும் என்பதைத் தீர்மானிக்கவும் இந்த விவரங்களைப் பயன்படுத்துங்கள்.",
+      en: "Thabaal has three plans: Starter at INR 1,199, Growth at INR 2,999 and Business at INR 4,999 per month, all with GST included. Quarterly billing saves 10% and yearly billing saves 20%.",
+      ta: "தபாலில் மூன்று திட்டங்கள் உள்ளன: ஸ்டார்ட்டர் மாதம் ₹1,199, வளர்ச்சி ₹2,999, பிசினஸ் ₹4,999—அனைத்தும் GST உள்ளிட்டவை. காலாண்டு கட்டணத்தில் 10%, வருடாந்திர கட்டணத்தில் 20% சேமிக்கலாம்.",
     },
   },
   {
     q: {
-      en: "Can I follow orders from my catalogue?",
-      ta: "எனது கேட்லாக்கிலிருந்து வரும் ஆர்டர்களைப் பின்தொடர முடியுமா?",
+      en: "Do you add to Meta’s WhatsApp message rate?",
+      ta: "மெட்டாவின் வாட்ஸ்அப் செய்திக் கட்டணத்தில் கூடுதல் கட்டணம் சேர்க்கிறீர்களா?",
     },
     a: {
-      en: "Yes. Thabaal brings catalogue products and customer orders together, with order, payment and fulfilment progress you can follow.",
-      ta: "ஆம். கேட்லாக் தயாரிப்புகளையும் வாடிக்கையாளர் ஆர்டர்களையும் தபால் ஒன்றாக இணைக்கிறது; ஆர்டர், பேமெண்ட் மற்றும் டெலிவரி முன்னேற்றத்தை எளிதாகப் பின்தொடரலாம்.",
+      en: "No—not one paisa. Meta’s official message charges pass through without a Thabaal markup; your Thabaal plan fee is separate.",
+      ta: "இல்லை—ஒரு பைசா கூட இல்லை. மெட்டாவின் அதிகாரப்பூர்வ செய்திக் கட்டணங்கள் தபாலின் கூடுதல் லாபம் எதுவுமின்றி நேரடியாக கணக்கிடப்படுகின்றன; தபால் மென்பொருள் திட்டக் கட்டணம் மட்டுமே தனியானது.",
+    },
+  },
+  {
+    q: {
+      en: "Is there a setup fee?",
+      ta: "செட்டப் கட்டணம் உள்ளதா?",
+    },
+    a: {
+      en: "Official WhatsApp setup and onboarding is free on Quarterly and Yearly plans. On the Monthly plan it is a one-time INR 299.",
+      ta: "அதிகாரப்பூர்வ வாட்ஸ்அப் செட்டப் மற்றும் ஆன்போர்டிங் காலாண்டு, வருடாந்திர திட்டங்களில் இலவசம். மாதாந்திர திட்டத்தில் ஒருமுறை ₹299 மட்டும்.",
+    },
+  },
+  {
+    q: {
+      en: "Can I use my existing WhatsApp number?",
+      ta: "என் ஏற்கனவே உள்ள வாட்ஸ்அப் எண்ணைப் பயன்படுத்தலாமா?",
+    },
+    a: {
+      en: "Yes. Your number can be moved onto the official WhatsApp Business API through Thabaal. Once moved, it runs through Thabaal and no longer works in the regular WhatsApp app.",
+      ta: "ஆம். உங்கள் எண்ணை தபால் மூலம் அதிகாரப்பூர்வ வாட்ஸ்அப் பிசினஸ் API-க்கு மாற்றலாம். மாற்றிய பிறகு அது தபால் வழியாகவே இயங்கும்; வழக்கமான வாட்ஸ்அப் செயலியில் இனி வேலை செய்யாது.",
     },
   },
   {
@@ -519,12 +539,32 @@ const FAQ_ITEMS: { q: T; a: T }[] = [
   },
   {
     q: {
-      en: "Do you add to Meta’s WhatsApp message rate?",
-      ta: "மெட்டாவின் வாட்ஸ்அப் செய்திக் கட்டணத்தில் கூடுதல் கட்டணம் சேர்க்கிறீர்களா?",
+      en: "Can I follow orders from my catalogue?",
+      ta: "எனது கேட்லாக்கிலிருந்து வரும் ஆர்டர்களைப் பின்தொடர முடியுமா?",
     },
     a: {
-      en: "No—not one paisa. Meta’s official message charges pass through without a Thabaal markup; your Thabaal plan fee is separate.",
-      ta: "இல்லை—ஒரு பைசா கூட இல்லை. மெட்டாவின் அதிகாரப்பூர்வ செய்திக் கட்டணங்கள் தபாலின் கூடுதல் லாபம் எதுவுமின்றி நேரடியாக கணக்கிடப்படுகின்றன; தபால் மென்பொருள் திட்டக் கட்டணம் மட்டுமே தனியானது.",
+      en: "Yes. Thabaal brings catalogue products and customer orders together, with order, payment and fulfilment progress you can follow.",
+      ta: "ஆம். கேட்லாக் தயாரிப்புகளையும் வாடிக்கையாளர் ஆர்டர்களையும் தபால் ஒன்றாக இணைக்கிறது; ஆர்டர், பேமெண்ட் மற்றும் டெலிவரி முன்னேற்றத்தை எளிதாகப் பின்தொடரலாம்.",
+    },
+  },
+  {
+    q: {
+      en: "Can I add more staff logins or WhatsApp numbers?",
+      ta: "கூடுதல் பணியாளர் கணக்குகள் அல்லது வாட்ஸ்அப் எண்கள் சேர்க்கலாமா?",
+    },
+    a: {
+      en: "Yes. Extra staff logins are INR 499 per seat per month, and extra WhatsApp numbers for branches or support lines are INR 599 per number per month.",
+      ta: "ஆம். கூடுதல் பணியாளர் கணக்கு ஒன்றுக்கு மாதம் ₹499, கிளைகள் அல்லது ஆதரவு எண்களுக்கான கூடுதல் வாட்ஸ்அப் எண் ஒன்றுக்கு மாதம் ₹599.",
+    },
+  },
+  {
+    q: {
+      en: "How do analytics help my business?",
+      ta: "அறிக்கைகள் எனது வணிகத்திற்கு எவ்வாறு உதவுகின்றன?",
+    },
+    a: {
+      en: "They put message reach, customer response, orders, recorded sales and message spend in one understandable view. Use that picture to improve your next offer and decide where to spend—not as a guarantee that every sale came from a message.",
+      ta: "செய்தி சென்றடைந்தது, வாடிக்கையாளர் பதில்கள், ஆர்டர்கள், விற்பனை மற்றும் செய்திச் செலவு ஆகியவற்றை ஒரே எளிய பார்வையில் வைக்கின்றன. அடுத்த சலுகையை மேம்படுத்தவும், எங்கு செலவிட வேண்டும் என்பதைத் தீர்மானிக்கவும் இந்த விவரங்களைப் பயன்படுத்துங்கள்.",
     },
   },
 ];
@@ -1392,44 +1432,72 @@ export function LandingSections({ lang }: { lang: Lang }) {
         </div>
       </section>
 
-      {/* ── 7. QUESTIONS OWNERS ASK (Exact Match HTML #faq) ── */}
-      <section className="faq-section" id="faq">
-        <div className="landing-container faq-grid">
-          {/* Left Column */}
-          <div>
-            <div className="eyebrow">{ta ? "உரிமையாளர்கள் கேட்கும் கேள்விகள்" : "Questions owners ask"}</div>
-            <h2>{ta ? "தெளிவாகப் புரிந்துகொள்வோம்." : "Let’s make this clear."}</h2>
+      {/* ── 7. FAQ — dark premium accordion (#faq) ── */}
+      <section className="faq-section" id="faq" aria-labelledby="faq-heading">
+        <div className="landing-container faq-shell">
+          <header className="faq-head">
+            <span className="faq-badge">FAQ</span>
+            <h2 id="faq-heading">{ta ? "அடிக்கடி கேட்கப்படும் கேள்விகள்" : "Frequently Asked Questions"}</h2>
             <p>
               {ta
                 ? "கடினமான வார்த்தைகள் இல்லை, யூகங்கள் இல்லை. டெமோ பாருங்கள் அல்லது நேரடியாக எங்களிடம் கேளுங்கள்."
                 : "No jargon, no guessing. See the demo or ask us directly."}
             </p>
-            <a className="btn btn-dark" href={TEL_PHONE}>
-              {ta ? "தபாலுடன் பேச" : "Call Thabaal"} <span>↗</span>
-            </a>
-          </div>
+          </header>
 
-          {/* Right Column: Accordion */}
           <div className="faq-list">
             {FAQ_ITEMS.map((item, idx) => {
               const isOpen = openFaq === idx;
               return (
                 <div key={idx} className={`faq-item ${isOpen ? "open" : ""}`}>
-                  <button
-                    type="button"
-                    className="faq-question"
-                    onClick={() => toggleFaq(idx)}
-                    aria-expanded={isOpen}
+                  <h3 className="faq-q-heading">
+                    <button
+                      type="button"
+                      id={`faq-q-${idx}`}
+                      className="faq-question"
+                      onClick={() => toggleFaq(idx)}
+                      aria-expanded={isOpen}
+                      aria-controls={`faq-a-${idx}`}
+                    >
+                      <span className="faq-q-text">{item.q[lang]}</span>
+                      <span className="faq-toggle-icon" aria-hidden="true" />
+                    </button>
+                  </h3>
+                  <div
+                    id={`faq-a-${idx}`}
+                    role="region"
+                    aria-labelledby={`faq-q-${idx}`}
+                    className="faq-answer-wrap"
                   >
-                    <span className="faq-q-text">{item.q[lang]}</span>
-                    <span className="faq-toggle-icon" aria-hidden="true">+</span>
-                  </button>
-                  <div className="faq-answer">
-                    <p>{item.a[lang]}</p>
+                    <div className="faq-answer">
+                      <p>{item.a[lang]}</p>
+                    </div>
                   </div>
                 </div>
               );
             })}
+          </div>
+
+          <div className="faq-contact">
+            <div className="faq-contact-copy">
+              <h3>{ta ? "இன்னும் கேள்விகள் உள்ளதா?" : "Still have questions?"}</h3>
+              <p>
+                {ta
+                  ? "தனிப்பட்ட விளக்கத்திற்கு எங்களைத் தொடர்பு கொள்ளுங்கள்."
+                  : "Speak with us for a personal walkthrough."}
+              </p>
+            </div>
+            <div className="faq-contact-actions">
+              <a className="faq-btn faq-btn-primary" href={MAILTO_DEMO}>
+                {ta ? "டெமோ பதிவு செய்க" : "Book a demo"} <span aria-hidden="true">↗</span>
+              </a>
+              <a className="faq-btn faq-btn-ghost" href={TEL_PHONE}>
+                {ta ? "தபாலுடன் பேச" : "Call Thabaal"}
+              </a>
+              <a className="faq-btn faq-btn-ghost" href={DEMO_URL} {...DEMO_TARGET}>
+                {ta ? "வாட்ஸ்அப்பில் பேச" : "WhatsApp us"}
+              </a>
+            </div>
           </div>
         </div>
       </section>
