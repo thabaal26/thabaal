@@ -4213,19 +4213,82 @@ html {
   outline-offset: 3px;
 }
 
-.faq-btn-primary {
-  background: var(--faq-yellow);
-  color: var(--faq-bg);
+.faq-btn-wa {
+  background: #25d366;
+  color: #062414;
+  box-shadow: 0 6px 20px rgba(37, 211, 102, 0.22);
 }
 
-.faq-btn-ghost {
-  border-color: rgba(248, 250, 252, 0.22);
-  background: transparent;
-  color: var(--faq-text);
+.faq-btn-wa:hover {
+  background: #3be37b;
 }
 
-.faq-btn-ghost:hover {
+.faq-more-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 18px;
+  border: 1px dashed rgba(255, 193, 41, 0.45);
+  border-radius: 14px;
+  background: rgba(255, 193, 41, 0.06);
+  color: var(--faq-yellow);
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.faq-more-btn:hover,
+.faq-more-btn.open {
   border-color: var(--faq-yellow);
+  background: rgba(255, 193, 41, 0.12);
+}
+
+.faq-more-btn:focus-visible {
+  outline: 2px solid var(--faq-yellow);
+  outline-offset: 2px;
+}
+
+.faq-more-chevron {
+  width: 8px;
+  height: 8px;
+  margin-top: -3px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), margin 0.28s ease;
+}
+
+.faq-more-btn.open .faq-more-chevron {
+  margin-top: 3px;
+  transform: rotate(-135deg);
+}
+
+.faq-more {
+  display: grid;
+  grid-template-rows: 0fr;
+  margin-top: -8px;
+  visibility: hidden;
+  transition: grid-template-rows 0.36s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s linear 0.36s;
+}
+
+.faq-more.open {
+  grid-template-rows: 1fr;
+  margin-top: 0;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.faq-more-inner {
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+  overflow: hidden;
 }
 
 @media (max-width: 960px) {
@@ -4267,11 +4330,7 @@ html {
   }
 
   .faq-btn {
-    flex: 1 1 calc(50% - 4px);
-  }
-
-  .faq-btn-primary {
-    flex-basis: 100%;
+    flex: 1 1 100%;
   }
 }
 
@@ -4281,7 +4340,10 @@ html {
   .faq-toggle-icon,
   .faq-toggle-icon::before,
   .faq-toggle-icon::after,
-  .faq-btn {
+  .faq-btn,
+  .faq-more,
+  .faq-more-btn,
+  .faq-more-chevron {
     transition: none !important;
   }
 

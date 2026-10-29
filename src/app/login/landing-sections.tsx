@@ -569,10 +569,14 @@ const FAQ_ITEMS: { q: T; a: T }[] = [
   },
 ];
 
+/** The first four questions stay visible; the rest sit behind the "more questions" button. */
+const FAQ_PRIMARY_COUNT = 4;
+
 export function LandingSections({ lang }: { lang: Lang }) {
   const ta = lang === "ta";
   const [activeDemo, setActiveDemo] = useState<"overview" | "campaign" | "payments">("overview");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [showMoreFaq, setShowMoreFaq] = useState(false);
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [pricingTab, setPricingTab] = useState<"plans" | "features" | "addons" | "compare">("plans");
 
@@ -580,6 +584,37 @@ export function LandingSections({ lang }: { lang: Lang }) {
 
   const toggleFaq = (index: number) => {
     setOpenFaq((prev) => (prev === index ? null : index));
+  };
+
+  const renderFaq = (item: { q: T; a: T }, idx: number) => {
+    const isOpen = openFaq === idx;
+    return (
+      <div key={idx} className={`faq-item ${isOpen ? "open" : ""}`}>
+        <h3 className="faq-q-heading">
+          <button
+            type="button"
+            id={`faq-q-${idx}`}
+            className="faq-question"
+            onClick={() => toggleFaq(idx)}
+            aria-expanded={isOpen}
+            aria-controls={`faq-a-${idx}`}
+          >
+            <span className="faq-q-text">{item.q[lang]}</span>
+            <span className="faq-toggle-icon" aria-hidden="true" />
+          </button>
+        </h3>
+        <div
+          id={`faq-a-${idx}`}
+          role="region"
+          aria-labelledby={`faq-q-${idx}`}
+          className="faq-answer-wrap"
+        >
+          <div className="faq-answer">
+            <p>{item.a[lang]}</p>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -1446,36 +1481,32 @@ export function LandingSections({ lang }: { lang: Lang }) {
           </header>
 
           <div className="faq-list">
-            {FAQ_ITEMS.map((item, idx) => {
-              const isOpen = openFaq === idx;
-              return (
-                <div key={idx} className={`faq-item ${isOpen ? "open" : ""}`}>
-                  <h3 className="faq-q-heading">
-                    <button
-                      type="button"
-                      id={`faq-q-${idx}`}
-                      className="faq-question"
-                      onClick={() => toggleFaq(idx)}
-                      aria-expanded={isOpen}
-                      aria-controls={`faq-a-${idx}`}
-                    >
-                      <span className="faq-q-text">{item.q[lang]}</span>
-                      <span className="faq-toggle-icon" aria-hidden="true" />
-                    </button>
-                  </h3>
-                  <div
-                    id={`faq-a-${idx}`}
-                    role="region"
-                    aria-labelledby={`faq-q-${idx}`}
-                    className="faq-answer-wrap"
-                  >
-                    <div className="faq-answer">
-                      <p>{item.a[lang]}</p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+            {FAQ_ITEMS.slice(0, FAQ_PRIMARY_COUNT).map((item, idx) => renderFaq(item, idx))}
+
+            <button
+              type="button"
+              className={`faq-more-btn ${showMoreFaq ? "open" : ""}`}
+              onClick={() => setShowMoreFaq((v) => !v)}
+              aria-expanded={showMoreFaq}
+              aria-controls="faq-more-panel"
+            >
+              <span>
+                {showMoreFaq
+                  ? ta
+                    ? "குறைவாகக் காட்டு"
+                    : "Show fewer"
+                  : ta
+                    ? `மேலும் ${FAQ_ITEMS.length - FAQ_PRIMARY_COUNT} கேள்விகள்`
+                    : `${FAQ_ITEMS.length - FAQ_PRIMARY_COUNT} more questions`}
+              </span>
+              <span className="faq-more-chevron" aria-hidden="true" />
+            </button>
+
+            <div id="faq-more-panel" className={`faq-more ${showMoreFaq ? "open" : ""}`}>
+              <div className="faq-more-inner">
+                {FAQ_ITEMS.slice(FAQ_PRIMARY_COUNT).map((item, i) => renderFaq(item, i + FAQ_PRIMARY_COUNT))}
+              </div>
+            </div>
           </div>
 
           <div className="faq-contact">
@@ -1488,14 +1519,8 @@ export function LandingSections({ lang }: { lang: Lang }) {
               </p>
             </div>
             <div className="faq-contact-actions">
-              <a className="faq-btn faq-btn-primary" href={MAILTO_DEMO}>
-                {ta ? "டெமோ பதிவு செய்க" : "Book a demo"} <span aria-hidden="true">↗</span>
-              </a>
-              <a className="faq-btn faq-btn-ghost" href={TEL_PHONE}>
-                {ta ? "தபாலுடன் பேச" : "Call Thabaal"}
-              </a>
-              <a className="faq-btn faq-btn-ghost" href={DEMO_URL} {...DEMO_TARGET}>
-                {ta ? "வாட்ஸ்அப்பில் பேச" : "WhatsApp us"}
+              <a className="faq-btn faq-btn-wa" href={DEMO_URL} {...DEMO_TARGET}>
+                {ta ? "வாட்ஸ்அப்பில் பேச" : "WhatsApp us"} <span aria-hidden="true">↗</span>
               </a>
             </div>
           </div>
