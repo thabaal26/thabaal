@@ -3960,7 +3960,7 @@ html {
   color: #8fa3bf;
 }
 
-/* ── Questions Owners Ask (#faq) — dark premium, compact two-column ── */
+/* ── Questions Owners Ask (#faq) — dark premium card, two columns ── */
 .faq-section {
   --faq-bg: #071a2e;
   --faq-surface: #10263d;
@@ -3968,85 +3968,224 @@ html {
   --faq-text: #f8fafc;
   --faq-muted: #a8b8cc;
   --faq-line: rgba(168, 184, 204, 0.16);
-  --faq-glow: rgba(255, 193, 41, 0.14);
+  padding: 56px 0;
+  background: #f4f8fd;
+}
+
+[data-theme="night"] .faq-section {
+  background: #07142b;
+}
+
+.faq-card {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  padding: 64px 0;
-  background: var(--faq-bg);
+  padding: 36px 40px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #071a2e 0%, #082543 58%, #06182c 100%);
   color: var(--faq-text);
+  box-shadow: 0 24px 60px rgba(6, 36, 69, 0.22);
 }
 
-.faq-section::before {
+.faq-card::before,
+.faq-card::after {
   content: "";
   position: absolute;
   z-index: -1;
-  top: -220px;
-  left: 18%;
-  width: 640px;
-  height: 420px;
-  background: radial-gradient(closest-side, var(--faq-glow), transparent);
+  border-radius: 50%;
   pointer-events: none;
 }
 
-.faq-section .faq-shell {
-  display: grid;
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
-  grid-template-areas:
-    "head list"
-    "contact list";
-  grid-template-rows: auto 1fr;
-  align-items: start;
-  column-gap: 56px;
-  row-gap: 28px;
-  width: min(1120px, calc(100% - 48px));
+.faq-card::before {
+  top: -190px;
+  left: 14%;
+  width: 560px;
+  height: 360px;
+  background: radial-gradient(closest-side, rgba(36, 118, 214, 0.3), transparent);
 }
 
-.faq-head {
-  grid-area: head;
+.faq-card::after {
+  bottom: -150px;
+  left: -90px;
+  width: 520px;
+  height: 340px;
+  background:
+    radial-gradient(closest-side at 22% 60%, rgba(255, 193, 41, 0.28), transparent 70%),
+    radial-gradient(closest-side at 78% 70%, rgba(31, 207, 131, 0.2), transparent 70%);
+}
+
+.faq-shell {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.7fr) minmax(0, 1.15fr);
+  align-items: stretch;
+  column-gap: 40px;
+}
+
+/* Natural height, top-aligned: opening an answer on the right never moves the left column. */
+.faq-aside {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  align-self: start;
+  gap: 22px;
 }
 
 .faq-badge {
   display: inline-flex;
   align-items: center;
-  padding: 5px 12px;
-  border: 1px solid rgba(255, 193, 41, 0.35);
+  padding: 6px 16px;
   border-radius: 999px;
-  background: rgba(255, 193, 41, 0.1);
-  color: var(--faq-yellow);
-  font-size: 11.5px;
+  background: var(--faq-yellow);
+  color: #071a2e;
+  font-size: 13px;
   font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .faq-section .faq-head h2 {
-  margin: 14px 0 10px;
+  margin: 16px 0 10px;
   color: var(--faq-text);
-  font-size: clamp(28px, 3.4vw, 40px);
-  line-height: 1.12;
+  font-size: clamp(30px, 3.4vw, 44px);
+  line-height: 1.08;
   font-weight: 800;
 }
 
+.faq-section .faq-head h2 em {
+  display: block;
+  color: var(--faq-yellow);
+  font-style: normal;
+}
+
 .faq-section .faq-head p {
-  max-width: 400px;
+  max-width: 360px;
   margin: 0;
   color: var(--faq-muted);
   font-size: 15px;
   line-height: 1.55;
 }
 
-.faq-list {
-  grid-area: list;
+/* Decorative flight path: a fixed-size box, so it never affects layout. */
+.faq-flight {
+  position: relative;
+  width: 300px;
+  max-width: 100%;
+  height: 90px;
+  flex: 0 0 auto;
+  pointer-events: none;
+}
+
+.faq-flight-trail {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.faq-flight-trail path {
+  fill: none;
+  stroke: rgba(255, 193, 41, 0.55);
+  stroke-width: 1.6;
+  stroke-dasharray: 3 7;
+  stroke-linecap: round;
+}
+
+.faq-flight-trail circle {
+  fill: var(--faq-yellow);
+}
+
+.faq-flight-bird {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 52px;
+  height: auto;
+  offset-path: path("M 8 80 C 52 30, 104 92, 160 54 S 236 14, 266 24");
+  offset-rotate: -8deg;
+  offset-distance: 100%;
+  /* A thin light rim keeps the logo's navy outline readable on the dark card; the artwork itself is untouched. */
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.85)) drop-shadow(0 0 8px rgba(255, 193, 41, 0.3));
+  animation: faq-fly 9s ease-in-out infinite;
+}
+
+@keyframes faq-fly {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  86% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+@supports not (offset-path: path("M 0 0")) {
+  .faq-flight-bird {
+    top: 0;
+    right: 0;
+    left: auto;
+    animation: none;
+  }
+}
+
+.faq-wa {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 20px 0 10px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #062445;
+  font-size: 15px;
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+}
+
+.faq-wa:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.34);
+}
+
+.faq-wa:focus-visible {
+  outline: 2px solid var(--faq-yellow);
+  outline-offset: 3px;
+}
+
+.faq-wa-icon {
   display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #25d366;
+  color: #ffffff;
+}
+
+.faq-wa-arrow {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.faq-list {
+  display: grid;
+  align-content: start;
   gap: 8px;
 }
 
 .faq-item {
   border: 1px solid var(--faq-line);
-  border-radius: 14px;
-  background: var(--faq-surface);
-  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  border-radius: 16px;
+  background: rgba(16, 38, 61, 0.72);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
 }
 
 .faq-item:hover {
@@ -4054,8 +4193,9 @@ html {
 }
 
 .faq-item.open {
-  border-color: rgba(255, 193, 41, 0.55);
-  box-shadow: 0 0 0 1px rgba(255, 193, 41, 0.14), 0 10px 30px rgba(0, 0, 0, 0.28), 0 0 28px rgba(255, 193, 41, 0.08);
+  border-color: rgba(255, 193, 41, 0.7);
+  background: linear-gradient(135deg, rgba(255, 193, 41, 0.1), rgba(16, 38, 61, 0.86) 48%);
+  box-shadow: inset 3px 0 0 var(--faq-yellow), 0 10px 30px rgba(0, 0, 0, 0.26);
 }
 
 .faq-q-heading {
@@ -4064,15 +4204,15 @@ html {
 }
 
 .faq-question {
-  display: flex;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 30px;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
+  column-gap: 14px;
   width: 100%;
-  min-height: 52px;
-  padding: 12px 18px;
+  min-height: 60px;
+  padding: 10px 16px;
   border: 0;
-  border-radius: 14px;
+  border-radius: 16px;
   background: transparent;
   color: var(--faq-text);
   text-align: left;
@@ -4089,14 +4229,32 @@ html {
   outline-offset: 2px;
 }
 
+.faq-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--tone-bg);
+  color: var(--tone-fg);
+}
+
+.faq-tone-gold { --tone-bg: #6b5420; --tone-fg: #ffc329; }
+.faq-tone-green { --tone-bg: #0d5f47; --tone-fg: #3ddc97; }
+.faq-tone-blue { --tone-bg: #12457f; --tone-fg: #6ab4ff; }
+.faq-tone-purple { --tone-bg: #4b2a86; --tone-fg: #dccbff; }
+.faq-tone-teal { --tone-bg: #0e5a63; --tone-fg: #62e3ec; }
+.faq-tone-orange { --tone-bg: #7a3d16; --tone-fg: #ffb072; }
+.faq-tone-pink { --tone-bg: #7a2450; --tone-fg: #ffa3cd; }
+.faq-tone-indigo { --tone-bg: #2b3a8a; --tone-fg: #b1bfff; }
+
 .faq-toggle-icon {
   position: relative;
-  flex: 0 0 26px;
-  width: 26px;
-  height: 26px;
-  border: 1px solid rgba(255, 193, 41, 0.4);
+  width: 30px;
+  height: 30px;
+  border: 1.5px solid rgba(248, 250, 252, 0.6);
   border-radius: 50%;
-  color: var(--faq-yellow);
+  color: var(--faq-text);
   transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
 }
 
@@ -4113,13 +4271,13 @@ html {
 }
 
 .faq-toggle-icon::before {
-  width: 10px;
+  width: 12px;
   height: 2px;
 }
 
 .faq-toggle-icon::after {
   width: 2px;
-  height: 10px;
+  height: 12px;
 }
 
 .faq-item.open .faq-toggle-icon {
@@ -4150,77 +4308,13 @@ html {
   overflow: hidden;
 }
 
+/* 16 (padding) + 38 (icon) + 14 (gap) = 68: answers line up with the question text. */
 .faq-answer p {
   margin: 0;
-  padding: 0 18px 16px;
+  padding: 0 60px 16px 68px;
   color: var(--faq-muted);
   font-size: 14px;
   line-height: 1.6;
-}
-
-.faq-contact {
-  grid-area: contact;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 20px;
-  border: 1px solid var(--faq-line);
-  border-radius: 18px;
-  background: linear-gradient(135deg, rgba(255, 193, 41, 0.1), rgba(16, 38, 61, 0.92) 55%);
-}
-
-.faq-contact-copy h3 {
-  margin: 0 0 2px;
-  color: var(--faq-text);
-  font-size: 18px;
-  font-weight: 800;
-}
-
-.faq-contact-copy p {
-  margin: 0;
-  color: var(--faq-muted);
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.faq-contact-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.faq-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 44px;
-  padding: 0 18px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  font-size: 13.5px;
-  font-weight: 800;
-  text-decoration: none;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, background 0.2s ease;
-}
-
-.faq-btn:hover {
-  transform: translateY(-2px);
-}
-
-.faq-btn:focus-visible {
-  outline: 2px solid var(--faq-yellow);
-  outline-offset: 3px;
-}
-
-.faq-btn-wa {
-  background: #25d366;
-  color: #062414;
-  box-shadow: 0 6px 20px rgba(37, 211, 102, 0.22);
-}
-
-.faq-btn-wa:hover {
-  background: #3be37b;
 }
 
 .faq-more-btn {
@@ -4229,14 +4323,14 @@ html {
   justify-content: center;
   gap: 10px;
   width: 100%;
-  min-height: 48px;
+  min-height: 50px;
   padding: 0 18px;
-  border: 1px dashed rgba(255, 193, 41, 0.45);
-  border-radius: 14px;
-  background: rgba(255, 193, 41, 0.06);
+  border: 1.5px dashed rgba(255, 193, 41, 0.55);
+  border-radius: 16px;
+  background: rgba(255, 193, 41, 0.05);
   color: var(--faq-yellow);
   font: inherit;
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 800;
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease;
@@ -4246,7 +4340,7 @@ html {
 .faq-more-btn:hover,
 .faq-more-btn.open {
   border-color: var(--faq-yellow);
-  background: rgba(255, 193, 41, 0.12);
+  background: rgba(255, 193, 41, 0.11);
 }
 
 .faq-more-btn:focus-visible {
@@ -4292,62 +4386,103 @@ html {
 }
 
 @media (max-width: 960px) {
-  .faq-section .faq-shell {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "head"
-      "list"
-      "contact";
-    grid-template-rows: auto;
-    row-gap: 24px;
+  .faq-card {
+    padding: 30px 28px;
   }
 
-  .faq-section .faq-head p {
-    max-width: 520px;
+  .faq-shell {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 22px;
+  }
+
+  /* Mobile order: heading, bird, questions, then the WhatsApp button. */
+  .faq-aside {
+    display: contents;
+  }
+
+  .faq-head {
+    order: 1;
+  }
+
+  .faq-flight {
+    order: 2;
+    height: 70px;
+    margin-top: -8px;
+    transform: scale(0.78);
+    transform-origin: left top;
+  }
+
+  .faq-list {
+    order: 3;
+  }
+
+  .faq-wa {
+    order: 4;
+    justify-self: start;
   }
 }
 
 @media (max-width: 720px) {
   .faq-section {
-    padding: 48px 0;
+    padding: 36px 0;
   }
 
-  .faq-section .faq-shell {
-    width: calc(100% - 32px);
+  .faq-section .landing-container {
+    width: calc(100% - 24px);
+  }
+
+  .faq-card {
+    padding: 24px 16px;
+    border-radius: 20px;
   }
 
   .faq-question {
-    padding: 11px 14px;
+    grid-template-columns: 34px minmax(0, 1fr) 28px;
+    column-gap: 12px;
+    padding: 10px 12px;
     font-size: 14.5px;
   }
 
+  .faq-icon {
+    width: 34px;
+    height: 34px;
+  }
+
+  .faq-toggle-icon {
+    width: 28px;
+    height: 28px;
+  }
+
   .faq-answer p {
-    padding: 0 14px 14px;
+    padding: 0 14px 14px 58px;
   }
 
-  .faq-contact {
-    padding: 18px 16px;
-  }
-
-  .faq-btn {
-    flex: 1 1 100%;
+  .faq-wa {
+    justify-self: stretch;
+    justify-content: center;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .faq-flight-bird {
+    animation: none !important;
+    offset-distance: 100%;
+    opacity: 1;
+  }
+
   .faq-item,
   .faq-answer-wrap,
   .faq-toggle-icon,
   .faq-toggle-icon::before,
   .faq-toggle-icon::after,
-  .faq-btn,
+  .faq-wa,
   .faq-more,
   .faq-more-btn,
   .faq-more-chevron {
     transition: none !important;
   }
 
-  .faq-btn:hover {
+  .faq-wa:hover {
     transform: none;
   }
 }
