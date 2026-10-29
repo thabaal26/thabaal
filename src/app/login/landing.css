@@ -2651,46 +2651,6 @@ html {
   color: #059669;
 }
 
-.enterprise-callout {
-  margin-top: 22px;
-  padding: 18px 24px;
-  border-radius: 16px;
-  background: rgba(253, 185, 19, 0.08);
-  border: 1px dashed rgba(253, 185, 19, 0.5);
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  font-size: 13.5px;
-}
-
-[data-theme="night"] .enterprise-callout {
-  background: rgba(253, 185, 19, 0.05);
-  border-color: rgba(253, 185, 19, 0.35);
-}
-
-.enterprise-callout strong {
-  display: block;
-  font-size: 14.5px;
-  color: var(--navy);
-  margin-bottom: 3px;
-}
-
-[data-theme="night"] .enterprise-callout strong {
-  color: #ffffff;
-}
-
-.enterprise-callout span {
-  color: var(--muted);
-}
-
-[data-theme="night"] .enterprise-callout span {
-  color: #9cb1cb;
-}
-
-
-
 /* ── Trust Strip ── */
 .pricing-trust-strip {
   display: flex;

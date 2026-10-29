@@ -1445,23 +1445,6 @@ export function LandingSections({ lang }: { lang: Lang }) {
               </div>
             </>
           )}
-
-          {/* Enterprise & White-Label Callout Banner */}
-          <div className="enterprise-callout">
-            <div>
-              <strong>
-                {ta ? "பெரிய நிறுவனங்களுக்கான தனிப்பயன் திட்டம் (Enterprise & White-Label)" : "Need custom infrastructure, ERP hooks, or 30+ team seats?"}
-              </strong>
-              <span>
-                {ta
-                  ? "Tally, SAP, Zoho ERP இணைப்பு, பிரத்யேக சர்வர், ஒயிட்-லேபிள் பிராண்டிங் & 99.9% Uptime SLA வசதிகள்."
-                  : "Direct Tally / SAP / Zoho integration, isolated database container, custom domain branding, and dedicated 24/7 SLA."}
-              </span>
-            </div>
-            <a className="btn btn-dark btn-small" href="tel:+916379140626">
-              {ta ? "எங்களுடன் பேச ↗" : "Talk to Enterprise ↗"}
-            </a>
-          </div>
         </div>
       </section>
 
