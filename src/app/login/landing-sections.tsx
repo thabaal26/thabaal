@@ -360,8 +360,6 @@ interface CompetitorRow {
   platform: string;
   isThabaal?: boolean;
   price: T;
-  focus: T;
-  comparison: T;
 }
 
 const COMPETITOR_COMPARISON: CompetitorRow[] = [
@@ -372,28 +370,12 @@ const COMPETITOR_COMPARISON: CompetitorRow[] = [
       en: "INR 1,199 / 2,999 / 4,999 monthly, GST included",
       ta: "மாதம் ₹1,199 / ₹2,999 / ₹4,999, GST உட்பட",
     },
-    focus: {
-      en: "Campaigns, catalogue, orders, payments and tiered reports.",
-      ta: "பிரச்சாரங்கள், கேட்லாக், ஆர்டர்கள், பேமெண்ட் & அடுக்கு அறிக்கைகள்.",
-    },
-    comparison: {
-      en: "2 / 3 / 5 numbers; simple local-business workflow.",
-      ta: "2 / 3 / 5 எண்கள்; எளிய தமிழ்நாடு வணிக வேலைப்பாய்வு.",
-    },
   },
   {
     platform: "AiSensy",
     price: {
       en: "Basic INR 1,500; Pro INR 3,200 monthly",
       ta: "பேஸிக் ₹1,500; ப்ரோ ₹3,200 மாதம்",
-    },
-    focus: {
-      en: "Broadcasts, shared inbox, retargeting and AI options.",
-      ta: "அறிவிப்புகள், பகிரப்பட்ட இன்பாக்ஸ் மற்றும் AI தேர்வுகள்.",
-    },
-    comparison: {
-      en: "Thabaal starts lower and includes order/payment tracking.",
-      ta: "தபால் குறைந்த கட்டணத்தில் ஆர்டர் & பேமெண்ட் கண்காணிப்பை வழங்குகிறது.",
     },
   },
   {
@@ -402,28 +384,12 @@ const COMPETITOR_COMPARISON: CompetitorRow[] = [
       en: "Basic INR 2,399 monthly, billed annually",
       ta: "பேஸிக் ₹2,399 மாதம், வருடாந்திர கட்டணம்",
     },
-    focus: {
-      en: "WhatsApp plus Instagram/web, catalogue and AI tools.",
-      ta: "வாட்ஸ்அப் + இன்ஸ்டாகிராம்/வெப், கேட்லாக் மற்றும் AI கருவிகள்.",
-    },
-    comparison: {
-      en: "Compare billing term, users and order reporting.",
-      ta: "கட்டணக் காலம், பயனர்கள் மற்றும் ஆர்டர் அறிக்கைகளை ஒப்பிடுங்கள்.",
-    },
   },
   {
     platform: "Wati",
     price: {
       en: "Regional pricing changes; check current quote",
       ta: "பிராந்திய விலை மாற்றம்; தற்போதைய மதிப்பீட்டைப் பார்க்கவும்",
-    },
-    focus: {
-      en: "Campaigns, AI, automations and multiple channels.",
-      ta: "பிரச்சாரங்கள், AI, ஆட்டோமேஷன் மற்றும் பல சேனல்கள்.",
-    },
-    comparison: {
-      en: "Thabaal keeps plan limits and order reporting straightforward.",
-      ta: "தபால் திட்ட வரம்புகளையும் ஆர்டர் அறிக்கைகளையும் வெளிப்படையாக வைக்கிறது.",
     },
   },
   {
@@ -432,28 +398,12 @@ const COMPETITOR_COMPARISON: CompetitorRow[] = [
       en: "Get current India price",
       ta: "தற்போதைய இந்திய விலையைப் பெறவும்",
     },
-    focus: {
-      en: "WhatsApp/Instagram marketing, automation and CRM.",
-      ta: "வாட்ஸ்அப்/இன்ஸ்டாகிராம் மார்க்கெட்டிங் மற்றும் CRM.",
-    },
-    comparison: {
-      en: "Thabaal emphasises order-to-payment visibility.",
-      ta: "தபால் ஆர்டர் முதல் பேமெண்ட் வரையிலான நேரடி கண்காணிப்பை முன்னிறுத்துகிறது.",
-    },
   },
   {
     platform: "DoubleTick",
     price: {
       en: "Plans listed; request a current quote",
       ta: "திட்டங்கள் பட்டியலிடப்பட்டுள்ளன; விலை கேட்க வேண்டும்",
-    },
-    focus: {
-      en: "WhatsApp customer experience, sales tools and AI agents.",
-      ta: "வாட்ஸ்அப் வாடிக்கையாளர் அனுபவம் மற்றும் விற்பனைக் கருவிகள்.",
-    },
-    comparison: {
-      en: "Thabaal offers clear INR tiers and support by plan.",
-      ta: "தபால் தெளிவான ரூபாய் விலையையும் திட்ட ஆதரவையும் வழங்குகிறது.",
     },
   },
 ];
@@ -1372,10 +1322,8 @@ export function LandingSections({ lang }: { lang: Lang }) {
                   <table className="pricing-table">
                     <thead>
                       <tr>
-                        <th style={{ width: "18%" }}>{ta ? "தளம்" : "Platform"}</th>
-                        <th style={{ width: "26%" }}>{ta ? "விலை" : "Price"}</th>
-                        <th style={{ width: "28%" }}>{ta ? "முக்கிய நோக்கம்" : "Primary focus"}</th>
-                        <th style={{ width: "28%" }}>{ta ? "தபால் ஒப்பீடு" : "Thabaal comparison"}</th>
+                        <th style={{ width: "30%" }}>{ta ? "தளம்" : "Platform"}</th>
+                        <th style={{ width: "70%" }}>{ta ? "விலை" : "Price"}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1391,10 +1339,6 @@ export function LandingSections({ lang }: { lang: Lang }) {
                           </td>
                           <td style={row.isThabaal ? { color: "var(--navy)", fontWeight: 800 } : undefined}>
                             {ta ? row.price.ta : row.price.en}
-                          </td>
-                          <td>{ta ? row.focus.ta : row.focus.en}</td>
-                          <td style={row.isThabaal ? { color: "#059669", fontWeight: 700 } : undefined}>
-                            {ta ? row.comparison.ta : row.comparison.en}
                           </td>
                         </tr>
                       ))}
