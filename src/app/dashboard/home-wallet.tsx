@@ -26,7 +26,7 @@ function Header() {
   return (
     <div className="hd" suppressHydrationWarning>
       <h2 suppressHydrationWarning>
-        <T ta="வாட்ஸ்அப் வாலட்">WhatsApp wallet</T>
+        <T ta="வாட்ஸ்அப் செலவு">WhatsApp spend</T>
       </h2>
       <Link className="btn sm" href="/dashboard/report">
         <T ta="செலவுகள்">Costs</T>
@@ -120,7 +120,7 @@ function Unavailable() {
   return (
     <section className="card" suppressHydrationWarning>
       <Header />
-      <p className="muted small">WhatsApp wallet couldn&apos;t be loaded just now.</p>
+      <p className="muted small">WhatsApp spend couldn&apos;t be loaded just now.</p>
     </section>
   );
 }
