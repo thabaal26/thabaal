@@ -52,6 +52,41 @@ async function alertThabaal(subject: string, clientId: string | null, rows: [str
 type RzpSubscription = { id: string; status: string; current_end?: number | null; charge_at?: number | null; start_at?: number | null };
 type RzpOrder = { id: string; amount: number; status: string };
 
+/* ------------------------------------------------------------- test package */
+
+/**
+ * The ₹1 Razorpay test package is offered to one business at a time, for checking live payments from a real
+ * client login. Set per business by a Thabaal admin (appearance.razorpayTest); until it is set, Thenan Oils has it.
+ * Test payments never change the business's plan; the ₹1 wallet test adds a real ₹1 to its wallet.
+ */
+export function razorpayTestOn(c: { name: string; appearance: unknown }) {
+  const a = c.appearance && typeof c.appearance === "object" && !Array.isArray(c.appearance) ? (c.appearance as Record<string, unknown>) : {};
+  if (typeof a.razorpayTest === "boolean") return a.razorpayTest;
+  return /thenan/i.test(c.name);
+}
+
+export async function testPackageFor(clientId: string | null) {
+  if (!clientId) return false;
+  const c = await db.client.findUnique({ where: { id: clientId }, select: { name: true, appearance: true } });
+  return !!c && razorpayTestOn(c);
+}
+
+/** May this login run the ₹1 tests (Thabaal admins, or a manager of the business that has the test package)? */
+async function canTest(who: Who) {
+  if (who.isAdmin) return true;
+  return who.canManage && (await testPackageFor(who.clientId));
+}
+
+/** The business's ₹1 test payments, newest first, for its account page. */
+export async function testRecords(clientId: string) {
+  return db.razorpayRecord.findMany({
+    where: { clientId, OR: [{ purpose: "test" }, { purpose: "wallet", amountPaise: TEST_PAISE }] },
+    orderBy: { createdAt: "desc" },
+    take: 8,
+    select: { id: true, kind: true, purpose: true, rzpId: true, status: true, amountPaise: true, paymentId: true, note: true, updatedAt: true },
+  });
+}
+
 /* ----------------------------------------------------------------- plans */
 
 /** The Razorpay plan for a Thabaal plan, cycle and price, made once per key mode and reused. */
@@ -187,7 +222,7 @@ export async function confirmSubscriptionCheckout(who: Who, input: { subscriptio
     if (!subscriptionSignatureOk(input.subscriptionId, input.paymentId, input.signature)) return { ok: false, message: "This payment couldn't be confirmed. If money left your account, contact Thabaal." };
     const rec = await db.razorpayRecord.findUnique({ where: { rzpId: input.subscriptionId } });
     if (!rec || rec.kind !== "subscription") return { ok: false, message: "Payment not found." };
-    if (rec.purpose === "test" ? !who.isAdmin : rec.clientId !== who.clientId) return { ok: false, message: "Payment not found." };
+    if (rec.clientId ? rec.clientId !== who.clientId : !who.isAdmin) return { ok: false, message: "Payment not found." };
     const [payment, sub] = await Promise.all([capturedPayment(input.paymentId), rzp<RzpSubscription>("GET", `/subscriptions/${input.subscriptionId}`)]);
     await db.razorpayRecord.update({ where: { id: rec.id }, data: { status: sub.status } });
     if (["authenticated", "active"].includes(sub.status)) await cancelOtherSubscriptions(rec.clientId, rec.purpose, rec.rzpId);
@@ -206,9 +241,9 @@ export async function confirmSubscriptionCheckout(who: Who, input: { subscriptio
 export async function cancelAutoRenew(who: Who, purpose: "plan" | "test" = "plan"): Promise<Result> {
   try {
     if (purpose === "plan" && (!who.clientId || !who.canManage)) return { ok: false, message: "Only the business owner or a manager can change this." };
-    if (purpose === "test" && !who.isAdmin) return { ok: false, message: "Only Thabaal can do this." };
+    if (purpose === "test" && !(await canTest(who))) return { ok: false, message: "The test package isn't on for this business." };
     const subs = await db.razorpayRecord.findMany({
-      where: { kind: "subscription", purpose, ...(purpose === "plan" ? { clientId: who.clientId } : {}), status: { in: LIVE_SUB } },
+      where: { kind: "subscription", purpose, clientId: who.clientId ?? null, status: { in: LIVE_SUB } },
     });
     if (!subs.length) return { ok: false, message: "Auto-renew isn't on." };
     for (const s of subs) {
@@ -242,7 +277,12 @@ export async function startOrder(who: Who, purpose: "wallet" | "test", rupeesAmo
     let clientId: string | null = null;
     let amountPaise = TEST_PAISE;
     if (purpose === "test") {
-      if (!who.isAdmin) return { ok: false, message: "Only Thabaal can run the test payment." };
+      if (!(await canTest(who))) return { ok: false, message: "The test package isn't on for this business." };
+      clientId = who.clientId ?? null;
+    } else if (rupeesAmount === 1 && (await testPackageFor(who.clientId)) && who.canManage) {
+      // ₹1 wallet test for the business with the test package: credited to its wallet like any recharge.
+      clientId = who.clientId;
+      amountPaise = TEST_PAISE;
     } else {
       if (!who.clientId || !who.canManage) return { ok: false, message: "Only the business owner or a manager can recharge." };
       const client = await db.client.findUnique({ where: { id: who.clientId }, select: { billingMode: true } });
@@ -265,7 +305,7 @@ export async function startOrder(who: Who, purpose: "wallet" | "test", rupeesAmo
       id: order.id,
       keyId: k.keyId,
       amountPaise,
-      label: purpose === "test" ? "Thabaal live test" : "Wallet recharge",
+      label: purpose === "test" ? "Thabaal ₹1 test package" : "Wallet recharge",
       startsLabel: null,
     };
   } catch (e) {
@@ -371,7 +411,7 @@ export async function confirmOrderCheckout(who: Who, input: { orderId: string; p
   try {
     if (!orderSignatureOk(input.orderId, input.paymentId, input.signature)) return { ok: false, message: "This payment couldn't be confirmed. If money left your account, contact Thabaal." };
     const rec = await db.razorpayRecord.findUnique({ where: { rzpId: input.orderId }, select: { purpose: true, clientId: true } });
-    if (!rec || (rec.purpose === "test" ? !who.isAdmin : rec.clientId !== who.clientId)) return { ok: false, message: "Payment not found." };
+    if (!rec || (rec.clientId ? rec.clientId !== who.clientId : !who.isAdmin)) return { ok: false, message: "Payment not found." };
     return await applyOrderPayment(input.orderId, input.paymentId);
   } catch (e) {
     console.error("razorpay confirmOrderCheckout", e);
@@ -512,7 +552,7 @@ export async function handleRazorpayEvent(body: WebhookBody): Promise<string> {
 /** ₹1 monthly auto-renew on Thabaal's live keys. Grants nothing; cancel it after the first charge. */
 export async function startTestSubscription(who: Who): Promise<CheckoutStart> {
   try {
-    if (!who.isAdmin) return { ok: false, message: "Only Thabaal can run the test." };
+    if (!(await canTest(who))) return { ok: false, message: "The test package isn't on for this business." };
     const k = keysOr();
     const planId = await razorpayPlanId("test", "m", TEST_PAISE);
     const sub = await rzp<RzpSubscription>("POST", "/subscriptions", {
@@ -521,10 +561,10 @@ export async function startTestSubscription(who: Who): Promise<CheckoutStart> {
       quantity: 1,
       customer_notify: 1,
       expire_by: nowSec() + 86_400,
-      notes: { purpose: "test" },
+      notes: { purpose: "test", clientId: who.clientId ?? "" },
     });
-    await db.razorpayRecord.create({ data: { kind: "subscription", rzpId: sub.id, purpose: "test", plan: "test", cycle: "m", amountPaise: TEST_PAISE, status: sub.status || "created", createdBy: who.name } });
-    return { ok: true, kind: "subscription", id: sub.id, keyId: k.keyId, amountPaise: TEST_PAISE, label: "Thabaal live test · auto-renew", startsLabel: null };
+    await db.razorpayRecord.create({ data: { kind: "subscription", rzpId: sub.id, purpose: "test", clientId: who.clientId ?? null, plan: "test", cycle: "m", amountPaise: TEST_PAISE, status: sub.status || "created", createdBy: who.name } });
+    return { ok: true, kind: "subscription", id: sub.id, keyId: k.keyId, amountPaise: TEST_PAISE, label: "Thabaal ₹1 test package · auto-renew", startsLabel: null };
   } catch (e) {
     console.error("razorpay startTestSubscription", e);
     return { ok: false, message: say(e) };

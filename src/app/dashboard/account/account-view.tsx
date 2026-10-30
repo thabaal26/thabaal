@@ -25,6 +25,7 @@ import {
 import { saveBillingDetails, sendPlanPayment, submitCustomWorkRequest, withdrawPlanPayment } from "../actions/account";
 import { rzpCancelAutoRenew, rzpConfirm, rzpStartPlan } from "../actions/razorpay";
 import { openRazorpay } from "@/components/razorpay-checkout";
+import { RazorpayTest } from "../../admin/settings/razorpay-test";
 import type { AccessState } from "@/lib/subscription-core";
 import type { BillingView, HistoryRow } from "./billing-types";
 import "./account.css";
@@ -51,6 +52,8 @@ export type AccountViewProps = {
   adminPanel?: ReactNode;
   /** Online payment through Razorpay (auto-renew). Off when the keys aren't set; UPI stays as the backup. */
   razorpay?: { enabled: boolean; autoRenew: { plan: PlanKey; cycle: BillingCycle; status: string; amount: number } | null };
+  /** The ₹1 Razorpay test package, offered to one business for checking live payments. */
+  testPackage?: { hasTestSub: boolean; rows: { id: string; what: string; amount: number; status: string; note: string | null; when: string }[] } | null;
 };
 
 const CYCLE_LENGTH: Record<BillingCycle, string> = { m: "1 month", q: "3 months", y: "12 months" };
@@ -74,7 +77,7 @@ const PHASE: Record<HistoryRow["phase"], { label: string; tone: "ok" | "warn" | 
   cancelled: { label: "Withdrawn", tone: "mute" },
 };
 
-export function AccountView({ billing, usage, billingProfile: initialProfile, customWorkRequests: initialCW = [], adminPanel, razorpay }: AccountViewProps) {
+export function AccountView({ billing, usage, billingProfile: initialProfile, customWorkRequests: initialCW = [], adminPanel, razorpay, testPackage }: AccountViewProps) {
   const router = useRouter();
   const notify = (text: string, ok = true) => toast(ok, text);
   const [busy, startBusy] = useTransition();
@@ -610,6 +613,38 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
               <button type="button" className="btn sm primary" onClick={() => setActiveTab("plans")}>
                 See plans
               </button>
+            </div>
+          )}
+
+          {/* ₹1 Razorpay test package: only for the business it is switched on for */}
+          {rzpOn && testPackage && billing.canPay && (
+            <div className="card" style={{ marginBottom: 16, borderLeft: "6px solid var(--bar2)" }}>
+              <div className="hd" style={{ marginBottom: 8 }}>
+                <div>
+                  <h2 style={{ fontSize: 17 }}>Razorpay test package · ₹1</h2>
+                  <p className="muted small">
+                    For checking live Razorpay payments. The plan tests don&apos;t change your plan; the wallet test adds ₹1 to your wallet. Your real plan
+                    carries on as it is.
+                  </p>
+                </div>
+              </div>
+              <RazorpayTest hasTestSub={testPackage.hasTestSub} showWallet />
+              {testPackage.rows.length > 0 && (
+                <div className="list" style={{ marginTop: 12 }}>
+                  {testPackage.rows.map((r) => (
+                    <div className="row" key={r.id}>
+                      <div className="grow">
+                        <div className="t">{r.what}</div>
+                        <div className="muted small">
+                          {r.when}
+                          {r.note ? ` · ${r.note}` : ""}
+                        </div>
+                      </div>
+                      <Pill tone={["paid", "active", "authenticated"].includes(r.status) ? "ok" : ["failed", "halted", "pending"].includes(r.status) ? "bad" : "info"}>{r.status}</Pill>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

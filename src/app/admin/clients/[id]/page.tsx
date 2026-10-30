@@ -14,6 +14,8 @@ import { APP_TZ } from "@/lib/format";
 import { numberHealth } from "@/lib/limits";
 import { getSettings } from "@/lib/provider";
 import { requireAdminPage } from "@/lib/session";
+import { razorpayTestOn } from "@/lib/razorpay-billing";
+import { rzpSetTestPackage } from "../../../dashboard/actions/razorpay";
 import { deleteClientUser } from "../../../dashboard/actions/clients";
 import { AdminPlanPanel } from "../../../dashboard/account/admin-plan-panel";
 import { ClientAppearance } from "../../../dashboard/appearance-editor";
@@ -170,6 +172,9 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
             <ViewAsButton clientId={c.id} />
             <OpenToChange clientId={c.id} />
+            <ActionButton action={rzpSetTestPackage.bind(null, c.id, !razorpayTestOn(c))} variant="ghost">
+              {razorpayTestOn(c) ? "Turn off ₹1 Razorpay test" : "Offer ₹1 Razorpay test"}
+            </ActionButton>
             {waPhone ? (
               <a className="btn sm" href={`https://wa.me/${waPhone}`} target="_blank" rel="noopener noreferrer">
                 Message on WhatsApp

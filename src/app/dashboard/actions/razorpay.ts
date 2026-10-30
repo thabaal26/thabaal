@@ -1,6 +1,8 @@
 "use server";
 
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { db } from "@/lib/db";
 import { getScope, requireUser } from "@/lib/session";
 import {
   cancelAutoRenew,
@@ -64,6 +66,23 @@ export async function rzpTestOrder(): Promise<CheckoutStart> {
 export async function rzpTestSubscription(): Promise<CheckoutStart> {
   return startTestSubscription(await who());
 }
+export async function rzpTestWallet(): Promise<CheckoutStart> {
+  return startOrder(await who(), "wallet", 1);
+}
+
+/** Thabaal admin: offer (or stop offering) the ₹1 test package to one business. */
+export async function rzpSetTestPackage(clientId: string, on: boolean): Promise<Result> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") return { ok: false, message: "Only Thabaal can change this." };
+  const c = await db.client.findUnique({ where: { id: clientId }, select: { appearance: true } });
+  if (!c) return { ok: false, message: "Business not found." };
+  const a = c.appearance && typeof c.appearance === "object" && !Array.isArray(c.appearance) ? (c.appearance as Record<string, unknown>) : {};
+  await db.client.update({ where: { id: clientId }, data: { appearance: { ...a, razorpayTest: on } as Prisma.InputJsonValue } });
+  revalidatePath(`/admin/clients/${clientId}`);
+  revalidatePath("/dashboard/account");
+  return { ok: true, message: on ? "₹1 test package is on for this business." : "₹1 test package is off for this business." };
+}
+
 export async function rzpCancelTest(): Promise<Result> {
   return refresh(await cancelAutoRenew(await who(), "test"));
 }

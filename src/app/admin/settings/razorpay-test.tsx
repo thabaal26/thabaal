@@ -4,10 +4,13 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { openRazorpay } from "@/components/razorpay-checkout";
 import { toast } from "@/components/toast";
-import { rzpCancelTest, rzpConfirm, rzpTestOrder, rzpTestSubscription } from "../../dashboard/actions/razorpay";
+import { rzpCancelTest, rzpConfirm, rzpTestOrder, rzpTestSubscription, rzpTestWallet } from "../../dashboard/actions/razorpay";
 
-/** ₹1 live payments that run the real checkout, signature check and webhook, and grant nothing. */
-export function RazorpayTest({ hasTestSub }: { hasTestSub: boolean }) {
+/**
+ * ₹1 live payments that run the real checkout, signature check and webhook. The plan tests grant nothing;
+ * the wallet test (for the business with the test package) adds a real ₹1 to its wallet.
+ */
+export function RazorpayTest({ hasTestSub, showWallet = false }: { hasTestSub: boolean; showWallet?: boolean }) {
   const [busy, start] = useTransition();
   const router = useRouter();
   const run = (make: typeof rzpTestOrder) =>
@@ -28,6 +31,11 @@ export function RazorpayTest({ hasTestSub }: { hasTestSub: boolean }) {
       <button type="button" className="btn sm" disabled={busy} onClick={() => run(rzpTestSubscription)}>
         ₹1 auto-renew test
       </button>
+      {showWallet && (
+        <button type="button" className="btn sm" disabled={busy} onClick={() => run(rzpTestWallet)}>
+          ₹1 wallet test
+        </button>
+      )}
       {hasTestSub && (
         <button
           type="button"
