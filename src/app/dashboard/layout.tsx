@@ -22,6 +22,8 @@ import { InlineScript } from "@/components/inline-script";
 import "./portal.css";
 import { PlanDueBar } from "./plan-due-bar";
 import { ViewOnlyBar } from "./view-only-bar";
+import { LogOut } from "@/components/icons";
+import { logout } from "../login/actions";
 import { clientAccess } from "@/lib/plan-access";
 import { PLANS, inr } from "@/lib/account-plans";
 import { appearanceAttrs, appearanceDataset, appearanceScript, resolveAppearance } from "@/lib/appearance";
@@ -224,13 +226,27 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
                 <span className="text-2xs font-semibold text-muted">மொழி / Lang</span>
                 <LanguageSwitch size="sm" />
               </div>
-              <Link href="/dashboard/settings" className="flex items-center gap-2.5 rounded-xl p-2 transition hover:bg-sunken">
-                <ClientMark logoUrl={client?.logoUrl} name={name} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13.5px] font-semibold text-ink">{name}</span>
-                  {status && <span className="block text-[12px]">{status}</span>}
-                </span>
-              </Link>
+              {/* The business card opens Settings; sign out sits beside it, the last thing in the menu. */}
+              <div className="flex items-center gap-1">
+                <Link href="/dashboard/settings" className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl p-2 transition hover:bg-sunken">
+                  <ClientMark logoUrl={client?.logoUrl} name={name} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13.5px] font-semibold text-ink">{name}</span>
+                    {status && <span className="block text-[12px]">{status}</span>}
+                  </span>
+                </Link>
+                <form action={logout} className="shrink-0">
+                  <button
+                    type="submit"
+                    title="Sign out · வெளியேறு"
+                    aria-label="Sign out"
+                    className="flex h-12 w-11 flex-col items-center justify-center gap-0.5 rounded-xl border border-line text-muted transition hover:border-danger-border hover:bg-danger-bg hover:text-danger"
+                  >
+                    <LogOut aria-hidden className="size-[18px]" />
+                    <span className="text-[10px] font-semibold leading-none">Logout</span>
+                  </button>
+                </form>
+              </div>
             </div>
           </aside>
 
