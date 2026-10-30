@@ -15,6 +15,7 @@ export type TableRow = {
   state: string;
   stateTone: string;
   stateLabel: string;
+  autoPay: "on" | "failing" | "off" | "none";
   monthly: number;
   renewal: number;
   camp: number;
@@ -135,6 +136,11 @@ export function ClientsTable({ rows }: { rows: TableRow[] }) {
                     </td>
                     <td>
                       <span className={`pill ${r.stateTone}`}>{r.stateLabel}</span>
+                  {r.autoPay !== "none" && (
+                    <div className={`small ${r.autoPay === "failing" ? "" : "muted"}`} style={{ marginTop: 4, ...(r.autoPay === "failing" ? { color: "var(--bad, #c0392b)", fontWeight: 600 } : {}) }}>
+                      {r.autoPay === "on" ? "Auto-pay on" : r.autoPay === "failing" ? "Auto-pay failing" : "Auto-pay turned off"}
+                    </div>
+                  )}
                     </td>
                     <td className="num">{r.monthly ? R(r.monthly) : "–"}</td>
                     <td>

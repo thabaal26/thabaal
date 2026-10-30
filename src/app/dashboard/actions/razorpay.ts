@@ -33,12 +33,12 @@ function refresh<T extends { ok: boolean }>(r: T): T {
 }
 
 /**
- * Monthly and quarterly plans renew automatically unless the client opts out; yearly plans are paid once
- * (every yearly charge is above the ₹15,000 UPI AutoPay / card e-mandate limit, so a mandate would fail).
+ * Every plan (monthly, quarterly, yearly) renews automatically unless the client unticks it. Yearly Growth and
+ * Business are above the ₹15,000 UPI AutoPay limit, so their renewals may need the client's approval each year.
  */
 export async function rzpStartPlan(plan: string, cycle: string, autoRenew = true): Promise<CheckoutStart> {
   const w = await who();
-  return autoRenew && cycle !== "y" ? startPlanSubscription(w, plan, cycle) : startPlanOrder(w, plan, cycle);
+  return autoRenew ? startPlanSubscription(w, plan, cycle) : startPlanOrder(w, plan, cycle);
 }
 
 export async function rzpStartRecharge(amount: number): Promise<CheckoutStart> {

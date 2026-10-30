@@ -46,6 +46,7 @@ export default async function ClientsPage() {
     state: r.state,
     stateTone: r.stateTone,
     stateLabel: r.stateLabel,
+    autoPay: r.autoPay,
     monthly: r.monthly,
     renewal: r.renewal,
     camp: r.usage.campaignsMonth,
