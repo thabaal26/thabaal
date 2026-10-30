@@ -64,7 +64,7 @@ export function PaymentsTable({ rows }: { rows: PayRow[] }) {
                       </td>
                       <td className="small">{r.what}</td>
                       <td className="num">{R(r.amount)}</td>
-                      <td className="small">{r.utr ?? (r.method === "ADMIN_RECORD" ? "recorded by Thabaal" : "–")}</td>
+                      <td className="small">{r.method === "RAZORPAY" ? `Razorpay ${r.utr ?? ""}` : (r.utr ?? (r.method === "ADMIN_RECORD" ? "recorded by Thabaal" : "–"))}</td>
                       <td>
                         <span className={`pill ${tone}`}>{label}</span>
                       </td>

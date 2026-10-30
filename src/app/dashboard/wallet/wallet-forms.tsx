@@ -8,6 +8,8 @@ import { toastResult } from "@/components/toast";
 import { Button, CheckRow, Field } from "@/components/ui";
 import { CATEGORY_NAMES, chargeFor, META_RATES, WALLET_CATEGORIES } from "@/lib/wallet-rates";
 import { adjustWallet, decideRecharge, requestRecharge, saveWalletPayment, saveWalletSettings } from "../actions/wallet";
+import { rzpConfirm, rzpStartRecharge } from "../actions/razorpay";
+import { openRazorpay } from "@/components/razorpay-checkout";
 
 type Result = { ok: boolean; message?: string; errors?: string[] };
 
@@ -29,12 +31,23 @@ function useSubmit() {
 const QUICK = [500, 1000, 2000, 5000];
 
 /** Pay by UPI (QR or ID), then send the transaction ID so Thabaal can confirm it. */
-export function RechargeForm({ upiId, payee, clientName }: { upiId: string | null; payee: string | null; clientName: string }) {
+export function RechargeForm({ upiId, payee, clientName, online = false }: { upiId: string | null; payee: string | null; clientName: string; online?: boolean }) {
   const [amount, setAmount] = useState("1000");
   const [utr, setUtr] = useState("");
   const [note, setNote] = useState("");
   const [qr, setQr] = useState<string | null>(null);
   const { pending, submit } = useSubmit();
+  // Online (Razorpay) first when it is set up; paying by UPI and sending the reference stays as the backup.
+  const [manual, setManual] = useState(!online);
+  const payOnline = () =>
+    submit(async () => {
+      const start = await rzpStartRecharge(value);
+      if (!start.ok) return start;
+      const out = await openRazorpay(start);
+      if (out.status === "closed") return { ok: false, message: "Payment not completed. Nothing was added." };
+      if (out.status === "failed") return { ok: false, message: out.message };
+      return rzpConfirm({ kind: start.kind, id: start.id, paymentId: out.paymentId, signature: out.signature });
+    });
   const value = Number(amount);
   const link =
     upiId && value >= 1
@@ -49,6 +62,34 @@ export function RechargeForm({ upiId, payee, clientName }: { upiId: string | nul
       alive = false;
     };
   }, [link]);
+
+  if (online && !manual) {
+    return (
+      <div className="space-y-4">
+        <Field id="w-amount" label="Amount (₹)" required>
+          <input id="w-amount" className="field tabular" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))} />
+        </Field>
+        <div className="flex flex-wrap gap-2">
+          {QUICK.map((q) => (
+            <button key={q} type="button" onClick={() => setAmount(String(q))} className="rounded-full border border-line px-3 py-1 text-sm text-ink-2 hover:border-brand hover:text-ink">
+              ₹{q.toLocaleString("en-IN")}
+            </button>
+          ))}
+        </div>
+        <p className="text-sm text-ink-2">UPI, card or net banking through Razorpay. The money is added to your wallet as soon as the payment goes through.</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="button" loading={pending} onClick={payOnline} className="max-sm:w-full">
+            Pay ₹{(value || 0).toLocaleString("en-IN")} now
+          </Button>
+          {upiId && (
+            <button type="button" className="text-sm font-medium text-ink-2 underline underline-offset-2 hover:text-ink" onClick={() => setManual(true)}>
+              Paid by UPI already? Send the reference
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (!upiId) {
     return <p className="text-sm text-muted">Recharges open once Thabaal adds its UPI ID. Contact Thabaal to add money in the meantime.</p>;

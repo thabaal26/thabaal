@@ -9,6 +9,8 @@ import { ConnectWhatsApp } from "../connect-whatsapp";
 import { PortalPage } from "../portal-ui";
 import { AccountView } from "./account-view";
 import { adminQueue } from "@/lib/admin-queue";
+import { razorpayReady } from "@/lib/razorpay";
+import { autoRenewView } from "@/lib/razorpay-billing";
 import { AdminPlanPanel } from "./admin-plan-panel";
 import type { AdminPendingRow, BillingView, HistoryRow, PeriodView } from "./billing-types";
 
@@ -145,6 +147,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       usage={{ numbers, staff, campaigns: campaignsCount, templates: templatesCount }}
       billingProfile={billingProfile}
       customWorkRequests={customWorkRequests}
+      razorpay={{ enabled: razorpayReady(), autoRenew: razorpayReady() ? await autoRenewView(clientId) : null }}
       adminPanel={
         scope.isAdmin ? (
           <AdminPlanPanel

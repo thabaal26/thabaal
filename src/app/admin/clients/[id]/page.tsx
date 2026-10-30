@@ -191,11 +191,11 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
               <div key={p.id} className={`e ${p.status === "VERIFIED" ? "ok" : p.status === "REJECTED" ? "bad" : ""}`}>
                 <b>
                   {planName(p.plan)} · {cycleName(p.cycle)} · {R(p.amountPaise / 100)} ·{" "}
-                  {p.status === "VERIFIED" ? (p.method === "ADMIN_RECORD" ? "recorded by Thabaal" : "verified") : p.status === "PENDING" ? "waiting for you to check" : p.status.toLowerCase()}
+                  {p.status === "VERIFIED" ? (p.method === "ADMIN_RECORD" ? "recorded by Thabaal" : p.method === "RAZORPAY" ? "paid via Razorpay" : "verified") : p.status === "PENDING" ? "waiting for you to check" : p.status.toLowerCase()}
                 </b>
                 <div className="d">
                   {p.startsAt && p.endsAt ? `${day(p.startsAt)} to ${day(p.endsAt)}` : `sent ${day(p.createdAt)}`}
-                  {p.utr ? ` · UPI ${p.utr}` : ""}
+                  {p.utr ? ` · ${p.method === "RAZORPAY" ? "Razorpay" : "UPI"} ${p.utr}` : ""}
                 </div>
               </div>
             ))}

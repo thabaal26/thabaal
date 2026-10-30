@@ -9,17 +9,21 @@ import { PaymentSettingsForm } from "../../dashboard/wallet/wallet-forms";
 import { OpenPortalSettings } from "../support/support-tools";
 import { ComingNext, PageHead, Pill, R } from "../ui";
 import { PlanRequiredToggle } from "./plan-toggle";
+import { razorpayStatus } from "@/lib/razorpay-billing";
+import { RazorpayTest } from "./razorpay-test";
 
 export const metadata: Metadata = { title: "Settings" };
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   await requireAdminPage();
-  const [{ rows }, setting, admins] = await Promise.all([
+  const [{ rows }, setting, admins, rzp] = await Promise.all([
     loadClientRows(),
     db.setting.findUnique({ where: { id: 1 } }),
     db.user.findMany({ where: { role: "ADMIN" }, select: { id: true, name: true, email: true, createdAt: true }, orderBy: { createdAt: "asc" } }),
+    razorpayStatus(),
   ]);
+  const when = (d: Date) => d.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
   const paying = rows.filter((r) => r.state === "ok" || r.state === "due");
 
   return (
@@ -27,6 +31,70 @@ export default async function SettingsPage() {
       <PageHead title="Settings" sub="Plans, how businesses pay, what happens when they don't, and your team." tools={<OpenPortalSettings />} />
       <div className="g2x">
         <div className="stack" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="card">
+            <div className="hd">
+              <div>
+                <h2>Razorpay</h2>
+                <p>Plan auto-renew and wallet recharges. Keys live in Vercel; only the key type is shown here.</p>
+              </div>
+              {rzp.configured ? <Pill tone={rzp.mode === "live" ? "ok" : "warn"}>{rzp.mode === "live" ? "Live" : "Test mode"}</Pill> : <Pill tone="bad">Not set up</Pill>}
+            </div>
+            <div className="list">
+              <div className="row">
+                <div className="grow muted">API key</div>
+                <b>{rzp.keyIdHint ?? "RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET missing"}</b>
+              </div>
+              <div className="row">
+                <div className="grow muted">Webhook secret</div>
+                {rzp.webhookSecret ? <Pill tone="ok">Set</Pill> : <Pill tone="bad">RAZORPAY_WEBHOOK_SECRET missing</Pill>}
+              </div>
+              <div className="row">
+                <div className="grow muted">Last webhook</div>
+                <b>{rzp.events[0] ? `${rzp.events[0].event} · ${when(rzp.events[0].createdAt)}` : "None received yet"}</b>
+              </div>
+            </div>
+            {rzp.configured && (
+              <div style={{ marginTop: 14 }}>
+                <p className="muted small" style={{ marginBottom: 8 }}>
+                  Live test: pays ₹1 with the real keys, checks the signature and the webhook, and changes no business. Refund it from the Razorpay dashboard.
+                </p>
+                <RazorpayTest hasTestSub={rzp.recent.some((r) => r.purpose === "test" && r.kind === "subscription" && ["authenticated", "active", "pending", "halted"].includes(r.status))} />
+              </div>
+            )}
+            {rzp.recent.length > 0 && (
+              <div className="tw" style={{ marginTop: 14 }}>
+                <table className="dt">
+                  <thead>
+                    <tr>
+                      <th>What</th>
+                      <th>Business</th>
+                      <th className="num">Amount</th>
+                      <th>Status</th>
+                      <th>Updated</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rzp.recent.map((r) => (
+                      <tr key={r.id}>
+                        <td>
+                          <b>{r.purpose === "test" ? "Test" : r.purpose === "wallet" ? "Wallet recharge" : `Plan ${r.plan ?? ""}`}</b>
+                          <div className="muted small">{r.kind === "subscription" ? "Auto-renew" : "One-time"} · {r.rzpId}</div>
+                          {r.note && <div className="muted small">{r.note}</div>}
+                        </td>
+                        <td>{rows.find((c) => c.id === r.clientId)?.name ?? (r.clientId ? "—" : "Thabaal")}</td>
+                        <td className="num">{R(r.amountPaise / 100)}</td>
+                        <td>
+                          <Pill tone={["paid", "active", "authenticated"].includes(r.status) ? "ok" : ["failed", "halted", "pending"].includes(r.status) ? "bad" : "info"}>{r.status}</Pill>
+                        </td>
+                        <td className="muted small">{when(r.updatedAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
           <div className="card">
             <div className="hd">
               <div>
@@ -72,7 +140,7 @@ export default async function SettingsPage() {
             <div className="hd">
               <div>
                 <h2>Ways a business can pay</h2>
-                <p>Plan payments go by UPI to {SUPPLIER_INFO.vpa}; the business sends the reference and you confirm it under Payments.</p>
+                <p>Online through Razorpay (added straight away), or by UPI to {SUPPLIER_INFO.vpa} with a reference you confirm under Payments.</p>
               </div>
             </div>
             <p className="muted small" style={{ marginBottom: 10 }}>

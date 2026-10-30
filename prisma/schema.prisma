@@ -700,3 +700,44 @@ model LoginAttempt {
 
   @@index([key, createdAt])
 }
+
+/// A Razorpay object Thabaal created for its own fees (lib/razorpay-billing.ts). Payments are matched to the
+/// business through this row, never through what the browser sends. prisma/sql/2026-10-30-razorpay.sql.
+model RazorpayRecord {
+  id          String   @id @default(cuid())
+  /// plan_def (a Razorpay plan) | subscription | order
+  kind        String
+  /// plan_xxx | sub_xxx | order_xxx
+  rzpId       String   @unique
+  /// plan (Thabaal plan auto-renew) | wallet (recharge) | test (admin's live test; grants nothing)
+  purpose     String
+  clientId    String?
+  plan        String?
+  cycle       String?
+  /// Expected amount of each charge, in paise.
+  amountPaise Int
+  /// Razorpay's status for subscriptions (created, authenticated, active, pending, halted, cancelled, completed);
+  /// created | paid | failed for orders; ready for plan definitions.
+  status      String   @default("created")
+  /// plan_def: "<plan>-<cycle>-<paise>", so a price change makes a new Razorpay plan.
+  lookupKey   String?
+  /// The last payment seen for this object.
+  paymentId   String?
+  /// What the payment produced: PlanPurchase id or WalletEntry id.
+  refId       String?
+  note        String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([kind, lookupKey])
+  @@index([clientId, kind, status])
+  @@index([paymentId])
+}
+
+/// Razorpay webhook events already handled (x-razorpay-event-id).
+model RazorpayEvent {
+  id        String   @id
+  event     String
+  createdAt DateTime @default(now())
+}

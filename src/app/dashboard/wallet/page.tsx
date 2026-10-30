@@ -8,6 +8,7 @@ import { SUPPLIER_INFO } from "@/lib/account-plans";
 import { db } from "@/lib/db";
 import { APP_TZ, fmtDate } from "@/lib/format";
 import { getScope } from "@/lib/session";
+import { razorpayReady } from "@/lib/razorpay";
 import { walletBalance, walletBalances } from "@/lib/wallet";
 import { CATEGORY_NAMES, chargeFor, ratesFor, rupees, WALLET_CATEGORIES, type WalletCategory } from "@/lib/wallet-rates";
 import { AdjustForm, DecideRecharge, PaymentSettingsForm, RechargeForm, WalletSettingsForm } from "./wallet-forms";
@@ -229,9 +230,9 @@ async function ClientWallet({ clientId, isAdmin, canManage }: { clientId: string
       {canManage && (
         <ScrollReveal>
           <Card className="card-3d mb-5">
-            <CardHeader tone="brand" icon={<Rupee3D />} title="Add money" description="Pay by UPI, then send the transaction ID. The money is added once Thabaal confirms it." />
+            <CardHeader tone="brand" icon={<Rupee3D />} title="Add money" description={razorpayReady() ? "Pay online and the money is added straight away. Paying by UPI with a reference still works." : "Pay by UPI, then send the transaction ID. The money is added once Thabaal confirms it."} />
             <div className="p-4 sm:p-5">
-              <RechargeForm upiId={settings?.walletUpiId || SUPPLIER_INFO.vpa} payee={settings?.walletPayee || SUPPLIER_INFO.legal} clientName={client.name} />
+              <RechargeForm upiId={settings?.walletUpiId || SUPPLIER_INFO.vpa} payee={settings?.walletPayee || SUPPLIER_INFO.legal} clientName={client.name} online={razorpayReady()} />
             </div>
           </Card>
         </ScrollReveal>
