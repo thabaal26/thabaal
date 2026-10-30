@@ -191,6 +191,7 @@ export async function setMetaAccountBalance(
     });
   }
   pricingCache.clear();
+  costSinceCache.clear();
   return getMetaAccountInfo(wabaId, clientId);
 }
 
@@ -324,6 +325,46 @@ export async function fetchMetaLivePricing(
     return out;
   } catch {
     return empty;
+  }
+}
+
+const costSinceCache = new Map<string, { expiresAt: number; cost: number }>();
+
+/**
+ * What Meta charged this client's WhatsApp account (ex-GST) from `fromSec` until now, read from
+ * `pricing_analytics` in half-hour buckets so spend on the day of a balance sync is counted from the sync on.
+ * Null when Meta can't be asked (no token, API error): the caller falls back to its own estimate.
+ */
+export async function fetchMetaCostSince(clientId: string, fromSec: number): Promise<number | null> {
+  try {
+    const [client, number] = await Promise.all([
+      db.client.findUnique({ where: { id: clientId }, select: { waToken: true, waBusinessAccountId: true } }),
+      db.whatsAppNumber.findFirst({ where: { clientId }, orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }] }),
+    ]);
+    const token = number?.token || client?.waToken;
+    const wabaId = number?.businessAccountId || client?.waBusinessAccountId;
+    if (!token || !wabaId) return null;
+    const start = Math.floor(fromSec / 1800) * 1800;
+    const key = `${wabaId}:${start}`;
+    const hit = costSinceCache.get(key);
+    if (hit && hit.expiresAt > Date.now()) return hit.cost;
+    const end = Math.ceil(Date.now() / 1000 / 1800) * 1800 + 1800;
+    // Meta keeps half-hour data for a limited time; a sync older than ~90 days needs daily buckets.
+    const granularity = Date.now() / 1000 - start > 80 * 86400 ? "DAILY" : "HALF_HOUR";
+    const field = `pricing_analytics.start(${start}).end(${end}).granularity(${granularity}).dimensions(["PRICING_CATEGORY"])`;
+    const res = await fetch(`https://graph.facebook.com/${VERSION}/${wabaId}?fields=${encodeURIComponent(field)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    })
+      .then((r) => r.json())
+      .catch(() => null);
+    if (!res || res.error || !res.id) return null;
+    const points: { start?: number; cost?: number }[] = res.pricing_analytics?.data?.[0]?.data_points ?? [];
+    const cost = Math.round(points.filter((p) => Number(p.start ?? 0) >= start).reduce((n, p) => n + Number(p.cost ?? 0), 0) * 100) / 100;
+    costSinceCache.set(key, { expiresAt: Date.now() + 60_000, cost });
+    return cost;
+  } catch {
+    return null;
   }
 }
 
