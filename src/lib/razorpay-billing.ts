@@ -89,12 +89,42 @@ export async function testRecords(clientId: string) {
 
 /* ----------------------------------------------------------------- plans */
 
+type RzpPlan = { id: string; period: string; interval: number; item?: { amount?: number; currency?: string; active?: boolean; name?: string } };
+
+/** A plan in the Razorpay account with this amount and billing frequency (Thabaal-named ones first), or null. */
+async function findDashboardPlan(cycle: BillingCycle, amountPaise: number): Promise<string | null> {
+  const months = INTERVAL[cycle];
+  const matches: RzpPlan[] = [];
+  for (let skip = 0; skip < 500; skip += 100) {
+    const page = await rzp<{ items: RzpPlan[] }>("GET", `/plans?count=100&skip=${skip}`);
+    for (const p of page.items ?? []) {
+      const everyMonths = p.period === "monthly" ? p.interval : p.period === "yearly" ? p.interval * 12 : -1;
+      if (everyMonths === months && p.item?.amount === amountPaise && (p.item?.currency ?? "INR") === "INR" && p.item?.active !== false) matches.push(p);
+    }
+    if ((page.items ?? []).length < 100) break;
+  }
+  const named = matches.find((p) => /thabaal/i.test(p.item?.name ?? ""));
+  return (named ?? matches[0])?.id ?? null;
+}
+
 /** The Razorpay plan for a Thabaal plan, cycle and price, made once per key mode and reused. */
 async function razorpayPlanId(plan: PlanKey | "test", cycle: BillingCycle, amountPaise: number) {
   const mode = keysOr().mode;
   const lookupKey = `${plan}-${cycle}-${amountPaise}-${mode}`;
   const found = await db.razorpayRecord.findFirst({ where: { kind: "plan_def", lookupKey }, select: { rzpId: true } });
   if (found) return found.rzpId;
+  // Use a plan already made in the Razorpay Dashboard when one matches (same amount and billing frequency),
+  // so subscriptions sit under Thabaal's own named plans instead of duplicates.
+  const existing = await findDashboardPlan(cycle, amountPaise).catch((e) => {
+    console.error("razorpay plan lookup", e);
+    return null;
+  });
+  if (existing) {
+    await db.razorpayRecord.create({
+      data: { kind: "plan_def", rzpId: existing, purpose: plan === "test" ? "test" : "plan", plan, cycle, amountPaise, status: "ready", lookupKey, note: "From Razorpay Dashboard" },
+    });
+    return existing;
+  }
   const name = plan === "test" ? "Thabaal live test" : `Thabaal ${planDef(plan)!.n}`;
   const created = await rzp<{ id: string }>("POST", "/plans", {
     period: "monthly",

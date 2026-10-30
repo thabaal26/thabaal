@@ -275,7 +275,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
   const [upiOpen, setUpiOpen] = useState(false);
   // Monthly and quarterly renew by themselves unless unticked; yearly is always paid once (above the ₹15,000 autopay limit).
   const [renewAuto, setRenewAuto] = useState(true);
-  const willAutoRenew = !!buy && buy.cycle !== "y" && renewAuto;
+  const willAutoRenew = !!buy && renewAuto;
   const payOnline = () => {
     if (!buy) return;
     startBusy(async () => {
@@ -1869,11 +1869,6 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                     <p className="muted small" style={{ margin: "6px 0 10px" }}>
                       UPI, card or net banking. Your plan is added the moment the payment goes through; nobody has to check it.
                     </p>
-                    {buy.cycle === "y" ? (
-                      <p className="muted small" style={{ marginBottom: 14 }}>
-                        Yearly plans are paid once. We remind you before the year ends; nothing is charged automatically.
-                      </p>
-                    ) : (
                       <label className="small" style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 14, cursor: "pointer" }}>
                         <input type="checkbox" checked={renewAuto} onChange={(e) => setRenewAuto(e.target.checked)} style={{ marginTop: 2 }} />
                         <span>
@@ -1885,6 +1880,10 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                           </span>
                         </span>
                       </label>
+                    {renewAuto && buyPrice > 15000 && (
+                      <p className="muted small" style={{ marginTop: -6, marginBottom: 14 }}>
+                        UPI AutoPay covers up to ₹15,000 a charge, so your bank or UPI app may ask you to approve each renewal of this plan.
+                      </p>
                     )}
                     <button type="button" className="btn primary" disabled={busy} onClick={payOnline} style={{ width: "100%", justifyContent: "center" }}>
                       {busy ? "Opening payment..." : willAutoRenew && billing.nextStartLabel ? "Set up auto-renew with Razorpay" : `Pay ${inr(buyPrice)} with Razorpay`}
