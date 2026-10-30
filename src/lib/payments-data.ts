@@ -91,7 +91,7 @@ export async function paymentsData(clientId: string, period: "t" | "w" | "m") {
     customer: { select: { name: true } },
   } as const;
 
-  const [open, paid, events, pay] = await Promise.all([
+  const [open, paid, inEv, refundEv, failEv, pay] = await Promise.all([
     // Owed: not cancelled, money not (fully) in, from the last 60 days.
     db.order.findMany({
       where: { clientId, status: { in: ["NEW", "CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"] }, paidAt: null, createdAt: { gte: new Date(now.getTime() - 60 * DAY) } },
@@ -100,13 +100,11 @@ export async function paymentsData(clientId: string, period: "t" | "w" | "m") {
     }),
     // Received in the period (the paid date).
     db.order.findMany({ where: { clientId, paidAt: { gte: from } }, select: paySelect, orderBy: { paidAt: "desc" } }),
-    // Every payment event in the last 90 days, for All transactions and today's cash.
-    db.order.findMany({
-      where: { clientId, OR: [{ paidAt: { gte: ninety } }, { refundedAt: { gte: ninety } }, { paymentFailedAt: { gte: ninety } }] },
-      select: paySelect,
-      orderBy: { updatedAt: "desc" },
-      take: 600,
-    }),
+    // Payment events in the last 90 days for All transactions — one query per kind, each newest-first by its own
+    // date, so a cap drops the oldest events (not whichever orders happened to be edited longest ago).
+    db.order.findMany({ where: { clientId, paidAt: { gte: ninety } }, select: paySelect, orderBy: { paidAt: "desc" }, take: 600 }),
+    db.order.findMany({ where: { clientId, refundedAt: { gte: ninety } }, select: paySelect, orderBy: { refundedAt: "desc" }, take: 200 }),
+    db.order.findMany({ where: { clientId, paymentFailedAt: { gte: ninety } }, select: paySelect, orderBy: { paymentFailedAt: "desc" }, take: 200 }),
     paySettingsFor(clientId),
   ]);
 
@@ -150,21 +148,29 @@ export async function paymentsData(clientId: string, period: "t" | "w" | "m") {
   }));
 
   const txns: TxnRow[] = [];
-  for (const o of events) {
+  for (const o of inEv) {
     const name = o.customer.name;
     const ref = orderRef(o);
-    if (o.paidAt && o.paidAt >= ninety)
+    if (o.paidAt)
       txns.push({ key: `${o.id}-in`, orderId: o.id, ref, name, kind: "in", way: WAY_LABEL[wayOf(methodOf(o), o.paymentSource)], amount: receivedOf(o), atMs: o.paidAt.getTime(), status: "Received", reference: paymentRefs(o.paymentTxnId, o.paymentUtr) });
-    if (o.refundedAt && o.refundedAt >= ninety)
+  }
+  for (const o of refundEv) {
+    const name = o.customer.name;
+    const ref = orderRef(o);
+    if (o.refundedAt)
       txns.push({ key: `${o.id}-refund`, orderId: o.id, ref, name, kind: "refund", way: "Refund", amount: o.refundAmount ?? receivedOf(o), atMs: o.refundedAt.getTime(), status: "Refunded", reference: paymentRefs(o.paymentTxnId, o.paymentUtr) });
-    if (o.paymentFailedAt && o.paymentFailedAt >= ninety)
-      txns.push({ key: `${o.id}-fail`, orderId: o.id, ref, name, kind: "fail", way: "WhatsApp pay", amount: shown(o), atMs: o.paymentFailedAt.getTime(), status: o.paymentFailReason ?? "Failed", reference: paymentRefs(o.paymentTxnId, o.paymentUtr) });
+  }
+  for (const o of failEv) {
+    const name = o.customer.name;
+    const ref = orderRef(o);
+    if (o.paymentFailedAt)
+      txns.push({ key: `${o.id}-fail`, orderId: o.id, ref, name, kind: "fail", way: o.paymentFailReason?.startsWith("Expired") ? "Payment request" : "WhatsApp pay", amount: shown(o), atMs: o.paymentFailedAt.getTime(), status: o.paymentFailReason ?? "Failed", reference: paymentRefs(o.paymentTxnId, o.paymentUtr) });
   }
   txns.sort((a, b) => b.atMs - a.atMs);
 
   // Today's cash, by who collected it (the day close).
   const cashToday = new Map<string, CashDayRow>();
-  for (const o of events) {
+  for (const o of paid) {
     if (!o.paidAt || o.paidAt < today || wayOf(methodOf(o), o.paymentSource) !== "cash") continue;
     const by = o.collectedBy?.trim() || "Not noted";
     const row = cashToday.get(by) ?? { by, orders: 0, amount: 0 };
@@ -173,7 +179,7 @@ export async function paymentsData(clientId: string, period: "t" | "w" | "m") {
     cashToday.set(by, row);
   }
 
-  const receivedToday = events.filter((o) => o.paidAt && o.paidAt >= today).reduce((n, o) => n + receivedOf(o), 0);
+  const receivedToday = paid.filter((o) => o.paidAt && o.paidAt >= today).reduce((n, o) => n + receivedOf(o), 0);
 
   return {
     collect,

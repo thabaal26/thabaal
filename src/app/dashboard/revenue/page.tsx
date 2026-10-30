@@ -31,8 +31,8 @@ type TabId = (typeof TABS)[number]["id"];
 
 const PERIODS = [
   { id: "t", label: "Today", ta: "இன்று" },
-  { id: "w", label: "This week", ta: "இந்த வாரம்" },
-  { id: "m", label: "This month", ta: "இந்த மாதம்" },
+  { id: "w", label: "Last 7 days", ta: "கடந்த 7 நாட்கள்" },
+  { id: "m", label: "Last 30 days", ta: "கடந்த 30 நாட்கள்" },
 ] as const;
 
 const SUB = "Money received, money waiting and what you should collect today.";
@@ -279,7 +279,14 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
       </>
     );
   } else if (tab === "all") {
-    body = <TxnTable rows={d.txns.map((t) => ({ ...t, when: fmtDate(new Date(t.atMs), "d MMM, h:mm a") }))} canOperate={scope.canOperate} />;
+    body = (
+      <>
+        <TxnTable rows={d.txns.map((t) => ({ ...t, when: fmtDate(new Date(t.atMs), "d MMM, h:mm a") }))} canOperate={scope.canOperate} />
+        <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+          <T ta="கடந்த 90 நாட்களின் பரிவர்த்தனைகள்.">Showing the last 90 days.</T>
+        </p>
+      </>
+    );
   } else if (tab === "set") {
     const [client, ownPaymentTemplate, paymentTemplate, catalogue] = await Promise.all([
       db.client.findUnique({ where: { id: clientId }, select: { loyaltyAutoRedeem: true } }),
