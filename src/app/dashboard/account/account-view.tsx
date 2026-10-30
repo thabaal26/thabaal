@@ -23,6 +23,9 @@ import {
   numberToWordsINR,
 } from "@/lib/account-plans";
 import { saveBillingDetails, sendPlanPayment, submitCustomWorkRequest, withdrawPlanPayment } from "../actions/account";
+import { rzpCancelAutoRenew, rzpConfirm, rzpStartPlan } from "../actions/razorpay";
+import { openRazorpay } from "@/components/razorpay-checkout";
+import { RazorpayTest } from "../../admin/settings/razorpay-test";
 import type { AccessState } from "@/lib/subscription-core";
 import type { BillingView, HistoryRow } from "./billing-types";
 import "./account.css";
@@ -47,6 +50,10 @@ export type AccountViewProps = {
   }>;
   /** Thabaal admin's payment checks, shown above everything else. */
   adminPanel?: ReactNode;
+  /** Online payment through Razorpay (auto-renew). Off when the keys aren't set; UPI stays as the backup. */
+  razorpay?: { enabled: boolean; autoRenew: { plan: PlanKey; cycle: BillingCycle; status: string; amount: number } | null };
+  /** The ₹1 Razorpay test package, offered to one business for checking live payments. */
+  testPackage?: { hasTestSub: boolean; rows: { id: string; what: string; amount: number; status: string; note: string | null; when: string }[] } | null;
 };
 
 const CYCLE_LENGTH: Record<BillingCycle, string> = { m: "1 month", q: "3 months", y: "12 months" };
@@ -70,7 +77,7 @@ const PHASE: Record<HistoryRow["phase"], { label: string; tone: "ok" | "warn" | 
   cancelled: { label: "Withdrawn", tone: "mute" },
 };
 
-export function AccountView({ billing, usage, billingProfile: initialProfile, customWorkRequests: initialCW = [], adminPanel }: AccountViewProps) {
+export function AccountView({ billing, usage, billingProfile: initialProfile, customWorkRequests: initialCW = [], adminPanel, razorpay, testPackage }: AccountViewProps) {
   const router = useRouter();
   const notify = (text: string, ok = true) => toast(ok, text);
   const [busy, startBusy] = useTransition();
@@ -261,6 +268,47 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
   const limits = curPlan?.lim ?? null;
   const isStaffFull = limits ? usage.staff >= limits.staff : false;
   const isCampNearLimit = limits ? usage.campaigns / limits.camp >= 0.8 : false;
+
+  // Online payment (Razorpay): the server makes the subscription and checks the result; UPI + reference stays as the backup.
+  const rzpOn = !!razorpay?.enabled;
+  const autoRenew = razorpay?.autoRenew ?? null;
+  const [upiOpen, setUpiOpen] = useState(false);
+  // Monthly and quarterly renew by themselves unless unticked; yearly is always paid once (above the ₹15,000 autopay limit).
+  const [renewAuto, setRenewAuto] = useState(true);
+  const willAutoRenew = !!buy && buy.cycle !== "y" && renewAuto;
+  const payOnline = () => {
+    if (!buy) return;
+    startBusy(async () => {
+      const start = await rzpStartPlan(buy.plan, buy.cycle, willAutoRenew);
+      if (!start.ok) {
+        notify(start.message, false);
+        return;
+      }
+      const out = await openRazorpay(start, { name: biz.contactPerson || biz.shopName, email: biz.email, contact: biz.mobile });
+      if (out.status === "closed") {
+        notify("Payment not completed. Try again, or pay by UPI below.", false);
+        return;
+      }
+      if (out.status === "failed") {
+        notify(out.message, false);
+        return;
+      }
+      const res = await rzpConfirm({ kind: start.kind, id: start.id, paymentId: out.paymentId, signature: out.signature });
+      notify(res.message, res.ok);
+      if (res.ok) {
+        setBuy(null);
+        setActiveTab("sub");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        router.refresh();
+      }
+    });
+  };
+  const turnOffAutoRenew = () =>
+    startBusy(async () => {
+      const r = await rzpCancelAutoRenew();
+      notify(r.message, r.ok);
+      if (r.ok) router.refresh();
+    });
 
   // Copy helper
   const handleCopy = (text: string, label: string) => {
@@ -568,6 +616,68 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
             </div>
           )}
 
+          {/* ₹1 Razorpay test package: only for the business it is switched on for */}
+          {rzpOn && testPackage && billing.canPay && (
+            <div className="card" style={{ marginBottom: 16, borderLeft: "6px solid var(--bar2)" }}>
+              <div className="hd" style={{ marginBottom: 8 }}>
+                <div>
+                  <h2 style={{ fontSize: 17 }}>Razorpay test package · ₹1</h2>
+                  <p className="muted small">
+                    For checking live Razorpay payments. The plan tests don&apos;t change your plan; the wallet test adds ₹1 to your wallet. Your real plan
+                    carries on as it is.
+                  </p>
+                </div>
+              </div>
+              <RazorpayTest hasTestSub={testPackage.hasTestSub} showWallet />
+              {testPackage.rows.length > 0 && (
+                <div className="list" style={{ marginTop: 12 }}>
+                  {testPackage.rows.map((r) => (
+                    <div className="row" key={r.id}>
+                      <div className="grow">
+                        <div className="t">{r.what}</div>
+                        <div className="muted small">
+                          {r.when}
+                          {r.note ? ` · ${r.note}` : ""}
+                        </div>
+                      </div>
+                      <Pill tone={["paid", "active", "authenticated"].includes(r.status) ? "ok" : ["failed", "halted", "pending"].includes(r.status) ? "bad" : "info"}>{r.status}</Pill>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Auto-renew through Razorpay */}
+          {rzpOn && autoRenew && (
+            <div className="card" style={{ marginBottom: 16, borderLeft: `6px solid ${autoRenew.status === "pending" || autoRenew.status === "halted" ? "var(--bad)" : "var(--ok)"}` }}>
+              <div className="hd" style={{ marginBottom: 0, flexWrap: "wrap", gap: 12 }}>
+                <div>
+                  <h2 style={{ fontSize: 17 }}>
+                    {autoRenew.status === "cancelling"
+                      ? "Auto-renew is off"
+                      : autoRenew.status === "pending" || autoRenew.status === "halted"
+                        ? "Auto-renew: last charge didn't go through"
+                        : "Auto-renew is on"}
+                  </h2>
+                  <p className="muted small">
+                    {planOf(autoRenew.plan)?.n} · {CYCLE_NAMES[autoRenew.cycle].en} · {inr(autoRenew.amount)}
+                    {autoRenew.status === "cancelling"
+                      ? ". Your current period stays until it ends; there are no more charges."
+                      : autoRenew.status === "pending" || autoRenew.status === "halted"
+                        ? ". Razorpay will try again. Make sure your card or UPI mandate is active, or pay by UPI."
+                        : ". Razorpay charges it at the start of each period, and the new period is added straight away."}
+                  </p>
+                </div>
+                {autoRenew.status !== "cancelling" && billing.canPay && (
+                  <button type="button" className="btn sm" disabled={busy} onClick={turnOffAutoRenew}>
+                    Turn off auto-renew
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Hero Section */}
           <div className="hero">
             <div className="card">
@@ -603,7 +713,9 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                     </div>
                   </div>
                   <p className="muted small" style={{ marginBottom: 14 }}>
-                    thabaal never takes money automatically. Pay for the next period any time; it starts exactly when this one ends.
+                    {autoRenew && autoRenew.status !== "cancelling"
+                      ? "Auto-renew is on: the next period is charged through Razorpay when this one ends."
+                      : "Nothing is charged automatically. Pay for the next period any time; it starts exactly when this one ends."}
                   </p>
                 </>
               ) : (
@@ -1751,6 +1863,42 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                   <div className="d muted">No extra charges · GST included</div>
                 </div>
 
+                {rzpOn && (
+                  <div className="card" style={{ background: "var(--soft)", boxShadow: "none", padding: 18, marginBottom: 14 }}>
+                    <b>Pay online with Razorpay</b>
+                    <p className="muted small" style={{ margin: "6px 0 10px" }}>
+                      UPI, card or net banking. Your plan is added the moment the payment goes through; nobody has to check it.
+                    </p>
+                    {buy.cycle === "y" ? (
+                      <p className="muted small" style={{ marginBottom: 14 }}>
+                        Yearly plans are paid once. We remind you before the year ends; nothing is charged automatically.
+                      </p>
+                    ) : (
+                      <label className="small" style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 14, cursor: "pointer" }}>
+                        <input type="checkbox" checked={renewAuto} onChange={(e) => setRenewAuto(e.target.checked)} style={{ marginTop: 2 }} />
+                        <span>
+                          <b>Renew automatically every {CYCLE_LENGTH[buy.cycle]}</b>
+                          <span className="muted">
+                            {" "}
+                            · Razorpay charges {inr(buyPrice)} when each period ends and tells you a day before. Turn it off any time from My plan.
+                            {renewAuto && billing.nextStartLabel ? ` Your current period keeps running; the first charge is on ${billing.nextStartLabel}.` : ""}
+                          </span>
+                        </span>
+                      </label>
+                    )}
+                    <button type="button" className="btn primary" disabled={busy} onClick={payOnline} style={{ width: "100%", justifyContent: "center" }}>
+                      {busy ? "Opening payment..." : willAutoRenew && billing.nextStartLabel ? "Set up auto-renew with Razorpay" : `Pay ${inr(buyPrice)} with Razorpay`}
+                    </button>
+                    {!upiOpen && (
+                      <button type="button" className="btn ghost sm" onClick={() => setUpiOpen(true)} style={{ marginTop: 10, width: "100%", justifyContent: "center" }}>
+                        Pay by UPI QR instead (we check it within a working day)
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {(!rzpOn || upiOpen) && (
+                <>
                 <div className="card" style={{ background: "var(--soft)", boxShadow: "none", textAlign: "center", padding: 18 }}>
                   {qrDataUrl && (
                     <>
@@ -1791,6 +1939,15 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                     I have paid
                   </button>
                 </div>
+                </>
+                )}
+                {rzpOn && !upiOpen && (
+                  <div className="acts" style={{ marginTop: 4, display: "flex", justifyContent: "flex-end" }}>
+                    <button type="button" className="btn" onClick={() => setBuyStep(1)}>
+                      Back
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1930,7 +2087,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                     <div className="lab" style={{ marginTop: 8 }}>
                       Payment
                     </div>
-                    <div>{billRow.method === "UPI" ? `UPI · reference ${billRow.utr}` : "Recorded by thabaal"}</div>
+                    <div>{billRow.method === "UPI" ? `UPI · reference ${billRow.utr}` : billRow.method === "RAZORPAY" ? `Razorpay · payment ${billRow.utr}` : "Recorded by thabaal"}</div>
                   </div>
                 </div>
 
@@ -2078,7 +2235,9 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
               </button>
             </div>
             <p className="muted small" style={{ marginBottom: 14 }}>
-              thabaal never takes money automatically, so there is nothing to cancel.{" "}
+              {autoRenew && autoRenew.status !== "cancelling"
+                ? "Auto-renew is on: turn it off from My plan so the next period isn't charged."
+                : "Nothing is charged automatically, so there is nothing to cancel."}{" "}
               {active ? `Your plan stays as it is until ${active.endsLabel} and ends then unless you pay for another period.` : "No plan is running now."}{" "}
               {billing.scheduled ? `A period you already paid for starts ${billing.scheduled.startsLabel}; ask us if you want it refunded.` : ""} Your
               customers, orders and products are kept.

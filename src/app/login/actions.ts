@@ -31,7 +31,8 @@ export async function login(_: { error?: string; email?: string } | undefined, f
     const access = await clientAccess(user.clientId).catch(() => null);
     if (access?.state === "new" && !access.pending) redirect("/dashboard/account?pay=now");
   }
-  redirect("/dashboard");
+  // Thabaal's own team starts in the admin panel.
+  redirect(user.role === "ADMIN" ? "/admin" : "/dashboard");
 }
 
 export async function logout() {

@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import { LoginForm } from "./login-form";
 import { SignupForm } from "./signup-form";
+import { ForgotForm, ResetForm } from "./reset-forms";
 import { LoginIllustration } from "./login-illustration";
 import { LandingSections } from "./landing-sections";
 import { MascotIntro } from "./mascot-intro";
@@ -35,7 +36,15 @@ function getLangSnapshot(): "en" | "ta" {
   }
 }
 
-export function ThabaalSignIn({ mode = "login" }: { mode?: "login" | "signup" }) {
+export function ThabaalSignIn({
+  mode = "login",
+  resetToken = "",
+  resetValid = false,
+}: {
+  mode?: "login" | "signup" | "forgot" | "reset";
+  resetToken?: string;
+  resetValid?: boolean;
+}) {
   const syncedTheme = useSyncExternalStore(
     subscribeTheme,
     getThemeSnapshot,
@@ -130,7 +139,15 @@ export function ThabaalSignIn({ mode = "login" }: { mode?: "login" | "signup" })
           </div>
 
           {/* Credential Form. Privacy, terms and the rest are in the page footer below (one place, not two). */}
-          {mode === "signup" ? <SignupForm lang={lang} /> : <LoginForm lang={lang} />}
+          {mode === "signup" ? (
+            <SignupForm lang={lang} />
+          ) : mode === "forgot" ? (
+            <ForgotForm lang={lang} />
+          ) : mode === "reset" ? (
+            <ResetForm lang={lang} token={resetToken} valid={resetValid} />
+          ) : (
+            <LoginForm lang={lang} />
+          )}
         </section>
 
         {/* RIGHT COLUMN: ANIMATED SKY WITH BIRD & TOGGLE */}

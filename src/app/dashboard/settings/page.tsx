@@ -1,4 +1,4 @@
-import { Building2, CheckCircle2, Circle, LogOut } from "@/components/icons";
+import { Building2, CheckCircle2, Circle } from "@/components/icons";
 import { Clock3D, Send3D, Sparkles3D } from "@/components/icons-3d";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
@@ -13,19 +13,16 @@ import { numberHealth } from "@/lib/limits";
 import { fmtDate } from "@/lib/format";
 import { keyId } from "@/lib/secret-box";
 import { getScope, requireUser } from "@/lib/session";
-import { logout } from "../../login/actions";
 import { cn } from "@/lib/cn";
 import { getSettings, wahaConfig } from "@/lib/provider";
 import { waConfig } from "@/lib/whatsapp";
 import { LocalSessionPanel, ProviderSwitch } from "./provider-panel";
-import { PasswordForm } from "./password-form";
 import { OrderStepsForm } from "./order-steps-form";
 import { PaymentSetupForm } from "./payment-setup-form";
 import { DefaultImage } from "./default-image";
 import { readFields } from "@/lib/custom-fields";
 import { PAYMENT_TEMPLATE, paymentTemplateFor } from "@/lib/payments";
 import { readFlow } from "@/lib/order-flow";
-import { readPaySettings, upiReady, waPayOn } from "@/lib/pay-settings";
 import { AppearanceEditor } from "../appearance-editor";
 import { portalDefault } from "@/lib/appearance";
 import { spendSummary } from "@/lib/spend";
@@ -61,22 +58,6 @@ function Copyable({ label, value }: { label: string; value: string }) {
 
 export default async function SettingsPage() {
   const user = await requireUser();
-  const accountCard = (
-    <section className="card">
-      <div className="hd">
-        <div>
-          <h2><T ta="உங்கள் கணக்கு">Your account</T></h2>
-          <p><T ta="உள்நுழைந்துள்ள கணக்கு">Signed in as</T> {user.email}</p>
-        </div>
-        <form action={logout}>
-          <button className="btn sm">
-            <LogOut aria-hidden className="ic shrink-0" style={{ width: 15, height: 15 }} /> <T ta="வெளியேறு">Sign out</T>
-          </button>
-        </form>
-      </div>
-      <PasswordForm />
-    </section>
-  );
   const lookCard = (
     <section className="card">
       <div className="hd">
@@ -101,7 +82,7 @@ export default async function SettingsPage() {
     </section>
   );
   const frame = (children: React.ReactNode, actions?: React.ReactNode) => (
-    <PortalPage title="Settings" titleTa="அமைப்புகள்" sub="WhatsApp numbers, payment details, language and your account." subTa="வாட்ஸ்அப் எண்கள், பண விவரங்கள், மொழி மற்றும் உங்கள் கணக்கு." actions={actions}>
+    <PortalPage title="Settings" titleTa="அமைப்புகள்" sub="WhatsApp numbers, payment details, language and look." subTa="வாட்ஸ்அப் எண்கள், பண விவரங்கள், மொழி மற்றும் தோற்றம்." actions={actions}>
       {children}
     </PortalPage>
   );
@@ -129,54 +110,8 @@ export default async function SettingsPage() {
       : r === "RED" ? { tone: "bad", label: "Low quality", labelTa: "குறைந்த தரம்" }
       : { tone: "mute", label: "Not rated yet", labelTa: "இன்னும் மதிப்பிடப்படவில்லை" }
     );
-    const pay = readPaySettings(client?.paySettings, client?.paymentConfig);
-    const onOff = (on: boolean) => (
-      <span className={`pill ${on ? "ok" : "mute"}`}>
-        <T ta={on ? "இயக்கத்தில்" : "முடக்கம்"}>{on ? "On" : "Off"}</T>
-      </span>
-    );
     return frame(
       <div className="stack">
-        {cid && (
-          <ScrollReveal>
-            <section className="card">
-              <div className="hd">
-                <div>
-                  <h2><T ta="வாடிக்கையாளர்கள் எவ்வாறு செலுத்துகிறார்கள்">How customers pay</T></h2>
-                  <p><T ta="WhatsApp கொடுப்பனவுகள், UPI மற்றும் டெலிவரி ரொக்கம் (COD).">WhatsApp payments, UPI and cash on delivery.</T></p>
-                </div>
-                <Link className="btn sm primary" href="/dashboard/revenue?tab=set">
-                  <T ta="பண அமைப்புகளைத் திற">Open payment settings</T>
-                </Link>
-              </div>
-              <div className="list">
-                <div className="row">
-                  <div className="grow t"><T ta="WhatsApp-லேயே செலுத்தவும்">Pay inside WhatsApp</T></div>
-                  {onOff(waPayOn(pay, client?.paymentConfig))}
-                </div>
-                <div className="row">
-                  <div className="grow">
-                    <div className="t"><T ta="UPI QR அல்லது பேமெண்ட் இணைப்பு">UPI QR or payment link</T></div>
-                    {upiReady(pay) && <div className="muted small">{pay.upiId}</div>}
-                  </div>
-                  {onOff(upiReady(pay))}
-                </div>
-                <div className="row">
-                  <div className="grow">
-                    <div className="t"><T ta="டெலிவரி ரொக்கம் (COD)">Cash on delivery</T></div>
-                    {pay.codOn && (pay.codMax != null || pay.codAreas) && (
-                      <div className="muted small">
-                        {[pay.codMax != null ? `Up to ₹${pay.codMax.toLocaleString("en-IN")}` : "", pay.codAreas].filter(Boolean).join(" · ")}
-                      </div>
-                    )}
-                  </div>
-                  {onOff(pay.codOn)}
-                </div>
-              </div>
-            </section>
-          </ScrollReveal>
-        )}
-
         {cid && client && (
           <ScrollReveal>
             <PaymentSetupForm
@@ -320,7 +255,6 @@ export default async function SettingsPage() {
           <StaggerItem>{lookCard}</StaggerItem>
         </StaggerGroup>
 
-        <ScrollReveal>{accountCard}</ScrollReveal>
 
         {cid && (
           <ScrollReveal>
@@ -483,7 +417,6 @@ export default async function SettingsPage() {
           <div className="space-y-4 sm:space-y-6">
             {langCard}
             {lookCard}
-            {accountCard}
           </div>
         </StaggerItem>
       </StaggerGroup>
@@ -499,7 +432,7 @@ export default async function SettingsPage() {
             icon={<Sparkles3D />}
             title="Appearance"
             description="The portal's default look: icons, tiles, cards, buttons and charts. Each client can have its own look on the Clients page."
-            action={<Link href="/dashboard/clients" className={buttonClass("secondary", "sm")}>Per client</Link>}
+            action={<Link href="/admin/clients" className={buttonClass("secondary", "sm")}>Per client</Link>}
           />
           <div className="p-3.5 sm:p-5">
             <AppearanceEditor mode="portal" initial={portalDefault(settings.appearance)} />
@@ -507,7 +440,7 @@ export default async function SettingsPage() {
         </Card>
       </ScrollReveal>
     </>,
-    <Link className="btn" href="/dashboard/clients">
+    <Link className="btn" href="/admin/clients">
       <Building2 aria-hidden className="ic shrink-0" style={{ width: 15, height: 15 }} /> Clients
     </Link>,
   );

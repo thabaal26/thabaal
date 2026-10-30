@@ -1,10 +1,9 @@
 // Thabaal plan payments and periods, stored in PlanPurchase (prisma/schema.prisma). The rules live in
 // subscription-core.ts; this file reads and writes them with the checks that make them safe:
 //
-//  - A client's button press never changes a plan. It can only send a UPI reference (PENDING), and that grants
-//    nothing: the repository has no trusted signal from a bank or payment gateway for Thabaal's own fees, so a
-//    Thabaal admin checks the money arrived and verifies it here. A future trusted callback must call
-//    verifyPlanPayment the same way.
+//  - A client's button press never changes a plan. A UPI reference is recorded as PENDING and grants nothing
+//    until a Thabaal admin checks the money arrived and verifies it here. Razorpay payments are the one trusted
+//    signal: lib/razorpay-billing.ts re-reads each payment from Razorpay, then calls grantGatewayPeriod.
 //  - Verifying fixes the period on the server: it starts when the client's last verified period ends (or now if
 //    nothing is running) and lasts the full cycle bought. Upgrades, downgrades and renewals all wait their turn.
 //  - Every change takes a row lock on the client first, so two verifications (or a verification and a new
@@ -219,6 +218,52 @@ export async function recordExistingPeriod(
     });
     return { ok: true, id: row.id, message: `Recorded ${planDef(input.plan)!.n} to ${formatInTimeZone(endsAt, APP_TZ, "d MMM yyyy")}.` };
   });
+}
+
+/**
+ * A payment gateway confirmed the money (Razorpay, checked on the server: lib/razorpay-billing.ts). Records a
+ * verified period straight away, placed like any verified payment: after the last verified period, or now.
+ * `paymentRef` is unique, so the same payment arriving twice (checkout and webhook) grants one period.
+ */
+export async function grantGatewayPeriod(
+  input: { clientId: string; plan: string; cycle: string; amountPaise: number; paymentRef: string; paymentId: string; payApp?: string | null; by: string; note?: string },
+  now = new Date(),
+): Promise<SubResult> {
+  if (!isPlanKey(input.plan) || !isCycle(input.cycle)) return { ok: false, code: "invalid", message: "Unknown plan." };
+  try {
+    return await db.$transaction(async (tx) => {
+      if (!(await lockClient(tx, input.clientId))) return { ok: false, code: "not_found", message: "Business not found." };
+      const already = await tx.planPurchase.findUnique({ where: { paymentRef: input.paymentRef }, select: { id: true } });
+      if (already) return { ok: true, code: "already", id: already.id, message: "Already recorded." };
+      const rows = await periodRows(tx, input.clientId);
+      const startsAt = nextStart(rows, now);
+      const endsAt = periodEnd(startsAt, input.cycle as never, APP_TZ);
+      const row = await tx.planPurchase.create({
+        data: {
+          clientId: input.clientId,
+          plan: input.plan,
+          cycle: input.cycle,
+          amountPaise: input.amountPaise,
+          status: "VERIFIED",
+          method: "RAZORPAY",
+          utr: input.paymentId,
+          paymentRef: input.paymentRef,
+          payApp: input.payApp?.slice(0, 40) || null,
+          startsAt,
+          endsAt,
+          submittedBy: input.by,
+          decidedBy: "Razorpay",
+          decidedAt: now,
+          note: input.note?.slice(0, 200) || null,
+        },
+      });
+      await tx.planPurchase.update({ where: { id: row.id }, data: { billNo: billNumber(row.id, now) } });
+      return { ok: true, id: row.id, message: `${planDef(input.plan)!.n} paid to ${formatInTimeZone(endsAt, APP_TZ, "d MMM yyyy, h:mm a")}.` };
+    });
+  } catch (e) {
+    if (isUniqueClash(e)) return { ok: true, code: "already", message: "Already recorded." };
+    throw e;
+  }
 }
 
 /**

@@ -360,8 +360,6 @@ interface CompetitorRow {
   platform: string;
   isThabaal?: boolean;
   price: T;
-  focus: T;
-  comparison: T;
 }
 
 const COMPETITOR_COMPARISON: CompetitorRow[] = [
@@ -372,28 +370,12 @@ const COMPETITOR_COMPARISON: CompetitorRow[] = [
       en: "INR 1,199 / 2,999 / 4,999 monthly, GST included",
       ta: "மாதம் ₹1,199 / ₹2,999 / ₹4,999, GST உட்பட",
     },
-    focus: {
-      en: "Campaigns, catalogue, orders, payments and tiered reports.",
-      ta: "பிரச்சாரங்கள், கேட்லாக், ஆர்டர்கள், பேமெண்ட் & அடுக்கு அறிக்கைகள்.",
-    },
-    comparison: {
-      en: "2 / 3 / 5 numbers; simple local-business workflow.",
-      ta: "2 / 3 / 5 எண்கள்; எளிய தமிழ்நாடு வணிக வேலைப்பாய்வு.",
-    },
   },
   {
     platform: "AiSensy",
     price: {
       en: "Basic INR 1,500; Pro INR 3,200 monthly",
       ta: "பேஸிக் ₹1,500; ப்ரோ ₹3,200 மாதம்",
-    },
-    focus: {
-      en: "Broadcasts, shared inbox, retargeting and AI options.",
-      ta: "அறிவிப்புகள், பகிரப்பட்ட இன்பாக்ஸ் மற்றும் AI தேர்வுகள்.",
-    },
-    comparison: {
-      en: "Thabaal starts lower and includes order/payment tracking.",
-      ta: "தபால் குறைந்த கட்டணத்தில் ஆர்டர் & பேமெண்ட் கண்காணிப்பை வழங்குகிறது.",
     },
   },
   {
@@ -402,28 +384,12 @@ const COMPETITOR_COMPARISON: CompetitorRow[] = [
       en: "Basic INR 2,399 monthly, billed annually",
       ta: "பேஸிக் ₹2,399 மாதம், வருடாந்திர கட்டணம்",
     },
-    focus: {
-      en: "WhatsApp plus Instagram/web, catalogue and AI tools.",
-      ta: "வாட்ஸ்அப் + இன்ஸ்டாகிராம்/வெப், கேட்லாக் மற்றும் AI கருவிகள்.",
-    },
-    comparison: {
-      en: "Compare billing term, users and order reporting.",
-      ta: "கட்டணக் காலம், பயனர்கள் மற்றும் ஆர்டர் அறிக்கைகளை ஒப்பிடுங்கள்.",
-    },
   },
   {
     platform: "Wati",
     price: {
       en: "Regional pricing changes; check current quote",
       ta: "பிராந்திய விலை மாற்றம்; தற்போதைய மதிப்பீட்டைப் பார்க்கவும்",
-    },
-    focus: {
-      en: "Campaigns, AI, automations and multiple channels.",
-      ta: "பிரச்சாரங்கள், AI, ஆட்டோமேஷன் மற்றும் பல சேனல்கள்.",
-    },
-    comparison: {
-      en: "Thabaal keeps plan limits and order reporting straightforward.",
-      ta: "தபால் திட்ட வரம்புகளையும் ஆர்டர் அறிக்கைகளையும் வெளிப்படையாக வைக்கிறது.",
     },
   },
   {
@@ -432,28 +398,12 @@ const COMPETITOR_COMPARISON: CompetitorRow[] = [
       en: "Get current India price",
       ta: "தற்போதைய இந்திய விலையைப் பெறவும்",
     },
-    focus: {
-      en: "WhatsApp/Instagram marketing, automation and CRM.",
-      ta: "வாட்ஸ்அப்/இன்ஸ்டாகிராம் மார்க்கெட்டிங் மற்றும் CRM.",
-    },
-    comparison: {
-      en: "Thabaal emphasises order-to-payment visibility.",
-      ta: "தபால் ஆர்டர் முதல் பேமெண்ட் வரையிலான நேரடி கண்காணிப்பை முன்னிறுத்துகிறது.",
-    },
   },
   {
     platform: "DoubleTick",
     price: {
       en: "Plans listed; request a current quote",
       ta: "திட்டங்கள் பட்டியலிடப்பட்டுள்ளன; விலை கேட்க வேண்டும்",
-    },
-    focus: {
-      en: "WhatsApp customer experience, sales tools and AI agents.",
-      ta: "வாட்ஸ்அப் வாடிக்கையாளர் அனுபவம் மற்றும் விற்பனைக் கருவிகள்.",
-    },
-    comparison: {
-      en: "Thabaal offers clear INR tiers and support by plan.",
-      ta: "தபால் தெளிவான ரூபாய் விலையையும் திட்ட ஆதரவையும் வழங்குகிறது.",
     },
   },
 ];
@@ -535,29 +485,135 @@ const DEMO_DATA: Record<"overview" | "campaign" | "payments", DemoDataset> = {
   },
 };
 
+/* ── FAQ icons (inline SVG, no extra dependency) ── */
+type FaqIconKey = "coins" | "whatsapp" | "gear" | "phone" | "document" | "bag" | "plus" | "chart";
+type FaqTone = "gold" | "green" | "blue" | "purple" | "teal" | "orange" | "pink" | "indigo";
+
+const WHATSAPP_GLYPH =
+  "M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z";
+
+function WhatsAppGlyph({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+      <path d={WHATSAPP_GLYPH} />
+    </svg>
+  );
+}
+
+function FaqIcon({ name }: { name: FaqIconKey }) {
+  if (name === "whatsapp") return <WhatsAppGlyph size={20} />;
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {name === "coins" && (
+        <>
+          <ellipse cx="12" cy="6" rx="7" ry="3" />
+          <path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6" />
+          <path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" />
+        </>
+      )}
+      {name === "gear" && (
+        <>
+          <circle cx="12" cy="12" r="3" />
+          <path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" />
+        </>
+      )}
+      {name === "phone" && (
+        <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z" />
+      )}
+      {name === "document" && (
+        <>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <path d="M14 2v6h6" />
+          <path d="m9 15 2 2 4-4" />
+        </>
+      )}
+      {name === "bag" && (
+        <>
+          <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+          <path d="M3 6h18" />
+          <path d="M16 10a4 4 0 0 1-8 0" />
+        </>
+      )}
+      {name === "plus" && (
+        <>
+          <rect x="3" y="3" width="18" height="18" rx="5" />
+          <path d="M12 8v8M8 12h8" />
+        </>
+      )}
+      {name === "chart" && (
+        <>
+          <path d="M3 3v18h18" />
+          <path d="M8 16v-4M13 16V8M18 16v-7" />
+        </>
+      )}
+    </svg>
+  );
+}
+
 /* ── 2. Frequently Asked Questions (Exact Match HTML #faq) ── */
-const FAQ_ITEMS: { q: T; a: T }[] = [
+const FAQ_ITEMS: { icon: FaqIconKey; tone: FaqTone; q: T; a: T }[] = [
   {
+    icon: "coins",
+    tone: "gold",
     q: {
-      en: "How do analytics help my business?",
-      ta: "அறிக்கைகள் எனது வணிகத்திற்கு எவ்வாறு உதவுகின்றன?",
+      en: "How much does Thabaal cost?",
+      ta: "தபாலின் கட்டணம் எவ்வளவு?",
     },
     a: {
-      en: "They put message reach, customer response, orders, recorded sales and message spend in one understandable view. Use that picture to improve your next offer and decide where to spend—not as a guarantee that every sale came from a message.",
-      ta: "செய்தி சென்றடைந்தது, வாடிக்கையாளர் பதில்கள், ஆர்டர்கள், விற்பனை மற்றும் செய்திச் செலவு ஆகியவற்றை ஒரே எளிய பார்வையில் வைக்கின்றன. அடுத்த சலுகையை மேம்படுத்தவும், எங்கு செலவிட வேண்டும் என்பதைத் தீர்மானிக்கவும் இந்த விவரங்களைப் பயன்படுத்துங்கள்.",
+      en: "Thabaal has three plans: Starter at INR 1,199, Growth at INR 2,999 and Business at INR 4,999 per month, all with GST included. Quarterly billing saves 10% and yearly billing saves 20%.",
+      ta: "தபாலில் மூன்று திட்டங்கள் உள்ளன: ஸ்டார்ட்டர் மாதம் ₹1,199, வளர்ச்சி ₹2,999, பிசினஸ் ₹4,999—அனைத்தும் GST உள்ளிட்டவை. காலாண்டு கட்டணத்தில் 10%, வருடாந்திர கட்டணத்தில் 20% சேமிக்கலாம்.",
     },
   },
   {
+    icon: "whatsapp",
+    tone: "green",
     q: {
-      en: "Can I follow orders from my catalogue?",
-      ta: "எனது கேட்லாக்கிலிருந்து வரும் ஆர்டர்களைப் பின்தொடர முடியுமா?",
+      en: "Do you add to Meta’s WhatsApp message rate?",
+      ta: "மெட்டாவின் வாட்ஸ்அப் செய்திக் கட்டணத்தில் கூடுதல் கட்டணம் சேர்க்கிறீர்களா?",
     },
     a: {
-      en: "Yes. Thabaal brings catalogue products and customer orders together, with order, payment and fulfilment progress you can follow.",
-      ta: "ஆம். கேட்லாக் தயாரிப்புகளையும் வாடிக்கையாளர் ஆர்டர்களையும் தபால் ஒன்றாக இணைக்கிறது; ஆர்டர், பேமெண்ட் மற்றும் டெலிவரி முன்னேற்றத்தை எளிதாகப் பின்தொடரலாம்.",
+      en: "No—not one paisa. Meta’s official message charges pass through without a Thabaal markup; your Thabaal plan fee is separate.",
+      ta: "இல்லை—ஒரு பைசா கூட இல்லை. மெட்டாவின் அதிகாரப்பூர்வ செய்திக் கட்டணங்கள் தபாலின் கூடுதல் லாபம் எதுவுமின்றி நேரடியாக கணக்கிடப்படுகின்றன; தபால் மென்பொருள் திட்டக் கட்டணம் மட்டுமே தனியானது.",
     },
   },
   {
+    icon: "gear",
+    tone: "blue",
+    q: {
+      en: "Is there a setup fee?",
+      ta: "செட்டப் கட்டணம் உள்ளதா?",
+    },
+    a: {
+      en: "Official WhatsApp setup and onboarding is free on Quarterly and Yearly plans. On the Monthly plan it is a one-time INR 299.",
+      ta: "அதிகாரப்பூர்வ வாட்ஸ்அப் செட்டப் மற்றும் ஆன்போர்டிங் காலாண்டு, வருடாந்திர திட்டங்களில் இலவசம். மாதாந்திர திட்டத்தில் ஒருமுறை ₹299 மட்டும்.",
+    },
+  },
+  {
+    icon: "phone",
+    tone: "purple",
+    q: {
+      en: "Can I use my existing WhatsApp number?",
+      ta: "என் ஏற்கனவே உள்ள வாட்ஸ்அப் எண்ணைப் பயன்படுத்தலாமா?",
+    },
+    a: {
+      en: "Yes. Your number can be moved onto the official WhatsApp Business API through Thabaal. Once moved, it runs through Thabaal and no longer works in the regular WhatsApp app.",
+      ta: "ஆம். உங்கள் எண்ணை தபால் மூலம் அதிகாரப்பூர்வ வாட்ஸ்அப் பிசினஸ் API-க்கு மாற்றலாம். மாற்றிய பிறகு அது தபால் வழியாகவே இயங்கும்; வழக்கமான வாட்ஸ்அப் செயலியில் இனி வேலை செய்யாது.",
+    },
+  },
+  {
+    icon: "document",
+    tone: "teal",
     q: {
       en: "Who approves WhatsApp templates?",
       ta: "வாட்ஸ்அப் டெம்ப்ளேட்டுகளை யார் அங்கீகரிப்பது?",
@@ -568,21 +624,51 @@ const FAQ_ITEMS: { q: T; a: T }[] = [
     },
   },
   {
+    icon: "bag",
+    tone: "orange",
     q: {
-      en: "Do you add to Meta’s WhatsApp message rate?",
-      ta: "மெட்டாவின் வாட்ஸ்அப் செய்திக் கட்டணத்தில் கூடுதல் கட்டணம் சேர்க்கிறீர்களா?",
+      en: "Can I follow orders from my catalogue?",
+      ta: "எனது கேட்லாக்கிலிருந்து வரும் ஆர்டர்களைப் பின்தொடர முடியுமா?",
     },
     a: {
-      en: "No—not one paisa. Meta’s official message charges pass through without a Thabaal markup; your Thabaal plan fee is separate.",
-      ta: "இல்லை—ஒரு பைசா கூட இல்லை. மெட்டாவின் அதிகாரப்பூர்வ செய்திக் கட்டணங்கள் தபாலின் கூடுதல் லாபம் எதுவுமின்றி நேரடியாக கணக்கிடப்படுகின்றன; தபால் மென்பொருள் திட்டக் கட்டணம் மட்டுமே தனியானது.",
+      en: "Yes. Thabaal brings catalogue products and customer orders together, with order, payment and fulfilment progress you can follow.",
+      ta: "ஆம். கேட்லாக் தயாரிப்புகளையும் வாடிக்கையாளர் ஆர்டர்களையும் தபால் ஒன்றாக இணைக்கிறது; ஆர்டர், பேமெண்ட் மற்றும் டெலிவரி முன்னேற்றத்தை எளிதாகப் பின்தொடரலாம்.",
+    },
+  },
+  {
+    icon: "plus",
+    tone: "pink",
+    q: {
+      en: "Can I add more staff logins or WhatsApp numbers?",
+      ta: "கூடுதல் பணியாளர் கணக்குகள் அல்லது வாட்ஸ்அப் எண்கள் சேர்க்கலாமா?",
+    },
+    a: {
+      en: "Yes. Extra staff logins are INR 499 per seat per month, and extra WhatsApp numbers for branches or support lines are INR 599 per number per month.",
+      ta: "ஆம். கூடுதல் பணியாளர் கணக்கு ஒன்றுக்கு மாதம் ₹499, கிளைகள் அல்லது ஆதரவு எண்களுக்கான கூடுதல் வாட்ஸ்அப் எண் ஒன்றுக்கு மாதம் ₹599.",
+    },
+  },
+  {
+    icon: "chart",
+    tone: "indigo",
+    q: {
+      en: "How do analytics help my business?",
+      ta: "அறிக்கைகள் எனது வணிகத்திற்கு எவ்வாறு உதவுகின்றன?",
+    },
+    a: {
+      en: "They put message reach, customer response, orders, recorded sales and message spend in one understandable view. Use that picture to improve your next offer and decide where to spend—not as a guarantee that every sale came from a message.",
+      ta: "செய்தி சென்றடைந்தது, வாடிக்கையாளர் பதில்கள், ஆர்டர்கள், விற்பனை மற்றும் செய்திச் செலவு ஆகியவற்றை ஒரே எளிய பார்வையில் வைக்கின்றன. அடுத்த சலுகையை மேம்படுத்தவும், எங்கு செலவிட வேண்டும் என்பதைத் தீர்மானிக்கவும் இந்த விவரங்களைப் பயன்படுத்துங்கள்.",
     },
   },
 ];
+
+/** The first four questions stay visible; the rest sit behind the "more questions" button. */
+const FAQ_PRIMARY_COUNT = 4;
 
 export function LandingSections({ lang }: { lang: Lang }) {
   const ta = lang === "ta";
   const [activeDemo, setActiveDemo] = useState<"overview" | "campaign" | "payments">("overview");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [showMoreFaq, setShowMoreFaq] = useState(false);
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [pricingTab, setPricingTab] = useState<"plans" | "features" | "addons" | "compare">("plans");
 
@@ -590,6 +676,40 @@ export function LandingSections({ lang }: { lang: Lang }) {
 
   const toggleFaq = (index: number) => {
     setOpenFaq((prev) => (prev === index ? null : index));
+  };
+
+  const renderFaq = (item: (typeof FAQ_ITEMS)[number], idx: number) => {
+    const isOpen = openFaq === idx;
+    return (
+      <div key={idx} className={`faq-item faq-tone-${item.tone} ${isOpen ? "open" : ""}`}>
+        <h3 className="faq-q-heading">
+          <button
+            type="button"
+            id={`faq-q-${idx}`}
+            className="faq-question"
+            onClick={() => toggleFaq(idx)}
+            aria-expanded={isOpen}
+            aria-controls={`faq-a-${idx}`}
+          >
+            <span className="faq-icon" aria-hidden="true">
+              <FaqIcon name={item.icon} />
+            </span>
+            <span className="faq-q-text">{item.q[lang]}</span>
+            <span className="faq-toggle-icon" aria-hidden="true" />
+          </button>
+        </h3>
+        <div
+          id={`faq-a-${idx}`}
+          role="region"
+          aria-labelledby={`faq-q-${idx}`}
+          className="faq-answer-wrap"
+        >
+          <div className="faq-answer">
+            <p>{item.a[lang]}</p>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -1372,10 +1492,8 @@ export function LandingSections({ lang }: { lang: Lang }) {
                   <table className="pricing-table">
                     <thead>
                       <tr>
-                        <th style={{ width: "18%" }}>{ta ? "தளம்" : "Platform"}</th>
-                        <th style={{ width: "26%" }}>{ta ? "விலை" : "Price"}</th>
-                        <th style={{ width: "28%" }}>{ta ? "முக்கிய நோக்கம்" : "Primary focus"}</th>
-                        <th style={{ width: "28%" }}>{ta ? "தபால் ஒப்பீடு" : "Thabaal comparison"}</th>
+                        <th style={{ width: "30%" }}>{ta ? "தளம்" : "Platform"}</th>
+                        <th style={{ width: "70%" }}>{ta ? "விலை" : "Price"}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1391,10 +1509,6 @@ export function LandingSections({ lang }: { lang: Lang }) {
                           </td>
                           <td style={row.isThabaal ? { color: "var(--navy)", fontWeight: 800 } : undefined}>
                             {ta ? row.price.ta : row.price.en}
-                          </td>
-                          <td>{ta ? row.focus.ta : row.focus.en}</td>
-                          <td style={row.isThabaal ? { color: "#059669", fontWeight: 700 } : undefined}>
-                            {ta ? row.comparison.ta : row.comparison.en}
                           </td>
                         </tr>
                       ))}
@@ -1445,64 +1559,90 @@ export function LandingSections({ lang }: { lang: Lang }) {
               </div>
             </>
           )}
-
-          {/* Enterprise & White-Label Callout Banner */}
-          <div className="enterprise-callout">
-            <div>
-              <strong>
-                {ta ? "பெரிய நிறுவனங்களுக்கான தனிப்பயன் திட்டம் (Enterprise & White-Label)" : "Need custom infrastructure, ERP hooks, or 30+ team seats?"}
-              </strong>
-              <span>
-                {ta
-                  ? "Tally, SAP, Zoho ERP இணைப்பு, பிரத்யேக சர்வர், ஒயிட்-லேபிள் பிராண்டிங் & 99.9% Uptime SLA வசதிகள்."
-                  : "Direct Tally / SAP / Zoho integration, isolated database container, custom domain branding, and dedicated 24/7 SLA."}
-              </span>
-            </div>
-            <a className="btn btn-dark btn-small" href="tel:+916379140626">
-              {ta ? "எங்களுடன் பேச ↗" : "Talk to Enterprise ↗"}
-            </a>
-          </div>
         </div>
       </section>
 
-      {/* ── 7. QUESTIONS OWNERS ASK (Exact Match HTML #faq) ── */}
-      <section className="faq-section" id="faq">
-        <div className="landing-container faq-grid">
-          {/* Left Column */}
-          <div>
-            <div className="eyebrow">{ta ? "உரிமையாளர்கள் கேட்கும் கேள்விகள்" : "Questions owners ask"}</div>
-            <h2>{ta ? "தெளிவாகப் புரிந்துகொள்வோம்." : "Let’s make this clear."}</h2>
-            <p>
-              {ta
-                ? "கடினமான வார்த்தைகள் இல்லை, யூகங்கள் இல்லை. டெமோ பாருங்கள் அல்லது நேரடியாக எங்களிடம் கேளுங்கள்."
-                : "No jargon, no guessing. See the demo or ask us directly."}
-            </p>
-            <a className="btn btn-dark" href={TEL_PHONE}>
-              {ta ? "தபாலுடன் பேச" : "Call Thabaal"} <span>↗</span>
-            </a>
-          </div>
+      {/* ── 7. FAQ — dark premium card, two columns (#faq) ── */}
+      <section className="faq-section" id="faq" aria-labelledby="faq-heading">
+        <div className="landing-container">
+          <div className="faq-card">
+            <div className="faq-shell">
+              <div className="faq-aside">
+                <header className="faq-head">
+                  <span className="faq-badge">FAQ</span>
+                  <h2 id="faq-heading">
+                    {ta ? (
+                      <>
+                        அடிக்கடி கேட்கப்படும் <em>கேள்விகள்</em>
+                      </>
+                    ) : (
+                      <>
+                        Frequently Asked <em>Questions</em>
+                      </>
+                    )}
+                  </h2>
+                  <p>
+                    {ta
+                      ? "தபால் பற்றிய பொதுவான கேள்விகளுக்கு விரைவான பதில்கள்."
+                      : "Quick answers to common questions about Thabaal."}
+                  </p>
+                </header>
 
-          {/* Right Column: Accordion */}
-          <div className="faq-list">
-            {FAQ_ITEMS.map((item, idx) => {
-              const isOpen = openFaq === idx;
-              return (
-                <div key={idx} className={`faq-item ${isOpen ? "open" : ""}`}>
-                  <button
-                    type="button"
-                    className="faq-question"
-                    onClick={() => toggleFaq(idx)}
-                    aria-expanded={isOpen}
-                  >
-                    <span className="faq-q-text">{item.q[lang]}</span>
-                    <span className="faq-toggle-icon" aria-hidden="true">+</span>
-                  </button>
-                  <div className="faq-answer">
-                    <p>{item.a[lang]}</p>
+                <div className="faq-flight" aria-hidden="true">
+                  <svg className="faq-flight-trail" viewBox="0 0 300 90" focusable="false">
+                    <path d="M 8 80 C 52 30, 104 92, 160 54 S 236 14, 266 24" />
+                    <circle cx="8" cy="80" r="3.4" />
+                  </svg>
+                  <Image
+                    className="faq-flight-bird"
+                    src="/brands/thabaal/mark.png"
+                    alt=""
+                    width={44}
+                    height={24}
+                    unoptimized
+                  />
+                </div>
+
+                <a className="faq-wa" href={DEMO_URL} {...DEMO_TARGET}>
+                  <span className="faq-wa-icon">
+                    <WhatsAppGlyph size={18} />
+                  </span>
+                  <span>{ta ? "வாட்ஸ்அப்பில் பேசுங்கள்" : "Chat on WhatsApp"}</span>
+                  <span className="faq-wa-arrow" aria-hidden="true">
+                    →
+                  </span>
+                </a>
+              </div>
+
+              <div className="faq-list">
+                {FAQ_ITEMS.slice(0, FAQ_PRIMARY_COUNT).map((item, idx) => renderFaq(item, idx))}
+
+                <button
+                  type="button"
+                  className={`faq-more-btn ${showMoreFaq ? "open" : ""}`}
+                  onClick={() => setShowMoreFaq((v) => !v)}
+                  aria-expanded={showMoreFaq}
+                  aria-controls="faq-more-panel"
+                >
+                  <span>
+                    {showMoreFaq
+                      ? ta
+                        ? "குறைவான கேள்விகளைக் காட்டு"
+                        : "Show fewer questions"
+                      : ta
+                        ? `மேலும் ${FAQ_ITEMS.length - FAQ_PRIMARY_COUNT} கேள்விகளைக் காட்டு`
+                        : `Show ${FAQ_ITEMS.length - FAQ_PRIMARY_COUNT} more questions`}
+                  </span>
+                  <span className="faq-more-chevron" aria-hidden="true" />
+                </button>
+
+                <div id="faq-more-panel" className={`faq-more ${showMoreFaq ? "open" : ""}`}>
+                  <div className="faq-more-inner">
+                    {FAQ_ITEMS.slice(FAQ_PRIMARY_COUNT).map((item, i) => renderFaq(item, i + FAQ_PRIMARY_COUNT))}
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            </div>
           </div>
         </div>
       </section>

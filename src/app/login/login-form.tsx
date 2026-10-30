@@ -18,12 +18,17 @@ export function LoginForm({ lang = "en" }: LoginFormProps) {
   const [state, action, pending] = useActionState(login, undefined);
   const [showPassword, setShowPassword] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
+  const [resetDone, setResetDone] = useState(false);
   const isTamil = lang === "ta";
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const timer = setTimeout(() => {
       const params = new URLSearchParams(window.location.search);
+      if (params.get("reset") === "done") {
+        setResetDone(true);
+        window.history.replaceState(null, "", window.location.pathname);
+      }
       const err = params.get("error");
       if (!err) return;
       // The refused Google address comes in a short-lived cookie (not the URL); read it once, then drop it.
@@ -91,6 +96,15 @@ export function LoginForm({ lang = "en" }: LoginFormProps) {
             ? "மீண்டும் வருக! தொடர உள்நுழையவும்"
             : "Welcome back! Please sign in to continue"}
         </p>
+
+        {resetDone && !error && (
+          <div
+            role="status"
+            className="w-full mt-4 mb-1 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-center text-xs font-semibold text-emerald-600"
+          >
+            {isTamil ? "கடவுச்சொல் மாற்றப்பட்டது. புதிய கடவுச்சொல்லுடன் உள்நுழையுங்கள்." : "Password changed. Sign in with your new password."}
+          </div>
+        )}
 
         {/* Error Alert */}
         {error && (
@@ -181,7 +195,7 @@ export function LoginForm({ lang = "en" }: LoginFormProps) {
 
         {/* Sessions always last the same time, so there's no "remember me" switch that would do nothing. */}
         <div className="thabaal-row" style={{ justifyContent: "flex-end" }}>
-          <a href="mailto:support@thabaal.com?subject=Password%20Reset%20Request">
+          <a href="/forgot-password">
             {isTamil ? "கடவுச்சொல் மறந்ததா?" : "Forgot password?"}
           </a>
         </div>
