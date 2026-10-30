@@ -49,10 +49,10 @@ describe("loyalty points", () => {
 
   test("points used on orders come off the balance; a cancelled order gives them back", () => {
     const orders = [
-      { id: "a", total: 3000, status: "DELIVERED", paidAt: new Date(), pointsRedeemed: 0 },
-      { id: "b", total: 2000, status: "CONFIRMED", paidAt: null, pointsRedeemed: 0 },
-      { id: "c", total: 640, status: "NEW", paidAt: null, pointsRedeemed: 100 },
-      { id: "d", total: 500, status: "CANCELLED", paidAt: null, pointsRedeemed: 50 },
+      { id: "a", total: 3000, status: "DELIVERED", paidAt: new Date(), paymentMethod: null, internalNote: null, pointsRedeemed: 0 },
+      { id: "b", total: 2000, status: "CONFIRMED", paidAt: null, paymentMethod: "cod", internalNote: null, pointsRedeemed: 0 },
+      { id: "c", total: 640, status: "NEW", paidAt: null, paymentMethod: null, internalNote: null, pointsRedeemed: 100 },
+      { id: "d", total: 500, status: "CANCELLED", paidAt: null, paymentMethod: null, internalNote: null, pointsRedeemed: 50 },
     ];
     // Bought: a + b = ₹5,000 → 50 points + 50 repeat bonus = 100; minus 100 used on c (d was cancelled).
     const l = loyaltyFromOrders({ name: "Meena R", orders });

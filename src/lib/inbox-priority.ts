@@ -2,6 +2,7 @@ import { orderRef } from "@/lib/order-ref";
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { db } from "./db";
+import { isOpenCart, isSale } from "@/lib/sale";
 
 // Inbox priority: every open conversation, sorted into lanes by what's at stake and how long
 // WhatsApp still lets us reply for free (24 hours from the customer's last message).
@@ -48,7 +49,7 @@ export async function inboxPriority(where: Prisma.ReplyWhereInput, now = new Dat
           phone: true,
           orders: {
             where: { status: { not: "CANCELLED" } },
-            select: { id: true, number: true, ref: true, total: true, status: true, paidAt: true, paymentRequestedAt: true, createdAt: true },
+            select: { id: true, number: true, ref: true, total: true, status: true, paidAt: true, paymentMethod: true, internalNote: true, paymentRequestedAt: true, createdAt: true },
             orderBy: { createdAt: "desc" },
             take: 50,
           },
@@ -73,8 +74,8 @@ export async function inboxPriority(where: Prisma.ReplyWhereInput, now = new Dat
       continue;
     }
     const orders = r.customer.orders;
-    const bought = orders.filter((o) => o.paidAt || ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"].includes(o.status));
-    const cart = orders.find((o) => !o.paidAt && (o.status === "NEW" || o.status === "CONFIRMED"));
+    const bought = orders.filter(isSale);
+    const cart = orders.find(isOpenCart);
     map.set(r.customerId, {
       customerId: r.customerId,
       name: r.customer.name,

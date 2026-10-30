@@ -26,7 +26,7 @@ export async function loyaltyHistory(clientId: string, limit = 400): Promise<Poi
     db.order.findMany({
       where: { clientId },
       orderBy: { createdAt: "asc" },
-      select: { id: true, number: true, ref: true, total: true, status: true, paidAt: true, createdAt: true, pointsRedeemed: true, customer: { select: { id: true, name: true } } },
+      select: { id: true, number: true, ref: true, total: true, status: true, paidAt: true, paymentMethod: true, internalNote: true, createdAt: true, pointsRedeemed: true, customer: { select: { id: true, name: true } } },
     }),
     // Before the history table exists on a database (it's added by an additive script), there are no hand changes to show.
     db.loyaltyEntry

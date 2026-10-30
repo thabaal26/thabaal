@@ -67,6 +67,8 @@ import { activeCount, keepFilters, narrowOrders, periodKeys, readFilters, resolv
 import { filterOptions, scopedCustomerIds } from "@/lib/filter-scope";
 import { catalogFor, catalogOrders, customerProducts } from "@/lib/product-scope";
 import { catalogMatcher } from "@/lib/catalog-match";
+import { isOpenCart, isSale } from "@/lib/sale";
+import { saleSql } from "@/lib/sale-sql";
 
 
 
@@ -192,6 +194,7 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
             customerId: true,
             status: true,
             paidAt: true,
+            paymentMethod: true,
             paymentRequestedAt: true,
             internalNote: true,
             createdAt: true,
@@ -227,10 +230,10 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
           WHERE m."createdAt" >= ${start} AND m."createdAt" < ${end} AND m.status NOT IN ('QUEUED', 'SKIPPED') AND (${cid}::text IS NULL OR c."clientId" = ${cid} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[])))
           GROUP BY 1
         ), carts AS (
-          SELECT DISTINCT o.id, o.total, o.status, o."paidAt", o."customerId" FROM "Order" o JOIN sent s ON s.cid = o."customerId"
+          SELECT DISTINCT o.id, o.total, o.status, o."paidAt", o."paymentMethod", o."internalNote", o."customerId" FROM "Order" o JOIN sent s ON s.cid = o."customerId"
           WHERE o."createdAt" >= s.first_at AND o."createdAt" < s.first_at + interval '7 days'
         ), bought AS (
-          SELECT * FROM carts WHERE status IN ('CONFIRMED', 'PAID', 'DISPATCHED', 'DELIVERED') OR "paidAt" IS NOT NULL
+          SELECT * FROM carts WHERE ${saleSql("carts")}
         )
         SELECT count(*) AS messaged,
           count(*) FILTER (WHERE delivered) AS delivered,
@@ -310,8 +313,8 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
               c.location,
               c.purchases,
               c.tags,
-              count(o.id) FILTER (WHERE o.status IN ('CONFIRMED', 'PAID', 'DISPATCHED', 'DELIVERED') OR o."paidAt" IS NOT NULL) AS paid_orders,
-              max(o."createdAt") FILTER (WHERE o.status IN ('CONFIRMED', 'PAID', 'DISPATCHED', 'DELIVERED') OR o."paidAt" IS NOT NULL) AS last_order_at,
+              count(o.id) FILTER (WHERE ${saleSql("o")}) AS paid_orders,
+              max(o."createdAt") FILTER (WHERE ${saleSql("o")}) AS last_order_at,
               (SELECT max(r."receivedAt") FROM "Reply" r WHERE r."customerId" = c.id) AS last_reply_at
             FROM "Customer" c
             LEFT JOIN "Order" o ON o."customerId" = c.id
@@ -361,10 +364,9 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
   const prevTotal = prevDelivered + prevCount("SENT") + prevCount("FAILED");
 
   // Distinguish actual bought/confirmed orders from unpaid active WhatsApp carts ("NEW" or "CONFIRMED" with paidAt == null) and replaced/cancelled carts.
-  const isBought = (o: (typeof orders)[number]) =>
-    o.status === "PAID" || o.status === "DISPATCHED" || o.status === "DELIVERED" || o.paidAt !== null;
-  const isUnpaidCart = (o: (typeof orders)[number]) =>
-    (o.status === "NEW" || o.status === "CONFIRMED") && o.paidAt === null;
+  // One rule everywhere (lib/sale.ts): paid, COD confirmed, or gone out. A confirmed COD order is a sale, not an unpaid cart.
+  const isBought = (o: (typeof orders)[number]) => isSale(o);
+  const isUnpaidCart = (o: (typeof orders)[number]) => isOpenCart(o);
 
   const curAllOrders = orders.filter((o) => o.createdAt >= start && o.createdAt < end);
   const curOrders = curAllOrders.filter(isBought);
@@ -918,7 +920,7 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
   {
     const units = new Map<string, number>();
     for (const o of catOrders) {
-      if (!inScope(o.customerId) || !(o.paidAt || ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"].includes(o.status))) continue;
+      if (!inScope(o.customerId) || !isSale(o)) continue;
       for (const l of o.lines) units.set(l.ref.retailerId, (units.get(l.ref.retailerId) ?? 0) + l.qty);
     }
     for (const p of catalog.products) {

@@ -15,6 +15,7 @@ import type { OrderItem } from "@/lib/orders";
 import { formatInTimeZone } from "date-fns-tz";
 import { adjustLoyaltyPoints } from "../../actions/customers";
 import { T } from "../../portal-ui";
+import { isSale } from "@/lib/sale";
 
 const DAY = 86_400_000;
 // Paid = emerald, waiting = gold, replaced or cancelled = neutral: the same meaning as every chart.
@@ -22,7 +23,7 @@ const PAID = "emerald";
 const OPEN = "gold";
 const DROPPED = "neutral";
 
-const bought = (o: Pick<Order, "paidAt" | "status">) => Boolean(o.paidAt) || ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"].includes(o.status);
+const bought = (o: Pick<Order, "paidAt" | "status" | "paymentMethod" | "internalNote">) => isSale(o);
 const kind = (o: Order) => (o.status === "CANCELLED" ? "dropped" : bought(o) ? "paid" : "open");
 
 const TIME_WINDOWS = [

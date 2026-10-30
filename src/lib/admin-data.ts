@@ -11,6 +11,7 @@ import { db } from "./db";
 import { APP_TZ } from "./format";
 import { RATES } from "./spend";
 import { accessState, CYCLE_MONTHS, DAY_MS, summarize, WARN_DAYS, type AccessState } from "./subscription-core";
+import { SALE_WHERE } from "@/lib/sale";
 
 // ---- plans -------------------------------------------------------------------------------------------------
 
@@ -126,7 +127,7 @@ export type ClientRow = {
 
 const SALE: Prisma.OrderWhereInput = {
   status: { not: "CANCELLED" },
-  OR: [{ paidAt: { not: null } }, { status: { in: ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"] } }],
+  ...SALE_WHERE,
 };
 
 type CountRow = { clientId: string; k: string | null; n: number };

@@ -2,6 +2,7 @@ import "server-only";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { db } from "./db";
 import { APP_TZ } from "./format";
+import { SALE_WHERE } from "@/lib/sale";
 import {
   fetchMetaCostSince,
   fetchMetaLivePricing,
@@ -263,7 +264,7 @@ export async function spendSummary(clientId: string) {
         where: {
           customer: { clientId },
           createdAt: { gte: thisMonth },
-          OR: [{ status: { in: ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"] } }, { paidAt: { not: null } }],
+          ...SALE_WHERE,
         },
         select: { total: true },
       })

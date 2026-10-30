@@ -32,7 +32,7 @@ async function loadOrder(orderId: string) {
           name: true,
           tags: true,
           purchases: true,
-          orders: { select: { id: true, total: true, status: true, paidAt: true, pointsRedeemed: true } },
+          orders: { select: { id: true, total: true, status: true, paidAt: true, paymentMethod: true, internalNote: true, pointsRedeemed: true } },
         },
       },
     },

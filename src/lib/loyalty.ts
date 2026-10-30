@@ -1,4 +1,5 @@
 import type { Tone } from "@/components/ui";
+import { isSale, type SaleFields } from "./sale";
 
 export type LoyaltyTier = "platinum" | "gold" | "silver" | "bronze";
 
@@ -87,11 +88,10 @@ export function applyManualLoyaltyDelta(tags: string[], delta: number, totalAfte
   return cleaned;
 }
 
-type LoyaltyOrderRow = { id?: string; total: number; status: string; paidAt: Date | null; pointsRedeemed?: number | null };
+type LoyaltyOrderRow = { id?: string; total: number; status: string; paidAt: Date | null; paymentMethod: string | null; internalNote: string | null; pointsRedeemed?: number | null };
 
 /** Bought = paid, or confirmed and beyond: the orders that earn points. */
-export const isBoughtOrder = (o: Pick<LoyaltyOrderRow, "status" | "paidAt">) =>
-  Boolean(o.paidAt) || ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"].includes(o.status);
+export const isBoughtOrder = (o: SaleFields) => isSale(o);
 
 /** Points used on orders that still stand; a cancelled order gives its points back. */
 export const redeemedOnOrders = (orders: LoyaltyOrderRow[], exceptOrderId?: string) =>
