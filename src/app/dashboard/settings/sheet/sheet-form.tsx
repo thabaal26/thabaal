@@ -102,7 +102,7 @@ export function SheetForm({ customersUrl, ordersUrl }: { customersUrl: string; o
         <button
           type="button"
           onClick={() => setUseSeparate(!useSeparate)}
-          className="inline-flex items-center gap-1 text-xs font-medium text-ink-2 underline underline-offset-2 transition hover:text-ink"
+          className="inline-flex min-h-11 items-center gap-1 text-xs font-medium text-ink-2 underline underline-offset-2 transition hover:text-ink sm:min-h-0"
         >
           {useSeparate ? (
             <>

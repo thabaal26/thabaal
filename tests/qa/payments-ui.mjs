@@ -351,7 +351,8 @@ await check(30, "Order steps: no confirm or dispatch before payment is verified;
   const mk = (ref, data = {}) =>
     db.order.create({ data: { ref, clientId: base.clientId, customerId: base.customerId, items: [{ id: "QA-001", name: "Groundnut oil 1L", quantity: 1, price: 360 }], total: 420, status: "NEW", ...data } });
   const mainBtn = async (c) => (await c.locator("button.btn.primary").first().textContent())?.trim();
-  const onSteps = async (c) => (await c.locator(".steps b.on").allTextContents()).join(" › ");
+  // Each reached step now also shows when it happened ("Order received(30 Oct, 11:00 PM)"): compare the step names only.
+  const onSteps = async (c) => (await c.locator(".steps b.on").allTextContents()).map((t) => t.replace(/\s*\([^)]*\)\s*$/, "").trim()).join(" › ");
 
   const r1 = `QA-F1${run}`;
   await mk(r1);
