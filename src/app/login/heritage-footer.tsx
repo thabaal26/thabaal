@@ -299,7 +299,7 @@ export function HeritageFooter({ lang }: HeritageFooterProps) {
             </g>
 
             {/* ── Monument A: Majestic Grand Dravidian Gopuram (Hero — Madurai/Thanjavur Style) ── */}
-            <g className="heritage-monument heritage-gopuram heritage-gopuram--main" tabIndex={0} role="img" aria-label="Grand Dravidian Temple Gopuram">
+            <g className="heritage-monument heritage-gopuram heritage-gopuram--main" role="img" aria-label="Grand Dravidian Temple Gopuram">
               {/* Adhisthana / Foundation Plinth */}
               <path d="M 158 175 L 158 152 L 278 152 L 278 175 Z" fill="#0d2644" />
               <line x1="156" y1="152" x2="280" y2="152" stroke="#255182" strokeWidth="2" />
@@ -371,7 +371,7 @@ export function HeritageFooter({ lang }: HeritageFooterProps) {
             </g>
 
             {/* ── Monument B: Second Gopuram (Mid-Distance Architectural Rhythm) ── */}
-            <g className="heritage-monument heritage-gopuram heritage-gopuram--second" tabIndex={0} role="img" aria-label="Second Temple Gopuram">
+            <g className="heritage-monument heritage-gopuram heritage-gopuram--second" role="img" aria-label="Second Temple Gopuram">
               <path d="M 300 175 L 300 155 L 374 155 L 374 175 Z" fill="#0f2b4a" />
               <line x1="298" y1="155" x2="376" y2="155" stroke="#255182" strokeWidth="1.6" />
               <path d="M 331 175 L 331 159 Q 337 154 343 159 L 343 175 Z" fill="#061626" />
@@ -416,7 +416,7 @@ export function HeritageFooter({ lang }: HeritageFooterProps) {
             </g>
 
             {/* ── Monument D: Traditional Pillared Mandapam (Colonnade / Hall of 1000 Pillars) ── */}
-            <g className="heritage-monument heritage-mandapam" tabIndex={0} role="img" aria-label="Heritage Pillared Mandapam">
+            <g className="heritage-monument heritage-mandapam" role="img" aria-label="Heritage Pillared Mandapam">
               {/* Upper Parapet & Cornice Slab */}
               <rect x="726" y="126" width="198" height="5" rx="0.5" fill="#1b3d63" />
               <rect x="730" y="121" width="190" height="5" fill="#254d77" />
@@ -434,7 +434,7 @@ export function HeritageFooter({ lang }: HeritageFooterProps) {
             </g>
 
             {/* ── Monument E: Coastal Lighthouse on Rocky Shoreline ── */}
-            <g className="heritage-monument heritage-lighthouse" tabIndex={0} role="img" aria-label="Coastal Lighthouse">
+            <g className="heritage-monument heritage-lighthouse" role="img" aria-label="Coastal Lighthouse">
               {/* Rocky Promontory */}
               <path d="M 1010 178 Q 1035 165 1060 178 Z" fill="#0b2036" />
               {/* Tapered Lighthouse Tower */}
@@ -449,7 +449,7 @@ export function HeritageFooter({ lang }: HeritageFooterProps) {
             </g>
 
             {/* ── Monument F: Traditional Tamil Catamaran / Fishing Boat (`Pattai`) ── */}
-            <g className="heritage-monument heritage-boat" tabIndex={0} role="img" aria-label="Tamil Fishing Boat">
+            <g className="heritage-monument heritage-boat" role="img" aria-label="Tamil Fishing Boat">
               {/* Slender Hull with Curved Bow and Stern */}
               <path d="M 1245 162 C 1268 174, 1318 174, 1340 160 C 1320 168, 1275 168, 1245 162 Z" fill="#0a1e33" />
               <path d="M 1242 161 L 1342 159 L 1334 166 L 1248 166 Z" fill="#16385d" />

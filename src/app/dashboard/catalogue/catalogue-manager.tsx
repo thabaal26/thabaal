@@ -393,7 +393,7 @@ export function CatalogueManager({
       )}
 
       <ScrollReveal as="div" className="card" style={{ padding: 0 }} duration={400}>
-        <div className="tw">
+        <div className="tw" tabIndex={0} role="region" aria-label="Products">
           <table>
             <thead>
               <tr>

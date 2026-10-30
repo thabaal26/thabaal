@@ -216,12 +216,14 @@ await check(7, "Undo payment: hidden for WhatsApp-confirmed, works for staff-rec
 
 // 3. Customer says paid → staff verify → Paid.
 await check(3, "Customer says paid → 'Payment received' marks it paid", async () => {
-  const c = await card("QA-1012");
+  // The seeded claim's order number depends on the time of day the seed runs, so find it by its claim.
+  const claimRef = (await db.order.findFirst({ where: { clientId: S.shopId, paymentClaimedAt: { not: null }, paidAt: null, status: { not: "CANCELLED" } }, orderBy: { createdAt: "asc" }, select: { ref: true } })).ref;
+  const c = await card(claimRef);
   const text = await c.textContent();
-  expect(/Customer says paid/.test(text), "claim not shown on the card");
+  expect(/Customer says paid/.test(text), `claim not shown on the card of ${claimRef}`);
   await c.getByRole("button", { name: "Payment received" }).first().click();
   await waitToast(/checked and recorded/);
-  const after = await get("QA-1012");
+  const after = await get(claimRef);
   expect(after.paidAt && after.paymentSource === "verified", snap(after));
   return snap(after);
 });
