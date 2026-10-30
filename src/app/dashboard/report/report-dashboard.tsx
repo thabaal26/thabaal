@@ -263,7 +263,8 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
       <StaggerGroup className="grid g4 keep2" id="rk" style={{ marginBottom: 16 }}>
         {k.map((x, i) => (
           <StaggerItem key={x[0]} index={i} className="h-full">
-            <div className="card stat">
+            {/* h-full: the animation wrapper stretches to the row; the tile must too, or tiles in a row differ in height. */}
+            <div className="card stat h-full">
               <div className="l">
                 <span>{x[0]}</span>
                 {x[3]}
