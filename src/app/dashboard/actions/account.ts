@@ -1,9 +1,8 @@
 "use server";
 
-import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { createSession, getScope, requireManager, requireUser, revokeSessions } from "@/lib/session";
+import { getScope, requireManager, requireUser } from "@/lib/session";
 import type { ActionResult } from "./templates";
 import { CYCLE_NAMES, type BillingProfile } from "@/lib/account-plans";
 import { isCycle, planDef } from "@/lib/subscription-core";
@@ -18,18 +17,6 @@ import {
   type Actor,
   type SubResult,
 } from "@/lib/subscription";
-
-export async function changePassword(current: string, next: string): Promise<ActionResult> {
-  const me = await requireUser();
-  const user = await db.user.findUniqueOrThrow({ where: { id: me.id } });
-  if (!(await bcrypt.compare(current, user.passwordHash))) return { ok: false, message: "Current password is wrong." };
-  if (next.length < 8) return { ok: false, message: "New password must be at least 8 characters." };
-  await db.user.update({ where: { id: me.id }, data: { passwordHash: await bcrypt.hash(next, 12) } });
-  // Log out every other device, then give this one a fresh login so the person changing it stays in.
-  await revokeSessions(me.id);
-  await createSession(me.id);
-  return { ok: true, message: "Password changed. Other devices signed in with this account are logged out." };
-}
 
 export async function saveBillingDetails(data: BillingProfile): Promise<ActionResult> {
   try {

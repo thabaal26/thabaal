@@ -1,4 +1,4 @@
-import { Building2, CheckCircle2, Circle, LogOut } from "@/components/icons";
+import { Building2, CheckCircle2, Circle } from "@/components/icons";
 import { Clock3D, Send3D, Sparkles3D } from "@/components/icons-3d";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
@@ -13,12 +13,10 @@ import { numberHealth } from "@/lib/limits";
 import { fmtDate } from "@/lib/format";
 import { keyId } from "@/lib/secret-box";
 import { getScope, requireUser } from "@/lib/session";
-import { logout } from "../../login/actions";
 import { cn } from "@/lib/cn";
 import { getSettings, wahaConfig } from "@/lib/provider";
 import { waConfig } from "@/lib/whatsapp";
 import { LocalSessionPanel, ProviderSwitch } from "./provider-panel";
-import { PasswordForm } from "./password-form";
 import { OrderStepsForm } from "./order-steps-form";
 import { PaymentSetupForm } from "./payment-setup-form";
 import { DefaultImage } from "./default-image";
@@ -60,22 +58,6 @@ function Copyable({ label, value }: { label: string; value: string }) {
 
 export default async function SettingsPage() {
   const user = await requireUser();
-  const accountCard = (
-    <section className="card">
-      <div className="hd">
-        <div>
-          <h2><T ta="உங்கள் கணக்கு">Your account</T></h2>
-          <p><T ta="உள்நுழைந்துள்ள கணக்கு">Signed in as</T> {user.email}</p>
-        </div>
-        <form action={logout}>
-          <button className="btn sm">
-            <LogOut aria-hidden className="ic shrink-0" style={{ width: 15, height: 15 }} /> <T ta="வெளியேறு">Sign out</T>
-          </button>
-        </form>
-      </div>
-      <PasswordForm />
-    </section>
-  );
   const lookCard = (
     <section className="card">
       <div className="hd">
@@ -100,7 +82,7 @@ export default async function SettingsPage() {
     </section>
   );
   const frame = (children: React.ReactNode, actions?: React.ReactNode) => (
-    <PortalPage title="Settings" titleTa="அமைப்புகள்" sub="WhatsApp numbers, payment details, language and your account." subTa="வாட்ஸ்அப் எண்கள், பண விவரங்கள், மொழி மற்றும் உங்கள் கணக்கு." actions={actions}>
+    <PortalPage title="Settings" titleTa="அமைப்புகள்" sub="WhatsApp numbers, payment details, language and look." subTa="வாட்ஸ்அப் எண்கள், பண விவரங்கள், மொழி மற்றும் தோற்றம்." actions={actions}>
       {children}
     </PortalPage>
   );
@@ -273,7 +255,6 @@ export default async function SettingsPage() {
           <StaggerItem>{lookCard}</StaggerItem>
         </StaggerGroup>
 
-        <ScrollReveal>{accountCard}</ScrollReveal>
 
         {cid && (
           <ScrollReveal>
@@ -436,7 +417,6 @@ export default async function SettingsPage() {
           <div className="space-y-4 sm:space-y-6">
             {langCard}
             {lookCard}
-            {accountCard}
           </div>
         </StaggerItem>
       </StaggerGroup>
