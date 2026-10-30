@@ -103,6 +103,9 @@ export type ClientRow = {
   endsAt: Date | null;
   days: number;
   pending: { id: string; amount: number; utr: string | null; createdAt: Date } | null;
+  /** Razorpay auto-pay: on (charging each period), failing (last charge failed, Razorpay retrying or stopped),
+   *  off (turned off, still running to the end of the paid period), or none (pays each period by hand). */
+  autoPay: "on" | "failing" | "off" | "none";
   limits: PlanLimits | null;
   usage: { numbers: number; staff: number; campaignsMonth: number; templates: number };
   salesMonth: number;
@@ -205,6 +208,16 @@ export async function loadClientRows(now = new Date()): Promise<{ rows: ClientRo
     lastReplies(),
     db.order.groupBy({ by: ["clientId"], _max: { createdAt: true } }),
   ]);
+  // Newest plan subscription per business (Razorpay auto-pay).
+  const subs = await db.razorpayRecord.findMany({
+    where: { kind: "subscription", purpose: "plan", status: { in: ["authenticated", "active", "pending", "halted", "cancelling"] } },
+    orderBy: { createdAt: "desc" },
+    select: { clientId: true, status: true },
+  });
+  const autoPayOf = (clientId: string): ClientRow["autoPay"] => {
+    const s = subs.find((x) => x.clientId === clientId)?.status;
+    return !s ? "none" : s === "pending" || s === "halted" ? "failing" : s === "cancelling" ? "off" : "on";
+  };
 
   const rows = clients.map((c): ClientRow => {
     const mine = purchases.filter((p) => p.clientId === c.id);
@@ -245,6 +258,8 @@ export async function loadClientRows(now = new Date()): Promise<{ rows: ClientRo
     if (acc.state === "locked" || acc.state === "new") flag(50, acc.state === "new" ? "has never paid" : "locked for non-payment");
     else if (acc.state === "overdue") flag(40, "payment overdue");
     else if (acc.state === "due") flag(10, `plan ends in ${acc.days} day${acc.days === 1 ? "" : "s"}`);
+    const autoPay = autoPayOf(c.id);
+    if (autoPay === "failing") flag(30, "auto-pay charge failed");
     if (!connectedNumbers && (paidNow || c.planRequired)) flag(25, "no WhatsApp number connected");
     if (numbersRed) flag(20, "a number is rated red by Meta");
     if (connectedNumbers && sent === 0) flag(20, "sent nothing in 30 days");
@@ -270,6 +285,7 @@ export async function loadClientRows(now = new Date()): Promise<{ rows: ClientRo
       endsAt: acc.endsAt,
       days: acc.days,
       pending: sum.pending ? { id: sum.pending.id, amount: sum.pending.amountPaise / 100, utr: sum.pending.utr, createdAt: sum.pending.createdAt } : null,
+      autoPay,
       limits,
       usage,
       salesMonth: salesMonth.find((s) => s.clientId === c.id)?._sum.total ?? 0,

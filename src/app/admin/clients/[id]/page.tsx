@@ -100,6 +100,9 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
         <Pill tone={r.stateTone}>{r.stateLabel}</Pill>
         <Pill tone="plain">{planName(r.plan)}</Pill>
         {r.cycle && <Pill tone="plain">{cycleName(r.cycle)}</Pill>}
+        <Pill tone={r.autoPay === "on" ? "ok" : r.autoPay === "failing" ? "bad" : "plain"}>
+          {r.autoPay === "on" ? "Auto-pay on" : r.autoPay === "failing" ? "Auto-pay failing" : r.autoPay === "off" ? "Auto-pay turned off" : "Pays by hand"}
+        </Pill>
         <Pill tone={r.health}>{r.healthLabel}</Pill>
         <span className="muted small">With thabaal since {day(c.createdAt)}</span>
       </div>

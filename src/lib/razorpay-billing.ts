@@ -7,6 +7,7 @@ import { capturedPayment, orderSignatureOk, razorpayKeys, RazorpayError, rzp, su
 import { isCycle, isPlanKey, paidThrough, planDef, pricePaise, purchaseBlock } from "./subscription-core";
 import { grantGatewayPeriod } from "./subscription";
 import { sendEmail } from "./email";
+import { APP_ORIGIN } from "./app-host";
 
 // Thabaal's own fees through Razorpay.
 //
@@ -46,6 +47,18 @@ async function alertThabaal(subject: string, clientId: string | null, rows: [str
     await sendEmail({ subject, rows: [["Business", client?.name ?? (clientId ? clientId : "Thabaal (test)")], ...rows] });
   } catch (e) {
     console.error("razorpay alert email", e);
+  }
+}
+
+/** Tells the business owner by email (best effort) that an auto-pay charge failed and how to keep things open. */
+async function emailOwner(clientId: string | null, subject: string, intro: string) {
+  if (!clientId) return;
+  try {
+    const owner = await db.user.findFirst({ where: { clientId, role: "CLIENT", access: "MANAGER" }, orderBy: { createdAt: "asc" }, select: { email: true } });
+    if (!owner) return;
+    await sendEmail({ to: owner.email, subject, intro, button: { label: "Open My account", url: `${APP_ORIGIN}/dashboard/account` }, rows: [] });
+  } catch (e) {
+    console.error("razorpay owner email", e);
   }
 }
 
@@ -506,6 +519,19 @@ export async function handleRazorpayEvent(body: WebhookBody): Promise<string> {
       // An immediate start carries its first charge on "activated"; granting is keyed by payment id, so a later
       // subscription.charged for the same payment adds nothing.
       if (body.event === "subscription.activated" && pay) await applySubscriptionCharge(sub.id, pay, "webhook");
+      // A failed charge: tell the owner once when retries start, and again when Razorpay gives up.
+      if (rec.purpose === "plan" && body.event === "subscription.pending" && rec.status !== "pending")
+        await emailOwner(
+          rec.clientId,
+          "Your Thabaal auto-pay didn't go through",
+          "Razorpay couldn't collect this period's plan payment (often not enough balance, or the UPI/card mandate was paused). It will try again over the next few days. Please keep money in the account, or pay now from My account so nothing stops.",
+        );
+      if (rec.purpose === "plan" && body.event === "subscription.halted")
+        await emailOwner(
+          rec.clientId,
+          "Thabaal auto-pay stopped: please pay to keep using Thabaal",
+          "Razorpay tried several times and couldn't collect your plan payment, so auto-pay has stopped. Your plan ends at the end of the paid period, then 2 grace days, then Thabaal locks until you pay. Pay from My account to continue; you can turn auto-pay on again there.",
+        );
       if (body.event === "subscription.halted" && rec.purpose === "plan")
         await alertThabaal("Auto-renew stopped: payments failed", rec.clientId, [
           ["Subscription", sub.id],
