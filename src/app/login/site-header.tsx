@@ -23,7 +23,10 @@ export function SiteHeader({ lang, onToggleLang, onSelectLang }: SiteHeaderProps
     const target = document.getElementById(targetId);
     if (target) {
       e.preventDefault();
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      // Sections skip rendering until they are near the screen (content-visibility: auto), so their real
+      // heights appear only mid-scroll and the jump stopped short. Render them first, then scroll.
+      document.querySelectorAll<HTMLElement>("main section").forEach((s) => (s.style.contentVisibility = "visible"));
+      requestAnimationFrame(() => target.scrollIntoView({ behavior: "smooth", block: "start" }));
       if (window.location.hash !== `#${targetId}`) {
         history.pushState(null, "", `#${targetId}`);
       }
@@ -112,12 +115,15 @@ export function SiteHeader({ lang, onToggleLang, onSelectLang }: SiteHeaderProps
             className="site-header-lang-btn"
             aria-label={ta ? "English / தமிழ் — Switch to English" : "தமிழ் / EN — தமிழுக்கு மாற்றவும்"}
           >
-            {ta ? "English / தமிழ்" : "தமிழ் / EN"}
+            {/* Phones show only the language you switch to, so the pill stays on one line. */}
+            <span className="site-header-label-long">{ta ? "English / தமிழ்" : "தமிழ் / EN"}</span>
+            <span className="site-header-label-short" aria-hidden="true">{ta ? "EN" : "தமிழ்"}</span>
           </button>
 
           {/* Book a demo CTA */}
           <a href={DEMO_URL} {...DEMO_TARGET} className="site-header-btn site-header-btn-primary">
-            {ta ? "டெமோ பதிவு செய்யுங்கள்" : "Book a demo"}
+            <span className="site-header-label-long">{ta ? "டெமோ பதிவு செய்யுங்கள்" : "Book a demo"}</span>
+            <span className="site-header-label-short">{ta ? "டெமோ பதிவு" : "Book demo"}</span>
           </a>
 
           {/* Download Brochure CTA (Dark button, placed after Book a Demo) */}
@@ -145,7 +151,7 @@ export function SiteHeader({ lang, onToggleLang, onSelectLang }: SiteHeaderProps
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            {ta ? "பிரோஷர் பதிவிறக்கு" : "Download brochure"}
+            <span className="site-header-btn-text">{ta ? "பிரோஷர் பதிவிறக்கு" : "Download brochure"}</span>
           </a>
 
           {/* Mobile Menu Hamburger Button */}

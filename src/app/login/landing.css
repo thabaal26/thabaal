@@ -5065,3 +5065,401 @@ html {
   }
 }
 
+
+/* ==========================================================================
+   Homepage mobile-first fixes (30 Oct 2026)
+   Kept last on purpose: several older mobile rules above come *before* the base
+   rules they were meant to override (e.g. .usp-grid), so phones never got them.
+   Everything here is scoped to landing-page classes; nothing global changes.
+   ========================================================================== */
+
+/* Header: labels that fit on one line on phones. The short label only shows below 640px. */
+.site-header-label-short {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .site-header-container {
+    width: calc(100% - 24px);
+    gap: 8px;
+    min-height: 60px;
+  }
+
+  .site-header-actions {
+    gap: 6px;
+  }
+
+  .site-header-label-long {
+    display: none;
+  }
+
+  .site-header-label-short {
+    display: inline;
+  }
+
+  .site-header-actions .site-header-lang-btn,
+  .site-header-actions .site-header-btn {
+    white-space: nowrap;
+    min-height: 40px;
+  }
+
+  .site-header-actions .site-header-lang-btn {
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  .site-header-actions .site-header-btn-primary {
+    padding: 0 14px;
+    font-size: 13px;
+  }
+
+  .site-header-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    font-size: 22px;
+    line-height: 1;
+  }
+
+  .site-header-nav {
+    top: 64px;
+    left: 12px;
+    right: 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  .site-header-brand img {
+    width: 100px;
+  }
+
+  .site-header-actions .site-header-lang-btn,
+  .site-header-actions .site-header-btn-primary {
+    padding: 0 10px;
+  }
+}
+
+/* "Three reasons": the 3-column grid squeezed each card to ~100px on phones. */
+@media (max-width: 960px) {
+  .usp-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .usp-card {
+    min-height: 0;
+    padding: 24px 22px;
+    gap: 14px;
+  }
+
+  .usp-card h3 {
+    margin: 12px 0 8px;
+    font-size: clamp(22px, 5.4vw, 28px);
+  }
+
+  .usp-card p {
+    max-width: 60ch;
+  }
+
+  .usp-kicker {
+    white-space: normal;
+  }
+}
+
+@media (min-width: 720px) and (max-width: 960px) {
+  .usp-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .usp-grid > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Section rhythm on phones: 96px above and below every section left ~190px of blank space each. */
+@media (max-width: 640px) {
+  .workspace-section,
+  .demo-section,
+  .steps-section,
+  .use-case-section,
+  .pricing-section,
+  .pricing,
+  .stories-section {
+    padding-top: 56px;
+    padding-bottom: 56px;
+  }
+
+  .final-cta {
+    padding-top: 48px;
+    padding-bottom: 48px;
+  }
+
+  .section-head {
+    margin-bottom: 28px;
+  }
+}
+
+/* Tamil labels are longer: let tabs and toggles wrap inside the screen instead of being clipped. */
+.demo-tabs {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.demo-tab,
+.demo-tab strong,
+.demo-tab span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.demo-panel,
+.demo-panel-top {
+  min-width: 0;
+}
+
+.demo-panel-top {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (min-width: 641px) and (max-width: 920px) {
+  .demo-tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .demo-tab.active {
+    transform: none;
+  }
+}
+
+.pricing-controls-row {
+  flex-wrap: wrap;
+  row-gap: 12px;
+}
+
+.billing-term-toggle {
+  max-width: 100%;
+}
+
+@media (max-width: 960px) {
+  .billing-term-toggle {
+    flex-wrap: wrap;
+  }
+
+  .billing-term-toggle button {
+    white-space: normal;
+    line-height: 1.25;
+  }
+}
+
+@media (max-width: 640px) {
+  .pricing-nav-tabs {
+    flex-wrap: wrap;
+    overflow: visible;
+    gap: 4px 18px;
+  }
+}
+
+@media (max-width: 520px) {
+  .billing-term-toggle {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Stacked story/template columns: a long Tamil word set the column's minimum width (315px on a 320px phone). */
+@media (max-width: 960px) {
+  .order-story,
+  .template-feature,
+  .demo-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .order-story > *,
+  .template-feature > *,
+  .demo-layout > * {
+    min-width: 0;
+  }
+
+  .order-story h3,
+  .template-feature h2,
+  .order-story p,
+  .template-feature p {
+    overflow-wrap: break-word;
+  }
+}
+
+/* Header between tablet and wide desktop: keep every button on one line. The brochure button
+   shows just its download icon here (its accessible name stays "Download brochure"). */
+.site-header-actions .site-header-lang-btn,
+.site-header-actions .site-header-btn {
+  white-space: nowrap;
+}
+
+@media (min-width: 921px) and (max-width: 1279px) {
+  .site-header-container {
+    gap: 16px;
+  }
+
+  .site-header-nav {
+    gap: 18px;
+  }
+
+  .site-header-actions {
+    gap: 8px;
+  }
+
+  .site-header-btn-dark {
+    width: 40px;
+    padding: 0;
+  }
+
+  .site-header-btn-dark svg {
+    margin-right: 0 !important;
+  }
+
+  .site-header-btn-dark .site-header-btn-text {
+    display: none;
+  }
+}
+
+@media (min-width: 921px) and (max-width: 1279px) {
+  [data-lang="ta"] .site-header-nav {
+    gap: 14px;
+    font-size: 13px;
+  }
+}
+
+/* The logo never shrinks and menu items never break; Tamil labels are longer, so the Tamil header
+   keeps the icon-only brochure button up to 1500px wide. */
+.site-header-brand {
+  flex-shrink: 0;
+}
+
+.site-header-nav a {
+  white-space: nowrap;
+}
+
+@media (min-width: 1280px) and (max-width: 1499px) {
+  [data-lang="ta"] .site-header-nav {
+    gap: 16px;
+    font-size: 13.5px;
+  }
+
+  [data-lang="ta"] .site-header-btn-dark {
+    width: 40px;
+    padding: 0;
+  }
+
+  [data-lang="ta"] .site-header-btn-dark svg {
+    margin-right: 0 !important;
+  }
+
+  [data-lang="ta"] .site-header-btn-dark .site-header-btn-text {
+    display: none;
+  }
+}
+
+/* Tamil header: the brochure button is icon-only on every desktop width (the container stops
+   growing at 1220px), and between 921px and 1179px the menu moves into the ☰ button, as below 920px. */
+@media (min-width: 921px) {
+  [data-lang="ta"] .site-header-btn-dark {
+    width: 40px;
+    padding: 0;
+  }
+
+  [data-lang="ta"] .site-header-btn-dark svg {
+    margin-right: 0 !important;
+  }
+
+  [data-lang="ta"] .site-header-btn-dark .site-header-btn-text {
+    display: none;
+  }
+}
+
+@media (min-width: 921px) and (max-width: 1179px) {
+  [data-lang="ta"] .site-header-container {
+    position: relative;
+  }
+
+  [data-lang="ta"] .site-header-nav {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 72px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: white;
+    box-shadow: var(--shadow-lg);
+    font-size: 14px;
+  }
+
+  [data-lang="ta"][data-theme="night"] .site-header-nav {
+    background: #0d1e38;
+    border-color: #233a5f;
+  }
+
+  [data-lang="ta"] .site-header-nav.open {
+    display: flex;
+  }
+
+  [data-lang="ta"] .site-header-nav a {
+    width: 100%;
+    padding: 12px 14px;
+  }
+
+  [data-lang="ta"] .site-header-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* Phones: sections now have 56px top padding, less than the 61px sticky header, so menu links
+   stop a little lower and the section label isn't tucked under the header. */
+@media (max-width: 640px) {
+  #features,
+  #reports,
+  #how-it-works,
+  #templates,
+  #pricing,
+  #faq,
+  #start {
+    scroll-margin-top: 48px;
+  }
+}
+
+/* 320–360px phones: logo, language, demo and menu must share ~300px, so everything tightens a little. */
+@media (max-width: 360px) {
+  .site-header-container {
+    gap: 6px;
+  }
+
+  .site-header-actions {
+    gap: 4px;
+  }
+
+  .site-header-brand img {
+    width: 88px;
+  }
+
+  .site-header-actions .site-header-lang-btn,
+  .site-header-actions .site-header-btn-primary {
+    padding: 0 9px;
+    font-size: 12px;
+  }
+
+  .site-header-menu-btn {
+    width: 36px;
+  }
+}
