@@ -7,6 +7,7 @@ import {
   confirmOrderCheckout,
   confirmSubscriptionCheckout,
   startOrder,
+  startPlanOrder,
   startPlanSubscription,
   startTestSubscription,
   type CheckoutStart,
@@ -29,8 +30,13 @@ function refresh<T extends { ok: boolean }>(r: T): T {
   return r;
 }
 
-export async function rzpStartPlan(plan: string, cycle: string): Promise<CheckoutStart> {
-  return startPlanSubscription(await who(), plan, cycle);
+/**
+ * Monthly and quarterly plans renew automatically unless the client opts out; yearly plans are paid once
+ * (every yearly charge is above the ₹15,000 UPI AutoPay / card e-mandate limit, so a mandate would fail).
+ */
+export async function rzpStartPlan(plan: string, cycle: string, autoRenew = true): Promise<CheckoutStart> {
+  const w = await who();
+  return autoRenew && cycle !== "y" ? startPlanSubscription(w, plan, cycle) : startPlanOrder(w, plan, cycle);
 }
 
 export async function rzpStartRecharge(amount: number): Promise<CheckoutStart> {

@@ -270,10 +270,13 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
   const rzpOn = !!razorpay?.enabled;
   const autoRenew = razorpay?.autoRenew ?? null;
   const [upiOpen, setUpiOpen] = useState(false);
+  // Monthly and quarterly renew by themselves unless unticked; yearly is always paid once (above the ₹15,000 autopay limit).
+  const [renewAuto, setRenewAuto] = useState(true);
+  const willAutoRenew = !!buy && buy.cycle !== "y" && renewAuto;
   const payOnline = () => {
     if (!buy) return;
     startBusy(async () => {
-      const start = await rzpStartPlan(buy.plan, buy.cycle);
+      const start = await rzpStartPlan(buy.plan, buy.cycle, willAutoRenew);
       if (!start.ok) {
         notify(start.message, false);
         return;
@@ -1827,14 +1830,29 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
 
                 {rzpOn && (
                   <div className="card" style={{ background: "var(--soft)", boxShadow: "none", padding: 18, marginBottom: 14 }}>
-                    <b>Pay online and turn on auto-renew</b>
-                    <p className="muted small" style={{ margin: "6px 0 14px" }}>
-                      UPI, card or net banking through Razorpay. Your plan is added the moment the payment goes through, and it renews every{" "}
-                      {CYCLE_LENGTH[buy.cycle]} by itself. Turn auto-renew off any time from My plan.
-                      {billing.nextStartLabel ? ` Your current period keeps running; the first charge is on ${billing.nextStartLabel}.` : ""}
+                    <b>Pay online with Razorpay</b>
+                    <p className="muted small" style={{ margin: "6px 0 10px" }}>
+                      UPI, card or net banking. Your plan is added the moment the payment goes through; nobody has to check it.
                     </p>
+                    {buy.cycle === "y" ? (
+                      <p className="muted small" style={{ marginBottom: 14 }}>
+                        Yearly plans are paid once. We remind you before the year ends; nothing is charged automatically.
+                      </p>
+                    ) : (
+                      <label className="small" style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 14, cursor: "pointer" }}>
+                        <input type="checkbox" checked={renewAuto} onChange={(e) => setRenewAuto(e.target.checked)} style={{ marginTop: 2 }} />
+                        <span>
+                          <b>Renew automatically every {CYCLE_LENGTH[buy.cycle]}</b>
+                          <span className="muted">
+                            {" "}
+                            · Razorpay charges {inr(buyPrice)} when each period ends and tells you a day before. Turn it off any time from My plan.
+                            {renewAuto && billing.nextStartLabel ? ` Your current period keeps running; the first charge is on ${billing.nextStartLabel}.` : ""}
+                          </span>
+                        </span>
+                      </label>
+                    )}
                     <button type="button" className="btn primary" disabled={busy} onClick={payOnline} style={{ width: "100%", justifyContent: "center" }}>
-                      {busy ? "Opening payment..." : `Pay ${inr(buyPrice)} with Razorpay`}
+                      {busy ? "Opening payment..." : willAutoRenew && billing.nextStartLabel ? "Set up auto-renew with Razorpay" : `Pay ${inr(buyPrice)} with Razorpay`}
                     </button>
                     {!upiOpen && (
                       <button type="button" className="btn ghost sm" onClick={() => setUpiOpen(true)} style={{ marginTop: 10, width: "100%", justifyContent: "center" }}>

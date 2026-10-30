@@ -6,6 +6,7 @@ import { CYCLE_NAMES, type BillingCycle, type PlanKey } from "./account-plans";
 import { capturedPayment, orderSignatureOk, razorpayKeys, RazorpayError, rzp, subscriptionSignatureOk, type RzpPayment } from "./razorpay";
 import { isCycle, isPlanKey, paidThrough, planDef, pricePaise, purchaseBlock } from "./subscription-core";
 import { grantGatewayPeriod } from "./subscription";
+import { sendEmail } from "./email";
 
 // Thabaal's own fees through Razorpay.
 //
@@ -37,6 +38,16 @@ const keysOr = () => {
 const say = (e: unknown) => (e instanceof RazorpayError ? e.message : "Couldn't reach Razorpay. Try again in a minute.");
 const rupees = (paise: number) => `₹${(paise / 100).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 const nowSec = () => Math.floor(Date.now() / 1000);
+
+/** Tells Thabaal's inbox about something that needs a person (a failing auto-renew, a dispute). Never throws. */
+async function alertThabaal(subject: string, clientId: string | null, rows: [string, string][]) {
+  try {
+    const client = clientId ? await db.client.findUnique({ where: { id: clientId }, select: { name: true } }) : null;
+    await sendEmail({ subject, rows: [["Business", client?.name ?? (clientId ? clientId : "Thabaal (test)")], ...rows] });
+  } catch (e) {
+    console.error("razorpay alert email", e);
+  }
+}
 
 type RzpSubscription = { id: string; status: string; current_end?: number | null; charge_at?: number | null; start_at?: number | null };
 type RzpOrder = { id: string; amount: number; status: string };
@@ -263,15 +274,71 @@ export async function startOrder(who: Who, purpose: "wallet" | "test", rupeesAmo
   }
 }
 
+/**
+ * Pays for one plan period once: yearly plans (each charge is above the ₹15,000 UPI AutoPay limit) and anyone who
+ * doesn't want auto-renew. The period is added the moment Razorpay confirms the payment.
+ */
+export async function startPlanOrder(who: Who, plan: string, cycle: string, now = new Date()): Promise<CheckoutStart> {
+  try {
+    if (!who.clientId) return { ok: false, message: who.isAdmin ? "Pick a client in the sidebar first." : "Your login isn't linked to a business." };
+    if (!who.canManage) return { ok: false, message: "Only the business owner or a manager can pay for the plan." };
+    if (!isPlanKey(plan) || !isCycle(cycle)) return { ok: false, message: "Pick one of the plans and how long to pay for." };
+    const k = keysOr();
+    const clientId = who.clientId;
+    const rows = await db.planPurchase.findMany({ where: { clientId }, orderBy: { createdAt: "asc" } });
+    const block = purchaseBlock(rows, now);
+    if (block) return { ok: false, message: block.message };
+    const amountPaise = pricePaise(plan, cycle);
+    const order = await rzp<RzpOrder>("POST", "/orders", {
+      amount: amountPaise,
+      currency: "INR",
+      receipt: `p-${Date.now().toString(36)}`,
+      notes: { clientId, plan, cycle, purpose: "plan" },
+    });
+    await db.razorpayRecord.create({ data: { kind: "order", rzpId: order.id, purpose: "plan", clientId, plan, cycle, amountPaise, status: "created", createdBy: who.name } });
+    const through = paidThrough(rows);
+    return {
+      ok: true,
+      kind: "order",
+      id: order.id,
+      keyId: k.keyId,
+      amountPaise,
+      label: `${planDef(plan)!.n} · ${CYCLE_NAMES[cycle].en}`,
+      startsLabel: through && through > now ? formatInTimeZone(through, APP_TZ, "d MMM yyyy, h:mm a") : null,
+    };
+  } catch (e) {
+    console.error("razorpay startPlanOrder", e);
+    return { ok: false, message: say(e) };
+  }
+}
+
 /** A paid order: re-read the payment, check it is this order's full amount, then credit once. */
 async function applyOrderPayment(orderId: string, paymentId: string): Promise<Result> {
   const rec = await db.razorpayRecord.findUnique({ where: { rzpId: orderId } });
   if (!rec || rec.kind !== "order") return { ok: false, message: "Unknown order." };
-  if (rec.status === "paid") return { ok: true, message: rec.purpose === "test" ? "Test payment received." : `${rupees(rec.amountPaise)} added to the wallet.` };
+  if (rec.status === "paid")
+    return { ok: true, message: rec.purpose === "test" ? "Test payment received." : rec.purpose === "plan" ? "Already paid. Your plan is updated." : `${rupees(rec.amountPaise)} added to the wallet.` };
   const p = await capturedPayment(paymentId);
   if (p.order_id !== orderId || p.status !== "captured" || p.amount !== rec.amountPaise || p.currency !== "INR") {
     await db.razorpayRecord.update({ where: { id: rec.id }, data: { paymentId, note: `Payment ${paymentId} is ${p.status}, ${rupees(p.amount)}` } });
     return { ok: false, message: p.status === "failed" ? "The payment failed. No money was taken." : "The payment isn't complete yet." };
+  }
+  if (rec.purpose === "plan") {
+    // grantGatewayPeriod is keyed by the payment id, so running this twice (checkout and webhook) adds one period.
+    const r = await grantGatewayPeriod({
+      clientId: rec.clientId!,
+      plan: rec.plan ?? "",
+      cycle: rec.cycle ?? "",
+      amountPaise: p.amount,
+      paymentRef: `RZP:${p.id}`,
+      paymentId: p.id,
+      payApp: p.method ? `Razorpay ${p.method}` : "Razorpay",
+      by: rec.createdBy ?? "Razorpay",
+      note: `One-time ${orderId}`,
+    });
+    await db.razorpayRecord.update({ where: { id: rec.id }, data: { paymentId: p.id, ...(r.ok ? { status: "paid", refId: r.id ?? rec.refId } : { note: r.message }) } });
+    if (!r.ok) await alertThabaal("Razorpay plan payment needs a look", rec.clientId, [["Payment", p.id], ["Problem", r.message]]);
+    return r.ok ? { ok: true, message: `Paid. ${r.message}` } : r;
   }
   return db.$transaction(async (tx) => {
     const claim = await tx.razorpayRecord.updateMany({ where: { id: rec.id, status: { not: "paid" } }, data: { status: "paid", paymentId: p.id } });
@@ -320,7 +387,8 @@ type WebhookBody = {
     payment?: { entity?: RzpPayment };
     subscription?: { entity?: RzpSubscription };
     order?: { entity?: RzpOrder };
-    refund?: { entity?: { id: string; payment_id: string; amount: number } };
+    refund?: { entity?: { id: string; payment_id: string; amount: number; status?: string } };
+    dispute?: { entity?: { id: string; payment_id: string; amount: number; reason_code?: string; status?: string; respond_by?: number } };
   };
 };
 
@@ -329,6 +397,7 @@ export async function handleRazorpayEvent(body: WebhookBody): Promise<string> {
   const pay = body.payload?.payment?.entity;
   const sub = body.payload?.subscription?.entity;
   switch (body.event) {
+    case "payment.authorized":
     case "payment.captured":
     case "order.paid": {
       const orderId = body.payload?.order?.entity?.id ?? pay?.order_id;
@@ -355,7 +424,8 @@ export async function handleRazorpayEvent(body: WebhookBody): Promise<string> {
     case "subscription.cancelled":
     case "subscription.completed":
     case "subscription.paused":
-    case "subscription.resumed": {
+    case "subscription.resumed":
+    case "subscription.updated": {
       if (!sub) return "no subscription";
       const rec = await db.razorpayRecord.findUnique({ where: { rzpId: sub.id } });
       if (!rec) return "not ours";
@@ -363,6 +433,14 @@ export async function handleRazorpayEvent(body: WebhookBody): Promise<string> {
       const status = rec.status === "cancelling" && ["active", "pending"].includes(sub.status) ? "cancelling" : sub.status;
       await db.razorpayRecord.update({ where: { id: rec.id }, data: { status } });
       if (["subscription.authenticated", "subscription.activated"].includes(body.event)) await cancelOtherSubscriptions(rec.clientId, rec.purpose, rec.rzpId);
+      // An immediate start carries its first charge on "activated"; granting is keyed by payment id, so a later
+      // subscription.charged for the same payment adds nothing.
+      if (body.event === "subscription.activated" && pay) await applySubscriptionCharge(sub.id, pay, "webhook");
+      if (body.event === "subscription.halted" && rec.purpose === "plan")
+        await alertThabaal("Auto-renew stopped: payments failed", rec.clientId, [
+          ["Subscription", sub.id],
+          ["What happens", "Razorpay stopped retrying. The plan ends at the end of the paid period unless the business pays again."],
+        ]);
       return status;
     }
     case "refund.processed": {
@@ -389,7 +467,42 @@ export async function handleRazorpayEvent(body: WebhookBody): Promise<string> {
       await db.razorpayRecord.updateMany({ where: { paymentId: rf.payment_id }, data: { note: `Refunded ${rupees(rf.amount)} (${rf.id})` } });
       return "refund noted";
     }
+    case "refund.created":
+    case "refund.failed": {
+      const rf = body.payload?.refund?.entity;
+      if (!rf) return "no refund";
+      const note = `Refund ${rf.id} ${body.event === "refund.failed" ? "FAILED" : "started"} (${rupees(rf.amount)})`;
+      await db.razorpayRecord.updateMany({ where: { paymentId: rf.payment_id }, data: { note } });
+      if (body.event === "refund.failed") {
+        const rec = await db.razorpayRecord.findFirst({ where: { paymentId: rf.payment_id }, select: { clientId: true } });
+        await alertThabaal("Razorpay refund failed", rec?.clientId ?? null, [["Payment", rf.payment_id], ["Refund", rf.id], ["Amount", rupees(rf.amount)]]);
+      }
+      return note;
+    }
+    case "payment.dispute.created":
+    case "payment.dispute.action_required":
+    case "payment.dispute.under_review":
+    case "payment.dispute.won":
+    case "payment.dispute.lost":
+    case "payment.dispute.closed": {
+      const d = body.payload?.dispute?.entity;
+      const paymentId = d?.payment_id ?? pay?.id;
+      if (!paymentId) return "no dispute";
+      const what = body.event.replace("payment.dispute.", "");
+      await db.razorpayRecord.updateMany({ where: { paymentId }, data: { note: `Dispute ${what}${d ? ` (${rupees(d.amount)})` : ""}` } });
+      const rec = await db.razorpayRecord.findFirst({ where: { paymentId }, select: { clientId: true } });
+      const plan = await db.planPurchase.findFirst({ where: { utr: paymentId, method: "RAZORPAY" }, select: { clientId: true } });
+      await alertThabaal(`Razorpay dispute ${what}`, rec?.clientId ?? plan?.clientId ?? null, [
+        ["Payment", paymentId],
+        ["Reason", d?.reason_code ?? "-"],
+        ["Respond by", d?.respond_by ? formatInTimeZone(new Date(d.respond_by * 1000), APP_TZ, "d MMM yyyy") : "-"],
+        ["Where", "Razorpay Dashboard → Disputes"],
+      ]);
+      return `dispute ${what}`;
+    }
     default:
+      // Payment links, QR codes, settlements, downtime, tokens, invoices and the rest: nothing to change here.
+      // (Subscription invoices are covered by subscription.charged.)
       return "ignored";
   }
 }
