@@ -81,6 +81,26 @@ export async function storePublicImage(opts: {
   return `${base}/api/upload/${id}`;
 }
 
+/** The stored-image id of a link to /api/upload/<id> (on any of the portal's addresses), or null. */
+export function uploadedImageId(url: string | null | undefined): string | null {
+  const m = /^https?:\/\/[^/]+\/api\/upload\/([\w-]+\.(?:jpg|png|webp|pdf))$/i.exec(url ?? "");
+  return m ? m[1] : null;
+}
+
+/** Of these stored-image ids, the ones the database doesn't have (their links answer 404). Empty on a read error. */
+export async function missingUploadedImages(ids: string[]): Promise<Set<string>> {
+  const unique = [...new Set(ids)];
+  if (!unique.length) return new Set();
+  try {
+    await ensureUploadedImageTable();
+    const rows = await db.$queryRaw<{ id: string }[]>`SELECT "id" FROM "PortalUploadedImage" WHERE "id" = ANY(${unique})`;
+    const have = new Set(rows.map((r) => r.id));
+    return new Set(unique.filter((id) => !have.has(id)));
+  } catch {
+    return new Set();
+  }
+}
+
 export async function getStoredPublicImage(id: string): Promise<{ mimeType: string; data: Buffer } | null> {
   try {
     await ensureUploadedImageTable();

@@ -15,6 +15,7 @@ import { paySettingsFor } from "./pay-settings-server";
 import { getSettings } from "./provider";
 import { replyWindowEnd } from "./replies";
 import { senderFor } from "./senders";
+import { missingUploadedImages, uploadedImageId } from "./uploaded-image";
 import { bold, nameOf } from "./wa-text";
 import { sendCatalogMessage, sendTextMessage, type WaConfig } from "./whatsapp";
 
@@ -322,11 +323,30 @@ type MetaProduct = {
   availability?: string;
   description?: string;
   image_url?: string;
+  /** Meta's own copies of the photo ("requested", "full"), kept even if the original link stops working. */
+  image_cdn_urls?: { key: string; value: string }[] | { data?: { key: string; value: string }[] };
   capability_to_review_status?: { key: string; value: string }[];
   product_type?: string;
 };
 
-function toDetail(p: MetaProduct): CatalogProductDetail {
+/** Meta's own copy of a product photo, or null. */
+function metaPhotoCopy(p: Pick<MetaProduct, "image_cdn_urls">): string | null {
+  const raw = p.image_cdn_urls;
+  const list = Array.isArray(raw) ? raw : (raw?.data ?? []);
+  return list.find((x) => x.key === "requested")?.value ?? list.find((x) => x.key === "full")?.value ?? null;
+}
+
+/**
+ * The photo to show in the portal: the link saved in Meta, except a photo uploaded to thabaal that thabaal no
+ * longer has (its /api/upload link would show a broken image), where Meta's own copy is shown instead.
+ */
+export function photoFor(p: Pick<MetaProduct, "image_url" | "image_cdn_urls">, missingUploads: Set<string>): string | null {
+  const id = uploadedImageId(p.image_url);
+  if (id && missingUploads.has(id)) return metaPhotoCopy(p) ?? currentAppUrl(p.image_url ?? null);
+  return currentAppUrl(p.image_url ?? null);
+}
+
+function toDetail(p: MetaProduct, missingUploads: Set<string> = new Set()): CatalogProductDetail {
   // Items created without a title (e.g. by a bad upsert) have no name; show their SKU instead of crashing.
   const name = p.name?.trim() || p.retailer_id;
   const waReview = p.capability_to_review_status?.find((c) => c.key === "WHATSAPP")?.value as
@@ -345,7 +365,7 @@ function toDetail(p: MetaProduct): CatalogProductDetail {
     currency: "INR",
     inStock: p.availability !== "out of stock",
     description: p.description ?? null,
-    imageUrl: currentAppUrl(p.image_url ?? null),
+    imageUrl: photoFor(p, missingUploads),
     category: detectCategory(name, p.product_type),
     whatsappStatus: waReview ?? null,
   };
@@ -440,15 +460,14 @@ async function readLiveCatalog(clientId: string): Promise<{ catalogId: string | 
   if (!catalogId) return { catalogId: null, products: [] };
   const out: CatalogProductDetail[] = [];
   const raw: MetaProduct[] = [];
-  let path: string | null = `${catalogId}/products?fields=id,retailer_id,name,price,availability,description,image_url,capability_to_review_status,product_type&limit=100`;
+  let path: string | null = `${catalogId}/products?fields=id,retailer_id,name,price,availability,description,image_url,image_cdn_urls,capability_to_review_status,product_type&limit=100`;
   while (path) {
     const page: { data: MetaProduct[]; paging?: { next?: string } } = await metaGet(cfg, path);
-    for (const p of page.data ?? []) {
-      raw.push(p);
-      out.push(toDetail(p));
-    }
+    raw.push(...(page.data ?? []));
     path = page.paging?.next ? page.paging.next.replace(/^https:\/\/graph\.facebook\.com\/v[\d.]+\//, "") : null;
   }
+  const missing = await missingUploadedImages(raw.map((p) => uploadedImageId(p.image_url)).filter((id): id is string => !!id));
+  for (const p of raw) out.push(toDetail(p, missing));
   out.sort((a, b) => a.retailerId.localeCompare(b.retailerId, undefined, { numeric: true }));
   await relinkOldPhotos(cfg, catalogId, raw);
   return { catalogId, products: out };
