@@ -32,11 +32,11 @@ export async function planGate(section?: ClientSectionId) {
           <div className="ic" aria-hidden>
             !
           </div>
-          <h2 id="plan-lock-title">{isNew ? "Pay to start using thabaal" : "Your plan payment is due"}</h2>
+          <h2 id="plan-lock-title">{isNew ? "Subscribe to start using thabaal" : "Your plan payment is due"}</h2>
           <p className="muted">
             {isNew
-              ? "Your account is ready. Make the first payment and everything opens up as soon as thabaal verifies it."
-              : "We have not received this period's payment, so thabaal is paused. Pay now and it opens again as soon as we confirm."}
+              ? "Your account is ready. Subscribe with auto-pay and everything opens up the moment the first payment goes through."
+              : "We have not received this period's payment, so thabaal is paused. Subscribe with auto-pay and it opens again the moment the payment goes through."}
           </p>
           <div className="amt">{plan ? inr(plan.p[cycle]) : `From ${inr(PLANS[0].p.m)}`}</div>
           <div className="muted small">{plan ? `${plan.n} plan` : "a month"}</div>
@@ -50,10 +50,7 @@ export async function planGate(section?: ClientSectionId) {
             {!access.pending && scope.manager && (
               <>
                 <Link className="btn primary" href="/dashboard/account?pay=now">
-                  Pay now by UPI
-                </Link>
-                <Link className="btn" href="/dashboard/account?pay=ref">
-                  I have already paid
+                  Subscribe with auto-pay
                 </Link>
               </>
             )}

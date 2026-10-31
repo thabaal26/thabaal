@@ -144,6 +144,13 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
   const access = scope.clientId ? await clientAccess(scope.clientId).catch(() => null) : null;
   const renewPlan = access ? PLANS.find((p) => p.k === access.plan) : undefined;
   const renewAmount = renewPlan ? inr(renewPlan.p[access?.cycle === "q" || access?.cycle === "y" ? access.cycle : "m"]) : null;
+  // A running auto-pay subscription renews by itself, so the "due" notice stays quiet (checked only when it would show).
+  const autoPayOn =
+    !!scope.clientId && !!access && (access.state === "due" || access.state === "overdue")
+      ? !!(await db.razorpayRecord
+          .findFirst({ where: { kind: "subscription", purpose: "plan", clientId: scope.clientId, status: { in: ["authenticated", "active"] } }, select: { id: true } })
+          .catch(() => null))
+      : false;
 
   const disabledSections = client?.disabledSections ?? [];
   const ordersOn = isSectionEnabled(disabledSections, "orders");
@@ -285,7 +292,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
                 <div className="wrapin">
                   {scope.viewOnly && <ViewOnlyBar name={scope.clientName ?? "this business"} />}
                   {client?.billingMode === "wallet" && <WalletBanner clientId={client.id} lowAlert={client.walletLowAlert} />}
-                  {access && <PlanDueBar state={access.state} days={access.days} amount={renewAmount} isAdmin={scope.isAdmin} />}
+                  {access && <PlanDueBar state={access.state} days={access.days} amount={renewAmount} isAdmin={scope.isAdmin} autoPay={autoPayOn} />}
                   {children}
                 </div>
               </div>

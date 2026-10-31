@@ -8,9 +8,11 @@ import { usePathname } from "next/navigation";
 import { openWhenLocked } from "@/lib/plan-lock-paths";
 import type { AccessState } from "@/lib/subscription-core";
 
-export function PlanDueBar({ state, days, amount, isAdmin }: { state: AccessState; days: number; amount: string | null; isAdmin: boolean }) {
+export function PlanDueBar({ state, days, amount, isAdmin, autoPay = false }: { state: AccessState; days: number; amount: string | null; isAdmin: boolean; autoPay?: boolean }) {
   const path = usePathname();
   if (path.startsWith("/dashboard/account")) return null;
+  // Auto-pay is on: Razorpay renews the plan by itself, so there is nothing to nag about (like any app subscription).
+  if (autoPay && !isAdmin && (state === "due" || state === "overdue")) return null;
   if (isAdmin) {
     if (state !== "locked" && state !== "new" && state !== "overdue") return null;
     return (
@@ -32,10 +34,10 @@ export function PlanDueBar({ state, days, amount, isAdmin }: { state: AccessStat
       <div className="duebar bad">
         <div className="grow">
           <b>{state === "new" ? "Pay to start using thabaal." : "thabaal is paused: this period's plan payment hasn't been received."}</b> Only Home,
-          My account and Settings open until the payment is verified. Nothing is deleted.
+          My account and Settings open until the payment goes through. Nothing is deleted.
         </div>
         <Link className="btn sm primary" href="/dashboard/account?pay=now">
-          {amount ? `Pay ${amount}` : "Choose a plan"}
+          {amount ? `Subscribe · ${amount}` : "Choose a plan"}
         </Link>
       </div>
     );
@@ -53,12 +55,12 @@ export function PlanDueBar({ state, days, amount, isAdmin }: { state: AccessStat
             <b>
               Payment due in {days} day{days === 1 ? "" : "s"}.
             </b>{" "}
-            Pay now so nothing stops.
+            Turn on auto-pay so nothing stops.
           </>
         )}
       </div>
       <Link className="btn sm primary" href="/dashboard/account?pay=now">
-        {amount ? `Pay ${amount}` : "Pay now"}
+        {amount ? `Subscribe · ${amount}` : "Subscribe"}
       </Link>
     </div>
   );

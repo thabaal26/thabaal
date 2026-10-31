@@ -9,7 +9,6 @@ import {
   confirmOrderCheckout,
   confirmSubscriptionCheckout,
   startOrder,
-  startPlanOrder,
   startPlanSubscription,
   startTestSubscription,
   type CheckoutStart,
@@ -33,12 +32,12 @@ function refresh<T extends { ok: boolean }>(r: T): T {
 }
 
 /**
- * Every plan (monthly, quarterly, yearly) renews automatically unless the client unticks it. Yearly Growth and
- * Business are above the ₹15,000 UPI AutoPay limit, so their renewals may need the client's approval each year.
+ * The only way a business pays for a plan: a Razorpay subscription (auto-pay) that renews every period until the
+ * owner cancels it. Yearly Growth and Business are above the ₹15,000 UPI AutoPay limit, so the owner's bank may ask
+ * them to approve each yearly renewal.
  */
-export async function rzpStartPlan(plan: string, cycle: string, autoRenew = true): Promise<CheckoutStart> {
-  const w = await who();
-  return autoRenew ? startPlanSubscription(w, plan, cycle) : startPlanOrder(w, plan, cycle);
+export async function rzpStartPlan(plan: string, cycle: string): Promise<CheckoutStart> {
+  return startPlanSubscription(await who(), plan, cycle);
 }
 
 export async function rzpStartRecharge(amount: number): Promise<CheckoutStart> {
@@ -55,8 +54,10 @@ export async function rzpConfirm(input: { kind: "subscription" | "order"; id: st
   return refresh(r);
 }
 
-export async function rzpCancelAutoRenew(): Promise<Result> {
-  return refresh(await cancelAutoRenew(await who(), "plan"));
+/** Cancel the plan subscription: no more charges; the period already paid for runs to its end. */
+export async function rzpCancelAutoRenew(reason?: string): Promise<Result> {
+  const why = typeof reason === "string" ? reason.replace(/\s+/g, " ").trim().slice(0, 80) : "";
+  return refresh(await cancelAutoRenew(await who(), "plan", why));
 }
 
 /* Thabaal admin: ₹1 live tests that grant nothing. */
