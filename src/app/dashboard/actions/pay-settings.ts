@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { APP_ORIGIN } from "@/lib/app-host";
 import { db } from "@/lib/db";
 import { normalizePhone } from "@/lib/phone";
-import { readPaySettings, SETTLEMENTS, UPI_ID_RE, upiLink, type PaySettings } from "@/lib/pay-settings";
+import { EXPIRY_DAYS, HHMM, readPaySettings, SETTLEMENTS, UPI_ID_RE, upiLink, type PaySettings } from "@/lib/pay-settings";
 import { textInWindow } from "@/lib/payments";
 import { requireManager } from "@/lib/session";
 import type { SendResult } from "./send-helpers";
@@ -134,4 +134,30 @@ export async function setWhatsappPay(on: boolean): Promise<SendResult> {
   if (on && !paymentConfig) return { ok: false, message: "Add the payment configuration name in Settings › WhatsApp payments setup first." };
   await store(s.clientId, { ...settings, whatsappPay: Boolean(on) });
   return { ok: true, message: `Pay inside WhatsApp is ${on ? "on" : "off"}.` };
+}
+
+export type AssistantInput = { nudgeOn: boolean; cartExpiryDays: number; hoursOn: boolean; openAt: string; closeAt: string };
+
+/** Payments › Payment settings › WhatsApp order assistant: reminders, expiry and the closed-hours reply. */
+export async function saveAssistantSettings(input: AssistantInput, changed?: keyof AssistantInput): Promise<SendResult> {
+  const s = await requireManager(true);
+  if ("denied" in s) return { ok: false, message: s.denied };
+  if (!EXPIRY_DAYS.includes(Number(input.cartExpiryDays))) return { ok: false, message: "Pick 1, 3 or 7 days." };
+  if (!HHMM.test(input.openAt) || !HHMM.test(input.closeAt)) return { ok: false, message: "Enter the opening and closing times." };
+  if (input.hoursOn && input.openAt === input.closeAt) return { ok: false, message: "Opening and closing times can't be the same." };
+  const { settings } = await current(s.clientId);
+  await store(s.clientId, { ...settings, nudgeOn: input.nudgeOn === true, cartExpiryDays: Number(input.cartExpiryDays), hoursOn: input.hoursOn === true, openAt: input.openAt, closeAt: input.closeAt });
+  const msg =
+    changed === "nudgeOn"
+      ? input.nudgeOn
+        ? "Reminders on: unfinished orders get a friendly reminder at 3 and 22 hours."
+        : "Reminders off for unfinished orders."
+      : changed === "cartExpiryDays"
+        ? `Unfinished orders now close after ${input.cartExpiryDays} day${Number(input.cartExpiryDays) === 1 ? "" : "s"}.`
+        : changed === "hoursOn"
+          ? input.hoursOn
+            ? "Shop hours reply on: customers who write while you're closed hear when you open."
+            : "Shop hours reply off."
+          : "Shop hours saved.";
+  return { ok: true, message: msg };
 }

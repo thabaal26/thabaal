@@ -6,7 +6,7 @@ import { safeAction, toastResult } from "@/components/toast";
 import { useLanguage } from "@/lib/i18n/context";
 import { SETTLEMENTS, type PaySettings } from "@/lib/pay-settings";
 import Link from "@/components/intent-link";
-import { saveBankDetails, savePaySettings, saveReminderRule, saveUpiQr, sendUpiTestLink, type HowPayInput } from "../actions/pay-settings";
+import { saveAssistantSettings, saveBankDetails, savePaySettings, saveReminderRule, saveUpiQr, sendUpiTestLink, type AssistantInput, type HowPayInput } from "../actions/pay-settings";
 import { T } from "../portal-ui";
 
 /** On/off switch in the design's look; saves as soon as it's tapped. */
@@ -413,6 +413,108 @@ export function ReminderRules({ settings, canManage }: { settings: PaySettings; 
             />
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+/** Payments › Payment settings › WhatsApp order assistant: reminders and expiry for unfinished orders, shop hours. */
+export function AssistantSettings({ settings, canManage }: { settings: PaySettings; canManage: boolean }) {
+  const router = useRouter();
+  const { isTa } = useLanguage();
+  const [, start] = useTransition();
+  const [busy, setBusy] = useState<string | null>(null);
+  const saved: AssistantInput = { nudgeOn: settings.nudgeOn, cartExpiryDays: settings.cartExpiryDays, hoursOn: settings.hoursOn, openAt: settings.openAt, closeAt: settings.closeAt };
+  const [f, setF] = useState<AssistantInput>(saved);
+  const hoursChanged = f.openAt !== saved.openAt || f.closeAt !== saved.closeAt;
+  const save = (next: AssistantInput, changed?: keyof AssistantInput) => {
+    setF(next);
+    setBusy(changed ?? "hours");
+    start(async () => {
+      const r = await safeAction(() => saveAssistantSettings(next, changed));
+      toastResult(r);
+      if (!r.ok) setF(saved);
+      setBusy(null);
+      router.refresh();
+    });
+  };
+  const off = !canManage;
+  return (
+    <section className="card" suppressHydrationWarning>
+      <div className="hd" suppressHydrationWarning>
+        <div>
+          <h2><T ta="வாட்ஸ்அப் ஆர்டர் உதவியாளர்">WhatsApp order assistant</T></h2>
+          <p>
+            <T ta="முடிக்காத ஆர்டர்களைத் தொடர்ந்து நினைவூட்டுகிறது, கடை மூடியிருக்கும்போது பதில் சொல்கிறது.">
+              Follows up orders customers didn&apos;t finish, and answers when you&apos;re closed.
+            </T>
+          </p>
+        </div>
+      </div>
+      <div className="list">
+        <div className="row">
+          <div className="grow">
+            <div className="t"><T ta="முடிக்காத ஆர்டர்களுக்கு நினைவூட்டல்">Remind unfinished orders</T></div>
+            <div className="muted small">
+              <T ta="கடைசி படிக்கு 3 மணி நேரம் கழித்து ஒரு நினைவூட்டல், 22 மணி நேரத்தில் கடைசி ஒன்று. வாட்ஸ்அப்பின் 24 மணி நேரத்துக்குள் இலவசம்.">
+                A friendly reminder 3 hours after the last step, and a last one at 22 hours. Free, inside WhatsApp&apos;s 24-hour window.
+              </T>
+            </div>
+          </div>
+          <Sw on={f.nudgeOn} label={isTa ? "நினைவூட்டல்" : "Remind unfinished orders"} busy={off || busy === "nudgeOn"} onChange={(on) => save({ ...f, nudgeOn: on }, "nudgeOn")} />
+        </div>
+        <div className="row">
+          <div className="grow">
+            <div className="t"><label htmlFor="as-expiry"><T ta="முடிக்காத ஆர்டர்களை மூடுவது">Close unfinished orders after</T></label></div>
+            <div className="muted small">
+              <T ta="முகவரி, பணம் அல்லது COD இல்லாத கார்ட்கள் தானாக மூடப்படும்; அவற்றின் பணம் செலுத்தும் இணைப்பு வேலை செய்யாது.">
+                Carts with no address, payment or cash on delivery close by themselves, and their pay link stops working.
+              </T>
+            </div>
+          </div>
+          <select
+            id="as-expiry"
+            className="field"
+            style={{ width: "auto", minWidth: 110 }}
+            value={f.cartExpiryDays}
+            disabled={off || busy === "cartExpiryDays"}
+            onChange={(e) => save({ ...f, cartExpiryDays: Number(e.target.value) }, "cartExpiryDays")}
+          >
+            {[1, 3, 7].map((d) => (
+              <option key={d} value={d}>
+                {isTa ? `${d} நாள்` : `${d} day${d === 1 ? "" : "s"}`}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="row">
+          <div className="grow">
+            <div className="t"><T ta="கடை நேரப் பதில்">Shop hours reply</T></div>
+            <div className="muted small">
+              <T ta="இந்த நேரத்துக்கு வெளியே எழுதுபவர்களுக்கு, கடை எப்போது திறக்கும் என்று இரவுக்கு ஒருமுறை பதில் செல்லும்.">
+                Outside these hours, customers who write get one reply a night saying when you open.
+              </T>
+            </div>
+            <div className="formgrid" style={{ marginTop: 10 }}>
+              <div className="field">
+                <label htmlFor="as-open"><T ta="திறக்கும் நேரம்">Opens at</T></label>
+                <input id="as-open" type="time" value={f.openAt} disabled={off} onChange={(e) => setF((v) => ({ ...v, openAt: e.target.value }))} />
+              </div>
+              <div className="field">
+                <label htmlFor="as-close"><T ta="மூடும் நேரம்">Closes at</T></label>
+                <input id="as-close" type="time" value={f.closeAt} disabled={off} onChange={(e) => setF((v) => ({ ...v, closeAt: e.target.value }))} />
+              </div>
+            </div>
+            {canManage && hoursChanged && (
+              <div className="tools" style={{ marginTop: 10 }}>
+                <button type="button" className="btn sm primary" disabled={busy === "hours"} aria-busy={busy === "hours" || undefined} onClick={() => save(f)}>
+                  <T ta="நேரத்தைச் சேமி">Save hours</T>
+                </button>
+              </div>
+            )}
+          </div>
+          <Sw on={f.hoursOn} label={isTa ? "கடை நேரப் பதில்" : "Shop hours reply"} busy={off || busy === "hoursOn"} onChange={(on) => save({ ...f, hoursOn: on }, "hoursOn")} />
+        </div>
       </div>
     </section>
   );

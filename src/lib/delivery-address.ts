@@ -24,7 +24,9 @@ import { db } from "./db";
 import { pushOrderToSheet } from "./google-sheets-live";
 import { orderRef } from "./orders";
 import { paySettingsFor } from "./pay-settings-server";
-import { firstName, logMessage, replyContext, startCheckout, textInWindow } from "./payments";
+import { confirmCod } from "./cod";
+import { logMessage, replyContext, startCheckout, textInWindow } from "./payments";
+import { bold, hello } from "./wa-text";
 import { getSettings } from "./provider";
 import { sendAddressMessage, sendInteractiveButtons, sendLocationRequest } from "./whatsapp";
 
@@ -65,13 +67,19 @@ async function changeableOrder(customerId: string) {
   });
 }
 
+/** "Your earlier cart X has been replaced by this one." when this order replaced one. */
+const replacedLine = (o: { internalNote: string | null }) => {
+  const r = /Replaced unpaid cart (\S+)/.exec(o.internalNote ?? "")?.[1];
+  return r ? `Your earlier cart ${r} has been replaced by this one.\n\n` : "";
+};
+
 async function sendForm(order: LoadedOrder, opts: { errors?: Record<string, string>; values?: FormValues } = {}) {
   const c = order.customer;
   const { number, cfg } = await replyContext(c);
   const ref = orderRef(order);
   const body = opts.errors
-    ? `Please check the marked fields and send your address again for order ${ref}.`
-    : `Hello ${firstName(c.name)}, where should we deliver your ${order.client.name} order ${ref}?\n\nTap the button below to add your address. We'll keep it for your next order too.`;
+    ? `Please check the marked fields and send your address again for order ${bold(ref)}.`
+    : `${replacedLine(order)}${hello(c.name)} thank you for your order ${bold(ref)} from ${order.client.name}.\n\nWhere should we deliver it? Tap the button below to add your address. We'll keep it for your next order too.`;
   const res = await sendAddressMessage(cfg, c.phone, body, { values: opts.values ?? formPrefill(c), errors: opts.errors });
   await logMessage(c.id, ADDRESS_FORM, body, res, number?.id ?? null);
 }
@@ -79,7 +87,7 @@ async function sendForm(order: LoadedOrder, opts: { errors?: Record<string, stri
 async function sendTypeOrPin(order: LoadedOrder) {
   const c = order.customer;
   const { number, cfg } = await replyContext(c);
-  const body = `Hello ${firstName(c.name)}, where should we deliver your ${order.client.name} order ${orderRef(order)}?\n\nPlease type your full address here (house/flat no., street, area, city and pincode), or tap "Send location" to share your location.`;
+  const body = `${replacedLine(order)}${hello(c.name)} thank you for your order ${bold(orderRef(order))} from ${order.client.name}.\n\nWhere should we deliver it? Please type your full address here (house/flat no., street, area, city and pincode), or tap ${bold("Send location")} to share your location.`;
   const res = await sendLocationRequest(cfg, c.phone, body);
   await logMessage(c.id, ADDRESS_REQUEST, body, res, number?.id ?? null);
 }
@@ -106,7 +114,7 @@ export async function startAddressStep(orderId: string): Promise<"asked" | "skip
   try {
     if (saved) {
       const { number, cfg } = await replyContext(c);
-      const body = `Hello ${firstName(c.name)}, shall we deliver your ${order.client.name} order ${orderRef(order)} to this address?\n\n📍 ${saved.slice(0, 400)}`;
+      const body = `${replacedLine(order)}${hello(c.name)} thank you for your order ${bold(orderRef(order))}.\n\nShall we deliver it to this address?\n📍 ${saved.slice(0, 400)}`;
       const res = await sendInteractiveButtons(
         cfg,
         c.phone,
@@ -115,7 +123,7 @@ export async function startAddressStep(orderId: string): Promise<"asked" | "skip
           { id: `addr_ok:${order.id}`, title: "✅ Yes, deliver here" },
           { id: `addr_new:${order.id}`, title: "✏️ New address" },
         ],
-        { header: "Delivery address" },
+        { header: "Delivery address", footer: order.client.name },
       );
       await logMessage(c.id, ADDRESS_CHECK, body, res, number?.id ?? null);
     } else if (isIndianNumber(c.phone)) {
@@ -150,7 +158,7 @@ export async function askNewAddress(orderId: string, customerId: string) {
   if (!order || order.customerId !== customerId) return;
   if (order.status === "CANCELLED") return replacedNotice(order);
   if (settled(order)) {
-    await textInWindow(order.customer, `Order ${orderRef(order)} is already packed or on its way, so its address can't change now. Reply here and our team will help.`, "Address (no change)").catch(() => {});
+    await textInWindow(order.customer, `Order ${bold(orderRef(order))} is already packed or on its way, so its address can't change now. Reply here and our team will help.`, "Address (no change)").catch(() => {});
     return;
   }
   try {
@@ -162,7 +170,7 @@ export async function askNewAddress(orderId: string, customerId: string) {
 }
 
 async function replacedNotice(order: LoadedOrder) {
-  await textInWindow(order.customer, `This cart (${orderRef(order)}) was replaced by your newer order, so nothing was changed. Please use the latest message.`, "Address (old cart)").catch(() => {});
+  await textInWindow(order.customer, `This cart (${bold(orderRef(order))}) was replaced by your newer order, so nothing was changed. Please use the latest message.`, "Address (old cart)").catch(() => {});
 }
 
 /** The customer tapped "Yes, deliver here" (or typed "yes"/"same"). */
@@ -185,11 +193,16 @@ async function continueToPayment(orderId: string, sheetNote: string) {
   const o = await loadOrder(orderId);
   if (!o) return;
   pushOrderToSheet(o.id, "ORDER_UPDATE", sheetNote);
-  // Already chose cash on delivery (typed "COD") or staff already sent the payment request: no second ask.
+  // They typed "COD" before giving the address: now it's in, the cash-on-delivery order is confirmed.
+  if (o.paymentMethod === "cod" && o.status === "NEW" && !o.paidAt) {
+    await confirmCod(o.id);
+    return;
+  }
+  // Already confirmed as COD, or staff already sent the payment request: no second ask.
   const decided = o.paymentMethod === "cod" || Boolean(o.paymentRequestedAt);
   const mode = decided ? "none" : await startCheckout(o);
   if (mode === "none")
-    await textInWindow(o.customer, `Thank you! We'll deliver order ${orderRef(o)} to:\n📍 ${o.note ?? ""}`, "Address saved").catch(() => {});
+    await textInWindow(o.customer, `Thank you! We'll deliver order ${bold(orderRef(o))} to:\n📍 ${o.note ?? ""}`, "Address saved").catch(() => {});
 }
 
 /**
@@ -244,7 +257,7 @@ async function applyNewAddress(customerId: string, text: string, next: DeliveryA
   if (open) {
     await db.order.update({ where: { id: open.id }, data: { note: text.slice(0, 500), mapUrl: next.mapUrl ?? null, addressConfirmedAt: open.addressConfirmedAt ?? new Date() } });
     pushOrderToSheet(open.id, "ORDER_UPDATE", "Customer changed the delivery address");
-    await textInWindow(cust, `Thank you! Order ${orderRef(open)} will be delivered to:\n📍 ${text}`, "Address saved").catch(() => {});
+    await textInWindow(cust, `Thank you! Order ${bold(orderRef(open))} will be delivered to:\n📍 ${text}`, "Address saved").catch(() => {});
   } else {
     await textInWindow(cust, `Thank you! We've saved your delivery address for your next order:\n📍 ${text}`, "Address saved").catch(() => {});
   }
@@ -270,7 +283,7 @@ export async function handleAddressReply(customer: { id: string }, m: InboundFor
     if (errors) {
       const waiting = await awaitingAddressOrder(customer.id);
       const order = waiting ?? (await changeableOrder(customer.id));
-      if (order) await sendForm(order, { values: v, errors: errors as Record<string, string> }).catch(() => textInWindow(order.customer, `Please send your full address with the 6-digit pincode for order ${orderRef(order)}.`, "Address request").catch(() => {}));
+      if (order) await sendForm(order, { values: v, errors: errors as Record<string, string> }).catch(() => textInWindow(order.customer, `Please send your full address with the 6-digit pincode for order ${bold(orderRef(order))}.`, "Address request").catch(() => {}));
       return true;
     }
     const line = formAddressText(v);
@@ -292,7 +305,7 @@ export async function handleAddressReply(customer: { id: string }, m: InboundFor
     await db.order.update({ where: { id: open.id }, data: { mapUrl: pin.mapUrl } });
     const prev = (open.customer.deliveryAddress && typeof open.customer.deliveryAddress === "object" ? open.customer.deliveryAddress : {}) as DeliveryAddress;
     await db.customer.update({ where: { id: customer.id }, data: { deliveryAddress: { ...prev, lat: pin.lat ?? undefined, lng: pin.lng ?? undefined, mapUrl: pin.mapUrl } as Prisma.InputJsonValue } });
-    await textInWindow(open.customer, `Thank you! We've added your location to order ${orderRef(open)} for the delivery person.`, "Location saved").catch(() => {});
+    await textInWindow(open.customer, `Thank you! We've added your location to order ${bold(orderRef(open))} for the delivery person.`, "Location saved").catch(() => {});
     return true;
   }
 

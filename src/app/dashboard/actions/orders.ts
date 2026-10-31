@@ -25,7 +25,7 @@ import { senderFor } from "@/lib/senders";
 import { requireManager, requireOrderAccess } from "@/lib/session";
 import { FLOW_KEYS, ORDER_FLOWS, stepBlocked, type OrderFlowKey } from "@/lib/order-flow";
 import { sendText } from "@/lib/waha";
-import { sendTemplateMessage, sendTextMessage } from "@/lib/whatsapp";
+import { sendInteractiveButtons, sendTemplateMessage, sendTextMessage } from "@/lib/whatsapp";
 import { explainSendError, type SendResult } from "./send-helpers";
 import { saveTemplate } from "./templates";
 
@@ -242,6 +242,14 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
         waId = `demo.${crypto.randomUUID()}`;
         simulated = true;
       }
+    } else if (open && kind === "deliver" && settings.provider === "META") {
+      // Delivered: one message that also asks how it went (All good / Report a problem).
+      const body = `Hello ${first}, your ${order.client.name} order ${ref} has been delivered.${payLine ? ` ${payLine}` : ""} Thank you for shopping with us!\n\nHow was everything?`;
+      ({ id: waId, simulated } = await sendInteractiveButtons(cfg, c.phone, body, [
+        { id: `fb_ok:${order.id}`, title: "👍 All good" },
+        { id: `fb_bad:${order.id}`, title: "⚠️ Report a problem" },
+      ], { footer: order.client.name }));
+      templateName = "Delivered";
     } else if (open && order.paymentRequestedAt && (await updateOrderCard(order, kind === "confirm" ? "processing" : kind === "dispatch" ? "shipped" : "completed", text).catch(() => false))) {
       // Sent on the order card from "Review and pay", which also moves its status; already logged.
       await db.order.update({ where: { id: order.id }, data: { status: nextStatus } });

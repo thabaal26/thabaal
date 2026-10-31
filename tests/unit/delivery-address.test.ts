@@ -168,7 +168,7 @@ describe("delivery address step", () => {
     await db.order.update({ where: { id: o.id }, data: { paymentMethod: "cod", status: "CONFIRMED" } });
     await handleAddressReply({ id: customerId }, answer(good), "x");
     assert.equal(last().type, "text");
-    assert.match(lastText(), /Order QD-11 will be delivered to/);
+    assert.match(lastText(), /Order \*QD-11\* will be delivered to/);
     assert.doesNotMatch(lastText(), /pay_online/);
     assert.ok((await fresh(o.id)).addressConfirmedAt);
   });
@@ -178,8 +178,12 @@ describe("delivery address step", () => {
     await startAddressStep(o.id);
     await db.order.update({ where: { id: o.id }, data: { paymentMethod: "cod" } });
     await handleAddressReply({ id: customerId }, answer(good), "x");
-    assert.match(lastText(), /We'll deliver order QD-16/);
+    // Typed "COD" + the address = the cash-on-delivery order is confirmed, in one message.
+    assert.match(lastText(), /cash on delivery order \*QD-16\*/);
     assert.doesNotMatch(lastText(), /pay_online/);
+    const after = await fresh(o.id);
+    assert.equal(after.status, "CONFIRMED");
+    assert.equal(after.paymentMethod, "cod");
   });
 
   test("an address sent for an old, replaced cart goes to the new cart", async () => {

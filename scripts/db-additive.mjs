@@ -20,6 +20,7 @@ const FILES = [
   "prisma/sql/2026-10-30-razorpay.sql",
   "prisma/sql/2026-10-31-loyalty-rules.sql",
   "prisma/sql/2026-10-31-delivery-address.sql",
+  "prisma/sql/2026-10-31-order-assistant.sql",
 ];
 
 if (process.env.VERCEL !== "1") {

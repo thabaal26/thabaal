@@ -12,7 +12,7 @@ import { LoyaltyRedeemSetting, LoyaltyRulesSetting } from "../orders/loyalty-poi
 import { LOYALTY_RULE_FIELDS, loyaltyRules } from "@/lib/loyalty";
 import { inr } from "../portal-format";
 import { LinkTabs, PortalPage, Seg, T } from "../portal-ui";
-import { BankAccount, HowCustomersPay, ReminderRules } from "./pay-settings-form";
+import { AssistantSettings, BankAccount, HowCustomersPay, ReminderRules } from "./pay-settings-form";
 import { CollectList, CsvButton, ReceiptButton, RecordByNumber, TxnTable } from "./payments-board";
 import Link from "@/components/intent-link";
 import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
@@ -311,6 +311,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         />
         {scope.canManage && <BankAccount settings={pay.settings} />}
         <ReminderRules settings={pay.settings} canManage={scope.canManage} />
+        <AssistantSettings settings={pay.settings} canManage={scope.canManage} />
         {scope.canManage && client && (
           <section className="card">
             <div className="hd">

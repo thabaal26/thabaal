@@ -517,6 +517,11 @@ model Order {
   addressConfirmedAt DateTime?
   /// Map link of a location the customer shared for this order.
   mapUrl             String?
+  /// Follow-ups for an unfinished WhatsApp order (lib/cart-followups.ts): how many nudges went, and when the last did.
+  nudgeCount         Int         @default(0)
+  nudgedAt           DateTime?
+  /// While the customer decides "Add to order X / Separate order": the earlier order's id (lib/order-intake.ts).
+  mergeWith          String?
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 
