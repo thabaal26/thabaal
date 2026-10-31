@@ -471,4 +471,85 @@ describe("WhatsApp order assistant", () => {
     await handleAssistantText(await asCust(), { type: "document" }, "[Document]", "media", { greeting: false });
     assert.match(lastText(), /Thank you for the file, Meena! Our team will take a look/);
   });
+
+  /* ---------- Several orders at once ---------- */
+
+  test("several orders: 'where is my order' lists each one with its own status and how to ask about one", async () => {
+    await order("QS-1101", { status: "DISPATCHED", paymentMethod: "cod" });
+    await order("QS-1102", { paymentRequestedAt: new Date() });
+    assert.equal(await say("where is my order?"), true);
+    const t = lastText();
+    assert.match(t, /You have \*2 orders\* with us right now/);
+    assert.match(t, /QS-1101\* is on its way/);
+    assert.match(t, /QS-1102\* is waiting for payment of \*₹560\*/);
+    assert.match(t, /Send its order number, for example \*QS-1102\*/);
+  });
+
+  test("several orders: naming one ('1101 enna aachu', 'QS1101?') answers only that one, even right after the list", async () => {
+    await order("QS-1101", { status: "DISPATCHED" });
+    await order("QS-1102");
+    await say("order status");
+    await say("1101 enna aachu");
+    assert.match(lastText(), /QS-1101\* is on its way/);
+    assert.doesNotMatch(lastText(), /QS-1102/);
+    await say("QS1102?");
+    assert.match(lastText(), /QS-1102\* and our team will confirm it shortly/);
+  });
+
+  test("several orders: 'hi' lists only the ones still open; a delivered one stays out", async () => {
+    await order("QS-1101", { status: "DELIVERED", deliveredAt: new Date(Date.now() - HOUR), paidAt: new Date() });
+    await order("QS-1102", { status: "CONFIRMED", paymentMethod: "cod" });
+    await order("QS-1103");
+    assert.equal(await handleAssistantText(await asCust(), { type: "text" }, "hi", "text", { greeting: true }), true);
+    assert.match(lastText(), /Hello Meena, you have \*2 orders\*/);
+    assert.doesNotMatch(lastText(), /QS-1101/);
+  });
+
+  test("several orders: 'cancel' asks which one with a button each; picking one asks the usual Yes / No", async () => {
+    const a = await order("QS-1101");
+    const b = await order("QS-1102", { total: 320 });
+    assert.equal(await handleCancelRequest(await asCust(), "cancel my order"), true);
+    const t = lastText();
+    assert.match(t, /You have 2 orders that can still be cancelled/);
+    assert.match(t, new RegExp(`ocancel_pick:${b.id}`));
+    assert.match(t, new RegExp(`ocancel_pick:${a.id}`));
+    await handleAssistantButton(await asCust(), `ocancel_pick:${a.id}`, "QS-1101");
+    assert.match(lastText(), new RegExp(`ocancel_yes:${a.id}`));
+    assert.match(lastText(), /cancel order \*QS-1101\*/);
+    await handleAssistantButton(await asCust(), `ocancel_yes:${a.id}`, "Yes, cancel it");
+    assert.equal((await fresh(a.id)).status, "CANCELLED");
+    assert.equal((await fresh(b.id)).status, "NEW", "the other order is untouched");
+  });
+
+  test("several orders: 'cancel QS-1102' goes straight to that one; one already on its way is not cancelled", async () => {
+    await order("QS-1101");
+    const b = await order("QS-1102");
+    const d = await order("QS-1103", { status: "DISPATCHED", dispatchedAt: new Date() });
+    assert.equal(await handleCancelRequest(await asCust(), "please cancel QS-1102"), true);
+    assert.match(lastText(), new RegExp(`ocancel_yes:${b.id}`));
+    assert.equal(await handleCancelRequest(await asCust(), "cancel 1103"), true);
+    assert.match(lastText(), /QS-1103\* is already on its way, so it can't be cancelled here/);
+    assert.equal((await fresh(d.id)).status, "DISPATCHED");
+    assert.match((await fresh(d.id)).internalNote ?? "", /asked to cancel/);
+  });
+
+  test("several orders: a problem is noted on the one they received (or the one they name), and the reply says which", async () => {
+    const got = await order("QS-1101", { status: "DELIVERED", deliveredAt: new Date(Date.now() - HOUR), paidAt: new Date() });
+    const open = await order("QS-1102");
+    await say("the oil bottle is damaged");
+    assert.match((await fresh(got.id)).internalNote ?? "", /reported a problem/);
+    assert.equal((await fresh(open.id)).internalNote ?? "", "");
+    assert.match(lastText(), /noted it on your order \*QS-1101\*\. If it's about a different order, send its order number/);
+    await say("1102 la wrong item vandhuchu");
+    assert.match((await fresh(open.id)).internalNote ?? "", /reported a problem/);
+    assert.match(lastText(), /noted it on your order \*QS-1102\*\./);
+  });
+
+  test("several orders: 'not received' while one is still on its way gets the statuses, not a complaint", async () => {
+    await order("QS-1101", { status: "DELIVERED", deliveredAt: new Date(Date.now() - HOUR), paidAt: new Date() });
+    await order("QS-1102", { status: "DISPATCHED" });
+    await say("order not received yet");
+    assert.match(lastText(), /You have \*2 orders\*/);
+    assert.doesNotMatch(lastText(), /really sorry/);
+  });
 });
