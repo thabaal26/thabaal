@@ -283,15 +283,41 @@ export async function effectivePlan(clientId: string, now = new Date()) {
   return { status: s.status, plan: s.active ? (planDef(s.active.plan) ?? null) : null, endsAt: s.active?.endsAt ?? s.lastEnded?.endsAt ?? null };
 }
 
-/** Why one more WhatsApp number or staff login can't be added for this business now, or null if it can. */
-export async function planCapacityBlock(clientId: string, kind: "num" | "staff", now = new Date()): Promise<string | null> {
+export type PlanLimitKind = "num" | "staff" | "camp" | "tmpl";
+const LIMIT_WORDS: Record<PlanLimitKind, string> = { num: "WhatsApp numbers", staff: "staff logins", camp: "campaign sends a month", tmpl: "templates" };
+
+/**
+ * How much of each plan limit a business uses now: WhatsApp numbers; staff logins (every login but the owner's, the
+ * business's first); campaign sends started this calendar month (India time); templates (all but rejected ones).
+ */
+export async function planUsage(clientId: string, now = new Date()): Promise<Record<PlanLimitKind, number>> {
+  const monthStart = fromZonedTime(`${formatInTimeZone(now, APP_TZ, "yyyy-MM")}-01T00:00:00`, APP_TZ);
+  const [num, logins, camp, tmpl] = await Promise.all([
+    db.whatsAppNumber.count({ where: { clientId } }),
+    db.user.count({ where: { clientId } }),
+    db.campaignRun.count({ where: { campaign: { clientId }, startedAt: { gte: monthStart } } }),
+    db.template.count({ where: { clientId, status: { not: "REJECTED" } } }),
+  ]);
+  return { num, staff: Math.max(0, logins - 1), camp, tmpl };
+}
+
+/**
+ * Why one more WhatsApp number, staff login, campaign send or template isn't allowed on this business's plan now,
+ * or null if it is. A business that has never had a verified plan period (set up before plans, or let off paying)
+ * has no limits.
+ */
+export async function planCapacityBlock(clientId: string, kind: PlanLimitKind, now = new Date()): Promise<string | null> {
   const eff = await effectivePlan(clientId, now);
   if (eff.status === "none") return null;
-  const what = kind === "num" ? "WhatsApp numbers" : "staff logins";
-  if (!eff.plan) return `This business's plan ended${eff.endsAt ? ` on ${formatInTimeZone(eff.endsAt, APP_TZ, "d MMM yyyy")}` : ""}. Renew it before adding more ${what}.`;
-  const used = kind === "num" ? await db.whatsAppNumber.count({ where: { clientId } }) : await db.user.count({ where: { clientId } });
+  const what = LIMIT_WORDS[kind];
+  if (!eff.plan) return `This business's plan ended${eff.endsAt ? ` on ${formatInTimeZone(eff.endsAt, APP_TZ, "d MMM yyyy")}` : ""}. Renew it in My account to continue.`;
+  const used = (await planUsage(clientId, now))[kind];
   const limit = eff.plan.lim[kind];
-  return used >= limit ? `The ${eff.plan.n} plan allows ${limit} ${what}, and all are in use.` : null;
+  if (used < limit) return null;
+  const more = "A bigger plan in My account gives you more.";
+  return kind === "camp"
+    ? `The ${eff.plan.n} plan allows ${limit} campaign sends a month, and all ${limit} are used this month. ${more}`
+    : `The ${eff.plan.n} plan allows ${limit} ${what}, and all are in use. ${more}`;
 }
 
 /** Thabaal decides whether a business must have a paid plan to use thabaal (new businesses start with yes). */

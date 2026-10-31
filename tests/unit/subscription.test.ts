@@ -243,7 +243,10 @@ describe("plan payments", () => {
 
   test("limits follow the plan in force; an ended plan keeps no capacity; untracked businesses are unchanged", async () => {
     const c = await growthClient("limits");
+    // The owner's login plus 3 staff: Growth's 3 staff logins are all in use (the owner doesn't count).
     for (let i = 0; i < 3; i++) await db.user.create({ data: { name: `Staff ${i}`, email: `lim-${c.id}-${i}@test.local`, passwordHash: "x", role: "CLIENT", clientId: c.id } });
+    assert.equal(await planCapacityBlock(c.id, "staff", NOW), null, "owner + 2 staff: one left");
+    await db.user.create({ data: { name: "Staff 3", email: `lim-${c.id}-3@test.local`, passwordHash: "x", role: "CLIENT", clientId: c.id } });
     assert.match((await planCapacityBlock(c.id, "staff", NOW)) ?? "", /allows 3 staff logins/);
     assert.equal(await planCapacityBlock(c.id, "num", NOW), null);
     assert.match((await planCapacityBlock(c.id, "num", ist("2026-12-01T00:00:00"))) ?? "", /plan ended/);

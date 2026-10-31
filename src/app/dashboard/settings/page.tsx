@@ -26,6 +26,8 @@ import { readFlow } from "@/lib/order-flow";
 import { AppearanceEditor } from "../appearance-editor";
 import { portalDefault } from "@/lib/appearance";
 import { spendSummary } from "@/lib/spend";
+import { effectivePlan, planUsage } from "@/lib/subscription";
+import { StaffLogins } from "./staff-logins";
 import { inr } from "../portal-format";
 import { LangChoice, PortalPage, T } from "../portal-ui";
 
@@ -104,6 +106,14 @@ export default async function SettingsPage() {
           paymentTemplateFor(cid),
         ])
       : [[], 0, null, 0, null, null, null, null];
+    // Staff logins: who can sign in, and the plan's staff limit (none for a business without a plan on record).
+    const [teamLogins, teamUsage, teamPlan] = cid
+      ? await Promise.all([
+          db.user.findMany({ where: { clientId: cid }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, email: true, access: true } }),
+          planUsage(cid),
+          effectivePlan(cid),
+        ])
+      : [[], null, null];
     const quality = (r: string | null | undefined) => (
       r === "GREEN" ? { tone: "ok", label: "High quality", labelTa: "உயர்ந்த தரம்" }
       : r === "YELLOW" ? { tone: "warn", label: "Medium quality", labelTa: "நடுத்தர தரம்" }
@@ -299,6 +309,18 @@ export default async function SettingsPage() {
                 )}
               </div>
             </section>
+          </ScrollReveal>
+        )}
+
+        {cid && teamUsage && (
+          <ScrollReveal>
+            <StaffLogins
+              logins={teamLogins.map((u, i) => ({ id: u.id, name: u.name, email: u.email, access: u.access, owner: i === 0, you: u.id === user.id }))}
+              used={teamUsage.staff}
+              limit={teamPlan?.status === "none" ? null : (teamPlan?.plan?.lim.staff ?? 0)}
+              planName={teamPlan?.plan?.n ?? null}
+              canChange={scope.manager && !scope.viewOnly}
+            />
           </ScrollReveal>
         )}
 
