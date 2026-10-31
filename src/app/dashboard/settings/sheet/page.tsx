@@ -8,6 +8,7 @@ import { testSheetConnection } from "../../actions/sheets";
 import { db } from "@/lib/db";
 import { fmtDate } from "@/lib/format";
 import { getScope } from "@/lib/session";
+import { GoogleSheetCard } from "./google-sheet-card";
 import { SheetForm } from "./sheet-form";
 import { SheetHookForm } from "./sheet-hook-form";
 
@@ -73,8 +74,8 @@ async function LiveUpdatesCard({ clientId, canManage, linked }: { clientId: stri
       <CardHeader
         tone="gold"
         icon={<Radio />}
-        title="Live updates to the sheet"
-        description="Orders, chats and campaign results are written to your sheet as they happen"
+        title="Apps Script live log (older way)"
+        description="For sheets set up with Thabaal's script before Connect Google Sheets; new businesses don't need this"
         action={<Badge tone={s.state === "on" ? "green" : "red"} dot>{s.state === "on" ? "On" : "Off"}</Badge>}
       />
       <div className="space-y-4 p-4 sm:p-5">
@@ -108,8 +109,8 @@ async function LiveUpdatesCard({ clientId, canManage, linked }: { clientId: stri
   );
 }
 
-export default async function SheetPage() {
-  const scope = await getScope();
+export default async function SheetPage({ searchParams }: { searchParams: Promise<{ google?: string }> }) {
+  const [scope, sp] = await Promise.all([getScope(), searchParams]);
   const back = { href: "/dashboard/settings", label: "Settings" };
   if (!scope.clientId) return <><PageHeader title="Google Sheet sync" back={back} /><PickClientNotice what="Google Sheet" /></>;
   const client = await db.client.findUnique({
@@ -122,14 +123,15 @@ export default async function SheetPage() {
       <PageHeader
         title="Google Sheet sync"
         back={back}
-        description="Keep customers and orders in a Google Sheet; the portal reads it every 30 minutes. New rows become customers and orders here, ready for campaigns and dispatch."
+        description="Connect your own Google Sheet for a live copy of customers, orders, payments and chats. You can also import customers and orders you already keep in a sheet."
       />
       <StaggerGroup className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
         <StaggerItem className="space-y-4 sm:space-y-6">
+          <GoogleSheetCard clientId={scope.clientId} canManage={scope.manager && !scope.viewOnly} flash={sp.google} />
           <Card className="card-3d">
             <CardHeader
               tone="brand"
-              title="Your sheet"
+              title="Import from your sheet"
               description={client?.sheetSyncedAt ? `Last synced ${fmtDate(client.sheetSyncedAt, "d MMM, h:mm a")}` : "Not synced yet"}
             />
             {client?.sheetSyncNote && (

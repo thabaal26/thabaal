@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { pushToGoogleSheet } from "@/lib/google-sheets-live";
+import { kickSheetSync } from "@/lib/gsheet/sync";
 import { fmtDate } from "@/lib/format";
 import { allowance } from "@/lib/limits";
 import { deliver, getSettings, readiness, templateSendable, wahaConfig } from "@/lib/provider";
@@ -168,6 +169,7 @@ export async function replyToCustomer(
     revalidatePath(`/dashboard/customers/${customer.id}`);
     revalidatePath("/dashboard/messages");
     revalidatePath("/dashboard/replies");
+    kickSheetSync(customer.clientId); // the reply shows in the connected sheet's Chats a moment later
     return { ok: true, message: simulated ? "Simulated reply logged (demo mode)." : "Reply sent." };
   } catch (e) {
     const { code, error } = explainSendError(e);

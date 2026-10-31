@@ -97,6 +97,10 @@ model Client {
   orderSeq            Int               @default(1000)
   sheetHookUrl        String?
   sheetHookSecret     String?
+  /// The business's own Google Sheet, connected with "Connect Google Sheets" (lib/gsheet): live sync of
+  /// customers, addresses, orders, items, payments, chats and activity.
+  sheetLink           SheetLink?
+  sheetLogs           SheetLog[]
   /// Win-back: customers whose last order is this many days old are tagged "lapsed" and sent winbackTemplate once.
   lapsedDays          Int               @default(60)
   winbackTemplateId   String?
@@ -756,6 +760,49 @@ model RazorpayRecord {
 }
 
 /// Razorpay webhook events already handled (x-razorpay-event-id).
+/// One business's Google Sheet: who connected it, the Google access (refresh token, encrypted) and how far the
+/// live sync has got. Thabaal only ever touches the one spreadsheet it created (Google's drive.file permission).
+model SheetLink {
+  id            String    @id @default(cuid())
+  clientId      String    @unique
+  client        Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  googleEmail   String?
+  /// Encrypted with DATA_ENC_KEY (lib/secret-box.ts).
+  refreshToken  String?
+  spreadsheetId String?
+  /// connected | error | off
+  status        String    @default("connected")
+  lastError     String?
+  /// How far each tab has synced: { customers, orders, chatsIn, chatsOut, payments, activity } as { at, id }.
+  cursors       Json?
+  /// Each tab's numeric sheet id, for formatting.
+  tabs          Json?
+  syncedAt      DateTime?
+  summaryAt     DateTime?
+  /// One sync at a time per business; a change during a sync sets `dirty` so it runs once more.
+  lockUntil     DateTime?
+  dirty         Boolean   @default(false)
+  connectedBy   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+/// What happened, for the sheet's Activity tab: written only while a sheet is connected, sent on the next sync.
+model SheetLog {
+  id       String   @id @default(cuid())
+  clientId String
+  client   Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  at       DateTime @default(now())
+  phone    String?
+  customer String?
+  event    String
+  details  String?
+  orderRef String?
+  by       String?
+
+  @@index([clientId, at])
+}
+
 model RazorpayEvent {
   id        String   @id
   event     String
