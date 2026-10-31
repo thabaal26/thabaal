@@ -623,6 +623,7 @@ export async function POST(req: NextRequest) {
                     await textInWindow(order.customer, "Your order is already confirmed as Cash on Delivery. Reply here if you want to change it.", "COD already confirmed").catch(() => {});
                   }
                 } else if (isOnline) {
+                  if (order.paymentMethod === "cod") await db.order.updateMany({ where: { id: order.id, paymentMethod: "cod", status: "NEW", paidAt: null }, data: { paymentMethod: null } });
                   const res = await sendPaymentRequestFor(order.id);
                   if (!res.ok) {
                     await textInWindow(order.customer, "We couldn't create the payment link just now. We will send it shortly.", "Payment link retry").catch(() => {});
