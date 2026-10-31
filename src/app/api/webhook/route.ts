@@ -22,6 +22,7 @@ import { mapMetaStatus } from "@/lib/whatsapp";
 import { findUtr, logPaymentEvent } from "@/lib/payment-events";
 import { JOIN_RE, joinFromWhatsApp } from "@/lib/optin";
 import { chargeMessage } from "@/lib/wallet";
+import { applyOwnerStatus } from "@/lib/owner-messages";
 
 export const dynamic = "force-dynamic";
 
@@ -77,7 +78,11 @@ async function applyStatus(s: StatusUpdate) {
       customer: { select: { phone: true, name: true, clientId: true, client: { select: { name: true } } } },
     },
   });
-  if (!msg) return;
+  // Not a business's message: maybe one of Thabaal's own messages to an owner (admin › Messages).
+  if (!msg) {
+    await applyOwnerStatus(s).catch((e) => console.error("[owner message status]", e));
+    return;
+  }
   const clientName = msg.customer?.client?.name || "Thabaal";
   // Every status carries Meta's pricing; keep it for cost reporting even when the status itself is stale.
   if (s.pricing?.category) {

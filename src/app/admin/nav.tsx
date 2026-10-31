@@ -79,7 +79,7 @@ export function AdminNav({ payments, newAccounts, leadsDue = 0 }: { payments: nu
       ],
     },
     { title: "Money", items: [{ href: "/admin/payments", label: "Payments", icon: I.pay, count: payments }] },
-    { title: "Reach out", items: [{ href: "/admin/messages", label: "Messages", icon: I.msg, soon: true }] },
+    { title: "Reach out", items: [{ href: "/admin/messages", label: "Messages", icon: I.msg }] },
     { title: "Admin", items: [{ href: "/admin/settings", label: "Settings", icon: I.gear }] },
   ];
   const active = (href: string) => (href === "/admin" ? path === "/admin" : path === href || path.startsWith(`${href}/`));
