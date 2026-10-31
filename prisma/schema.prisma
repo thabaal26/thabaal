@@ -32,6 +32,10 @@ model Setting {
   /// GST on wallet receipts: off until Thabaal is registered; gstin is printed when on.
   gstEnabled     Boolean   @default(false)
   gstin          String?
+  /// Plan prices changed from the admin panel ({ starter: { m, q, y }, … }, rupees); empty = lib/account-plans.ts.
+  planPrices     Json?
+  planPricesAt   DateTime?
+  planPricesBy   String?
   updatedAt      DateTime  @updatedAt
 }
 

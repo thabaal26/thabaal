@@ -14,8 +14,8 @@ import {
   CYCLE_SUFFIX,
   INDIAN_STATES,
   PLAN_COMPARISON_ROWS,
+  PlanDef,
   PlanKey,
-  PLANS,
   SUPPLIER_INFO,
   inr,
   inrDec,
@@ -48,12 +48,13 @@ export type AccountViewProps = {
   }>;
   /** Thabaal admin's payment checks, shown above everything else. */
   adminPanel?: ReactNode;
+  /** The plans with today's prices (Settings › Plans and prices; lib/plan-prices-server.ts). */
+  plans: readonly PlanDef[];
   /** The plan subscription through Razorpay auto-pay: the only way to pay for a plan. Off when the keys aren't set. */
   razorpay?: { enabled: boolean; autoRenew: { plan: PlanKey; cycle: BillingCycle; status: string; amount: number } | null };
 };
 
 const CYCLE_LENGTH: Record<BillingCycle, string> = { m: "1 month", q: "3 months", y: "12 months" };
-const planOf = (k: string | null | undefined) => PLANS.find((p) => p.k === k) ?? null;
 
 const ACCESS_LABEL: Record<AccessState, string> = {
   ok: "paid",
@@ -73,7 +74,8 @@ const PHASE: Record<HistoryRow["phase"], { label: string; tone: "ok" | "warn" | 
   cancelled: { label: "Withdrawn", tone: "mute" },
 };
 
-export function AccountView({ billing, usage, billingProfile: initialProfile, customWorkRequests: initialCW = [], adminPanel, razorpay }: AccountViewProps) {
+export function AccountView({ billing, usage, billingProfile: initialProfile, customWorkRequests: initialCW = [], adminPanel, razorpay, plans }: AccountViewProps) {
+  const planOf = (k: string | null | undefined) => plans.find((p) => p.k === k) ?? null;
   const router = useRouter();
   const notify = (text: string, ok = true) => toast(ok, text);
   const [busy, startBusy] = useTransition();
@@ -404,7 +406,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                 ? "Your account is ready. Subscribe with auto-pay and everything opens up the moment the first payment goes through."
                 : "We have not received this period's payment, so thabaal is paused. Subscribe with auto-pay and it opens again the moment the payment goes through."}
             </p>
-            <div className="amt">{renewPrice !== null ? inr(renewPrice) : `From ${inr(PLANS[0].p.m)}`}</div>
+            <div className="amt">{renewPrice !== null ? inr(renewPrice) : `From ${inr(plans[0].p.m)}`}</div>
             <div className="muted small">{renewPlan ? `${renewPlan.n} plan` : "a month"}</div>
             {billing.pending && !sim ? (
               <p className="small" style={{ marginTop: 16 }}>
@@ -724,7 +726,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                   <div>
                     <div className="l">To start</div>
                     <div className="v">Pick a plan</div>
-                    <div className="l">From {inr(PLANS[0].p.m)} a month</div>
+                    <div className="l">From {inr(plans[0].p.m)} a month</div>
                   </div>
                   <button type="button" className="btn primary" onClick={() => setActiveTab("plans")}>
                     See plans
@@ -1025,10 +1027,10 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
 
           {/* 3 Plan Cards */}
           <div className="plans" style={{ marginTop: 14 }}>
-            {PLANS.map((plan, i) => {
+            {plans.map((plan, i) => {
               const isCur = plan.k === currentPlanKey && currentCycle === viewCycle;
               const subHere = subOn && autoRenew?.plan === plan.k && autoRenew?.cycle === viewCycle;
-              const curIndex = PLANS.findIndex((p) => p.k === currentPlanKey);
+              const curIndex = plans.findIndex((p) => p.k === currentPlanKey);
               const price = plan.p[viewCycle];
               const savings =
                 viewCycle === "m" ? 0 : plan.p.m * (viewCycle === "q" ? 3 : 12) - price;
@@ -1145,7 +1147,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                     <th>
                       <T ta="அம்சம்">Feature</T>
                     </th>
-                    {PLANS.map((p) => (
+                    {plans.map((p) => (
                       <th
                         key={p.k}
                         className={`c ${p.k === currentPlanKey ? "cur" : ""}`}
@@ -1712,7 +1714,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                       ? `Subscribe to ${buyPlan.n}`
                       : buyPlan.k === currentPlanKey
                         ? `Change ${buyPlan.n} billing`
-                        : PLANS.findIndex((p) => p.k === buyPlan.k) > PLANS.findIndex((p) => p.k === currentPlanKey)
+                        : plans.findIndex((p) => p.k === buyPlan.k) > plans.findIndex((p) => p.k === currentPlanKey)
                           ? `Upgrade to ${buyPlan.n}`
                           : `Move to ${buyPlan.n}`}
                   </h2>

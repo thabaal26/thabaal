@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IconSetLink } from "@/components/icon-set-link";
+import { displayPlanPrices } from "@/lib/plan-prices-server";
 import { ThabaalSignIn } from "./thabaal-sign-in";
 
 export const metadata: Metadata = {
@@ -8,11 +9,14 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-export default function LoginPage() {
+// The pricing section shows the prices set in the admin panel, read on each visit (never at build time).
+export const dynamic = "force-dynamic";
+
+export default async function LoginPage() {
   return (
     <div data-iconset="hugeicons-regular" className="contents">
       <IconSetLink set="hugeicons-regular" />
-      <ThabaalSignIn />
+      <ThabaalSignIn prices={await displayPlanPrices()} />
     </div>
   );
 }

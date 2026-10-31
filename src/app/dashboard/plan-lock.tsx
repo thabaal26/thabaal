@@ -3,7 +3,8 @@
 
 import Link from "@/components/intent-link";
 import { redirect } from "next/navigation";
-import { PLANS, inr } from "@/lib/account-plans";
+import { inr } from "@/lib/account-plans";
+import { livePlans } from "@/lib/plan-prices-server";
 import { isSectionEnabled, type ClientSectionId } from "@/lib/client-sections";
 import { db } from "@/lib/db";
 import { clientAccess } from "@/lib/plan-access";
@@ -22,8 +23,8 @@ export async function planGate(section?: ClientSectionId) {
     if (!isSectionEnabled(c?.disabledSections, section)) redirect("/dashboard");
   }
   if (!scope.planLocked || !scope.clientId) return null;
-  const access = await clientAccess(scope.clientId);
-  const plan = PLANS.find((p) => p.k === access.plan);
+  const [access, plans] = await Promise.all([clientAccess(scope.clientId), livePlans()]);
+  const plan = plans.find((p) => p.k === access.plan);
   const cycle = access.cycle === "q" || access.cycle === "y" ? access.cycle : "m";
   const isNew = access.state === "new";
   return (
@@ -38,7 +39,7 @@ export async function planGate(section?: ClientSectionId) {
               ? "Your account is ready. Subscribe with auto-pay and everything opens up the moment the first payment goes through."
               : "We have not received this period's payment, so thabaal is paused. Subscribe with auto-pay and it opens again the moment the payment goes through."}
           </p>
-          <div className="amt">{plan ? inr(plan.p[cycle]) : `From ${inr(PLANS[0].p.m)}`}</div>
+          <div className="amt">{plan ? inr(plan.p[cycle]) : `From ${inr(plans[0].p.m)}`}</div>
           <div className="muted small">{plan ? `${plan.n} plan` : "a month"}</div>
           {access.pending ? (
             <p className="small" style={{ marginTop: 16 }}>

@@ -6,6 +6,7 @@ import { CYCLE_NAMES, type BillingCycle, type PlanKey } from "./account-plans";
 import { capturedPayment, orderSignatureOk, razorpayKeys, RazorpayError, rzp, subscriptionSignatureOk, type RzpPayment } from "./razorpay";
 import { isCycle, isPlanKey, paidThrough, planDef, pricePaise, purchaseBlock } from "./subscription-core";
 import { grantGatewayPeriod } from "./subscription";
+import { loadPlanPrices } from "./plan-prices-server";
 import { sendEmail } from "./email";
 import { APP_ORIGIN } from "./app-host";
 
@@ -172,10 +173,12 @@ export async function startPlanSubscription(who: Who, plan: string, cycle: strin
     const block = purchaseBlock(rows, now);
     if (block) return { ok: false, message: block.message };
 
-    const amountPaise = pricePaise(plan, cycle);
+    // Today's price (Settings › Plans and prices). A running subscription keeps the amount it was made with.
+    const amountPaise = pricePaise(plan, cycle, await loadPlanPrices());
     const label = `${planDef(plan)!.n} · ${CYCLE_NAMES[cycle].en}`;
+    // At any amount: a business on an older price stays on it, it isn't moved to the new one by subscribing again.
     const same = await db.razorpayRecord.findFirst({
-      where: { kind: "subscription", purpose: "plan", clientId, plan, cycle, amountPaise, status: { in: ["authenticated", "active"] } },
+      where: { kind: "subscription", purpose: "plan", clientId, plan, cycle, status: { in: ["authenticated", "active"] } },
       select: { id: true },
     });
     if (same) return { ok: false, message: `You are already subscribed to ${label}. Auto-pay renews it by itself.` };

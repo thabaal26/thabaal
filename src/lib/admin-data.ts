@@ -9,6 +9,8 @@ import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { PLANS, type BillingCycle, type PlanKey, type PlanLimits } from "./account-plans";
 import { db } from "./db";
 import { APP_TZ } from "./format";
+import type { PriceTable } from "./plan-prices";
+import { loadPlanPrices } from "./plan-prices-server";
 import { RATES } from "./spend";
 import { accessState, CYCLE_MONTHS, DAY_MS, summarize, WARN_DAYS, type AccessState } from "./subscription-core";
 import { SALE_WHERE } from "@/lib/sale";
@@ -20,17 +22,19 @@ export const planName = (k: string | null | undefined) => planDefOf(k)?.n ?? (k 
 const cycleOf = (c: string | null | undefined): BillingCycle => (c === "q" || c === "y" ? c : "m");
 export const cycleName = (c: string | null | undefined) => ({ m: "Monthly", q: "Every 3 months", y: "Yearly" })[cycleOf(c)];
 
-/** What a plan brings in per month: the cycle's price spread over its months. */
-export function monthlyValue(plan: string | null | undefined, cycle: string | null | undefined) {
-  const d = planDefOf(plan);
-  if (!d) return 0;
+/**
+ * What a plan brings in per month: the amount paid for the period spread over its months, or the price list's
+ * price when the amount isn't known. A price changed later never changes what an earlier period brought in.
+ */
+export function monthlyValue(plan: string | null | undefined, cycle: string | null | undefined, amountPaise?: number | null, prices?: PriceTable) {
   const c = cycleOf(cycle);
-  return d.p[c] / CYCLE_MONTHS[c];
+  if (amountPaise && amountPaise > 0) return amountPaise / 100 / CYCLE_MONTHS[c];
+  return renewalPrice(plan, cycle, prices) / CYCLE_MONTHS[c];
 }
-/** What renewing the same plan and cycle costs. */
-export function renewalPrice(plan: string | null | undefined, cycle: string | null | undefined) {
+/** What a new subscription to the same plan and cycle costs today. */
+export function renewalPrice(plan: string | null | undefined, cycle: string | null | undefined, prices?: PriceTable) {
   const d = planDefOf(plan);
-  return d ? d.p[cycleOf(cycle)] : 0;
+  return d ? (prices?.[d.k] ?? d.p)[cycleOf(cycle)] : 0;
 }
 
 // ---- months in the app's time zone -------------------------------------------------------------------------
@@ -213,6 +217,7 @@ export async function loadClientRows(now = new Date()): Promise<{ rows: ClientRo
     lastReplies(),
     db.order.groupBy({ by: ["clientId"], _max: { createdAt: true } }),
   ]);
+  const prices = await loadPlanPrices();
   // Newest plan subscription per business (Razorpay auto-pay).
   const subs = await db.razorpayRecord.findMany({
     where: { kind: "subscription", purpose: "plan", status: { in: ["authenticated", "active", "pending", "halted", "cancelling"] } },
@@ -287,8 +292,9 @@ export async function loadClientRows(now = new Date()): Promise<{ rows: ClientRo
       stateLabel,
       plan,
       cycle,
-      monthly: paidNow ? monthlyValue(plan, cycle) : 0,
-      renewal: renewalPrice(plan, cycle),
+      monthly: paidNow ? monthlyValue(plan, cycle, sum.active?.amountPaise, prices) : 0,
+      // A running subscription renews at the amount it was made with; otherwise today's price.
+      renewal: subRec && autoPay !== "off" && subRec.plan === plan && subRec.cycle === cycle ? subRec.amountPaise / 100 : renewalPrice(plan, cycle, prices),
       endsAt: acc.endsAt,
       days: acc.days,
       pending: sum.pending ? { id: sum.pending.id, amount: sum.pending.amountPaise / 100, utr: sum.pending.utr, createdAt: sum.pending.createdAt } : null,
@@ -341,7 +347,7 @@ export async function loadHistory(purchases: PurchaseRow[], now = new Date(), n 
     return {
       key: mo.key,
       label: mo.label,
-      mrr: live.reduce((s, p) => s + monthlyValue(p.plan, p.cycle), 0),
+      mrr: live.reduce((s, p) => s + monthlyValue(p.plan, p.cycle, p.amountPaise), 0),
       paying: paying.size,
       collected,
       spend,

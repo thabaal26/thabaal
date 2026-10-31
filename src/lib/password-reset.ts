@@ -1,6 +1,8 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
+import { headers } from "next/headers";
+import { APP_ORIGIN } from "./app-host";
 import { db } from "./db";
 
 // "Forgot password" links. Each link is a signed token, so nothing new is stored in the database:
@@ -22,13 +24,24 @@ function key() {
 /** A short fingerprint of the stored password hash; changes whenever the password does. */
 const fingerprint = (passwordHash: string) => createHash("sha256").update(passwordHash).digest("base64url").slice(0, 22);
 
-export async function makeResetToken(user: { id: string; passwordHash: string }) {
+/** `minutes`: how long the link works (an invite to a new login gets longer than a reset). */
+export async function makeResetToken(user: { id: string; passwordHash: string }, minutes = RESET_MINUTES) {
   return new SignJWT({ p: PURPOSE, pf: fingerprint(user.passwordHash) })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
     .setIssuedAt()
-    .setExpirationTime(`${RESET_MINUTES}m`)
+    .setExpirationTime(`${minutes}m`)
     .sign(key());
+}
+
+/** Where links in emails point. Production always uses the real site, never the request's Host header. */
+export async function linkOrigin() {
+  if (process.env.NODE_ENV === "production") return APP_ORIGIN;
+  try {
+    return `http://${(await headers()).get("host") ?? "localhost:3000"}`;
+  } catch {
+    return "http://localhost:3000"; // outside a request (tests)
+  }
 }
 
 /** The account the link is for, or null when the link is forged, expired or already used. */

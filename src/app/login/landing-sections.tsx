@@ -5,6 +5,7 @@ import Image from "next/image";
 import "./landing.css";
 import { DEMO_TARGET, DEMO_URL } from "./demo-link";
 import { HeritageFooter } from "./heritage-footer";
+import { DEFAULT_PRICES, savePercent, type CyclePrices, type PriceTable } from "@/lib/plan-prices";
 
 type Lang = "en" | "ta";
 type T = { en: string; ta: string };
@@ -17,13 +18,6 @@ interface PricingPlan {
   popular?: boolean;
   badge?: T;
   specs: { en: string[]; ta: string[] };
-  pricing: Record<
-    BillingCycle,
-    {
-      monthlyRate: string;
-      billedNote: T;
-    }
-  >;
   features: { en: string[]; ta: string[] };
   cta: T;
 }
@@ -52,29 +46,6 @@ const PRICING_PLANS: PricingPlan[] = [
         "மாதம் 5 பிரச்சாரங்கள்*",
         "10 அனுமதிக்கப்பட்ட டெம்ப்ளேட்கள்*",
       ],
-    },
-    pricing: {
-      monthly: {
-        monthlyRate: "1,199",
-        billedNote: {
-          en: "INR 1,199 per month, GST included",
-          ta: "மாதம் ₹1,199, GST உட்பட",
-        },
-      },
-      quarterly: {
-        monthlyRate: "1,079",
-        billedNote: {
-          en: "Quarterly total: INR 3,237 (Save 10%)",
-          ta: "காலாண்டு மொத்தம்: ₹3,237 (10% சேமிப்பு)",
-        },
-      },
-      yearly: {
-        monthlyRate: "959",
-        billedNote: {
-          en: "Yearly total: INR 11,510 (Save 20%)",
-          ta: "வருடாந்திர மொத்தம்: ₹11,510 (20% சேமிப்பு)",
-        },
-      },
     },
     features: {
       en: [
@@ -128,29 +99,6 @@ const PRICING_PLANS: PricingPlan[] = [
         "50 அனுமதிக்கப்பட்ட டெம்ப்ளேட்கள்*",
       ],
     },
-    pricing: {
-      monthly: {
-        monthlyRate: "2,999",
-        billedNote: {
-          en: "INR 2,999 per month, GST included",
-          ta: "மாதம் ₹2,999, GST உட்பட",
-        },
-      },
-      quarterly: {
-        monthlyRate: "2,699",
-        billedNote: {
-          en: "Quarterly total: INR 8,097 (Save 10%)",
-          ta: "காலாண்டு மொத்தம்: ₹8,097 (10% சேமிப்பு)",
-        },
-      },
-      yearly: {
-        monthlyRate: "2,399",
-        billedNote: {
-          en: "Yearly total: INR 28,790 (Save 20%)",
-          ta: "வருடாந்திர மொத்தம்: ₹28,790 (20% சேமிப்பு)",
-        },
-      },
-    },
     features: {
       en: [
         "Everything in Starter, plus:",
@@ -199,29 +147,6 @@ const PRICING_PLANS: PricingPlan[] = [
         "மாதம் 50 பிரச்சாரங்கள்*",
         "100 அனுமதிக்கப்பட்ட டெம்ப்ளேட்கள்*",
       ],
-    },
-    pricing: {
-      monthly: {
-        monthlyRate: "4,999",
-        billedNote: {
-          en: "INR 4,999 per month, GST included",
-          ta: "மாதம் ₹4,999, GST உட்பட",
-        },
-      },
-      quarterly: {
-        monthlyRate: "4,499",
-        billedNote: {
-          en: "Quarterly total: INR 13,497 (Save 10%)",
-          ta: "காலாண்டு மொத்தம்: ₹13,497 (10% சேமிப்பு)",
-        },
-      },
-      yearly: {
-        monthlyRate: "3,999",
-        billedNote: {
-          en: "Yearly total: INR 47,990 (Save 20%)",
-          ta: "வருடாந்திர மொத்தம்: ₹47,990 (20% சேமிப்பு)",
-        },
-      },
     },
     features: {
       en: [
@@ -367,8 +292,8 @@ const COMPETITOR_COMPARISON: CompetitorRow[] = [
     platform: "Thabaal",
     isThabaal: true,
     price: {
-      en: "INR 1,199 / 2,999 / 4,999 monthly, GST included",
-      ta: "மாதம் ₹1,199 / ₹2,999 / ₹4,999, GST உட்பட",
+      en: "INR {starter} / {growth} / {business} monthly, GST included",
+      ta: "மாதம் ₹{starter} / ₹{growth} / ₹{business}, GST உட்பட",
     },
   },
   {
@@ -571,8 +496,8 @@ const FAQ_ITEMS: { icon: FaqIconKey; tone: FaqTone; q: T; a: T }[] = [
       ta: "தபாலின் கட்டணம் எவ்வளவு?",
     },
     a: {
-      en: "Thabaal has three plans: Starter at INR 1,199, Growth at INR 2,999 and Business at INR 4,999 per month, all with GST included. Quarterly billing saves 10% and yearly billing saves 20%.",
-      ta: "தபாலில் மூன்று திட்டங்கள் உள்ளன: ஸ்டார்ட்டர் மாதம் ₹1,199, வளர்ச்சி ₹2,999, பிசினஸ் ₹4,999—அனைத்தும் GST உள்ளிட்டவை. காலாண்டு கட்டணத்தில் 10%, வருடாந்திர கட்டணத்தில் 20% சேமிக்கலாம்.",
+      en: "Thabaal has three plans: Starter at INR {starter}, Growth at INR {growth} and Business at INR {business} per month, all with GST included. Quarterly billing saves {qsave}% and yearly billing saves {ysave}%.",
+      ta: "தபாலில் மூன்று திட்டங்கள் உள்ளன: ஸ்டார்ட்டர் மாதம் ₹{starter}, வளர்ச்சி ₹{growth}, பிசினஸ் ₹{business}—அனைத்தும் GST உள்ளிட்டவை. காலாண்டு கட்டணத்தில் {qsave}%, வருடாந்திர கட்டணத்தில் {ysave}% சேமிக்கலாம்.",
     },
   },
   {
@@ -664,7 +589,40 @@ const FAQ_ITEMS: { icon: FaqIconKey; tone: FaqTone; q: T; a: T }[] = [
 /** The first four questions stay visible; the rest sit behind the "more questions" button. */
 const FAQ_PRIMARY_COUNT = 4;
 
-export function LandingSections({ lang }: { lang: Lang }) {
+const fmtInr = (n: number) => n.toLocaleString("en-IN");
+
+/** Percent saved on 3 or 12 months: "10" when every plan saves the same, "8–10" when they differ. */
+function saveRange(prices: PriceTable, cycle: "q" | "y") {
+  const all = Object.values(prices).map((p) => savePercent(p, cycle));
+  const lo = Math.min(...all);
+  const hi = Math.max(...all);
+  return lo === hi ? String(hi) : `${lo}–${hi}`;
+}
+
+/** Fills {starter} {growth} {business} (monthly prices) and {qsave} {ysave} from the prices in force. */
+function fillPrices(text: string, prices: PriceTable) {
+  return text.replace(/\{(starter|growth|business|qsave|ysave)\}/g, (_, k: string) =>
+    k === "qsave" ? saveRange(prices, "q") : k === "ysave" ? saveRange(prices, "y") : fmtInr(prices[k as keyof PriceTable].m),
+  );
+}
+
+/** The price box on a plan card: the rate per month for the cycle, and what is billed. */
+function priceInfoOf(p: CyclePrices, cycle: BillingCycle): { monthlyRate: string; billedNote: T } {
+  if (cycle === "monthly") return { monthlyRate: fmtInr(p.m), billedNote: { en: `INR ${fmtInr(p.m)} per month, GST included`, ta: `மாதம் ₹${fmtInr(p.m)}, GST உட்பட` } };
+  const c = cycle === "quarterly" ? "q" : "y";
+  const save = savePercent(p, c);
+  const tail = save > 0 ? { en: ` (Save ${save}%)`, ta: ` (${save}% சேமிப்பு)` } : { en: "", ta: "" };
+  return {
+    monthlyRate: fmtInr(Math.round(p[c] / (c === "q" ? 3 : 12))),
+    billedNote:
+      c === "q"
+        ? { en: `Quarterly total: INR ${fmtInr(p.q)}${tail.en}`, ta: `காலாண்டு மொத்தம்: ₹${fmtInr(p.q)}${tail.ta}` }
+        : { en: `Yearly total: INR ${fmtInr(p.y)}${tail.en}`, ta: `வருடாந்திர மொத்தம்: ₹${fmtInr(p.y)}${tail.ta}` },
+  };
+}
+
+/** `prices`: the plan prices in force (Settings › Plans and prices), read on the server. */
+export function LandingSections({ lang, prices = DEFAULT_PRICES }: { lang: Lang; prices?: PriceTable }) {
   const ta = lang === "ta";
   const [activeDemo, setActiveDemo] = useState<"overview" | "campaign" | "payments">("overview");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
@@ -705,7 +663,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
           className="faq-answer-wrap"
         >
           <div className="faq-answer">
-            <p>{item.a[lang]}</p>
+            <p>{fillPrices(item.a[lang], prices)}</p>
           </div>
         </div>
       </div>
@@ -1198,7 +1156,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
                   className={billingCycle === "quarterly" ? "active" : ""}
                   onClick={() => setBillingCycle("quarterly")}
                 >
-                  {ta ? "காலாண்டு (10% சேமிப்பு)" : "Quarterly (Save 10%)"}
+                  {fillPrices(ta ? "காலாண்டு ({qsave}% சேமிப்பு)" : "Quarterly (Save {qsave}%)", prices)}
                 </button>
                 <button
                   type="button"
@@ -1207,7 +1165,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
                   className={billingCycle === "yearly" ? "active" : ""}
                   onClick={() => setBillingCycle("yearly")}
                 >
-                  {ta ? "வருடாந்திரம் (20% சேமிப்பு)" : "Yearly (Save 20%)"}
+                  {fillPrices(ta ? "வருடாந்திரம் ({ysave}% சேமிப்பு)" : "Yearly (Save {ysave}%)", prices)}
                 </button>
               </div>
             )}
@@ -1240,7 +1198,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
               <div className="pricing-tiers-grid">
                 {PRICING_PLANS.map((plan) => {
                   const isPopular = plan.popular;
-                  const priceInfo = plan.pricing[billingCycle];
+                  const priceInfo = priceInfoOf(prices[plan.id as keyof PriceTable], billingCycle);
 
                   return (
                     <article
@@ -1316,8 +1274,8 @@ export function LandingSections({ lang }: { lang: Lang }) {
                     <strong>{ta ? "தபால் மென்பொருள் சந்தா" : "Thabaal software subscription"}</strong>
                     <p>
                       {ta
-                        ? "மாதாந்திர, காலாண்டு (-10%) அல்லது வருடாந்திர (-20%) கட்டணம். இயங்குதள வசதிகள், கேட்லாக், ஆர்டர்கள், அறிக்கைகள் மற்றும் உங்கள் திட்டத்திற்குரிய எண்கள் & பணியாளர் கணக்குகளை உள்ளடக்கியது. அனைத்து திட்டங்களிலும் GST சேர்க்கப்பட்டுள்ளது."
-                        : "Billed monthly, quarterly (-10%) or yearly (-20%). Covers platform access, catalogue, orders, reports, and your plan’s included numbers and logins. All plan prices include GST."}
+                        ? fillPrices("மாதாந்திர, காலாண்டு (-{qsave}%) அல்லது வருடாந்திர (-{ysave}%) கட்டணம். இயங்குதள வசதிகள், கேட்லாக், ஆர்டர்கள், அறிக்கைகள் மற்றும் உங்கள் திட்டத்திற்குரிய எண்கள் & பணியாளர் கணக்குகளை உள்ளடக்கியது. அனைத்து திட்டங்களிலும் GST சேர்க்கப்பட்டுள்ளது.", prices)
+                        : fillPrices("Billed monthly, quarterly (-{qsave}%) or yearly (-{ysave}%). Covers platform access, catalogue, orders, reports, and your plan’s included numbers and logins. All plan prices include GST.", prices)}
                     </p>
                   </div>
                   <div className="how-billing-item">
@@ -1349,11 +1307,11 @@ export function LandingSections({ lang }: { lang: Lang }) {
                   <thead>
                     <tr>
                       <th style={{ width: "38%" }}>{ta ? "அம்சம்" : "Feature"}</th>
-                      <th style={{ width: "20%" }}>{ta ? "ஸ்டார்ட்டர் (₹1,199/மா)" : "Starter (₹1,199/mo)"}</th>
+                      <th style={{ width: "20%" }}>{fillPrices(ta ? "ஸ்டார்ட்டர் (₹{starter}/மா)" : "Starter (₹{starter}/mo)", prices)}</th>
                       <th className="col-featured" style={{ width: "22%" }}>
-                        {ta ? "வளர்ச்சி (₹2,999/மா) ★" : "Growth (₹2,999/mo) ★"}
+                        {fillPrices(ta ? "வளர்ச்சி (₹{growth}/மா) ★" : "Growth (₹{growth}/mo) ★", prices)}
                       </th>
-                      <th style={{ width: "20%" }}>{ta ? "பிசினஸ் (₹4,999/மா)" : "Business (₹4,999/mo)"}</th>
+                      <th style={{ width: "20%" }}>{fillPrices(ta ? "பிசினஸ் (₹{business}/மா)" : "Business (₹{business}/mo)", prices)}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1508,7 +1466,7 @@ export function LandingSections({ lang }: { lang: Lang }) {
                             </strong>
                           </td>
                           <td style={row.isThabaal ? { color: "var(--navy)", fontWeight: 800 } : undefined}>
-                            {ta ? row.price.ta : row.price.en}
+                            {fillPrices(ta ? row.price.ta : row.price.en, prices)}
                           </td>
                         </tr>
                       ))}
