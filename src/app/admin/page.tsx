@@ -19,6 +19,15 @@ function needsYou(rows: ClientRow[], newAccounts: number): Todo[] {
     const page = `/admin/clients/${r.id}`;
     if (r.pending)
       out.push({ tone: "warn", weight: 90, title: `Confirm payment from ${r.name}`, sub: `${R(r.pending.amount)} · UPI reference ${r.pending.utr ?? "not given"}`, action: "Check", href: "/admin/payments" });
+    if (r.autoPay === "failing")
+      out.push({
+        tone: "bad",
+        weight: 92,
+        title: `${r.name}: auto-pay charge failed`,
+        sub: `${planName(r.sub?.plan ?? r.plan)} · ${R(r.sub?.amount ?? r.renewal)} · ${r.sub?.status === "halted" ? "Razorpay stopped retrying" : "Razorpay is retrying"}`,
+        action: "Open",
+        href: page,
+      });
     if (r.state === "locked" || r.state === "overdue")
       out.push({
         tone: "bad",
@@ -30,8 +39,16 @@ function needsYou(rows: ClientRow[], newAccounts: number): Todo[] {
       });
     if (r.state === "new" && !r.pending)
       out.push({ tone: "bad", weight: 80, title: `${r.name} has never paid`, sub: "Needs a paid plan to use thabaal, so the app is closed for them", action: "Open", href: page });
-    if (r.state === "due")
-      out.push({ tone: "warn", weight: 60, title: `${r.name} renews in ${r.days} day${r.days === 1 ? "" : "s"}`, sub: `${planName(r.plan)} · ${R(r.renewal)}`, action: "Open", href: page });
+    // On auto-pay, a coming renewal needs nobody; without it the plan simply ends.
+    if (r.state === "due" && r.autoPay !== "on")
+      out.push({
+        tone: "warn",
+        weight: 65,
+        title: `${r.name}'s plan ends in ${r.days} day${r.days === 1 ? "" : "s"}, no auto-pay`,
+        sub: `${planName(r.plan)} · ${R(r.renewal)} · ask them to subscribe in My account`,
+        action: "Open",
+        href: page,
+      });
     if (!r.connected && (r.state === "ok" || r.state === "due"))
       out.push({ tone: "warn", weight: 70, title: `${r.name} pays but has no WhatsApp number`, sub: `${N(r.customers)} customers waiting · connect their number`, action: "Connect", href: page });
     if (r.numbersRed) out.push({ tone: "bad", weight: 85, title: `${r.name}: a number is rated red by Meta`, sub: "Sending from it is paused to protect it", action: "Open", href: page });
@@ -61,6 +78,8 @@ export default async function OverviewPage() {
   const neverPaid = rows.filter((r) => r.state === "new");
   const pending = rows.filter((r) => r.pending);
   const pendingAmt = pending.reduce((s, r) => s + (r.pending?.amount ?? 0), 0);
+  const autoOn = paying.filter((r) => r.autoPay === "on").length;
+  const failing = rows.filter((r) => r.autoPay === "failing").length;
   const sent30 = rows.reduce((s, r) => s + r.messages30.sent, 0);
   const salesMonth = rows.reduce((s, r) => s + r.salesMonth, 0);
   const last = hist[hist.length - 1];
@@ -86,7 +105,13 @@ export default async function OverviewPage() {
       <div className="card mb16" style={{ borderLeft: "6px solid var(--mango)" }}>
         <h2 style={{ fontSize: 22, marginBottom: 6 }}>Today, {formatInTimeZone(now, APP_TZ, "d MMMM yyyy")}</h2>
         <p>
-          You have <b>{paying.length} paying {paying.length === 1 ? "business" : "businesses"}</b> bringing in <b>{R(mrr)}</b> a month.{" "}
+          You have <b>{paying.length} paying {paying.length === 1 ? "business" : "businesses"}</b> bringing in <b>{R(mrr)}</b> a month
+          {paying.length ? (
+            <>
+              ; <b>{autoOn}</b> of them renew by auto-pay
+            </>
+          ) : null}
+          .{" "}
           {unpaid.length ? (
             <>
               <b>{unpaid.length}</b> {unpaid.length === 1 ? "has" : "have"} not renewed, which is <b>{R(owed)}</b> outside.{" "}
@@ -115,7 +140,16 @@ export default async function OverviewPage() {
           },
           { label: "Paying businesses", value: String(paying.length), note: `${rows.length} on thabaal`, tone: "mute", spark: hist.map((h) => h.paying) },
           { label: "Money not collected", value: R(owed), note: unpaid.length ? `${unpaid.length} overdue or locked` : "nothing overdue", tone: unpaid.length ? "dn" : "up", sparkColor: "#C0412A" },
-          { label: "Waiting for you", value: String(pending.length), note: pending.length ? `${R(pendingAmt)} to confirm` : "no payments to check", tone: pending.length ? "dn" : "mute" },
+          {
+            label: "On auto-pay",
+            value: `${autoOn} of ${paying.length}`,
+            note: failing
+              ? `${failing} charge${failing === 1 ? "" : "s"} failing`
+              : pending.length
+                ? `${pending.length} old UPI payment${pending.length === 1 ? "" : "s"} to confirm`
+                : "renewing by themselves",
+            tone: failing || pending.length ? "dn" : "up",
+          },
         ]}
       />
 

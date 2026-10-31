@@ -104,9 +104,13 @@ export type ClientRow = {
   endsAt: Date | null;
   days: number;
   pending: { id: string; amount: number; utr: string | null; createdAt: Date } | null;
-  /** Razorpay auto-pay: on (charging each period), failing (last charge failed, Razorpay retrying or stopped),
-   *  off (turned off, still running to the end of the paid period), or none (pays each period by hand). */
+  /** Razorpay auto-pay (the only way plans are paid): on (approved or charging each period), failing (last charge
+   *  failed, Razorpay retrying or stopped), off (cancelled, running to the end of the paid period), or none. */
   autoPay: "on" | "failing" | "off" | "none";
+  /** The newest plan subscription, for Payments › Auto-pay. */
+  sub: { rzpId: string; status: string; plan: string | null; cycle: string | null; amount: number; since: Date; updatedAt: Date; note: string | null } | null;
+  /** When Razorpay last collected a plan payment for this business. */
+  lastAutoCharge: Date | null;
   limits: PlanLimits | null;
   usage: { numbers: number; staff: number; campaignsMonth: number; templates: number };
   salesMonth: number;
@@ -213,7 +217,7 @@ export async function loadClientRows(now = new Date()): Promise<{ rows: ClientRo
   const subs = await db.razorpayRecord.findMany({
     where: { kind: "subscription", purpose: "plan", status: { in: ["authenticated", "active", "pending", "halted", "cancelling"] } },
     orderBy: { createdAt: "desc" },
-    select: { clientId: true, status: true },
+    select: { clientId: true, status: true, rzpId: true, plan: true, cycle: true, amountPaise: true, createdAt: true, updatedAt: true, note: true },
   });
   const autoPayOf = (clientId: string): ClientRow["autoPay"] => {
     const s = subs.find((x) => x.clientId === clientId)?.status;
@@ -260,6 +264,8 @@ export async function loadClientRows(now = new Date()): Promise<{ rows: ClientRo
     else if (acc.state === "overdue") flag(40, "payment overdue");
     else if (acc.state === "due") flag(10, `plan ends in ${acc.days} day${acc.days === 1 ? "" : "s"}`);
     const autoPay = autoPayOf(c.id);
+    const subRec = subs.find((x) => x.clientId === c.id) ?? null;
+    const lastAutoCharge = latest(...mine.filter((p) => p.method === "RAZORPAY" && p.status === "VERIFIED").map((p) => p.decidedAt ?? p.createdAt));
     if (autoPay === "failing") flag(30, "auto-pay charge failed");
     if (!connectedNumbers && (paidNow || c.planRequired)) flag(25, "no WhatsApp number connected");
     if (numbersRed) flag(20, "a number is rated red by Meta");
@@ -287,6 +293,10 @@ export async function loadClientRows(now = new Date()): Promise<{ rows: ClientRo
       days: acc.days,
       pending: sum.pending ? { id: sum.pending.id, amount: sum.pending.amountPaise / 100, utr: sum.pending.utr, createdAt: sum.pending.createdAt } : null,
       autoPay,
+      sub: subRec
+        ? { rzpId: subRec.rzpId, status: subRec.status, plan: subRec.plan, cycle: subRec.cycle, amount: subRec.amountPaise / 100, since: subRec.createdAt, updatedAt: subRec.updatedAt, note: subRec.note }
+        : null,
+      lastAutoCharge,
       limits,
       usage,
       salesMonth: salesMonth.find((s) => s.clientId === c.id)?._sum.total ?? 0,
@@ -367,6 +377,33 @@ export async function loadUsage(now = new Date()) {
     return { key, label: formatInTimeZone(d, APP_TZ, "EEEEE"), date: formatInTimeZone(d, APP_TZ, "d MMM"), messages: row?.n ?? 0, shops: row?.shops ?? 0 };
   });
   return { work, days };
+}
+
+// ---- plan subscriptions (Razorpay auto-pay) ----------------------------------------------------------------------
+
+/** What each Razorpay subscription status means to Thabaal, for the admin panel. */
+export const SUB_STATUS: Record<string, [Tone, string]> = {
+  created: ["mute", "Checkout not finished"],
+  authenticated: ["ok", "Approved · first charge later"],
+  active: ["ok", "Active · charging each period"],
+  pending: ["bad", "Charge failed · Razorpay retrying"],
+  halted: ["bad", "Stopped · charges failed"],
+  cancelling: ["warn", "Cancelled · runs to period end"],
+  cancelled: ["mute", "Cancelled"],
+  completed: ["mute", "Completed"],
+  expired: ["mute", "Checkout expired"],
+  paused: ["warn", "Paused"],
+};
+
+/** Every plan subscription of one business (or all), newest first. */
+export async function loadSubscriptions(clientId?: string) {
+  const rows = await db.razorpayRecord.findMany({
+    where: { kind: "subscription", purpose: "plan", ...(clientId ? { clientId } : {}) },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, rzpId: true, clientId: true, plan: true, cycle: true, amountPaise: true, status: true, note: true, createdAt: true, updatedAt: true, paymentId: true },
+    take: 200,
+  });
+  return rows.map((r) => ({ ...r, amount: r.amountPaise / 100 }));
 }
 
 // ---- plan payments, newest first -------------------------------------------------------------------------------

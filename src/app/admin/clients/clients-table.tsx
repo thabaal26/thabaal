@@ -46,19 +46,21 @@ export function ClientsTable({ rows }: { rows: TableRow[] }) {
   const [q, setQ] = useState("");
   const [plan, setPlan] = useState("");
   const [st, setSt] = useState("");
+  const [ap, setAp] = useState("");
   const [sort, setSort] = useState("risk");
   const shown = useMemo(() => {
     const t = q.trim().toLowerCase();
     const L = rows.filter((r) => {
       if (plan && (plan === "none" ? r.plan !== null && (r.state === "ok" || r.state === "due") : r.plan !== plan)) return false;
       if (st && r.state !== st && !(st === "pending" && r.stateLabel === "Checking payment")) return false;
+      if (ap && r.autoPay !== ap) return false;
       if (t && !`${r.name} ${r.sub}`.toLowerCase().includes(t)) return false;
       return true;
     });
     return [...L].sort((a, b) =>
       sort === "risk" ? b.risk - a.risk : sort === "mrr" ? b.monthly - a.monthly : sort === "sales" ? b.sales - a.sales : sort === "new" ? b.created - a.created : a.name.localeCompare(b.name),
     );
-  }, [rows, q, plan, st, sort]);
+  }, [rows, q, plan, st, ap, sort]);
 
   return (
     <>
@@ -77,11 +79,18 @@ export function ClientsTable({ rows }: { rows: TableRow[] }) {
           <option value="">All statuses</option>
           <option value="ok">Active</option>
           <option value="due">Renews soon</option>
-          <option value="pending">Checking payment</option>
+          <option value="pending">Old UPI to check</option>
           <option value="overdue">Overdue</option>
           <option value="locked">Locked</option>
           <option value="new">Not paid yet</option>
           <option value="unmanaged">No plan needed</option>
+        </select>
+        <select aria-label="Auto-pay" value={ap} onChange={(e) => setAp(e.target.value)}>
+          <option value="">Auto-pay: all</option>
+          <option value="on">Auto-pay on</option>
+          <option value="failing">Auto-pay failing</option>
+          <option value="off">Cancelled, runs to end</option>
+          <option value="none">No auto-pay</option>
         </select>
         <select aria-label="Sort" value={sort} onChange={(e) => setSort(e.target.value)}>
           <option value="risk">Sort: needs attention</option>
@@ -136,9 +145,9 @@ export function ClientsTable({ rows }: { rows: TableRow[] }) {
                     </td>
                     <td>
                       <span className={`pill ${r.stateTone}`}>{r.stateLabel}</span>
-                  {r.autoPay !== "none" && (
+                  {(r.autoPay !== "none" || r.state === "ok" || r.state === "due" || r.state === "overdue") && (
                     <div className={`small ${r.autoPay === "failing" ? "" : "muted"}`} style={{ marginTop: 4, ...(r.autoPay === "failing" ? { color: "var(--bad, #c0392b)", fontWeight: 600 } : {}) }}>
-                      {r.autoPay === "on" ? "Auto-pay on" : r.autoPay === "failing" ? "Auto-pay failing" : "Auto-pay turned off"}
+                      {r.autoPay === "on" ? "Auto-pay on" : r.autoPay === "failing" ? "Auto-pay failing" : r.autoPay === "off" ? "Auto-pay cancelled" : "No auto-pay"}
                     </div>
                   )}
                     </td>

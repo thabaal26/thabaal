@@ -28,13 +28,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const user = await requireAdminPage();
   const picked = (await cookies()).get(CLIENT_COOKIE)?.value;
   const viewingId = picked?.startsWith(VIEW_PREFIX) ? picked.slice(VIEW_PREFIX.length) : null;
-  const [planPending, walletPending, newAccounts, businesses, viewing, settings] = await Promise.all([
+  const [planPending, walletPending, newAccounts, businesses, viewing, settings, autoPayFailing] = await Promise.all([
     db.planPurchase.count({ where: { status: "PENDING" } }),
     db.walletEntry.count({ where: { kind: "RECHARGE", status: "PENDING" } }),
     pendingSignupCount().catch(() => 0),
     db.client.count(),
     viewingId ? db.client.findUnique({ where: { id: viewingId }, select: { name: true } }) : null,
     getSettings(),
+    db.razorpayRecord.count({ where: { kind: "subscription", purpose: "plan", status: { in: ["pending", "halted"] } } }),
   ]);
   // The portal's icon set: the app components reused here (setup tools, light/dark switch) draw their icons from it.
   const iconset = appearanceDataset(resolveAppearance(settings.appearance, null)).iconset;
@@ -50,7 +51,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <b>thabaal</b>
             <span className="tag">admin</span>
           </Link>
-          <AdminNav payments={planPending + walletPending} newAccounts={newAccounts} />
+          <AdminNav payments={planPending + walletPending + autoPayFailing} newAccounts={newAccounts} />
           <div className="foot">
             <span className="live">
               <i />

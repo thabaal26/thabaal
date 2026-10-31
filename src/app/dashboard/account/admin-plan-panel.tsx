@@ -211,13 +211,13 @@ export function AdminPlanPanel({
     <div className="card" style={{ marginBottom: 16, borderLeft: "6px solid var(--bar2)" }}>
       <div className="hd">
         <div>
-          <h2 style={{ fontSize: 17 }}>Thabaal admin: plan payments{clientName ? ` for ${clientName}` : ""}</h2>
+          <h2 style={{ fontSize: 17 }}>Thabaal admin: old UPI payments and manual periods{clientName ? ` for ${clientName}` : ""}</h2>
           <p className="muted small">
-            Check each UPI reference against the bank statement before verifying. A client&apos;s reference alone never
-            changes their plan. Only you see this panel.
+            Plans are paid by Razorpay auto-pay and added by themselves. This panel only holds UPI references sent before auto-pay (check each
+            against the bank statement before verifying) and lets you record a period paid outside thabaal. Only you see it.
           </p>
         </div>
-        <Pill tone={rows.length ? "warn" : "ok"}>{rows.length ? `${rows.length} waiting` : "Nothing waiting"}</Pill>
+        <Pill tone={rows.length ? "warn" : "ok"}>{rows.length ? `${rows.length} waiting` : "Nothing to check"}</Pill>
       </div>
       {rows.length > 0 && (
         <div className="list">
