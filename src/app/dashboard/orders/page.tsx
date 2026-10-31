@@ -3,6 +3,8 @@ import { getCatalogWithProducts } from "@/lib/catalog";
 import { db } from "@/lib/db";
 import { readPaySettings } from "@/lib/pay-settings";
 import { getScope, owned } from "@/lib/session";
+import { LiveRefresh } from "@/components/live-refresh";
+import { RefreshButton } from "@/components/refresh-button";
 import { PortalPage } from "../portal-ui";
 import { OrdersView } from "./orders-view";
 import { DEFAULT_FLOW, readFlow, type OrderFlowKey } from "@/lib/order-flow";
@@ -125,11 +127,14 @@ export default async function OrdersPage({
 
   return (
     <PortalPage
+      actions={<RefreshButton />}
       title="Orders"
       titleTa="ஆர்டர்கள்"
       sub="Track, pack, dispatch and deliver every order."
       subTa="ஒவ்வொரு ஆர்டரையும் கண்காணித்து, பேக் செய்து, அனுப்பி, டெலிவரி செய்யுங்கள்."
     >
+      {/* A payment or a new order arriving on WhatsApp shows up here without reloading. */}
+      <LiveRefresh />
       <OrdersView
         orders={orders}
         catalogProducts={catalogProducts}

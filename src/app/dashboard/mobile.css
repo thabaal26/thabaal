@@ -20,7 +20,19 @@
   .thabaal-portal header.top .tools {
     gap: 6px;
   }
-  .thabaal-portal header.top .tools > :is(a, button):not([aria-haspopup]) {
+  /* A round icon button (e.g. Refresh) sits at the top right, beside the title, instead of on a row of its own. */
+  .thabaal-portal header.top:has(> .tools > [data-icon]) {
+    position: relative;
+  }
+  .thabaal-portal header.top:has(> .tools > [data-icon]) > div:first-child {
+    padding-right: 52px;
+  }
+  .thabaal-portal header.top .tools > [data-icon] {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+  .thabaal-portal header.top .tools > :is(a, button):not([aria-haspopup]):not([data-icon]) {
     flex: 1 1 auto;
     justify-content: center;
     padding-inline: 12px;
