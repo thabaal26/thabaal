@@ -60,14 +60,14 @@ const I = {
   ),
 };
 
-export function AdminNav({ payments, newAccounts }: { payments: number; newAccounts: number }) {
+export function AdminNav({ payments, newAccounts, leadsDue = 0 }: { payments: number; newAccounts: number; leadsDue?: number }) {
   const path = usePathname();
   const groups: { title: string; items: Item[] }[] = [
     {
       title: "Business",
       items: [
         { href: "/admin", label: "Overview", icon: I.home },
-        { href: "/admin/enquiries", label: "Enquiries", icon: I.leads, soon: true },
+        { href: "/admin/enquiries", label: "Enquiries", icon: I.leads, count: leadsDue },
       ],
     },
     {

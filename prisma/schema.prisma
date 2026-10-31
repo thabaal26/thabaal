@@ -106,6 +106,8 @@ model Client {
   sheetLink           SheetLink?
   sheetLogs           SheetLog[]
   usage               UsageDay[]
+  /// The enquiry this business came from (admin › Enquiries › Make it a business).
+  lead                Lead?
   /// Win-back: customers whose last order is this many days old are tagged "lapsed" and sent winbackTemplate once.
   lapsedDays          Int               @default(60)
   winbackTemplateId   String?
@@ -196,6 +198,8 @@ model User {
   client       Client?      @relation(fields: [clientId], references: [id], onDelete: Cascade)
   createdAt    DateTime     @default(now())
   usage        UsageDay[]
+  /// Enquiries this admin follows up.
+  leads        Lead[]
 }
 
 model Customer {
@@ -766,6 +770,57 @@ model RazorpayRecord {
 }
 
 /// Razorpay webhook events already handled (x-razorpay-event-id).
+/// A shop that asked about thabaal (admin panel › Enquiries; lib/leads.ts), from first contact to paying business.
+model Lead {
+  id        String         @id @default(cuid())
+  shop      String
+  person    String?
+  /// Indian mobile, 10 digits.
+  phone     String
+  town      String?
+  sells     String?
+  /// Where it came from: lib/lead-stages.ts LEAD_SOURCES.
+  source    String
+  /// The plan they asked about (starter | growth | business).
+  plan      String?
+  /// new | contact | demo | quote | won | lost (lib/lead-stages.ts).
+  stage     String         @default("new")
+  /// The furthest stage it ever got to before won or lost, for the funnel.
+  reached   String         @default("new")
+  /// What they asked for, in their words.
+  note      String?
+  /// The next follow-up day; empty once won or lost.
+  nextOn    DateTime?      @db.Date
+  ownerId   String?
+  owner     User?          @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  /// The business it became.
+  clientId  String?        @unique
+  client    Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  closedAt  DateTime?
+  createdBy String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  activity  LeadActivity[]
+
+  @@index([stage])
+  @@index([nextOn])
+  @@index([phone])
+}
+
+/// What happened with an enquiry: created, calls, stage moves, follow-up dates, edits, conversion.
+model LeadActivity {
+  id        String   @id @default(cuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  /// created | call | stage | next | edit | converted
+  kind      String
+  text      String
+  by        String
+  createdAt DateTime @default(now())
+
+  @@index([leadId, createdAt])
+}
+
 /// What a business's logins did on one day (lib/usage-record.ts), for the admin panel's Usage page: sections
 /// opened ('open'), actions done ('press') and sign-ins ('login'). Thabaal's own logins are never counted.
 model UsageDay {
