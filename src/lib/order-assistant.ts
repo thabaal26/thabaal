@@ -97,18 +97,43 @@ const today = () => formatInTimeZone(new Date(), APP_TZ, "d MMM, h:mm a");
 export const STATUS_RE =
   /\b(where|when|status|track|tracking|update)\b[^.?!]*\b(order|parcel|delivery|package|items?)\b|\b(order|parcel|delivery)\b[^.?!]*\b(status|where|when|update|come|reach|arrive)\b|\b(enga|eppo|eppa|epo|eppadi)\b[^.?!]*\b(order|parcel|varum|irukku)\b|\border\s+(enna\s+)?(aachu|achu|aayiduchu)\b|எப்போ\s*வரும்|எங்கே|ஆர்டர்\s*என்ன/i;
 
-/** The customer's order to talk about: the newest one that isn't cancelled, or was delivered in the last 3 days. */
-export async function currentOrder(customerId: string) {
-  const o = await db.order.findFirst({
+/** At most this many orders in one reply. */
+const MAX_LISTED = 5;
+
+/**
+ * The customer's orders to talk about, newest first: not cancelled, from the last 14 days, and a delivered one only
+ * for 3 days after delivery. A customer often has more than one going at once.
+ */
+export async function currentOrders(customerId: string) {
+  const list = await db.order.findMany({
     where: { customerId, status: { not: "CANCELLED" }, createdAt: { gte: new Date(Date.now() - 14 * DAY) } },
     orderBy: { createdAt: "desc" },
+    take: 20,
     include: { customer: true, client: { select: { name: true } } },
   });
-  if (!o) return null;
-  if (o.status === "DELIVERED" && (o.deliveredAt ?? o.updatedAt).getTime() < Date.now() - 3 * DAY) return null;
-  return o;
+  return list.filter((o) => !(o.status === "DELIVERED" && (o.deliveredAt ?? o.updatedAt).getTime() < Date.now() - 3 * DAY));
+}
+/** The newest of them. */
+export async function currentOrder(customerId: string) {
+  return (await currentOrders(customerId))[0] ?? null;
 }
 type Current = NonNullable<Awaited<ReturnType<typeof currentOrder>>>;
+
+/**
+ * The order a message names, when it names exactly one: "QS-1002", "qs1002", "#1002" or "1002" (the number on its own,
+ * not part of a phone number or a longer number). Null when it names none, or several.
+ */
+export function mentionedOrder<T extends { number: number; ref: string | null }>(text: string, orders: T[]): T | null {
+  const t = text.toUpperCase();
+  const squashed = t.replace(/[\s#-]/g, "");
+  const hits = orders.filter((o) => {
+    const ref = orderRef(o).toUpperCase();
+    if (squashed.includes(ref.replace(/[\s-]/g, ""))) return true;
+    const digits = /(\d+)$/.exec(ref)?.[1];
+    return !!digits && digits.length >= 3 && new RegExp(`(^|[^\\d])${digits}([^\\d]|$)`).test(t);
+  });
+  return hits.length === 1 ? hits[0] : null;
+}
 
 /** One line about where the order stands, and what (if anything) the customer should do. */
 async function statusText(o: Current): Promise<string | "choice"> {
@@ -136,18 +161,39 @@ async function statusText(o: Current): Promise<string | "choice"> {
   return `We've received your order ${ref} and our team will confirm it shortly.`;
 }
 
-/** Answers "where is my order?". Returns true when it replied (or a reply went out a moment ago). */
-export async function replyWithStatus(c: Cust, opts: { greeting?: boolean } = {}) {
-  const o = await currentOrder(c.id);
-  if (!o) {
+/**
+ * Answers "where is my order?". With one order, its status; with several, all of them in one message (the customer
+ * may mean any of them), unless the message names one. Returns true when it replied (or one went out a moment ago).
+ */
+export async function replyWithStatus(c: Cust, opts: { greeting?: boolean; text?: string } = {}) {
+  const all = await currentOrders(c.id);
+  if (!all.length) {
     if (opts.greeting) return false; // a plain hello with no order: the catalogue answers it
     if (await sentRecently(c.id, STATUS_REPLY, 10 * MIN)) return true;
     await textInWindow(c, `${hello(c.name)} we couldn't find an open order for this number. If you ordered from another number, please send it here and our team will check.`, STATUS_REPLY);
     return true;
   }
+  const named = opts.text ? mentionedOrder(opts.text, all) : null;
   // A hello after delivery is a new conversation: the catalogue answers it, not an old order.
-  if (opts.greeting && o.status === "DELIVERED") return false;
-  if (await sentRecently(c.id, STATUS_REPLY, 10 * MIN)) return true;
+  const list = named ? [named] : opts.greeting ? all.filter((x) => x.status !== "DELIVERED") : all;
+  if (!list.length) return false;
+  // Asked twice in a row: one answer. Naming a particular order always gets its answer.
+  if (!named && (await sentRecently(c.id, STATUS_REPLY, 10 * MIN))) return true;
+  if (list.length > 1) {
+    const shown = list.slice(0, MAX_LISTED);
+    const lines = await Promise.all(
+      shown.map(async (x) => {
+        const s = await statusText(x);
+        return s === "choice" ? `Your order ${bold(orderRef(x))} is ready. Please choose how you'd like to pay in the message about it above.` : s;
+      }),
+    );
+    const head = `${opts.greeting ? `${hello(c.name)} you` : "You"} have ${bold(`${list.length} orders`)} with us right now:`;
+    const more = list.length > MAX_LISTED ? `\n\n…and ${list.length - MAX_LISTED} more.` : "";
+    const tail = `\n\nAsking about one of them? Send its order number, for example ${bold(orderRef(shown[0]))}.`;
+    await textInWindow(c, `${head}\n\n${lines.map((l) => `• ${l}`).join("\n\n")}${more}${tail}`, STATUS_REPLY);
+    return true;
+  }
+  const o = list[0];
   const text = await statusText(o);
   if (text === "choice") {
     const r = await sendPaymentChoicePrompt(o.id);
@@ -164,20 +210,68 @@ export async function replyWithStatus(c: Cust, opts: { greeting?: boolean } = {}
 export const CANCEL_RE =
   /^\s*(please\s+)?(cancel|cancel\s+(my|the|this)\s+order|cancel\s+order|order\s+cancel|i\s+want\s+to\s+cancel(\s+(my|the|this))?(\s+order)?|cancel\s+pannunga|cancel\s+pannu|cancel\s+it|venaam|vendam|வேண்டாம்|ரத்து\s*செய்)\s*(please|pls)?\s*[.!]*\s*$/i;
 
-/** The newest order the customer could be asking to cancel. */
-async function cancellableOrder(customerId: string) {
-  return db.order.findFirst({
+/** A cancel that may name an order: "cancel QS-1002", "please cancel order 1002". */
+const CANCEL_WORD_RE = /\bcancel\w*\b|வேண்டாம்|ரத்து/i;
+
+/** The orders the customer could be asking to cancel, newest first (not on the way yet). */
+async function cancellableOrders(customerId: string) {
+  return db.order.findMany({
     where: { customerId, status: { in: ["NEW", "CONFIRMED", "PAID"] }, dispatchedAt: null, createdAt: { gte: new Date(Date.now() - 14 * DAY) } },
     orderBy: { createdAt: "desc" },
+    take: 20,
     include: { customer: true, client: { select: { name: true } } },
   });
 }
+type Cancellable = Awaited<ReturnType<typeof cancellableOrders>>[number];
 
-/** "cancel" with an order open: confirm first (or tell staff when money is in or it's packed). False: no order to cancel. */
+/** The items of an order in a few words, for a list ("Coconut oil 1L × 2, Ghee +1 more"). */
+function itemsLine(items: unknown) {
+  const list = Array.isArray(items) ? (items as { name?: string; quantity?: number }[]) : [];
+  const words = list.slice(0, 2).map((i) => `${i.name ?? "item"}${(i.quantity ?? 1) > 1 ? ` × ${i.quantity}` : ""}`);
+  return (words.join(", ") + (list.length > 2 ? ` +${list.length - 2} more` : "")).slice(0, 80) || "your items";
+}
+
+/**
+ * "cancel" with an order open: confirm first (or tell staff when money is in or it's packed). With several orders it
+ * asks which one (a button for each of the newest three), unless the message names one. False: no order to cancel.
+ */
 export async function handleCancelRequest(c: Cust, text: string) {
-  if (!CANCEL_RE.test(text)) return false;
-  const o = await cancellableOrder(c.id);
-  if (!o) return false;
+  const plain = CANCEL_RE.test(text);
+  if (!plain && !CANCEL_WORD_RE.test(text)) return false;
+  const open = await cancellableOrders(c.id);
+  const named = mentionedOrder(text, open);
+  if (!plain && !named) {
+    // "cancel 1002" for an order that is already on its way or delivered: say so, and ask staff to call.
+    const other = mentionedOrder(text, await currentOrders(c.id));
+    if (!other) return false;
+    const ref = bold(orderRef(other));
+    if (other.status === "DELIVERED") {
+      await textInWindow(c, `Your order ${ref} was already delivered. If something isn't right with it, tell us here and our team will sort it out.`, "Cancel request").catch(() => {});
+    } else {
+      await db.order.update({ where: { id: other.id }, data: { internalNote: appendNote(other.internalNote, `Customer asked to cancel on WhatsApp after dispatch (${today()}): please call them`) } });
+      await textInWindow(c, `Your order ${ref} is already on its way, so it can't be cancelled here. Our team will call you to help.`, "Cancel request").catch(() => {});
+    }
+    return true;
+  }
+  if (!open.length) return false;
+  if (!named && open.length > 1) {
+    const shown = open.slice(0, MAX_LISTED);
+    const lines = shown.map((x) => `• ${bold(orderRef(x))}: ${bold(money(x.total, x.currency))}, ${itemsLine(x.items)}`).join("\n");
+    const others = open.length > 3 ? ` Tap one, or reply ${bold(`cancel ${orderRef(open[3])}`)} for another.` : "";
+    await sendButtons(
+      c,
+      "Cancel request",
+      `You have ${open.length} orders that can still be cancelled:\n\n${lines}\n\nWhich one should we cancel?${others}`,
+      open.slice(0, 3).map((x) => ({ id: `ocancel_pick:${x.id}`, title: orderRef(x).slice(0, 20) })),
+      { header: "Which order?", footer: open[0].client.name },
+    );
+    return true;
+  }
+  return confirmCancel(c, named ?? open[0]);
+}
+
+/** "Cancel order X?" Yes / No; when it's paid or packed, staff are asked to call instead. */
+async function confirmCancel(c: Cust, o: Cancellable) {
   const ref = orderRef(o);
   const paid = Boolean(o.paidAt || (o.paidAmount ?? 0) > 0);
   if (paid || o.packedAt) {
@@ -286,6 +380,13 @@ export async function handleAssistantButton(c: Cust, actionVal: string, text: st
     case "ocancel_no":
       await answerCancel(c.id, id, kind === "ocancel_yes");
       return true;
+    case "ocancel_pick": {
+      // One of several orders picked to cancel: the usual question for it, if it can still be cancelled.
+      const o = (await cancellableOrders(c.id)).find((x) => x.id === id);
+      if (o) await confirmCancel(c, o);
+      else await textInWindow(c, "That order can't be cancelled here any more. Reply here and our team will help.", "Cancel request").catch(() => {});
+      return true;
+    }
     case "fb_ok":
     case "fb_bad":
       await answerFeedback(c.id, id, kind === "fb_ok");
@@ -325,13 +426,21 @@ const addTag = (c: Tagged, tag: string) =>
 async function reportProblem(c: Tagged, text: string, opensAt: string | null) {
   const shop = await shopInfoFor(c.clientId);
   await addTag(c, "issue-open");
-  const o = await db.order.findFirst({ where: { customerId: c.id, createdAt: { gte: new Date(Date.now() - 30 * DAY) } }, orderBy: { createdAt: "desc" } });
+  // The order it's about: the one the message names; else the one they received last; else the newest.
+  const recent = await db.order.findMany({ where: { customerId: c.id, createdAt: { gte: new Date(Date.now() - 30 * DAY) } }, orderBy: { createdAt: "desc" }, take: 20 });
+  const named = mentionedOrder(text, recent);
+  const received = recent
+    .filter((x) => x.status === "DELIVERED" || x.status === "DISPATCHED")
+    .sort((a, b) => (b.deliveredAt ?? b.dispatchedAt ?? b.updatedAt).getTime() - (a.deliveredAt ?? a.dispatchedAt ?? a.updatedAt).getTime());
+  const o = named ?? received[0] ?? recent[0];
   if (o) {
     await db.order.update({ where: { id: o.id }, data: { internalNote: appendNote(o.internalNote, `Customer reported a problem on WhatsApp (${today()}): "${text.trim().slice(0, 160)}"`) } });
     pushOrderToSheet(o.id, "ORDER_UPDATE", "Customer reported a problem");
   }
-  if (await sentRecently(c.id, PROBLEM_REPLY, 2 * HOUR)) return true;
-  await textInWindow(c, problemText(shop, c.name, opensAt), PROBLEM_REPLY).catch(() => {});
+  if (!named && (await sentRecently(c.id, PROBLEM_REPLY, 2 * HOUR))) return true;
+  // Several orders lately: say which one it was noted on, so they can correct it.
+  const which = o && recent.length > 1 ? `\n\nWe've noted it on your order ${bold(orderRef(o))}.${named ? "" : " If it's about a different order, send its order number."}` : "";
+  await textInWindow(c, `${problemText(shop, c.name, opensAt)}${which}`, PROBLEM_REPLY).catch(() => {});
   return true;
 }
 
@@ -390,9 +499,10 @@ export async function handleAssistantText(
 
   // Something wrong with an order comes before everything else: it's the message that loses a customer if ignored.
   if (intent === "notArrived") {
-    const o = await currentOrder(c.id);
+    const all = await currentOrders(c.id);
+    const named = mentionedOrder(text, all);
     // Still on its way (or being prepared): the honest answer is where it is. Delivered but not received: a problem.
-    if (o && o.status !== "DELIVERED") return replyWithStatus(c);
+    if (named ? named.status !== "DELIVERED" : all.some((x) => x.status !== "DELIVERED")) return replyWithStatus(c, { text });
     return reportProblem(c, text, opensAt);
   }
   if (intent === "problem") return reportProblem(c, text, opensAt);
@@ -402,7 +512,9 @@ export async function handleAssistantText(
     const shop = await shopInfoFor(c.clientId);
     return once(c, CALL_REPLY, 2 * HOUR, () => humanText(shop, c.name, opensAt));
   }
-  if (isText && STATUS_RE.test(text)) return replyWithStatus(c);
+  if (isText && STATUS_RE.test(text)) return replyWithStatus(c, { text });
+  // Just an order number ("QS-1002?", "1002 enna aachu"): that order's status.
+  if (isText && !intent && mentionedOrder(text, await currentOrders(c.id))) return replyWithStatus(c, { text });
 
   // Questions the shop's own settings answer: hours, delivery, payment, where the shop is.
   if (intent === "hours" || intent === "delivery" || intent === "payment" || intent === "location") {
