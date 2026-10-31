@@ -70,20 +70,48 @@ await check(2, "every section opens to look around (no padlocks, no lock screen)
   return seen.join(", ");
 });
 
-await check(3, "trying a change (Add customer) shows the popup, and nothing is saved", async () => {
+await check(3, "pressing a button (Add customer) shows the popup straight away; the form never opens", async () => {
   await go(m, "/dashboard/customers");
   await m.getByRole("button", { name: /^Add/ }).first().click();
-  const d = m.getByRole("dialog").filter({ hasText: "Add customer" }).last();
-  await d.getByLabel("Name").fill("QA Locked Customer");
-  await d.getByLabel("WhatsApp number").fill(PHONE);
-  await d.getByRole("button", { name: "Add customer" }).click();
   await popup(m).waitFor({ state: "visible", timeout: 10_000 });
-  expect(!(await db.customer.findFirst({ where: { clientId: S.otherId, phone: PHONE } })), "customer was saved while unpaid");
+  expect(!(await m.getByRole("dialog").filter({ hasText: "WhatsApp number" }).count()), "the Add customer form opened");
   expect((await popup(m).getByRole("link", { name: "Start subscription" }).getAttribute("href"))?.includes("/dashboard/account"), "subscribe link");
-  return "refused, popup shown";
+  await popup(m).getByRole("button", { name: "Not now" }).click();
+  return "popup";
 });
 
-await check(4, "Start subscription goes to My account", async () => {
+await check(31, "moving around still works: a tab switches without the popup", async () => {
+  await go(m, "/dashboard/campaigns");
+  const tab = m.getByRole("tab").nth(1);
+  if (!(await tab.count())) return "no tabs on this page";
+  await tab.click();
+  await m.waitForTimeout(500);
+  expect(!(await popup(m).isVisible()), "popup on a tab");
+  return "tab ok";
+});
+
+await check(32, "a switch in Settings shows the popup", async () => {
+  await go(m, "/dashboard/settings");
+  const sw = m.locator("#main [role='switch']").first();
+  if (!(await sw.count())) return "no switch on Settings";
+  const before = await sw.getAttribute("aria-checked");
+  await sw.click();
+  await popup(m).waitFor({ state: "visible", timeout: 10_000 });
+  expect((await sw.getAttribute("aria-checked")) === before, "the switch changed");
+  return "popup, switch unchanged";
+});
+
+await check(33, "nothing was saved for the unpaid business", async () => {
+  // The server refusing writes while unpaid is checked by tests/qa/action-guards.mjs and the unit tests.
+  await popup(m).getByRole("button", { name: "Not now" }).click().catch(() => {});
+  await go(m, "/dashboard/customers");
+  expect(!(await db.customer.findFirst({ where: { clientId: S.otherId, phone: PHONE } })), "customer exists");
+  return "nothing saved";
+});
+
+await check(4, "Start subscription goes to My account, where buttons work (no popup)", async () => {
+  await go(m, "/dashboard/customers");
+  await m.getByRole("button", { name: /^Add/ }).first().click();
   await popup(m).getByRole("link", { name: "Start subscription" }).click();
   await m.waitForURL(/\/dashboard\/account/, { timeout: 15_000 });
   return new URL(m.url()).pathname;

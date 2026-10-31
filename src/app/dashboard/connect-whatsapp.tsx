@@ -27,7 +27,7 @@ export async function ConnectWhatsApp() {
     if (!(await senderFor(clientId)).cfg.notConnected) {
       if (!(await attachedRecently(clientId))) return null;
       return (
-        <div className="card" style={{ marginBottom: 16, borderLeft: "6px solid var(--ok)" }}>
+        <div data-lock-free className="card" style={{ marginBottom: 16, borderLeft: "6px solid var(--ok)" }}>
           <div className="hd">
             <div>
               <h2 style={{ fontSize: 17 }}>WhatsApp is connected</h2>
@@ -43,7 +43,7 @@ export async function ConnectWhatsApp() {
     const url = metaSignupUrl();
 
     return (
-      <div className="card" style={{ marginBottom: 16, borderLeft: "6px solid var(--bar2)" }}>
+      <div data-lock-free className="card" style={{ marginBottom: 16, borderLeft: "6px solid var(--bar2)" }}>
         <div className="hd">
           <div>
             <h2 style={{ fontSize: 17 }}>{waiting ? "Finish on Meta's page" : "Connect your WhatsApp"}</h2>

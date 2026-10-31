@@ -30,7 +30,23 @@ export function PlanLockPopup({ canPay }: { canPay: boolean }) {
     } catch {
       // Storage blocked: the popup still comes with the first change they try.
     }
-    return () => window.removeEventListener(PLAN_LOCKED_EVENT, open);
+    // Any button or switch on a page (outside My account) answers with the popup before it does anything.
+    // Moving around stays open: links, the menu, tabs, filters (aria-pressed), "more" toggles (aria-expanded),
+    // search boxes and typing, and anything marked data-lock-free (the Connect WhatsApp card).
+    const onClick = (e: MouseEvent) => {
+      if (onAccount) return;
+      const el = (e.target as Element | null)?.closest?.("button, [role='switch'], input[type='submit']");
+      if (!el || !el.closest("#main") || el.closest("[data-testid='plan-lock-popup'], [data-lock-free], [role='tablist']")) return;
+      if (el.getAttribute("role") === "tab" || el.hasAttribute("aria-pressed") || el.hasAttribute("aria-expanded")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      open();
+    };
+    document.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener(PLAN_LOCKED_EVENT, open);
+      document.removeEventListener("click", onClick, true);
+    };
   }, [onAccount]);
 
   const close = () => ref.current?.close();
