@@ -1,7 +1,7 @@
 // Loyalty points: how they're earned, what they're worth, and that offers never promise more than the balance.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { applyManualLoyaltyDelta, computeCustomerLoyalty, loyaltyFromOrders } from "../../src/lib/loyalty";
+import { applyManualLoyaltyDelta, computeCustomerLoyalty, DEFAULT_LOYALTY_RULES, loyaltyFromOrders, loyaltyRules, pointsForOrder } from "../../src/lib/loyalty";
 import { getOrderPricing, pointsDiscount } from "../../src/lib/order-pricing";
 
 const base = { name: "Meena R", brandName: "Test Shop" };
@@ -85,5 +85,58 @@ describe("loyalty points", () => {
   test("the vip tag is added once a customer reaches 250 points", () => {
     assert.deepEqual(applyManualLoyaltyDelta(["regular"], 100, 260), ["regular", "loyalty-bonus:100", "vip"]);
     assert.deepEqual(applyManualLoyaltyDelta(["regular"], 100, 200), ["regular", "loyalty-bonus:100"]);
+  });
+
+  test("each shop's own rules: a different rate and bonus, or either one turned off", () => {
+    const orders = [
+      { id: "a", total: 1000, status: "DELIVERED", paidAt: new Date(), paymentMethod: null, internalNote: null, pointsRedeemed: 0 },
+      { id: "b", total: 500, status: "DELIVERED", paidAt: new Date(), paymentMethod: null, internalNote: null, pointsRedeemed: 0 },
+      { id: "c", total: 900, status: "NEW", paidAt: null, paymentMethod: null, internalNote: null, pointsRedeemed: 0 },
+    ];
+    const c = { name: "Meena R", orders };
+    // Defaults: ₹1,500 → 15 + 50 repeat bonus.
+    assert.equal(loyaltyFromOrders(c).totalPoints, 65);
+    assert.equal(loyaltyFromOrders(c, { rules: DEFAULT_LOYALTY_RULES }).totalPoints, 65);
+    // 1 point per ₹50 and +20 per repeat order.
+    const custom = { earnOn: true, rupeesPerPoint: 50, repeatOn: true, repeatBonus: 20 };
+    assert.equal(loyaltyFromOrders(c, { rules: custom }).totalPoints, 50);
+    // Repeat bonus off: spend points only. Spend off: bonus only. Both off: nothing new.
+    assert.equal(loyaltyFromOrders(c, { rules: { ...custom, repeatOn: false } }).totalPoints, 30);
+    assert.equal(loyaltyFromOrders(c, { rules: { ...custom, earnOn: false } }).totalPoints, 20);
+    const none = loyaltyFromOrders({ ...c, tags: ["loyalty-bonus:100"] }, { rules: { ...custom, earnOn: false, repeatOn: false } });
+    assert.equal(none.totalPoints, 100); // hand-given points stay
+    assert.equal(none.redeemableRupees, 50); // and are worth the same
+  });
+
+  test("checkout uses the shop's rules for what a customer can take off", () => {
+    const orders = [
+      { id: "a", total: 4000, status: "DELIVERED", paidAt: new Date(), paymentMethod: null, internalNote: null, pointsRedeemed: 0 },
+      { id: "new", total: 800, status: "NEW", paidAt: null, paymentMethod: null, internalNote: null, pointsRedeemed: 0 },
+    ];
+    const c = { name: "Meena R", orders };
+    assert.equal(loyaltyFromOrders(c, { exceptOrderId: "new" }).redeemableRupees, 0); // 40 points: below 50
+    assert.equal(loyaltyFromOrders(c, { exceptOrderId: "new", rules: { ...DEFAULT_LOYALTY_RULES, rupeesPerPoint: 20 } }).redeemableRupees, 100); // 200 points
+    assert.equal(loyaltyFromOrders(c, { exceptOrderId: "new", rules: { ...DEFAULT_LOYALTY_RULES, rupeesPerPoint: 1 } }).redeemableRupees, 250); // capped
+  });
+
+  test("rules read from the database fall back to the defaults when missing or out of range", () => {
+    assert.deepEqual(loyaltyRules(null), DEFAULT_LOYALTY_RULES);
+    assert.deepEqual(loyaltyRules({ loyaltyEarnOn: false, loyaltyRupeesPerPoint: 0, loyaltyRepeatOn: true, loyaltyRepeatBonus: 2.5 }), {
+      earnOn: false,
+      rupeesPerPoint: 100,
+      repeatOn: true,
+      repeatBonus: 50,
+    });
+    assert.equal(pointsForOrder(1250, 1), 12);
+    assert.equal(pointsForOrder(1250, 2), 62);
+    assert.equal(pointsForOrder(1250, 2, { earnOn: false, rupeesPerPoint: 100, repeatOn: true, repeatBonus: 30 }), 30);
+  });
+
+  test("the first-order invite only mentions rules that are on", () => {
+    const off = computeCustomerLoyalty({ ...base, paidOrdersCount: 0, totalSpent: 0, rules: { ...DEFAULT_LOYALTY_RULES, earnOn: false, repeatOn: false } });
+    assert.doesNotMatch(off.whatsappOfferCopy, /point/);
+    const on = computeCustomerLoyalty({ ...base, paidOrdersCount: 0, totalSpent: 0, rules: { ...DEFAULT_LOYALTY_RULES, rupeesPerPoint: 200, repeatOn: false } });
+    assert.match(on.whatsappOfferCopy, /1 point for every ₹200/);
+    assert.doesNotMatch(on.whatsappOfferCopy, /repeat/);
   });
 });

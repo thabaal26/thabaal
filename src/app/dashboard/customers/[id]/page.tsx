@@ -29,6 +29,7 @@ import { T } from "../../portal-ui";
 import { CallButton } from "./call-button";
 import { PausedOffersNote } from "./paused-offers-note";
 import { PurchaseJourney } from "./purchase-journey";
+import { LOYALTY_RULE_FIELDS, loyaltyRules } from "@/lib/loyalty";
 import { SendPanel } from "./send-panel";
 import { planGate } from "@/app/dashboard/plan-lock";
 import { isSale } from "@/lib/sale";
@@ -45,7 +46,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
   const c = await db.customer.findFirst({
     where: { id, ...owned(scope) },
     include: {
-      client: { select: { name: true, homeCity: true, customFields: true } },
+      client: { select: { name: true, homeCity: true, customFields: true, ...LOYALTY_RULE_FIELDS } },
       messages: { include: { run: { select: { campaign: { select: { name: true } } } }, sender: { select: { label: true } } }, orderBy: { createdAt: "desc" }, take: 100 },
       replies: { include: { sender: { select: { label: true } } }, orderBy: { receivedAt: "desc" }, take: 100 },
       orders: { orderBy: { createdAt: "desc" }, take: 100 },
@@ -234,6 +235,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
             replies={c.replies}
             readDates={c.messages.map((m) => m.readAt).filter((d): d is Date => d !== null)}
             sheetPurchases={c.purchases}
+            rules={loyaltyRules(c.client)}
           />
 
           <Card className="card-3d overflow-hidden">

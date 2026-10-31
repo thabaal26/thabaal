@@ -16,7 +16,7 @@ import { homeCityOf, regionsFor } from "@/lib/regions";
 import { getScope, owned, ownedMessages } from "@/lib/session";
 import { numberHealth } from "@/lib/limits";
 import { analyzeCartMentality } from "@/lib/cart-mentality";
-import { computeCustomerLoyalty } from "@/lib/loyalty";
+import { computeCustomerLoyalty, loyaltyRules } from "@/lib/loyalty";
 import { refillForecast } from "@/lib/refill-forecast";
 import type { OrderItem } from "@/lib/orders";
 import { cancelRun, runDispatcherNow } from "./actions/campaigns";
@@ -1534,6 +1534,7 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
       unpaidCartValue: custUnpaidVal,
       daysSinceLastOrder,
       avgGapDays,
+      rules: loyaltyRules(client),
       redeemedPoints: custOrders.reduce((n, o) => n + (o.status !== "CANCELLED" ? ((o as { pointsRedeemed?: number | null }).pointsRedeemed ?? 0) : 0), 0),
     });
 
@@ -1581,6 +1582,7 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
 
   const topFrequentCustomersData: TopFrequentCustomersData = {
     canManage: scope.canManage,
+    rules: loyaltyRules(client),
     totalBuyersCount: Math.max(totalEverBuyers, totalBuyersWithSpend),
     frequentBuyersCount: rankedCustomersList.filter((c) => c.loyalty.isFrequentBuyer).length,
     topSpendersCount: rankedCustomersList.filter((c) => c.loyalty.isTopCustomer).length,

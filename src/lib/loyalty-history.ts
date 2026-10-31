@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
-import { isBoughtOrder, RUPEES_PER_POINT } from "@/lib/loyalty";
+import { isBoughtOrder, pointsForOrder } from "@/lib/loyalty";
+import { loyaltyRulesFor } from "@/lib/loyalty-rules";
 import { orderRef } from "@/lib/order-ref";
 
 /** One line of Customers › Loyalty › Point history. */
@@ -18,11 +19,11 @@ export type PointEvent = {
 
 /**
  * Every points change for a client's customers, newest first: points the rule gave on each bought order
- * (1 per ₹100, +50 from the second order), points used on orders that still stand, and the hand changes
+ * (the shop's rules: by default 1 per ₹100, +50 from the second order), points used on orders that still stand, and the hand changes
  * saved in LoyaltyEntry. Worked out from the same rows as the balance, so the two agree.
  */
 export async function loyaltyHistory(clientId: string, limit = 400): Promise<PointEvent[]> {
-  const [orders, entries] = await Promise.all([
+  const [orders, entries, rules] = await Promise.all([
     db.order.findMany({
       where: { clientId },
       orderBy: { createdAt: "asc" },
@@ -32,6 +33,7 @@ export async function loyaltyHistory(clientId: string, limit = 400): Promise<Poi
     db.loyaltyEntry
       .findMany({ where: { clientId }, orderBy: { createdAt: "desc" }, take: limit, include: { customer: { select: { name: true } } } })
       .catch(() => []),
+    loyaltyRulesFor(clientId),
   ]);
 
   const events: PointEvent[] = [];
@@ -41,7 +43,7 @@ export async function loyaltyHistory(clientId: string, limit = 400): Promise<Poi
     if (isBoughtOrder(o)) {
       const n = (boughtSoFar.get(o.customer.id) ?? 0) + 1;
       boughtSoFar.set(o.customer.id, n);
-      const pts = Math.floor(o.total / RUPEES_PER_POINT) + (n > 1 ? 50 : 0);
+      const pts = pointsForOrder(o.total, n, rules);
       if (pts > 0)
         events.push({
           id: `e-${o.id}`,
@@ -50,7 +52,9 @@ export async function loyaltyHistory(clientId: string, limit = 400): Promise<Poi
           name: o.customer.name,
           kind: "auto",
           what: `Earned on order #${ref}`,
-          why: n > 1 ? `1 point per ₹${RUPEES_PER_POINT} · +50 for a repeat order` : `1 point per ₹${RUPEES_PER_POINT}`,
+          why: [rules.earnOn ? `1 point per ₹${rules.rupeesPerPoint.toLocaleString("en-IN")}` : null, rules.repeatOn && n > 1 ? `+${rules.repeatBonus} for a repeat order` : null]
+            .filter(Boolean)
+            .join(" · "),
           points: pts,
           by: "Automatic",
         });

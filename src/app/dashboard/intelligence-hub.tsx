@@ -1,5 +1,7 @@
 "use client";
 
+import { DEFAULT_LOYALTY_RULES, type LoyaltyRules } from "@/lib/loyalty";
+
 import { ArrowRight, Check, Copy, MessageCircle, Search, Sparkles, Zap } from "@/components/icons";
 import Link from "@/components/intent-link";
 import { useState } from "react";
@@ -705,6 +707,8 @@ export type TopCustomerLoyaltyItem = {
 
 export type TopFrequentCustomersData = {
   canManage: boolean;
+  /** The shop's earning rules, for the "how points work" guide. */
+  rules?: LoyaltyRules;
   totalBuyersCount: number;
   frequentBuyersCount: number;
   topSpendersCount: number;
@@ -718,6 +722,7 @@ export type TopFrequentCustomersData = {
 type LeaderboardTab = "all" | "top_spenders" | "frequent" | "champions" | "hesitators";
 
 export function TopFrequentCustomersCard({ data }: { data: TopFrequentCustomersData }) {
+  const lr = data.rules ?? DEFAULT_LOYALTY_RULES;
   const [tab, setTab] = useState<LeaderboardTab>("all");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(data.customers[0]?.id ?? null);
@@ -809,8 +814,8 @@ export function TopFrequentCustomersCard({ data }: { data: TopFrequentCustomersD
           <div className="rounded-md border border-line bg-panel p-2.5">
             <p className="font-semibold text-ink">1. How Loyalty Points Are Earned</p>
             <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[11px] text-ink-2">
-              <li><strong>Order Spend:</strong> <code>1 pt</code> per <code>₹100</code> spent</li>
-              <li><strong>Repeat Frequency Bonus:</strong> <code>+50 pts</code> for every repeat paid order (2nd, 3rd, 4th+)</li>
+              <li><strong>Order Spend:</strong> {lr.earnOn ? <><code>1 pt</code> per <code>₹{lr.rupeesPerPoint.toLocaleString("en-IN")}</code> spent</> : "off"}</li>
+              <li><strong>Repeat Frequency Bonus:</strong> {lr.repeatOn ? <><code>+{lr.repeatBonus} pts</code> for every repeat paid order (2nd, 3rd, 4th+)</> : "off"}</li>
               <li><strong>Historical Sheet Orders:</strong> <code>+35 pts</code> per recorded sheet item</li>
               <li><strong>Manual Bonus:</strong> Award <code>+50 / +100 / +200 pts</code> anytime</li>
             </ul>
