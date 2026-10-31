@@ -31,6 +31,7 @@ async function regionToSave(clientId: string, picked: string | undefined, locati
 }
 
 export async function saveCustomer(id: string | null, input: CustomerInput): Promise<ActionResult> {
+  trackPress("customer.save");
   const s = id ? await requireManager() : await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
   const existing = id ? await db.customer.findFirst({ where: { id, ...owned(s) } }) : null;
@@ -156,6 +157,7 @@ function splitCsv(line: string) {
 }
 
 export async function importCustomers(csv: string, extraTags: string, optInSource = ""): Promise<ActionResult> {
+  trackPress("customer.import");
   const s = await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
   if (!optInSource.trim()) return { ok: false, message: "Note how these customers agreed to WhatsApp messages; Meta requires it." };
@@ -220,6 +222,7 @@ export async function importCustomers(csv: string, extraTags: string, optInSourc
 }
 
 import { applyManualLoyaltyDelta, LOYALTY_RULE_FIELDS, loyaltyFromOrders, loyaltyRules, parseManualLoyaltyPoints } from "@/lib/loyalty";
+import { trackPress } from "@/lib/usage";
 
 export async function setOptOut(id: string, optedOut: boolean): Promise<ActionResult> {
   const s = await requireManager();

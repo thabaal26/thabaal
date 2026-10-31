@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { businessTypeOf } from "@/lib/business-types";
+import { CITY, newClientData } from "@/lib/client-create";
 import { db } from "@/lib/db";
 import { CLIENT_SECTIONS, sanitizeDisabledSections } from "@/lib/client-sections";
 import { CLIENT_COOKIE, VIEW_PREFIX, requireAdmin } from "@/lib/session";
@@ -57,24 +58,14 @@ export async function leaveClientView(): Promise<ActionResult> {
   return { ok: true };
 }
 
-/** A city name: letters, spaces, dots, apostrophes and hyphens (e.g. "Chennai", "Tiruchirappalli"). */
-const CITY = /^[\p{L}][\p{L} .'-]{1,39}$/u;
-
 export async function createClient(name: string, disabledSections?: string[], homeCity?: string, businessType?: string): Promise<ActionResult> {
   const s = await requireAdmin();
   if ("denied" in s) return { ok: false, message: s.denied };
-  const clean = name.trim();
-  if (!clean) return { ok: false, message: "Enter the client's business name." };
-  const city = homeCity?.trim().replace(/\s+/g, " ") ?? "";
-  if (!city) return { ok: false, message: "Enter the city they deliver from, e.g. Chennai." };
-  if (!CITY.test(city)) return { ok: false, message: "Enter just the city name, e.g. Chennai." };
+  const v = newClientData({ name, city: homeCity, businessType, disabledSections });
+  if (!v.ok) return v;
+  const clean = v.name;
   if (await db.client.findUnique({ where: { name: clean } })) return { ok: false, message: `${clean} already exists.` };
-  const sanitized = sanitizeDisabledSections(disabledSections);
-  // The business type starts the client with the extra fields that kind of business usually keeps.
-  const type = businessTypeOf(businessType);
-  const c = await db.client.create({
-    data: { name: clean, planRequired: true, disabledSections: sanitized, homeCity: city, businessType: type?.id ?? null, ...(type?.starterFields.length && { customFields: type.starterFields }) },
-  });
+  const c = await db.client.create({ data: v.data });
   const prefix = await ensureOrderPrefix(c.id).catch(() => null);
   refresh();
   return { ok: true, id: c.id, message: `${clean} added.${prefix ? ` Its orders will be numbered ${prefix}-1001, ${prefix}-1002…` : ""}` };

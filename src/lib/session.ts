@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import { db } from "./db";
 import { clientAccess } from "./plan-access";
+import { recordUsage } from "./usage-record";
 
 const COOKIE = "wp_session";
 const MAX_AGE = 60 * 60 * 24 * 7; // 7 days
@@ -17,7 +18,7 @@ function secret() {
 
 export async function createSession(userId: string) {
   // The user's session version rides in the token; raising it (password change) ends older logins.
-  const u = await db.user.findUnique({ where: { id: userId }, select: { sessionVersion: true } });
+  const u = await db.user.findUnique({ where: { id: userId }, select: { sessionVersion: true, role: true, clientId: true } });
   const token = await new SignJWT({ sub: userId, sv: u?.sessionVersion ?? 0 })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -30,6 +31,8 @@ export async function createSession(userId: string) {
     path: "/",
     maxAge: MAX_AGE,
   });
+  // Every sign-in makes a session here, so this is where a business login's sign-ins are counted (Usage page).
+  if (u) await recordUsage({ id: userId, role: u.role, clientId: u.clientId }, "login", "login");
 }
 
 export async function destroySession() {
@@ -51,6 +54,14 @@ async function readSession(token?: string): Promise<{ userId: string; version: n
 
 export async function readSessionUserId(token?: string) {
   return (await readSession(token))?.userId ?? null;
+}
+
+/** The signed-in login from the cookie (still valid: version checked), or null. Never redirects. */
+export async function sessionUser() {
+  const s = await readSession((await cookies()).get(COOKIE)?.value);
+  if (!s) return null;
+  const u = await db.user.findUnique({ where: { id: s.userId }, select: { id: true, role: true, clientId: true, sessionVersion: true } });
+  return u && u.sessionVersion === s.version ? { id: u.id, role: u.role as string, clientId: u.clientId } : null;
 }
 
 /** Ends every login of this user (all devices); call after the password changes. */

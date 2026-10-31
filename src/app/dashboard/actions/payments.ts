@@ -13,6 +13,7 @@ import { paymentRef } from "@/lib/plain-error";
 import { requireOrderAccess } from "@/lib/session";
 import { notifyOrder } from "./orders";
 import type { SendResult } from "./send-helpers";
+import { trackPress } from "@/lib/usage";
 
 // Staff side of order payments: record UPI / cash / bank money (in full or in part), cash on delivery,
 // checking a customer's "I paid", refunds, and undoing a payment recorded by mistake.
@@ -44,6 +45,7 @@ export async function recordPayment(
   id: string,
   input: { method: string; amount?: number | null; reference?: string; collectedBy?: string; tell?: boolean; seenReceived?: number | null },
 ): Promise<SendResult> {
+  trackPress("payment.record");
   const r = await ownOrder(id);
   if (!r.order) return { ok: false, message: r.denied };
   const o = r.order;
@@ -140,6 +142,7 @@ export async function setPaymentMethod(id: string, method: "cod" | "upi", opts: 
 
 /** Cash on delivery handed over: records the cash (when collected) and marks it delivered with the usual thank-you. */
 export async function deliverCod(id: string, input: { collected: boolean; amount?: number | null; collectedBy?: string }): Promise<SendResult> {
+  trackPress("order.cod");
   const r = await ownOrder(id);
   if (!r.order) return { ok: false, message: r.denied };
   const o = r.order;
@@ -161,6 +164,7 @@ export async function deliverCod(id: string, input: { collected: boolean; amount
 
 /** The customer said they paid: staff checked the bank / UPI app. Received → paid; not received → ask them for the reference. */
 export async function verifyPaymentClaim(id: string, received: boolean): Promise<SendResult> {
+  trackPress("payment.verify");
   const r = await ownOrder(id);
   if (!r.order) return { ok: false, message: r.denied };
   const o = r.order;

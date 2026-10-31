@@ -44,6 +44,7 @@ const env = {
   GOOGLE_API_KEY: "",
   GROQ_API_KEY: "",
   BLOB_READ_WRITE_TOKEN: "",
+  RESEND_API_KEY: "",
   NODE_ENV: "test",
 };
 

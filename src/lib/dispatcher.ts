@@ -12,6 +12,8 @@ import { applyFailure, quietUntil, recentlyMarketed } from "./rules";
 import { sendRefillReminders } from "./refill";
 import { lockedClientIds } from "./plan-access";
 import { syncDueSheets } from "./sheets";
+import { syncAllSheets } from "./gsheet/sync";
+import { processOwnerMessages, queueAutoReminders } from "./owner-messages";
 import { campaignAudienceWhere } from "./audiences";
 import { refreshLifecycleTags, sendWinbacks } from "./lifecycle";
 import { backfillOrderNames } from "./orders";
@@ -335,12 +337,17 @@ export async function dispatch() {
   if (Date.now() < deadline) await retryHeldBack({ now, deadline }).catch((e) => console.error("Held-back retries failed", e));
   if (Date.now() < deadline) await sendRefillReminders(now, noOrders).catch((e) => console.error("Refill reminders failed", e));
   if (Date.now() < deadline) await syncDueSheets(now).catch((e) => console.error("Sheet sync failed", e));
+  // Connected Google Sheets (lib/gsheet): anything a live update missed.
+  if (Date.now() < deadline) await syncAllSheets(deadline).catch((e) => console.error("Google Sheet live sync failed", e));
   if (Date.now() < deadline) await backfillOrderNames().catch((e) => console.error("Order name backfill failed", e));
   if (Date.now() < deadline) await expireUnfinishedOrders(now, noOrders).catch((e) => console.error("Order expiry failed", e));
   if (Date.now() < deadline) await nudgeUnfinishedOrders(now, noOrders).catch((e) => console.error("Order nudges failed", e));
   if (Date.now() < deadline) await remindUnpaidOrders(now, 20, noOrders).catch((e) => console.error("Payment reminders failed", e));
   if (Date.now() < deadline) await refreshLifecycleTags().catch((e) => console.error("Lifecycle tags failed", e));
   if (Date.now() < deadline) await sendWinbacks(now, noOrders).catch((e) => console.error("Win-back failed", e));
+  // Messages from Thabaal to business owners (admin › Messages): automatic payment reminders, then anything due.
+  if (Date.now() < deadline) await queueAutoReminders(now).catch((e) => console.error("Owner reminders failed", e));
+  if (Date.now() < deadline) await processOwnerMessages(now, deadline).catch((e) => console.error("Owner messages failed", e));
   await db.setting.upsert({ where: { id: 1 }, update: { lastDispatchAt: now }, create: { id: 1, lastDispatchAt: now } });
   return { campaignsStarted, runsProcessed: runs.length, sent, failed, ms: Date.now() - startedAt };
 }

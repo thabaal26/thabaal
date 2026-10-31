@@ -25,6 +25,7 @@ import {
 import { clientAccounts, clientNumbers, senderForAccount } from "@/lib/senders";
 import { explainError } from "@/lib/meta-errors";
 import { syncedHeaderImage } from "@/lib/media";
+import { trackPress } from "@/lib/usage";
 
 export type ActionResult = { ok: boolean; message?: string; errors?: string[]; id?: string };
 
@@ -65,6 +66,7 @@ async function targetAccount(clientId: string, picked?: string | null) {
 }
 
 export async function saveTemplate(id: string | null, draft: TemplateDraft): Promise<ActionResult> {
+  trackPress("template.save");
   const s = id ? await requireManager() : await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
   // An approved template can drop its own image (it then sends the default image); Meta only needs a sample

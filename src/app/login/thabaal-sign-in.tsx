@@ -7,6 +7,7 @@ import { SignupForm } from "./signup-form";
 import { ForgotForm, ResetForm } from "./reset-forms";
 import { LoginIllustration } from "./login-illustration";
 import { LandingSections } from "./landing-sections";
+import type { PriceTable } from "@/lib/plan-prices";
 import { MascotIntro } from "./mascot-intro";
 import { ScrollDownPrompt } from "./scroll-prompt";
 import { SiteHeader } from "./site-header";
@@ -40,10 +41,13 @@ export function ThabaalSignIn({
   mode = "login",
   resetToken = "",
   resetValid = false,
+  prices,
 }: {
   mode?: "login" | "signup" | "forgot" | "reset";
   resetToken?: string;
   resetValid?: boolean;
+  /** Plan prices in force, for the pricing section (read on the server). */
+  prices?: PriceTable;
 }) {
   const syncedTheme = useSyncExternalStore(
     subscribeTheme,
@@ -162,7 +166,7 @@ export function ThabaalSignIn({
       {mode === "login" && <ScrollDownPrompt lang={lang} />}
 
       {/* What Thabaal does: features, the order journey, pricing and questions, below the sign-in. */}
-      {mode === "login" && <LandingSections lang={lang} />}
+      {mode === "login" && <LandingSections lang={lang} prices={prices} />}
     </main>
   );
 }

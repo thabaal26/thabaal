@@ -1,14 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PLANS, SUPPLIER_INFO } from "@/lib/account-plans";
+import { isDefault } from "@/lib/plan-prices";
+import { loadPlanPrices } from "@/lib/plan-prices-server";
 import { loadClientRows } from "@/lib/admin-data";
 import { db } from "@/lib/db";
 import { requireAdminPage } from "@/lib/session";
 import { GRACE_DAYS, WARN_DAYS } from "@/lib/subscription-core";
 import { PaymentSettingsForm } from "../../dashboard/wallet/wallet-forms";
 import { OpenPortalSettings } from "../support/support-tools";
-import { ComingNext, PageHead, Pill, R } from "../ui";
+import { PageHead, Pill, R } from "../ui";
+import { InviteAdmin } from "./invite-admin";
 import { PlanRequiredToggle } from "./plan-toggle";
+import { PriceEditor } from "./price-editor";
 import { razorpayStatus } from "@/lib/razorpay-billing";
 import { RazorpayTest } from "./razorpay-test";
 
@@ -17,18 +21,19 @@ export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   await requireAdminPage();
-  const [{ rows }, setting, admins, rzp] = await Promise.all([
+  const [{ rows }, setting, admins, rzp, prices] = await Promise.all([
     loadClientRows(),
     db.setting.findUnique({ where: { id: 1 } }),
     db.user.findMany({ where: { role: "ADMIN" }, select: { id: true, name: true, email: true, createdAt: true }, orderBy: { createdAt: "asc" } }),
     razorpayStatus(),
+    loadPlanPrices(),
   ]);
   const when = (d: Date) => d.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
   const paying = rows.filter((r) => r.state === "ok" || r.state === "due");
 
   return (
     <>
-      <PageHead title="Settings" sub="Plans, how businesses pay, what happens when they don't, and your team." tools={<OpenPortalSettings />} />
+      <PageHead title="Settings" sub="Plans and prices, what happens when a business doesn't pay, and your team." tools={<OpenPortalSettings />} />
       <div className="g2x">
         <div className="stack" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div className="card">
@@ -99,7 +104,7 @@ export default async function SettingsPage() {
             <div className="hd">
               <div>
                 <h2>Plans and prices</h2>
-                <p>What a new business is offered, GST included. Businesses already on a plan keep the price they paid.</p>
+                <p>What a new business is offered, GST included. Changing a price here does not change businesses already subscribed.</p>
               </div>
             </div>
             <div className="tw">
@@ -122,25 +127,30 @@ export default async function SettingsPage() {
                           {p.lim.num} numbers · {p.lim.staff} logins · {p.lim.camp} campaigns · {p.lim.tmpl} templates
                         </div>
                       </td>
-                      <td className="num">{R(p.p.m)}</td>
-                      <td className="num">{R(p.p.q)}</td>
-                      <td className="num">{R(p.p.y)}</td>
+                      <td className="num">{R(prices[p.k].m)}</td>
+                      <td className="num">{R(prices[p.k].q)}</td>
+                      <td className="num">{R(prices[p.k].y)}</td>
                       <td className="num">{paying.filter((r) => r.plan === p.k).length}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <p className="muted small" style={{ marginTop: 12 }}>
-              Prices are set in the app&apos;s code today (lib/account-plans.ts), the same list the website and My account show. Editing them here comes in phase 2.
-            </p>
+            <div className="tools" style={{ marginTop: 14 }}>
+              <PriceEditor prices={prices} />
+              <span className="muted small">
+                {setting?.planPricesAt && !isDefault(prices)
+                  ? `Changed by ${setting.planPricesBy ?? "an admin"} on ${when(setting.planPricesAt)}. The website and My account show these.`
+                  : "The original prices. The website and My account show these."}
+              </span>
+            </div>
           </div>
 
           <div className="card">
             <div className="hd">
               <div>
-                <h2>Ways a business can pay</h2>
-                <p>Online through Razorpay (added straight away), or by UPI to {SUPPLIER_INFO.vpa} with a reference you confirm under Payments.</p>
+                <h2>Wallet recharges and GST</h2>
+                <p>Plans are paid only by Razorpay auto-pay. These details are for wallet recharges and the bills.</p>
               </div>
             </div>
             <p className="muted small" style={{ marginBottom: 10 }}>
@@ -184,6 +194,9 @@ export default async function SettingsPage() {
                 <b>{SUPPLIER_INFO.email}</b>
               </div>
             </div>
+            <p className="muted small" style={{ marginTop: 12 }}>
+              Bills change to a GST tax invoice automatically once GST is switched on with a GST number under Wallet recharges and GST.
+            </p>
           </div>
         </div>
 
@@ -210,11 +223,9 @@ export default async function SettingsPage() {
                 <b>{GRACE_DAYS} days</b>
               </div>
             </div>
-            <div style={{ marginTop: 14 }}>
-              <ComingNext title="Coming in phase 2" items={["Change the grace days here", "A longer grace period for one business you trust", "One switch to stop locking anybody"]}>
-                These rules are fixed in the app today (lib/subscription-core.ts).
-              </ComingNext>
-            </div>
+            <p className="muted small" style={{ marginTop: 12 }}>
+              These are the same for every business. To never lock one business, switch off &ldquo;Needs a paid plan&rdquo; for it below.
+            </p>
           </div>
 
           <div className="card">
@@ -259,9 +270,9 @@ export default async function SettingsPage() {
                 </div>
               ))}
             </div>
-            <p className="muted small" style={{ marginTop: 12 }}>
-              Inviting another admin from here comes in phase 2. Today admin logins are created on the server.
-            </p>
+            <div className="tools" style={{ marginTop: 14 }}>
+              <InviteAdmin />
+            </div>
           </div>
         </div>
       </div>

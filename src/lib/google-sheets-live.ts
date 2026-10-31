@@ -6,6 +6,7 @@ import { APP_TZ } from "./format";
 import { itemsText, orderRef, type OrderItem } from "./orders";
 import { methodLabel, methodOf } from "./payment-state";
 import { orderStage } from "./order-flow";
+import { logSheetActivity, syncClientSheet } from "./gsheet/sync";
 
 // The client's Google Sheet live log (deploy/google-sheets/Code.gs): each event lands in its own tab.
 
@@ -143,6 +144,16 @@ export async function testSheetPush(clientId: string): Promise<{ ok: boolean; me
 export function pushToGoogleSheet(clientId: string | null | undefined, event: SheetLiveEvent, data: Record<string, unknown>): void {
   if (!clientId) return;
   later(async () => {
+    // The connected Google Sheet (lib/gsheet): a line in Activity for a button, then the sheet catches up.
+    if (event === "BUTTON_CLICK")
+      await logSheetActivity(clientId, {
+        event: `Tapped "${String(data.buttonText ?? "a button").slice(0, 60)}"`,
+        phone: typeof data.phone === "string" ? data.phone : null,
+        customer: typeof data.name === "string" ? data.name : null,
+        by: "Customer",
+      });
+    // Campaign messages arrive by the thousand: they show in Chats on the scheduler's next sync, not one by one.
+    if (event !== "CAMPAIGN_STATUS") await syncClientSheet(clientId, 20_000).catch((e) => console.warn("[gsheet] sync failed", e));
     const { hook } = await resolveHook(clientId);
     if (hook) await send(hook, event, data);
   });
@@ -169,10 +180,21 @@ export function pushOrderToSheet(orderId: string, event: "NEW_ORDER" | "ORDER_UP
       .findUnique({ where: { id: orderId }, include: { customer: { select: { name: true, phone: true, location: true } }, client: { select: { name: true } } } })
       .catch(() => null);
     if (!o) return;
-    const { hook } = await resolveHook(o.clientId);
-    if (!hook) return;
     const stage = orderStage(o);
     const status = STATUS_WORD[stage] ?? stage;
+    // The connected Google Sheet (lib/gsheet): the step in Activity, then the sheet catches up.
+    const items = (Array.isArray(o.items) ? (o.items as { name?: string; id?: string; quantity?: number }[]) : []).map((i) => `${Number(i.quantity) || 1} × ${i.name ?? i.id ?? "item"}`).join(", ");
+    await logSheetActivity(o.clientId, {
+      event: event === "NEW_ORDER" ? "Order placed" : (change ?? `Order: ${status}`),
+      details: event === "NEW_ORDER" ? `${items} · ₹${Math.round(o.total).toLocaleString("en-IN")}`.slice(0, 400) : `Now: ${status}`,
+      phone: o.customer.phone,
+      customer: o.customer.name,
+      orderRef: orderRef(o),
+      by: event === "NEW_ORDER" || /^customer/i.test(change ?? "") ? "Customer" : "Shop",
+    });
+    await syncClientSheet(o.clientId, 20_000).catch((e) => console.warn("[gsheet] sync failed", e));
+    const { hook } = await resolveHook(o.clientId);
+    if (!hook) return;
     await send(hook, event, {
       orderId: orderRef(o),
       created: formatInTimeZone(o.createdAt, APP_TZ, "yyyy-MM-dd HH:mm:ss"),

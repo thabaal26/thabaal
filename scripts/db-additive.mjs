@@ -21,6 +21,11 @@ const FILES = [
   "prisma/sql/2026-10-31-loyalty-rules.sql",
   "prisma/sql/2026-10-31-delivery-address.sql",
   "prisma/sql/2026-10-31-order-assistant.sql",
+  "prisma/sql/2026-11-01-google-sheets.sql",
+  "prisma/sql/2026-11-02-plan-prices.sql",
+  "prisma/sql/2026-11-02-usage.sql",
+  "prisma/sql/2026-11-02-leads.sql",
+  "prisma/sql/2026-11-02-owner-messages.sql",
 ];
 
 if (process.env.VERCEL !== "1") {

@@ -12,6 +12,7 @@ import { adminQueue } from "@/lib/admin-queue";
 import { razorpayReady } from "@/lib/razorpay";
 import { autoRenewView } from "@/lib/razorpay-billing";
 import { AdminPlanPanel } from "./admin-plan-panel";
+import { livePlans } from "@/lib/plan-prices-server";
 import type { AdminPendingRow, BillingView, HistoryRow, PeriodView } from "./billing-types";
 
 export const metadata: Metadata = { title: "My account" };
@@ -147,6 +148,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       usage={{ numbers, staff, campaigns: campaignsCount, templates: templatesCount }}
       billingProfile={billingProfile}
       customWorkRequests={customWorkRequests}
+      plans={await livePlans()}
       razorpay={{ enabled: razorpayReady(), autoRenew: razorpayReady() ? await autoRenewView(clientId) : null }}
       adminPanel={
         scope.isAdmin ? (

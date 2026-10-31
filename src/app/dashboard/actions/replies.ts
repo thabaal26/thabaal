@@ -4,12 +4,14 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { getScope, ownedMessages } from "@/lib/session";
 import type { ActionResult } from "./templates";
+import { trackPress } from "@/lib/usage";
 
 /**
  * Following up on replies is the client's own work, so client logins may do this
  * (only for their own customers) even though the rest of their portal is read-only.
  */
 export async function setReplyHandled(id: string, handled: boolean): Promise<ActionResult> {
+  trackPress("chat.done");
   const scope = await getScope();
   if (!scope.canOperate) return { ok: false, message: "Your login can view but not change anything." };
   const target = await db.reply.findFirst({

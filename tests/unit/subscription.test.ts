@@ -2,6 +2,7 @@
 // verified payment, and a payment made early waits for the current paid period to end.
 import assert from "node:assert/strict";
 import { before, describe, test } from "node:test";
+import { Prisma } from "@prisma/client";
 import { fromZonedTime } from "date-fns-tz";
 import { db } from "../../src/lib/db";
 import {
@@ -16,6 +17,10 @@ import {
 } from "../../src/lib/subscription";
 import { accessState, openWhenLocked, periodEnd, summarize, timeLeft, type PurchaseLike } from "../../src/lib/subscription-core";
 import { clientAccess, lockedClientIds } from "../../src/lib/plan-access";
+import { savePlanPrices } from "../../src/lib/admin-settings";
+import { loadPlanPrices } from "../../src/lib/plan-prices-server";
+import { DEFAULT_PRICES } from "../../src/lib/plan-prices";
+import { monthlyValue, renewalPrice } from "../../src/lib/admin-data";
 
 const TZ = "Asia/Kolkata";
 const ist = (s: string) => fromZonedTime(s, TZ);
@@ -317,5 +322,48 @@ describe("access: due soon, overdue, locked, never paid", () => {
     await verifyPlanPayment(admin, sent.id!, {}, later);
     assert.equal((await clientAccess(paid.id, later)).locked, false);
     assert.equal((await lockedClientIds(later)).has(paid.id), false);
+  });
+});
+
+// Prices changed from the admin panel (lib/admin-settings.ts savePlanPrices). Kept in this file so they never
+// change prices under test 2 above (test files run side by side; tests in one file run in order).
+describe("plan prices from the admin panel", () => {
+  const raised = structuredClone(DEFAULT_PRICES);
+  raised.growth = { m: 3499, q: 9447, y: 33590 };
+
+  test("30. only an admin can change prices, and bad prices are refused", async () => {
+    await db.setting.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
+    const shop = await savePlanPrices({ isAdmin: false, name: "Owner" }, raised);
+    assert.equal(shop.ok, false);
+    const cheapYear = await savePlanPrices({ isAdmin: true, name: "Admin" }, { ...raised, growth: { m: 3499, q: 9447, y: 9000 } });
+    assert.equal(cheapYear.ok, false, "12 months cheaper than 3 months");
+    const dearer = await savePlanPrices({ isAdmin: true, name: "Admin" }, { ...raised, growth: { m: 3499, q: 11000, y: 33590 } });
+    assert.equal(dearer.ok, false, "3 months dearer than 3 monthly payments");
+    assert.deepEqual(await loadPlanPrices(), DEFAULT_PRICES, "nothing saved");
+  });
+
+  test("31. a new price applies to new payments; periods already paid keep their amount", async () => {
+    const old = await growthClient("price-old"); // recorded at the original 2,999
+    const r = await savePlanPrices({ isAdmin: true, name: "Admin" }, raised, NOW);
+    assert.equal(r.ok, true, r.message);
+    try {
+      const s = await db.setting.findUniqueOrThrow({ where: { id: 1 } });
+      assert.equal(s.planPricesBy, "Admin");
+      assert.equal((await loadPlanPrices()).growth.m, 3499);
+
+      const oldRow = (await rowsOf(old.id))[0];
+      assert.equal(oldRow.amountPaise, 299_900, "the earlier period keeps the price it was paid at");
+      assert.equal(monthlyValue("growth", "m", oldRow.amountPaise), 2999, "money figures use what was paid");
+
+      const fresh = await growthClient("price-new");
+      assert.equal((await rowsOf(fresh.id))[0].amountPaise, 349_900, "a period recorded now uses the new price");
+      const sent = await submitPlanPayment(manager(old.id), { clientId: old.id, plan: "growth", cycle: "q", utr: utr() }, NOW);
+      assert.equal(sent.ok, true, sent.message);
+      assert.equal((await db.planPurchase.findUniqueOrThrow({ where: { id: sent.id! } })).amountPaise, 944_700);
+      assert.equal(renewalPrice("growth", "q", await loadPlanPrices()), 9447, "a new subscription costs the new price");
+    } finally {
+      await db.setting.update({ where: { id: 1 }, data: { planPrices: Prisma.DbNull, planPricesAt: null, planPricesBy: null } });
+    }
+    assert.deepEqual(await loadPlanPrices(), DEFAULT_PRICES);
   });
 });

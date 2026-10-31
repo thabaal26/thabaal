@@ -28,6 +28,7 @@ import { sendText } from "@/lib/waha";
 import { sendInteractiveButtons, sendTemplateMessage, sendTextMessage } from "@/lib/whatsapp";
 import { explainSendError, type SendResult } from "./send-helpers";
 import { saveTemplate } from "./templates";
+import { trackPress } from "@/lib/usage";
 
 /** The client's home city as set (null = Madurai), for reading regions out of addresses. */
 async function homeCityFor(clientId: string | null | undefined) {
@@ -79,6 +80,7 @@ async function tellCancelled(order: Parameters<typeof updateOrderCard>[0] & { cu
 }
 
 export async function setOrderStatus(id: string, status: OrderStatus): Promise<SendResult> {
+  trackPress("order.step");
   const s = await requireOrderAccess();
   if ("denied" in s) return { ok: false, message: s.denied };
   if (!STATUSES.includes(status)) return { ok: false, message: "Unknown status." };
@@ -169,6 +171,7 @@ function dispatchLine(d: DispatchDetails) {
  * needs the approved order_confirmation / order_dispatched / order_delivered utility template.
  */
 export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "deliver", details: DispatchDetails = {}): Promise<SendResult> {
+  trackPress(kind === "confirm" ? "order.confirm" : kind === "dispatch" ? "order.dispatch" : "order.deliver");
   const s = await requireOrderAccess();
   if ("denied" in s) return { ok: false, message: s.denied };
   const order = await db.order.findFirst({
@@ -309,6 +312,7 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
  * client's payment configuration. Meta's payment webhook marks the order paid.
  */
 export async function requestPayment(id: string): Promise<SendResult> {
+  trackPress("payment.request");
   const s = await requireOrderAccess();
   if ("denied" in s) return { ok: false, message: s.denied };
   const order = await db.order.findFirst({ where: { id, ...(s.clientId ? { clientId: s.clientId } : {}) }, select: { id: true } });
@@ -641,6 +645,7 @@ export async function createOrder(input: {
   /** For an already-paid order: the UPI reference, if any. */
   paymentRef?: string;
 }): Promise<SendResult> {
+  trackPress("order.new");
   const s = await requireOrderAccess();
   if ("denied" in s) return { ok: false, message: s.denied };
   if (!s.clientId) return { ok: false, message: "Pick a client in the sidebar first." };

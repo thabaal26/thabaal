@@ -32,6 +32,12 @@ model Setting {
   /// GST on wallet receipts: off until Thabaal is registered; gstin is printed when on.
   gstEnabled     Boolean   @default(false)
   gstin          String?
+  /// Plan prices changed from the admin panel ({ starter: { m, q, y }, … }, rupees); empty = lib/account-plans.ts.
+  planPrices     Json?
+  planPricesAt   DateTime?
+  planPricesBy   String?
+  /// Messages to business owners: automatic reminders and quiet hours (lib/owner-messages-core.ts OwnerMsgSettings).
+  ownerMessages  Json?
   updatedAt      DateTime  @updatedAt
 }
 
@@ -97,6 +103,14 @@ model Client {
   orderSeq            Int               @default(1000)
   sheetHookUrl        String?
   sheetHookSecret     String?
+  /// The business's own Google Sheet, connected with "Connect Google Sheets" (lib/gsheet): live sync of
+  /// customers, addresses, orders, items, payments, chats and activity.
+  sheetLink           SheetLink?
+  sheetLogs           SheetLog[]
+  usage               UsageDay[]
+  /// The enquiry this business came from (admin › Enquiries › Make it a business).
+  lead                Lead?
+  ownerMessages       OwnerMessageTo[]
   /// Win-back: customers whose last order is this many days old are tagged "lapsed" and sent winbackTemplate once.
   lapsedDays          Int               @default(60)
   winbackTemplateId   String?
@@ -186,6 +200,9 @@ model User {
   clientId     String?
   client       Client?      @relation(fields: [clientId], references: [id], onDelete: Cascade)
   createdAt    DateTime     @default(now())
+  usage        UsageDay[]
+  /// Enquiries this admin follows up.
+  leads        Lead[]
 }
 
 model Customer {
@@ -756,6 +773,167 @@ model RazorpayRecord {
 }
 
 /// Razorpay webhook events already handled (x-razorpay-event-id).
+/// A message from Thabaal to business owners (admin panel › Messages; lib/owner-messages.ts), sent now, scheduled,
+/// or made by the automatic payment reminders. Each business it goes to is an OwnerMessageTo.
+model OwnerMessage {
+  id        String           @id @default(cuid())
+  /// rem | over | up | win | news | free (lib/owner-messages-core.ts KINDS)
+  kind      String
+  /// auto | all | overdue | risk | pick | automatic
+  audience  String
+  /// As written, with {shop} {owner} {amount} {date} {plan}.
+  text      String
+  /// scheduled | sending | done | cancelled
+  status    String           @default("scheduled")
+  /// The earliest it may go (already moved into quiet hours).
+  sendAt    DateTime
+  auto      Boolean          @default(false)
+  createdBy String
+  createdAt DateTime         @default(now())
+  doneAt    DateTime?
+  to        OwnerMessageTo[]
+
+  @@index([status, sendAt])
+}
+
+/// One business's copy of an OwnerMessage: its own filled-in text, and how it went on WhatsApp.
+model OwnerMessageTo {
+  id        String       @id @default(cuid())
+  messageId String
+  message   OwnerMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  clientId  String
+  client    Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  /// The owner's WhatsApp, with country code.
+  phone     String?
+  owner     String?
+  text      String
+  /// queued | sending | sent | delivered | read | failed | skipped
+  status    String       @default("queued")
+  reason    String?
+  waId      String?      @unique
+  /// Sent while Thabaal's number isn't connected (test and QA copies): nothing reached WhatsApp.
+  simulated Boolean      @default(false)
+  /// One automatic reminder per business, plan end and day: "rem:<clientId>:<end day>:<offset>".
+  autoKey   String?      @unique
+  sentAt    DateTime?
+  updatedAt DateTime     @updatedAt
+
+  @@index([messageId])
+  @@index([clientId])
+}
+
+/// A shop that asked about thabaal (admin panel › Enquiries; lib/leads.ts), from first contact to paying business.
+model Lead {
+  id        String         @id @default(cuid())
+  shop      String
+  person    String?
+  /// Indian mobile, 10 digits.
+  phone     String
+  town      String?
+  sells     String?
+  /// Where it came from: lib/lead-stages.ts LEAD_SOURCES.
+  source    String
+  /// The plan they asked about (starter | growth | business).
+  plan      String?
+  /// new | contact | demo | quote | won | lost (lib/lead-stages.ts).
+  stage     String         @default("new")
+  /// The furthest stage it ever got to before won or lost, for the funnel.
+  reached   String         @default("new")
+  /// What they asked for, in their words.
+  note      String?
+  /// The next follow-up day; empty once won or lost.
+  nextOn    DateTime?      @db.Date
+  ownerId   String?
+  owner     User?          @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  /// The business it became.
+  clientId  String?        @unique
+  client    Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  closedAt  DateTime?
+  createdBy String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  activity  LeadActivity[]
+
+  @@index([stage])
+  @@index([nextOn])
+  @@index([phone])
+}
+
+/// What happened with an enquiry: created, calls, stage moves, follow-up dates, edits, conversion.
+model LeadActivity {
+  id        String   @id @default(cuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  /// created | call | stage | next | edit | converted
+  kind      String
+  text      String
+  by        String
+  createdAt DateTime @default(now())
+
+  @@index([leadId, createdAt])
+}
+
+/// What a business's logins did on one day (lib/usage-record.ts), for the admin panel's Usage page: sections
+/// opened ('open'), actions done ('press') and sign-ins ('login'). Thabaal's own logins are never counted.
+model UsageDay {
+  clientId String
+  client   Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The day in the app's time zone (Asia/Kolkata).
+  day      DateTime @db.Date
+  kind     String
+  key      String
+  count    Int      @default(0)
+  lastAt   DateTime @default(now())
+
+  @@id([clientId, userId, day, kind, key])
+  @@index([day])
+}
+
+/// One business's Google Sheet: who connected it, the Google access (refresh token, encrypted) and how far the
+/// live sync has got. Thabaal only ever touches the one spreadsheet it created (Google's drive.file permission).
+model SheetLink {
+  id            String    @id @default(cuid())
+  clientId      String    @unique
+  client        Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  googleEmail   String?
+  /// Encrypted with DATA_ENC_KEY (lib/secret-box.ts).
+  refreshToken  String?
+  spreadsheetId String?
+  /// connected | error | off
+  status        String    @default("connected")
+  lastError     String?
+  /// How far each tab has synced: { customers, orders, chatsIn, chatsOut, payments, activity } as { at, id }.
+  cursors       Json?
+  /// Each tab's numeric sheet id, for formatting.
+  tabs          Json?
+  syncedAt      DateTime?
+  summaryAt     DateTime?
+  /// One sync at a time per business; a change during a sync sets `dirty` so it runs once more.
+  lockUntil     DateTime?
+  dirty         Boolean   @default(false)
+  connectedBy   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+/// What happened, for the sheet's Activity tab: written only while a sheet is connected, sent on the next sync.
+model SheetLog {
+  id       String   @id @default(cuid())
+  clientId String
+  client   Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  at       DateTime @default(now())
+  phone    String?
+  customer String?
+  event    String
+  details  String?
+  orderRef String?
+  by       String?
+
+  @@index([clientId, at])
+}
+
 model RazorpayEvent {
   id        String   @id
   event     String

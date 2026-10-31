@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { pushToGoogleSheet } from "@/lib/google-sheets-live";
+import { kickSheetSync } from "@/lib/gsheet/sync";
 import { fmtDate } from "@/lib/format";
 import { allowance } from "@/lib/limits";
 import { deliver, getSettings, readiness, templateSendable, wahaConfig } from "@/lib/provider";
@@ -13,6 +14,7 @@ import { sendImage, sendText, WahaError } from "@/lib/waha";
 import { sendMediaMessage, sendTextMessage } from "@/lib/whatsapp";
 import { normalizePhone } from "@/lib/phone";
 import { explainSendError, type SendResult } from "./send-helpers";
+import { trackPress } from "@/lib/usage";
 
 const WINDOW_MS = 24 * 3_600_000;
 
@@ -28,6 +30,7 @@ export async function sendToCustomer(
   force = false,
   otpCode?: string,
 ): Promise<SendResult> {
+  trackPress("chat.send");
   const s = await requireManager();
   if ("denied" in s) return { ok: false, message: s.denied };
   const customer = await db.customer.findFirst({ where: { id: customerId, ...owned(s) }, include: { client: true } });
@@ -112,6 +115,7 @@ export async function replyToCustomer(
   text: string,
   mediaUrl?: string | null,
 ): Promise<SendResult> {
+  trackPress("chat.reply");
   const scope = await getScope();
   if (!scope.canOperate) return { ok: false, message: "Your login can view but not change anything." };
   const body = text.trim();
@@ -168,6 +172,7 @@ export async function replyToCustomer(
     revalidatePath(`/dashboard/customers/${customer.id}`);
     revalidatePath("/dashboard/messages");
     revalidatePath("/dashboard/replies");
+    kickSheetSync(customer.clientId); // the reply shows in the connected sheet's Chats a moment later
     return { ok: true, message: simulated ? "Simulated reply logged (demo mode)." : "Reply sent." };
   } catch (e) {
     const { code, error } = explainSendError(e);

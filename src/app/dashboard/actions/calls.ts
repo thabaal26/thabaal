@@ -6,6 +6,7 @@ import { clientNumbers, numberConfig, senderFor } from "@/lib/senders";
 import { getScope, owned, requireManager, requireUser } from "@/lib/session";
 import { callAction, getIncomingCalls, MetaError, sendCallPermissionRequest, setIncomingCalls, startMetaCall, type IncomingCalls } from "@/lib/whatsapp";
 import type { ActionResult } from "./templates";
+import { trackPress } from "@/lib/usage";
 
 const errText = (e: unknown) => (e instanceof MetaError || e instanceof Error ? e.message : "Something went wrong");
 
@@ -23,6 +24,7 @@ async function callFor(id: string) {
 
 /** Picks up a ringing call with the SDP answer the browser made from Meta's offer. */
 export async function answerCall(id: string, sdp: string): Promise<ActionResult> {
+  trackPress("call.answer");
   const found = await callFor(id);
   if ("denied" in found) return { ok: false, message: found.denied };
   const user = await requireUser();
@@ -88,6 +90,7 @@ export async function requestCallPermission(customerId: string): Promise<ActionR
 
 /** Rings the customer with the browser's SDP offer. Returns the call's id for the browser to follow. */
 export async function startCall(customerId: string, sdp: string): Promise<ActionResult> {
+  trackPress("call.start");
   const found = await customerFor(customerId);
   if ("denied" in found) return { ok: false, message: found.denied };
   const { customer } = found;

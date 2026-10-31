@@ -1,13 +1,11 @@
 "use server";
 
 import bcrypt from "bcryptjs";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { APP_ORIGIN } from "@/lib/app-host";
 import { db } from "@/lib/db";
 import { sendEmail, THABAAL_INBOX } from "@/lib/email";
 import { clearLoginFailures, clientIp } from "@/lib/login-guard";
-import { RESET_MINUTES, makeResetToken, readResetToken } from "@/lib/password-reset";
+import { RESET_MINUTES, linkOrigin, makeResetToken, readResetToken } from "@/lib/password-reset";
 import { destroySession, revokeSessions } from "@/lib/session";
 
 export type ForgotState = { sent?: boolean; error?: string; email?: string } | undefined;
@@ -17,12 +15,6 @@ const WINDOW_MS = 15 * 60_000;
 const MAX_PER_EMAIL = 3;
 const MAX_PER_IP = 10;
 
-/** Where links in emails point. Production always uses the real site, never the request's Host header. */
-async function origin() {
-  if (process.env.NODE_ENV === "production") return APP_ORIGIN;
-  const h = await headers();
-  return `http://${h.get("host") ?? "localhost:3000"}`;
-}
 
 /**
  * "Forgot password": emails a 30-minute, one-time link to the account's own address.
@@ -46,7 +38,7 @@ export async function requestPasswordReset(_: ForgotState, form: FormData): Prom
 
   const user = await db.user.findUnique({ where: { email }, select: { id: true, email: true, name: true, passwordHash: true } });
   if (user) {
-    const link = `${await origin()}/reset-password?token=${encodeURIComponent(await makeResetToken(user))}`;
+    const link = `${await linkOrigin()}/reset-password?token=${encodeURIComponent(await makeResetToken(user))}`;
     const sent = await sendEmail({
       to: user.email,
       subject: "Reset your Thabaal password",

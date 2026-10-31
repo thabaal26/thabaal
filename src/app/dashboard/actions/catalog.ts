@@ -6,9 +6,11 @@ import { createCatalogProductItem, deleteCatalogProductItem, sendCatalogueTo, up
 import { getScope, owned } from "@/lib/session";
 import { storePublicImage } from "@/lib/uploaded-image";
 import type { ActionResult } from "./templates";
+import { trackPress } from "@/lib/usage";
 
 /** Staff send the free catalogue message to a customer who wrote in the last 24 hours. */
 export async function sendCatalogue(customerId: string): Promise<ActionResult> {
+  trackPress("catalogue.send");
   const scope = await getScope();
   if (!scope.canOperate) return { ok: false, message: "Your login can view but not change anything." };
   const c = await db.customer.findFirst({ where: { id: customerId, ...owned(scope) }, select: { id: true } });
@@ -60,6 +62,7 @@ export async function updateProduct(data: {
   description?: string;
   imageUrl?: string | null;
 }): Promise<ActionResult> {
+  trackPress("product.save");
   const scope = await getScope();
   if (!scope.canOperate) return { ok: false, message: "Your login can view but not change products." };
   if (!scope.clientId) return { ok: false, message: "No client selected." };
@@ -71,6 +74,7 @@ export async function updateProduct(data: {
 
 /** Add a product to the client's WhatsApp catalogue. */
 export async function createProduct(data: { retailerId: string; name: string; priceAmount: number; inStock: boolean; description: string; imageUrl: string | null }): Promise<ActionResult> {
+  trackPress("product.save");
   const scope = await getScope();
   if (!scope.canManage) return { ok: false, message: "Only managers can add products." };
   if (!scope.clientId) return { ok: false, message: "No client selected." };

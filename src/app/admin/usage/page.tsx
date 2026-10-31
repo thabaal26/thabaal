@@ -5,7 +5,7 @@ import { loadClientRows, loadHistory, loadUsage } from "@/lib/admin-data";
 import { APP_TZ } from "@/lib/format";
 import { requireAdminPage } from "@/lib/session";
 import { Tabs } from "../nav";
-import { BarChart, ComingNext, HBars, K, Kpis, N, PageHead, Pill, R, pctOf } from "../ui";
+import { BarChart, HBars, K, Kpis, LineChart, N, PageHead, Pill, R, pctOf } from "../ui";
 
 export const metadata: Metadata = { title: "Usage and analytics" };
 export const dynamic = "force-dynamic";
@@ -19,8 +19,10 @@ export default async function UsagePage() {
   const read = rows.reduce((s, r) => s + r.messages30.read, 0);
   const replied = rows.reduce((s, r) => s + r.messages30.replied, 0);
   const spend = rows.reduce((s, r) => s + r.spendMonth, 0);
-  const maxDay = Math.max(1, ...usage.days.map((d) => d.messages));
+  const maxOpened = Math.max(1, ...usage.days.map((d) => d.opened));
   const slipping = [...rows].sort((a, b) => b.risk - a.risk);
+  const kept = hist.filter((h) => h.kept !== null);
+  const since = usage.since ? `Counted since ${formatInTimeZone(usage.since, "UTC", "d MMM yyyy")}.` : "Nothing counted yet: counting starts when a business opens thabaal.";
   const ago = (d: Date | null) => {
     if (!d) return "Never";
     const days = Math.floor((now.getTime() - d.getTime()) / 86_400_000);
@@ -46,7 +48,36 @@ export default async function UsagePage() {
             label: "What they use",
             panel: (
               <>
-                <div className="card mb16">
+                <div className="g6 mb16">
+                  <div className="card">
+                    <div className="hd">
+                      <div>
+                        <h2>Which parts of thabaal get used</h2>
+                        <p>
+                          Share of the {N(usage.activeShops)} business{usage.activeShops === 1 ? "" : "es"} that opened thabaal this month who opened each section.
+                        </p>
+                      </div>
+                    </div>
+                    <HBars
+                      fmt={(v) => `${v}%`}
+                      empty="No business has opened thabaal this month yet."
+                      rows={usage.sections.map((s) => [s.label, s.pct, s.pct >= 70 ? "var(--bar4)" : s.pct >= 45 ? "var(--bar2)" : "var(--bar3)"])}
+                    />
+                    <p className="muted small" style={{ marginTop: 14 }}>
+                      Business logins only; your own visits (help a client) never count. {since}
+                    </p>
+                  </div>
+                  <div className="card">
+                    <div className="hd">
+                      <div>
+                        <h2>Most pressed buttons</h2>
+                        <p>Across all businesses this month: the actions they actually did.</p>
+                      </div>
+                    </div>
+                    <HBars empty="No actions recorded this month yet." rows={usage.presses.slice(0, 10).map((p) => [p.label, p.count, "var(--bar)"])} />
+                  </div>
+                </div>
+                <div className="card">
                   <div className="hd">
                     <div>
                       <h2>Work done through thabaal</h2>
@@ -66,12 +97,6 @@ export default async function UsagePage() {
                     <span style={{ ["--c" as string]: "var(--bar)" }}>Templates made</span>
                   </div>
                 </div>
-                <ComingNext
-                  title="Which sections and buttons get used: coming in phase 2"
-                  items={["Share of businesses that opened each section this month", "Most pressed buttons across all businesses", "Sign-ins per business and when they last opened the app"]}
-                >
-                  thabaal does not record page opens or button presses yet, so these charts from the design stay empty rather than show made-up numbers. Phase 2 adds a small activity log.
-                </ComingNext>
               </>
             ),
           },
@@ -147,14 +172,15 @@ export default async function UsagePage() {
                 <div className="card" style={{ padding: 0 }}>
                   <div style={{ padding: "18px 20px 4px" }}>
                     <h2>Businesses to call this week</h2>
-                    <p className="muted small">Unpaid, not connected, or quiet. These leave first.</p>
+                    <p className="muted small">Low use, few logins, unpaid or not connected. These leave first.</p>
                   </div>
                   <div className="tw">
                     <table className="dt">
                       <thead>
                         <tr>
                           <th>Business</th>
-                          <th>Last activity</th>
+                          <th>Last opened</th>
+                          <th className="num">Logins (30d)</th>
                           <th className="num">Sent (30d)</th>
                           <th className="num">Campaigns</th>
                           <th>Risk</th>
@@ -167,7 +193,8 @@ export default async function UsagePage() {
                               <Link href={`/admin/clients/${r.id}`}>{r.name}</Link>
                               {r.reasons.length > 0 && <div className="muted small">{r.reasons.join(", ")}</div>}
                             </td>
-                            <td className="small">{ago(r.lastActivity)}</td>
+                            <td className="small">{ago(r.lastOpened)}</td>
+                            <td className="num">{N(r.logins30)}</td>
                             <td className="num">{N(r.messages30.sent)}</td>
                             <td className="num">{r.usage.campaignsMonth}</td>
                             <td>
@@ -182,16 +209,16 @@ export default async function UsagePage() {
                 <div className="card">
                   <div className="hd">
                     <div>
-                      <h2>Messages sent per day</h2>
-                      <p>Last 14 days, all businesses. Darker means more messages.</p>
+                      <h2>How often they open thabaal</h2>
+                      <p>Last 14 days, all businesses. Darker means more businesses opened the app that day.</p>
                     </div>
                   </div>
                   <div className="heat">
                     {usage.days.map((d) => (
                       <i
                         key={d.key}
-                        title={`${d.date}: ${N(d.messages)} messages from ${d.shops} business${d.shops === 1 ? "" : "es"}`}
-                        style={{ background: d.messages ? `rgba(255,195,41,${0.18 + 0.82 * (d.messages / maxDay)})` : undefined }}
+                        title={`${d.date}: ${d.opened} business${d.opened === 1 ? "" : "es"} opened thabaal · ${N(d.messages)} messages sent`}
+                        style={{ background: d.opened ? `rgba(16,40,59,${0.18 + 0.82 * (d.opened / maxOpened)})` : undefined }}
                       />
                     ))}
                   </div>
@@ -200,9 +227,19 @@ export default async function UsagePage() {
                       <span key={d.key}>{d.label}</span>
                     ))}
                   </div>
-                  <h2 style={{ fontSize: 17, margin: "18px 0 8px" }}>Paying businesses, month by month</h2>
-                  <BarChart labels={hist.map((h) => h.label)} series={[{ name: "Paying", vals: hist.map((h) => h.paying), color: "#20C985" }]} h={160} label="Paying businesses by month" />
-                  <p className="muted small">Spend history: {hist.map((h) => `${h.label} ${K(h.spend)}`).join(" · ")}</p>
+                  <p className="muted small" style={{ marginTop: 10 }}>
+                    {since}
+                  </p>
+                  <h2 style={{ fontSize: 17, margin: "18px 0 8px" }}>Businesses kept, month by month</h2>
+                  {kept.length ? (
+                    <LineChart labels={kept.map((h) => h.label)} vals={kept.map((h) => h.kept ?? 0)} color="#20C985" fmt={(v) => `${Math.round(v)}%`} h={170} label="Businesses kept by month" />
+                  ) : (
+                    <p className="muted small">Shows once businesses have paid for two months in a row.</p>
+                  )}
+                  <p className="muted small">
+                    Of the businesses paying at the end of a month, the share still paying at the end of the next. Paying now:{" "}
+                    {hist.map((h) => `${h.label} ${h.paying}`).join(" · ")}. Meta spend: {hist.map((h) => `${h.label} ${K(h.spend)}`).join(" · ")}
+                  </p>
                 </div>
               </div>
             ),

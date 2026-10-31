@@ -12,6 +12,7 @@ import { logout } from "../login/actions";
 import "../dashboard/portal.css";
 import "./admin.css";
 import { AdminNav } from "./nav";
+import { todayKey } from "@/lib/leads";
 import { LeaveViewButton } from "./support/support-tools";
 
 export const metadata: Metadata = {
@@ -37,6 +38,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     getSettings(),
     db.razorpayRecord.count({ where: { kind: "subscription", purpose: "plan", status: { in: ["pending", "halted"] } } }),
   ]);
+  // Enquiries whose follow-up is today or late.
+  const leadsDue = await db.lead
+    .count({ where: { stage: { notIn: ["won", "lost"] }, nextOn: { lte: new Date(`${todayKey()}T00:00:00Z`) } } })
+    .catch(() => 0);
   // The portal's icon set: the app components reused here (setup tools, light/dark switch) draw their icons from it.
   const iconset = appearanceDataset(resolveAppearance(settings.appearance, null)).iconset;
 
@@ -51,7 +56,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <b>thabaal</b>
             <span className="tag">admin</span>
           </Link>
-          <AdminNav payments={planPending + walletPending + autoPayFailing} newAccounts={newAccounts} />
+          <AdminNav payments={planPending + walletPending + autoPayFailing} newAccounts={newAccounts} leadsDue={leadsDue} />
           <div className="foot">
             <span className="live">
               <i />

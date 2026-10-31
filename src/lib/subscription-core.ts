@@ -33,11 +33,11 @@ export const isCycle = (v: unknown): v is BillingCycle => v === "m" || v === "q"
 export const planDef = (k: string): PlanDef | undefined => PLANS.find((p) => p.k === k);
 export const planIndex = (k: string | null | undefined) => PLANS.findIndex((p) => p.k === k);
 
-/** The plan's price for the cycle, in paise. */
-export function pricePaise(plan: PlanKey, cycle: BillingCycle): number {
+/** The plan's price for the cycle, in paise: from `prices` (the ones in force, lib/plan-prices-server.ts) when given. */
+export function pricePaise(plan: PlanKey, cycle: BillingCycle, prices?: Record<PlanKey, Record<BillingCycle, number>>): number {
   const def = planDef(plan);
   if (!def) throw new Error(`Unknown plan ${plan}`);
-  return Math.round(def.p[cycle] * 100);
+  return Math.round((prices?.[plan] ?? def.p)[cycle] * 100);
 }
 
 /**

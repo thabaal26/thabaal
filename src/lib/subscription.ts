@@ -18,6 +18,7 @@ import { Prisma } from "@prisma/client";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { db } from "./db";
 import { APP_TZ } from "./format";
+import { loadPlanPrices } from "./plan-prices-server";
 import {
   isCycle,
   isPlanKey,
@@ -80,6 +81,7 @@ export async function submitPlanPayment(
 
   const usedInWallet = await db.walletEntry.findFirst({ where: { utr: { equals: ref, mode: "insensitive" }, status: { not: "REJECTED" } }, select: { id: true } });
   if (usedInWallet) return { ok: false, code: "duplicate", message: "This UPI reference was already used for a wallet recharge." };
+  const prices = await loadPlanPrices();
 
   try {
     return await db.$transaction(async (tx) => {
@@ -91,7 +93,7 @@ export async function submitPlanPayment(
           clientId: input.clientId,
           plan: input.plan as string,
           cycle: input.cycle as string,
-          amountPaise: pricePaise(input.plan as never, input.cycle as never),
+          amountPaise: pricePaise(input.plan as never, input.cycle as never, prices),
           status: "PENDING",
           method: "UPI",
           utr: ref,
@@ -194,6 +196,7 @@ export async function recordExistingPeriod(
   const startsAt = fromZonedTime(`${input.startDate}T00:00:00`, APP_TZ);
   if (Number.isNaN(startsAt.getTime()) || startsAt > now) return { ok: false, code: "invalid", message: "The start date must be today or earlier." };
   const endsAt = periodEnd(startsAt, input.cycle, APP_TZ);
+  const prices = await loadPlanPrices();
 
   return db.$transaction(async (tx) => {
     if (!(await lockClient(tx, input.clientId))) return { ok: false, code: "not_found", message: "Business not found." };
@@ -205,7 +208,7 @@ export async function recordExistingPeriod(
         clientId: input.clientId,
         plan: input.plan as string,
         cycle: input.cycle as string,
-        amountPaise: pricePaise(input.plan as never, input.cycle as never),
+        amountPaise: pricePaise(input.plan as never, input.cycle as never, prices),
         status: "VERIFIED",
         method: "ADMIN_RECORD",
         startsAt,
