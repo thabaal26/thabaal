@@ -20,6 +20,7 @@ import { AppearanceSync } from "@/components/appearance-sync";
 import { IconSetLink } from "@/components/icon-set-link";
 import { InlineScript } from "@/components/inline-script";
 import "./portal.css";
+import "./mobile.css";
 import { PlanDueBar } from "./plan-due-bar";
 import { ViewOnlyBar } from "./view-only-bar";
 import { LogOut } from "@/components/icons";
@@ -251,7 +252,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           </aside>
 
           {/* Phones and tablets: a slim top bar with the logo, the business and quick controls. */}
-          <header className="sticky top-0 z-30 w-full border-b border-line bg-canvas/95 pt-[env(safe-area-inset-top)] text-ink backdrop-blur-md lg:hidden print:hidden">
+          <header data-mhead className="sticky top-0 z-30 w-full border-b border-line bg-canvas/95 pt-[env(safe-area-inset-top)] text-ink backdrop-blur-md lg:hidden print:hidden">
             <div className="flex h-14 items-center gap-1.5 pl-3 pr-1.5 sm:gap-3 sm:pl-4 sm:pr-2">
               <Logo size="sm" />
               {scope.isAdmin ? (

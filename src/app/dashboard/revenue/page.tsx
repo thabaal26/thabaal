@@ -176,7 +176,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         </div>
         <div className="card" style={{ padding: 0 }}>
           <div className="tw">
-            <table>
+            <table className="mcards">
               <thead>
                 <tr>
                   <th><T ta="நேரம்">When</T></th>
@@ -192,7 +192,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                   <tr key={r.id}>
                     <td className="muted">{when(r.atMs)}</td>
                     <td>{r.ref}</td>
-                    <td>
+                    <td data-m="title">
                       <b>{r.name}</b>
                     </td>
                     <td>
@@ -200,8 +200,8 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                         <T ta={WAY_LABEL_TA[r.way]}>{WAY_LABEL[r.way]}</T>
                       </span>
                     </td>
-                    <td className="num">{inr(r.amount)}</td>
-                    <td>
+                    <td className="num" data-m="amount">{inr(r.amount)}</td>
+                    <td data-m="end">
                       <ReceiptButton row={r} way={WAY_LABEL[r.way]} when={fmtDate(new Date(r.atMs), "EEE d MMM, h:mm a")} canOperate={scope.canOperate} />
                     </td>
                   </tr>

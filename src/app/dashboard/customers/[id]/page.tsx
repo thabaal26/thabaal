@@ -141,7 +141,8 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
             {scope.canOperate && <CallButton customerId={c.id} name={c.name} primary={callAllowed} />}
             <Link href={`/dashboard?cust=${c.id}&range=all`} className={buttonClass("secondary")}>
               <span>
-                <span className="max-sm:sr-only"><T ta="அவர்களின் ">Their </T></span><T ta="விவரங்கள்">insights</T>
+                <span className="max-sm:hidden"><T ta="அவர்களின் விவரங்கள்">Their insights</T></span>
+                <span className="sm:hidden"><T ta="விவரங்கள்">Insights</T></span>
               </span>
             </Link>
             {more.length > 0 && (
