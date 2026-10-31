@@ -13,7 +13,7 @@ import { metaReplyContent, receivingNumber, recordReply } from "@/lib/replies";
 import { autoRedeemPoints } from "@/lib/loyalty-redeem";
 import { codBlocked } from "@/lib/pay-settings";
 import { paySettingsFor } from "@/lib/pay-settings-server";
-import { autoRequestPayment, cancelSupersededOrdersForCustomer, confirmPayment, parseMetaAmount, recordPaymentClaim, recordPaymentFailure, sendCodConfirmationPrompt, textInWindow, updateOrderCard } from "@/lib/payments";
+import { cancelSupersededOrdersForCustomer, confirmPayment, parseMetaAmount, recordPaymentClaim, recordPaymentFailure, sendCodConfirmationPrompt, sendPaymentRequestFor, startCheckout, textInWindow, updateOrderCard } from "@/lib/payments";
 import { autoReplyToButton, autoSendCatalogue, catalogueTrigger, firstMessageToday } from "@/lib/catalog";
 import { mapMetaStatus } from "@/lib/whatsapp";
 import { findUtr, logPaymentEvent } from "@/lib/payment-events";
@@ -521,6 +521,29 @@ async function applyCallPermission(phone: string, phoneNumberId: string | undefi
   await db.customer.updateMany({ where: { phone, ...customers }, data: { callAllowedUntil: until } });
 }
 
+async function loadOrderForButton(orderId: string) {
+  return db.order.findUnique({
+    where: { id: orderId },
+    include: { customer: { include: { client: true } } },
+  });
+}
+type OrderWithCustomer = NonNullable<Awaited<ReturnType<typeof loadOrderForButton>>>;
+
+async function confirmCod(order: OrderWithCustomer) {
+  const ref = orderRef(order);
+  await db.order.update({
+    where: { id: order.id },
+    data: { status: "CONFIRMED", paymentMethod: "cod" },
+  });
+  pushOrderToSheet(order.id, "ORDER_UPDATE", "Customer confirmed COD");
+  const hasAddr = Boolean(order.customer.locationRaw?.trim() || order.customer.location?.trim() || order.note?.trim());
+  const replyMsg = hasAddr
+    ? `🎉 Thank you! Your Cash on Delivery order ${ref} (${money(order.total, order.currency)}) is confirmed.\n\nWe will pack and dispatch it to your delivery address:\n📍 ${order.customer.locationRaw || order.customer.location || order.note}`
+    : `🎉 Thank you! Your Cash on Delivery order ${ref} (${money(order.total, order.currency)}) is confirmed.\n\n📍 Please reply with your full delivery address (Door No, Street, Landmark, City & Pincode) so our delivery partner can reach you smoothly.`;
+  await textInWindow(order.customer, replyMsg, "COD Confirmed").catch(() => {});
+  await updateOrderCard(order, "processing", "COD order confirmed - packing now").catch(() => {});
+}
+
 export async function POST(req: NextRequest) {
   const raw = await req.text();
   const signature = checkSignature(raw, req.headers.get("x-hub-signature-256"));
@@ -559,6 +582,7 @@ export async function POST(req: NextRequest) {
           const customer = await recordReply({ phone: m.from, text, kind, media, waMessageId: m.id, phoneNumberId, at: m.timestamp ? new Date(Number(m.timestamp) * 1000) : undefined });
           const clientName = customer?.client?.name || "Thabaal";
 
+          let handledByOrderButton = false;
           if (kind === "button") {
             const contactName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name;
             const actionVal = m.button?.payload ?? m.interactive?.button_reply?.id ?? m.interactive?.list_reply?.id ?? text;
@@ -571,14 +595,60 @@ export async function POST(req: NextRequest) {
               client: clientName,
             });
 
+            // 1-Click Payment Choice Flow (pay_online / pay_cod)
+            if (typeof actionVal === "string" && (actionVal.startsWith("pay_online:") || actionVal.startsWith("pay_cod:"))) {
+              handledByOrderButton = true;
+              const isOnline = actionVal.startsWith("pay_online:");
+              const orderId = actionVal.slice(isOnline ? 11 : 8);
+              const order = await loadOrderForButton(orderId);
+              const mine = Boolean(order && customer && order.customerId === customer.id);
+              if (order && mine) {
+                const ref = orderRef(order);
+                if (order.status === "CANCELLED") {
+                  await textInWindow(
+                    order.customer,
+                    `This cart (${ref}) was replaced by your newer order, so nothing was changed. Please use the latest message.`,
+                    "Payment choice (cancelled)",
+                  ).catch(() => {});
+                } else if (order.paidAt || (order.paidAmount ?? 0) > 0 || order.packedAt || ["PAID", "DISPATCHED", "DELIVERED"].includes(order.status)) {
+                  await textInWindow(
+                    order.customer,
+                    `Order ${ref} is already ${order.status === "DELIVERED" ? "delivered" : order.status === "DISPATCHED" ? "on its way" : order.packedAt ? "packed" : "paid"}, so nothing was changed. If you need help with it, reply here.`,
+                    "Payment choice (no change)",
+                  ).catch(() => {});
+                } else if (order.status === "CONFIRMED" && order.paymentMethod === "cod") {
+                  if (!isOnline) {
+                    await textInWindow(order.customer, `Your Cash on Delivery order ${ref} is already confirmed.`, "COD already confirmed").catch(() => {});
+                  } else {
+                    await textInWindow(order.customer, "Your order is already confirmed as Cash on Delivery. Reply here if you want to change it.", "COD already confirmed").catch(() => {});
+                  }
+                } else if (isOnline) {
+                  const res = await sendPaymentRequestFor(order.id);
+                  if (!res.ok) {
+                    await textInWindow(order.customer, "We couldn't create the payment link just now. We will send it shortly.", "Payment link retry").catch(() => {});
+                    console.warn(`sendPaymentRequestFor failed for order ${order.id}: ${res.message}`);
+                  }
+                  pushOrderToSheet(order.id, "ORDER_UPDATE", "Customer chose online payment");
+                } else {
+                  // pay_cod: re-check codBlocked
+                  const pay = await paySettingsFor(order.clientId);
+                  const blocked = codBlocked(pay.settings, order.total, order.customer);
+                  if (blocked) {
+                    await textInWindow(order.customer, `Sorry, cash on delivery isn't available for order ${ref}. Here is the payment link.`, "COD unavailable").catch(() => {});
+                    await sendPaymentRequestFor(order.id);
+                  } else {
+                    await confirmCod(order);
+                  }
+                }
+              }
+            }
+
             // 1-Click COD Confirmation Flow
             if (typeof actionVal === "string" && (actionVal.startsWith("cod_confirm:") || actionVal.startsWith("cod_cancel:"))) {
+              handledByOrderButton = true;
               const isConfirm = actionVal.startsWith("cod_confirm:");
               const orderId = actionVal.slice(isConfirm ? 12 : 11);
-              const order = await db.order.findUnique({
-                where: { id: orderId },
-                include: { customer: { include: { client: true } } },
-              });
+              const order = await loadOrderForButton(orderId);
               // Only the customer the buttons were sent to, and only while the order still waits for this answer:
               // an old button pressed after payment, packing or dispatch must not move the order back or cancel it.
               const mine = Boolean(order && customer && order.customerId === customer.id);
@@ -593,17 +663,7 @@ export async function POST(req: NextRequest) {
               } else if (order && mine && order.status !== "CANCELLED" && !alreadyConfirmed) {
                 const ref = orderRef(order);
                 if (isConfirm) {
-                  await db.order.update({
-                    where: { id: order.id },
-                    data: { status: "CONFIRMED", paymentMethod: "cod" },
-                  });
-                  pushOrderToSheet(order.id, "ORDER_UPDATE", "Customer confirmed COD");
-                  const hasAddr = Boolean(order.customer.locationRaw?.trim() || order.customer.location?.trim() || order.note?.trim());
-                  const replyMsg = hasAddr
-                    ? `🎉 Thank you! Your Cash on Delivery order ${ref} (${money(order.total, order.currency)}) is confirmed.\n\nWe will pack and dispatch it to your delivery address:\n📍 ${order.customer.locationRaw || order.customer.location || order.note}`
-                    : `🎉 Thank you! Your Cash on Delivery order ${ref} (${money(order.total, order.currency)}) is confirmed.\n\n📍 Please reply with your full delivery address (Door No, Street, Landmark, City & Pincode) so our delivery partner can reach you smoothly.`;
-                  await textInWindow(order.customer, replyMsg, "COD Confirmed").catch(() => {});
-                  await updateOrderCard(order, "processing", "COD order confirmed - packing now").catch(() => {});
+                  await confirmCod(order);
                 } else {
                   await db.order.update({
                     where: { id: order.id },
@@ -646,7 +706,7 @@ export async function POST(req: NextRequest) {
           // Said hi, asked about products or prices (e.g. tapped "Send price list"), or wrote for the first time
           // today: reply with the free catalogue message (at most once every 12 hours).
           // Buttons with their own answer ("Make a gift pack", "Happy Deepavali") get that instead.
-          const isSystemOrPayment = handledAsPayment || m.type === "order" || m.type === "errors" || m.type === "unsupported" || m.type === "payment";
+          const isSystemOrPayment = handledAsPayment || handledByOrderButton || m.type === "order" || m.type === "errors" || m.type === "unsupported" || m.type === "payment";
           const answered = customer && !isSystemOrPayment ? await autoReplyToButton(customer.id, text, kind).catch((e) => (console.error("Automatic button reply failed", e), true)) : false;
           if (customer && !isSystemOrPayment && !answered) {
             const trigger = catalogueTrigger(text, kind) ?? ((await firstMessageToday(customer.id)) ? "greeting" : null);
@@ -659,7 +719,7 @@ export async function POST(req: NextRequest) {
               await cancelSupersededOrdersForCustomer(customer.id, order).catch((e) => console.error("Could not expire old carts", e));
               // Automatic loyalty points (Order & Payment Settings) come off before "Review and pay" goes out.
               await autoRedeemPoints(order.id).catch((e) => console.error("Could not use loyalty points", e));
-              await autoRequestPayment(order).catch((e) => console.error("Automatic payment request failed", e));
+              await startCheckout(order).catch((e) => console.error("Automatic checkout start failed", e));
               pushOrderToSheet(order.id, "NEW_ORDER");
 
               // If customer has no saved delivery address, prompt them in chat:

@@ -105,3 +105,23 @@ export function codBlocked(
   });
   return hit ? null : `Cash on delivery is only for ${areas.join(", ")}.`;
 }
+
+export type CheckoutMode = "choose" | "online" | "none";
+
+/**
+ * Decides what payment path a newly received cart should take:
+ * - "choose": customer is offered "Pay now online" or "Cash on delivery" buttons
+ * - "online": goes straight to "Review and pay" (COD is off, over limit, or outside areas)
+ * - "none": online payment is not set up, so no payment request is sent
+ */
+export function checkoutMode(
+  p: { settings: PaySettings; waPay: boolean; upi: boolean },
+  total: number,
+  customer: Parameters<typeof codBlocked>[2],
+): CheckoutMode {
+  const online = p.waPay || p.upi;
+  if (!online) return "none";
+  if (codBlocked(p.settings, total, customer) === null) return "choose";
+  return "online";
+}
+

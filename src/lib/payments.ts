@@ -6,7 +6,7 @@ import { pushOrderToSheet } from "./google-sheets-live";
 import { getOrderPricing, itemsText, itemsWithNames, money, orderRef } from "./orders";
 import { pointsDiscount } from "./order-pricing";
 import { logPaymentEvent, utrOf } from "./payment-events";
-import { upiLink, type PaySettings } from "./pay-settings";
+import { checkoutMode, upiLink, type PaySettings } from "./pay-settings";
 import { paySettingsFor } from "./pay-settings-server";
 import { dueOf, receivedOf } from "./payment-state";
 import { getSettings } from "./provider";
@@ -213,6 +213,36 @@ export async function autoRequestPayment(order: { id: string; clientId: string; 
   if (!pay.waPay && !pay.upi) return;
   const r = await sendPaymentRequestFor(order.id);
   if (!r.ok) console.warn(`Automatic payment request for order ${order.id} not sent: ${r.message}`);
+}
+
+/**
+ * Starts checkout for a freshly received catalogue cart:
+ * asks the customer "Pay now online" or "Cash on delivery" when both are available,
+ * or goes straight to "Review and pay" when only online payment is on.
+ */
+export async function startCheckout(order: { id: string; clientId: string; total: number }) {
+  if (order.total <= 0) return;
+  const fresh = await db.order.findUnique({
+    where: { id: order.id },
+    select: {
+      id: true,
+      clientId: true,
+      total: true,
+      customer: { select: { region: true, location: true, locationRaw: true } },
+    },
+  });
+  if (!fresh || fresh.total <= 0) return;
+  const pay = await paySettingsFor(fresh.clientId);
+  const mode = checkoutMode(pay, fresh.total, fresh.customer);
+  if (mode === "choose") {
+    const r = await sendPaymentChoicePrompt(fresh.id);
+    if (!r.ok) {
+      console.warn(`Payment choice prompt for order ${fresh.id} not sent: ${r.message}. Falling back to pay-now.`);
+      await autoRequestPayment(fresh);
+    }
+  } else if (mode === "online") {
+    await autoRequestPayment(fresh);
+  }
 }
 
 export type PaymentRecord = {
@@ -565,4 +595,57 @@ export async function sendCodConfirmationPrompt(orderId: string): Promise<{ ok: 
     return { ok: false, message: explainSendError(e).error };
   }
 }
+
+/**
+ * Sends a 1-click interactive payment choice prompt for new catalogue carts
+ * with "💳 Pay now online" and "🚚 Cash on delivery" buttons when both are available.
+ */
+export async function sendPaymentChoicePrompt(orderId: string): Promise<{ ok: boolean; message: string }> {
+  const order = await db.order.findUnique({
+    where: { id: orderId },
+    include: { customer: true, client: { select: { name: true } } },
+  });
+  if (!order) return { ok: false, message: "Order not found." };
+  if (order.status === "CANCELLED") return { ok: false, message: "This order is cancelled." };
+  if (order.paidAt || ["PAID", "DISPATCHED", "DELIVERED"].includes(order.status)) return { ok: false, message: "This order is already paid." };
+  if (order.total <= 0) return { ok: false, message: "This order has no total." };
+  const c = order.customer;
+  if (c.optedOut) return { ok: false, message: "Customer opted out." };
+  if ((await getSettings()).provider !== "META") return { ok: false, message: "Needs Meta Cloud API." };
+
+  const { open, number, cfg } = await replyContext(c);
+  if (!open) return { ok: false, message: "Customer 24h window closed." };
+
+  const items = await itemsWithNames(order);
+  const pricing = getOrderPricing(items, order.total, { applyDefaultWhenEqual: true, discount: pointsDiscount(order) });
+  const ref = orderRef(order);
+  const isReplacement = Boolean(order.internalNote?.includes("Replaced unpaid cart"));
+  const head = isReplacement
+    ? `Hello ${firstName(c.name)}, here is your updated ${order.client.name} order ${ref} (replacing your earlier cart).`
+    : `Hello ${firstName(c.name)}, here is your ${order.client.name} order ${ref}.`;
+
+  const pointsLine = pricing.discount > 0 ? `\nLoyalty points (${order.pointsRedeemed}): -${money(pricing.discount, order.currency)}` : "";
+  const shippingLine = pricing.shipping > 0 ? `\nShipping: ${money(pricing.shipping, order.currency)}` : "";
+  const breakdown = `Items: ${itemsText(items)} (${money(pricing.subtotal, order.currency)})${shippingLine}${pointsLine}\nTotal: ${money(pricing.total, order.currency)}`;
+  let body = `${head}\n\n${breakdown}\n\nHow would you like to pay?`;
+  if (body.length > 1024) body = body.slice(0, 1024);
+
+  try {
+    const res = await sendInteractiveButtons(
+      cfg,
+      c.phone,
+      body,
+      [
+        { id: `pay_online:${order.id}`, title: "💳 Pay now online" },
+        { id: `pay_cod:${order.id}`, title: "🚚 Cash on delivery" },
+      ],
+      { header: "Choose how to pay", footer: "Tap one option" }
+    );
+    await logMessage(c.id, "Payment choice", body, res, number?.id ?? null);
+    return { ok: true, message: `Payment choice sent to ${c.name}.` };
+  } catch (e) {
+    return { ok: false, message: explainSendError(e).error };
+  }
+}
+
 
