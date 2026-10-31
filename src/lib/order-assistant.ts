@@ -7,10 +7,28 @@
 //   • a typed list or a voice note                            → "our team will put your order together"
 //   • outside shop hours                                      → once a night, when the shop opens
 //   • "Reorder" / "same order"                                → "Same as last time?" (lib/order-intake.ts)
+//    "damaged", "wrong item", "refund"                        → sorry, a photo please; staff see it on the order, offers pause
+//    "not received" after delivery                            → the same (still on its way: the order's status)
+//    "call me", "customer care"                               → someone will call; the shop's number if saved
+//    hours, delivery, payment, where the shop is              → answered from the shop's own settings
+//    "thank you" / "ok" / a sticker                           → a short "you're welcome" / nothing
+//    anything else                                            → "our team will reply shortly" (once in 6 hours)
+//    "hi"                                                     → the shop's welcome with its catalogue (lib/catalog.ts)
 // While staff are chatting with a customer (a typed reply in the last 2 hours), these automatic replies pause.
 import "server-only";
 import { formatInTimeZone } from "date-fns-tz";
-import { sendCatalogueTo } from "./catalog";
+import {
+  deliveryText,
+  hoursText,
+  humanText,
+  intentOf,
+  locationText,
+  paymentText,
+  problemText,
+  receivedText,
+  thanksText,
+} from "./assistant-intents";
+import { sendCatalogueTo, shopInfoFor, type CatalogueTrigger } from "./catalog";
 import { db } from "./db";
 import { APP_TZ } from "./format";
 import { pushOrderToSheet } from "./google-sheets-live";
@@ -37,6 +55,11 @@ export const STATUS_REPLY = "Order status";
 export const CLOSED_REPLY = "Closed reply";
 export const LIST_REPLY = "Order by message";
 export const WHO_REPLY = "Introduction";
+export const PROBLEM_REPLY = "Problem reported";
+export const CALL_REPLY = "Call request";
+export const INFO_REPLY = "Shop info";
+export const THANKS_REPLY = "Thank you";
+export const RECEIVED_REPLY = "Auto reply";
 
 type Cust = { id: string; clientId: string; phone: string; name: string; optedOut: boolean; tags?: string[] };
 
@@ -290,12 +313,47 @@ export async function handleAssistantButton(c: Cust, actionVal: string, text: st
 /* ---------- Typed messages ---------- */
 
 type Inbound = { type?: string };
+type Tagged = Cust & { tags?: string[] };
+
+const addTag = (c: Tagged, tag: string) =>
+  db.customer.update({ where: { id: c.id }, data: { tags: Array.from(new Set([...(c.tags ?? []), tag])) } }).catch(() => {});
+
+/**
+ * Something went wrong with what they received: one sorry (not repeated within 2 hours), the problem noted on their
+ * latest order for staff, the customer tagged so offers pause until it's sorted.
+ */
+async function reportProblem(c: Tagged, text: string, opensAt: string | null) {
+  const shop = await shopInfoFor(c.clientId);
+  await addTag(c, "issue-open");
+  const o = await db.order.findFirst({ where: { customerId: c.id, createdAt: { gte: new Date(Date.now() - 30 * DAY) } }, orderBy: { createdAt: "desc" } });
+  if (o) {
+    await db.order.update({ where: { id: o.id }, data: { internalNote: appendNote(o.internalNote, `Customer reported a problem on WhatsApp (${today()}): "${text.trim().slice(0, 160)}"`) } });
+    pushOrderToSheet(o.id, "ORDER_UPDATE", "Customer reported a problem");
+  }
+  if (await sentRecently(c.id, PROBLEM_REPLY, 2 * HOUR)) return true;
+  await textInWindow(c, problemText(shop, c.name, opensAt), PROBLEM_REPLY).catch(() => {});
+  return true;
+}
+
+/** Sends a reply once, unless the same kind went out in the last `ms` (a double message gets one answer). */
+async function once(c: Cust, label: string, ms: number, body: () => string | Promise<string>) {
+  if (await sentRecently(c.id, label, ms)) return true;
+  await textInWindow(c, await body(), label).catch(() => {});
+  return true;
+}
 
 /**
  * Automatic replies to what the customer typed or sent (not carts, payments or the address, handled earlier).
- * Returns true when it answered, so the catalogue doesn't also go out.
+ * Returns true when it answered (or chose to stay quiet), so the catalogue doesn't also go out; false leaves a hello
+ * or a request for products to the catalogue (the caller sends it for `trigger`).
  */
-export async function handleAssistantText(c: Cust, m: Inbound, text: string, kind: string, opts: { greeting: boolean; staff?: boolean }) {
+export async function handleAssistantText(
+  c: Tagged,
+  m: Inbound,
+  text: string,
+  kind: string,
+  opts: { greeting: boolean; staff?: boolean; trigger?: CatalogueTrigger | null },
+) {
   if (!(await canMessage(c))) return false;
   const isText = m.type === "text";
 
@@ -306,6 +364,10 @@ export async function handleAssistantText(c: Cust, m: Inbound, text: string, kin
     return true;
   }
   if (opts.staff) return false; // staff are chatting: no automatic replies (the caller decides about the catalogue)
+
+  // "Ok", "seri", 👍, a sticker or a reaction: an acknowledgement, nothing to answer.
+  const intent = isText ? intentOf(text) : null;
+  if (intent === "ack" || m.type === "sticker" || m.type === "reaction") return true;
 
   if (isText && REORDER_RE.test(text)) {
     if (!(await offerReorder(c.id))) await sendCatalogueTo(c.id);
@@ -318,38 +380,84 @@ export async function handleAssistantText(c: Cust, m: Inbound, text: string, kin
       `${hello(c.name)} this is ${bold(await shopName(c.clientId))} on WhatsApp. 👋 You're receiving our messages because you've shopped with us or joined our list.\n\nReply ${bold("STOP")} anytime if you'd rather not hear from us.`,
       WHO_REPLY,
     ).catch(() => {});
-    await db.customer.update({ where: { id: c.id }, data: { tags: Array.from(new Set([...(c.tags ?? []), "asked-who"])) } });
+    await addTag(c, "asked-who");
     return true;
   }
-  if (isText && STATUS_RE.test(text)) return replyWithStatus(c);
-  if (isText && opts.greeting && (await replyWithStatus(c, { greeting: true }))) return true;
 
-  // Outside shop hours: once a night.
   const pay = await paySettingsFor(c.clientId);
-  if (isShopClosed(pay.settings)) {
-    if (!(await sentRecently(c.id, CLOSED_REPLY, 10 * HOUR))) {
-      await textInWindow(
-        c,
-        `Thank you for your message! 🌙\n\n${await shopName(c.clientId)} is closed right now. We open at ${bold(opensAtText(pay.settings))} and will reply as soon as we're back.\n\nYou can still browse our catalogue and send your order anytime.`,
-        CLOSED_REPLY,
-      ).catch(() => {});
-      // A hello still gets the catalogue below; anything else waits for the team.
-      return !opts.greeting;
-    }
+  const closed = isShopClosed(pay.settings);
+  const opensAt = closed ? opensAtText(pay.settings) : null;
+
+  // Something wrong with an order comes before everything else: it's the message that loses a customer if ignored.
+  if (intent === "notArrived") {
+    const o = await currentOrder(c.id);
+    // Still on its way (or being prepared): the honest answer is where it is. Delivered but not received: a problem.
+    if (o && o.status !== "DELIVERED") return replyWithStatus(c);
+    return reportProblem(c, text, opensAt);
+  }
+  if (intent === "problem") return reportProblem(c, text, opensAt);
+
+  if (intent === "human") {
+    await addTag(c, "callback");
+    const shop = await shopInfoFor(c.clientId);
+    return once(c, CALL_REPLY, 2 * HOUR, () => humanText(shop, c.name, opensAt));
+  }
+  if (isText && STATUS_RE.test(text)) return replyWithStatus(c);
+
+  // Questions the shop's own settings answer: hours, delivery, payment, where the shop is.
+  if (intent === "hours" || intent === "delivery" || intent === "payment" || intent === "location") {
+    const shop = await shopInfoFor(c.clientId);
+    const p = pay.settings;
+    const body =
+      intent === "hours"
+        ? hoursText(shop, p, closed)
+        : intent === "delivery"
+          ? deliveryText(shop, p)
+          : intent === "payment"
+            ? paymentText(shop, p, { waPay: pay.waPay, upi: pay.upi })
+            : locationText(shop, opensAt);
+    return once(c, `${INFO_REPLY}: ${intent}`, 30 * MIN, () => body);
+  }
+  // A thank-you gets one warm line; a second within 6 hours, nothing.
+  if (intent === "thanks") {
+    const shop = await shopInfoFor(c.clientId);
+    return once(c, THANKS_REPLY, 6 * HOUR, () => thanksText(shop, c.name));
   }
 
-  // An order written out, or spoken: staff build it from the chat.
-  if ((isText && LIST_RE.test(text)) || m.type === "audio" || m.type === "image") {
+  if (isText && opts.greeting && (await replyWithStatus(c, { greeting: true }))) return true;
+
+  // A hello or a request for products at night: the catalogue's welcome says when the shop opens (one message).
+  if (opts.trigger) return false;
+
+  // An order written out, or spoken, photographed or filmed: staff build it from the chat.
+  const when = opensAt ? `as soon as we open at ${bold(opensAt)}` : "shortly";
+  const media = m.type === "audio" ? "voice message" : m.type === "image" ? "photo" : m.type === "video" ? "video" : m.type === "document" ? "file" : null;
+  if ((isText && LIST_RE.test(text)) || media) {
     if (await sentRecently(c.id, LIST_REPLY, 2 * HOUR)) return true;
-    const body =
-      m.type === "audio" || m.type === "image"
-        ? `Thank you for your ${m.type === "audio" ? "voice message" : "photo"}${nameOf(c.name) ? `, ${nameOf(c.name)}` : ""}! Our team will ${m.type === "audio" ? "listen" : "take a look"} and reply shortly.`
-        : `Thank you${nameOf(c.name) ? `, ${nameOf(c.name)}` : ""}! 🙏 Our team will put your order together and send it here for you to confirm.\n\nPrefer to choose yourself? Just say ${bold("catalogue")} and we'll send it.`;
+    const body = media
+      ? `Thank you for the ${media}${nameOf(c.name) ? `, ${nameOf(c.name)}` : ""}! Our team will ${media === "voice message" ? "listen" : "take a look"} and reply ${when}.`
+      : `Thank you${nameOf(c.name) ? `, ${nameOf(c.name)}` : ""}! 🙏 Our team will put your order together and send it here for you to confirm${opensAt ? ` ${when}` : ""}.\n\nPrefer to choose yourself? Just say ${bold("catalogue")} and we'll send it.`;
     await textInWindow(c, body, LIST_REPLY).catch(() => {});
     return true;
   }
+
+  // Outside shop hours: one reply a night, then quiet until the team is back (no repeats on every message).
+  if (closed) {
+    if (!(await sentRecently(c.id, CLOSED_REPLY, 10 * HOUR))) {
+      const shop = await shopInfoFor(c.clientId);
+      await textInWindow(
+        c,
+        `Thank you for your message! 🌙\n\n${bold(shop.name)} is closed right now. We open at ${bold(opensAt ?? opensAtText(pay.settings))} and will reply first thing.${shop.catalogue ? "\n\nYou can still browse our catalogue and send your order anytime." : ""}`,
+        CLOSED_REPLY,
+      ).catch(() => {});
+    }
+    return true;
+  }
+
+  // Anything else: received, and the team will reply (once in 6 hours, so a conversation isn't interrupted).
   void kind;
-  return false;
+  const shop = await shopInfoFor(c.clientId);
+  return once(c, RECEIVED_REPLY, 6 * HOUR, () => receivedText(shop, c.name, opensAt));
 }
 
 /** Records where a customer came from (a Click-to-WhatsApp ad, or a "(via web)" style link text) as a src: tag, once. */

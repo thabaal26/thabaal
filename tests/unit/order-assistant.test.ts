@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, test } from "node:test";
 import { db } from "../../src/lib/db";
+import { autoSendCatalogue } from "../../src/lib/catalog";
 import { confirmCod } from "../../src/lib/cod";
 import { expireUnfinishedOrders, nudgeUnfinishedOrders } from "../../src/lib/cart-followups";
 import { busyForOffers, handleAssistantButton, handleAssistantText, handleCancelRequest, noteSource, replyWithStatus } from "../../src/lib/order-assistant";
@@ -100,7 +101,7 @@ describe("WhatsApp order assistant", () => {
 
   test("'hi' a week after delivery is a new conversation: the catalogue answers it", async () => {
     await order("QS-4", { status: "DELIVERED", deliveredAt: new Date(Date.now() - 5 * 24 * HOUR), paidAt: new Date() });
-    assert.equal(await handleAssistantText(await asCust(), { type: "text" }, "hello", "text", { greeting: true }), false);
+    assert.equal(await handleAssistantText(await asCust(), { type: "text" }, "hello", "text", { greeting: true, trigger: "greeting" }), false);
   });
 
   /* ---------- Cancel ---------- */
@@ -348,5 +349,126 @@ describe("WhatsApp order assistant", () => {
     assert.match((await cust()).optInSource ?? "", /WhatsApp ad: Diwali oils|Inbound/);
     await noteSource(customerId, {}, "Hi, I want to order (via instagram)");
     assert.equal((await cust()).tags.filter((t) => t.startsWith("src:")).length, 1); // the first source stays
+  });
+
+  /* ---------- Every kind of message, in the shop's own name ---------- */
+
+  const say = async (text: string, extra: { greeting?: boolean; trigger?: "greeting" | "asked" | "prices" | null } = {}) =>
+    handleAssistantText(await asCust(), { type: "text" }, text, "text", { greeting: false, ...extra });
+  const catalogueBody = () => String((last()?.interactive as { body?: { text?: string } } | undefined)?.body?.text ?? "");
+
+  test("'hi' from a new customer: the catalogue with 'Welcome to <this shop>'", async () => {
+    assert.equal(await say("hi", { greeting: true, trigger: "greeting" }), false); // the catalogue answers a hello
+    await autoSendCatalogue(customerId, "greeting");
+    assert.equal((last()?.interactive as { type?: string })?.type, "catalog_message");
+    assert.match(catalogueBody(), /^Hi Meena! 👋 Welcome to \*QA Assistant Shop\*\./);
+  });
+
+  test("'hi' from someone who ordered before: 'Welcome back', with Reorder", async () => {
+    await order("QS-40", { status: "DELIVERED", deliveredAt: new Date(Date.now() - 10 * 24 * HOUR), paidAt: new Date() });
+    await autoSendCatalogue(customerId, "greeting");
+    assert.match(catalogueBody(), /^Welcome back, Meena! 👋 Lovely to hear from you again at \*QA Assistant Shop\*/);
+    assert.match(catalogueBody(), /reply \*Reorder\*/);
+  });
+
+  test("no catalogue connected: a hello still gets the shop's welcome, as text", async () => {
+    const ok = globalThis.fetch;
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : {};
+      if (body.interactive?.type === "catalog_message")
+        return new Response(JSON.stringify({ error: { message: "No catalog", code: 131009 } }), { status: 400, headers: { "Content-Type": "application/json" } });
+      return ok(url, init);
+    }) as typeof fetch;
+    try {
+      await autoSendCatalogue(customerId, "greeting");
+    } finally {
+      globalThis.fetch = ok;
+    }
+    assert.match(lastText(), /Welcome to \*QA Assistant Shop\*/);
+    assert.match(lastText(), /How can we help you today/);
+    assert.ok(await db.message.findFirst({ where: { customerId, templateName: "Welcome" } }));
+  });
+
+  test("'hi' at night: one message (the welcome says when we open), no separate closed reply", async () => {
+    await db.client.update({ where: { id: clientId }, data: { paySettings: pay({ hoursOn: true, openAt: shopClock(1), closeAt: shopClock(2) }) } });
+    assert.equal(await say("hi", { greeting: true, trigger: "greeting" }), false);
+    assert.equal(sent.length, 0);
+    await autoSendCatalogue(customerId, "greeting");
+    assert.equal(sent.length, 1);
+    assert.match(catalogueBody(), /closed right now and open at/);
+  });
+
+  test("'damaged': sorry, a photo please; noted on the order for staff, offers pause; said twice, answered once", async () => {
+    const o = await order("QS-41", { status: "DELIVERED", deliveredAt: new Date(), paidAt: new Date() });
+    assert.equal(await say("the oil bottle came damaged"), true);
+    assert.match(lastText(), /really sorry about this, Meena.*send a photo.*QA Assistant Shop\* team/);
+    assert.ok((await cust()).tags.includes("issue-open"));
+    assert.match((await fresh(o.id)).internalNote ?? "", /Customer reported a problem on WhatsApp .*"the oil bottle came damaged"/);
+    assert.equal((await busyForOffers([customerId])).get(customerId), "Reported a problem with an order");
+    const count = sent.length;
+    await say("it is leaking everywhere");
+    assert.equal(sent.length, count);
+  });
+
+  test("'not received' while it's on its way: the order's status, not a complaint", async () => {
+    await order("QS-42", { status: "DISPATCHED", paidAt: new Date() });
+    await say("I have not received my order");
+    assert.match(lastText(), /on its way/);
+    assert.ok(!(await cust()).tags.includes("issue-open"));
+  });
+
+  test("'not received' after it was marked delivered: treated as a problem", async () => {
+    await order("QS-43", { status: "DELIVERED", deliveredAt: new Date(), paidAt: new Date() });
+    await say("I didn't get my parcel");
+    assert.match(lastText(), /really sorry/);
+    assert.ok((await cust()).tags.includes("issue-open"));
+  });
+
+  test("'call me': someone will call, with the shop's number; the customer is tagged for a call back", async () => {
+    await db.client.update({ where: { id: clientId }, data: { supportPhone: "98400 12345" } });
+    await say("please call me");
+    assert.match(lastText(), /Someone from \*QA Assistant Shop\* will call you on this number shortly/);
+    assert.match(lastText(), /98400 12345/);
+    assert.ok((await cust()).tags.includes("callback"));
+    await db.client.update({ where: { id: clientId }, data: { supportPhone: null } });
+  });
+
+  test("delivery and payment questions are answered from the shop's own settings, once in 30 minutes", async () => {
+    await say("do you deliver to KK Nagar?");
+    assert.match(lastText(), /Yes, we deliver/);
+    assert.match(lastText(), /Cash on delivery is available/);
+    const count = sent.length;
+    await say("do you deliver to Anna Nagar?");
+    assert.equal(sent.length, count);
+    await say("is COD available");
+    assert.match(lastText(), /you can pay online right here in WhatsApp/);
+  });
+
+  test("'ok', 👍 or a sticker: no reply at all (and no catalogue)", async () => {
+    assert.equal(await say("ok"), true);
+    assert.equal(await say("👍", { greeting: true }), true);
+    assert.equal(await handleAssistantText(await asCust(), { type: "sticker" }, "[Sticker]", "media", { greeting: false }), true);
+    assert.equal(sent.length, 0);
+  });
+
+  test("'thank you': one warm line with the shop's name; a second within 6 hours, nothing", async () => {
+    await say("thank you so much");
+    assert.match(lastText(), /most welcome, Meena! 😊 Thank you for choosing \*QA Assistant Shop\*/);
+    const count = sent.length;
+    await say("thanks");
+    assert.equal(sent.length, count);
+  });
+
+  test("anything else: 'thanks for reaching out, our team will reply shortly', once in 6 hours", async () => {
+    assert.equal(await say("do you have ghee?"), true);
+    assert.match(lastText(), /Thanks for reaching out to \*QA Assistant Shop\*, Meena! 🙏 Our team will reply shortly/);
+    const count = sent.length;
+    await say("and also sesame oil?");
+    assert.equal(sent.length, count);
+  });
+
+  test("a video or a file gets 'our team will take a look'", async () => {
+    await handleAssistantText(await asCust(), { type: "document" }, "[Document]", "media", { greeting: false });
+    assert.match(lastText(), /Thank you for the file, Meena! Our team will take a look/);
   });
 });

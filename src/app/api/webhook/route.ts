@@ -87,7 +87,7 @@ async function applyStatus(s: StatusUpdate) {
       await chargeMessage(msg.id, s.pricing.category.toLowerCase()).catch((e) => console.error("[wallet] charge failed", msg.id, e));
     }
   } else if (!msg.pricingCategory && (s.status.toUpperCase() === "DELIVERED" || s.status.toUpperCase() === "READ")) {
-    const inferred = msg.template?.category?.toLowerCase() ?? (["Catalogue", "Price list", "Payment request", "Freeform reply", "Auto reply", "Typed reply", "Media reply"].includes(msg.templateName) ? "service" : null);
+    const inferred = msg.template?.category?.toLowerCase() ?? (["Catalogue", "Price list", "Payment request", "Freeform reply", "Auto reply", "Typed reply", "Media reply", "Welcome"].includes(msg.templateName) ? "service" : null);
     if (inferred) {
       await db.message.update({ where: { id: msg.id }, data: { pricingCategory: inferred, billable: inferred !== "service" } });
     }
@@ -708,10 +708,16 @@ export async function POST(req: NextRequest) {
           // today: reply with the free catalogue message (at most once every 12 hours).
           const isSystemOrPayment = handledAsPayment || handledByOrderButton || m.type === "order" || m.type === "errors" || m.type === "unsupported" || m.type === "payment";
           if (customer && !isSystemOrPayment) {
-            const trigger = catalogueTrigger(text, kind) ?? ((await firstMessageToday(customer.id)) ? "greeting" : null);
-            // The order assistant answers first (order status, reorder, wrong number, closed hours, typed lists...).
+            // What they asked for: prices, the catalogue, or a hello. An unknown campaign button counts as asking.
+            const trigger = catalogueTrigger(text, kind) ?? (kind === "button" ? "asked" : null);
+            // Their first message today is treated like a hello for the order's status (an open order is what they mean).
+            const firstToday = !trigger && (await firstMessageToday(customer.id));
+            // The order assistant answers first (problems, a person, hours, delivery, payment, order status, reorder,
+            // wrong number, closed hours, typed lists...); anything it doesn't know gets "our team will reply".
             const staff = await staffActive(customer.id).catch(() => false);
-            const answered = await handleAssistantText(customer, m, text, kind, { greeting: trigger === "greeting", staff }).catch((e) => (console.error("Assistant reply failed", e), false));
+            const answered = await handleAssistantText(customer, m, text, kind, { greeting: trigger === "greeting" || firstToday, staff, trigger }).catch(
+              (e) => (console.error("Assistant reply failed", e), false),
+            );
             // A hello while staff are chatting gets no catalogue; asking for it always does.
             if (trigger && !answered && !(staff && trigger === "greeting"))
               await autoSendCatalogue(customer.id, trigger).catch((e) => console.error("Automatic catalogue reply failed", e));
