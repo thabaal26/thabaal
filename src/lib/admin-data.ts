@@ -14,6 +14,7 @@ import { loadPlanPrices } from "./plan-prices-server";
 import { RATES } from "./spend";
 import { accessState, CYCLE_MONTHS, DAY_MS, summarize, WARN_DAYS, type AccessState } from "./subscription-core";
 import { SALE_WHERE } from "@/lib/sale";
+import { PRESSES, SECTIONS } from "./usage-record";
 
 // ---- plans -------------------------------------------------------------------------------------------------
 
@@ -55,6 +56,13 @@ export function lastMonths(n: number, now = new Date()): Month[] {
 }
 
 const monthKey = (d: Date) => formatInTimeZone(d, APP_TZ, "yyyy-MM");
+/** The calendar day (app time zone) of `d`, as a value for a DATE column. */
+const dateOnly = (d: Date) => new Date(`${formatInTimeZone(d, APP_TZ, "yyyy-MM-dd")}T00:00:00Z`);
+
+/** The first day usage was recorded (lib/usage-record.ts), or null before anything was. */
+async function usageSince(): Promise<Date | null> {
+  return (await db.usageDay.aggregate({ _min: { day: true } }))._min.day;
+}
 
 // ---- status words for a business's plan --------------------------------------------------------------------
 
@@ -125,6 +133,9 @@ export type ClientRow = {
   messages30: { sent: number; read: number; failed: number; replied: number };
   customers: number;
   lastActivity: Date | null;
+  /** When a login of the business last opened thabaal or signed in (usage tracking), and sign-ins in 30 days. */
+  lastOpened: Date | null;
+  logins30: number;
   connected: boolean;
   numbersRed: number;
   risk: number;
@@ -217,7 +228,15 @@ export async function loadClientRows(now = new Date()): Promise<{ rows: ClientRo
     lastReplies(),
     db.order.groupBy({ by: ["clientId"], _max: { createdAt: true } }),
   ]);
-  const prices = await loadPlanPrices();
+  const [prices, opened, logins, since] = await Promise.all([
+    loadPlanPrices(),
+    db.usageDay.groupBy({ by: ["clientId"], where: { kind: { in: ["open", "login"] } }, _max: { lastAt: true } }),
+    db.usageDay.groupBy({ by: ["clientId"], where: { kind: "login", day: { gte: dateOnly(d30) } }, _sum: { count: true } }),
+    usageSince(),
+  ]);
+  // "Not opened lately" only counts once usage has been recorded for longer than that.
+  const quietDays = 14;
+  const canJudgeQuiet = !!since && since.getTime() <= now.getTime() - quietDays * DAY_MS;
   // Newest plan subscription per business (Razorpay auto-pay).
   const subs = await db.razorpayRecord.findMany({
     where: { kind: "subscription", purpose: "plan", status: { in: ["authenticated", "active", "pending", "halted", "cancelling"] } },
@@ -258,7 +277,8 @@ export async function loadClientRows(now = new Date()): Promise<{ rows: ClientRo
       templates: templates.find((t) => t.clientId === c.id)?._count ?? 0,
     };
 
-    // Health: a plain points score from facts on record. Logins are not tracked yet, so app opens don't count.
+    // Health: a plain points score from facts on record.
+    const lastOpened = opened.find((o) => o.clientId === c.id)?._max.lastAt ?? null;
     const reasons: string[] = [];
     let risk = 0;
     const flag = (points: number, why: string) => {
@@ -276,6 +296,8 @@ export async function loadClientRows(now = new Date()): Promise<{ rows: ClientRo
     if (numbersRed) flag(20, "a number is rated red by Meta");
     if (connectedNumbers && sent === 0) flag(20, "sent nothing in 30 days");
     if (sent >= 10 && failed / (sent + failed) > 0.15) flag(10, "many messages failing");
+    if (canJudgeQuiet && (paidNow || c.planRequired) && (!lastOpened || lastOpened.getTime() < now.getTime() - quietDays * DAY_MS))
+      flag(15, lastOpened ? `hasn't opened thabaal in ${quietDays} days` : "hasn't opened thabaal yet");
     const [health, healthLabel]: [Tone, string] = risk < 20 ? ["ok", "Healthy"] : risk < 50 ? ["warn", "Watch"] : ["bad", "At risk"];
 
     return {
@@ -312,6 +334,8 @@ export async function loadClientRows(now = new Date()): Promise<{ rows: ClientRo
       messages30: { sent, read, failed, replied },
       customers: customers.find((x) => x.clientId === c.id)?._count ?? 0,
       lastActivity,
+      lastOpened,
+      logins30: logins.find((l) => l.clientId === c.id)?._sum.count ?? 0,
       connected: connectedNumbers > 0,
       numbersRed,
       risk,
@@ -325,7 +349,8 @@ export async function loadClientRows(now = new Date()): Promise<{ rows: ClientRo
 
 // ---- history (last six months) ------------------------------------------------------------------------------
 
-export type MonthPoint = { key: string; label: string; mrr: number; paying: number; collected: number; spend: number };
+/** `kept`: of the businesses paying at the end of the month before, the percent still paying at this month's end. */
+export type MonthPoint = { key: string; label: string; mrr: number; paying: number; collected: number; spend: number; kept: number | null };
 
 export async function loadHistory(purchases: PurchaseRow[], now = new Date(), n = 6): Promise<MonthPoint[]> {
   const months = lastMonths(n, now);
@@ -336,10 +361,13 @@ export async function loadHistory(purchases: PurchaseRow[], now = new Date(), n 
     WHERE m.billable = true AND m.simulated = false AND m."pricingCategory" IS NOT NULL AND m."pricingCategory" <> 'service'
       AND m.status::text IN ('SENT', 'DELIVERED', 'READ') AND m."createdAt" >= ${months[0].start}
     GROUP BY 1, 2`;
+  const payingAt = (at: Date) => new Set(verified.filter((p) => p.startsAt! <= at && at < p.endsAt!).map((p) => p.clientId));
   return months.map((mo) => {
     const at = mo.end > now ? now : new Date(mo.end.getTime() - 1);
     const live = verified.filter((p) => p.startsAt! <= at && at < p.endsAt!);
     const paying = new Set(live.map((p) => p.clientId));
+    const before = payingAt(new Date(mo.start.getTime() - 1));
+    const kept = before.size ? Math.round(([...before].filter((id) => paying.has(id)).length / before.size) * 100) : null;
     const collected = verified
       .filter((p) => monthKey(p.decidedAt ?? p.createdAt) === mo.key)
       .reduce((s, p) => s + p.amountPaise / 100, 0);
@@ -351,6 +379,7 @@ export async function loadHistory(purchases: PurchaseRow[], now = new Date(), n 
       paying: paying.size,
       collected,
       spend,
+      kept,
     };
   });
 }
@@ -376,13 +405,46 @@ export async function loadUsage(now = new Date()) {
     campaigns: runs.filter((r) => monthKey(r.startedAt) === mo.key).length,
     templates: templates.filter((t) => monthKey(t.createdAt) === mo.key).length,
   }));
+  // What business logins opened and did (lib/usage-record.ts): this month, and which days in the last 14.
+  // Raw SQL gets the day as text, so the database's own time zone can't shift it.
+  const thisMonth = dateOnly(months[months.length - 1].start);
+  const monthDay = formatInTimeZone(months[months.length - 1].start, APP_TZ, "yyyy-MM-dd");
+  const firstDay = formatInTimeZone(day0, APP_TZ, "yyyy-MM-dd");
+  const [sectionRows, pressRows, activeRows, openDays, since] = await Promise.all([
+    db.$queryRaw<{ key: string; shops: number }[]>`
+      SELECT "key", count(DISTINCT "clientId")::int AS shops FROM "UsageDay"
+      WHERE "kind" = 'open' AND "day" >= ${monthDay}::date GROUP BY 1`,
+    db.usageDay.groupBy({ by: ["key"], where: { kind: "press", day: { gte: thisMonth } }, _sum: { count: true } }),
+    db.$queryRaw<{ n: number }[]>`
+      SELECT count(DISTINCT "clientId")::int AS n FROM "UsageDay" WHERE "kind" IN ('open', 'login') AND "day" >= ${monthDay}::date`,
+    db.$queryRaw<{ d: string; shops: number }[]>`
+      SELECT to_char("day", 'YYYY-MM-DD') AS d, count(DISTINCT "clientId")::int AS shops FROM "UsageDay"
+      WHERE "kind" IN ('open', 'login') AND "day" >= ${firstDay}::date GROUP BY 1`,
+    usageSince(),
+  ]);
+  const activeShops = activeRows[0]?.n ?? 0;
+  // Sections folded like the sidebar (Calls with Chats): a business counts once per label.
+  const sectionShops = new Map<string, number>();
+  for (const r of sectionRows) sectionShops.set(SECTIONS[r.key] ?? r.key, Math.max(sectionShops.get(SECTIONS[r.key] ?? r.key) ?? 0, r.shops));
+  const sections = [...sectionShops].map(([label, shops]) => ({ label, shops, pct: activeShops ? Math.round((shops / activeShops) * 100) : 0 })).sort((a, b) => b.shops - a.shops);
+  const pressTotals = new Map<string, number>();
+  for (const r of pressRows) pressTotals.set(PRESSES[r.key] ?? r.key, (pressTotals.get(PRESSES[r.key] ?? r.key) ?? 0) + (r._sum.count ?? 0));
+  const presses = [...pressTotals].map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);
+
   const days = Array.from({ length: 14 }, (_, i) => {
     const d = new Date(day0.getTime() + i * DAY_MS + 12 * 3600_000);
     const key = formatInTimeZone(d, APP_TZ, "yyyy-MM-dd");
     const row = daily.find((r) => r.d === key);
-    return { key, label: formatInTimeZone(d, APP_TZ, "EEEEE"), date: formatInTimeZone(d, APP_TZ, "d MMM"), messages: row?.n ?? 0, shops: row?.shops ?? 0 };
+    return {
+      key,
+      label: formatInTimeZone(d, APP_TZ, "EEEEE"),
+      date: formatInTimeZone(d, APP_TZ, "d MMM"),
+      messages: row?.n ?? 0,
+      shops: row?.shops ?? 0,
+      opened: openDays.find((r) => r.d === key)?.shops ?? 0,
+    };
   });
-  return { work, days };
+  return { work, days, sections, presses, activeShops, since };
 }
 
 // ---- plan subscriptions (Razorpay auto-pay) ----------------------------------------------------------------------

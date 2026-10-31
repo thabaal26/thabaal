@@ -6,6 +6,7 @@ import { getScope, owned } from "@/lib/session";
 import { sendToCustomer } from "./send";
 import type { SendResult } from "./send-helpers";
 import { SALE_WHERE } from "@/lib/sale";
+import { trackPress } from "@/lib/usage";
 
 /**
  * Sends the client's refill template to one customer now, from the refill calendar. Marks their
@@ -13,6 +14,7 @@ import { SALE_WHERE } from "@/lib/sale";
  * Quiet hours and the marketing gap come back as a question (`soft`) the page asks before forcing.
  */
 export async function sendRefillNudge(customerId: string, force = false): Promise<SendResult> {
+  trackPress("refill.nudge");
   const s = await getScope();
   const c = await db.customer.findFirst({
     where: { id: customerId, ...owned(s) },

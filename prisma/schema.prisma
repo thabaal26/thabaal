@@ -105,6 +105,7 @@ model Client {
   /// customers, addresses, orders, items, payments, chats and activity.
   sheetLink           SheetLink?
   sheetLogs           SheetLog[]
+  usage               UsageDay[]
   /// Win-back: customers whose last order is this many days old are tagged "lapsed" and sent winbackTemplate once.
   lapsedDays          Int               @default(60)
   winbackTemplateId   String?
@@ -194,6 +195,7 @@ model User {
   clientId     String?
   client       Client?      @relation(fields: [clientId], references: [id], onDelete: Cascade)
   createdAt    DateTime     @default(now())
+  usage        UsageDay[]
 }
 
 model Customer {
@@ -764,6 +766,24 @@ model RazorpayRecord {
 }
 
 /// Razorpay webhook events already handled (x-razorpay-event-id).
+/// What a business's logins did on one day (lib/usage-record.ts), for the admin panel's Usage page: sections
+/// opened ('open'), actions done ('press') and sign-ins ('login'). Thabaal's own logins are never counted.
+model UsageDay {
+  clientId String
+  client   Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The day in the app's time zone (Asia/Kolkata).
+  day      DateTime @db.Date
+  kind     String
+  key      String
+  count    Int      @default(0)
+  lastAt   DateTime @default(now())
+
+  @@id([clientId, userId, day, kind, key])
+  @@index([day])
+}
+
 /// One business's Google Sheet: who connected it, the Google access (refresh token, encrypted) and how far the
 /// live sync has got. Thabaal only ever touches the one spreadsheet it created (Google's drive.file permission).
 model SheetLink {

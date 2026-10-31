@@ -19,6 +19,7 @@ import { LanguageSwitch, LanguageToggle } from "@/lib/i18n/language-switch";
 import { AppearanceSync } from "@/components/appearance-sync";
 import { IconSetLink } from "@/components/icon-set-link";
 import { InlineScript } from "@/components/inline-script";
+import { UsageBeacon } from "@/components/usage-beacon";
 import "./portal.css";
 import "./mobile.css";
 import { PlanDueBar } from "./plan-due-bar";
@@ -199,6 +200,8 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           <IconSetLink set={lookData.iconset} />
           <InlineScript html={appearanceScript(lookData)} />
           <AppearanceSync data={lookData} />
+          {/* Sections a business opens, for the admin panel's Usage page (Thabaal's own logins aren't counted). */}
+          {!scope.isAdmin && <UsageBeacon />}
           <a href="#main" className="sr-only z-[70] rounded-control bg-panel px-4 py-2 text-sm font-medium text-ink shadow-pop focus:not-sr-only focus:fixed focus:left-4 focus:top-4">
             Skip to content
           </a>

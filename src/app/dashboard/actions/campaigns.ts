@@ -16,6 +16,7 @@ import { senderFor } from "@/lib/senders";
 import { mine, requireAdmin, requireManager } from "@/lib/session";
 import { sendToCustomer } from "./send";
 import type { ActionResult } from "./templates";
+import { trackPress } from "@/lib/usage";
 
 export type CampaignInput = {
   name: string;
@@ -37,6 +38,7 @@ function refresh() {
 }
 
 export async function saveCampaign(id: string | null, input: CampaignInput): Promise<ActionResult> {
+  trackPress("campaign.save");
   const s = id ? await requireManager() : await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
   const existing = id ? await db.campaign.findUnique({ where: { id }, select: { clientId: true } }) : null;
@@ -124,6 +126,7 @@ export async function deleteCampaign(id: string): Promise<ActionResult> {
 }
 
 export async function runCampaignNow(id: string): Promise<ActionResult> {
+  trackPress("campaign.run");
   const s = await requireManager();
   if ("denied" in s) return { ok: false, message: s.denied };
   const c = await db.campaign.findUnique({ where: { id }, include: { template: true } });
