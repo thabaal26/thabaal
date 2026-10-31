@@ -2,11 +2,17 @@
 
 import { CheckCircle2, X, XCircle } from "@/components/icons";
 import { useCallback, useEffect, useState } from "react";
+import { isPlanLockedMessage, PLAN_LOCKED_EVENT } from "@/lib/plan-lock-paths";
 
 type Toast = { id: number; ok: boolean; text: string; details?: string[] };
 const EVENT = "portal-toast";
 
 export function toast(ok: boolean, text: string, details?: string[]) {
+  // An unpaid business tried to change something: the "Subscribe to continue" popup says it better than a toast.
+  if (!ok && isPlanLockedMessage(text)) {
+    window.dispatchEvent(new CustomEvent(PLAN_LOCKED_EVENT));
+    return;
+  }
   window.dispatchEvent(new CustomEvent(EVENT, { detail: { ok, text, details } }));
 }
 

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { createCatalogProductItem, deleteCatalogProductItem, sendCatalogueTo, updateCatalogProductItem } from "@/lib/catalog";
-import { getScope, owned } from "@/lib/session";
+import { getScope, owned, PLAN_LOCKED_MESSAGE } from "@/lib/session";
 import { storePublicImage } from "@/lib/uploaded-image";
 import type { ActionResult } from "./templates";
 import { trackPress } from "@/lib/usage";
@@ -12,6 +12,7 @@ import { trackPress } from "@/lib/usage";
 export async function sendCatalogue(customerId: string): Promise<ActionResult> {
   trackPress("catalogue.send");
   const scope = await getScope();
+  if (scope.planLocked) return { ok: false, message: PLAN_LOCKED_MESSAGE };
   if (!scope.canOperate) return { ok: false, message: "Your login can view but not change anything." };
   const c = await db.customer.findFirst({ where: { id: customerId, ...owned(scope) }, select: { id: true } });
   if (!c) return { ok: false, message: "Customer not found." };
@@ -26,6 +27,7 @@ export async function sendCatalogue(customerId: string): Promise<ActionResult> {
  */
 export async function uploadProductImage(formData: FormData): Promise<{ ok: boolean; url?: string; message?: string }> {
   const scope = await getScope();
+  if (scope.planLocked) return { ok: false, message: PLAN_LOCKED_MESSAGE };
   if (!scope.canOperate) return { ok: false, message: "Your login can view but not upload files." };
   const file = formData.get("file") as File | null;
   if (!file) return { ok: false, message: "No file provided." };
@@ -64,6 +66,7 @@ export async function updateProduct(data: {
 }): Promise<ActionResult> {
   trackPress("product.save");
   const scope = await getScope();
+  if (scope.planLocked) return { ok: false, message: PLAN_LOCKED_MESSAGE };
   if (!scope.canOperate) return { ok: false, message: "Your login can view but not change products." };
   if (!scope.clientId) return { ok: false, message: "No client selected." };
 
@@ -76,6 +79,7 @@ export async function updateProduct(data: {
 export async function createProduct(data: { retailerId: string; name: string; priceAmount: number; inStock: boolean; description: string; imageUrl: string | null }): Promise<ActionResult> {
   trackPress("product.save");
   const scope = await getScope();
+  if (scope.planLocked) return { ok: false, message: PLAN_LOCKED_MESSAGE };
   if (!scope.canManage) return { ok: false, message: "Only managers can add products." };
   if (!scope.clientId) return { ok: false, message: "No client selected." };
   const client = await db.client.findUnique({ where: { id: scope.clientId }, select: { name: true, website: true, supportPhone: true } });
@@ -92,6 +96,7 @@ export async function createProduct(data: { retailerId: string; name: string; pr
 /** Remove a product from the client's WhatsApp catalogue. */
 export async function deleteProduct(retailerId: string): Promise<ActionResult> {
   const scope = await getScope();
+  if (scope.planLocked) return { ok: false, message: PLAN_LOCKED_MESSAGE };
   if (!scope.canManage) return { ok: false, message: "Only managers can delete products." };
   if (!scope.clientId) return { ok: false, message: "No client selected." };
   const res = await deleteCatalogProductItem(scope.clientId, retailerId);

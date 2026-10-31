@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { getScope, ownedMessages } from "@/lib/session";
+import { getScope, ownedMessages, PLAN_LOCKED_MESSAGE } from "@/lib/session";
 import type { ActionResult } from "./templates";
 import { trackPress } from "@/lib/usage";
 
@@ -13,6 +13,7 @@ import { trackPress } from "@/lib/usage";
 export async function setReplyHandled(id: string, handled: boolean): Promise<ActionResult> {
   trackPress("chat.done");
   const scope = await getScope();
+  if (scope.planLocked) return { ok: false, message: PLAN_LOCKED_MESSAGE };
   if (!scope.canOperate) return { ok: false, message: "Your login can view but not change anything." };
   const target = await db.reply.findFirst({
     where: { id, ...ownedMessages(scope) },
@@ -40,6 +41,7 @@ export async function setReplyHandled(id: string, handled: boolean): Promise<Act
 
 export async function handleAllReplies(): Promise<ActionResult> {
   const scope = await getScope();
+  if (scope.planLocked) return { ok: false, message: PLAN_LOCKED_MESSAGE };
   if (!scope.canOperate) return { ok: false, message: "Your login can view but not change anything." };
   const r = await db.reply.updateMany({ where: { handled: false, ...ownedMessages(scope) }, data: { handled: true } });
   revalidatePath("/dashboard", "layout");
@@ -49,6 +51,7 @@ export async function handleAllReplies(): Promise<ActionResult> {
 /** Marks the conversations behind these replies handled (one group on the Priority board). */
 export async function handleRepliesOf(replyIds: string[]): Promise<ActionResult> {
   const scope = await getScope();
+  if (scope.planLocked) return { ok: false, message: PLAN_LOCKED_MESSAGE };
   if (!scope.canOperate) return { ok: false, message: "Your login can view but not change anything." };
   const ids = [...new Set(replyIds)].slice(0, 500);
   if (!ids.length) return { ok: true, message: "Nothing to mark." };

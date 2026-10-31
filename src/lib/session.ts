@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import { db } from "./db";
 import { clientAccess } from "./plan-access";
+import { PLAN_LOCKED_MESSAGE } from "./plan-lock-paths";
 import { recordUsage } from "./usage-record";
 
 const COOKIE = "wp_session";
@@ -97,11 +98,14 @@ export type Scope = {
   isAdmin: boolean;
   /** An admin looking at one business read-only ("Help a client"): no admin powers and no writes. */
   viewOnly: boolean;
-  /** Campaigns, templates, customers, automations: admins and client managers. False while the business is locked. */
+  /**
+   * Campaigns, templates, customers, automations: admins and client managers. While the business is locked this
+   * still says what the login may do (so the screens show the buttons), but every write also checks planLocked.
+   */
   canManage: boolean;
-  /** Orders, dispatch, replies: everyone but viewers. False while the business is locked. */
+  /** Orders, dispatch, replies: everyone but viewers. Same rule while locked as canManage. */
   canOperate: boolean;
-  /** The business hasn't paid (lib/plan-access.ts): only Home, My account and Settings open. Never for admins. */
+  /** The business hasn't paid (lib/plan-access.ts): pages open to look, every change refused. Never for admins. */
   planLocked: boolean;
   /** The login's own rights, even while locked: for My account and Settings, which stay open. */
   manager: boolean;
@@ -142,13 +146,14 @@ export const getScope = cache(async (): Promise<Scope> => {
   if (user.role === "CLIENT") {
     const manager = user.access === "MANAGER";
     const operator = user.access !== "VIEWER";
-    // Unpaid business: everything that changes data is closed, except what My account and Settings allow.
+    // Unpaid business: every page opens, but every change is refused (requireManager, requireOrderAccess and the
+    // actions' own planLocked checks), except what My account and Settings allow.
     const planLocked = user.clientId ? (await clientAccess(user.clientId)).locked : false;
     return {
       isAdmin: false,
       viewOnly: false,
-      canManage: manager && !planLocked,
-      canOperate: operator && !planLocked,
+      canManage: manager,
+      canOperate: operator,
       planLocked,
       manager,
       operator,
@@ -190,7 +195,7 @@ type Denied = { denied: string };
  * For day-to-day order work (confirm, dispatch, deliver, notes, new orders): the client's own
  * staff do this, so client logins may, limited to their own client. Admins may too.
  */
-export const PLAN_LOCKED_MESSAGE = "thabaal is paused until your plan payment is verified. Pay in My account.";
+export { PLAN_LOCKED_MESSAGE };
 
 /** Options for the few actions that belong to My account or Settings, which stay open while a business is locked. */
 type LockOpts = { evenIfLocked?: boolean };

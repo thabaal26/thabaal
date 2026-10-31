@@ -9,7 +9,7 @@ import { allowance } from "@/lib/limits";
 import { deliver, getSettings, readiness, templateSendable, wahaConfig } from "@/lib/provider";
 import { applyFailure, quietUntil, recentlyMarketed } from "@/lib/rules";
 import { senderFor } from "@/lib/senders";
-import { getScope, owned, requireManager } from "@/lib/session";
+import { getScope, owned, requireManager, PLAN_LOCKED_MESSAGE } from "@/lib/session";
 import { sendImage, sendText, WahaError } from "@/lib/waha";
 import { sendMediaMessage, sendTextMessage } from "@/lib/whatsapp";
 import { normalizePhone } from "@/lib/phone";
@@ -117,6 +117,7 @@ export async function replyToCustomer(
 ): Promise<SendResult> {
   trackPress("chat.reply");
   const scope = await getScope();
+  if (scope.planLocked) return { ok: false, message: PLAN_LOCKED_MESSAGE };
   if (!scope.canOperate) return { ok: false, message: "Your login can view but not change anything." };
   const body = text.trim();
   const cleanMedia = mediaUrl?.trim() || null;

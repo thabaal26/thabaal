@@ -13,7 +13,7 @@ import {
   type ReplyAnalysisResult,
 } from "@/lib/ai";
 import { db } from "@/lib/db";
-import { getScope, owned } from "@/lib/session";
+import { getScope, owned, PLAN_LOCKED_MESSAGE } from "@/lib/session";
 import { spendSummary } from "@/lib/spend";
 
 const WINDOW_MS = 24 * 3_600_000;
@@ -64,6 +64,7 @@ export async function generateAiTemplateAction(params: {
   mode: "generate" | "optimize_utility" | "translate_tamil";
 }): Promise<{ ok: boolean; message?: string; data?: GeneratedTemplateResult }> {
   const scope = await getScope();
+  if (scope.planLocked) return { ok: false, message: PLAN_LOCKED_MESSAGE };
   if (!scope.canOperate) return { ok: false, message: "Your login is view-only." };
 
   const data = await generateOrOptimizeTemplate(params);
@@ -79,6 +80,7 @@ export async function parseOrderFromChatAction(rawText: string): Promise<{
   data?: ParsedOrderFromChat;
 }> {
   const scope = await getScope();
+  if (scope.planLocked) return { ok: false, message: PLAN_LOCKED_MESSAGE };
   if (!scope.canOperate) return { ok: false, message: "Your login is view-only." };
   if (!rawText.trim()) return { ok: false, message: "Paste the customer's WhatsApp message or address first." };
 
@@ -195,6 +197,7 @@ export async function generateAudienceFilterAction(prompt: string): Promise<{
   data?: AudienceAiFilter;
 }> {
   const scope = await getScope();
+  if (scope.planLocked) return { ok: false, message: PLAN_LOCKED_MESSAGE };
   if (!scope.canManage) return { ok: false, message: "Only managers can build audiences." };
   if (!prompt.trim()) return { ok: false, message: "Describe the audience you want to filter first." };
   const data = await parseNaturalLanguageAudience(prompt.slice(0, 500));
