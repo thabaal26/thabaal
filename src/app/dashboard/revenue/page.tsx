@@ -16,6 +16,8 @@ import { CollectList, CsvButton, ReceiptButton, RecordByNumber, TxnTable } from 
 import Link from "@/components/intent-link";
 import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 import { planGate } from "@/app/dashboard/plan-lock";
+import { LiveRefresh } from "@/components/live-refresh";
+import { RefreshButton } from "@/components/refresh-button";
 
 export const metadata: Metadata = { title: "Payments" };
 export const dynamic = "force-dynamic";
@@ -326,7 +328,8 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   }
 
   return (
-    <PortalPage title="Payments" titleTa="பணம்" sub={SUB} subTa={SUB_TA} actions={scope.canOperate ? <RecordByNumber rows={d.collect} /> : undefined}>
+    <PortalPage title="Payments" titleTa="பணம்" sub={SUB} subTa={SUB_TA} actions={<><RefreshButton />{scope.canOperate && <RecordByNumber rows={d.collect} />}</>}>
+      <LiveRefresh />
       {kpis}
       {tabsFor(pay.settings.codOn)}
       <ScrollReveal duration={450}>
