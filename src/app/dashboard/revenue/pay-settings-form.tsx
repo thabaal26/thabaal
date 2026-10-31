@@ -42,13 +42,14 @@ export function HowCustomersPay({
     codOn: settings.codOn,
     codMax: settings.codMax != null ? String(settings.codMax) : "",
     codAreas: settings.codAreas,
+    askAddress: settings.askAddress,
   });
   const [qr, setQr] = useState(settings.upiQrUrl);
   const [testLink, setTestLink] = useState<string | null>(null);
   const file = useRef<HTMLInputElement>(null);
   const set = (patch: Partial<HowPayInput>) => setF((v) => ({ ...v, ...patch }));
 
-  const save = (next: HowPayInput, changed?: "whatsappPay" | "upiOn" | "codOn") => {
+  const save = (next: HowPayInput, changed?: "whatsappPay" | "upiOn" | "codOn" | "askAddress") => {
     setBusy(changed ?? "save");
     start(async () => {
       const r = await safeAction(() => savePaySettings(next, changed));
@@ -60,7 +61,7 @@ export function HowCustomersPay({
       router.refresh();
     });
   };
-  const flip = (k: "whatsappPay" | "upiOn" | "codOn", on: boolean) => {
+  const flip = (k: "whatsappPay" | "upiOn" | "codOn" | "askAddress", on: boolean) => {
     const next = { ...f, [k]: on };
     setF(next);
     save(next, k);
@@ -248,6 +249,18 @@ export function HowCustomersPay({
           </div>
           <Sw on={f.codOn} label={isTa ? "டெலிவரியின் போது பணம்" : "Cash on delivery"} busy={busy === "codOn" || off} onChange={(on) => flip("codOn", on)} />
         </div>
+
+        <div className="row">
+          <div className="grow">
+            <div className="t"><T ta="டெலிவரி முகவரி கேள்">Ask for the delivery address</T></div>
+            <div className="muted small">
+              <T ta="இயக்கத்தில் இருந்தால், கார்ட் வந்தவுடன் வாட்ஸ்அப் முகவரிப் படிவம் செல்லும் (சேமித்த முகவரி இருந்தால் 'இங்கேயே அனுப்பவா?' எனக் கேட்கும்). முகவரி கிடைத்த பிறகே பணம் செலுத்தும் தேர்வு செல்லும்.">
+                When on, a new cart first gets WhatsApp&apos;s address form (or, for a saved address, &quot;Deliver here?&quot;). The payment message goes once the address is in. Customers can also type it or share their location.
+              </T>
+            </div>
+          </div>
+          <Sw on={f.askAddress} label={isTa ? "டெலிவரி முகவரி கேள்" : "Ask for the delivery address"} busy={busy === "askAddress" || off} onChange={(on) => flip("askAddress", on)} />
+        </div>
       </div>
       {canManage && (
         <div className="tools" style={{ marginTop: 14 }}>
@@ -258,8 +271,8 @@ export function HowCustomersPay({
       )}
       <div className="note small" style={{ marginTop: 14 }}>
         <b><T ta="ஆர்டர் வழிமுறை: ">How an order flows: </T></b>
-        <T ta="சலுகை செய்தி › Order now › பட்டியல் › கார்ட் › Review and pay › பணம் வந்தது. பட்டியல் இல்லாத ஆர்டர்கள் UPI QR, பேமெண்ட் இணைப்பு அல்லது COD மூலம் செல்லும்.">
-          offer message › Order now › catalogue › cart › Review and pay › paid. Orders without a catalogue go through a UPI QR, a payment link, or cash on delivery.
+        <T ta="சலுகை செய்தி › Order now › பட்டியல் › கார்ட் › டெலிவரி முகவரி › ஆன்லைனில் செலுத்து அல்லது COD › பணம் வந்தது. பட்டியல் இல்லாத ஆர்டர்கள் UPI QR, பேமெண்ட் இணைப்பு அல்லது COD மூலம் செல்லும்.">
+          offer message › Order now › catalogue › cart › delivery address › pay online or COD › paid. Orders without a catalogue go through a UPI QR, a payment link, or cash on delivery.
         </T>
       </div>
     </section>

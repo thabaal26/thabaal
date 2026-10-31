@@ -11,6 +11,7 @@ import { money, orderRef, orderWhereRef, recordOrder } from "@/lib/orders";
 import { ORDER_REF_RE } from "@/lib/order-ref";
 import { metaReplyContent, receivingNumber, recordReply } from "@/lib/replies";
 import { autoRedeemPoints } from "@/lib/loyalty-redeem";
+import { ADDRESS_FORM, askNewAddress, confirmSavedAddress, handleAddressReply, sendAddressFallback, startAddressStep } from "@/lib/delivery-address";
 import { codBlocked } from "@/lib/pay-settings";
 import { paySettingsFor } from "@/lib/pay-settings-server";
 import { cancelSupersededOrdersForCustomer, confirmPayment, parseMetaAmount, recordPaymentClaim, recordPaymentFailure, sendCodConfirmationPrompt, sendPaymentRequestFor, startCheckout, textInWindow, updateOrderCard } from "@/lib/payments";
@@ -99,6 +100,8 @@ async function applyStatus(s: StatusUpdate) {
       data: { status: "FAILED", failedAt: at, billable: false, errorCode: code, error: explainError(code, err?.error_data?.details || err?.message || err?.title || "Delivery failed") },
     });
     await applyFailure(msg.customerId, code);
+    // The address form can't show on this customer's WhatsApp (old app): ask them to type it or share a location.
+    if (code === 1026 && msg.templateName === ADDRESS_FORM) await sendAddressFallback(msg.customerId).catch((e) => console.error("Address fallback failed", e));
     pushToGoogleSheet(msg.customer?.clientId, "CAMPAIGN_STATUS", {
       campaign: msg.templateName || "Campaign Message",
       phone: msg.customer?.phone || "",
@@ -341,10 +344,12 @@ async function detectAndApplyUpiPayment(
   // The customer asks to pay cash on delivery: set it on the order and send 1-click confirmation prompt.
   if (m.type === "text" && COD_ASK_RE.test(base.text) && !NO_COD_RE.test(base.text)) {
     // Payment settings › Cash on delivery: off, over the limit or outside the allowed areas → a polite no.
-    const asked = await db.order.findUnique({ where: { id: targetOrder.id }, select: { total: true, clientId: true, customer: true } });
+    const asked = await db.order.findUnique({ where: { id: targetOrder.id }, select: { total: true, clientId: true, customer: true, paymentRequestedAt: true } });
     const blocked = asked ? codBlocked((await paySettingsFor(asked.clientId)).settings, asked.total, asked.customer) : null;
     if (asked && blocked) {
-      await textInWindow(asked.customer, `Sorry, cash on delivery isn't available for order ${ref}. Please pay using the payment link we sent, and we will pack it right away.`, "COD not available").catch(() => false);
+      // The payment link may not have gone yet (e.g. we're still waiting for the delivery address).
+      const how = asked.paymentRequestedAt ? "Please pay using the payment link we sent, and we will pack it right away." : "You can pay online: the payment link comes with your order details.";
+      await textInWindow(asked.customer, `Sorry, cash on delivery isn't available for order ${ref}. ${how}`, "COD not available").catch(() => false);
       return { text: `${base.text} · Asked for cash on delivery on ${ref}; not allowed (${blocked})`, kind: base.kind, media: base.media, handledAsPayment: false };
     }
     await db.order.updateMany({ where: { id: targetOrder.id, paymentMethod: null }, data: { paymentMethod: "cod" } });
@@ -536,9 +541,10 @@ async function confirmCod(order: OrderWithCustomer) {
     data: { status: "CONFIRMED", paymentMethod: "cod" },
   });
   pushOrderToSheet(order.id, "ORDER_UPDATE", "Customer confirmed COD");
-  const hasAddr = Boolean(order.customer.locationRaw?.trim() || order.customer.location?.trim() || order.note?.trim());
+  const addr = order.note?.trim() || order.customer.locationRaw?.trim() || order.customer.location?.trim() || "";
+  const hasAddr = Boolean(addr);
   const replyMsg = hasAddr
-    ? `🎉 Thank you! Your Cash on Delivery order ${ref} (${money(order.total, order.currency)}) is confirmed.\n\nWe will pack and dispatch it to your delivery address:\n📍 ${order.customer.locationRaw || order.customer.location || order.note}`
+    ? `🎉 Thank you! Your Cash on Delivery order ${ref} (${money(order.total, order.currency)}) is confirmed.\n\nWe will pack and dispatch it to your delivery address:\n📍 ${addr}`
     : `🎉 Thank you! Your Cash on Delivery order ${ref} (${money(order.total, order.currency)}) is confirmed.\n\n📍 Please reply with your full delivery address (Door No, Street, Landmark, City & Pincode) so our delivery partner can reach you smoothly.`;
   await textInWindow(order.customer, replyMsg, "COD Confirmed").catch(() => {});
   await updateOrderCard(order, "processing", "COD order confirmed - packing now").catch(() => {});
@@ -594,6 +600,14 @@ export async function POST(req: NextRequest) {
               actionValue: actionVal,
               client: clientName,
             });
+
+            // Delivery address step: "Yes, deliver here" / "New address" (lib/delivery-address.ts)
+            if (typeof actionVal === "string" && customer && (actionVal.startsWith("addr_ok:") || actionVal.startsWith("addr_new:"))) {
+              handledByOrderButton = true;
+              const ok = actionVal.startsWith("addr_ok:");
+              const orderId = actionVal.slice(ok ? 8 : 9);
+              await (ok ? confirmSavedAddress(orderId, customer.id) : askNewAddress(orderId, customer.id)).catch((e) => console.error("Address button failed", e));
+            }
 
             // 1-Click Payment Choice Flow (pay_online / pay_cod)
             if (typeof actionVal === "string" && (actionVal.startsWith("pay_online:") || actionVal.startsWith("pay_cod:"))) {
@@ -704,6 +718,11 @@ export async function POST(req: NextRequest) {
             }
           }
 
+          // The delivery address: WhatsApp's address form, a shared location, or typed while we wait for it.
+          if (customer && !handledAsPayment && !handledByOrderButton && kind !== "button" && m.type !== "order") {
+            if (await handleAddressReply(customer, m, text).catch((e) => (console.error("Address reply failed", e), false))) handledByOrderButton = true;
+          }
+
           // Said hi, asked about products or prices (e.g. tapped "Send price list"), or wrote for the first time
           // today: reply with the free catalogue message (at most once every 12 hours).
           // Buttons with their own answer ("Make a gift pack", "Happy Deepavali") get that instead.
@@ -720,18 +739,10 @@ export async function POST(req: NextRequest) {
               await cancelSupersededOrdersForCustomer(customer.id, order).catch((e) => console.error("Could not expire old carts", e));
               // Automatic loyalty points (Order & Payment Settings) come off before "Review and pay" goes out.
               await autoRedeemPoints(order.id).catch((e) => console.error("Could not use loyalty points", e));
-              await startCheckout(order).catch((e) => console.error("Automatic checkout start failed", e));
+              // The delivery address first (form, or "deliver here?" for a saved one); payment follows once it's in.
+              const step = await startAddressStep(order.id).catch((e) => (console.error("Address step failed", e), "skip" as const));
+              if (step === "skip") await startCheckout(order).catch((e) => console.error("Automatic checkout start failed", e));
               pushOrderToSheet(order.id, "NEW_ORDER");
-
-              // If customer has no saved delivery address, prompt them in chat:
-              const hasAddress = Boolean(customer.locationRaw?.trim() || customer.location?.trim() || order.note?.trim());
-              if (!hasAddress) {
-                await textInWindow(
-                  customer,
-                  "📍 Please reply with your delivery address (Door/Flat No, Street, City & Pincode) so we can pack and deliver your order promptly.",
-                  "Address Prompt",
-                ).catch(() => {});
-              }
             }
           }
         }

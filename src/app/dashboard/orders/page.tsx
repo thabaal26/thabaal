@@ -108,6 +108,9 @@ export default async function OrdersPage({
     refundAmount: o.refundAmount,
     refundNote: o.refundNote,
     pointsRedeemed: o.pointsRedeemed,
+    addressAskedAt: o.addressAskedAt,
+    addressConfirmedAt: o.addressConfirmedAt,
+    mapUrl: o.mapUrl,
     items: (o.items as OrderItem[]) ?? [],
     customer: {
       id: o.customer.id,

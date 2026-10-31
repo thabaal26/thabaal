@@ -59,7 +59,7 @@ export async function sendCatalogueTo(customerId: string): Promise<{ ok: boolean
 
   const { number, cfg } = await senderFor(c.clientId, last?.senderId);
   const first = c.name.trim().split(/\s+/)[0] || "there";
-  const body = `Hi ${first}, here is the full ${c.client.name} range. Tap "View catalog", add what you need to your cart and send it. We will send you a payment link right away.`;
+  const body = `Hi ${first}, here is the full ${c.client.name} range. Tap "View catalog", add what you need to your cart and send it here. We'll take it from there: delivery and payment, right in this chat.`;
   try {
     const res = await sendCatalogMessage(cfg, c.phone, body);
     await db.message.create({

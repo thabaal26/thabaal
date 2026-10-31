@@ -25,6 +25,8 @@ export type PaySettings = {
   remind3: boolean;
   /** Thank-you message with the amount once an order is fully paid. */
   receipt: boolean;
+  /** A new WhatsApp cart first asks for (or confirms) the delivery address, then how to pay. */
+  askAddress: boolean;
 };
 
 export const SETTLEMENTS = [
@@ -55,6 +57,7 @@ export function readPaySettings(raw: unknown, paymentConfig: string | null | und
     remind1: bool(r.remind1, true),
     remind3: bool(r.remind3, true),
     receipt: bool(r.receipt, true),
+    askAddress: bool(r.askAddress, true),
   };
 }
 

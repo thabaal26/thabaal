@@ -31,10 +31,11 @@ export type HowPayInput = {
   codOn: boolean;
   codMax: string;
   codAreas: string;
+  askAddress: boolean;
 };
 
 /** "How customers pay": the three switches and their fields. */
-export async function savePaySettings(input: HowPayInput, changed?: "whatsappPay" | "upiOn" | "codOn"): Promise<SendResult> {
+export async function savePaySettings(input: HowPayInput, changed?: "whatsappPay" | "upiOn" | "codOn" | "askAddress"): Promise<SendResult> {
   const s = await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
   const { settings, paymentConfig } = await current(s.clientId);
@@ -52,7 +53,7 @@ export async function savePaySettings(input: HowPayInput, changed?: "whatsappPay
   const codMax = maxText ? Math.round(Number(maxText)) : null;
   if (maxText && (!Number.isFinite(codMax) || (codMax ?? 0) <= 0)) return { ok: false, message: "Highest COD order: enter an amount in rupees, or leave it empty for no limit." };
 
-  await store(s.clientId, { ...settings, whatsappPay: input.whatsappPay, upiOn: input.upiOn, upiId, upiName, codOn: input.codOn, codMax, codAreas: input.codAreas.trim().slice(0, 300) });
+  await store(s.clientId, { ...settings, whatsappPay: input.whatsappPay, upiOn: input.upiOn, upiId, upiName, codOn: input.codOn, codMax, codAreas: input.codAreas.trim().slice(0, 300), askAddress: input.askAddress !== false });
   const msg =
     changed === "whatsappPay"
       ? `Pay inside WhatsApp is ${input.whatsappPay ? "on" : "off"}.`
@@ -60,7 +61,11 @@ export async function savePaySettings(input: HowPayInput, changed?: "whatsappPay
         ? `UPI link is ${input.upiOn ? "on" : "off"}.`
         : changed === "codOn"
           ? `Cash on delivery is ${input.codOn ? "on" : "off"}.`
-          : "Payment settings saved.";
+          : changed === "askAddress"
+            ? input.askAddress
+              ? "Delivery address on: new carts ask for the address first, then how to pay."
+              : "Delivery address off: new carts go straight to payment."
+            : "Payment settings saved.";
   return { ok: true, message: msg };
 }
 

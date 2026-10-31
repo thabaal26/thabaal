@@ -79,6 +79,10 @@ export type OrderCardData = {
   refundAmount?: number | null;
   refundNote?: string | null;
   pointsRedeemed?: number;
+  /** WhatsApp address step: asked, and given or confirmed by the customer; a shared location's map link. */
+  addressAskedAt?: Date | string | null;
+  addressConfirmedAt?: Date | string | null;
+  mapUrl?: string | null;
   items?: OrderItem[];
   customer: {
     id: string;
@@ -353,6 +357,8 @@ export function OrderCard({
   const phoneClean = o.customer.phone ? o.customer.phone.replace(/\D/g, "") : "";
   const missingPhone = !phoneClean || phoneClean.length < 10;
   const missingAddress = !fullAddress && o.status !== "CANCELLED" && o.status !== "NEW";
+  // Asked on WhatsApp and not answered yet: the payment message goes once they reply.
+  const waitingAddress = o.status === "NEW" && !o.paidAt && Boolean(o.addressAskedAt) && !o.addressConfirmedAt;
 
   const missingBadges: string[] = [];
   if (missingAddress) missingBadges.push("Address needed");
@@ -1167,9 +1173,43 @@ export function OrderCard({
             Cancel
           </button>
         </div>
+      ) : waitingAddress ? (
+        <p className="muted small" role="status" style={{ marginTop: 12, fontSize: 13.5, lineHeight: 1.5, display: "flex", alignItems: "flex-start", gap: 8 }}>
+          <span aria-hidden style={{ width: 8, height: 8, marginTop: 7, borderRadius: 99, background: "var(--warn, #b45309)", flex: "none" }} />
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <T ta="வாட்ஸ்அப்பில் முகவரிக்காகக் காத்திருக்கிறது. அவர்கள் பதிலளித்ததும் பணம் செலுத்தும் செய்தி தானாகச் செல்லும்.">
+              Waiting for the customer&apos;s address on WhatsApp. The payment message goes by itself once they reply.
+            </T>
+            {fullAddress ? (
+              <>
+                {" "}
+                <T ta="கோப்பில் உள்ளது:">On file:</T> <b style={{ color: "var(--fg)" }}>{fullAddress}</b>
+              </>
+            ) : null}{" "}
+            ·{" "}
+            <button
+              type="button"
+              className="linkb"
+              onClick={() => {
+                setAddressInput(fullAddress);
+                setEditingAddress(true);
+              }}
+            >
+              <T ta="நானே சேர்க்கிறேன்">Add it myself</T>
+            </button>
+          </span>
+        </p>
       ) : fullAddress ? (
         <p className="muted small" style={{ marginTop: 12, fontSize: 13.5, lineHeight: 1.5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
           <T ta="அனுப்பும் முகவரி:">Deliver to:</T> <b style={{ color: "var(--fg)" }}>{fullAddress}</b> ·{" "}
+          {o.mapUrl && (
+            <>
+              <a className="linkb" href={o.mapUrl} target="_blank" rel="noopener noreferrer">
+                <T ta="வரைபடம்">Map</T>
+              </a>{" "}
+              ·{" "}
+            </>
+          )}
           <button
             type="button"
             className="linkb"

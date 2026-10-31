@@ -13,6 +13,7 @@ import { utrOf } from "@/lib/payment-events";
 import { dueOf, methodOf, receivedOf } from "@/lib/payment-state";
 import { autoRedeemPoints, keptPointsDiscount, setOrderPoints } from "@/lib/loyalty-redeem";
 import { LOYALTY_RULE_LIMITS, loyaltyRules, loyaltyRuleWords } from "@/lib/loyalty";
+import { addressGivenByStaff } from "@/lib/delivery-address";
 import { pointsDiscount } from "@/lib/order-pricing";
 import { getSettings, wahaConfig } from "@/lib/provider";
 import { replyWindowEnd } from "@/lib/replies";
@@ -603,12 +604,16 @@ export async function saveOrderAddress(
     });
   }
 
+  // The order was waiting for this address on WhatsApp: carry on to the payment message.
+  const continued = cleanAddr ? await addressGivenByStaff(order.id).catch((e) => (console.error("Could not continue after the address", e), false)) : false;
+
   revalidatePath("/dashboard", "layout");
+  const next = continued ? " The payment message went to the customer." : "";
   return {
     ok: true,
     message: shouldSyncCustomer
-      ? `Updated delivery address for ${orderRef(order)} and saved to ${order.customer.name}'s profile${resolvedArea ? ` (${resolvedArea})` : ""}.`
-      : `Updated delivery address for ${orderRef(order)} only.`,
+      ? `Updated delivery address for ${orderRef(order)} and saved to ${order.customer.name}'s profile${resolvedArea ? ` (${resolvedArea})` : ""}.${next}`
+      : `Updated delivery address for ${orderRef(order)} only.${next}`,
   };
 }
 

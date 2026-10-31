@@ -6,7 +6,7 @@ import { pushOrderToSheet } from "./google-sheets-live";
 import { getOrderPricing, itemsText, itemsWithNames, money, orderRef } from "./orders";
 import { pointsDiscount } from "./order-pricing";
 import { logPaymentEvent, utrOf } from "./payment-events";
-import { checkoutMode, upiLink, type PaySettings } from "./pay-settings";
+import { checkoutMode, upiLink, type CheckoutMode, type PaySettings } from "./pay-settings";
 import { paySettingsFor } from "./pay-settings-server";
 import { dueOf, receivedOf } from "./payment-state";
 import { getSettings } from "./provider";
@@ -59,13 +59,13 @@ export async function paymentTemplateFor(clientId: string) {
 }
 
 /** The customer's last message (whose 24-hour window allows free-form messages) and the number to reply from. */
-async function replyContext(customer: { id: string; clientId: string }) {
+export async function replyContext(customer: { id: string; clientId: string }) {
   const last = await db.reply.findFirst({ where: { customerId: customer.id }, orderBy: { receivedAt: "desc" }, select: { receivedAt: true, senderId: true } });
   const { number, cfg } = await senderFor(customer.clientId, last?.senderId);
   return { open: replyWindowEnd(last?.receivedAt) !== null, number, cfg };
 }
 
-async function logMessage(customerId: string, templateName: string, body: string, res: { id: string; simulated: boolean }, senderId: string | null) {
+export async function logMessage(customerId: string, templateName: string, body: string, res: { id: string; simulated: boolean }, senderId: string | null) {
   await db.message.create({
     data: { customerId, templateName, body, status: "SENT", waMessageId: res.id, simulated: res.simulated, provider: "META", sentAt: new Date(), senderId },
   });
@@ -88,7 +88,7 @@ async function withCatalogFallback<T, P extends { catalogId?: string | null }>(p
   }
 }
 
-const firstName = (name: string) => name.trim().split(/\s+/)[0] || "there";
+export const firstName = (name: string) => (name.trim().startsWith("+") ? "" : name.trim().split(/\s+/)[0]) || "there";
 
 /**
  * Sends the "Review and pay" message for an order, paid by UPI through the client's payment configuration.
@@ -148,7 +148,9 @@ export async function sendPaymentRequestFor(orderId: string, opts: { reminder?: 
 
   if (useUpi) return sendUpiRequest({ order, settings: pay.settings, due, head, breakdownLines, open, number, cfg, sentData, sentWord, reminder: opts.reminder });
 
-  const text = `${head}\n\n${breakdownLines}\n\nTap "Review and pay" to pay by UPI${opts.reminder ? ", and we will pack it right away" : ""}.`;
+  // The first request after the customer gave their address repeats it, so they see where it goes.
+  const deliverLine = !opts.reminder && order.addressConfirmedAt && order.note?.trim() ? `\n\nDeliver to: ${order.note.trim().slice(0, 300)}` : "";
+  const text = `${head}\n\n${breakdownLines}${deliverLine}\n\nTap "Review and pay" to pay by UPI${opts.reminder ? ", and we will pack it right away" : ""}.`;
   try {
     let res: { id: string; simulated: boolean };
     let templateName = opts.reminder === "last" ? "Last payment reminder" : opts.reminder ? "Payment reminder" : "Payment request";
@@ -220,8 +222,8 @@ export async function autoRequestPayment(order: { id: string; clientId: string; 
  * asks the customer "Pay now online" or "Cash on delivery" when both are available,
  * or goes straight to "Review and pay" when only online payment is on.
  */
-export async function startCheckout(order: { id: string; clientId: string; total: number }) {
-  if (order.total <= 0) return;
+export async function startCheckout(order: { id: string; clientId: string; total: number }): Promise<CheckoutMode> {
+  if (order.total <= 0) return "none";
   const fresh = await db.order.findUnique({
     where: { id: order.id },
     select: {
@@ -231,7 +233,7 @@ export async function startCheckout(order: { id: string; clientId: string; total
       customer: { select: { region: true, location: true, locationRaw: true } },
     },
   });
-  if (!fresh || fresh.total <= 0) return;
+  if (!fresh || fresh.total <= 0) return "none";
   const pay = await paySettingsFor(fresh.clientId);
   const mode = checkoutMode(pay, fresh.total, fresh.customer);
   if (mode === "choose") {
@@ -243,6 +245,7 @@ export async function startCheckout(order: { id: string; clientId: string; total
   } else if (mode === "online") {
     await autoRequestPayment(fresh);
   }
+  return mode;
 }
 
 export type PaymentRecord = {
@@ -627,7 +630,8 @@ export async function sendPaymentChoicePrompt(orderId: string): Promise<{ ok: bo
   const pointsLine = pricing.discount > 0 ? `\nLoyalty points (${order.pointsRedeemed}): -${money(pricing.discount, order.currency)}` : "";
   const shippingLine = pricing.shipping > 0 ? `\nShipping: ${money(pricing.shipping, order.currency)}` : "";
   const breakdown = `Items: ${itemsText(items)} (${money(pricing.subtotal, order.currency)})${shippingLine}${pointsLine}\nTotal: ${money(pricing.total, order.currency)}`;
-  let body = `${head}\n\n${breakdown}\n\nHow would you like to pay?`;
+  const deliverLine = order.addressConfirmedAt && order.note?.trim() ? `\n\nDeliver to: ${order.note.trim().slice(0, 300)}` : "";
+  let body = `${head}\n\n${breakdown}${deliverLine}\n\nHow would you like to pay?`;
   if (body.length > 1024) body = body.slice(0, 1024);
 
   try {

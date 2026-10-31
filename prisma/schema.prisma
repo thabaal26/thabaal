@@ -214,6 +214,9 @@ model Customer {
   callAllowedUntil DateTime?
   /// Values of the client's custom fields, by key (lib/custom-fields.ts).
   extra            Json?
+  /// The last delivery address the customer gave on WhatsApp (address form fields, or a shared location's
+  /// lat/lng and map link), to fill in the form next time. locationRaw keeps the same address as one line.
+  deliveryAddress  Json?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   messages         Message[]
@@ -508,6 +511,12 @@ model Order {
   /// Loyalty points used on this order; total is already reduced by their value (100 points = ₹50).
   /// Points used on a cancelled order go back to the customer (lib/loyalty-redeem.ts).
   pointsRedeemed     Int         @default(0)
+  /// Delivery address step on WhatsApp (lib/delivery-address.ts): when the customer was asked, and when they
+  /// gave or confirmed it (the payment choice goes out after that). note holds the address itself.
+  addressAskedAt     DateTime?
+  addressConfirmedAt DateTime?
+  /// Map link of a location the customer shared for this order.
+  mapUrl             String?
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 
