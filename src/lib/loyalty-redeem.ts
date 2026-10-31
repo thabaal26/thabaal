@@ -3,7 +3,7 @@
 // its total is the amount to pay after the discount, so payment requests, COD and reports all see the right
 // money. A cancelled order no longer counts, so its points go back to the customer.
 import { db } from "./db";
-import { loyaltyFromOrders } from "./loyalty";
+import { LOYALTY_RULE_FIELDS, loyaltyFromOrders, loyaltyRules, type LoyaltyRules } from "./loyalty";
 import { getOrderPricing, pointsDiscount } from "./order-pricing";
 
 /** Discounts go in ₹25 steps (50 points). */
@@ -27,6 +27,7 @@ async function loadOrder(orderId: string) {
       paidAmount: true,
       pointsRedeemed: true,
       paymentRequestedAt: true,
+      client: { select: LOYALTY_RULE_FIELDS },
       customer: {
         select: {
           name: true,
@@ -41,7 +42,7 @@ async function loadOrder(orderId: string) {
 
 /**
  * The most this order can take off with points right now: the customer's balance (leaving this order's own
- * points and its own spend out) in ₹25 steps, at most ₹250, and never more than the items cost.
+ * points and its own spend out, earned by the shop's rules) in ₹25 steps, at most ₹250, and never more than the items cost.
  */
 export function maxPointsDiscount(order: {
   id: string;
@@ -49,10 +50,10 @@ export function maxPointsDiscount(order: {
   total: number;
   pointsRedeemed?: number | null;
   customer: Parameters<typeof loyaltyFromOrders>[0];
-}) {
+}, rules?: LoyaltyRules) {
   const items = (order.items as PricedLine[] | null) ?? [];
   const { subtotal } = getOrderPricing(items, order.total, { discount: pointsDiscount(order) });
-  const loyalty = loyaltyFromOrders(order.customer, { exceptOrderId: order.id });
+  const loyalty = loyaltyFromOrders(order.customer, { exceptOrderId: order.id, rules });
   const itemsCap = Math.floor(subtotal / REDEEM_STEP) * REDEEM_STEP;
   return { max: Math.max(0, Math.min(loyalty.redeemableRupees, itemsCap)), balance: loyalty.totalPoints };
 }
@@ -74,7 +75,7 @@ export async function setOrderPoints(orderId: string, amount: number | "max"): P
   const { subtotal, shipping } = getOrderPricing(items, order.total, { discount: current });
   if (subtotal <= 0) return { ok: false, message: "Add item prices before using points.", applied: 0 };
 
-  const { max, balance } = maxPointsDiscount(order);
+  const { max, balance } = maxPointsDiscount(order, loyaltyRules(order.client));
   const wanted = amount === "max" ? max : Math.max(0, Math.floor(amount / REDEEM_STEP) * REDEEM_STEP);
   if (wanted > max) {
     return {

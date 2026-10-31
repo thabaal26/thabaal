@@ -16,6 +16,7 @@ import { CopyText } from "./copy-text";
 import { CustomerActions, PendingCustomersBanner } from "./customer-tools";
 import { CustomersTabs, CUSTOMERS_SUB, CUSTOMERS_SUB_TA } from "./customers-tabs";
 import { CustomerTable, LoyaltyPanel } from "./customers-board";
+import { loyaltyRulesFor } from "@/lib/loyalty-rules";
 import { GroupCampaign } from "./group-campaign";
 import { planGate } from "@/app/dashboard/plan-lock";
 
@@ -176,7 +177,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
       </>
     );
   } else if (tab === "loyalty") {
-    body = <LoyaltyPanel rows={rows} canManage={scope.canManage} history={await loyaltyHistory(clientId).catch(() => [])} />;
+    body = <LoyaltyPanel rows={rows} canManage={scope.canManage} history={await loyaltyHistory(clientId).catch(() => [])} rules={await loyaltyRulesFor(clientId)} />;
   } else {
     const total = rows.length;
     const optedOut = rows.filter((c) => c.optedOut || c.unreachable).length;

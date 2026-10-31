@@ -104,6 +104,12 @@ model Client {
   paymentConfig       String?
   /// Use a customer's loyalty points automatically on each new order (cart or hand-entered), before payment is asked.
   loyaltyAutoRedeem   Boolean           @default(false)
+  /// Loyalty rules (Payments › Settings): 1 point per loyaltyRupeesPerPoint ₹ of bought orders, when loyaltyEarnOn.
+  loyaltyEarnOn         Boolean         @default(true)
+  loyaltyRupeesPerPoint Int             @default(100)
+  /// Bonus points for every bought order after the first, when loyaltyRepeatOn.
+  loyaltyRepeatOn       Boolean         @default(true)
+  loyaltyRepeatBonus    Int             @default(50)
   /// Payments › Payment settings (lib/pay-settings.ts): pay in WhatsApp, UPI, cash on delivery, bank (last 4 only), reminders.
   paySettings         Json?
   /// Portal sections disabled for this client by the portal owner (e.g. ["orders", "catalogue", "calls"]). Empty means all sections enabled.

@@ -8,7 +8,8 @@ import { paymentsData, WAY_COLOR, WAY_LABEL, WAY_LABEL_TA, type Way } from "@/li
 import { getScope } from "@/lib/session";
 import { getCatalogWithProducts } from "@/lib/catalog";
 import { paySettingsFor } from "@/lib/pay-settings-server";
-import { LoyaltyRedeemSetting } from "../orders/loyalty-points-ui";
+import { LoyaltyRedeemSetting, LoyaltyRulesSetting } from "../orders/loyalty-points-ui";
+import { LOYALTY_RULE_FIELDS, loyaltyRules } from "@/lib/loyalty";
 import { inr } from "../portal-format";
 import { LinkTabs, PortalPage, Seg, T } from "../portal-ui";
 import { BankAccount, HowCustomersPay, ReminderRules } from "./pay-settings-form";
@@ -291,7 +292,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
     );
   } else if (tab === "set") {
     const [client, ownPaymentTemplate, paymentTemplate, catalogue] = await Promise.all([
-      db.client.findUnique({ where: { id: clientId }, select: { loyaltyAutoRedeem: true } }),
+      db.client.findUnique({ where: { id: clientId }, select: { loyaltyAutoRedeem: true, ...LOYALTY_RULE_FIELDS } }),
       db.template.findFirst({ where: { clientId, name: PAYMENT_TEMPLATE }, select: { status: true } }),
       paymentTemplateFor(clientId),
       // Whether a catalogue is connected; null when Meta couldn't be asked (the badge is then left out).
@@ -314,11 +315,14 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
           <section className="card">
             <div className="hd">
               <div>
-                <h2><T ta="செக்அவுட்டில் லாயல்டி புள்ளிகள்">Loyalty points at checkout</T></h2>
-                <p><T ta="ஆர்டரில் வாடிக்கையாளர்கள் தங்கள் லாயல்டி புள்ளிகளைப் பயன்படுத்த அனுமதிக்கவும்.">Let customers use their points on an order.</T></p>
+                <h2><T ta="லாயல்டி புள்ளிகள்">Loyalty points</T></h2>
+                <p><T ta="வாடிக்கையாளர்கள் புள்ளிகளை எப்படிப் பெறுகிறார்கள், ஆர்டரில் எப்படிப் பயன்படுத்துகிறார்கள்.">How customers earn points, and how they use them on an order.</T></p>
               </div>
             </div>
-            <LoyaltyRedeemSetting on={client.loyaltyAutoRedeem} />
+            <div className="stack">
+              <LoyaltyRulesSetting rules={loyaltyRules(client)} />
+              <LoyaltyRedeemSetting on={client.loyaltyAutoRedeem} />
+            </div>
           </section>
         )}
       </div>

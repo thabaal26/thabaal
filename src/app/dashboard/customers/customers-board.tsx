@@ -11,6 +11,7 @@ import type { CustomerRow, Status, Tier } from "@/lib/customers-data";
 import { useLanguage } from "@/lib/i18n/context";
 import { formatPhone } from "@/lib/phone";
 import type { PointEvent } from "@/lib/loyalty-history";
+import { DEFAULT_LOYALTY_RULES, type LoyaltyRules } from "@/lib/loyalty";
 import { adjustLoyaltyPoints, tagCustomers } from "../actions/customers";
 import { replyToCustomer } from "../actions/send";
 import { inr } from "../portal-format";
@@ -337,7 +338,18 @@ const LOG_FILTERS: { id: string; label: string; ta: string }[] = [
 ];
 
 /** Customers › Loyalty: give or take back points, everyone's balance, how points work, and the history. */
-export function LoyaltyPanel({ rows, canManage, history = [] }: { rows: CustomerRow[]; canManage: boolean; history?: PointEvent[] }) {
+export function LoyaltyPanel({
+  rows,
+  canManage,
+  history = [],
+  rules = DEFAULT_LOYALTY_RULES,
+}: {
+  rows: CustomerRow[];
+  canManage: boolean;
+  history?: PointEvent[];
+  rules?: LoyaltyRules;
+}) {
+  const rs = rules.rupeesPerPoint.toLocaleString("en-IN");
   const router = useRouter();
   const { isTamil } = useLanguage();
   const members = rows.filter((c) => c.points > 0 || c.orders > 0).sort((a, b) => b.points - a.points);
@@ -700,17 +712,34 @@ export function LoyaltyPanel({ rows, canManage, history = [] }: { rows: Customer
           <div className="hd">
             <div>
               <h2>{isTamil ? "புள்ளிகள் செயல்படும் விதம்" : "How points work"}</h2>
-              <p>{isTamil ? "ஒவ்வொரு ஆர்டரிலும் புள்ளிகள், பில்லில் தள்ளுபடி. அனைவருக்கும் ஒரே விதி." : "Earn on every order, save on the next bill. The same rules for everyone."}</p>
+              <p>
+                {isTamil ? "ஒவ்வொரு ஆர்டரிலும் புள்ளிகள், பில்லில் தள்ளுபடி. அனைவருக்கும் ஒரே விதி." : "Earn on every order, save on the next bill. The same rules for everyone."}{" "}
+                {canManage && (
+                  <Link href="/dashboard/revenue?tab=set" style={{ fontWeight: 600 }}>
+                    {isTamil ? "விதிகளை மாற்று" : "Change the rules"}
+                  </Link>
+                )}
+              </p>
             </div>
           </div>
           <div className="list">
             <div className="row">
               <div className="grow">{isTamil ? "புள்ளிகள் பெற" : "Earn"}</div>
-              <b>{isTamil ? "உறுதியான அல்லது பணம் செலுத்திய ஒவ்வொரு ₹100-க்கும் 1 புள்ளி" : "1 point for every ₹100 of confirmed or paid orders"}</b>
+              <b>
+                {!rules.earnOn
+                  ? isTamil ? "அணைக்கப்பட்டுள்ளது" : "Off"
+                  : isTamil ? `உறுதியான அல்லது பணம் செலுத்திய ஒவ்வொரு ₹${rs}-க்கும் 1 புள்ளி` : `1 point for every ₹${rs} of confirmed or paid orders`}
+              </b>
             </div>
             <div className="row">
               <div className="grow">{isTamil ? "மீண்டும் வாங்கினால்" : "Coming back"}</div>
-              <b>{isTamil ? "முதல் ஆர்டருக்குப் பிறகு வரும் ஒவ்வொரு மறு ஆர்டருக்கும் +50 புள்ளிகள்" : "+50 points for every repeat order after the first"}</b>
+              <b>
+                {!rules.repeatOn
+                  ? isTamil ? "அணைக்கப்பட்டுள்ளது" : "Off"
+                  : isTamil
+                    ? `முதல் ஆர்டருக்குப் பிறகு வரும் ஒவ்வொரு மறு ஆர்டருக்கும் +${rules.repeatBonus} புள்ளிகள்`
+                    : `+${rules.repeatBonus} points for every repeat order after the first`}
+              </b>
             </div>
             <div className="row">
               <div className="grow">{isTamil ? "மதிப்பு" : "Worth"}</div>

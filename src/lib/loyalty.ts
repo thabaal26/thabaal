@@ -15,9 +15,9 @@ export type RfmSegment =
   | "Cold Prospect";
 
 export type CustomerLoyaltySummary = {
-  /** Points from confirmed order spend (1 pt per ₹100 spent) */
+  /** Points from confirmed order spend (1 pt per ₹100 spent by default; the shop's rule) */
   spendPoints: number;
-  /** Bonus points from order frequency (+50 pts for every repeat order after the 1st) */
+  /** Bonus points from order frequency (+50 pts for every repeat order after the 1st by default; the shop's rule) */
   frequencyPoints: number;
   /** Bonus points from historical order-sheet purchases (+35 pts per recorded sheet item) */
   sheetPoints: number;
@@ -59,6 +59,62 @@ const BONUS_TAG_PREFIX = "loyalty-bonus:";
 
 /** Rupees a customer spends to earn 1 loyalty point. */
 export const RUPEES_PER_POINT = 100;
+
+/** A shop's own rules for earning points (Payments › Settings). What points are worth is the same for every shop. */
+export type LoyaltyRules = {
+  /** Points for spend: 1 point for every `rupeesPerPoint` ₹ of bought orders. */
+  earnOn: boolean;
+  rupeesPerPoint: number;
+  /** Repeat-order bonus: `repeatBonus` points for every bought order after the first. */
+  repeatOn: boolean;
+  repeatBonus: number;
+};
+
+/** The limits a shop can set (checked when saving, and again when reading). */
+export const LOYALTY_RULE_LIMITS = { rupeesPerPoint: { min: 1, max: 100000 }, repeatBonus: { min: 1, max: 10000 } } as const;
+
+export const DEFAULT_LOYALTY_RULES: LoyaltyRules = { earnOn: true, rupeesPerPoint: RUPEES_PER_POINT, repeatOn: true, repeatBonus: 50 };
+
+/** The Client columns that hold the rules, for Prisma selects. */
+export const LOYALTY_RULE_FIELDS = { loyaltyEarnOn: true, loyaltyRupeesPerPoint: true, loyaltyRepeatOn: true, loyaltyRepeatBonus: true } as const;
+
+type RuleColumns = { loyaltyEarnOn?: boolean | null; loyaltyRupeesPerPoint?: number | null; loyaltyRepeatOn?: boolean | null; loyaltyRepeatBonus?: number | null };
+
+const wholeIn = (n: unknown, lim: { min: number; max: number }, fallback: number) =>
+  typeof n === "number" && Number.isInteger(n) && n >= lim.min && n <= lim.max ? n : fallback;
+
+/** A client's rules from its columns; the defaults for anything missing or out of range. */
+export function loyaltyRules(c?: RuleColumns | null): LoyaltyRules {
+  const d = DEFAULT_LOYALTY_RULES;
+  return {
+    earnOn: c?.loyaltyEarnOn ?? d.earnOn,
+    rupeesPerPoint: wholeIn(c?.loyaltyRupeesPerPoint, LOYALTY_RULE_LIMITS.rupeesPerPoint, d.rupeesPerPoint),
+    repeatOn: c?.loyaltyRepeatOn ?? d.repeatOn,
+    repeatBonus: wholeIn(c?.loyaltyRepeatBonus, LOYALTY_RULE_LIMITS.repeatBonus, d.repeatBonus),
+  };
+}
+
+/** Points the rules give for one bought order; `nth` is its place among the customer's bought orders (1 = first). */
+export function pointsForOrder(total: number, nth: number, rules: LoyaltyRules = DEFAULT_LOYALTY_RULES) {
+  const spend = rules.earnOn ? Math.floor(Math.max(0, Number(total) || 0) / rules.rupeesPerPoint) : 0;
+  return spend + (rules.repeatOn && nth > 1 ? rules.repeatBonus : 0);
+}
+
+/** The earning rules in words (English and Tamil); a rule that is off is left out. */
+export function loyaltyRuleWords(rules: LoyaltyRules = DEFAULT_LOYALTY_RULES) {
+  const rs = rules.rupeesPerPoint.toLocaleString("en-IN");
+  const en: string[] = [];
+  const ta: string[] = [];
+  if (rules.earnOn) {
+    en.push(`1 point for every ₹${rs}`);
+    ta.push(`ஒவ்வொரு ₹${rs}-க்கும் 1 புள்ளி`);
+  }
+  if (rules.repeatOn) {
+    en.push(`+${rules.repeatBonus} points for every repeat order`);
+    ta.push(`ஒவ்வொரு மறு ஆர்டருக்கும் +${rules.repeatBonus} புள்ளிகள்`);
+  }
+  return { en: en.join(", "), ta: ta.join(", "), any: en.length > 0 };
+}
 
 /** Reads manual bonus/redeemed points stored in Customer.tags (e.g. "loyalty-bonus:150" or "loyalty-bonus:-100"). */
 export function parseManualLoyaltyPoints(tags: string[] | null | undefined): number {
@@ -142,7 +198,10 @@ export function computeCustomerLoyalty(input: {
   avgGapDays?: number | null;
   /** Points already used on orders that aren't cancelled (Order.pointsRedeemed). */
   redeemedPoints?: number;
+  /** The shop's earning rules; the defaults (1 point per ₹100, +50 per repeat order) when left out. */
+  rules?: LoyaltyRules;
 }): CustomerLoyaltySummary {
+  const rules = input.rules ?? DEFAULT_LOYALTY_RULES;
   const paidOrders = Math.max(0, Math.round(input.paidOrdersCount || 0));
   const spent = Math.max(0, Number(input.totalSpent) || 0);
   const sheetItemsCount = input.sheetPurchases
@@ -153,12 +212,12 @@ export function computeCustomerLoyalty(input: {
     : 0;
 
   // 1. Points formula:
-  //    - 1 pt per ₹100 spent on confirmed WhatsApp orders (the client's rule)
-  //    - +50 pts per repeat WhatsApp order (2nd order onwards)
+  //    - 1 pt per ₹rupeesPerPoint spent on bought WhatsApp orders, when the shop has it on (default ₹100)
+  //    - +repeatBonus pts per repeat WhatsApp order (2nd order onwards), when on (default 50)
   //    - +35 pts per historical sheet purchase item
   //    - + manual bonus / minus points redeemed by hand (tags) and on orders (Order.pointsRedeemed)
-  const spendPoints = Math.floor(spent / RUPEES_PER_POINT);
-  const frequencyPoints = Math.max(0, paidOrders - 1) * 50;
+  const spendPoints = rules.earnOn ? Math.floor(spent / rules.rupeesPerPoint) : 0;
+  const frequencyPoints = rules.repeatOn ? Math.max(0, paidOrders - 1) * rules.repeatBonus : 0;
   const sheetPoints = sheetItemsCount * 35;
   const manualPoints = parseManualLoyaltyPoints(input.tags) - Math.max(0, Math.round(input.redeemedPoints ?? 0));
   const totalPoints = Math.max(0, spendPoints + frequencyPoints + sheetPoints + manualPoints);
@@ -329,8 +388,13 @@ export function computeCustomerLoyalty(input: {
   } else {
     offerBadge = "First Order";
     offerHeadline = "Invite them to place their first WhatsApp order";
-    offerReason = `Hasn't ordered on WhatsApp yet. Every order earns points (1 point per ₹${RUPEES_PER_POINT}), so tell them about it.`;
-    whatsappOfferCopy = `Vanakkam ${firstName}! Welcome to ${brand}. Order on WhatsApp and earn loyalty points on every order: 1 point for every ₹${RUPEES_PER_POINT}, and 100 points = ₹50 off.`;
+    const earn = loyaltyRuleWords(rules);
+    offerReason = earn.any
+      ? `Hasn't ordered on WhatsApp yet. Orders earn points (${earn.en}), so tell them about it.`
+      : "Hasn't ordered on WhatsApp yet. Invite them to place a first order.";
+    whatsappOfferCopy = earn.any
+      ? `Vanakkam ${firstName}! Welcome to ${brand}. Order on WhatsApp and earn loyalty points: ${earn.en}, and 100 points = ₹50 off.`
+      : `Vanakkam ${firstName}! Welcome to ${brand}. Reply here to place your first order on WhatsApp.`;
   }
 
   return {

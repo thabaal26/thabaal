@@ -12,6 +12,7 @@ import { paySettingsFor } from "@/lib/pay-settings-server";
 import { utrOf } from "@/lib/payment-events";
 import { dueOf, methodOf, receivedOf } from "@/lib/payment-state";
 import { autoRedeemPoints, keptPointsDiscount, setOrderPoints } from "@/lib/loyalty-redeem";
+import { LOYALTY_RULE_LIMITS, loyaltyRules, loyaltyRuleWords } from "@/lib/loyalty";
 import { pointsDiscount } from "@/lib/order-pricing";
 import { getSettings, wahaConfig } from "@/lib/provider";
 import { replyWindowEnd } from "@/lib/replies";
@@ -334,6 +335,29 @@ export async function saveLoyaltyAutoRedeem(on: boolean): Promise<SendResult> {
     message: on
       ? "Automatic points on: new orders use the customer's points before payment is asked."
       : "Automatic points off: use points by hand on each order.",
+  };
+}
+
+/** Payments › Settings: the shop's own rules for earning points (spend rate and repeat-order bonus), each with an on/off switch. */
+export async function saveLoyaltyRules(input: { earnOn: boolean; rupeesPerPoint: number; repeatOn: boolean; repeatBonus: number }): Promise<SendResult> {
+  const s = await requireManager(true);
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const rpp = Number(input?.rupeesPerPoint);
+  const bonus = Number(input?.repeatBonus);
+  const L = LOYALTY_RULE_LIMITS;
+  if (!Number.isInteger(rpp) || rpp < L.rupeesPerPoint.min || rpp > L.rupeesPerPoint.max)
+    return { ok: false, message: "Rupees for 1 point must be a whole number from 1 to 1,00,000." };
+  if (!Number.isInteger(bonus) || bonus < L.repeatBonus.min || bonus > L.repeatBonus.max)
+    return { ok: false, message: "The repeat-order bonus must be a whole number of points from 1 to 10,000." };
+  const data = { loyaltyEarnOn: input.earnOn === true, loyaltyRupeesPerPoint: rpp, loyaltyRepeatOn: input.repeatOn === true, loyaltyRepeatBonus: bonus };
+  await db.client.update({ where: { id: s.clientId }, data });
+  revalidatePath("/dashboard", "layout");
+  const words = loyaltyRuleWords(loyaltyRules(data));
+  return {
+    ok: true,
+    message: words.any
+      ? `Loyalty rules saved: ${words.en}. Every customer's balance now follows them.`
+      : "Loyalty rules saved: new orders don't earn points now. Points customers already have stay, and they can still use them.",
   };
 }
 

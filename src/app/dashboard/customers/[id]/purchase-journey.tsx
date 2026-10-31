@@ -10,7 +10,7 @@ import { formatValue } from "@/lib/chart-math";
 import { cssColor } from "@/lib/chart-theme";
 import { cn } from "@/lib/cn";
 import { APP_TZ, fmtDate, fmtNumber } from "@/lib/format";
-import { computeCustomerLoyalty } from "@/lib/loyalty";
+import { computeCustomerLoyalty, DEFAULT_LOYALTY_RULES, type LoyaltyRules } from "@/lib/loyalty";
 import type { OrderItem } from "@/lib/orders";
 import { formatInTimeZone } from "date-fns-tz";
 import { adjustLoyaltyPoints } from "../../actions/customers";
@@ -46,6 +46,7 @@ export function PurchaseJourney({
   replies = [],
   readDates = [],
   sheetPurchases,
+  rules = DEFAULT_LOYALTY_RULES,
   now = new Date(),
 }: {
   customer?: { id: string; name: string; phone: string; tags: string[] };
@@ -55,6 +56,8 @@ export function PurchaseJourney({
   replies?: { receivedAt: Date; text: string; kind: string }[];
   readDates?: Date[];
   sheetPurchases?: string | null;
+  /** The shop's earning rules. */
+  rules?: LoyaltyRules;
   now?: Date;
 }) {
   if (!orders.length && !replies.length && !sheetPurchases && !customer) return null;
@@ -161,7 +164,11 @@ export function PurchaseJourney({
     avgGapDays: avgGap,
     // Points used on orders that still stand (a cancelled order gave its points back).
     redeemedPoints: list.reduce((n, o) => n + (o.status !== "CANCELLED" ? (o.pointsRedeemed ?? 0) : 0), 0),
+    rules,
   });
+  const rs = fmtNumber(rules.rupeesPerPoint);
+  const earnEn = [rules.earnOn ? `1 pt per ₹${rs} spent` : null, rules.repeatOn ? `${rules.repeatBonus} bonus pts per repeat order` : null].filter(Boolean).join(" + ");
+  const earnTa = [rules.earnOn ? `₹${rs} செலவுக்கு 1 புள்ளி` : null, rules.repeatOn ? `ஒவ்வொரு மறு ஆர்டருக்கும் ${rules.repeatBonus} போனஸ் புள்ளிகள்` : null].filter(Boolean).join(" + ");
 
   // Buyer Persona Badge
   const persona: { label: string; tone: Tone } =
@@ -242,8 +249,8 @@ export function PurchaseJourney({
                     </span>
                   </h4>
                   <p className="text-[11px] text-muted">
-                    <T ta="₹100 செலவுக்கு 1 புள்ளி + ஒவ்வொரு மறு ஆர்டருக்கும் 50 போனஸ் புள்ளிகள் · 100 புள்ளிகள் = ₹50 தள்ளுபடி">
-                      1 pt per ₹100 spent + 50 bonus pts per repeat order · 100 pts = ₹50 off
+                    <T ta={`${earnTa || "புதிய ஆர்டர்களுக்குப் புள்ளிகள் இல்லை"} · 100 புள்ளிகள் = ₹50 தள்ளுபடி`}>
+                      {`${earnEn || "No points for new orders"} · 100 pts = ₹50 off`}
                     </T>
                   </p>
                 </div>

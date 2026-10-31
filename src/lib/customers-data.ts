@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "./db";
 import { computeCustomerLoyalty, isInternalLoyaltyTag } from "./loyalty";
+import { loyaltyRulesFor } from "./loyalty-rules";
 import { saleSql } from "@/lib/sale-sql";
 
 /*
@@ -49,6 +50,7 @@ const DEFAULT_GAP = 30;
 
 export async function customersData(clientId: string, opts: { clientName?: string | null } = {}) {
   const now = Date.now();
+  const rulesP = loyaltyRulesFor(clientId);
   const rows = await db.$queryRaw<
     {
       id: string;
@@ -85,6 +87,7 @@ export async function customersData(clientId: string, opts: { clientName?: strin
     LIMIT 5000
   `;
 
+  const rules = await rulesP;
   // Tier cut-offs: top 10% of spend (with 3+ orders) is Platinum, the next 20% Gold.
   const spends = rows.map((r) => Number(r.spend ?? 0)).filter((s) => s > 0).sort((a, b) => b - a);
   const cut = (share: number) => spends[Math.max(0, Math.ceil(spends.length * share) - 1)] ?? Infinity;
@@ -109,6 +112,7 @@ export async function customersData(clientId: string, opts: { clientName?: strin
       sheetPurchases: r.purchases,
       tags: r.tags,
       redeemedPoints: Number(r.redeemed ?? 0),
+      rules,
     });
     const digits = r.phone.replace(/\D/g, "");
     return {
