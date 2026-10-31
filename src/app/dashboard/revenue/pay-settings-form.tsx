@@ -230,6 +230,11 @@ export function HowCustomersPay({
             <div className="muted small">
               <T ta="இயக்கத்தில் இருந்தால், ஆர்டர்களை COD எனக் குறிக்கலாம்; ரொக்கம் / COD தாவல் தெரியும்.">When on, orders can be marked COD and the Cash / COD tab appears.</T>
             </div>
+            <div className="muted small" style={{ marginTop: 4 }}>
+              <T ta="இது இயக்கத்தில் இருந்தால், கார்ட் அனுப்பும் வாடிக்கையாளர்களிடம் 'இப்போதே ஆன்லைனில் செலுத்து' அல்லது 'டெலிவரியின் போது பணம்' எனத் தேர்வு கேட்கப்படும். அணைக்கப்பட்டிருந்தால், பணம் செலுத்தும் செய்தி மட்டும் செல்லும்.">
+                When this is on, customers who send a cart are asked to choose Pay now online or Cash on delivery. When it&apos;s off, they only get the pay-now message.
+              </T>
+            </div>
             <div className="formgrid" style={{ marginTop: 10 }}>
               <div className="field">
                 <label htmlFor="ps-codmax"><T ta="அதிகபட்ச COD ஆர்டர் (₹)">Highest COD order allowed (₹)</T></label>
