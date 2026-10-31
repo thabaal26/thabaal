@@ -10,7 +10,7 @@ export type PayRow = { id: string; date: string; clientId: string; shop: string;
 const R = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
 const TONE: Record<string, [string, string]> = {
   VERIFIED: ["ok", "Confirmed"],
-  PENDING: ["warn", "Being checked"],
+  PENDING: ["warn", "Old UPI, being checked"],
   REJECTED: ["bad", "Turned down"],
   CANCELLED: ["mute", "Withdrawn"],
 };
@@ -26,7 +26,7 @@ export function PaymentsTable({ rows }: { rows: PayRow[] }) {
     <>
       <div className="filters">
         <div className="q">
-          <input type="search" placeholder="Search business or UPI reference" aria-label="Search payments" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input type="search" placeholder="Search business or payment reference" aria-label="Search payments" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <select aria-label="Status" value={f} onChange={(e) => setF(e.target.value)}>
           <option value="">All</option>
@@ -48,7 +48,7 @@ export function PaymentsTable({ rows }: { rows: PayRow[] }) {
                 <th>Business</th>
                 <th>Plan</th>
                 <th className="num">Amount</th>
-                <th>UPI reference</th>
+                <th>How paid</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -64,7 +64,7 @@ export function PaymentsTable({ rows }: { rows: PayRow[] }) {
                       </td>
                       <td className="small">{r.what}</td>
                       <td className="num">{R(r.amount)}</td>
-                      <td className="small">{r.method === "RAZORPAY" ? `Razorpay ${r.utr ?? ""}` : (r.utr ?? (r.method === "ADMIN_RECORD" ? "recorded by Thabaal" : "–"))}</td>
+                      <td className="small">{r.method === "RAZORPAY" ? `Auto-pay · ${r.utr ?? ""}` : r.method === "ADMIN_RECORD" ? "Recorded by Thabaal" : `UPI${r.utr ? ` · ${r.utr}` : ""}`}</td>
                       <td>
                         <span className={`pill ${tone}`}>{label}</span>
                       </td>

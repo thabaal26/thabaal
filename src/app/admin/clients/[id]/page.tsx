@@ -5,7 +5,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { CheckCircle2, Circle } from "@/components/icons";
 import { ActionButton } from "@/components/action-button";
 import { Badge, QualityBadge } from "@/components/ui";
-import { cycleName, loadClientRows, planName } from "@/lib/admin-data";
+import { cycleName, loadClientRows, loadSubscriptions, planName, SUB_STATUS } from "@/lib/admin-data";
 import { adminQueue } from "@/lib/admin-queue";
 import { cleanOverrides, legacyOverrides, portalDefault } from "@/lib/appearance";
 import { CLIENT_PLAN_PRESETS, CLIENT_SECTIONS, detectPlanPreset } from "@/lib/client-sections";
@@ -44,7 +44,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
   await requireAdminPage();
   const { id } = await params;
   const now = new Date();
-  const [{ rows, purchases }, c, settings, queue] = await Promise.all([
+  const [{ rows, purchases }, c, settings, queue, subList] = await Promise.all([
     loadClientRows(now),
     db.client.findUnique({
       where: { id },
@@ -56,6 +56,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
     }),
     getSettings(),
     adminQueue(now, id),
+    loadSubscriptions(id),
   ]);
   const r = rows.find((x) => x.id === id);
   if (!c || !r) notFound();
@@ -100,8 +101,8 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
         <Pill tone={r.stateTone}>{r.stateLabel}</Pill>
         <Pill tone="plain">{planName(r.plan)}</Pill>
         {r.cycle && <Pill tone="plain">{cycleName(r.cycle)}</Pill>}
-        <Pill tone={r.autoPay === "on" ? "ok" : r.autoPay === "failing" ? "bad" : "plain"}>
-          {r.autoPay === "on" ? "Auto-pay on" : r.autoPay === "failing" ? "Auto-pay failing" : r.autoPay === "off" ? "Auto-pay turned off" : "Pays by hand"}
+        <Pill tone={r.autoPay === "on" ? "ok" : r.autoPay === "failing" ? "bad" : r.autoPay === "off" ? "warn" : "plain"}>
+          {r.autoPay === "on" ? "Auto-pay on" : r.autoPay === "failing" ? "Auto-pay failing" : r.autoPay === "off" ? "Auto-pay cancelled" : "No auto-pay"}
         </Pill>
         <Pill tone={r.health}>{r.healthLabel}</Pill>
         <span className="muted small">With thabaal since {day(c.createdAt)}</span>
@@ -199,7 +200,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
               <div key={p.id} className={`e ${p.status === "VERIFIED" ? "ok" : p.status === "REJECTED" ? "bad" : ""}`}>
                 <b>
                   {planName(p.plan)} · {cycleName(p.cycle)} · {R(p.amountPaise / 100)} ·{" "}
-                  {p.status === "VERIFIED" ? (p.method === "ADMIN_RECORD" ? "recorded by Thabaal" : p.method === "RAZORPAY" ? "paid via Razorpay" : "verified") : p.status === "PENDING" ? "waiting for you to check" : p.status.toLowerCase()}
+                  {p.status === "VERIFIED" ? (p.method === "ADMIN_RECORD" ? "recorded by Thabaal" : p.method === "RAZORPAY" ? "paid by auto-pay" : "verified") : p.status === "PENDING" ? "waiting for you to check" : p.status.toLowerCase()}
                 </b>
                 <div className="d">
                   {p.startsAt && p.endsAt ? `${day(p.startsAt)} to ${day(p.endsAt)}` : `sent ${day(p.createdAt)}`}
@@ -219,6 +220,53 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Auto-pay: plans are paid only by Razorpay subscription, so this is where a business's payments come from. */}
+      <div className="card mb16" style={{ borderLeft: `6px solid var(--${r.autoPay === "failing" ? "bad" : r.autoPay === "on" ? "ok" : "bar2"})` }}>
+        <div className="hd">
+          <div>
+            <h2>Auto-pay subscription</h2>
+            <p className="muted small">
+              Plans are paid only by Razorpay auto-pay. Razorpay confirms each charge and the period is added by itself, so there is nothing to
+              verify. The owner subscribes or cancels in My account.
+            </p>
+          </div>
+          <Pill tone={r.autoPay === "on" ? "ok" : r.autoPay === "failing" ? "bad" : r.autoPay === "off" ? "warn" : "plain"}>
+            {r.autoPay === "on" ? "On" : r.autoPay === "failing" ? "Failing" : r.autoPay === "off" ? "Cancelled" : "Not set up"}
+          </Pill>
+        </div>
+        {subList.length ? (
+          <div className="list">
+            {subList.map((s) => {
+              const [tone, label] = SUB_STATUS[s.status] ?? (["mute", s.status] as const);
+              return (
+                <div className="row" key={s.id}>
+                  <div className="grow">
+                    <div className="t">
+                      {planName(s.plan)} · {cycleName(s.cycle)} · {R(s.amount)}
+                    </div>
+                    <div className="muted small">
+                      Started {day(s.createdAt)} · last change {day(s.updatedAt)}
+                      {s.note ? ` · ${s.note}` : ""} · {s.rzpId}
+                    </div>
+                  </div>
+                  <Pill tone={tone}>{label}</Pill>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="muted small">
+            No auto-pay set up yet.
+            {(r.state === "ok" || r.state === "due") && r.endsAt ? ` Their plan ends ${day(r.endsAt)} and will not renew by itself.` : ""}
+          </p>
+        )}
+        {r.lastAutoCharge && (
+          <p className="muted small" style={{ marginTop: 10 }}>
+            Last auto-pay charge received {day(r.lastAutoCharge)}.
+          </p>
+        )}
       </div>
 
       <AdminPlanPanel rows={queue} clientId={c.id} clientName={c.name} hasHistory={hasHistory} planRequired={c.planRequired} accessLabel={r.state} />

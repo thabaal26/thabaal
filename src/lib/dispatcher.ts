@@ -16,6 +16,8 @@ import { campaignAudienceWhere } from "./audiences";
 import { refreshLifecycleTags, sendWinbacks } from "./lifecycle";
 import { backfillOrderNames } from "./orders";
 import { remindUnpaidOrders } from "./payments";
+import { expireUnfinishedOrders, nudgeUnfinishedOrders } from "./cart-followups";
+import { busyForOffers } from "./order-assistant";
 import { senderFor } from "./senders";
 import { WahaError } from "./waha";
 import { MetaError } from "./whatsapp";
@@ -164,6 +166,8 @@ async function processRun(runId: string, now: Date, deadline: number) {
   const recent = marketing ? await recentlyMarketed(batch.map((m) => m.customerId), campaign.client.marketingGapHours) : new Map<string, Date>();
   // Meta recently held marketing back from these customers; another offer now would only be held again.
   const paused = marketing ? await marketingPaused(batch.map((m) => m.customerId)) : new Map<string, Date>();
+  // No offers for someone in the middle of an order, with a problem open, or who asked for none.
+  const busy = marketing ? await busyForOffers(batch.map((m) => m.customerId)) : new Map<string, string>();
 
   // The local session sends one by one with human-like gaps; Meta can take parallel sends.
   const local = settings.provider === "LOCAL" && !isSimulated(settings, cfg);
@@ -196,6 +200,11 @@ async function processRun(runId: string, now: Date, deadline: number) {
         where: { id: m.id },
         data: { status: "SKIPPED", error: `Meta is holding back marketing to this customer until about ${fmtDate(until, "d MMM")}` },
       });
+      return;
+    }
+    const why = busy.get(m.customerId);
+    if (why) {
+      await db.message.update({ where: { id: m.id }, data: { status: "SKIPPED", error: why } });
       return;
     }
     const last = recent.get(m.customerId);
@@ -327,6 +336,8 @@ export async function dispatch() {
   if (Date.now() < deadline) await sendRefillReminders(now, noOrders).catch((e) => console.error("Refill reminders failed", e));
   if (Date.now() < deadline) await syncDueSheets(now).catch((e) => console.error("Sheet sync failed", e));
   if (Date.now() < deadline) await backfillOrderNames().catch((e) => console.error("Order name backfill failed", e));
+  if (Date.now() < deadline) await expireUnfinishedOrders(now, noOrders).catch((e) => console.error("Order expiry failed", e));
+  if (Date.now() < deadline) await nudgeUnfinishedOrders(now, noOrders).catch((e) => console.error("Order nudges failed", e));
   if (Date.now() < deadline) await remindUnpaidOrders(now, 20, noOrders).catch((e) => console.error("Payment reminders failed", e));
   if (Date.now() < deadline) await refreshLifecycleTags().catch((e) => console.error("Lifecycle tags failed", e));
   if (Date.now() < deadline) await sendWinbacks(now, noOrders).catch((e) => console.error("Win-back failed", e));

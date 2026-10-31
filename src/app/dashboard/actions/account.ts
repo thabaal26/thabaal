@@ -156,7 +156,9 @@ function done(r: SubResult): SubResult {
  */
 export async function sendPlanPayment(input: { plan: string; cycle: string; utr: string; payApp?: string; paidOn?: string }): Promise<SubResult> {
   const a = await actor();
-  if (!a.clientId) return { ok: false, message: a.isAdmin ? "Pick a client in the sidebar first." : "Your login isn't linked to a business." };
+  // Plans are paid only by auto-pay subscription (Razorpay). A typed UPI reference is accepted from Thabaal admins only.
+  if (!a.isAdmin) return { ok: false, message: "Plans are paid by auto-pay subscription. Choose a plan in My account and subscribe." };
+  if (!a.clientId) return { ok: false, message: "Pick a client in the sidebar first." };
   const result = await submitPlanPayment(a, { ...input, clientId: a.clientId });
   if (result.ok && result.id) await emailPlanPaymentToThabaal(result.id, a.clientId);
   return done(result);

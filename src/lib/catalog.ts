@@ -6,18 +6,24 @@ import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { revalidateTag, unstable_cache } from "next/cache";
 import { cache } from "react";
 import { APP_HOST, currentAppUrl, isOldAppUrl } from "./app-host";
+import { welcomeText, whenTeam, type ShopInfo } from "./assistant-intents";
 import { chooseCatalogId } from "./catalog-pick";
 import { db } from "./db";
 import { APP_TZ } from "./format";
+import { isShopClosed, opensAtText } from "./pay-settings";
+import { paySettingsFor } from "./pay-settings-server";
 import { getSettings } from "./provider";
 import { replyWindowEnd } from "./replies";
 import { senderFor } from "./senders";
+import { bold, nameOf } from "./wa-text";
 import { sendCatalogMessage, sendTextMessage, type WaConfig } from "./whatsapp";
 
 // The free way to show the catalogue: a catalogue message inside the customer's 24-hour window
 // (a service message), instead of a paid marketing template.
 
 const LOG_NAME = "Catalogue";
+/** The text welcome sent instead when the shop's catalogue can't be shown. */
+export const WELCOME_LABEL = "Welcome";
 /** Replies to greetings and first messages go to the same customer at most once in this long. */
 const AUTO_GAP_MS = 12 * 3_600_000;
 /** A customer who asks (button tap, price question) always gets it; this only ignores double taps. */
@@ -47,8 +53,36 @@ export async function firstMessageToday(customerId: string) {
   return (await db.reply.count({ where: { customerId, receivedAt: { gte: today } } })) <= 1;
 }
 
-/** Sends the "View catalogue" message to a customer whose 24-hour window is open. */
-export async function sendCatalogueTo(customerId: string): Promise<{ ok: boolean; message: string }> {
+/** The shop's own details for the automatic replies' wording (lib/assistant-intents.ts). */
+export async function shopInfoFor(clientId: string): Promise<ShopInfo> {
+  const c = await db.client.findUnique({
+    where: { id: clientId },
+    select: { name: true, tagline: true, homeCity: true, supportPhone: true, website: true, orderFlow: true, disabledSections: true },
+  });
+  return {
+    name: c?.name ?? "our shop",
+    tagline: c?.tagline,
+    homeCity: c?.homeCity,
+    supportPhone: c?.supportPhone,
+    website: c?.website,
+    orderFlow: c?.orderFlow,
+    catalogue: !(c?.disabledSections ?? []).includes("catalogue"),
+  };
+}
+
+/** Has this customer ordered before (a welcome back), and is there an order worth repeating? */
+async function orderHistory(customerId: string) {
+  const orders = await db.order.findMany({ where: { customerId, status: { not: "CANCELLED" } }, select: { status: true, paymentMethod: true, paidAt: true }, take: 20 });
+  const done = orders.some((o) => o.paidAt || ["PAID", "DISPATCHED", "DELIVERED"].includes(o.status) || (o.status === "CONFIRMED" && o.paymentMethod === "cod"));
+  return { returning: orders.length > 0, canReorder: done };
+}
+
+/**
+ * Sends the "View catalogue" message to a customer whose 24-hour window is open. "welcome" (a hello) greets them
+ * by the shop's name, or welcomes them back; "asked" (they asked for it) just shows the range.
+ * `failed` is true only when WhatsApp itself refused the catalogue (e.g. no catalogue connected).
+ */
+export async function sendCatalogueTo(customerId: string, mode: "asked" | "welcome" = "asked"): Promise<{ ok: boolean; message: string; failed?: boolean }> {
   const c = await db.customer.findUnique({ where: { id: customerId }, select: { id: true, name: true, phone: true, clientId: true, optedOut: true, client: { select: { name: true } } } });
   if (!c) return { ok: false, message: "Customer not found." };
   if (c.optedOut) return { ok: false, message: "This customer opted out of messages." };
@@ -58,8 +92,14 @@ export async function sendCatalogueTo(customerId: string): Promise<{ ok: boolean
     return { ok: false, message: "WhatsApp only allows this within 24 hours of the customer's last message. Use a catalogue template instead (paid)." };
 
   const { number, cfg } = await senderFor(c.clientId, last?.senderId);
-  const first = c.name.trim().split(/\s+/)[0] || "there";
-  const body = `Hi ${first}, here is the full ${c.client.name} range. Tap "View catalog", add what you need to your cart and send it. We will send you a payment link right away.`;
+  const first = nameOf(c.name);
+  const pay = await paySettingsFor(c.clientId);
+  const opensAt = isShopClosed(pay.settings) ? opensAtText(pay.settings) : null;
+  const night = opensAt ? `\n\nWe're closed right now and open at ${bold(opensAt)}. Send your order anytime; it'll be the first thing we look at.` : "";
+  const body =
+    mode === "welcome"
+      ? welcomeText(await shopInfoFor(c.clientId), c.name, { ...(await orderHistory(c.id)), withCatalogue: true, closedOpensAt: opensAt })
+      : `${first ? `Hi ${first}, here` : "Here"} is the full ${bold(c.client.name)} range. 🛍️ Tap ${bold("View catalog")}, add what you need to your cart and send it here. We'll take it from there: delivery and payment, right in this chat.${night}`;
   try {
     const res = await sendCatalogMessage(cfg, c.phone, body);
     await db.message.create({
@@ -67,8 +107,31 @@ export async function sendCatalogueTo(customerId: string): Promise<{ ok: boolean
     });
     return { ok: true, message: res.simulated ? "Simulated catalogue message logged (demo mode)." : `Catalogue sent to ${c.name}.` };
   } catch (e) {
-    return { ok: false, message: explainSendError(e).error };
+    return { ok: false, message: explainSendError(e).error, failed: true };
   }
+}
+
+/**
+ * When WhatsApp can't show the catalogue (none connected yet), a hello still gets the shop's welcome as text, and
+ * a request for products gets an honest "our team will send them", so no customer is left without an answer.
+ */
+async function sendTextWelcome(customerId: string, trigger: CatalogueTrigger) {
+  const c = await db.customer.findUnique({ where: { id: customerId }, select: { id: true, name: true, phone: true, clientId: true, optedOut: true } });
+  if (!c || c.optedOut) return;
+  const last = await db.reply.findFirst({ where: { customerId: c.id }, orderBy: { receivedAt: "desc" }, select: { receivedAt: true, senderId: true } });
+  if (!replyWindowEnd(last?.receivedAt)) return;
+  const [shop, pay] = await Promise.all([shopInfoFor(c.clientId), paySettingsFor(c.clientId)]);
+  const opensAt = isShopClosed(pay.settings) ? opensAtText(pay.settings) : null;
+  const n = nameOf(c.name);
+  const body =
+    trigger === "greeting"
+      ? welcomeText({ ...shop, catalogue: false }, c.name, { ...(await orderHistory(c.id)), withCatalogue: false, closedOpensAt: opensAt })
+      : `${n ? `Thanks, ${n}!` : "Thanks for asking!"} Our team at ${bold(shop.name)} will send you our products and prices ${whenTeam(opensAt)}.`;
+  const { number, cfg } = await senderFor(c.clientId, last?.senderId);
+  const res = await sendTextMessage(cfg, c.phone, body);
+  await db.message.create({
+    data: { customerId: c.id, templateName: WELCOME_LABEL, body, status: "SENT", waMessageId: res.id, simulated: res.simulated, provider: "META", sentAt: new Date(), senderId: number?.id ?? null },
+  });
 }
 
 /**
@@ -77,57 +140,14 @@ export async function sendCatalogueTo(customerId: string): Promise<{ ok: boolean
  */
 export async function autoSendCatalogue(customerId: string, trigger: CatalogueTrigger) {
   const gap = trigger === "greeting" ? AUTO_GAP_MS : ASKED_GAP_MS;
-  const recent = await db.message.findFirst({ where: { customerId, templateName: LOG_NAME, createdAt: { gte: new Date(Date.now() - gap) } }, select: { id: true } });
+  const recent = await db.message.findFirst({ where: { customerId, templateName: { in: [LOG_NAME, WELCOME_LABEL] }, createdAt: { gte: new Date(Date.now() - gap) } }, select: { id: true } });
   if (recent) return;
   // A price question gets the list first; the catalogue below it is how they order.
   if (trigger === "prices") await sendPriceList(customerId).catch((e) => console.warn("Price list not sent", e));
-  const r = await sendCatalogueTo(customerId);
-  if (!r.ok) console.warn(`Automatic catalogue reply not sent: ${r.message}`);
-}
-
-/**
- * Quick-reply buttons on campaign templates that get a fixed answer instead of the catalogue.
- * `then: "catalogue"` also sends the catalogue so the customer can start choosing.
- */
-const BUTTON_REPLIES: { match: RegExp; reply: (first: string, business: string) => string; then?: "catalogue" }[] = [
-  {
-    match: /^\s*make a gift pack\s*$/i,
-    reply: (first, business) =>
-      `நன்றி ${first}! 🎁 உங்கள் தீபாவளி பரிசுப் பெட்டியை தயார் செய்ய எங்கள் குழு விரைவில் உங்களை அழைக்கும்.
-
-Thank you! Our ${business} team will call you shortly to put together your Deepavali gift pack. Meanwhile, browse our products below. 🪔`,
-    then: "catalogue",
-  },
-  {
-    match: /^\s*happy (deepavali|diwali)\s*$/i,
-    reply: (first, business) =>
-      `நன்றி ${first}! 🪔✨ உங்களுக்கும் உங்கள் குடும்பத்தினருக்கும் இனிய தீபாவளி நல்வாழ்த்துக்கள்! 💛
-
-Thank you, and a very Happy Deepavali to you and your family from all of us at ${business}! 🙏`,
-  },
-];
-
-/**
- * Answers a campaign button that has its own reply (e.g. "Make a gift pack"). Returns true when the tap
- * was one of those, so the caller doesn't also treat it as a greeting. Double taps within 2 minutes are ignored.
- */
-export async function autoReplyToButton(customerId: string, text: string, kind: string) {
-  if (kind !== "button" && kind !== "text") return false;
-  const rule = BUTTON_REPLIES.find((r) => r.match.test(text));
-  if (!rule) return false;
-  const c = await db.customer.findUnique({ where: { id: customerId }, select: { id: true, name: true, phone: true, clientId: true, optedOut: true, client: { select: { name: true } } } });
-  if (!c || c.optedOut || (await getSettings()).provider !== "META") return true;
-  const recent = await db.message.findFirst({ where: { customerId, templateName: "Auto reply", createdAt: { gte: new Date(Date.now() - ASKED_GAP_MS) } }, select: { id: true } });
-  if (recent) return true;
-  const last = await db.reply.findFirst({ where: { customerId }, orderBy: { receivedAt: "desc" }, select: { senderId: true } });
-  const { number, cfg } = await senderFor(c.clientId, last?.senderId);
-  const body = rule.reply(c.name.trim().split(/\s+/)[0] || "", c.client.name);
-  const res = await sendTextMessage(cfg, c.phone, body);
-  await db.message.create({
-    data: { customerId: c.id, templateName: "Auto reply", body, status: "SENT", waMessageId: res.id, simulated: res.simulated, provider: "META", sentAt: new Date(), senderId: number?.id ?? null },
-  });
-  if (rule.then === "catalogue") await autoSendCatalogue(c.id, "asked");
-  return true;
+  const r = await sendCatalogueTo(customerId, trigger === "greeting" ? "welcome" : "asked");
+  if (r.ok) return;
+  console.warn(`Automatic catalogue reply not sent: ${r.message}`);
+  if (r.failed) await sendTextWelcome(customerId, trigger).catch((e) => console.warn("Text welcome not sent", e));
 }
 
 /** A read from Meta's Graph API with this number's token. */

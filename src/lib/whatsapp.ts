@@ -462,6 +462,55 @@ export async function sendInteractiveButtons(
   return { id: res.messages[0].id, simulated: false };
 }
 
+/**
+ * WhatsApp's own address form (India only): the customer taps the button, fills in name, phone, pincode, house,
+ * area, city and state, and the answer comes back as an nfm_reply. values fills fields in; validation_errors
+ * marks fields to fix (the customer can't send until they do).
+ */
+export async function sendAddressMessage(
+  cfg: WaConfig,
+  to: string,
+  body: string,
+  opts: { values?: Record<string, string>; errors?: Record<string, string> } = {},
+): Promise<{ id: string; simulated: boolean }> {
+  if (!cfg.live) return offline(cfg);
+  const values = opts.values && Object.keys(opts.values).length ? opts.values : undefined;
+  const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "interactive",
+      interactive: {
+        type: "address_message",
+        body: { text: body.slice(0, 1024) },
+        action: {
+          name: "address_message",
+          parameters: { country: "IN", ...(values ? { values } : {}), ...(opts.errors ? { validation_errors: opts.errors } : {}) },
+        },
+      },
+    }),
+  });
+  return { id: res.messages[0].id, simulated: false };
+}
+
+/** A message with WhatsApp's "Send location" button; the customer's pin comes back as a location message. */
+export async function sendLocationRequest(cfg: WaConfig, to: string, body: string): Promise<{ id: string; simulated: boolean }> {
+  if (!cfg.live) return offline(cfg);
+  const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "interactive",
+      interactive: { type: "location_request_message", body: { text: body.slice(0, 1024) }, action: { name: "send_location" } },
+    }),
+  });
+  return { id: res.messages[0].id, simulated: false };
+}
+
 export type MetaTemplate = {
   id: string;
   name: string;

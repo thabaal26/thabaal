@@ -33,7 +33,7 @@ const MAX_RECHARGE = 500_000;
 
 const keysOr = () => {
   const k = razorpayKeys();
-  if (!k) throw new RazorpayError("Online payment isn't set up yet. Pay by UPI below, or try again later.", 500, "not_configured");
+  if (!k) throw new RazorpayError("Online payment isn't available right now. WhatsApp thabaal on 6379140626 and we will help you subscribe.", 500, "not_configured");
   return k;
 };
 const say = (e: unknown) => (e instanceof RazorpayError ? e.message : "Couldn't reach Razorpay. Try again in a minute.");
@@ -178,7 +178,7 @@ export async function startPlanSubscription(who: Who, plan: string, cycle: strin
       where: { kind: "subscription", purpose: "plan", clientId, plan, cycle, amountPaise, status: { in: ["authenticated", "active"] } },
       select: { id: true },
     });
-    if (same) return { ok: false, message: `Auto-renew is already on for ${label}.` };
+    if (same) return { ok: false, message: `You are already subscribed to ${label}. Auto-pay renews it by itself.` };
 
     const through = paidThrough(rows);
     const startAt = through && through.getTime() > now.getTime() + 10 * 60_000 ? Math.floor(through.getTime() / 1000) : null;
@@ -271,30 +271,32 @@ export async function confirmSubscriptionCheckout(who: Who, input: { subscriptio
     if (["authenticated", "active"].includes(sub.status)) await cancelOtherSubscriptions(rec.clientId, rec.purpose, rec.rzpId);
     const charged = await applySubscriptionCharge(rec.rzpId, payment, "checkout");
     if (payment.amount !== rec.amountPaise && sub.charge_at) {
-      return { ok: true, message: `Auto-renew is on. The first charge of ${rupees(rec.amountPaise)} is on ${formatInTimeZone(new Date(sub.charge_at * 1000), APP_TZ, "d MMM yyyy")}.` };
+      return { ok: true, message: `Subscribed. Auto-pay makes the first charge of ${rupees(rec.amountPaise)} on ${formatInTimeZone(new Date(sub.charge_at * 1000), APP_TZ, "d MMM yyyy")}.` };
     }
-    return charged.ok ? { ok: true, message: `Paid. ${charged.message} Auto-renew is on.` } : charged;
+    return charged.ok ? { ok: true, message: `Subscribed and paid. ${charged.message} Auto-pay renews it by itself; cancel any time.` } : charged;
   } catch (e) {
     console.error("razorpay confirmSubscriptionCheckout", e);
     return { ok: false, message: `${say(e)} If money left your account, it is added automatically within a few minutes.` };
   }
 }
 
-/** Turns off auto-renew. A running period stays; the next charge doesn't happen. */
-export async function cancelAutoRenew(who: Who, purpose: "plan" | "test" = "plan"): Promise<Result> {
+/** Cancels the subscription (turns off auto-pay). A running paid period stays; the next charge doesn't happen. */
+export async function cancelAutoRenew(who: Who, purpose: "plan" | "test" = "plan", reason = ""): Promise<Result> {
   try {
     if (purpose === "plan" && (!who.clientId || !who.canManage)) return { ok: false, message: "Only the business owner or a manager can change this." };
     if (purpose === "test" && !(await canTest(who))) return { ok: false, message: "The test package isn't on for this business." };
     const subs = await db.razorpayRecord.findMany({
       where: { kind: "subscription", purpose, clientId: who.clientId ?? null, status: { in: LIVE_SUB } },
     });
-    if (!subs.length) return { ok: false, message: "Auto-renew isn't on." };
+    if (!subs.length) return { ok: false, message: "There is no running subscription to cancel." };
     for (const s of subs) {
       const atEnd = s.status === "active";
       const r = await rzp<RzpSubscription>("POST", `/subscriptions/${s.rzpId}/cancel`, { cancel_at_cycle_end: atEnd ? 1 : 0 });
-      await db.razorpayRecord.update({ where: { id: s.id }, data: { status: atEnd ? "cancelling" : r.status, note: `Turned off by ${who.name}` } });
+      await db.razorpayRecord.update({ where: { id: s.id }, data: { status: atEnd ? "cancelling" : r.status, note: `Cancelled by ${who.name}${reason ? `: ${reason}` : ""}`.slice(0, 200) } });
     }
-    return { ok: true, message: "Auto-renew is off. Your current period stays until it ends; pay again any time." };
+    return purpose === "plan"
+      ? { ok: true, message: "Subscription cancelled. Nothing more will be charged, and you keep access until your paid period ends. Resubscribe any time." }
+      : { ok: true, message: "Auto-renew is off. Your current period stays until it ends; pay again any time." };
   } catch (e) {
     console.error("razorpay cancelAutoRenew", e);
     return { ok: false, message: say(e) };
@@ -357,45 +359,6 @@ export async function startOrder(who: Who, purpose: "wallet" | "test", rupeesAmo
   }
 }
 
-/**
- * Pays for one plan period once: yearly plans (each charge is above the ₹15,000 UPI AutoPay limit) and anyone who
- * doesn't want auto-renew. The period is added the moment Razorpay confirms the payment.
- */
-export async function startPlanOrder(who: Who, plan: string, cycle: string, now = new Date()): Promise<CheckoutStart> {
-  try {
-    if (!who.clientId) return { ok: false, message: who.isAdmin ? "Pick a client in the sidebar first." : "Your login isn't linked to a business." };
-    if (!who.canManage) return { ok: false, message: "Only the business owner or a manager can pay for the plan." };
-    if (!isPlanKey(plan) || !isCycle(cycle)) return { ok: false, message: "Pick one of the plans and how long to pay for." };
-    const k = keysOr();
-    const clientId = who.clientId;
-    const rows = await db.planPurchase.findMany({ where: { clientId }, orderBy: { createdAt: "asc" } });
-    const block = purchaseBlock(rows, now);
-    if (block) return { ok: false, message: block.message };
-    const amountPaise = pricePaise(plan, cycle);
-    const order = await rzp<RzpOrder>("POST", "/orders", {
-      amount: amountPaise,
-      currency: "INR",
-      receipt: `p-${Date.now().toString(36)}`,
-      notes: { clientId, plan, cycle, purpose: "plan" },
-    });
-    await db.razorpayRecord.create({ data: { kind: "order", rzpId: order.id, purpose: "plan", clientId, plan, cycle, amountPaise, status: "created", createdBy: who.name } });
-    const through = paidThrough(rows);
-    return {
-      ok: true,
-      kind: "order",
-      id: order.id,
-      keyId: k.keyId,
-      amountPaise,
-      label: `${planDef(plan)!.n} · ${CYCLE_NAMES[cycle].en}`,
-      startsLabel: through && through > now ? formatInTimeZone(through, APP_TZ, "d MMM yyyy, h:mm a") : null,
-    };
-  } catch (e) {
-    console.error("razorpay startPlanOrder", e);
-    return { ok: false, message: say(e) };
-  }
-}
-
-/** A paid order: re-read the payment, check it is this order's full amount, then credit once. */
 async function applyOrderPayment(orderId: string, paymentId: string): Promise<Result> {
   const rec = await db.razorpayRecord.findUnique({ where: { rzpId: orderId } });
   if (!rec || rec.kind !== "order") return { ok: false, message: "Unknown order." };
@@ -524,13 +487,13 @@ export async function handleRazorpayEvent(body: WebhookBody): Promise<string> {
         await emailOwner(
           rec.clientId,
           "Your Thabaal auto-pay didn't go through",
-          "Razorpay couldn't collect this period's plan payment (often not enough balance, or the UPI/card mandate was paused). It will try again over the next few days. Please keep money in the account, or pay now from My account so nothing stops.",
+          "Razorpay couldn't collect this period's plan payment (often not enough balance, or the UPI/card mandate was paused). It will try again over the next few days. Please keep money in the account, or set up auto-pay again from My account with another card or UPI app so nothing stops.",
         );
       if (rec.purpose === "plan" && body.event === "subscription.halted")
         await emailOwner(
           rec.clientId,
           "Thabaal auto-pay stopped: please pay to keep using Thabaal",
-          "Razorpay tried several times and couldn't collect your plan payment, so auto-pay has stopped. Your plan ends at the end of the paid period, then 2 grace days, then Thabaal locks until you pay. Pay from My account to continue; you can turn auto-pay on again there.",
+          "Razorpay tried several times and couldn't collect your plan payment, so auto-pay has stopped. Your plan ends at the end of the paid period, then 2 grace days, then Thabaal locks until you pay. Subscribe again from My account to continue.",
         );
       if (body.event === "subscription.halted" && rec.purpose === "plan")
         await alertThabaal("Auto-renew stopped: payments failed", rec.clientId, [

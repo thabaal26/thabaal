@@ -13,6 +13,7 @@ import { utrOf } from "@/lib/payment-events";
 import { dueOf, methodOf, receivedOf } from "@/lib/payment-state";
 import { autoRedeemPoints, keptPointsDiscount, setOrderPoints } from "@/lib/loyalty-redeem";
 import { LOYALTY_RULE_LIMITS, loyaltyRules, loyaltyRuleWords } from "@/lib/loyalty";
+import { addressGivenByStaff } from "@/lib/delivery-address";
 import { pointsDiscount } from "@/lib/order-pricing";
 import { getSettings, wahaConfig } from "@/lib/provider";
 import { replyWindowEnd } from "@/lib/replies";
@@ -24,7 +25,7 @@ import { senderFor } from "@/lib/senders";
 import { requireManager, requireOrderAccess } from "@/lib/session";
 import { FLOW_KEYS, ORDER_FLOWS, stepBlocked, type OrderFlowKey } from "@/lib/order-flow";
 import { sendText } from "@/lib/waha";
-import { sendTemplateMessage, sendTextMessage } from "@/lib/whatsapp";
+import { sendInteractiveButtons, sendTemplateMessage, sendTextMessage } from "@/lib/whatsapp";
 import { explainSendError, type SendResult } from "./send-helpers";
 import { saveTemplate } from "./templates";
 
@@ -241,6 +242,14 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
         waId = `demo.${crypto.randomUUID()}`;
         simulated = true;
       }
+    } else if (open && kind === "deliver" && settings.provider === "META") {
+      // Delivered: one message that also asks how it went (All good / Report a problem).
+      const body = `Hello ${first}, your ${order.client.name} order ${ref} has been delivered.${payLine ? ` ${payLine}` : ""} Thank you for shopping with us!\n\nHow was everything?`;
+      ({ id: waId, simulated } = await sendInteractiveButtons(cfg, c.phone, body, [
+        { id: `fb_ok:${order.id}`, title: "👍 All good" },
+        { id: `fb_bad:${order.id}`, title: "⚠️ Report a problem" },
+      ], { footer: order.client.name }));
+      templateName = "Delivered";
     } else if (open && order.paymentRequestedAt && (await updateOrderCard(order, kind === "confirm" ? "processing" : kind === "dispatch" ? "shipped" : "completed", text).catch(() => false))) {
       // Sent on the order card from "Review and pay", which also moves its status; already logged.
       await db.order.update({ where: { id: order.id }, data: { status: nextStatus } });
@@ -603,12 +612,16 @@ export async function saveOrderAddress(
     });
   }
 
+  // The order was waiting for this address on WhatsApp: carry on to the payment message.
+  const continued = cleanAddr ? await addressGivenByStaff(order.id).catch((e) => (console.error("Could not continue after the address", e), false)) : false;
+
   revalidatePath("/dashboard", "layout");
+  const next = continued ? " The payment message went to the customer." : "";
   return {
     ok: true,
     message: shouldSyncCustomer
-      ? `Updated delivery address for ${orderRef(order)} and saved to ${order.customer.name}'s profile${resolvedArea ? ` (${resolvedArea})` : ""}.`
-      : `Updated delivery address for ${orderRef(order)} only.`,
+      ? `Updated delivery address for ${orderRef(order)} and saved to ${order.customer.name}'s profile${resolvedArea ? ` (${resolvedArea})` : ""}.${next}`
+      : `Updated delivery address for ${orderRef(order)} only.${next}`,
   };
 }
 

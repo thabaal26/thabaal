@@ -25,6 +25,16 @@ export type PaySettings = {
   remind3: boolean;
   /** Thank-you message with the amount once an order is fully paid. */
   receipt: boolean;
+  /** A new WhatsApp cart first asks for (or confirms) the delivery address, then how to pay. */
+  askAddress: boolean;
+  /** Friendly reminders for an unfinished WhatsApp order: 3 hours and 22 hours after it (free, inside the 24-hour window). */
+  nudgeOn: boolean;
+  /** An unfinished WhatsApp order (no address, no payment, no COD) is cancelled after this many days: 1, 3 or 7. */
+  cartExpiryDays: number;
+  /** Reply once a night, outside these hours (shop time zone, "HH:mm"), saying when the shop opens. */
+  hoursOn: boolean;
+  openAt: string;
+  closeAt: string;
 };
 
 export const SETTLEMENTS = [
@@ -37,6 +47,10 @@ const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice
 const bool = (v: unknown, dflt: boolean) => (typeof v === "boolean" ? v : dflt);
 
 /** Settings from the stored JSON, with defaults that match how the app worked before the settings existed. */
+/** Choices for how long an unfinished WhatsApp order waits before it is cancelled. */
+export const EXPIRY_DAYS = [1, 3, 7];
+export const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
 export function readPaySettings(raw: unknown, paymentConfig: string | null | undefined): PaySettings {
   const r = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
   const max = Number(r.codMax);
@@ -55,6 +69,12 @@ export function readPaySettings(raw: unknown, paymentConfig: string | null | und
     remind1: bool(r.remind1, true),
     remind3: bool(r.remind3, true),
     receipt: bool(r.receipt, true),
+    askAddress: bool(r.askAddress, true),
+    nudgeOn: bool(r.nudgeOn, true),
+    cartExpiryDays: EXPIRY_DAYS.includes(Number(r.cartExpiryDays)) ? Number(r.cartExpiryDays) : 3,
+    hoursOn: bool(r.hoursOn, false),
+    openAt: HHMM.test(str(r.openAt, 5)) ? str(r.openAt, 5) : "09:00",
+    closeAt: HHMM.test(str(r.closeAt, 5)) ? str(r.closeAt, 5) : "21:00",
   };
 }
 
@@ -125,3 +145,21 @@ export function checkoutMode(
   return "online";
 }
 
+
+/** The shop's clock (Asia/Kolkata unless APP_TIMEZONE says otherwise) as "HH:mm". */
+const shopClock = (now: Date) =>
+  new Intl.DateTimeFormat("en-GB", { timeZone: process.env.APP_TIMEZONE ?? "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(now);
+
+/** Outside the shop's hours (only when the shop set them). Hours may run past midnight (e.g. 18:00 to 02:00). */
+export function isShopClosed(s: Pick<PaySettings, "hoursOn" | "openAt" | "closeAt">, now = new Date()) {
+  if (!s.hoursOn || !HHMM.test(s.openAt) || !HHMM.test(s.closeAt) || s.openAt === s.closeAt) return false;
+  const t = shopClock(now);
+  const open = s.openAt < s.closeAt ? t >= s.openAt && t < s.closeAt : t >= s.openAt || t < s.closeAt;
+  return !open;
+}
+
+/** "9:00 AM" from "09:00". */
+export function opensAtText(s: Pick<PaySettings, "openAt">) {
+  const [h, m] = s.openAt.split(":").map(Number);
+  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+}

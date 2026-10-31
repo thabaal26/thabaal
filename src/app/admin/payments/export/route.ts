@@ -19,7 +19,7 @@ export async function GET() {
   const user = await requireUser();
   if (user.role !== "ADMIN") return new NextResponse("Not allowed", { status: 403 });
   const rows = await loadPayments();
-  const head = ["Sent", "Business", "Plan", "Cycle", "Amount (INR)", "Status", "Method", "UPI reference", "Paid with", "Paid on (as told)", "Period starts", "Period ends", "Bill no", "Checked by", "Checked at", "Note"];
+  const head = ["Sent", "Business", "Plan", "Cycle", "Amount (INR)", "Status", "Method", "Payment reference", "Paid with", "Paid on (as told)", "Period starts", "Period ends", "Bill no", "Checked by", "Checked at", "Note"];
   const lines = rows.map((p) =>
     [
       when(p.createdAt),

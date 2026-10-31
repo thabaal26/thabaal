@@ -3,7 +3,7 @@
 import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "@/components/intent-link";
-import { Copy, ExternalLink, FileText, Inbox, Megaphone, MessageCircle, Printer, Users, X } from "@/components/icons";
+import { ExternalLink, FileText, Inbox, Megaphone, MessageCircle, Printer, Users, X } from "@/components/icons";
 import { toast } from "@/components/toast";
 import { PortalPage, Pill, T } from "../portal-ui";
 import {
@@ -16,13 +16,12 @@ import {
   PLAN_COMPARISON_ROWS,
   PlanKey,
   PLANS,
-  QR_CODES,
   SUPPLIER_INFO,
   inr,
   inrDec,
   numberToWordsINR,
 } from "@/lib/account-plans";
-import { saveBillingDetails, sendPlanPayment, submitCustomWorkRequest, withdrawPlanPayment } from "../actions/account";
+import { saveBillingDetails, submitCustomWorkRequest, withdrawPlanPayment } from "../actions/account";
 import { rzpCancelAutoRenew, rzpConfirm, rzpStartPlan } from "../actions/razorpay";
 import { openRazorpay } from "@/components/razorpay-checkout";
 import type { AccessState } from "@/lib/subscription-core";
@@ -49,7 +48,7 @@ export type AccountViewProps = {
   }>;
   /** Thabaal admin's payment checks, shown above everything else. */
   adminPanel?: ReactNode;
-  /** Online payment through Razorpay (auto-renew). Off when the keys aren't set; UPI stays as the backup. */
+  /** The plan subscription through Razorpay auto-pay: the only way to pay for a plan. Off when the keys aren't set. */
   razorpay?: { enabled: boolean; autoRenew: { plan: PlanKey; cycle: BillingCycle; status: string; amount: number } | null };
 };
 
@@ -80,12 +79,17 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
   const [busy, startBusy] = useTransition();
 
   // Active Tab: 'sub' (My plan) | 'plans' (Change plan) | 'pay' (Payments) | 'acct' (Business & help)
-  // Arriving from a closed section's lock screen (?pay=now or ?pay=ref) opens the payment steps straight away.
-  const canAutoPay = billing.autoPay !== null && billing.canPay && !billing.block;
+  // The plan subscription (Razorpay auto-pay). "authenticated": approved, first charge later; "active": charging.
+  const rzpOn = !!razorpay?.enabled;
+  const autoRenew = razorpay?.autoRenew ?? null;
+  const subOn = !!autoRenew && (autoRenew.status === "authenticated" || autoRenew.status === "active");
+  const subFailing = !!autoRenew && (autoRenew.status === "pending" || autoRenew.status === "halted");
+  // Arriving from a closed section's lock screen (?pay=now) opens the subscribe steps straight away.
+  const canAutoPay = billing.autoPay !== null && billing.canPay && !billing.block && !subOn;
   const [activeTab, setActiveTab] = useState<"sub" | "plans" | "pay" | "acct">(canAutoPay && !billing.renew ? "plans" : "sub");
 
   // The plan in force now comes only from a verified period covering this moment (server). Clicking a plan
-  // never changes it: it opens the purchase steps below, which end in a payment waiting to be verified.
+  // never changes it: it opens the subscribe steps below, and only a payment Razorpay confirms adds a period.
   const active = billing.active;
   const curPlan = planOf(active?.plan);
   const currentPlanKey: PlanKey | null = curPlan?.k ?? null;
@@ -100,13 +104,9 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
   // Custom work list
   const [cwList, setCwList] = useState(initialCW);
 
-  // Purchase steps: 1 confirm what is bought and when it starts, 2 pay by UPI, 3 send the UPI reference.
+  // Subscribe steps: 1 confirm the plan and when the first charge is, 2 approve auto-pay in Razorpay checkout.
   const [buy, setBuy] = useState<{ plan: PlanKey; cycle: BillingCycle } | null>(canAutoPay && billing.renew ? billing.renew : null);
-  const [buyStep, setBuyStep] = useState<1 | 2 | 3>(billing.autoPay === "ref" ? 3 : 1);
-  const [utrNumber, setUtrNumber] = useState("");
-  const [payDate, setPayDate] = useState(billing.todayLabel);
-  const [payApp, setPayApp] = useState("GPay");
-
+  const [buyStep, setBuyStep] = useState<1 | 2>(1);
   // Bill viewer
   const [billRow, setBillRow] = useState<HistoryRow | null>(null);
 
@@ -127,7 +127,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
   // The newest payment (history is newest first), to tell the client when their last one wasn't found.
   const latestRejected = billing.history[0]?.phase === "rejected" ? billing.history[0] : null;
 
-  /** Opens the purchase steps for a plan and cycle. Nothing is saved until the UPI reference is sent. */
+  /** Opens the subscribe steps for a plan and cycle. Nothing changes until Razorpay checkout succeeds. */
   const openBuy = (plan: PlanKey, cycle: BillingCycle) => {
     if (!billing.canPay) {
       notify("Only the business owner or a manager can pay for the plan.", false);
@@ -137,16 +137,25 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
       notify(billing.block.message, false);
       return;
     }
+    if (subOn && autoRenew && autoRenew.plan === plan && autoRenew.cycle === cycle) {
+      notify("You are already subscribed to this plan. Auto-pay renews it by itself.");
+      return;
+    }
     setBuy({ plan, cycle });
     setBuyStep(1);
-    setUtrNumber("");
   };
   const closeBuy = () => setBuy(null);
 
   /** Pay for the next period of the plan in force, or the last one (or pick one when there is none). */
   const renew = billing.renew;
   const payNext = () => {
-    if (renew) openBuy(renew.plan, renew.cycle);
+    if (subOn) {
+      setActiveTab("sub");
+      notify("Auto-pay is on. The next period is charged by itself; nothing to do.");
+      return;
+    }
+    const again = autoRenew ?? renew;
+    if (again) openBuy(again.plan, again.cycle);
     else setActiveTab("plans");
   };
 
@@ -160,39 +169,6 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
   const renewCycle: BillingCycle = renew?.cycle ?? "m";
   const renewPrice = renewPlan ? renewPlan.p[renewCycle] : null;
   const dueDays = sim === "due" ? 3 : billing.access.days;
-
-  /** "I have already paid": straight to the step that takes the UPI reference. */
-  const alreadyPaid = () => {
-    if (!renew) {
-      setActiveTab("plans");
-      notify("Pick the plan you paid for, then send the reference.");
-      return;
-    }
-    openBuy(renew.plan, renew.cycle);
-    setBuyStep(3);
-  };
-
-
-  // Send the UPI reference: recorded as waiting to be checked. The plan doesn't change.
-  const handlePaymentSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!buy) return;
-    const ref = utrNumber.trim().replace(/\s+/g, "");
-    if (!/^[A-Za-z0-9]{6,22}$/.test(ref)) {
-      notify("Please check the UPI reference (UTR): 6 to 22 letters or digits.", false);
-      return;
-    }
-    startBusy(async () => {
-      const res = await sendPlanPayment({ plan: buy.plan, cycle: buy.cycle, utr: ref, payApp, paidOn: payDate });
-      notify(res.message, res.ok);
-      if (res.ok) {
-        setBuy(null);
-        setActiveTab("sub");
-        window.scrollTo({ top: 0, behavior: "smooth" });
-        router.refresh();
-      }
-    });
-  };
 
   const handleWithdraw = (id: string) => {
     startBusy(async () => {
@@ -252,38 +228,23 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
     notify(res.ok ? `Request sent for ${what}. Your limits change only after it is paid and confirmed.` : (res.message ?? "Could not send the request."), res.ok);
   };
 
-  // QR Code and UPI link for the plan being bought: the amount is the plan's price for that cycle.
-  const qrDataUrl = buy ? (QR_CODES[`${buy.plan}-${buy.cycle}`] ?? null) : null;
-  const upiDeepLink =
-    buy && buyPlan
-      ? `upi://pay?pa=${encodeURIComponent(SUPPLIER_INFO.vpa)}&pn=${encodeURIComponent(SUPPLIER_INFO.legal)}&cu=INR&am=${buyPrice.toFixed(
-          2,
-        )}&tn=${encodeURIComponent(`thabaal ${buyPlan.n} ${CYCLE_NAMES[buy.cycle].en}`)}`
-      : "#";
-
   // Limits come only from the plan in force now.
   const limits = curPlan?.lim ?? null;
   const isStaffFull = limits ? usage.staff >= limits.staff : false;
   const isCampNearLimit = limits ? usage.campaigns / limits.camp >= 0.8 : false;
 
-  // Online payment (Razorpay): the server makes the subscription and checks the result; UPI + reference stays as the backup.
-  const rzpOn = !!razorpay?.enabled;
-  const autoRenew = razorpay?.autoRenew ?? null;
-  const [upiOpen, setUpiOpen] = useState(false);
-  // Monthly and quarterly renew by themselves unless unticked; yearly is always paid once (above the ₹15,000 autopay limit).
-  const [renewAuto, setRenewAuto] = useState(true);
-  const willAutoRenew = !!buy && renewAuto;
+  /** Subscribe: the server creates the Razorpay subscription and reads the result back from Razorpay. */
   const payOnline = () => {
     if (!buy) return;
     startBusy(async () => {
-      const start = await rzpStartPlan(buy.plan, buy.cycle, willAutoRenew);
+      const start = await rzpStartPlan(buy.plan, buy.cycle);
       if (!start.ok) {
         notify(start.message, false);
         return;
       }
       const out = await openRazorpay(start, { name: biz.contactPerson || biz.shopName, email: biz.email, contact: biz.mobile });
       if (out.status === "closed") {
-        notify("Payment not completed. Try again, or pay by UPI below.", false);
+        notify("Subscription not completed. If money left your account, it is added automatically within a few minutes.", false);
         return;
       }
       if (out.status === "failed") {
@@ -300,30 +261,22 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
       }
     });
   };
-  const turnOffAutoRenew = () =>
+  /** Cancel: auto-pay stops and nothing more is charged; the period already paid for runs to its end. */
+  const cancelSubscription = () =>
     startBusy(async () => {
-      const r = await rzpCancelAutoRenew();
+      const r = await rzpCancelAutoRenew(cancelReason);
       notify(r.message, r.ok);
-      if (r.ok) router.refresh();
+      if (r.ok) {
+        setCancelModalOpen(false);
+        router.refresh();
+      }
     });
-
-  // Copy helper
-  const handleCopy = (text: string, label: string) => {
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(text).then(
-        () => notify(`${label} copied`),
-        () => notify(`${label}: ${text}`),
-      );
-    } else {
-      notify(`${label}: ${text}`);
-    }
-  };
 
   /** When a payment for `cycle` would start and end, from the server's dates. */
   const timing = (cycle: BillingCycle) =>
     billing.nextStartLabel && billing.nextEndLabels
       ? { starts: billing.nextStartLabel, ends: billing.nextEndLabels[cycle], fixed: true }
-      : { starts: "the moment Thabaal verifies your payment", ends: `${CYCLE_LENGTH[cycle]} after that`, fixed: false };
+      : { starts: "today, the moment the first payment goes through", ends: `${CYCLE_LENGTH[cycle]} after that`, fixed: false };
 
   const pendingPlan = planOf(billing.pending?.plan);
   const scheduledPlan = planOf(billing.scheduled?.plan);
@@ -336,9 +289,9 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
       sub="Your plan, payments and invoices."
       subTa="உங்கள் திட்டம், கட்டணங்கள் மற்றும் ரசீதுகள்."
       actions={
-        billing.canPay && !billing.block ? (
+        billing.canPay && !billing.block && !subOn ? (
           <button type="button" className="btn primary" onClick={payNext}>
-            <T ta="கட்டணம் செலுத்து">{active ? "Pay for next period" : "Choose a plan"}</T>
+            <T ta={active || autoRenew ? "தானியங்கி கட்டணத்துடன் சந்தா" : "திட்டத்தைத் தேர்வுசெய்க"}>{active || autoRenew ? "Subscribe with auto-pay" : "Choose a plan"}</T>
           </button>
         ) : null
       }
@@ -376,22 +329,24 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
         <div className="duebar bad">
           <div className="grow">
             <b>We could not find your payment</b> with UPI reference {latestRejected.utr}
-            {latestRejected.note ? `: ${latestRejected.note}` : ""}. Check the reference in your UPI app and send it again, or
-            WhatsApp us on 6379140626.
+            {latestRejected.note ? `: ${latestRejected.note}` : ""}. If money left your account, WhatsApp us on 6379140626. Plans are now
+            paid by auto-pay subscription only.
           </div>
         </div>
       )}
       {shown === "due" && (
-        <div className="duebar warn">
+        <div className={`duebar ${subOn && !sim ? "info" : "warn"}`}>
           <div className="grow">
             <b>
-              Payment due in {dueDays} day{dueDays === 1 ? "" : "s"}.
+              {subOn && !sim ? "Renews" : "Payment due"} in {dueDays} day{dueDays === 1 ? "" : "s"}.
             </b>{" "}
-            Pay now so nothing stops. The new period starts exactly when this one ends{active ? ` (${active.endsLabel})` : ""}.
+            {subOn && !sim
+              ? "Auto-pay charges it by itself; nothing to do."
+              : `Turn on auto-pay so nothing stops. The new period starts exactly when this one ends${active ? ` (${active.endsLabel})` : ""}.`}
           </div>
-          {billing.canPay && !billing.block && renewPrice !== null && (
+          {billing.canPay && !billing.block && !subOn && renewPrice !== null && (
             <button type="button" className="btn sm primary" onClick={payNext}>
-              Pay {inr(renewPrice)}
+              Subscribe · {inr(renewPrice)}
             </button>
           )}
         </div>
@@ -400,11 +355,11 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
         <div className="duebar bad">
           <div className="grow">
             <b>Payment is overdue.</b> thabaal will pause{billing.access.locksOnLabel && !sim ? ` on ${billing.access.locksOnLabel}` : ""} until this
-            period&apos;s payment is received.
+            period&apos;s payment is received.{subOn ? " Auto-pay is collecting it." : " Turn on auto-pay to keep going."}
           </div>
-          {billing.canPay && !billing.block && renewPrice !== null && (
+          {billing.canPay && !billing.block && !subOn && renewPrice !== null && (
             <button type="button" className="btn sm primary" onClick={payNext}>
-              Pay {inr(renewPrice)}
+              Subscribe · {inr(renewPrice)}
             </button>
           )}
         </div>
@@ -412,12 +367,12 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
       {(shown === "locked" || shown === "new") && (
         <div className="duebar bad">
           <div className="grow">
-            <b>{shown === "new" ? "Pay to start using thabaal." : "thabaal is paused."}</b> Only Home, My account and Settings open until your
-            payment is verified. Nothing is deleted.
+            <b>{shown === "new" ? "Subscribe to start using thabaal." : "thabaal is paused."}</b> Only Home, My account and Settings open until your
+            payment goes through. Nothing is deleted.
           </div>
-          {billing.canPay && !billing.block && (
+          {billing.canPay && !billing.block && !subOn && (
             <button type="button" className="btn sm primary" onClick={payNext}>
-              {renewPrice !== null ? `Pay ${inr(renewPrice)}` : "Choose a plan"}
+              {renewPrice !== null ? `Subscribe · ${inr(renewPrice)}` : "Choose a plan"}
             </button>
           )}
         </div>
@@ -425,7 +380,8 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
       {shown === "unmanaged" && !billing.pending && (
         <div className="duebar info">
           <div className="grow">
-            <b>No paid plan is on record for this business yet.</b> Choose a plan and pay by UPI. It starts when Thabaal verifies the payment.
+            <b>No paid plan is on record for this business yet.</b> Choose a plan and subscribe with auto-pay. It starts the moment the first
+            payment goes through.
           </div>
           {billing.canPay && !billing.block && (
             <button type="button" className="btn sm primary" onClick={() => setActiveTab("plans")}>
@@ -442,11 +398,11 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
             <div className="ic" aria-hidden>
               !
             </div>
-            <h2 id="ac-lock-title">{shown === "new" ? "Pay to start using thabaal" : "Your plan payment is due"}</h2>
+            <h2 id="ac-lock-title">{shown === "new" ? "Subscribe to start using thabaal" : "Your plan payment is due"}</h2>
             <p className="muted">
               {shown === "new"
-                ? "Your account is ready. Make the first payment and everything opens up as soon as thabaal verifies it."
-                : "We have not received this period's payment, so thabaal is paused. Pay now and it opens again as soon as we confirm."}
+                ? "Your account is ready. Subscribe with auto-pay and everything opens up the moment the first payment goes through."
+                : "We have not received this period's payment, so thabaal is paused. Subscribe with auto-pay and it opens again the moment the payment goes through."}
             </p>
             <div className="amt">{renewPrice !== null ? inr(renewPrice) : `From ${inr(PLANS[0].p.m)}`}</div>
             <div className="muted small">{renewPlan ? `${renewPlan.n} plan` : "a month"}</div>
@@ -463,23 +419,12 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                     type="button"
                     className="btn primary"
                     onClick={() => {
-                      if (sim) return notify("Preview only: this opens the UPI payment for the shop owner.");
+                      if (sim) return notify("Preview only: this opens the auto-pay subscription for the shop owner.");
                       setLockDismissed(true);
                       payNext();
                     }}
                   >
-                    Pay now by UPI
-                  </button>
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => {
-                      if (sim) return notify("Preview only: this asks the shop owner for the UPI reference.");
-                      setLockDismissed(true);
-                      alreadyPaid();
-                    }}
-                  >
-                    I have already paid
+                    Subscribe with auto-pay
                   </button>
                 </>
               )}
@@ -613,32 +558,59 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
             </div>
           )}
 
-          {/* Auto-renew through Razorpay */}
+          {/* The plan subscription (Razorpay auto-pay): subscribed, cancelled (runs to the period end) or failing. */}
           {rzpOn && autoRenew && (
-            <div className="card" style={{ marginBottom: 16, borderLeft: `6px solid ${autoRenew.status === "pending" || autoRenew.status === "halted" ? "var(--bad)" : "var(--ok)"}` }}>
+            <div
+              className="card"
+              style={{ marginBottom: 16, borderLeft: `6px solid ${subFailing ? "var(--bad)" : subOn ? "var(--ok)" : "var(--warn)"}` }}
+            >
               <div className="hd" style={{ marginBottom: 0, flexWrap: "wrap", gap: 12 }}>
                 <div>
                   <h2 style={{ fontSize: 17 }}>
-                    {autoRenew.status === "cancelling"
-                      ? "Auto-renew is off"
-                      : autoRenew.status === "pending" || autoRenew.status === "halted"
-                        ? "Auto-renew: last charge didn't go through"
-                        : "Auto-renew is on"}
+                    {subOn ? "Subscribed · auto-pay is on" : subFailing ? "Auto-pay: the last charge didn't go through" : "Subscription cancelled"}
                   </h2>
                   <p className="muted small">
-                    {planOf(autoRenew.plan)?.n} · {CYCLE_NAMES[autoRenew.cycle].en} · {inr(autoRenew.amount)}
-                    {autoRenew.status === "cancelling"
-                      ? ". Your current period stays until it ends; there are no more charges."
-                      : autoRenew.status === "pending" || autoRenew.status === "halted"
-                        ? ". Razorpay will try again. Make sure your card or UPI mandate is active, or pay by UPI."
-                        : ". Razorpay charges it at the start of each period, and the new period is added straight away."}
+                    {planOf(autoRenew.plan)?.n} · {CYCLE_NAMES[autoRenew.cycle].en} · {inr(autoRenew.amount)} {CYCLE_SUFFIX[autoRenew.cycle].en}
+                    {subOn
+                      ? active
+                        ? `. Renews by itself on ${active.endsLabel}; Razorpay tells you before each charge. Cancel any time and you keep access until the paid period ends.`
+                        : ". Renews by itself at the end of each period. Cancel any time."
+                      : subFailing
+                        ? ". Razorpay is trying again. Check that your UPI or card mandate is active, or set up auto-pay again with another card or UPI app."
+                        : active
+                          ? `. Nothing more will be charged. You keep full access until ${active.endsLabel}; resubscribe before then and nothing stops.`
+                          : ". Nothing more will be charged."}
                   </p>
                 </div>
-                {autoRenew.status !== "cancelling" && billing.canPay && (
-                  <button type="button" className="btn sm" disabled={busy} onClick={turnOffAutoRenew}>
-                    Turn off auto-renew
-                  </button>
+                {billing.canPay && (
+                  <div className="tools">
+                    {!subOn && !billing.block && (
+                      <button type="button" className="btn sm primary" disabled={busy} onClick={() => openBuy(autoRenew.plan, autoRenew.cycle)}>
+                        {subFailing ? "Set up auto-pay again" : "Resubscribe"}
+                      </button>
+                    )}
+                    {(subOn || subFailing) && (
+                      <button type="button" className="btn sm" disabled={busy} onClick={() => setCancelModalOpen(true)}>
+                        Cancel subscription
+                      </button>
+                    )}
+                  </div>
                 )}
+              </div>
+            </div>
+          )}
+          {rzpOn && !autoRenew && active && billing.canPay && !billing.block && (
+            <div className="card" style={{ marginBottom: 16, borderLeft: "6px solid var(--warn)" }}>
+              <div className="hd" style={{ marginBottom: 0, flexWrap: "wrap", gap: 12 }}>
+                <div>
+                  <h2 style={{ fontSize: 17 }}>Auto-pay is off</h2>
+                  <p className="muted small">
+                    Your plan ends on {active.endsLabel}. Subscribe with auto-pay and it renews by itself; cancel any time.
+                  </p>
+                </div>
+                <button type="button" className="btn sm primary" onClick={payNext}>
+                  Subscribe with auto-pay
+                </button>
               </div>
             </div>
           )}
@@ -678,9 +650,11 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                     </div>
                   </div>
                   <p className="muted small" style={{ marginBottom: 14 }}>
-                    {autoRenew && autoRenew.status !== "cancelling"
-                      ? "Auto-renew is on: the next period is charged through Razorpay when this one ends."
-                      : "Nothing is charged automatically. Pay for the next period any time; it starts exactly when this one ends."}
+                    {subOn
+                      ? `Auto-pay is on: the next period is charged on ${active.endsLabel}, and it starts exactly when this one ends.`
+                      : subFailing
+                        ? "Auto-pay couldn't collect the last charge. Set it up again so nothing stops."
+                        : `Auto-pay is off: the plan ends on ${active.endsLabel} unless you subscribe.`}
                   </p>
                 </>
               ) : (
@@ -695,7 +669,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                     {billing.status === "expired" && endedPlan && billing.lastEnded
                       ? `Your ${endedPlan.n} plan ended on ${billing.lastEnded.endsLabel}.`
                       : "No paid period is on record for this business yet."}{" "}
-                    A new plan starts when Thabaal verifies your payment.
+                    Subscribe with auto-pay and the plan starts the moment the first payment goes through.
                   </p>
                 </>
               )}
@@ -734,14 +708,14 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                 <>
                   <div>
                     <div className="l">Next period</div>
-                    <div className="v">{inr(curPlan.p[active.cycle])}</div>
+                    <div className="v">{inr(autoRenew && subOn ? autoRenew.amount : curPlan.p[active.cycle])}</div>
                     <div className="l">
-                      Pay before {active.endsLabel} · {active.leftLabel}
+                      {subOn ? `Auto-pay charges it on ${active.endsLabel}` : `Plan ends ${active.endsLabel} · ${active.leftLabel}`}
                     </div>
                   </div>
-                  {billing.canPay && (
+                  {billing.canPay && !subOn && (
                     <button type="button" className="btn primary" onClick={payNext}>
-                      <T ta="கட்டணம் செலுத்து">Pay now</T>
+                      <T ta="தானியங்கி கட்டணத்துடன் சந்தா">Subscribe</T>
                     </button>
                   )}
                 </>
@@ -948,7 +922,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
       {/* ========================================================================= */}
       {activeTab === "plans" && (
         <section>
-          {/* A business that has never paid sees the whole path: package, UPI payment, then activation. */}
+          {/* A business that has never paid sees the whole path: package, auto-pay subscription, then activation. */}
           {!billing.active && !billing.lastEnded && !billing.scheduled && (
             <ol className="firststeps" aria-label="How to start">
               <li className={billing.pending ? "done" : "on"}>
@@ -963,9 +937,9 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
               <li className={billing.pending ? "done" : ""}>
                 <b>2</b>
                 <span>
-                  <T ta="UPI மூலம் செலுத்துங்கள்">Pay by UPI</T>
+                  <T ta="தானியங்கி கட்டணத்துடன் சந்தா">Subscribe with auto-pay</T>
                   <small>
-                    <T ta="QR ஸ்கேன் செய்து, UTR எண்ணை அனுப்புங்கள்">Scan the QR, then send the UTR number</T>
+                    <T ta="Razorpay வழியாக UPI AutoPay அல்லது கார்டு · எப்போது வேண்டுமானாலும் ரத்து செய்யலாம்">UPI AutoPay or card through Razorpay · cancel any time</T>
                   </small>
                 </span>
               </li>
@@ -974,7 +948,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                 <span>
                   <T ta="கணக்கு செயல்படும்">Account activated</T>
                   <small>
-                    <T ta="தபால் கட்டணத்தைச் சரிபார்த்தவுடன்">As soon as Thabaal verifies your payment</T>
+                    <T ta="முதல் கட்டணம் வந்தவுடன்">The moment the first payment goes through</T>
                   </small>
                 </span>
               </li>
@@ -1036,13 +1010,14 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                 <>Only the business owner or a manager can pay for the plan.</>
               ) : billing.nextStartLabel ? (
                 <>
-                  <b>Choosing a plan here does not change your plan today.</b> You pay first; once Thabaal verifies the payment, the plan you chose
-                  starts {billing.nextStartLabel}, when your paid period ends, and runs its full length. Until then {curPlan ? curPlan.n : "your current plan"} stays as it is.
+                  <b>Choosing a plan here does not change your plan today.</b> You subscribe now; auto-pay makes the first charge on{" "}
+                  {billing.nextStartLabel}, when your paid period ends, and the plan you chose starts then. Until then{" "}
+                  {curPlan ? curPlan.n : "your current plan"} stays as it is.
                 </>
               ) : (
                 <>
-                  <b>Choosing a plan here does not change anything by itself.</b> You pay first; the plan starts when Thabaal verifies the payment and runs
-                  its full length from then.
+                  <b>One simple subscription.</b> Subscribe with auto-pay: the first charge is made now and the plan starts at once. It renews by
+                  itself every period until you cancel, and you keep access until the end of what you paid for.
                 </>
               )}
             </div>
@@ -1052,6 +1027,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
           <div className="plans" style={{ marginTop: 14 }}>
             {PLANS.map((plan, i) => {
               const isCur = plan.k === currentPlanKey && currentCycle === viewCycle;
+              const subHere = subOn && autoRenew?.plan === plan.k && autoRenew?.cycle === viewCycle;
               const curIndex = PLANS.findIndex((p) => p.k === currentPlanKey);
               const price = plan.p[viewCycle];
               const savings =
@@ -1115,14 +1091,15 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                   <button
                     type="button"
                     className={`btn ${isCur || !currentPlanKey || i > curIndex ? "primary" : ""}`}
-                    disabled={!canStartPurchase}
+                    disabled={!canStartPurchase || subHere}
                     onClick={() => openBuy(plan.k, viewCycle)}
                   >
                     <T
                       ta={
-                        isCur
-                          ? "அடுத்த காலத்திற்கு செலுத்து"
-                          : !currentPlanKey
+                        subHere
+                          ? "சந்தா செயலில் உள்ளது"
+                          : isCur
+                          ? "சந்தா செய்"                          : !currentPlanKey
                             ? `தேர்வு செய் (${plan.nTa})`
                             : plan.k === currentPlanKey
                               ? "பில்லிங் மாற்று"
@@ -1131,8 +1108,10 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                                 : `மாற்று (${plan.nTa})`
                       }
                     >
-                      {isCur
-                        ? "Pay for next period"
+                      {subHere
+                        ? "Subscribed · auto-pay on"
+                        : isCur
+                        ? "Subscribe"
                         : !currentPlanKey
                           ? `Choose ${plan.n}`
                           : plan.k === currentPlanKey
@@ -1213,8 +1192,8 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                     <T ta="தபாஅல் கட்டணம் செலுத்துதல்">Pay for thabaal</T>
                   </h2>
                   <p>
-                    <T ta="UPI மூலம் செலுத்துங்கள். அடுத்த வேலை நாளுக்குள் உறுதி செய்யப்படும்.">
-                      Pay by UPI. We confirm it by the next working day. A payment counts only after it is verified.
+                    <T ta="ஒருமுறை தானியங்கி கட்டணத்துடன் சந்தா செய்யுங்கள். ஒவ்வொரு காலமும் தானாகக் கட்டணம்; எப்போது வேண்டுமானாலும் ரத்து செய்யலாம்.">
+                      Subscribe once with auto-pay. Each period is charged by itself, and you can cancel any time.
                     </T>
                   </p>
                 </div>
@@ -1235,8 +1214,8 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                 </div>
               </div>
               <div className="tools">
-                <button type="button" className="btn primary" disabled={!canStartPurchase} onClick={payNext}>
-                  <T ta="கட்டணம் செலுத்து">{active ? "Pay for next period" : "Choose a plan"}</T>
+                <button type="button" className="btn primary" disabled={!canStartPurchase || subOn} onClick={payNext}>
+                  <T ta={subOn ? "தானியங்கி கட்டணம் இயக்கத்தில்" : "தானியங்கி கட்டணத்துடன் சந்தா"}>{subOn ? "Auto-pay is on" : active || autoRenew ? "Subscribe with auto-pay" : "Choose a plan"}</T>
                 </button>
               </div>
               {billing.block && (
@@ -1251,8 +1230,8 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                       <T ta="செலுத்தும் முறை">How you pay</T>
                     </div>
                     <div className="muted small">
-                      <T ta="CupNSaucerLLP-க்கு UPI மூலம்: QR குறியீட்டை ஸ்கேன் செய்து, UTR எண்ணை எங்களுக்குத் தெரிவிக்கவும்.">
-                        By UPI to CupNSaucerLLP: pick the plan, scan the code, which already carries the amount, then send us the reference number.
+                      <T ta="Razorpay வழியாக தானியங்கி கட்டணம்: UPI AutoPay, கார்டு அல்லது நெட் பேங்கிங். ஒவ்வொரு கட்டணத்திற்கும் முன் Razorpay தெரிவிக்கும்; என் திட்டம் பகுதியில் எப்போது வேண்டுமானாலும் ரத்து செய்யலாம்.">
+                        Auto-pay through Razorpay: UPI AutoPay, card or net banking. Razorpay tells you before each charge, and you can cancel from My plan any time; access stays until the paid period ends.
                       </T>
                     </div>
                   </div>
@@ -1260,11 +1239,11 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                 <div className="row">
                   <div className="grow">
                     <div className="t">
-                      <T ta="முன்கூட்டியே செலுத்துதல்">Paying early</T>
+                      <T ta="திட்டம் மாற்றுதல்">Changing plan</T>
                     </div>
                     <div className="muted small">
-                      An early payment never shortens your current plan. Once verified, it is booked to start the moment your paid period ends, and runs
-                      the full 1, 3 or 12 months from then.
+                      Subscribing or switching while a period is running never shortens it. The new subscription makes its first charge the moment your
+                      paid period ends, and the old one stops then.
                     </div>
                   </div>
                 </div>
@@ -1719,23 +1698,20 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
       )}
 
       {/* ========================================================================= */}
-      {/* DIALOG 1: BUY A PLAN PERIOD — confirm, pay by UPI, send the reference      */}
-      {/* Nothing is saved until step 3, and even then the plan doesn't change until */}
-      {/* Thabaal verifies the payment.                                              */}
+      {/* DIALOG 1: SUBSCRIBE: confirm the plan, then approve auto-pay in Razorpay checkout. Nothing changes until  */}
+      {/* checkout succeeds, and the server reads the result back from Razorpay before granting anything.           */}
       {/* ========================================================================= */}
       {buy && buyPlan && (
-        <div className="lockwrap" role="dialog" aria-modal="true" aria-label="Pay for a plan" style={{ background: "rgba(16,40,59,.65)" }}>
+        <div className="lockwrap" role="dialog" aria-modal="true" aria-label="Subscribe to a plan" style={{ background: "rgba(16,40,59,.65)" }}>
           <div className="card-3d lockbox" style={{ maxWidth: 560, textAlign: "left", padding: 24 }}>
             {buyStep === 1 && (
               <div>
                 <div className="hd" style={{ marginBottom: 12 }}>
                   <h2 style={{ fontSize: 20 }}>
-                    {!currentPlanKey
-                      ? `Choose ${buyPlan.n}`
+                    {!currentPlanKey || (buyPlan.k === currentPlanKey && buy.cycle === currentCycle)
+                      ? `Subscribe to ${buyPlan.n}`
                       : buyPlan.k === currentPlanKey
-                        ? buy.cycle === currentCycle
-                          ? `Pay for your next ${buyPlan.n} period`
-                          : `Change how you pay for ${buyPlan.n}`
+                        ? `Change ${buyPlan.n} billing`
                         : PLANS.findIndex((p) => p.k === buyPlan.k) > PLANS.findIndex((p) => p.k === currentPlanKey)
                           ? `Upgrade to ${buyPlan.n}`
                           : `Move to ${buyPlan.n}`}
@@ -1757,9 +1733,9 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                     </div>
                   )}
                   <div className="row">
-                    <div className="grow muted">You are buying</div>
+                    <div className="grow muted">You are subscribing to</div>
                     <b>
-                      {buyPlan.n} · {CYCLE_LENGTH[buy.cycle]}
+                      {buyPlan.n} · {CYCLE_NAMES[buy.cycle].en}
                     </b>
                   </div>
                   <div className="row">
@@ -1769,23 +1745,25 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                     </b>
                   </div>
                   <div className="row">
-                    <div className="grow muted">Starts</div>
-                    <b>{timing(buy.cycle).starts}</b>
+                    <div className="grow muted">First charge</div>
+                    <b>{timing(buy.cycle).fixed ? timing(buy.cycle).starts : "Today"}</b>
                   </div>
                   <div className="row">
-                    <div className="grow muted">Ends</div>
-                    <b>{timing(buy.cycle).ends}</b>
+                    <div className="grow muted">Renews</div>
+                    <b>Every {CYCLE_LENGTH[buy.cycle]}, until you cancel</b>
                   </div>
                 </div>
 
                 <p className="small muted" style={{ marginBottom: 10 }}>
                   {timing(buy.cycle).fixed
-                    ? `Your ${curPlan?.n ?? "current"} plan and everything in it stay exactly as they are until ${billing.nextStartLabel}. Once Thabaal verifies this payment, ${buyPlan.n} is booked to start at that moment and runs the full ${CYCLE_LENGTH[buy.cycle]}. Paying early never shortens your current period.`
-                    : `Once Thabaal verifies this payment, ${buyPlan.n} starts and runs the full ${CYCLE_LENGTH[buy.cycle]} from that moment.`}{" "}
-                  Sending a payment reference does not count as paid until it is verified.
+                    ? `Your ${curPlan?.n ?? "current"} plan stays exactly as it is until ${billing.nextStartLabel}. Auto-pay makes the first charge then and ${buyPlan.n} starts at that moment, so subscribing early never shortens a paid period.`
+                    : `The first ${inr(buyPrice)} is charged now and ${buyPlan.n} starts the moment it goes through.`}{" "}
+                  After that Razorpay charges {inr(buyPrice)} every {CYCLE_LENGTH[buy.cycle]} and tells you before each charge. Cancel any time from My
+                  plan; you keep access until the end of the period you paid for.
+                  {subOn && autoRenew ? ` Your ${planOf(autoRenew.plan)?.n ?? "current"} subscription stops when this one starts.` : ""}
                 </p>
 
-                {/* Capacity check against the plan being bought */}
+                {/* Capacity check against the plan being subscribed to */}
                 {(() => {
                   const warnings: string[] = [];
                   if (usage.staff > buyPlan.lim.staff)
@@ -1804,7 +1782,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                     Not now
                   </button>
                   <button type="button" className="btn primary" onClick={() => setBuyStep(2)}>
-                    Continue to payment
+                    Continue
                   </button>
                 </div>
               </div>
@@ -1814,7 +1792,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
               <div>
                 <div className="hd" style={{ marginBottom: 10 }}>
                   <h2 style={{ fontSize: 20 }}>
-                    <T ta="தபாஅல் கட்டணம் செலுத்துதல்">Pay for thabaal</T>
+                    <T ta="தானியங்கி கட்டணத்துடன் சந்தா">Subscribe with auto-pay</T>
                   </h2>
                   <button type="button" className="btn sm ghost" aria-label="Close" onClick={closeBuy}>
                     <X className="size-4" />
@@ -1825,154 +1803,42 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                     {buyPlan.n} plan · {CYCLE_NAMES[buy.cycle].en}
                   </div>
                   <div className="v">{inr(buyPrice)}</div>
-                  <div className="d muted">No extra charges · GST included</div>
+                  <div className="d muted">{CYCLE_SUFFIX[buy.cycle].en} · GST included · cancel any time</div>
                 </div>
 
-                {rzpOn && (
+                {rzpOn ? (
                   <div className="card" style={{ background: "var(--soft)", boxShadow: "none", padding: 18, marginBottom: 14 }}>
-                    <b>Pay online with Razorpay</b>
-                    <p className="muted small" style={{ margin: "6px 0 10px" }}>
-                      UPI, card or net banking. Your plan is added the moment the payment goes through; nobody has to check it.
+                    <b>Auto-pay with Razorpay</b>
+                    <p className="muted small" style={{ margin: "6px 0 14px" }}>
+                      Approve the auto-pay mandate once with UPI AutoPay, a card or net banking.{" "}
+                      {timing(buy.cycle).fixed
+                        ? `Nothing is charged for the plan today: the first ${inr(buyPrice)} is on ${billing.nextStartLabel}. Your bank may show a small verification amount, which is returned.`
+                        : `${inr(buyPrice)} is charged now and your plan starts straight away.`}{" "}
+                      Razorpay tells you before every renewal.
                     </p>
-                      <label className="small" style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 14, cursor: "pointer" }}>
-                        <input type="checkbox" checked={renewAuto} onChange={(e) => setRenewAuto(e.target.checked)} style={{ marginTop: 2 }} />
-                        <span>
-                          <b>Renew automatically every {CYCLE_LENGTH[buy.cycle]}</b>
-                          <span className="muted">
-                            {" "}
-                            · Razorpay charges {inr(buyPrice)} when each period ends and tells you a day before. Turn it off any time from My plan.
-                            {renewAuto && billing.nextStartLabel ? ` Your current period keeps running; the first charge is on ${billing.nextStartLabel}.` : ""}
-                          </span>
-                        </span>
-                      </label>
-                    {renewAuto && buyPrice > 15000 && (
+                    {buyPrice > 15000 && (
                       <p className="muted small" style={{ marginTop: -6, marginBottom: 14 }}>
                         UPI AutoPay covers up to ₹15,000 a charge, so your bank or UPI app may ask you to approve each renewal of this plan.
                       </p>
                     )}
                     <button type="button" className="btn primary" disabled={busy} onClick={payOnline} style={{ width: "100%", justifyContent: "center" }}>
-                      {busy ? "Opening payment..." : willAutoRenew && billing.nextStartLabel ? "Set up auto-renew with Razorpay" : `Pay ${inr(buyPrice)} with Razorpay`}
+                      {busy ? "Opening Razorpay..." : timing(buy.cycle).fixed ? "Set up auto-pay" : `Subscribe · ${inr(buyPrice)}`}
                     </button>
-                    {!upiOpen && (
-                      <button type="button" className="btn ghost sm" onClick={() => setUpiOpen(true)} style={{ marginTop: 10, width: "100%", justifyContent: "center" }}>
-                        Pay by UPI QR instead (we check it within a working day)
-                      </button>
-                    )}
+                  </div>
+                ) : (
+                  <div className="duebar warn" style={{ marginBottom: 14 }}>
+                    <div className="grow">
+                      <b>Online payment isn&apos;t available right now.</b> Please WhatsApp thabaal on 6379140626 and we will help you subscribe.
+                    </div>
                   </div>
                 )}
 
-                {(!rzpOn || upiOpen) && (
-                <>
-                <div className="card" style={{ background: "var(--soft)", boxShadow: "none", textAlign: "center", padding: 18 }}>
-                  {qrDataUrl && (
-                    <>
-                      <div className="muted small" style={{ marginBottom: 10 }}>
-                        Scan with GPay, PhonePe, Paytm or any UPI app
-                      </div>
-                      {/* eslint-disable-next-line @next/next/no-img-element -- inline data URL */}
-                      <img
-                        src={qrDataUrl}
-                        alt={`UPI QR code for ${inr(buyPrice)}`}
-                        style={{ width: 168, height: 168, borderRadius: 12, background: "#fff", padding: 6, margin: "0 auto", display: "block" }}
-                      />
-                      <div className="muted small" style={{ marginTop: 8 }}>
-                        The amount is already in the code. Nothing to type.
-                      </div>
-                    </>
-                  )}
-                  <div style={{ marginTop: 14 }}>
-                    <div className="muted small">Or pay {inr(buyPrice)} directly to this UPI ID</div>
-                    <div className="tools" style={{ justifyContent: "center", marginTop: 6 }}>
-                      <b style={{ fontSize: 17 }}>{SUPPLIER_INFO.vpa}</b>
-                      <button type="button" className="btn sm" onClick={() => handleCopy(SUPPLIER_INFO.vpa, "UPI ID")}>
-                        <Copy className="size-3.5" />
-                        Copy
-                      </button>
-                    </div>
-                  </div>
-                  <a className="btn primary" href={upiDeepLink} style={{ marginTop: 16, display: "inline-flex", width: "100%", justifyContent: "center" }}>
-                    Open my UPI app
-                  </a>
-                </div>
-
-                <div className="acts" style={{ marginTop: 18, display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
+                <div className="acts" style={{ marginTop: 4, display: "flex", justifyContent: "flex-end" }}>
                   <button type="button" className="btn" onClick={() => setBuyStep(1)}>
                     Back
                   </button>
-                  <button type="button" className="btn primary" onClick={() => setBuyStep(3)}>
-                    I have paid
-                  </button>
                 </div>
-                </>
-                )}
-                {rzpOn && !upiOpen && (
-                  <div className="acts" style={{ marginTop: 4, display: "flex", justifyContent: "flex-end" }}>
-                    <button type="button" className="btn" onClick={() => setBuyStep(1)}>
-                      Back
-                    </button>
-                  </div>
-                )}
               </div>
-            )}
-
-            {buyStep === 3 && (
-              <form onSubmit={handlePaymentSubmit}>
-                <div className="hd" style={{ marginBottom: 10 }}>
-                  <h2 style={{ fontSize: 20 }}>
-                    <T ta="கட்டண விவரங்களைத் தெரிவிக்கவும்">Tell us about the payment</T>
-                  </h2>
-                  <button type="button" className="btn sm ghost" aria-label="Close" onClick={closeBuy}>
-                    <X className="size-4" />
-                  </button>
-                </div>
-                <p className="muted small" style={{ marginBottom: 14 }}>
-                  For {buyPlan.n} · {CYCLE_LENGTH[buy.cycle]} · {inr(buyPrice)}. Your UPI app shows a reference or UTR number after a successful payment. It is
-                  usually 12 digits.
-                </p>
-
-                <div className="stack" style={{ gap: 14 }}>
-                  <div className="field">
-                    <label htmlFor="ac-utr">UPI reference number (UTR) *</label>
-                    <input
-                      id="ac-utr"
-                      autoComplete="off"
-                      maxLength={22}
-                      placeholder="123456789012"
-                      value={utrNumber}
-                      onChange={(e) => setUtrNumber(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="ac-paydate">Date you paid</label>
-                    <input id="ac-paydate" value={payDate} onChange={(e) => setPayDate(e.target.value)} maxLength={40} />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="ac-payapp">Which app did you use?</label>
-                    <select id="ac-payapp" value={payApp} onChange={(e) => setPayApp(e.target.value)}>
-                      <option>GPay</option>
-                      <option>PhonePe</option>
-                      <option>Paytm</option>
-                      <option>Bank app</option>
-                      <option>Other UPI app</option>
-                    </select>
-                  </div>
-                </div>
-
-                <p className="small muted" style={{ marginTop: 14 }}>
-                  We check our bank entry and verify it within one working day. Until then it shows as &ldquo;awaiting verification&rdquo; and nothing
-                  about your plan changes.
-                </p>
-
-                <div className="acts" style={{ marginTop: 18, display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
-                  <button type="button" className="btn" onClick={() => setBuyStep(2)}>
-                    Back
-                  </button>
-                  <button type="submit" className="btn primary" disabled={busy}>
-                    {busy ? "Sending..." : "Send for checking"}
-                  </button>
-                </div>
-              </form>
             )}
           </div>
         </div>
@@ -2185,26 +2051,31 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
       )}
 
       {/* ========================================================================= */}
-      {/* DIALOG 5: STOP OR PAUSE — there is no automatic charge to cancel            */}
+      {/* DIALOG 5: CANCEL SUBSCRIPTION: auto-pay stops; the period already paid for runs to its end.              */}
       {/* ========================================================================= */}
       {cancelModalOpen && (
-        <div className="lockwrap" role="dialog" aria-modal="true" aria-label="Stop or pause" style={{ background: "rgba(16,40,59,.65)" }}>
+        <div
+          className="lockwrap"
+          role="dialog"
+          aria-modal="true"
+          aria-label={subOn || subFailing ? "Cancel subscription" : "Stop or pause"}
+          style={{ background: "rgba(16,40,59,.65)" }}
+        >
           <div className="card-3d lockbox" style={{ maxWidth: 500, textAlign: "left", padding: 24 }}>
             <div className="hd" style={{ marginBottom: 10 }}>
               <h2 style={{ fontSize: 20 }}>
-                <T ta="நிறுத்த அல்லது இடைநிறுத்தம் செய்ய">Stop or pause</T>
+                {subOn || subFailing ? <T ta="சந்தாவை ரத்து செய்">Cancel subscription</T> : <T ta="நிறுத்த அல்லது இடைநிறுத்தம் செய்ய">Stop or pause</T>}
               </h2>
               <button type="button" className="btn sm ghost" aria-label="Close" onClick={() => setCancelModalOpen(false)}>
                 <X className="size-4" />
               </button>
             </div>
             <p className="muted small" style={{ marginBottom: 14 }}>
-              {autoRenew && autoRenew.status !== "cancelling"
-                ? "Auto-renew is on: turn it off from My plan so the next period isn't charged."
-                : "Nothing is charged automatically, so there is nothing to cancel."}{" "}
-              {active ? `Your plan stays as it is until ${active.endsLabel} and ends then unless you pay for another period.` : "No plan is running now."}{" "}
-              {billing.scheduled ? `A period you already paid for starts ${billing.scheduled.startsLabel}; ask us if you want it refunded.` : ""} Your
-              customers, orders and products are kept.
+              {subOn || subFailing
+                ? `Auto-pay stops and nothing more is charged.${active ? ` You keep full access until ${active.endsLabel}, then thabaal pauses.` : ""}`
+                : `Auto-pay is not on, so nothing will be charged.${active ? ` Your plan stays as it is until ${active.endsLabel}.` : ""}`}{" "}
+              {billing.scheduled ? `A period you already paid for starts ${billing.scheduled.startsLabel} and stays.` : ""} You can subscribe again any
+              time. Your customers, orders and products are kept.
             </p>
 
             <div className="field" style={{ marginBottom: 18 }}>
@@ -2220,19 +2091,25 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
 
             <div className="acts" style={{ display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
               <button type="button" className="btn" onClick={() => setCancelModalOpen(false)}>
-                Close
+                {subOn || subFailing ? "Keep subscription" : "Close"}
               </button>
-              <button
-                type="button"
-                className="btn danger"
-                onClick={async () => {
-                  const res = await sendRequest("Stop or pause my plan", `Reason: ${cancelReason}. Please don't remind me to renew.`, "No hurry");
-                  notify(res.ok ? "Noted. We will not remind you to renew." : (res.message ?? "Could not send the request."), res.ok);
-                  if (res.ok) setCancelModalOpen(false);
-                }}
-              >
-                Tell thabaal I am stopping
-              </button>
+              {subOn || subFailing ? (
+                <button type="button" className="btn danger" disabled={busy} onClick={cancelSubscription}>
+                  {busy ? "Cancelling..." : "Cancel subscription"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn danger"
+                  onClick={async () => {
+                    const res = await sendRequest("Stop or pause my plan", `Reason: ${cancelReason}. Please don't remind me to renew.`, "No hurry");
+                    notify(res.ok ? "Noted. We will not remind you to renew." : (res.message ?? "Could not send the request."), res.ok);
+                    if (res.ok) setCancelModalOpen(false);
+                  }}
+                >
+                  Tell thabaal I am stopping
+                </button>
+              )}
             </div>
           </div>
         </div>

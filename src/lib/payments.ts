@@ -6,7 +6,8 @@ import { pushOrderToSheet } from "./google-sheets-live";
 import { getOrderPricing, itemsText, itemsWithNames, money, orderRef } from "./orders";
 import { pointsDiscount } from "./order-pricing";
 import { logPaymentEvent, utrOf } from "./payment-events";
-import { checkoutMode, upiLink, type PaySettings } from "./pay-settings";
+import { checkoutMode, codBlocked, upiLink, type CheckoutMode, type PaySettings } from "./pay-settings";
+import { bold, hello, itemLines } from "./wa-text";
 import { paySettingsFor } from "./pay-settings-server";
 import { dueOf, receivedOf } from "./payment-state";
 import { getSettings } from "./provider";
@@ -59,13 +60,13 @@ export async function paymentTemplateFor(clientId: string) {
 }
 
 /** The customer's last message (whose 24-hour window allows free-form messages) and the number to reply from. */
-async function replyContext(customer: { id: string; clientId: string }) {
+export async function replyContext(customer: { id: string; clientId: string }) {
   const last = await db.reply.findFirst({ where: { customerId: customer.id }, orderBy: { receivedAt: "desc" }, select: { receivedAt: true, senderId: true } });
   const { number, cfg } = await senderFor(customer.clientId, last?.senderId);
   return { open: replyWindowEnd(last?.receivedAt) !== null, number, cfg };
 }
 
-async function logMessage(customerId: string, templateName: string, body: string, res: { id: string; simulated: boolean }, senderId: string | null) {
+export async function logMessage(customerId: string, templateName: string, body: string, res: { id: string; simulated: boolean }, senderId: string | null) {
   await db.message.create({
     data: { customerId, templateName, body, status: "SENT", waMessageId: res.id, simulated: res.simulated, provider: "META", sentAt: new Date(), senderId },
   });
@@ -88,7 +89,7 @@ async function withCatalogFallback<T, P extends { catalogId?: string | null }>(p
   }
 }
 
-const firstName = (name: string) => name.trim().split(/\s+/)[0] || "there";
+export const firstName = (name: string) => (name.trim().startsWith("+") ? "" : name.trim().split(/\s+/)[0]) || "there";
 
 /**
  * Sends the "Review and pay" message for an order, paid by UPI through the client's payment configuration.
@@ -148,7 +149,9 @@ export async function sendPaymentRequestFor(orderId: string, opts: { reminder?: 
 
   if (useUpi) return sendUpiRequest({ order, settings: pay.settings, due, head, breakdownLines, open, number, cfg, sentData, sentWord, reminder: opts.reminder });
 
-  const text = `${head}\n\n${breakdownLines}\n\nTap "Review and pay" to pay by UPI${opts.reminder ? ", and we will pack it right away" : ""}.`;
+  // The first request after the customer gave their address repeats it, so they see where it goes.
+  const deliverLine = !opts.reminder && order.addressConfirmedAt && order.note?.trim() ? `\n\nDeliver to: ${order.note.trim().slice(0, 300)}` : "";
+  const text = `${head}\n\n${breakdownLines}${deliverLine}\n\nTap "Review and pay" to pay by UPI${opts.reminder ? ", and we will pack it right away" : ""}.`;
   try {
     let res: { id: string; simulated: boolean };
     let templateName = opts.reminder === "last" ? "Last payment reminder" : opts.reminder ? "Payment reminder" : "Payment request";
@@ -220,8 +223,8 @@ export async function autoRequestPayment(order: { id: string; clientId: string; 
  * asks the customer "Pay now online" or "Cash on delivery" when both are available,
  * or goes straight to "Review and pay" when only online payment is on.
  */
-export async function startCheckout(order: { id: string; clientId: string; total: number }) {
-  if (order.total <= 0) return;
+export async function startCheckout(order: { id: string; clientId: string; total: number }): Promise<CheckoutMode> {
+  if (order.total <= 0) return "none";
   const fresh = await db.order.findUnique({
     where: { id: order.id },
     select: {
@@ -231,7 +234,7 @@ export async function startCheckout(order: { id: string; clientId: string; total
       customer: { select: { region: true, location: true, locationRaw: true } },
     },
   });
-  if (!fresh || fresh.total <= 0) return;
+  if (!fresh || fresh.total <= 0) return "none";
   const pay = await paySettingsFor(fresh.clientId);
   const mode = checkoutMode(pay, fresh.total, fresh.customer);
   if (mode === "choose") {
@@ -243,6 +246,7 @@ export async function startCheckout(order: { id: string; clientId: string; total
   } else if (mode === "online") {
     await autoRequestPayment(fresh);
   }
+  return mode;
 }
 
 export type PaymentRecord = {
@@ -404,8 +408,30 @@ export async function recordPaymentFailure(orderId: string, reason: string) {
     include: { customer: true },
   });
   if (order && !order.customer.optedOut) {
+    const pay = await paySettingsFor(order.clientId);
+    const codOk = pay.settings.codOn && codBlocked(pay.settings, order.total, order.customer) === null;
+    const body = `${hello(order.customer.name)} your payment of ${bold(money(dueOf(order), order.currency))} for order ${bold(orderRef(order))} didn't go through (${reason}).\n\nYou can try again${codOk ? ", or pay in cash when it's delivered" : ""}.`;
+    try {
+      if ((await getSettings()).provider === "META") {
+        const { open, number, cfg } = await replyContext(order.customer);
+        if (open) {
+          const client = await db.client.findUnique({ where: { id: order.clientId }, select: { name: true } });
+          const res = await sendInteractiveButtons(
+            cfg,
+            order.customer.phone,
+            body,
+            [{ id: `pay_online:${order.id}`, title: "🔁 Try again" }, ...(codOk ? [{ id: `pay_cod:${order.id}`, title: "🚚 Cash on delivery" }] : [])],
+            { header: "Payment not completed", footer: client?.name },
+          );
+          await logMessage(order.customer.id, "Payment failed", body, res, number?.id ?? null);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("Payment-failed buttons not sent", e);
+    }
     const first = order.customer.name.trim().split(/\s+/)[0] || "there";
-    const codOn = (await paySettingsFor(order.clientId)).settings.codOn;
+    const codOn = codOk;
     const text = `Hello ${first}, your payment of ${money(dueOf(order), order.currency)} for order ${orderRef(order)} could not be completed (${reason}). Tap the payment link above to try again${codOn ? ', or reply "COD" to pay in cash upon delivery' : ""}.`;
     await textInWindow(order.customer, text, "Payment failed").catch(() => false);
   }
@@ -452,7 +478,10 @@ export async function cancelSupersededOrdersForCustomer(
       customerId,
       id: { not: newOrder.id },
       paidAt: null,
+      packedAt: null,
       status: { in: ["NEW", "CONFIRMED"] },
+      OR: [{ paidAmount: null }, { paidAmount: { lte: 0 } }],
+      NOT: { status: "CONFIRMED", paymentMethod: "cod" },
     },
     include: {
       customer: { select: { id: true, clientId: true, phone: true } },
@@ -483,7 +512,7 @@ export async function cancelSupersededOrdersForCustomer(
       await updateOrderCard(
         old,
         "canceled",
-        `This cart was replaced by your updated cart ${newRef} (${newTotal}). Please use the new payment request below.`,
+        `This cart was replaced by your new order ${newRef} (${newTotal}).`,
         "Cart replaced by newer order",
       ).catch((e) => console.warn(`Could not cancel WhatsApp card for old order ${oldRef}`, e));
     }
@@ -619,15 +648,24 @@ export async function sendPaymentChoicePrompt(orderId: string): Promise<{ ok: bo
   const items = await itemsWithNames(order);
   const pricing = getOrderPricing(items, order.total, { applyDefaultWhenEqual: true, discount: pointsDiscount(order) });
   const ref = orderRef(order);
-  const isReplacement = Boolean(order.internalNote?.includes("Replaced unpaid cart"));
-  const head = isReplacement
-    ? `Hello ${firstName(c.name)}, here is your updated ${order.client.name} order ${ref} (replacing your earlier cart).`
-    : `Hello ${firstName(c.name)}, here is your ${order.client.name} order ${ref}.`;
-
-  const pointsLine = pricing.discount > 0 ? `\nLoyalty points (${order.pointsRedeemed}): -${money(pricing.discount, order.currency)}` : "";
-  const shippingLine = pricing.shipping > 0 ? `\nShipping: ${money(pricing.shipping, order.currency)}` : "";
-  const breakdown = `Items: ${itemsText(items)} (${money(pricing.subtotal, order.currency)})${shippingLine}${pointsLine}\nTotal: ${money(pricing.total, order.currency)}`;
-  let body = `${head}\n\n${breakdown}\n\nHow would you like to pay?`;
+  const replaced = /Replaced unpaid cart (\S+)/.exec(order.internalNote ?? "")?.[1];
+  const money2 = (n: number) => money(n, order.currency);
+  let body = [
+    replaced ? `Your earlier cart ${replaced} has been replaced by this one.` : null,
+    `${hello(c.name)} here is your ${order.client.name} order ${bold(ref)}.`,
+    [
+      itemLines(items, order.currency),
+      pricing.shipping > 0 ? `Shipping: ${money2(pricing.shipping)}` : null,
+      pricing.discount > 0 ? `Loyalty points (${order.pointsRedeemed}): −${money2(pricing.discount)}` : null,
+      bold(`Total: ${money2(pricing.total)}`),
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    order.addressConfirmedAt && order.note?.trim() ? `📍 Deliver to: ${order.note.trim().slice(0, 300)}` : null,
+    "How would you like to pay?",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
   if (body.length > 1024) body = body.slice(0, 1024);
 
   try {
@@ -639,7 +677,7 @@ export async function sendPaymentChoicePrompt(orderId: string): Promise<{ ok: bo
         { id: `pay_online:${order.id}`, title: "💳 Pay now online" },
         { id: `pay_cod:${order.id}`, title: "🚚 Cash on delivery" },
       ],
-      { header: "Choose how to pay", footer: "Tap one option" }
+      { header: "Choose how to pay", footer: order.client.name }
     );
     await logMessage(c.id, "Payment choice", body, res, number?.id ?? null);
     return { ok: true, message: `Payment choice sent to ${c.name}.` };

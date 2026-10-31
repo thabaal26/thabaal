@@ -57,7 +57,7 @@ export function parseOrder(m: { order?: MetaOrder }) {
 export const itemsText = (items: OrderItem[]) => items.map((i) => `${i.quantity} × ${i.name ?? i.id}`).join(", ");
 
 export const money = (n: number, currency = "INR") =>
-  new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 2 }).format(n);
+  new Intl.NumberFormat("en-IN", { style: "currency", currency, minimumFractionDigits: Number.isInteger(Math.round(n * 100) / 100) ? 0 : 2, maximumFractionDigits: 2 }).format(n);
 
 /** Saves a cart against the customer. The same WhatsApp message id arriving twice is ignored. */
 export async function recordOrder(customer: { id: string; clientId: string }, waMessageId: string | undefined, m: { order?: MetaOrder }, names?: Map<string, string>) {
@@ -69,8 +69,16 @@ export async function recordOrder(customer: { id: string; clientId: string }, wa
 
   // Check if this customer already has any unpaid active carts (NEW or CONFIRMED with paidAt = null).
   // We keep all earlier carts in the DB for customer mentality analytics, but mark them superseded so only the latest cart is active.
+  // Only carts that were never confirmed are replaced (lib/order-intake.ts); a confirmed COD order or one with money in stays.
   const priorUnpaid = await db.order.findMany({
-    where: { customerId: customer.id, paidAt: null, status: { in: ["NEW", "CONFIRMED"] } },
+    where: {
+      customerId: customer.id,
+      paidAt: null,
+      packedAt: null,
+      status: { in: ["NEW", "CONFIRMED"] },
+      OR: [{ paidAmount: null }, { paidAmount: { lte: 0 } }],
+      NOT: { status: "CONFIRMED", paymentMethod: "cod" },
+    },
     orderBy: { createdAt: "desc" },
     select: { id: true, number: true, ref: true, total: true, currency: true, items: true, internalNote: true },
   });
@@ -151,19 +159,6 @@ export async function recordOrder(customer: { id: string; clientId: string }, wa
       currency: o.currency,
     },
   });
-
-  if (priorUnpaid.length > 0) {
-    const newRef = orderRef(created);
-    const newTotal = money(created.total, created.currency);
-    for (const oldOrder of priorUnpaid) {
-      const supersedeTag = `Superseded by ${newRef} (${newTotal}) · Customer sent a newer cart`;
-      const mergedNote = [oldOrder.internalNote, supersedeTag].filter(Boolean).join(" | ").slice(0, 1000);
-      await db.order.update({
-        where: { id: oldOrder.id },
-        data: { status: "CANCELLED", internalNote: mergedNote, paymentReminderAt: new Date() },
-      });
-    }
-  }
 
   await syncCustomerOrderedProducts(customer.id, items).catch((e) =>
     console.error("Could not sync customer ordered products", e),

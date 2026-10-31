@@ -1,6 +1,7 @@
 import "server-only";
 import { Prisma } from "@prisma/client";
 import { parseAddressText } from "./address";
+import { formAddressText, formValuesFrom } from "./address-form";
 import { db } from "./db";
 
 /**
@@ -147,7 +148,7 @@ export function metaReplyContent(m: {
   type?: string;
   text?: { body?: string };
   button?: { text?: string };
-  interactive?: { type?: string; button_reply?: { title?: string }; list_reply?: { title?: string }; call_permission_reply?: { response?: string } };
+  interactive?: { type?: string; button_reply?: { title?: string }; list_reply?: { title?: string }; call_permission_reply?: { response?: string }; nfm_reply?: { name?: string; response_json?: string; body?: string } };
   image?: { caption?: string };
   order?: { product_items?: { quantity?: number | string }[] };
   video?: { caption?: string };
@@ -171,6 +172,12 @@ export function metaReplyContent(m: {
   }
   if (m.interactive?.type === "call_permission_reply")
     return { text: m.interactive.call_permission_reply?.response === "accept" ? "Allowed you to call them on WhatsApp" : "Declined calls on WhatsApp", kind: "button" };
+  // WhatsApp's address form, filled in and sent back.
+  if (m.interactive?.nfm_reply) {
+    const v = formValuesFrom(m.interactive.nfm_reply.response_json);
+    if (v) return { text: `Delivery address: ${formAddressText(v)}`, kind: "text" };
+    return { text: m.interactive.nfm_reply.body?.trim() || "Sent a WhatsApp form", kind: "media" };
+  }
   if (m.type === "payment" || (m as Record<string, unknown>).payment) {
     return { text: "UPI payment completed on WhatsApp", kind: "order" };
   }

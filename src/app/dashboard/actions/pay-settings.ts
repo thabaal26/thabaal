@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { APP_ORIGIN } from "@/lib/app-host";
 import { db } from "@/lib/db";
 import { normalizePhone } from "@/lib/phone";
-import { readPaySettings, SETTLEMENTS, UPI_ID_RE, upiLink, type PaySettings } from "@/lib/pay-settings";
+import { EXPIRY_DAYS, HHMM, readPaySettings, SETTLEMENTS, UPI_ID_RE, upiLink, type PaySettings } from "@/lib/pay-settings";
 import { textInWindow } from "@/lib/payments";
 import { requireManager } from "@/lib/session";
 import type { SendResult } from "./send-helpers";
@@ -31,10 +31,11 @@ export type HowPayInput = {
   codOn: boolean;
   codMax: string;
   codAreas: string;
+  askAddress: boolean;
 };
 
 /** "How customers pay": the three switches and their fields. */
-export async function savePaySettings(input: HowPayInput, changed?: "whatsappPay" | "upiOn" | "codOn"): Promise<SendResult> {
+export async function savePaySettings(input: HowPayInput, changed?: "whatsappPay" | "upiOn" | "codOn" | "askAddress"): Promise<SendResult> {
   const s = await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
   const { settings, paymentConfig } = await current(s.clientId);
@@ -52,7 +53,7 @@ export async function savePaySettings(input: HowPayInput, changed?: "whatsappPay
   const codMax = maxText ? Math.round(Number(maxText)) : null;
   if (maxText && (!Number.isFinite(codMax) || (codMax ?? 0) <= 0)) return { ok: false, message: "Highest COD order: enter an amount in rupees, or leave it empty for no limit." };
 
-  await store(s.clientId, { ...settings, whatsappPay: input.whatsappPay, upiOn: input.upiOn, upiId, upiName, codOn: input.codOn, codMax, codAreas: input.codAreas.trim().slice(0, 300) });
+  await store(s.clientId, { ...settings, whatsappPay: input.whatsappPay, upiOn: input.upiOn, upiId, upiName, codOn: input.codOn, codMax, codAreas: input.codAreas.trim().slice(0, 300), askAddress: input.askAddress !== false });
   const msg =
     changed === "whatsappPay"
       ? `Pay inside WhatsApp is ${input.whatsappPay ? "on" : "off"}.`
@@ -60,7 +61,11 @@ export async function savePaySettings(input: HowPayInput, changed?: "whatsappPay
         ? `UPI link is ${input.upiOn ? "on" : "off"}.`
         : changed === "codOn"
           ? `Cash on delivery is ${input.codOn ? "on" : "off"}.`
-          : "Payment settings saved.";
+          : changed === "askAddress"
+            ? input.askAddress
+              ? "Delivery address on: new carts ask for the address first, then how to pay."
+              : "Delivery address off: new carts go straight to payment."
+            : "Payment settings saved.";
   return { ok: true, message: msg };
 }
 
@@ -129,4 +134,30 @@ export async function setWhatsappPay(on: boolean): Promise<SendResult> {
   if (on && !paymentConfig) return { ok: false, message: "Add the payment configuration name in Settings › WhatsApp payments setup first." };
   await store(s.clientId, { ...settings, whatsappPay: Boolean(on) });
   return { ok: true, message: `Pay inside WhatsApp is ${on ? "on" : "off"}.` };
+}
+
+export type AssistantInput = { nudgeOn: boolean; cartExpiryDays: number; hoursOn: boolean; openAt: string; closeAt: string };
+
+/** Payments › Payment settings › WhatsApp order assistant: reminders, expiry and the closed-hours reply. */
+export async function saveAssistantSettings(input: AssistantInput, changed?: keyof AssistantInput): Promise<SendResult> {
+  const s = await requireManager(true);
+  if ("denied" in s) return { ok: false, message: s.denied };
+  if (!EXPIRY_DAYS.includes(Number(input.cartExpiryDays))) return { ok: false, message: "Pick 1, 3 or 7 days." };
+  if (!HHMM.test(input.openAt) || !HHMM.test(input.closeAt)) return { ok: false, message: "Enter the opening and closing times." };
+  if (input.hoursOn && input.openAt === input.closeAt) return { ok: false, message: "Opening and closing times can't be the same." };
+  const { settings } = await current(s.clientId);
+  await store(s.clientId, { ...settings, nudgeOn: input.nudgeOn === true, cartExpiryDays: Number(input.cartExpiryDays), hoursOn: input.hoursOn === true, openAt: input.openAt, closeAt: input.closeAt });
+  const msg =
+    changed === "nudgeOn"
+      ? input.nudgeOn
+        ? "Reminders on: unfinished orders get a friendly reminder at 3 and 22 hours."
+        : "Reminders off for unfinished orders."
+      : changed === "cartExpiryDays"
+        ? `Unfinished orders now close after ${input.cartExpiryDays} day${Number(input.cartExpiryDays) === 1 ? "" : "s"}.`
+        : changed === "hoursOn"
+          ? input.hoursOn
+            ? "Shop hours reply on: customers who write while you're closed hear when you open."
+            : "Shop hours reply off."
+          : "Shop hours saved.";
+  return { ok: true, message: msg };
 }
