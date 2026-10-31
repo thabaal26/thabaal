@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { clientNumbers, numberConfig, senderFor } from "@/lib/senders";
-import { getScope, owned, requireManager, requireUser } from "@/lib/session";
+import { getScope, owned, requireManager, requireUser, PLAN_LOCKED_MESSAGE } from "@/lib/session";
 import { callAction, getIncomingCalls, MetaError, sendCallPermissionRequest, setIncomingCalls, startMetaCall, type IncomingCalls } from "@/lib/whatsapp";
 import type { ActionResult } from "./templates";
 import { trackPress } from "@/lib/usage";
@@ -13,6 +13,7 @@ const errText = (e: unknown) => (e instanceof MetaError || e instanceof Error ? 
 /** The call, if this login may handle it, with credentials for the number that was called. */
 async function callFor(id: string) {
   const scope = await getScope();
+  if (scope.planLocked) return { denied: PLAN_LOCKED_MESSAGE } as const;
   if (!scope.canOperate) return { denied: "Your login can view but not change anything." } as const;
   const call = await db.call.findFirst({
     where: { id, ...owned(scope) },
@@ -64,6 +65,7 @@ export async function hangUp(id: string): Promise<ActionResult> {
 
 async function customerFor(customerId: string) {
   const scope = await getScope();
+  if (scope.planLocked) return { denied: PLAN_LOCKED_MESSAGE } as const;
   if (!scope.canOperate) return { denied: "Your login can view but not change anything." } as const;
   const customer = await db.customer.findFirst({ where: { id: customerId, ...owned(scope) }, select: { id: true, phone: true, clientId: true, client: { select: { name: true } } } });
   if (!customer) return { denied: "Customer not found." } as const;

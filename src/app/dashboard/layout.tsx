@@ -20,6 +20,7 @@ import { AppearanceSync } from "@/components/appearance-sync";
 import { IconSetLink } from "@/components/icon-set-link";
 import { InlineScript } from "@/components/inline-script";
 import { UsageBeacon } from "@/components/usage-beacon";
+import { PlanLockPopup } from "./plan-lock-popup";
 import "./portal.css";
 import "./mobile.css";
 import { PlanDueBar } from "./plan-due-bar";
@@ -219,7 +220,6 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
             )}
             <div className="thin-scroll min-h-0 flex-1 overflow-y-auto px-3 py-3">
               <SideNav
-                planLocked={scope.planLocked}
                 isAdmin={scope.isAdmin}
                 showWallet={client?.billingMode === "wallet"}
                 disabledSections={disabledSections}
@@ -295,6 +295,8 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
               <div className="thabaal-portal">
                 <div className="wrapin">
                   {scope.viewOnly && <ViewOnlyBar name={scope.clientName ?? "this business"} />}
+                  {/* Unpaid business: pages open, and any change answers with the "Subscribe to continue" popup. */}
+                  {scope.planLocked && <PlanLockPopup canPay={scope.manager && !scope.viewOnly} />}
                   {client?.billingMode === "wallet" && <WalletBanner clientId={client.id} lowAlert={client.walletLowAlert} />}
                   {access && <PlanDueBar state={access.state} days={access.days} amount={renewAmount} isAdmin={scope.isAdmin} autoPay={autoPayOn} />}
                   {children}
@@ -304,7 +306,6 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           </div>
           {callsOn && scope.canOperate && <CallWidget />}
           <BottomNav
-            planLocked={scope.planLocked}
             isAdmin={scope.isAdmin}
             showWallet={client?.billingMode === "wallet"}
             role={role}
