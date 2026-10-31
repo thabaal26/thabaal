@@ -625,3 +625,27 @@ export async function enableMetaCalling(cfg: WaConfig) {
     return false;
   }
 }
+
+/**
+ * Incoming WhatsApp calls on a number (Meta: POST /{phone-number-id}/settings, "calling").
+ * On: calling enabled and the call button shown, so customers can call the business.
+ * Off: the call button is hidden and customers can't call on their own; calling itself stays enabled, so the
+ * business can still call customers who allowed it.
+ */
+export type IncomingCalls = "on" | "off";
+
+/** What Meta has for this number now; null when it can't be read (not connected, or Meta refused). */
+export async function getIncomingCalls(cfg: WaConfig): Promise<IncomingCalls | null> {
+  if (!cfg.live || !cfg.phoneNumberId) return null;
+  const res = await graph<{ calling?: { status?: string; call_icon_visibility?: string } }>(cfg, `${cfg.phoneNumberId}/settings`);
+  const c = res.calling;
+  return c?.status === "ENABLED" && c.call_icon_visibility !== "DISABLE_ALL" ? "on" : "off";
+}
+
+export async function setIncomingCalls(cfg: WaConfig, on: boolean): Promise<void> {
+  if (!cfg.live || !cfg.phoneNumberId) throw new MetaError("Calling needs the WhatsApp Cloud API connected.");
+  await graph(cfg, `${cfg.phoneNumberId}/settings`, {
+    method: "POST",
+    body: JSON.stringify({ calling: on ? { status: "ENABLED", call_icon_visibility: "DEFAULT" } : { call_icon_visibility: "DISABLE_ALL" } }),
+  });
+}

@@ -10,7 +10,7 @@ import { PortalPage } from "../portal-ui";
 import { AccountView } from "./account-view";
 import { adminQueue } from "@/lib/admin-queue";
 import { razorpayReady } from "@/lib/razorpay";
-import { autoRenewView, testPackageFor, testRecords } from "@/lib/razorpay-billing";
+import { autoRenewView } from "@/lib/razorpay-billing";
 import { AdminPlanPanel } from "./admin-plan-panel";
 import type { AdminPendingRow, BillingView, HistoryRow, PeriodView } from "./billing-types";
 
@@ -148,21 +148,6 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       billingProfile={billingProfile}
       customWorkRequests={customWorkRequests}
       razorpay={{ enabled: razorpayReady(), autoRenew: razorpayReady() ? await autoRenewView(clientId) : null }}
-      testPackage={
-        razorpayReady() && (await testPackageFor(clientId))
-          ? await testRecords(clientId).then((rows) => ({
-              hasTestSub: rows.some((r) => r.kind === "subscription" && ["authenticated", "active", "pending", "halted"].includes(r.status)),
-              rows: rows.map((r) => ({
-                id: r.id,
-                what: r.purpose === "wallet" ? "₹1 wallet test" : r.kind === "subscription" ? "₹1 auto-renew test" : "₹1 one-time test",
-                amount: r.amountPaise / 100,
-                status: r.status,
-                note: r.note,
-                when: label(r.updatedAt),
-              })),
-            }))
-          : null
-      }
       adminPanel={
         scope.isAdmin ? (
           <AdminPlanPanel
