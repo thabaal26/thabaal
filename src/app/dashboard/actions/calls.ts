@@ -2,9 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { numberConfig, senderFor } from "@/lib/senders";
-import { getScope, owned, requireUser } from "@/lib/session";
-import { callAction, MetaError, sendCallPermissionRequest, startMetaCall } from "@/lib/whatsapp";
+import { clientNumbers, numberConfig, senderFor } from "@/lib/senders";
+import { getScope, owned, requireManager, requireUser } from "@/lib/session";
+import { callAction, getIncomingCalls, MetaError, sendCallPermissionRequest, setIncomingCalls, startMetaCall, type IncomingCalls } from "@/lib/whatsapp";
 import type { ActionResult } from "./templates";
 
 const errText = (e: unknown) => (e instanceof MetaError || e instanceof Error ? e.message : "Something went wrong");
@@ -108,4 +108,39 @@ export async function startCall(customerId: string, sdp: string): Promise<Action
   });
   revalidatePath("/dashboard/calls");
   return { ok: true, id: call.id };
+}
+
+/**
+ * Chats › Calls toggle: lets customers call the business on WhatsApp, or not. Changed on Meta for every
+ * WhatsApp number the business has, then read back so the switch shows what WhatsApp really has.
+ */
+export async function setIncomingCallsAction(on: boolean): Promise<ActionResult & { state?: IncomingCalls | null }> {
+  const s = await requireManager(true);
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const [client, numbers] = await Promise.all([
+    db.client.findUnique({ where: { id: s.clientId }, select: { waToken: true } }),
+    clientNumbers(s.clientId),
+  ]);
+  if (!numbers.length) return { ok: false, message: "Connect your WhatsApp number first." };
+  const cfgs = numbers.map((n) => numberConfig(n, client?.waToken ?? null));
+  try {
+    for (const cfg of cfgs) await setIncomingCalls(cfg, Boolean(on));
+  } catch (e) {
+    const msg = errText(e);
+    return {
+      ok: false,
+      message: /messaging limit|tier|eligib|not.*(allowed|eligible)/i.test(msg)
+        ? `WhatsApp didn't allow it: ${msg} (calling needs a messaging limit of 2,000 or more).`
+        : `WhatsApp didn't save it: ${msg}`,
+    };
+  }
+  const state = await getIncomingCalls(cfgs[0]).catch(() => null);
+  revalidatePath("/dashboard/calls");
+  return {
+    ok: true,
+    state: state ?? (on ? "on" : "off"),
+    message: on
+      ? "Customers can now call you on WhatsApp. Their app may take a little while to show the call button."
+      : "Customers can no longer call you. You can still call customers who allowed calls.",
+  };
 }

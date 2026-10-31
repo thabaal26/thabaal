@@ -6,10 +6,13 @@ import { Stat } from "@/components/ui";
 import { db } from "@/lib/db";
 import { fmtDate } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
+import { senderFor } from "@/lib/senders";
 import { getScope, owned } from "@/lib/session";
+import { getIncomingCalls } from "@/lib/whatsapp";
 import { PortalPage, Pill, T, type PillTone } from "../portal-ui";
 import { CHATS_SUB, CHATS_SUB_TA, InboxTabs } from "../replies/inbox-tabs";
 import { planGate } from "@/app/dashboard/plan-lock";
+import { IncomingCallsToggle } from "./incoming-toggle";
 
 export const metadata: Metadata = { title: "Calls" };
 export const dynamic = "force-dynamic";
@@ -21,6 +24,10 @@ export default async function CallsPage() {
   const locked = await planGate("calls");
   if (locked) return locked;
   const scope = await getScope();
+  // Incoming calls on or off, as WhatsApp has it now for the business's main number.
+  const sender = scope.clientId ? await senderFor(scope.clientId) : null;
+  const waConnected = Boolean(sender?.cfg.live && sender.cfg.phoneNumberId);
+  const incoming = waConnected && sender ? await getIncomingCalls(sender.cfg).catch(() => null) : null;
   const calls = await db.call.findMany({
     where: owned(scope),
     include: { customer: { select: { id: true, name: true } }, sender: { select: { label: true } } },
@@ -53,6 +60,8 @@ export default async function CallsPage() {
   return (
     <PortalPage title="Chats" titleTa="அரட்டை" sub={CHATS_SUB} subTa={CHATS_SUB_TA}>
       <InboxTabs active="calls" />
+
+      {scope.clientId && <IncomingCallsToggle initial={incoming} canManage={scope.canManage} connected={waConnected} />}
 
       <StaggerGroup className="grid g4 keep2" style={{ marginBottom: 16 }}>
         <StaggerItem>
