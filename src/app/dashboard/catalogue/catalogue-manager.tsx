@@ -13,6 +13,7 @@ import type { CatalogProductDetail } from "@/lib/catalog";
 import type { ProductDemandStats } from "@/lib/catalog-demand";
 import { useLanguage } from "@/lib/i18n/context";
 import { createProduct, deleteProduct, updateProduct, uploadProductImage } from "../actions/catalog";
+import { shrinkImage } from "@/lib/shrink-image";
 
 type StockFilter = "ALL" | "IN_STOCK" | "OUT_OF_STOCK";
 type StatusFilter = "ALL" | "APPROVED" | "REVIEW" | "REJECTED";
@@ -40,8 +41,8 @@ function PhotoField({ value, onChange, removable, isTa = false }: { value: strin
     if (!file) return;
     setUploading(true);
     const formData = new FormData();
-    formData.append("file", file);
-    const res = await uploadProductImage(formData);
+    formData.append("file", await shrinkImage(file));
+    const res = await uploadProductImage(formData).catch(() => ({ ok: false as const, url: undefined, message: isTa ? "படத்தை பதிவேற்ற முடியவில்லை. மீண்டும் முயற்சிக்கவும்." : "Couldn't upload the photo. Check your connection and try again." }));
     setUploading(false);
     if (res.ok && res.url) {
       onChange(res.url);

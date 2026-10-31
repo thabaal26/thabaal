@@ -9,6 +9,7 @@ import type { ReplyAnalysisResult } from "@/lib/ai";
 import { useLanguage } from "@/lib/i18n/context";
 import { getAiSmartRepliesAction } from "../actions/ai";
 import { uploadProductImage } from "../actions/catalog";
+import { shrinkImage } from "@/lib/shrink-image";
 import { setReplyHandled } from "../actions/replies";
 import { replyToCustomer } from "../actions/send";
 
@@ -170,8 +171,8 @@ export function InlineReplyBox({
                   if (!file) return;
                   startUpload(async () => {
                     const fd = new FormData();
-                    fd.set("file", file);
-                    const res = await uploadProductImage(fd);
+                    fd.set("file", await shrinkImage(file));
+                    const res = await uploadProductImage(fd).catch(() => ({ ok: false as const, url: undefined, message: "Upload failed. Check your connection and try again." }));
                     if (res.ok && res.url) setMediaUrl(res.url);
                     else toastResult({ ok: false, message: res.message ?? "Upload failed." });
                   });

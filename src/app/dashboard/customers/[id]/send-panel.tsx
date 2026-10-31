@@ -9,6 +9,7 @@ import { Button, Callout, Card, CardHeader, Field } from "@/components/ui";
 import { renderFor, type TemplateButton, type VarMap } from "@/lib/template";
 import { generateCustomerFollowUpAction } from "../../actions/ai";
 import { uploadProductImage } from "../../actions/catalog";
+import { shrinkImage } from "@/lib/shrink-image";
 import { replyToCustomer, sendToCustomer } from "../../actions/send";
 import { templateLabel } from "@/lib/plain-error";
 import { useTr } from "@/lib/i18n/context";
@@ -242,8 +243,8 @@ export function SendPanel({
                           if (!file) return;
                           startUpload(async () => {
                             const fd = new FormData();
-                            fd.set("file", file);
-                            const res = await uploadProductImage(fd);
+                            fd.set("file", await shrinkImage(file));
+                            const res = await uploadProductImage(fd).catch(() => ({ ok: false as const, url: undefined, message: "Upload failed. Check your connection and try again." }));
                             if (res.ok && res.url) setMediaUrl(res.url);
                             else toastResult({ ok: false, message: res.message ?? "Upload failed." });
                           });

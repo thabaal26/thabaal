@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Photo and file uploads go through server actions (default limit 1 MB). Photos are shrunk in the browser first
+    // (lib/shrink-image.ts); this leaves room for a PDF up to the 4 MB the upload accepts (Vercel's own cap is 4.5 MB).
+    serverActions: { bodySizeLimit: "4.5mb" },
+  },
   async headers() {
     return [
       {
