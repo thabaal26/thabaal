@@ -51,7 +51,7 @@ export async function startRun(campaign: Campaign & { template: { name: string }
   return run;
 }
 
-async function startDueCampaigns(now: Date, paused: ReadonlySet<string>) {
+export async function startDueCampaigns(now: Date, paused: ReadonlySet<string>) {
   const due = await db.campaign.findMany({
     // Businesses locked for an unpaid plan: their scheduled campaigns wait (and start once they pay).
     where: { active: true, nextRunAt: { lte: now }, clientId: { notIn: [...paused] } },

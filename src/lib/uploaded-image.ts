@@ -1,6 +1,7 @@
 import "server-only";
 import crypto from "node:crypto";
 import { put } from "@vercel/blob";
+import { headers } from "next/headers";
 import { APP_ORIGIN } from "./app-host";
 import { db } from "./db";
 
@@ -74,11 +75,26 @@ export async function storePublicImage(opts: {
     ON CONFLICT ("id") DO UPDATE SET "mimeType" = EXCLUDED."mimeType", "data" = EXCLUDED."data"
   `;
 
-  // Always the portal's public address (never a preview or old deployment URL), so the link keeps working.
-  void opts.origin;
-  const base = APP_ORIGIN;
+  return `${await storageOrigin(opts.origin)}/api/upload/${id}`;
+}
 
-  return `${base}/api/upload/${id}`;
+/**
+ * The address that serves what was just stored in this database. In production that is always the portal's public
+ * address (never an old or deployment URL), so the link keeps working. Anywhere else (a preview, a QA or test copy)
+ * the file sits in that copy's own database, so a www.thabaal.in link would answer 404 there: those get their own
+ * address. (Photos uploaded from another copy and linked to www.thabaal.in were why some product photos broke.)
+ */
+async function storageOrigin(given?: string): Promise<string> {
+  if (process.env.VERCEL_ENV === "production") return APP_ORIGIN;
+  if (given && /^https?:\/\/[^/]+$/.test(given)) return given;
+  try {
+    const h = await headers();
+    const host = h.get("x-forwarded-host") ?? h.get("host");
+    if (host) return `${h.get("x-forwarded-proto") ?? (/^(localhost|127\.0\.0\.1)(:|$)/.test(host) ? "http" : "https")}://${host}`;
+  } catch {
+    // Outside a request (scripts, tests).
+  }
+  return APP_ORIGIN;
 }
 
 /** The stored-image id of a link to /api/upload/<id> (on any of the portal's addresses), or null. */
