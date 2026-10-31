@@ -228,7 +228,7 @@ export function BottomNav({
   const dot = "absolute -right-2 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-danger-solid px-1 text-[9px] font-bold text-white";
 
   return (
-    <nav aria-label="Main" className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-line bg-canvas/95 backdrop-blur-md lg:hidden print:hidden">
+    <nav aria-label="Main" data-mtabs className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-line bg-canvas/95 backdrop-blur-md lg:hidden print:hidden">
       <ul className="mx-auto grid max-w-lg" style={{ gridTemplateColumns: `repeat(${tabItems.length + 1}, minmax(0, 1fr))` }}>
         {tabItems.map((item) => {
           const { href, short, icon: Icon } = item;

@@ -4,12 +4,12 @@ import { formatInTimeZone } from "date-fns-tz";
 import { db } from "./db";
 import { APP_TZ } from "./format";
 import type { OrderItem } from "./orders";
+import { SALE_WHERE } from "@/lib/sale";
 
 // Refill forecast: when each buyer is likely to run out, from their own reorder rhythm when they
 // have one (two or more orders), otherwise from the client's refill setting (or 30 days).
 
 const DAY = 86_400_000;
-const BOUGHT = ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"] as const;
 /** Orders closer together than this count as one shopping trip, not a refill. */
 const SAME_TRIP_DAYS = 4;
 
@@ -77,7 +77,7 @@ export async function refillForecast(clientId: string, now = new Date()): Promis
       where: {
         clientId,
         createdAt: { gte: since },
-        OR: [{ status: { in: [...BOUGHT] } }, { paidAt: { not: null }, status: { not: "CANCELLED" } }],
+        AND: [{ status: { not: "CANCELLED" } }, SALE_WHERE],
         customer: { optedOut: false, unreachable: false },
       },
       select: {

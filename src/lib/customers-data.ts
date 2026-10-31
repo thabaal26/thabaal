@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "./db";
 import { computeCustomerLoyalty, isInternalLoyaltyTag } from "./loyalty";
+import { saleSql } from "@/lib/sale-sql";
 
 /*
  * Customers page (portal design): one row per customer with what they bought, how much, when last,
@@ -69,11 +70,11 @@ export async function customersData(clientId: string, opts: { clientName?: strin
     }[]
   >`
     SELECT c.id, c.name, c.phone, c.location, c.region, c."optedOut", c.unreachable, c.tags, c.purchases,
-      count(o.id) FILTER (WHERE o."paidAt" IS NOT NULL OR o.status IN ('CONFIRMED','PAID','DISPATCHED','DELIVERED')) AS orders,
-      sum(o.total) FILTER (WHERE o."paidAt" IS NOT NULL OR o.status IN ('CONFIRMED','PAID','DISPATCHED','DELIVERED')) AS spend,
-      max(o."createdAt") FILTER (WHERE o."paidAt" IS NOT NULL OR o.status IN ('CONFIRMED','PAID','DISPATCHED','DELIVERED')) AS last_at,
-      min(o."createdAt") FILTER (WHERE o."paidAt" IS NOT NULL OR o.status IN ('CONFIRMED','PAID','DISPATCHED','DELIVERED')) AS first_at,
-      sum(o.total) FILTER (WHERE o."paidAt" IS NULL AND o.status IN ('NEW','CONFIRMED')) AS cart,
+      count(o.id) FILTER (WHERE ${saleSql("o")}) AS orders,
+      sum(o.total) FILTER (WHERE ${saleSql("o")}) AS spend,
+      max(o."createdAt") FILTER (WHERE ${saleSql("o")}) AS last_at,
+      min(o."createdAt") FILTER (WHERE ${saleSql("o")}) AS first_at,
+      sum(o.total) FILTER (WHERE o."paidAt" IS NULL AND o.status IN ('NEW','CONFIRMED') AND NOT ${saleSql("o")}) AS cart,
       sum(o."pointsRedeemed") AS redeemed,
       (SELECT count(*) FROM "Reply" r WHERE r."customerId" = c.id) AS replies
     FROM "Customer" c

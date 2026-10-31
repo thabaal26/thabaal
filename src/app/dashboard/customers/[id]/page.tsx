@@ -31,6 +31,7 @@ import { PausedOffersNote } from "./paused-offers-note";
 import { PurchaseJourney } from "./purchase-journey";
 import { SendPanel } from "./send-panel";
 import { planGate } from "@/app/dashboard/plan-lock";
+import { isSale } from "@/lib/sale";
 
 export const metadata: Metadata = { title: "Customer" };
 export const dynamic = "force-dynamic";
@@ -140,7 +141,8 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
             {scope.canOperate && <CallButton customerId={c.id} name={c.name} primary={callAllowed} />}
             <Link href={`/dashboard?cust=${c.id}&range=all`} className={buttonClass("secondary")}>
               <span>
-                <span className="max-sm:sr-only"><T ta="அவர்களின் ">Their </T></span><T ta="விவரங்கள்">insights</T>
+                <span className="max-sm:hidden"><T ta="அவர்களின் விவரங்கள்">Their insights</T></span>
+                <span className="sm:hidden"><T ta="விவரங்கள்">Insights</T></span>
               </span>
             </Link>
             {more.length > 0 && (
@@ -154,7 +156,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
 
       {(() => {
         // The design's profile figures: what they bought, from orders that stand.
-        const bought = c.orders.filter((o) => o.status !== "CANCELLED" && (o.paidAt || ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"].includes(o.status)));
+        const bought = c.orders.filter((o) => o.status !== "CANCELLED" && isSale(o));
         const spent = bought.reduce((n, o) => n + o.total, 0);
         const last = bought.reduce<Date | null>((d, o) => (!d || o.createdAt > d ? o.createdAt : d), null);
         const unpaid = c.orders.filter((o) => !o.paidAt && (o.status === "NEW" || o.status === "CONFIRMED")).reduce((n, o) => n + o.total, 0);

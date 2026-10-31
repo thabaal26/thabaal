@@ -236,10 +236,10 @@ export function CustomerTable({ rows, canManage }: { rows: CustomerRow[]; canMan
 
       <ScrollReveal as="div" className="card" style={{ padding: 0 }} duration={400}>
         <div className="tw">
-          <table>
+          <table className="mcards">
             <thead>
               <tr>
-                <th>
+                <th data-m="pick">
                   <label className="pick">
                     <input
                       type="checkbox"
@@ -249,7 +249,7 @@ export function CustomerTable({ rows, canManage }: { rows: CustomerRow[]; canMan
                     />
                   </label>
                 </th>
-                <th>{isTamil ? "வாடிக்கையாளர்" : "Customer"}</th>
+                <th data-m="title">{isTamil ? "வாடிக்கையாளர்" : "Customer"}</th>
                 <th>{isTamil ? "பகுதி" : "Area"}</th>
                 <th>{isTamil ? "அடுக்கு" : "Tier"}</th>
                 <th>{isTamil ? "வாங்கும் நிலை" : "How they are buying"}</th>
@@ -261,7 +261,7 @@ export function CustomerTable({ rows, canManage }: { rows: CustomerRow[]; canMan
             <tbody>
               {shown.map((c) => (
                 <tr key={c.id}>
-                  <td>
+                  <td data-m="pick">
                     <label className="pick">
                     <input
                       type="checkbox"
@@ -278,7 +278,7 @@ export function CustomerTable({ rows, canManage }: { rows: CustomerRow[]; canMan
                     />
                     </label>
                   </td>
-                  <td>
+                  <td data-m="title">
                     <Link href={`/dashboard/customers/${c.id}`} style={{ fontWeight: 700, textDecoration: "none" }}>
                       {c.name}
                     </Link>
@@ -294,8 +294,8 @@ export function CustomerTable({ rows, canManage }: { rows: CustomerRow[]; canMan
                     <Pill tone={TIER_TONE[c.tier]}>{isTamil ? TIER_TA[c.tier] ?? c.tier : c.tier}</Pill>
                   </td>
                   <td>{c.status === "—" ? <span className="muted">—</span> : <Pill tone={STATUS_TONE[c.status]}>{isTamil ? STATUS_TA[c.status] ?? c.status : c.status}</Pill>}</td>
-                  <td className="num">{c.orders}</td>
-                  <td className="num">{inr(c.spend)}</td>
+                  <td className="num" data-label={isTamil ? "ஆர்டர்கள்" : "Orders"}>{c.orders}</td>
+                  <td className="num" data-m="amount">{inr(c.spend)}</td>
                   <td className="muted">{lastTxt(c.lastDays, isTamil)}</td>
                 </tr>
               ))}

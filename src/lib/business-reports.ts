@@ -10,13 +10,14 @@ import { catalogFor } from "./product-scope";
 import { catalogProducts } from "./catalog";
 import { dueOf, methodOf, paymentState, receivedOf, type PayFields } from "./payment-state";
 import { INDIA_GST_RATE, RATES } from "./spend";
+import { isSale, saleSqlText } from "@/lib/sale";
 
 // Read-only reports behind the campaign comparison, revenue, combo and weekly-report pages.
 
 const DAY = 86_400_000;
-const BOUGHT_SQL = `(o."paidAt" IS NOT NULL OR o.status IN ('CONFIRMED','PAID','DISPATCHED','DELIVERED'))`;
+const BOUGHT_SQL = saleSqlText("o");
 export const dayStart = (d: Date) => fromZonedTime(`${formatInTimeZone(d, APP_TZ, "yyyy-MM-dd")}T00:00:00`, APP_TZ);
-const isBought = (o: { paidAt: Date | null; status: string }) => Boolean(o.paidAt) || ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"].includes(o.status);
+const isBought = isSale;
 
 /* ───────────────────────── Campaign results ───────────────────────── */
 
@@ -249,7 +250,7 @@ export async function comboReport(clientId: string, days = 365): Promise<ComboRe
   const since = new Date(Date.now() - days * DAY);
   const orders = await db.order.findMany({
     where: { clientId, createdAt: { gte: since }, status: { not: "CANCELLED" } },
-    select: { items: true, paidAt: true, status: true, createdAt: true },
+    select: { items: true, paidAt: true, paymentMethod: true, internalNote: true, status: true, createdAt: true },
   });
   const catalog = await catalogFor(clientId);
   const bought = orders.filter(isBought);
@@ -329,7 +330,7 @@ export type WeeklyReport = {
 async function weekFigures(clientId: string, from: Date, to: Date): Promise<WeekFigures> {
   const range = { gte: from, lt: to };
   const [orders, newCustomers, msgs, replies, repliers] = await Promise.all([
-    db.order.findMany({ where: { clientId, createdAt: range }, select: { total: true, paidAt: true, status: true, customerId: true } }),
+    db.order.findMany({ where: { clientId, createdAt: range }, select: { total: true, paidAt: true, paymentMethod: true, internalNote: true, status: true, customerId: true } }),
     db.customer.count({ where: { clientId, createdAt: range } }),
     db.message.groupBy({ by: ["status"], where: { customer: { clientId }, createdAt: range, status: { notIn: ["QUEUED", "SKIPPED"] } }, _count: true }),
     db.reply.count({ where: { customer: { clientId }, receivedAt: range } }),
@@ -360,7 +361,7 @@ export async function weeklyReport(clientId: string, now = new Date()): Promise<
   const [cur, prev, orders] = await Promise.all([
     weekFigures(clientId, from, to),
     weekFigures(clientId, prevFrom, from),
-    db.order.findMany({ where: { clientId, createdAt: { gte: from, lt: to }, status: { not: "CANCELLED" } }, select: { items: true, total: true, paidAt: true, status: true, createdAt: true } }),
+    db.order.findMany({ where: { clientId, createdAt: { gte: from, lt: to }, status: { not: "CANCELLED" } }, select: { items: true, total: true, paidAt: true, paymentMethod: true, internalNote: true, status: true, createdAt: true } }),
   ]);
   const daily = Array.from({ length: 7 }, (_, i) => {
     const d = addDays(from, i);

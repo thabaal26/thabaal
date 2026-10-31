@@ -2,7 +2,9 @@ import "server-only";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { db } from "./db";
 import { APP_TZ } from "./format";
+import { SALE_WHERE } from "@/lib/sale";
 import {
+  fetchMetaCostSince,
   fetchMetaLivePricing,
   getMetaAccountInfo,
   SYNC_NOTE_PREFIX,
@@ -262,7 +264,7 @@ export async function spendSummary(clientId: string) {
         where: {
           customer: { clientId },
           createdAt: { gte: thisMonth },
-          OR: [{ status: { in: ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"] } }, { paidAt: { not: null } }],
+          ...SALE_WHERE,
         },
         select: { total: true },
       })
@@ -338,11 +340,11 @@ export async function spendSummary(clientId: string) {
   // Only deduct spend that happened AFTER a real balance sync timestamp (if lastSyncedAt is epoch 0, liveBalance is already current)
   const syncDate = new Date(metaAccount.lastSyncedAt);
   const hasExplicitSync = !isNaN(syncDate.getTime()) && syncDate.getTime() > 0;
-  const spentSinceSync = hasExplicitSync
-    ? useLiveMeta
-      ? total(spendFromMetaPoints(liveMeta.points, Math.floor(syncDate.getTime() / 1000)))
-      : total(await spendBetweenLocal(clientId, syncDate, undefined, phoneCount))
-    : 0;
+  // Meta's own half-hour figures from the sync on; if Meta can't be asked, our per-message estimate.
+  const metaSince = hasExplicitSync ? await fetchMetaCostSince(clientId, Math.floor(syncDate.getTime() / 1000)) : null;
+  const spentSinceSync = hasExplicitSync ? (metaSince ?? total(await spendBetweenLocal(clientId, syncDate, undefined, phoneCount))) : 0;
+  // Meta takes GST from the prepaid balance along with each charge.
+  const spentSinceSyncWithGst = Math.round(spentSinceSync * (1 + INDIA_GST_RATE) * 100) / 100;
 
   // Manual top-ups (excluding internal [META_SYNC] snapshots) added after the balance snapshot
   const manualTopUps = allTopUps.filter((t) => !t.note?.startsWith(SYNC_NOTE_PREFIX));
@@ -351,7 +353,7 @@ export async function spendSummary(clientId: string) {
     .reduce((sum, t) => sum + t.amount, 0);
 
   const prepaidFunds = metaAccount.liveBalance + addedSinceSync;
-  const remainingBalance = Math.max(0, Math.round((prepaidFunds - spentSinceSync) * 100) / 100);
+  const remainingBalance = Math.max(0, Math.round((prepaidFunds - spentSinceSyncWithGst) * 100) / 100);
 
   return {
     current,
@@ -371,6 +373,10 @@ export async function spendSummary(clientId: string) {
     allTimeSpent,
     prepaidFunds,
     remainingBalance,
+    /** How the balance was worked out: the Billing Hub figure, top-ups since, and Meta's charges since (incl. GST). */
+    balanceFrom: hasExplicitSync
+      ? { syncedAt: syncDate, synced: metaAccount.liveBalance, added: addedSinceSync, spentWithGst: spentSinceSyncWithGst, fromMeta: metaSince !== null }
+      : null,
     metaAccount,
     topUps: manualTopUps.slice(0, 5),
     lastSyncedAt: metaAccount.lastSyncedAt,

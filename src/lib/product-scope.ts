@@ -33,7 +33,7 @@ export const catalogOrders = cache(async (clientId: string) => {
     catalogFor(clientId),
     db.order.findMany({
       where: { clientId },
-      select: { id: true, customerId: true, items: true, status: true, paidAt: true, createdAt: true },
+      select: { id: true, customerId: true, items: true, status: true, paidAt: true, paymentMethod: true, internalNote: true, createdAt: true },
     }),
   ]);
   return rows.map((o) => ({

@@ -1,0 +1,189 @@
+/*
+ * Phones, every page of the portal (loaded after portal.css). Nothing here applies on tablets or computers.
+ * Portrait (≤639px wide):
+ *  - Filter bars: search on its own line, filters two to a row, the main action first and full width.
+ *  - Chip filters: one swipeable row instead of three or four wrapped lines.
+ *  - Tabs: a fade at the end shows there is more to swipe to.
+ *  - Card actions: the main action full width, the others share the next row evenly; no lone button left behind.
+ *  - Wide tables marked .mcards: each row becomes a small card (name and amount first, details under it).
+ * Landscape phones (≤500px tall): the top bar scrolls away and the bottom bar is slimmer, so the page gets the room.
+ */
+
+@media (max-width: 639px) {
+  /* ── Filter bars ── */
+  .thabaal-portal .toolbar > .search {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
+  /* ── Page header actions (e.g. a customer's WhatsApp / Call / Insights): share the row ── */
+  .thabaal-portal header.top .tools {
+    gap: 6px;
+  }
+  .thabaal-portal header.top .tools > :is(a, button):not([aria-haspopup]) {
+    flex: 1 1 auto;
+    justify-content: center;
+    padding-inline: 12px;
+  }
+  .thabaal-portal .toolbar > select {
+    flex: 1 1 calc(50% - 5px);
+    min-width: 0;
+  }
+  .thabaal-portal .toolbar > .chips {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .thabaal-portal .toolbar > .btn,
+  .thabaal-portal .toolbar > button.btn {
+    flex: 1 1 auto;
+    margin-left: 0 !important;
+    justify-content: center;
+  }
+  /* The page's main action (e.g. New order) leads the bar, full width. */
+  .thabaal-portal .toolbar > .btn.primary {
+    order: -1;
+    flex-basis: 100%;
+  }
+
+  /* ── Chip filters: one row that swipes ── */
+  .thabaal-portal .chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    padding-inline-end: 28px;
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+    mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+  }
+  .thabaal-portal .chips::-webkit-scrollbar {
+    display: none;
+  }
+  .thabaal-portal .chips > * {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    white-space: nowrap;
+  }
+
+  /* ── Tabs: show that the row continues ── */
+  .thabaal-portal .tabs {
+    scrollbar-width: none;
+    padding-inline-end: 28px;
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+    mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+  }
+  .thabaal-portal .tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* ── Card actions ── */
+  .thabaal-portal .card .tools > .btn,
+  .thabaal-portal .card .tools > button.btn,
+  .thabaal-portal .card .tools > a.btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .thabaal-portal .card .tools > .btn.primary {
+    flex-basis: 100%;
+  }
+  /* Text-style buttons look like buttons once they stretch. */
+  .thabaal-portal .card .tools > .btn.ghost {
+    border: 1.5px solid var(--line);
+  }
+
+  /* ── Wide tables as cards ── */
+  .thabaal-portal table.mcards {
+    min-width: 0 !important;
+    width: 100%;
+  }
+  .thabaal-portal table.mcards thead tr {
+    display: flex;
+    align-items: center;
+  }
+  .thabaal-portal table.mcards thead th {
+    display: none;
+  }
+  /* Keep "select all" and the first heading. */
+  .thabaal-portal table.mcards thead th[data-m="pick"],
+  .thabaal-portal table.mcards thead th[data-m="title"] {
+    display: block;
+    border: 0;
+  }
+  .thabaal-portal table.mcards tbody tr {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .thabaal-portal table.mcards tbody tr:has(> td[data-m="pick"]) {
+    padding-left: 52px;
+  }
+  .thabaal-portal table.mcards tbody td {
+    display: block;
+    padding: 0;
+    border: 0;
+    text-align: left;
+    order: 3;
+    min-width: 0;
+    font-size: 13.5px;
+  }
+  /* Name and amount on the first line, everything else below. */
+  .thabaal-portal table.mcards tbody tr::after {
+    content: "";
+    order: 2;
+    flex-basis: 100%;
+    height: 0;
+  }
+  .thabaal-portal table.mcards tbody td[data-m="pick"] {
+    position: absolute;
+    left: 10px;
+    top: 12px;
+  }
+  .thabaal-portal .tw table.mcards tbody td[data-m="title"] {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .thabaal-portal table.mcards tbody td[data-m="title"] {
+    order: 1;
+    flex: 1 1 calc(100% - 120px);
+    font-size: 15px;
+  }
+  .thabaal-portal table.mcards tbody td[data-m="amount"] {
+    order: 2;
+    margin-left: auto;
+    font-weight: 700;
+    font-size: 15px;
+    text-align: right;
+  }
+  .thabaal-portal table.mcards tbody td[data-m="end"] {
+    order: 4;
+    margin-left: auto;
+  }
+  .thabaal-portal table.mcards tbody td[data-label]::before {
+    content: attr(data-label) " ";
+    color: var(--muted);
+  }
+  .thabaal-portal table.mcards tbody td:empty {
+    display: none;
+  }
+  .thabaal-portal .tw:has(> table.mcards) {
+    overflow-x: visible;
+  }
+}
+
+/* Landscape phones: the page needs the height more than the bars do. */
+@media (orientation: landscape) and (max-height: 500px) {
+  [data-mhead] {
+    position: static !important;
+  }
+  [data-mtabs] li > a,
+  [data-mtabs] li > button {
+    flex-direction: row !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    gap: 8px !important;
+  }
+}

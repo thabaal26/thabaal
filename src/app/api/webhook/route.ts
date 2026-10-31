@@ -579,7 +579,18 @@ export async function POST(req: NextRequest) {
                 where: { id: orderId },
                 include: { customer: { include: { client: true } } },
               });
-              if (order && order.status !== "CANCELLED") {
+              // Only the customer the buttons were sent to, and only while the order still waits for this answer:
+              // an old button pressed after payment, packing or dispatch must not move the order back or cancel it.
+              const mine = Boolean(order && customer && order.customerId === customer.id);
+              const settled = Boolean(order && (order.paidAt || (order.paidAmount ?? 0) > 0 || order.packedAt || ["PAID", "DISPATCHED", "DELIVERED"].includes(order.status)));
+              const alreadyConfirmed = Boolean(order && isConfirm && order.status === "CONFIRMED" && order.paymentMethod === "cod");
+              if (order && mine && order.status !== "CANCELLED" && settled) {
+                await textInWindow(
+                  order.customer,
+                  `Order ${orderRef(order)} is already ${order.status === "DELIVERED" ? "delivered" : order.status === "DISPATCHED" ? "on its way" : order.packedAt ? "packed" : "paid"}, so nothing was changed. If you need help with it, reply here.`,
+                  "COD button (no change)",
+                ).catch(() => {});
+              } else if (order && mine && order.status !== "CANCELLED" && !alreadyConfirmed) {
                 const ref = orderRef(order);
                 if (isConfirm) {
                   await db.order.update({

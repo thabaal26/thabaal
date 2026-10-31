@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "./db";
 import type { CatalogProductDetail } from "./catalog";
+import { isSale } from "@/lib/sale";
 
 export type ProductDemandStats = {
   retailerId: string;
@@ -103,7 +104,7 @@ export async function getCatalogDemandSummary(
         number: true,
         ref: true,
         status: true,
-        paidAt: true,
+        paidAt: true, paymentMethod: true, internalNote: true,
         total: true,
         items: true,
         createdAt: true,
@@ -120,13 +121,7 @@ export async function getCatalogDemandSummary(
 
   const totalCartsAnalyzed = orders.length;
 
-  const totalPaidOrders = orders.filter(
-    (o) =>
-      o.paidAt !== null ||
-      o.status === "PAID" ||
-      o.status === "DISPATCHED" ||
-      o.status === "DELIVERED",
-  ).length;
+  const totalPaidOrders = orders.filter(isSale).length;
 
   const uniqueShopperIds = new Set(orders.map((o) => o.customerId));
   const uniqueShoppers = uniqueShopperIds.size;

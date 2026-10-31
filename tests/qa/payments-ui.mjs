@@ -216,12 +216,14 @@ await check(7, "Undo payment: hidden for WhatsApp-confirmed, works for staff-rec
 
 // 3. Customer says paid → staff verify → Paid.
 await check(3, "Customer says paid → 'Payment received' marks it paid", async () => {
-  const c = await card("QA-1012");
+  // The seeded claim's order number depends on the time of day the seed runs, so find it by its claim.
+  const claimRef = (await db.order.findFirst({ where: { clientId: S.shopId, paymentClaimedAt: { not: null }, paidAt: null, status: { not: "CANCELLED" } }, orderBy: { createdAt: "asc" }, select: { ref: true } })).ref;
+  const c = await card(claimRef);
   const text = await c.textContent();
-  expect(/Customer says paid/.test(text), "claim not shown on the card");
+  expect(/Customer says paid/.test(text), `claim not shown on the card of ${claimRef}`);
   await c.getByRole("button", { name: "Payment received" }).first().click();
   await waitToast(/checked and recorded/);
-  const after = await get("QA-1012");
+  const after = await get(claimRef);
   expect(after.paidAt && after.paymentSource === "verified", snap(after));
   return snap(after);
 });
@@ -351,7 +353,8 @@ await check(30, "Order steps: no confirm or dispatch before payment is verified;
   const mk = (ref, data = {}) =>
     db.order.create({ data: { ref, clientId: base.clientId, customerId: base.customerId, items: [{ id: "QA-001", name: "Groundnut oil 1L", quantity: 1, price: 360 }], total: 420, status: "NEW", ...data } });
   const mainBtn = async (c) => (await c.locator("button.btn.primary").first().textContent())?.trim();
-  const onSteps = async (c) => (await c.locator(".steps b.on").allTextContents()).join(" › ");
+  // Each reached step now also shows when it happened ("Order received(30 Oct, 11:00 PM)"): compare the step names only.
+  const onSteps = async (c) => (await c.locator(".steps b.on").allTextContents()).map((t) => t.replace(/\s*\([^)]*\)\s*$/, "").trim()).join(" › ");
 
   const r1 = `QA-F1${run}`;
   await mk(r1);

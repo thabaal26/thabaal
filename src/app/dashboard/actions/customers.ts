@@ -267,7 +267,7 @@ export async function adjustLoyaltyPoints(
       tags: true,
       purchases: true,
       // Every order: bought ones earn points, and points used on orders that still stand come off.
-      orders: { select: { id: true, total: true, status: true, paidAt: true, pointsRedeemed: true } },
+      orders: { select: { id: true, total: true, status: true, paidAt: true, paymentMethod: true, internalNote: true, pointsRedeemed: true } },
     },
   });
   if (!c) return { ok: false, message: "Customer not found." };

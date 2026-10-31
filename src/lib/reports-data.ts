@@ -8,6 +8,7 @@ import { refillForecast } from "./refill-forecast";
 import { numberHealth } from "./limits";
 import { spendSummary, RATES } from "./spend";
 import type { OrderItem } from "./orders";
+import { isSale } from "@/lib/sale";
 
 export type PeriodKey = "m" | "w";
 
@@ -216,7 +217,7 @@ async function computePeriodFigures(
     }),
     db.order.findMany({
       where: { clientId, createdAt: range, status: { not: "CANCELLED" } },
-      select: { id: true, total: true, status: true, paidAt: true },
+      select: { id: true, total: true, status: true, paidAt: true, paymentMethod: true, internalNote: true },
     }),
     db.reply.count({
       where: { customer: { clientId }, receivedAt: range },
@@ -245,7 +246,7 @@ async function computePeriodFigures(
   let unpaidCount = 0;
 
   for (const o of orders) {
-    const isPaid = Boolean(o.paidAt) || ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"].includes(o.status);
+    const isPaid = isSale(o);
     if (isPaid) {
       sales += o.total;
       paidCount++;
@@ -385,7 +386,7 @@ export async function getComprehensiveReportData(clientId: string): Promise<Comp
         id: true,
         customerId: true,
         total: true,
-        paidAt: true,
+        paidAt: true, paymentMethod: true, internalNote: true,
         status: true,
         createdAt: true,
         items: true,
@@ -621,7 +622,7 @@ export async function getComprehensiveReportData(clientId: string): Promise<Comp
   // 4. Customers Performance
   const sixtyDaysAgo = new Date(now.getTime() - 60 * DAY);
   const buyersAll = allOrders.filter(
-    (o) => Boolean(o.paidAt) || ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"].includes(o.status),
+    (o) => isSale(o),
   );
 
   const lastOrderDateByCust = new Map<string, Date>();
@@ -716,7 +717,7 @@ export async function getComprehensiveReportData(clientId: string): Promise<Comp
   // 5. Products Performance
   const productMap = new Map<string, { sold: number; sales: number; leftInCarts: number }>();
   for (const o of allOrders) {
-    const isPaid = Boolean(o.paidAt) || ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"].includes(o.status);
+    const isPaid = isSale(o);
     const items = (o.items as OrderItem[] | null) ?? [];
     for (const it of items) {
       const name = it.name || "Product";

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { getScope, owned } from "@/lib/session";
 import { sendToCustomer } from "./send";
 import type { SendResult } from "./send-helpers";
+import { SALE_WHERE } from "@/lib/sale";
 
 /**
  * Sends the client's refill template to one customer now, from the refill calendar. Marks their
@@ -23,7 +24,7 @@ export async function sendRefillNudge(customerId: string, force = false): Promis
   const r = await sendToCustomer(c.id, c.client.refillTemplateId, null, force);
   if (r.ok) {
     const last = await db.order.findFirst({
-      where: { customerId: c.id, status: { not: "CANCELLED" }, OR: [{ paidAt: { not: null } }, { status: { in: ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"] } }] },
+      where: { customerId: c.id, AND: [{ status: { not: "CANCELLED" } }, SALE_WHERE] },
       orderBy: { createdAt: "desc" },
       select: { id: true },
     });

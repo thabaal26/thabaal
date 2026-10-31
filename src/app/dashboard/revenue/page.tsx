@@ -31,8 +31,8 @@ type TabId = (typeof TABS)[number]["id"];
 
 const PERIODS = [
   { id: "t", label: "Today", ta: "இன்று" },
-  { id: "w", label: "This week", ta: "இந்த வாரம்" },
-  { id: "m", label: "This month", ta: "இந்த மாதம்" },
+  { id: "w", label: "Last 7 days", ta: "கடந்த 7 நாட்கள்" },
+  { id: "m", label: "Last 30 days", ta: "கடந்த 30 நாட்கள்" },
 ] as const;
 
 const SUB = "Money received, money waiting and what you should collect today.";
@@ -176,7 +176,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         </div>
         <div className="card" style={{ padding: 0 }}>
           <div className="tw">
-            <table>
+            <table className="mcards">
               <thead>
                 <tr>
                   <th><T ta="நேரம்">When</T></th>
@@ -192,7 +192,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                   <tr key={r.id}>
                     <td className="muted">{when(r.atMs)}</td>
                     <td>{r.ref}</td>
-                    <td>
+                    <td data-m="title">
                       <b>{r.name}</b>
                     </td>
                     <td>
@@ -200,8 +200,8 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                         <T ta={WAY_LABEL_TA[r.way]}>{WAY_LABEL[r.way]}</T>
                       </span>
                     </td>
-                    <td className="num">{inr(r.amount)}</td>
-                    <td>
+                    <td className="num" data-m="amount">{inr(r.amount)}</td>
+                    <td data-m="end">
                       <ReceiptButton row={r} way={WAY_LABEL[r.way]} when={fmtDate(new Date(r.atMs), "EEE d MMM, h:mm a")} canOperate={scope.canOperate} />
                     </td>
                   </tr>
@@ -279,7 +279,14 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
       </>
     );
   } else if (tab === "all") {
-    body = <TxnTable rows={d.txns.map((t) => ({ ...t, when: fmtDate(new Date(t.atMs), "d MMM, h:mm a") }))} canOperate={scope.canOperate} />;
+    body = (
+      <>
+        <TxnTable rows={d.txns.map((t) => ({ ...t, when: fmtDate(new Date(t.atMs), "d MMM, h:mm a") }))} canOperate={scope.canOperate} />
+        <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+          <T ta="கடந்த 90 நாட்களின் பரிவர்த்தனைகள்.">Showing the last 90 days.</T>
+        </p>
+      </>
+    );
   } else if (tab === "set") {
     const [client, ownPaymentTemplate, paymentTemplate, catalogue] = await Promise.all([
       db.client.findUnique({ where: { id: clientId }, select: { loyaltyAutoRedeem: true } }),

@@ -3,6 +3,8 @@ import { cache } from "react";
 import { db } from "./db";
 import type { FilterState } from "./filters";
 import { catalogFor, catalogOrders, customerProducts, customersWithProducts, ordersWithProducts } from "./product-scope";
+import { SALE_WHERE } from "@/lib/sale";
+import { saleSql } from "@/lib/sale-sql";
 
 // Server side of the shared filters: which customers a filter covers, and the choices to offer.
 
@@ -143,9 +145,9 @@ export async function customerSegmentIds(
   if (opts.stage) {
     const rows = await db.$queryRaw<{ id: string; paid: bigint; spent: number; last_paid: Date | null; open_cart: boolean }[]>`
       SELECT c.id,
-        count(o.id) FILTER (WHERE o.status IN ('CONFIRMED','PAID','DISPATCHED','DELIVERED') OR o."paidAt" IS NOT NULL) AS paid,
-        coalesce(sum(o.total) FILTER (WHERE o.status IN ('CONFIRMED','PAID','DISPATCHED','DELIVERED') OR o."paidAt" IS NOT NULL), 0)::float8 AS spent,
-        max(o."createdAt") FILTER (WHERE o.status IN ('CONFIRMED','PAID','DISPATCHED','DELIVERED') OR o."paidAt" IS NOT NULL) AS last_paid,
+        count(o.id) FILTER (WHERE ${saleSql("o")}) AS paid,
+        coalesce(sum(o.total) FILTER (WHERE ${saleSql("o")}), 0)::float8 AS spent,
+        max(o."createdAt") FILTER (WHERE ${saleSql("o")}) AS last_paid,
         bool_or(o.status = 'NEW' AND o."paidAt" IS NULL) AS open_cart
       FROM "Customer" c LEFT JOIN "Order" o ON o."customerId" = c.id AND o.status <> 'CANCELLED'
       WHERE c."clientId" = ${clientId}
@@ -177,7 +179,7 @@ export async function customerSegmentIds(
     let ids: string[] = [];
     if (opts.act === "ordered" || opts.act === "not-ordered") {
       const rows = await db.order.findMany({
-        where: { clientId, createdAt: { gte: from, lt: to }, status: { not: "CANCELLED" }, OR: [{ paidAt: { not: null } }, { status: { in: ["CONFIRMED", "PAID", "DISPATCHED", "DELIVERED"] } }] },
+        where: { clientId, createdAt: { gte: from, lt: to }, AND: [{ status: { not: "CANCELLED" } }, SALE_WHERE] },
         select: { customerId: true },
         distinct: ["customerId"],
       });

@@ -97,7 +97,7 @@ export function Conversation({ entries, className, plain }: { entries: Conversat
                       <CheckCircle2 className="size-3.5 shrink-0" /> WhatsApp UPI Payment
                     </p>
                   ) : (
-                    <p className="mb-1 flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400">
+                    <p className="mb-1 flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-400">
                       <ShoppingBag className="size-3.5 shrink-0" /> <T>Catalogue Order Cart</T>
                     </p>
                   )

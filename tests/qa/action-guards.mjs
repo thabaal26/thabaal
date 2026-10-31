@@ -14,7 +14,9 @@ const files = [];
 })("src");
 
 const GUARD = /\b(requireUser|requireManager|requireAdmin|requireOrderAccess|getScope)\s*\(/;
-const PUBLIC = new Set(["login", "logout"]); // the sign-in form itself
+// Run before anyone is signed in: the sign-in form, sign-up and "forgot password". These protect themselves instead
+// (rate limits per network and email; the reset is a signed, 30-minute, one-time token; answers never reveal accounts).
+const PUBLIC = new Set(["login", "logout", "signup", "requestPasswordReset", "resetPassword"]);
 const problems = [];
 let checked = 0;
 for (const f of files) {

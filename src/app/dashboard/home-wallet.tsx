@@ -1,8 +1,11 @@
 import { Suspense } from "react";
+import { formatInTimeZone } from "date-fns-tz";
+import { APP_TZ } from "@/lib/format";
 import { ExternalLink } from "@/components/icons";
 import Link from "@/components/intent-link";
 import { INDIA_GST_RATE, RATES, spendSummary } from "@/lib/spend";
 import { affordableMessages, walletBalance } from "@/lib/wallet";
+import { MetaBalanceForm } from "./meta-balance-form";
 import { T } from "./portal-ui";
 
 /*
@@ -26,7 +29,7 @@ function Header() {
   return (
     <div className="hd" suppressHydrationWarning>
       <h2 suppressHydrationWarning>
-        <T ta="வாட்ஸ்அப் வாலட்">WhatsApp wallet</T>
+        <T ta="வாட்ஸ்அப் செலவு">WhatsApp spend</T>
       </h2>
       <Link className="btn sm" href="/dashboard/report">
         <T ta="செலவுகள்">Costs</T>
@@ -71,7 +74,8 @@ async function WalletBody({ clientId, isWallet, lowAlert, canManage }: { clientI
 
   const s = await spendSummary(clientId).catch(() => null);
   if (!s) return <Unavailable />;
-  const synced = s.metaAccount.liveBalance > 0 || s.prepaidFunds > 0;
+  const synced = Boolean(s.balanceFrom) || s.prepaidFunds > 0;
+  const from = s.balanceFrom;
   const left = s.remainingBalance;
   const low = synced && s.prepaidFunds > 0 && left / s.prepaidFunds < 0.2;
   const q = s.serviceQuota;
@@ -89,6 +93,13 @@ async function WalletBody({ clientId, isWallet, lowAlert, canManage }: { clientI
             {low && <span className="pill warn">Low balance</span>} {messagesLeftText(Math.floor(left / (RATES.marketing * (1 + INDIA_GST_RATE))))}
             {low ? " Top up before your next campaign." : ""}
           </p>
+          {from && (
+            <p className="muted small" style={{ marginTop: 6 }} suppressHydrationWarning>
+              {money(from.synced)} on Meta at {formatInTimeZone(from.syncedAt, APP_TZ, "d MMM, h:mm a")}
+              {from.added > 0 ? ` + ${money(from.added)} added` : ""} − {money(from.spentWithGst)} spent since (incl. GST
+              {from.fromMeta ? ", from Meta" : ", estimate"}).
+            </p>
+          )}
           <p className="muted small" style={{ marginTop: 6 }}>
             {money(s.totalMonthSpentWithGst)} spent in {s.monthLabel}, incl. GST{s.liveSyncedFromMeta ? "" : " (estimate)"}. {q.freeRemaining.toLocaleString("en-IN")} of{" "}
             {q.totalFreeLimit.toLocaleString("en-IN")} free replies left this month.
@@ -111,6 +122,7 @@ async function WalletBody({ clientId, isWallet, lowAlert, canManage }: { clientI
             <T ta="மெட்டாவில் ரீசார்ஜ்">Recharge on Meta</T> <ExternalLink aria-hidden className="ic" style={{ width: 14, height: 14 }} />
           </a>
         )}
+        {canManage && s.metaAccount.wabaId && <MetaBalanceForm wabaId={s.metaAccount.wabaId} hasBalance={synced} />}
       </div>
     </section>
   );
@@ -120,7 +132,7 @@ function Unavailable() {
   return (
     <section className="card" suppressHydrationWarning>
       <Header />
-      <p className="muted small">WhatsApp wallet couldn&apos;t be loaded just now.</p>
+      <p className="muted small">WhatsApp spend couldn&apos;t be loaded just now.</p>
     </section>
   );
 }

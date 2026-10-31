@@ -507,7 +507,7 @@ export function TxnTable({ rows, canOperate = false }: { rows: (TxnRow & { when:
       </div>
       <div className="card" style={{ padding: 0 }}>
         <div className="tw">
-          <table>
+          <table className="mcards">
             <thead>
               <tr>
                 <th>{isTa ? "தேதி" : "Date"}</th>
@@ -524,7 +524,7 @@ export function TxnTable({ rows, canOperate = false }: { rows: (TxnRow & { when:
                 <tr key={r.key}>
                   <td className="muted">{r.when}</td>
                   <td>{r.ref}</td>
-                  <td>
+                  <td data-m="title">
                     <b>{r.name}</b>
                   </td>
                   <td>{r.kind === "in" ? (isTa ? "வந்த பணம்" : "Money in") : r.kind === "refund" ? (isTa ? "திருப்பிச் செலுத்தியது" : "Refund") : isTa ? "தோல்வி" : "Payment"}</td>
@@ -547,7 +547,7 @@ export function TxnTable({ rows, canOperate = false }: { rows: (TxnRow & { when:
                       canOperate && r.kind === "in" && r.way !== "Cash" && <AddReference orderId={r.orderId} compact />
                     )}
                   </td>
-                  <td className="num">{r.kind === "refund" ? `−${inr(r.amount)}` : inr(r.amount)}</td>
+                  <td className="num" data-m="amount">{r.kind === "refund" ? `−${inr(r.amount)}` : inr(r.amount)}</td>
                   <td>
                     <Pill tone={tone(r.kind)}>{r.status}</Pill>
                   </td>

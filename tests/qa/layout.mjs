@@ -15,7 +15,8 @@ const arg = (k, d) => (process.argv.find((a) => a.startsWith(k + "="))?.slice(k.
 const SIZES = arg(
   "sizes",
   // The 14 viewports of the QA brief, plus a tall tablet, a 1536 laptop and a 2560 monitor.
-  "320x568,360x800,375x812,390x844,414x896,430x932,600x960,768x1024,820x1180,1024x768,1280x720,1366x768,1440x900,1536x864,1600x900,1920x1080,2560x1440",
+  // Portrait phones, phones turned sideways (740x360, 844x390), tablets and computers.
+"320x568,360x800,375x812,390x844,414x896,430x932,740x360,844x390,600x960,768x1024,820x1180,1024x768,1280x720,1366x768,1440x900,1536x864,1600x900,1920x1080,2560x1440",
 ).map((s) => {
   const [w, h] = s.split("x").map(Number);
   return { name: s, width: w, height: h };
