@@ -26,6 +26,7 @@ import { clientAccounts, clientNumbers, senderForAccount } from "@/lib/senders";
 import { explainError } from "@/lib/meta-errors";
 import { syncedHeaderImage } from "@/lib/media";
 import { trackPress } from "@/lib/usage";
+import { planCapacityBlock } from "@/lib/subscription";
 
 export type ActionResult = { ok: boolean; message?: string; errors?: string[]; id?: string };
 
@@ -77,6 +78,11 @@ export async function saveTemplate(id: string | null, draft: TemplateDraft): Pro
   const owner = id ? await db.template.findUnique({ where: { id }, select: { clientId: true, businessAccountId: true } }) : null;
   if (id && (!owner || !mine(s, owner.clientId))) return { ok: false, message: "Template not found." };
   const clientId = owner?.clientId ?? s.clientId!;
+  // A new template counts against the plan's templates.
+  if (!id) {
+    const block = await planCapacityBlock(clientId, "tmpl");
+    if (block) return { ok: false, message: block };
+  }
   const businessAccountId = owner ? owner.businessAccountId : await targetAccount(clientId, draft.businessAccountId);
   const { cfg } = await senderForAccount(clientId, businessAccountId);
   const { live } = cfg;

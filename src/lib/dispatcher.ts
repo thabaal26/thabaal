@@ -14,6 +14,7 @@ import { lockedClientIds } from "./plan-access";
 import { syncDueSheets } from "./sheets";
 import { syncAllSheets } from "./gsheet/sync";
 import { processOwnerMessages, queueAutoReminders } from "./owner-messages";
+import { planCapacityBlock } from "./subscription";
 import { campaignAudienceWhere } from "./audiences";
 import { refreshLifecycleTags, sendWinbacks } from "./lifecycle";
 import { backfillOrderNames } from "./orders";
@@ -66,6 +67,12 @@ export async function startDueCampaigns(now: Date, paused: ReadonlySet<string>) 
       data: { nextRunAt: next, active: next !== null },
     });
     if (!claimed.count) continue;
+    // The plan's campaign sends for this month are used up: this send is skipped (the next one is still scheduled).
+    const block = await planCapacityBlock(c.clientId, "camp", now).catch(() => null);
+    if (block) {
+      console.warn(`Campaign ${c.id} skipped: ${block}`);
+      continue;
+    }
     try {
       await startRun(c, c.nextRunAt!);
       started++;

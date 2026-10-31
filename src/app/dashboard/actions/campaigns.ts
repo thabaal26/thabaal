@@ -17,6 +17,7 @@ import { mine, requireAdmin, requireManager } from "@/lib/session";
 import { sendToCustomer } from "./send";
 import type { ActionResult } from "./templates";
 import { trackPress } from "@/lib/usage";
+import { planCapacityBlock } from "@/lib/subscription";
 
 export type CampaignInput = {
   name: string;
@@ -134,6 +135,8 @@ export async function runCampaignNow(id: string): Promise<ActionResult> {
   if (!templateSendable(await getSettings(), c.template)) return { ok: false, message: "The template isn't approved by Meta yet." };
   const busy = await db.campaignRun.findFirst({ where: { campaignId: id, status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET", "WAITING_FUNDS"] } } });
   if (busy) return { ok: false, message: "This campaign is already sending. Wait for it to finish or stop it." };
+  const block = await planCapacityBlock(c.clientId, "camp");
+  if (block) return { ok: false, message: block };
   const run = await startRun(c, new Date());
   await dispatch();
   refresh();
