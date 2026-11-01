@@ -5463,3 +5463,138 @@ html {
     width: 36px;
   }
 }
+
+/* ── Free demo form (final CTA, #start): lands in Admin › Enquiries ── */
+.final-cta-inner.demo-cta-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 440px);
+  align-items: start;
+  gap: 40px;
+}
+.demo-cta-copy h2 {
+  margin: 0 0 10px;
+  color: var(--navy);
+  font-size: clamp(28px, 3.6vw, 44px);
+  line-height: 1.08;
+  font-weight: 800;
+}
+.demo-cta-copy p {
+  margin: 0 0 16px;
+  color: rgba(6, 36, 69, 0.78);
+  font-size: 16px;
+  font-weight: 600;
+}
+.demo-cta-points {
+  margin: 0 0 22px;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  color: var(--navy);
+  font-weight: 600;
+}
+.demo-cta-points li::before {
+  content: "✓ ";
+  color: #0b8a57;
+  font-weight: 800;
+}
+.demo-form-card {
+  background: #fff;
+  color: var(--ink);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 24px;
+  display: grid;
+  gap: 12px;
+}
+.demo-form-card h3 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 22px;
+  font-weight: 800;
+}
+.demo-form-sub,
+.demo-form-foot {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.demo-form-foot a {
+  color: #0b8a57;
+  font-weight: 700;
+}
+.demo-field {
+  display: grid;
+  gap: 5px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+}
+.demo-field i {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--muted);
+}
+.demo-field input,
+.demo-field select {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-weight: 500;
+  color: var(--ink);
+  background: #fff;
+}
+.demo-field input:focus,
+.demo-field select:focus {
+  outline: 3px solid rgba(255, 209, 46, 0.55);
+  border-color: var(--navy);
+}
+.demo-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.demo-submit {
+  width: 100%;
+  min-height: 50px;
+  justify-content: center;
+  font-size: 16px;
+}
+.demo-form-error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: #fde8e8;
+  color: #9b1c1c;
+  font-weight: 600;
+  font-size: 14px;
+}
+.demo-form-done p {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.demo-hp {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+@media (max-width: 860px) {
+  .final-cta-inner.demo-cta-inner {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+}
+@media (max-width: 420px) {
+  .demo-row {
+    grid-template-columns: 1fr;
+  }
+  .demo-form-card {
+    padding: 18px;
+  }
+}

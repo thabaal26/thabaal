@@ -14,9 +14,10 @@ const files = [];
 })("src");
 
 const GUARD = /\b(requireUser|requireManager|requireAdmin|requireOrderAccess|getScope)\s*\(/;
-// Run before anyone is signed in: the sign-in form, sign-up and "forgot password". These protect themselves instead
-// (rate limits per network and email; the reset is a signed, 30-minute, one-time token; answers never reveal accounts).
-const PUBLIC = new Set(["login", "logout", "signup", "requestPasswordReset", "resetPassword"]);
+// Run before anyone is signed in: the sign-in form, sign-up, "forgot password" and the website's free demo form. These
+// protect themselves instead (rate limits per network and email; the reset is a signed, 30-minute, one-time token;
+// answers never reveal accounts; the demo form only adds an enquiry, with a hidden robot field and a per-network limit).
+const PUBLIC = new Set(["login", "logout", "signup", "requestPasswordReset", "resetPassword", "requestDemo"]);
 const problems = [];
 let checked = 0;
 for (const f of files) {

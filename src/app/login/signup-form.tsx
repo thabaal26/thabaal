@@ -64,6 +64,13 @@ export function SignupForm({ lang = "en" }: { lang?: "en" | "ta" }) {
 
         <div className="thabaal-field">
           <svg className="ic" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z" />
+          </svg>
+          <input id="phone" name="phone" type="tel" inputMode="numeric" aria-label={t("Your WhatsApp number", "உங்கள் WhatsApp எண்")} placeholder={t("Your WhatsApp number (we help you set up here)", "உங்கள் WhatsApp எண் (அமைக்க உதவுவோம்)")} autoComplete="tel-national" required maxLength={16} defaultValue={v?.phone} />
+        </div>
+
+        <div className="thabaal-field">
+          <svg className="ic" viewBox="0 0 24 24" aria-hidden="true">
             <rect width="20" height="16" x="2" y="4" rx="2" />
             <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
           </svg>

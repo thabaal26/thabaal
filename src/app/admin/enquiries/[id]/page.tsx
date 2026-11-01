@@ -30,13 +30,18 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
   const plan = PLANS.find((p) => p.k === lead.plan);
   const owner = lead.owner ? lead.owner.name || lead.owner.email : null;
   const when = (t: Date) => formatInTimeZone(t, APP_TZ, "d MMM yyyy, h:mm a");
-  const hello = `Vanakkam${lead.person ? ` ${lead.person}` : ""}, this is thabaal. You asked about running ${lead.shop} on WhatsApp. Shall I show you how it works in 10 minutes?`;
+  // A sign-up that hasn't paid: still a business of ours, so "signed up, not paid" until a payment is verified.
+  const signedUp = Boolean(lead.client) && lead.stage !== "won";
+  const hello = signedUp
+    ? `Vanakkam${lead.person ? ` ${lead.person}` : ""}, this is thabaal. Thank you for signing up ${lead.shop}! Shall I help you pick a plan and connect your WhatsApp number? It takes about 10 minutes.`
+    : `Vanakkam${lead.person ? ` ${lead.person}` : ""}, this is thabaal. You asked about running ${lead.shop} on WhatsApp. Shall I show you how it works in 10 minutes?`;
+  const mail = lead.email ? `mailto:${lead.email}?subject=${encodeURIComponent(`thabaal for ${lead.shop}`)}&body=${encodeURIComponent(hello)}` : null;
 
   return (
     <>
       <PageHead
         title={lead.shop}
-        sub={[lead.person, lead.town, lead.phone].filter(Boolean).join(" · ")}
+        sub={[lead.person, lead.town, lead.phone || lead.email].filter(Boolean).join(" · ")}
         tools={
           <>
             <Link className="btn sm" href="/admin/enquiries">
@@ -66,7 +71,7 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
           {stageName(lead.stage)}
         </span>
         {plan && <span className="pill">Asked about {plan.n}</span>}
-        {lead.client && <Pill tone="ok">Business: {lead.client.name}</Pill>}
+        {lead.client && (signedUp ? <Pill tone="warn">Signed up · not paid yet</Pill> : <Pill tone="ok">Business: {lead.client.name}</Pill>)}
         <span className="muted small">
           From {lead.source} on {formatInTimeZone(lead.createdAt, APP_TZ, "d MMM yyyy")}
         </span>
@@ -112,8 +117,14 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
               </div>
               <div className="row">
                 <div className="grow muted">Phone</div>
-                <b>{lead.phone}</b>
+                <b>{lead.phone || "Not given: add it with Edit"}</b>
               </div>
+              {lead.email && (
+                <div className="row">
+                  <div className="grow muted">Email</div>
+                  <b>{lead.email}</b>
+                </div>
+              )}
             </div>
             {lead.note && (
               <div className="card" style={{ background: "var(--soft)", boxShadow: "none", marginTop: 14 }}>
@@ -131,7 +142,7 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
                 <h2>Move it along</h2>
               </div>
             </div>
-            <StageButtons id={lead.id} stage={lead.stage} locked={!!lead.clientId} />
+            <StageButtons id={lead.id} stage={lead.stage} locked={!!lead.clientId && lead.stage === "won"} />
           </div>
 
           {lead.stage === "won" && !lead.clientId && (
@@ -150,7 +161,11 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
               <div className="hd">
                 <div>
                   <h2>The business</h2>
-                  <p>This enquiry became {lead.client.name}.</p>
+                  <p>
+                    {signedUp
+                      ? `${lead.client.name} made its own account but hasn't paid yet. It turns Won by itself once a payment is verified.`
+                      : `This enquiry became ${lead.client.name}.`}
+                  </p>
                 </div>
                 <Link className="btn sm primary" href={`/admin/clients/${lead.client.id}`}>
                   Open the business
@@ -166,9 +181,15 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
               <div>
                 <h2>Next step</h2>
               </div>
-              <a className="btn sm primary" href={`https://wa.me/91${lead.phone}?text=${encodeURIComponent(hello)}`} target="_blank" rel="noopener noreferrer">
-                WhatsApp them
-              </a>
+              {lead.phone ? (
+                <a className="btn sm primary" href={`https://wa.me/91${lead.phone}?text=${encodeURIComponent(hello)}`} target="_blank" rel="noopener noreferrer">
+                  WhatsApp them
+                </a>
+              ) : mail ? (
+                <a className="btn sm primary" href={mail}>
+                  Email them
+                </a>
+              ) : null}
             </div>
             <CallForm id={lead.id} open={isOpenStage(lead.stage)} today={today} />
             {isOpenStage(lead.stage) && (

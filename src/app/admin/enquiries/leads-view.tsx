@@ -5,7 +5,7 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
-import { daysTo, isOpenStage, LEAD_SOURCES, LEAD_STAGES, stageName } from "@/lib/lead-stages";
+import { AUTO_SOURCES, daysTo, isOpenStage, LEAD_SOURCES, LEAD_STAGES, stageName } from "@/lib/lead-stages";
 import { Tabs } from "../nav";
 
 export type LeadRow = {
@@ -14,6 +14,7 @@ export type LeadRow = {
   person: string | null;
   town: string | null;
   phone: string;
+  email: string | null;
   sells: string | null;
   source: string;
   plan: string | null;
@@ -37,6 +38,10 @@ const initials = (n: string) =>
     .toUpperCase();
 const who = (l: LeadRow) => [l.person, l.town].filter(Boolean).join(" · ");
 const dueText = (d: number) => (d < 0 ? `${-d}d late` : d === 0 ? "today" : `in ${d}d`);
+/** Made their own account but no payment verified yet. */
+const signedUp = (l: LeadRow) => Boolean(l.clientName) && l.stage !== "won";
+/** Where it came from, when it came by itself. */
+const autoTag = (l: LeadRow) => (signedUp(l) ? "Signed up · not paid" : AUTO_SOURCES.includes(l.source) ? (l.source === "Sign-up" ? "Signed up" : "From the website") : null);
 
 export function LeadsView({ leads, team, today, insights, addButton }: { leads: LeadRow[]; team: { id: string; name: string }[]; today: string; insights: ReactNode; addButton: ReactNode }) {
   const [own, setOwn] = useState("all");
@@ -51,7 +56,7 @@ export function LeadsView({ leads, team, today, insights, addButton }: { leads: 
   const match = (l: LeadRow) => {
     if (src && l.source !== src) return false;
     if (plan && l.plan !== plan) return false;
-    if (q && ![l.shop, l.person, l.town, l.sells, l.phone].join(" ").toLowerCase().includes(q.toLowerCase())) return false;
+    if (q && ![l.shop, l.person, l.town, l.sells, l.phone, l.email].join(" ").toLowerCase().includes(q.toLowerCase())) return false;
     return true;
   };
   const shown = leads.filter(match);
@@ -105,13 +110,20 @@ export function LeadsView({ leads, team, today, insights, addButton }: { leads: 
                       {l.shop} {who(l) && <span className="muted small">· {who(l)}</span>}
                     </div>
                     <div className="muted small">
+                      {autoTag(l) && <span className="pill warn" style={{ marginRight: 6 }}>{autoTag(l)}</span>}
                       {stageName(l.stage)} · {d < 0 ? `${-d} day${d === -1 ? "" : "s"} late` : "due today"}
-                      {l.note ? ` · ${l.note.slice(0, 90)}` : ""}
+                      {l.sells ? ` · sells ${l.sells}` : l.note ? ` · ${l.note.slice(0, 90)}` : ""}
                     </div>
                   </div>
-                  <a className="btn sm" href={`https://wa.me/91${l.phone}`} target="_blank" rel="noopener noreferrer">
-                    WhatsApp
-                  </a>
+                  {l.phone ? (
+                    <a className="btn sm" href={`https://wa.me/91${l.phone}`} target="_blank" rel="noopener noreferrer">
+                      WhatsApp
+                    </a>
+                  ) : l.email ? (
+                    <a className="btn sm" href={`mailto:${l.email}`}>
+                      Email
+                    </a>
+                  ) : null}
                   <Link className="btn sm primary" href={`/admin/enquiries/${l.id}`}>
                     Open
                   </Link>
@@ -153,7 +165,8 @@ export function LeadsView({ leads, team, today, insights, addButton }: { leads: 
                                 <div className="f">
                                   {l.planName && <span className="pill">{l.planName}</span>}
                                   {d !== null && <span className={`due ${d < 0 ? "late" : d === 0 ? "today" : ""}`}>{dueText(d)}</span>}
-                                  {l.clientName && <span className="pill ok">Business</span>}
+                                  {l.clientName && (signedUp(l) ? <span className="pill warn">Not paid</span> : <span className="pill ok">Business</span>)}
+                                  {!l.clientName && l.source === "Home page form" && <span className="pill">Website</span>}
                                   {l.ownerName && (
                                     <span className="av" title={l.ownerName} style={{ width: 22, height: 22, fontSize: 10, marginLeft: "auto" }}>
                                       {initials(l.ownerName)}
@@ -211,11 +224,19 @@ export function LeadsView({ leads, team, today, insights, addButton }: { leads: 
                                     <div className="n">
                                       <Link href={`/admin/enquiries/${l.id}`}>{l.shop}</Link>
                                     </div>
-                                    <div className="s">{who(l) || l.phone}</div>
+                                    <div className="s">{who(l) || l.phone || l.email}</div>
                                   </div>
                                 </div>
                               </td>
-                              <td className="muted small">{l.source}</td>
+                              <td className="muted small">
+                                {l.source}
+                                {signedUp(l) && (
+                                  <>
+                                    {" "}
+                                    <span className="pill warn">Not paid</span>
+                                  </>
+                                )}
+                              </td>
                               <td>{l.planName ? <span className="pill">{l.planName}</span> : <span className="muted small">—</span>}</td>
                               <td>
                                 <span className="pill" style={{ background: "transparent", border: `1.5px solid ${s?.color ?? "var(--line)"}` }}>

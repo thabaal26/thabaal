@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import "./landing.css";
 import { DEMO_TARGET, DEMO_URL } from "./demo-link";
+import { DemoForm } from "./demo-form";
 import { HeritageFooter } from "./heritage-footer";
 import { DEFAULT_PRICES, savePercent, type CyclePrices, type PriceTable } from "@/lib/plan-prices";
 
@@ -334,9 +335,7 @@ const COMPETITOR_COMPARISON: CompetitorRow[] = [
 ];
 
 const TALK = DEMO_URL;
-const MAILTO_ORDER = "mailto:thabaal26@gmail.com?subject=Show%20me%20Thabaal%20order%20tracking";
 const MAILTO_TEMPLATE = "mailto:thabaal26@gmail.com?subject=Show%20me%20Thabaal%20templates";
-const MAILTO_DEMO = "mailto:thabaal26@gmail.com?subject=Thabaal%20demo%20request";
 const TEL_PHONE = "tel:+916379140626";
 
 /* ── 1. Analytics & Reports Datasets (Matches Exact HTML Script) ── */
@@ -624,6 +623,8 @@ function priceInfoOf(p: CyclePrices, cycle: BillingCycle): { monthlyRate: string
 /** `prices`: the plan prices in force (Settings › Plans and prices), read on the server. */
 export function LandingSections({ lang, prices = DEFAULT_PRICES }: { lang: Lang; prices?: PriceTable }) {
   const ta = lang === "ta";
+  // The plan a pricing button was pressed on, filled into the demo form (#start).
+  const [demoPlan, setDemoPlan] = useState("");
   const [activeDemo, setActiveDemo] = useState<"overview" | "campaign" | "payments">("overview");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [showMoreFaq, setShowMoreFaq] = useState(false);
@@ -981,7 +982,7 @@ export function LandingSections({ lang, prices = DEFAULT_PRICES }: { lang: Lang;
                 <li>{ta ? "எந்த ஆர்டர்கள் புதிது, பேக்கிங் ஆகிறது, அனுப்பப்பட்டது, சேர்ந்தது என்பதை அறியுங்கள்." : "Know which orders are new, being prepared, dispatched or delivered."}</li>
               </ul>
               <div style={{ marginTop: "20px" }}>
-                <a className="btn btn-dark btn-small" href={MAILTO_ORDER}>
+                <a className="btn btn-dark btn-small" href="#start">
                   {ta ? "டெமோ பார்க்கவும் ↗" : "Show me a demo ↗"}
                 </a>
               </div>
@@ -1247,6 +1248,7 @@ export function LandingSections({ lang, prices = DEFAULT_PRICES }: { lang: Lang;
                         <a
                           className={`btn tier-btn ${isPopular ? "landing-btn-yellow" : "btn-dark"}`}
                           href="#start"
+                          onClick={() => setDemoPlan(plan.id)}
                         >
                           {ta ? plan.cta.ta : plan.cta.en}
                         </a>
@@ -1607,23 +1609,24 @@ export function LandingSections({ lang, prices = DEFAULT_PRICES }: { lang: Lang;
 
       {/* ── 8. FINAL CTA BANNER (Exact Match HTML #start) ── */}
       <section className="final-cta" id="start">
-        <div className="landing-container final-cta-inner">
-          <div>
+        <div className="landing-container final-cta-inner demo-cta-inner">
+          <div className="demo-cta-copy">
             <h2>{ta ? "உங்கள் வணிகத்திற்கு தபால் எதை தெளிவாக்கும் என்பதைப் பாருங்கள்." : "See what Thabaal could make clearer for your business."}</h2>
             <p>
               {ta
-                ? "மாதிரி டாஷ்போர்டைப் பாருங்கள், அல்லது தனிப்பட்ட விளக்கத்திற்கு எங்களைத் தொடர்பு கொள்ளுங்கள்."
-                : "Take a look at the sample dashboard, or speak with us for a personal walkthrough."}
+                ? "உங்கள் விவரங்களைக் கொடுங்கள், உங்கள் கடைக்கு ஏற்ற 15 நிமிட டெமோவைக் காட்டுகிறோம்."
+                : "Leave your number and we'll show you a 15-minute demo made for your shop."}
             </p>
-          </div>
-          <div className="final-cta-actions">
-            <a className="btn btn-dark" href={MAILTO_DEMO}>
-              {ta ? "டெமோ பதிவு செய்க" : "Book a demo"} <span>↗</span>
-            </a>
+            <ul className="demo-cta-points">
+              <li>{ta ? "WhatsApp-ல் ஆர்டர்கள், பணம், வாடிக்கையாளர்கள் ஒரே இடத்தில்" : "Orders, payments and customers from WhatsApp in one place"}</li>
+              <li>{ta ? "உங்கள் கடைக்கு எந்தத் திட்டம் சரி என்று சொல்வோம்" : "We tell you which plan fits your shop"}</li>
+              <li>{ta ? "எந்தக் கடமையும் இல்லை" : "No obligation"}</li>
+            </ul>
             <a className="btn btn-secondary" href={TEL_PHONE}>
               {ta ? "அழைக்க 63791 40626" : "Call 63791 40626"}
             </a>
           </div>
+          <DemoForm lang={lang} plan={demoPlan} onPlan={setDemoPlan} />
         </div>
       </section>
 

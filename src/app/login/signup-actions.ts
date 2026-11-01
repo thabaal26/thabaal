@@ -2,12 +2,17 @@
 
 import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
+import { APP_ORIGIN } from "@/lib/app-host";
 import { db } from "@/lib/db";
+import { sendEmail } from "@/lib/email";
+import { cleanPhone } from "@/lib/lead-stages";
+import { leadFromSignup } from "@/lib/leads";
 import { clientIp } from "@/lib/login-guard";
 import { ensureOrderPrefix } from "@/lib/orders";
 import { createSession } from "@/lib/session";
 
-export type SignupState = { error?: string; values?: { business: string; city: string; name: string; email: string; agreed: boolean } } | undefined;
+export type SignupState = { error?: string; values?: { business: string; city: string; name: string; phone: string; email: string; agreed: boolean } } | undefined;
 
 /** A city name: letters, spaces, dots, apostrophes and hyphens (same rule as adding a client in the admin panel). */
 const CITY = /^[\p{L}][\p{L} .'-]{1,39}$/u;
@@ -25,14 +30,18 @@ export async function signup(_: SignupState, form: FormData): Promise<SignupStat
   const business = String(form.get("business") ?? "").trim().replace(/\s+/g, " ");
   const city = String(form.get("city") ?? "").trim().replace(/\s+/g, " ");
   const name = String(form.get("name") ?? "").trim().replace(/\s+/g, " ");
+  const phoneText = String(form.get("phone") ?? "").trim();
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   const password = String(form.get("password") ?? "");
   const agreed = form.get("terms") === "on";
-  const values = { business, city, name, email, agreed };
+  const values = { business, city, name, phone: phoneText, email, agreed };
 
   if (business.length < 2 || business.length > 60) return { error: "Enter your business name (2 to 60 characters).", values };
   if (!CITY.test(city)) return { error: "Enter just the city you deliver from, e.g. Chennai.", values };
   if (name.length < 2 || name.length > 60) return { error: "Enter your name.", values };
+  // The owner's WhatsApp number: Thabaal helps them set up there.
+  const phone = cleanPhone(phoneText);
+  if (!phone) return { error: "Enter your 10-digit WhatsApp number.", values };
   if (!EMAIL.test(email)) return { error: "Enter a valid email address.", values };
   if (password.length < 8) return { error: "Password must be at least 8 characters.", values };
   if (password.length > 200) return { error: "That password is too long.", values };
@@ -53,19 +62,38 @@ export async function signup(_: SignupState, form: FormData): Promise<SignupStat
 
   const passwordHash = await bcrypt.hash(password, 12);
   let userId: string;
+  let clientId: string;
   try {
     const created = await db.$transaction(async (tx) => {
       const client = await tx.client.create({ data: { name: business, planRequired: true, homeCity: city } });
       return tx.user.create({ data: { name, email, passwordHash, role: "CLIENT", access: "MANAGER", clientId: client.id }, select: { id: true, clientId: true } });
     });
     userId = created.id;
-    await ensureOrderPrefix(created.clientId!).catch(() => null);
+    clientId = created.clientId!;
+    await ensureOrderPrefix(clientId).catch(() => null);
   } catch {
     // A second sign-up with the same email or business name slipped in between the checks above and the save.
     return { error: "That email or business name was just taken. Please check and try again.", values };
   }
 
   await db.loginAttempt.create({ data: { key } });
+  // Admin › Enquiries: followed up until they pay (won by itself then). Never holds up the sign-up.
+  after(async () => {
+    const lead = await leadFromSignup({ clientId, business, person: name, phone, email, town: city }).catch((e) => (console.error("Sign-up enquiry not added", e), null));
+    const sent = await sendEmail({
+      subject: `New sign-up: ${business}`,
+      intro: "A business made its own account on thabaal.in and hasn't paid yet. It is waiting in Enquiries › Follow up today.",
+      ...(lead?.id ? { button: { label: "Open the enquiry", url: `${APP_ORIGIN}/admin/enquiries/${lead.id}` } } : {}),
+      rows: [
+        ["Business", business],
+        ["Owner", name],
+        ["WhatsApp", `+91 ${phone}`],
+        ["Email", email],
+        ["City", city],
+      ],
+    });
+    if (!sent.ok) console.warn("Sign-up email not sent:", sent.error);
+  });
   await createSession(userId);
   redirect("/dashboard/account?pay=now");
 }

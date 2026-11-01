@@ -9,7 +9,6 @@ interface HeritageFooterProps {
   lang: Lang;
 }
 
-const MAILTO_DEMO = "mailto:thabaal26@gmail.com?subject=Thabaal%20demo%20request";
 const TEL_PHONE = "tel:+916379140626";
 
 export function HeritageFooter({ lang }: HeritageFooterProps) {
@@ -135,7 +134,7 @@ export function HeritageFooter({ lang }: HeritageFooterProps) {
                 <a href="#pricing" className="footer-nav-link">
                   {ta ? "கட்டணம்" : "Pricing"}
                 </a>
-                <a href={MAILTO_DEMO} className="footer-nav-link footer-nav-link--accent">
+                <a href="#start" className="footer-nav-link footer-nav-link--accent">
                   {ta ? "டெமோ பதிவு செய்க" : "Book a demo"}
                 </a>
               </div>

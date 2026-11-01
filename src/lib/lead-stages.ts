@@ -13,7 +13,10 @@ export const LEAD_STAGES: readonly { k: LeadStage; n: string; color: string }[] 
   { k: "lost", n: "Lost", color: "var(--muted)" },
 ];
 
-export const LEAD_SOURCES = ["Home page form", "Referral", "WhatsApp", "Walk-in", "Other"] as const;
+/** "Home page form" is the website's free demo form; "Sign-up" is a business that made its own account (both automatic). */
+export const LEAD_SOURCES = ["Home page form", "Sign-up", "Referral", "WhatsApp", "Walk-in", "Other"] as const;
+/** Sources that arrive by themselves, not typed in by Thabaal. */
+export const AUTO_SOURCES = ["Home page form", "Sign-up"];
 
 export const isLeadStage = (v: unknown): v is LeadStage => typeof v === "string" && LEAD_STAGES.some((s) => s.k === v);
 export const stageName = (k: string) => LEAD_STAGES.find((s) => s.k === k)?.n ?? k;
