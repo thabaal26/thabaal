@@ -12,6 +12,7 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import { parseAddressText } from "./address";
 import { flowShips, readFlow } from "./order-flow";
+import { fillCustomerName, nameFromText } from "./customer-name";
 import { addressKey, pickedNumber, type SavedAddress } from "./address-book";
 import { addressBook, keepKnownAddresses, rememberAddress } from "./address-book-server";
 import {
@@ -293,10 +294,10 @@ async function saveOnCustomer(customerId: string, text: string, next: DeliveryAd
       ...(a ? { location: a.slice(0, 80) } : {}),
       ...(parsed.region !== "Not sure" ? { region: parsed.region } : {}),
       deliveryAddress: next as Prisma.InputJsonValue,
-      // A customer known only by their number gets the name they typed in the form.
-      ...(next.name && cust.name.trim().startsWith("+") ? { name: next.name.slice(0, 80) } : {}),
     },
   });
+  // A customer known only by their number gets the name they gave (form, or a "Name: …" line they typed).
+  await fillCustomerName(customerId, next.name);
   await rememberAddress(customerId, { text, area: a || null, mapUrl: next.mapUrl ?? null });
 }
 
@@ -398,6 +399,7 @@ export async function handleAddressReply(customer: { id: string }, m: InboundFor
   const looksLikeAddress = parsed.isLikelyAddress || (parsed.confidence >= 30 && Boolean(parsed.area || parsed.pincode));
   if (!looksLikeAddress || text.trim().length < 8) return false;
   const line = (parsed.fullAddress || text).trim().slice(0, 500);
-  await applyNewAddress(customer.id, line, { address: line, ...(parsed.pincode ? { in_pin_code: parsed.pincode } : {}), savedAt: new Date().toISOString() }, parsed.area);
+  const typedName = nameFromText(text);
+  await applyNewAddress(customer.id, line, { address: line, ...(parsed.pincode ? { in_pin_code: parsed.pincode } : {}), ...(typedName ? { name: typedName } : {}), savedAt: new Date().toISOString() }, parsed.area);
   return true;
 }

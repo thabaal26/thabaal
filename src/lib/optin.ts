@@ -1,4 +1,5 @@
 import "server-only";
+import { cleanPersonName } from "./customer-name";
 import { db } from "./db";
 import { receivingNumber } from "./replies";
 import { numberConfig } from "./senders";
@@ -48,7 +49,7 @@ export async function joinFromWhatsApp(m: { phone: string; profileName?: string;
         data: {
           clientId,
           phone: m.phone,
-          name: m.profileName?.trim() || `+${m.phone}`,
+          name: cleanPersonName(m.profileName) ?? `+${m.phone}`,
           tags: [tag],
           optInSource: `WhatsApp JOIN (${source})`,
           optInAt: new Date(),

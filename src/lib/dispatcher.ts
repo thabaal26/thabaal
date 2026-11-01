@@ -1,5 +1,6 @@
 import "server-only";
 import type { Campaign } from "@prisma/client";
+import { backfillCustomerNames } from "./customer-name";
 import { db } from "./db";
 import { pushToGoogleSheet } from "./google-sheets-live";
 import { computeNextRun } from "./schedule";
@@ -347,6 +348,7 @@ export async function dispatch() {
   // Connected Google Sheets (lib/gsheet): anything a live update missed.
   if (Date.now() < deadline) await syncAllSheets(deadline).catch((e) => console.error("Google Sheet live sync failed", e));
   if (Date.now() < deadline) await backfillOrderNames().catch((e) => console.error("Order name backfill failed", e));
+  if (Date.now() < deadline) await backfillCustomerNames().catch((e) => console.error("Customer name backfill failed", e));
   if (Date.now() < deadline) await expireUnfinishedOrders(now, noOrders).catch((e) => console.error("Order expiry failed", e));
   if (Date.now() < deadline) await nudgeUnfinishedOrders(now, noOrders).catch((e) => console.error("Order nudges failed", e));
   if (Date.now() < deadline) await remindUnpaidOrders(now, 20, noOrders).catch((e) => console.error("Payment reminders failed", e));
