@@ -8,7 +8,7 @@ import { safeAction, toastResult } from "@/components/toast";
 import { Badge, Button, Card, CardHeader } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { LOYALTY_RULE_LIMITS, type LoyaltyRules } from "@/lib/loyalty";
-import { saveLoyaltyAutoRedeem, saveLoyaltyRules, setOrderPointsAction } from "../actions/orders";
+import { saveLoyaltyAutoRedeem, saveLoyaltyRedeemOn, saveLoyaltyRules, setOrderPointsAction } from "../actions/orders";
 
 const inr = (n: number) => `₹${(Math.round(n * 100) / 100).toLocaleString("en-IN")}`;
 
@@ -27,13 +27,13 @@ export function OrderPointsControl({
   orderId: string;
   /** ₹ already off this order. */
   applied: number;
-  /** The most the customer could take off this order now, in ₹ (0 = not enough points). */
+  /** The most the customer could take off this order now, in ₹ (0 = not enough points, or using points is off). */
   max: number;
   /** The customer's points not yet used. */
   balance: number;
   /** Unpaid, not cancelled, and this person may edit orders. */
   canChange: boolean;
-  /** A "Review and pay" request already went out, so it needs sending again after a change. */
+  /** A payment request already went out, so it needs sending again after a change. */
   paymentSent: boolean;
 }) {
   const router = useRouter();
@@ -50,60 +50,63 @@ export function OrderPointsControl({
     });
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-success-border/60 bg-success-bg/40 px-2.5 py-1.5 text-xs">
-      <span className="inline-flex min-w-0 items-center gap-1.5 text-ink">
-        <Trophy aria-hidden className="size-3.5 shrink-0 text-success" />
+    <div className="points-row" data-points={applied > 0 ? "used" : "available"} style={{ marginTop: 10, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 12, border: "1px solid var(--line)", background: "var(--ok-bg)" }}>
+      <Trophy aria-hidden className="size-4 shrink-0" style={{ color: "var(--ok)" }} />
+      <span style={{ flex: "1 1 220px", minWidth: 0, fontSize: 13.5 }}>
         {applied > 0 ? (
-          <span>
-            Loyalty points used: <b className="tabular">{applied * 2} pts</b> · <b className="tabular text-success">−{inr(applied)}</b>
-          </span>
+          <>
+            Loyalty points used: <b>{applied * 2} pts</b> · <b style={{ color: "var(--ok)" }}>−{inr(applied)}</b>
+          </>
         ) : (
-          <span>
-            Can use up to <b className="tabular">{inr(max)}</b> in points <span className="text-muted">({balance} pts)</span>
-          </span>
+          <>
+            Can use up to <b>{inr(max)}</b> in loyalty points <span className="muted">({balance} pts)</span>
+          </>
         )}
       </span>
       {canChange && (
-        <span className="flex shrink-0 items-center gap-1.5">
+        <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
           {applied > 0 ? (
-            <Button variant="link" size="sm" className="h-auto px-1 text-xs" disabled={pending} onClick={() => run(0)}>
-              Remove
-            </Button>
+            <button type="button" className="btn sm" disabled={pending} onClick={() => run(0)}>
+              Remove points
+            </button>
           ) : (
             <>
               {steps.length > 1 && (
-                <select
-                  aria-label="Points discount"
-                  className="field h-8 min-h-8 w-auto py-0 pl-2 pr-7 text-xs"
-                  value={amount}
-                  onChange={(e) => setAmount(Number(e.target.value))}
-                >
-                  {steps.map((s) => (
-                    <option key={s} value={s}>
-                      {inr(s)} ({s * 2} pts)
+                <select aria-label="Points discount" value={amount} onChange={(e) => setAmount(Number(e.target.value))} style={{ width: "auto", minHeight: 34, padding: "4px 34px 4px 10px", fontSize: 13.5 }}>
+                  {steps.map((v) => (
+                    <option key={v} value={v}>
+                      {inr(v)} ({v * 2} pts)
                     </option>
                   ))}
                 </select>
               )}
-              <Button size="sm" variant="secondary" className="h-8 text-xs" loading={pending} onClick={() => run(amount)}>
-                Use {inr(amount)}
-              </Button>
+              {/* Not the yellow button: the order's next step stays the one main action on the card. */}
+              <button type="button" className="btn sm" disabled={pending} onClick={() => run(amount)} style={{ fontWeight: 700 }}>
+                {pending ? "Using…" : `Use ${inr(amount)}`}
+              </button>
             </>
           )}
         </span>
       )}
       {canChange && paymentSent && (
-        <p className="w-full text-2xs text-muted">The payment request was already sent. After a change, send it again so they pay the new total.</p>
+        <span className="muted small" style={{ flexBasis: "100%" }}>
+          The payment link already went: after a change, send it again so they pay the new total.
+        </span>
       )}
     </div>
   );
 }
 
-/** Order & Payment Settings: use loyalty points automatically on every new order, or only by hand. */
-export function LoyaltyRedeemSetting({ on }: { on: boolean }) {
+/**
+ * Payments › Settings › Loyalty points at checkout. First, whether customers can use their points at all (off: points
+ * still add up, but nobody can use them and no message offers them). Then, when on, how: automatically on every new
+ * order, or by hand with the Use button on each unpaid order.
+ */
+export function LoyaltyRedeemSetting({ on, redeemOn }: { on: boolean; redeemOn: boolean }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [value, setValue] = useState(on);
+  const [canUse, setCanUse] = useState(redeemOn);
 
   const choose = (next: boolean) => {
     if (next === value) return;
@@ -115,52 +118,83 @@ export function LoyaltyRedeemSetting({ on }: { on: boolean }) {
       router.refresh();
     });
   };
+  const toggleUse = () => {
+    const next = !canUse;
+    setCanUse(next);
+    start(async () => {
+      const r = await safeAction(() => saveLoyaltyRedeemOn(next));
+      toastResult(r);
+      if (!r.ok) setCanUse(!next);
+      router.refresh();
+    });
+  };
 
   return (
-    <Card className="card-3d">
+    <Card className="card-3d" id="points-at-checkout">
       <CardHeader
         tone="gold"
         icon={<Sparkles3D />}
         title="Loyalty points at checkout"
-        description="Choose whether customers' points come off their orders automatically or only when you use them."
+        description="Whether customers can use their points as a discount, and if so, automatically or only when you use them."
         action={
-          <Badge tone={value ? "green" : "gray"} className="shrink-0">
-            {value ? "Automatic" : "By hand"}
+          <Badge tone={!canUse ? "gray" : value ? "green" : "blue"} className="shrink-0">
+            {!canUse ? "Off" : value ? "Automatic" : "By hand"}
           </Badge>
         }
       />
       <div className="space-y-3 p-4 sm:p-5">
-        <div role="radiogroup" aria-label="Loyalty points at checkout" className="inline-flex rounded-control border-[1.5px] border-line bg-panel p-[3px]">
-          {[
-            { id: true, label: "Automatic" },
-            { id: false, label: "By hand" },
-          ].map((o) => (
-            <button
-              key={String(o.id)}
-              type="button"
-              role="radio"
-              aria-checked={value === o.id}
-              disabled={pending}
-              onClick={() => choose(o.id)}
-              className={cn(
-                "rounded-[9px] px-3.5 py-1.5 text-[13.5px] font-semibold transition disabled:opacity-60",
-                value === o.id ? "bg-ink text-canvas" : "text-muted hover:text-ink",
-              )}
-            >
-              {o.label}
-            </button>
-          ))}
+        <div className={cn("rounded-control border border-line p-3 transition", canUse ? "bg-panel" : "bg-canvas/60")}>
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <p id="points-use-label" className="text-sm font-semibold text-ink">
+                Customers can use their points
+              </p>
+              <p className="text-xs text-muted">
+                {canUse
+                  ? "Points come off orders as a discount (100 points = ₹50)."
+                  : "Off: points still add up on every order by your rules above, but nobody can use them and no message offers them."}
+              </p>
+            </div>
+            <button type="button" role="switch" aria-checked={canUse} aria-labelledby="points-use-label" className="sw shrink-0" disabled={pending} onClick={toggleUse} />
+          </div>
         </div>
-        <ul className="list-disc space-y-1 pl-4 text-xs text-muted">
-          <li>
-            <b className="text-ink">Automatic:</b> when a cart arrives or you add an order, the customer&apos;s points come off before the payment
-            request goes out (up to ₹250, in ₹25 steps, never more than the items).
-          </li>
-          <li>
-            <b className="text-ink">By hand:</b> each unpaid order shows what the customer can use, with a <b className="text-ink">Use</b> button.
-          </li>
-          <li>Either way you can remove points from an unpaid order, and a cancelled order gives its points back.</li>
-        </ul>
+        {canUse && (
+          <>
+            <div role="radiogroup" aria-label="Loyalty points at checkout" className="inline-flex rounded-control border-[1.5px] border-line bg-panel p-[3px]">
+              {[
+                { id: true, label: "Automatic" },
+                { id: false, label: "By hand" },
+              ].map((o) => (
+                <button
+                  key={String(o.id)}
+                  type="button"
+                  role="radio"
+                  aria-checked={value === o.id}
+                  disabled={pending}
+                  onClick={() => choose(o.id)}
+                  className={cn(
+                    "rounded-[9px] px-3.5 py-1.5 text-[13.5px] font-semibold transition disabled:opacity-60",
+                    value === o.id ? "bg-ink text-canvas" : "text-muted hover:text-ink",
+                  )}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <ul className="list-disc space-y-1 pl-4 text-xs text-muted">
+              <li>
+                <b className="text-ink">Automatic:</b> when a cart arrives or you add an order, the customer&apos;s points come off before the
+                payment request goes out (up to ₹250, in ₹25 steps, never more than the items). The WhatsApp order and payment messages show
+                the points used and the lower total.
+              </li>
+              <li>
+                <b className="text-ink">By hand:</b> each unpaid order in Orders shows what the customer can use, with a <b className="text-ink">Use</b>{" "}
+                button. If the payment link already went, send it again so they pay the new total.
+              </li>
+              <li>Either way you can remove points from an unpaid order, and a cancelled order gives its points back.</li>
+            </ul>
+          </>
+        )}
       </div>
     </Card>
   );
