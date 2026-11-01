@@ -3,12 +3,16 @@
 //                          address or tap Send location" message instead (also used when Meta says the form
 //                          can't be shown on their phone, error 1026).
 //   Address on file      → "Deliver to this address?" with Yes / New address buttons ("yes"/"same" typed works too).
+//   Two or more on file  → "Which address?" listing them (buttons for two, a list for more) plus New address; replying
+//                          with the number works too. The picked one becomes their latest address.
 //   Any of: form answer, a typed address, a shared location → saved on the customer and the order, then the
 //   payment choice (or pay-now) goes out, showing "Deliver to: …".
 // Payment settings › "Ask for the delivery address" turns the step off (the cart goes straight to payment).
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { parseAddressText } from "./address";
+import { addressKey, pickedNumber, type SavedAddress } from "./address-book";
+import { addressBook, rememberAddress } from "./address-book-server";
 import {
   formAddressText,
   formErrors,
@@ -28,7 +32,7 @@ import { confirmCod } from "./cod";
 import { logMessage, replyContext, startCheckout, textInWindow } from "./payments";
 import { bold, hello } from "./wa-text";
 import { getSettings } from "./provider";
-import { sendAddressMessage, sendInteractiveButtons, sendLocationRequest } from "./whatsapp";
+import { sendAddressMessage, sendInteractiveButtons, sendInteractiveList, sendLocationRequest } from "./whatsapp";
 
 /** Message labels (Message.templateName) for the address step; the webhook reads ADDRESS_FORM on a failed status. */
 export const ADDRESS_FORM = "Address form";
@@ -92,6 +96,36 @@ async function sendTypeOrPin(order: LoadedOrder) {
   await logMessage(c.id, ADDRESS_REQUEST, body, res, number?.id ?? null);
 }
 
+/** "Which address?" for a customer with two or more saved: buttons for two, a list for more, and New address. */
+async function sendAddressChoice(order: LoadedOrder, book: SavedAddress[]) {
+  const c = order.customer;
+  const { number, cfg } = await replyContext(c);
+  const pick = (a: SavedAddress) => `addr_pick:${order.id}:${addressKey(a.text)}`;
+  const lines = book.map((a, i) => `${i + 1}. ${a.text.slice(0, 140)}`).join("\n");
+  const body = `${replacedLine(order)}${hello(c.name)} thank you for your order ${bold(orderRef(order))}.\n\nWhich address shall we deliver it to?\n${lines}\n\nTap one below, or reply with its number.`;
+  const res =
+    book.length <= 2
+      ? await sendInteractiveButtons(
+          cfg,
+          c.phone,
+          body,
+          [...book.map((a, i) => ({ id: pick(a), title: `📍 Address ${i + 1}` })), { id: `addr_new:${order.id}`, title: "✏️ New address" }],
+          { header: "Delivery address", footer: order.client.name },
+        )
+      : await sendInteractiveList(
+          cfg,
+          c.phone,
+          body,
+          "Choose address",
+          [
+            ...book.map((a, i) => ({ id: pick(a), title: `${i + 1}. ${a.area || "Address"}`, description: a.text })),
+            { id: `addr_new:${order.id}`, title: "✏️ New address", description: "Send a different address" },
+          ],
+          { header: "Delivery address", footer: order.client.name },
+        );
+  await logMessage(c.id, ADDRESS_CHECK, body, res, number?.id ?? null);
+}
+
 /** Whether WhatsApp messages can go to this customer now (Cloud API, not opted out, inside the 24-hour window). */
 async function canMessage(c: { id: string; clientId: string; optedOut: boolean }) {
   if (c.optedOut) return false;
@@ -110,9 +144,12 @@ export async function startAddressStep(orderId: string): Promise<"asked" | "skip
   if (!pay.settings.askAddress) return "skip";
   const c = order.customer;
   if (!(await canMessage(c))) return "skip";
-  const saved = c.locationRaw?.trim() || c.location?.trim() || "";
+  const book = await addressBook(c.id);
+  const saved = book.length === 1 ? book[0].text : book.length ? "" : c.location?.trim() || "";
   try {
-    if (saved) {
+    if (book.length >= 2) {
+      await sendAddressChoice(order, book);
+    } else if (saved) {
       const { number, cfg } = await replyContext(c);
       const body = `${replacedLine(order)}${hello(c.name)} thank you for your order ${bold(orderRef(order))}.\n\nShall we deliver it to this address?\n📍 ${saved.slice(0, 400)}`;
       const res = await sendInteractiveButtons(
@@ -173,13 +210,31 @@ async function replacedNotice(order: LoadedOrder) {
   await textInWindow(order.customer, `This cart (${bold(orderRef(order))}) was replaced by your newer order, so nothing was changed. Please use the latest message.`, "Address (old cart)").catch(() => {});
 }
 
-/** The customer tapped "Yes, deliver here" (or typed "yes"/"same"). */
-export async function confirmSavedAddress(orderId: string, customerId: string) {
+/**
+ * The customer tapped "Yes, deliver here" (or typed "yes"/"same"), or picked one of their saved addresses (key, from
+ * "Which address?"). A picked address goes on the order and becomes their latest address.
+ */
+export async function confirmSavedAddress(orderId: string, customerId: string, key?: string) {
   const order = await loadOrder(orderId);
   if (!order || order.customerId !== customerId) return;
   if (order.status === "CANCELLED") return replacedNotice(order);
   if (order.addressConfirmedAt || settled(order)) return; // a second tap changes nothing
-  const saved = order.customer.locationRaw?.trim() || order.customer.location?.trim() || "";
+  const book = await addressBook(customerId);
+  if (key) {
+    const picked = book.find((a) => addressKey(a.text) === key);
+    // The list changed since we asked (e.g. they sent a new address): ask again with what is saved now.
+    if (!picked) return book.length >= 2 ? sendAddressChoice(order, book) : askNewAddress(orderId, customerId);
+    const done = await db.order.updateMany({
+      where: { id: order.id, addressConfirmedAt: null },
+      data: { addressConfirmedAt: new Date(), note: picked.text, mapUrl: picked.mapUrl ?? null },
+    });
+    if (!done.count) return;
+    await db.customer.update({ where: { id: customerId }, data: { locationRaw: picked.text, ...(picked.area ? { location: picked.area } : {}) } });
+    await rememberAddress(customerId, picked);
+    await continueToPayment(order.id, "Customer picked a saved address");
+    return;
+  }
+  const saved = order.customer.locationRaw?.trim() || book[0]?.text || order.customer.location?.trim() || "";
   if (!saved) return askNewAddress(orderId, customerId);
   const done = await db.order.updateMany({
     where: { id: order.id, addressConfirmedAt: null },
@@ -236,6 +291,7 @@ async function saveOnCustomer(customerId: string, text: string, next: DeliveryAd
       ...(next.name && cust.name.trim().startsWith("+") ? { name: next.name.slice(0, 80) } : {}),
     },
   });
+  await rememberAddress(customerId, { text, area: a || null, mapUrl: next.mapUrl ?? null });
 }
 
 /** A new address (form, typed or a location): onto the waiting order and on to payment, or onto an open order. */
@@ -313,6 +369,19 @@ export async function handleAddressReply(customer: { id: string }, m: InboundFor
   if (m.type !== "text") return false;
   const waiting = await awaitingAddressOrder(customer.id);
   if (!waiting) return false;
+  // Two or more saved: "2" picks the second; "yes" doesn't say which, so the question goes again.
+  const book = await addressBook(customer.id);
+  if (book.length >= 2) {
+    const i = pickedNumber(text, book.length);
+    if (i !== null) {
+      await confirmSavedAddress(waiting.id, customer.id, addressKey(book[i].text));
+      return true;
+    }
+    if (SAME_ADDRESS_RE.test(text)) {
+      await sendAddressChoice(waiting, book);
+      return true;
+    }
+  }
   const saved = waiting.customer.locationRaw?.trim() || waiting.customer.location?.trim();
   if (saved && SAME_ADDRESS_RE.test(text)) {
     await confirmSavedAddress(waiting.id, customer.id);

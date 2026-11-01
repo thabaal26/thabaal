@@ -26,6 +26,7 @@ const FILES = [
   "prisma/sql/2026-11-02-usage.sql",
   "prisma/sql/2026-11-02-leads.sql",
   "prisma/sql/2026-11-02-owner-messages.sql",
+  "prisma/sql/2026-11-03-saved-addresses.sql",
 ];
 
 if (process.env.VERCEL !== "1") {

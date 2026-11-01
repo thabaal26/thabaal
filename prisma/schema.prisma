@@ -234,6 +234,9 @@ model Customer {
   /// The last delivery address the customer gave on WhatsApp (address form fields, or a shared location's
   /// lat/lng and map link), to fill in the form next time. locationRaw keeps the same address as one line.
   deliveryAddress  Json?
+  /// Every delivery address they have used, newest first, up to 5 (lib/address-book.ts): picked from a dropdown on
+  /// orders, and offered on WhatsApp ("which address?") when there are two or more.
+  addresses        Json?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   messages         Message[]

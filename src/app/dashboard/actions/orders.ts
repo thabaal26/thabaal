@@ -5,15 +5,17 @@ import { revalidatePath } from "next/cache";
 import { findAddressesInReplies, parseAddressText } from "@/lib/address";
 import { db } from "@/lib/db";
 import { pushOrderToSheet } from "@/lib/google-sheets-live";
-import { DEFAULT_SHIPPING_FEE, getOrderPricing, itemsText, itemsWithNames, money, nextOrderRef, orderRef, syncCustomerOrderedProducts, type OrderItem } from "@/lib/orders";
+import { getOrderPricing, itemsText, itemsWithNames, money, nextOrderRef, orderRef, syncCustomerOrderedProducts, type OrderItem } from "@/lib/orders";
 import { confirmPayment, sendPaymentRequestFor, updateOrderCard } from "@/lib/payments";
 import { codBlocked } from "@/lib/pay-settings";
-import { paySettingsFor } from "@/lib/pay-settings-server";
+import { deliveryFeeFor, paySettingsFor } from "@/lib/pay-settings-server";
 import { utrOf } from "@/lib/payment-events";
 import { dueOf, methodOf, receivedOf } from "@/lib/payment-state";
 import { autoRedeemPoints, keptPointsDiscount, setOrderPoints } from "@/lib/loyalty-redeem";
 import { LOYALTY_RULE_LIMITS, loyaltyRules, loyaltyRuleWords } from "@/lib/loyalty";
 import { addressGivenByStaff } from "@/lib/delivery-address";
+import { addressBook, rememberAddress } from "@/lib/address-book-server";
+import type { SavedAddress } from "@/lib/address-book";
 import { pointsDiscount } from "@/lib/order-pricing";
 import { getSettings, wahaConfig } from "@/lib/provider";
 import { replyWindowEnd } from "@/lib/replies";
@@ -408,6 +410,8 @@ export async function lookupOrderCustomer(rawPhone: string): Promise<
         locationRaw: string | null;
         region: string | null;
         chatAddresses: ChatAddressCandidate[];
+        /** Every delivery address they have used, newest first (the dropdown on New order). */
+        savedAddresses: SavedAddress[];
       } | null;
     }
 > {
@@ -464,8 +468,17 @@ export async function lookupOrderCustomer(rawPhone: string): Promise<
       locationRaw: existing.locationRaw,
       region: existing.region,
       chatAddresses: detected,
+      savedAddresses: await addressBook(existing.id),
     },
   };
+}
+
+/** A customer's saved delivery addresses, newest first (the dropdown when changing an order's address). */
+export async function customerAddressBook(customerId: string): Promise<SavedAddress[]> {
+  const s = await requireOrderAccess();
+  if ("denied" in s) return [];
+  const c = await db.customer.findFirst({ where: { id: customerId, ...(s.clientId ? { clientId: s.clientId } : {}) }, select: { id: true } });
+  return c ? addressBook(c.id) : [];
 }
 
 /** Fetches address suggestions from a customer's recent WhatsApp chat replies and past orders. */
@@ -603,6 +616,9 @@ export async function saveOrderAddress(
     });
   }
 
+  // Every address used goes on their list, even one kept for this order only.
+  if (cleanAddr) await rememberAddress(order.customer.id, { text: cleanAddr, area: input.area?.trim().slice(0, 120) || parsed.area || null });
+
   // 3. Also fill other active orders for the same customer that are missing an address
   if (cleanAddr && (customerHasNoAddress || input.syncOtherActiveOrders !== false)) {
     await db.order.updateMany({
@@ -683,7 +699,7 @@ export async function createOrder(input: {
   if (!existing && !name) return { ok: false, message: "This is a new customer: enter their name so they can be saved." };
   // Payment settings › Cash on delivery: on, under the limit and in an allowed area (checked before anything is saved).
   if (input.paymentMode === "cod") {
-    const fee = input.shippingFee !== undefined ? Math.max(0, Number(input.shippingFee) || 0) : DEFAULT_SHIPPING_FEE;
+    const fee = input.shippingFee !== undefined ? Math.max(0, Number(input.shippingFee) || 0) : pay.settings.deliveryFee;
     const estimate = getOrderPricing(lines.map((i, k) => ({ id: i.id || `m${k}`, name: i.name, quantity: i.quantity, price: i.price, currency: "INR" })), null, { customShippingFee: fee }).total;
     const blocked = codBlocked(pay.settings, estimate, existing ? { ...existing, ...(resolvedRegion && { region: resolvedRegion }), ...(rawAddr && { locationRaw: rawAddr }) } : { region: resolvedRegion, location: resolvedArea, locationRaw: rawAddr });
     if (blocked) return { ok: false, message: blocked };
@@ -732,7 +748,8 @@ export async function createOrder(input: {
     price: i.price,
     currency: "INR",
   }));
-  const shippingFee = input.shippingFee !== undefined ? Math.max(0, Number(input.shippingFee) || 0) : DEFAULT_SHIPPING_FEE;
+  // Settings › Delivery charge unless the order form changed it for this order.
+  const shippingFee = input.shippingFee !== undefined ? Math.max(0, Number(input.shippingFee) || 0) : pay.settings.deliveryFee;
   const { total: grossTotal } = getOrderPricing(items, null, { customShippingFee: shippingFee });
 
   const finalOrderNote =
@@ -753,6 +770,7 @@ export async function createOrder(input: {
   });
 
   await syncCustomerOrderedProducts(customer.id, items).catch(() => {});
+  if (input.address?.trim()) await rememberAddress(customer.id, { text: input.address.trim().slice(0, 500), area: resolvedArea });
   // Automatic points (Order & Payment Settings) come off before any payment is asked or recorded.
   const pointsOff = await autoRedeemPoints(order.id).catch((e) => (console.error("Could not use loyalty points", e), 0));
   const total = Math.round((grossTotal - pointsOff) * 100) / 100;
@@ -831,7 +849,7 @@ export async function updateOrderItems(
     price: i.price,
     currency: "INR",
   }));
-  const shippingFee = input.shippingFee !== undefined ? Math.max(0, Number(input.shippingFee) || 0) : DEFAULT_SHIPPING_FEE;
+  const shippingFee = input.shippingFee !== undefined ? Math.max(0, Number(input.shippingFee) || 0) : await deliveryFeeFor(order.clientId);
   // Points already used stay on the order (cut back if the items now cost less than the discount).
   const before = getOrderPricing(items, null, { customShippingFee: shippingFee });
   const keptPoints = keptPointsDiscount(order, before.subtotal);

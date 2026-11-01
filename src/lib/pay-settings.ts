@@ -1,6 +1,8 @@
 // Payments › Payment settings: what a client turned on and the rules around it, kept in Client.paySettings.
 // Plain helpers shared by server and client code (no database access here; see pay-settings-server.ts).
 
+import { DEFAULT_SHIPPING_FEE } from "./order-pricing";
+
 export type PaySettings = {
   /** Catalogue carts get WhatsApp's "Review and pay" (needs Client.paymentConfig too). */
   whatsappPay: boolean;
@@ -35,7 +37,12 @@ export type PaySettings = {
   hoursOn: boolean;
   openAt: string;
   closeAt: string;
+  /** Settings › Delivery charge: rupees added to every new order (0 is free delivery); one order can still be changed. */
+  deliveryFee: number;
 };
+
+/** Highest delivery charge a shop can set. */
+export const MAX_DELIVERY_FEE = 10_000;
 
 export const SETTLEMENTS = [
   { id: "Straight to your account, same day", ta: "நேரடியாக உங்கள் கணக்கிற்கு, அதே நாள்" },
@@ -54,6 +61,7 @@ export const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 export function readPaySettings(raw: unknown, paymentConfig: string | null | undefined): PaySettings {
   const r = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
   const max = Number(r.codMax);
+  const fee = typeof r.deliveryFee === "number" ? r.deliveryFee : NaN;
   return {
     whatsappPay: bool(r.whatsappPay, Boolean(paymentConfig)),
     upiOn: bool(r.upiOn, false),
@@ -75,6 +83,8 @@ export function readPaySettings(raw: unknown, paymentConfig: string | null | und
     hoursOn: bool(r.hoursOn, false),
     openAt: HHMM.test(str(r.openAt, 5)) ? str(r.openAt, 5) : "09:00",
     closeAt: HHMM.test(str(r.closeAt, 5)) ? str(r.closeAt, 5) : "21:00",
+    // Shops that never set it keep the ₹60 every order had before the setting.
+    deliveryFee: Number.isFinite(fee) && fee >= 0 && fee <= MAX_DELIVERY_FEE ? Math.round(fee) : DEFAULT_SHIPPING_FEE,
   };
 }
 

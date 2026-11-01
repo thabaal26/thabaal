@@ -17,6 +17,7 @@ import { Clock } from "@/components/icons";
 import { T, useLang } from "../portal-ui";
 import { getOrderPricing, pointsDiscount } from "@/lib/order-pricing";
 import { orderRef, type OrderItem } from "@/lib/order-ref";
+import type { SavedAddress } from "@/lib/address-book";
 import {
   DEFAULT_FLOW,
   flowHas,
@@ -34,6 +35,7 @@ import {
   notifyOrder,
   requestPayment,
   saveOrderAddress,
+  customerAddressBook,
   setOrderPacked,
   setOrderStatus,
   updateOrderItems,
@@ -141,6 +143,18 @@ export function OrderCard({
   const [addressInput, setAddressInput] = useState(
     o.note?.trim() || o.customer.locationRaw?.trim() || o.customer.location?.trim() || "",
   );
+  // The customer's saved addresses, loaded when the address is being changed (the dropdown).
+  const [savedAddrs, setSavedAddrs] = useState<SavedAddress[]>([]);
+  useEffect(() => {
+    if (!editingAddress) return;
+    let live = true;
+    customerAddressBook(o.customer.id)
+      .then((list) => live && setSavedAddrs(list))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [editingAddress, o.customer.id]);
 
   // Modals state
   const [dispatchOpen, setDispatchOpen] = useState(false);
@@ -1146,6 +1160,23 @@ export function OrderCard({
       {/* 7. Address Row */}
       {editingAddress ? (
         <div className="tools" style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {savedAddrs.length > 0 && (
+            <select
+              id={`ads-${o.id}`}
+              aria-label={isTa ? "சேமித்த முகவரிகள்" : "Saved addresses"}
+              value={savedAddrs.some((a) => a.text === addressInput.trim()) ? addressInput.trim() : ""}
+              onChange={(e) => setAddressInput(e.target.value)}
+              style={{ flexBasis: "100%", minHeight: 38 }}
+            >
+              <option value="">{isTa ? "✏️ புதிய முகவரியை கீழே தட்டச்சு செய்யவும்" : `✏️ Type a new address below · ${savedAddrs.length} saved`}</option>
+              {savedAddrs.map((a, i) => (
+                <option key={i} value={a.text}>
+                  {i === 0 ? (isTa ? "சமீபத்தியது · " : "Latest · ") : ""}
+                  {a.text}
+                </option>
+              ))}
+            </select>
+          )}
           <input
             type="text"
             id="ad"

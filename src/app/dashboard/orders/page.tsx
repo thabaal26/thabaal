@@ -57,7 +57,7 @@ export default async function OrdersPage({
     scope.clientId
       ? db.client.findUnique({
           where: { id: scope.clientId },
-          select: { name: true, paymentConfig: true, orderFlow: true },
+          select: { name: true, paymentConfig: true, orderFlow: true, paySettings: true },
         })
       : null,
     scope.clientId ? getCatalogWithProducts(scope.clientId) : null,
@@ -145,6 +145,7 @@ export default async function OrdersPage({
           name: clientData?.name ?? "All businesses",
           orderFlow,
           paymentConfig: Boolean(clientData?.paymentConfig),
+          deliveryFee: readPaySettings(clientData?.paySettings, clientData?.paymentConfig).deliveryFee,
         }}
         canEdit={canEdit}
         scopeClientId={scope.clientId}

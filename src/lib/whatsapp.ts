@@ -463,6 +463,49 @@ export async function sendInteractiveButtons(
 }
 
 /**
+ * A list message (up to 10 rows) inside the 24-hour window: the customer taps the button, then one row; the answer
+ * comes back as a list_reply with the row's id.
+ */
+export async function sendInteractiveList(
+  cfg: WaConfig,
+  to: string,
+  body: string,
+  button: string,
+  rows: { id: string; title: string; description?: string }[],
+  opts: { header?: string; footer?: string } = {},
+): Promise<{ id: string; simulated: boolean }> {
+  if (!cfg.live) return offline(cfg);
+  const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "interactive",
+      interactive: {
+        type: "list",
+        ...(opts.header ? { header: { type: "text", text: opts.header.slice(0, 60) } } : {}),
+        body: { text: body.slice(0, 1024) },
+        ...(opts.footer ? { footer: { text: opts.footer.slice(0, 60) } } : {}),
+        action: {
+          button: button.slice(0, 20),
+          sections: [
+            {
+              rows: rows.slice(0, 10).map((r) => ({
+                id: r.id.slice(0, 200),
+                title: r.title.slice(0, 24),
+                ...(r.description ? { description: r.description.slice(0, 72) } : {}),
+              })),
+            },
+          ],
+        },
+      },
+    }),
+  });
+  return { id: res.messages[0].id, simulated: false };
+}
+
+/**
  * WhatsApp's own address form (India only): the customer taps the button, fills in name, phone, pincode, house,
  * area, city and state, and the answer comes back as an nfm_reply. values fills fields in; validation_errors
  * marks fields to fix (the customer can't send until they do).

@@ -2,6 +2,7 @@ import "server-only";
 import { findAddressesInReplies, parseAddressText } from "./address";
 import { db } from "./db";
 import { DEFAULT_SHIPPING_FEE, calcItemsSubtotal, getOrderPricing } from "./order-pricing";
+import { deliveryFeeFor } from "./pay-settings-server";
 import { senderFor } from "./senders";
 import { catalogProductNames } from "./whatsapp";
 
@@ -40,8 +41,8 @@ export type OrderItem = { id: string; name?: string; quantity: number; price: nu
 
 type MetaOrder = { catalog_id?: string; text?: string; product_items?: { product_retailer_id?: string; quantity?: number | string; item_price?: number | string; currency?: string }[] };
 
-/** Items, subtotal, ₹60 shipping, final total and note from a Cloud API "order" message (a cart sent from the catalogue). */
-export function parseOrder(m: { order?: MetaOrder }) {
+/** Items, subtotal, shipping (the shop's delivery charge), final total and note from a Cloud API "order" message (a cart sent from the catalogue). */
+export function parseOrder(m: { order?: MetaOrder }, shippingFee = DEFAULT_SHIPPING_FEE) {
   const o = m.order ?? {};
   const items: OrderItem[] = (o.product_items ?? []).map((p) => ({
     id: String(p.product_retailer_id ?? "item"),
@@ -49,7 +50,7 @@ export function parseOrder(m: { order?: MetaOrder }) {
     price: Number(p.item_price) || 0,
     currency: p.currency ?? "INR",
   }));
-  const { subtotal, shipping, total } = getOrderPricing(items);
+  const { subtotal, shipping, total } = getOrderPricing(items, null, { customShippingFee: shippingFee });
   return { items, subtotal, shipping, total, currency: items[0]?.currency ?? "INR", catalogId: o.catalog_id ?? null, note: o.text?.trim() || null };
 }
 
@@ -61,7 +62,8 @@ export const money = (n: number, currency = "INR") =>
 
 /** Saves a cart against the customer. The same WhatsApp message id arriving twice is ignored. */
 export async function recordOrder(customer: { id: string; clientId: string }, waMessageId: string | undefined, m: { order?: MetaOrder }, names?: Map<string, string>) {
-  const o = parseOrder(m);
+  if (!m.order?.product_items?.length) return null;
+  const o = parseOrder(m, await deliveryFeeFor(customer.clientId));
   if (!o.items.length) return null;
   const known = names ?? (await lookupNames(customer.clientId, o.catalogId, o.items.map((i) => i.id)));
   const items = o.items.map((i) => ({ ...i, name: known.get(i.id) }));
