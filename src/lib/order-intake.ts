@@ -12,7 +12,8 @@ import { pushOrderToSheet } from "./google-sheets-live";
 import { autoRedeemPoints } from "./loyalty-redeem";
 import { getOrderPricing } from "./order-pricing";
 import { itemsWithNames, money, nextOrderRef, orderRef, type OrderItem } from "./orders";
-import { deliveryFeeFor } from "./pay-settings-server";
+import { deliveryFeeFor, flowFor } from "./pay-settings-server";
+import { customerWords } from "./order-flow";
 import { cancelSupersededOrdersForCustomer, logMessage, replyContext, startCheckout, textInWindow } from "./payments";
 import { getSettings } from "./provider";
 import { SALE_WHERE } from "./sale";
@@ -125,7 +126,8 @@ export async function handleCartChoice(customerId: string, actionVal: string) {
     const stillOpen = old && old.customerId === customerId && old.status !== "CANCELLED" && !old.packedAt && !old.dispatchedAt;
     if (!old || !stillOpen) {
       await db.order.update({ where: { id: o.id }, data: { internalNote: note(o.internalNote, "Customer asked to add to an earlier order that was already packed") } });
-      await textInWindow(o.customer, `Your earlier order is already packed, so these items will come as a separate order ${bold(newRef)}.`, "Add to order").catch(() => {});
+      const already = old?.dispatchedAt ? "on its way" : customerWords(await flowFor(o.clientId)).packed;
+      await textInWindow(o.customer, `Your earlier order is already ${already}, so these items will be a separate order ${bold(newRef)}.`, "Add to order").catch(() => {});
       return toAddressAndPayment(o.id);
     }
     const oldRef = orderRef(old);

@@ -23,7 +23,9 @@ import { readPaySettings } from "@/lib/pay-settings";
 import { PaymentSetupForm } from "./payment-setup-form";
 import { readFields } from "@/lib/custom-fields";
 import { PAYMENT_TEMPLATE, paymentTemplateFor } from "@/lib/payments";
-import { flowShips, readFlow } from "@/lib/order-flow";
+import { flowShips, readFlow, type OrderFlowKey } from "@/lib/order-flow";
+import { FLOW_TEMPLATE_NAMES, orderTemplateNames } from "@/lib/order-templates";
+import { OrderTemplatesCard } from "./order-templates-card";
 import { AppearanceEditor } from "../appearance-editor";
 import { portalDefault } from "@/lib/appearance";
 import { spendSummary } from "@/lib/spend";
@@ -31,6 +33,17 @@ import { effectivePlan, planUsage } from "@/lib/subscription";
 import { StaffLogins } from "./staff-logins";
 import { inr } from "../portal-format";
 import { LangChoice, PortalPage, T } from "../portal-ui";
+
+/** The order update templates the shop's order steps need, each with its best status (any plain or picture version). */
+async function orderTemplateRows(clientId: string, flow: OrderFlowKey) {
+  const bases = FLOW_TEMPLATE_NAMES[flow];
+  const have = await db.template.findMany({ where: { clientId, name: { in: bases.flatMap(orderTemplateNames) } }, select: { name: true, status: true } });
+  const best = ["APPROVED", "PENDING", "PAUSED", "DRAFT", "REJECTED", "DISABLED"];
+  return bases.map((name) => ({
+    name,
+    status: have.filter((t) => orderTemplateNames(name).includes(t.name)).map((t) => t.status as string).sort((a, b) => best.indexOf(a) - best.indexOf(b))[0] ?? null,
+  }));
+}
 
 /** Within the last two days (module scope keeps the clock read out of render). */
 const seenRecently = (d: Date | null) => Boolean(d && Date.now() - d.getTime() < 2 * 86_400_000);
@@ -186,6 +199,12 @@ export default async function SettingsPage() {
         {cid && client && (
           <ScrollReveal>
             <OrderStepsForm current={readFlow(client.orderFlow)} canChange={scope.manager} />
+          </ScrollReveal>
+        )}
+
+        {cid && client && (
+          <ScrollReveal>
+            <OrderTemplatesCard rows={await orderTemplateRows(cid, readFlow(client.orderFlow))} canChange={scope.manager} />
           </ScrollReveal>
         )}
 

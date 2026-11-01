@@ -7,8 +7,8 @@ import { after, before, beforeEach, describe, test } from "node:test";
 import { confirmCod } from "../../src/lib/cod";
 import { db } from "../../src/lib/db";
 import { startAddressStep } from "../../src/lib/delivery-address";
-import { replyWithStatus } from "../../src/lib/order-assistant";
-import { customerWords, flowShips, type OrderFlowKey } from "../../src/lib/order-flow";
+import { handleCancelRequest, replyWithStatus } from "../../src/lib/order-assistant";
+import { customerWords, flowShips, packLabel, type OrderFlowKey } from "../../src/lib/order-flow";
 import { recordOrder } from "../../src/lib/orders";
 import { readPaySettings, shopDeliveryFee } from "../../src/lib/pay-settings";
 import { sendPaymentChoicePrompt } from "../../src/lib/payments";
@@ -22,6 +22,7 @@ describe("order steps: the words and rules", () => {
     assert.equal(customerWords("pickup").finished, "collected");
     assert.equal(customerWords("service").finished, "completed");
     assert.equal(customerWords("deliver").finished, "delivered");
+    assert.deepEqual([packLabel("pickup"), packLabel("deliver")], ["Ready for pickup", "Packed"]);
     for (const f of ["deliver", "courier", "pickup", "service"] as OrderFlowKey[]) assert.ok(customerWords(f).cashButton.length <= 20, "a WhatsApp button title is 20 characters at most");
   });
 });
@@ -144,6 +145,23 @@ describe("order steps on WhatsApp", () => {
     sent.length = 0;
     await replyWithStatus(await cust(), { text: "QF-8" });
     assert.match(lastText(), /was collected on/);
+  });
+
+  test("10. pickup: once marked ready, 'where is my order' says come and collect it, with the cash to bring", async () => {
+    await flow("pickup");
+    await db.order.create({ data: { ref: "QF-10", clientId, customerId, status: "CONFIRMED", paymentMethod: "cod", total: 200, items: [], packedAt: new Date() } });
+    await replyWithStatus(await cust(), { text: "where is my order" });
+    assert.match(lastText(), /is ready for pickup at our shop/);
+    assert.match(lastText(), /when you collect it/);
+    assert.doesNotMatch(lastText(), /packed|on its way/);
+  });
+
+  test("11. pickup: a cancel after it's ready says 'ready for pickup', not 'packed'", async () => {
+    await flow("pickup");
+    await db.order.create({ data: { ref: "QF-11", clientId, customerId, status: "CONFIRMED", paymentMethod: "cod", total: 200, items: [], packedAt: new Date() } });
+    await handleCancelRequest(await cust(), "cancel QF-11");
+    assert.match(allText(), /already ready for pickup/);
+    assert.doesNotMatch(allText(), /packed/);
   });
 
   test("9. where is my order: deliver keeps 'on the way' (unchanged)", async () => {

@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { pushOrderToSheet } from "@/lib/google-sheets-live";
 import { getOrderPricing, itemsText, itemsWithNames, money, nextOrderRef, orderRef, syncCustomerOrderedProducts, type OrderItem } from "@/lib/orders";
 import { confirmPayment, sendPaymentRequestFor, updateOrderCard } from "@/lib/payments";
-import { codBlocked } from "@/lib/pay-settings";
+import { codBlocked, opensAtText } from "@/lib/pay-settings";
 import { deliveryFeeFor, paySettingsFor } from "@/lib/pay-settings-server";
 import { utrOf } from "@/lib/payment-events";
 import { dueOf, methodOf, receivedOf } from "@/lib/payment-state";
@@ -21,7 +21,7 @@ import { getSettings, wahaConfig } from "@/lib/provider";
 import { replyWindowEnd } from "@/lib/replies";
 import { headerImageFor } from "@/lib/media";
 import { normalizePhone } from "@/lib/phone";
-import { isTemplatePicture, orderTemplateNames, picturePrefixFor } from "@/lib/order-templates";
+import { FLOW_TEMPLATE_NAMES, isTemplatePicture, orderTemplateNames, picturePrefixFor } from "@/lib/order-templates";
 import { cleanValues, readFields, readValues } from "@/lib/custom-fields";
 import { senderFor } from "@/lib/senders";
 import { requireManager, requireOrderAccess } from "@/lib/session";
@@ -149,11 +149,13 @@ export async function saveOrderNote(id: string, note: string): Promise<SendResul
   return { ok: true, message: "Note saved." };
 }
 
-const TEMPLATE_NAMES = {
-  confirm: orderTemplateNames("order_confirmation"),
-  dispatch: orderTemplateNames("order_dispatched"),
-  deliver: orderTemplateNames("order_delivered"),
-};
+/** The approved templates an order update can use once the customer's 24-hour window has closed, in the shop's words. */
+function templateNamesFor(kind: "confirm" | "dispatch" | "deliver" | "ready", flow: OrderFlowKey) {
+  if (kind === "confirm") return orderTemplateNames(flow === "pickup" ? "order_confirmation_pickup" : flow === "service" ? "booking_confirmation" : "order_confirmation");
+  if (kind === "ready") return orderTemplateNames("order_ready_pickup");
+  if (kind === "deliver") return flowShips(flow) ? orderTemplateNames("order_delivered") : [];
+  return orderTemplateNames("order_dispatched");
+}
 
 /** Who is bringing the order and how to follow it; all optional. */
 export type DispatchDetails = { eta?: string; by?: string; phone?: string; link?: string };
@@ -168,12 +170,12 @@ function dispatchLine(d: DispatchDetails) {
 }
 
 /**
- * Tells the customer their order is confirmed, dispatched or delivered, then moves the order on.
- * While their 24-hour window is open (an order always opens it) it sends a typed message; later it
- * needs the approved order_confirmation / order_dispatched / order_delivered utility template.
+ * Tells the customer their order is confirmed, dispatched, delivered or (pickup shops) ready for pickup, then moves the
+ * order on. While their 24-hour window is open (an order always opens it) it sends a typed message; later it needs the
+ * approved utility template for the shop's order steps (templateNamesFor).
  */
-export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "deliver", details: DispatchDetails = {}): Promise<SendResult> {
-  trackPress(kind === "confirm" ? "order.confirm" : kind === "dispatch" ? "order.dispatch" : "order.deliver");
+export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "deliver" | "ready", details: DispatchDetails = {}): Promise<SendResult> {
+  trackPress(kind === "confirm" ? "order.confirm" : kind === "dispatch" ? "order.dispatch" : kind === "ready" ? "order.ready" : "order.deliver");
   const s = await requireOrderAccess();
   if ("denied" in s) return { ok: false, message: s.denied };
   const order = await db.order.findFirst({
@@ -185,7 +187,9 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
   // delivery before the order is confirmed. Pickup and service shops have no dispatch step.
   const flow = readFlow(order.client.orderFlow);
   if (kind === "dispatch" && !flowHas(flow, "DISPATCHED")) return { ok: false, message: `Your order steps (${ORDER_FLOWS[flow].label}) have no dispatch. Mark it ${customerWords(flow).finished} when it's done.` };
-  const blocked = stepBlocked(order, kind === "confirm" ? "CONFIRMED" : kind === "dispatch" ? "DISPATCHED" : "DELIVERED");
+  if (kind === "ready" && flow !== "pickup") return { ok: false, message: "Ready for pickup is for counter or pickup shops (Settings › Order steps)." };
+  if (kind === "ready" && order.packedAt) return { ok: true, message: "Already marked ready for pickup." };
+  const blocked = stepBlocked(order, kind === "confirm" ? "CONFIRMED" : kind === "dispatch" ? "DISPATCHED" : kind === "ready" ? "PACKED" : "DELIVERED");
   if (blocked) return { ok: false, message: blocked };
   const words = customerWords(flow);
   const noun = flow === "service" ? "booking" : "order";
@@ -228,13 +232,27 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
         : order.paidAt && (order.paymentMethod === "cod" || order.paymentMethod === "cash")
           ? `We received ${money(receivedOf(order), order.currency)} in cash. Thank you!`
           : "";
+  // Ready for pickup: what to do now (come), what to pay, when the shop is open, and what to say at the counter.
+  const shopHours = kind === "ready" ? (await paySettingsFor(order.clientId)).settings : null;
+  const readyText = [
+    `Hello ${first}, good news! 🛍️ Your ${order.client.name} order ${ref} is ready for pickup.`,
+    cod ? words.cashDue(money(due, order.currency)) : due > 0 ? `Amount to pay: ${money(due, order.currency)}.` : "It's already paid, so just collect it.",
+    shopHours?.hoursOn ? `We're open ${opensAtText(shopHours)} to ${opensAtText({ openAt: shopHours.closeAt })}.` : "",
+    `Show this message or tell us your order number ${ref} at the counter.`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
   const text =
-    kind === "confirm"
+    kind === "ready"
+      ? readyText
+      : kind === "confirm"
       ? `Hello ${first}, your ${order.client.name} ${noun} ${ref} ${words.confirmed}\n\n${confirmPricingText}${payLine ? `\n${payLine}` : ""}${flowShips(flow) ? "\n\nWe will message you with the next update." : ""}`
       : kind === "dispatch"
         ? `Hello ${first}, your ${order.client.name} order ${ref} is on its way and will reach you by ${details.eta?.trim() || "soon"}.${contact ? `\n\n${contact}` : ""}${payLine ? `\n\n${payLine}` : ""}\n\nFor any help, reply to this message.`
         : `Hello ${first}, your ${order.client.name} ${noun} ${ref} has been ${words.finished}.${payLine ? ` ${payLine}` : ""} Thank you for shopping with us!\n\nIf anything is not right, reply to this message.`;
-  const nextStatus = kind === "confirm" ? "CONFIRMED" : kind === "dispatch" ? "DISPATCHED" : "DELIVERED";
+  const nextStatus = kind === "ready" ? order.status : kind === "confirm" ? "CONFIRMED" : kind === "dispatch" ? "DISPATCHED" : "DELIVERED";
+  // Ready for pickup is a tick (packedAt) inside Order confirmed, not a status.
+  const moveOn = kind === "ready" ? { packedAt: new Date() } : { status: nextStatus };
 
   const settings = await getSettings();
   const lastReply = await db.reply.findFirst({ where: { customerId: c.id }, orderBy: { receivedAt: "desc" }, select: { receivedAt: true, senderId: true } });
@@ -261,7 +279,7 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
         { id: `fb_bad:${order.id}`, title: "⚠️ Report a problem" },
       ], { footer: order.client.name }));
       templateName = "Delivered";
-    } else if (open && order.paymentRequestedAt && (await updateOrderCard(order, kind === "confirm" ? "processing" : kind === "dispatch" ? "shipped" : "completed", text).catch(() => false))) {
+    } else if (open && kind !== "ready" && order.paymentRequestedAt && (await updateOrderCard(order, kind === "confirm" ? "processing" : kind === "dispatch" ? "shipped" : "completed", text).catch(() => false))) {
       // Sent on the order card from "Review and pay", which also moves its status; already logged.
       await db.order.update({ where: { id: order.id }, data: { status: nextStatus } });
       pushOrderToSheet(order.id, "ORDER_UPDATE");
@@ -271,9 +289,17 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
       ({ id: waId, simulated } = await sendTextMessage(cfg, c.phone, text));
     } else {
       // Prefer the version with a picture once Meta has approved it; the plain one stays as a fallback.
-      const options = await db.template.findMany({ where: { clientId: c.clientId, name: { in: TEMPLATE_NAMES[kind] }, status: "APPROVED" } });
+      const names = templateNamesFor(kind, flow);
+      const options = names.length ? await db.template.findMany({ where: { clientId: c.clientId, name: { in: names }, status: "APPROVED" } }) : [];
       const t = options.find((x) => x.headerType === "IMAGE") ?? options.find((x) => x.headerType === "NONE") ?? null;
       if (!t) {
+        // Ready for pickup is still true at the counter: mark it, and say the customer wasn't told.
+        if (kind === "ready") {
+          await db.order.update({ where: { id: order.id }, data: moveOn });
+          pushOrderToSheet(order.id, "ORDER_UPDATE", "Ready for pickup");
+          revalidatePath("/dashboard", "layout");
+          return { ok: true, message: `Marked ready for pickup. ${c.name} wasn't told: their 24-hour window has closed and order_ready_pickup isn't approved yet, so call them.` };
+        }
         // A delivery thank-you is optional: still close the order when there's no way to message.
         if (kind === "deliver") {
           await db.order.update({ where: { id: order.id }, data: { status: "DELIVERED" } });
@@ -281,7 +307,7 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
           revalidatePath("/dashboard", "layout");
           return { ok: true, message: "Marked delivered. No message sent: the 24-hour window has closed and order_delivered isn't approved yet." };
         }
-        return { ok: false, message: `The customer's 24-hour window has closed, so WhatsApp needs an approved ${TEMPLATE_NAMES[kind][0]} template. Use "Create order templates" at the top of Orders.` };
+        return { ok: false, message: `The customer's 24-hour window has closed, so WhatsApp needs an approved ${names[0]} template. Create it in Settings › Order steps › Order update templates.` };
       }
       const codNote = cod ? ` - cash on delivery, please keep Rs ${Math.round(due)} ready` : "";
       const bodyParams =
@@ -289,7 +315,7 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
           ? [first, `${itemsText(items).slice(0, 240)}${pricing.shipping > 0 ? ` (+ Rs ${pricing.shipping} shipping)` : ""}${cod ? " - cash on delivery" : ""}`, String(Math.round(pricing.total))]
           : kind === "dispatch"
             ? [first, ref, `${when}${codNote}`.slice(0, 300)]
-            : [first, ref];
+            : [first, ref]; // delivered, ready for pickup
       ({ id: waId, simulated } = await sendTemplateMessage(cfg, { to: c.phone, templateName: t.name, language: t.language, headerType: t.headerType, headerMediaUrl: await headerImageFor(t), headerParams: [], bodyParams }));
       templateName = t.name;
       templateId = t.id;
@@ -304,11 +330,11 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
     const record = kind === "dispatch" && contact ? `Dispatched ${new Date().toLocaleDateString("en-IN")}: ${when}` : null;
     await db.order.update({
       where: { id: order.id },
-      data: { status: nextStatus, ...(record && { internalNote: [order.internalNote, record].filter(Boolean).join("\n").slice(0, 1000) }) },
+      data: { ...moveOn, ...(record && { internalNote: [order.internalNote, record].filter(Boolean).join("\n").slice(0, 1000) }) },
     });
     pushOrderToSheet(order.id, "ORDER_UPDATE");
     revalidatePath("/dashboard", "layout");
-    const label = kind === "confirm" ? "Confirmation" : kind === "dispatch" ? "Dispatch update" : "Delivery thank-you";
+    const label = kind === "confirm" ? "Confirmation" : kind === "dispatch" ? "Dispatch update" : kind === "ready" ? "Ready for pickup message" : "Delivery thank-you";
     return { ok: true, message: simulated ? "Simulated message logged (demo mode)." : `${label} sent to ${c.name}.` };
   } catch (e) {
     return { ok: false, message: explainSendError(e).error };
@@ -927,6 +953,21 @@ const ORDER_TEMPLATES: { name: string; body: string; samples: string[] }[] = [
     samples: ["Priya", "#A1B2C"],
   },
   {
+    name: "order_confirmation_pickup",
+    body: "Hello {{1}}, thank you for your order. Items: {{2}}. Total: Rs {{3}}. We will message you when it is ready for pickup.",
+    samples: ["Priya", "2 x Groundnut oil 1 L", "560"],
+  },
+  {
+    name: "order_ready_pickup",
+    body: "Hello {{1}}, your order {{2}} is ready for pickup. Please collect it from our shop. Reply to this message for any help.",
+    samples: ["Priya", "#FM-1001"],
+  },
+  {
+    name: "booking_confirmation",
+    body: "Hello {{1}}, your booking is confirmed. Details: {{2}}. Total: Rs {{3}}. Our team will confirm the time with you here.",
+    samples: ["Priya", "Hair cut and styling", "450"],
+  },
+  {
     name: "order_cancelled",
     body: "Hello {{1}}, your order {{2}} has been cancelled. If you have already paid, we will contact you about the refund. Reply to this message if you have any questions.",
     samples: ["Priya", "#FM-1001"],
@@ -934,19 +975,22 @@ const ORDER_TEMPLATES: { name: string; body: string; samples: string[] }[] = [
 ];
 
 /**
- * Creates the four order update templates (confirmation, dispatched, delivered, cancelled)
- * and submits them to Meta. Skips any the client already has.
+ * Creates the order update templates the shop's order steps need (FLOW_TEMPLATE_NAMES: confirmation, dispatched,
+ * delivered, cancelled for delivering shops; their own words for pickup and service) and submits them to Meta.
+ * Skips any the client already has.
  */
 export async function createOrderTemplates(imageUrl?: string): Promise<SendResult> {
   const s = await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
+  const flow = readFlow((await db.client.findUnique({ where: { id: s.clientId }, select: { orderFlow: true } }))?.orderFlow);
+  const needed = ORDER_TEMPLATES.filter((t) => FLOW_TEMPLATE_NAMES[flow].includes(t.name));
   // The picture versions get their own names, so the plain ones keep working while Meta reviews them.
   const image = imageUrl?.trim();
   if (image && !isTemplatePicture(image)) return { ok: false, message: "Use a public https link to a JPG or PNG image." };
   // New clients' picture versions are pic_…; a client that already has thenan_… ones keeps that name.
   const own = await db.template.findMany({ where: { clientId: s.clientId }, select: { name: true } });
   const prefix = picturePrefixFor(own.map((t) => t.name));
-  const named = ORDER_TEMPLATES.map((t) => ({ ...t, name: image ? `${prefix}${t.name}` : t.name }));
+  const named = needed.map((t) => ({ ...t, name: image ? `${prefix}${t.name}` : t.name }));
   const existing = await db.template.findMany({ where: { clientId: s.clientId, name: { in: named.map((t) => t.name) } }, select: { name: true } });
   const missing = named.filter((t) => !existing.some((e) => e.name === t.name));
   if (!missing.length) return { ok: true, message: `All ${image ? "picture " : ""}order templates already exist.` };

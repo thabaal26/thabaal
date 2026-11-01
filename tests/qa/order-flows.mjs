@@ -1,7 +1,9 @@
 // Settings › Order steps in a real browser against the QA app (tests/qa/serve.mjs), for a counter / pickup shop:
-// Settings has no Default image card and says no delivery charge is added; a cash order is confirmed with "collect it
-// at our shop", has no dispatch or address, and "Collected, cash received" records the cash and tells the customer
-// it was collected; New order starts with no delivery charge. Puts the QA shop's own order steps back after.
+// Settings has no Default image card, says no delivery charge is added, shows the steps with "Ready for pickup" and
+// the order update templates pickup needs; a cash order is confirmed ("we'll message you when it's ready"), then
+// "Mark ready for pickup" tells the customer to come (amount, order number), has no dispatch or address, and
+// "Collected, cash received" records the cash; New order starts with no delivery charge. Puts the QA shop's own
+// order steps back after.
 //   node tests/qa/order-flows.mjs
 import fs from "node:fs";
 import { createRequire } from "node:module";
@@ -65,30 +67,47 @@ await check(1, "Settings: no Default image card; Delivery charge says pickup add
   await m.goto(`${BASE}/dashboard/settings`, { waitUntil: "networkidle" });
   expect((await m.getByText("Upload default image").count()) === 0 && (await m.locator("#default-picture").count()) === 0, "Default image card still shown");
   expect(await m.locator("#delivery-charge-off").isVisible(), "no pickup note on Delivery charge");
-  return "removed; note shown";
+  const steps = (await m.locator("#order-steps .steps").innerText()).replace(/\s+/g, " ");
+  expect(/Order confirmed › Ready for pickup › Collected/.test(steps), "steps: " + steps);
+  const tmpl = (await m.locator("#order-templates").innerText()).replace(/\s+/g, " ");
+  expect(/order_confirmation_pickup/.test(tmpl) && /order_ready_pickup/.test(tmpl) && /order_cancelled/.test(tmpl) && !/order_dispatched/.test(tmpl), "templates: " + tmpl.slice(0, 300));
+  return "removed; note, steps and templates shown";
 });
 
-await check(2, "a cash order: 'Confirm COD order' tells the customer to collect it at the shop, no delivery words", async () => {
+await check(2, "a cash order: 'Confirm COD order' says we'll message when it's ready, pay when collecting; no delivery words", async () => {
   await openOrder();
   await card().getByRole("button", { name: "Confirm COD order" }).click();
   const said = await toast(/sent|Simulated|logged|window|template|can't|isn't/i);
   const o = await db.order.findUniqueOrThrow({ where: { id: order.id } });
   expect(o.status === "CONFIRMED", "status " + o.status + " · " + said);
   const body = await lastMessage();
-  expect(/collect it at our shop/.test(body) && /when you collect it/.test(body), "message: " + body.slice(0, 200));
+  expect(/message you when it's ready for pickup/.test(body) && /when you collect it/.test(body), "message: " + body.slice(0, 200));
   expect(!/delivery|on its way|arrives/i.test(body), "delivery words: " + body.slice(0, 200));
   return "confirmed";
 });
 
-await check(3, "confirmed: no dispatch and no address on the card; the next step is 'Collected, cash received ₹200'", async () => {
+await check(3, "confirmed: no dispatch or address; 'Mark ready for pickup' tells the customer to come, with the amount and order number", async () => {
   await openOrder();
   const text = (await card().innerText()).replace(/\s+/g, " ");
   expect(!/Dispatch order|Ship order|Add address|Address needed|Deliver to/.test(text), "card: " + text.slice(0, 300));
+  await card().getByRole("button", { name: "Mark ready for pickup" }).click();
+  const said = await toast(/Ready|sent|Simulated|logged/i);
+  const o = await db.order.findUniqueOrThrow({ where: { id: order.id } });
+  expect(Boolean(o.packedAt) && o.status === "CONFIRMED", `packedAt ${o.packedAt} status ${o.status} · ${said}`);
+  const body = await lastMessage();
+  expect(/is ready for pickup/.test(body) && /Please pay ₹200 when you collect it/.test(body) && new RegExp(REF).test(body), "message: " + body.slice(0, 300));
+  return "ready, customer told";
+});
+
+await check(4, "ready: the next step is 'Collected, cash received ₹200'; 'Not ready yet' is offered", async () => {
+  await openOrder();
+  const text = (await card().innerText()).replace(/\s+/g, " ");
   expect(await card().getByRole("button", { name: /Collected, cash received ₹200/ }).isVisible(), "no collected button: " + text.slice(0, 300));
+  expect(/Ready for pickup/.test(text), "card doesn't say ready: " + text.slice(0, 300));
   return "ok";
 });
 
-await check(4, "'Collected, cash received': the cash is recorded and the customer is told it was collected", async () => {
+await check(5, "'Collected, cash received': the cash is recorded and the customer is told it was collected", async () => {
   await card().getByRole("button", { name: /Collected, cash received/ }).click();
   await toast(/Cash|recorded/i);
   const o = await db.order.findUniqueOrThrow({ where: { id: order.id } });
@@ -99,7 +118,7 @@ await check(4, "'Collected, cash received': the cash is recorded and the custome
   return "₹200 recorded";
 });
 
-await check(5, "New order starts with no delivery charge for a pickup shop", async () => {
+await check(6, "New order starts with no delivery charge for a pickup shop", async () => {
   await m.goto(`${BASE}/dashboard/orders`, { waitUntil: "networkidle" });
   await m.locator('button[aria-haspopup="dialog"]', { hasText: "New order" }).click();
   await m.fill("#nop", `98${run}77`.slice(0, 10));
@@ -113,7 +132,7 @@ await check(5, "New order starts with no delivery charge for a pickup shop", asy
   return "₹0";
 });
 
-await check(6, "no browser errors", async () => {
+await check(7, "no browser errors", async () => {
   expect(!errors.length, errors.join(" | ").slice(0, 300));
   return "none";
 });

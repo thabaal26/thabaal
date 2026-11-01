@@ -24,6 +24,8 @@ import {
   flowPacks,
   flowShips,
   flowSteps,
+  packLabel,
+  packLabelTa,
   isConfirmedOrLater,
   orderStage,
   RANK,
@@ -390,7 +392,9 @@ export function OrderCard({
   else if (confirmed)
     primaryAction =
       hasPack && !o.packedAt
-        ? { key: "pack", label: "Pack order" }
+        ? flow === "pickup"
+          ? { key: "ready", label: "Mark ready for pickup" }
+          : { key: "pack", label: "Pack order" }
         : hasDispatch
           ? { key: "dispatch", label: flow === "courier" ? "Ship order" : "Dispatch order" }
           : isCod && !isPaid
@@ -406,6 +410,7 @@ export function OrderCard({
     verify: "பணம் வந்தது",
     confirm: "COD ஆர்டரை உறுதி செய்",
     pack: "பேக் செய்",
+    ready: "எடுக்கத் தயார் எனக் குறி",
     dispatch: flow === "courier" ? "கொரியரில் அனுப்பு" : "டெலிவரிக்கு அனுப்பு",
     deliver: "டெலிவரி ஆனதாகக் குறி",
     remind: "நினைவூட்டல் அனுப்பு",
@@ -431,6 +436,10 @@ export function OrderCard({
     switch (primaryAction.key) {
       case "confirm":
         runAction("confirm", () => notifyOrder(o.id, "confirm"));
+        break;
+      case "ready":
+        // Ready at the counter: ticks it and tells the customer to come and collect it.
+        runAction("ready", () => notifyOrder(o.id, "ready"));
         break;
       case "pack":
         runAction("pack", () => setOrderPacked(o.id, true));
@@ -642,7 +651,7 @@ export function OrderCard({
                 ] as [string, string | null],
               ]),
           [confirmLabel, confirmed ? (when(isPaid ? (o.paidAt ?? o.confirmedAt) : o.confirmedAt) ?? "Done") : null] as [string, string | null],
-          ...(hasPack ? [["Packed", o.packedAt ? when(o.packedAt) : rank >= RANK.DISPATCHED ? "Done" : null] as [string, string | null]] : []),
+          ...(hasPack ? [[packLabel(flow), o.packedAt ? when(o.packedAt) : rank >= RANK.DISPATCHED ? "Done" : null] as [string, string | null]] : []),
           ...(hasDispatch
             ? [[stepLabel(flow, "DISPATCHED") ?? "Dispatched", rank >= RANK.DISPATCHED ? when(o.dispatchedAt) ?? "Done" : null] as [string, string | null]]
             : []),
@@ -961,6 +970,13 @@ export function OrderCard({
                   </span>
                 )}
               </b>
+              {/* The tick inside Order confirmed (Packed, or Ready for pickup), shown as its own step. */}
+              {f.key === "CONFIRMED" && hasPack && (
+                <>
+                  <span style={{ opacity: 0.45, margin: "0 3px", fontSize: 13, userSelect: "none" }}>›</span>
+                  <b className={o.packedAt || rank > RANK.CONFIRMED ? "on" : undefined}>{isTa ? packLabelTa(flow) : packLabel(flow)}</b>
+                </>
+              )}
             </Fragment>
           ))}
         </div>
@@ -1364,7 +1380,7 @@ export function OrderCard({
               disabled={pending}
               onClick={() => runAction("unpack", () => setOrderPacked(o.id, false))}
             >
-              <T ta="இன்னும் பேக் ஆகவில்லை">Not packed yet</T>
+              {flow === "pickup" ? <T ta="இன்னும் தயாராகவில்லை">Not ready yet</T> : <T ta="இன்னும் பேக் ஆகவில்லை">Not packed yet</T>}
             </button>
           )}
 

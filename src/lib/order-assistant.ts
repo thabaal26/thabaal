@@ -37,7 +37,7 @@ import { customerWords, flowShips, readFlow } from "./order-flow";
 import { money, orderRef } from "./orders";
 import { REORDER_RE, handleCartChoice, offerReorder, placeReorder } from "./order-intake";
 import { isShopClosed, opensAtText } from "./pay-settings";
-import { paySettingsFor } from "./pay-settings-server";
+import { flowFor, paySettingsFor } from "./pay-settings-server";
 import { dueOf } from "./payment-state";
 import { logMessage, replyContext, sendPaymentChoicePrompt, textInWindow, updateOrderCard } from "./payments";
 import { getSettings } from "./provider";
@@ -151,6 +151,10 @@ async function statusText(o: Current): Promise<string | "choice"> {
     const details = sent ? `\n\n${sent.replace(/^Dispatched [^:]+:\s*/, "Expected: ")}` : "";
     const cash = o.paymentMethod === "cod" && due > 0 ? `\n\nPlease keep ${bold(money(due, o.currency))} ready for the delivery.` : "";
     return `🚚 Your order ${ref} is on its way.${details}${cash}`;
+  }
+  if (o.packedAt && flow === "pickup") {
+    const cash = o.paymentMethod === "cod" && due > 0 ? ` ${words.cashDue(bold(money(due, o.currency)))}` : "";
+    return `Good news! Your order ${ref} is ready for pickup at our shop.${cash}`;
   }
   if (o.packedAt) return `Good news! Your order ${ref} is packed and will be on its way soon. We'll message you when it leaves.`;
   if (o.paidAt || o.status === "PAID" || (o.status === "CONFIRMED" && o.paymentMethod === "cod")) {
@@ -284,7 +288,7 @@ async function confirmCancel(c: Cust, o: Cancellable) {
     pushOrderToSheet(o.id, "ORDER_UPDATE", "Customer asked to cancel");
     await textInWindow(
       c,
-      `${hello(c.name)} your order ${bold(ref)} is already ${paid ? "paid" : "packed"}, so our team will call you shortly to help with the cancellation${paid ? " and your refund" : ""}.`,
+      `${hello(c.name)} your order ${bold(ref)} is already ${paid ? "paid" : customerWords(await flowFor(o.clientId)).packed}, so our team will call you shortly to help with the cancellation${paid ? " and your refund" : ""}.`,
       "Cancel request",
     ).catch(() => {});
     return true;
@@ -313,7 +317,8 @@ async function answerCancel(customerId: string, orderId: string, yes: boolean) {
   if (o.status === "CANCELLED") return; // a second tap
   const paid = Boolean(o.paidAt || (o.paidAmount ?? 0) > 0);
   if (paid || o.packedAt || o.dispatchedAt) {
-    await textInWindow(o.customer, `Your order ${bold(ref)} has just been ${paid ? "paid" : "packed"}, so our team will call you to help with the cancellation.`, "Cancel request").catch(() => {});
+    const done = paid ? "paid" : o.packedAt ? `marked ${customerWords(await flowFor(o.clientId)).packed}` : "sent";
+    await textInWindow(o.customer, `Your order ${bold(ref)} has just been ${done}, so our team will call you to help with the cancellation.`, "Cancel request").catch(() => {});
     await db.order.update({ where: { id: o.id }, data: { internalNote: appendNote(o.internalNote, `Customer asked to cancel on WhatsApp (${today()}): please call them`) } });
     return;
   }

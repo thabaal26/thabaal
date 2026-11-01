@@ -8,7 +8,7 @@ import { toastResult } from "@/components/toast";
 import { fmtDate } from "@/lib/format";
 import { inr } from "../portal-format";
 import { T, useLang } from "../portal-ui";
-import { DEFAULT_FLOW, flowHas, flowPacks, flowSteps, isCodOrder, isConfirmedOrLater, isPaidOrder, orderStage, readFlow, stepLabel, type OrderFlowKey } from "@/lib/order-flow";
+import { DEFAULT_FLOW, flowHas, flowPacks, flowSteps, packLabel, packLabelTa, isCodOrder, isConfirmedOrLater, isPaidOrder, orderStage, readFlow, stepLabel, type OrderFlowKey } from "@/lib/order-flow";
 import { getOrderPricing, pointsDiscount } from "@/lib/order-pricing";
 import { orderRef, type OrderItem } from "@/lib/order-ref";
 import { dayStartIST, resolvePeriod, type RangeKey } from "@/lib/filters";
@@ -517,8 +517,8 @@ export function OrdersView({
             </StaggerItem>
             <StaggerItem index={2} className="h-full">
               <Stat
-                label={hasPack ? (isTa ? "பேக் செய்ய வேண்டியவை" : "To pack") : (isTa ? "முடிக்க வேண்டியவை" : "To finish")}
-                labelTa={hasPack ? "பேக் செய்ய வேண்டியவை" : "முடிக்க வேண்டியவை"}
+                label={flow === "pickup" ? (isTa ? "தயார் செய்ய வேண்டியவை" : "To get ready") : hasPack ? (isTa ? "பேக் செய்ய வேண்டியவை" : "To pack") : (isTa ? "முடிக்க வேண்டியவை" : "To finish")}
+                labelTa={flow === "pickup" ? "தயார் செய்ய வேண்டியவை" : hasPack ? "பேக் செய்ய வேண்டியவை" : "முடிக்க வேண்டியவை"}
                 value={toPackCount}
                 sub={isTa ? "உறுதியான ஆர்டர்கள்" : "Confirmed orders"}
                 subTa="உறுதியான ஆர்டர்கள்"
@@ -756,7 +756,7 @@ export function OrdersView({
                 aria-pressed={show === "packed"}
                 onClick={() => setShow("packed")}
               >
-                <T ta="பேக் செய்தவை">Packed</T> <small>{packedCount}</small>
+                <T ta={packLabelTa(flow)}>{packLabel(flow)}</T> <small>{packedCount}</small>
               </button>
             )}
             {hasDispatch && (

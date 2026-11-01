@@ -22,17 +22,21 @@ const PAY_STEPS: FlowStep[] = [
   { key: "VERIFY", label: "Payment verification", ta: "பணம் சரிபார்ப்பு" },
 ];
 
-export const ORDER_FLOWS: Record<OrderFlowKey, { label: string; hint: string; pack: boolean; steps: FlowStep[] }> = {
+/**
+ * pack: the tick inside "Order confirmed" (Order.packedAt) and what it is called. Pickup shops tick "Ready for pickup",
+ * which also tells the customer to come and collect it.
+ */
+export const ORDER_FLOWS: Record<OrderFlowKey, { label: string; hint: string; pack: false | { label: string; ta: string }; steps: FlowStep[] }> = {
   pickup: {
     label: "Counter or pickup",
-    hint: "The customer pays and takes it at the shop.",
-    pack: false,
-    steps: [...PAY_STEPS, { key: "CONFIRMED", label: "Ready for pickup", ta: "எடுக்கத் தயார்" }, { key: "DELIVERED", label: "Collected", ta: "பெற்றுக்கொண்டார்" }],
+    hint: "You get it ready and the customer collects it at the shop.",
+    pack: { label: "Ready for pickup", ta: "எடுக்கத் தயார்" },
+    steps: [...PAY_STEPS, { key: "CONFIRMED", label: "Order confirmed", ta: "ஆர்டர் உறுதியானது" }, { key: "DELIVERED", label: "Collected", ta: "பெற்றுக்கொண்டார்" }],
   },
   deliver: {
     label: "I deliver myself",
     hint: "You pack and your own person drops it.",
-    pack: true,
+    pack: { label: "Packed", ta: "பேக் செய்யப்பட்டது" },
     steps: [
       ...PAY_STEPS,
       { key: "CONFIRMED", label: "Order confirmed", ta: "ஆர்டர் உறுதியானது" },
@@ -43,7 +47,7 @@ export const ORDER_FLOWS: Record<OrderFlowKey, { label: string; hint: string; pa
   courier: {
     label: "I send by courier",
     hint: "You pack and hand it to a courier with a tracking number.",
-    pack: true,
+    pack: { label: "Packed", ta: "பேக் செய்யப்பட்டது" },
     steps: [
       ...PAY_STEPS,
       { key: "CONFIRMED", label: "Order confirmed", ta: "ஆர்டர் உறுதியானது" },
@@ -69,8 +73,11 @@ export function readFlow(v: string | null | undefined): OrderFlowKey {
 
 export const flowSteps = (flow: OrderFlowKey) => ORDER_FLOWS[flow].steps;
 export const flowHas = (flow: OrderFlowKey, key: StageKey) => ORDER_FLOWS[flow].steps.some((s) => s.key === key);
-/** Deliver and courier shops tick "Packed" inside Order confirmed. */
-export const flowPacks = (flow: OrderFlowKey) => ORDER_FLOWS[flow].pack;
+/** Deliver and courier shops tick "Packed" inside Order confirmed; pickup shops tick "Ready for pickup". */
+export const flowPacks = (flow: OrderFlowKey) => Boolean(ORDER_FLOWS[flow].pack);
+/** The name of that tick ("Packed", "Ready for pickup"). */
+export const packLabel = (flow: OrderFlowKey) => (ORDER_FLOWS[flow].pack || { label: "Packed" }).label;
+export const packLabelTa = (flow: OrderFlowKey) => (ORDER_FLOWS[flow].pack || { ta: "பேக் செய்யப்பட்டது" }).ta;
 /** The shop takes orders to the customer (deliver, courier): WhatsApp asks for the address and a delivery charge is added. */
 export const flowShips = (flow: OrderFlowKey) => flowHas(flow, "DISPATCHED");
 
@@ -81,9 +88,10 @@ export function customerWords(flow: OrderFlowKey) {
       cashButton: "💵 Pay at the shop",
       cashLater: "pay in cash when you collect it",
       cashDue: (amount: string) => `Please pay ${amount} when you collect it.`,
-      confirmed: "is confirmed. You can collect it at our shop.",
+      confirmed: "is confirmed. We'll message you when it's ready for pickup.",
       next: "We'll message you when it's ready for pickup at our shop.",
       finished: "collected",
+      packed: "ready for pickup",
     };
   if (flow === "service")
     return {
@@ -93,6 +101,7 @@ export function customerWords(flow: OrderFlowKey) {
       confirmed: "is confirmed. Our team will confirm the time with you here.",
       next: "Our team will confirm the time with you here.",
       finished: "completed",
+      packed: "being prepared",
     };
   return {
     cashButton: "🚚 Cash on delivery",
@@ -101,6 +110,7 @@ export function customerWords(flow: OrderFlowKey) {
     confirmed: "is confirmed.",
     next: "We'll message you as soon as it's on the way.",
     finished: "delivered",
+    packed: "packed",
   };
 }
 
