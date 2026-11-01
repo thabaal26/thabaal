@@ -7,8 +7,9 @@
  * (Chrome / Edge 135+, most of our users), the open list is a rounded card with hover, a tick on the chosen item and
  * a short fade; elsewhere the phone's or browser's own list opens, as before.
  *
- * Colours come from the area's own tokens (the portal's --card / --fg / --line / --soft, else the app theme's), so
- * light and dark both follow.
+ * Colours come from the control itself: the open list takes the dropdown's own background and text colour, and
+ * highlights, borders and ticks are mixed from its text colour. So a white form on the website stays white even when
+ * the app is in dark mode, and the dark portal stays dark.
  */
 
 /* ── Dropdowns: the closed field ── */
@@ -25,14 +26,13 @@ select:not([multiple]):not([size]) {
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
 }
 select:not([multiple]):not([size]):hover:not(:disabled) {
-  border-color: var(--fg, var(--color-ink, #10283b));
+  border-color: currentColor;
 }
 select:disabled {
   cursor: not-allowed;
   opacity: 0.6;
 }
-html.dark select:not([multiple]):not([size]),
-[data-theme="night"] select:not([multiple]):not([size]) {
+html.dark .thabaal-portal select:not([multiple]):not([size]) {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23A8BACA' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
 }
 
@@ -46,8 +46,7 @@ html.dark select:not([multiple]):not([size]),
     align-items: center;
     gap: 8px;
   }
-  html.dark select:not([multiple]):not([size]),
-  [data-theme="night"] select:not([multiple]):not([size]) {
+  html.dark .thabaal-portal select:not([multiple]):not([size]) {
     background-image: none;
   }
   select:not([multiple]):not([size])::picker-icon {
@@ -71,10 +70,12 @@ html.dark select:not([multiple]):not([size]),
     min-width: anchor-size(width);
     max-height: min(340px, 60vh);
     overflow-y: auto;
-    border: 1.5px solid var(--line, var(--color-line, #eadfcb));
+    /* The list looks like the field it opens from: same background and text, a border mixed from the text. */
+    border: 1.5px solid color-mix(in srgb, currentColor 16%, transparent);
     border-radius: 14px;
-    background: var(--card, var(--color-panel, #fff));
-    color: var(--fg, var(--color-ink, #10283b));
+    background-color: inherit;
+    color: inherit;
+    color-scheme: inherit;
     box-shadow: 0 18px 44px -14px rgba(16, 40, 59, 0.38), 0 2px 6px rgba(16, 40, 59, 0.08);
     opacity: 1;
     translate: 0 0;
@@ -100,18 +101,21 @@ html.dark select:not([multiple]):not([size]),
   }
   select:not([multiple]):not([size]) option:hover,
   select:not([multiple]):not([size]) option:focus-visible {
-    background: color-mix(in srgb, var(--fg, var(--color-ink, #10283b)) 7%, transparent);
+    background: color-mix(in srgb, currentColor 8%, transparent);
   }
   select:not([multiple]):not([size]) option:checked {
     font-weight: 600;
-    background: var(--soft, var(--color-sunken, #fff3d6));
+    background: color-mix(in srgb, #ffc329 26%, transparent);
+  }
+  /* On the dark portal a mango tint turns muddy: a lighter shade of the text colour instead. */
+  html.dark .thabaal-portal select:not([multiple]):not([size]) option:checked {
+    background: color-mix(in srgb, currentColor 15%, transparent);
   }
   select:not([multiple]):not([size]) option::checkmark {
     content: "✓";
     order: 1;
     margin-left: auto;
     font-weight: 700;
-    color: var(--ok, #086842);
   }
   select:not([multiple]):not([size]) option:disabled {
     opacity: 0.45;
@@ -122,7 +126,8 @@ html.dark select:not([multiple]):not([size]),
     padding: 4px 0;
     font-size: 12px;
     font-weight: 700;
-    color: var(--muted, #5a6b7b);
+    color: inherit;
+    opacity: 0.7;
   }
 }
 
@@ -137,9 +142,9 @@ input[type="radio"]:not(.sr-only):not([hidden]) {
   margin: 0;
   display: inline-grid;
   place-content: center;
-  border: 1.5px solid color-mix(in srgb, var(--fg, var(--color-ink, #10283b)) 38%, transparent);
+  border: 1.5px solid color-mix(in srgb, currentColor 45%, transparent);
   border-radius: 6px;
-  background: var(--card, var(--color-panel, #fff));
+  background: transparent;
   cursor: pointer;
   vertical-align: middle;
   transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
@@ -149,18 +154,15 @@ input[type="radio"]:not(.sr-only):not([hidden]) {
 }
 input[type="checkbox"]:not(.sr-only):not([hidden]):hover:not(:disabled),
 input[type="radio"]:not(.sr-only):not([hidden]):hover:not(:disabled) {
-  border-color: var(--fg, var(--color-ink, #10283b));
+  border-color: currentColor;
 }
 input[type="checkbox"]:not(.sr-only):not([hidden]):checked {
-  border-color: var(--fg, var(--color-ink, #10283b));
-  background: var(--fg, var(--color-ink, #10283b)) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3.5 8.5 3 3 6-7'/%3E%3C/svg%3E") center / 14px no-repeat;
+  border-color: #e0a800;
+  background: #ffc329 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2310283B' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3.5 8.5 3 3 6-7'/%3E%3C/svg%3E") center / 14px no-repeat;
 }
 input[type="radio"]:not(.sr-only):not([hidden]):checked {
-  border-color: var(--fg, var(--color-ink, #10283b));
-  background: radial-gradient(circle, var(--fg, var(--color-ink, #10283b)) 0 4px, var(--card, var(--color-panel, #fff)) 4.5px);
-}
-html.dark input[type="checkbox"]:not(.sr-only):not([hidden]):checked {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%230B1E2D' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3.5 8.5 3 3 6-7'/%3E%3C/svg%3E");
+  border-color: #e0a800;
+  background: radial-gradient(circle, #10283b 0 3.5px, #ffc329 4px);
 }
 input[type="checkbox"]:not(.sr-only):not([hidden]):focus-visible,
 input[type="radio"]:not(.sr-only):not([hidden]):focus-visible {
@@ -191,25 +193,22 @@ input::-webkit-calendar-picker-indicator:hover {
   opacity: 1;
   background-color: rgba(255, 195, 41, 0.25);
 }
-html.dark input::-webkit-calendar-picker-indicator {
-  filter: invert(1);
-}
 
 /* ── File pickers: a proper button instead of the grey browser one ── */
 input[type="file"]::file-selector-button {
   margin-right: 12px;
   padding: 8px 14px;
-  border: 1.5px solid var(--line, var(--color-line, #eadfcb));
+  border: 1.5px solid color-mix(in srgb, currentColor 22%, transparent);
   border-radius: 10px;
-  background: var(--soft, var(--color-sunken, #fff3d6));
-  color: var(--fg, var(--color-ink, #10283b));
+  background: color-mix(in srgb, #ffc329 22%, transparent);
+  color: inherit;
   font: inherit;
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 input[type="file"]::file-selector-button:hover {
-  border-color: var(--fg, var(--color-ink, #10283b));
+  border-color: currentColor;
 }
 
 @media (prefers-reduced-motion: reduce) {

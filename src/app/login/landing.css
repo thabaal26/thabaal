@@ -1525,17 +1525,8 @@ html {
 }
 
 /* ── 60–120 FPS High-Refresh Scroll Optimization & Virtualization ── */
-.workspace-section,
-.demo-section,
-.steps-section,
-.use-case-section,
-.pricing-section,
-.faq-section,
-.final-cta-section {
-  content-visibility: auto;
-  contain-intrinsic-size: 0 650px;
-  contain: layout style;
-}
+/* Sections render normally (no content-visibility: auto): skipping them left a thin dark line between sections at
+   some screen scalings, and links like #start jumped short. */
 
 /* ── Motion Safety ── */
 @media (prefers-reduced-motion: reduce) {
@@ -5499,6 +5490,15 @@ html {
   font-weight: 800;
 }
 .demo-form-card {
+  /* The form is a white card in every theme (day, night, the app's dark mode), so it keeps the day colours. */
+  color-scheme: light;
+  --ink: #132b43;
+  --navy: #062445;
+  --muted: #63758a;
+  --line: #dbe6ef;
+  --fg: #062548;
+  --bg: #ffffff;
+  --field: #f5f8fc;
   background: #fff;
   color: var(--ink);
   border-radius: var(--radius-md);

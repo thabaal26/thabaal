@@ -22,10 +22,7 @@ export function SiteHeader({ lang, onToggleLang, onSelectLang }: SiteHeaderProps
     const target = document.getElementById(targetId);
     if (target) {
       e.preventDefault();
-      // Sections skip rendering until they are near the screen (content-visibility: auto), so their real
-      // heights appear only mid-scroll and the jump stopped short. Render them first, then scroll.
-      document.querySelectorAll<HTMLElement>("main section").forEach((s) => (s.style.contentVisibility = "visible"));
-      requestAnimationFrame(() => target.scrollIntoView({ behavior: "smooth", block: "start" }));
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
       if (window.location.hash !== `#${targetId}`) {
         history.pushState(null, "", `#${targetId}`);
       }
@@ -120,7 +117,7 @@ export function SiteHeader({ lang, onToggleLang, onSelectLang }: SiteHeaderProps
           </button>
 
           {/* Book a demo CTA */}
-          <a href="#start" className="site-header-btn site-header-btn-primary">
+          <a href="#start" onClick={(e) => handleNavClick(e, "start")} className="site-header-btn site-header-btn-primary">
             <span className="site-header-label-long">{ta ? "டெமோ பதிவு செய்யுங்கள்" : "Book a demo"}</span>
             <span className="site-header-label-short">{ta ? "டெமோ பதிவு" : "Book demo"}</span>
           </a>
