@@ -14,6 +14,8 @@ import { dueOf, methodOf, receivedOf } from "@/lib/payment-state";
 import { autoRedeemPoints, keptPointsDiscount, setOrderPoints } from "@/lib/loyalty-redeem";
 import { LOYALTY_RULE_LIMITS, loyaltyRules, loyaltyRuleWords } from "@/lib/loyalty";
 import { addressGivenByStaff } from "@/lib/delivery-address";
+import { addressBook, rememberAddress } from "@/lib/address-book-server";
+import type { SavedAddress } from "@/lib/address-book";
 import { pointsDiscount } from "@/lib/order-pricing";
 import { getSettings, wahaConfig } from "@/lib/provider";
 import { replyWindowEnd } from "@/lib/replies";
@@ -408,6 +410,8 @@ export async function lookupOrderCustomer(rawPhone: string): Promise<
         locationRaw: string | null;
         region: string | null;
         chatAddresses: ChatAddressCandidate[];
+        /** Every delivery address they have used, newest first (the dropdown on New order). */
+        savedAddresses: SavedAddress[];
       } | null;
     }
 > {
@@ -464,8 +468,17 @@ export async function lookupOrderCustomer(rawPhone: string): Promise<
       locationRaw: existing.locationRaw,
       region: existing.region,
       chatAddresses: detected,
+      savedAddresses: await addressBook(existing.id),
     },
   };
+}
+
+/** A customer's saved delivery addresses, newest first (the dropdown when changing an order's address). */
+export async function customerAddressBook(customerId: string): Promise<SavedAddress[]> {
+  const s = await requireOrderAccess();
+  if ("denied" in s) return [];
+  const c = await db.customer.findFirst({ where: { id: customerId, ...(s.clientId ? { clientId: s.clientId } : {}) }, select: { id: true } });
+  return c ? addressBook(c.id) : [];
 }
 
 /** Fetches address suggestions from a customer's recent WhatsApp chat replies and past orders. */
@@ -602,6 +615,9 @@ export async function saveOrderAddress(
       },
     });
   }
+
+  // Every address used goes on their list, even one kept for this order only.
+  if (cleanAddr) await rememberAddress(order.customer.id, { text: cleanAddr, area: input.area?.trim().slice(0, 120) || parsed.area || null });
 
   // 3. Also fill other active orders for the same customer that are missing an address
   if (cleanAddr && (customerHasNoAddress || input.syncOtherActiveOrders !== false)) {
@@ -754,6 +770,7 @@ export async function createOrder(input: {
   });
 
   await syncCustomerOrderedProducts(customer.id, items).catch(() => {});
+  if (input.address?.trim()) await rememberAddress(customer.id, { text: input.address.trim().slice(0, 500), area: resolvedArea });
   // Automatic points (Order & Payment Settings) come off before any payment is asked or recorded.
   const pointsOff = await autoRedeemPoints(order.id).catch((e) => (console.error("Could not use loyalty points", e), 0));
   const total = Math.round((grossTotal - pointsOff) * 100) / 100;

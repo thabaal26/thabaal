@@ -598,12 +598,11 @@ export async function POST(req: NextRequest) {
               client: clientName,
             });
 
-            // Delivery address step: "Yes, deliver here" / "New address" (lib/delivery-address.ts)
-            if (typeof actionVal === "string" && customer && (actionVal.startsWith("addr_ok:") || actionVal.startsWith("addr_new:"))) {
+            // Delivery address step: "Yes, deliver here" / one of their saved addresses / "New address" (lib/delivery-address.ts)
+            if (typeof actionVal === "string" && customer && /^addr_(ok|new|pick):/.test(actionVal)) {
               handledByOrderButton = true;
-              const ok = actionVal.startsWith("addr_ok:");
-              const orderId = actionVal.slice(ok ? 8 : 9);
-              await (ok ? confirmSavedAddress(orderId, customer.id) : askNewAddress(orderId, customer.id)).catch((e) => console.error("Address button failed", e));
+              const [kind, orderId, key] = actionVal.split(":");
+              await (kind === "addr_new" ? askNewAddress(orderId, customer.id) : confirmSavedAddress(orderId, customer.id, kind === "addr_pick" ? key : undefined)).catch((e) => console.error("Address button failed", e));
             }
 
             // The order assistant's buttons: add to order / separate, cancel yes/no, delivered feedback, reorder, stop offers.

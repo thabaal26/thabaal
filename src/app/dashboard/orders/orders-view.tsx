@@ -13,6 +13,7 @@ import { getOrderPricing, pointsDiscount } from "@/lib/order-pricing";
 import { orderRef, type OrderItem } from "@/lib/order-ref";
 import { dayStartIST, resolvePeriod, type RangeKey } from "@/lib/filters";
 import { createOrder, lookupOrderCustomer } from "../actions/orders";
+import type { SavedAddress } from "@/lib/address-book";
 import { OrderCard, type OrderCardData } from "./order-card";
 import type { CatalogProductOption } from "./order-items-editor";
 import { Clock, Package, PackageCheck, ShoppingBag } from "@/components/icons";
@@ -130,7 +131,7 @@ export function OrdersView({
   const [newAddress, setNewAddress] = useState("");
   // The number decides who the order is for: an existing customer (name and address filled in from
   // their record or WhatsApp chat) or a new one, who is saved as a customer when the order is saved.
-  const [who, setWho] = useState<{ digits: string; state: "checking" | "new" | "existing"; name?: string } | null>(null);
+  const [who, setWho] = useState<{ digits: string; state: "checking" | "new" | "existing"; name?: string; addresses?: SavedAddress[] } | null>(null);
   const newDigits = newCustPhone.replace(/\D/g, "");
   useEffect(() => {
     if (newDigits.length < 10) return;
@@ -142,7 +143,7 @@ export function OrdersView({
       if (!r.valid) return setWho(null);
       if (!r.existing) return setWho({ digits: newDigits, state: "new" });
       const ex = r.existing;
-      setWho({ digits: newDigits, state: "existing", name: ex.name });
+      setWho({ digits: newDigits, state: "existing", name: ex.name, addresses: ex.savedAddresses });
       if (!/^\+?\d+$/.test(ex.name.trim())) setNewCustName((prev) => (prev.trim() ? prev : ex.name));
       const addr = ex.locationRaw?.trim() || ex.location?.trim() || ex.chatAddresses[0]?.fullAddress || "";
       if (addr) setNewAddress((prev) => (prev.trim() ? prev : addr));
@@ -153,6 +154,8 @@ export function OrdersView({
     };
   }, [newDigits]);
   const whoNow = who && who.digits === newDigits && newDigits.length >= 10 ? who : null;
+  // Every address this customer has used: pick one, or type a new one.
+  const savedAddrs = whoNow?.addresses ?? [];
   const [newItems, setNewItems] = useState<{ name: string; price: number; qty: number }[]>([]);
   const [selectedProdIdx, setSelectedProdIdx] = useState<string>("0");
   const [customItemName, setCustomItemName] = useState("");
@@ -1181,6 +1184,25 @@ export function OrdersView({
                 <Link href="/dashboard/catalogue">Add a product</Link> if something is missing.
               </p>
             </div>
+
+            {savedAddrs.length > 0 && (
+              <div className="field">
+                <label htmlFor="noas">Saved addresses ({savedAddrs.length})</label>
+                <select
+                  id="noas"
+                  value={savedAddrs.some((a) => a.text === newAddress.trim()) ? newAddress.trim() : ""}
+                  onChange={(e) => setNewAddress(e.target.value)}
+                >
+                  <option value="">✏️ Type a new address below</option>
+                  {savedAddrs.map((a, i) => (
+                    <option key={i} value={a.text}>
+                      {i === 0 ? "Latest · " : ""}
+                      {a.text}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="field">
               <label htmlFor="noa">Delivery address</label>
