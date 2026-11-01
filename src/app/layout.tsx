@@ -5,6 +5,7 @@ import { ServiceWorkerRegister } from "@/components/sw-register";
 import { Toaster } from "@/components/toast";
 import { THEME_SCRIPT } from "@/lib/theme-script";
 import "./globals.css";
+import "./controls.css";
 
 const dmSans = DM_Sans({ variable: "--font-dm-sans", subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap" });
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"], display: "swap", preload: false });
