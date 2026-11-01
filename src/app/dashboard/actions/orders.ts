@@ -25,7 +25,7 @@ import { isTemplatePicture, orderTemplateNames, picturePrefixFor } from "@/lib/o
 import { cleanValues, readFields, readValues } from "@/lib/custom-fields";
 import { senderFor } from "@/lib/senders";
 import { requireManager, requireOrderAccess } from "@/lib/session";
-import { FLOW_KEYS, ORDER_FLOWS, stepBlocked, type OrderFlowKey } from "@/lib/order-flow";
+import { customerWords, FLOW_KEYS, flowHas, flowShips, ORDER_FLOWS, readFlow, stepBlocked, type OrderFlowKey } from "@/lib/order-flow";
 import { sendText } from "@/lib/waha";
 import { sendInteractiveButtons, sendTemplateMessage, sendTextMessage } from "@/lib/whatsapp";
 import { explainSendError, type SendResult } from "./send-helpers";
@@ -178,13 +178,17 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
   if ("denied" in s) return { ok: false, message: s.denied };
   const order = await db.order.findFirst({
     where: { id, ...(s.clientId ? { clientId: s.clientId } : {}) },
-    include: { customer: true, client: { select: { name: true } } },
+    include: { customer: true, client: { select: { name: true, orderFlow: true } } },
   });
   if (!order) return { ok: false, message: "Order not found." };
   // Order steps: no confirmation before the payment is verified (cash on delivery excepted), and no dispatch or
-  // delivery before the order is confirmed.
+  // delivery before the order is confirmed. Pickup and service shops have no dispatch step.
+  const flow = readFlow(order.client.orderFlow);
+  if (kind === "dispatch" && !flowHas(flow, "DISPATCHED")) return { ok: false, message: `Your order steps (${ORDER_FLOWS[flow].label}) have no dispatch. Mark it ${customerWords(flow).finished} when it's done.` };
   const blocked = stepBlocked(order, kind === "confirm" ? "CONFIRMED" : kind === "dispatch" ? "DISPATCHED" : "DELIVERED");
   if (blocked) return { ok: false, message: blocked };
+  const words = customerWords(flow);
+  const noun = flow === "service" ? "booking" : "order";
   const c = order.customer;
   if (c.optedOut) return { ok: false, message: "This customer opted out of messages." };
 
@@ -209,7 +213,9 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
       ? order.paidAt
         ? `Payment received: ${money(receivedOf(order), order.currency)}. Thank you!`
         : cod
-          ? `Payment: cash on delivery. Please keep ${money(due, order.currency)} ready when it arrives.`
+          ? flowShips(flow)
+            ? `Payment: cash on delivery. Please keep ${money(due, order.currency)} ready when it arrives.`
+            : words.cashDue(money(due, order.currency))
           : receivedOf(order) > 0
             ? `Received ${money(receivedOf(order), order.currency)}; ${money(due, order.currency)} still to pay.`
             : ""
@@ -224,10 +230,10 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
           : "";
   const text =
     kind === "confirm"
-      ? `Hello ${first}, your ${order.client.name} order ${ref} is confirmed.\n\n${confirmPricingText}${payLine ? `\n${payLine}` : ""}\n\nWe will message you with the next update.`
+      ? `Hello ${first}, your ${order.client.name} ${noun} ${ref} ${words.confirmed}\n\n${confirmPricingText}${payLine ? `\n${payLine}` : ""}${flowShips(flow) ? "\n\nWe will message you with the next update." : ""}`
       : kind === "dispatch"
         ? `Hello ${first}, your ${order.client.name} order ${ref} is on its way and will reach you by ${details.eta?.trim() || "soon"}.${contact ? `\n\n${contact}` : ""}${payLine ? `\n\n${payLine}` : ""}\n\nFor any help, reply to this message.`
-        : `Hello ${first}, your ${order.client.name} order ${ref} has been delivered.${payLine ? ` ${payLine}` : ""} Thank you for shopping with us!\n\nIf anything is not right, reply to this message.`;
+        : `Hello ${first}, your ${order.client.name} ${noun} ${ref} has been ${words.finished}.${payLine ? ` ${payLine}` : ""} Thank you for shopping with us!\n\nIf anything is not right, reply to this message.`;
   const nextStatus = kind === "confirm" ? "CONFIRMED" : kind === "dispatch" ? "DISPATCHED" : "DELIVERED";
 
   const settings = await getSettings();
@@ -249,7 +255,7 @@ export async function notifyOrder(id: string, kind: "confirm" | "dispatch" | "de
       }
     } else if (open && kind === "deliver" && settings.provider === "META") {
       // Delivered: one message that also asks how it went (All good / Report a problem).
-      const body = `Hello ${first}, your ${order.client.name} order ${ref} has been delivered.${payLine ? ` ${payLine}` : ""} Thank you for shopping with us!\n\nHow was everything?`;
+      const body = `Hello ${first}, your ${order.client.name} ${noun} ${ref} has been ${words.finished}.${payLine ? ` ${payLine}` : ""} Thank you for shopping with us!\n\nHow was everything?`;
       ({ id: waId, simulated } = await sendInteractiveButtons(cfg, c.phone, body, [
         { id: `fb_ok:${order.id}`, title: "👍 All good" },
         { id: `fb_bad:${order.id}`, title: "⚠️ Report a problem" },
@@ -700,7 +706,7 @@ export async function createOrder(input: {
   if (!existing && !name) return { ok: false, message: "This is a new customer: enter their name so they can be saved." };
   // Payment settings › Cash on delivery: on, under the limit and in an allowed area (checked before anything is saved).
   if (input.paymentMode === "cod") {
-    const fee = input.shippingFee !== undefined ? Math.max(0, Number(input.shippingFee) || 0) : pay.settings.deliveryFee;
+    const fee = input.shippingFee !== undefined ? Math.max(0, Number(input.shippingFee) || 0) : await deliveryFeeFor(s.clientId);
     const estimate = getOrderPricing(lines.map((i, k) => ({ id: i.id || `m${k}`, name: i.name, quantity: i.quantity, price: i.price, currency: "INR" })), null, { customShippingFee: fee }).total;
     const blocked = codBlocked(pay.settings, estimate, existing ? { ...existing, ...(resolvedRegion && { region: resolvedRegion }), ...(rawAddr && { locationRaw: rawAddr }) } : { region: resolvedRegion, location: resolvedArea, locationRaw: rawAddr });
     if (blocked) return { ok: false, message: blocked };
@@ -751,7 +757,7 @@ export async function createOrder(input: {
     currency: "INR",
   }));
   // Settings › Delivery charge unless the order form changed it for this order.
-  const shippingFee = input.shippingFee !== undefined ? Math.max(0, Number(input.shippingFee) || 0) : pay.settings.deliveryFee;
+  const shippingFee = input.shippingFee !== undefined ? Math.max(0, Number(input.shippingFee) || 0) : await deliveryFeeFor(s.clientId);
   const { total: grossTotal } = getOrderPricing(items, null, { customShippingFee: shippingFee });
 
   const finalOrderNote =

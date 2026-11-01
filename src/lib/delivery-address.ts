@@ -11,6 +11,7 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { parseAddressText } from "./address";
+import { flowShips, readFlow } from "./order-flow";
 import { addressKey, pickedNumber, type SavedAddress } from "./address-book";
 import { addressBook, keepKnownAddresses, rememberAddress } from "./address-book-server";
 import {
@@ -42,7 +43,7 @@ export const ADDRESS_REQUEST = "Address request";
 /** An unanswered address question stops counting after this long (a later "yes" isn't taken as an answer). */
 const WAIT_MS = 7 * 86_400_000;
 
-const orderWithCustomer = { customer: true, client: { select: { name: true } } } as const;
+const orderWithCustomer = { customer: true, client: { select: { name: true, orderFlow: true } } } as const;
 
 async function loadOrder(orderId: string) {
   return db.order.findUnique({ where: { id: orderId }, include: orderWithCustomer });
@@ -142,6 +143,8 @@ export async function startAddressStep(orderId: string): Promise<"asked" | "skip
   if (!order || settled(order) || order.total <= 0) return "skip";
   const pay = await paySettingsFor(order.clientId);
   if (!pay.settings.askAddress) return "skip";
+  // Counter / pickup and service shops: nothing is delivered, so no address is asked.
+  if (!flowShips(readFlow(order.client.orderFlow))) return "skip";
   const c = order.customer;
   if (!(await canMessage(c))) return "skip";
   const book = await addressBook(c.id);

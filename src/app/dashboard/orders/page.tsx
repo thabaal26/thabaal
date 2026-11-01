@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getCatalogWithProducts } from "@/lib/catalog";
 import { db } from "@/lib/db";
-import { readPaySettings } from "@/lib/pay-settings";
+import { readPaySettings, shopDeliveryFee } from "@/lib/pay-settings";
 import { getScope, owned } from "@/lib/session";
 import { LiveRefresh } from "@/components/live-refresh";
 import { RefreshButton } from "@/components/refresh-button";
@@ -145,7 +145,7 @@ export default async function OrdersPage({
           name: clientData?.name ?? "All businesses",
           orderFlow,
           paymentConfig: Boolean(clientData?.paymentConfig),
-          deliveryFee: readPaySettings(clientData?.paySettings, clientData?.paymentConfig).deliveryFee,
+          deliveryFee: shopDeliveryFee(readPaySettings(clientData?.paySettings, clientData?.paymentConfig), orderFlow),
         }}
         canEdit={canEdit}
         scopeClientId={scope.clientId}

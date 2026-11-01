@@ -22,6 +22,7 @@ import {
   DEFAULT_FLOW,
   flowHas,
   flowPacks,
+  flowShips,
   flowSteps,
   isConfirmedOrLater,
   orderStage,
@@ -370,7 +371,9 @@ export function OrderCard({
     o.note?.trim() || o.customer.locationRaw?.trim() || o.customer.location?.trim() || "";
   const phoneClean = o.customer.phone ? o.customer.phone.replace(/\D/g, "") : "";
   const missingPhone = !phoneClean || phoneClean.length < 10;
-  const missingAddress = !fullAddress && o.status !== "CANCELLED" && o.status !== "NEW";
+  // Pickup and service shops deliver nothing, so no address is asked or needed.
+  const ships = flowShips(flow);
+  const missingAddress = ships && !fullAddress && o.status !== "CANCELLED" && o.status !== "NEW";
   // Asked on WhatsApp and not answered yet: the payment message goes once they reply.
   const waitingAddress = o.status === "NEW" && !o.paidAt && Boolean(o.addressAskedAt) && !o.addressConfirmedAt;
 
@@ -390,7 +393,10 @@ export function OrderCard({
         ? { key: "pack", label: "Pack order" }
         : hasDispatch
           ? { key: "dispatch", label: flow === "courier" ? "Ship order" : "Dispatch order" }
-          : { key: "deliver", label: `Mark ${finishLabel.toLowerCase()}` };
+          : isCod && !isPaid
+            ? // Pickup / service with cash: the cash is taken at the counter or the visit, so finishing records it.
+              { key: "codin", label: `${finishLabel}, cash received ${inr(due)}` }
+            : { key: "deliver", label: `Mark ${finishLabel.toLowerCase()}` };
   else if (stage === "VERIFY") primaryAction = { key: "verify", label: "Payment received" };
   else if (isCod) primaryAction = { key: "confirm", label: "Confirm COD order" };
   else if (stage === "PAYMENT") primaryAction = { key: "remind", label: "Send reminder" };
@@ -404,7 +410,7 @@ export function OrderCard({
     deliver: "டெலிவரி ஆனதாகக் குறி",
     remind: "நினைவூட்டல் அனுப்பு",
     link: "கட்டண இணைப்பு அனுப்பு",
-    codin: `டெலிவரி ஆனது, பணம் வரவு ${inr(due)}`,
+    codin: hasDispatch ? `டெலிவரி ஆனது, பணம் வரவு ${inr(due)}` : `முடிந்தது, பணம் வரவு ${inr(due)}`,
     receipt: "ரசீது பார்க்க",
     restore: "ஆர்டரை மீட்டெடு",
   };
@@ -1230,7 +1236,7 @@ export function OrderCard({
             </button>
           </span>
         </p>
-      ) : fullAddress ? (
+      ) : ships && fullAddress ? (
         <p className="muted small" style={{ marginTop: 12, fontSize: 13.5, lineHeight: 1.5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
           <T ta="அனுப்பும் முகவரி:">Deliver to:</T> <b style={{ color: "var(--fg)" }}>{fullAddress}</b> ·{" "}
           {o.mapUrl && (
@@ -1252,7 +1258,7 @@ export function OrderCard({
             <T>Change</T>
           </button>
         </p>
-      ) : o.status !== "CANCELLED" && !missingBadges.includes("Address needed") ? (
+      ) : ships && o.status !== "CANCELLED" && !missingBadges.includes("Address needed") ? (
         <p style={{ marginTop: 12 }}>
           <button
             type="button"
@@ -1384,7 +1390,7 @@ export function OrderCard({
             </button>
           )}
 
-          {(readyStage || packedStage) && (
+          {ships && (readyStage || packedStage) && (
             <button
               type="button"
               className="btn sm"
