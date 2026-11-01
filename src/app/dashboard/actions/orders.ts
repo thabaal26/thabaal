@@ -15,6 +15,7 @@ import { autoRedeemPoints, keptPointsDiscount, setOrderPoints } from "@/lib/loya
 import { LOYALTY_RULE_LIMITS, loyaltyRules, loyaltyRuleWords } from "@/lib/loyalty";
 import { addressGivenByStaff } from "@/lib/delivery-address";
 import { addressBook, keepKnownAddresses, rememberAddress } from "@/lib/address-book-server";
+import { cleanPersonName, fillCustomerName, isPlaceholderName, nameFromText } from "@/lib/customer-name";
 import type { SavedAddress } from "@/lib/address-book";
 import { pointsDiscount } from "@/lib/order-pricing";
 import { getSettings, wahaConfig } from "@/lib/provider";
@@ -668,6 +669,8 @@ export async function saveOrderAddress(
 
   // Every address used goes on their list, even one kept for this order only.
   if (cleanAddr) await rememberAddress(order.customer.id, { text: cleanAddr, area: input.area?.trim().slice(0, 120) || parsed.area || null });
+  // "Name: …" in the address names a customer known only by their number.
+  if (cleanAddr) await fillCustomerName(order.customer.id, nameFromText(cleanAddr));
 
   // 3. Also fill other active orders for the same customer that are missing an address
   if (cleanAddr && (customerHasNoAddress || input.syncOtherActiveOrders !== false)) {
@@ -759,7 +762,8 @@ export async function createOrder(input: {
   if (existing) {
     const customerHasNoAddress = !existing.location?.trim() && !existing.locationRaw?.trim();
     const shouldSyncAddr = (rawAddr || resolvedArea) && (customerHasNoAddress || input.syncCustomerAddress !== false);
-    const shouldUpdateName = existing.name === `+${phone}` && Boolean(name);
+    // Staff typed a name for someone known only by their number: that name is theirs now.
+    const shouldUpdateName = isPlaceholderName(existing.name) && Boolean(cleanPersonName(name));
 
     if (shouldSyncAddr || shouldUpdateName) {
       if (shouldSyncAddr) await keepKnownAddresses(existing.id);

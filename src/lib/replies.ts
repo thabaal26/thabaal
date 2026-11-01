@@ -2,6 +2,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { parseAddressText } from "./address";
 import { formAddressText, formValuesFrom } from "./address-form";
+import { cleanPersonName, fillCustomerName, isPlaceholderName } from "./customer-name";
 import { db } from "./db";
 
 /**
@@ -26,6 +27,8 @@ export type IncomingReply = {
   anyClient?: boolean;
   /** A photo, voice note or file on Meta's servers, downloaded when someone views it. */
   media?: { id: string; type: string };
+  /** Their WhatsApp profile name (sent with every message): fills in a customer still named by their number. */
+  profileName?: string | null;
 };
 
 const MEDIA_TYPES = ["image", "audio", "video", "document", "sticker"];
@@ -46,9 +49,9 @@ export async function recordReply(r: IncomingReply) {
   }
   const candidates = await db.customer.findMany({
     where,
-    select: { id: true, messages: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } } },
+    select: { id: true, name: true, messages: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } } },
   });
-  let customer = candidates.sort((a, b) => (b.messages[0]?.createdAt.getTime() ?? 0) - (a.messages[0]?.createdAt.getTime() ?? 0))[0];
+  let customer: { id: string; name?: string } | undefined = candidates.sort((a, b) => (b.messages[0]?.createdAt.getTime() ?? 0) - (a.messages[0]?.createdAt.getTime() ?? 0))[0];
   if (!customer) {
     const { number } = await receivingNumber(r.phoneNumberId);
     if (number?.clientId) {
@@ -57,13 +60,14 @@ export async function recordReply(r: IncomingReply) {
           data: {
             clientId: number.clientId,
             phone: r.phone,
-            name: `+${r.phone}`,
+            // Their WhatsApp name when it is a real one, else their number until they give a name.
+            name: cleanPersonName(r.profileName) ?? `+${r.phone}`,
             optInSource: "Inbound WhatsApp Chat",
             optInAt: new Date(),
           },
           select: { id: true },
         });
-        customer = { id: newCust.id, messages: [] };
+        customer = { id: newCust.id };
       } catch {
         return null;
       }
@@ -71,6 +75,9 @@ export async function recordReply(r: IncomingReply) {
       return null;
     }
   }
+
+  // Known only by their number so far: their WhatsApp name fills it in (a real name is never replaced).
+  if (r.profileName && customer.name !== undefined && isPlaceholderName(customer.name)) await fillCustomerName(customer.id, r.profileName).catch(() => false);
 
   try {
     await db.reply.create({
