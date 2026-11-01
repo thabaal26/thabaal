@@ -45,6 +45,7 @@ import {
 } from "../actions/orders";
 import { deliverCod, paymentHistory, setPaymentMethod, undoPayment, verifyPaymentClaim } from "../actions/payments";
 import { RecordPaymentSheet, RefundSheet } from "./payment-ui";
+import { OrderPointsControl } from "./loyalty-points-ui";
 import {
   blankOrderLine,
   OrderItemsEditor,
@@ -84,6 +85,8 @@ export type OrderCardData = {
   refundAmount?: number | null;
   refundNote?: string | null;
   pointsRedeemed?: number;
+  /** Loyalty points on this order: ₹ used, the most the customer could use now (0 when none or using is off), their points. */
+  points?: { max: number; balance: number } | null;
   /** WhatsApp address step: asked, and given or confirmed by the customer; a shared location's map link. */
   addressAskedAt?: Date | string | null;
   addressConfirmedAt?: Date | string | null;
@@ -1041,6 +1044,16 @@ export function OrderCard({
 
         {isLate && <span className="pill bad">Late {lateText}</span>}
       </div>
+
+      {/* 3b. Loyalty points: used on this order, or what the customer can use (Use button, "By hand"). */}
+      <OrderPointsControl
+        orderId={o.id}
+        applied={pointsDiscount(o)}
+        max={o.points?.max ?? 0}
+        balance={o.points?.balance ?? 0}
+        canChange={canEdit && o.status !== "CANCELLED" && !o.paidAt && !((o.paidAmount ?? 0) > 0)}
+        paymentSent={Boolean(o.paymentRequestedAt)}
+      />
 
       {/* 4. Missing info notice */}
       {missingBadges.length > 0 && (

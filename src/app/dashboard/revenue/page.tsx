@@ -322,7 +322,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
             </div>
             <div className="stack">
               <LoyaltyRulesSetting rules={loyaltyRules(client)} />
-              <LoyaltyRedeemSetting on={client.loyaltyAutoRedeem} />
+              <LoyaltyRedeemSetting on={client.loyaltyAutoRedeem} redeemOn={client.loyaltyRedeemOn} />
             </div>
           </section>
         )}

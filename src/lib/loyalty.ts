@@ -68,17 +68,19 @@ export type LoyaltyRules = {
   /** Repeat-order bonus: `repeatBonus` points for every bought order after the first. */
   repeatOn: boolean;
   repeatBonus: number;
+  /** Customers can use their points as a discount. Off: points still add up, but none can be used (nothing worth ₹). */
+  redeemOn?: boolean;
 };
 
 /** The limits a shop can set (checked when saving, and again when reading). */
 export const LOYALTY_RULE_LIMITS = { rupeesPerPoint: { min: 1, max: 100000 }, repeatBonus: { min: 1, max: 10000 } } as const;
 
-export const DEFAULT_LOYALTY_RULES: LoyaltyRules = { earnOn: true, rupeesPerPoint: RUPEES_PER_POINT, repeatOn: true, repeatBonus: 50 };
+export const DEFAULT_LOYALTY_RULES: LoyaltyRules = { earnOn: true, rupeesPerPoint: RUPEES_PER_POINT, repeatOn: true, repeatBonus: 50, redeemOn: true };
 
 /** The Client columns that hold the rules, for Prisma selects. */
-export const LOYALTY_RULE_FIELDS = { loyaltyEarnOn: true, loyaltyRupeesPerPoint: true, loyaltyRepeatOn: true, loyaltyRepeatBonus: true } as const;
+export const LOYALTY_RULE_FIELDS = { loyaltyEarnOn: true, loyaltyRupeesPerPoint: true, loyaltyRepeatOn: true, loyaltyRepeatBonus: true, loyaltyRedeemOn: true } as const;
 
-type RuleColumns = { loyaltyEarnOn?: boolean | null; loyaltyRupeesPerPoint?: number | null; loyaltyRepeatOn?: boolean | null; loyaltyRepeatBonus?: number | null };
+type RuleColumns = { loyaltyEarnOn?: boolean | null; loyaltyRupeesPerPoint?: number | null; loyaltyRepeatOn?: boolean | null; loyaltyRepeatBonus?: number | null; loyaltyRedeemOn?: boolean | null };
 
 const wholeIn = (n: unknown, lim: { min: number; max: number }, fallback: number) =>
   typeof n === "number" && Number.isInteger(n) && n >= lim.min && n <= lim.max ? n : fallback;
@@ -91,6 +93,7 @@ export function loyaltyRules(c?: RuleColumns | null): LoyaltyRules {
     rupeesPerPoint: wholeIn(c?.loyaltyRupeesPerPoint, LOYALTY_RULE_LIMITS.rupeesPerPoint, d.rupeesPerPoint),
     repeatOn: c?.loyaltyRepeatOn ?? d.repeatOn,
     repeatBonus: wholeIn(c?.loyaltyRepeatBonus, LOYALTY_RULE_LIMITS.repeatBonus, d.repeatBonus),
+    redeemOn: c?.loyaltyRedeemOn ?? true,
   };
 }
 
@@ -226,7 +229,8 @@ export function computeCustomerLoyalty(input: {
   const rewardRupees = Math.round(totalPoints * 0.5);
   // What can be offered as a discount right now: the balance in steps of ₹25, at most ₹250,
   // and nothing below 50 points. Never more than the customer actually has.
-  const redeemableRupees = totalPoints >= 50 ? Math.min(250, Math.floor(rewardRupees / 25) * 25) : 0;
+  // Using points switched off by the shop: they still add up, but are worth nothing off an order (so no message offers them).
+  const redeemableRupees = rules.redeemOn !== false && totalPoints >= 50 ? Math.min(250, Math.floor(rewardRupees / 25) * 25) : 0;
 
   // 3. RFM (Recency, Frequency, Monetary) 1–5 Scoring
   const days = input.daysSinceLastOrder ?? null;

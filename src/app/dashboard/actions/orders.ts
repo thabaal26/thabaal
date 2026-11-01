@@ -371,6 +371,23 @@ export async function setOrderPointsAction(id: string, rupees: number | "max"): 
   return { ok: r.ok, message: r.message };
 }
 
+/**
+ * Payments › Settings: whether customers can use their points at all. Off: no Use button, nothing comes off by
+ * itself and no message offers points; points still add up, and points already on an unpaid order stay until removed.
+ */
+export async function saveLoyaltyRedeemOn(on: boolean): Promise<SendResult> {
+  const s = await requireManager(true);
+  if ("denied" in s) return { ok: false, message: s.denied };
+  await db.client.update({ where: { id: s.clientId }, data: { loyaltyRedeemOn: Boolean(on) } });
+  revalidatePath("/dashboard", "layout");
+  return {
+    ok: true,
+    message: on
+      ? "Customers can use their loyalty points again."
+      : "Using points is off. Points still add up on every order, but nobody can use them until you turn this on.",
+  };
+}
+
 /** Order & Payment Settings: use customers' loyalty points automatically on new orders, or only by hand. */
 export async function saveLoyaltyAutoRedeem(on: boolean): Promise<SendResult> {
   const s = await requireManager(true);

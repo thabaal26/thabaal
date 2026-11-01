@@ -118,6 +118,9 @@ model Client {
   paymentConfig       String?
   /// Use a customer's loyalty points automatically on each new order (cart or hand-entered), before payment is asked.
   loyaltyAutoRedeem   Boolean           @default(false)
+  /// Customers can use their points as a discount (by hand or automatically). Off: points still add up, but nobody
+  /// can use them and no message offers them (lib/loyalty.ts redeemOn).
+  loyaltyRedeemOn     Boolean           @default(true)
   /// Loyalty rules (Payments › Settings): 1 point per loyaltyRupeesPerPoint ₹ of bought orders, when loyaltyEarnOn.
   loyaltyEarnOn         Boolean         @default(true)
   loyaltyRupeesPerPoint Int             @default(100)

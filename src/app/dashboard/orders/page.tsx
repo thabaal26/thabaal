@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { getCatalogWithProducts } from "@/lib/catalog";
 import { db } from "@/lib/db";
 import { readPaySettings, shopDeliveryFee } from "@/lib/pay-settings";
+import { LOYALTY_RULE_FIELDS, loyaltyRules } from "@/lib/loyalty";
+import { maxPointsDiscount } from "@/lib/loyalty-redeem";
 import { getScope, owned } from "@/lib/session";
 import { LiveRefresh } from "@/components/live-refresh";
 import { RefreshButton } from "@/components/refresh-button";
@@ -47,9 +49,13 @@ export default async function OrdersPage({
             location: true,
             locationRaw: true,
             client: { select: { name: true } },
+            // For the loyalty points each unpaid order could use.
+            tags: true,
+            purchases: true,
+            orders: { select: { id: true, total: true, status: true, paidAt: true, paymentMethod: true, internalNote: true, pointsRedeemed: true } },
           },
         },
-        client: { select: { name: true, paymentConfig: true, orderFlow: true, paySettings: true } },
+        client: { select: { name: true, paymentConfig: true, orderFlow: true, paySettings: true, ...LOYALTY_RULE_FIELDS } },
       },
       orderBy: { createdAt: "desc" },
       take: 400,
@@ -108,6 +114,8 @@ export default async function OrdersPage({
     refundAmount: o.refundAmount,
     refundNote: o.refundNote,
     pointsRedeemed: o.pointsRedeemed,
+    // Unpaid orders: what the customer could take off in points now (nothing when the shop turned using points off).
+    points: o.status === "CANCELLED" || o.paidAt || (o.paidAmount ?? 0) > 0 ? null : maxPointsDiscount(o, loyaltyRules(o.client)),
     addressAskedAt: o.addressAskedAt,
     addressConfirmedAt: o.addressConfirmedAt,
     mapUrl: o.mapUrl,

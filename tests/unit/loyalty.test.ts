@@ -126,6 +126,7 @@ describe("loyalty points", () => {
       rupeesPerPoint: 100,
       repeatOn: true,
       repeatBonus: 50,
+      redeemOn: true, // using points: on unless the shop turned it off
     });
     assert.equal(pointsForOrder(1250, 1), 12);
     assert.equal(pointsForOrder(1250, 2), 62);

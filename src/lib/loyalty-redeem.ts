@@ -75,8 +75,13 @@ export async function setOrderPoints(orderId: string, amount: number | "max"): P
   const { subtotal, shipping } = getOrderPricing(items, order.total, { discount: current });
   if (subtotal <= 0) return { ok: false, message: "Add item prices before using points.", applied: 0 };
 
-  const { max, balance } = maxPointsDiscount(order, loyaltyRules(order.client));
+  const rules = loyaltyRules(order.client);
+  const { max, balance } = maxPointsDiscount(order, rules);
   const wanted = amount === "max" ? max : Math.max(0, Math.floor(amount / REDEEM_STEP) * REDEEM_STEP);
+  // Using points is off: nothing new comes off; points already on an order can still be taken back off.
+  if (rules.redeemOn === false && wanted > 0) {
+    return { ok: false, message: "Using loyalty points is off. Turn it on in Payments › Settings › Loyalty points at checkout.", applied: current };
+  }
   if (wanted > max) {
     return {
       ok: false,
@@ -110,8 +115,8 @@ export async function setOrderPoints(orderId: string, amount: number | "max"): P
 
 /** A new order arrived (cart or hand-entered): use the customer's points on it when the client has this turned on. */
 export async function autoRedeemPoints(orderId: string): Promise<number> {
-  const order = await db.order.findUnique({ where: { id: orderId }, select: { pointsRedeemed: true, client: { select: { loyaltyAutoRedeem: true } } } });
-  if (!order?.client.loyaltyAutoRedeem || order.pointsRedeemed > 0) return 0;
+  const order = await db.order.findUnique({ where: { id: orderId }, select: { pointsRedeemed: true, client: { select: { loyaltyAutoRedeem: true, loyaltyRedeemOn: true } } } });
+  if (!order?.client.loyaltyAutoRedeem || !order.client.loyaltyRedeemOn || order.pointsRedeemed > 0) return 0;
   const r = await setOrderPoints(orderId, "max");
   return r.ok ? r.applied : 0;
 }
