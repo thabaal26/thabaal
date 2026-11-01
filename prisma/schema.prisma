@@ -830,8 +830,10 @@ model Lead {
   id        String         @id @default(cuid())
   shop      String
   person    String?
-  /// Indian mobile, 10 digits.
+  /// Indian mobile, 10 digits ("" for an older sign-up that gave none: the email is used then).
   phone     String
+  /// The sign-up's email (sign-ups only).
+  email     String?
   town      String?
   sells     String?
   /// Where it came from: lib/lead-stages.ts LEAD_SOURCES.

@@ -38,6 +38,7 @@ export const PRESSES: Record<string, string> = {
   "order.confirm": "Confirm order",
   "order.dispatch": "Dispatch order",
   "order.deliver": "Mark delivered",
+  "order.ready": "Ready for pickup",
   "order.cod": "Cash received",
   "payment.request": "Payment link",
   "payment.record": "Mark as paid",

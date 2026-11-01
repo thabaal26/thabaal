@@ -6,6 +6,17 @@
 
 export const ORDER_TEMPLATE_NAMES = ["order_confirmation", "order_dispatched", "order_delivered", "order_cancelled"] as const;
 
+/**
+ * The order update templates a shop needs for its order steps (Settings › Order steps), used once a customer's 24-hour
+ * window has closed. Pickup and service shops get their own words: no "delivery slot", no "dispatched".
+ */
+export const FLOW_TEMPLATE_NAMES: Record<"pickup" | "deliver" | "courier" | "service", string[]> = {
+  deliver: ["order_confirmation", "order_dispatched", "order_delivered", "order_cancelled"],
+  courier: ["order_confirmation", "order_dispatched", "order_delivered", "order_cancelled"],
+  pickup: ["order_confirmation_pickup", "order_ready_pickup", "order_cancelled"],
+  service: ["booking_confirmation", "order_cancelled"],
+};
+
 const PICTURE_PREFIXES = ["pic_", "thenan_"] as const;
 
 /** The plain name and every picture-version name for one order template. */

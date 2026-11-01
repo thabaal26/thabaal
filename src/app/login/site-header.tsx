@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { DEMO_TARGET, DEMO_URL } from "./demo-link";
 
 type Lang = "en" | "ta";
 
@@ -121,7 +120,7 @@ export function SiteHeader({ lang, onToggleLang, onSelectLang }: SiteHeaderProps
           </button>
 
           {/* Book a demo CTA */}
-          <a href={DEMO_URL} {...DEMO_TARGET} className="site-header-btn site-header-btn-primary">
+          <a href="#start" className="site-header-btn site-header-btn-primary">
             <span className="site-header-label-long">{ta ? "டெமோ பதிவு செய்யுங்கள்" : "Book a demo"}</span>
             <span className="site-header-label-short">{ta ? "டெமோ பதிவு" : "Book demo"}</span>
           </a>

@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 const NEW_DAYS = 30;
 const WEEKS = 8;
-const SOURCE_COLORS = ["#FFC329", "#20C985", "#2B5C86", "#F46B4E", "#8E5AC6"];
+const SOURCE_COLORS = ["#FFC329", "#0E9F6E", "#20C985", "#2B5C86", "#F46B4E", "#8E5AC6"];
 
 export default async function EnquiriesPage() {
   const me = await requireAdminPage();
@@ -32,6 +32,7 @@ export default async function EnquiriesPage() {
     person: l.person,
     town: l.town,
     phone: l.phone,
+    email: l.email,
     sells: l.sells,
     source: l.source,
     plan: l.plan,

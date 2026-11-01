@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { safeAction, toastResult } from "@/components/toast";
-import { FLOW_KEYS, ORDER_FLOWS, type OrderFlowKey } from "@/lib/order-flow";
+import { FLOW_KEYS, ORDER_FLOWS, packLabel, packLabelTa, type OrderFlowKey } from "@/lib/order-flow";
 import { useLanguage } from "@/lib/i18n/context";
 import { saveOrderFlow } from "../actions/orders";
 
@@ -62,6 +62,12 @@ export function OrderStepsForm({ current, canChange }: { current: OrderFlowKey; 
             <span key={s.key} style={{ display: "contents" }}>
               {i > 0 && " › "}
               <b className="on">{isTa ? s.ta : s.label}</b>
+              {s.key === "CONFIRMED" && ORDER_FLOWS[flow].pack && (
+                <>
+                  {" › "}
+                  <b className="on">{isTa ? packLabelTa(flow) : packLabel(flow)}</b>
+                </>
+              )}
             </span>
           ))}
         </div>

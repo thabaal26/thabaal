@@ -110,7 +110,8 @@ export async function moveLead(actor: LeadActor, id: string, stage: string, now 
   const lead = await db.lead.findUnique({ where: { id } });
   if (!lead) return { ok: false, message: "Enquiry not found." };
   if (lead.stage === stage) return { ok: true, message: `Already in ${stageName(stage)}.` };
-  if (lead.clientId) return { ok: false, message: "This enquiry is already a business, so it stays Won." };
+  // A paying business stays Won; a sign-up that hasn't paid can still be moved (or lost).
+  if (lead.clientId && lead.stage === "won") return { ok: false, message: "This enquiry is already a business, so it stays Won." };
   const closing = !isOpenStage(stage);
   await db.lead.update({
     where: { id },
@@ -204,9 +205,140 @@ export async function convertLead(actor: LeadActor, id: string, input: { name: s
   return { ok: true, id: clientId, message: `${v.name} added to All clients. Add their login and WhatsApp number there.` };
 }
 
+// ---- enquiries that arrive by themselves: the website's free demo form, and sign-ups --------------------------------
+
+const WEBSITE = "Website";
+const SIGNUP_NOTE = "Made their own account on thabaal.in and hasn't paid yet. Help them pick a plan and connect their WhatsApp number.";
+
+/**
+ * The website's free demo form (no sign-in). One open enquiry per number: asking again brings that one back to today
+ * instead of adding a second. Checks here; the action (app/login/demo-actions.ts) also limits how often a network asks.
+ */
+export async function addWebsiteLead(
+  input: { shop: string; person: string; phone: string; town?: string; sells?: string; plan?: string },
+  now = new Date(),
+): Promise<LeadResult & { again?: boolean }> {
+  const phone = cleanPhone(input.phone);
+  if (!phone) return { ok: false, message: "Enter your 10-digit WhatsApp number." };
+  const shop = text(input.shop, 120);
+  if (shop.length < 2) return { ok: false, message: "Enter your shop's name." };
+  const person = text(input.person, 80);
+  if (person.length < 2) return { ok: false, message: "Enter your name." };
+  const plan = input.plan && isPlanKey(input.plan) ? input.plan : null;
+  const town = text(input.town, 60) || null;
+  const sells = text(input.sells, 120) || null;
+  const asked = [sells && `sells ${sells}`, plan && `asked about ${plan}`].filter(Boolean).join(", ");
+  const open = await db.lead.findFirst({ where: { phone, stage: { notIn: ["won", "lost"] } } });
+  if (open) {
+    await db.lead.update({
+      where: { id: open.id },
+      data: {
+        nextOn: asDate(todayKey(now)),
+        ...(plan && !open.plan ? { plan } : {}),
+        ...(sells && !open.sells ? { sells } : {}),
+        ...(town && !open.town ? { town } : {}),
+        ...(!open.person ? { person } : {}),
+        activity: { create: { kind: "edit", text: `Asked for a demo again on the website${asked ? ` (${asked})` : ""}. Follow up today.`, by: WEBSITE } },
+      },
+    });
+    return { ok: true, id: open.id, again: true, message: "We already have your request and will call you today." };
+  }
+  const lead = await db.lead.create({
+    data: {
+      shop,
+      person,
+      phone,
+      town,
+      sells,
+      plan,
+      source: "Home page form",
+      nextOn: asDate(todayKey(now)),
+      createdBy: WEBSITE,
+      activity: { create: { kind: "created", text: `Asked for a free demo on the website${asked ? ` (${asked})` : ""}`, by: WEBSITE } },
+    },
+  });
+  return { ok: true, id: lead.id, message: "Thank you! We'll WhatsApp you soon." };
+}
+
+/**
+ * A business made its own account: an enquiry to follow up until it pays (it is won by itself then, syncSignupLeads).
+ * An open enquiry with the same number (they asked for a demo first) is linked instead of adding a second one.
+ */
+export async function leadFromSignup(
+  input: { clientId: string; business: string; person: string; phone?: string | null; email: string; town?: string | null; at?: Date },
+  now = new Date(),
+): Promise<LeadResult> {
+  const phone = input.phone ? cleanPhone(input.phone) : null;
+  const linked = await db.lead.findUnique({ where: { clientId: input.clientId }, select: { id: true } });
+  if (linked) return { ok: true, id: linked.id, message: "Already an enquiry." };
+  const open = phone ? await db.lead.findFirst({ where: { phone, clientId: null, stage: { notIn: ["won", "lost"] } } }) : null;
+  if (open) {
+    await db.lead.update({
+      where: { id: open.id },
+      data: {
+        clientId: input.clientId,
+        email: input.email,
+        nextOn: asDate(todayKey(now)),
+        activity: { create: { kind: "edit", text: `Signed up as ${input.business} (not paid yet). Help them pick a plan.`, by: WEBSITE } },
+      },
+    });
+    return { ok: true, id: open.id, message: "Linked to their enquiry." };
+  }
+  const lead = await db.lead.create({
+    data: {
+      shop: text(input.business, 120),
+      person: text(input.person, 80) || null,
+      phone: phone ?? "",
+      email: input.email,
+      town: text(input.town, 60) || null,
+      source: "Sign-up",
+      clientId: input.clientId,
+      note: SIGNUP_NOTE,
+      nextOn: asDate(todayKey(now)),
+      createdBy: WEBSITE,
+      ...(input.at ? { createdAt: input.at } : {}),
+      activity: { create: { kind: "created", text: "Signed up on thabaal.in (not paid yet)", by: WEBSITE } },
+    },
+  });
+  return { ok: true, id: lead.id, message: "Enquiry added." };
+}
+
+/** Sign-ups from before enquiries came in by themselves: the last 30 days. */
+const BACKFILL_DAYS = 30;
+
+/**
+ * Keeps sign-up enquiries in step with the business: won once a payment of theirs is verified (a lost one too: they
+ * came back), and a recent sign-up that has no enquiry yet gets one. Run when the Enquiries pages open.
+ */
+export async function syncSignupLeads(now = new Date()) {
+  const paid = await db.lead.findMany({
+    where: { clientId: { not: null }, stage: { not: "won" }, client: { planPurchases: { some: { status: "VERIFIED" } } } },
+    select: { id: true, client: { select: { name: true, planPurchases: { where: { status: "VERIFIED" }, orderBy: { startsAt: "asc" }, take: 1, select: { plan: true } } } } },
+  });
+  for (const l of paid) {
+    const done = await db.lead.updateMany({ where: { id: l.id, stage: { not: "won" } }, data: { stage: "won", reached: "won", closedAt: now, nextOn: null } });
+    if (done.count) {
+      const plan = l.client?.planPurchases[0]?.plan;
+      await db.leadActivity.create({ data: { leadId: l.id, kind: "stage", text: `Paid${plan ? ` for the ${plan} plan` : ""}: won`, by: "thabaal" } });
+    }
+  }
+  // A sign-up makes its first login (the owner) in the same moment as the business; a business Thabaal added gets
+  // its login later, so only the first counts.
+  const recent = await db.client.findMany({
+    where: { createdAt: { gte: new Date(now.getTime() - BACKFILL_DAYS * 86_400_000) }, planRequired: true, lead: null, planPurchases: { none: { status: "VERIFIED" } } },
+    select: { id: true, name: true, homeCity: true, createdAt: true, users: { where: { role: "CLIENT", access: "MANAGER" }, orderBy: { createdAt: "asc" }, take: 1, select: { name: true, email: true, createdAt: true } } },
+  });
+  for (const c of recent) {
+    const owner = c.users[0];
+    if (!owner || owner.createdAt.getTime() - c.createdAt.getTime() > 60_000) continue;
+    await leadFromSignup({ clientId: c.id, business: c.name, person: owner.name, email: owner.email, town: c.homeCity, at: c.createdAt }, now).catch(() => null);
+  }
+}
+
 // ---- reading, for the Enquiries page -----------------------------------------------------------------------------
 
 export async function loadLeads() {
+  await syncSignupLeads().catch((e) => console.error("Could not bring sign-ups into Enquiries", e));
   const [leads, team] = await Promise.all([
     db.lead.findMany({
       orderBy: { createdAt: "desc" },
