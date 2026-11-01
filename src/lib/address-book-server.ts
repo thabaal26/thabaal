@@ -45,6 +45,17 @@ export async function addressBook(customerId: string): Promise<SavedAddress[]> {
   return mergeAddresses(saved, profile, past);
 }
 
+/**
+ * Call before a customer's latest address (locationRaw) changes: a customer from before the list gets the addresses
+ * known so far (profile and past orders) written to it, so the one being replaced isn't lost.
+ */
+export async function keepKnownAddresses(customerId: string) {
+  const c = await db.customer.findUnique({ where: { id: customerId }, select: { addresses: true } });
+  if (!c || readAddresses(c.addresses).length) return;
+  const known = await addressBook(customerId);
+  if (known.length) await db.customer.update({ where: { id: customerId }, data: { addresses: known as unknown as Prisma.InputJsonValue } });
+}
+
 /** Puts an address on top of the customer's list (given or used now). The first save keeps their older addresses. */
 export async function rememberAddress(customerId: string, entry: { text: string; area?: string | null; mapUrl?: string | null }) {
   if (!entry.text.trim()) return;

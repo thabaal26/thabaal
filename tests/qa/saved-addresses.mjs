@@ -124,7 +124,20 @@ await check(4, "New order for that number offers all saved addresses; the pick i
   return `${opts.length - 1} offered`;
 });
 
-await check(5, "no browser errors", async () => {
+await check(5, "a customer from before the list (profile address only): a new address typed on the order keeps the old one saved", async () => {
+  await db.customer.update({ where: { id: cust.id }, data: { addresses: null, locationRaw: HOME, location: "Anna Nagar" } });
+  await db.order.updateMany({ where: { customerId: cust.id }, data: { note: null } });
+  await m.goto(`${BASE}/dashboard/orders?q=${encodeURIComponent(REF)}`, { waitUntil: "networkidle" });
+  await card().getByRole("button", { name: /^Change$|Add or change address|Add address/ }).first().click();
+  await card().locator("#ad").fill(OFFICE);
+  await card().getByRole("button", { name: "Save", exact: true }).click();
+  await toast(/delivery address/i);
+  const list = await book();
+  expect(list.length === 2 && list[0] === OFFICE && list[1] === HOME, "list: " + list.join(" / "));
+  return "both saved";
+});
+
+await check(6, "no browser errors", async () => {
   expect(!errors.length, errors.join(" | ").slice(0, 300));
   return "none";
 });

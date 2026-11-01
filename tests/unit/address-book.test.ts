@@ -4,10 +4,11 @@
 // what each message asked WhatsApp to show.
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, test } from "node:test";
-import { addressKey, pickedNumber, withAddress, type SavedAddress } from "../../src/lib/address-book";
+import { Prisma } from "@prisma/client";
+import { addressKey, pickedNumber, readAddresses, withAddress, type SavedAddress } from "../../src/lib/address-book";
 import { addressBook, rememberAddress } from "../../src/lib/address-book-server";
 import { db } from "../../src/lib/db";
-import { confirmSavedAddress, handleAddressReply, startAddressStep } from "../../src/lib/delivery-address";
+import { askNewAddress, confirmSavedAddress, handleAddressReply, startAddressStep } from "../../src/lib/delivery-address";
 
 const HOME = "12, 3rd Street, Anna Nagar, Madurai - 625020";
 const OFFICE = "45, Bypass Road, KK Nagar, Madurai - 625020";
@@ -193,5 +194,38 @@ describe("saved addresses: on WhatsApp and the customer", () => {
     assert.equal(wa().length, asked + 1);
     assert.match(lastText(), /Which address/);
     assert.equal((await fresh(o.id)).addressConfirmedAt, null);
+  });
+
+  test("11. a customer from before the list (one address on the profile only) taps New address and fills the form: both are saved straight away", async () => {
+    await db.customer.update({ where: { id: customerId }, data: { locationRaw: HOME, location: "Anna Nagar", addresses: Prisma.DbNull } });
+    const o = await cart("QB-8");
+    await startAddressStep(o.id);
+    assert.match(lastText(), /addr_ok:/, "one address: deliver here?");
+    await askNewAddress(o.id, customerId);
+    const form = { name: "Meena R", phone_number: "+919990008888", in_pin_code: "625020", house_number: "45", address: "Bypass Road", landmark_area: "KK Nagar", city: "Madurai", state: "Tamil Nadu" };
+    await handleAddressReply({ id: customerId }, { type: "interactive", interactive: { type: "nfm_reply", nfm_reply: { name: "address_message", response_json: JSON.stringify({ values: form }) } } }, "x");
+    const c = await customer();
+    const saved = readAddresses(c.addresses).map((a) => a.text);
+    assert.equal(saved.length, 2, "both in the database: " + saved.join(" / "));
+    assert.match(saved[0], /45, Bypass Road, KK Nagar/);
+    assert.equal(saved[1], HOME);
+    assert.match(c.locationRaw ?? "", /Bypass Road/, "the new one is their latest");
+    assert.match((await fresh(o.id)).note ?? "", /Bypass Road/);
+    // Their next order asks which one.
+    await db.order.update({ where: { id: o.id }, data: { status: "DELIVERED" } });
+    const next = await cart("QB-9");
+    await startAddressStep(next.id);
+    assert.match(lastText(), /Which address/);
+  });
+
+  test("12. a customer from before the list picks an address only found on a past order: the profile one stays saved", async () => {
+    await db.customer.update({ where: { id: customerId }, data: { locationRaw: HOME, addresses: Prisma.DbNull } });
+    await db.order.create({ data: { ref: "QB-OLD3", clientId, customerId, status: "DELIVERED", total: 300, items: [], note: OFFICE, createdAt: new Date(Date.now() - 5 * 86_400_000) } });
+    const o = await cart("QB-10");
+    await startAddressStep(o.id);
+    await confirmSavedAddress(o.id, customerId, addressKey(OFFICE));
+    await db.order.deleteMany({ where: { ref: "QB-OLD3", clientId } }); // even with that order gone, both stay saved
+    const saved = readAddresses((await customer()).addresses).map((a) => a.text);
+    assert.deepEqual(saved, [OFFICE, HOME]);
   });
 });
