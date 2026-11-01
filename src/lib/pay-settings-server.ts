@@ -8,3 +8,9 @@ export async function paySettingsFor(clientId: string): Promise<{ settings: PayS
   const settings = readPaySettings(c?.paySettings, c?.paymentConfig);
   return { settings, paymentConfig: c?.paymentConfig ?? null, waPay: waPayOn(settings, c?.paymentConfig), upi: upiReady(settings) };
 }
+
+/** The delivery charge a new order of this client gets (Settings › Delivery charge; 0 is free delivery). */
+export async function deliveryFeeFor(clientId: string): Promise<number> {
+  const c = await db.client.findUnique({ where: { id: clientId }, select: { paySettings: true } });
+  return readPaySettings(c?.paySettings, null).deliveryFee;
+}

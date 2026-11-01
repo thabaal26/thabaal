@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { APP_ORIGIN } from "@/lib/app-host";
 import { db } from "@/lib/db";
 import { normalizePhone } from "@/lib/phone";
-import { EXPIRY_DAYS, HHMM, readPaySettings, SETTLEMENTS, UPI_ID_RE, upiLink, type PaySettings } from "@/lib/pay-settings";
+import { EXPIRY_DAYS, HHMM, MAX_DELIVERY_FEE, readPaySettings, SETTLEMENTS, UPI_ID_RE, upiLink, type PaySettings } from "@/lib/pay-settings";
 import { textInWindow } from "@/lib/payments";
 import { requireManager } from "@/lib/session";
 import type { SendResult } from "./send-helpers";
@@ -67,6 +67,19 @@ export async function savePaySettings(input: HowPayInput, changed?: "whatsappPay
               : "Delivery address off: new carts go straight to payment."
             : "Payment settings saved.";
   return { ok: true, message: msg };
+}
+
+/** Settings › Delivery charge: free delivery, or the rupees every new order gets. Staff can still change it on one order. */
+export async function saveDeliveryFee(free: boolean, amount: string): Promise<SendResult> {
+  const s = await requireManager(true);
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const n = free ? 0 : Number(amount.trim());
+  if (!free && (!amount.trim() || !Number.isFinite(n) || n < 1 || n > MAX_DELIVERY_FEE))
+    return { ok: false, message: `Delivery charge: enter an amount from ₹1 to ₹${MAX_DELIVERY_FEE.toLocaleString("en-IN")}, or choose Free delivery.` };
+  const deliveryFee = Math.round(n);
+  const { settings } = await current(s.clientId);
+  await store(s.clientId, { ...settings, deliveryFee });
+  return { ok: true, message: deliveryFee ? `New orders get a ₹${deliveryFee} delivery charge.` : "Free delivery: new orders get no delivery charge." };
 }
 
 /** The QR picture sent with UPI links (an upload from /api/upload), or "" to remove it. */

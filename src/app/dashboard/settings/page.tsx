@@ -18,6 +18,8 @@ import { getSettings, wahaConfig } from "@/lib/provider";
 import { waConfig } from "@/lib/whatsapp";
 import { LocalSessionPanel, ProviderSwitch } from "./provider-panel";
 import { OrderStepsForm } from "./order-steps-form";
+import { DeliveryChargeForm } from "./delivery-charge-form";
+import { readPaySettings } from "@/lib/pay-settings";
 import { PaymentSetupForm } from "./payment-setup-form";
 import { DefaultImage } from "./default-image";
 import { readFields } from "@/lib/custom-fields";
@@ -191,6 +193,12 @@ export default async function SettingsPage() {
         {cid && client && (
           <ScrollReveal>
             <OrderStepsForm current={readFlow(client.orderFlow)} canChange={scope.manager} />
+          </ScrollReveal>
+        )}
+
+        {cid && client && (
+          <ScrollReveal>
+            <DeliveryChargeForm current={readPaySettings(client.paySettings, client.paymentConfig).deliveryFee} canChange={scope.manager} />
           </ScrollReveal>
         )}
 

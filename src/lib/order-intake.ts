@@ -12,6 +12,7 @@ import { pushOrderToSheet } from "./google-sheets-live";
 import { autoRedeemPoints } from "./loyalty-redeem";
 import { getOrderPricing } from "./order-pricing";
 import { itemsWithNames, money, nextOrderRef, orderRef, type OrderItem } from "./orders";
+import { deliveryFeeFor } from "./pay-settings-server";
 import { cancelSupersededOrdersForCustomer, logMessage, replyContext, startCheckout, textInWindow } from "./payments";
 import { getSettings } from "./provider";
 import { SALE_WHERE } from "./sale";
@@ -195,7 +196,7 @@ export async function offerReorder(customerId: string) {
   if (!last) return false;
   const items = (await itemsWithNames(last)) as OrderItem[];
   if (!items.length) return false;
-  const pricing = getOrderPricing(items);
+  const pricing = getOrderPricing(items, null, { customShippingFee: await deliveryFeeFor(c.clientId) });
   const when = last.createdAt.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
   const body = [
     `${hello(c.name)} here is your last order ${bold(orderRef(last))} from ${when}:`,
@@ -226,7 +227,7 @@ export async function placeReorder(customerId: string, lastId: string, waMessage
   const key = waMessageId ? `reorder.${waMessageId}` : undefined;
   if (key && (await db.order.findUnique({ where: { waMessageId: key }, select: { id: true } }))) return null;
   const items = (await itemsWithNames(last)) as OrderItem[];
-  const pricing = getOrderPricing(items);
+  const pricing = getOrderPricing(items, null, { customShippingFee: await deliveryFeeFor(last.clientId) });
   let created;
   try {
     created = await db.order.create({

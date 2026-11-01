@@ -5,10 +5,10 @@ import { revalidatePath } from "next/cache";
 import { findAddressesInReplies, parseAddressText } from "@/lib/address";
 import { db } from "@/lib/db";
 import { pushOrderToSheet } from "@/lib/google-sheets-live";
-import { DEFAULT_SHIPPING_FEE, getOrderPricing, itemsText, itemsWithNames, money, nextOrderRef, orderRef, syncCustomerOrderedProducts, type OrderItem } from "@/lib/orders";
+import { getOrderPricing, itemsText, itemsWithNames, money, nextOrderRef, orderRef, syncCustomerOrderedProducts, type OrderItem } from "@/lib/orders";
 import { confirmPayment, sendPaymentRequestFor, updateOrderCard } from "@/lib/payments";
 import { codBlocked } from "@/lib/pay-settings";
-import { paySettingsFor } from "@/lib/pay-settings-server";
+import { deliveryFeeFor, paySettingsFor } from "@/lib/pay-settings-server";
 import { utrOf } from "@/lib/payment-events";
 import { dueOf, methodOf, receivedOf } from "@/lib/payment-state";
 import { autoRedeemPoints, keptPointsDiscount, setOrderPoints } from "@/lib/loyalty-redeem";
@@ -683,7 +683,7 @@ export async function createOrder(input: {
   if (!existing && !name) return { ok: false, message: "This is a new customer: enter their name so they can be saved." };
   // Payment settings › Cash on delivery: on, under the limit and in an allowed area (checked before anything is saved).
   if (input.paymentMode === "cod") {
-    const fee = input.shippingFee !== undefined ? Math.max(0, Number(input.shippingFee) || 0) : DEFAULT_SHIPPING_FEE;
+    const fee = input.shippingFee !== undefined ? Math.max(0, Number(input.shippingFee) || 0) : pay.settings.deliveryFee;
     const estimate = getOrderPricing(lines.map((i, k) => ({ id: i.id || `m${k}`, name: i.name, quantity: i.quantity, price: i.price, currency: "INR" })), null, { customShippingFee: fee }).total;
     const blocked = codBlocked(pay.settings, estimate, existing ? { ...existing, ...(resolvedRegion && { region: resolvedRegion }), ...(rawAddr && { locationRaw: rawAddr }) } : { region: resolvedRegion, location: resolvedArea, locationRaw: rawAddr });
     if (blocked) return { ok: false, message: blocked };
@@ -732,7 +732,8 @@ export async function createOrder(input: {
     price: i.price,
     currency: "INR",
   }));
-  const shippingFee = input.shippingFee !== undefined ? Math.max(0, Number(input.shippingFee) || 0) : DEFAULT_SHIPPING_FEE;
+  // Settings › Delivery charge unless the order form changed it for this order.
+  const shippingFee = input.shippingFee !== undefined ? Math.max(0, Number(input.shippingFee) || 0) : pay.settings.deliveryFee;
   const { total: grossTotal } = getOrderPricing(items, null, { customShippingFee: shippingFee });
 
   const finalOrderNote =
@@ -831,7 +832,7 @@ export async function updateOrderItems(
     price: i.price,
     currency: "INR",
   }));
-  const shippingFee = input.shippingFee !== undefined ? Math.max(0, Number(input.shippingFee) || 0) : DEFAULT_SHIPPING_FEE;
+  const shippingFee = input.shippingFee !== undefined ? Math.max(0, Number(input.shippingFee) || 0) : await deliveryFeeFor(order.clientId);
   // Points already used stay on the order (cut back if the items now cost less than the discount).
   const before = getOrderPricing(items, null, { customShippingFee: shippingFee });
   const keptPoints = keptPointsDiscount(order, before.subtotal);

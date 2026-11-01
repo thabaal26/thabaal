@@ -34,6 +34,8 @@ export type OrdersViewProps = {
     name: string;
     orderFlow: OrderFlowKey;
     paymentConfig: boolean;
+    /** Settings › Delivery charge: what a new order gets (0 is free delivery). */
+    deliveryFee: number;
   };
   canEdit: boolean;
   scopeClientId: string | null;
@@ -157,6 +159,8 @@ export function OrdersView({
   const [customItemPrice, setCustomItemPrice] = useState<string>("");
   const [itemQty, setItemQty] = useState<number>(1);
   const [newOrderError, setNewOrderError] = useState("");
+  // Delivery charge for this one order: the shop's setting, changeable here.
+  const [newShipping, setNewShipping] = useState(String(client.deliveryFee));
   const [savingOrder, startOrderTransition] = useTransition();
 
   const flow = readFlow(client.orderFlow ?? DEFAULT_FLOW);
@@ -397,7 +401,9 @@ export function OrdersView({
     setNewItems(newItems.filter((_, i) => i !== idx));
   };
 
-  const newOrderTotal = newItems.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const newItemsTotal = newItems.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const newShippingFee = Math.max(0, Math.round(Number(newShipping) || 0));
+  const newOrderTotal = newItemsTotal + (newItemsTotal > 0 ? newShippingFee : 0);
 
   // Submit New Order
   const handleSaveNewOrder = (e: React.FormEvent) => {
@@ -427,6 +433,7 @@ export function OrdersView({
           price: item.price,
         })),
         address: newAddress.trim(),
+        shippingFee: newShippingFee,
         paymentMode: "later",
       });
       toastResult(r);
@@ -437,6 +444,7 @@ export function OrdersView({
         setNewAddress("");
         setWho(null);
         setNewItems([]);
+        setNewShipping(String(client.deliveryFee));
         setNewOrderError("");
         router.refresh();
       } else {
@@ -1134,6 +1142,26 @@ export function OrdersView({
                   </div>
                 ))}
               </div>
+
+              {newItems.length > 0 && (
+                <div className="row" id="noship">
+                  <label className="grow t" htmlFor="nosf">
+                    Delivery charge
+                    <span className="muted small"> · {client.deliveryFee ? `₹${client.deliveryFee} in Settings` : "free in Settings"}</span>
+                  </label>
+                  <input
+                    id="nosf"
+                    type="number"
+                    min={0}
+                    step={1}
+                    inputMode="numeric"
+                    aria-label="Delivery charge for this order"
+                    value={newShipping}
+                    onChange={(e) => setNewShipping(e.target.value)}
+                    style={{ width: 110 }}
+                  />
+                </div>
+              )}
 
               {newItems.length > 0 && (
                 <div
