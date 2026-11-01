@@ -71,6 +71,39 @@ export const flowSteps = (flow: OrderFlowKey) => ORDER_FLOWS[flow].steps;
 export const flowHas = (flow: OrderFlowKey, key: StageKey) => ORDER_FLOWS[flow].steps.some((s) => s.key === key);
 /** Deliver and courier shops tick "Packed" inside Order confirmed. */
 export const flowPacks = (flow: OrderFlowKey) => ORDER_FLOWS[flow].pack;
+/** The shop takes orders to the customer (deliver, courier): WhatsApp asks for the address and a delivery charge is added. */
+export const flowShips = (flow: OrderFlowKey) => flowHas(flow, "DISPATCHED");
+
+/** What the customer reads on WhatsApp about paying in cash and the last step, in this shop's words. */
+export function customerWords(flow: OrderFlowKey) {
+  if (flow === "pickup")
+    return {
+      cashButton: "💵 Pay at the shop",
+      cashLater: "pay in cash when you collect it",
+      cashDue: (amount: string) => `Please pay ${amount} when you collect it.`,
+      confirmed: "is confirmed. You can collect it at our shop.",
+      next: "We'll message you when it's ready for pickup at our shop.",
+      finished: "collected",
+    };
+  if (flow === "service")
+    return {
+      cashButton: "💵 Pay at the visit",
+      cashLater: "pay in cash at the visit",
+      cashDue: (amount: string) => `Please pay ${amount} at the visit.`,
+      confirmed: "is confirmed. Our team will confirm the time with you here.",
+      next: "Our team will confirm the time with you here.",
+      finished: "completed",
+    };
+  return {
+    cashButton: "🚚 Cash on delivery",
+    cashLater: "pay in cash when it's delivered",
+    cashDue: (amount: string) => `Please keep ${amount} ready when it arrives.`,
+    confirmed: "is confirmed.",
+    next: "We'll message you as soon as it's on the way.",
+    finished: "delivered",
+  };
+}
+
 export const stepLabel = (flow: OrderFlowKey, key: StageKey) => ORDER_FLOWS[flow].steps.find((s) => s.key === key)?.label ?? null;
 export const stepLabelTa = (flow: OrderFlowKey, key: StageKey) => ORDER_FLOWS[flow].steps.find((s) => s.key === key)?.ta ?? null;
 

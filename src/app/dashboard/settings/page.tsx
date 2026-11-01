@@ -21,10 +21,9 @@ import { OrderStepsForm } from "./order-steps-form";
 import { DeliveryChargeForm } from "./delivery-charge-form";
 import { readPaySettings } from "@/lib/pay-settings";
 import { PaymentSetupForm } from "./payment-setup-form";
-import { DefaultImage } from "./default-image";
 import { readFields } from "@/lib/custom-fields";
 import { PAYMENT_TEMPLATE, paymentTemplateFor } from "@/lib/payments";
-import { readFlow } from "@/lib/order-flow";
+import { flowShips, readFlow } from "@/lib/order-flow";
 import { AppearanceEditor } from "../appearance-editor";
 import { portalDefault } from "@/lib/appearance";
 import { spendSummary } from "@/lib/spend";
@@ -141,8 +140,8 @@ export default async function SettingsPage() {
                 <div>
                   <h2><T ta="தரவு மற்றும் இணைப்புகள்">Data and connections</T></h2>
                   <p>
-                    <T ta="Google Sheet ஒத்திசைவு, வாடிக்கையாளர் மற்றும் ஆர்டர்களின் கூடுதல் விவரங்கள், டெம்ப்ளேட்களின் இயல்புப் படம்.">
-                      Google Sheet sync, extra details on customers and orders, and the default picture for templates.
+                    <T ta="Google Sheet ஒத்திசைவு, வாடிக்கையாளர் மற்றும் ஆர்டர்களின் கூடுதல் விவரங்கள்.">
+                      Google Sheet sync, and extra details on customers and orders.
                     </T>
                   </p>
                 </div>
@@ -184,12 +183,6 @@ export default async function SettingsPage() {
           </ScrollReveal>
         )}
 
-        {cid && client && scope.manager && (
-          <ScrollReveal id="default-picture" style={{ scrollMarginTop: 80 }}>
-            <DefaultImage url={client.defaultImageUrl} fallback={client.bannerUrl} />
-          </ScrollReveal>
-        )}
-
         {cid && client && (
           <ScrollReveal>
             <OrderStepsForm current={readFlow(client.orderFlow)} canChange={scope.manager} />
@@ -198,7 +191,7 @@ export default async function SettingsPage() {
 
         {cid && client && (
           <ScrollReveal>
-            <DeliveryChargeForm current={readPaySettings(client.paySettings, client.paymentConfig).deliveryFee} canChange={scope.manager} />
+            <DeliveryChargeForm current={readPaySettings(client.paySettings, client.paymentConfig).deliveryFee} canChange={scope.manager} ships={flowShips(readFlow(client.orderFlow))} />
           </ScrollReveal>
         )}
 

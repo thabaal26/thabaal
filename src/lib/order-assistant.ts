@@ -33,6 +33,7 @@ import { db } from "./db";
 import { APP_TZ } from "./format";
 import { pushOrderToSheet } from "./google-sheets-live";
 import { loyaltyFromOrders, loyaltyRules, LOYALTY_RULE_FIELDS } from "./loyalty";
+import { customerWords, flowShips, readFlow } from "./order-flow";
 import { money, orderRef } from "./orders";
 import { REORDER_RE, handleCartChoice, offerReorder, placeReorder } from "./order-intake";
 import { isShopClosed, opensAtText } from "./pay-settings";
@@ -109,7 +110,7 @@ export async function currentOrders(customerId: string) {
     where: { customerId, status: { not: "CANCELLED" }, createdAt: { gte: new Date(Date.now() - 14 * DAY) } },
     orderBy: { createdAt: "desc" },
     take: 20,
-    include: { customer: true, client: { select: { name: true } } },
+    include: { customer: true, client: { select: { name: true, orderFlow: true } } },
   });
   return list.filter((o) => !(o.status === "DELIVERED" && (o.deliveredAt ?? o.updatedAt).getTime() < Date.now() - 3 * DAY));
 }
@@ -139,9 +140,11 @@ export function mentionedOrder<T extends { number: number; ref: string | null }>
 async function statusText(o: Current): Promise<string | "choice"> {
   const ref = bold(orderRef(o));
   const due = dueOf(o);
+  const flow = readFlow(o.client.orderFlow);
+  const words = customerWords(flow);
   if (o.status === "DELIVERED") {
     const when = formatInTimeZone(o.deliveredAt ?? o.updatedAt, APP_TZ, "d MMM");
-    return `Your order ${ref} was delivered on ${when}. If anything isn't right, reply here and we'll sort it out.`;
+    return `Your order ${ref} was ${words.finished} on ${when}. If anything isn't right, reply here and we'll sort it out.`;
   }
   if (o.status === "DISPATCHED") {
     const sent = o.internalNote?.split("\n").reverse().find((l) => l.startsWith("Dispatched "));
@@ -150,8 +153,10 @@ async function statusText(o: Current): Promise<string | "choice"> {
     return `🚚 Your order ${ref} is on its way.${details}${cash}`;
   }
   if (o.packedAt) return `Good news! Your order ${ref} is packed and will be on its way soon. We'll message you when it leaves.`;
-  if (o.paidAt || o.status === "PAID" || (o.status === "CONFIRMED" && o.paymentMethod === "cod"))
-    return `Your order ${ref} is confirmed and being prepared. We'll message you as soon as it's on the way.`;
+  if (o.paidAt || o.status === "PAID" || (o.status === "CONFIRMED" && o.paymentMethod === "cod")) {
+    const cash = !flowShips(flow) && o.paymentMethod === "cod" && due > 0 ? ` ${words.cashDue(bold(money(due, o.currency)))}` : "";
+    return `Your order ${ref} is confirmed and being prepared. ${words.next}${cash}`;
+  }
   if (o.mergeWith) return `Your new order ${ref} is waiting for one answer: please choose in the message above whether to add it to your earlier order or keep it separate.`;
   if (o.addressAskedAt && !o.addressConfirmedAt)
     return `Your order ${ref} is waiting for your delivery address. Please type it here (house/flat no., street, area, city and pincode) or share your location, and we'll pack it right away.`;

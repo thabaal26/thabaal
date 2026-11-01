@@ -7,6 +7,7 @@
 import "server-only";
 import { db } from "./db";
 import { pushOrderToSheet } from "./google-sheets-live";
+import { customerWords, flowShips, readFlow } from "./order-flow";
 import { money, orderRef } from "./orders";
 import { readPaySettings, type PaySettings } from "./pay-settings";
 import { dueOf } from "./payment-state";
@@ -52,6 +53,7 @@ type Waiting = {
   paymentRequestedAt: Date | null;
   mergeWith: string | null;
   customer: { id: string; clientId: string; phone: string; name: string; optedOut: boolean };
+  client: { orderFlow: string | null };
 };
 
 /** The one thing still missing, in the customer's words. */
@@ -60,7 +62,8 @@ function whatsMissing(o: Waiting) {
   if (o.mergeWith) return `Your order ${ref} needs one answer: add it to your earlier order, or keep it separate? Please choose in the message above.`;
   if (o.addressAskedAt && !o.addressConfirmedAt) return `Your order ${ref} is almost done. 🛒 Just send your delivery address (or use the button above) and we'll pack it for you.`;
   if (o.paymentRequestedAt) return `Your order ${ref} is waiting for payment of ${bold(money(dueOf(o), o.currency))}. Tap ${bold("Review and pay")} above to complete it, and we'll pack it right away.`;
-  return `Your order ${ref} (${bold(money(o.total, o.currency))}) is ready. Please choose ${bold("Pay now online")} or ${bold("Cash on delivery")} in the message above to confirm it.`;
+  const cash = customerWords(readFlow(o.client.orderFlow)).cashButton.replace(/^\S+\s/, "");
+  return `Your order ${ref} (${bold(money(o.total, o.currency))}) is ready. Please choose ${bold("Pay now online")} or ${bold(cash)} in the message above to confirm it.`;
 }
 
 /** When the customer was last asked something about this order. */
@@ -81,7 +84,7 @@ export async function nudgeUnfinishedOrders(now = new Date(), paused: ReadonlySe
       id: true, number: true, ref: true, total: true, currency: true, status: true, paidAmount: true, paidAt: true, createdAt: true, nudgeCount: true, nudgedAt: true,
       addressAskedAt: true, addressConfirmedAt: true, paymentRequestedAt: true, mergeWith: true,
       customer: { select: { id: true, clientId: true, phone: true, name: true, optedOut: true } },
-      client: { select: { paySettings: true, paymentConfig: true, quietFrom: true, quietTo: true } },
+      client: { select: { paySettings: true, paymentConfig: true, quietFrom: true, quietTo: true, orderFlow: true } },
     },
     orderBy: { createdAt: "asc" },
     take: PER_TICK,
@@ -103,7 +106,7 @@ export async function nudgeUnfinishedOrders(now = new Date(), paused: ReadonlySe
     const claimed = await db.order.updateMany({ where: { id: o.id, nudgeCount: o.nudgeCount }, data: { nudgeCount: o.nudgeCount + 1, nudgedAt: now, ...(last ? { paymentReminderAt: now } : {}) } });
     if (!claimed.count) continue;
     const text = last
-      ? `${hello(o.customer.name)} a quick reminder: your order is still waiting.\n\n${whatsMissing(o)}\n\nPlease complete it today so we can deliver it to you.`
+      ? `${hello(o.customer.name)} a quick reminder: your order is still waiting.\n\n${whatsMissing(o)}\n\nPlease complete it today so we can ${flowShips(readFlow(o.client.orderFlow)) ? "deliver it to you" : "get it ready for you"}.`
       : `${hello(o.customer.name)} ${whatsMissing(o).replace(/^Your/, "your")}`;
     if (await textInWindow(o.customer, text, last ? "Order reminder (last)" : "Order reminder").catch(() => false)) sent++;
   }

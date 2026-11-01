@@ -7,8 +7,9 @@ import { getOrderPricing, itemsText, itemsWithNames, money, orderRef } from "./o
 import { pointsDiscount } from "./order-pricing";
 import { logPaymentEvent, utrOf } from "./payment-events";
 import { checkoutMode, codBlocked, upiLink, type CheckoutMode, type PaySettings } from "./pay-settings";
+import { customerWords, flowShips } from "./order-flow";
 import { bold, hello, itemLines } from "./wa-text";
-import { paySettingsFor } from "./pay-settings-server";
+import { flowFor, paySettingsFor } from "./pay-settings-server";
 import { dueOf, receivedOf } from "./payment-state";
 import { getSettings } from "./provider";
 import { replyWindowEnd } from "./replies";
@@ -410,7 +411,8 @@ export async function recordPaymentFailure(orderId: string, reason: string) {
   if (order && !order.customer.optedOut) {
     const pay = await paySettingsFor(order.clientId);
     const codOk = pay.settings.codOn && codBlocked(pay.settings, order.total, order.customer) === null;
-    const body = `${hello(order.customer.name)} your payment of ${bold(money(dueOf(order), order.currency))} for order ${bold(orderRef(order))} didn't go through (${reason}).\n\nYou can try again${codOk ? ", or pay in cash when it's delivered" : ""}.`;
+    const words = customerWords(await flowFor(order.clientId));
+    const body = `${hello(order.customer.name)} your payment of ${bold(money(dueOf(order), order.currency))} for order ${bold(orderRef(order))} didn't go through (${reason}).\n\nYou can try again${codOk ? `, or ${words.cashLater}` : ""}.`;
     try {
       if ((await getSettings()).provider === "META") {
         const { open, number, cfg } = await replyContext(order.customer);
@@ -420,7 +422,7 @@ export async function recordPaymentFailure(orderId: string, reason: string) {
             cfg,
             order.customer.phone,
             body,
-            [{ id: `pay_online:${order.id}`, title: "🔁 Try again" }, ...(codOk ? [{ id: `pay_cod:${order.id}`, title: "🚚 Cash on delivery" }] : [])],
+            [{ id: `pay_online:${order.id}`, title: "🔁 Try again" }, ...(codOk ? [{ id: `pay_cod:${order.id}`, title: words.cashButton }] : [])],
             { header: "Payment not completed", footer: client?.name },
           );
           await logMessage(order.customer.id, "Payment failed", body, res, number?.id ?? null);
@@ -432,7 +434,7 @@ export async function recordPaymentFailure(orderId: string, reason: string) {
     }
     const first = order.customer.name.trim().split(/\s+/)[0] || "there";
     const codOn = codOk;
-    const text = `Hello ${first}, your payment of ${money(dueOf(order), order.currency)} for order ${orderRef(order)} could not be completed (${reason}). Tap the payment link above to try again${codOn ? ', or reply "COD" to pay in cash upon delivery' : ""}.`;
+    const text = `Hello ${first}, your payment of ${money(dueOf(order), order.currency)} for order ${orderRef(order)} could not be completed (${reason}). Tap the payment link above to try again${codOn ? `, or reply "COD" to ${words.cashLater}` : ""}.`;
     await textInWindow(order.customer, text, "Payment failed").catch(() => false);
   }
 }
@@ -605,7 +607,10 @@ export async function sendCodConfirmationPrompt(orderId: string): Promise<{ ok: 
 
   const ref = orderRef(order);
   const totalFormatted = money(order.total, order.currency);
-  const body = `Hello ${firstName(c.name)}, your Cash on Delivery request for ${order.client.name} order ${ref} (${totalFormatted}) is received.\n\nPlease confirm your order below so we can pack and dispatch it for you:`;
+  const flow = await flowFor(order.clientId);
+  const body = flowShips(flow)
+    ? `Hello ${firstName(c.name)}, your Cash on Delivery request for ${order.client.name} order ${ref} (${totalFormatted}) is received.\n\nPlease confirm your order below so we can pack and dispatch it for you:`
+    : `Hello ${firstName(c.name)}, your ${order.client.name} order ${ref} (${totalFormatted}) is received, to ${customerWords(flow).cashLater}.\n\nPlease confirm it below:`;
 
   try {
     const res = await sendInteractiveButtons(
@@ -648,6 +653,7 @@ export async function sendPaymentChoicePrompt(orderId: string): Promise<{ ok: bo
   const items = await itemsWithNames(order);
   const pricing = getOrderPricing(items, order.total, { applyDefaultWhenEqual: true, discount: pointsDiscount(order) });
   const ref = orderRef(order);
+  const flow = await flowFor(order.clientId);
   const replaced = /Replaced unpaid cart (\S+)/.exec(order.internalNote ?? "")?.[1];
   const money2 = (n: number) => money(n, order.currency);
   let body = [
@@ -661,7 +667,7 @@ export async function sendPaymentChoicePrompt(orderId: string): Promise<{ ok: bo
     ]
       .filter(Boolean)
       .join("\n"),
-    order.addressConfirmedAt && order.note?.trim() ? `📍 Deliver to: ${order.note.trim().slice(0, 300)}` : null,
+    flowShips(flow) && order.addressConfirmedAt && order.note?.trim() ? `📍 Deliver to: ${order.note.trim().slice(0, 300)}` : null,
     "How would you like to pay?",
   ]
     .filter(Boolean)
@@ -675,7 +681,7 @@ export async function sendPaymentChoicePrompt(orderId: string): Promise<{ ok: bo
       body,
       [
         { id: `pay_online:${order.id}`, title: "💳 Pay now online" },
-        { id: `pay_cod:${order.id}`, title: "🚚 Cash on delivery" },
+        { id: `pay_cod:${order.id}`, title: customerWords(flow).cashButton },
       ],
       { header: "Choose how to pay", footer: order.client.name }
     );

@@ -1,6 +1,7 @@
 // Payments › Payment settings: what a client turned on and the rules around it, kept in Client.paySettings.
 // Plain helpers shared by server and client code (no database access here; see pay-settings-server.ts).
 
+import { flowShips, type OrderFlowKey } from "./order-flow";
 import { DEFAULT_SHIPPING_FEE } from "./order-pricing";
 
 export type PaySettings = {
@@ -43,6 +44,9 @@ export type PaySettings = {
 
 /** Highest delivery charge a shop can set. */
 export const MAX_DELIVERY_FEE = 10_000;
+
+/** The charge a new order gets: the shop's delivery charge, or nothing when its order steps don't deliver (pickup, service). */
+export const shopDeliveryFee = (s: Pick<PaySettings, "deliveryFee">, flow: OrderFlowKey) => (flowShips(flow) ? s.deliveryFee : 0);
 
 export const SETTLEMENTS = [
   { id: "Straight to your account, same day", ta: "நேரடியாக உங்கள் கணக்கிற்கு, அதே நாள்" },

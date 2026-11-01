@@ -7,7 +7,7 @@ import { useLanguage } from "@/lib/i18n/context";
 import { saveDeliveryFee } from "../actions/pay-settings";
 
 /** Settings → Delivery charge: free delivery, or the amount every new order gets. One order can still be changed on it. */
-export function DeliveryChargeForm({ current, canChange }: { current: number; canChange: boolean }) {
+export function DeliveryChargeForm({ current, canChange, ships = true }: { current: number; canChange: boolean; ships?: boolean }) {
   const router = useRouter();
   const { isTa } = useLanguage();
   const [free, setFree] = useState(current === 0);
@@ -34,6 +34,14 @@ export function DeliveryChargeForm({ current, canChange }: { current: number; ca
           </p>
         </div>
       </div>
+
+      {!ships && (
+        <div className="note muted small" id="delivery-charge-off" style={{ marginBottom: 12 }}>
+          {isTa
+            ? "உங்கள் ஆர்டர் நிலைகளில் டெலிவரி இல்லை (கடையில் எடுத்தல் / சேவை), எனவே டெலிவரி கட்டணம் சேர்க்கப்படாது, முகவரியும் கேட்கப்படாது."
+            : "Your order steps don't deliver (counter or pickup, or service), so no delivery charge is added and no address is asked. This applies again if you choose I deliver myself or I send by courier."}
+        </div>
+      )}
 
       <div className="list" role="radiogroup" aria-label={isTa ? "டெலிவரி கட்டணம்" : "Delivery charge"}>
         <label className="row" style={{ cursor: canChange ? "pointer" : "default", flexWrap: "nowrap", alignItems: "center" }}>
