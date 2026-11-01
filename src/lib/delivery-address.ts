@@ -12,7 +12,7 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import { parseAddressText } from "./address";
 import { addressKey, pickedNumber, type SavedAddress } from "./address-book";
-import { addressBook, rememberAddress } from "./address-book-server";
+import { addressBook, keepKnownAddresses, rememberAddress } from "./address-book-server";
 import {
   formAddressText,
   formErrors,
@@ -229,6 +229,7 @@ export async function confirmSavedAddress(orderId: string, customerId: string, k
       data: { addressConfirmedAt: new Date(), note: picked.text, mapUrl: picked.mapUrl ?? null },
     });
     if (!done.count) return;
+    await keepKnownAddresses(customerId);
     await db.customer.update({ where: { id: customerId }, data: { locationRaw: picked.text, ...(picked.area ? { location: picked.area } : {}) } });
     await rememberAddress(customerId, picked);
     await continueToPayment(order.id, "Customer picked a saved address");
@@ -278,6 +279,8 @@ export async function addressGivenByStaff(orderId: string) {
 async function saveOnCustomer(customerId: string, text: string, next: DeliveryAddress, area?: string | null) {
   const cust = await db.customer.findUnique({ where: { id: customerId }, select: { name: true, region: true, client: { select: { homeCity: true } } } });
   if (!cust) return;
+  // The address being replaced stays on their list.
+  await keepKnownAddresses(customerId);
   const parsed = parseAddressText(text, cust.client.homeCity);
   const a = (area || parsed.area || "").trim();
   await db.customer.update({

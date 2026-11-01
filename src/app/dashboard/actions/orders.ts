@@ -14,7 +14,7 @@ import { dueOf, methodOf, receivedOf } from "@/lib/payment-state";
 import { autoRedeemPoints, keptPointsDiscount, setOrderPoints } from "@/lib/loyalty-redeem";
 import { LOYALTY_RULE_LIMITS, loyaltyRules, loyaltyRuleWords } from "@/lib/loyalty";
 import { addressGivenByStaff } from "@/lib/delivery-address";
-import { addressBook, rememberAddress } from "@/lib/address-book-server";
+import { addressBook, keepKnownAddresses, rememberAddress } from "@/lib/address-book-server";
 import type { SavedAddress } from "@/lib/address-book";
 import { pointsDiscount } from "@/lib/order-pricing";
 import { getSettings, wahaConfig } from "@/lib/provider";
@@ -606,6 +606,7 @@ export async function saveOrderAddress(
     (customerHasNoAddress || input.syncToCustomer !== false);
 
   if (shouldSyncCustomer) {
+    await keepKnownAddresses(order.customer.id);
     await db.customer.update({
       where: { id: order.customer.id },
       data: {
@@ -712,6 +713,7 @@ export async function createOrder(input: {
     const shouldUpdateName = existing.name === `+${phone}` && Boolean(name);
 
     if (shouldSyncAddr || shouldUpdateName) {
+      if (shouldSyncAddr) await keepKnownAddresses(existing.id);
       customer = await db.customer.update({
         where: { id: existing.id },
         data: {
