@@ -17,7 +17,7 @@ run), and the payment scripts (`tests/qa/payments*.mjs`) press the money buttons
 | `/dashboard/customers` (+ `[id]`, `audiences`, `fields`, `grow`, `sheet`) | customer, pendingCustomer, audience, template, whatsAppNumber, client | customers.ts (`saveCustomer`, `importCustomers`, `setOptOut`, `deleteCustomer`, `adjustLoyaltyPoints`, `tagCustomers`, pending customers), audiences.ts, custom-fields.ts, sheets.ts, send.ts |
 | `/dashboard/catalogue` (+ `combos`) | client, order, catalogue (Meta catalogue via lib/catalog) | catalog.ts: `createProduct`, `updateProduct`, `deleteProduct`, `uploadProductImage`, `sendCatalogue` |
 | `/dashboard/templates` (+ `[id]`, `new`) | template, client | templates.ts: `saveTemplate`, `syncTemplates`, `deleteTemplate`, `sendTestMessage`, `setDefaultImage` |
-| `/dashboard/campaigns` (+ `[id]`, `new`, `compare`) | campaign, customer, client, template, message | campaigns.ts: `saveCampaign`, `toggleCampaign`, `deleteCampaign`, `runCampaignNow`, `sendCampaignTest`, `duplicateCampaign`, `countCampaignAudience`, `cancelRun`, `retryHeldBackNow` |
+| `/dashboard/campaigns` (+ `[id]`, `new`, `compare`) | campaign, customer, client, template, message | campaigns.ts: `saveCampaign`, `toggleCampaign`, `deleteCampaign`, `runCampaignNow`, `sendCampaignTest`, `duplicateCampaign`, `countCampaignAudience`, `cancelRun`, `retryHeldBackNow`, `moveFailedToInactive` |
 | `/dashboard/messages` | message, campaign | export CSV (`/api/messages/export`) |
 | `/dashboard/replies` (+ `priority`) | reply, message | replies.ts: `setReplyHandled`, `handleAllReplies`, `handleRepliesOf`; send.ts: `replyToCustomer` |
 | `/dashboard/notifications` | reply, order, call, message | links |

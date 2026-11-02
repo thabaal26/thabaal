@@ -410,14 +410,18 @@ export function CampaignForm({
                     ? [
                         "வாட்ஸ்அப் பெற முடியாதவர்கள் (Meta 131026: வாட்ஸ்அப் இல்லை, பழைய ஆப், அல்லது உங்களைத் தடுத்தவர்கள்): முதல் தோல்விக்குப் பின் எந்தப் பிரச்சாரத்திலும் இல்லை.",
                         "STOP அனுப்பியவர்கள், அல்லது உங்கள் சலுகைகளை அணைத்தவர்கள் (Meta 131050): மீண்டும் சலுகை இல்லை.",
-                        "Meta நிறுத்தி வைத்தவர்கள் (131049): ஒருவருக்கு எல்லா வணிகங்களிலிருந்தும் வரும் சலுகைகளை Meta கட்டுப்படுத்துகிறது. 3 நாள் தவிர்க்கப்பட்டு ஒருமுறை மட்டும் மீண்டும் அனுப்பப்படும்; உடனே மீண்டும் அனுப்பினால் மீண்டும் நிறுத்தப்படும்.",
+                        "Meta நிறுத்தி வைத்தவர்கள் (131049): ஒருவருக்கு எல்லா வணிகங்களிலிருந்தும் வரும் சலுகைகளை Meta கட்டுப்படுத்துகிறது. 3 நாள் பிரச்சாரங்களில் தவிர்க்கப்படுவார்கள்; 24 மணி நேரத்துக்குப் பின் பிரச்சாரப் பக்கத்தில் நீங்களே ஒருமுறை மீண்டும் அனுப்பலாம்.",
+                        "Meta சோதனையில் உள்ளவர்கள் (130472): சலுகைகள் அவர்களைச் சேராது; 3 நாள் தவிர்க்கப்படுவார்கள்.",
+                        "செயலற்றவர்கள் (inactive குறிச்சொல்): தோல்விக்குப் பின் நீங்கள் Inactive-க்கு மாற்றியவர்கள்.",
                         "சமீபத்தில் உங்கள் சலுகை பெற்றவர்கள் (கடைசி சலுகைக்குப் பின் இடைவெளி), ஆர்டர் நடந்துகொண்டிருப்பவர்கள், சலுகை வேண்டாம் என்றவர்கள்.",
                         "வாட்ஸ்அப் எண்ணின் 24 மணி நேர வரம்பு முடிந்தால், மீதி அடுத்த நேரத்தில் தானாகச் செல்லும்.",
                       ]
                     : [
                         "Can't receive WhatsApp (Meta 131026: not on WhatsApp, an old app, or they blocked you): left out of every campaign after the first failure.",
                         "Replied STOP, or turned off your offers (Meta 131050): never offered again.",
-                        "Held back by Meta (131049): Meta limits how many offers one person gets from all businesses. They're skipped for 3 days, then tried once more; sending again sooner is only held again.",
+                        "Held back by Meta (131049): Meta limits how many offers one person gets from all businesses. Campaigns skip them for 3 days; after 24 hours you can send once more from the campaign page.",
+                        "In a Meta test (130472): offers don't reach them at all. Skipped for 3 days.",
+                        "Inactive (tag inactive): people you moved to Inactive after their messages failed.",
                         "Got an offer from you recently (your gap between offers), have an order in progress, or asked for no offers.",
                         "When the number's 24-hour limit is reached, the rest go out by themselves when it frees up.",
                       ]

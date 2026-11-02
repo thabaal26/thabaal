@@ -5,6 +5,7 @@ export type ErrorKind =
   | "unreachable" // this person can't get WhatsApp messages: skip them from now on
   | "stopped-marketing" // they turned off marketing from this business: opt them out
   | "marketing-limit" // Meta is holding back marketing to this person for now
+  | "experiment" // Meta's marketing experiment: no offers reach them at all, resending gets the same error
   | "rate" // sending too fast: slow down and retry, the message isn't lost
   | "temporary" // Meta is briefly unavailable: try again in a few minutes, the message isn't lost
   | "number-restricted" // the sending number is limited: pause the campaign
@@ -29,8 +30,8 @@ const ERRORS: Record<number, { title: string; kind: ErrorKind }> = {
   131021: { title: "Recipient is the sending number itself", kind: "unreachable" },
   130403: { title: "This customer is blocked in your WhatsApp Business account", kind: "unreachable" },
   131050: { title: "Customer turned off marketing messages from this business", kind: "stopped-marketing" },
-  131049: { title: "Meta held this marketing message back because the customer gets many; campaign messages are retried once after a few days", kind: "marketing-limit" },
-  130472: { title: "Customer is part of a Meta experiment that limits marketing messages", kind: "marketing-limit" },
+  131049: { title: "Meta held this offer back because the customer gets many; it can be sent again after 24 hours", kind: "marketing-limit" },
+  130472: { title: "Customer is in a Meta test that stops offers reaching them; sending again won't work", kind: "experiment" },
 
   // Speed and Meta's availability
   131056: { title: "Too many messages to this customer in a short time", kind: "rate" },

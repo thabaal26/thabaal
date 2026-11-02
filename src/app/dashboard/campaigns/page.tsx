@@ -6,7 +6,7 @@ import { templateLabel } from "@/lib/plain-error";
 import { computeNextRun, DAYS } from "@/lib/schedule";
 import { getScope, owned } from "@/lib/session";
 import { INDIA_GST_RATE, RATES, spendSummary } from "@/lib/spend";
-import { campaignAudienceWhere } from "@/lib/audiences";
+import { campaignAudienceWhere, offerSkipWhere } from "@/lib/audiences";
 import { readPaySettings, waPayOn } from "@/lib/pay-settings";
 import { Automations } from "./automations";
 import { CampaignsDashboard, type CampaignItem } from "./campaigns-dashboard";
@@ -41,7 +41,7 @@ export default async function CampaignsPage() {
     db.campaign.findMany({
       where: owned(scope),
       include: {
-        client: { select: { name: true, quietFrom: true, quietTo: true } },
+        client: { select: { name: true, quietFrom: true, quietTo: true, marketingGapHours: true } },
         template: { select: { id: true, name: true, status: true, category: true, body: true, buttons: true } },
         runs: { orderBy: { startedAt: "desc" }, take: 1 },
         _count: { select: { runs: true } },
@@ -123,13 +123,18 @@ export default async function CampaignsPage() {
       }
 
       let targetCount = reach(c.clientId);
-      if (c.audienceTag || c.includeIds.length || c.excludeIds.length) {
-        try {
-          const audienceWhereClause = await campaignAudienceWhere(c.clientId, c.audienceTag?.trim() || null, c);
-          targetCount = await db.customer.count({ where: audienceWhereClause });
-        } catch {
-          targetCount = reach(c.clientId);
+      // A scheduled send leaves out, at send time, who got an offer within the gap or was held back by Meta: the
+      // card says how many it really goes to.
+      let skipped = 0;
+      try {
+        const audienceWhereClause = await campaignAudienceWhere(c.clientId, c.audienceTag?.trim() || null, c);
+        targetCount = await db.customer.count({ where: audienceWhereClause });
+        if (s === "scheduled" && c.template.category === "MARKETING") {
+          const at = c.nextRunAt && c.nextRunAt > now ? c.nextRunAt : now;
+          skipped = await db.customer.count({ where: { AND: [audienceWhereClause, offerSkipWhere(c.client.marketingGapHours, at)] } });
         }
+      } catch {
+        targetCount = reach(c.clientId);
       }
 
       const spent = r ? r.delivered * PER_MSG : (last ? (last.total ?? 0) * PER_MSG : 0);
@@ -153,15 +158,18 @@ export default async function CampaignsPage() {
         tpl: templateLabel(c.template.name),
         s,
         aud: audienceLabel,
-        cnt: targetCount || (last?.total ?? 0),
-        sent: r?.sent ?? last?.total ?? 0,
+        cnt: (targetCount || (last?.total ?? 0)) - skipped,
+        skip: skipped,
+        // Accepted by Meta; failures are counted apart.
+        sent: r ? r.sent - r.failed : (last?.total ?? 0),
+        read: r?.read,
         seen: seenRate,
         rep: r?.replied ?? 0,
         ord: r?.bought ?? 0,
         sp: Math.round(spent),
         sale: Math.round(r?.revenue ?? 0),
         fail: r?.failed ?? 0,
-        est: Math.round(targetCount * PER_MSG) || 1,
+        est: Math.round((targetCount - skipped) * PER_MSG) || 1,
         body: c.template.body ?? "",
         buttons: templateButtons.length > 0 ? templateButtons : ["Order now"],
         isLive: true,

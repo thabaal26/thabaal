@@ -20,7 +20,11 @@ export type CampaignItem = {
   s: "scheduled" | "running" | "paused" | "completed" | "drafts";
   aud: string;
   cnt: number;
+  /** Scheduled: people in the audience the send will leave out (an offer within the gap, or held back by Meta). */
+  skip?: number;
+  /** Accepted by Meta; failures are in `fail`. */
   sent: number;
+  read?: number;
   seen: number;
   rep: number;
   ord: number;
@@ -80,12 +84,15 @@ function ver(c: CampaignItem, isTamil = false): [string, string] | null {
   return r >= 10 ? ["ok", "Working well"] : r >= 3 ? ["warn", "OK"] : ["bad", "Not paying back"];
 }
 
+/** How many read it: counted when known, else from the read rate. */
+const readOf = (c: CampaignItem) => c.read ?? Math.round((c.sent * c.seen) / 100);
+
 function sum(c: CampaignItem, isTamil = false) {
   const r = Math.round((c.sale / c.sp) * 100) / 100;
   if (isTamil) {
     return (
-      `${c.sent.toLocaleString("en-IN")} வாடிக்கையாளர்களை சென்றடைந்தது. ` +
-      `${Math.round((c.sent * c.seen) / 100).toLocaleString("en-IN")} பேர் படித்தனர். ` +
+      `${c.sent.toLocaleString("en-IN")} வாடிக்கையாளர்களை சென்றடைந்தது${c.fail ? ` (${c.fail} தோல்வி, காரணம் முடிவுப் பக்கத்தில்)` : ""}. ` +
+      `${readOf(c).toLocaleString("en-IN")} பேர் படித்தனர். ` +
       `${c.ord} ஆர்டர்கள் மூலம் ${R(c.sale)} விற்பனை வந்தது. ` +
       (c.sp > 0 ? `செலவு ${R(c.sp)}. ஒவ்வொரு ₹1 செலவுக்கும் ${R(r)} விற்பனை.` : "செய்திக் கட்டணம் இன்னும் பதிவாகவில்லை.")
     );
@@ -93,8 +100,10 @@ function sum(c: CampaignItem, isTamil = false) {
   return (
     "Reached " +
     c.sent.toLocaleString("en-IN") +
-    " customers. " +
-    Math.round((c.sent * c.seen) / 100).toLocaleString("en-IN") +
+    " customers" +
+    (c.fail ? ` (${c.fail} failed: see why in View result)` : "") +
+    ". " +
+    readOf(c).toLocaleString("en-IN") +
     " read it. " +
     c.ord +
     " paid orders brought " +
@@ -369,7 +378,7 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                           <b>{c.n}</b>
                         </td>
                         <td className="num">{c.sent.toLocaleString("en-IN")}</td>
-                        <td className="num">{Math.round((c.sent * c.seen) / 100).toLocaleString("en-IN")}</td>
+                        <td className="num">{readOf(c).toLocaleString("en-IN")}</td>
                         <td className="num">{c.rep}</td>
                         <td className="num">{c.ord}</td>
                         <td className="num">{R(c.sp)}</td>
@@ -427,6 +436,13 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                       )}
                     </p>
                   )}
+                  {c.s === "scheduled" && !!c.skip && (
+                    <p className="small muted" data-testid="campaign-skip">
+                      {isTamil
+                        ? `${c.skip.toLocaleString("en-IN")} பேர் விடப்படுவார்கள்: சமீபத்தில் சலுகை பெற்றவர்கள் அல்லது Meta நிறுத்தி வைத்தவர்கள்.`
+                        : `${c.skip.toLocaleString("en-IN")} more are left out: they got an offer recently or Meta held one back.`}
+                    </p>
+                  )}
 
                   {c.s === "drafts" && (
                     <p className="small muted">
@@ -455,11 +471,12 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                           <div className="v" style={{ fontSize: 20 }}>
                             {c.sent.toLocaleString("en-IN")}
                           </div>
+                          {!!c.fail && <div className="d muted">{isTamil ? `${c.fail} தோல்வி` : `${c.fail} failed`}</div>}
                         </div>
                         <div className="stat">
                           <div className="l">{isTamil ? "படித்தது" : "Read"}</div>
                           <div className="v" style={{ fontSize: 20 }}>
-                            {Math.round((c.sent * c.seen) / 100).toLocaleString("en-IN")}
+                            {readOf(c).toLocaleString("en-IN")}
                           </div>
                           <div className="d muted">{isTamil ? `100-ல் ${c.seen}` : `${c.seen} of 100`}</div>
                         </div>
@@ -697,7 +714,7 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
               </div>
               <div className="row">
                 <div className="grow muted">{isTamil ? "படித்தது" : "Read"}</div>
-                <b>{Math.round((progModal.sent * progModal.seen) / 100).toLocaleString("en-IN")}</b>
+                <b>{readOf(progModal).toLocaleString("en-IN")}</b>
               </div>
               <div className="row">
                 <div className="grow muted">{isTamil ? "பதில்கள்" : "Replies"}</div>
