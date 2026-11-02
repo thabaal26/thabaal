@@ -137,7 +137,8 @@ export function ReplyInbox({
   const [paying, setPaying] = useState(false);
 
   const selected = replies.find((x) => x.id === selectedId || x.customer.id === selectedId) ?? replies[0];
-  const latestInboundAt = thread.find((e) => e.type === "in")?.at ?? selected?.receivedAt;
+  // A chat we started (a campaign) has no message from them: no 24-hour window until they write.
+  const latestInboundAt = thread.find((e) => e.type === "in")?.at ?? (selected?.kind === "sent" ? undefined : selected?.receivedAt);
   const windowTimeRemaining = useWindowCountdown(latestInboundAt, isTamil);
   const windowOpen = Boolean(replyWindowEnd(latestInboundAt));
   const hrefFor = (customerId: string) => `/dashboard/replies?${new URLSearchParams({ ...(show && { show: String(show) }), r: customerId })}`;
@@ -202,6 +203,7 @@ export function ReplyInbox({
       timeStr: fmtDate(r.receivedAt, "h:mm a"),
       previewText: preview(r, isTamil),
       isButton: r.kind === "button",
+      isSent: r.kind === "sent",
       openCount: r.openCount ?? (r.handled ? 0 : 1),
       handled: r.handled,
       unpaidLabel: uo ? (isTamil ? `நிலுவை ${money(uo.total, uo.currency)}` : `Unpaid ${money(uo.total, uo.currency)}`) : null,

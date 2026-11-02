@@ -17,6 +17,7 @@ import { mine, requireAdmin, requireManager } from "@/lib/session";
 import { sendToCustomer } from "./send";
 import type { ActionResult } from "./templates";
 import { trackPress } from "@/lib/usage";
+import { notOpeningOffers } from "@/lib/engagement";
 import { planCapacityBlock } from "@/lib/subscription";
 
 export type CampaignInput = {
@@ -32,7 +33,22 @@ export type CampaignInput = {
   batchSize: number;
   intervalMinutes: number;
   active: boolean;
+  /** Customers added by hand on top of "Send to", and customers left out of it. */
+  includeIds: string[];
+  excludeIds: string[];
+  /** Leave out people who didn't open their last offers (lib/engagement.ts). */
+  skipUnread: boolean;
 };
+
+/** At most this many people added or left out by hand (each list). */
+const MAX_HAND_PICKED = 500;
+
+/** The ids among these that are this client's customers, once each. */
+async function ownCustomers(clientId: string, ids: unknown): Promise<string[]> {
+  const list = Array.isArray(ids) ? [...new Set(ids.filter((x): x is string => typeof x === "string" && /^[a-z0-9]{10,40}$/i.test(x)))].slice(0, MAX_HAND_PICKED) : [];
+  if (!list.length) return [];
+  return (await db.customer.findMany({ where: { clientId, id: { in: list } }, select: { id: true } })).map((c) => c.id);
+}
 
 function refresh() {
   revalidatePath("/dashboard", "layout");
@@ -78,7 +94,11 @@ export async function saveCampaign(id: string | null, input: CampaignInput): Pro
   const runAt = input.scheduleType === "ONCE" ? fromZonedTime(`${input.runDate}T${input.sendTime}:00`, APP_TZ) : null;
   if (runAt && runAt <= new Date() && input.active) return { ok: false, errors: ["That date and time has already passed."] };
 
+  const [includeIds, excludeIds] = await Promise.all([ownCustomers(clientId, input.includeIds), ownCustomers(clientId, input.excludeIds)]);
   const data = {
+    includeIds: includeIds.filter((x) => !excludeIds.includes(x)),
+    excludeIds,
+    skipUnread: input.skipUnread === true,
     name: input.name.trim(),
     templateId: input.templateId,
     senderId: input.senderId || null,
@@ -183,21 +203,51 @@ export async function retryHeldBackNow(campaignId: string): Promise<ActionResult
   };
 }
 
-/**
- * How many customers a "Send to" choice reaches right now, for the campaign form's live count
- * (several tags can overlap, so the form can't add up per-tag counts itself).
- */
-export async function countCampaignAudience(campaignId: string | null, audienceTag: string): Promise<{ ok: boolean; n: number }> {
+/** The business a campaign form works for: the campaign's own, else the one open now. Null when not allowed. */
+async function formClient(campaignId: string | null) {
   const s = await requireManager();
-  if ("denied" in s) return { ok: false, n: 0 };
-  let clientId = s.clientId;
-  if (campaignId) {
-    const c = await db.campaign.findUnique({ where: { id: campaignId }, select: { clientId: true } });
-    if (!c || !mine(s, c.clientId)) return { ok: false, n: 0 };
-    clientId = c.clientId;
-  }
+  if ("denied" in s) return null;
+  if (!campaignId) return s.clientId ?? null;
+  const c = await db.campaign.findUnique({ where: { id: campaignId }, select: { clientId: true } });
+  return c && mine(s, c.clientId) ? c.clientId : null;
+}
+
+/**
+ * Who a campaign form's choices reach right now: how many customers ("Send to", plus people added, minus people left
+ * out), how many of them didn't open their last offers, and the test numbers (tagged "test") still in it.
+ */
+export async function countCampaignAudience(
+  campaignId: string | null,
+  audienceTag: string,
+  people: { includeIds?: string[]; excludeIds?: string[] } = {},
+): Promise<{ ok: boolean; n: number; unread?: number; testIds?: string[] }> {
+  const clientId = await formClient(campaignId);
   if (!clientId) return { ok: false, n: 0 };
-  return { ok: true, n: await db.customer.count({ where: await campaignAudienceWhere(clientId, audienceTag.trim() || null) }) };
+  const where = await campaignAudienceWhere(clientId, audienceTag.trim() || null, {
+    includeIds: await ownCustomers(clientId, people.includeIds),
+    excludeIds: await ownCustomers(clientId, people.excludeIds),
+  });
+  const [n, tests, unread] = await Promise.all([
+    db.customer.count({ where }),
+    db.customer.findMany({ where: { AND: [where, { tags: { has: TEST_TAG } }] }, select: { id: true }, take: 50 }),
+    notOpeningOffers(clientId),
+  ]);
+  const unreadIn = unread.size ? await db.customer.count({ where: { AND: [where, { id: { in: [...unread] } }] } }) : 0;
+  return { ok: true, n, unread: unreadIn, testIds: tests.map((t) => t.id) };
+}
+
+/** Customers matching a name or number, to add to a campaign or leave out of it (at most 8). */
+export async function searchCampaignCustomers(campaignId: string | null, q: string): Promise<{ id: string; name: string; phone: string; tags: string[] }[]> {
+  const clientId = await formClient(campaignId);
+  const text = q.trim().slice(0, 60);
+  if (!clientId || text.length < 2) return [];
+  const digits = text.replace(/\D/g, "");
+  return db.customer.findMany({
+    where: { clientId, OR: [{ name: { contains: text, mode: "insensitive" } }, ...(digits.length >= 3 ? [{ phone: { contains: digits } }] : [])] },
+    select: { id: true, name: true, phone: true, tags: true },
+    orderBy: { name: "asc" },
+    take: 8,
+  });
 }
 
 export async function cancelRun(runId: string): Promise<ActionResult> {
@@ -233,6 +283,9 @@ export async function duplicateCampaign(id: string): Promise<ActionResult> {
       timezone: c.timezone,
       batchSize: c.batchSize,
       intervalMinutes: c.intervalMinutes,
+      includeIds: c.includeIds,
+      excludeIds: c.excludeIds,
+      skipUnread: c.skipUnread,
       active: false,
       nextRunAt: null,
     },

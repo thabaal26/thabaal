@@ -47,6 +47,9 @@ export default async function NewCampaignPage({ searchParams }: { searchParams: 
           batchSize: 100,
           intervalMinutes: 10,
           active: true,
+          includeIds: [],
+          excludeIds: [],
+          skipUnread: false,
         }}
       />
     </>

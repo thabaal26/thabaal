@@ -44,16 +44,22 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
   });
   if (!c) notFound();
 
-  const [{ templates, audience, numbers }, stats, charged] = await Promise.all([
+  const [{ templates, audience, numbers }, stats, charged, people] = await Promise.all([
     campaignFormData(c.clientId),
     db.message.groupBy({ by: ["runId", "status"], where: { runId: { in: c.runs.map((r) => r.id) } }, _count: true }),
     // Meta reports per message whether it was billed; it doesn't send the amount.
     db.message.groupBy({ by: ["runId"], where: { runId: { in: c.runs.map((r) => r.id) }, billable: true }, _count: true }),
+    // Names for the people added or left out by hand.
+    c.includeIds.length || c.excludeIds.length
+      ? db.customer.findMany({ where: { clientId: c.clientId, id: { in: [...c.includeIds, ...c.excludeIds] } }, select: { id: true, name: true, phone: true } })
+      : [],
   ]);
   const picked = c.audienceTag ? audience.tags.find((t) => t.tag === c.audienceTag) : undefined;
   // Several tags can overlap, so their reach is counted, not looked up.
   const tagPick = picked ? null : decodeTags(c.audienceTag);
-  const audienceSize = !c.audienceTag ? audience.all : picked ? picked.n : await db.customer.count({ where: await campaignAudienceWhere(c.clientId, c.audienceTag) });
+  const handPicked = c.includeIds.length > 0 || c.excludeIds.length > 0;
+  const audienceSize =
+    !handPicked && !c.audienceTag ? audience.all : !handPicked && picked ? picked.n : await db.customer.count({ where: await campaignAudienceWhere(c.clientId, c.audienceTag, c) });
   const audienceName = picked?.label ?? (tagPick ? describeTags(tagPick) : c.audienceTag);
   const sendConfirm = `Send "${templateLabel(c.template.name)}" now to ${fmtNumber(audienceSize)} customer${audienceSize === 1 ? "" : "s"} (${c.audienceTag ? `"${audienceName}"` : "ALL customers, no tag"})?`;
   // Sales credited to a run: orders a recipient placed within 7 days of getting its message.
@@ -142,7 +148,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
           <Stat
             label="Audience size"
             value={fmtNumber(audienceSize)}
-            sub={c.audienceTag ? `${audienceName}` : "All opted-in customers"}
+            sub={`${c.audienceTag ? audienceName : "All opted-in customers"}${handPicked ? ` · ${c.includeIds.length} added, ${c.excludeIds.length} left out` : ""}`}
             icon={<Users3D />}
             tone="info"
           />
@@ -227,7 +233,11 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
             batchSize: c.batchSize,
             intervalMinutes: c.intervalMinutes,
             active: c.active,
+            includeIds: c.includeIds,
+            excludeIds: c.excludeIds,
+            skipUnread: c.skipUnread,
           }}
+          people={people}
         />
       )}
 

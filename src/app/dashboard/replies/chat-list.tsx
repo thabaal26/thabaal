@@ -12,6 +12,8 @@ export type ChatListItem = {
   timeStr: string;
   previewText: string;
   isButton: boolean;
+  /** We messaged them (a campaign, an update) and they haven't written back. */
+  isSent: boolean;
   openCount: number;
   handled: boolean;
   unpaidLabel: string | null;
@@ -53,13 +55,14 @@ export function ChatList({
               </span>
               <span className="pv">
                 {item.isButton && <b className="up">Tapped: </b>}
+                {item.isSent && <b className="up">You sent: </b>}
                 {item.previewText}
               </span>
-              {(item.unpaidLabel || item.openCount > 1 || item.handled) && (
+              {(item.unpaidLabel || item.openCount > 1 || (item.handled && !item.isSent)) && (
                 <span className="chips" style={{ gap: 6, marginTop: 4 }}>
                   {item.unpaidLabel && <span className="pill warn">{item.unpaidLabel}</span>}
                   {item.openCount > 1 && <span className="pill ok">{item.openCount} new</span>}
-                  {item.handled && <span className="muted small">✓ Handled</span>}
+                  {item.handled && !item.isSent && <span className="muted small">✓ Handled</span>}
                 </span>
               )}
             </Link>

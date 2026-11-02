@@ -349,6 +349,11 @@ model Campaign {
   senderId        String?
   sender          WhatsAppNumber? @relation(fields: [senderId], references: [id], onDelete: SetNull)
   audienceTag     String? // null = all opted-in customers
+  /// Customers added by hand on top of "Send to", and customers left out of it (campaign form).
+  includeIds      String[]        @default([])
+  excludeIds      String[]        @default([])
+  /// Leave out customers who didn't open the last 3 offers they got (lib/engagement.ts).
+  skipUnread      Boolean         @default(false)
   scheduleType    ScheduleType    @default(WEEKLY)
   daysOfWeek      Int[]           @default([]) // 0 = Sunday … 6 = Saturday
   sendTime        String          @default("10:00") // HH:mm in timezone
