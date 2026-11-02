@@ -1,8 +1,8 @@
 // Orders on another number, in a real browser against the QA app (tests/qa/serve.mjs): Payments › Payment settings ›
 // How orders work saves the main number (not the connected one), shows the Chat to Order link, and that link opens
 // WhatsApp with the main number; a message or a cart to the connected number is saved in Chats but makes no order;
-// Duplicate turns a flyer template into a Tamil-poster and an English-poster copy with Call to Order and Chat to Order
-// buttons and the same message. Puts the QA shop back after.
+// Duplicate turns a flyer template into a Tamil-poster and an English-poster copy with a Call to Order button and a
+// Chat to Order reply button (no link button: WhatsApp would show its web address under the picture), same message. Puts the QA shop back after.
 //   node tests/qa/orders-elsewhere.mjs [tamilPoster.jpg] [englishPoster.jpg]
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -101,16 +101,17 @@ try {
     return number.displayPhone ? "connected number refused" : "QA number has no display phone";
   });
 
-  await check(2, "the main number saves, and the Chat to Order link for templates shows", async () => {
+  await check(2, "the main number saves; the card says to use a Reply button (no thabaal link to copy)", async () => {
     await page.locator("#oh-phone").fill("89253 90439");
     await card().getByRole("button", { name: "Save" }).click();
     await page.waitForTimeout(1500);
     const s = (await db.client.findUniqueOrThrow({ where: { id: S.shopId }, select: { paySettings: true } })).paySettings;
     expect(s?.orderPhone === MAIN, `saved ${s?.orderPhone}`);
     await openSettings();
-    const link = await page.locator("#oh-link").inputValue();
-    expect(link === `https://www.thabaal.in/go/${S.shopId}`, `link ${link}`);
-    return link;
+    const text = await card().innerText();
+    expect(/Reply button named Chat to Order/.test(text), "no Reply button advice");
+    expect(!/thabaal\.in/.test(text) && !(await page.locator("#oh-link").count()), "a thabaal link is still shown");
+    return "Reply button advised";
   });
 
   await check(3, "the Chat to Order link opens WhatsApp with the main number, the order typed in; an unknown shop is 404", async () => {
@@ -147,7 +148,7 @@ try {
   });
 
   for (const [i, [poster, label]] of [[posters[0], "tamil"], [posters[1], "english"]].entries()) {
-    await check(6 + i, `Duplicate: the ${label} poster copy keeps the message, Call to Order and gets Chat to Order`, async () => {
+    await check(6 + i, `Duplicate: the ${label} poster copy keeps the message, Call to Order and a Chat to Order reply button`, async () => {
       errors.length = 0;
       await page.goto(`${BASE}/dashboard/templates/new?from=${flyer.id}`, { waitUntil: "networkidle" });
       const name = `qa_doorstep_${label}_poster_${run}`;
@@ -158,9 +159,8 @@ try {
       const uploaded = await page.locator('input[aria-label="Image link"]').inputValue();
       await page.locator('input[aria-label="Image link"]').fill(uploaded.replace(/^http:\/\/localhost:\d+/, "https://www.thabaal.in"));
       await page.getByRole("button", { name: "Remove button 2" }).click();
-      await page.getByRole("button", { name: /^Link$/ }).click();
+      await page.getByRole("button", { name: /^Reply$/ }).click();
       await page.getByLabel("Button 2 label").fill("Chat to Order");
-      await page.getByLabel("Button 2 link").fill(`https://www.thabaal.in/go/${S.shopId}`);
       await page.getByRole("button", { name: "Create template" }).first().click();
       await page.waitForURL(/\/dashboard\/templates\/(?!new)/, { timeout: 20_000 }).catch(() => {});
       const t = await db.template.findFirst({ where: { clientId: S.shopId, name } });
@@ -170,7 +170,7 @@ try {
       expect(t.headerType === "IMAGE" && /^https:\/\/www\.thabaal\.in\/api\/upload\//.test(t.headerMediaUrl ?? ""), `header ${t.headerMediaUrl}`);
       const b = t.buttons;
       expect(b.length === 2 && b[0].type === "PHONE_NUMBER" && b[0].text === "Call to Order" && b[0].phone === `+${MAIN}`, `call ${JSON.stringify(b[0])}`);
-      expect(b[1].type === "URL" && b[1].text === "Chat to Order" && b[1].url === `https://www.thabaal.in/go/${S.shopId}`, `chat ${JSON.stringify(b[1])}`);
+      expect(b[1].type === "QUICK_REPLY" && b[1].text === "Chat to Order" && !b[1].url, `chat ${JSON.stringify(b[1])}`);
       expect(!errors.length, `script error: ${errors[0]}`);
       await page.screenshot({ path: `.git/shots-elsewhere/template-${label}.png`, fullPage: false }).catch(() => {});
       return `${name} · ${t.status}`;

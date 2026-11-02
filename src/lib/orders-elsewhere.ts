@@ -17,7 +17,7 @@ export async function ordersElsewhere(clientId: string): Promise<string | null> 
 }
 
 type Cust = { id: string; clientId: string; phone: string; name: string; optedOut: boolean };
-type CartMessage = { type?: string; order?: { catalog_id?: string; product_items?: { product_retailer_id?: string; quantity?: number | string }[] } };
+type CartMessage = { type?: string; interactive?: { type?: string }; order?: { catalog_id?: string; product_items?: { product_retailer_id?: string; quantity?: number | string }[] } };
 
 /** A catalogue cart's lines with product names (the product code when the catalogue can't be asked). */
 async function cartLines(clientId: string, m: CartMessage): Promise<CartLine[]> {
@@ -30,13 +30,15 @@ async function cartLines(clientId: string, m: CartMessage): Promise<CartLine[]> 
 /**
  * Answers a customer who wrote to a shop that takes orders on its main number: one reply with that number and a
  * "Chat to Order" button opening a chat there. A cart is never saved or charged here: its items go into the chat
- * for the customer to send. Other messages get the reply at most once every 6 hours. False when nothing went out
- * (24-hour window closed, messages off, or already told recently).
+ * for the customer to send. A tapped button (a campaign's "Chat to Order" reply button) always gets it; other
+ * messages at most once every 6 hours. False when nothing went out (24-hour window closed, messages off, or already
+ * told recently).
  */
 export async function replyOrdersElsewhere(c: Cust, m: CartMessage, phone: string): Promise<boolean> {
   if (c.optedOut) return false;
   const cart = m.type === "order";
-  if (!cart) {
+  const tapped = m.type === "button" || m.interactive?.type === "button_reply" || m.interactive?.type === "list_reply";
+  if (!cart && !tapped) {
     const recent = await db.message.findFirst({ where: { customerId: c.id, templateName: ELSEWHERE_LABEL, createdAt: { gte: new Date(Date.now() - ELSEWHERE_GAP_MS) } }, select: { id: true } });
     if (recent) return false;
   }

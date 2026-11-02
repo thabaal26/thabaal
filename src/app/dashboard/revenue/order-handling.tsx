@@ -11,12 +11,12 @@ import { T } from "../portal-ui";
 /** What happens when a shop sends customers to its main number, step by step (owner's view and customer's view). */
 const ELSEWHERE_STEPS = [
   {
-    t: "Your campaigns go from this number. In the template, add a Call button with your main number and a Link button with the Chat to Order link below.",
-    ta: "உங்கள் கேம்பெயின்கள் இந்த எண்ணிலிருந்து செல்லும். டெம்ப்ளேட்டில் உங்கள் முதன்மை எண்ணுடன் Call பட்டனும், கீழே உள்ள Chat to Order இணைப்புடன் Link பட்டனும் சேர்க்கவும்.",
+    t: "Your campaigns go from this number. In the template, add a Call button with your main number and a Reply button named Chat to Order. Not a Link button: WhatsApp shows a link's web address under your picture.",
+    ta: "உங்கள் கேம்பெயின்கள் இந்த எண்ணிலிருந்து செல்லும். டெம்ப்ளேட்டில் உங்கள் முதன்மை எண்ணுடன் Call பட்டனும், Chat to Order என்ற Reply பட்டனும் சேர்க்கவும். Link பட்டன் வேண்டாம்: அதன் இணைய முகவரியை வாட்ஸ்அப் உங்கள் படத்தின் கீழே காட்டும்.",
   },
   {
-    t: "A customer who writes here gets one reply: your main number and a Chat to Order button that opens WhatsApp with you there (at most once in 6 hours).",
-    ta: "இங்கே எழுதும் வாடிக்கையாளருக்கு ஒரு பதில் செல்லும்: உங்கள் முதன்மை எண்ணும், அங்கே உங்களுடன் வாட்ஸ்அப்பைத் திறக்கும் Chat to Order பட்டனும் (6 மணி நேரத்துக்கு ஒருமுறை).",
+    t: "A customer who taps Chat to Order, or writes here, gets one reply: your main number and a Chat to Order button that opens WhatsApp with you there (for a message, at most once in 6 hours).",
+    ta: "Chat to Order அழுத்தும் அல்லது இங்கே எழுதும் வாடிக்கையாளருக்கு ஒரு பதில் செல்லும்: உங்கள் முதன்மை எண்ணும், அங்கே உங்களுடன் வாட்ஸ்அப்பைத் திறக்கும் Chat to Order பட்டனும் (செய்திக்கு 6 மணி நேரத்துக்கு ஒருமுறை).",
   },
   {
     t: "A catalogue cart sent here is not saved as an order: the reply carries its items, so the customer just presses send on your main number.",
@@ -38,7 +38,7 @@ const local = (digits: string) => digits.replace(/^91(?=\d{10}$)/, "");
  * Payments › Payment settings › How orders work: orders and payments on this WhatsApp number (the order assistant), or
  * on the shop's own main number, where customers who write here are sent. One way at a time.
  */
-export function OrderHandling({ settings, canManage, chatToOrderLink }: { settings: PaySettings; canManage: boolean; chatToOrderLink: string }) {
+export function OrderHandling({ settings, canManage }: { settings: PaySettings; canManage: boolean }) {
   const router = useRouter();
   const { isTa } = useLanguage();
   const [, start] = useTransition();
@@ -46,7 +46,6 @@ export function OrderHandling({ settings, canManage, chatToOrderLink }: { settin
   const [mode, setMode] = useState<"here" | "elsewhere">(savedMode);
   const [phone, setPhone] = useState(local(settings.orderPhone));
   const [busy, setBusy] = useState(false);
-  const [copied, setCopied] = useState(false);
   const changed = mode !== savedMode || (mode === "elsewhere" && phone.replace(/\D/g, "") !== local(settings.orderPhone));
   const off = !canManage;
   const save = () => {
@@ -108,22 +107,6 @@ export function OrderHandling({ settings, canManage, chatToOrderLink }: { settin
               ))}
             </ol>
           </div>
-          {savedMode === "elsewhere" && (
-            <div className="field">
-              <label htmlFor="oh-link"><T ta="டெம்ப்ளேட்டின் Chat to Order இணைப்பு">Chat to Order link for templates</T></label>
-              <div className="tools" style={{ flexWrap: "wrap" }}>
-                <input id="oh-link" type="text" readOnly value={chatToOrderLink} onFocus={(e) => e.currentTarget.select()} style={{ flex: "1 1 260px", minWidth: 0 }} />
-                <button type="button" className="btn sm" onClick={() => navigator.clipboard?.writeText(chatToOrderLink).then(() => setCopied(true), () => setCopied(false))}>
-                  {copied ? <T ta="நகலெடுக்கப்பட்டது">Copied</T> : <T ta="நகலெடு">Copy</T>}
-                </button>
-              </div>
-              <div className="muted small">
-                <T ta="இது உங்கள் முதன்மை எண்ணில் வாட்ஸ்அப்பைத் திறக்கும். எண் மாறினாலும் டெம்ப்ளேட்டை மாற்ற வேண்டியதில்லை.">
-                  Opens WhatsApp with your main number. If the number changes, the template doesn&apos;t need to.
-                </T>
-              </div>
-            </div>
-          )}
         </div>
       )}
       {canManage && changed && (
