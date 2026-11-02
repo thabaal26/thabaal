@@ -89,7 +89,7 @@ describe("orders on another number: what the customer gets", () => {
     await db.client.delete({ where: { id: clientId } });
   });
 
-  test("4. a message gets the main number and a Chat to Order button, logged in Chats; again within 6 hours, nothing", async () => {
+  test("4. a message gets the main number and a Chat to Order button, logged in Chats; a second one sent with it, nothing", async () => {
     assert.deepEqual(await ordersElsewhere(clientId), CHAT);
     assert.equal(await replyOrdersElsewhere(await cust(), { type: "text" }, CHAT), true);
     assert.equal(sent.length, 1);
@@ -128,31 +128,51 @@ describe("orders on another number: what the customer gets", () => {
     assert.equal(sent.length, 0);
   });
 
-  test("6b. by call: View Products gets the price list ending with the number to call; others are told to call", async () => {
+  // Our replies so far happened a while ago (a minute), as when the customer writes again later.
+  const earlier = () => db.message.updateMany({ where: { customerId }, data: { createdAt: new Date(Date.now() - 2 * 60_000) } });
+  const lastText = () => String((sent[sent.length - 1].body.text as { body: string }).body);
+
+  test("6b. by call: View Products and price questions get the price list, ending with call or WhatsApp", async () => {
     await db.message.deleteMany({ where: { customerId } });
     // The campaign's "View Products" reply button.
     assert.equal(await replyOrdersElsewhere(await cust(), { type: "button" }, CALL, "View Products"), true);
-    const list = String((sent[0].body.text as { body: string }).body);
+    const list = lastText();
     assert.equal(sent[0].body.type, "text", "plain text, no buttons");
     assert.match(list, /^🛒 \*QA Elsewhere Shop \d+ – Price List\*/);
     assert.match(list, /🫒 \*Oils\*\n• Gingelly oil – ₹460\n• Groundnut oil 1l – ₹360/);
     assert.match(list, /🧈 \*Ghee & Dairy\*\n• Ghee 100ml – ₹150\n• Paneer 200g – ₹120/);
     assert.match(list, /• Ragi Flour – ₹90/);
     assert.doesNotMatch(list, /Almond oil|View catalog/, "out of stock left out; no catalogue to order in");
-    assert.match(list, /📞 To order, call \*\+91 89253 90439\*$/);
-    // Typing "price list" asks the same, every time.
-    assert.equal(await replyOrdersElsewhere(await cust(), { type: "text" }, CALL, "price list please"), true);
-    assert.equal(sent.length, 2);
-    // Anything else: the number to call (once in 6 hours).
-    assert.equal(await replyOrdersElsewhere(await cust(), { type: "text" }, CALL, "Is delivery available in Anna Nagar?"), true);
-    assert.match(String((sent[2].body.text as { body: string }).body), /To order, please call \*\+91 89253 90439\*\. Our team will also reply here\./);
-    assert.equal(await replyOrdersElsewhere(await cust(), { type: "text" }, CALL, "ok"), false);
-    // A cart: its items and the number to call; never an order, never a Chat to Order button.
-    assert.equal(await replyOrdersElsewhere(await cust(), { type: "order", order: { catalog_id: "qa-cat", product_items: [{ product_retailer_id: "GHEE", quantity: 2 }] } }, CALL), true);
-    const cartReply = String((sent[sent.length - 1].body.text as { body: string }).body);
-    assert.match(cartReply, /• 2 × GHEE/);
-    assert.match(cartReply, /Please call \*\+91 89253 90439\* to order these items\./);
+    assert.match(list, /📞 To order, call or WhatsApp \*\+91 89253 90439\*$/);
+    // Asked again in words, right away: the list again.
+    for (const ask of ["price list please", "How much is ghee?", "ghee evlo"]) assert.equal(await replyOrdersElsewhere(await cust(), { type: "text" }, CALL, ask), true, ask);
+    assert.equal(sent.length, 4);
     assert.ok(sent.every((s) => (s.body.interactive as { type?: string } | undefined)?.type !== "cta_url"));
+  });
+
+  test("6c. by call: Hi, a question or a photo always gets 'call or WhatsApp'; a burst gets one reply; ok after it, none", async () => {
+    await earlier();
+    // "Hi" a minute after the price list: answered (it was swallowed by a 6-hour gap before).
+    assert.equal(await replyOrdersElsewhere(await cust(), { type: "text" }, CALL, "Hi"), true);
+    assert.match(lastText(), /^Hello Meena, thank you for messaging \*QA Elsewhere Shop \d+\*! 🙏\n\nTo order, call or WhatsApp us on \*\+91 89253 90439\*\.$/);
+    // Sent together with it: one reply is enough.
+    assert.equal(await replyOrdersElsewhere(await cust(), { type: "text" }, CALL, "anyone there?"), false);
+    // "ok" / 👍 right after our reply: quiet.
+    assert.equal(await replyOrdersElsewhere(await cust(), { type: "text" }, CALL, "ok"), false);
+    assert.equal(await replyOrdersElsewhere(await cust(), { type: "text" }, CALL, "👍"), false);
+    // Later, a question or a photo: answered again.
+    await earlier();
+    assert.equal(await replyOrdersElsewhere(await cust(), { type: "text" }, CALL, "Is delivery available in Anna Nagar?"), true);
+    await earlier();
+    assert.equal(await replyOrdersElsewhere(await cust(), { type: "image" }, CALL, "[Photo]"), true);
+    assert.match(lastText(), /To order, call or WhatsApp us on/);
+  });
+
+  test("6d. by call: a cart lists its items with call or WhatsApp, every time; never an order", async () => {
+    const cartMsg = { type: "order", order: { catalog_id: "qa-cat", product_items: [{ product_retailer_id: "GHEE", quantity: 2 }] } };
+    assert.equal(await replyOrdersElsewhere(await cust(), cartMsg, CALL), true);
+    assert.match(lastText(), /• 2 × GHEE\n\nTo order these, call or WhatsApp us on \*\+91 89253 90439\*\.$/);
+    assert.equal(await replyOrdersElsewhere(await cust(), cartMsg, CALL), true, "a second cart right away is answered too");
     assert.equal(await db.order.count({ where: { clientId } }), 1, "only the order staff made in test 6");
   });
 

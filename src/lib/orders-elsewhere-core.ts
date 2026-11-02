@@ -2,11 +2,11 @@
 // messages, and who takes orders and payments on its own main number. Pure wording and links, no database here
 // (lib/orders-elsewhere.ts sends the reply).
 import { formatPhone } from "./phone";
+import { ACK_RE, THANKS_RE } from "./assistant-intents";
 import { bold, hello } from "./wa-text";
 
-/** How the reply is logged in Chats, and how often a customer gets it (a cart always gets one). */
+/** How the reply is logged in Chats. */
 export const ELSEWHERE_LABEL = "Orders on another number";
-export const ELSEWHERE_GAP_MS = 6 * 3600_000;
 /** The reply's button, and the template button that opens the same chat. */
 export const CHAT_TO_ORDER = "Chat to Order";
 
@@ -32,18 +32,25 @@ export function elsewhereReply(o: { shop: string; name: string; phone: string; w
   return `${head}\n\n${how}${site}`;
 }
 
-/** "View Products", "price list", "catalogue", "products": the customer wants to see what the shop sells. */
-export const ASKS_PRODUCTS = /\b(view|new|all|our)?\s*products?\b|\bprices?\b|price\s*list|\brates?\b|catalog(ue)?|\bmenu\b|விலை|பொருட்கள்/i;
+/** "View Products", "price list", "how much is…", "catalogue": the customer wants to see what the shop sells. */
+export const ASKS_PRODUCTS =
+  /\b(view|new|all|our)?\s*products?\b|\bprices?\b|price\s*list|\brates?\b|\bcost\b|how\s+much|\bevl[ao]\b|evvalavu|catalog(ue)?|\bmenu\b|விலை|எவ்வளவு|பொருட்கள்/i;
 
-/** The last line of the price list for a shop that takes orders by phone. */
-export const callToOrder = (phone: string) => `📞 To order, call ${bold(formatPhone(phone))}`;
+/** "ok", "thanks", 👍, a reaction: a customer closing the conversation, not a question. */
+export const isAck = (text: string) =>
+  ACK_RE.test(text) || THANKS_RE.test(text) || /^Reacted /.test(text) || /^[\p{Extended_Pictographic}‍️\u{1F3FB}-\u{1F3FF}\s!.?]+$/u.test(text);
 
-/** The automatic reply for a shop that takes orders by phone: the number to call; a cart's items listed to call about. */
-export function callReply(o: { shop: string; name: string; phone: string; website?: string | null; cart?: CartLine[] | null }) {
+/** Several messages sent together get one reply; an "ok"/"thanks" right after a reply gets none. */
+export const BURST_MS = 20_000;
+export const ACK_QUIET_MS = 10 * 60_000;
+
+/** The last line of the price list for a shop that takes orders on its main number: call or WhatsApp it. */
+export const callToOrder = (phone: string) => `📞 To order, call or WhatsApp ${bold(formatPhone(phone))}`;
+
+/** The automatic reply for a shop that takes orders on its main number by phone: call or WhatsApp it; a cart's items listed. */
+export function callReply(o: { shop: string; name: string; phone: string; cart?: CartLine[] | null }) {
   const main = bold(formatPhone(o.phone));
-  const head = o.cart ? `${hello(o.name)} thank you for choosing ${bold(o.shop)}! 🙏` : `${hello(o.name)} thank you for messaging ${bold(o.shop)}! 🙏`;
-  const items = o.cart?.length ? `\n\n${o.cart.map((l) => `• ${l.quantity} × ${l.name.trim()}`).join("\n")}` : "";
-  const how = o.cart ? `We take orders by phone. Please call ${main} to order these items.` : `To order, please call ${main}. Our team will also reply here.`;
-  const site = o.website?.trim() ? `\n\nSee all our products: ${o.website.trim()}` : "";
-  return `${head}${items}\n\n${how}${site}`;
+  if (!o.cart) return `${hello(o.name)} thank you for messaging ${bold(o.shop)}! 🙏\n\nTo order, call or WhatsApp us on ${main}.`;
+  const items = o.cart.length ? `\n\n${o.cart.map((l) => `• ${l.quantity} × ${l.name.trim()}`).join("\n")}` : "";
+  return `${hello(o.name)} thank you for choosing ${bold(o.shop)}! 🙏${items}\n\nTo order these, call or WhatsApp us on ${main}.`;
 }
