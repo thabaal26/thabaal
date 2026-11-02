@@ -11,7 +11,8 @@ import { decodeTags, TAGS_PREFIX } from "@/lib/audience-tags";
 import { getSettings, templateSendable } from "@/lib/provider";
 import { unmappedVars, type VarMap } from "@/lib/template";
 import { isQuietTime } from "@/lib/rules";
-import { computeNextRun, TEST_TAG } from "@/lib/schedule";
+import { computeNextRun, INACTIVE_TAG, TEST_TAG } from "@/lib/schedule";
+import { INACTIVE_GROUPS, inactiveCandidates, moveToInactive, type InactiveGroup } from "@/lib/inactive";
 import { senderFor } from "@/lib/senders";
 import { mine, requireAdmin, requireManager } from "@/lib/session";
 import { sendToCustomer } from "./send";
@@ -184,18 +185,18 @@ export async function sendCampaignTest(id: string): Promise<ActionResult> {
 }
 
 /**
- * Sends this campaign's held-back messages (Meta error 131049/130472) once more right away,
- * instead of waiting for the automatic retry. Same rules as a normal send.
+ * Sends this campaign's held-back messages (Meta error 131049) once more, the suggestion on the campaign page once
+ * 24 hours have passed. Same rules as a normal send.
  */
 export async function retryHeldBackNow(campaignId: string): Promise<ActionResult> {
   const s = await requireManager();
   if ("denied" in s) return { ok: false, message: s.denied };
   const c = await db.campaign.findUnique({ where: { id: campaignId }, select: { clientId: true } });
   if (!c || !mine(s, c.clientId)) return { ok: false, message: "Campaign not found." };
-  const r = await retryHeldBack({ campaignId, ignoreWait: true });
+  const r = await retryHeldBack({ campaignId });
   refresh();
   if (!r.retried && !r.failed) {
-    return { ok: false, message: r.waiting.length ? `Nothing sent yet: ${[...new Set(r.waiting)].join(", ")}. The scheduler will try again.` : "No held-back messages are waiting for a retry." };
+    return { ok: false, message: r.waiting.length ? `Nothing sent yet: ${[...new Set(r.waiting)].join(", ")}. Try again later.` : "No held-back messages are ready to send again." };
   }
   return {
     ok: true,
@@ -248,6 +249,18 @@ export async function searchCampaignCustomers(campaignId: string | null, q: stri
     orderBy: { name: "asc" },
     take: 8,
   });
+}
+
+/** The campaign page's suggestion: moves one group of this campaign's failed customers to Inactive (lib/inactive.ts). */
+export async function moveFailedToInactive(campaignId: string, group: InactiveGroup): Promise<ActionResult> {
+  const s = await requireManager();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const c = await db.campaign.findUnique({ where: { id: campaignId }, select: { clientId: true, runs: { select: { id: true } } } });
+  if (!c || !mine(s, c.clientId)) return { ok: false, message: "Campaign not found." };
+  if (!INACTIVE_GROUPS.includes(group)) return { ok: false, message: "Nothing to move." };
+  const n = await moveToInactive(c.clientId, (await inactiveCandidates(c.runs.map((r) => r.id)))[group]);
+  refresh();
+  return n ? { ok: true, message: `Moved ${n} to Inactive. Campaigns leave them out; remove the "${INACTIVE_TAG}" tag to bring someone back.` } : { ok: false, message: "They're already in Inactive." };
 }
 
 export async function cancelRun(runId: string): Promise<ActionResult> {

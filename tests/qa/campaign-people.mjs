@@ -35,8 +35,10 @@ const tpl = await db.template.findFirstOrThrow({ where: { clientId: S.shopId, st
 await db.message.create({ data: { customerId: sentOnly.id, templateId: tpl.id, templateName: tpl.name, status: "DELIVERED", sentAt: new Date(), body: "QA poster offer" } });
 let campaignId = null;
 let stoppedId = null;
+let reachId = null;
 const cleanup = async () => {
   if (campaignId) await db.campaign.delete({ where: { id: campaignId } }).catch(() => {});
+  if (reachId) await db.campaign.delete({ where: { id: reachId } }).catch(() => {});
   const ids = [sentOnly.id, added.id, left.id, tester.id];
   await db.message.deleteMany({ where: { customerId: { in: ids } } });
   if (stoppedId) {
@@ -115,20 +117,41 @@ try {
     return "131026 · 131050 · 131049";
   });
 
-  await check(5, "a stopped run's held-back message says it won't be retried, not 'waiting'", async () => {
-    const c = await db.campaign.create({ data: { clientId: S.shopId, name: `QA stopped ${run}`, templateId: tpl.id, scheduleType: "ONCE", active: false } });
+  await check(5, "failures: a simple reason each, 'send again' after 24 h, and Move to Inactive (which works)", async () => {
+    const c = await db.campaign.create({ data: { clientId: S.shopId, name: `QA failed ${run}`, templateId: tpl.id, scheduleType: "ONCE", active: false } });
     stoppedId = c.id;
-    const r = await db.campaignRun.create({ data: { campaignId: c.id, scheduledFor: new Date(Date.now() - 86_400_000), status: "CANCELLED", total: 1 } });
-    await db.message.create({ data: { runId: r.id, customerId: left.id, templateId: tpl.id, templateName: tpl.name, status: "FAILED", errorCode: 131049, failedAt: new Date(), sentAt: new Date() } });
+    const ago = new Date(Date.now() - 30 * 3_600_000);
+    const r = await db.campaignRun.create({ data: { campaignId: c.id, scheduledFor: ago, status: "CANCELLED", total: 3 } });
+    for (const [who, code] of [[left, 131026], [added, 131049], [tester, 130472]])
+      await db.message.create({ data: { runId: r.id, customerId: who.id, templateId: tpl.id, templateName: tpl.name, status: "FAILED", errorCode: code, failedAt: ago, sentAt: ago } });
     await page.goto(`${BASE}/dashboard/campaigns/${c.id}`, { waitUntil: "networkidle" });
-    const line = page.getByTestId("held-stopped");
-    await line.waitFor({ timeout: 10_000 });
-    const text = await line.innerText();
-    expect(/1 not retried \(the run was stopped\)/.test(text), text);
-    expect(!/waiting/.test(await page.locator("li").filter({ hasText: "Held back by Meta" }).first().innerText()), "still says waiting");
-    expect(!(await page.getByRole("button", { name: /Retry now/ }).count()), "Retry now still shown");
-    await page.screenshot({ path: ".git/shots-held-stopped.png", fullPage: false });
-    return text;
+    const held = page.getByTestId("failure-held");
+    await held.waitFor({ timeout: 10_000 });
+    expect(/can be sent again now/.test(await held.innerText()), await held.innerText());
+    expect(await held.getByRole("button", { name: "Send again to 1" }).count(), "no Send again button");
+    const gone = page.getByTestId("failure-unreachable");
+    expect(/Sending again is a waste/.test(await gone.innerText()), await gone.innerText());
+    expect(/Sending again is a waste/.test(await page.getByTestId("failure-experiment").innerText()), "experiment line");
+    await page.screenshot({ path: ".git/shots-failure-suggestions.png", fullPage: false });
+    await gone.getByRole("button", { name: "Move 1 to Inactive" }).click();
+    await page.getByRole("button", { name: "Yes, continue" }).click();
+    await page.waitForTimeout(2500);
+    const tags = (await db.customer.findUnique({ where: { id: left.id } })).tags;
+    expect(tags.includes("inactive"), `tags ${tags}: ${await toast()}`);
+    expect(/All of them are in Inactive/.test(await page.getByTestId("failure-unreachable").innerText()), "card not updated");
+    expect(!errors.length, `script error: ${errors[0]}`);
+    return "reasons · send again · moved to Inactive";
+  });
+
+  await check(6, "a scheduled campaign card counts only who it will really reach", async () => {
+    const at = new Date(Date.now() + 3 * 3_600_000);
+    const c = await db.campaign.create({ data: { clientId: S.shopId, name: `QA reach ${run}`, templateId: tpl.id, scheduleType: "ONCE", runAt: at, nextRunAt: at, active: true } });
+    reachId = c.id;
+    await page.goto(`${BASE}/dashboard/campaigns`, { waitUntil: "networkidle" });
+    const card = page.locator("article").filter({ hasText: `QA reach ${run}` });
+    const text = await card.innerText();
+    expect(/more are left out: they got an offer recently or Meta held one back/.test(text), text.slice(0, 300));
+    return text.split("\n").filter((l) => /Will go to|left out/.test(l)).join(" · ");
   });
 } finally {
   await browser.close();

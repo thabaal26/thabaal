@@ -227,10 +227,10 @@ export default async function NotificationsPage({
     items.push({
       id: "held-today",
       type: "alert",
-      title: `Meta held back ${heldToday} marketing message${heldToday === 1 ? "" : "s"} in the last 24 hours. No action needed.`,
-      description: "Those customers recently got a lot of marketing on WhatsApp. Held messages aren't charged and are retried automatically after a few days.",
+      title: `Meta held back ${heldToday} marketing message${heldToday === 1 ? "" : "s"} in the last 24 hours.`,
+      description: "Those customers recently got a lot of offers on WhatsApp. Held messages aren't charged. After 24 hours you can send them once more from the campaign page.",
       date: new Date(),
-      href: "/dashboard/messages?status=FAILED",
+      href: "/dashboard/campaigns",
       unread: false,
     });
 

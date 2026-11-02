@@ -7,26 +7,32 @@ import { explainError, metaError, PAUSING_KINDS } from "./meta-errors";
 import { deliver, getSettings, readiness, templateSendable } from "./provider";
 import { applyFailure, quietUntil, recentlyMarketed } from "./rules";
 import { senderFor } from "./senders";
+import { INACTIVE_TAG } from "./schedule";
 import { MetaError } from "./whatsapp";
 
-// When Meta holds a marketing message back (131049: the person gets too much marketing;
-// 130472: they're in Meta's marketing experiment), the message isn't lost for good. Meta's
-// advice is to try again in a few days, so:
-//  - the customer's marketing is paused for RETRY_AFTER_DAYS (campaigns skip them meanwhile),
-//  - then the campaign message is sent once more, automatically,
-//  - and if Meta holds it back again, it stays failed. Retrying harder hurts the number's quality.
-// No extra columns: a retry is a second message for the same customer in the same campaign run,
-// and Meta doesn't charge for held-back messages.
+// When Meta holds a marketing message back (131049: the person gets too much marketing), the message isn't lost
+// for good. Meta: "wait at least 24 hours before resending"; sooner gets the same error. So:
+//  - campaigns skip the customer for SKIP_DAYS, so a regular send doesn't hit the limit again,
+//  - after RETRY_AFTER_HOURS the campaign page suggests sending it once more, and the business decides,
+//  - and if Meta holds it back again, it stays failed (and the page suggests Inactive).
+// 130472 (Meta's marketing experiment) is skipped the same way, but never retried: Meta says resending gets the
+// same error, with no end date. No extra columns: a retry is a second message for the same customer in the same
+// campaign run, and Meta doesn't charge for held-back messages.
+// https://developers.facebook.com/docs/whatsapp/cloud-api/support/error-codes
 
-export const HELD_CODES = [131049, 130472];
-export const RETRY_AFTER_DAYS = 3;
-/** Offers go stale (a Deepavali offer a fortnight later), so a retry that couldn't go out by then is dropped. */
+/** Held back for now, can be sent again later. */
+export const HELD_CODES = [131049];
+/** Campaigns skip the customer for a while after these. */
+export const SKIP_CODES = [131049, 130472];
+export const SKIP_DAYS = 3;
+export const RETRY_AFTER_HOURS = 24;
+/** Offers go stale (a Deepavali offer a fortnight later), so a retry is offered only this long. */
 export const RETRY_UNTIL_DAYS = 7;
 
-/** Stopping a run ends it for good: what's queued is skipped and held-back messages aren't retried. */
-export const STOP_CONFIRM = "Stop this run? Queued messages won't be sent, and messages Meta held back won't be retried.";
+export const STOP_CONFIRM = "Stop this run? Queued messages won't be sent.";
 
 const DAY = 86_400_000;
+const HOUR = 3_600_000;
 /** Marks a retry row from creation until Meta returns the real message id; also stops two scheduler calls retrying the same message. */
 const RETRY_MARK = "retry:";
 
@@ -37,22 +43,23 @@ export async function marketingPaused(customerIds: string[], now = new Date()) {
   const paused = new Map<string, Date>();
   if (!customerIds.length) return paused;
   const rows = await db.message.findMany({
-    where: { customerId: { in: customerIds }, status: "FAILED", errorCode: { in: HELD_CODES }, failedAt: { gt: new Date(now.getTime() - RETRY_AFTER_DAYS * DAY) } },
+    where: { customerId: { in: customerIds }, status: "FAILED", errorCode: { in: SKIP_CODES }, failedAt: { gt: new Date(now.getTime() - SKIP_DAYS * DAY) } },
     select: { customerId: true, failedAt: true },
     orderBy: { failedAt: "desc" },
   });
-  for (const r of rows) if (!paused.has(r.customerId)) paused.set(r.customerId, new Date(r.failedAt!.getTime() + RETRY_AFTER_DAYS * DAY));
+  for (const r of rows) if (!paused.has(r.customerId)) paused.set(r.customerId, new Date(r.failedAt!.getTime() + SKIP_DAYS * DAY));
   return paused;
 }
 
 type Candidate = { id: string; runId: string; customerId: string; campaignId: string };
 
 /**
- * Held-back campaign messages ready for their one retry: the first message to that customer in
- * that run, not retried yet, held long enough (unless `ignoreWait`) and not gone stale.
+ * Held-back campaign messages ready for their one retry: the first message to that customer in that run, not
+ * retried yet, held at least RETRY_AFTER_HOURS and not gone stale. A stopped run's count too: the retry is the
+ * business's own choice. Inactive customers are left alone.
  */
-async function candidates(now: Date, campaignId?: string, ignoreWait = false) {
-  const readyBy = new Date(now.getTime() - (ignoreWait ? 0 : RETRY_AFTER_DAYS) * DAY);
+async function candidates(now: Date, campaignId: string) {
+  const readyBy = new Date(now.getTime() - RETRY_AFTER_HOURS * HOUR);
   const staleBy = new Date(now.getTime() - RETRY_UNTIL_DAYS * DAY);
   return db.$queryRaw<Candidate[]>`
     SELECT m.id, m."runId", m."customerId", r."campaignId"
@@ -61,9 +68,8 @@ async function candidates(now: Date, campaignId?: string, ignoreWait = false) {
     JOIN "Customer" c ON c.id = m."customerId"
     WHERE m.status = 'FAILED' AND m."errorCode" IN (${Prisma.join(HELD_CODES)})
       AND m."failedAt" <= ${readyBy} AND m."failedAt" > ${staleBy}
-      AND r.status <> 'CANCELLED'
-      AND c."optedOut" = false AND c.unreachable = false
-      AND (${campaignId ?? null}::text IS NULL OR r."campaignId" = ${campaignId ?? null})
+      AND c."optedOut" = false AND c.unreachable = false AND NOT (${INACTIVE_TAG} = ANY(c.tags))
+      AND r."campaignId" = ${campaignId}
       AND NOT EXISTS (SELECT 1 FROM "Message" o WHERE o."runId" = m."runId" AND o."customerId" = m."customerId" AND o.id <> m.id)
     ORDER BY m."failedAt" ASC
     LIMIT 200`;
@@ -72,13 +78,13 @@ async function candidates(now: Date, campaignId?: string, ignoreWait = false) {
 export type RetryResult = { retried: number; failed: number; waiting: string[] };
 
 /**
- * Sends each ready held-back message once more, from its campaign, with the same rules as a
- * normal batch: approved template, connected number, quiet hours, quality, the 24-hour limit
- * and the gap between offers. Anything blocked right now is simply tried on a later call.
+ * Sends this campaign's ready held-back messages once more (the business asked, from the campaign page), with the
+ * same rules as a normal batch: approved template, connected number, quiet hours, quality, the 24-hour limit and
+ * the gap between offers. Anything blocked right now stays ready for another try.
  */
-export async function retryHeldBack({ now = new Date(), deadline = Date.now() + 40_000, campaignId, ignoreWait = false }: { now?: Date; deadline?: number; campaignId?: string; ignoreWait?: boolean } = {}): Promise<RetryResult> {
+export async function retryHeldBack({ now = new Date(), deadline = Date.now() + 40_000, campaignId }: { now?: Date; deadline?: number; campaignId: string }): Promise<RetryResult> {
   const result: RetryResult = { retried: 0, failed: 0, waiting: [] };
-  const ready = await candidates(now, campaignId, ignoreWait);
+  const ready = await candidates(now, campaignId);
   if (!ready.length) return result;
 
   const settings = await getSettings();
@@ -192,19 +198,20 @@ export async function retryHeldBack({ now = new Date(), deadline = Date.now() + 
 }
 
 /**
- * expired: too old to retry, or a retry that didn't finish. stopped: the run was stopped before the retry, and a
- * stopped run sends nothing more, retries included (`candidates` skips cancelled runs).
+ * ready: can be sent again now. waiting: not yet (readyAt is the first one's time). retriedOk / heldTwice: the retry
+ * went through / was held again. expired: too old to retry, or a retry that didn't finish. inactive: moved to
+ * Inactive before a retry.
  */
-export type HeldSummary = { waiting: number; nextRetry: Date | null; retriedOk: number; heldTwice: number; expired: number; stopped: number };
+export type HeldSummary = { ready: number; waiting: number; readyAt: Date | null; retriedOk: number; heldTwice: number; expired: number; inactive: number };
 
-/** Where each held-back message of these runs stands: waiting for its retry, retried, held twice, too old, or stopped. */
+/** Where each held-back message of these runs stands. */
 export async function heldSummary(runIds: string[], now = new Date()): Promise<HeldSummary> {
-  const summary: HeldSummary = { waiting: 0, nextRetry: null, retriedOk: 0, heldTwice: 0, expired: 0, stopped: 0 };
+  const summary: HeldSummary = { ready: 0, waiting: 0, readyAt: null, retriedOk: 0, heldTwice: 0, expired: 0, inactive: 0 };
   if (!runIds.length) return summary;
-  const rows = await db.$queryRaw<{ failedAt: Date; retryStatus: string | null; runStatus: string }[]>`
-    SELECT m."failedAt", rt.status::text AS "retryStatus", r.status::text AS "runStatus"
+  const rows = await db.$queryRaw<{ failedAt: Date; retryStatus: string | null; inactive: boolean }[]>`
+    SELECT m."failedAt", rt.status::text AS "retryStatus", (${INACTIVE_TAG} = ANY(c.tags)) AS inactive
     FROM "Message" m
-    JOIN "CampaignRun" r ON r.id = m."runId"
+    JOIN "Customer" c ON c.id = m."customerId"
     LEFT JOIN LATERAL (
       SELECT o.status FROM "Message" o
       WHERE o."runId" = m."runId" AND o."customerId" = m."customerId" AND o."createdAt" > m."createdAt"
@@ -216,12 +223,15 @@ export async function heldSummary(runIds: string[], now = new Date()): Promise<H
     if (r.retryStatus === "FAILED") summary.heldTwice++;
     else if (r.retryStatus === "SENT" || r.retryStatus === "DELIVERED" || r.retryStatus === "READ") summary.retriedOk++;
     else if (r.retryStatus) summary.expired++; // a retry that was interrupted
-    else if (r.runStatus === "CANCELLED") summary.stopped++;
+    else if (r.inactive) summary.inactive++;
     else if (r.failedAt.getTime() <= now.getTime() - RETRY_UNTIL_DAYS * DAY) summary.expired++;
     else {
-      summary.waiting++;
-      const at = new Date(r.failedAt.getTime() + RETRY_AFTER_DAYS * DAY);
-      if (!summary.nextRetry || at < summary.nextRetry) summary.nextRetry = at;
+      const at = new Date(r.failedAt.getTime() + RETRY_AFTER_HOURS * HOUR);
+      if (at <= now) summary.ready++;
+      else {
+        summary.waiting++;
+        if (!summary.readyAt || at < summary.readyAt) summary.readyAt = at;
+      }
     }
   }
   return summary;

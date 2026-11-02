@@ -4,6 +4,8 @@ import { AUDIENCE_PREFIX, decodeTags } from "./audience-tags";
 import { db } from "./db";
 import { catalogFor, customersWithProducts } from "./product-scope";
 import { normKey } from "./catalog-match";
+import { INACTIVE_TAG } from "./schedule";
+import { SKIP_CODES, SKIP_DAYS } from "./held";
 
 // Saved audiences: a named filter over a client's customers that campaigns can send to.
 // Campaigns store it as audienceTag "aud:<id>"; tags work too (see src/lib/audience-tags.ts).
@@ -91,10 +93,12 @@ export type CampaignPeople = { includeIds?: readonly string[]; excludeIds?: read
 
 /**
  * The customer filter for a campaign: its audienceTag (a saved audience, one or more tags, or everyone), plus the
- * people added by hand, minus the people left out. Opted-out and unreachable customers are never in it.
+ * people added by hand, minus the people left out. Opted-out and unreachable customers are never in it; Inactive
+ * ones (INACTIVE_TAG) only when the campaign picks that tag or adds them by hand.
  */
 export async function campaignAudienceWhere(clientId: string, audienceTag: string | null, people: CampaignPeople = {}): Promise<Prisma.CustomerWhereInput> {
-  const send = await sendToWhere(clientId, audienceTag);
+  const picked = await sendToWhere(clientId, audienceTag);
+  const send = decodeTags(audienceTag)?.tags.includes(INACTIVE_TAG) ? picked : { AND: [picked, { NOT: { tags: { has: INACTIVE_TAG } } }] };
   const include = [...(people.includeIds ?? [])];
   const exclude = [...(people.excludeIds ?? [])];
   if (!include.length && !exclude.length) return send;
@@ -104,6 +108,16 @@ export async function campaignAudienceWhere(clientId: string, audienceTag: strin
       ...(exclude.length ? [{ id: { notIn: exclude } }] : []),
     ],
   };
+}
+
+/**
+ * Customers a campaign starting at `at` would skip at send time (lib/dispatcher.ts): they got an offer within the
+ * business's gap between offers, or Meta held one back from them lately (lib/held.ts).
+ */
+export function offerSkipWhere(gapHours: number, at: Date): Prisma.CustomerWhereInput {
+  const recent: Prisma.MessageWhereInput[] = [{ status: "FAILED", errorCode: { in: SKIP_CODES }, failedAt: { gt: new Date(at.getTime() - SKIP_DAYS * DAY) } }];
+  if (gapHours > 0) recent.push({ status: { in: ["SENT", "DELIVERED", "READ"] }, sentAt: { gte: new Date(at.getTime() - gapHours * 3_600_000) }, template: { category: "MARKETING" } });
+  return { messages: { some: { OR: recent } } };
 }
 
 /** The customer filter for a campaign's audienceTag alone. */

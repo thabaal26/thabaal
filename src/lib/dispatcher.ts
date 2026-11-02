@@ -7,7 +7,7 @@ import { computeNextRun } from "./schedule";
 import { fmtDate } from "./format";
 import { deliver, getSettings, isSimulated, readiness, templateSendable } from "./provider";
 import { allowance, refreshStaleNumbers, windowFreesAt } from "./limits";
-import { marketingPaused, retryHeldBack } from "./held";
+import { marketingPaused } from "./held";
 import { explainError, metaError, PAUSING_KINDS } from "./meta-errors";
 import { applyFailure, quietUntil, recentlyMarketed } from "./rules";
 import { sendRefillReminders } from "./refill";
@@ -393,8 +393,6 @@ export async function dispatch() {
   await refreshStaleNumbers().catch((e) => console.error("Could not refresh number status", e));
   // A run started just now is due now (its first batch goes in this same call, not the next one).
   const { runs, sent, failed } = await processDueRuns(new Date(), deadline, paused);
-  // Messages Meta held back a few days ago get their one retry.
-  if (Date.now() < deadline) await retryHeldBack({ now, deadline }).catch((e) => console.error("Held-back retries failed", e));
   if (Date.now() < deadline) await sendRefillReminders(now, noOrders).catch((e) => console.error("Refill reminders failed", e));
   if (Date.now() < deadline) await syncDueSheets(now).catch((e) => console.error("Sheet sync failed", e));
   // Connected Google Sheets (lib/gsheet): anything a live update missed.

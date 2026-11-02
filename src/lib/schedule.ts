@@ -2,6 +2,8 @@ import { fromZonedTime, toZonedTime } from "date-fns-tz";
 
 /** The tag that marks your own numbers; a campaign's "Send test" goes only to these customers. */
 export const TEST_TAG = "test";
+/** The tag for customers a business moved to Inactive after their messages failed; campaigns leave them out. */
+export const INACTIVE_TAG = "inactive";
 
 export const DAYS =["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
