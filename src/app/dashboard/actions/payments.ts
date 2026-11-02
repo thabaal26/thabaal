@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { detectPaymentApp, isPaymentApp } from "@/lib/payment-app";
 import { db } from "@/lib/db";
 import { pushOrderToSheet } from "@/lib/google-sheets-live";
 import { money, orderRef } from "@/lib/orders";
@@ -43,7 +44,7 @@ const done = (message: string, ok = true): SendResult => {
  */
 export async function recordPayment(
   id: string,
-  input: { method: string; amount?: number | null; reference?: string; collectedBy?: string; tell?: boolean; seenReceived?: number | null },
+  input: { method: string; amount?: number | null; reference?: string; collectedBy?: string; tell?: boolean; seenReceived?: number | null; app?: string | null },
 ): Promise<SendResult> {
   trackPress("payment.record");
   const r = await ownOrder(id);
@@ -69,6 +70,8 @@ export async function recordPayment(
     quiet: input.tell === false,
     seenReceived: input.seenReceived ?? null,
     utr: utrOf(ref),
+    // The UPI app staff picked (or one named in the reference they typed).
+    app: input.method === "upi" ? (isPaymentApp(input.app) ? input.app : detectPaymentApp(ref)) : null,
   });
   if (!saved) return done(`${orderRef(o)} is already paid or was updated a moment ago. Nothing new was recorded.`, false);
   const full = amount + 0.5 >= due;

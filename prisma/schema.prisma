@@ -530,6 +530,12 @@ model Order {
   paymentFailReason  String?
   /// Cash on delivery / cash: who collected it.
   collectedBy        String?
+  /// The UPI app it was paid with (lib/payment-app.ts: gpay, phonepe, paytm, bhim, …), when known: from the
+  /// customer's message or screenshot, their UPI ID's handle, or what staff picked when recording it.
+  paymentApp         String?
+  /// When and why the order was cancelled ("Customer on WhatsApp", "Staff (Ravi)", "Replaced by RG-1033", …).
+  cancelledAt        DateTime?
+  cancelledBy        String?
   /// Money given back after a cancellation or a problem with the order.
   refundedAt         DateTime?
   refundAmount       Float?
