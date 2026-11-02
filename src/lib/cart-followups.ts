@@ -92,7 +92,8 @@ export async function nudgeUnfinishedOrders(now = new Date(), paused: ReadonlySe
   let sent = 0;
   for (const o of due) {
     const s: PaySettings = readPaySettings(o.client.paySettings, o.client.paymentConfig);
-    if (!s.nudgeOn || o.customer.optedOut) continue;
+    // A shop taking orders on its main number gets no "finish your order" reminders from this one.
+    if (!s.nudgeOn || s.orderPhone || o.customer.optedOut) continue;
     const age = t - o.createdAt.getTime();
     const last = o.nudgeCount === 1;
     // First nudge 3 hours after the last thing we asked; the last one at 22 hours, at least 3 hours after the first.

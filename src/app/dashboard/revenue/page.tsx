@@ -13,6 +13,8 @@ import { LOYALTY_RULE_FIELDS, loyaltyRules } from "@/lib/loyalty";
 import { inr } from "../portal-format";
 import { LinkTabs, PortalPage, Seg, T } from "../portal-ui";
 import { AssistantSettings, BankAccount, HowCustomersPay, ReminderRules } from "./pay-settings-form";
+import { OrderHandling } from "./order-handling";
+import { APP_ORIGIN } from "@/lib/app-host";
 import { CollectList, CsvButton, ReceiptButton, RecordByNumber, TxnTable } from "./payments-board";
 import Link from "@/components/intent-link";
 import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
@@ -302,6 +304,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
     ]);
     body = (
       <div className="stack">
+        <OrderHandling settings={pay.settings} canManage={scope.canManage} chatToOrderLink={`${APP_ORIGIN}/go/${scope.clientId}`} />
         <HowCustomersPay
           settings={pay.settings}
           paymentConfig={pay.paymentConfig}
