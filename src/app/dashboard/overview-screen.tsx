@@ -69,6 +69,7 @@ import { catalogFor, catalogOrders, customerProducts } from "@/lib/product-scope
 import { catalogMatcher } from "@/lib/catalog-match";
 import { isOpenCart, isSale } from "@/lib/sale";
 import { saleSql } from "@/lib/sale-sql";
+import { spendSummary } from "@/lib/spend";
 
 
 
@@ -92,15 +93,26 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
   const scope = await getScope();
   const cid = scope.clientId;
   const now = new Date();
-  // Everything that only needs the filters is read at once: the first order (for "all time"), the
-  // customers the filters cover, the filter choices, and the live catalogue with what customers bought.
+  // Read now, used later: the business, the filter choices, and the live catalogue with what customers bought.
   // Products are catalogue items only (live from Meta): order lines and sheet notes are matched to
   // them, and anything else (customer tags, typed names that aren't catalogue items) is left out.
-  const [firstOrder, allowed, filterOpts, [catalog, custProds, catOrders]] = await Promise.all([
-    filters.range === "all" && cid ? db.order.findFirst({ where: { clientId: cid }, orderBy: { createdAt: "asc" }, select: { createdAt: true } }) : null,
-    cid ? scopedCustomerIds(cid, filters) : null,
+  const clientRead = cid ? db.client.findUnique({ where: { id: cid } }) : null;
+  const sideReads = Promise.all([
     cid ? filterOptions(cid) : null,
     (async () => (cid ? await Promise.all([catalogFor(cid), customerProducts(cid), catalogOrders(cid)]) : ([catalogMatcher([]), new Map<string, Set<string>>(), []] as const)))(),
+  ]);
+  // Both are awaited with the figures below; a failure shows there, not as an unhandled rejection.
+  sideReads.catch(() => {});
+  clientRead?.catch(() => {});
+  // Home's WhatsApp spend card streams in after the page: its figures (Meta included) are asked now, alongside.
+  if (mode === "home" && cid) {
+    void clientRead?.then((c) => (c && c.billingMode !== "wallet" ? spendSummary(cid) : null)).catch(() => {});
+  }
+  // What the figures' reads need first: the first order (for "all time") and the customers the filters cover
+  // (no reads at all when nothing is filtered).
+  const [firstOrder, allowed] = await Promise.all([
+    filters.range === "all" && cid ? db.order.findFirst({ where: { clientId: cid }, orderBy: { createdAt: "asc" }, select: { createdAt: true } }) : null,
+    cid ? scopedCustomerIds(cid, filters) : null,
   ]);
   // The period (any preset or custom dates) and the same stretch of time just before it.
   const period = resolvePeriod(filters, now, firstOrder?.createdAt);
@@ -137,9 +149,10 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
     [catalogueMsgs, periodReplies, unhandledGroup, toPackGroups, catalogRes, customerLifecycleRows],
     runProgress,
     refillForecastRes,
+    [filterOpts, [catalog, custProds, catOrders]],
   ] = await Promise.all([
     Promise.all([
-    cid ? db.client.findUnique({ where: { id: cid } }) : null,
+    clientRead,
     cid
       ? db.customer.findMany({ where: { clientId: cid, optedOut: false, ...(ids && { id: { in: ids } }) }, select: { id: true } })
       : [],
@@ -331,6 +344,7 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
     }),
     // Reorders due this week (shown only when the Orders section is on).
     cid ? refillForecast(cid, now).catch(() => null) : null,
+    sideReads,
   ]);
 
   const toDispatchCount = toPackGroups.reduce((n, g) => n + g._count, 0);

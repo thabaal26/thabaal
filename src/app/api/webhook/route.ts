@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
+import { withMemo } from "@/lib/request-memo";
 import { pushOrderToSheet, pushToGoogleSheet } from "@/lib/google-sheets-live";
 import { refreshNumberStatus } from "@/lib/limits";
 import { recordMetaAccountAlert } from "@/lib/meta-balance";
@@ -571,175 +572,179 @@ export async function POST(req: NextRequest) {
             : applyStatus(s));
         }
         for (const m of v.messages ?? []) {
-          const base = metaReplyContent(m);
-          const phoneNumberId = v.metadata?.phone_number_id;
-          const { text, kind, media, handledAsPayment } = await detectAndApplyUpiPayment(m, phoneNumberId, base, signed);
-          if (m.interactive?.type === "call_permission_reply") await applyCallPermission(m.from, phoneNumberId, m.interactive.call_permission_reply ?? {});
-          // "JOIN van" from an opt-in QR code or link: add them as an opted-in customer first.
-          const join = JOIN_RE.exec(text);
-          if (join) {
-            const profileName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name;
-            await joinFromWhatsApp({ phone: m.from, profileName, source: join[1], phoneNumberId }).catch((e) => console.error("Could not add joining customer", e));
-          }
-          const profileName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name ?? null;
-          const customer = await recordReply({ phone: m.from, text, kind, media, waMessageId: m.id, phoneNumberId, at: m.timestamp ? new Date(Number(m.timestamp) * 1000) : undefined, profileName });
-          const clientName = customer?.client?.name || "Thabaal";
-
-          // "cancel" while an order is open is about that order, not about stopping messages.
-          const cancelHandled = customer && m.type === "text" ? await handleCancelRequest(customer, text).catch((e) => (console.error("Cancel request failed", e), false)) : false;
-          if (!cancelHandled && OPT_OUT.test(text)) await optOut(m.from, phoneNumberId);
-          if (customer) await noteSource(customer.id, m, text).catch(() => {});
-
-          let handledByOrderButton = cancelHandled;
-          if (kind === "button") {
-            const contactName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name;
-            const actionVal = m.button?.payload ?? m.interactive?.button_reply?.id ?? m.interactive?.list_reply?.id ?? text;
-            pushToGoogleSheet(customer?.clientId, "BUTTON_CLICK", {
-              phone: m.from,
-              name: customer?.name || contactName || "",
-              campaign: "WhatsApp Portal",
-              buttonText: text,
-              actionValue: actionVal,
-              client: clientName,
-            });
-
-            // Delivery address step: "Yes, deliver here" / one of their saved addresses / "New address" (lib/delivery-address.ts)
-            if (typeof actionVal === "string" && customer && /^addr_(ok|new|pick):/.test(actionVal)) {
-              handledByOrderButton = true;
-              const [kind, orderId, key] = actionVal.split(":");
-              await (kind === "addr_new" ? askNewAddress(orderId, customer.id) : confirmSavedAddress(orderId, customer.id, kind === "addr_pick" ? key : undefined)).catch((e) => console.error("Address button failed", e));
+          // One message at a time, each with its own memo: the settings, the number to answer from and the shop's
+          // details are read once while it is answered (lib/request-memo.ts), not again for every step.
+          await withMemo(async () => {
+            const base = metaReplyContent(m);
+            const phoneNumberId = v.metadata?.phone_number_id;
+            const { text, kind, media, handledAsPayment } = await detectAndApplyUpiPayment(m, phoneNumberId, base, signed);
+            if (m.interactive?.type === "call_permission_reply") await applyCallPermission(m.from, phoneNumberId, m.interactive.call_permission_reply ?? {});
+            // "JOIN van" from an opt-in QR code or link: add them as an opted-in customer first.
+            const join = JOIN_RE.exec(text);
+            if (join) {
+              const profileName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name;
+              await joinFromWhatsApp({ phone: m.from, profileName, source: join[1], phoneNumberId }).catch((e) => console.error("Could not add joining customer", e));
             }
+            const profileName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name ?? null;
+            const customer = await recordReply({ phone: m.from, text, kind, media, waMessageId: m.id, phoneNumberId, at: m.timestamp ? new Date(Number(m.timestamp) * 1000) : undefined, profileName });
+            const clientName = customer?.client?.name || "Thabaal";
 
-            // The order assistant's buttons: add to order / separate, cancel yes/no, delivered feedback, reorder, stop offers.
-            if (typeof actionVal === "string" && customer && !handledByOrderButton) {
-              if (await handleAssistantButton(customer, actionVal, text, m.id).catch((e) => (console.error("Assistant button failed", e), false))) handledByOrderButton = true;
-            }
+            // "cancel" while an order is open is about that order, not about stopping messages.
+            const cancelHandled = customer && m.type === "text" ? await handleCancelRequest(customer, text).catch((e) => (console.error("Cancel request failed", e), false)) : false;
+            if (!cancelHandled && OPT_OUT.test(text)) await optOut(m.from, phoneNumberId);
+            if (customer) await noteSource(customer.id, m, text).catch(() => {});
 
-            // 1-Click Payment Choice Flow (pay_online / pay_cod)
-            if (typeof actionVal === "string" && (actionVal.startsWith("pay_online:") || actionVal.startsWith("pay_cod:"))) {
-              handledByOrderButton = true;
-              const isOnline = actionVal.startsWith("pay_online:");
-              const orderId = actionVal.slice(isOnline ? 11 : 8);
-              const order = await loadOrderForButton(orderId);
-              const mine = Boolean(order && customer && order.customerId === customer.id);
-              if (order && mine) {
-                const ref = orderRef(order);
-                if (order.status === "CANCELLED") {
+            let handledByOrderButton = cancelHandled;
+            if (kind === "button") {
+              const contactName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name;
+              const actionVal = m.button?.payload ?? m.interactive?.button_reply?.id ?? m.interactive?.list_reply?.id ?? text;
+              pushToGoogleSheet(customer?.clientId, "BUTTON_CLICK", {
+                phone: m.from,
+                name: customer?.name || contactName || "",
+                campaign: "WhatsApp Portal",
+                buttonText: text,
+                actionValue: actionVal,
+                client: clientName,
+              });
+
+              // Delivery address step: "Yes, deliver here" / one of their saved addresses / "New address" (lib/delivery-address.ts)
+              if (typeof actionVal === "string" && customer && /^addr_(ok|new|pick):/.test(actionVal)) {
+                handledByOrderButton = true;
+                const [kind, orderId, key] = actionVal.split(":");
+                await (kind === "addr_new" ? askNewAddress(orderId, customer.id) : confirmSavedAddress(orderId, customer.id, kind === "addr_pick" ? key : undefined)).catch((e) => console.error("Address button failed", e));
+              }
+
+              // The order assistant's buttons: add to order / separate, cancel yes/no, delivered feedback, reorder, stop offers.
+              if (typeof actionVal === "string" && customer && !handledByOrderButton) {
+                if (await handleAssistantButton(customer, actionVal, text, m.id).catch((e) => (console.error("Assistant button failed", e), false))) handledByOrderButton = true;
+              }
+
+              // 1-Click Payment Choice Flow (pay_online / pay_cod)
+              if (typeof actionVal === "string" && (actionVal.startsWith("pay_online:") || actionVal.startsWith("pay_cod:"))) {
+                handledByOrderButton = true;
+                const isOnline = actionVal.startsWith("pay_online:");
+                const orderId = actionVal.slice(isOnline ? 11 : 8);
+                const order = await loadOrderForButton(orderId);
+                const mine = Boolean(order && customer && order.customerId === customer.id);
+                if (order && mine) {
+                  const ref = orderRef(order);
+                  if (order.status === "CANCELLED") {
+                    await textInWindow(
+                      order.customer,
+                      `This cart (${ref}) was replaced by your newer order, so nothing was changed. Please use the latest message.`,
+                      "Payment choice (cancelled)",
+                    ).catch(() => {});
+                  } else if (order.paidAt || (order.paidAmount ?? 0) > 0 || order.packedAt || ["PAID", "DISPATCHED", "DELIVERED"].includes(order.status)) {
+                    await textInWindow(
+                      order.customer,
+                      `Order ${ref} is already ${order.status === "DELIVERED" ? "delivered" : order.status === "DISPATCHED" ? "on its way" : order.packedAt ? "packed" : "paid"}, so nothing was changed. If you need help with it, reply here.`,
+                      "Payment choice (no change)",
+                    ).catch(() => {});
+                  } else if (order.status === "CONFIRMED" && order.paymentMethod === "cod") {
+                    if (!isOnline) {
+                      await textInWindow(order.customer, `Your Cash on Delivery order ${ref} is already confirmed.`, "COD already confirmed").catch(() => {});
+                    } else {
+                      await textInWindow(order.customer, "Your order is already confirmed as Cash on Delivery. Reply here if you want to change it.", "COD already confirmed").catch(() => {});
+                    }
+                  } else if (isOnline) {
+                    if (order.paymentMethod === "cod") await db.order.updateMany({ where: { id: order.id, paymentMethod: "cod", status: "NEW", paidAt: null }, data: { paymentMethod: null } });
+                    const res = await sendPaymentRequestFor(order.id);
+                    if (!res.ok) {
+                      await db.order.update({ where: { id: order.id }, data: { paymentFailedAt: new Date(), paymentFailReason: `Payment link didn't go: ${res.message}`.slice(0, 200) } });
+                      await textInWindow(order.customer, "Sorry, we couldn't create your payment link just now. Our team will send it to you shortly.", "Payment link problem").catch(() => {});
+                      console.warn(`sendPaymentRequestFor failed for order ${order.id}: ${res.message}`);
+                    }
+                    pushOrderToSheet(order.id, "ORDER_UPDATE", "Customer chose online payment");
+                  } else {
+                    // pay_cod: re-check codBlocked
+                    const pay = await paySettingsFor(order.clientId);
+                    const blocked = codBlocked(pay.settings, order.total, order.customer);
+                    if (blocked) {
+                      await textInWindow(order.customer, `Sorry, cash on delivery isn't available for order ${ref}. Here is the payment link.`, "COD unavailable").catch(() => {});
+                      await sendPaymentRequestFor(order.id);
+                    } else {
+                      await confirmCod(order.id);
+                    }
+                  }
+                }
+              }
+
+              // 1-Click COD Confirmation Flow
+              if (typeof actionVal === "string" && (actionVal.startsWith("cod_confirm:") || actionVal.startsWith("cod_cancel:"))) {
+                handledByOrderButton = true;
+                const isConfirm = actionVal.startsWith("cod_confirm:");
+                const orderId = actionVal.slice(isConfirm ? 12 : 11);
+                const order = await loadOrderForButton(orderId);
+                // Only the customer the buttons were sent to, and only while the order still waits for this answer:
+                // an old button pressed after payment, packing or dispatch must not move the order back or cancel it.
+                const mine = Boolean(order && customer && order.customerId === customer.id);
+                const settled = Boolean(order && (order.paidAt || (order.paidAmount ?? 0) > 0 || order.packedAt || ["PAID", "DISPATCHED", "DELIVERED"].includes(order.status)));
+                const alreadyConfirmed = Boolean(order && isConfirm && order.status === "CONFIRMED" && order.paymentMethod === "cod");
+                if (order && mine && order.status !== "CANCELLED" && settled) {
                   await textInWindow(
                     order.customer,
-                    `This cart (${ref}) was replaced by your newer order, so nothing was changed. Please use the latest message.`,
-                    "Payment choice (cancelled)",
+                    `Order ${orderRef(order)} is already ${order.status === "DELIVERED" ? "delivered" : order.status === "DISPATCHED" ? "on its way" : order.packedAt ? "packed" : "paid"}, so nothing was changed. If you need help with it, reply here.`,
+                    "COD button (no change)",
                   ).catch(() => {});
-                } else if (order.paidAt || (order.paidAmount ?? 0) > 0 || order.packedAt || ["PAID", "DISPATCHED", "DELIVERED"].includes(order.status)) {
-                  await textInWindow(
-                    order.customer,
-                    `Order ${ref} is already ${order.status === "DELIVERED" ? "delivered" : order.status === "DISPATCHED" ? "on its way" : order.packedAt ? "packed" : "paid"}, so nothing was changed. If you need help with it, reply here.`,
-                    "Payment choice (no change)",
-                  ).catch(() => {});
-                } else if (order.status === "CONFIRMED" && order.paymentMethod === "cod") {
-                  if (!isOnline) {
-                    await textInWindow(order.customer, `Your Cash on Delivery order ${ref} is already confirmed.`, "COD already confirmed").catch(() => {});
-                  } else {
-                    await textInWindow(order.customer, "Your order is already confirmed as Cash on Delivery. Reply here if you want to change it.", "COD already confirmed").catch(() => {});
-                  }
-                } else if (isOnline) {
-                  if (order.paymentMethod === "cod") await db.order.updateMany({ where: { id: order.id, paymentMethod: "cod", status: "NEW", paidAt: null }, data: { paymentMethod: null } });
-                  const res = await sendPaymentRequestFor(order.id);
-                  if (!res.ok) {
-                    await db.order.update({ where: { id: order.id }, data: { paymentFailedAt: new Date(), paymentFailReason: `Payment link didn't go: ${res.message}`.slice(0, 200) } });
-                    await textInWindow(order.customer, "Sorry, we couldn't create your payment link just now. Our team will send it to you shortly.", "Payment link problem").catch(() => {});
-                    console.warn(`sendPaymentRequestFor failed for order ${order.id}: ${res.message}`);
-                  }
-                  pushOrderToSheet(order.id, "ORDER_UPDATE", "Customer chose online payment");
-                } else {
-                  // pay_cod: re-check codBlocked
-                  const pay = await paySettingsFor(order.clientId);
-                  const blocked = codBlocked(pay.settings, order.total, order.customer);
-                  if (blocked) {
-                    await textInWindow(order.customer, `Sorry, cash on delivery isn't available for order ${ref}. Here is the payment link.`, "COD unavailable").catch(() => {});
-                    await sendPaymentRequestFor(order.id);
-                  } else {
+                } else if (order && mine && order.status !== "CANCELLED" && !alreadyConfirmed) {
+                  const ref = orderRef(order);
+                  if (isConfirm) {
                     await confirmCod(order.id);
+                  } else {
+                    await db.order.update({
+                      where: { id: order.id },
+                      data: { status: "CANCELLED", cancelledAt: new Date(), cancelledBy: "Customer (tapped Cancel on WhatsApp)" },
+                    });
+                    pushOrderToSheet(order.id, "ORDER_UPDATE", "Customer cancelled COD");
+                    await textInWindow(order.customer, `Your order ${ref} has been cancelled as requested. If you need any assistance or want to order later, feel free to message us anytime!`, "COD Cancelled").catch(() => {});
+                    await updateOrderCard(order, "canceled", "Order cancelled").catch(() => {});
                   }
                 }
               }
+            } else if (m.type !== "order") {
+              const contactName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name;
+              pushToGoogleSheet(customer?.clientId, "NEW_CHAT", {
+                phone: m.from,
+                name: customer?.name || contactName || "",
+                message: text,
+                source: join ? `Opt-in (${join[1]})` : handledAsPayment ? "UPI Payment" : "Inbound WhatsApp",
+                client: clientName,
+              });
             }
 
-            // 1-Click COD Confirmation Flow
-            if (typeof actionVal === "string" && (actionVal.startsWith("cod_confirm:") || actionVal.startsWith("cod_cancel:"))) {
-              handledByOrderButton = true;
-              const isConfirm = actionVal.startsWith("cod_confirm:");
-              const orderId = actionVal.slice(isConfirm ? 12 : 11);
-              const order = await loadOrderForButton(orderId);
-              // Only the customer the buttons were sent to, and only while the order still waits for this answer:
-              // an old button pressed after payment, packing or dispatch must not move the order back or cancel it.
-              const mine = Boolean(order && customer && order.customerId === customer.id);
-              const settled = Boolean(order && (order.paidAt || (order.paidAmount ?? 0) > 0 || order.packedAt || ["PAID", "DISPATCHED", "DELIVERED"].includes(order.status)));
-              const alreadyConfirmed = Boolean(order && isConfirm && order.status === "CONFIRMED" && order.paymentMethod === "cod");
-              if (order && mine && order.status !== "CANCELLED" && settled) {
-                await textInWindow(
-                  order.customer,
-                  `Order ${orderRef(order)} is already ${order.status === "DELIVERED" ? "delivered" : order.status === "DISPATCHED" ? "on its way" : order.packedAt ? "packed" : "paid"}, so nothing was changed. If you need help with it, reply here.`,
-                  "COD button (no change)",
-                ).catch(() => {});
-              } else if (order && mine && order.status !== "CANCELLED" && !alreadyConfirmed) {
-                const ref = orderRef(order);
-                if (isConfirm) {
-                  await confirmCod(order.id);
-                } else {
-                  await db.order.update({
-                    where: { id: order.id },
-                    data: { status: "CANCELLED", cancelledAt: new Date(), cancelledBy: "Customer (tapped Cancel on WhatsApp)" },
-                  });
-                  pushOrderToSheet(order.id, "ORDER_UPDATE", "Customer cancelled COD");
-                  await textInWindow(order.customer, `Your order ${ref} has been cancelled as requested. If you need any assistance or want to order later, feel free to message us anytime!`, "COD Cancelled").catch(() => {});
-                  await updateOrderCard(order, "canceled", "Order cancelled").catch(() => {});
-                }
+            // The delivery address: WhatsApp's address form, a shared location, or typed while we wait for it.
+            if (customer && !handledAsPayment && !handledByOrderButton && kind !== "button" && m.type !== "order") {
+              if (await handleAddressReply(customer, m, text).catch((e) => (console.error("Address reply failed", e), false))) handledByOrderButton = true;
+            }
+
+            // Said hi, asked about products or prices (e.g. tapped "Send price list"), or wrote for the first time
+            // today: reply with the free catalogue message (at most once every 12 hours).
+            const isSystemOrPayment = handledAsPayment || handledByOrderButton || m.type === "order" || m.type === "errors" || m.type === "unsupported" || m.type === "payment";
+            if (customer && !isSystemOrPayment) {
+              // What they asked for: prices, the catalogue, or a hello. An unknown campaign button counts as asking.
+              const trigger = catalogueTrigger(text, kind) ?? (kind === "button" ? "asked" : null);
+              // Their first message today is treated like a hello for the order's status (an open order is what they mean),
+              // and whether staff are chatting with them: both read at once.
+              const [firstToday, staff] = await Promise.all([trigger ? false : firstMessageToday(customer.id), staffActive(customer.id).catch(() => false)]);
+              // The order assistant answers first (problems, a person, hours, delivery, payment, order status, reorder,
+              // wrong number, closed hours, typed lists...); anything it doesn't know gets "our team will reply".
+              const answered = await handleAssistantText(customer, m, text, kind, { greeting: trigger === "greeting" || firstToday, staff, trigger }).catch(
+                (e) => (console.error("Assistant reply failed", e), false),
+              );
+              // A hello while staff are chatting gets no catalogue; asking for it always does.
+              if (trigger && !answered && !(staff && trigger === "greeting"))
+                await autoSendCatalogue(customer.id, trigger).catch((e) => console.error("Automatic catalogue reply failed", e));
+            }
+            if (customer && m.type === "order") {
+              const order = await recordOrder(customer, m.id, m).catch((e) => (console.error("Could not save order", e), null));
+              // A new cart: expire all previous unpaid carts & payment links, then send fresh "Review and pay"
+              if (order) {
+                // Earlier unconfirmed carts replaced, points, "add to your order?", then address and payment (lib/order-intake.ts).
+                await afterNewOrder(order).catch((e) => console.error("New order steps failed", e));
+                pushOrderToSheet(order.id, "NEW_ORDER");
               }
             }
-          } else if (m.type !== "order") {
-            const contactName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name;
-            pushToGoogleSheet(customer?.clientId, "NEW_CHAT", {
-              phone: m.from,
-              name: customer?.name || contactName || "",
-              message: text,
-              source: join ? `Opt-in (${join[1]})` : handledAsPayment ? "UPI Payment" : "Inbound WhatsApp",
-              client: clientName,
-            });
-          }
-
-          // The delivery address: WhatsApp's address form, a shared location, or typed while we wait for it.
-          if (customer && !handledAsPayment && !handledByOrderButton && kind !== "button" && m.type !== "order") {
-            if (await handleAddressReply(customer, m, text).catch((e) => (console.error("Address reply failed", e), false))) handledByOrderButton = true;
-          }
-
-          // Said hi, asked about products or prices (e.g. tapped "Send price list"), or wrote for the first time
-          // today: reply with the free catalogue message (at most once every 12 hours).
-          const isSystemOrPayment = handledAsPayment || handledByOrderButton || m.type === "order" || m.type === "errors" || m.type === "unsupported" || m.type === "payment";
-          if (customer && !isSystemOrPayment) {
-            // What they asked for: prices, the catalogue, or a hello. An unknown campaign button counts as asking.
-            const trigger = catalogueTrigger(text, kind) ?? (kind === "button" ? "asked" : null);
-            // Their first message today is treated like a hello for the order's status (an open order is what they mean).
-            const firstToday = !trigger && (await firstMessageToday(customer.id));
-            // The order assistant answers first (problems, a person, hours, delivery, payment, order status, reorder,
-            // wrong number, closed hours, typed lists...); anything it doesn't know gets "our team will reply".
-            const staff = await staffActive(customer.id).catch(() => false);
-            const answered = await handleAssistantText(customer, m, text, kind, { greeting: trigger === "greeting" || firstToday, staff, trigger }).catch(
-              (e) => (console.error("Assistant reply failed", e), false),
-            );
-            // A hello while staff are chatting gets no catalogue; asking for it always does.
-            if (trigger && !answered && !(staff && trigger === "greeting"))
-              await autoSendCatalogue(customer.id, trigger).catch((e) => console.error("Automatic catalogue reply failed", e));
-          }
-          if (customer && m.type === "order") {
-            const order = await recordOrder(customer, m.id, m).catch((e) => (console.error("Could not save order", e), null));
-            // A new cart: expire all previous unpaid carts & payment links, then send fresh "Review and pay"
-            if (order) {
-              // Earlier unconfirmed carts replaced, points, "add to your order?", then address and payment (lib/order-intake.ts).
-              await afterNewOrder(order).catch((e) => console.error("New order steps failed", e));
-              pushOrderToSheet(order.id, "NEW_ORDER");
-            }
-          }
+          });
         }
       } else if (change.field === "calls") {
         for (const c of v.calls ?? []) await applyCall(c, v);

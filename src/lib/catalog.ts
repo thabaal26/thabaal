@@ -9,11 +9,12 @@ import { APP_HOST, currentAppUrl, isOldAppUrl } from "./app-host";
 import { welcomeText, whenTeam, type ShopInfo } from "./assistant-intents";
 import { chooseCatalogId } from "./catalog-pick";
 import { db } from "./db";
+import { memo } from "./request-memo";
 import { APP_TZ } from "./format";
 import { isShopClosed, opensAtText } from "./pay-settings";
 import { paySettingsFor } from "./pay-settings-server";
+import { replyContext } from "./payments";
 import { getSettings } from "./provider";
-import { replyWindowEnd } from "./replies";
 import { senderFor } from "./senders";
 import { missingUploadedImages, uploadedImageId } from "./uploaded-image";
 import { bold, nameOf } from "./wa-text";
@@ -55,20 +56,22 @@ export async function firstMessageToday(customerId: string) {
 }
 
 /** The shop's own details for the automatic replies' wording (lib/assistant-intents.ts). */
-export async function shopInfoFor(clientId: string): Promise<ShopInfo> {
-  const c = await db.client.findUnique({
-    where: { id: clientId },
-    select: { name: true, tagline: true, homeCity: true, supportPhone: true, website: true, orderFlow: true, disabledSections: true },
+export function shopInfoFor(clientId: string): Promise<ShopInfo> {
+  return memo(`shop-info:${clientId}`, async () => {
+    const c = await db.client.findUnique({
+      where: { id: clientId },
+      select: { name: true, tagline: true, homeCity: true, supportPhone: true, website: true, orderFlow: true, disabledSections: true },
+    });
+    return {
+      name: c?.name ?? "our shop",
+      tagline: c?.tagline,
+      homeCity: c?.homeCity,
+      supportPhone: c?.supportPhone,
+      website: c?.website,
+      orderFlow: c?.orderFlow,
+      catalogue: !(c?.disabledSections ?? []).includes("catalogue"),
+    };
   });
-  return {
-    name: c?.name ?? "our shop",
-    tagline: c?.tagline,
-    homeCity: c?.homeCity,
-    supportPhone: c?.supportPhone,
-    website: c?.website,
-    orderFlow: c?.orderFlow,
-    catalogue: !(c?.disabledSections ?? []).includes("catalogue"),
-  };
 }
 
 /** Has this customer ordered before (a welcome back), and is there an order worth repeating? */
@@ -87,19 +90,23 @@ export async function sendCatalogueTo(customerId: string, mode: "asked" | "welco
   const c = await db.customer.findUnique({ where: { id: customerId }, select: { id: true, name: true, phone: true, clientId: true, optedOut: true, client: { select: { name: true } } } });
   if (!c) return { ok: false, message: "Customer not found." };
   if (c.optedOut) return { ok: false, message: "This customer opted out of messages." };
-  if ((await getSettings()).provider !== "META") return { ok: false, message: "Catalogue messages need the WhatsApp Cloud API." };
-  const last = await db.reply.findFirst({ where: { customerId: c.id }, orderBy: { receivedAt: "desc" }, select: { receivedAt: true, senderId: true } });
-  if (!replyWindowEnd(last?.receivedAt))
-    return { ok: false, message: "WhatsApp only allows this within 24 hours of the customer's last message. Use a catalogue template instead (paid)." };
+  // What the message needs, read together: the provider, their 24-hour window and our number, the shop's details.
+  const [settings, { open, number, cfg }, pay, shop, history] = await Promise.all([
+    getSettings(),
+    replyContext(c),
+    paySettingsFor(c.clientId),
+    mode === "welcome" ? shopInfoFor(c.clientId) : null,
+    mode === "welcome" ? orderHistory(c.id) : null,
+  ]);
+  if (settings.provider !== "META") return { ok: false, message: "Catalogue messages need the WhatsApp Cloud API." };
+  if (!open) return { ok: false, message: "WhatsApp only allows this within 24 hours of the customer's last message. Use a catalogue template instead (paid)." };
 
-  const { number, cfg } = await senderFor(c.clientId, last?.senderId);
   const first = nameOf(c.name);
-  const pay = await paySettingsFor(c.clientId);
   const opensAt = isShopClosed(pay.settings) ? opensAtText(pay.settings) : null;
   const night = opensAt ? `\n\nWe're closed right now and open at ${bold(opensAt)}. Send your order anytime; it'll be the first thing we look at.` : "";
   const body =
-    mode === "welcome"
-      ? welcomeText(await shopInfoFor(c.clientId), c.name, { ...(await orderHistory(c.id)), withCatalogue: true, closedOpensAt: opensAt })
+    shop && history
+      ? welcomeText(shop, c.name, { ...history, withCatalogue: true, closedOpensAt: opensAt })
       : `${first ? `Hi ${first}, here` : "Here"} is the full ${bold(c.client.name)} range. 🛍️ Tap ${bold("View catalog")}, add what you need to your cart and send it here. We'll take it from there: delivery and payment, right in this chat.${night}`;
   try {
     const res = await sendCatalogMessage(cfg, c.phone, body);
@@ -119,16 +126,14 @@ export async function sendCatalogueTo(customerId: string, mode: "asked" | "welco
 async function sendTextWelcome(customerId: string, trigger: CatalogueTrigger) {
   const c = await db.customer.findUnique({ where: { id: customerId }, select: { id: true, name: true, phone: true, clientId: true, optedOut: true } });
   if (!c || c.optedOut) return;
-  const last = await db.reply.findFirst({ where: { customerId: c.id }, orderBy: { receivedAt: "desc" }, select: { receivedAt: true, senderId: true } });
-  if (!replyWindowEnd(last?.receivedAt)) return;
-  const [shop, pay] = await Promise.all([shopInfoFor(c.clientId), paySettingsFor(c.clientId)]);
+  const [{ open, number, cfg }, shop, pay, history] = await Promise.all([replyContext(c), shopInfoFor(c.clientId), paySettingsFor(c.clientId), orderHistory(c.id)]);
+  if (!open) return;
   const opensAt = isShopClosed(pay.settings) ? opensAtText(pay.settings) : null;
   const n = nameOf(c.name);
   const body =
     trigger === "greeting"
-      ? welcomeText({ ...shop, catalogue: false }, c.name, { ...(await orderHistory(c.id)), withCatalogue: false, closedOpensAt: opensAt })
+      ? welcomeText({ ...shop, catalogue: false }, c.name, { ...history, withCatalogue: false, closedOpensAt: opensAt })
       : `${n ? `Thanks, ${n}!` : "Thanks for asking!"} Our team at ${bold(shop.name)} will send you our products and prices ${whenTeam(opensAt)}.`;
-  const { number, cfg } = await senderFor(c.clientId, last?.senderId);
   const res = await sendTextMessage(cfg, c.phone, body);
   await db.message.create({
     data: { customerId: c.id, templateName: WELCOME_LABEL, body, status: "SENT", waMessageId: res.id, simulated: res.simulated, provider: "META", sentAt: new Date(), senderId: number?.id ?? null },
