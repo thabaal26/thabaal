@@ -23,6 +23,7 @@ import { cancelRun, runDispatcherNow } from "./actions/campaigns";
 import { HomeTiers, type HomeCampaignRow, type HomeKpi } from "./home-tiers";
 import { HomeWallet } from "./home-wallet";
 import { templateLabel } from "@/lib/plain-error";
+import { STOP_CONFIRM } from "@/lib/held";
 import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 import { AreaChips } from "./area-chips";
 import {
@@ -1752,7 +1753,7 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
                     </p>
                   </div>
                   {scope.isAdmin && (
-                    <ActionButton action={cancelRun.bind(null, r.id)} variant="danger" confirm="Stop this run? Queued messages will not be sent.">
+                    <ActionButton action={cancelRun.bind(null, r.id)} variant="danger" confirm={STOP_CONFIRM}>
                       Stop
                     </ActionButton>
                   )}

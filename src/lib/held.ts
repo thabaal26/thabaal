@@ -23,6 +23,9 @@ export const RETRY_AFTER_DAYS = 3;
 /** Offers go stale (a Deepavali offer a fortnight later), so a retry that couldn't go out by then is dropped. */
 export const RETRY_UNTIL_DAYS = 7;
 
+/** Stopping a run ends it for good: what's queued is skipped and held-back messages aren't retried. */
+export const STOP_CONFIRM = "Stop this run? Queued messages won't be sent, and messages Meta held back won't be retried.";
+
 const DAY = 86_400_000;
 /** Marks a retry row from creation until Meta returns the real message id; also stops two scheduler calls retrying the same message. */
 const RETRY_MARK = "retry:";
@@ -188,16 +191,20 @@ export async function retryHeldBack({ now = new Date(), deadline = Date.now() + 
   return result;
 }
 
-/** expired: too old to retry, or a retry that didn't finish. */
-export type HeldSummary = { waiting: number; nextRetry: Date | null; retriedOk: number; heldTwice: number; expired: number };
+/**
+ * expired: too old to retry, or a retry that didn't finish. stopped: the run was stopped before the retry, and a
+ * stopped run sends nothing more, retries included (`candidates` skips cancelled runs).
+ */
+export type HeldSummary = { waiting: number; nextRetry: Date | null; retriedOk: number; heldTwice: number; expired: number; stopped: number };
 
-/** Where each held-back message of these runs stands: waiting for its retry, retried, held twice, or too old. */
+/** Where each held-back message of these runs stands: waiting for its retry, retried, held twice, too old, or stopped. */
 export async function heldSummary(runIds: string[], now = new Date()): Promise<HeldSummary> {
-  const summary: HeldSummary = { waiting: 0, nextRetry: null, retriedOk: 0, heldTwice: 0, expired: 0 };
+  const summary: HeldSummary = { waiting: 0, nextRetry: null, retriedOk: 0, heldTwice: 0, expired: 0, stopped: 0 };
   if (!runIds.length) return summary;
-  const rows = await db.$queryRaw<{ failedAt: Date; retryStatus: string | null }[]>`
-    SELECT m."failedAt", rt.status::text AS "retryStatus"
+  const rows = await db.$queryRaw<{ failedAt: Date; retryStatus: string | null; runStatus: string }[]>`
+    SELECT m."failedAt", rt.status::text AS "retryStatus", r.status::text AS "runStatus"
     FROM "Message" m
+    JOIN "CampaignRun" r ON r.id = m."runId"
     LEFT JOIN LATERAL (
       SELECT o.status FROM "Message" o
       WHERE o."runId" = m."runId" AND o."customerId" = m."customerId" AND o."createdAt" > m."createdAt"
@@ -209,6 +216,7 @@ export async function heldSummary(runIds: string[], now = new Date()): Promise<H
     if (r.retryStatus === "FAILED") summary.heldTwice++;
     else if (r.retryStatus === "SENT" || r.retryStatus === "DELIVERED" || r.retryStatus === "READ") summary.retriedOk++;
     else if (r.retryStatus) summary.expired++; // a retry that was interrupted
+    else if (r.runStatus === "CANCELLED") summary.stopped++;
     else if (r.failedAt.getTime() <= now.getTime() - RETRY_UNTIL_DAYS * DAY) summary.expired++;
     else {
       summary.waiting++;
