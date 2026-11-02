@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { db } from "./db";
-import { clientAccess } from "./plan-access";
+import { clientAccessNow } from "./plan-access";
 import { PLAN_LOCKED_MESSAGE } from "./plan-lock-paths";
 import { recordUsage } from "./usage-record";
 
@@ -130,7 +130,7 @@ export const getScope = cache(async (): Promise<Scope> => {
   ]);
   if (user.role === "ADMIN" && viewing && pickedClient) {
     // Read-only, as the owner sees it: their plan lock applies, and no admin menus or writes.
-    const planLocked = (await clientAccess(pickedClient.id)).locked;
+    const planLocked = (await clientAccessNow(pickedClient.id)).locked;
     return {
       isAdmin: false,
       viewOnly: true,
@@ -148,7 +148,7 @@ export const getScope = cache(async (): Promise<Scope> => {
     const operator = user.access !== "VIEWER";
     // Unpaid business: every page opens, but every change is refused (requireManager, requireOrderAccess and the
     // actions' own planLocked checks), except what My account and Settings allow.
-    const planLocked = user.clientId ? (await clientAccess(user.clientId)).locked : false;
+    const planLocked = user.clientId ? (await clientAccessNow(user.clientId)).locked : false;
     return {
       isAdmin: false,
       viewOnly: false,

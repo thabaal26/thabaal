@@ -10,6 +10,10 @@ const { default: EmbeddedPostgres } = await import("embedded-postgres");
 const DIR = path.resolve(".qadb");
 const PORT = 5434;
 const url = `postgresql://postgres:test@localhost:${PORT}/thabaal_qa`;
+// QA_APP_DB_PORT points only the app at another port (e.g. a proxy that adds the live site's database latency);
+// seeding and the tests' own database reads still use the database directly.
+// With it, the app also gets 5 database connections (QA_APP_DB_POOL), as a live function did (Prisma: 2 per CPU + 1).
+const appUrl = process.env.QA_APP_DB_PORT ? `${url.replace(`:${PORT}/`, `:${Number(process.env.QA_APP_DB_PORT)}/`)}?connection_limit=${Number(process.env.QA_APP_DB_POOL ?? 5)}` : url;
 if (!/@localhost:/.test(url)) throw new Error("QA database must be on localhost");
 
 // Next.js also loads .env files when it starts, without overriding keys already set. So every key named in them is set
@@ -27,7 +31,7 @@ export const QA_ENV = {
   APP_TIMEZONE: "Asia/Kolkata",
   DEFAULT_COUNTRY_CODE: "91",
   META_GRAPH_VERSION: "v21.0",
-  DATABASE_URL: url,
+  DATABASE_URL: appUrl,
   DATABASE_URL_UNPOOLED: url,
   AUTH_SECRET: "qa-auth-secret-0123456789abcdefghijklmnopqr",
   CRON_SECRET: "qa-cron-secret",

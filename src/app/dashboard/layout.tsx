@@ -27,7 +27,7 @@ import { PlanDueBar } from "./plan-due-bar";
 import { ViewOnlyBar } from "./view-only-bar";
 import { LogOut } from "@/components/icons";
 import { logout } from "../login/actions";
-import { clientAccess } from "@/lib/plan-access";
+import { clientAccessNow } from "@/lib/plan-access";
 import { inr } from "@/lib/account-plans";
 import { livePlans } from "@/lib/plan-prices-server";
 import { appearanceAttrs, appearanceDataset, appearanceScript, resolveAppearance } from "@/lib/appearance";
@@ -119,7 +119,7 @@ function ClientMark({ logoUrl, name }: { logoUrl?: string | null; name: string }
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
   await requireUser();
   const scope = await getScope();
-  const [settings, client, sender, clients, rawOpenReplies, rawOrdersToHandle, rawPaymentsToCheck, requestsToCheck] = await Promise.all([
+  const [settings, client, sender, clients, rawOpenReplies, rawOrdersToHandle, rawPaymentsToCheck, requestsToCheck, access, plans] = await Promise.all([
     getSettings(),
     brandedClient(),
     scope.clientId ? senderFor(scope.clientId) : null,
@@ -141,11 +141,12 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
       .catch(() => 0),
     // Thabaal only: plan payments clients sent for checking that nobody has verified yet (the Requests page).
     scope.isAdmin ? Promise.all([db.planPurchase.count({ where: { status: "PENDING" } }).catch(() => 0), pendingSignupCount()]).then(([a, b]) => a + b) : 0,
+    // Plan payment state for the notice above each page (lib/plan-access.ts): already read by getScope this request.
+    scope.clientId ? clientAccessNow(scope.clientId).catch(() => null) : null,
+    scope.clientId ? livePlans().catch(() => []) : [],
   ]);
 
-  // Plan payment state for the notice above each page (lib/plan-access.ts).
-  const access = scope.clientId ? await clientAccess(scope.clientId).catch(() => null) : null;
-  const renewPlan = access ? (await livePlans().catch(() => [])).find((p) => p.k === access.plan) : undefined;
+  const renewPlan = access ? plans.find((p) => p.k === access.plan) : undefined;
   const renewAmount = renewPlan ? inr(renewPlan.p[access?.cycle === "q" || access?.cycle === "y" ? access.cycle : "m"]) : null;
   // A running auto-pay subscription renews by itself, so the "due" notice stays quiet (checked only when it would show).
   const autoPayOn =

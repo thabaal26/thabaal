@@ -1,6 +1,7 @@
 // Whether a business may use thabaal right now (see accessState in subscription-core.ts for the rules).
 // Read on every request for client logins (lib/session.ts getScope), so it is one small query per request.
 
+import { cache } from "react";
 import { db } from "./db";
 import { accessState, type AccessInfo } from "./subscription-core";
 
@@ -25,6 +26,9 @@ export async function clientAccess(clientId: string, now = new Date()): Promise<
     pending: pending ? { plan: pending.plan, cycle: pending.cycle, utr: pending.utr, createdAt: pending.createdAt } : null,
   };
 }
+
+/** clientAccess for this request: getScope and the dashboard layout both need it, so it is read once per page. */
+export const clientAccessNow = cache((clientId: string) => clientAccess(clientId));
 
 /** Businesses that are locked now: their campaigns and automatic messages wait until they pay. */
 export async function lockedClientIds(now = new Date()): Promise<Set<string>> {

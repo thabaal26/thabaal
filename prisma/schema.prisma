@@ -1,5 +1,8 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  /// relationJoins: a read with nested relations (include / select) is one SQL query with joins, not one round trip
+  /// per level; with the database a few ms away that is most of a page's wait.
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {

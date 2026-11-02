@@ -49,10 +49,6 @@ export default async function OrdersPage({
             location: true,
             locationRaw: true,
             client: { select: { name: true } },
-            // For the loyalty points each unpaid order could use.
-            tags: true,
-            purchases: true,
-            orders: { select: { id: true, total: true, status: true, paidAt: true, paymentMethod: true, internalNote: true, pointsRedeemed: true } },
           },
         },
         client: { select: { name: true, paymentConfig: true, orderFlow: true, paySettings: true, ...LOYALTY_RULE_FIELDS } },
@@ -70,6 +66,17 @@ export default async function OrdersPage({
   ]);
 
   const canEdit = scope.canOperate && (scope.canManage || !!scope.clientId);
+
+  // Loyalty points each unpaid order could use: only those customers' orders are read (a small second read).
+  const unpaid = (o: (typeof rawOrders)[number]) => o.status !== "CANCELLED" && !o.paidAt && !((o.paidAmount ?? 0) > 0);
+  const pointsCustomers = [...new Set(rawOrders.filter(unpaid).map((o) => o.customerId))];
+  const loyaltyRows = pointsCustomers.length
+    ? await db.customer.findMany({
+        where: { id: { in: pointsCustomers } },
+        select: { id: true, name: true, tags: true, purchases: true, orders: { select: { id: true, total: true, status: true, paidAt: true, paymentMethod: true, internalNote: true, pointsRedeemed: true } } },
+      })
+    : [];
+  const loyaltyOf = new Map(loyaltyRows.map((c) => [c.id, c]));
 
   const catalogProducts: CatalogProductOption[] = (catalogData?.products ?? []).map((p) => ({
     id: p.id,
@@ -115,7 +122,7 @@ export default async function OrdersPage({
     refundNote: o.refundNote,
     pointsRedeemed: o.pointsRedeemed,
     // Unpaid orders: what the customer could take off in points now (nothing when the shop turned using points off).
-    points: o.status === "CANCELLED" || o.paidAt || (o.paidAmount ?? 0) > 0 ? null : maxPointsDiscount(o, loyaltyRules(o.client)),
+    points: unpaid(o) && loyaltyOf.has(o.customerId) ? maxPointsDiscount({ ...o, customer: loyaltyOf.get(o.customerId)! }, loyaltyRules(o.client)) : null,
     addressAskedAt: o.addressAskedAt,
     addressConfirmedAt: o.addressConfirmedAt,
     mapUrl: o.mapUrl,

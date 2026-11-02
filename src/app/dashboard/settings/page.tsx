@@ -106,8 +106,10 @@ export default async function SettingsPage() {
   if (user.role !== "ADMIN") {
     const cid = user.clientId;
     const scope = await getScope();
-    const [numbers, customers, products, ordersCount, client, spend, ownPayTemplate, payTemplate] = cid
-      ? await Promise.all([
+    // Everything the page needs is read in one round (staff logins and order templates used to wait their turn).
+    const [[numbers, customers, products, ordersCount, client, spend, ownPayTemplate, payTemplate], [teamLogins, teamUsage, teamPlan], tmplRows] = await Promise.all([
+      cid
+      ? Promise.all([
           numberHealth(cid).catch(() => []),
           db.customer.count({ where: { clientId: cid, optedOut: false } }),
           getCatalogWithProducts(cid)
@@ -119,15 +121,20 @@ export default async function SettingsPage() {
           db.template.findFirst({ where: { clientId: cid, name: PAYMENT_TEMPLATE }, select: { status: true } }),
           paymentTemplateFor(cid),
         ])
-      : [[], 0, null, 0, null, null, null, null];
-    // Staff logins: who can sign in, and the plan's staff limit (none for a business without a plan on record).
-    const [teamLogins, teamUsage, teamPlan] = cid
-      ? await Promise.all([
-          db.user.findMany({ where: { clientId: cid }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, email: true, access: true } }),
-          planUsage(cid),
-          effectivePlan(cid),
-        ])
-      : [[], null, null];
+      : ([[], 0, null, 0, null, null, null, null] as const),
+      // Staff logins: who can sign in, and the plan's staff limit (none for a business without a plan on record).
+      cid
+        ? Promise.all([
+            db.user.findMany({ where: { clientId: cid }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, email: true, access: true } }),
+            planUsage(cid),
+            effectivePlan(cid),
+          ])
+        : ([[], null, null] as const),
+      // The order update templates the shop's order steps need (its order steps are read alongside).
+      cid
+        ? db.client.findUnique({ where: { id: cid }, select: { orderFlow: true } }).then((c) => orderTemplateRows(cid, readFlow(c?.orderFlow)))
+        : [],
+    ]);
     const quality = (r: string | null | undefined) => (
       r === "GREEN" ? { tone: "ok", label: "High quality", labelTa: "உயர்ந்த தரம்" }
       : r === "YELLOW" ? { tone: "warn", label: "Medium quality", labelTa: "நடுத்தர தரம்" }
@@ -204,7 +211,7 @@ export default async function SettingsPage() {
 
         {cid && client && (
           <ScrollReveal>
-            <OrderTemplatesCard rows={await orderTemplateRows(cid, readFlow(client.orderFlow))} canChange={scope.manager} />
+            <OrderTemplatesCard rows={tmplRows} canChange={scope.manager} />
           </ScrollReveal>
         )}
 
