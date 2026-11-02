@@ -56,12 +56,31 @@ function getEffectiveDbUrl(): string | undefined {
   return process.env.DATABASE_URL;
 }
 
+/**
+ * Prisma opens 2 connections per CPU + 1 (about 5 on a live function), so a page that reads 30 to 60 things at once
+ * waits in line for a connection. Through Neon's pooler (thousands of connections allowed) a function may use 10.
+ * A connection_limit already in the address is kept, and a direct (non-pooler) address is left as it is.
+ */
+export function withPoolSize(url: string | undefined, size = 10): string | undefined {
+  if (!url || !/-pooler\./.test(url) || /[?&]connection_limit=/.test(url)) return url;
+  return `${url}${url.includes("?") ? "&" : "?"}connection_limit=${size}`;
+}
+
 function makeClient() {
-  const url = getEffectiveDbUrl();
+  const url = withPoolSize(getEffectiveDbUrl());
   return new PrismaClient(url ? { datasources: { db: { url } } } : undefined)
     .$extends({
       query: {
-        async $allOperations({ operation, args, query }) {
+        async $allOperations({ model, operation, args, query }) {
+          // DB_TIMING=1 (QA speed checks only): each call's start and end, to see which ones wait on each other.
+          if (process.env.DB_TIMING === "1") {
+            const t0 = performance.now();
+            try {
+              return await query(args);
+            } finally {
+              console.log(`[db] ${t0.toFixed(0)} +${(performance.now() - t0).toFixed(0)}ms ${model ?? ""}.${operation}`);
+            }
+          }
           if (!READS.has(operation)) return query(args);
           for (let attempt = 0; ; attempt++) {
             try {
