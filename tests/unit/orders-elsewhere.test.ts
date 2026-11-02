@@ -90,6 +90,12 @@ describe("orders on another number: what the customer gets", () => {
     assert.equal(sent.length, 0);
   });
 
+  test("4b. a tapped Chat to Order button always gets the reply, even right after another", async () => {
+    assert.equal(await replyOrdersElsewhere(await cust(), { type: "button" }, MAIN), true);
+    assert.equal(await replyOrdersElsewhere(await cust(), { type: "interactive", interactive: { type: "button_reply" } }, MAIN), true);
+    assert.equal(sent.filter((s) => (s.body.interactive as { type?: string } | undefined)?.type === "cta_url").length, 2);
+  });
+
   test("5. a cart always gets a reply, its items typed into the chat; no order is saved", async () => {
     const cart = { type: "order", order: { catalog_id: "qa-cat", product_items: [{ product_retailer_id: "GINGELLY-1L", quantity: 2 }, { product_retailer_id: "GHEE-500", quantity: "1" }] } };
     assert.equal(await replyOrdersElsewhere(await cust(), cart, MAIN), true);
