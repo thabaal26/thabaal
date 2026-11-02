@@ -15,7 +15,7 @@ import { templateLabel } from "@/lib/plain-error";
 import { useTr } from "@/lib/i18n/context";
 import { dayName, DAYS, describeScheduleSummary, effectiveInterval, estimateDuration, formatMinutes, SCHEDULER_TICK_MINUTES, TIME_PRESETS, WEEKLY_PAIRS } from "@/lib/schedule";
 import { AUDIENCE_PREFIX, decodeTags, describeTags, encodeTags, TAGS_PREFIX, type TagPick } from "@/lib/audience-tags";
-import { countCampaignAudience, saveCampaign, type CampaignInput } from "../actions/campaigns";
+import { countCampaignAudience, saveCampaign, searchCampaignCustomers, type CampaignInput } from "../actions/campaigns";
 
 type SendTo = "all" | "tags" | "saved";
 type ScheduleMode = "DATE" | "WEEKLY_1" | "WEEKLY_2" | "WEEKDAYS" | "DAILY" | "CUSTOM";
@@ -42,9 +42,12 @@ export function CampaignForm({
   templates,
   audience,
   numbers,
+  people = [],
 }: {
   id: string | null;
   initial: CampaignInput;
+  /** Names of the people already added or left out by hand. */
+  people?: { id: string; name: string; phone: string }[];
   templates: { id: string; name: string; category: string; status: string; businessAccountId: string | null }[];
   audience: { all: number; tags: { tag: string; label: string; hint?: string; n: number }[] };
   numbers: { id: string; label: string; businessAccountId: string; isDefault: boolean; dailyLimit: number | null; quality: string | null }[];
@@ -109,31 +112,54 @@ export function CampaignForm({
     set({ audienceTag: tagValue(next) });
   };
 
-  // Several tags can overlap, so their reach is counted on the server.
+  // Several tags can overlap, and people can be added or left out by hand, so the reach is counted on the server
+  // (with how many don't open offers, and the test numbers still in it).
   const multi = sendTo === "tags" && pick.tags.length > 1;
-  const [counted, setCounted] = useState<{ key: string; n: number } | null>(null);
+  const handPicked = c.includeIds.length > 0 || c.excludeIds.length > 0;
+  const serverSize = multi || handPicked;
+  const peopleKey = JSON.stringify([c.audienceTag, c.includeIds, c.excludeIds]);
+  const [counted, setCounted] = useState<{ key: string; n: number; unread: number; testIds: string[] } | null>(null);
   useEffect(() => {
-    if (!multi) return;
-    const key = c.audienceTag;
     const t = setTimeout(async () => {
-      const r = await countCampaignAudience(id, key).catch(() => ({ ok: false, n: 0 }));
-      setCounted({ key, n: r.ok ? r.n : -1 }); // -1: couldn't count
+      const r = await countCampaignAudience(id, c.audienceTag, { includeIds: c.includeIds, excludeIds: c.excludeIds }).catch(() => ({ ok: false, n: 0, unread: 0, testIds: [] }));
+      setCounted({ key: peopleKey, n: r.ok ? r.n : -1, unread: r.unread ?? 0, testIds: r.testIds ?? [] }); // -1: couldn't count
     }, 300);
     return () => clearTimeout(t);
-  }, [multi, c.audienceTag, id]);
-  const counting = multi && counted?.key !== c.audienceTag;
+    // peopleKey stands for audienceTag, includeIds and excludeIds.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [peopleKey, id]);
+  const counting = serverSize && counted?.key !== peopleKey;
+  const fresh = counted?.key === peopleKey ? counted : null;
 
-  const size =
-    sendTo === "all" || !c.audienceTag
+  const size = serverSize
+    ? Math.max(0, counted?.n ?? 0)
+    : sendTo === "all" || !c.audienceTag
       ? audience.all
-      : multi
-        ? Math.max(0, counted?.n ?? 0)
-        : sendTo === "tags" && !pick.tags.length
-          ? 0
-          : (audience.tags.find((t) => t.tag === (sendTo === "tags" ? pick.tags[0] : c.audienceTag))?.n ?? 0);
+      : sendTo === "tags" && !pick.tags.length
+        ? 0
+        : (audience.tags.find((t) => t.tag === (sendTo === "tags" ? pick.tags[0] : c.audienceTag))?.n ?? 0);
   const tagLabel = (tag: string) => tagOptions.find((t) => t.tag === tag)?.label ?? tag;
-  // While several tags are being counted (or couldn't be), the summary shows that instead of 0.
-  const sizeKnown = !multi || (!counting && (counted?.n ?? -1) >= 0);
+  // While the server is counting (or couldn't), the summary shows that instead of 0.
+  const sizeKnown = !serverSize || (!counting && (counted?.n ?? -1) >= 0);
+
+  // People added or left out by hand: names come from the page, then from searches.
+  const [names, setNames] = useState(() => new Map(people.map((p) => [p.id, p])));
+  const [q, setQ] = useState("");
+  const [found, setFound] = useState<{ id: string; name: string; phone: string; tags: string[] }[]>([]);
+  useEffect(() => {
+    const text = q.trim();
+    if (text.length < 2) return;
+    const t = setTimeout(async () => {
+      const rows = await searchCampaignCustomers(id, text).catch(() => []);
+      setFound(rows);
+      setNames((m) => new Map([...m, ...rows.map((r) => [r.id, r] as const)]));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q, id]);
+  const shown = q.trim().length >= 2 ? found : [];
+  const addPerson = (pid: string) => set({ includeIds: [...new Set([...c.includeIds, pid])], excludeIds: c.excludeIds.filter((x) => x !== pid) });
+  const leaveOut = (ids: string[]) => set({ excludeIds: [...new Set([...c.excludeIds, ...ids])], includeIds: c.includeIds.filter((x) => !ids.includes(x)) });
+  const nameOf = (pid: string) => names.get(pid)?.name ?? (isTa ? "வாடிக்கையாளர்" : "Customer");
   const batches = c.batchSize > 0 ? Math.ceil(size / c.batchSize) : 0;
   const mins = estimateDuration(size, c.batchSize, c.intervalMinutes);
   const [h, m] = c.sendTime.split(":").map(Number);
@@ -275,25 +301,131 @@ export function CampaignForm({
 
               <p className="tabular text-sm text-muted" aria-live="polite">
                 {isTa
-                  ? sendTo === "all"
+                  ? sendTo === "all" && !handPicked
                     ? `ஒப்புதல் அளித்த அனைத்து ${audience.all.toLocaleString("en-IN")} வாடிக்கையாளர்களும்.`
                     : sendTo === "tags" && !pick.tags.length
                       ? tr("Pick at least one tag.")
                       : counting
                         ? tr("Counting customers…")
-                        : multi && counted?.n === -1
+                        : serverSize && counted?.n === -1
                           ? `${describeTags(pick, tagLabel)} குறிச்சொல் உள்ளவர்கள். இப்போது எண்ண முடியவில்லை; பொருந்தும் அனைவருக்கும் பிரச்சாரம் சென்றடையும்.`
+                          : handPicked
+                            ? `${size.toLocaleString("en-IN")} வாடிக்கையாளர்கள் (${c.includeIds.length} சேர்த்தது, ${c.excludeIds.length} விலக்கியது).`
                           : `${size.toLocaleString("en-IN")} வாடிக்கையாளர்கள்${sendTo === "tags" ? ` (${describeTags(pick, tagLabel)})` : ""}.`
-                  : sendTo === "all"
+                  : sendTo === "all" && !handPicked
                   ? `All ${audience.all.toLocaleString("en-IN")} opted-in customers.`
                   : sendTo === "tags" && !pick.tags.length
                     ? "Pick at least one tag."
                     : counting
                       ? "Counting customers…"
-                      : multi && counted?.n === -1
+                      : serverSize && counted?.n === -1
                         ? `Customers tagged ${describeTags(pick, tagLabel)}. Couldn't count them right now; the campaign still reaches everyone who matches.`
+                      : handPicked
+                        ? `${size.toLocaleString("en-IN")} customer${size === 1 ? "" : "s"} (${c.includeIds.length} added, ${c.excludeIds.length} left out).`
                       : `${size.toLocaleString("en-IN")} customer${size === 1 ? "" : "s"}${sendTo === "tags" ? ` tagged ${describeTags(pick, tagLabel)}` : ""}.`}
               </p>
+
+              {/* Add one person, or leave some out, on top of "Send to". */}
+              <div className="space-y-2.5 rounded-control border border-line p-3" data-testid="campaign-people">
+                <label htmlFor="people-q" className="block text-sm font-medium text-ink-2">
+                  {isTa ? "சிலரைச் சேர் அல்லது விலக்கு" : "Add or leave out people"}
+                </label>
+                <input
+                  id="people-q"
+                  type="search"
+                  className="field"
+                  autoComplete="off"
+                  placeholder={isTa ? "பெயர் அல்லது எண்ணைத் தேடுங்கள்" : "Search a name or number"}
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                />
+                {shown.length > 0 && (
+                  <ul aria-label={isTa ? "தேடல் முடிவுகள்" : "Search results"} className="divide-y divide-line rounded-control border border-line">
+                    {shown.map((p) => (
+                      <li key={p.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
+                        <span className="min-w-0 flex-1 text-sm">
+                          <span className="font-medium text-ink">{p.name}</span> <span className="tabular text-muted">+{p.phone}</span>
+                        </span>
+                        <Button size="sm" variant="secondary" disabled={c.includeIds.includes(p.id)} onClick={() => addPerson(p.id)}>
+                          {isTa ? "சேர்" : "Add"}
+                        </Button>
+                        <Button size="sm" variant="secondary" disabled={c.excludeIds.includes(p.id)} onClick={() => leaveOut([p.id])}>
+                          {isTa ? "விலக்கு" : "Leave out"}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {fresh && fresh.testIds.length > 0 && (
+                  <Button size="sm" variant="secondary" onClick={() => leaveOut(fresh.testIds)}>
+                    {isTa ? `சோதனை எண்களை விலக்கு (${fresh.testIds.length})` : `Leave out test numbers (${fresh.testIds.length})`}
+                  </Button>
+                )}
+                {(
+                  [
+                    ["include", c.includeIds, isTa ? "சேர்த்தவர்கள்" : "Added", "bg-brand-soft text-brand-deep"],
+                    ["exclude", c.excludeIds, isTa ? "விலக்கியவர்கள்" : "Left out", "bg-danger-bg text-danger"],
+                  ] as const
+                ).map(([kind, ids, title, tone]) =>
+                  ids.length ? (
+                    <div key={kind}>
+                      <div className="mb-1 text-xs font-medium text-muted">{title}</div>
+                      <ul aria-label={title} className="m-0 flex list-none flex-wrap gap-1.5 p-0">
+                        {ids.map((pid) => (
+                          <li key={pid}>
+                            <span className={cn("inline-flex min-h-8 items-center gap-1 rounded-full py-0.5 pl-3 pr-1 text-sm font-medium", tone)}>
+                              {nameOf(pid)}
+                              <button
+                                type="button"
+                                aria-label={isTa ? `${nameOf(pid)} நீக்கு` : `Remove ${nameOf(pid)}`}
+                                onClick={() => set(kind === "include" ? { includeIds: c.includeIds.filter((x) => x !== pid) } : { excludeIds: c.excludeIds.filter((x) => x !== pid) })}
+                                className="grid size-7 place-items-center rounded-full transition hover:bg-black/5 pointer-coarse:size-9"
+                              >
+                                <X aria-hidden className="size-3.5 shrink-0" />
+                              </button>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null,
+                )}
+              </div>
+
+              <CheckRow
+                label={isTa ? "கடைசி 3 சலுகைகளைத் திறக்காதவர்களை விலக்கு" : "Leave out people who didn't open their last 3 offers"}
+                description={
+                  isTa
+                    ? `இதில் ${fresh?.unread ?? 0} பேர். அவர்களின் கடைசி 3 சலுகைகள் போனைச் சேர்ந்தன, ஒன்றும் திறக்கப்படவில்லை. திறக்காதவர்களுக்கு மீண்டும் அனுப்புவது உங்கள் எண்ணின் தரத்தைக் குறைக்கும். சிலர் read receipt-ஐ அணைத்திருப்பார்கள், அதனால் இது உங்கள் விருப்பம்.`
+                    : `${fresh?.unread ?? 0} in this campaign. Their last 3 offers reached the phone and none was opened. Offers to people who never open them lower your number's quality. Some people turn read receipts off, so this is your choice.`
+                }
+                checked={c.skipUnread}
+                onChange={(e) => set({ skipUnread: e.target.checked })}
+              />
+
+              <details className="rounded-control border border-line px-3 py-2 text-sm">
+                <summary className="cursor-pointer font-medium text-ink-2">{isTa ? "யார் தானாக விலக்கப்படுகிறார்கள், ஏன்" : "Who is left out automatically, and why"}</summary>
+                <ul className="mt-2 list-disc space-y-1.5 pl-5 text-muted">
+                  {(isTa
+                    ? [
+                        "வாட்ஸ்அப் பெற முடியாதவர்கள் (Meta 131026: வாட்ஸ்அப் இல்லை, பழைய ஆப், அல்லது உங்களைத் தடுத்தவர்கள்): முதல் தோல்விக்குப் பின் எந்தப் பிரச்சாரத்திலும் இல்லை.",
+                        "STOP அனுப்பியவர்கள், அல்லது உங்கள் சலுகைகளை அணைத்தவர்கள் (Meta 131050): மீண்டும் சலுகை இல்லை.",
+                        "Meta நிறுத்தி வைத்தவர்கள் (131049): ஒருவருக்கு எல்லா வணிகங்களிலிருந்தும் வரும் சலுகைகளை Meta கட்டுப்படுத்துகிறது. 3 நாள் தவிர்க்கப்பட்டு ஒருமுறை மட்டும் மீண்டும் அனுப்பப்படும்; உடனே மீண்டும் அனுப்பினால் மீண்டும் நிறுத்தப்படும்.",
+                        "சமீபத்தில் உங்கள் சலுகை பெற்றவர்கள் (கடைசி சலுகைக்குப் பின் இடைவெளி), ஆர்டர் நடந்துகொண்டிருப்பவர்கள், சலுகை வேண்டாம் என்றவர்கள்.",
+                        "வாட்ஸ்அப் எண்ணின் 24 மணி நேர வரம்பு முடிந்தால், மீதி அடுத்த நேரத்தில் தானாகச் செல்லும்.",
+                      ]
+                    : [
+                        "Can't receive WhatsApp (Meta 131026: not on WhatsApp, an old app, or they blocked you): left out of every campaign after the first failure.",
+                        "Replied STOP, or turned off your offers (Meta 131050): never offered again.",
+                        "Held back by Meta (131049): Meta limits how many offers one person gets from all businesses. They're skipped for 3 days, then tried once more; sending again sooner is only held again.",
+                        "Got an offer from you recently (your gap between offers), have an order in progress, or asked for no offers.",
+                        "When the number's 24-hour limit is reached, the rest go out by themselves when it frees up.",
+                      ]
+                  ).map((t) => (
+                    <li key={t}>{t}</li>
+                  ))}
+                </ul>
+              </details>
             </fieldset>
           </div>
         </Card>

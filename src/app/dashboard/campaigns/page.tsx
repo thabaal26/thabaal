@@ -123,9 +123,9 @@ export default async function CampaignsPage() {
       }
 
       let targetCount = reach(c.clientId);
-      if (c.audienceTag) {
+      if (c.audienceTag || c.includeIds.length || c.excludeIds.length) {
         try {
-          const audienceWhereClause = await campaignAudienceWhere(c.clientId, c.audienceTag.trim() || null);
+          const audienceWhereClause = await campaignAudienceWhere(c.clientId, c.audienceTag?.trim() || null, c);
           targetCount = await db.customer.count({ where: audienceWhereClause });
         } catch {
           targetCount = reach(c.clientId);

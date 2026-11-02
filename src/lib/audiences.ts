@@ -86,8 +86,28 @@ export function describeFilter(raw: AudienceFilter) {
   return parts.length ? parts.join(" · ") : "all opted-in customers";
 }
 
-/** The customer filter for a campaign's audienceTag: a saved audience, one or more tags, or everyone. */
-export async function campaignAudienceWhere(clientId: string, audienceTag: string | null): Promise<Prisma.CustomerWhereInput> {
+/** People added to or left out of a campaign by hand (Campaign.includeIds / excludeIds). */
+export type CampaignPeople = { includeIds?: readonly string[]; excludeIds?: readonly string[] };
+
+/**
+ * The customer filter for a campaign: its audienceTag (a saved audience, one or more tags, or everyone), plus the
+ * people added by hand, minus the people left out. Opted-out and unreachable customers are never in it.
+ */
+export async function campaignAudienceWhere(clientId: string, audienceTag: string | null, people: CampaignPeople = {}): Promise<Prisma.CustomerWhereInput> {
+  const send = await sendToWhere(clientId, audienceTag);
+  const include = [...(people.includeIds ?? [])];
+  const exclude = [...(people.excludeIds ?? [])];
+  if (!include.length && !exclude.length) return send;
+  return {
+    AND: [
+      include.length ? { OR: [send, { id: { in: include }, clientId, optedOut: false, unreachable: false }] } : send,
+      ...(exclude.length ? [{ id: { notIn: exclude } }] : []),
+    ],
+  };
+}
+
+/** The customer filter for a campaign's audienceTag alone. */
+async function sendToWhere(clientId: string, audienceTag: string | null): Promise<Prisma.CustomerWhereInput> {
   const base = { clientId, optedOut: false, unreachable: false };
   if (!audienceTag) return base;
   if (audienceTag.startsWith(AUDIENCE_PREFIX)) {

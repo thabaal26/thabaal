@@ -27,6 +27,7 @@ import { WahaError } from "./waha";
 import { MetaError } from "./whatsapp";
 import { normalizePhone } from "./phone";
 import { affordableMessages } from "./wallet";
+import { notOpeningOffers, UNREAD_OFFERS } from "./engagement";
 
 const TIME_BUDGET_MS = 50_000; // stay under Vercel's function limit
 const KICK_BUDGET_MS = 40_000; // a kick runs after a webhook's answer, inside the same function
@@ -38,7 +39,7 @@ const LOCAL_GAP_MS = [1_000, 3_000]; // random pause between local-session sends
 
 /** Creates a run and queues one message per eligible customer. */
 export async function startRun(campaign: Campaign & { template: { name: string } }, scheduledFor: Date) {
-  const customers = await db.customer.findMany({ where: await campaignAudienceWhere(campaign.clientId, campaign.audienceTag), select: { id: true } });
+  const customers = await db.customer.findMany({ where: await campaignAudienceWhere(campaign.clientId, campaign.audienceTag, campaign), select: { id: true } });
   const run = await db.campaignRun.create({
     data: { campaignId: campaign.id, scheduledFor, total: customers.length, nextBatchAt: new Date() },
   });
@@ -186,6 +187,8 @@ async function processRun(runId: string, now: Date, deadline: number) {
   const paused = marketing ? await marketingPaused(batch.map((m) => m.customerId)) : new Map<string, Date>();
   // No offers for someone in the middle of an order, with a problem open, or who asked for none.
   const busy = marketing ? await busyForOffers(batch.map((m) => m.customerId)) : new Map<string, string>();
+  // The campaign leaves out people who didn't open their last offers (lib/engagement.ts), when it says so.
+  const unread = marketing && campaign.skipUnread ? await notOpeningOffers(campaign.clientId, batch.map((m) => m.customerId)) : new Set<string>();
 
   // The local session sends one by one with human-like gaps; Meta can take parallel sends.
   const local = settings.provider === "LOCAL" && !isSimulated(settings, cfg);
@@ -218,6 +221,10 @@ async function processRun(runId: string, now: Date, deadline: number) {
         where: { id: m.id },
         data: { status: "SKIPPED", error: `Meta is holding back marketing to this customer until about ${fmtDate(until, "d MMM")}` },
       });
+      return;
+    }
+    if (unread.has(m.customerId)) {
+      await db.message.update({ where: { id: m.id }, data: { status: "SKIPPED", error: `Didn't open the last ${UNREAD_OFFERS} offers` } });
       return;
     }
     const why = busy.get(m.customerId);

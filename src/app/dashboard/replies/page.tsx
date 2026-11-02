@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import Link from "@/components/intent-link";
 import type { ConversationEntry } from "@/components/conversation";
 import { db } from "@/lib/db";
-import { fmtNumber } from "@/lib/format";
+import { daysAgo, fmtNumber } from "@/lib/format";
 import { getScope, ownedMessages } from "@/lib/session";
 import { handleAllReplies } from "../actions/replies";
 import { CHATS_SUB, CHATS_SUB_TA, InboxTabs } from "./inbox-tabs";
 import { PAction, PortalPage, T } from "../portal-ui";
 import { ReplyInbox } from "./reply-inbox";
+import { templateLabel } from "@/lib/plain-error";
 import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Chats" };
@@ -18,7 +19,12 @@ const TABS = [
   { key: "", label: "All", labelTa: "அனைத்தும்" },
   { key: "open", label: "Open", labelTa: "திறந்தவை" },
   { key: "handled", label: "Handled", labelTa: "பார்த்தவை" },
+  { key: "sent", label: "Sent", labelTa: "அனுப்பியவை" },
 ] as const;
+
+/** Customers we messaged (a campaign, an order update) who haven't written back show as chats this many days. */
+const SENT_DAYS = 7;
+const SENT_LABEL: Record<string, string> = { SENT: "Sent ✓", DELIVERED: "Delivered ✓✓", READ: "Read ✓✓", FAILED: "Not delivered" };
 
 export default async function RepliesPage({ searchParams }: PageProps<"/dashboard/replies">) {
   const locked = await planGate();
@@ -87,20 +93,87 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
   }
 
   // A customer thread is open if ANY reply from that customer is still unhandled.
-  const allThreads = [...threadMap.values()].map((t) => ({
+  const replyThreads = [...threadMap.values()].map((t) => ({
     ...t,
     handled: t.openCount === 0,
   }));
 
-  const openThreadsCount = allThreads.filter((t) => !t.handled).length;
-  const handledThreadsCount = allThreads.filter((t) => t.handled).length;
+  // Customers we messaged lately who haven't written back: a chat too, so every campaign message shows here. One
+  // row per customer, our newest message as its preview.
+  const sentMessages = await db.message.findMany({
+    where: {
+      ...mine,
+      status: { notIn: ["QUEUED", "SKIPPED"] },
+      createdAt: { gte: daysAgo(SENT_DAYS) },
+      customerId: { notIn: [...threadMap.keys()] },
+    },
+    distinct: ["customerId"],
+    orderBy: { createdAt: "desc" },
+    take: 500,
+    select: {
+      id: true,
+      templateName: true,
+      status: true,
+      sentAt: true,
+      createdAt: true,
+      customerId: true,
+    },
+  });
+  const sentCustomers = sentMessages.length
+    ? await db.customer.findMany({
+        where: { id: { in: sentMessages.map((m) => m.customerId) } },
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          purchases: true,
+          client: { select: { name: true } },
+          orders: {
+            where: { paidAt: null, status: { in: ["NEW", "CONFIRMED"] } },
+            orderBy: [{ paymentRequestedAt: "desc" }, { createdAt: "desc" }],
+            take: 1,
+            select: { id: true, number: true, ref: true, total: true, currency: true, paymentClaimedAt: true, paidAmount: true, paymentMethod: true, paymentTxnId: true },
+          },
+        },
+      })
+    : [];
+  const customerById = new Map(sentCustomers.map((c) => [c.id, c]));
+  const sentThreads = sentMessages.flatMap((m) => {
+    const customer = customerById.get(m.customerId);
+    if (!customer) return [];
+    return [
+      {
+        id: m.id,
+        text: `${templateLabel(m.templateName ?? "Message")} · ${SENT_LABEL[m.status] ?? m.status}`,
+        kind: "sent",
+        handled: true,
+        receivedAt: m.sentAt ?? m.createdAt,
+        mediaId: null,
+        mediaType: null,
+        openCount: 0,
+        totalCount: 0,
+        hasButtonTap: false,
+        hasOrderInquiry: false,
+        customer,
+        sender: null,
+      },
+    ];
+  });
+
+  // Newest activity first: their last message to us, or ours to them when they haven't written.
+  const allThreads = [...replyThreads, ...sentThreads].sort((a, b) => b.receivedAt.getTime() - a.receivedAt.getTime());
+  const openThreadsCount = replyThreads.filter((t) => !t.handled).length;
+  const handledThreadsCount = replyThreads.filter((t) => t.handled).length;
   const tabCount = {
     "": allThreads.length,
     open: openThreadsCount,
     handled: handledThreadsCount,
+    sent: sentThreads.length,
   };
 
-  const replies = allThreads.filter((t) => (show === "handled" ? t.handled : show === "open" ? !t.handled : true));
+  const replies = allThreads.filter((t) =>
+    show === "handled" ? t.handled && t.kind !== "sent" : show === "open" ? !t.handled : show === "sent" ? t.kind === "sent" : true,
+  );
 
   // Computers show the picked customer's conversation beside the list (the newest customer thread by default).
   let selected = replies.find((x) => x.id === picked || x.customer.id === picked);
@@ -184,7 +257,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
         />
       ) : (
         <section className="card">
-          <h2>{show === "handled" ? "Nothing handled yet" : show === "open" ? "You're all caught up" : "No replies yet"}</h2>
+          <h2>{show === "handled" ? "Nothing handled yet" : show === "open" ? "You're all caught up" : show === "sent" ? "Nothing sent in the last 7 days" : "No replies yet"}</h2>
           <p className="muted" style={{ marginTop: 6 }}>
             When customers tap &ldquo;Order now&rdquo; or write back after a campaign, each customer&apos;s conversation appears here.
           </p>
