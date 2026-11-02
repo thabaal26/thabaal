@@ -88,7 +88,17 @@ export async function uploadWhatsAppMedia(cfg: WaConfig, imageUrl: string): Prom
   if (cached && cached.expiresAt > Date.now()) {
     return cached.id;
   }
+  // A campaign sends 10 at once: they share one upload instead of each sending the picture to Meta.
+  const pending = mediaUploads.get(cacheKey);
+  if (pending) return pending;
+  const upload = uploadMediaOnce(cfg, imageUrl, cacheKey).finally(() => mediaUploads.delete(cacheKey));
+  mediaUploads.set(cacheKey, upload);
+  return upload;
+}
 
+const mediaUploads = new Map<string, Promise<string | null>>();
+
+async function uploadMediaOnce(cfg: WaConfig, imageUrl: string, cacheKey: string): Promise<string | null> {
   try {
     const resolved = await resolveImageBytes(imageUrl);
     if (!resolved) return null;
