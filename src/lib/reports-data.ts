@@ -201,16 +201,10 @@ function fmtInr(n: number) {
   return `₹${Math.round(n).toLocaleString("en-IN")}`;
 }
 
-async function computePeriodFigures(
-  clientId: string,
-  from: Date,
-  to: Date,
-  periodName: "this month" | "this week",
-  refillDueCount: number,
-): Promise<PeriodFigures> {
+/** The messages, orders and replies of [from, to): read with the rest of the report, in its one round. */
+function readPeriod(clientId: string, from: Date, to: Date) {
   const range = { gte: from, lt: to };
-
-  const [msgs, orders, rawReplies] = await Promise.all([
+  return Promise.all([
     db.message.findMany({
       where: { customer: { clientId }, createdAt: range, status: { notIn: ["QUEUED", "SKIPPED"] } },
       select: { status: true, pricingCategory: true, billable: true },
@@ -223,7 +217,13 @@ async function computePeriodFigures(
       where: { customer: { clientId }, receivedAt: range },
     }),
   ]);
+}
 
+function computePeriodFigures(
+  [msgs, orders, rawReplies]: Awaited<ReturnType<typeof readPeriod>>,
+  periodName: "this month" | "this week",
+  refillDueCount: number,
+): PeriodFigures {
   const replies = rawReplies;
   let cost = 0;
   const sent = msgs.length;
@@ -366,8 +366,10 @@ export async function getComprehensiveReportData(clientId: string): Promise<Comp
   const tomorrow = addDays(today, 1);
   const weekStart = new Date(today.getTime() - 6 * DAY);
 
-  // Parallel fetch core data
-  const [spend, refills, numbers, campaignsRaw, allReplies, allCustomers, allOrders] = await Promise.all([
+  const fourteenDaysAgo = new Date(today.getTime() - 13 * DAY);
+
+  // Everything the report needs, read in one round.
+  const [spend, refills, numbers, campaignsRaw, allReplies, allCustomers, allOrders, monthReads, weekReads, recentMsgs] = await Promise.all([
     spendSummary(clientId).catch(() => null),
     refillForecast(clientId, now).catch(() => ({ due: [], lapsedCount: 0 })),
     numberHealth(clientId).catch(() => []),
@@ -392,15 +394,23 @@ export async function getComprehensiveReportData(clientId: string): Promise<Comp
         items: true,
       },
     }),
+    readPeriod(clientId, thisMonth, tomorrow),
+    readPeriod(clientId, weekStart, tomorrow),
+    db.message.findMany({
+      where: {
+        customer: { clientId },
+        createdAt: { gte: fourteenDaysAgo },
+        status: { notIn: ["QUEUED", "SKIPPED"] },
+      },
+      select: { createdAt: true, pricingCategory: true, billable: true, status: true },
+    }),
   ]);
 
   const refillDueCount = refills.due.length;
 
   // 1. Period Figures for Month & Week
-  const [pMonth, pWeek] = await Promise.all([
-    computePeriodFigures(clientId, thisMonth, tomorrow, "this month", refillDueCount),
-    computePeriodFigures(clientId, weekStart, tomorrow, "this week", refillDueCount),
-  ]);
+  const pMonth = computePeriodFigures(monthReads, "this month", refillDueCount);
+  const pWeek = computePeriodFigures(weekReads, "this week", refillDueCount);
 
   // 2. Wallet & Spend Telemetry
   // Real figures only: a balance when Meta's prepaid balance is known (as on Home), otherwise none.
@@ -424,15 +434,6 @@ export async function getComprehensiveReportData(clientId: string): Promise<Comp
   const paidList: number[] = [];
   const freeList: number[] = [];
 
-  const fourteenDaysAgo = new Date(today.getTime() - 13 * DAY);
-  const recentMsgs = await db.message.findMany({
-    where: {
-      customer: { clientId },
-      createdAt: { gte: fourteenDaysAgo },
-      status: { notIn: ["QUEUED", "SKIPPED"] },
-    },
-    select: { createdAt: true, pricingCategory: true, billable: true, status: true },
-  });
 
   let maxDaySpend = 0;
   let totalDeliveredMsgs = 0;

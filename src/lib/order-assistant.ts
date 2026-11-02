@@ -75,12 +75,13 @@ async function sentRecently(customerId: string, label: string, ms: number) {
 }
 
 async function canMessage(c: { id: string; clientId: string; optedOut: boolean }) {
-  if (c.optedOut || (await getSettings()).provider !== "META") return false;
-  return (await replyContext(c)).open;
+  if (c.optedOut) return false;
+  const [settings, ctx] = await Promise.all([getSettings(), replyContext(c)]);
+  return settings.provider === "META" && ctx.open;
 }
 
 async function shopName(clientId: string) {
-  return (await db.client.findUnique({ where: { id: clientId }, select: { name: true } }))?.name ?? "our shop";
+  return (await shopInfoFor(clientId)).name;
 }
 
 async function sendButtons(c: Cust, label: string, body: string, buttons: { id: string; title: string }[], opts: { header?: string; footer?: string } = {}) {

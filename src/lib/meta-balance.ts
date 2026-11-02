@@ -152,7 +152,13 @@ async function clientAccount(clientId: string | null | undefined, wabaId?: strin
  * top-up). Built only from the client's own records: nothing is hard-coded and nothing is shared between clients.
  */
 export async function getMetaAccountInfo(wabaId?: string | null, clientId?: string | null): Promise<MetaAccountRecord> {
-  const acc = await clientAccount(clientId, wabaId);
+  // The account and its last Billing Hub balance are read together (one round).
+  const [acc, latestSync] = await Promise.all([
+    clientAccount(clientId, wabaId),
+    clientId
+      ? db.topUp.findFirst({ where: { clientId, note: { startsWith: SYNC_NOTE_PREFIX } }, orderBy: { createdAt: "desc" } }).catch(() => null)
+      : null,
+  ]);
   const id = acc?.wabaId ?? wabaId ?? "";
   const base: MetaAccountRecord = {
     accountName: acc?.name ?? "Not connected",
@@ -165,10 +171,6 @@ export async function getMetaAccountInfo(wabaId?: string | null, clientId?: stri
     syncedBy: "",
     billingUrl: id ? `https://business.facebook.com/latest/billing_hub/accounts/?asset_id=${id}` : "https://business.facebook.com/latest/billing_hub/accounts/",
   };
-  if (!clientId) return base;
-  const latestSync = await db.topUp
-    .findFirst({ where: { clientId, note: { startsWith: SYNC_NOTE_PREFIX } }, orderBy: { createdAt: "desc" } })
-    .catch(() => null);
   if (latestSync) {
     base.liveBalance = latestSync.amount;
     base.lastSyncedAt = latestSync.createdAt.toISOString();

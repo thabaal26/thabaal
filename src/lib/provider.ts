@@ -2,6 +2,7 @@ import "server-only";
 import { headerImageFor } from "./media";
 import type { Setting, Template } from "@prisma/client";
 import { db } from "./db";
+import { memo } from "./request-memo";
 import { placeholders, renderFor, resolveVar, toPlainText, unmappedVars, type TemplateButton, type VarMap } from "./template";
 import { getSession, sendImage, sendText, type WahaConfig } from "./waha";
 import { NOT_CONNECTED, sendTemplateMessage, waConfig, type WaConfig } from "./whatsapp";
@@ -10,7 +11,7 @@ export type ProviderName = "META" | "LOCAL";
 
 /** The single settings row. A plain read (pages ask for it on every load); created on first use. */
 export async function getSettings(): Promise<Setting> {
-  return (await db.setting.findUnique({ where: { id: 1 } })) ?? db.setting.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
+  return memo("settings", async () => (await db.setting.findUnique({ where: { id: 1 } })) ?? db.setting.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } }));
 }
 
 export function wahaConfig(s: Setting): WahaConfig | null {

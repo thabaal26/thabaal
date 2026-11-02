@@ -1,6 +1,7 @@
 import "server-only";
 import { explainSendError } from "@/app/dashboard/actions/send-helpers";
 import { db } from "./db";
+import { memo, replyContextKey } from "./request-memo";
 import { headerImageFor } from "./media";
 import { pushOrderToSheet } from "./google-sheets-live";
 import { getOrderPricing, itemsText, itemsWithNames, money, orderRef } from "./orders";
@@ -62,10 +63,13 @@ export async function paymentTemplateFor(clientId: string) {
 }
 
 /** The customer's last message (whose 24-hour window allows free-form messages) and the number to reply from. */
-export async function replyContext(customer: { id: string; clientId: string }) {
-  const last = await db.reply.findFirst({ where: { customerId: customer.id }, orderBy: { receivedAt: "desc" }, select: { receivedAt: true, senderId: true } });
-  const { number, cfg } = await senderFor(customer.clientId, last?.senderId);
-  return { open: replyWindowEnd(last?.receivedAt) !== null, number, cfg };
+export function replyContext(customer: { id: string; clientId: string }) {
+  // Kept for the message being answered; recordReply forgets it when a new reply is saved.
+  return memo(replyContextKey(customer.id), async () => {
+    const last = await db.reply.findFirst({ where: { customerId: customer.id }, orderBy: { receivedAt: "desc" }, select: { receivedAt: true, senderId: true } });
+    const { number, cfg } = await senderFor(customer.clientId, last?.senderId);
+    return { open: replyWindowEnd(last?.receivedAt) !== null, number, cfg };
+  });
 }
 
 export async function logMessage(customerId: string, templateName: string, body: string, res: { id: string; simulated: boolean }, senderId: string | null) {
@@ -398,9 +402,9 @@ export async function recordPaymentClaim(orderId: string, note: string, referenc
 
 /** A plain WhatsApp text inside the customer's 24-hour window; false when the window is closed or messages are off. */
 export async function textInWindow(customer: { id: string; clientId: string; phone: string; optedOut: boolean }, text: string, label: string) {
-  if (customer.optedOut || (await getSettings()).provider !== "META") return false;
-  const { open, number, cfg } = await replyContext(customer);
-  if (!open) return false;
+  if (customer.optedOut) return false;
+  const [settings, { open, number, cfg }] = await Promise.all([getSettings(), replyContext(customer)]);
+  if (settings.provider !== "META" || !open) return false;
   const res = await sendTextMessage(cfg, customer.phone, text);
   await logMessage(customer.id, label, text, res, number?.id ?? null);
   return true;

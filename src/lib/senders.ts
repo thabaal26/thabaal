@@ -1,6 +1,7 @@
 import "server-only";
 import type { WhatsAppNumber } from "@prisma/client";
 import { db } from "./db";
+import { memo } from "./request-memo";
 import { waConfig } from "./whatsapp";
 
 // Which WhatsApp number a client sends from, and the credentials for it.
@@ -19,13 +20,15 @@ export function numberConfig(n: Pick<WhatsAppNumber, "token" | "phoneNumberId" |
 }
 
 /** The number to send from: the chosen one, else the client's default. Without one the config is not connected. */
-export async function senderFor(clientId: string, senderId?: string | null) {
-  const [client, numbers] = await Promise.all([
-    db.client.findUnique({ where: { id: clientId }, select: { waToken: true } }),
-    clientNumbers(clientId),
-  ]);
-  const number = (senderId && numbers.find((n) => n.id === senderId)) || numbers[0] || null;
-  return { number, cfg: numberConfig(number, client?.waToken ?? null) };
+export function senderFor(clientId: string, senderId?: string | null) {
+  return memo(`sender:${clientId}:${senderId ?? ""}`, async () => {
+    const [client, numbers] = await Promise.all([
+      db.client.findUnique({ where: { id: clientId }, select: { waToken: true } }),
+      clientNumbers(clientId),
+    ]);
+    const number = (senderId && numbers.find((n) => n.id === senderId)) || numbers[0] || null;
+    return { number, cfg: numberConfig(number, client?.waToken ?? null) };
+  });
 }
 
 /**

@@ -4,15 +4,18 @@ import { parseAddressText } from "./address";
 import { formAddressText, formValuesFrom } from "./address-form";
 import { cleanPersonName, fillCustomerName, isPlaceholderName } from "./customer-name";
 import { db } from "./db";
+import { forget, memo, replyContextKey } from "./request-memo";
 
 /**
  * Which client's customers a message to this Meta number concerns: the client that owns the
  * number, or (for the env-configured number) every client without numbers of its own.
  */
-export async function receivingNumber(phoneNumberId?: string) {
-  const number = phoneNumberId ? await db.whatsAppNumber.findUnique({ where: { phoneNumberId }, select: { id: true, clientId: true } }) : null;
-  const customers: Prisma.CustomerWhereInput = number ? { clientId: number.clientId } : { client: { numbers: { none: {} } } };
-  return { number, customers };
+export function receivingNumber(phoneNumberId?: string) {
+  return memo(`receiving:${phoneNumberId ?? ""}`, async () => {
+    const number = phoneNumberId ? await db.whatsAppNumber.findUnique({ where: { phoneNumberId }, select: { id: true, clientId: true } }) : null;
+    const customers: Prisma.CustomerWhereInput = number ? { clientId: number.clientId } : { client: { numbers: { none: {} } } };
+    return { number, customers };
+  });
 }
 
 export type IncomingReply = {
@@ -87,6 +90,8 @@ export async function recordReply(r: IncomingReply) {
     // Webhooks retry; the same message id arriving twice is expected.
     if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) throw e;
   }
+  // Their 24-hour window starts again from this message.
+  forget(replyContextKey(customer.id));
 
   // Automatically detect delivery addresses sent in chat (text or shared location pin)
   // and sync to the customer profile (if missing) and any active open order without an address.

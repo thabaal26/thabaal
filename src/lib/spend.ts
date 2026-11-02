@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { db } from "./db";
 import { APP_TZ } from "./format";
@@ -8,7 +9,6 @@ import {
   fetchMetaLivePricing,
   getMetaAccountInfo,
   SYNC_NOTE_PREFIX,
-  type MetaAccountRecord,
   type MetaPricingPoint,
 } from "./meta-balance";
 
@@ -79,7 +79,12 @@ function monthStarts(now = new Date()) {
  * Enforces Meta's delivery-only billing (excludes FAILED/QUEUED/SKIPPED) and the 1,000 free service messages/month quota per number.
  */
 async function spendBetweenLocal(clientId: string, from: Date, to?: Date, phoneCount = 1): Promise<SpendRow[]> {
-  const groups = await db.message.groupBy({
+  return spendFromLocalGroups(await localSpendGroups(clientId, from, to), phoneCount);
+}
+
+/** The delivered messages of [from, to) by pricing category: the read behind spendBetweenLocal. */
+function localSpendGroups(clientId: string, from: Date, to?: Date) {
+  return db.message.groupBy({
     by: ["pricingCategory", "billable"],
     where: {
       customer: { clientId },
@@ -89,6 +94,9 @@ async function spendBetweenLocal(clientId: string, from: Date, to?: Date, phoneC
     },
     _count: true,
   });
+}
+
+function spendFromLocalGroups(groups: Awaited<ReturnType<typeof localSpendGroups>>, phoneCount: number): SpendRow[] {
   const rows = new Map<string, SpendRow>();
   for (const g of groups) {
     const category = g.pricingCategory!;
@@ -219,8 +227,12 @@ function buildDailySeries(
 
 export const total = (rows: SpendRow[]) => rows.reduce((sum, r) => sum + r.cost, 0);
 
-/** This month's and last month's spend synced live from Meta `pricing_analytics`, plus prepaid balance, 1,000 free service quota, and top-ups. */
-export async function spendSummary(clientId: string) {
+/**
+ * This month's and last month's spend synced live from Meta `pricing_analytics`, plus prepaid balance, 1,000 free
+ * service quota, and top-ups. Everything is read in one round; Meta's charges since the last balance sync are asked
+ * as soon as that sync is known, alongside the rest. Read once per request (Home, Report, Campaigns, Settings).
+ */
+export const spendSummary = cache(async (clientId: string) => {
   const now = new Date();
   const { thisMonth, lastMonth } = monthStarts(now);
   const thisMonthSec = Math.floor(thisMonth.getTime() / 1000);
@@ -228,18 +240,23 @@ export async function spendSummary(clientId: string) {
   const nowSec = Math.floor(now.getTime() / 1000) + 86400;
   const fourteenDaysAgo = new Date(now.getTime() - 15 * 86400_000);
 
-  const clientNumbers = await db.whatsAppNumber
-    .findMany({
-      where: { clientId },
-      orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
-    })
-    .catch(() => []);
-  const clientNumber = clientNumbers[0] ?? null;
-  const phoneCount = Math.max(1, clientNumbers.length);
+  const numbersRead = db.whatsAppNumber.findMany({ where: { clientId }, select: { id: true } }).catch(() => []);
+  // The account of the default number (getMetaAccountInfo picks it), with its last Billing Hub balance.
+  const accountRead = getMetaAccountInfo(null, clientId);
+  // Meta's own figures from the sync on; if Meta can't be asked, our per-message estimate (null: never synced).
+  const sinceSyncRead = Promise.all([accountRead, numbersRead]).then(async ([acc, nums]) => {
+    const syncDate = new Date(acc.lastSyncedAt);
+    if (isNaN(syncDate.getTime()) || syncDate.getTime() <= 0) return null;
+    const fromMeta = await fetchMetaCostSince(clientId, Math.floor(syncDate.getTime() / 1000));
+    return { fromMeta, spent: fromMeta ?? total(await spendBetweenLocal(clientId, syncDate, undefined, Math.max(1, nums.length))) };
+  });
 
-  const [localCurrent, localPrevious, allTimeGroups, allTopUps, liveMeta, localRecentMsgs, monthOrders, localServiceRepliesCount] = await Promise.all([
-    spendBetweenLocal(clientId, thisMonth, undefined, phoneCount),
-    spendBetweenLocal(clientId, lastMonth, thisMonth, phoneCount),
+  const [clientNumbers, metaAccount, sinceSync, currentGroups, previousGroups, allTimeGroups, allTopUps, liveMeta, localRecentMsgs, monthOrders, localServiceRepliesCount] = await Promise.all([
+    numbersRead,
+    accountRead,
+    sinceSyncRead,
+    localSpendGroups(clientId, thisMonth),
+    localSpendGroups(clientId, lastMonth, thisMonth),
     db.message.groupBy({
       by: ["pricingCategory"],
       where: { customer: { clientId }, billable: true, status: { notIn: ["QUEUED", "FAILED", "SKIPPED"] }, pricingCategory: { not: null } },
@@ -281,6 +298,9 @@ export async function spendSummary(clientId: string) {
       })
       .catch(() => 0),
   ]);
+  const phoneCount = Math.max(1, clientNumbers.length);
+  const localCurrent = spendFromLocalGroups(currentGroups, phoneCount);
+  const localPrevious = spendFromLocalGroups(previousGroups, phoneCount);
 
   // Use Meta's live pricing_analytics when connected and non-empty; otherwise fall back to local DB.
   const useLiveMeta = liveMeta.live && liveMeta.points.length > 0;
@@ -334,15 +354,11 @@ export async function spendSummary(clientId: string) {
   const totalLastMonthSpent = total(previous);
   const allTimeSpent = Math.max(localAllTimeSpent, totalMonthSpent + totalLastMonthSpent);
 
-  // Fetch verified Meta account info and live synced balance
-  const metaAccount: MetaAccountRecord = await getMetaAccountInfo(clientNumber?.businessAccountId, clientId);
-
   // Only deduct spend that happened AFTER a real balance sync timestamp (if lastSyncedAt is epoch 0, liveBalance is already current)
   const syncDate = new Date(metaAccount.lastSyncedAt);
-  const hasExplicitSync = !isNaN(syncDate.getTime()) && syncDate.getTime() > 0;
-  // Meta's own half-hour figures from the sync on; if Meta can't be asked, our per-message estimate.
-  const metaSince = hasExplicitSync ? await fetchMetaCostSince(clientId, Math.floor(syncDate.getTime() / 1000)) : null;
-  const spentSinceSync = hasExplicitSync ? (metaSince ?? total(await spendBetweenLocal(clientId, syncDate, undefined, phoneCount))) : 0;
+  const hasExplicitSync = sinceSync !== null;
+  const metaSince = sinceSync?.fromMeta ?? null;
+  const spentSinceSync = sinceSync?.spent ?? 0;
   // Meta takes GST from the prepaid balance along with each charge.
   const spentSinceSyncWithGst = Math.round(spentSinceSync * (1 + INDIA_GST_RATE) * 100) / 100;
 
@@ -388,6 +404,6 @@ export async function spendSummary(clientId: string) {
       since: hasExplicitSync ? syncDate : thisMonth,
     },
   };
-}
+});
 
 
