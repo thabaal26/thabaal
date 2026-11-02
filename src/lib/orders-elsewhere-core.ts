@@ -31,3 +31,19 @@ export function elsewhereReply(o: { shop: string; name: string; phone: string; w
   const site = o.website?.trim() ? `\n\nSee all our products: ${o.website.trim()}` : "";
   return `${head}\n\n${how}${site}`;
 }
+
+/** "View Products", "price list", "catalogue", "products": the customer wants to see what the shop sells. */
+export const ASKS_PRODUCTS = /\b(view|new|all|our)?\s*products?\b|\bprices?\b|price\s*list|\brates?\b|catalog(ue)?|\bmenu\b|விலை|பொருட்கள்/i;
+
+/** The last line of the price list for a shop that takes orders by phone. */
+export const callToOrder = (phone: string) => `📞 To order, call ${bold(formatPhone(phone))}`;
+
+/** The automatic reply for a shop that takes orders by phone: the number to call; a cart's items listed to call about. */
+export function callReply(o: { shop: string; name: string; phone: string; website?: string | null; cart?: CartLine[] | null }) {
+  const main = bold(formatPhone(o.phone));
+  const head = o.cart ? `${hello(o.name)} thank you for choosing ${bold(o.shop)}! 🙏` : `${hello(o.name)} thank you for messaging ${bold(o.shop)}! 🙏`;
+  const items = o.cart?.length ? `\n\n${o.cart.map((l) => `• ${l.quantity} × ${l.name.trim()}`).join("\n")}` : "";
+  const how = o.cart ? `We take orders by phone. Please call ${main} to order these items.` : `To order, please call ${main}. Our team will also reply here.`;
+  const site = o.website?.trim() ? `\n\nSee all our products: ${o.website.trim()}` : "";
+  return `${head}${items}\n\n${how}${site}`;
+}

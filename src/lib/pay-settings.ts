@@ -46,6 +46,9 @@ export type PaySettings = {
    * Empty: orders and payments happen on the connected number, as usual.
    */
   orderPhone: string;
+  /** With orderPhone: customers order by calling it ("call", replies give the price list and the number to call) or by
+   *  WhatsApp chat there ("chat", replies carry a Chat to Order button). */
+  orderBy: "call" | "chat";
 };
 
 /** Highest delivery charge a shop can set. */
@@ -96,6 +99,7 @@ export function readPaySettings(raw: unknown, paymentConfig: string | null | und
     // Shops that never set it keep the ₹60 every order had before the setting.
     deliveryFee: Number.isFinite(fee) && fee >= 0 && fee <= MAX_DELIVERY_FEE ? Math.round(fee) : DEFAULT_SHIPPING_FEE,
     orderPhone: /^\d{10,15}$/.test(str(r.orderPhone, 15)) ? str(r.orderPhone, 15) : "",
+    orderBy: r.orderBy === "call" ? "call" : "chat",
   };
 }
 

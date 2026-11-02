@@ -9,6 +9,13 @@ import { kickCampaigns, runDueCampaigns } from "../../src/lib/dispatcher";
 
 const DAY = 86_400_000;
 const MIN = 60_000;
+// The campaign is due far in the future and started with that clock, so other test files that start "every due
+// campaign" on the same database at the same time never see it (and this file only ever runs its own shop's).
+const FAR = new Date("2099-01-01T04:30:00Z");
+const LATE = new Date(FAR.getTime() + MIN);
+// The second run of test 5 (a campaign runs once per scheduled time).
+const FAR2 = new Date(FAR.getTime() + DAY);
+const LATE2 = new Date(FAR2.getTime() + MIN);
 
 describe("a campaign run, end to end", () => {
   let clientId: string;
@@ -50,7 +57,7 @@ describe("a campaign run, end to end", () => {
     ).id;
     campaignId = (
       await db.campaign.create({
-        data: { clientId, name: "QA run", templateId, scheduleType: "ONCE", sendTime: "10:00", runAt: new Date(Date.now() - MIN), nextRunAt: new Date(Date.now() - MIN), active: true, batchSize: 100, intervalMinutes: 10, audienceTag: tag },
+        data: { clientId, name: "QA run", templateId, scheduleType: "ONCE", sendTime: "10:00", runAt: FAR, nextRunAt: FAR, active: true, batchSize: 100, intervalMinutes: 10, audienceTag: tag },
       })
     ).id;
   });
@@ -71,7 +78,7 @@ describe("a campaign run, end to end", () => {
   });
 
   test("1. a due campaign starts and sends its first batch; the picture goes to Meta once; buttons need nothing per send", async () => {
-    await runDueCampaigns();
+    await runDueCampaigns(LATE, undefined, [clientId]);
     const r = await run();
     assert.equal(r.total, 300);
     assert.equal(r.status, "RUNNING");
@@ -87,14 +94,14 @@ describe("a campaign run, end to end", () => {
 
   test("2. a scheduler that comes 35 minutes late sends the batches it missed, up to Meta's daily limit (240 with margin)", async () => {
     await dueAgo(35 * MIN);
-    await runDueCampaigns();
+    await runDueCampaigns(LATE, undefined, [clientId]);
     assert.equal(await count("SENT"), 240);
     assert.equal(sends(), 140);
   });
 
   test("3. the limit reached, the run waits for the first send to turn 24 hours old, not giving up", async () => {
     await dueAgo(MIN);
-    await runDueCampaigns();
+    await runDueCampaigns(LATE, undefined, [clientId]);
     const r = await run();
     assert.equal(r.status, "WAITING_LIMIT");
     assert.equal(sends(), 0);
@@ -107,7 +114,7 @@ describe("a campaign run, end to end", () => {
     // A day later: yesterday's sends left the 24-hour window.
     await db.message.updateMany({ where: { run: { campaignId }, status: "SENT" }, data: { sentAt: new Date(Date.now() - DAY - 5 * MIN) } });
     await dueAgo(MIN);
-    await runDueCampaigns();
+    await runDueCampaigns(LATE, undefined, [clientId]);
     assert.equal(await count("SENT"), 300);
     assert.equal(await count("QUEUED"), 0);
     assert.equal((await run()).status, "COMPLETED");
@@ -115,14 +122,14 @@ describe("a campaign run, end to end", () => {
 
   test("5. a template sent back to Meta for review holds the run, which goes on once it is approved", async () => {
     await db.message.updateMany({ where: { run: { campaignId } }, data: { sentAt: new Date(Date.now() - 2 * DAY) } });
-    await db.campaign.update({ where: { id: campaignId }, data: { active: true, nextRunAt: new Date(Date.now() - MIN) } });
+    await db.campaign.update({ where: { id: campaignId }, data: { active: true, runAt: FAR2, nextRunAt: FAR2 } });
     await db.template.update({ where: { id: templateId }, data: { status: "PENDING" } });
-    await runDueCampaigns();
+    await runDueCampaigns(LATE2, undefined, [clientId]);
     assert.equal((await run()).status, "WAITING_TEMPLATE");
     assert.equal(sends(), 0);
     await db.template.update({ where: { id: templateId }, data: { status: "APPROVED" } });
     await dueAgo(MIN);
-    await runDueCampaigns();
+    await runDueCampaigns(LATE2, undefined, [clientId]);
     assert.equal((await run()).status, "RUNNING");
     assert.equal(sends(), 100);
   });
@@ -131,7 +138,7 @@ describe("a campaign run, end to end", () => {
     const hhmm = (d: Date) => d.toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: false });
     await db.client.update({ where: { id: clientId }, data: { quietFrom: hhmm(new Date(Date.now() - 60 * MIN)), quietTo: hhmm(new Date(Date.now() + 60 * MIN)) } });
     await dueAgo(MIN);
-    await runDueCampaigns();
+    await runDueCampaigns(LATE2, undefined, [clientId]);
     const r = await run();
     assert.equal(r.status, "WAITING_QUIET");
     assert.equal(sends(), 0);
