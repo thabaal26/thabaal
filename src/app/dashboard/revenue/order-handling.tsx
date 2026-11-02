@@ -17,12 +17,12 @@ const CALL_STEPS: Step[] = [
     ta: "உங்கள் கேம்பெயின்கள் இந்த எண்ணிலிருந்து செல்லும். டெம்ப்ளேட்டில் உங்கள் முதன்மை எண்ணுடன் Call பட்டனும், View Products என்ற Reply பட்டனும் சேர்க்கவும். Link பட்டன் வேண்டாம்: அதன் இணைய முகவரியை வாட்ஸ்அப் உங்கள் படத்தின் கீழே காட்டும்.",
   },
   {
-    t: "A customer who taps View Products (or asks for prices) gets your price list from your catalogue, in stock items with prices, ending with “To order, call” your main number.",
-    ta: "View Products அழுத்தும் (அல்லது விலை கேட்கும்) வாடிக்கையாளருக்கு உங்கள் கேட்டலாகில் இருந்து விலைப் பட்டியல் செல்லும்: இருப்பில் உள்ள பொருட்கள், விலையுடன், கடைசியில் உங்கள் முதன்மை எண்ணை அழைக்கச் சொல்லி.",
+    t: "A customer who taps View Products (or asks for prices) gets your price list from your catalogue, in stock items with prices, ending with “To order, call or WhatsApp” your main number.",
+    ta: "View Products அழுத்தும் (அல்லது விலை கேட்கும்) வாடிக்கையாளருக்கு உங்கள் கேட்டலாகில் இருந்து விலைப் பட்டியல் செல்லும்: இருப்பில் உள்ள பொருட்கள், விலையுடன், கடைசியில் உங்கள் முதன்மை எண்ணை அழைக்க அல்லது வாட்ஸ்அப் செய்யச் சொல்லி.",
   },
   {
-    t: "Anyone who writes anything else gets “To order, please call” your main number (at most once in 6 hours). A catalogue cart is not saved as an order: the reply lists its items and asks them to call.",
-    ta: "வேறு எதை எழுதினாலும் உங்கள் முதன்மை எண்ணை அழைக்கச் சொல்லும் பதில் செல்லும் (6 மணி நேரத்துக்கு ஒருமுறை). கேட்டலாக் கார்ட் ஆர்டராகச் சேமிக்கப்படாது: அதன் பொருட்களுடன் அழைக்கச் சொல்லும்.",
+    t: "Anything else (Hi, a question, a photo) gets “To order, call or WhatsApp us on” your main number, every time; an ok or thanks right after a reply stays quiet. A catalogue cart is not saved as an order: the reply lists its items with the same line.",
+    ta: "வேறு எதை எழுதினாலும் (Hi, கேள்வி, புகைப்படம்) ஒவ்வொரு முறையும் உங்கள் முதன்மை எண்ணை அழைக்க அல்லது வாட்ஸ்அப் செய்யச் சொல்லும் பதில் செல்லும்; பதிலுக்குப் பின் வரும் ok/நன்றிக்கு பதில் இல்லை. கேட்டலாக் கார்ட் ஆர்டராகச் சேமிக்கப்படாது: அதன் பொருட்களுடன் அதே வரி செல்லும்.",
   },
 ];
 
@@ -32,8 +32,8 @@ const CHAT_STEPS: Step[] = [
     ta: "உங்கள் கேம்பெயின்கள் இந்த எண்ணிலிருந்து செல்லும். டெம்ப்ளேட்டில் உங்கள் முதன்மை எண்ணுடன் Call பட்டனும், Chat to Order என்ற Reply பட்டனும் சேர்க்கவும். Link பட்டன் வேண்டாம்: அதன் இணைய முகவரியை வாட்ஸ்அப் உங்கள் படத்தின் கீழே காட்டும்.",
   },
   {
-    t: "A customer who taps Chat to Order, or writes here, gets one reply: your main number and a Chat to Order button that opens WhatsApp with you there (for a message, at most once in 6 hours).",
-    ta: "Chat to Order அழுத்தும் அல்லது இங்கே எழுதும் வாடிக்கையாளருக்கு ஒரு பதில் செல்லும்: உங்கள் முதன்மை எண்ணும், அங்கே உங்களுடன் வாட்ஸ்அப்பைத் திறக்கும் Chat to Order பட்டனும் (செய்திக்கு 6 மணி நேரத்துக்கு ஒருமுறை).",
+    t: "A customer who taps Chat to Order, or writes here, gets a reply every time: your main number and a Chat to Order button that opens WhatsApp with you there (an ok or thanks right after a reply stays quiet).",
+    ta: "Chat to Order அழுத்தும் அல்லது இங்கே எழுதும் வாடிக்கையாளருக்கு ஒவ்வொரு முறையும் பதில் செல்லும்: உங்கள் முதன்மை எண்ணும், அங்கே உங்களுடன் வாட்ஸ்அப்பைத் திறக்கும் Chat to Order பட்டனும் (பதிலுக்குப் பின் வரும் ok/நன்றிக்கு பதில் இல்லை).",
   },
   {
     t: "A catalogue cart sent here is not saved as an order: the reply carries its items, so the customer just presses send on your main number.",

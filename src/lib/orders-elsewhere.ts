@@ -1,16 +1,16 @@
 import "server-only";
-import { formatPriceList, listCatalogProducts, shopInfoFor } from "./catalog";
+import { formatPriceList, getCatalogWithProducts, listCatalogProducts, shopInfoFor, type CatalogProduct } from "./catalog";
 import { db } from "./db";
 import { lookupNames } from "./orders";
-import { ASKS_PRODUCTS, CHAT_TO_ORDER, callReply, callToOrder, chatLink, ELSEWHERE_GAP_MS, ELSEWHERE_LABEL, elsewhereReply, orderText, type CartLine } from "./orders-elsewhere-core";
+import { ACK_QUIET_MS, ASKS_PRODUCTS, BURST_MS, CHAT_TO_ORDER, callReply, callToOrder, chatLink, ELSEWHERE_LABEL, elsewhereReply, isAck, orderText, type CartLine } from "./orders-elsewhere-core";
 import { paySettingsFor } from "./pay-settings-server";
 import { logMessage, replyContext } from "./payments";
 import { getSettings } from "./provider";
 import { sendCtaUrl, sendTextMessage } from "./whatsapp";
 
 // "Orders on another number" (Payments › Payment settings › How orders work): the connected number only sends the
-// shop's messages; customers order and pay on the shop's main number, by calling it or by WhatsApp chat there.
-// Wording: lib/orders-elsewhere-core.ts.
+// shop's messages; customers order and pay on the shop's main number, by calling or WhatsApp-ing it, or by WhatsApp
+// chat there. Wording: lib/orders-elsewhere-core.ts.
 
 export type Elsewhere = { phone: string; by: "call" | "chat" };
 
@@ -31,33 +31,51 @@ async function cartLines(clientId: string, m: CartMessage): Promise<CartLine[]> 
   return items.map((i) => ({ name: names.get(String(i.product_retailer_id)) ?? String(i.product_retailer_id), quantity: Number(i.quantity) || 1 }));
 }
 
+/** When we last answered this customer with one of these replies, if at all. */
+async function lastAnswer(customerId: string) {
+  const m = await db.message.findFirst({ where: { customerId, templateName: { in: [ELSEWHERE_LABEL, "Price list"] } }, orderBy: { createdAt: "desc" }, select: { createdAt: true } });
+  return m?.createdAt ?? null;
+}
+
 /**
- * Answers a customer who wrote to a shop that takes orders on its main number. A cart is never saved or charged here.
- *  - by call: asking for products ("View Products" button, "price list", "products"…) gets the shop's price list from
- *    its catalogue, ending with the number to call; a cart gets its items and the number to call; anything else gets
- *    "To order, please call …".
- *  - by chat: one reply with the main number and a "Chat to Order" button opening WhatsApp there (a cart's items typed in).
- * A tapped button, a cart or a request for products always gets an answer; other messages at most once every 6 hours.
- * False when nothing went out (24-hour window closed, messages off, or already told recently).
+ * Answers a customer who wrote to a shop that takes orders on its main number, whatever they did after a campaign. A
+ * cart is never saved or charged here.
+ *  - by call: "View Products" (or asking for prices, products, "how much…") gets the price list from the catalogue,
+ *    ending "To order, call or WhatsApp <main number>"; a cart gets its items and the same line; anything else
+ *    ("Hi", a question, a photo) gets "To order, call or WhatsApp us on <main number>".
+ *  - by chat: the main number and a "Chat to Order" button opening WhatsApp there (a cart's items typed in).
+ * A tap, a cart or a request for products is always answered; any other message too, except one within 20 seconds
+ * of our reply (one reply for a burst) and an "ok"/"thanks"/👍 within ten minutes of it. False when nothing went out (also: 24-hour window closed, messages off).
  */
 export async function replyOrdersElsewhere(c: Cust, m: CartMessage, where: Elsewhere, text = ""): Promise<boolean> {
   if (c.optedOut) return false;
   const cart = m.type === "order";
   const tapped = m.type === "button" || m.interactive?.type === "button_reply" || m.interactive?.type === "list_reply";
   const wantsProducts = where.by === "call" && !cart && ASKS_PRODUCTS.test(text);
-  if (!cart && !tapped && !wantsProducts) {
-    const recent = await db.message.findFirst({ where: { customerId: c.id, templateName: ELSEWHERE_LABEL, createdAt: { gte: new Date(Date.now() - ELSEWHERE_GAP_MS) } }, select: { id: true } });
-    if (recent) return false;
+  const [settings, ctx, shop, lines, last] = await Promise.all([
+    getSettings(),
+    replyContext(c),
+    shopInfoFor(c.clientId),
+    cart ? cartLines(c.clientId, m) : [],
+    cart || tapped || wantsProducts ? null : lastAnswer(c.id),
+  ]);
+  if (last) {
+    const since = Date.now() - last.getTime();
+    if (since < BURST_MS || (isAck(text) && since < ACK_QUIET_MS)) return false;
   }
-  const [settings, ctx, shop, lines] = await Promise.all([getSettings(), replyContext(c), shopInfoFor(c.clientId), cart ? cartLines(c.clientId, m) : []]);
   if (settings.provider !== "META" || !ctx.open) return false;
 
   if (where.by === "call") {
-    const products = wantsProducts ? await listCatalogProducts(ctx.cfg).catch(() => []) : [];
+    // The catalogue as last read (at most a minute old), so the list goes out at once; Meta itself if that has nothing.
+    let products: CatalogProduct[] = [];
+    if (wantsProducts) {
+      products = (await getCatalogWithProducts(c.clientId).catch(() => null))?.products ?? [];
+      if (!products.some((p) => p.inStock && p.price)) products = await listCatalogProducts(ctx.cfg).catch(() => []);
+    }
     const list = products.some((p) => p.inStock && p.price);
     const body = list
       ? formatPriceList(shop.name, products, callToOrder(where.phone)).slice(0, 4096)
-      : callReply({ shop: shop.name, name: c.name, phone: where.phone, website: shop.website, cart: cart ? lines : null });
+      : callReply({ shop: shop.name, name: c.name, phone: where.phone, cart: cart ? lines : null });
     const res = await sendTextMessage(ctx.cfg, c.phone, body);
     await logMessage(c.id, list ? "Price list" : ELSEWHERE_LABEL, body, res, ctx.number?.id ?? null);
     return true;
