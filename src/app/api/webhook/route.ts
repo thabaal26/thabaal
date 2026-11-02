@@ -17,6 +17,7 @@ import { handleAssistantButton, handleAssistantText, handleCancelRequest, noteSo
 import { codBlocked } from "@/lib/pay-settings";
 import { paySettingsFor } from "@/lib/pay-settings-server";
 import { confirmPayment, parseMetaAmount, recordPaymentClaim, recordPaymentFailure, sendPaymentRequestFor, textInWindow, updateOrderCard } from "@/lib/payments";
+import { detectPaymentApp } from "@/lib/payment-app";
 import { autoSendCatalogue, catalogueTrigger, firstMessageToday } from "@/lib/catalog";
 import { mapMetaStatus } from "@/lib/whatsapp";
 import { findUtr, logPaymentEvent } from "@/lib/payment-events";
@@ -227,7 +228,9 @@ async function applyPayment(s: PaymentUpdate, phoneNumberId: string | undefined,
     return;
   }
   // confirmPayment keeps a smaller amount as a part payment, so the order is only "Paid" when the full total arrived.
-  await confirmPayment(order.id, txn?.id ?? s.id ?? null, { method: "upi_whatsapp", source: "meta", amount, utr });
+  // Meta's details sometimes carry the payer's UPI ID or app: kept when they do; otherwise it was WhatsApp's own pay.
+  const app = detectPaymentApp(JSON.stringify(s.payment ?? {})) ?? "whatsapp";
+  await confirmPayment(order.id, txn?.id ?? s.id ?? null, { method: "upi_whatsapp", source: "meta", amount, utr, app });
 }
 
 
@@ -332,7 +335,8 @@ async function detectAndApplyUpiPayment(
       await recordPaymentClaim(targetOrder.id, note, String(txnId)).catch(() => {});
       return { text: `UPI payment on WhatsApp for ${ref} (${totalFormatted}) · check the amount`, kind: "order", media: base.media, handledAsPayment: true };
     }
-    await confirmPayment(targetOrder.id, String(txnId), { method: "upi_whatsapp", source: "meta", amount, utr: bubbleUtr }).catch((e) => console.error("Auto confirmPayment on UPI bubble failed", e));
+    const app = detectPaymentApp(JSON.stringify(m.payment ?? {})) ?? "whatsapp";
+    await confirmPayment(targetOrder.id, String(txnId), { method: "upi_whatsapp", source: "meta", amount, utr: bubbleUtr, app }).catch((e) => console.error("Auto confirmPayment on UPI bubble failed", e));
     return {
       text: `UPI payment completed on WhatsApp (${money(amount, targetOrder.currency)} for ${ref})`,
       kind: "order",
@@ -685,7 +689,7 @@ export async function POST(req: NextRequest) {
                 } else {
                   await db.order.update({
                     where: { id: order.id },
-                    data: { status: "CANCELLED" },
+                    data: { status: "CANCELLED", cancelledAt: new Date(), cancelledBy: "Customer (tapped Cancel on WhatsApp)" },
                   });
                   pushOrderToSheet(order.id, "ORDER_UPDATE", "Customer cancelled COD");
                   await textInWindow(order.customer, `Your order ${ref} has been cancelled as requested. If you need any assistance or want to order later, feel free to message us anytime!`, "COD Cancelled").catch(() => {});

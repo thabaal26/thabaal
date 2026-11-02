@@ -324,7 +324,7 @@ async function answerCancel(customerId: string, orderId: string, yes: boolean) {
   }
   const done = await db.order.updateMany({
     where: { id: o.id, status: { in: ["NEW", "CONFIRMED"] }, paidAt: null, packedAt: null },
-    data: { status: "CANCELLED", paymentReminderAt: new Date(), internalNote: appendNote(o.internalNote, `Cancelled by the customer on WhatsApp (${today()})`) },
+    data: { status: "CANCELLED", cancelledAt: new Date(), cancelledBy: "Customer on WhatsApp", paymentReminderAt: new Date(), internalNote: appendNote(o.internalNote, `Cancelled by the customer on WhatsApp (${today()})`) },
   });
   if (!done.count) return;
   pushOrderToSheet(o.id, "ORDER_UPDATE", "Cancelled by the customer");

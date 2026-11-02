@@ -1,5 +1,6 @@
 "use client";
 
+import { PAYMENT_APPS } from "@/lib/payment-app";
 import { Banknote, CalendarClock, CreditCard, Landmark, QrCode, Smartphone, Truck, Undo2, type IconComponent } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -130,6 +131,8 @@ export function RecordPaymentSheet({
   const [method, setMethod] = useState<Method>(cod ? "cod" : "upi");
   const [amount, setAmount] = useState(String(due));
   const [reference, setReference] = useState(knownRef ?? "");
+  // Which UPI app (optional): shown on the order card with the payment.
+  const [app, setApp] = useState("");
   const [by, setBy] = useState("");
   const [tell, setTell] = useState(true);
   const [seen, setSeen] = useState(open);
@@ -140,6 +143,7 @@ export function RecordPaymentSheet({
       setAmount(String(due));
       setReference(knownRef ?? "");
       setBy("");
+      setApp("");
       setTell(true);
     }
   }
@@ -154,7 +158,7 @@ export function RecordPaymentSheet({
         onSubmit={(e) => {
           e.preventDefault();
           start(async () => {
-            const r = await safeAction(() => recordPayment(id, { method, amount: n, reference, collectedBy: by, tell, seenReceived: received ?? null }));
+            const r = await safeAction(() => recordPayment(id, { method, amount: n, reference, collectedBy: by, tell, seenReceived: received ?? null, app: app || null }));
             toastResult(r);
             if (r.ok) {
               onClose();
@@ -191,6 +195,18 @@ export function RecordPaymentSheet({
             />
           </div>
         </Field>
+        {method === "upi" && (
+          <Field id={`app-${id}`} label="Paid with" hint="optional">
+            <select className="field" value={app} onChange={(e) => setApp(e.target.value)}>
+              <option value="">Not sure</option>
+              {Object.entries(PAYMENT_APPS).map(([k, label]) => (
+                <option key={k} value={k}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
         {!cashLike && (
           <Field id={`ref-${id}`} label={method === "upi" ? "UPI reference (UTR)" : "Reference"} hint="optional">
             <input className="field tabular" maxLength={60} value={reference} placeholder={method === "upi" ? "12-digit number" : "Transaction or receipt number"} onChange={(e) => setReference(e.target.value)} />

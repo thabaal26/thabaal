@@ -133,7 +133,7 @@ export async function expireUnfinishedOrders(now = new Date(), paused: ReadonlyS
     const reason = `Expired: not completed within ${days} day${days === 1 ? "" : "s"}`;
     const done = await db.order.updateMany({
       where: { id: o.id, status: "NEW", paidAt: null, paymentClaimedAt: null },
-      data: { status: "CANCELLED", paymentReminderAt: now, internalNote: [o.internalNote, reason].filter(Boolean).join("\n").slice(0, 1000) },
+      data: { status: "CANCELLED", cancelledAt: now, cancelledBy: `Automatically: not completed within ${days} day${days === 1 ? "" : "s"}`, paymentReminderAt: now, internalNote: [o.internalNote, reason].filter(Boolean).join("\n").slice(0, 1000) },
     });
     if (!done.count) continue;
     expired++;

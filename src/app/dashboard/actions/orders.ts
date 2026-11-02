@@ -25,7 +25,7 @@ import { normalizePhone } from "@/lib/phone";
 import { FLOW_TEMPLATE_NAMES, isTemplatePicture, orderTemplateNames, picturePrefixFor } from "@/lib/order-templates";
 import { cleanValues, readFields, readValues } from "@/lib/custom-fields";
 import { senderFor } from "@/lib/senders";
-import { requireManager, requireOrderAccess } from "@/lib/session";
+import { requireManager, requireOrderAccess, requireUser } from "@/lib/session";
 import { customerWords, FLOW_KEYS, flowHas, flowShips, ORDER_FLOWS, readFlow, stepBlocked, type OrderFlowKey } from "@/lib/order-flow";
 import { sendText } from "@/lib/waha";
 import { sendInteractiveButtons, sendTemplateMessage, sendTextMessage } from "@/lib/whatsapp";
@@ -104,7 +104,16 @@ export async function setOrderStatus(id: string, status: OrderStatus): Promise<S
     if (blocked) return { ok: false, message: blocked };
   }
   // Reopening starts the order over, so it isn't still shown as packed.
-  await db.order.update({ where: { id: order.id }, data: { status, ...(status === "NEW" ? { packedAt: null } : {}) } });
+  // Cancelled: when and by whom (the database also stamps the time); reopened: neither applies any more.
+  const who = status === "CANCELLED" ? await requireUser() : null;
+  await db.order.update({
+    where: { id: order.id },
+    data: {
+      status,
+      ...(status === "NEW" ? { packedAt: null } : {}),
+      ...(who ? { cancelledAt: new Date(), cancelledBy: `Staff (${(who.name || who.email).slice(0, 60)})` } : { cancelledAt: null, cancelledBy: null }),
+    },
+  });
   pushOrderToSheet(order.id, "ORDER_UPDATE");
   let told = false;
   if (status === "CANCELLED" && !order.customer.optedOut) told = await tellCancelled(order).catch((e) => (console.error("Could not tell the customer about the cancellation", e), false));

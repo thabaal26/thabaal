@@ -17,6 +17,7 @@ import { Clock } from "@/components/icons";
 import { T, useLang } from "../portal-ui";
 import { getOrderPricing, pointsDiscount } from "@/lib/order-pricing";
 import { orderRef, type OrderItem } from "@/lib/order-ref";
+import { PAYMENT_SOURCE_WORDS, paymentAppName } from "@/lib/payment-app";
 import type { SavedAddress } from "@/lib/address-book";
 import {
   DEFAULT_FLOW,
@@ -81,6 +82,11 @@ export type OrderCardData = {
   paymentFailedAt?: Date | string | null;
   paymentFailReason?: string | null;
   collectedBy?: string | null;
+  /** The UPI app it was paid with (lib/payment-app.ts), when known. */
+  paymentApp?: string | null;
+  /** When and why it was cancelled. */
+  cancelledAt?: Date | string | null;
+  cancelledBy?: string | null;
   refundedAt?: Date | string | null;
   refundAmount?: number | null;
   refundNote?: string | null;
@@ -201,9 +207,11 @@ export function OrderCard({
   const [itemsCopied, setItemsCopied] = useState(false);
   const [refCopied, setRefCopied] = useState(false);
 
+  // The bank's UPI reference (UTR) when known (what a shop finds in its bank app), else the transaction id.
+  const shownRef = o.paymentUtr || o.paymentTxnId || "";
   const handleCopyRef = () => {
-    if (!o.paymentTxnId) return;
-    navigator.clipboard?.writeText(o.paymentTxnId);
+    if (!shownRef) return;
+    navigator.clipboard?.writeText(shownRef);
     setRefCopied(true);
     setTimeout(() => setRefCopied(false), 1800);
   };
@@ -632,10 +640,23 @@ export function OrderCard({
 
   // Timeline: one line per step, with when it happened.
   const payRef = o.paymentUtr ? `UTR ${o.paymentUtr}` : o.paymentTxnId ? `Ref: ${o.paymentTxnId}` : "";
+  // How the money came: the app, and how it was confirmed (WhatsApp, the customer's UPI ref, staff).
+  const appName = paymentAppName(o.paymentApp);
+  const sourceWords = o.paymentSource ? (PAYMENT_SOURCE_WORDS[o.paymentSource] ?? null) : null;
+  const moneyIn = isPaid || (o.paidAmount ?? 0) > 0;
+  const payDetail = moneyIn
+    ? [o.paidAt ? `Paid ${when(o.paidAt)}` : null, appName, sourceWords, o.collectedBy ? `collected by ${o.collectedBy}` : null].filter(Boolean).join(" · ")
+    : o.paymentClaimedAt
+      ? [`Customer says paid ${when(o.paymentClaimedAt)}`, appName].filter(Boolean).join(" · ")
+      : "";
+  const cancelDetail = o.status === "CANCELLED" ? [o.cancelledAt ? `Cancelled ${when(o.cancelledAt)}` : "Cancelled", o.cancelledBy].filter(Boolean).join(" · ") : "";
   const timelineEvents: [string, string | null][] = [
     ["Order received", fmtDate(new Date(o.createdAt), "EEE, d MMM yyyy, h:mm a")],
     ...(o.status === "CANCELLED"
-      ? [["Cancelled", o.internalNote ? `Cancelled · ${o.internalNote}` : "Cancelled"] as [string, string | null]]
+      ? [
+          ...(moneyIn ? [["Payment received", [when(o.paidAt), appName, sourceWords, payRef].filter(Boolean).join(" · ") || "Done"] as [string, string | null]] : []),
+          ["Cancelled", [when(o.cancelledAt), o.cancelledBy].filter(Boolean).join(" · ") || "Done"] as [string, string | null],
+        ]
       : [
           ...(isCod && !isPaid
             ? [["Cash on delivery", "No online payment; collect the cash on delivery"] as [string, string | null]]
@@ -647,7 +668,7 @@ export function OrderCard({
                 [
                   "Payment verification",
                   isPaid
-                    ? [when(o.paidAt), payRef].filter(Boolean).join(" · ") || "Done"
+                    ? [when(o.paidAt), appName, sourceWords, payRef].filter(Boolean).join(" · ") || "Done"
                     : o.paymentClaimedAt
                       ? `Customer says paid ${when(o.paymentClaimedAt) ?? ""} · check your account`.replace("  ", " ")
                       : null,
@@ -1001,8 +1022,8 @@ export function OrderCard({
           {payText}
         </span>
 
-        {/* Dedicated UPI Reference Pill with 1-tap copy and clean visual breathing room */}
-        {isPaid && o.paymentTxnId && (
+        {/* The UPI reference (UTR) with 1-tap copy: once paid, or while the customer says they paid (to check). */}
+        {(moneyIn || o.paymentClaimedAt) && shownRef && (
           <button
             type="button"
             onClick={handleCopyRef}
@@ -1033,9 +1054,9 @@ export function OrderCard({
                 textTransform: "uppercase",
               }}
             >
-              UPI
+              {o.paymentUtr ? "UTR" : "UPI"}
             </span>
-            <span style={{ fontWeight: 500, letterSpacing: "0.02em" }}>{o.paymentTxnId}</span>
+            <span style={{ fontWeight: 500, letterSpacing: "0.02em" }}>{shownRef}</span>
             <span style={{ fontSize: 11, color: refCopied ? "var(--ok)" : "var(--muted)", marginLeft: 1 }}>
               {refCopied ? "✓" : "📋"}
             </span>
@@ -1044,6 +1065,12 @@ export function OrderCard({
 
         {isLate && <span className="pill bad">Late {lateText}</span>}
       </div>
+      {/* When and how it was paid, or when and why it was cancelled: one quiet line. */}
+      {(payDetail || cancelDetail) && (
+        <p className="muted small" data-pay-detail style={{ margin: "0 0 4px", fontSize: 13, lineHeight: 1.45 }}>
+          {[payDetail, cancelDetail].filter(Boolean).join(" · ")}
+        </p>
+      )}
 
       {/* 3b. Loyalty points: used on this order, or what the customer can use (Use button, "By hand"). */}
       <OrderPointsControl

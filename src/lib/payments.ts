@@ -7,6 +7,7 @@ import { getOrderPricing, itemsText, itemsWithNames, money, orderRef } from "./o
 import { pointsDiscount } from "./order-pricing";
 import { logPaymentEvent, utrOf } from "./payment-events";
 import { checkoutMode, codBlocked, upiLink, type CheckoutMode, type PaySettings } from "./pay-settings";
+import { detectPaymentApp, type PaymentApp } from "./payment-app";
 import { customerWords, flowShips } from "./order-flow";
 import { bold, hello, itemLines } from "./wa-text";
 import { flowFor, paySettingsFor } from "./pay-settings-server";
@@ -264,6 +265,8 @@ export type PaymentRecord = {
   seenReceived?: number | null;
   /** The bank's 12-digit UPI reference, when known; saved apart from the transaction reference. */
   utr?: string | null;
+  /** The UPI app it was paid with (lib/payment-app.ts), when known. */
+  app?: PaymentApp | null;
 };
 
 /**
@@ -322,6 +325,7 @@ async function confirmPaymentOnce(orderId: string, txnId: string | null | undefi
       ...(txnId && { paymentTxnId: txnId }),
       ...((rec.utr ?? utrOf(txnId)) && { paymentUtr: rec.utr ?? utrOf(txnId) }),
       ...(rec.collectedBy && { collectedBy: rec.collectedBy.slice(0, 80) }),
+      ...(rec.app && { paymentApp: rec.app }),
       paymentClaimedAt: null,
       paymentFailedAt: null,
       paymentFailReason: null,
@@ -378,13 +382,15 @@ async function confirmPaymentOnce(orderId: string, txnId: string | null | undefi
 
 /** The customer says they paid (a "paid" message, a screenshot) but nothing confirms it: flag it for staff to check. */
 export async function recordPaymentClaim(orderId: string, note: string, reference?: string | null) {
-  const order = await db.order.findUnique({ where: { id: orderId }, select: { id: true, paidAt: true, paymentClaimNote: true } });
+  const order = await db.order.findUnique({ where: { id: orderId }, select: { id: true, paidAt: true, paymentClaimNote: true, paymentApp: true } });
   if (!order || order.paidAt) return false;
   // A UTR the customer sent is kept in its own field too (a duplicate one isn't: it belongs to another order).
   const utr = reference && !/^DUP-/i.test(reference) ? utrOf(reference) : null;
+  // "Paid by GPay", a caption, a UPI ID's handle: which app it was, when it says (kept once known).
+  const app = order.paymentApp ? null : detectPaymentApp(note);
   await db.order.update({
     where: { id: order.id },
-    data: { paymentClaimedAt: new Date(), paymentClaimNote: note.slice(0, 300), ...(reference && { paymentTxnId: reference.slice(0, 60) }), ...(utr && { paymentUtr: utr }) },
+    data: { paymentClaimedAt: new Date(), paymentClaimNote: note.slice(0, 300), ...(reference && { paymentTxnId: reference.slice(0, 60) }), ...(utr && { paymentUtr: utr }), ...(app && { paymentApp: app }) },
   });
   pushOrderToSheet(order.id, "ORDER_UPDATE", "Customer says paid");
   return true;
@@ -503,6 +509,8 @@ export async function cancelSupersededOrdersForCustomer(
       where: { id: old.id },
       data: {
         status: "CANCELLED",
+        cancelledAt: new Date(),
+        cancelledBy: `Replaced by the customer's newer cart ${newRef}`.slice(0, 120),
         internalNote: mergedNote,
         paymentReminderAt: new Date(),
       },
