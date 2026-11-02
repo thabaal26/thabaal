@@ -174,3 +174,26 @@ export async function saveAssistantSettings(input: AssistantInput, changed?: key
           : "Shop hours saved.";
   return { ok: true, message: msg };
 }
+
+/**
+ * Payments › Payment settings › How orders work: orders and payments on this WhatsApp number ("here"), or on the
+ * shop's own main number ("elsewhere", with that number). One way at a time.
+ */
+export async function saveOrderHandling(mode: "here" | "elsewhere", phone: string): Promise<SendResult> {
+  const s = await requireManager(true);
+  if ("denied" in s) return { ok: false, message: s.denied };
+  if (mode !== "here" && mode !== "elsewhere") return { ok: false, message: "Choose how orders work." };
+  const { settings } = await current(s.clientId);
+  if (mode === "here") {
+    await store(s.clientId, { ...settings, orderPhone: "" });
+    return { ok: true, message: "Orders and payments happen on this WhatsApp number again." };
+  }
+  const orderPhone = normalizePhone(phone);
+  if (!orderPhone) return { ok: false, message: "Enter your main WhatsApp number, like 89253 90439." };
+  // The main number has to be another one: this one would send customers back to itself.
+  const own = await db.whatsAppNumber.findMany({ where: { clientId: s.clientId }, select: { displayPhone: true } });
+  if (own.some((n) => n.displayPhone && normalizePhone(n.displayPhone) === orderPhone))
+    return { ok: false, message: "That is the number connected to thabaal. Enter the main number your customers order on." };
+  await store(s.clientId, { ...settings, orderPhone });
+  return { ok: true, message: `Customers who write here are now sent to +${orderPhone} to order and pay.` };
+}

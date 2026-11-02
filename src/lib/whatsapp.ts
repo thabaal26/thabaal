@@ -463,6 +463,36 @@ export async function sendInteractiveButtons(
 }
 
 /**
+ * A message with one button that opens a link (WhatsApp's "cta_url"), inside the customer's 24-hour window.
+ * E.g. "Chat to Order", opening a chat with the shop's main number.
+ */
+export async function sendCtaUrl(
+  cfg: WaConfig,
+  to: string,
+  body: string,
+  button: { text: string; url: string },
+  opts: { footer?: string } = {},
+): Promise<{ id: string; simulated: boolean }> {
+  if (!cfg.live) return offline(cfg);
+  const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "interactive",
+      interactive: {
+        type: "cta_url",
+        body: { text: body.slice(0, 1024) },
+        ...(opts.footer ? { footer: { text: opts.footer.slice(0, 60) } } : {}),
+        action: { name: "cta_url", parameters: { display_text: button.text.slice(0, 20), url: button.url } },
+      },
+    }),
+  });
+  return { id: res.messages[0].id, simulated: false };
+}
+
+/**
  * A list message (up to 10 rows) inside the 24-hour window: the customer taps the button, then one row; the answer
  * comes back as a list_reply with the row's id.
  */

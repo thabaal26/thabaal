@@ -40,6 +40,12 @@ export type PaySettings = {
   closeAt: string;
   /** Settings › Delivery charge: rupees added to every new order (0 is free delivery); one order can still be changed. */
   deliveryFee: number;
+  /**
+   * Orders on another number: the shop's own main number (digits with country code) where customers order and pay.
+   * Set, the connected number takes no carts or payments: whoever writes is sent there (lib/orders-elsewhere.ts).
+   * Empty: orders and payments happen on the connected number, as usual.
+   */
+  orderPhone: string;
 };
 
 /** Highest delivery charge a shop can set. */
@@ -89,6 +95,7 @@ export function readPaySettings(raw: unknown, paymentConfig: string | null | und
     closeAt: HHMM.test(str(r.closeAt, 5)) ? str(r.closeAt, 5) : "21:00",
     // Shops that never set it keep the ₹60 every order had before the setting.
     deliveryFee: Number.isFinite(fee) && fee >= 0 && fee <= MAX_DELIVERY_FEE ? Math.round(fee) : DEFAULT_SHIPPING_FEE,
+    orderPhone: /^\d{10,15}$/.test(str(r.orderPhone, 15)) ? str(r.orderPhone, 15) : "",
   };
 }
 

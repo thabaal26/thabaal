@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { withMemo } from "@/lib/request-memo";
+import { ordersElsewhere, replyOrdersElsewhere } from "@/lib/orders-elsewhere";
 import { pushOrderToSheet, pushToGoogleSheet } from "@/lib/google-sheets-live";
 import { refreshNumberStatus } from "@/lib/limits";
 import { recordMetaAccountAlert } from "@/lib/meta-balance";
@@ -588,6 +589,21 @@ export async function POST(req: NextRequest) {
             const profileName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name ?? null;
             const customer = await recordReply({ phone: m.from, text, kind, media, waMessageId: m.id, phoneNumberId, at: m.timestamp ? new Date(Number(m.timestamp) * 1000) : undefined, profileName });
             const clientName = customer?.client?.name || "Thabaal";
+
+            // The shop takes orders and payments on its main number (Payment settings › How orders work): no carts,
+            // payments or order replies here; the customer gets that number and a "Chat to Order" button. STOP still works.
+            const mainNumber = customer && !handledAsPayment ? await ordersElsewhere(customer.clientId) : null;
+            if (customer && mainNumber) {
+              if (OPT_OUT.test(text)) {
+                await optOut(m.from, phoneNumberId);
+                return;
+              }
+              await noteSource(customer.id, m, text).catch(() => {});
+              const contactName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name;
+              pushToGoogleSheet(customer.clientId, "NEW_CHAT", { phone: m.from, name: customer.name || contactName || "", message: text, source: "Inbound WhatsApp", client: clientName });
+              await replyOrdersElsewhere(customer, m, mainNumber).catch((e) => console.error("Orders-elsewhere reply failed", e));
+              return;
+            }
 
             // "cancel" while an order is open is about that order, not about stopping messages.
             const cancelHandled = customer && m.type === "text" ? await handleCancelRequest(customer, text).catch((e) => (console.error("Cancel request failed", e), false)) : false;

@@ -13,6 +13,7 @@ import { customerWords, flowShips } from "./order-flow";
 import { bold, hello, itemLines } from "./wa-text";
 import { flowFor, paySettingsFor } from "./pay-settings-server";
 import { dueOf, receivedOf } from "./payment-state";
+import { formatPhone } from "./phone";
 import { getSettings } from "./provider";
 import { replyWindowEnd } from "./replies";
 import { senderFor } from "./senders";
@@ -108,6 +109,8 @@ export async function sendPaymentRequestFor(orderId: string, opts: { reminder?: 
   if (order.status === "CANCELLED") return { ok: false, message: "This order is cancelled." };
   // Catalogue carts use WhatsApp's "Review and pay"; orders from chat use the UPI link when it's on (Payment settings).
   const pay = await paySettingsFor(order.clientId);
+  // Orders on another number: customers pay the shop there, never on this number (reminders included).
+  if (pay.settings.orderPhone) return { ok: false, message: `Payments go to your main number (${formatPhone(pay.settings.orderPhone)}): see Payments › Payment settings › How orders work.` };
   const useUpi = pay.upi && (!pay.waPay || !order.catalogId);
   if (!pay.waPay && !useUpi) return { ok: false, message: "Turn on Pay inside WhatsApp or the UPI link in Payments › Payment settings first." };
   if (order.total <= 0) return { ok: false, message: "This order has no total. Add prices before asking for payment." };
