@@ -592,7 +592,8 @@ export async function POST(req: NextRequest) {
             const clientName = customer?.client?.name || "Thabaal";
 
             // The shop takes orders and payments on its main number (Payment settings › How orders work): no carts,
-            // payments or order replies here; the customer gets that number and a "Chat to Order" button. STOP still works.
+            // payments or order replies here; the customer is told to call it (with the price list when asked) or gets a
+            // "Chat to Order" button. STOP still works.
             const mainNumber = customer && !handledAsPayment ? await ordersElsewhere(customer.clientId) : null;
             if (customer && mainNumber) {
               if (OPT_OUT.test(text)) {
@@ -602,7 +603,7 @@ export async function POST(req: NextRequest) {
               await noteSource(customer.id, m, text).catch(() => {});
               const contactName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name;
               pushToGoogleSheet(customer.clientId, "NEW_CHAT", { phone: m.from, name: customer.name || contactName || "", message: text, source: "Inbound WhatsApp", client: clientName });
-              await replyOrdersElsewhere(customer, m, mainNumber).catch((e) => console.error("Orders-elsewhere reply failed", e));
+              await replyOrdersElsewhere(customer, m, mainNumber, text).catch((e) => console.error("Orders-elsewhere reply failed", e));
               return;
             }
 

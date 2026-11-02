@@ -179,10 +179,11 @@ export async function saveAssistantSettings(input: AssistantInput, changed?: key
  * Payments › Payment settings › How orders work: orders and payments on this WhatsApp number ("here"), or on the
  * shop's own main number ("elsewhere", with that number). One way at a time.
  */
-export async function saveOrderHandling(mode: "here" | "elsewhere", phone: string): Promise<SendResult> {
+export async function saveOrderHandling(mode: "here" | "elsewhere", phone: string, by: "call" | "chat" = "chat"): Promise<SendResult> {
   const s = await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
   if (mode !== "here" && mode !== "elsewhere") return { ok: false, message: "Choose how orders work." };
+  if (by !== "call" && by !== "chat") return { ok: false, message: "Choose how customers order: by calling or by WhatsApp chat." };
   const { settings } = await current(s.clientId);
   if (mode === "here") {
     await store(s.clientId, { ...settings, orderPhone: "" });
@@ -194,6 +195,9 @@ export async function saveOrderHandling(mode: "here" | "elsewhere", phone: strin
   const own = await db.whatsAppNumber.findMany({ where: { clientId: s.clientId }, select: { displayPhone: true } });
   if (own.some((n) => n.displayPhone && normalizePhone(n.displayPhone) === orderPhone))
     return { ok: false, message: "That is the number connected to thabaal. Enter the main number your customers order on." };
-  await store(s.clientId, { ...settings, orderPhone });
-  return { ok: true, message: `Customers who write here are now sent to +${orderPhone} to order and pay.` };
+  await store(s.clientId, { ...settings, orderPhone, orderBy: by });
+  return {
+    ok: true,
+    message: by === "call" ? `Customers who write here are now asked to call +${orderPhone} to order.` : `Customers who write here are now sent to +${orderPhone} to order and pay.`,
+  };
 }

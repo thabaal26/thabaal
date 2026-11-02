@@ -114,6 +114,20 @@ try {
     return "Reply button advised";
   });
 
+  await check(9, "order by calling: saves, and the card explains View Products and the price list", async () => {
+    await page.locator("#oh-by").selectOption("call");
+    expect(/Reply button named View Products/.test(await card().innerText()), "steps don't follow the choice");
+    await card().getByRole("button", { name: "Save" }).click();
+    await page.waitForTimeout(1500);
+    const s = (await db.client.findUniqueOrThrow({ where: { id: S.shopId }, select: { paySettings: true } })).paySettings;
+    expect(s?.orderBy === "call" && s?.orderPhone === MAIN, `saved ${s?.orderBy} ${s?.orderPhone}`);
+    expect(/asked to call \+918925390439/.test(await toast()), `toast: ${await toast()}`);
+    await openSettings();
+    expect((await page.locator("#oh-by").inputValue()) === "call", "choice not kept");
+    expect(/price list/.test(await card().innerText()), "no price list step");
+    return "call";
+  });
+
   await check(3, "the Chat to Order link opens WhatsApp with the main number, the order typed in; an unknown shop is 404", async () => {
     const r = await fetch(`${BASE}/go/${S.shopId}`, { redirect: "manual" });
     expect(r.status === 302, `status ${r.status}`);

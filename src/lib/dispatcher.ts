@@ -57,10 +57,10 @@ export async function startRun(campaign: Campaign & { template: { name: string }
   return run;
 }
 
-export async function startDueCampaigns(now: Date, paused: ReadonlySet<string>) {
+export async function startDueCampaigns(now: Date, paused: ReadonlySet<string>, only?: readonly string[]) {
   const due = await db.campaign.findMany({
     // Businesses locked for an unpaid plan: their scheduled campaigns wait (and start once they pay).
-    where: { active: true, nextRunAt: { lte: now }, clientId: { notIn: [...paused] } },
+    where: { active: true, nextRunAt: { lte: now }, clientId: { notIn: [...paused], ...(only && { in: [...only] }) } },
     include: { template: { select: { name: true } } },
   });
   let started = 0;
@@ -315,12 +315,12 @@ async function processRun(runId: string, now: Date, deadline: number) {
 }
 
 /** Due campaign runs: each sends what is due now. Safe to call concurrently (every run and batch is claimed first). */
-async function processDueRuns(now: Date, deadline: number, paused: ReadonlySet<string>) {
+async function processDueRuns(now: Date, deadline: number, paused: ReadonlySet<string>, only?: readonly string[]) {
   const runs = await db.campaignRun.findMany({
     where: {
       status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET", "WAITING_FUNDS"] },
       nextBatchAt: { lte: now },
-      campaign: { clientId: { notIn: [...paused] } },
+      campaign: { clientId: { notIn: [...paused], ...(only && { in: [...only] }) } },
     },
     select: { id: true },
     orderBy: { nextBatchAt: "asc" },
@@ -344,12 +344,15 @@ const lockedNow = (now: Date) =>
     return new Set<string>();
   });
 
-/** Campaigns only: starts the due ones and sends what is due on running ones (the scheduler's campaign part). */
-export async function runDueCampaigns(now = new Date(), budgetMs = KICK_BUDGET_MS) {
+/**
+ * Campaigns only: starts the due ones and sends what is due on running ones (the scheduler's campaign part).
+ * `only` limits it to some businesses (tests share one database).
+ */
+export async function runDueCampaigns(now = new Date(), budgetMs = KICK_BUDGET_MS, only?: readonly string[]) {
   const paused = await lockedNow(now);
-  const started = await startDueCampaigns(now, paused);
+  const started = await startDueCampaigns(now, paused, only);
   // Read the clock again: a run started just now is due now, and sends its first batch in this same call.
-  const r = await processDueRuns(new Date(), Date.now() + budgetMs, paused);
+  const r = await processDueRuns(new Date(), Date.now() + budgetMs, paused, only);
   return { campaignsStarted: started, runsProcessed: r.runs, sent: r.sent, failed: r.failed };
 }
 

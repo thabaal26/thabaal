@@ -688,7 +688,8 @@ export async function listCatalogProducts(cfg: WaConfig): Promise<CatalogProduct
 
 const GROUPS: { title: string; match: RegExp }[] = [
   { title: "🫒 *Oils*", match: /oil/i },
-  { title: "🍯 *Ghee & Sweeteners*", match: /ghee|karupatti|nattusakkarai|jaggery|sugar/i },
+  { title: "🧈 *Ghee & Dairy*", match: /ghee|paneer|butter|curd|milk/i },
+  { title: "🍯 *Sweeteners*", match: /karupatti|nattusakkarai|jaggery|sugar|honey/i },
   { title: "🌶️ *Masala Powders*", match: /powder|masala/i },
   { title: "🌾 *Flours & Millets*", match: /flour|atta|millet|ragi|kambu/i },
 ];
@@ -696,8 +697,11 @@ const GROUPS: { title: string; match: RegExp }[] = [
 /** "₹ 460.00" → "₹460"; Meta formats prices with the currency symbol and decimals. */
 const shortPrice = (p: string | null) => (p ? p.replace(/\s+/g, "").replace(/\.00$/, "") : "");
 
-/** The catalogue as a WhatsApp text, grouped by kind of product; out-of-stock items are left out. */
-export function formatPriceList(business: string, products: CatalogProduct[]) {
+/**
+ * The catalogue as a WhatsApp text, grouped by kind of product; out-of-stock items are left out. `footer` replaces
+ * the closing "Tap View catalog below to order" (a shop that takes orders by phone ends with the number to call).
+ */
+export function formatPriceList(business: string, products: CatalogProduct[], footer = "Tap *View catalog* below to order 👇") {
   const items = products.filter((p) => p.inStock && p.price);
   const used = new Set<CatalogProduct>();
   const sections: string[] = [];
@@ -707,7 +711,7 @@ export function formatPriceList(business: string, products: CatalogProduct[]) {
     const title = g.match.source === "." && !sections.length ? "🛍️ *Products*" : g.title;
     if (rows.length) sections.push(`${title}\n${rows.map((p) => `• ${p.name} – ${shortPrice(p.price)}`).join("\n")}`);
   }
-  return `🛒 *${business} – Price List*\nவிலைப் பட்டியல்\n\n${sections.join("\n\n")}\n\nTap *View catalog* below to order 👇`;
+  return `🛒 *${business} – Price List*\nவிலைப் பட்டியல்\n\n${sections.join("\n\n")}\n\n${footer}`;
 }
 
 /** Sends today's prices, read live from the catalogue so they always match it. */
