@@ -29,6 +29,10 @@ import { normalizePhone } from "./phone";
 import { affordableMessages } from "./wallet";
 
 const TIME_BUDGET_MS = 50_000; // stay under Vercel's function limit
+const KICK_BUDGET_MS = 40_000; // a kick runs after a webhook's answer, inside the same function
+const KICK_GAP_MS = 60_000; // at most one kick a minute per server instance
+/** A late scheduler call sends the batches it missed, up to this many at once (still within Meta's daily limit). */
+const MAX_CATCH_UP = 12;
 const CONCURRENCY = 10;
 const LOCAL_GAP_MS = [1_000, 3_000]; // random pause between local-session sends
 
@@ -111,6 +115,10 @@ async function processRun(runId: string, now: Date, deadline: number) {
     data: { nextBatchAt: new Date(now.getTime() + campaign.intervalMinutes * 60_000) },
   });
   if (!claimed.count) return { sent: 0, failed: 0 };
+  // The scheduler is often late (GitHub runs its "every 5 minutes" every 30 to 80): the batches due since are sent now,
+  // so a campaign keeps its pace instead of one batch per call.
+  const behind = run.nextBatchAt ? Math.floor((now.getTime() - run.nextBatchAt.getTime()) / (campaign.intervalMinutes * 60_000)) + 1 : 1;
+  const batches = Math.min(MAX_CATCH_UP, Math.max(1, behind));
 
   type Wait = "WAITING_TEMPLATE" | "WAITING_CONNECTION" | "WAITING_LIMIT" | "WAITING_QUALITY" | "WAITING_QUIET" | "WAITING_FUNDS";
   const pauseUntil = (status: Wait, at: Date) => db.campaignRun.update({ where: { id: run.id }, data: { status, nextBatchAt: at } });
@@ -140,7 +148,7 @@ async function processRun(runId: string, now: Date, deadline: number) {
     return { sent: 0, failed: 0 };
   }
   // Respect Meta's 24-hour messaging limit and stop if the number's quality turns red.
-  let take = campaign.batchSize;
+  let take = campaign.batchSize * batches;
   if (settings.provider === "META" && number && cfg.live) {
     if (number.qualityRating === "RED") {
       await pause("WAITING_QUALITY", 60);
@@ -306,22 +314,8 @@ async function processRun(runId: string, now: Date, deadline: number) {
   return { sent, failed };
 }
 
-/** One tick of the scheduler. Safe to call often and concurrently. */
-export async function dispatch() {
-  const startedAt = Date.now();
-  const deadline = startedAt + TIME_BUDGET_MS;
-  const now = new Date();
-
-  // Businesses locked for an unpaid plan (lib/plan-access.ts): nothing goes out for them until they pay.
-  const paused = await lockedClientIds(now).catch((e) => {
-    console.error("Could not read plan locks", e);
-    return new Set<string>();
-  });
-  // Marketing-only businesses (Orders switched off): no order-based messages (reorder, unpaid-order, win-back).
-  const noOrders = new Set(paused);
-  for (const c of await db.client.findMany({ where: { disabledSections: { has: "orders" } }, select: { id: true } }).catch(() => [])) noOrders.add(c.id);
-  const campaignsStarted = await startDueCampaigns(now, paused);
-  await refreshStaleNumbers().catch((e) => console.error("Could not refresh number status", e));
+/** Due campaign runs: each sends what is due now. Safe to call concurrently (every run and batch is claimed first). */
+async function processDueRuns(now: Date, deadline: number, paused: ReadonlySet<string>) {
   const runs = await db.campaignRun.findMany({
     where: {
       status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET", "WAITING_FUNDS"] },
@@ -332,7 +326,6 @@ export async function dispatch() {
     orderBy: { nextBatchAt: "asc" },
     take: 20,
   });
-
   let sent = 0;
   let failed = 0;
   for (const r of runs) {
@@ -341,6 +334,55 @@ export async function dispatch() {
     sent += res.sent;
     failed += res.failed;
   }
+  return { runs: runs.length, sent, failed };
+}
+
+/** Businesses locked for an unpaid plan (lib/plan-access.ts): nothing goes out for them until they pay. */
+const lockedNow = (now: Date) =>
+  lockedClientIds(now).catch((e) => {
+    console.error("Could not read plan locks", e);
+    return new Set<string>();
+  });
+
+/** Campaigns only: starts the due ones and sends what is due on running ones (the scheduler's campaign part). */
+export async function runDueCampaigns(now = new Date(), budgetMs = KICK_BUDGET_MS) {
+  const paused = await lockedNow(now);
+  const started = await startDueCampaigns(now, paused);
+  // Read the clock again: a run started just now is due now, and sends its first batch in this same call.
+  const r = await processDueRuns(new Date(), Date.now() + budgetMs, paused);
+  return { campaignsStarted: started, runsProcessed: r.runs, sent: r.sent, failed: r.failed };
+}
+
+let lastKick = 0;
+
+/**
+ * Campaigns between scheduler calls, started from WhatsApp's webhook (message statuses and replies come in all day):
+ * at most once a minute per server instance, so a due campaign or its next batch doesn't wait for the scheduler.
+ * Null when it didn't run. Never throws.
+ */
+export async function kickCampaigns() {
+  if (Date.now() - lastKick < KICK_GAP_MS) return null;
+  lastKick = Date.now();
+  return runDueCampaigns().catch((e) => {
+    console.error("Campaign kick failed", e);
+    return null;
+  });
+}
+
+/** One tick of the scheduler. Safe to call often and concurrently. */
+export async function dispatch() {
+  const startedAt = Date.now();
+  const deadline = startedAt + TIME_BUDGET_MS;
+  const now = new Date();
+
+  const paused = await lockedNow(now);
+  // Marketing-only businesses (Orders switched off): no order-based messages (reorder, unpaid-order, win-back).
+  const noOrders = new Set(paused);
+  for (const c of await db.client.findMany({ where: { disabledSections: { has: "orders" } }, select: { id: true } }).catch(() => [])) noOrders.add(c.id);
+  const campaignsStarted = await startDueCampaigns(now, paused);
+  await refreshStaleNumbers().catch((e) => console.error("Could not refresh number status", e));
+  // A run started just now is due now (its first batch goes in this same call, not the next one).
+  const { runs, sent, failed } = await processDueRuns(new Date(), deadline, paused);
   // Messages Meta held back a few days ago get their one retry.
   if (Date.now() < deadline) await retryHeldBack({ now, deadline }).catch((e) => console.error("Held-back retries failed", e));
   if (Date.now() < deadline) await sendRefillReminders(now, noOrders).catch((e) => console.error("Refill reminders failed", e));
@@ -358,5 +400,5 @@ export async function dispatch() {
   if (Date.now() < deadline) await queueAutoReminders(now).catch((e) => console.error("Owner reminders failed", e));
   if (Date.now() < deadline) await processOwnerMessages(now, deadline).catch((e) => console.error("Owner messages failed", e));
   await db.setting.upsert({ where: { id: 1 }, update: { lastDispatchAt: now }, create: { id: 1, lastDispatchAt: now } });
-  return { campaignsStarted, runsProcessed: runs.length, sent, failed, ms: Date.now() - startedAt };
+  return { campaignsStarted, runsProcessed: runs, sent, failed, ms: Date.now() - startedAt };
 }

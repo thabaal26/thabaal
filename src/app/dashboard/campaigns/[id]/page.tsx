@@ -75,6 +75,10 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
     stats.filter((x) => x.runId === runId && s.includes(x.status)).reduce((a, x) => a + x._count, 0);
 
   const running = (status: string) => ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET", "WAITING_FUNDS"].includes(status);
+  // A one-time campaign switches itself off when its run starts: say it is sending (or done), not "Paused".
+  const last = c.runs[0];
+  const live = last && running(last.status) ? last : null;
+  const done = !live && !c.active && c.scheduleType !== "WEEKLY" && last && !c.nextRunAt ? last : null;
 
   return (
     <>
@@ -84,8 +88,22 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
         back={{ href: "/dashboard/campaigns", label: "Campaigns" }}
         meta={
           <span className="flex flex-wrap items-center gap-2">
-            {c.active ? <Badge tone="green" dot>Active</Badge> : <Badge dot>Paused</Badge>}
-            {c.active && c.nextRunAt ? `Next send ${fmtDate(c.nextRunAt, "EEEE d MMM, h:mm a")}` : "Paused: nothing scheduled"}
+            {live ? (
+              <>
+                <StatusBadge status={live.status} />
+                {`${fmtNumber(stat(live.id, "SENT", "DELIVERED", "READ"))} of ${fmtNumber(live.total)} sent${live.status !== "RUNNING" && live.nextBatchAt ? ` · goes on by itself about ${fmtDate(live.nextBatchAt, "EEE d MMM, h:mm a")}` : ""}`}
+              </>
+            ) : done ? (
+              <>
+                <Badge tone="green" dot>Completed</Badge>
+                {`Sent ${fmtDate(done.completedAt ?? done.scheduledFor, "EEE d MMM, h:mm a")}`}
+              </>
+            ) : (
+              <>
+                {c.active ? <Badge tone="green" dot>Active</Badge> : <Badge dot>Paused</Badge>}
+                {c.active && c.nextRunAt ? `Next send ${fmtDate(c.nextRunAt, "EEEE d MMM, h:mm a")}` : "Paused: nothing scheduled"}
+              </>
+            )}
           </span>
         }
         rowActions

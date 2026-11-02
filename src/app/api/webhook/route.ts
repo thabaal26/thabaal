@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
+import { kickCampaigns } from "@/lib/dispatcher";
 import { db } from "@/lib/db";
 import { withMemo } from "@/lib/request-memo";
 import { ordersElsewhere, replyOrdersElsewhere } from "@/lib/orders-elsewhere";
@@ -807,5 +808,7 @@ export async function POST(req: NextRequest) {
       }
     }
   }
+  // Campaigns due now (a start, the next batch, a limit that freed up) go out without waiting for the scheduler.
+  after(() => kickCampaigns());
   return NextResponse.json({ ok: true });
 }

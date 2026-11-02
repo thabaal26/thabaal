@@ -661,7 +661,7 @@ export function CampaignForm({
                   ? tr("No customers match yet")
                   : isTa
                     ? `${batches} தொகுதி · ${days > 1 ? `சுமார் ${days} நாட்களில்` : formatMinutes(mins, true)} முடியும்`
-                    : <>{batches} batch{batches === 1 ? "" : "es"} · done in {days > 1 ? `about ${days} days` : formatMinutes(mins)}</>}
+                    : <>{batches} batch{batches === 1 ? "" : "es"} · {days > 1 ? `done in about ${days} days` : mins < 1 ? "all at once" : `done in ${formatMinutes(mins)}`}</>}
             </p>
             {days > 1 && sender?.dailyLimit && (
               <p className="mt-2 rounded-control bg-white/10 px-2.5 py-1.5 text-xs text-white/85">
@@ -733,7 +733,7 @@ export function CampaignForm({
                 ? tr("No customers match yet")
                 : isTa
                   ? `${batches} தொகுதி · ${days > 1 ? `சுமார் ${days} நாட்கள்` : `${formatMinutes(mins, true)}-ல் முடியும்`}`
-                  : `${batches} batch${batches === 1 ? "" : "es"} · ${days > 1 ? `about ${days} days` : `done in ${formatMinutes(mins)}`}`}
+                  : `${batches} batch${batches === 1 ? "" : "es"} · ${days > 1 ? `about ${days} days` : mins < 1 ? "all at once" : `done in ${formatMinutes(mins)}`}`}
           </p>
         </div>
         <Button className="!flex-none shrink-0 px-6" loading={pending} onClick={save}>
