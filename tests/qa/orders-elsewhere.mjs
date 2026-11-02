@@ -120,6 +120,13 @@ try {
     expect(`${to.origin}${to.pathname}` === `https://wa.me/${MAIN}`, String(to));
     expect(to.searchParams.get("text") === `Hi ${shop.name}, I'd like to order.`, `text ${to.searchParams.get("text")}`);
     expect((await fetch(`${BASE}/go/doesnotexist1234`, { redirect: "manual" })).status === 404, "unknown shop not 404");
+    // WhatsApp's link preview doesn't follow the redirect: it gets the shop's own name, never thabaal's sign-in page.
+    const bot = await fetch(`${BASE}/go/${S.shopId}`, { redirect: "manual", headers: { "user-agent": "WhatsApp/2.23.20.0 A" } });
+    const html = await bot.text();
+    expect(bot.status === 200, `preview ${bot.status}`);
+    expect(html.includes(`<meta property="og:title" content="${shop.name} · Chat to Order">`), "no shop title in the preview");
+    expect(!/thabaal|sign in/i.test(html.replace(/<meta property="og:image"[^>]*>/, "")), "preview mentions thabaal");
+    expect(html.includes(`url=https://wa.me/${MAIN}`), "preview page doesn't go on to WhatsApp");
     return String(to);
   });
 
