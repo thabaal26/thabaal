@@ -121,7 +121,8 @@ describe("a campaign run, end to end", () => {
   });
 
   test("5. a template sent back to Meta for review holds the run, which goes on once it is approved", async () => {
-    await db.message.updateMany({ where: { run: { campaignId } }, data: { sentAt: new Date(Date.now() - 2 * DAY) } });
+    // Reused over a week later, the one-time campaign goes to everyone again (sooner it would only carry on).
+    await db.message.updateMany({ where: { run: { campaignId } }, data: { sentAt: new Date(Date.now() - 8 * DAY) } });
     await db.campaign.update({ where: { id: campaignId }, data: { active: true, runAt: FAR2, nextRunAt: FAR2 } });
     await db.template.update({ where: { id: templateId }, data: { status: "PENDING" } });
     await runDueCampaigns(LATE2, undefined, [clientId]);

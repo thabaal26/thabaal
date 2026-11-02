@@ -439,8 +439,8 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                   {c.s === "scheduled" && !!c.skip && (
                     <p className="small muted" data-testid="campaign-skip">
                       {isTamil
-                        ? `${c.skip.toLocaleString("en-IN")} பேர் விடப்படுவார்கள்: சமீபத்தில் சலுகை பெற்றவர்கள் அல்லது Meta நிறுத்தி வைத்தவர்கள்.`
-                        : `${c.skip.toLocaleString("en-IN")} more are left out: they got an offer recently or Meta held one back.`}
+                        ? `${c.skip.toLocaleString("en-IN")} பேர் விடப்படுவார்கள்: ஏற்கனவே பெற்றவர்கள், சமீபத்தில் சலுகை பெற்றவர்கள் அல்லது Meta நிறுத்தி வைத்தவர்கள்.`
+                        : `${c.skip.toLocaleString("en-IN")} more are left out: they already got it, got an offer recently, or Meta held one back.`}
                     </p>
                   )}
 

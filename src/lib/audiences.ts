@@ -120,6 +120,19 @@ export function offerSkipWhere(gapHours: number, at: Date): Prisma.CustomerWhere
   return { messages: { some: { OR: recent } } };
 }
 
+/** A one-time campaign sent again within this many days is the same send carried on (see alreadyReachedWhere). */
+export const RESUME_WITHIN_DAYS = 7;
+
+/**
+ * Customers this campaign already reached lately (Meta accepted its message in the last RESUME_WITHIN_DAYS). A
+ * one-time campaign sent again soon, say after it was stopped, goes only to the rest: nobody gets the same offer
+ * twice. Reused later (a new date next month), it goes to everyone again.
+ */
+export function alreadyReachedWhere(campaignId: string, now = new Date()): Prisma.CustomerWhereInput {
+  const since = new Date(now.getTime() - RESUME_WITHIN_DAYS * DAY);
+  return { messages: { some: { status: { in: ["SENT", "DELIVERED", "READ"] }, sentAt: { gte: since }, run: { campaignId } } } };
+}
+
 /** The customer filter for a campaign's audienceTag alone. */
 async function sendToWhere(clientId: string, audienceTag: string | null): Promise<Prisma.CustomerWhereInput> {
   const base = { clientId, optedOut: false, unreachable: false };

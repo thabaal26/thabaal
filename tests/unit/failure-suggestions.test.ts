@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { campaignAudienceWhere } from "../../src/lib/audiences";
 import { db } from "../../src/lib/db";
+import { startRun } from "../../src/lib/dispatcher";
 import { heldSummary, retryHeldBack } from "../../src/lib/held";
 import { inactiveCandidates, moveToInactive } from "../../src/lib/inactive";
 
@@ -91,5 +92,15 @@ describe("failure suggestions: send again after 24 h, Inactive", () => {
     assert.deepEqual(await names("inactive"), ["gone", "test"]);
     assert.ok((await names(null, { includeIds: [ids.test] })).includes("test"), "added by hand");
     assert.equal((await inactiveCandidates([runs.done])).experiment.length, 0, "no suggestion once moved");
+  });
+
+  test("5. a one-time campaign sent again (resumed) skips who it already reached, even with no gap between offers", async () => {
+    const before = sentTo.length;
+    const c = await db.campaign.findUniqueOrThrow({ where: { id: campaignId }, include: { template: { select: { name: true } } } });
+    const run = await startRun(c, new Date(Date.now() + 60_000));
+    const queued = (await db.message.findMany({ where: { runId: run.id }, select: { customerId: true } })).map((m) => m.customerId);
+    assert.ok(!queued.includes(ids.stopped) && !queued.includes(ids.done), "the two reached by the retry aren't queued again");
+    assert.ok(queued.includes(ids.ok) && queued.includes(ids.fresh), "the rest are");
+    assert.equal(sentTo.length, before);
   });
 });

@@ -150,7 +150,7 @@ try {
     await page.goto(`${BASE}/dashboard/campaigns`, { waitUntil: "networkidle" });
     const card = page.locator("article").filter({ hasText: `QA reach ${run}` });
     const text = await card.innerText();
-    expect(/more are left out: they got an offer recently or Meta held one back/.test(text), text.slice(0, 300));
+    expect(/more are left out: they already got it, got an offer recently, or Meta held one back/.test(text), text.slice(0, 300));
     return text.split("\n").filter((l) => /Will go to|left out/.test(l)).join(" · ");
   });
 } finally {
