@@ -16,7 +16,7 @@ import { syncDueSheets } from "./sheets";
 import { syncAllSheets } from "./gsheet/sync";
 import { processOwnerMessages, queueAutoReminders } from "./owner-messages";
 import { planCapacityBlock } from "./subscription";
-import { campaignAudienceWhere } from "./audiences";
+import { alreadyReachedWhere, campaignAudienceWhere } from "./audiences";
 import { refreshLifecycleTags, sendWinbacks } from "./lifecycle";
 import { backfillOrderNames } from "./orders";
 import { remindUnpaidOrders } from "./payments";
@@ -39,7 +39,10 @@ const LOCAL_GAP_MS = [1_000, 3_000]; // random pause between local-session sends
 
 /** Creates a run and queues one message per eligible customer. */
 export async function startRun(campaign: Campaign & { template: { name: string } }, scheduledFor: Date) {
-  const customers = await db.customer.findMany({ where: await campaignAudienceWhere(campaign.clientId, campaign.audienceTag, campaign), select: { id: true } });
+  const audience = await campaignAudienceWhere(campaign.clientId, campaign.audienceTag, campaign);
+  // A one-time campaign sent again soon (resumed after a stop) skips who it already reached; weekly ones repeat by design.
+  const where = campaign.scheduleType === "ONCE" ? { AND: [audience, { NOT: alreadyReachedWhere(campaign.id, scheduledFor) }] } : audience;
+  const customers = await db.customer.findMany({ where, select: { id: true } });
   const run = await db.campaignRun.create({
     data: { campaignId: campaign.id, scheduledFor, total: customers.length, nextBatchAt: new Date() },
   });

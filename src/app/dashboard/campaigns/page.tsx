@@ -6,7 +6,7 @@ import { templateLabel } from "@/lib/plain-error";
 import { computeNextRun, DAYS } from "@/lib/schedule";
 import { getScope, owned } from "@/lib/session";
 import { INDIA_GST_RATE, RATES, spendSummary } from "@/lib/spend";
-import { campaignAudienceWhere, offerSkipWhere } from "@/lib/audiences";
+import { alreadyReachedWhere, campaignAudienceWhere, offerSkipWhere } from "@/lib/audiences";
 import { readPaySettings, waPayOn } from "@/lib/pay-settings";
 import { Automations } from "./automations";
 import { CampaignsDashboard, type CampaignItem } from "./campaigns-dashboard";
@@ -129,9 +129,13 @@ export default async function CampaignsPage() {
       try {
         const audienceWhereClause = await campaignAudienceWhere(c.clientId, c.audienceTag?.trim() || null, c);
         targetCount = await db.customer.count({ where: audienceWhereClause });
-        if (s === "scheduled" && c.template.category === "MARKETING") {
+        if (s === "scheduled") {
           const at = c.nextRunAt && c.nextRunAt > now ? c.nextRunAt : now;
-          skipped = await db.customer.count({ where: { AND: [audienceWhereClause, offerSkipWhere(c.client.marketingGapHours, at)] } });
+          const skip = [
+            ...(c.template.category === "MARKETING" ? [offerSkipWhere(c.client.marketingGapHours, at)] : []),
+            ...(c.scheduleType === "ONCE" && c._count.runs ? [alreadyReachedWhere(c.id, at)] : []),
+          ];
+          if (skip.length) skipped = await db.customer.count({ where: { AND: [audienceWhereClause, { OR: skip }] } });
         }
       } catch {
         targetCount = reach(c.clientId);
