@@ -24,6 +24,7 @@ import { CampaignForm } from "../campaign-form";
 import { FailureSummary } from "../failure-summary";
 import { campaignFormData } from "../form-data";
 import { templateLabel } from "@/lib/plain-error";
+import { STOP_CONFIRM } from "@/lib/held";
 import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Campaign" };
@@ -282,7 +283,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
                       )}
                       <div className="mt-1 flex justify-end">
                         {running(r.status) && scope.canManage ? (
-                          <ActionButton action={cancelRun.bind(null, r.id)} variant="danger" confirm="Stop this run?">
+                          <ActionButton action={cancelRun.bind(null, r.id)} variant="danger" confirm={STOP_CONFIRM}>
                             Stop sending
                           </ActionButton>
                         ) : (
@@ -339,7 +340,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
                           </Td>
                           <Td className="py-2 text-right">
                             {scope.canManage && running(r.status) ? (
-                              <ActionButton action={cancelRun.bind(null, r.id)} variant="danger" confirm="Stop this run?">
+                              <ActionButton action={cancelRun.bind(null, r.id)} variant="danger" confirm={STOP_CONFIRM}>
                                 Stop
                               </ActionButton>
                             ) : (

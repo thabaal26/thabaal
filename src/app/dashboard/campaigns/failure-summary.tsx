@@ -55,7 +55,7 @@ export function FailureSummaryView({
   held: HeldSummary;
   canManage: boolean;
 }) {
-  const heldTotal = held.waiting + held.retriedOk + held.heldTwice + held.expired;
+  const heldTotal = held.waiting + held.retriedOk + held.heldTwice + held.expired + held.stopped;
   if (!heldTotal && !groups.length) return null;
 
   return (
@@ -101,6 +101,11 @@ export function FailureSummaryView({
                   {held.expired > 0 && (
                     <li>
                       <b className="text-ink">{fmtNumber(held.expired)}</b> not retried (older than {RETRY_UNTIL_DAYS} days)
+                    </li>
+                  )}
+                  {held.stopped > 0 && (
+                    <li data-testid="held-stopped">
+                      <b className="text-ink">{fmtNumber(held.stopped)}</b> not retried (the run was stopped). To reach them, add them to a new campaign after {RETRY_AFTER_DAYS} days
                     </li>
                   )}
                 </ul>

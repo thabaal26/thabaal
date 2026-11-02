@@ -34,10 +34,15 @@ const tester = await mk("04", `Tester ${run}`, ["test"]);
 const tpl = await db.template.findFirstOrThrow({ where: { clientId: S.shopId, status: "APPROVED", category: "MARKETING" } });
 await db.message.create({ data: { customerId: sentOnly.id, templateId: tpl.id, templateName: tpl.name, status: "DELIVERED", sentAt: new Date(), body: "QA poster offer" } });
 let campaignId = null;
+let stoppedId = null;
 const cleanup = async () => {
   if (campaignId) await db.campaign.delete({ where: { id: campaignId } }).catch(() => {});
   const ids = [sentOnly.id, added.id, left.id, tester.id];
   await db.message.deleteMany({ where: { customerId: { in: ids } } });
+  if (stoppedId) {
+    await db.campaignRun.deleteMany({ where: { campaignId: stoppedId } });
+    await db.campaign.delete({ where: { id: stoppedId } }).catch(() => {});
+  }
   await db.customer.deleteMany({ where: { id: { in: ids } } });
 };
 
@@ -108,6 +113,22 @@ try {
     expect(/131026/.test(t) && /131050/.test(t) && /131049/.test(t), t.slice(0, 200));
     expect(!errors.length, `script error: ${errors[0]}`);
     return "131026 · 131050 · 131049";
+  });
+
+  await check(5, "a stopped run's held-back message says it won't be retried, not 'waiting'", async () => {
+    const c = await db.campaign.create({ data: { clientId: S.shopId, name: `QA stopped ${run}`, templateId: tpl.id, scheduleType: "ONCE", active: false } });
+    stoppedId = c.id;
+    const r = await db.campaignRun.create({ data: { campaignId: c.id, scheduledFor: new Date(Date.now() - 86_400_000), status: "CANCELLED", total: 1 } });
+    await db.message.create({ data: { runId: r.id, customerId: left.id, templateId: tpl.id, templateName: tpl.name, status: "FAILED", errorCode: 131049, failedAt: new Date(), sentAt: new Date() } });
+    await page.goto(`${BASE}/dashboard/campaigns/${c.id}`, { waitUntil: "networkidle" });
+    const line = page.getByTestId("held-stopped");
+    await line.waitFor({ timeout: 10_000 });
+    const text = await line.innerText();
+    expect(/1 not retried \(the run was stopped\)/.test(text), text);
+    expect(!/waiting/.test(await page.locator("li").filter({ hasText: "Held back by Meta" }).first().innerText()), "still says waiting");
+    expect(!(await page.getByRole("button", { name: /Retry now/ }).count()), "Retry now still shown");
+    await page.screenshot({ path: ".git/shots-held-stopped.png", fullPage: false });
+    return text;
   });
 } finally {
   await browser.close();
