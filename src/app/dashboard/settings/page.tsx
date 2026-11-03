@@ -98,7 +98,7 @@ export default async function SettingsPage() {
     </section>
   );
   const frame = (children: React.ReactNode, actions?: React.ReactNode) => (
-    <PortalPage title="Settings" titleTa="அமைப்புகள்" sub="WhatsApp numbers, payment details, language and look." subTa="வாட்ஸ்அப் எண்கள், பண விவரங்கள், மொழி மற்றும் தோற்றம்." actions={actions}>
+    <PortalPage title="Settings" titleTa="அமைப்புகள்" sub="WhatsApp numbers, payment details, language and look." subTa="வாட்ஸ்அப் எண்கள், பண விவரங்கள், மொழி மற்றும் தோற்றம்." actions={actions} read>
       {children}
     </PortalPage>
   );

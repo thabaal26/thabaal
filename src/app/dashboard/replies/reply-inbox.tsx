@@ -351,7 +351,7 @@ export function ReplyInbox({
     ) : null;
 
   return (
-    <div className={cn("wa", infoOpen && selected && "info")} data-view={mobileView}>
+    <div className={cn("wa-app", infoOpen && selected && "info")} data-view={mobileView}>
       {/* Left: the chat list */}
       <aside className="wa-list" aria-label={isTamil ? "உரையாடல் பட்டியல்" : "Chat list"}>
         <div className="wa-lh">

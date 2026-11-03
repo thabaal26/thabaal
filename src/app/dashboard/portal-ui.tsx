@@ -88,6 +88,7 @@ export function PortalPage({
   subTa,
   actions,
   wide,
+  read,
   children,
 }: {
   title: ReactNode;
@@ -98,11 +99,13 @@ export function PortalPage({
   actions?: ReactNode;
   /** Use the whole width (Chats: the list and the conversation side by side). */
   wide?: boolean;
+  /** A form or reading page: keep lines a readable length on big screens (Settings, Guide). */
+  read?: boolean;
   children: ReactNode;
 }) {
   return (
     <div className="thabaal-portal" suppressHydrationWarning>
-      <div className={wide ? "wrapin wide" : "wrapin"} suppressHydrationWarning>
+      <div className={wide ? "wrapin wide" : read ? "wrapin read" : "wrapin"} suppressHydrationWarning>
         <header className="top" suppressHydrationWarning>
           <div suppressHydrationWarning>
             <h1>

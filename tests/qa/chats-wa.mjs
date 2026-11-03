@@ -208,7 +208,7 @@ try {
   await check(10, "Desktop: list and chat scroll on their own; the page doesn't scroll sideways", async () => {
     await page.goto(`${BASE}/dashboard/replies?r=${chatty.id}`, { waitUntil: "networkidle" });
     const m = await page.evaluate(() => {
-      const wa = document.querySelector(".wa").getBoundingClientRect();
+      const wa = document.querySelector(".wa-app").getBoundingClientRect();
       const comp = document.querySelector(".wa-comp").getBoundingClientRect();
       return { waBottom: wa.bottom, compBottom: comp.bottom, vh: innerHeight, sx: document.documentElement.scrollWidth - innerWidth };
     });

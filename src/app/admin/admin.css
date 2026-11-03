@@ -147,7 +147,9 @@
   padding: 22px max(20px, 4vw) 60px;
 }
 .thabaal-admin .wrapin {
-  max-width: 1080px;
+  /* Grows with the screen like the business portal's pages (portal.css --page-max). */
+  max-width: 1600px;
+  min-width: 0;
   margin: 0 auto;
 }
 .thabaal-admin .atop {
