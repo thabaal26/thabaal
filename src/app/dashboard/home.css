@@ -48,3 +48,45 @@ html.dark .thabaal-portal .home-now{background:linear-gradient(120deg,rgba(255,1
   .thabaal-portal .home-now .todo{grid-template-columns:auto minmax(0,1fr);grid-template-areas:"ico go" "big big" "title title" "sub sub";row-gap:4px}
   .thabaal-portal .home-now .todo>.top .big{margin-top:6px}
 }
+
+/* ── WhatsApp spend: the card from the owner's reference. A soft green curved panel on the right holds a 3D WhatsApp
+   illustration; the figures and buttons stay on the left, above it. On a narrow card the picture gets small and moves
+   up beside the figure; it never covers text or catches clicks. ── */
+.thabaal-portal .spend-card{position:relative;overflow:hidden;container-type:inline-size;background:linear-gradient(120deg,var(--card) 48%,#F2FBF5 100%)}
+html.dark .thabaal-portal .spend-card{background:linear-gradient(120deg,var(--card) 50%,rgba(32,201,133,.09) 100%)}
+.thabaal-portal .spend-card>:not(.spend-art){position:relative;z-index:1}
+.thabaal-portal .spend-art{position:absolute;top:0;right:0;bottom:0;width:42%;pointer-events:none;z-index:0}
+.thabaal-portal .spend-art::before{content:"";position:absolute;top:16%;right:-20%;bottom:-26%;left:0;border-radius:58% 0 0 46% / 64% 0 0 36%;background:linear-gradient(165deg,#E6F7EC 0%,#D3F0DE 55%,#C4EAD2 100%)}
+html.dark .thabaal-portal .spend-art::before{background:linear-gradient(165deg,rgba(32,201,133,.16),rgba(32,201,133,.06))}
+.thabaal-portal .spend-art img{position:absolute;right:7%;top:52%;width:min(176px,80%);height:auto;transform:translateY(-50%) rotate(-5deg);filter:drop-shadow(0 18px 22px rgba(11,115,66,.22))}
+/* Keep the words clear of the picture (the buttons may run over the soft panel; they sit above it). */
+.thabaal-portal .spend-card>.stat,.thabaal-portal .spend-card>p,.thabaal-portal .spend-card>.bar{max-width:57%}
+/* Phones: a small picture beside the big figure, the words full width under it. */
+@container (max-width:380px){
+  .thabaal-portal .spend-art{width:40%}
+  .thabaal-portal .spend-art::before{top:22%;opacity:.75}
+  .thabaal-portal .spend-art img{top:58px;right:10px;width:84px;transform:rotate(-5deg)}
+  .thabaal-portal .spend-card>p,.thabaal-portal .spend-card>.bar{max-width:100%}
+  .thabaal-portal .spend-card>.stat{max-width:62%}
+}
+
+/* ── Home's canvas: a soft golden wave in the top-right corner, as in the reference. Home only (:has(.home-now)); the
+   rest of the app keeps the plain glow. ── */
+.app-canvas:has(.home-now){
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 320'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23FFE7A3'/%3E%3Cstop offset='1' stop-color='%23FFF3D2'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M640 0H170c40 46 96 96 178 112 92 18 160 40 206 96 30 37 58 76 86 112z' fill='url(%23g)' opacity='.55'/%3E%3Cpath d='M640 0H330c34 34 82 58 140 66 74 10 128 38 170 92z' fill='%23FFD873' opacity='.22'/%3E%3C/svg%3E"),
+    radial-gradient(900px 340px at 92% -8%,rgba(255,195,41,.16),transparent 62%),
+    radial-gradient(700px 260px at 0% -12%,rgba(255,226,150,.14),transparent 60%);
+  background-repeat:no-repeat;
+  background-position:right top,0 0,0 0;
+  background-size:min(640px,62%) auto,auto,auto;
+}
+html.dark .app-canvas:has(.home-now){
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 320'%3E%3Cpath d='M640 0H170c40 46 96 96 178 112 92 18 160 40 206 96 30 37 58 76 86 112z' fill='%23FFC329' opacity='.07'/%3E%3Cpath d='M640 0H330c34 34 82 58 140 66 74 10 128 38 170 92z' fill='%23FFC329' opacity='.05'/%3E%3C/svg%3E"),
+    radial-gradient(900px 340px at 92% -8%,rgba(255,195,41,.06),transparent 62%);
+  background-repeat:no-repeat;
+  background-position:right top,0 0;
+  background-size:min(640px,62%) auto,auto;
+}
+@media (max-width:639px){.app-canvas:has(.home-now){background-size:88% auto,auto,auto}}

@@ -25,6 +25,18 @@ function messagesLeftText(n: number) {
   return `About ${shown.toLocaleString("en-IN")} marketing message${shown === 1 ? "" : "s"} left.`;
 }
 
+/** The card's artwork, as in the owner's reference: a soft green curved panel on the right with a 3D WhatsApp
+ * illustration (public/art/whatsapp-3d.webp, 19 KB). Decorative only: hidden from screen readers, never clickable, and
+ * placed absolutely so it can't move the figures (home.css .spend-card / .spend-art). */
+function SpendArt() {
+  return (
+    <div aria-hidden className="spend-art">
+      {/* eslint-disable-next-line @next/next/no-img-element -- small static decorative artwork */}
+      <img src="/art/whatsapp-3d.webp" alt="" width={400} height={296} loading="lazy" decoding="async" />
+    </div>
+  );
+}
+
 function Header() {
   return (
     <div className="hd" suppressHydrationWarning>
@@ -57,7 +69,8 @@ async function WalletBody({ clientId, isWallet, lowAlert, canManage }: { clientI
     if (balance === null) return <Unavailable />;
     const low = balance < lowAlert;
     return (
-      <section className="card">
+      <section className="card spend-card">
+        <SpendArt />
         <Header />
         <div className="stat">
           <div className="l">Balance</div>
@@ -85,7 +98,8 @@ async function WalletBody({ clientId, isWallet, lowAlert, canManage }: { clientI
   const low = synced && s.prepaidFunds > 0 && left / s.prepaidFunds < 0.2;
   const q = s.serviceQuota;
   return (
-    <section className="card">
+    <section className="card spend-card">
+      <SpendArt />
       <Header />
       {synced ? (
         <>
@@ -144,7 +158,8 @@ function Unavailable() {
 
 function Loading() {
   return (
-    <section className="card" aria-busy="true" suppressHydrationWarning>
+    <section className="card spend-card" aria-busy="true" suppressHydrationWarning>
+      <SpendArt />
       <Header />
       <div className="stat" suppressHydrationWarning>
         <div className="l">Balance</div>
