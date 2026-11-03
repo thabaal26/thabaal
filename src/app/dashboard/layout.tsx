@@ -41,11 +41,9 @@ const brandedClient = cache(async () => {
 
 export async function generateMetadata(): Promise<Metadata> {
   const client = await brandedClient();
+  // One tab icon: listing mark.png (127 KB) as a second one made browsers download it on every first visit.
   const icons = {
-    icon: [
-      { url: "/icon", type: "image/png", sizes: "512x512" },
-      { url: "/brands/thabaal/mark.png", type: "image/png" },
-    ],
+    icon: [{ url: "/icon", type: "image/png", sizes: "512x512" }],
     shortcut: "/icon",
     apple: [{ url: "/apple-icon", sizes: "180x180", type: "image/png" }],
   };
@@ -77,22 +75,23 @@ function Logo({ size }: { size: "sm" | "md" }) {
         data-keep
         className={`h-auto dark:[filter:drop-shadow(0_0_0.6px_#fff)_drop-shadow(0_0_1.2px_rgb(255_255_255/0.55))] ${size === "md" ? "w-11" : "w-9"}`}
       />
-      {/* The same drawn wordmark as the sign-in page (dark letters by day, white at night), not typed text. */}
+      {/* The same drawn wordmark as the sign-in page (dark letters by day, white at night), not typed text. A copy
+          sized for the menu (shown 24–28px tall; 7 KB instead of the sign-in page's 120 KB). */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/brands/thabaal/w-day.png"
+        src="/brands/thabaal/w-day-sm.png"
         alt="thabaal"
-        width={900}
-        height={252}
+        width={300}
+        height={84}
         data-keep
         className={`w-auto dark:hidden ${size === "md" ? "h-7" : "h-6"}`}
       />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/brands/thabaal/w-night.png"
+        src="/brands/thabaal/w-night-sm.png"
         alt="thabaal"
-        width={900}
-        height={252}
+        width={300}
+        height={84}
         data-keep
         className={`hidden w-auto dark:block ${size === "md" ? "h-7" : "h-6"}`}
       />

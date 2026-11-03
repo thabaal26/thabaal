@@ -24,10 +24,7 @@ export const metadata: Metadata = {
   applicationName: "Thabaal",
   description: "Thabaal (தபால்) — A message with momentum. Warm, quick, and dependable identity for customer messaging, campaigns, and orders.",
   icons: {
-    icon: [
-      { url: "/icon", type: "image/png", sizes: "512x512" },
-      { url: "/brands/thabaal/mark.png", type: "image/png" },
-    ],
+    icon: [{ url: "/icon", type: "image/png", sizes: "512x512" }],
     shortcut: "/icon",
     apple: [{ url: "/apple-icon", sizes: "180x180", type: "image/png" }],
   },

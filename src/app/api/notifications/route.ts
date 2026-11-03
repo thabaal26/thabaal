@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { orderRef } from "@/lib/order-ref";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
@@ -21,7 +22,7 @@ export type NotificationItem = {
   urgent?: boolean;
 };
 
-export async function GET() {
+export async function GET(req: Request) {
   const userId = await readSessionUserId((await cookies()).get(SESSION_COOKIE)?.value);
   if (!userId) return new NextResponse("Unauthorized", { status: 401 });
 
@@ -266,8 +267,10 @@ export async function GET() {
 
   const unreadCount = items.filter((i) => i.unread).length;
 
-  return NextResponse.json({
-    unreadCount,
-    notifications: items.slice(0, 30),
-  });
+  // The bell asks every 12 seconds; when nothing changed since its last copy (?v=), it gets a few bytes instead of
+  // the whole list again, and the page doesn't re-render.
+  const body = { unreadCount, notifications: items.slice(0, 30) };
+  const v = createHash("sha1").update(JSON.stringify(body)).digest("base64url").slice(0, 16);
+  if (new URL(req.url).searchParams.get("v") === v) return NextResponse.json({ v, same: true });
+  return NextResponse.json({ v, ...body });
 }

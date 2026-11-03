@@ -269,6 +269,26 @@ try {
     return "ok";
   });
 
+  await check(13, "Live: a new customer message shows by itself; nothing reloads while nothing changes", async () => {
+    await page.goto(`${BASE}/dashboard/replies?r=${chatty.id}`, { waitUntil: "networkidle" });
+    const pageLoads = [];
+    const onReq = (r) => {
+      if (r.url().includes("/dashboard/replies") && r.headers()["rsc"]) pageLoads.push(r.url());
+    };
+    page.on("request", onReq);
+    await page.waitForTimeout(13000);
+    const idle = pageLoads.length;
+    await db.reply.create({ data: { customerId: chatty.id, text: `Live check ${run}`, kind: "text" } });
+    await page.waitForFunction((t) => document.querySelector(".wa-msgs")?.textContent?.includes(t), `Live check ${run}`, { timeout: 20000 });
+    page.off("request", onReq);
+    // The bell gets a short "same" answer when its list hasn't changed.
+    const first = await page.evaluate(() => fetch("/api/notifications").then((r) => r.json()));
+    const again = await page.evaluate((v) => fetch(`/api/notifications?v=${v}`).then((r) => r.json()), first.v);
+    expect(idle === 0, `page re-rendered ${idle}× while idle`);
+    expect(again.same === true && !again.notifications, `notifications resent: ${JSON.stringify(again).slice(0, 80)}`);
+    return `idle re-renders ${idle}; new message shown; bell "same"`;
+  });
+
   await check(12, "No script errors", async () => {
     expect(!errors.length, errors.slice(0, 2).join(" | "));
     return "none";
