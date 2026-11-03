@@ -111,3 +111,16 @@ html.dark .ui-sheet{border-color:#27465C;box-shadow:0 30px 80px -24px rgba(0,0,0
 .thabaal-portal dialog{border-radius:24px;box-shadow:0 30px 80px -24px rgba(122,78,0,.45),0 2px 6px rgba(16,40,59,.06);background-image:linear-gradient(180deg,rgba(255,195,41,.10),transparent 120px)}
 html.dark .thabaal-portal dialog{box-shadow:0 30px 80px -24px rgba(0,0,0,.8);background-image:linear-gradient(180deg,rgba(255,195,41,.06),transparent 120px)}
 .thabaal-portal dialog::backdrop{backdrop-filter:blur(2px)}
+
+/* ── Admin panel (it also wears .thabaal-portal, so everything above applies): its page gets the golden glow, its
+   figure labels sit beside their icon tile, its change notes use the same pills ── */
+.thabaal-admin .main{background-image:radial-gradient(900px 340px at 92% -8%,rgba(255,195,41,.18),transparent 62%);background-repeat:no-repeat}
+html.dark .thabaal-admin .main{background-image:radial-gradient(900px 340px at 92% -8%,rgba(255,195,41,.07),transparent 62%)}
+.thabaal-admin .kpi .l{display:flex;align-items:center;gap:10px}
+.thabaal-portal .d.dn,.thabaal-portal .kpi .d.mute{display:inline-flex;align-items:center;padding:2px 10px;border-radius:999px;font-size:12.5px;font-weight:700;line-height:1.5}
+.thabaal-portal .d.dn{background:var(--bad-bg)}
+.thabaal-portal .kpi .d.mute{background:var(--soft);font-weight:600}
+
+/* ── Orders' New order form (its own dialog markup): the same rounder, warm dialog look ── */
+.thabaal-portal form.dlg.card[role=dialog]{border-radius:24px;box-shadow:0 30px 80px -24px rgba(122,78,0,.45),0 2px 6px rgba(16,40,59,.06);background-image:linear-gradient(180deg,rgba(255,195,41,.10),transparent 120px)}
+html.dark .thabaal-portal form.dlg.card[role=dialog]{box-shadow:0 30px 80px -24px rgba(0,0,0,.8);background-image:linear-gradient(180deg,rgba(255,195,41,.06),transparent 120px)}

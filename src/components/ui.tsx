@@ -162,12 +162,11 @@ export function CardHeader({
   descriptionTa?: ReactNode;
   action?: ReactNode;
   as?: "h2" | "h3";
-  /** A coloured header band and accent strip (kept for backwards compatibility). */
+  /** The colour of the icon's tile (design.css .ico-tile). */
   tone?: HeaderTone;
-  /** Accepted for older callers; the design's card headers have no icon. */
+  /** Shown on a soft tile in the tone's colour, in front of the title. */
   icon?: ReactNode;
 }) {
-  void tone;
   const { isTa, trn } = useTr();
   const renderedTitle = isTa ? (titleTa ?? trn(title)) : title;
   const renderedDesc = isTa ? (descriptionTa ?? trn(description)) : description;
@@ -178,7 +177,7 @@ export function CardHeader({
       {/* The title keeps at least ~14rem; a wide row of actions moves under it instead of squeezing it to one letter a line. */}
       <div className={cn("flex min-w-[min(9rem,100%)] flex-1 basis-36 gap-2.5 sm:min-w-[min(14rem,100%)] sm:basis-56 sm:gap-3", renderedDesc ? "items-start" : "items-center")}>
         {icon && (
-          <span aria-hidden className="shrink-0 text-muted mt-0.5 [&_svg]:size-[18px] sm:[&_svg]:size-5 [&_svg]:stroke-[1.8] flex items-center justify-center">
+          <span aria-hidden className="ico-tile" data-tone={tone ?? "gold"}>
             {icon}
           </span>
         )}

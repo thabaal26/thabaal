@@ -11,6 +11,7 @@ import { CLIENT_COOKIE, VIEW_PREFIX, requireAdminPage } from "@/lib/session";
 import { logout } from "../login/actions";
 import "../dashboard/portal.css";
 import "./admin.css";
+import "../dashboard/design.css";
 import { AdminNav } from "./nav";
 import { todayKey } from "@/lib/leads";
 import { LeaveViewButton } from "./support/support-tools";
@@ -46,7 +47,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const iconset = appearanceDataset(resolveAppearance(settings.appearance, null)).iconset;
 
   return (
-    <div className="thabaal-portal thabaal-admin">
+    // data-iconset: the icon set's stylesheet defines its drawings under that attribute; without it the app icons
+    // (figure tiles, the light/dark switch) were drawn empty in the admin panel.
+    <div className="thabaal-portal thabaal-admin" data-iconset={iconset}>
       <IconSetLink set={iconset} />
       <div className="app">
         <aside className="side">

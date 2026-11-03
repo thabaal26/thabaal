@@ -5520,7 +5520,8 @@ html {
   font-size: 14px;
 }
 .demo-form-foot a {
-  color: #0b8a57;
+  /* #0b8a57 was 4.3:1 on white; this passes AA (axe colour-contrast). */
+  color: #07704a;
   font-weight: 700;
 }
 .demo-field {
