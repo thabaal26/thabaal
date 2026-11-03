@@ -2,6 +2,7 @@
 
 import { formatPhone } from "@/lib/phone";
 import { Fragment, useEffect, useState, useTransition } from "react";
+import { Sheet } from "@/components/sheet";
 import { useModalKeys } from "@/components/use-modal";
 import Link from "@/components/intent-link";
 import { useRouter } from "next/navigation";
@@ -12,12 +13,12 @@ import { T, useLang } from "../portal-ui";
 import { DEFAULT_FLOW, flowHas, flowPacks, flowSteps, packLabel, packLabelTa, isCodOrder, isConfirmedOrLater, isPaidOrder, orderStage, readFlow, stepLabel, type OrderFlowKey } from "@/lib/order-flow";
 import { getOrderPricing, pointsDiscount } from "@/lib/order-pricing";
 import { orderRef, type OrderItem } from "@/lib/order-ref";
-import { dayStartIST, resolvePeriod, type RangeKey } from "@/lib/filters";
+import { resolvePeriod, type RangeKey } from "@/lib/filters";
 import { createOrder, lookupOrderCustomer } from "../actions/orders";
 import type { SavedAddress } from "@/lib/address-book";
 import { OrderCard, type OrderCardData } from "./order-card";
 import type { CatalogProductOption } from "./order-items-editor";
-import { Clock, Package, PackageCheck, ShoppingBag } from "@/components/icons";
+import { Clock, Package, PackageCheck, ShoppingBag, SlidersHorizontal } from "@/components/icons";
 import { Stat } from "@/components/ui";
 import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 import {
@@ -87,14 +88,17 @@ export function OrdersView({
   const [dateFilter, setDateFilter] = useState<string>(initialDate);
   const [query, setQuery] = useState<string>(initialQ);
   const [exportOpen, setExportOpen] = useState(false);
+  // Phones: date, payment and source live in a bottom sheet behind one Filters button.
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
-  // Sync prop changes from external router navigation
-  useEffect(() => {
-    if (initialDate && initialDate !== dateFilter) setDateFilter(initialDate);
-  }, [initialDate]);
-  useEffect(() => {
-    if (initialShow && initialShow !== show) setShow(initialShow);
-  }, [initialShow]);
+  // A link to this page with other filters (e.g. Home's "To pack") while it is open: take them over. Done while
+  // rendering, by remembering the last value from the address (React's way; an effect would render twice).
+  const [seen, setSeen] = useState({ date: initialDate, show: initialShow });
+  if (seen.date !== initialDate || seen.show !== initialShow) {
+    if (initialDate && seen.date !== initialDate) setDateFilter(initialDate);
+    if (initialShow && seen.show !== initialShow) setShow(initialShow);
+    setSeen({ date: initialDate, show: initialShow });
+  }
 
   // Keep URL search params in sync with active filters without full page reload
   useEffect(() => {
@@ -262,23 +266,35 @@ export function OrdersView({
 
   const toPackCount = baseFilteredOrders.filter(toPack).length;
 
-  // 2. Final filtered orders (also applies Status tab 'show' and Payment dropdown 'payFilter')
+  // 2. Final filtered orders: the status chips (several at once: an order shows when it matches any of them, none
+  // picked = all) and the Payment dropdown. Other pages link with one key (?show=topack, unpaid, refund, paid).
+  const picked = !show || show === "all" ? [] : show.split(",").filter(Boolean);
+  const matchShow = (o: OrderCardData, key: string) => {
+    switch (key) {
+      case "new": return stageIs(o, "RECEIVED");
+      case "payment": return stageIs(o, "PAYMENT");
+      case "verify": return stageIs(o, "VERIFY");
+      case "confirmed": return stageIs(o, "CONFIRMED");
+      case "paid": return isOrderPaid(o) || isOrderCod(o);
+      // "To pack" (from the To pack card and Home): confirmed (paid or COD confirmed), not packed yet.
+      case "topack": return toPack(o);
+      case "packed": return o.packedAt != null && preDispatch(o);
+      case "dispatched": return o.status === "DISPATCHED";
+      case "done": return o.status === "DELIVERED";
+      case "cancelled": return o.status === "CANCELLED";
+      // Lists other pages link to (Home, Reports, Products): not paid yet, refunds due.
+      case "unpaid": return o.status !== "CANCELLED" && !isOrderPaid(o) && !isOrderCod(o);
+      case "refund": return o.status === "CANCELLED" && isOrderPaid(o) && !o.refundedAt;
+      default: return true;
+    }
+  };
+  /** A status chip adds or removes its status; "All" (or removing the last one) shows everything again. */
+  const toggleShow = (key: string) => {
+    const next = picked.includes(key) ? picked.filter((k) => k !== key) : [...picked.filter((k) => !SPECIAL_SHOW[k]), key];
+    setShow(next.length ? next.join(",") : "all");
+  };
   const filteredOrders = baseFilteredOrders.filter((o) => {
-    // Step filter
-    if (show === "new" && !stageIs(o, "RECEIVED")) return false;
-    if (show === "payment" && !stageIs(o, "PAYMENT")) return false;
-    if (show === "verify" && !stageIs(o, "VERIFY")) return false;
-    if (show === "confirmed" && !stageIs(o, "CONFIRMED")) return false;
-    if (show === "paid" && !isOrderPaid(o) && !isOrderCod(o)) return false;
-    // "To pack" (from the To pack card and Home): confirmed (paid or COD confirmed), not packed yet.
-    if (show === "topack" && !toPack(o)) return false;
-    if (show === "packed" && !(o.packedAt != null && preDispatch(o))) return false;
-    if (show === "dispatched" && o.status !== "DISPATCHED") return false;
-    if (show === "done" && o.status !== "DELIVERED") return false;
-    if (show === "cancelled" && o.status !== "CANCELLED") return false;
-    // Lists other pages link to (Home, Reports, Products): not paid yet, refunds due.
-    if (show === "unpaid" && !(o.status !== "CANCELLED" && !isOrderPaid(o) && !isOrderCod(o))) return false;
-    if (show === "refund" && !(o.status === "CANCELLED" && isOrderPaid(o) && !o.refundedAt)) return false;
+    if (picked.length && !picked.some((k) => matchShow(o, k))) return false;
 
     // Payment dropdown filter
     if (payFilter === "none" && (isOrderPaid(o) || o.paymentRequestedAt != null)) return false;
@@ -288,6 +304,22 @@ export function OrdersView({
 
     return true;
   });
+  // Orders still needing work come first, newest first; delivered and cancelled ones go below, folded away when
+  // every status is showing (the person's job is the orders waiting on them, not the finished ones).
+  const isFinished = (o: OrderCardData) => o.status === "DELIVERED" || o.status === "CANCELLED";
+  const activeOrders = filteredOrders.filter((o) => !isFinished(o));
+  const finishedOrders = filteredOrders.filter(isFinished);
+  const foldFinished = picked.length === 0 && activeOrders.length > 0 && finishedOrders.length > 0;
+  const listed = foldFinished ? activeOrders : [...activeOrders, ...finishedOrders];
+  const anyFilter = picked.length > 0 || payFilter !== "all" || srcFilter !== "all" || dateFilter !== "all" || qClean !== "";
+  const clearFilters = () => {
+    setShow("all");
+    setPayFilter("all");
+    setSrcFilter("all");
+    setDateFilter("all");
+    setQuery("");
+  };
+  const moreFilters = (payFilter !== "all" ? 1 : 0) + (srcFilter !== "all" ? 1 : 0) + (dateFilter !== "all" ? 1 : 0);
 
   // Packing list orders (confirmed or paid orders waiting for dispatch)
   const waitingPackOrders = baseFilteredOrders.filter(
@@ -545,6 +577,8 @@ export function OrdersView({
             </StaggerItem>
           </StaggerGroup>
 
+          {/* Search, filters and the status chips: one bar that stays in view on computers while the list scrolls. */}
+          <div className="ord-bar">
           {/* Toolbar */}
           <ScrollReveal duration={400} className="toolbar">
             <div className="search">
@@ -565,6 +599,7 @@ export function OrdersView({
             {/* Date filter dropdown */}
             <select
               id="fd"
+              className="ord-more"
               aria-label={isTa ? "ஆர்டர் வந்த தேதி" : "Order received date"}
               style={{ width: "auto" }}
               value={dateFilter}
@@ -583,6 +618,7 @@ export function OrdersView({
 
             <select
               id="fp"
+              className="ord-more"
               aria-label="Payment status"
               style={{ width: "auto" }}
               value={payFilter}
@@ -597,6 +633,7 @@ export function OrdersView({
 
             <select
               id="fs"
+              className="ord-more"
               aria-label="Where the order came from"
               style={{ width: "auto" }}
               value={srcFilter}
@@ -608,9 +645,16 @@ export function OrdersView({
               <option value="manual">{isTa ? "வகை: கைமுறை பதிவு" : "From: manual entry"}</option>
             </select>
 
+            {/* Phones: date, payment and source in a bottom sheet. */}
+            <button type="button" className="btn ord-filters-btn" aria-haspopup="dialog" onClick={() => setFiltersOpen(true)}>
+              <SlidersHorizontal aria-hidden className="ic" style={{ width: 17, height: 17 }} />
+              <T ta="வடிகட்டிகள்">Filters</T>
+              {moreFilters > 0 && <span className="pill warn">{moreFilters}</span>}
+            </button>
+
             {/* Export Details Dropdown */}
             <details
-              className="more"
+              className="more ord-more"
               open={exportOpen}
               onToggle={(e) => setExportOpen((e.target as HTMLDetailsElement).open)}
               style={{ border: 0, margin: 0, padding: 0, position: "relative" }}
@@ -681,11 +725,11 @@ export function OrdersView({
 
           {/* Filter Chips */}
           <div className="chips" id="oc" style={{ marginBottom: 14 }}>
-            {SPECIAL_SHOW[show] && (
-              <button type="button" className="chip" aria-pressed onClick={() => setShow("all")} aria-label={isTa ? "இந்த வடிகட்டியை நீக்கு" : "Clear this filter"}>
-                {isTa ? SPECIAL_SHOW[show][1] : SPECIAL_SHOW[show][0]} <small>{filteredOrders.length}</small> <span aria-hidden>×</span>
+            {picked.filter((k) => SPECIAL_SHOW[k]).map((k) => (
+              <button key={k} type="button" className="chip" aria-pressed onClick={() => toggleShow(k)} aria-label={isTa ? "இந்த வடிகட்டியை நீக்கு" : "Clear this filter"}>
+                {isTa ? SPECIAL_SHOW[k][1] : SPECIAL_SHOW[k][0]} <small>{baseFilteredOrders.filter((o) => matchShow(o, k)).length}</small> <span aria-hidden>×</span>
               </button>
-            )}
+            ))}
             {dateFilter !== "all" && (
               <button
                 type="button"
@@ -716,7 +760,7 @@ export function OrdersView({
             <button
               type="button"
               className="chip"
-              aria-pressed={show === "all"}
+              aria-pressed={picked.length === 0}
               onClick={() => setShow("all")}
             >
               <T ta="அனைத்தும்">All</T> <small>{allCount}</small>
@@ -724,32 +768,32 @@ export function OrdersView({
             <button
               type="button"
               className="chip"
-              aria-pressed={show === "new"}
-              onClick={() => setShow("new")}
+              aria-pressed={picked.includes("new")}
+              onClick={() => toggleShow("new")}
             >
               <T ta="வந்தவை">Received</T> <small>{newCount}</small>
             </button>
             <button
               type="button"
               className="chip"
-              aria-pressed={show === "payment"}
-              onClick={() => setShow("payment")}
+              aria-pressed={picked.includes("payment")}
+              onClick={() => toggleShow("payment")}
             >
               <T ta="பணம் செலுத்துதல்">Payment processing</T> <small>{paymentCount}</small>
             </button>
             <button
               type="button"
               className="chip"
-              aria-pressed={show === "verify"}
-              onClick={() => setShow("verify")}
+              aria-pressed={picked.includes("verify")}
+              onClick={() => toggleShow("verify")}
             >
               <T ta="பணம் சரிபார்ப்பு">Payment verification</T> <small>{verifyCount}</small>
             </button>
             <button
               type="button"
               className="chip"
-              aria-pressed={show === "confirmed"}
-              onClick={() => setShow("confirmed")}
+              aria-pressed={picked.includes("confirmed")}
+              onClick={() => toggleShow("confirmed")}
             >
               <T ta="உறுதியானவை">{confirmLabel}</T> <small>{confirmedCount}</small>
             </button>
@@ -757,8 +801,8 @@ export function OrdersView({
               <button
                 type="button"
                 className="chip"
-                aria-pressed={show === "packed"}
-                onClick={() => setShow("packed")}
+                aria-pressed={picked.includes("packed")}
+                onClick={() => toggleShow("packed")}
               >
                 <T ta={packLabelTa(flow)}>{packLabel(flow)}</T> <small>{packedCount}</small>
               </button>
@@ -767,8 +811,8 @@ export function OrdersView({
               <button
                 type="button"
                 className="chip"
-                aria-pressed={show === "dispatched"}
-                onClick={() => setShow("dispatched")}
+                aria-pressed={picked.includes("dispatched")}
+                onClick={() => toggleShow("dispatched")}
               >
                 <T ta="அனுப்பியவை">Dispatched</T> <small>{dispatchedCount}</small>
               </button>
@@ -776,19 +820,21 @@ export function OrdersView({
             <button
               type="button"
               className="chip"
-              aria-pressed={show === "done"}
-              onClick={() => setShow("done")}
+              aria-pressed={picked.includes("done")}
+              onClick={() => toggleShow("done")}
             >
               <T ta={finishLabel === "Delivered" ? "டெலிவரி ஆனவை" : finishLabel}>{finishLabel}</T> <small>{deliveredCount}</small>
             </button>
             <button
               type="button"
               className="chip"
-              aria-pressed={show === "cancelled"}
-              onClick={() => setShow("cancelled")}
+              aria-pressed={picked.includes("cancelled")}
+              onClick={() => toggleShow("cancelled")}
             >
               <T ta="ரத்து செய்தவை">Cancelled</T> <small>{cancelledCount}</small>
             </button>
+          </div>
+
           </div>
 
           {/* Steps Line */}
@@ -818,10 +864,10 @@ export function OrdersView({
             </Link>
           </div>
 
-          {/* Orders Stack */}
+          {/* Orders Stack: waiting orders first (the first one marked as next up), finished ones after. */}
           <StaggerGroup className="stack" id="ol">
-            {filteredOrders.map((o, i) => (
-              <StaggerItem key={o.id} index={i}>
+            {listed.map((o, i) => (
+              <StaggerItem key={o.id} index={i} className={i === 0 && !isFinished(o) ? "ord-first" : undefined}>
                 <OrderCard
                   order={o}
                   items={(o.items as OrderItem[]) ?? []}
@@ -834,13 +880,108 @@ export function OrdersView({
             ))}
           </StaggerGroup>
 
+          {foldFinished && (
+            <details className="ord-done" data-testid="orders-done">
+              <summary>
+                <T ta={`முடிந்தவை, ரத்து செய்தவை (${finishedOrders.length})`}>{`Delivered and cancelled (${finishedOrders.length})`}</T>
+              </summary>
+              <div className="stack">
+                {finishedOrders.map((o) => (
+                  <OrderCard
+                    key={o.id}
+                    order={o}
+                    items={(o.items as OrderItem[]) ?? []}
+                    showClient={!scopeClientId}
+                    canEdit={canEdit}
+                    catalogProducts={catalogProducts}
+                    flow={flow}
+                  />
+                ))}
+              </div>
+            </details>
+          )}
+
           {filteredOrders.length === 0 && (
             <ScrollReveal duration={400}>
-              <p className="muted" id="oe">
-                <T ta="பொருத்தமான ஆர்டர்கள் எதுவும் இல்லை.">No orders match.</T>
-              </p>
+              <div className="card" id="oe" style={{ textAlign: "center" }}>
+                <p className="muted">
+                  <T ta="பொருத்தமான ஆர்டர்கள் எதுவும் இல்லை.">No orders match.</T>
+                </p>
+                {anyFilter && (
+                  <button type="button" className="btn sm" style={{ marginTop: 10 }} onClick={clearFilters}>
+                    <T ta="வடிகட்டிகளை நீக்கு">Clear filters</T>
+                  </button>
+                )}
+              </div>
             </ScrollReveal>
           )}
+
+          {/* Phones: the toolbar's dropdowns, in a bottom sheet. */}
+          <Sheet
+            open={filtersOpen}
+            onClose={() => setFiltersOpen(false)}
+            title={isTa ? "வடிகட்டிகள்" : "Filters"}
+            footer={
+              <div className="flex w-full items-center justify-between gap-2">
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    setPayFilter("all");
+                    setSrcFilter("all");
+                    setDateFilter("all");
+                  }}
+                >
+                  <T ta="மீட்டமை">Reset</T>
+                </button>
+                <button type="button" className="btn primary" onClick={() => setFiltersOpen(false)}>
+                  {isTa ? `${filteredOrders.length} ஆர்டர்களைக் காட்டு` : `Show ${filteredOrders.length} orders`}
+                </button>
+              </div>
+            }
+          >
+            <div className="grid gap-3">
+              <label className="grid gap-1 text-sm font-semibold">
+                {isTa ? "ஆர்டர் வந்த தேதி" : "Order received"}
+                <select className="field" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}>
+                  <option value="all">{isTa ? "அனைத்தும்" : "All time"}</option>
+                  <option value="today">{isTa ? "இன்று" : "Today"}</option>
+                  <option value="yesterday">{isTa ? "நேற்று" : "Yesterday"}</option>
+                  <option value="7d">{isTa ? "கடந்த 7 நாட்கள்" : "Last 7 days"}</option>
+                  <option value="14d">{isTa ? "கடந்த 14 நாட்கள்" : "Last 14 days"}</option>
+                  <option value="30d">{isTa ? "கடந்த 30 நாட்கள்" : "Last 30 days"}</option>
+                  <option value="90d">{isTa ? "கடந்த 90 நாட்கள்" : "Last 90 days"}</option>
+                  <option value="month">{isTa ? "இந்த மாதம்" : "This month"}</option>
+                  <option value="lastmonth">{isTa ? "கடந்த மாதம்" : "Last month"}</option>
+                </select>
+              </label>
+              <label className="grid gap-1 text-sm font-semibold">
+                {isTa ? "பணம்" : "Payment"}
+                <select className="field" value={payFilter} onChange={(e) => setPayFilter(e.target.value)}>
+                  <option value="all">{isTa ? "அனைத்தும்" : "All"}</option>
+                  <option value="none">{isTa ? "வர வேண்டியவை" : "Waiting"}</option>
+                  <option value="sent">{isTa ? "இணைப்பு அனுப்பப்பட்டது" : "Link sent"}</option>
+                  <option value="paid">{isTa ? "செலுத்தப்பட்டது" : "Paid"}</option>
+                  <option value="cod">{isTa ? "டெலிவரியின் போது (COD)" : "Cash on delivery"}</option>
+                </select>
+              </label>
+              <label className="grid gap-1 text-sm font-semibold">
+                {isTa ? "எங்கிருந்து வந்தது" : "Came from"}
+                <select className="field" value={srcFilter} onChange={(e) => setSrcFilter(e.target.value)}>
+                  <option value="all">{isTa ? "அனைத்தும்" : "Everywhere"}</option>
+                  <option value="cat">{isTa ? "பட்டியல்" : "Catalogue"}</option>
+                  <option value="camp">{isTa ? "பிரச்சாரம்" : "Campaign"}</option>
+                  <option value="manual">{isTa ? "கைமுறை பதிவு" : "Manual entry"}</option>
+                </select>
+              </label>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <span className="w-full text-sm font-semibold">{isTa ? "ஏற்றுமதி" : "Export"}</span>
+                <button type="button" className="btn sm" onClick={handleExportPdf}>PDF</button>
+                <button type="button" className="btn sm" onClick={handleExportExcel}>Excel</button>
+                <button type="button" className="btn sm" onClick={handleExportCsv}>CSV</button>
+              </div>
+            </div>
+          </Sheet>
         </section>
       )}
 

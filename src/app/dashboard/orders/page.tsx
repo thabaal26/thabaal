@@ -13,6 +13,7 @@ import { DEFAULT_FLOW, readFlow, type OrderFlowKey } from "@/lib/order-flow";
 import type { CatalogProductOption } from "./order-items-editor";
 import type { OrderItem } from "@/lib/orders";
 import { planGate } from "@/app/dashboard/plan-lock";
+import "./orders.css";
 
 export const metadata: Metadata = { title: "Orders" };
 export const dynamic = "force-dynamic";
