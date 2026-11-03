@@ -2,6 +2,7 @@
 // Plain server components (no state), so every page renders its numbers on the server.
 
 import type { ReactNode } from "react";
+import { AlertCircle, BarChart3 as BarIcon, Building2, IndianRupee, MessageCircle, Repeat, UserPlus, Users } from "@/components/icons";
 import type { Tone } from "@/lib/admin-data";
 
 export const R = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
@@ -36,12 +37,30 @@ export function Pill({ tone = "mute", children }: { tone?: Tone | "plain"; child
 
 export type KpiItem = { label: string; value: string; note: string; tone?: "up" | "dn" | "mute"; spark?: number[]; sparkColor?: string };
 
+/** An icon for a figure from what it counts (money, businesses, renewals, problems, messages, enquiries, people). */
+function kpiIcon(label: string): { icon: ReactNode; tone: string } {
+  const l = label.toLowerCase();
+  if (/overdue|not collected|failed|risk|behind|expired|quiet/.test(l)) return { icon: <AlertCircle />, tone: "rose" };
+  if (/auto-pay|autopay|renew/.test(l)) return { icon: <Repeat />, tone: "violet" };
+  if (/revenue|mrr|money|paid|spend|cost|₹|sales|collected|income/.test(l)) return { icon: <IndianRupee />, tone: "gold" };
+  if (/enquir|lead|follow/.test(l)) return { icon: <UserPlus />, tone: "amber" };
+  if (/message|sent|whatsapp/.test(l)) return { icon: <MessageCircle />, tone: "green" };
+  if (/business|client|shop/.test(l)) return { icon: <Building2 />, tone: "info" };
+  if (/admin|user|login|staff|owner|customer/.test(l)) return { icon: <Users />, tone: "info" };
+  return { icon: <BarIcon />, tone: "info" };
+}
+
 export function Kpis({ items, className = "" }: { items: KpiItem[]; className?: string }) {
   return (
     <div className={`kpi ${className}`}>
       {items.map((k) => (
         <div key={k.label} className="card">
-          <div className="l">{k.label}</div>
+          <div className="l">
+            <span aria-hidden className="ico-tile sm" data-tone={kpiIcon(k.label).tone}>
+              {kpiIcon(k.label).icon}
+            </span>
+            <span>{k.label}</span>
+          </div>
           <div className="v">{k.value}</div>
           <div className={`d ${k.tone ?? "mute"}`}>{k.note}</div>
           {k.spark && k.spark.length > 1 && (
