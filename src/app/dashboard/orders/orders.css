@@ -1,0 +1,33 @@
+/* Orders: the bar (search, filters, status chips), the next order to handle, compact cards and the folded finished
+   orders. Class names start with ord- so they can't meet another page's (route CSS stays loaded after navigation). */
+.thabaal-portal .ord-bar{min-width:0}
+/* Computers with room: the bar stays at the top while the list scrolls under it. */
+@media (min-width:1024px) and (min-height:720px){
+  .thabaal-portal .ord-bar{position:sticky;top:0;z-index:20;background:var(--bg);margin:0 -4px;padding:10px 4px 4px;box-shadow:0 10px 12px -12px rgba(16,40,59,.25)}
+  .thabaal-portal .ord-bar>.chips{margin-bottom:8px!important}
+}
+/* Tablets: the search box gets its own line so its hint isn't cut short. */
+@media (max-width:900px){
+  .thabaal-portal .ord-bar .toolbar>.search{flex:1 1 100%;max-width:none}
+}
+/* Phones: date, payment, source and export move into the Filters bottom sheet. */
+.thabaal-portal .ord-filters-btn{display:none}
+@media (max-width:639px){
+  .thabaal-portal .ord-bar .toolbar>.ord-more{display:none}
+  .thabaal-portal .ord-filters-btn{display:inline-flex}
+}
+
+/* The next order to handle: the first waiting one, outlined in the brand's mango. */
+.thabaal-portal .ord-first>.card{box-shadow:0 0 0 2px var(--mango),var(--shadow)}
+
+/* Compact cards: a little less padding and space between them, so more orders fit on a screen. */
+.thabaal-portal #ol.stack{gap:12px}
+.thabaal-portal #ol .card,.thabaal-portal .ord-done .card{padding:16px 18px}
+
+/* Delivered and cancelled orders, folded under the waiting ones when every status is showing. */
+.thabaal-portal .ord-done{margin-top:14px}
+.thabaal-portal .ord-done>summary{cursor:pointer;display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:6px 12px;border:1.5px solid var(--line);border-radius:999px;background:var(--card);font-weight:600;font-size:14px;color:var(--muted)}
+.thabaal-portal .ord-done>summary::marker{content:""}
+.thabaal-portal .ord-done>summary::before{content:"▸";font-size:12px}
+.thabaal-portal .ord-done[open]>summary::before{content:"▾"}
+.thabaal-portal .ord-done>.stack{margin-top:12px;gap:12px}
