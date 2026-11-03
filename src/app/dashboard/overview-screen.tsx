@@ -69,6 +69,7 @@ import { filterOptions, scopedCustomerIds } from "@/lib/filter-scope";
 import { catalogFor, catalogOrders, customerProducts } from "@/lib/product-scope";
 import { catalogMatcher } from "@/lib/catalog-match";
 import { isOpenCart, isSale } from "@/lib/sale";
+import { isUnpaidOrder } from "@/lib/order-flow";
 import { saleSql } from "@/lib/sale-sql";
 import { spendSummary } from "@/lib/spend";
 
@@ -147,7 +148,7 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
   const [
     [client, reachable, msgByCustomer, repliersMonth, health, areaRows],
     [customers, optedOut, prevStatus, msgSeries, activeRuns, upcoming, recentRaw, ordersRaw, replySeries, repliers, prevReplies, funnelRows, heat, todayMsgs, todayReplies],
-    [catalogueMsgs, periodReplies, unhandledGroup, toPackGroups, catalogRes, customerLifecycleRows],
+    [catalogueMsgs, periodReplies, unhandledGroup, toPackGroups, unpaidOpenRaw, catalogRes, customerLifecycleRows],
     runProgress,
     refillForecastRes,
     [filterOpts, [catalog, custProds, catOrders]],
@@ -304,6 +305,14 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
         by: ["status", "paymentMethod"],
         where: { ...mineOrders, status: { in: ["NEW", "CONFIRMED", "PAID"] }, packedAt: null, OR: [{ paidAt: { not: null } }, { status: "PAID" }, { status: "CONFIRMED", paymentMethod: "cod" }] },
         _count: true,
+      })
+      .catch(() => []),
+    // Unpaid carts on Home: every order of the business still waiting for money, whenever it came (the tile links to
+    // Orders' "Not paid yet" list, which shows them all). The exact rule (isUnpaidOrder) is applied below.
+    db.order
+      .findMany({
+        where: { ...mineOrders, status: { notIn: ["CANCELLED", "PAID"] }, paidAt: null },
+        select: { status: true, paidAt: true, paymentMethod: true, internalNote: true, total: true },
       })
       .catch(() => []),
     cid ? getCatalogWithProducts(cid).catch(() => null) : Promise.resolve(null),
@@ -2052,11 +2061,16 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
       })),
   ].slice(0, 3);
 
+  // Home's "Unpaid carts" tile and the brief count every order still waiting for money with Orders' own rule, so the
+  // number matches the "Not paid yet" list the tile opens (it used to count only this period's open carts).
+  const unpaidOpen = unpaidOpenRaw.filter(isUnpaidOrder);
+  const unpaidOpenValue = unpaidOpen.reduce((n, o) => n + o.total, 0);
+
   // The brief: the same live figures in a sentence or two, with buttons to the pages it mentions.
   const plural = (n: number, one: string, many = `${one}s`) => `${fmtNumber(n)} ${n === 1 ? one : many}`;
   const facts: string[] = [];
   if (ordersOn) facts.push(`${plural(curOrders.length, "confirmed order")} worth ₹${Math.round(revenue).toLocaleString("en-IN")} (${period.label.toLowerCase()})`);
-  if (ordersOn && curUnpaidCarts.length) facts.push(`${plural(curUnpaidCarts.length, "cart")} worth ₹${Math.round(unpaidCartRevenue).toLocaleString("en-IN")} still unpaid`);
+  if (ordersOn && unpaidOpen.length) facts.push(`${plural(unpaidOpen.length, "cart")} worth ₹${Math.round(unpaidOpenValue).toLocaleString("en-IN")} still unpaid`);
   if (ordersOn && toDispatchCount) facts.push(`${plural(toDispatchCount, "order")} to pack`);
   if (repliesOn) facts.push(unhandledGroup.length ? `${plural(unhandledGroup.length, "chat")} waiting for a reply` : "no chats waiting");
   if (refillsWeek.length) facts.push(`${plural(refillsWeek.length, "regular customer")} due to reorder this week`);
@@ -2065,7 +2079,7 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
     : "Nothing to report yet. Figures appear here as soon as customers message and order.";
   const briefActions = [
     repliesOn && unhandledGroup.length ? { label: `Reply to ${plural(unhandledGroup.length, "chat")}`, href: "/dashboard/replies" } : null,
-    ordersOn && curUnpaidCarts.length ? { label: "Chase unpaid carts", href: "/dashboard/orders?show=unpaid" } : null,
+    ordersOn && unpaidOpen.length ? { label: "Chase unpaid carts", href: "/dashboard/orders?show=unpaid" } : null,
     ordersOn && toDispatchCount ? { label: "Orders to pack", href: "/dashboard/orders?show=topack" } : null,
     refillsWeek.length ? { label: "Reorders due", href: "/dashboard/refills" } : null,
   ].filter((a): a is { label: string; href: string } => Boolean(a)).slice(0, 3);
@@ -2082,8 +2096,8 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
           ordersOn={ordersOn}
           repliesOn={repliesOn}
           campaignsOn={campaignsOn}
-          unpaidCartsCount={curUnpaidCarts.length}
-          unpaidCartsValue={unpaidCartRevenue}
+          unpaidCartsCount={unpaidOpen.length}
+          unpaidCartsValue={unpaidOpenValue}
           toPackCount={toDispatchCount}
           toPackSplit={{ paid: toPackPaid, cod: toPackCod, other: toPackOther }}
           today={{ sent: todayMsgs.reduce((n, r) => n + Number(r.n), 0), replies: todayReplies.reduce((n, r) => n + Number(r.n), 0) }}

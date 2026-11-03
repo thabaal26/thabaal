@@ -135,6 +135,12 @@ export const isPaidOrder = (o: StageFields) => Boolean(o.paidAt) || o.status ===
 /** Cash on delivery (chosen on the order, or an older order whose note says COD), not yet paid. */
 export const isCodOrder = (o: StageFields) => !isPaidOrder(o) && methodOf({ status: o.status, total: 0, paidAt: null, paymentMethod: o.paymentMethod, internalNote: o.internalNote }) === "cod";
 
+/**
+ * Money still to come: not cancelled, not paid, not cash on delivery. Orders' "Not paid yet" list (?show=unpaid) and
+ * Home's "Unpaid carts" tile both count with this, so the tile's number is the list's length.
+ */
+export const isUnpaidOrder = (o: StageFields) => o.status !== "CANCELLED" && !isPaidOrder(o) && !isCodOrder(o);
+
 /** The order's step, or "CANCELLED". */
 export function orderStage(o: StageFields): StageKey | "CANCELLED" {
   if (o.status === "CANCELLED") return "CANCELLED";

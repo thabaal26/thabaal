@@ -15,6 +15,7 @@ const S = JSON.parse(fs.readFileSync(".git/qa-state.json", "utf8"));
 if (!/localhost/.test(S.base) || !/localhost|127\.0\.0\.1/.test(S.dbUrl)) throw new Error("QA only");
 const BASE = S.base;
 const db = new PrismaClient({ datasources: { db: { url: S.dbUrl } } });
+const dbClient = db;
 const results = [];
 const expect = (c, m) => {
   if (!c) throw new Error(m);
@@ -85,12 +86,13 @@ try {
   await check(3, "Nothing waiting: \"Nothing needs you right now\" and ✓ links, no tiles", async () => {
     // The other QA shop, with its open chats handled and its open orders delivered for a moment (put back after).
     const openReplies = await db.reply.findMany({ where: { handled: false, customer: { clientId: S.otherId } }, select: { id: true } });
-    const openOrders = await db.order.findMany({ where: { clientId: S.otherId, status: { notIn: ["DELIVERED", "CANCELLED"] } }, select: { id: true, status: true } });
+    // Every order not cancelled is made delivered and paid (unpaid ones count as unpaid carts at any step).
+    const openOrders = await db.order.findMany({ where: { clientId: S.otherId, status: { not: "CANCELLED" } }, select: { id: true, status: true, paidAt: true } });
     await db.reply.updateMany({ where: { id: { in: openReplies.map((r) => r.id) } }, data: { handled: true } });
-    await db.order.updateMany({ where: { id: { in: openOrders.map((o) => o.id) } }, data: { status: "DELIVERED" } });
+    await db.order.updateMany({ where: { id: { in: openOrders.map((o) => o.id) } }, data: { status: "DELIVERED", paidAt: new Date() } });
     restore.push(async () => {
       await db.reply.updateMany({ where: { id: { in: openReplies.map((r) => r.id) } }, data: { handled: false } });
-      for (const o of openOrders) await db.order.update({ where: { id: o.id }, data: { status: o.status } });
+      for (const o of openOrders) await db.order.update({ where: { id: o.id }, data: { status: o.status, paidAt: o.paidAt } });
     });
     const o = await newPage({ token: S.tokens.otherManager });
     await o.goto(`${BASE}/dashboard`, { waitUntil: "networkidle" });
@@ -100,7 +102,7 @@ try {
     const quiet = await card.locator(".home-quiet a").allInnerTexts();
     await o.context().close();
     for (const f of restore.splice(0)) await f();
-    expect(h === "Nothing needs you right now" && quiet.length > 0, `"${h}", quiet ${quiet.join(", ")}`);
+    expect(h === "Nothing needs you right now" && tiles === 0 && quiet.length > 0, `"${h}", quiet ${quiet.join(", ")}`);
     return quiet.join(" · ");
   });
 
@@ -145,6 +147,26 @@ try {
       await p.context().close();
     }
     return "clean";
+  });
+
+  await check(8, "Unpaid carts on Home = the \"Not paid yet\" list it opens, for 7 and 90 days", async () => {
+    const counts = [];
+    for (const q of ["", "?range=90d"]) {
+      await page.goto(`${BASE}/dashboard${q}`, { waitUntil: "networkidle" });
+      const tile = page.locator('.home-now [data-todo="carts"]');
+      const text = await tile.innerText();
+      const n = /No unpaid carts/.test(text) ? 0 : Number((text.match(/(\d+) orders? waiting for payment/) ?? [])[1]);
+      counts.push(n);
+    }
+    await page.goto(`${BASE}/dashboard/orders?show=unpaid`, { waitUntil: "networkidle" });
+    const listed = await page.locator("#ol article.card").count();
+    const db = await (async () => {
+      const rows = await dbClient.order.findMany({ where: { clientId: S.shopId, status: { notIn: ["CANCELLED", "PAID"] }, paidAt: null }, select: { paymentMethod: true, internalNote: true } });
+      return rows.filter((r) => r.paymentMethod !== "cod" && !(r.paymentMethod == null && /\b(cod|cash\s+on\s+delivery)\b/i.test(r.internalNote ?? ""))).length;
+    })();
+    expect(counts[0] === listed && counts[1] === listed, `Home 7 days ${counts[0]}, 90 days ${counts[1]}, list ${listed}`);
+    expect(listed === db, `list ${listed}, database ${db}`);
+    return `Home ${counts.join("/")} = list ${listed} = database ${db}`;
   });
 
   await check(7, "No script errors", async () => {
