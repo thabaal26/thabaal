@@ -10,7 +10,7 @@ import { toastResult } from "@/components/toast";
 import { fmtDate } from "@/lib/format";
 import { inr } from "../portal-format";
 import { T, useLang } from "../portal-ui";
-import { DEFAULT_FLOW, flowHas, flowPacks, flowSteps, packLabel, packLabelTa, isCodOrder, isConfirmedOrLater, isPaidOrder, orderStage, readFlow, stepLabel, type OrderFlowKey } from "@/lib/order-flow";
+import { DEFAULT_FLOW, flowHas, flowPacks, flowSteps, packLabel, packLabelTa, isCodOrder, isConfirmedOrLater, isPaidOrder, isUnpaidOrder, orderStage, readFlow, stepLabel, type OrderFlowKey } from "@/lib/order-flow";
 import { getOrderPricing, pointsDiscount } from "@/lib/order-pricing";
 import { orderRef, type OrderItem } from "@/lib/order-ref";
 import { resolvePeriod, type RangeKey } from "@/lib/filters";
@@ -253,9 +253,7 @@ export function OrdersView({
   const deliveredCount = baseFilteredOrders.filter((o) => o.status === "DELIVERED").length;
   const cancelledCount = baseFilteredOrders.filter((o) => o.status === "CANCELLED").length;
 
-  const unpaidOrders = baseFilteredOrders.filter(
-    (o) => o.status !== "CANCELLED" && !isOrderPaid(o) && !isOrderCod(o),
-  );
+  const unpaidOrders = baseFilteredOrders.filter(isUnpaidOrder);
   const waitingSum = unpaidOrders.reduce((sum, o) => {
     const p = getOrderPricing((o.items as OrderItem[]) ?? [], o.total, {
       applyDefaultWhenEqual: true,
@@ -283,7 +281,7 @@ export function OrdersView({
       case "done": return o.status === "DELIVERED";
       case "cancelled": return o.status === "CANCELLED";
       // Lists other pages link to (Home, Reports, Products): not paid yet, refunds due.
-      case "unpaid": return o.status !== "CANCELLED" && !isOrderPaid(o) && !isOrderCod(o);
+      case "unpaid": return isUnpaidOrder(o);
       case "refund": return o.status === "CANCELLED" && isOrderPaid(o) && !o.refundedAt;
       default: return true;
     }

@@ -159,8 +159,9 @@ export function HomeTiers(p: HomeTiersProps) {
       big: inr(p.unpaidCartsValue),
       title: "Unpaid carts",
       titleTa: "செலுத்தப்படாத கார்ட்டுகள்",
-      sub: `${p.unpaidCartsCount} customer${p.unpaidCartsCount === 1 ? "" : "s"}`,
-      subTa: `${p.unpaidCartsCount} வாடிக்கையாளர்${p.unpaidCartsCount === 1 ? "" : "கள்"}`,
+      // Orders, not customers: one customer can have two unpaid orders, and the list counts orders.
+      sub: `${p.unpaidCartsCount} order${p.unpaidCartsCount === 1 ? "" : "s"} waiting for payment`,
+      subTa: `பணம் வர வேண்டிய ${p.unpaidCartsCount} ஆர்டர்${p.unpaidCartsCount === 1 ? "" : "கள்"}`,
       go: "Chase",
       goTa: "நினைவூட்டு",
       none: "No unpaid carts",
