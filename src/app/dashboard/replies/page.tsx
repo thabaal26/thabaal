@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
-import Link from "@/components/intent-link";
 import type { ConversationEntry } from "@/components/conversation";
 import { db } from "@/lib/db";
-import { daysAgo, fmtNumber } from "@/lib/format";
+import { daysAgo } from "@/lib/format";
 import { getScope, ownedMessages } from "@/lib/session";
-import { handleAllReplies } from "../actions/replies";
 import { CHATS_SUB, CHATS_SUB_TA, InboxTabs } from "./inbox-tabs";
-import { PAction, PortalPage, T } from "../portal-ui";
-import { ReplyInbox } from "./reply-inbox";
+import { PortalPage } from "../portal-ui";
+import { ReplyInbox, type ChatProfile } from "./reply-inbox";
+import "./chats.css";
 import { templateLabel } from "@/lib/plain-error";
 import { planGate } from "@/app/dashboard/plan-lock";
 
@@ -24,7 +23,6 @@ const TABS = [
 
 /** Customers we messaged (a campaign, an order update) who haven't written back show as chats this many days. */
 const SENT_DAYS = 7;
-const SENT_LABEL: Record<string, string> = { SENT: "Sent ✓", DELIVERED: "Delivered ✓✓", READ: "Read ✓✓", FAILED: "Not delivered" };
 
 export default async function RepliesPage({ searchParams }: PageProps<"/dashboard/replies">) {
   const locked = await planGate();
@@ -144,8 +142,9 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
     return [
       {
         id: m.id,
-        text: `${templateLabel(m.templateName ?? "Message")} · ${SENT_LABEL[m.status] ?? m.status}`,
+        text: templateLabel(m.templateName ?? "Message"),
         kind: "sent",
+        sentStatus: m.status,
         handled: true,
         receivedAt: m.sentAt ?? m.createdAt,
         mediaId: null,
@@ -187,8 +186,9 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
     selected = replies[0];
   }
   const thread: ConversationEntry[] = [];
+  let profile: ChatProfile | null = null;
   if (selected) {
-    const [msgs, reps] = await Promise.all([
+    const [msgs, reps, info] = await Promise.all([
       db.message.findMany({
         where: { customerId: selected.customer.id, status: { not: "QUEUED" } },
         include: { run: { select: { campaign: { select: { name: true } } } }, sender: { select: { label: true } } },
@@ -201,7 +201,31 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
         orderBy: { receivedAt: "desc" },
         take: 40,
       }),
+      // The contact info panel: tags, area, and the latest orders.
+      db.customer.findUnique({
+        where: { id: selected.customer.id },
+        select: {
+          tags: true,
+          location: true,
+          createdAt: true,
+          optedOut: true,
+          unreachable: true,
+          _count: { select: { orders: true } },
+          orders: { orderBy: { createdAt: "desc" }, take: 3, select: { id: true, number: true, ref: true, total: true, currency: true, status: true, createdAt: true } },
+        },
+      }),
     ]);
+    if (info) {
+      profile = {
+        tags: info.tags,
+        location: info.location,
+        since: info.createdAt,
+        optedOut: info.optedOut,
+        unreachable: info.unreachable,
+        orderCount: info._count.orders,
+        orders: info.orders,
+      };
+    }
     thread.push(
       ...msgs.map((m) => ({
         at: m.sentAt ?? m.createdAt,
@@ -230,39 +254,20 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
   }
 
   return (
-    <PortalPage title="Chats" titleTa="உரையாடல்கள்" sub={CHATS_SUB} subTa={CHATS_SUB_TA}>
+    <PortalPage title="Chats" titleTa="உரையாடல்கள்" sub={CHATS_SUB} subTa={CHATS_SUB_TA} wide>
       <InboxTabs active="inbox" />
-
-      <div className="chips" style={{ marginBottom: 14, alignItems: "center" }}>
-        {TABS.map((t) => (
-          <Link key={t.key} href={t.key ? `/dashboard/replies?show=${t.key}` : "/dashboard/replies"} className="chip" aria-current={show === t.key ? "true" : undefined} scroll={false}>
-            {t.label} <small>{fmtNumber(tabCount[t.key])}</small>
-          </Link>
-        ))}
-        {scope.canOperate && openThreadsCount > 0 && (
-          <PAction action={handleAllReplies} className="sm ghost" style={{ marginLeft: "auto" }} confirm="Mark every open customer conversation as handled?">
-            <T ta="அனைத்தையும் முடிந்ததாகக் குறி">Mark all handled</T>
-          </PAction>
-        )}
-      </div>
-
-      {replies.length ? (
-        <ReplyInbox
-          replies={replies}
-          selectedId={selected?.id}
-          thread={thread}
-          show={typeof show === "string" ? show : ""}
-          canOperate={scope.canOperate}
-          showClient={!scope.clientId}
-        />
-      ) : (
-        <section className="card">
-          <h2>{show === "handled" ? "Nothing handled yet" : show === "open" ? "You're all caught up" : show === "sent" ? "Nothing sent in the last 7 days" : "No replies yet"}</h2>
-          <p className="muted" style={{ marginTop: 6 }}>
-            When customers tap &ldquo;Order now&rdquo; or write back after a campaign, each customer&apos;s conversation appears here.
-          </p>
-        </section>
-      )}
+      <ReplyInbox
+        replies={replies}
+        selectedId={selected?.id}
+        thread={thread}
+        profile={profile}
+        show={typeof show === "string" ? show : ""}
+        filters={TABS.map((t) => ({ ...t, count: tabCount[t.key] }))}
+        openCount={openThreadsCount}
+        opened={Boolean(picked)}
+        canOperate={scope.canOperate}
+        showClient={!scope.clientId}
+      />
     </PortalPage>
   );
 }

@@ -87,6 +87,7 @@ export function PortalPage({
   sub,
   subTa,
   actions,
+  wide,
   children,
 }: {
   title: ReactNode;
@@ -95,11 +96,13 @@ export function PortalPage({
   subTa?: string;
   /** The page's main button(s), left of the bell. */
   actions?: ReactNode;
+  /** Use the whole width (Chats: the list and the conversation side by side). */
+  wide?: boolean;
   children: ReactNode;
 }) {
   return (
     <div className="thabaal-portal" suppressHydrationWarning>
-      <div className="wrapin" suppressHydrationWarning>
+      <div className={wide ? "wrapin wide" : "wrapin"} suppressHydrationWarning>
         <header className="top" suppressHydrationWarning>
           <div suppressHydrationWarning>
             <h1>
