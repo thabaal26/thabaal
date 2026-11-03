@@ -110,7 +110,7 @@ export function Sheet({
         aria-describedby={description ? descId : undefined}
         tabIndex={-1}
         className={cn(
-          "relative flex max-h-[92dvh] w-full animate-sheet flex-col rounded-t-sheet glass-modal outline-none sm:animate-rise sm:rounded-sheet",
+          "ui-sheet relative flex max-h-[92dvh] w-full animate-sheet flex-col rounded-t-sheet glass-modal outline-none sm:animate-rise sm:rounded-sheet",
           className?.includes("max-w-") ? "" : "sm:max-w-md",
           className,
         )}
@@ -119,7 +119,7 @@ export function Sheet({
           <div aria-hidden className="mx-auto mb-2.5 h-1 w-10 rounded-full bg-line-strong/50 sm:hidden" />
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 pt-1.5">
-              <h2 id={titleId} className="text-base font-semibold leading-snug text-ink [overflow-wrap:anywhere]">{title}</h2>
+              <h2 id={titleId} className="font-display text-lg font-bold leading-snug tracking-[-0.2px] text-ink [overflow-wrap:anywhere]">{title}</h2>
               {description && <p id={descId} className="mt-1 text-sm text-muted">{description}</p>}
             </div>
             <button type="button" onClick={close} aria-label="Close" className="-mr-2 grid size-11 shrink-0 place-items-center rounded-control text-muted transition hover:bg-sunken hover:text-ink active:bg-sunken sm:size-9">
