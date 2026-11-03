@@ -134,7 +134,8 @@ function updateDynamicFavicon(count: number) {
       document.head.appendChild(link);
     }
   };
-  img.src = "/brands/thabaal/mark.png";
+  // A 128px copy: the tab icon is drawn 64px wide (the full mark is 127 KB).
+  img.src = "/brands/thabaal/mark-sm.png";
 }
 
 export function NotificationProvider({
@@ -152,12 +153,15 @@ export function NotificationProvider({
   const seenIdsRef = useRef<Set<string>>(new Set());
   const initialFetchRef = useRef(true);
   const updatingTitleRef = useRef(false);
+  /** The version of the list we hold: the server answers "same" instead of resending it. */
+  const versionRef = useRef<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
       const res = await fetch("/api/notifications", { cache: "no-store" });
       if (!res.ok) return;
-      const data = (await res.json()) as { unreadCount: number; notifications: NotificationItem[] };
+      const data = (await res.json()) as { v?: string; unreadCount: number; notifications: NotificationItem[] };
+      versionRef.current = data.v ?? null;
       setNotifications(data.notifications);
       setUnreadCount(data.unreadCount);
     } catch {
@@ -169,10 +173,11 @@ export function NotificationProvider({
     let stop = false;
     const tick = async () => {
       try {
-        const res = await fetch("/api/notifications", { cache: "no-store" });
+        const res = await fetch(`/api/notifications${versionRef.current ? `?v=${encodeURIComponent(versionRef.current)}` : ""}`, { cache: "no-store" });
         if (!res.ok || stop) return;
-        const data = (await res.json()) as { unreadCount: number; notifications: NotificationItem[] };
-        if (stop) return;
+        const data = (await res.json()) as { v?: string; same?: boolean; unreadCount: number; notifications: NotificationItem[] };
+        if (stop || data.same) return;
+        versionRef.current = data.v ?? null;
         setNotifications(data.notifications);
         setUnreadCount(data.unreadCount);
 

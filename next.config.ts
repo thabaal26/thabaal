@@ -28,6 +28,12 @@ const nextConfig: NextConfig = {
         headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
       },
       {
+        // The app icon is drawn once at build time, but Next.js serves it with max-age=0. Pages put its link back in the
+        // head on every refresh (Chats refreshes itself), so the browser downloaded the 73 KB picture again each time.
+        source: "/icon",
+        headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
+      },
+      {
         // Uploaded files are served on this site's own address, so they get the strictest policy: nothing in them
         // may run or load anything. (The route sets this too, but the rule above would overwrite it; the last
         // matching rule wins.)

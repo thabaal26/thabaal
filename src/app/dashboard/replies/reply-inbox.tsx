@@ -246,31 +246,37 @@ export function ReplyInbox({
     setTimeout(() => setIsSyncing(false), 800);
   }, [router]);
 
-  // Smart background live polling: refreshes every 6 seconds when tab is active and operator is not typing
+  // Live updates: every 6 seconds (tab visible, nobody typing) ask /api/chats-live whether anything Chats shows changed,
+  // and re-render only then. It used to rebuild the whole page every 6 seconds even when nothing had happened.
+  const stampRef = useRef<string | null>(null);
   useEffect(() => {
-    let mounted = true;
-    const interval = setInterval(() => {
+    let stop = false;
+    const check = async () => {
       if (document.visibilityState === "hidden" || isTyping) return;
-      setIsSyncing(true);
-      router.refresh();
-      setTimeout(() => {
-        if (mounted) setIsSyncing(false);
-      }, 800);
-    }, 6000);
-
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible" && !isTyping) {
-        refreshChats();
+      try {
+        const res = await fetch("/api/chats-live", { cache: "no-store" });
+        if (!res.ok || stop) return;
+        const { v } = (await res.json()) as { v: string };
+        if (stop || isTyping) return;
+        if (stampRef.current !== null && v !== stampRef.current) refreshChats();
+        stampRef.current = v;
+      } catch {
+        // offline for a moment: try again on the next tick
       }
     };
+    void check();
+    const interval = setInterval(check, 6000);
+    // Coming back to the tab checks straight away.
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") void check();
+    };
     document.addEventListener("visibilitychange", onVisibilityChange);
-
     return () => {
-      mounted = false;
+      stop = true;
       clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [isTyping, refreshChats, router]);
+  }, [isTyping, refreshChats]);
 
   // A phone shows the open chat full screen: the page behind it must not scroll.
   useEffect(() => {
