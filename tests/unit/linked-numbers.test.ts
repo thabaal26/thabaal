@@ -6,7 +6,10 @@ import { after, before, describe, test } from "node:test";
 import { campaignAudienceWhere } from "../../src/lib/audiences";
 import { db } from "../../src/lib/db";
 import { runDueCampaigns } from "../../src/lib/dispatcher";
-import { linkCustomers, numbersNote, otherNumbers, setOtherNumbers, unlinkCustomer, withSamePerson } from "../../src/lib/linked-numbers";
+import { customersData } from "../../src/lib/customers-data";
+import { asPerson, LOYALTY_ORDER_SELECT, linkCustomers, mergePurchases, numbersNote, otherNumbers, setOtherNumbers, unlinkCustomer, withSamePerson } from "../../src/lib/linked-numbers";
+import { loyaltyFromOrders } from "../../src/lib/loyalty";
+import { setOrderPoints } from "../../src/lib/loyalty-redeem";
 import { formatPhone, readPhones } from "../../src/lib/phone";
 
 const FAR = new Date("2099-04-01T04:30:00Z");
@@ -59,6 +62,7 @@ describe("linked numbers: saving and campaigns", () => {
   after(async () => {
     globalThis.fetch = realFetch;
     await db.message.deleteMany({ where: { customer: { clientId } } });
+    await db.order.deleteMany({ where: { clientId } });
     await db.campaignRun.deleteMany({ where: { campaign: { clientId } } });
     await db.campaign.deleteMany({ where: { clientId } });
     await db.template.deleteMany({ where: { clientId } });
@@ -134,5 +138,46 @@ describe("linked numbers: saving and campaigns", () => {
     assert.ok(sent.has(ids.jeeva) && sent.has(ids.second), "both of jeeva's numbers got the offer");
     assert.ok(sentTo.includes(`${P}1`) && sentTo.includes(`${P}4`));
     assert.ok(!sentTo.includes(`${P}3`), "the unreachable number is never sent");
+  });
+
+  // jeeva's two numbers (P1, P4): an order on each, points given by hand on P1 (the loyalty-bonus:50 tag), the same
+  // order-sheet purchase copied onto both. One person: 2 orders, ₹800, one sheet item.
+  const balance = async (id: string) =>
+    loyaltyFromOrders(await asPerson(await db.customer.findUniqueOrThrow({ where: { id }, select: { id: true, personId: true, name: true, tags: true, purchases: true, orders: { select: LOYALTY_ORDER_SELECT } } })));
+
+  test("7. points are one balance over all the person's numbers, whichever number is looked at", async () => {
+    let n = 0;
+    const order = (customerId: string, total: number, extra = {}) =>
+      db.order.create({ data: { clientId, customerId, ref: `QL-${Date.now()}-${n++}`, status: "DELIVERED", paidAt: new Date(), total, items: [{ id: "oil", name: "Gingelly oil", quantity: 1, price: total }], ...extra } });
+    await order(ids.jeeva, 500);
+    await order(ids.second, 300);
+    // 800/100 = 8, repeat order +50, one sheet item +35 (counted once though both numbers have it), +50 by hand.
+    assert.equal((await balance(ids.jeeva)).totalPoints, 143);
+    assert.equal((await balance(ids.second)).totalPoints, 143, "the same from the other number");
+    assert.equal(loyaltyFromOrders(await db.customer.findUniqueOrThrow({ where: { id: ids.second }, select: { name: true, tags: true, purchases: true, orders: { select: LOYALTY_ORDER_SELECT } } })).totalPoints, 38, "alone, the second number has only its own 38");
+    assert.equal(mergePurchases(["Gingelly oil", " gingelly oil ", null, "Ghee"]), "Gingelly oil, Ghee");
+  });
+
+  test("8. an order on the second number can use the person's points", async () => {
+    const o = await db.order.create({ data: { clientId, customerId: ids.second, ref: `QL-${Date.now()}-u`, status: "NEW", total: 500, items: [{ id: "oil", name: "Gingelly oil", quantity: 1, price: 500 }] } });
+    const r = await setOrderPoints(o.id, "max");
+    assert.equal(r.ok, true, r.message);
+    assert.equal(r.applied, 50, "143 points = ₹71 → ₹50 in ₹25 steps; the number alone (38) couldn't use any");
+    assert.equal((await db.order.findUniqueOrThrow({ where: { id: o.id } })).total, 450);
+    assert.equal((await balance(ids.jeeva)).totalPoints, 43, "the 100 points used come off the person's balance");
+  });
+
+  test("9. the customer list shows the person's totals on each number; the cart stays on its number", async () => {
+    const { customers } = await customersData(clientId);
+    const [a, b] = [customers.find((c) => c.id === ids.jeeva)!, customers.find((c) => c.id === ids.second)!];
+    for (const row of [a, b]) {
+      assert.equal(row.orders, 2);
+      assert.equal(row.spend, 800);
+      assert.equal(row.points, 43);
+    }
+    assert.equal(a.cart, 0);
+    assert.equal(b.cart, 450, "the unpaid cart is on the second number");
+    assert.deepEqual(a.others, [`${P}4`]);
+    assert.equal(customers.find((c) => c.id === ids.kala)!.orders, 0, "a single number keeps its own totals");
   });
 });

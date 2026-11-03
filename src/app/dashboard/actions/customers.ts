@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { formatPhone, MAX_NUMBERS, readPhones } from "@/lib/phone";
-import { linkCustomers, numbersNote, otherNumbers, setOtherNumbers } from "@/lib/linked-numbers";
+import { asPerson, linkCustomers, numbersNote, otherNumbers, setOtherNumbers } from "@/lib/linked-numbers";
 import { defaultRegion, homeCityOf, regionsFor } from "@/lib/regions";
 import { cleanValues, readFields, readValues } from "@/lib/custom-fields";
 import { owned, requireManager, requireUser } from "@/lib/session";
@@ -309,6 +309,7 @@ export async function adjustLoyaltyPoints(
     where: { id, ...owned(s) },
     select: {
       id: true,
+      personId: true,
       clientId: true,
       name: true,
       tags: true,
@@ -320,8 +321,8 @@ export async function adjustLoyaltyPoints(
   });
   if (!c) return { ok: false, message: "Customer not found." };
 
-  // The balance right now, worked out the same way as on screen.
-  const balance = loyaltyFromOrders(c, { rules: loyaltyRules(c.client) }).totalPoints;
+  // The balance right now, worked out the same way as on screen: one balance over all the person's numbers.
+  const balance = loyaltyFromOrders(await asPerson(c), { rules: loyaltyRules(c.client) }).totalPoints;
   if (delta < 0 && -delta > balance) {
     return { ok: false, message: `${c.name} has only ${balance} points, so ${Math.abs(Math.round(delta))} can't be redeemed.` };
   }

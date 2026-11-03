@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { readPaySettings, shopDeliveryFee } from "@/lib/pay-settings";
 import { LOYALTY_RULE_FIELDS, loyaltyRules } from "@/lib/loyalty";
 import { maxPointsDiscount } from "@/lib/loyalty-redeem";
+import { asPeople, LOYALTY_ORDER_SELECT } from "@/lib/linked-numbers";
 import { getScope, owned } from "@/lib/session";
 import { LiveRefresh } from "@/components/live-refresh";
 import { RefreshButton } from "@/components/refresh-button";
@@ -71,11 +72,14 @@ export default async function OrdersPage({
   // Loyalty points each unpaid order could use: only those customers' orders are read (a small second read).
   const unpaid = (o: (typeof rawOrders)[number]) => o.status !== "CANCELLED" && !o.paidAt && !((o.paidAmount ?? 0) > 0);
   const pointsCustomers = [...new Set(rawOrders.filter(unpaid).map((o) => o.customerId))];
+  // A person's points are one balance over all their numbers (lib/linked-numbers.ts).
   const loyaltyRows = pointsCustomers.length
-    ? await db.customer.findMany({
-        where: { id: { in: pointsCustomers } },
-        select: { id: true, name: true, tags: true, purchases: true, orders: { select: { id: true, total: true, status: true, paidAt: true, paymentMethod: true, internalNote: true, pointsRedeemed: true } } },
-      })
+    ? await asPeople(
+        await db.customer.findMany({
+          where: { id: { in: pointsCustomers } },
+          select: { id: true, personId: true, name: true, tags: true, purchases: true, orders: { select: LOYALTY_ORDER_SELECT } },
+        }),
+      )
     : [];
   const loyaltyOf = new Map(loyaltyRows.map((c) => [c.id, c]));
 

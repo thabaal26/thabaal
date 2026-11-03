@@ -16,7 +16,8 @@ import { itemsText, money, type OrderItem } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { replyWindowEnd } from "@/lib/replies";
 import { marketingPaused } from "@/lib/held";
-import { otherNumbers } from "@/lib/linked-numbers";
+import { mergePurchases, otherNumbers } from "@/lib/linked-numbers";
+import { isInternalLoyaltyTag } from "@/lib/loyalty";
 import { homeCityOf, regionsFor } from "@/lib/regions";
 import { readFields, readValues, showValue } from "@/lib/custom-fields";
 import { getScope, owned } from "@/lib/session";
@@ -55,14 +56,19 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
   });
   if (!c) notFound();
 
-  const [templates, numbers, paused, others] = await Promise.all([
+  const [templates, numbers, paused, others, otherOrders] = await Promise.all([
     sendableTemplates(c.clientId).then((sendable) =>
       db.template.findMany({ where: { clientId: c.clientId, status: "APPROVED", name: { notIn: META_SAMPLES }, ...sendable }, orderBy: { name: "asc" } }),
     ),
     db.whatsAppNumber.findMany({ where: { clientId: c.clientId }, orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }], select: { id: true, label: true, businessAccountId: true } }),
     marketingPaused([c.id]),
     otherNumbers(c.clientId, c),
+    // One person, several numbers: their orders on the other numbers count here too (lib/linked-numbers.ts).
+    c.personId ? db.order.findMany({ where: { clientId: c.clientId, customer: { personId: c.personId }, customerId: { not: c.id } }, orderBy: { createdAt: "desc" }, take: 100 }) : [],
   ]);
+  const orders = otherOrders.length ? [...c.orders, ...otherOrders].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()) : c.orders;
+  const personTags = [...c.tags, ...others.flatMap((o) => o.tags.filter(isInternalLoyaltyTag))];
+  const personPurchases = others.length ? mergePurchases([c.purchases, ...others.map((o) => o.purchases)]) : c.purchases;
   const pausedUntil = paused.get(c.id);
   // WhatsApp allows typed messages for 24 hours after the customer last wrote to us.
   const windowEnd = replyWindowEnd(c.replies[0]?.receivedAt);
@@ -159,10 +165,10 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
 
       {(() => {
         // The design's profile figures: what they bought, from orders that stand.
-        const bought = c.orders.filter((o) => o.status !== "CANCELLED" && isSale(o));
+        const bought = orders.filter((o) => o.status !== "CANCELLED" && isSale(o));
         const spent = bought.reduce((n, o) => n + o.total, 0);
         const last = bought.reduce<Date | null>((d, o) => (!d || o.createdAt > d ? o.createdAt : d), null);
-        const unpaid = c.orders.filter((o) => !o.paidAt && (o.status === "NEW" || o.status === "CONFIRMED")).reduce((n, o) => n + o.total, 0);
+        const unpaid = orders.filter((o) => !o.paidAt && (o.status === "NEW" || o.status === "CONFIRMED")).reduce((n, o) => n + o.total, 0);
         return (
           <>
             <StaggerGroup className="grid g4 keep2">
@@ -212,6 +218,14 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                 {c.replies[0] ? ` (last ${fmtDate(c.replies[0].receivedAt, "d MMM")})` : ""}
                 {c.optedOut ? " · opted out of campaigns" : ""}
               </T>
+              {others.length > 0 && (
+                <span data-testid="person-totals">
+                  {" · "}
+                  <T ta={`ஆர்டர்கள், செலவு, புள்ளிகள்: இவருடைய ${others.length + 1} எண்களும் சேர்த்து`}>
+                    {`Orders, spend and points: all ${others.length + 1} of their numbers together`}
+                  </T>
+                </span>
+              )}
             </p>
           </>
         );
@@ -230,13 +244,13 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
           />
 
           <PurchaseJourney
-            customer={{ id: c.id, name: c.name, phone: c.phone, tags: c.tags }}
+            customer={{ id: c.id, name: c.name, phone: c.phone, tags: personTags }}
             brandName={c.client.name}
             canManage={scope.canManage}
-            orders={c.orders}
+            orders={orders}
             replies={c.replies}
             readDates={c.messages.map((m) => m.readAt).filter((d): d is Date => d !== null)}
-            sheetPurchases={c.purchases}
+            sheetPurchases={personPurchases}
             rules={loyaltyRules(c.client)}
           />
 
@@ -279,9 +293,9 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
             }
           />
           <div className="space-y-4 p-4 sm:p-5">
-            {c.orders.length > 0 && (() => {
-              const activeOrders = c.orders.filter((o) => o.status !== "CANCELLED");
-              const replacedCarts = c.orders.filter((o) => o.status === "CANCELLED");
+            {orders.length > 0 && (() => {
+              const activeOrders = orders.filter((o) => o.status !== "CANCELLED");
+              const replacedCarts = orders.filter((o) => o.status === "CANCELLED");
               const boughtItemSet = new Set(
                 activeOrders.flatMap((o) => ((o.items as OrderItem[] | null) ?? []).map((i) => (i.name ?? i.id).toLowerCase())),
               );
@@ -351,7 +365,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                 {c.purchases}
               </p>
             ) : (
-              c.orders.length === 0 && <p className="text-sm text-muted"><T>No purchase recorded.</T></p>
+              orders.length === 0 && <p className="text-sm text-muted"><T>No purchase recorded.</T></p>
             )}
             {c.location && (
               <div className="flex items-start gap-2 text-sm">
