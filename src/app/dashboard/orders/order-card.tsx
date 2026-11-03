@@ -13,7 +13,7 @@ import { fmtDate } from "@/lib/format";
 import { canUndoPayment, dueOf, paymentState, receivedOf, slipPay } from "@/lib/payment-state";
 import { openPrintablePdfWindow } from "./packing/print-button";
 import { inr } from "../portal-format";
-import { Clock } from "@/components/icons";
+import { Clock, CreditCard, PackageCheck, PackageOpen, ShoppingBag, Truck, XCircle } from "@/components/icons";
 import { T, useLang } from "../portal-ui";
 import { getOrderPricing, pointsDiscount } from "@/lib/order-pricing";
 import { orderRef, type OrderItem } from "@/lib/order-ref";
@@ -128,6 +128,28 @@ const HISTORY_STATUS: Record<string, string> = {
   expired: "request expired",
   reference_added: "reference added",
 };
+
+/** The order's step at a glance, as an icon on a tinted tile (design.css .ico-tile): new, waiting for money,
+ * confirmed, sent out, delivered or cancelled. */
+const STAGE_TILE: Record<string, { tone: string; icon: React.ReactNode; label: string }> = {
+  RECEIVED: { tone: "amber", icon: <ShoppingBag />, label: "New order" },
+  PAYMENT: { tone: "gold", icon: <CreditCard />, label: "Waiting for payment" },
+  VERIFY: { tone: "gold", icon: <Clock />, label: "Payment to check" },
+  CONFIRMED: { tone: "info", icon: <PackageOpen />, label: "Confirmed" },
+  DISPATCHED: { tone: "violet", icon: <Truck />, label: "Sent out" },
+  DELIVERED: { tone: "green", icon: <PackageCheck />, label: "Delivered" },
+  CANCELLED: { tone: "rose", icon: <XCircle />, label: "Cancelled" },
+};
+
+function StageTile({ stage }: { stage: string }) {
+  const t = STAGE_TILE[stage];
+  if (!t) return null;
+  return (
+    <span className="ico-tile sm" data-tone={t.tone} title={t.label} aria-hidden style={{ marginRight: 4 }}>
+      {t.icon}
+    </span>
+  );
+}
 
 export function OrderCard({
   order: o,
@@ -709,6 +731,7 @@ export function OrderCard({
       <div className="hd" style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 14 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <h2 data-data style={{ fontSize: 17, margin: 0, lineHeight: 1.3, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <StageTile stage={stage} />
             #{refText} ·{" "}
             <Link href={`/dashboard/customers/${o.customer.id}`} style={{ textDecoration: "none" }}>
               {o.customer.name}
