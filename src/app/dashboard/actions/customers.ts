@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { normalizePhone } from "@/lib/phone";
+import { formatPhone, MAX_NUMBERS, readPhones } from "@/lib/phone";
+import { linkCustomers, numbersNote, otherNumbers, setOtherNumbers } from "@/lib/linked-numbers";
 import { defaultRegion, homeCityOf, regionsFor } from "@/lib/regions";
 import { cleanValues, readFields, readValues } from "@/lib/custom-fields";
 import { owned, requireManager, requireUser } from "@/lib/session";
@@ -21,7 +22,27 @@ export type CustomerInput = {
   purchases?: string;
   /** Custom field values by key (lib/custom-fields.ts). */
   extra?: Record<string, string>;
+  /** The same person's other WhatsApp numbers, comma separated (lib/linked-numbers.ts); undefined leaves them as they are. */
+  otherPhones?: string;
 };
+
+/**
+ * Reads the number box (one number, or several: the first is this customer's, the rest are their other numbers) and
+ * the other-numbers box. Returns the main number and the full list of other numbers, or an error for the owner.
+ */
+function readNumbers(phoneBox: string, otherBox: string | undefined, current: string[]) {
+  const main = readPhones(phoneBox);
+  const more = readPhones(otherBox);
+  const bad = [...main.bad, ...more.bad];
+  if (bad.length) return { error: `Couldn't read ${bad.map((b) => `"${b}"`).join(", ")} as a mobile number.` };
+  const phone = main.phones[0];
+  if (!phone) return { error: "Enter a valid mobile number with country code." };
+  const others = [...new Set([...(otherBox === undefined ? current : []), ...main.phones.slice(1), ...more.phones])].filter((p) => p !== phone);
+  if (others.length + 1 > MAX_NUMBERS) return { error: `One customer can have up to ${MAX_NUMBERS} numbers.` };
+  // Nothing typed about other numbers: leave the links alone.
+  const touched = otherBox !== undefined || main.phones.length > 1;
+  return { phone, others: touched ? others : null };
+}
 
 /** The region to save: one of the client's three, or the default when an area was typed without one. */
 async function regionToSave(clientId: string, picked: string | undefined, location: string | null | undefined) {
@@ -38,9 +59,11 @@ export async function saveCustomer(id: string | null, input: CustomerInput): Pro
   if (id && !existing) return { ok: false, message: "Customer not found." };
   const clientId = existing?.clientId ?? s.clientId!;
 
-  const phone = normalizePhone(input.phone);
   if (!input.name.trim()) return { ok: false, message: "Enter the customer's name." };
-  if (!phone) return { ok: false, message: "Enter a valid mobile number with country code." };
+  const current = existing ? (await otherNumbers(clientId, existing)).map((o) => o.phone) : [];
+  const numbers = readNumbers(input.phone, input.otherPhones, current);
+  if ("error" in numbers) return { ok: false, message: numbers.error! };
+  const { phone, others } = numbers;
   const clash = await db.customer.findUnique({ where: { clientId_phone: { clientId, phone } } });
   if (clash && clash.id !== id) return { ok: false, message: `+${phone} already belongs to ${clash.name}.` };
 
@@ -71,15 +94,17 @@ export async function saveCustomer(id: string | null, input: CustomerInput): Pro
     ...(extra !== undefined && { extra }),
   };
 
+  let savedId = id;
   if (id) {
     await db.customer.update({ where: { id }, data });
     revalidatePath(`/dashboard/customers/${id}`);
   } else {
     if (!input.optInSource?.trim()) return { ok: false, message: "Note how the customer agreed to WhatsApp messages; Meta requires it." };
-    await db.customer.create({ data: { ...data, clientId, optInSource: input.optInSource.trim(), optInAt: new Date() } });
+    savedId = (await db.customer.create({ data: { ...data, clientId, optInSource: input.optInSource.trim(), optInAt: new Date() }, select: { id: true } })).id;
   }
+  const note = others ? numbersNote(await setOtherNumbers(clientId, savedId!, others), formatPhone) : "";
   revalidatePath("/dashboard/customers");
-  return { ok: true, message: id ? "Customer details updated." : "Customer added." };
+  return { ok: true, message: `${id ? "Customer details updated." : "Customer added."}${note}` };
 }
 
 /** Promotes a PendingCustomer (from transcribed paper order sheets) into an active Customer once their phone number is verified. */
@@ -92,18 +117,22 @@ export async function promotePendingCustomer(
   const row = await db.pendingCustomer.findFirst({ where: { id: pendingId, ...owned(s) } });
   if (!row) return { ok: false, message: "Pending entry not found." };
 
-  const phone = normalizePhone(input.phone);
   if (!input.name.trim() || input.name.trim() === "(name unclear)") {
     return { ok: false, message: "Enter the customer's name before adding them." };
   }
+  // Order sheets often have two numbers for one person ("98653 10945 / 90805 53061"): all of them are saved.
+  const typed = readPhones(input.phone);
+  if (typed.bad.length) return { ok: false, message: `Couldn't read ${typed.bad.map((b) => `"${b}"`).join(", ")} as a mobile number.` };
+  const phone = typed.phones[0];
   if (!phone) return { ok: false, message: "Enter a valid 10-digit mobile number (or number with country code)." };
+  if (typed.phones.length > MAX_NUMBERS) return { ok: false, message: `One customer can have up to ${MAX_NUMBERS} numbers.` };
 
   const location = input.location?.trim() || row.location || null;
   const region = await regionToSave(row.clientId, input.region, location);
   const purchases = input.purchases?.trim() || row.items || null;
   const optInSource = input.optInSource?.trim() || "Bought from us and gave their number";
 
-  await db.$transaction([
+  const [saved] = await db.$transaction([
     db.customer.upsert({
       where: { clientId_phone: { clientId: row.clientId, phone } },
       update: {
@@ -126,9 +155,15 @@ export async function promotePendingCustomer(
     }),
     db.pendingCustomer.delete({ where: { id: row.id } }),
   ]);
+  const more = typed.phones.slice(1);
+  const current = more.length ? (await otherNumbers(row.clientId, saved)).map((o) => o.phone) : [];
+  if (more.length) await setOtherNumbers(row.clientId, saved.id, [...current, ...more]);
 
   revalidatePath("/dashboard/customers");
-  return { ok: true, message: `${input.name.trim()} added to customer directory.` };
+  return {
+    ok: true,
+    message: `${input.name.trim()} added to customer directory${typed.phones.length > 1 ? ` with ${typed.phones.length} numbers (${typed.phones.map(formatPhone).join(", ")}); campaigns go to each` : ""}.`,
+  };
 }
 
 export async function deletePendingCustomer(pendingId: string): Promise<ActionResult> {
@@ -178,21 +213,25 @@ export async function importCustomers(csv: string, extraTags: string, optInSourc
 
   const extra = parseTags(extraTags);
   const rows = new Map<string, { name: string; tags: string[]; fields: Record<string, string> }>();
+  // A cell with two numbers ("98653 10945 / 90805 53061") is one person: each number is saved and linked.
+  const people: string[][] = [];
   let invalid = 0;
   for (const line of lines.slice(hasHeader ? 1 : 0)) {
     const cells = splitCsv(line);
-    const phone = normalizePhone(cells[phoneIdx] ?? "");
-    if (!phone) { invalid++; continue; }
+    const phones = readPhones(cells[phoneIdx] ?? "").phones.slice(0, MAX_NUMBERS);
+    if (!phones.length) { invalid++; continue; }
+    if (phones.length > 1) people.push(phones);
     const fields: Record<string, string> = {};
     for (const { f, i } of fieldCols) {
       const checked = cleanValues([f], { [f.key]: cells[i] ?? "" });
       if ("values" in checked && checked.values[f.key]) fields[f.key] = checked.values[f.key];
     }
-    rows.set(phone, {
+    const row = {
       name: (nameIdx >= 0 && cells[nameIdx]) || "Customer",
       tags: [...new Set([...parseTags(tagIdx >= 0 ? cells[tagIdx] ?? "" : ""), ...extra])],
       fields,
-    });
+    };
+    for (const phone of phones) rows.set(phone, row);
   }
   if (rows.size > 20_000) return { ok: false, message: "Import up to 20,000 customers at a time." };
 
@@ -214,10 +253,15 @@ export async function importCustomers(csv: string, extraTags: string, optInSourc
         data: { name: r.name, tags: [...new Set([...tags, ...r.tags])], ...(Object.keys(r.fields).length && { extra: { ...knownExtra.get(phone), ...r.fields } }) },
       });
   }
+  let linked = 0;
+  if (people.length) {
+    const ids = new Map((await db.customer.findMany({ where: { clientId, phone: { in: people.flat() } }, select: { id: true, phone: true } })).map((c) => [c.phone, c.id]));
+    for (const phones of people) if (await linkCustomers(clientId, phones.map((p) => ids.get(p)).filter((x): x is string => Boolean(x)))) linked++;
+  }
   revalidatePath("/dashboard", "layout");
   return {
     ok: true,
-    message: `${fresh.length} added, ${existing.length} updated${invalid ? `, ${invalid} skipped (invalid number)` : ""}.`,
+    message: `${fresh.length} added, ${existing.length} updated${linked ? `, ${linked} with more than one number (each number saved and linked)` : ""}${invalid ? `, ${invalid} skipped (invalid number)` : ""}.`,
   };
 }
 

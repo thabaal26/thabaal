@@ -79,8 +79,10 @@ export function CustomerTable({ rows, canManage }: { rows: CustomerRow[]; canMan
   }, [rows]);
 
   const ql = q.trim().toLowerCase();
+  const qDigits = /^[\d\s+()-]{5,}$/.test(ql) ? ql.replace(/\D/g, "") : "";
   const list = rows.filter((c) => {
-    if (ql && !`${c.name} ${c.area ?? ""} ${c.phone}`.toLowerCase().includes(ql)) return false;
+    // A number finds the customer however it's typed ("98653 10945", "+91 9865310945"), and by any of their numbers.
+    if (ql && !`${c.name} ${c.area ?? ""} ${c.phone} ${c.others.join(" ")}`.toLowerCase().includes(ql) && !(qDigits && [c.phone, ...c.others].some((p) => p.includes(qDigits)))) return false;
     if (sel.list.length && !sel.list.every((id) => LISTS.find((l) => l.id === id)!.test(c))) return false;
     if (sel.tier.length && !sel.tier.includes(c.tier)) return false;
     if (sel.stat.length && !sel.stat.includes(c.status)) return false;
@@ -285,6 +287,11 @@ export function CustomerTable({ rows, canManage }: { rows: CustomerRow[]; canMan
                     </Link>
                     <div className="muted small">
                       {formatPhone(c.phone)}
+                      {c.others.length > 0 && (
+                        <span title={c.others.map(formatPhone).join(", ")} data-testid="other-numbers">
+                          {" "}· {isTamil ? `+${c.others.length} எண்` : `+${c.others.length} more number${c.others.length === 1 ? "" : "s"}`}
+                        </span>
+                      )}
                       {c.cart > 0 && <> · {isTamil ? `கார்ட் ${inr(c.cart)} நிலுவை` : `Cart ${inr(c.cart)} unpaid`}</>}
                       {c.optedOut && <> · {isTamil ? "விலகியவர்" : "opted out"}</>}
                       {c.unreachable && <> · {isTamil ? "செய்தி செல்லவில்லை" : "can't receive"}</>}
