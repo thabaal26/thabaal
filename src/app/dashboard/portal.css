@@ -5,6 +5,9 @@
   --ok:#086842; --ok-bg:rgba(32,201,133,.16); --warn:#8A5A00; --warn-bg:rgba(255,195,41,.28); --bad:#B73822; --bad-bg:rgba(244,107,78,.16);
   --info:#2B5C86; --info-bg:rgba(43,92,134,.12); --bar:#10283B; --bar2:#FFC329; --bar3:#F46B4E; --bar4:#20C985;
   --shadow:0 1px 0 rgba(16,40,59,.04),0 14px 30px -22px rgba(16,40,59,.35);
+  /* Page widths: lists, tables and dashboards grow with the screen up to --page-max; forms and reading pages stop at
+     --page-read; Chats uses --page-wide. Below these the page simply fills its card. */
+  --page-max:1600px; --page-read:1040px; --page-wide:2400px;
   --display:var(--font-dm-sans),"DM Sans","Noto Sans Tamil",ui-rounded,system-ui,sans-serif; --ui:var(--font-dm-sans),"DM Sans","Noto Sans Tamil",system-ui,-apple-system,"Segoe UI",sans-serif;
 }
 html.dark .thabaal-portal{
@@ -55,7 +58,15 @@ html.dark .thabaal-portal{
 .thabaal-portal .live{display:inline-flex;align-items:center;gap:6px}
 .thabaal-portal .live i{width:8px;height:8px;border-radius:50%;background:#20C985}
 .thabaal-portal .main{min-width:0;padding:22px max(20px,4vw) 60px}
-.thabaal-portal .wrapin{max-width:1040px;margin:0 auto}
+.thabaal-portal .wrapin{max-width:var(--page-max);margin:0 auto;min-width:0}
+/* The shell's frame holds a page's own frame (PortalPage): only the inner one sets the width. */
+.thabaal-portal .wrapin:has(.wrapin){max-width:none}
+/* Bars shown above a page (view only, plan due, connect WhatsApp) line up with that page's own width. */
+.thabaal-portal .wrapin:has(.wrapin)>:not(.thabaal-portal):not(dialog){max-width:var(--page-max);margin-left:auto;margin-right:auto}
+.thabaal-portal .wrapin:has(.wrapin.wide)>:not(.thabaal-portal):not(dialog){max-width:var(--page-wide)}
+.thabaal-portal .wrapin:has(.wrapin.read)>:not(.thabaal-portal):not(dialog){max-width:var(--page-read)}
+.thabaal-portal .wrapin.wide{max-width:var(--page-wide)}
+.thabaal-portal .wrapin.read{max-width:var(--page-read)}
 .thabaal-portal .top{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;justify-content:space-between;margin-bottom:20px}
 .thabaal-portal .top h1{font-family:var(--title);font-weight:700;letter-spacing:0;font-size:clamp(28px,3.2vw,36px);line-height:1.1}
 .thabaal-portal .top .sub{color:var(--muted);margin-top:6px;max-width:34em;font-size:15px;line-height:1.5}

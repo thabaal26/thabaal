@@ -1,19 +1,43 @@
 /* Chats: WhatsApp's own layout (chat list | open chat | contact info) in Thabaal's colours. Only this page loads it. */
-.thabaal-portal .wrapin.wide{max-width:1480px}
-.thabaal-portal .wa{
+
+/* The chat fills the screen down to the bottom at any size or browser zoom: the page's column (main → frames → .wa-app)
+   is a flex column as tall as what the window shows, and .wa-app takes what the title and tabs leave. No fixed offsets. */
+@media (min-width:1024px){
+  #main:has(.wa-app){height:calc(100dvh - 1.5rem - 2px);display:flex;flex-direction:column;padding-bottom:1rem}
+}
+@media (min-width:901px) and (max-width:1023px){
+  /* Tablets: below the 56px top bar; main's own bottom padding keeps the chat above the bottom tabs. */
+  #main:has(.wa-app){height:calc(100dvh - 3.5rem - env(safe-area-inset-top,0px));display:flex;flex-direction:column}
+}
+@media (min-width:901px){
+  #main:has(.wa-app) .thabaal-portal:has(.wa-app),#main:has(.wa-app) .wrapin:has(.wa-app){flex:1 1 auto;min-height:0;display:flex;flex-direction:column;width:100%}
+  #main:has(.wa-app) .wrapin:has(.wa-app)>:not(:has(.wa-app)):not(.wa-app){flex:none}
+  #main .thabaal-portal .wrapin>.wa-app{flex:1 1 auto;height:auto;min-height:200px}
+}
+/* Short windows (a laptop at 125–150% zoom): the title's second line gives its room to the chat. */
+@media (min-width:901px) and (max-height:760px){
+  .thabaal-portal .wrapin.wide>.top{margin-bottom:8px}
+  .thabaal-portal .wrapin.wide>.top .sub{display:none}
+}
+/* Very short windows: the list already says "Chats", so the page title steps aside too (the bell and tools stay). */
+@media (min-width:901px) and (max-height:560px){
+  .thabaal-portal .wrapin.wide>.top h1{display:none}
+  .thabaal-portal .wa-hint{display:none}
+  /* Below this the messages would have no room: the page scrolls a little instead. */
+  #main .thabaal-portal .wrapin>.wa-app{min-height:300px}
+}
+.thabaal-portal .wa-app{
   --wa-bar:#FFF7E8; --wa-wall:#F3EADC; --wa-in:#fff; --wa-out:#FFEDBF; --wa-bad:#FCE2DC; --wa-meta:#667785;
   --wa-read:#2E9BE6; --wa-sel:#FFEFC7; --wa-hover:#FFFAF0; --wa-time:#A26F00; --wa-doodle:rgba(16,40,59,.06);
-  position:relative;display:grid;grid-template-columns:minmax(290px,380px) minmax(0,1fr);
-  height:clamp(520px,calc(100dvh - 230px),1100px);background:var(--card);border:1.5px solid var(--line);border-radius:18px;
+  position:relative;display:grid;grid-template-columns:clamp(280px,27%,440px) minmax(0,1fr);
+  height:clamp(460px,calc(100dvh - 230px),1100px);background:var(--card);border:1.5px solid var(--line);border-radius:18px;
   overflow:hidden;box-shadow:var(--shadow)}
-html.dark .thabaal-portal .wa{
+html.dark .thabaal-portal .wa-app{
   --wa-bar:#17394F; --wa-wall:#0E2535; --wa-in:#1C415A; --wa-out:#4E4318; --wa-bad:#4B2A2A; --wa-meta:#9DB0C1;
   --wa-read:#53BDEB; --wa-sel:#21475F; --wa-hover:#18405A; --wa-time:#FFC329; --wa-doodle:rgba(255,249,240,.035)}
-@media (min-width:1280px){.thabaal-portal .wa.info{grid-template-columns:minmax(270px,320px) minmax(0,1fr) 320px}}
+@media (min-width:1280px){.thabaal-portal .wa-app.info{grid-template-columns:clamp(270px,24%,420px) minmax(0,1fr) clamp(300px,22%,400px)}}
 /* With contact info open the chat is narrower: the name keeps the room (the panel shows who it is). */
-.thabaal-portal .wa.info .wa-ch .wa-win{display:none}
-/* Tablets have the app's bottom tabs: keep the message box above them. */
-@media (min-width:901px) and (max-width:1023px){.thabaal-portal .wa{height:clamp(460px,calc(100dvh - 320px),1100px)}}
+.thabaal-portal .wa-app.info .wa-ch .wa-win{display:none}
 
 /* ── Chat list ── */
 .thabaal-portal .wa-list{display:flex;flex-direction:column;min-height:0;min-width:0;border-right:1px solid var(--line)}
@@ -169,18 +193,18 @@ html.dark .thabaal-portal .wa-file{background:rgba(255,249,240,.08)}
 
 /* ── Phones and small tablets: the list first, a chat opens full screen with a back arrow ── */
 @media (max-width:900px){
-  .thabaal-portal .wa{grid-template-columns:minmax(0,1fr);height:auto;min-height:0;border-radius:16px}
+  .thabaal-portal .wa-app{grid-template-columns:minmax(0,1fr);height:auto;min-height:0;border-radius:16px}
   /* The page itself scrolls the list, as a phone app does (the bottom tabs leave room under it). */
-  .thabaal-portal .wa{overflow:visible}
+  .thabaal-portal .wa-app{overflow:visible}
   .thabaal-portal .wa-list{border-right:0}
   .thabaal-portal .wa-rows{overflow:visible;flex:none}
-  .thabaal-portal .wa[data-view=list] .wa-chat{display:none}
+  .thabaal-portal .wa-app[data-view=list] .wa-chat{display:none}
   /* The page's fade-in animation makes it a stacking context, which would keep the full-screen chat under the app's
      top bar and bottom tabs; it has finished by the time a chat opens. */
-  .thabaal-portal:has(.wa[data-view=chat]){animation:none}
-  .thabaal-portal .wa[data-view=chat] .wa-chat{position:fixed;inset:0;z-index:45;background:var(--card)}
-  .thabaal-portal .wa[data-view=chat] .wa-ch{padding-top:max(8px,env(safe-area-inset-top,0px));padding-left:4px}
-  .thabaal-portal .wa[data-view=chat] .wa-comp,.thabaal-portal .wa[data-view=chat] .wa-closed{padding-bottom:max(8px,env(safe-area-inset-bottom,0px))}
+  .thabaal-portal:has(.wa-app[data-view=chat]){animation:none}
+  .thabaal-portal .wa-app[data-view=chat] .wa-chat{position:fixed;inset:0;z-index:45;background:var(--card)}
+  .thabaal-portal .wa-app[data-view=chat] .wa-ch{padding-top:max(8px,env(safe-area-inset-top,0px));padding-left:4px}
+  .thabaal-portal .wa-app[data-view=chat] .wa-comp,.thabaal-portal .wa-app[data-view=chat] .wa-closed{padding-bottom:max(8px,env(safe-area-inset-bottom,0px))}
   .thabaal-portal .wa-back{display:inline-grid}
   .thabaal-portal .wa-info{position:fixed;inset:0;z-index:46;width:auto;border-left:0}
   .thabaal-portal .wa-ch .wa-win{display:none}

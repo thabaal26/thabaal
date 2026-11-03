@@ -58,7 +58,7 @@ export default async function GuidePage() {
   const locked = await planGate();
   if (locked) return locked;
   return (
-    <PortalPage title="What changed" titleTa="என்ன மாறியது" sub="Where every feature lives in the new menu." subTa="ஒவ்வொரு வசதியும் புதிய மெனுவில் எங்கே உள்ளது.">
+    <PortalPage title="What changed" titleTa="என்ன மாறியது" sub="Where every feature lives in the new menu." subTa="ஒவ்வொரு வசதியும் புதிய மெனுவில் எங்கே உள்ளது." read>
       <div className="stack">
         <section>
           <h2 style={{ marginBottom: 12 }}><T>All pages</T></h2>
