@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { formatInTimeZone } from "date-fns-tz";
 import { APP_TZ } from "@/lib/format";
-import { ExternalLink } from "@/components/icons";
+import { ExternalLink, MessageCircle } from "@/components/icons";
 import Link from "@/components/intent-link";
 import { INDIA_GST_RATE, RATES, spendSummary } from "@/lib/spend";
 import { affordableMessages, walletBalance } from "@/lib/wallet";
@@ -28,9 +28,14 @@ function messagesLeftText(n: number) {
 function Header() {
   return (
     <div className="hd" suppressHydrationWarning>
-      <h2 suppressHydrationWarning>
-        <T ta="வாட்ஸ்அப் செலவு">WhatsApp spend</T>
-      </h2>
+      <div className="hd-ico">
+        <span aria-hidden className="ico-tile" data-tone="green">
+          <MessageCircle />
+        </span>
+        <h2 suppressHydrationWarning>
+          <T ta="வாட்ஸ்அப் செலவு">WhatsApp spend</T>
+        </h2>
+      </div>
       <Link className="btn sm" href="/dashboard/report">
         <T ta="செலவுகள்">Costs</T>
       </Link>

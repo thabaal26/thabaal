@@ -23,6 +23,7 @@ import { UsageBeacon } from "@/components/usage-beacon";
 import { PlanLockPopup } from "./plan-lock-popup";
 import "./portal.css";
 import "./mobile.css";
+import "./design.css";
 import { PlanDueBar } from "./plan-due-bar";
 import { ViewOnlyBar } from "./view-only-bar";
 import { LogOut } from "@/components/icons";
@@ -286,7 +287,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
             </div>
           </header>
 
-          <div className="min-w-0 flex-1 lg:min-h-[calc(100dvh-1.5rem)] lg:rounded-[22px] lg:border lg:border-line lg:bg-canvas lg:shadow-float print:border-0 print:shadow-none">
+          <div className="app-canvas min-w-0 flex-1 lg:min-h-[calc(100dvh-1.5rem)] lg:rounded-[22px] lg:border lg:border-line lg:bg-canvas lg:shadow-float print:border-0 print:shadow-none print:bg-none">
             <main
               id="main"
               className="stagger relative mx-auto w-full px-3.5 pb-[calc(4.75rem+env(safe-area-inset-bottom))] pt-3.5 sm:px-6 sm:pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pt-6 lg:px-[clamp(2rem,2.5vw,3.5rem)] lg:pb-12 lg:pt-7 print:p-0"

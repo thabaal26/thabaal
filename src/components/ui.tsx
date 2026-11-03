@@ -725,15 +725,16 @@ export function Stat({
 
   const body = (
     <>
-      <div className="flex items-center justify-between gap-1.5 sm:gap-2">
-        <span className="min-w-0 truncate text-[11.5px] font-medium text-muted sm:text-[13.5px]">
-          {displayLabel}
-        </span>
+      <div className="flex items-center gap-2 sm:gap-3">
         {icon && (
-          <span aria-hidden className="shrink-0 text-muted [&_svg]:size-4 sm:[&_svg]:size-[18px] [&_svg]:stroke-2">
+          // The icon on a soft tile in the card's colour (design.css .ico-tile).
+          <span aria-hidden className="ico-tile" data-tone={tone}>
             {icon}
           </span>
         )}
+        <span className="min-w-0 truncate text-[11.5px] font-medium text-muted sm:text-[13.5px]">
+          {displayLabel}
+        </span>
       </div>
       <div className="tabular mt-0.5 sm:mt-1 font-display font-bold text-xl sm:text-[26px] lg:text-[28px] leading-tight tracking-[-0.5px] text-ink truncate">{value}</div>
       {meter !== undefined && <Meter raised value={meter} tone={tone === "amber" || tone === "rose" ? "warning" : "brand"} className="mt-1.5 sm:mt-2.5" />}

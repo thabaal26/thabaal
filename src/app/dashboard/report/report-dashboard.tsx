@@ -6,7 +6,7 @@ import Link from "@/components/intent-link";
 import { PageTools } from "@/components/shell-tools";
 import { LangButton, useLang } from "../portal-ui";
 import type { ComprehensiveReportData, PeriodFigures, PeriodKey } from "@/lib/reports-data";
-import { ScrollReveal, SectionReveal, StaggerGroup, StaggerItem } from "@/components/motion";
+import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 import "./reports.css";
 
 function R(n: number) {
@@ -266,8 +266,11 @@ export function ReportDashboard({ data }: { data: ComprehensiveReportData }) {
             {/* h-full: the animation wrapper stretches to the row; the tile must too, or tiles in a row differ in height. */}
             <div className="card stat h-full">
               <div className="l">
+                {/* The icon on a soft tile in front of the label, as on every other page's figures (design.css). */}
+                <span aria-hidden className="ico-tile" data-tone={(["gold", "green", "amber", "violet"] as const)[i]}>
+                  {x[3]}
+                </span>
                 <span>{x[0]}</span>
-                {x[3]}
               </div>
               <div className="v">{x[1]}</div>
               <div className="d muted">{x[2]}</div>

@@ -189,7 +189,7 @@ export function Seg({ options, value, onChange, label }: { options: { id: string
     <div className="seg" role="group" aria-label={label}>
       {options.map((o) =>
         o.href ? (
-          <Link key={o.id} href={o.href} scroll={false} aria-pressed={value === o.id} role="button" style={{ border: 0, padding: "6px 12px", borderRadius: 9, fontWeight: 600, fontSize: 13.5, textDecoration: "none", color: value === o.id ? "var(--bg)" : "var(--muted)", background: value === o.id ? "var(--ink)" : "none" }}>
+          <Link key={o.id} href={o.href} scroll={false} aria-pressed={value === o.id} role="button" style={{ border: 0, padding: "6px 12px", borderRadius: 9, fontWeight: 600, fontSize: 13.5, textDecoration: "none", color: value === o.id ? "#10283B" : "var(--muted)", background: value === o.id ? "var(--mango)" : "none" }}>
             <T ta={o.ta}>{o.label}</T>
           </Link>
         ) : (
