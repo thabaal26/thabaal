@@ -525,7 +525,7 @@ html.dark .thabaal-portal select option {
    green = positive / outside links, outlined = everything else, red = stop.
    =========================================================================== */
 
-.thabaal-portal:has(.acct) .wrapin { max-width: 1160px; }
+/* Width: the portal's page frame (--page-max, as on the other pages), so it grows with the screen and browser zoom. */
 .thabaal-portal:has(.acct) .top { margin-bottom: 22px; }
 
 /* Buttons */
