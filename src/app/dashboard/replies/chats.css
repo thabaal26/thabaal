@@ -28,7 +28,7 @@
 }
 .thabaal-portal .wa-app{
   --wa-bar:#FFF7E8; --wa-wall:#F3EADC; --wa-in:#fff; --wa-out:#FFEDBF; --wa-bad:#FCE2DC; --wa-meta:#667785;
-  --wa-read:#2E9BE6; --wa-sel:#FFEFC7; --wa-hover:#FFFAF0; --wa-time:#A26F00; --wa-doodle:rgba(16,40,59,.06);
+  --wa-read:#2E9BE6; --wa-sel:#FFEFC7; --wa-hover:#FFFAF0; --wa-time:#8A5A00; --wa-doodle:rgba(16,40,59,.06);
   position:relative;display:grid;grid-template-columns:clamp(280px,27%,440px) minmax(0,1fr);
   height:clamp(460px,calc(100dvh - 230px),1100px);background:var(--card);border:1.5px solid var(--line);border-radius:18px;
   overflow:hidden;box-shadow:var(--shadow)}

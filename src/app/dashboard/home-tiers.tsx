@@ -1,14 +1,17 @@
 import type { ReactNode } from "react";
-import { IndianRupee, MessageCircle, Plus, Repeat, ShoppingBag } from "@/components/icons";
+import { CheckCircle2, IndianRupee, MessageCircle, Plus, Repeat, ShoppingBag } from "@/components/icons";
 import { Stat } from "@/components/ui";
 import Link from "@/components/intent-link";
 import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
 import { AiBusinessCopilot } from "./ai-copilot";
 import { inr } from "./portal-format";
 import { Pill, PortalPage, Seg, Spark, T } from "./portal-ui";
+import "./home.css";
 
 /*
- * Home: a short, live summary of today. Every figure comes from the client's own orders, chats and
+ * Home, in the order an owner asks: what needs me now (the work waiting, most urgent first), how the business is
+ * doing (four figures for 7/30/90 days), what is coming up (campaigns, reorder reminders, WhatsApp spend), and what
+ * to do after that (the daily brief). A short, live summary of today. Every figure comes from the client's own orders, chats and
  * messages; when there is nothing, it says so (zero, "nothing scheduled"), never sample numbers.
  * The full analysis (customers, products, carts, message-to-sale) lives on Reports.
  */
@@ -82,6 +85,11 @@ function waitText(since: Date | null, ta = false) {
     : (ta ? `அதிகபட்ச காத்திருப்பு ${Math.round(h / 24)} நாட்கள்` : `Longest wait ${Math.round(h / 24)} days`);
 }
 
+/** The longest-waiting chat first wrote more than a day ago. */
+function waitedOverADay(since: Date | null) {
+  return Boolean(since && Date.now() - since.getTime() > 24 * 3_600_000);
+}
+
 /** "2 paid · 1 COD" from the real orders; "Paid or COD" when there's nothing to pack. */
 function packText(s: HomeTiersProps["toPackSplit"], ta = false) {
   if (!s) return ta ? "செலுத்தப்பட்டது அல்லது COD" : "Paid or COD";
@@ -97,16 +105,35 @@ function packText(s: HomeTiersProps["toPackSplit"], ta = false) {
   return parts.length ? parts.join(" · ") : "Paid or COD";
 }
 
-function TodoTile({ href, big, title, titleTa, sub, subTa, go, goTa }: { href: string; big: string; title: string; titleTa: string; sub: string; subTa?: string; go: string; goTa: string }) {
+type Todo = {
+  key: string;
+  /** How many need doing; 0 = nothing waiting (shown as a quiet "done" link instead of a tile). */
+  n: number;
+  /** Older than a day (chats): shown first and in the problem colour. */
+  urgent?: boolean;
+  href: string;
+  big: string;
+  title: string;
+  titleTa: string;
+  sub: string;
+  subTa?: string;
+  go: string;
+  goTa: string;
+  /** The words for a zero count, e.g. "No unpaid carts". */
+  none: string;
+  noneTa: string;
+};
+
+function TodoTile({ t, first }: { t: Todo; first: boolean }) {
   return (
-    <Link className="todo" href={href}>
-      <span className="big">{big}</span>
+    <Link className={`todo${first ? " first" : ""}${t.urgent ? " urgent" : ""}`} href={t.href} data-todo={t.key}>
+      <span className="big">{t.big}</span>
       <span>
-        <b><T ta={titleTa}>{title}</T></b>
+        <b><T ta={t.titleTa}>{t.title}</T></b>
         <br />
-        <span className="muted small"><T ta={subTa}>{sub}</T></span>
+        <span className="small sub"><T ta={t.subTa}>{t.sub}</T></span>
       </span>
-      <span className="go"><T ta={goTa}>{go}</T> ›</span>
+      <span className="go"><T ta={t.goTa}>{t.go}</T> ›</span>
     </Link>
   );
 }
@@ -122,60 +149,57 @@ const RANGES = [
 const campaignTone = { Scheduled: "info", Sending: "ok", "Template not approved": "warn" } as const;
 
 export function HomeTiers(p: HomeTiersProps) {
-  const todos = [
+  // Waiting longer than a day is the one thing that gets worse by itself (customers give up), so it goes first.
+  const chatsUrgent = waitedOverADay(p.oldestWaitingAt);
+  const todos = ([
     p.ordersOn && {
       key: "carts",
       n: p.unpaidCartsCount,
-      node: (
-        <TodoTile
-          key="carts"
-          href="/dashboard/orders?show=unpaid"
-          big={inr(p.unpaidCartsValue)}
-          title="Unpaid carts"
-          titleTa="செலுத்தப்படாத கார்ட்டுகள்"
-          sub={`${p.unpaidCartsCount} customer${p.unpaidCartsCount === 1 ? "" : "s"}`}
-          subTa={`${p.unpaidCartsCount} வாடிக்கையாளர்${p.unpaidCartsCount === 1 ? "" : "கள்"}`}
-          go="Chase"
-          goTa="நினைவூட்டு"
-        />
-      ),
+      href: "/dashboard/orders?show=unpaid",
+      big: inr(p.unpaidCartsValue),
+      title: "Unpaid carts",
+      titleTa: "செலுத்தப்படாத கார்ட்டுகள்",
+      sub: `${p.unpaidCartsCount} customer${p.unpaidCartsCount === 1 ? "" : "s"}`,
+      subTa: `${p.unpaidCartsCount} வாடிக்கையாளர்${p.unpaidCartsCount === 1 ? "" : "கள்"}`,
+      go: "Chase",
+      goTa: "நினைவூட்டு",
+      none: "No unpaid carts",
+      noneTa: "செலுத்தப்படாத கார்ட் இல்லை",
     },
     p.ordersOn && {
       key: "pack",
       n: p.toPackCount,
-      node: (
-        <TodoTile
-          key="pack"
-          href="/dashboard/orders?show=topack"
-          big={String(p.toPackCount)}
-          title="Orders to pack"
-          titleTa="பேக் செய்ய வேண்டியவை"
-          sub={packText(p.toPackSplit, false)}
-          subTa={packText(p.toPackSplit, true)}
-          go="Pack"
-          goTa="பேக்"
-        />
-      ),
+      href: "/dashboard/orders?show=topack",
+      big: String(p.toPackCount),
+      title: "Orders to pack",
+      titleTa: "பேக் செய்ய வேண்டியவை",
+      sub: packText(p.toPackSplit, false),
+      subTa: packText(p.toPackSplit, true),
+      go: "Pack",
+      goTa: "பேக்",
+      none: "Nothing to pack",
+      noneTa: "பேக் செய்ய எதுவும் இல்லை",
     },
     p.repliesOn && {
       key: "chats",
       n: p.unhandledRepliesCount,
-      node: (
-        <TodoTile
-          key="chats"
-          href="/dashboard/replies?show=open"
-          big={String(p.unhandledRepliesCount)}
-          title="Chats waiting"
-          titleTa="காத்திருக்கும் உரையாடல்கள்"
-          sub={waitText(p.oldestWaitingAt, false)}
-          subTa={waitText(p.oldestWaitingAt, true)}
-          go="Reply"
-          goTa="பதில்"
-        />
-      ),
+      urgent: chatsUrgent,
+      href: "/dashboard/replies?show=open",
+      big: String(p.unhandledRepliesCount),
+      title: "Chats waiting",
+      titleTa: "காத்திருக்கும் உரையாடல்கள்",
+      sub: waitText(p.oldestWaitingAt, false),
+      subTa: waitText(p.oldestWaitingAt, true),
+      go: "Reply",
+      goTa: "பதில்",
+      none: "No chats waiting",
+      noneTa: "காத்திருக்கும் உரையாடல் இல்லை",
     },
-  ].filter((t): t is { key: string; n: number; node: React.JSX.Element } => Boolean(t));
-  const needing = todos.filter((t) => t.n > 0).length;
+  ] as (Todo | false)[]).filter((t): t is Todo => Boolean(t));
+  // The heading counts the kinds of work waiting ("2 of 3"); kinds with nothing waiting become a quiet ✓ link below.
+  const waiting = todos.filter((t) => t.n > 0).sort((a, b) => Number(Boolean(b.urgent)) - Number(Boolean(a.urgent)));
+  const quiet = todos.filter((t) => t.n === 0);
+  const needing = waiting.length;
   const rangeWord = RANGES.find((r) => r.id === p.activeRange)?.label ?? "7 days";
   const rangeWordTa = RANGES.find((r) => r.id === p.activeRange)?.ta ?? "7 நாட்கள்";
   const activeRange = RANGES.some((r) => r.id === p.activeRange) ? p.activeRange : "7d";
@@ -184,8 +208,20 @@ export function HomeTiers(p: HomeTiersProps) {
     <PortalPage
       title={p.businessName ? `${p.greetingText}, ${p.businessName}` : p.greetingText}
       titleTa={`${GREETING_TA[p.greetingText] ?? "வணக்கம்"}${p.businessName ? `, ${p.businessName}` : ""}`}
-      sub={p.ordersOn ? "Orders, payments and chats that need you today." : "Chats and campaigns that need you today."}
-      subTa={p.ordersOn ? "இன்று உங்கள் கவனம் தேவைப்படும் ஆர்டர்கள், பணம் மற்றும் உரையாடல்கள்." : "இன்று உங்கள் கவனம் தேவைப்படும் உரையாடல்கள் மற்றும் பிரச்சாரங்கள்."}
+      sub={
+        p.today
+          ? `Today so far: ${p.today.sent.toLocaleString("en-IN")} message${p.today.sent === 1 ? "" : "s"} sent · ${p.today.replies.toLocaleString("en-IN")} repl${p.today.replies === 1 ? "y" : "ies"} from customers.`
+          : p.ordersOn
+          ? "Orders, payments and chats that need you today."
+          : "Chats and campaigns that need you today."
+      }
+      subTa={
+        p.today
+          ? `இன்று இதுவரை: ${p.today.sent.toLocaleString("en-IN")} செய்திகள் அனுப்பப்பட்டன · வாடிக்கையாளர்களிடமிருந்து ${p.today.replies.toLocaleString("en-IN")} பதில்கள்.`
+          : p.ordersOn
+          ? "இன்று உங்கள் கவனம் தேவைப்படும் ஆர்டர்கள், பணம் மற்றும் உரையாடல்கள்."
+          : "இன்று உங்கள் கவனம் தேவைப்படும் உரையாடல்கள் மற்றும் பிரச்சாரங்கள்."
+      }
       actions={
         <>
           {p.actions}
@@ -202,39 +238,55 @@ export function HomeTiers(p: HomeTiersProps) {
         {p.alerts && <div className="stack">{p.alerts}</div>}
 
         {todos.length > 0 && (
-          <ScrollReveal as="section" className="card" duration={500}>
+          <ScrollReveal as="section" className="card home-now" duration={500} aria-labelledby="home-now">
             <div className="hd">
               <div>
-                <h2>
+                <h2 id="home-now">
                   {needing === 0 ? (
                     <T ta="இப்போது உடனடி கவனம் எதுவும் தேவையில்லை">Nothing needs you right now</T>
+                  ) : todos.length === 1 ? (
+                    <T ta="இது உங்கள் கவனம் தேவை">This needs you now</T>
                   ) : (
-                    <T ta={`இன்று உங்களுக்கு ${needing} பணிகள் உள்ளன`}>{`${needing} thing${needing === 1 ? "" : "s"} need${needing === 1 ? "s" : ""} you today`}</T>
+                    <T ta={`${todos.length}-ல் ${needing} உங்கள் கவனம் தேவை`}>{`${needing} of ${todos.length} need you now`}</T>
                   )}
                 </h2>
                 <p>
                   {needing === 0 ? (
                     p.ordersOn ? <T ta="அனைத்தும் முடிந்தது. புதிய ஆர்டர்களும் உரையாடல்களும் இங்கு காட்டப்படும்.">All caught up. New orders and chats will show here.</T> : <T ta="அனைத்தும் முடிந்தது. புதிய உரையாடல்கள் இங்கு காட்டப்படும்.">All caught up. New chats will show here.</T>
                   ) : (
-                    <T ta="இங்கிருந்து தொடங்குங்கள். மற்றவை காத்திருக்கலாம்.">Start here. Everything else can wait.</T>
+                    <T ta="முதலாவதிலிருந்து தொடங்குங்கள். மற்றவை காத்திருக்கலாம்.">Start with the first one. Everything else can wait.</T>
                   )}
                 </p>
               </div>
             </div>
-            <StaggerGroup className={`grid ${todos.length === 3 ? "g3" : todos.length === 2 ? "g2" : "gx"}`}>
-              {todos.map((t, i) => (
-                <StaggerItem key={t.key} index={i} className="h-full">
-                  {t.node}
-                </StaggerItem>
-              ))}
-            </StaggerGroup>
+            {waiting.length > 0 && (
+              <StaggerGroup className="home-todos" style={{ "--n": waiting.length } as React.CSSProperties}>
+                {waiting.map((t, i) => (
+                  <StaggerItem key={t.key} index={i} className="h-full">
+                    <TodoTile t={t} first={i === 0} />
+                  </StaggerItem>
+                ))}
+              </StaggerGroup>
+            )}
+            {quiet.length > 0 && (
+              <ul className="home-quiet" aria-label="Nothing waiting">
+                {quiet.map((t) => (
+                  <li key={t.key}>
+                    <Link href={t.href} data-todo={t.key}>
+                      <CheckCircle2 aria-hidden className="ic" />
+                      <T ta={t.noneTa}>{t.none}</T>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </ScrollReveal>
         )}
 
-        <section>
+        <section aria-labelledby="home-kpis">
           <ScrollReveal duration={450}>
             <div className="hd">
-              <h2><T ta="வணிகம் எப்படி போகிறது">How the business is doing</T></h2>
+              <h2 id="home-kpis"><T ta="வணிகம் எப்படி போகிறது">How the business is doing</T></h2>
               <Seg label="Period" value={activeRange} options={RANGES.map((r) => ({ ...r, href: r.id === "7d" ? "/dashboard" : `/dashboard?range=${r.id}` }))} />
             </div>
           </ScrollReveal>
@@ -288,69 +340,64 @@ export function HomeTiers(p: HomeTiersProps) {
           </p>
         </section>
 
-        <div className="grid g2">
-          {p.wallet && (
-            <ScrollReveal duration={500} className="h-full">
-              {p.wallet}
-            </ScrollReveal>
-          )}
-          {p.campaignsOn && (
-            <ScrollReveal as="section" className="card h-full" duration={500} delay={80}>
-              <div className="hd">
-                <h2><T ta="அடுத்த பிரச்சாரம்">Next campaign</T></h2>
-                <Link className="btn sm" href="/dashboard/campaigns"><T ta="அனைத்து பிரச்சாரங்கள்">All campaigns</T></Link>
-              </div>
-              <div className="list">
-                {p.campaigns.length === 0 && (
-                  <div className="row">
-                    <div className="grow muted">Nothing scheduled.</div>
+        {(p.campaignsOn || p.wallet) && (
+          <div className="grid g2 home-next">
+            {p.campaignsOn && (
+              <ScrollReveal as="section" className="card h-full" duration={500} aria-labelledby="home-next">
+                <div className="hd">
+                  <div>
+                    <h2 id="home-next"><T ta="அடுத்து வருபவை">Coming up</T></h2>
+                    <p><T ta="திட்டமிட்ட பிரச்சாரங்களும் மறு ஆர்டர் நினைவூட்டல்களும்">Scheduled campaigns and reorder reminders</T></p>
                   </div>
-                )}
-                {p.campaigns.map((c) => (
-                  <div key={c.id} className="row">
-                    <div className="grow">
-                      <Link href={`/dashboard/campaigns/${c.id}`} className="t" style={{ textDecoration: "none" }}>
-                        {c.name}
-                      </Link>
-                      <div className="muted small">{c.when}</div>
+                  <Link className="btn sm" href="/dashboard/campaigns"><T ta="அனைத்து பிரச்சாரங்கள்">All campaigns</T></Link>
+                </div>
+                <div className="list">
+                  {p.campaigns.length === 0 && (
+                    <div className="row">
+                      <div className="grow muted"><T ta="எதுவும் திட்டமிடப்படவில்லை.">Nothing scheduled.</T></div>
                     </div>
-                    <Pill tone={campaignTone[c.status]}>{c.status}</Pill>
-                  </div>
-                ))}
-                {p.reminderDays !== undefined && (
-                  <div className="row">
-                    <div className="grow">
-                      <div className="t"><T ta="மறு ஆர்டர் நினைவூட்டல்">Reorder reminder</T></div>
-                      <div className="muted small">
-                        {p.reminderDays ? `${p.reminderDays} days after an order · Automatic` : "No reminders going out"}
-                        {p.refillsDueCount > 0 ? ` · ${p.refillsDueCount} due this week` : ""}
+                  )}
+                  {p.campaigns.map((c) => (
+                    <div key={c.id} className="row" data-campaign-row>
+                      <div className="grow">
+                        <Link href={`/dashboard/campaigns/${c.id}`} className="t" style={{ textDecoration: "none" }}>
+                          {c.name}
+                        </Link>
+                        <div className="muted small">{c.when}</div>
                       </div>
+                      <Pill tone={campaignTone[c.status]}>{c.status}</Pill>
                     </div>
-                    <Pill tone={p.reminderDays ? "ok" : "mute"}>{p.reminderDays ? "On" : "Off"}</Pill>
-                  </div>
-                )}
-                {p.today && (
-                  <div className="row">
-                    <div className="grow">
-                      <div className="t"><T ta="இன்று இதுவரை">Today so far</T></div>
-                      <div className="muted small">
-                        {p.today.sent.toLocaleString("en-IN")} message{p.today.sent === 1 ? "" : "s"} sent · {p.today.replies.toLocaleString("en-IN")} repl{p.today.replies === 1 ? "y" : "ies"}
+                  ))}
+                  {p.reminderDays !== undefined && (
+                    <div className="row">
+                      <div className="grow">
+                        <div className="t"><T ta="மறு ஆர்டர் நினைவூட்டல்">Reorder reminder</T></div>
+                        <div className="muted small">
+                          {p.reminderDays ? `${p.reminderDays} days after an order · Automatic` : "No reminders going out"}
+                          {p.refillsDueCount > 0 ? ` · ${p.refillsDueCount} due this week` : ""}
+                        </div>
                       </div>
+                      <Pill tone={p.reminderDays ? "ok" : "mute"}>{p.reminderDays ? "On" : "Off"}</Pill>
                     </div>
-                  </div>
-                )}
-              </div>
-              <div className="tools" style={{ marginTop: 12 }}>
-                <Link className="btn primary sm" href="/dashboard/campaigns/new">+ <T ta="பிரச்சாரம் உருவாக்கு">Create campaign</T></Link>
-                {p.reminderDays !== undefined && (
-                  <Link className="btn sm" href="/dashboard/campaigns?show=auto">
-                    Reorder settings
-                  </Link>
-                )}
-              </div>
-            </ScrollReveal>
-          )}
-        </div>
+                  )}
+                </div>
+                <div className="tools" style={{ marginTop: 12 }}>
+                  <Link className="btn sm" href="/dashboard/campaigns/new">+ <T ta="பிரச்சாரம் உருவாக்கு">Create campaign</T></Link>
+                  {p.reminderDays !== undefined && (
+                    <Link className="btn sm ghost" href="/dashboard/campaigns?show=auto">
+                      <T ta="மறு ஆர்டர் அமைப்புகள்">Reorder settings</T>
+                    </Link>
+                  )}
+                </div>
+              </ScrollReveal>
+            )}
+            {p.wallet && (
+              <ScrollReveal duration={500} delay={80} className="h-full">
+                {p.wallet}
+              </ScrollReveal>
+            )}
+          </div>
+        )}
 
         <ScrollReveal duration={500} delay={100}>
           <AiBusinessCopilot initialBrief={p.brief} initialActions={p.briefActions} />
