@@ -40,6 +40,8 @@ export type CustomerRow = {
   products: string[];
   tags: string[];
   badPhone: boolean;
+  /** The same person's other numbers (lib/linked-numbers.ts), so a search by any of them finds every row. */
+  others: string[];
 };
 
 export const TIER_TONE: Record<Tier, "ok" | "warn" | "mute" | "info"> = { Platinum: "ok", Gold: "warn", Silver: "mute", New: "info", "No orders": "mute" };
@@ -69,9 +71,10 @@ export async function customersData(clientId: string, opts: { clientName?: strin
       cart: number | null;
       redeemed: bigint | null;
       replies: bigint;
+      personId: string | null;
     }[]
   >`
-    SELECT c.id, c.name, c.phone, c.location, c.region, c."optedOut", c.unreachable, c.tags, c.purchases,
+    SELECT c.id, c.name, c.phone, c.location, c.region, c."optedOut", c.unreachable, c.tags, c.purchases, c."personId",
       count(o.id) FILTER (WHERE ${saleSql("o")}) AS orders,
       sum(o.total) FILTER (WHERE ${saleSql("o")}) AS spend,
       max(o."createdAt") FILTER (WHERE ${saleSql("o")}) AS last_at,
@@ -95,6 +98,8 @@ export async function customersData(clientId: string, opts: { clientName?: strin
   const goldCut = cut(0.3);
   const plain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
   const clientTag = opts.clientName ? plain(opts.clientName) : "";
+  const numbersOf = new Map<string, string[]>();
+  for (const r of rows) if (r.personId) numbersOf.set(r.personId, [...(numbersOf.get(r.personId) ?? []), r.phone]);
 
   const customers: CustomerRow[] = rows.map((r) => {
     const orders = Number(r.orders);
@@ -137,6 +142,7 @@ export async function customersData(clientId: string, opts: { clientName?: strin
       products: r.tags.filter((t) => t.startsWith("product:")).map((t) => t.slice(8)),
       tags: r.tags.filter((t) => !t.startsWith("product:") && !isInternalLoyaltyTag(t) && plain(t) !== clientTag),
       badPhone: digits.length < 10,
+      others: r.personId ? (numbersOf.get(r.personId) ?? []).filter((p) => p !== r.phone) : [],
     };
   });
 

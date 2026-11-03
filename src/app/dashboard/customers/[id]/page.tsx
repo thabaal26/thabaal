@@ -1,4 +1,4 @@
-import { ArrowUpRight, Clock, IndianRupee, MapPin, MessageCircle, ShoppingBag } from "@/components/icons";
+import { ArrowUpRight, Clock, IndianRupee, MapPin, MessageCircle, ShoppingBag, Smartphone } from "@/components/icons";
 import { StaggerGroup, StaggerItem } from "@/components/motion";
 import type { Metadata } from "next";
 import Link from "@/components/intent-link";
@@ -16,6 +16,7 @@ import { itemsText, money, type OrderItem } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { replyWindowEnd } from "@/lib/replies";
 import { marketingPaused } from "@/lib/held";
+import { otherNumbers } from "@/lib/linked-numbers";
 import { homeCityOf, regionsFor } from "@/lib/regions";
 import { readFields, readValues, showValue } from "@/lib/custom-fields";
 import { getScope, owned } from "@/lib/session";
@@ -54,12 +55,13 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
   });
   if (!c) notFound();
 
-  const [templates, numbers, paused] = await Promise.all([
+  const [templates, numbers, paused, others] = await Promise.all([
     sendableTemplates(c.clientId).then((sendable) =>
       db.template.findMany({ where: { clientId: c.clientId, status: "APPROVED", name: { notIn: META_SAMPLES }, ...sendable }, orderBy: { name: "asc" } }),
     ),
     db.whatsAppNumber.findMany({ where: { clientId: c.clientId }, orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }], select: { id: true, label: true, businessAccountId: true } }),
     marketingPaused([c.id]),
+    otherNumbers(c.clientId, c),
   ]);
   const pausedUntil = paused.get(c.id);
   // WhatsApp allows typed messages for 24 hours after the customer last wrote to us.
@@ -268,6 +270,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                     region: c.region ?? regionsFor(homeCityOf(c.client))[0],
                     purchases: c.purchases ?? "",
                     extra: readValues(c.extra),
+                    otherPhones: others.map((o) => formatPhone(o.phone)).join(", "),
                   }}
                   regions={regionsFor(homeCityOf(c.client))}
                   fields={readFields(c.client.customFields, "customer")}
@@ -361,6 +364,28 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
                     {c.region}
                     {c.locationRaw && c.locationRaw !== c.location ? <T ta={` · "${c.locationRaw}" என எழுதப்பட்டது`}>{` · written as "${c.locationRaw}"`}</T> : ""}
                   </p>
+                </div>
+              </div>
+            )}
+            {others.length > 0 && (
+              <div className="flex items-start gap-2 text-sm" data-testid="other-numbers">
+                <Smartphone aria-hidden className="mt-0.5 size-4 shrink-0 text-brand-deep" />
+                <div className="min-w-0">
+                  <p className="font-medium text-ink-2"><T ta="இவருடைய மற்ற WhatsApp எண்கள்">Their other WhatsApp numbers</T></p>
+                  <ul className="list-none p-0">
+                    {others.map((o) => (
+                      <li key={o.id}>
+                        <Link href={`/dashboard/customers/${o.id}`} className="tabular inline-flex min-h-10 items-center hover:underline sm:min-h-0">
+                          {formatPhone(o.phone)}
+                        </Link>
+                        <span className="text-xs text-muted">
+                          {o.name !== c.name ? ` · ${o.name}` : ""}
+                          {o.optedOut ? <T ta=" · விலகியவர்"> · opted out</T> : o.unreachable ? <T ta=" · செய்தி செல்லவில்லை"> · can&apos;t receive</T> : null}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-xs text-muted"><T ta="பிரச்சாரங்கள் ஒவ்வொரு எண்ணுக்கும் போகும்.">Campaigns go to each number.</T></p>
                 </div>
               </div>
             )}

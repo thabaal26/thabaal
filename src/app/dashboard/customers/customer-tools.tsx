@@ -13,6 +13,7 @@ import { cn } from "@/lib/cn";
 import { CustomFieldInputs } from "@/components/custom-field-inputs";
 import { useLanguage } from "@/lib/i18n/context";
 import type { CustomField } from "@/lib/custom-fields";
+import { readPhones } from "@/lib/phone";
 import { deleteCustomer, deletePendingCustomer, importCustomers, promotePendingCustomer, saveCustomer } from "../actions/customers";
 
 /** Deletes a customer from their profile after a confirmation, then goes back to the customer list. */
@@ -171,6 +172,8 @@ export type EditableCustomer = {
   purchases: string;
   /** Custom field values by key. */
   extra?: Record<string, string>;
+  /** The same person's other WhatsApp numbers, comma separated. */
+  otherPhones?: string;
 };
 
 function CustomerForm({
@@ -198,6 +201,7 @@ function CustomerForm({
     purchases: initial?.purchases ?? "",
     optInSource: CONSENT[0],
     extra: initial?.extra ?? {},
+    otherPhones: initial?.otherPhones ?? "",
   });
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -221,6 +225,9 @@ function CustomerForm({
       </Field>
       <Field id="p" label="WhatsApp number" hint="10-digit numbers get +91" required>
         <input type="tel" inputMode="tel" autoComplete="tel" className="field" placeholder="+91 98765 43210" value={v.phone} onChange={(e) => setV({ ...v, phone: e.target.value })} />
+      </Field>
+      <Field id="p-more" label="Other numbers" hint="same person, optional" help="Each number is saved and gets your campaigns. Separate numbers with a comma.">
+        <input type="tel" inputMode="tel" className="field" placeholder="e.g. 90805 53061, 98765 43210" value={v.otherPhones} onChange={(e) => setV({ ...v, otherPhones: e.target.value })} />
       </Field>
       {/* Side-by-side fields keep their boxes on one line: short labels, hints in the placeholder, bottoms aligned. */}
       <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2">
@@ -314,6 +321,7 @@ export function PendingCustomersBanner({ rows }: { rows: PendingCustomerRow[] })
         <div className="space-y-3">
           <p className="text-xs text-muted">
             Enter a 10-digit mobile number for any customer below to move them into your WhatsApp directory, or dismiss entries that can&apos;t be recovered.
+            Two numbers for one person? Keep both, separated by a comma: both are saved and your campaigns go to each.
           </p>
           <ul className="space-y-3">
             {rows.map((r) => (
@@ -328,7 +336,10 @@ export function PendingCustomersBanner({ rows }: { rows: PendingCustomerRow[] })
 
 function PendingRowItem({ row }: { row: PendingCustomerRow }) {
   const router = useRouter();
-  const firstTenDigits = row.rawPhone?.match(/\d{10}/)?.[0] ?? row.rawPhone?.replace(/[^\d+]/g, "") ?? "";
+  // Every number on the sheet ("98653 10945 / 90805 53061" → "9865310945, 9080553061"): all are saved for this person.
+  const local = (p: string) => (p.length === 12 && p.startsWith("91") ? p.slice(2) : p);
+  const found = readPhones(row.rawPhone).phones;
+  const firstTenDigits = found.length ? found.map(local).join(", ") : (row.rawPhone?.replace(/[^\d+]/g, "") ?? "");
   const [name, setName] = useState(!row.name || row.name === "(name unclear)" ? "" : row.name);
   const [phone, setPhone] = useState(firstTenDigits);
   const [location, setLocation] = useState(row.location ?? "");
@@ -340,6 +351,7 @@ function PendingRowItem({ row }: { row: PendingCustomerRow }) {
         <span className="font-semibold text-ink">{row.name || "(name unclear)"}</span>
         <div className="flex flex-wrap gap-1">
           {row.rawPhone && <Badge tone="amber">Raw: {row.rawPhone}</Badge>}
+          {found.length > 1 && <Badge tone="blue">{found.length} numbers</Badge>}
           {row.page && <Badge tone="gray">Page {row.page}</Badge>}
         </div>
       </div>
@@ -359,10 +371,10 @@ function PendingRowItem({ row }: { row: PendingCustomerRow }) {
           onChange={(e) => setName(e.target.value)}
         />
         <input
-          className="field font-mono py-1.5 text-xs"
+          className={cn("field font-mono py-1.5 text-xs", found.length > 1 && "sm:order-last sm:col-span-3")}
           type="tel"
           inputMode="tel"
-          placeholder="10-digit phone"
+          placeholder="10-digit phone(s)"
           aria-label="WhatsApp phone number"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}

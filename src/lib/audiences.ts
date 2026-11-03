@@ -6,6 +6,7 @@ import { catalogFor, customersWithProducts } from "./product-scope";
 import { normKey } from "./catalog-match";
 import { INACTIVE_TAG } from "./schedule";
 import { SKIP_CODES, SKIP_DAYS } from "./held";
+import { withSamePerson } from "./linked-numbers";
 
 // Saved audiences: a named filter over a client's customers that campaigns can send to.
 // Campaigns store it as audienceTag "aud:<id>"; tags work too (see src/lib/audience-tags.ts).
@@ -93,14 +94,15 @@ export type CampaignPeople = { includeIds?: readonly string[]; excludeIds?: read
 
 /**
  * The customer filter for a campaign: its audienceTag (a saved audience, one or more tags, or everyone), plus the
- * people added by hand, minus the people left out. Opted-out and unreachable customers are never in it; Inactive
+ * people added by hand, minus the people left out (each with all their numbers). Opted-out and unreachable customers are never in it; Inactive
  * ones (INACTIVE_TAG) only when the campaign picks that tag or adds them by hand.
  */
 export async function campaignAudienceWhere(clientId: string, audienceTag: string | null, people: CampaignPeople = {}): Promise<Prisma.CustomerWhereInput> {
   const picked = await sendToWhere(clientId, audienceTag);
   const send = decodeTags(audienceTag)?.tags.includes(INACTIVE_TAG) ? picked : { AND: [picked, { NOT: { tags: { has: INACTIVE_TAG } } }] };
-  const include = [...(people.includeIds ?? [])];
-  const exclude = [...(people.excludeIds ?? [])];
+  // A person with several numbers is added or left out as a whole (lib/linked-numbers.ts).
+  const include = await withSamePerson(clientId, people.includeIds ?? []);
+  const exclude = await withSamePerson(clientId, people.excludeIds ?? []);
   if (!include.length && !exclude.length) return send;
   return {
     AND: [

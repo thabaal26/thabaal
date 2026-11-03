@@ -243,6 +243,9 @@ model Customer {
   /// Every delivery address they have used, newest first, up to 5 (lib/address-book.ts): picked from a dropdown on
   /// orders, and offered on WhatsApp ("which address?") when there are two or more.
   addresses        Json?
+  /// One person with several WhatsApp numbers (lib/linked-numbers.ts): every number is its own row, and rows with
+  /// the same personId are the same person. Campaigns reach each number; null = a single number.
+  personId         String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   messages         Message[]
@@ -253,6 +256,7 @@ model Customer {
 
   @@unique([clientId, phone])
   @@index([phone])
+  @@index([clientId, personId])
   @@index([clientId, region])
   @@index([clientId, optedOut, unreachable])
 }
