@@ -331,7 +331,7 @@ export default async function NotificationsPage({
         }
       />
 
-      <StaggerGroup aria-label="Activity summary" className="mb-4 grid grid-cols-2 gap-2.5 sm:mb-5 sm:gap-3.5 lg:grid-cols-4">
+      <StaggerGroup aria-label="Activity summary" className="mb-4 grid grid-cols-2 gap-2.5 sm:mb-5 sm:gap-3.5 min-[1200px]:grid-cols-4">
         <StaggerItem>
           <Stat
             label="Unread items"
