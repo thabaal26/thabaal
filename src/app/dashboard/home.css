@@ -1,0 +1,30 @@
+/* Home (home-tiers.tsx): the work waiting, the quiet ✓ links, and the "Coming up" row. Class names start with home- or
+   modify .todo, so nothing here can reach another page (route CSS stays loaded after moving between pages). */
+
+/* Work waiting: one tile per kind, as many columns as there are kinds (--n), one column on phones. */
+.thabaal-portal .home-todos{display:grid;gap:12px;grid-template-columns:repeat(var(--n,3),minmax(0,1fr))}
+@media (max-width:639px){.thabaal-portal .home-todos{grid-template-columns:minmax(0,1fr)}}
+.thabaal-portal .home-now .todo{height:100%;transition:border-color .15s,box-shadow .15s}
+.thabaal-portal .home-now .todo .sub{color:var(--muted)}
+/* The action reads as a button: a pill, filled in the brand's mango on the tile to start with. */
+.thabaal-portal .home-now .todo .go{min-height:36px;padding:6px 14px;border:1.5px solid var(--line);border-radius:999px;background:var(--card);color:var(--fg);font-size:14px}
+.thabaal-portal .home-now .todo:hover .go{border-color:var(--fg)}
+.thabaal-portal .home-now .todo.first{border-color:var(--mango);box-shadow:0 0 0 1px var(--mango)}
+.thabaal-portal .home-now .todo.first .go{background:var(--mango);border-color:var(--mango);color:#10283B}
+/* Waiting longer than a day: the wait in the problem colour (red is for problems, as the guide says). */
+.thabaal-portal .home-now .todo.urgent .sub{color:var(--bad);font-weight:600}
+
+/* Kinds with nothing waiting: small ✓ links, so the card shows what is done without taking a tile each. */
+.thabaal-portal .home-quiet{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:12px 0 0;padding:0}
+.thabaal-portal .home-todos+.home-quiet{margin-top:14px}
+.thabaal-portal .home-quiet a{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:6px 12px;border-radius:999px;background:var(--ok-bg);color:var(--ok);font-weight:600;font-size:13.5px;text-decoration:none}
+.thabaal-portal .home-quiet a:hover{text-decoration:underline}
+.thabaal-portal .home-quiet .ic{width:16px;height:16px}
+
+/* Coming up (campaigns, reorders) a little wider than WhatsApp spend; one column below 901px. */
+.thabaal-portal .grid.home-next{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);align-items:stretch}
+@media (max-width:900px){.thabaal-portal .grid.home-next{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:639px){.thabaal-portal .home-quiet a{min-height:40px}}
+
+/* The four figures: a long label (Tamil) wraps onto a second line instead of ending in "…". */
+.thabaal-portal section[aria-labelledby="home-kpis"] .truncate{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:break-word}
