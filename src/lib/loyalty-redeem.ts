@@ -4,6 +4,7 @@
 // money. A cancelled order no longer counts, so its points go back to the customer.
 import { db } from "./db";
 import { LOYALTY_RULE_FIELDS, loyaltyFromOrders, loyaltyRules, type LoyaltyRules } from "./loyalty";
+import { asPerson, LOYALTY_ORDER_SELECT } from "./linked-numbers";
 import { getOrderPricing, pointsDiscount } from "./order-pricing";
 
 /** Discounts go in ₹25 steps (50 points). */
@@ -14,8 +15,9 @@ const rupees = (n: number) => `₹${Number.isInteger(n) ? n : n.toFixed(2)}`;
 
 type PricedLine = { price: number; quantity: number };
 
+/** The order with its customer's loyalty over all their numbers (a person's points are one balance). */
 async function loadOrder(orderId: string) {
-  return db.order.findUnique({
+  const order = await db.order.findUnique({
     where: { id: orderId },
     select: {
       id: true,
@@ -28,16 +30,10 @@ async function loadOrder(orderId: string) {
       pointsRedeemed: true,
       paymentRequestedAt: true,
       client: { select: LOYALTY_RULE_FIELDS },
-      customer: {
-        select: {
-          name: true,
-          tags: true,
-          purchases: true,
-          orders: { select: { id: true, total: true, status: true, paidAt: true, paymentMethod: true, internalNote: true, pointsRedeemed: true } },
-        },
-      },
+      customer: { select: { id: true, personId: true, name: true, tags: true, purchases: true, orders: { select: LOYALTY_ORDER_SELECT } } },
     },
   });
+  return order && { ...order, customer: await asPerson(order.customer) };
 }
 
 /**

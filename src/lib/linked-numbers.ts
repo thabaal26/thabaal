@@ -3,6 +3,7 @@
 // the customer page lists the other numbers, adding or leaving out one number in a campaign does the same to all of
 // them, and campaigns send to every number (each number gets the offer; each one's own state still applies).
 import { db } from "./db";
+import { isInternalLoyaltyTag } from "./loyalty";
 
 /** These customers and every other number of the same people (for adding or leaving out a person in a campaign). */
 export async function withSamePerson(clientId: string, ids: readonly string[]): Promise<string[]> {
@@ -41,7 +42,7 @@ export async function otherNumbers(clientId: string, c: { id: string; personId: 
   if (!c.personId) return [];
   return db.customer.findMany({
     where: { clientId, personId: c.personId, id: { not: c.id } },
-    select: { id: true, name: true, phone: true, optedOut: true, unreachable: true },
+    select: { id: true, name: true, phone: true, optedOut: true, unreachable: true, purchases: true, tags: true },
     orderBy: { createdAt: "asc" },
   });
 }
@@ -98,4 +99,50 @@ export function numbersNote(r: { added: string[]; joined: { name: string; phone:
     r.removed.length && `unlinked ${r.removed.map(show).join(", ")} (kept as separate customers)`,
   ].filter(Boolean);
   return parts.length ? ` Other numbers: ${parts.join("; ")}.` : "";
+}
+
+/* ---------- One person's totals: orders, sheet purchases and points on every number ---------- */
+
+/** The order fields loyalty needs (lib/loyalty.ts loyaltyFromOrders). */
+export const LOYALTY_ORDER_SELECT = { id: true, total: true, status: true, paidAt: true, paymentMethod: true, internalNote: true, pointsRedeemed: true } as const;
+
+/** What was written on the order sheets for each number, once: a linked number copies it, so the same text counts once. */
+export function mergePurchases(list: readonly (string | null | undefined)[]) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const p of list) {
+    const key = p?.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(p!.trim());
+  }
+  return out.length ? out.join(", ") : null;
+}
+
+type LoyaltyInput = { id: string; personId: string | null; purchases?: string | null; tags?: string[] | null; orders: { id?: string }[] };
+
+/**
+ * These customers' loyalty inputs for the whole person (one query for all): orders of every number, their sheet
+ * purchases once, and points given or used by hand on any number (loyalty-bonus tags). The rest of each row,
+ * its own tags included, stays as it is. Rows without other numbers come back unchanged.
+ */
+export async function asPeople<T extends LoyaltyInput>(rows: T[]): Promise<T[]> {
+  const people = [...new Set(rows.map((r) => r.personId).filter((p): p is string => Boolean(p)))];
+  if (!people.length) return rows;
+  const all = await db.customer.findMany({ where: { personId: { in: people } }, select: { id: true, personId: true, purchases: true, tags: true, orders: { select: LOYALTY_ORDER_SELECT } } });
+  return rows.map((r) => {
+    const others = all.filter((o) => o.personId === r.personId && o.id !== r.id);
+    if (!r.personId || !others.length) return r;
+    return {
+      ...r,
+      purchases: mergePurchases([r.purchases, ...others.map((o) => o.purchases)]),
+      tags: [...(r.tags ?? []), ...others.flatMap((o) => o.tags.filter(isInternalLoyaltyTag))],
+      orders: [...r.orders, ...others.flatMap((o) => o.orders)] as T["orders"],
+    };
+  });
+}
+
+/** One customer's loyalty inputs for the whole person (see asPeople). */
+export async function asPerson<T extends LoyaltyInput>(row: T): Promise<T> {
+  return (await asPeople([row]))[0];
 }

@@ -170,6 +170,24 @@ await check("Import CSV", "A phone cell with two numbers saves both and links th
   return msg;
 });
 
+await check("Customer page", "Orders and spend add up over the person's numbers; the list shows the same on each", async () => {
+  const [d, e, f] = await Promise.all([D, E, F].map(byPhone));
+  for (const [c, total, i] of [[e, 400, 1], [f, 600, 2]])
+    await db.order.create({ data: { clientId: S.shopId, customerId: c.id, ref: `QM-${run}-${i}`, status: "DELIVERED", paidAt: new Date(), total, items: [{ id: "oil", name: "Gingelly oil", quantity: 1, price: total }] } });
+  await go(manager, `/dashboard/customers/${d.id}`);
+  const main = await manager.locator("main").innerText();
+  expect(/Orders\s+2\s/.test(main), "Orders stat is not 2");
+  expect(main.includes("₹1,000"), "spend ₹1,000 not shown");
+  expect(await manager.getByTestId("person-totals").isVisible(), "no 'all 3 of their numbers together' note");
+  await go(manager, "/dashboard/customers");
+  await manager.getByLabel("Search customers").fill(`QA Add Two ${run}`);
+  const rows = manager.locator("tbody tr").filter({ hasText: `QA Add Two ${run}` });
+  await rows.first().waitFor();
+  const texts = await rows.allInnerTexts();
+  expect(texts.length === 3 && texts.every((t) => t.includes("₹1,000")), `rows: ${texts.map((t) => t.replace(/\s+/g, " ").slice(0, 80)).join(" | ")}`);
+  return `${texts.length} rows, ₹1,000 each`;
+});
+
 await check("Phone", "390px: the customer page's other-numbers block fits without sideways scroll", async () => {
   const p = await as("manager", { width: 390, height: 844 });
   await go(p, `/dashboard/customers/${(await byPhone(D)).id}`);

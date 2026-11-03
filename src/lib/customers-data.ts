@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "./db";
 import { computeCustomerLoyalty, isInternalLoyaltyTag } from "./loyalty";
+import { mergePurchases } from "./linked-numbers";
 import { loyaltyRulesFor } from "./loyalty-rules";
 import { saleSql } from "@/lib/sale-sql";
 
@@ -91,8 +92,29 @@ export async function customersData(clientId: string, opts: { clientName?: strin
   `;
 
   const rules = await rulesP;
-  // Tier cut-offs: top 10% of spend (with 3+ orders) is Platinum, the next 20% Gold.
-  const spends = rows.map((r) => Number(r.spend ?? 0)).filter((s) => s > 0).sort((a, b) => b - a);
+  // One person, several numbers (lib/linked-numbers.ts): every row of the person shows the person's orders, spend,
+  // points, tier and buying status; the cart, chats and the number's own state stay per number.
+  const group = new Map<string, typeof rows>();
+  for (const r of rows) if (r.personId) group.set(r.personId, [...(group.get(r.personId) ?? []), r]);
+  const latest = (ds: (Date | null)[], pick: (a: Date, b: Date) => boolean) => ds.reduce<Date | null>((x, d) => (d && (!x || pick(d, x)) ? d : x), null);
+  const personTotals = (r: (typeof rows)[number]) => {
+    const g = r.personId ? (group.get(r.personId) ?? []) : [];
+    if (g.length < 2) return r;
+    return {
+      ...r,
+      orders: g.reduce((n, x) => n + x.orders, BigInt(0)),
+      spend: g.reduce((n, x) => n + Number(x.spend ?? 0), 0),
+      last_at: latest(g.map((x) => x.last_at), (a, b) => a > b),
+      first_at: latest(g.map((x) => x.first_at), (a, b) => a < b),
+      redeemed: g.reduce((n, x) => n + (x.redeemed ?? BigInt(0)), BigInt(0)),
+      purchases: mergePurchases(g.map((x) => x.purchases)),
+      tags: [...r.tags, ...g.filter((x) => x !== r).flatMap((x) => x.tags.filter(isInternalLoyaltyTag))],
+    };
+  };
+  const totals = new Map(rows.map((r) => [r.id, personTotals(r)]));
+  // Tier cut-offs: top 10% of spend (with 3+ orders) is Platinum, the next 20% Gold; each person counted once.
+  const perPerson = new Map(rows.map((r) => [r.personId ?? r.id, Number(totals.get(r.id)!.spend ?? 0)]));
+  const spends = [...perPerson.values()].filter((s) => s > 0).sort((a, b) => b - a);
   const cut = (share: number) => spends[Math.max(0, Math.ceil(spends.length * share) - 1)] ?? Infinity;
   const platinumCut = cut(0.1);
   const goldCut = cut(0.3);
@@ -101,7 +123,8 @@ export async function customersData(clientId: string, opts: { clientName?: strin
   const numbersOf = new Map<string, string[]>();
   for (const r of rows) if (r.personId) numbersOf.set(r.personId, [...(numbersOf.get(r.personId) ?? []), r.phone]);
 
-  const customers: CustomerRow[] = rows.map((r) => {
+  const customers: CustomerRow[] = rows.map((own) => {
+    const r = totals.get(own.id)!;
     const orders = Number(r.orders);
     const spend = Number(r.spend ?? 0);
     const lastDays = r.last_at ? Math.floor((now - r.last_at.getTime()) / DAY) : null;
@@ -132,15 +155,15 @@ export async function customersData(clientId: string, opts: { clientName?: strin
       spend,
       lastDays,
       gapDays,
-      cart: Number(r.cart ?? 0),
-      chatted: Number(r.replies) > 0,
+      cart: Number(own.cart ?? 0),
+      chatted: Number(own.replies) > 0,
       tier,
       status,
       points: loyalty.totalPoints,
       pointsWorth: loyalty.rewardRupees,
       redeemable: loyalty.redeemableRupees,
-      products: r.tags.filter((t) => t.startsWith("product:")).map((t) => t.slice(8)),
-      tags: r.tags.filter((t) => !t.startsWith("product:") && !isInternalLoyaltyTag(t) && plain(t) !== clientTag),
+      products: own.tags.filter((t) => t.startsWith("product:")).map((t) => t.slice(8)),
+      tags: own.tags.filter((t) => !t.startsWith("product:") && !isInternalLoyaltyTag(t) && plain(t) !== clientTag),
       badPhone: digits.length < 10,
       others: r.personId ? (numbersOf.get(r.personId) ?? []).filter((p) => p !== r.phone) : [],
     };

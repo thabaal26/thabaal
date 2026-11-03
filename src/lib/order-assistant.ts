@@ -33,6 +33,7 @@ import { db } from "./db";
 import { APP_TZ } from "./format";
 import { pushOrderToSheet } from "./google-sheets-live";
 import { loyaltyFromOrders, loyaltyRules, LOYALTY_RULE_FIELDS } from "./loyalty";
+import { asPerson, LOYALTY_ORDER_SELECT } from "./linked-numbers";
 import { customerWords, flowShips, readFlow } from "./order-flow";
 import { money, orderRef } from "./orders";
 import { REORDER_RE, handleCartChoice, offerReorder, placeReorder } from "./order-intake";
@@ -359,10 +360,10 @@ async function answerFeedback(customerId: string, orderId: string, good: boolean
   let pointsLine = "";
   const c = await db.customer.findUnique({
     where: { id: o.customerId },
-    select: { name: true, tags: true, purchases: true, client: { select: LOYALTY_RULE_FIELDS }, orders: { select: { id: true, total: true, status: true, paidAt: true, paymentMethod: true, internalNote: true, pointsRedeemed: true } } },
+    select: { id: true, personId: true, name: true, tags: true, purchases: true, client: { select: LOYALTY_RULE_FIELDS }, orders: { select: LOYALTY_ORDER_SELECT } },
   });
   if (c) {
-    const l = loyaltyFromOrders(c, { rules: loyaltyRules(c.client) });
+    const l = loyaltyFromOrders(await asPerson(c), { rules: loyaltyRules(c.client) });
     if (l.totalPoints > 0) pointsLine = `\n\nYou now have ${bold(`${l.totalPoints} loyalty points`)}${l.redeemableRupees > 0 ? `, worth ${bold(money(l.redeemableRupees))} off your next order` : ""}.`;
   }
   await textInWindow(o.customer, `Thank you${nameOf(o.customer.name) ? `, ${nameOf(o.customer.name)}` : ""}! 🙏 We're glad everything arrived well.${pointsLine}`, "Thank you").catch(() => {});
