@@ -110,6 +110,9 @@ html.dark .thabaal-portal{
 .thabaal-portal .g2{grid-template-columns:repeat(2,minmax(0,1fr))}
 .thabaal-portal .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .thabaal-portal .g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+/* Four tiles need about 850px (200px each). Laptops with the menu (1024–1199px) and tablets (641–900px) have less, so
+   they show two by two instead of cutting the labels short; phones keep one column below. */
+@media (min-width:641px) and (max-width:900px),(min-width:1024px) and (max-width:1199px){.thabaal-portal .g4{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .thabaal-portal .split{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
 .thabaal-portal .stat .l{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:13px;font-weight:600}
 .thabaal-portal .stat .l svg,.thabaal-portal .stat .l .ic{width:16px;height:16px;color:var(--muted);flex-shrink:0;opacity:0.85}
@@ -220,7 +223,8 @@ html.dark .thabaal-portal .phone{background:#0E2535;color:#FFF9F0}
   .thabaal-portal .nav{flex-direction:row;gap:6px;overflow-x:auto;padding-bottom:6px}
   .thabaal-portal .nav>div{display:flex;gap:4px}.thabaal-portal .nav h4,.thabaal-portal .side .foot{display:none}
   .thabaal-portal .nav a{white-space:nowrap;padding:8px 12px;border:1.5px solid var(--line);border-radius:999px}
-  .thabaal-portal .g3,.thabaal-portal .g4,.thabaal-portal .g2,.thabaal-portal .split,.thabaal-portal .formgrid,.thabaal-portal .convo{grid-template-columns:minmax(0,1fr)}
+  .thabaal-portal .g3,.thabaal-portal .g2,.thabaal-portal .split,.thabaal-portal .formgrid,.thabaal-portal .convo{grid-template-columns:minmax(0,1fr)}
+  @media (max-width:640px){.thabaal-portal .g4{grid-template-columns:minmax(0,1fr)}}
   .thabaal-portal .g4.keep2{grid-template-columns:repeat(2,minmax(0,1fr))}
   .thabaal-portal .main{padding:16px max(16px,env(safe-area-inset-left,0px)) 50px}
 }

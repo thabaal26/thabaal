@@ -335,6 +335,12 @@ body.dark .thabaal-reports,
 .thabaal-reports .g4 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
+/* Same as the portal (portal.css): two by two where four tiles would cut their labels short. */
+@media (min-width: 641px) and (max-width: 900px), (min-width: 1024px) and (max-width: 1199px) {
+  .thabaal-reports .g4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 .thabaal-reports .split {
   grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
 }
@@ -603,9 +609,13 @@ body.dark .thabaal-reports,
 }
 
 /* responsive */
+@media (max-width: 640px) {
+  .thabaal-reports .g4:not(.keep2) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 @media (max-width: 900px) {
   .thabaal-reports .g3,
-  .thabaal-reports .g4,
   .thabaal-reports .g2,
   .thabaal-reports .split {
     grid-template-columns: minmax(0, 1fr);
