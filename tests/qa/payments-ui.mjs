@@ -318,9 +318,8 @@ await check(27, "Chat confirm opens Record payment; recording with the UTR marks
     data: { ref, clientId: S.shopId, customerId: reply.customerId, items: [{ id: "QA-001", name: "Groundnut oil 1L", quantity: 1, price: 360 }], total: 360, status: "CONFIRMED", paymentClaimedAt: new Date(), paymentRequestedAt: new Date() },
   });
   await p.goto(`${BASE}/dashboard/replies?r=${reply.customerId}`, { waitUntil: "networkidle" });
-  const more = p.locator("details.more").first();
-  if ((await more.getAttribute("open")) === null) await more.locator("summary").click();
-  await p.getByRole("button", { name: "Payment received: confirm" }).click();
+  // A quick action above the message box (Chats in WhatsApp's layout).
+  await p.getByRole("button", { name: "Payment received: confirm" }).first().click();
   const sh = sheet("Record payment");
   await sh.waitFor();
   await sh.getByPlaceholder("12-digit number", { exact: true }).fill("512345678902");

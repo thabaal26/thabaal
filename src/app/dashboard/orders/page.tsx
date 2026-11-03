@@ -173,6 +173,7 @@ export default async function OrdersPage({
         initialSrc={initialSrc}
         initialDate={initialDate}
         initialQ={initialQ}
+        initialNew={sp.new === "1" ? { phone: typeof sp.phone === "string" ? sp.phone.replace(/\D/g, "") : "" } : null}
       />
     </PortalPage>
   );

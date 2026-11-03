@@ -1,5 +1,6 @@
 "use client";
 
+import { formatPhone } from "@/lib/phone";
 import { Fragment, useEffect, useState, useTransition } from "react";
 import { useModalKeys } from "@/components/use-modal";
 import Link from "@/components/intent-link";
@@ -45,6 +46,8 @@ export type OrdersViewProps = {
   initialSrc?: string;
   initialDate?: string;
   initialQ?: string;
+  /** Open New order straight away, for this number when given (?new=1&phone=…, e.g. "Create order" in Chats). */
+  initialNew?: { phone: string } | null;
   initialTab?: "orders" | "pack";
 };
 
@@ -67,6 +70,7 @@ export function OrdersView({
   initialSrc = "all",
   initialDate = "all",
   initialQ = "",
+  initialNew = null,
   initialTab = "orders",
 }: OrdersViewProps) {
   const router = useRouter();
@@ -123,11 +127,11 @@ export function OrdersView({
   const [packSort, setPackSort] = useState<"old" | "new">("old");
 
   // New order modal state
-  const [newOrderOpen, setNewOrderOpen] = useState(false);
+  const [newOrderOpen, setNewOrderOpen] = useState(Boolean(initialNew && canEdit));
   // The New order form is a dialog: focus goes into it, Escape closes it, and focus returns to the button.
   useModalKeys(newOrderOpen, () => setNewOrderOpen(false), "neworder");
   const [newCustName, setNewCustName] = useState("");
-  const [newCustPhone, setNewCustPhone] = useState("");
+  const [newCustPhone, setNewCustPhone] = useState(initialNew?.phone ? formatPhone(initialNew.phone) : "");
   const [newAddress, setNewAddress] = useState("");
   // The number decides who the order is for: an existing customer (name and address filled in from
   // their record or WhatsApp chat) or a new one, who is saved as a customer when the order is saved.

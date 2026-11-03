@@ -51,7 +51,19 @@ function Ticks({ status }: { status: string }) {
  * A customer's messages and replies as a chat: oldest at the top, newest at the bottom,
  * with native, smooth, responsive scrolling that auto-anchors to the latest message.
  */
-export function Conversation({ entries, className, plain }: { entries: ConversationEntry[]; className?: string; /** No wallpaper: the parent gives the background (Chats). */ plain?: boolean }) {
+export function Conversation({
+  entries,
+  className,
+  plain,
+  skin,
+}: {
+  entries: ConversationEntry[];
+  className?: string;
+  /** No wallpaper: the parent gives the background (Chats). */
+  plain?: boolean;
+  /** "wa": WhatsApp's own bubbles (tails, time and ticks inside the bubble), styled by replies/chats.css. */
+  skin?: "wa";
+}) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Oldest → newest with day dividers
@@ -72,6 +84,13 @@ export function Conversation({ entries, className, plain }: { entries: Conversat
       el.scrollTop = el.scrollHeight;
     }
   }, [entriesCount, firstEntryId]);
+
+  if (skin === "wa")
+    return (
+      <div ref={scrollRef} className={cn("panel-scroll flex-1 min-h-0 overflow-y-auto overscroll-contain [contain:layout_paint]", className)} tabIndex={0} aria-label="Conversation">
+        <WaRows rows={rows} />
+      </div>
+    );
 
   return (
     <div
@@ -158,5 +177,121 @@ export function Conversation({ entries, className, plain }: { entries: Conversat
         )}
       </ol>
     </div>
+  );
+}
+
+type Row = { divider: string; key: string } | { entry: ConversationEntry; key: string };
+
+/** WhatsApp's ticks: one grey (sent), two grey (delivered), two blue (read); words for screen readers. */
+function WaTicks({ status }: { status: string }) {
+  const label = { QUEUED: "Queued", SENT: "Sent", DELIVERED: "Delivered", READ: "Read", FAILED: "Not delivered", SKIPPED: "Skipped" }[status] ?? status;
+  if (status === "FAILED")
+    return (
+      <span className="fail inline-flex items-center gap-0.5">
+        <CircleAlert aria-hidden /> {label}
+      </span>
+    );
+  if (status === "SKIPPED" || status === "QUEUED")
+    return (
+      <span className="inline-flex items-center gap-0.5">
+        <Clock aria-hidden /> {label}
+      </span>
+    );
+  return (
+    <span className={status === "READ" ? "read inline-flex" : "inline-flex"}>
+      {status === "SENT" ? <Check aria-hidden /> : <CheckCheck aria-hidden />}
+      <span className="sr-only">{label}</span>
+    </span>
+  );
+}
+
+/** The bubbles of the "wa" skin: messages in a row from the same side group together, and only the first has a tail. */
+function WaRows({ rows }: { rows: Row[] }) {
+  return (
+    <ol className="wa-msgs">
+      {rows.map((r, i) => {
+        if ("divider" in r)
+          return (
+            <li key={r.key} className="wa-day">
+              <span>{r.divider}</span>
+            </li>
+          );
+        const e = r.entry;
+        const prev = rows[i - 1];
+        const first = !prev || "divider" in prev || prev.entry.type !== e.type;
+        const time = (
+          <time dateTime={e.at.toISOString()}>{fmtDate(e.at, "h:mm a")}</time>
+        );
+        if (e.type === "in") {
+          const paid = e.kind === "order" && /upi payment|payment completed/i.test(e.text);
+          return (
+            <li key={r.key} className={cn("in", first && "first")}>
+              <div className="wa-b">
+                {e.kind === "button" && (
+                  <p className="wa-lbl tap">
+                    <T>Tapped a button</T>
+                  </p>
+                )}
+                {e.kind === "order" &&
+                  (paid ? (
+                    <p className="wa-lbl tap">
+                      <CheckCircle2 aria-hidden className="ic" /> WhatsApp UPI Payment
+                    </p>
+                  ) : (
+                    <p className="wa-lbl cart">
+                      <ShoppingBag aria-hidden className="ic" /> <T>Catalogue Order Cart</T>
+                    </p>
+                  ))}
+                {e.mediaId && <ReplyMedia id={e.id} type={e.mediaType} />}
+                <div className="wa-clear">
+                  {e.text && <span className="tx">{e.text}</span>}
+                  <span className="wa-meta">
+                    {e.via && <T ta={`${e.via}-க்கு · `}>{`to ${e.via} · `}</T>}
+                    {time}
+                  </span>
+                </div>
+              </div>
+            </li>
+          );
+        }
+        const { text, mediaUrl } = parseOutboundBody(e.body);
+        const isPdf = mediaUrl ? /\.pdf(\?|$)/i.test(mediaUrl) : false;
+        return (
+          <li key={r.key} className={cn("out", first && "first")}>
+            <div className={cn("wa-b", e.status === "FAILED" && "bad")}>
+              {(!TYPED.has(e.template) || e.campaign) && (
+                <p className="wa-lbl">
+                  {!TYPED.has(e.template) && <span>{templateLabel(e.template)}</span>}
+                  {e.campaign && <span>· {e.campaign}</span>}
+                </p>
+              )}
+              {mediaUrl &&
+                (isPdf ? (
+                  <a href={mediaUrl} target="_blank" rel="noreferrer" className="wa-file">
+                    <FileText aria-hidden className="ic" />
+                    <span className="truncate">
+                      <T>Open PDF attachment</T>
+                    </span>
+                  </a>
+                ) : (
+                  <a href={mediaUrl} target="_blank" rel="noreferrer" className="wa-img">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- outbound attachment preview */}
+                    <img src={mediaUrl} alt="Sent attachment" />
+                  </a>
+                ))}
+              <div className="wa-clear">
+                {text && <span className="tx">{text}</span>}
+                <span className="wa-meta">
+                  {e.via && <T ta={`${e.via}-லிருந்து · `}>{`from ${e.via} · `}</T>}
+                  {time}
+                  <WaTicks status={e.status} />
+                </span>
+              </div>
+              {e.error && <p className="wa-err">{plainError(e.error)}</p>}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
   );
 }

@@ -1,0 +1,193 @@
+/* Chats: WhatsApp's own layout (chat list | open chat | contact info) in Thabaal's colours. Only this page loads it. */
+.thabaal-portal .wrapin.wide{max-width:1480px}
+.thabaal-portal .wa{
+  --wa-bar:#FFF7E8; --wa-wall:#F3EADC; --wa-in:#fff; --wa-out:#FFEDBF; --wa-bad:#FCE2DC; --wa-meta:#667785;
+  --wa-read:#2E9BE6; --wa-sel:#FFEFC7; --wa-hover:#FFFAF0; --wa-time:#A26F00; --wa-doodle:rgba(16,40,59,.06);
+  position:relative;display:grid;grid-template-columns:minmax(290px,380px) minmax(0,1fr);
+  height:clamp(520px,calc(100dvh - 230px),1100px);background:var(--card);border:1.5px solid var(--line);border-radius:18px;
+  overflow:hidden;box-shadow:var(--shadow)}
+html.dark .thabaal-portal .wa{
+  --wa-bar:#17394F; --wa-wall:#0E2535; --wa-in:#1C415A; --wa-out:#4E4318; --wa-bad:#4B2A2A; --wa-meta:#9DB0C1;
+  --wa-read:#53BDEB; --wa-sel:#21475F; --wa-hover:#18405A; --wa-time:#FFC329; --wa-doodle:rgba(255,249,240,.035)}
+@media (min-width:1280px){.thabaal-portal .wa.info{grid-template-columns:minmax(270px,320px) minmax(0,1fr) 320px}}
+/* With contact info open the chat is narrower: the name keeps the room (the panel shows who it is). */
+.thabaal-portal .wa.info .wa-ch .wa-win{display:none}
+/* Tablets have the app's bottom tabs: keep the message box above them. */
+@media (min-width:901px) and (max-width:1023px){.thabaal-portal .wa{height:clamp(460px,calc(100dvh - 320px),1100px)}}
+
+/* ── Chat list ── */
+.thabaal-portal .wa-list{display:flex;flex-direction:column;min-height:0;min-width:0;border-right:1px solid var(--line)}
+.thabaal-portal .wa-lh{display:flex;align-items:center;gap:6px;padding:12px 10px 6px 16px;min-height:56px}
+.thabaal-portal .wa-lh h2{flex:1;min-width:0;font-size:19px;font-weight:700;letter-spacing:-.2px}
+.thabaal-portal .wa-live{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--muted)}
+.thabaal-portal .wa-live i{width:7px;height:7px;border-radius:50%;background:#20C985}
+.thabaal-portal .wa-live[data-busy=true] i{background:var(--mango)}
+.thabaal-portal .wa-search{position:relative;margin:2px 12px 8px}
+.thabaal-portal .wa-search svg,.thabaal-portal .wa-search .ic{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:17px;height:17px;color:var(--muted)}
+.thabaal-portal .wa-search input[type=search]{min-height:38px;border:0;border-radius:10px;background:var(--wa-bar);padding:6px 12px 6px 40px;font-size:14px}
+.thabaal-portal .wa-search input[type=search]:focus{box-shadow:0 0 0 2px var(--mango)}
+.thabaal-portal .wa-filters{display:flex;gap:6px;padding:0 12px 8px;overflow-x:auto;scrollbar-width:none}
+.thabaal-portal .wa-f{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:4px 12px;background:var(--wa-bar);color:var(--muted);font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap}
+.thabaal-portal .wa-f small{font-size:11.5px;opacity:.8}
+.thabaal-portal .wa-f:hover{color:var(--fg)}
+.thabaal-portal .wa-f[aria-current=true]{background:var(--mango);color:#10283B}
+.thabaal-portal .wa-rows{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.thabaal-portal .wa-row{display:flex;align-items:center;gap:12px;padding:0 0 0 14px;text-decoration:none;color:inherit;min-height:68px}
+.thabaal-portal .wa-row:hover{background:var(--wa-hover)}
+.thabaal-portal .wa-row[aria-current=true]{background:var(--wa-sel)}
+.thabaal-portal .wa-rb{flex:1;min-width:0;align-self:stretch;display:flex;flex-direction:column;justify-content:center;gap:2px;padding:8px 14px 8px 0;border-bottom:1px solid var(--line)}
+.thabaal-portal .wa-l1,.thabaal-portal .wa-l2{display:flex;align-items:center;gap:8px;min-width:0}
+.thabaal-portal .wa-nm{flex:1;min-width:0;font-size:15.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.thabaal-portal .wa-tm{font-size:12px;color:var(--wa-meta);white-space:nowrap}
+.thabaal-portal .wa-row.wa-new .wa-tm{color:var(--wa-time);font-weight:700}
+.thabaal-portal .wa-pv{flex:1;min-width:0;display:flex;align-items:center;gap:4px;font-size:13.5px;color:var(--wa-meta)}
+.thabaal-portal .wa-pv span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.thabaal-portal .wa-pv b{font-weight:600;color:var(--fg);flex:none}
+.thabaal-portal .wa-row.wa-new .wa-pv{color:var(--fg)}
+.thabaal-portal .wa-badge{flex:none;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--mango);color:#10283B;font-size:11.5px;font-weight:700;display:inline-grid;place-items:center}
+.thabaal-portal .wa-tag{flex:none;font-size:11px;font-weight:700;border-radius:6px;padding:1px 6px;background:var(--warn-bg);color:var(--warn);white-space:nowrap}
+.thabaal-portal .wa-tag.ok{background:var(--ok-bg);color:var(--ok)}
+.thabaal-portal .wa-empty{padding:18px 16px;color:var(--muted);font-size:14px}
+
+/* Avatars: initials on a colour picked from the name (WhatsApp Cloud API doesn't share profile photos). */
+.thabaal-portal .wa-av{flex:none;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:15.5px;color:#10283B;user-select:none}
+.thabaal-portal .wa-av.sm{width:40px;height:40px;font-size:14.5px}
+.thabaal-portal .wa-av.lg{width:96px;height:96px;font-size:32px}
+.thabaal-portal .wa-av[data-c="0"]{background:#FFD772}.thabaal-portal .wa-av[data-c="1"]{background:#A8E6CF}
+.thabaal-portal .wa-av[data-c="2"]{background:#FFB8A6}.thabaal-portal .wa-av[data-c="3"]{background:#B9D7F2}
+.thabaal-portal .wa-av[data-c="4"]{background:#D9C8F5}.thabaal-portal .wa-av[data-c="5"]{background:#F6D2B0}
+
+/* ── Open chat ── */
+.thabaal-portal .wa-chat{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0}
+.thabaal-portal .wa-ch{position:relative;z-index:3;display:flex;align-items:center;gap:10px;padding:8px 10px 8px 14px;min-height:60px;background:var(--wa-bar);border-bottom:1px solid var(--line)}
+.thabaal-portal .wa-who{flex:1;min-width:0;display:flex;align-items:center;gap:12px;background:none;border:0;padding:0;text-align:left;cursor:pointer;color:inherit}
+.thabaal-portal .wa-who>span{min-width:0}
+.thabaal-portal .wa-who h2{font-size:16px;font-weight:600;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.thabaal-portal .wa-who p{font-size:12.5px;color:var(--wa-meta);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.thabaal-portal .wa-who p.claim{color:var(--warn);font-weight:600}
+.thabaal-portal .wa-win{flex:none;font-size:12px;font-weight:700;border-radius:999px;padding:3px 10px;background:var(--ok-bg);color:var(--ok);white-space:nowrap}
+.thabaal-portal .wa-win.closed{background:var(--warn-bg);color:var(--warn)}
+.thabaal-portal .wa-ib{flex:none;width:38px;height:38px;border-radius:50%;display:inline-grid;place-items:center;border:0;background:transparent;color:var(--muted);cursor:pointer;text-decoration:none}
+.thabaal-portal .wa-ib:hover,.thabaal-portal .wa-ib[aria-expanded=true]{background:rgba(16,40,59,.07);color:var(--fg)}
+html.dark .thabaal-portal .wa-ib:hover,html.dark .thabaal-portal .wa-ib[aria-expanded=true]{background:rgba(255,249,240,.08)}
+.thabaal-portal .wa-ib .ic{width:20px;height:20px}
+.thabaal-portal .wa-back{display:none}
+.thabaal-portal .wa-body{flex:1;min-height:0;display:flex;flex-direction:column;background-color:var(--wa-wall);
+  background-image:radial-gradient(var(--wa-doodle) 1.2px,transparent 1.4px),radial-gradient(var(--wa-doodle) 1.2px,transparent 1.4px);
+  background-size:26px 26px;background-position:0 0,13px 13px}
+.thabaal-portal .wa-pick{flex:1;display:grid;place-items:center;text-align:center;color:var(--muted);padding:24px}
+.thabaal-portal .wa-pick b{display:block;color:var(--fg);font-size:20px;margin-bottom:6px}
+
+/* Messages */
+.thabaal-portal .wa-msgs{list-style:none;margin:0;padding:10px clamp(10px,5%,64px) 14px;display:flex;flex-direction:column;justify-content:flex-end;min-height:100%;gap:2px}
+.thabaal-portal .wa-msgs>li{display:flex}
+.thabaal-portal .wa-msgs>li.out{justify-content:flex-end}
+.thabaal-portal .wa-msgs>li.first{margin-top:8px}
+.thabaal-portal .wa-day{align-self:center;justify-content:center;margin:10px 0 4px}
+.thabaal-portal .wa-day span{background:var(--wa-in);color:var(--wa-meta);font-size:12px;font-weight:600;padding:5px 12px;border-radius:8px;box-shadow:0 1px .5px rgba(11,20,26,.13)}
+.thabaal-portal .wa-b{position:relative;max-width:min(80%,560px);padding:6px 8px 7px 9px;border-radius:8px;background:var(--wa-in);color:var(--fg);font-size:14.3px;line-height:1.4;box-shadow:0 1px .5px rgba(11,20,26,.13)}
+.thabaal-portal .out .wa-b{background:var(--wa-out)}
+.thabaal-portal .out .wa-b.bad{background:var(--wa-bad)}
+.thabaal-portal .first .wa-b::before{content:"";position:absolute;top:0;width:8px;height:13px;background:inherit}
+.thabaal-portal .in.first .wa-b{border-top-left-radius:0}
+.thabaal-portal .in.first .wa-b::before{left:-8px;clip-path:polygon(0 0,100% 0,100% 100%)}
+.thabaal-portal .out.first .wa-b{border-top-right-radius:0}
+.thabaal-portal .out.first .wa-b::before{right:-8px;clip-path:polygon(0 0,100% 0,0 100%)}
+.thabaal-portal .wa-b .tx{white-space:pre-wrap;overflow-wrap:anywhere}
+.thabaal-portal .wa-meta{float:right;position:relative;top:5px;margin:4px 0 0 12px;display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--wa-meta);white-space:nowrap}
+.thabaal-portal .wa-meta .ic,.thabaal-portal .wa-meta svg{width:16px;height:16px}
+.thabaal-portal .wa-meta .read{color:var(--wa-read)}
+.thabaal-portal .wa-meta .fail{color:var(--bad);font-weight:600}
+.thabaal-portal .wa-lbl{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;font-size:12px;font-weight:600;color:var(--wa-meta);margin-bottom:3px}
+.thabaal-portal .wa-lbl .ic{width:14px;height:14px}
+.thabaal-portal .wa-lbl.tap{color:var(--ok)}
+.thabaal-portal .wa-lbl.cart{color:var(--warn)}
+.thabaal-portal .wa-err{font-size:12px;color:var(--bad);margin-top:3px}
+.thabaal-portal .wa-file{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:4px;border-radius:6px;background:rgba(16,40,59,.06);font-size:13px;font-weight:600;text-decoration:none;color:inherit}
+html.dark .thabaal-portal .wa-file{background:rgba(255,249,240,.08)}
+.thabaal-portal .wa-img{display:block;margin:-3px -5px 4px;border-radius:6px;overflow:hidden}
+.thabaal-portal .wa-img img{display:block;max-height:280px;width:auto;max-width:100%;object-fit:cover}
+.thabaal-portal .wa-clear::after{content:"";display:block;clear:both}
+
+/* ── Composer ── */
+.thabaal-portal .wa-comp{position:relative;background:var(--wa-bar);border-top:1px solid var(--line);padding:6px 10px 8px}
+.thabaal-portal .wa-qr{display:flex;gap:6px;overflow-x:auto;padding:2px 0 6px;scrollbar-width:none}
+.thabaal-portal .wa-qc{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:30px;padding:3px 11px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--fg);font-size:13px;font-weight:600;cursor:pointer;text-decoration:none;white-space:nowrap}
+.thabaal-portal .wa-qc:hover{border-color:var(--mango)}
+.thabaal-portal .wa-qc:disabled{opacity:.6;cursor:default}
+.thabaal-portal .wa-qc .ic{width:15px;height:15px}
+.thabaal-portal .wa-qc.on{background:var(--mango);border-color:var(--mango);color:#10283B}
+.thabaal-portal select.wa-qc{width:auto;min-height:30px;padding:3px 26px 3px 11px;border-radius:999px;border:1px solid var(--line);font-size:13px}
+.thabaal-portal .wa-bar{display:flex;align-items:flex-end;gap:4px}
+.thabaal-portal .wa-comp textarea{flex:1;min-width:0;min-height:42px;max-height:150px;resize:none;border:0;border-radius:10px;background:var(--card);padding:10px 12px;font-size:15px;line-height:1.4;box-shadow:0 1px .5px rgba(11,20,26,.08)}
+.thabaal-portal .wa-comp textarea:focus{box-shadow:0 0 0 2px var(--mango)}
+.thabaal-portal .wa-send{flex:none;width:44px;height:44px;border-radius:50%;border:0;background:var(--mango);color:#10283B;display:grid;place-items:center;cursor:pointer}
+.thabaal-portal .wa-send:disabled{opacity:.55;cursor:default}
+.thabaal-portal .wa-send .ic{width:20px;height:20px}
+.thabaal-portal .wa-hint{font-size:11.5px;color:var(--muted);margin:4px 2px 0}
+.thabaal-portal .wa-hint .wa-win-sm{display:none}
+.thabaal-portal .wa-att{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:6px}
+.thabaal-portal .wa-att input[type=text]{flex:1;min-width:180px;min-height:36px;font-size:14px}
+.thabaal-portal .wa-ai{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-bottom:6px;font-size:13px}
+.thabaal-portal .wa-ai .row1{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.thabaal-portal .wa-ai .row1 p{flex:1;min-width:0;color:var(--muted)}
+.thabaal-portal .wa-closed{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 14px;background:var(--wa-bar);border-top:1px solid var(--line);font-size:13.5px}
+.thabaal-portal .wa-closed p{flex:1;min-width:200px}
+.thabaal-portal .wa-pop{position:absolute;bottom:calc(100% + 4px);left:10px;z-index:30;display:grid;grid-template-columns:repeat(8,38px);gap:2px;padding:8px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 40px -18px rgba(16,40,59,.45)}
+.thabaal-portal .wa-pop button{width:38px;height:38px;border:0;border-radius:8px;background:none;font-size:21px;cursor:pointer}
+.thabaal-portal .wa-pop button:hover{background:var(--wa-hover)}
+
+/* Menus (⋮ in the chat header, ⋮ in the list header) */
+.thabaal-portal .wa-menu{position:absolute;z-index:30;top:calc(100% - 4px);right:10px;min-width:240px;display:flex;flex-direction:column;padding:6px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 40px -18px rgba(16,40,59,.45)}
+.thabaal-portal .wa-menu .btn,.thabaal-portal .wa-menu a,.thabaal-portal .wa-menu button{display:flex;align-items:center;justify-content:flex-start;gap:10px;width:100%;min-height:40px;padding:0 12px;border:0;border-radius:8px;background:none;color:var(--fg);font-size:14px;font-weight:500;text-align:left;text-decoration:none;cursor:pointer;white-space:nowrap}
+.thabaal-portal .wa-menu .btn:hover,.thabaal-portal .wa-menu a:hover,.thabaal-portal .wa-menu button:hover{background:var(--wa-hover)}
+.thabaal-portal .wa-menu[hidden]{display:none}
+.thabaal-portal .wa-menu .ic{width:17px;height:17px;color:var(--muted)}
+.thabaal-portal .wa-menu hr{border:0;border-top:1px solid var(--line);margin:4px 6px}
+
+/* ── Contact info ── */
+.thabaal-portal .wa-info{display:flex;flex-direction:column;min-height:0;overflow-y:auto;background:var(--card);border-left:1px solid var(--line)}
+.thabaal-portal .wa-info>header{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:8px;padding:8px 10px;min-height:60px;background:var(--wa-bar);border-bottom:1px solid var(--line)}
+.thabaal-portal .wa-info>header h2{font-size:16px;font-weight:600}
+.thabaal-portal .wa-hero{display:flex;flex-direction:column;align-items:center;gap:4px;padding:22px 16px 18px;text-align:center}
+.thabaal-portal .wa-hero h3{font-size:20px;font-weight:600;margin-top:10px}
+.thabaal-portal .wa-hero p{color:var(--wa-meta);font-size:14px}
+.thabaal-portal .wa-hero .acts{display:flex;gap:8px;margin-top:12px}
+.thabaal-portal .wa-sec{padding:14px 18px;border-top:8px solid var(--wa-bar)}
+.thabaal-portal .wa-sec h4{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:8px}
+.thabaal-portal .wa-sec dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0;font-size:14px}
+.thabaal-portal .wa-sec dt{color:var(--muted)}
+.thabaal-portal .wa-sec dd{margin:0;text-align:right;overflow-wrap:anywhere}
+.thabaal-portal .wa-sec ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;font-size:14px}
+.thabaal-portal .wa-sec li{display:flex;justify-content:space-between;gap:10px}
+.thabaal-portal .wa-sec li a{color:inherit}
+.thabaal-portal .wa-tags{display:flex;flex-wrap:wrap;gap:6px}
+.thabaal-portal .wa-tags span{font-size:12.5px;font-weight:600;border-radius:999px;padding:2px 10px;background:var(--wa-bar);color:var(--fg)}
+@media (max-width:1279px){
+  .thabaal-portal .wa-info{position:absolute;top:0;right:0;bottom:0;z-index:25;width:min(360px,100%);box-shadow:-20px 0 50px -30px rgba(0,0,0,.5)}
+}
+
+/* ── Phones and small tablets: the list first, a chat opens full screen with a back arrow ── */
+@media (max-width:900px){
+  .thabaal-portal .wa{grid-template-columns:minmax(0,1fr);height:auto;min-height:0;border-radius:16px}
+  /* The page itself scrolls the list, as a phone app does (the bottom tabs leave room under it). */
+  .thabaal-portal .wa{overflow:visible}
+  .thabaal-portal .wa-list{border-right:0}
+  .thabaal-portal .wa-rows{overflow:visible;flex:none}
+  .thabaal-portal .wa[data-view=list] .wa-chat{display:none}
+  /* The page's fade-in animation makes it a stacking context, which would keep the full-screen chat under the app's
+     top bar and bottom tabs; it has finished by the time a chat opens. */
+  .thabaal-portal:has(.wa[data-view=chat]){animation:none}
+  .thabaal-portal .wa[data-view=chat] .wa-chat{position:fixed;inset:0;z-index:45;background:var(--card)}
+  .thabaal-portal .wa[data-view=chat] .wa-ch{padding-top:max(8px,env(safe-area-inset-top,0px));padding-left:4px}
+  .thabaal-portal .wa[data-view=chat] .wa-comp,.thabaal-portal .wa[data-view=chat] .wa-closed{padding-bottom:max(8px,env(safe-area-inset-bottom,0px))}
+  .thabaal-portal .wa-back{display:inline-grid}
+  .thabaal-portal .wa-info{position:fixed;inset:0;z-index:46;width:auto;border-left:0}
+  .thabaal-portal .wa-ch .wa-win{display:none}
+  .thabaal-portal .wa-hint .wa-win-sm{display:inline}
+  .thabaal-portal .wa-msgs{padding:8px 10px 12px}
+  .thabaal-portal .wa-b{max-width:88%}
+}
+@media (max-width:639px){
+  .thabaal-portal .wa-qc,.thabaal-portal select.wa-qc{min-height:36px}
+}

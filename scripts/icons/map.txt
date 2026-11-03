@@ -156,3 +156,6 @@ t-target | Target3D | Target02Icon | Target | target | target | focus-3 | target
 t-clock | Clock3D | Clock01Icon | Clock | clock | clock | time | schedule
 t-chart-bar | ChartBar3D | ChartColumnIcon | ChartColumn | chart-bar | chart-bar | bar-chart-box | bar-chart
 t-map-pin | MapPin3D | Location01Icon | MapPin | map-pin | map-pin | map-pin | location-on
+paperclip | Paperclip | Attachment01Icon | Paperclip | paperclip | paperclip | attachment-2 | attach-file
+smile | Smile | SmileIcon | Smile | mood-smile | smiley | emotion-happy | sentiment-satisfied
+more-vertical | MoreVertical | MoreVerticalIcon | EllipsisVertical | dots-vertical | dots-three-vertical | more-2 | more-vert
