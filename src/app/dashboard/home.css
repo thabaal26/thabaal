@@ -49,8 +49,8 @@ html.dark .thabaal-portal .home-now{background:linear-gradient(120deg,rgba(255,1
   .thabaal-portal .home-now .todo>.top .big{margin-top:6px}
 }
 
-/* ── WhatsApp spend: the card from the owner's reference. A soft green curved panel on the right holds a 3D WhatsApp
-   illustration; the figures and buttons stay on the left, above it. On a narrow card the picture gets small and moves
+/* ── WhatsApp spend: the card from the owner's reference. A soft green curved panel on the right holds a slanted
+   WhatsApp mark; the figures and buttons stay on the left, above it. On a narrow card the picture gets small and moves
    up beside the figure; it never covers text or catches clicks. ── */
 .thabaal-portal .spend-card{position:relative;overflow:hidden;container-type:inline-size;background:linear-gradient(120deg,var(--card) 48%,#F2FBF5 100%)}
 html.dark .thabaal-portal .spend-card{background:linear-gradient(120deg,var(--card) 50%,rgba(32,201,133,.09) 100%)}
@@ -58,14 +58,23 @@ html.dark .thabaal-portal .spend-card{background:linear-gradient(120deg,var(--ca
 .thabaal-portal .spend-art{position:absolute;top:0;right:0;bottom:0;width:42%;pointer-events:none;z-index:0}
 .thabaal-portal .spend-art::before{content:"";position:absolute;top:16%;right:-20%;bottom:-26%;left:0;border-radius:58% 0 0 46% / 64% 0 0 36%;background:linear-gradient(165deg,#E6F7EC 0%,#D3F0DE 55%,#C4EAD2 100%)}
 html.dark .thabaal-portal .spend-art::before{background:linear-gradient(165deg,rgba(32,201,133,.16),rgba(32,201,133,.06))}
-.thabaal-portal .spend-art img{position:absolute;right:7%;top:52%;width:min(176px,80%);height:auto;transform:translateY(-50%) rotate(-5deg);filter:drop-shadow(0 18px 22px rgba(11,115,66,.22))}
+/* The mark: a white chat bubble behind, the green tile in front, tilted back at a slant (2D, like the reference). */
+.thabaal-portal .sa-mark{position:absolute;right:9%;top:52%;width:min(168px,82%);aspect-ratio:200/160;transform:translateY(-50%)}
+.thabaal-portal .sa-bubble{position:absolute;left:0;top:6%;width:58%;transform:rotate(-12deg);filter:drop-shadow(0 10px 14px rgba(11,115,66,.16))}
+.thabaal-portal .sa-bubble path{fill:#fff;opacity:.92}
+.thabaal-portal .sa-bubble rect{fill:#CDEBD7}
+html.dark .thabaal-portal .sa-bubble path{fill:#E7F5EC;opacity:.7}
+html.dark .thabaal-portal .sa-bubble rect{fill:#9BCDB0}
+.thabaal-portal .sa-tile{position:absolute;right:0;top:12%;width:64%;transform:perspective(520px) rotateY(-24deg) rotateX(10deg) rotate(-9deg);filter:drop-shadow(0 18px 20px rgba(11,115,66,.32))}
+.thabaal-portal .sa-ring{fill:none;stroke:#fff;stroke-width:6.5;stroke-linejoin:round}
+.thabaal-portal .sa-phone{fill:#fff}
 /* Keep the words clear of the picture (the buttons may run over the soft panel; they sit above it). */
 .thabaal-portal .spend-card>.stat,.thabaal-portal .spend-card>p,.thabaal-portal .spend-card>.bar{max-width:57%}
 /* Phones: a small picture beside the big figure, the words full width under it. */
 @container (max-width:380px){
   .thabaal-portal .spend-art{width:40%}
   .thabaal-portal .spend-art::before{top:22%;opacity:.75}
-  .thabaal-portal .spend-art img{top:58px;right:10px;width:84px;transform:rotate(-5deg)}
+  .thabaal-portal .sa-mark{top:58px;right:10px;width:92px;transform:none}
   .thabaal-portal .spend-card>p,.thabaal-portal .spend-card>.bar{max-width:100%}
   .thabaal-portal .spend-card>.stat{max-width:62%}
 }

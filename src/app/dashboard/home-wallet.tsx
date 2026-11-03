@@ -25,14 +25,40 @@ function messagesLeftText(n: number) {
   return `About ${shown.toLocaleString("en-IN")} marketing message${shown === 1 ? "" : "s"} left.`;
 }
 
-/** The card's artwork, as in the owner's reference: a soft green curved panel on the right with a 3D WhatsApp
- * illustration (public/art/whatsapp-3d.webp, 19 KB). Decorative only: hidden from screen readers, never clickable, and
- * placed absolutely so it can't move the figures (home.css .spend-card / .spend-art). */
+/** The card's artwork, as in the owner's reference: on a soft green curved panel, a green WhatsApp tile seen at a
+ * slant with a white chat bubble behind it. Drawn here (two small SVGs; the slant is CSS), so it is sharp at any size and
+ * follows dark mode. Decorative only: hidden from screen readers, never clickable, placed absolutely so it can't move
+ * the figures (home.css .spend-card / .spend-art / .sa-*). */
 function SpendArt() {
   return (
     <div aria-hidden className="spend-art">
-      {/* eslint-disable-next-line @next/next/no-img-element -- small static decorative artwork */}
-      <img src="/art/whatsapp-3d.webp" alt="" width={400} height={296} loading="lazy" decoding="async" />
+      <div className="sa-mark">
+        <svg className="sa-bubble" viewBox="0 0 120 96">
+          <path d="M22 4h76a18 18 0 0 1 18 18v38a18 18 0 0 1-18 18H40l-20 14 4-14h-2A18 18 0 0 1 4 60V22A18 18 0 0 1 22 4z" />
+          <rect x="24" y="30" width="58" height="8" rx="4" />
+          <rect x="24" y="46" width="40" height="8" rx="4" />
+        </svg>
+        <svg className="sa-tile" viewBox="0 0 120 120">
+          <defs>
+            <linearGradient id="sa-g" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor="#5FE38E" />
+              <stop offset=".55" stopColor="#22B45E" />
+              <stop offset="1" stopColor="#12884A" />
+            </linearGradient>
+            <linearGradient id="sa-h" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#fff" stopOpacity=".45" />
+              <stop offset="1" stopColor="#fff" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <rect x="4" y="4" width="112" height="112" rx="30" fill="url(#sa-g)" />
+          <rect x="10" y="8" width="100" height="50" rx="24" fill="url(#sa-h)" />
+          <path className="sa-ring" d="M60 26a34 34 0 1 1-17.6 63.1L27 94l5-14.6A34 34 0 0 1 60 26z" />
+          <path
+            className="sa-phone"
+            d="M75.6 69.1c-.9 2.5-4.6 4.6-7.2 4.9-1.9.2-4.4.3-12.9-3.2C44.8 66.4 37.9 55.6 37.4 54.9c-.5-.7-4.3-5.7-4.3-10.9s2.7-7.7 3.7-8.8c.9-1 2-1.2 2.7-1.2h1.9c.6 0 1.4-.1 2.2 1.8.9 2 2.8 7 3 7.5.3.5.4 1.1.1 1.8-.3.7-.5 1.1-1 1.7l-1.5 1.8c-.5.5-1 1-.4 2 .6 1 2.6 4.3 5.6 7 3.9 3.4 7.1 4.5 8.1 5 1 .5 1.6.4 2.2-.2.6-.7 2.5-2.9 3.2-3.9.7-1 1.3-.8 2.2-.5.9.3 5.8 2.7 6.8 3.2s1.7.7 1.9 1.2c.3.4.3 2.6-.6 5.1z"
+          />
+        </svg>
+      </div>
     </div>
   );
 }
