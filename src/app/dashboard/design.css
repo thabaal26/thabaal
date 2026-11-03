@@ -1,0 +1,83 @@
+/*
+ * Thabaal's look, refreshed (Nov 2026, from the owner's yellow dashboard reference): warm cream canvas with a soft golden
+ * glow, white cards with a warm shadow, deep navy text, golden-yellow for the main action and for whatever is selected,
+ * and meaningful icons on soft tinted tiles. One file over portal.css (loaded after it, outside its layer), so every page
+ * of the business portal picks it up at once; pages keep their own layouts.
+ */
+.thabaal-portal{
+  --radius-card:20px;
+  --shadow:0 1px 2px rgba(16,40,59,.04),0 18px 36px -26px rgba(122,78,0,.38);
+  --shadow-hover:0 2px 4px rgba(16,40,59,.05),0 22px 40px -22px rgba(122,78,0,.48);
+  /* Icon tiles: a soft background and a stronger icon colour per meaning. */
+  --tile-brand-bg:#FFF0C2; --tile-brand:#9A6300;
+  --tile-amber-bg:#FFE6C7; --tile-amber:#9C4D00;
+  --tile-green-bg:#DFF5E8; --tile-green:#0B7342;
+  --tile-blue-bg:#E2EDFA; --tile-blue:#255B91;
+  --tile-violet-bg:#ECE6FA; --tile-violet:#5E3DAE;
+  --tile-rose-bg:#FCE4DE; --tile-rose:#A93A25;
+}
+html.dark .thabaal-portal{
+  --shadow:0 18px 36px -24px rgba(0,0,0,.75);
+  --shadow-hover:0 22px 40px -20px rgba(0,0,0,.85);
+  --tile-brand-bg:rgba(255,195,41,.16); --tile-brand:#FFD15C;
+  --tile-amber-bg:rgba(255,150,60,.16); --tile-amber:#FFB877;
+  --tile-green-bg:rgba(32,201,133,.16); --tile-green:#5BE3AE;
+  --tile-blue-bg:rgba(142,195,238,.16); --tile-blue:#9CCBF2;
+  --tile-violet-bg:rgba(176,150,240,.18); --tile-violet:#C6B3F7;
+  --tile-rose-bg:rgba(244,107,78,.18); --tile-rose:#FF9C86;
+}
+
+/* The page's canvas (the big rounded panel on computers): a soft golden glow at the top, as in the reference. */
+.app-canvas{background-image:radial-gradient(900px 340px at 92% -8%,rgba(255,195,41,.18),transparent 62%),radial-gradient(700px 260px at 0% -12%,rgba(255,226,150,.16),transparent 60%);background-repeat:no-repeat}
+html.dark .app-canvas{background-image:radial-gradient(900px 340px at 92% -8%,rgba(255,195,41,.07),transparent 62%)}
+
+/* Cards: a little rounder, a warm soft shadow; cards that are links lift slightly on hover. */
+.thabaal-portal .card{border-radius:var(--radius-card);transition:box-shadow .2s ease,border-color .2s ease}
+.thabaal-portal a.card:hover,.thabaal-portal a.todo:hover{box-shadow:var(--shadow-hover)}
+
+/* The main action: golden yellow with a soft glow under it. */
+.thabaal-portal .btn.primary{box-shadow:0 10px 20px -12px rgba(214,150,0,.85)}
+html.dark .thabaal-portal .btn.primary{box-shadow:0 10px 20px -12px rgba(255,195,41,.45)}
+.thabaal-portal .btn{transition:border-color .15s,background-color .15s,box-shadow .15s,filter .15s}
+
+/* Selected: golden yellow with navy text, the same everywhere (chips, period switches, Chats filters). */
+.thabaal-portal .chip[aria-pressed=true],.thabaal-portal a.chip[aria-current]{background:var(--mango);border-color:var(--mango);color:#10283B}
+.thabaal-portal .seg{border-radius:14px}
+.thabaal-portal .seg button[aria-pressed=true]{background:var(--mango);color:#10283B}
+.thabaal-portal .chip:not([aria-pressed=true]):not([aria-current]):hover{border-color:var(--fg);color:var(--fg)}
+
+/* Icon tiles (components/ui.tsx Stat, Home): a rounded square in the meaning's soft colour. */
+.thabaal-portal .ico-tile{flex:none;display:inline-grid;place-items:center;width:40px;height:40px;border-radius:12px;background:var(--tile-brand-bg);color:var(--tile-brand)}
+.thabaal-portal .ico-tile svg,.thabaal-portal .ico-tile .ic{width:20px;height:20px;stroke-width:2}
+.thabaal-portal .ico-tile.sm{width:34px;height:34px;border-radius:10px}
+.thabaal-portal .ico-tile.sm svg,.thabaal-portal .ico-tile.sm .ic{width:18px;height:18px}
+.thabaal-portal .ico-tile[data-tone=gold]{background:var(--tile-brand-bg);color:var(--tile-brand)}
+.thabaal-portal .ico-tile[data-tone=amber]{background:var(--tile-amber-bg);color:var(--tile-amber)}
+.thabaal-portal .ico-tile[data-tone=green]{background:var(--tile-green-bg);color:var(--tile-green)}
+.thabaal-portal .ico-tile[data-tone=info]{background:var(--tile-blue-bg);color:var(--tile-blue)}
+.thabaal-portal .ico-tile[data-tone=violet]{background:var(--tile-violet-bg);color:var(--tile-violet)}
+.thabaal-portal .ico-tile[data-tone=rose]{background:var(--tile-rose-bg);color:var(--tile-rose)}
+@media (max-width:639px){.thabaal-portal .ico-tile{width:32px;height:32px;border-radius:10px}.thabaal-portal .ico-tile svg,.thabaal-portal .ico-tile .ic{width:17px;height:17px}}
+
+/* A card heading with its icon tile in front ("WhatsApp spend", "Coming up"). */
+.thabaal-portal .hd-ico{display:flex;align-items:center;gap:12px;min-width:0}
+
+/* Changes against the period before, as small tinted pills (green up, red down, grey no change). */
+.thabaal-portal .d.up,.thabaal-portal .d.down,.thabaal-portal .d.flat{display:inline-flex;align-items:center;padding:2px 10px;border-radius:999px;font-size:12.5px;font-weight:700;line-height:1.5}
+.thabaal-portal .d.up{background:var(--ok-bg)}
+.thabaal-portal .d.down{background:var(--bad-bg)}
+.thabaal-portal .d.flat{background:var(--soft)}
+
+/* Tabs: the selected one underlined in golden yellow, bolder. */
+.thabaal-portal .tabs button[aria-selected=true],.thabaal-portal .tabs a[aria-current]{font-weight:700}
+
+/* Reports keeps its own copy of the portal styles (report/reports.css, loaded after this file): the same refresh there,
+   one step more specific so it wins. */
+.thabaal-portal .thabaal-reports{--shadow:0 1px 2px rgba(16,40,59,.04),0 18px 36px -26px rgba(122,78,0,.38)}
+html.dark .thabaal-portal .thabaal-reports{--shadow:0 18px 36px -24px rgba(0,0,0,.75)}
+.thabaal-portal .thabaal-reports .card{border-radius:var(--radius-card,20px)}
+.thabaal-portal .thabaal-reports .seg{border-radius:14px}
+.thabaal-portal .thabaal-reports .seg button[aria-pressed="true"]{background:var(--mango);color:#10283B}
+.thabaal-portal .thabaal-reports .chip[aria-pressed="true"]{background:var(--mango);border-color:var(--mango);color:#10283B}
+.thabaal-portal .thabaal-reports .stat .l{justify-content:flex-start;gap:12px}
+.thabaal-portal .thabaal-reports .stat .l .ico-tile svg,.thabaal-reports .stat .l .ico-tile .ic{width:20px;height:20px;color:inherit;opacity:1}

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { CheckCircle2, IndianRupee, MessageCircle, Plus, Repeat, ShoppingBag } from "@/components/icons";
+import { BellRing, CheckCircle2, IndianRupee, Megaphone, MessageCircle, Package, Plus, Repeat, ShoppingBag, ShoppingCart } from "@/components/icons";
 import { Stat } from "@/components/ui";
 import Link from "@/components/intent-link";
 import { ScrollReveal, StaggerGroup, StaggerItem } from "@/components/motion";
@@ -122,17 +122,21 @@ type Todo = {
   /** The words for a zero count, e.g. "No unpaid carts". */
   none: string;
   noneTa: string;
+  icon: ReactNode;
+  tone: "amber" | "gold" | "green";
 };
 
 function TodoTile({ t, first }: { t: Todo; first: boolean }) {
   return (
     <Link className={`todo${first ? " first" : ""}${t.urgent ? " urgent" : ""}`} href={t.href} data-todo={t.key}>
-      <span className="big">{t.big}</span>
-      <span>
-        <b><T ta={t.titleTa}>{t.title}</T></b>
-        <br />
-        <span className="small sub"><T ta={t.subTa}>{t.sub}</T></span>
+      <span aria-hidden className="ico-tile" data-tone={t.tone}>
+        {t.icon}
       </span>
+      <span className="top">
+        <span className="big">{t.big}</span>
+        <b><T ta={t.titleTa}>{t.title}</T></b>
+      </span>
+      <span className="small sub"><T ta={t.subTa}>{t.sub}</T></span>
       <span className="go"><T ta={t.goTa}>{t.go}</T> ›</span>
     </Link>
   );
@@ -166,6 +170,8 @@ export function HomeTiers(p: HomeTiersProps) {
       goTa: "நினைவூட்டு",
       none: "No unpaid carts",
       noneTa: "செலுத்தப்படாத கார்ட் இல்லை",
+      icon: <ShoppingCart />,
+      tone: "amber",
     },
     p.ordersOn && {
       key: "pack",
@@ -180,6 +186,8 @@ export function HomeTiers(p: HomeTiersProps) {
       goTa: "பேக்",
       none: "Nothing to pack",
       noneTa: "பேக் செய்ய எதுவும் இல்லை",
+      icon: <Package />,
+      tone: "gold",
     },
     p.repliesOn && {
       key: "chats",
@@ -195,6 +203,8 @@ export function HomeTiers(p: HomeTiersProps) {
       goTa: "பதில்",
       none: "No chats waiting",
       noneTa: "காத்திருக்கும் உரையாடல் இல்லை",
+      icon: <MessageCircle />,
+      tone: "green",
     },
   ] as (Todo | false)[]).filter((t): t is Todo => Boolean(t));
   // The heading counts the kinds of work waiting ("2 of 3"); kinds with nothing waiting become a quiet ✓ link below.
@@ -241,7 +251,11 @@ export function HomeTiers(p: HomeTiersProps) {
         {todos.length > 0 && (
           <ScrollReveal as="section" className="card home-now" duration={500} aria-labelledby="home-now">
             <div className="hd">
-              <div>
+              <div className="hd-ico">
+                <span aria-hidden className="ico-tile" data-tone="gold">
+                  <BellRing />
+                </span>
+                <div>
                 <h2 id="home-now">
                   {needing === 0 ? (
                     <T ta="இப்போது உடனடி கவனம் எதுவும் தேவையில்லை">Nothing needs you right now</T>
@@ -258,6 +272,7 @@ export function HomeTiers(p: HomeTiersProps) {
                     <T ta="முதலாவதிலிருந்து தொடங்குங்கள். மற்றவை காத்திருக்கலாம்.">Start with the first one. Everything else can wait.</T>
                   )}
                 </p>
+                </div>
               </div>
             </div>
             {waiting.length > 0 && (
@@ -346,9 +361,14 @@ export function HomeTiers(p: HomeTiersProps) {
             {p.campaignsOn && (
               <ScrollReveal as="section" className="card h-full" duration={500} aria-labelledby="home-next">
                 <div className="hd">
-                  <div>
-                    <h2 id="home-next"><T ta="அடுத்து வருபவை">Coming up</T></h2>
-                    <p><T ta="திட்டமிட்ட பிரச்சாரங்களும் மறு ஆர்டர் நினைவூட்டல்களும்">Scheduled campaigns and reorder reminders</T></p>
+                  <div className="hd-ico">
+                    <span aria-hidden className="ico-tile" data-tone="amber">
+                      <Megaphone />
+                    </span>
+                    <div>
+                      <h2 id="home-next"><T ta="அடுத்து வருபவை">Coming up</T></h2>
+                      <p><T ta="திட்டமிட்ட பிரச்சாரங்களும் மறு ஆர்டர் நினைவூட்டல்களும்">Scheduled campaigns and reorder reminders</T></p>
+                    </div>
                   </div>
                   <Link className="btn sm" href="/dashboard/campaigns"><T ta="அனைத்து பிரச்சாரங்கள்">All campaigns</T></Link>
                 </div>

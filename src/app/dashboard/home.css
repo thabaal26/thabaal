@@ -28,3 +28,23 @@
 
 /* The four figures: a long label (Tamil) wraps onto a second line instead of ending in "…". */
 .thabaal-portal section[aria-labelledby="home-kpis"] .truncate{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:break-word}
+
+/* Reference look: the "needs you" card on a soft golden wash; each tile has its icon on a tinted tile, the figure with
+   its action beside it, and the name and detail under them at full width (so Tamil and long details don't squeeze). */
+.thabaal-portal .home-now{background:linear-gradient(120deg,#FFF5D6 0%,#FFFBF0 38%,var(--card) 70%)}
+html.dark .thabaal-portal .home-now{background:linear-gradient(120deg,rgba(255,195,41,.10) 0%,var(--card) 60%)}
+.thabaal-portal .home-now .todo{grid-template-columns:auto minmax(0,1fr) auto;grid-template-rows:auto auto auto;grid-template-areas:"ico big go" "ico title title" "ico sub sub";align-content:center;column-gap:12px;row-gap:2px;align-items:center;background:var(--card)}
+.thabaal-portal .home-now .todo>.ico-tile{grid-area:ico;align-self:start}
+.thabaal-portal .home-now .todo>.top{display:contents}
+.thabaal-portal .home-now .todo>.top .big{grid-area:big;font-size:24px;line-height:1.15}
+.thabaal-portal .home-now .todo>.top b{grid-area:title;font-size:15px}
+.thabaal-portal .home-now .todo>.sub{grid-area:sub;min-width:0}
+.thabaal-portal .home-now .todo>.go{grid-area:go;justify-self:end}
+/* A narrow tile (three side by side on a laptop, or Tamil): icon and action on top, then the figure, name and detail. */
+.thabaal-portal .home-now .todo>.top .big{white-space:nowrap}
+/* The tile's wrapper is the container (a container query can't restyle the container itself). */
+.thabaal-portal .home-todos>*{container-type:inline-size}
+@container (max-width:260px){
+  .thabaal-portal .home-now .todo{grid-template-columns:auto minmax(0,1fr);grid-template-areas:"ico go" "big big" "title title" "sub sub";row-gap:4px}
+  .thabaal-portal .home-now .todo>.top .big{margin-top:6px}
+}
