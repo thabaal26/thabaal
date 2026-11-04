@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { db } from "../../src/lib/db";
 import { deliver, getSettings } from "../../src/lib/provider";
-import { claimInbound, markProcessed, pruneInbound, STALE_MS } from "../../src/lib/engine/inbound";
+import { claimInbound, markProcessed, pruneInbound, releaseInbound, STALE_MS } from "../../src/lib/engine/inbound";
 import { chatAutomation, pauseChat, resumeChat } from "../../src/lib/engine/conversation";
 import { handleButtonTap, resolveTap } from "../../src/lib/engine/buttons";
 import { buttonKeyOf, cleanAction, fillReply, quickReplies } from "../../src/lib/engine/keys";
@@ -47,6 +47,11 @@ describe("engine: one claim per Meta message", () => {
     assert.equal(await claimInbound(id, null, new Date(t0.getTime() + STALE_MS + 1000)), "new", "the first try crashed: handled again");
     await markProcessed(id);
     assert.equal(await claimInbound(id, null, new Date(t0.getTime() + 3 * STALE_MS)), "duplicate", "handled: never again");
+    // Handling failed: the claim is dropped and Meta's retry handles it again at once.
+    const failed = `wamid.claim-fail-${Date.now()}`;
+    assert.equal(await claimInbound(failed), "new");
+    await releaseInbound(failed);
+    assert.equal(await claimInbound(failed), "new", "the retry is handled");
     await db.inboundEvent.update({ where: { id }, data: { receivedAt: new Date(Date.now() - 40 * 86_400_000) } });
     assert.ok((await pruneInbound()) >= 1);
     assert.equal(await db.inboundEvent.findUnique({ where: { id } }), null);

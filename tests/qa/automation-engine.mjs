@@ -7,7 +7,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import { createRequire } from "node:module";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PW_CORE ?? "C:/Users/step1/pwtmp/node_modules/playwright-core");
@@ -185,7 +185,7 @@ await check("Phone", "390px: the button actions card fits without sideways scrol
 });
 
 // Put the shop back as it was for other suites.
-await db.client.update({ where: { id: S.shopId }, data: { automationMode: shop.automationMode, paySettings: shop.paySettings ?? undefined } });
+await db.client.update({ where: { id: S.shopId }, data: { automationMode: shop.automationMode, paySettings: shop.paySettings ?? Prisma.DbNull } });
 expect(!manager.errors.length, manager.errors.join(" | "));
 await browser.close();
 await db.$disconnect();
