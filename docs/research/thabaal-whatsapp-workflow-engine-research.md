@@ -1392,7 +1392,7 @@ Extend the existing QA suites (`assistant-ui.mjs`, `orders-elsewhere.mjs`, `addr
 
 | # | Decision | Options | Recommendation |
 |---|---|---|---|
-| D1 | Do "ok", 👍, stickers and reactions get a reply? | (a) Silent, as today; (b) always reply; (c) reply only if a step is pending, else one short "Noted" per 6 h | **(c)**. It honours the standing "every reaction answered fast" preference while avoiding nagging and per-message cost |
+| D1 | Do "ok", 👍, stickers and reactions get a reply? | (a) Silent, as today; (b) always reply; (c) reply only if a step is pending, else one short "Noted" per 6 h | **DECIDED 4 Nov 2026 by the product owner: (c)**, reply only when a step is pending (address, confirmation, payment), else at most one short "Noted" per 6 h |
 | D2 | Default payment route for new tenants | Meta deep integration (Razorpay/PayU/BillDesk/Zaakpay); EPL (Razorpay/PayU/Cashfree); third-party link via CTA; UPI link/claims | Deep integration for tenants on those four gateways (already partly built); EPL as the simple alternative; never pool funds |
 | D3 | Scheduler for timers | GitHub Actions (today, 30-80 min late); external one-minute cron (cron-job.org); Vercel Cron; managed queue | External one-minute cron in Phase 3; revisit a queue only for sub-minute needs |
 | D4 | Staff takeover default | Auto-pause 2 h after a staff message (today); pause until staff clicks Resume; per-tenant setting | Per-tenant setting, default 2 h auto-pause plus a visible manual Pause/Resume |
