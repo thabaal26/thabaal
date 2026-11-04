@@ -110,8 +110,13 @@ await check("Second campaign", "With history: groups with live counts; picking o
   await picker.waitFor({ timeout: 15000 });
   expect((await manager.getByTestId("first-campaign").count()) === 0, "first-campaign still shown");
   const card = (s) => picker.locator(`[data-segment=${s}]`);
-  superN = num(await card("super").locator("span.tabular").innerText());
-  activeN = num(await card("active").locator("span.tabular").innerText());
+  // What a send reaches: the "N can be sent now" line when some in the group are left out, else the group's total.
+  const sendable = async (s) => {
+    const line = card(s).getByTestId(`segment-sendable-${s}`);
+    return num(await ((await line.count()) ? line : card(s).getByTestId(`segment-total-${s}`)).innerText());
+  };
+  superN = await sendable("super");
+  activeN = await sendable("active");
   expect(superN >= 1 && activeN >= 3, `super ${superN}, active ${activeN}`);
   await card("super").click();
   await manager.waitForFunction((n) => /in the groups you picked/.test(document.querySelector("[data-testid=audience-size]")?.textContent ?? "") && document.querySelector("[data-testid=audience-size]")?.textContent?.includes(String(n)), superN, { timeout: 15000 });

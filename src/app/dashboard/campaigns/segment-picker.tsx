@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Check } from "@/components/icons";
 import { cn } from "@/lib/cn";
 import { useTr } from "@/lib/i18n/context";
+import { liveSegmentSummary } from "../actions/campaigns";
 
 // Campaign form › Send to › who to reach by how they respond (lib/engagement-segments.ts). A business that has
 // never sent a campaign sees what a first send reaches; after that, it can keep the send to one or more groups.
@@ -19,7 +21,7 @@ const LABEL: Record<Seg, { en: string; ta: string; hint: string; hintTa: string;
 export type SegmentSummaryProps = {
   history: boolean;
   rules: { days: number; offers: number };
-  segments: Record<Seg, { eligible: number; excluded: number }>;
+  segments: Record<Seg, { eligible: number; excluded: number; moved: number }>;
   activeRead: number;
   totals: { customers: number; eligible: number; optedOut: number; unreachable: number; movedInactive: number; paused: number; invalidNumber: number };
 };
@@ -28,8 +30,42 @@ export type Capacity = { known: boolean; limit: number | null; left: number | nu
 
 const n = (x: number) => x.toLocaleString("en-IN");
 
-export function SegmentPicker({ summary, value, onChange, capacity }: { summary: SegmentSummaryProps; value: string[]; onChange: (v: string[]) => void; capacity: Capacity }) {
+/** The counts follow what customers do: read again every minute while the form is open, and when the tab comes back. */
+const REFRESH_MS = 60_000;
+
+export function SegmentPicker({
+  campaignId,
+  summary: initial,
+  value,
+  onChange,
+  capacity,
+}: {
+  campaignId: string | null;
+  summary: SegmentSummaryProps;
+  value: string[];
+  onChange: (v: string[]) => void;
+  capacity: Capacity;
+}) {
   const { isTa } = useTr();
+  const [summary, setSummary] = useState(initial);
+  useEffect(() => {
+    let stop = false;
+    const pull = () => {
+      if (document.visibilityState !== "visible") return;
+      liveSegmentSummary(campaignId)
+        .then((s) => {
+          if (s && !stop) setSummary(s);
+        })
+        .catch(() => {});
+    };
+    const t = setInterval(pull, REFRESH_MS);
+    document.addEventListener("visibilitychange", pull);
+    return () => {
+      stop = true;
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", pull);
+    };
+  }, [campaignId]);
   const t = summary.totals;
   const capacityText = !capacity
     ? null
@@ -115,15 +151,21 @@ export function SegmentPicker({ summary, value, onChange, capacity }: { summary:
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline justify-between gap-2">
                   <span className="font-semibold">{isTa ? LABEL[s].ta : LABEL[s].en}</span>
-                  <span className="tabular text-sm font-semibold">{n(seg.eligible)}</span>
+                  <span className="tabular text-sm font-semibold" data-testid={`segment-total-${s}`}>{n(seg.eligible + seg.excluded)}</span>
                 </span>
                 <span className="block text-xs text-muted">{sub}</span>
-                {s === "inactive" && (
+                {s === "inactive" && seg.moved > 0 ? (
                   <span className="block text-xs text-warning" data-testid="moved-inactive-count">
                     {isTa
-                      ? `${n(t.movedInactive)} பேரை நீங்கள் Inactive-க்கு மாற்றியுள்ளீர்கள் · பிரச்சாரங்களில் விலக்கு`
-                      : `${n(t.movedInactive)} moved to Inactive · excluded from campaigns`}
+                      ? `${n(seg.eligible)} பேருக்கு மீண்டும் சலுகை அனுப்பலாம் · நீங்கள் மாற்றிய ${n(seg.moved)} பேர் விலக்கு`
+                      : `${n(seg.eligible)} can get a win-back offer · ${n(seg.moved)} you moved here are left out`}
                   </span>
+                ) : (
+                  seg.excluded > 0 && (
+                    <span className="block text-xs text-muted" data-testid={`segment-sendable-${s}`}>
+                      {isTa ? `இப்போது ${n(seg.eligible)} பேருக்கு அனுப்பலாம்` : `${n(seg.eligible)} can be sent now`}
+                    </span>
+                  )
                 )}
               </span>
             </button>

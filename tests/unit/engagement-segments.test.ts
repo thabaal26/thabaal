@@ -236,4 +236,20 @@ describe("engagement: two businesses, real records", () => {
     failFor.clear();
     void templateB;
   });
+
+  test("10. moved to Inactive: counted in the Inactive group and left out; a reply brings them back to Super active at once", async () => {
+    await db.customer.update({ where: { id: id.cold }, data: { tags: ["inactive"], unreachable: true } });
+    let s = (await segs(A)).get(id.cold)!;
+    assert.equal(s.segment, "inactive");
+    assert.equal(s.movedToInactive, true);
+    const sum = await segmentSummary(A);
+    assert.equal(sum.segments.inactive.moved, 1, "shown on the Inactive card");
+    assert.equal((await db.customer.findMany({ where: await campaignAudienceWhere(A, null, { segments: ["inactive"] }), select: { id: true } })).some((c) => c.id === id.cold), false, "never sent");
+    await recordReply({ phone: `${P}04`, text: "price?", kind: "text", waMessageId: `wamid.back-${Date.now()}`, anyClient: true });
+    const back = await db.customer.findUniqueOrThrow({ where: { id: id.cold } });
+    assert.equal(back.tags.includes("inactive"), false, "tag removed by their reply");
+    assert.equal(back.unreachable, false, "they wrote to us, so they can receive");
+    s = (await segs(A)).get(id.cold)!;
+    assert.equal(s.segment, "super");
+  });
 });

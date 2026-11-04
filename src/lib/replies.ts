@@ -5,6 +5,7 @@ import { formAddressText, formValuesFrom } from "./address-form";
 import { cleanPersonName, fillCustomerName, isPlaceholderName } from "./customer-name";
 import { db } from "./db";
 import { forget, memo, replyContextKey } from "./request-memo";
+import { INACTIVE_TAG } from "./schedule";
 
 /**
  * Which client's customers a message to this Meta number concerns: the client that owns the
@@ -94,6 +95,11 @@ export async function recordReply(r: IncomingReply) {
   }
   // Their 24-hour window starts again from this message.
   forget(replyContextKey(customer.id));
+  // They wrote to us, so they are on WhatsApp and want to hear from us: out of Inactive, and "can't receive" no longer
+  // holds (lib/engagement-segments.ts puts them in Super active from this message on). Opt-outs stay as they are.
+  await db.$executeRaw`
+    UPDATE "Customer" SET tags = array_remove(tags, ${INACTIVE_TAG}), unreachable = false, "updatedAt" = now()
+    WHERE id = ${customer.id} AND (${INACTIVE_TAG} = ANY(tags) OR unreachable = true)`.catch((e) => console.error("Could not bring the customer back", e));
 
   // Automatically detect delivery addresses sent in chat (text or shared location pin)
   // and sync to the customer profile (if missing) and any active open order without an address.
