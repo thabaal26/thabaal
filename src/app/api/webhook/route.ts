@@ -580,7 +580,7 @@ export async function POST(req: NextRequest) {
         for (const m of v.messages ?? []) {
           // Meta retries webhooks for days: a message already handled (or being handled) is not handled again.
           const inboundId = m.id ? String(m.id) : "";
-          if (inboundId && (await claimInbound(inboundId)) === "duplicate") continue;
+          if (inboundId && (await claimInbound(inboundId, null, new Date(), m.type ? String(m.type) : null)) === "duplicate") continue;
           // One message at a time, each with its own memo: the settings, the number to answer from and the shop's
           // details are read once while it is answered (lib/request-memo.ts), not again for every step. If handling
           // fails, the claim is dropped so Meta's retry handles the message again.
@@ -781,7 +781,7 @@ export async function POST(req: NextRequest) {
             }
           });
           } catch (e) {
-            if (inboundId) await releaseInbound(inboundId);
+            if (inboundId) await releaseInbound(inboundId, e);
             throw e;
           }
           if (inboundId) await markProcessed(inboundId).catch(() => {});

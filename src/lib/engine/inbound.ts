@@ -13,9 +13,9 @@ const KEEP_DAYS = 30;
  * "new" = handle this message now; "duplicate" = it was handled already, or is being handled right now. If the claim
  * itself can't be written, the message is handled anyway (as before claims existed): a reply is never lost to it.
  */
-export async function claimInbound(id: string, clientId: string | null = null, now = new Date()): Promise<"new" | "duplicate"> {
+export async function claimInbound(id: string, clientId: string | null = null, now = new Date(), kind: string | null = null): Promise<"new" | "duplicate"> {
   try {
-    await db.inboundEvent.create({ data: { id, clientId, receivedAt: now } });
+    await db.inboundEvent.create({ data: { id, clientId, kind, receivedAt: now } });
     return "new";
   } catch (e) {
     if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) {
@@ -27,9 +27,12 @@ export async function claimInbound(id: string, clientId: string | null = null, n
   }
 }
 
-/** Handling failed: drop the claim so Meta's next retry handles the message again. */
-export async function releaseInbound(id: string) {
-  await db.inboundEvent.deleteMany({ where: { id, processedAt: null } }).catch(() => {});
+/** Handling failed: note why, and free the claim so Meta's next retry handles the message again at once. */
+export async function releaseInbound(id: string, error?: unknown) {
+  const why = error instanceof Error ? `${error.name}: ${error.message}` : error ? String(error) : null;
+  await db.inboundEvent
+    .updateMany({ where: { id, processedAt: null }, data: { receivedAt: new Date(0), ...(why && { lastError: why.replace(/\d{10,}/g, "#").slice(0, 500) }) } })
+    .catch(() => {});
 }
 
 /** The message was handled to the end. */
