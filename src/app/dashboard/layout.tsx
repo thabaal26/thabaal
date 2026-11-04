@@ -32,6 +32,7 @@ import { clientAccessNow } from "@/lib/plan-access";
 import { inr } from "@/lib/account-plans";
 import { livePlans } from "@/lib/plan-prices-server";
 import { appearanceAttrs, appearanceDataset, appearanceScript, resolveAppearance } from "@/lib/appearance";
+import { redirect } from "next/navigation";
 
 /** The client whose look the dashboard wears: a client login's own, or the one an admin picked.
     Read once per request (the metadata and the layout both need it). */
@@ -119,6 +120,9 @@ function ClientMark({ logoUrl, name }: { logoUrl?: string | null; name: string }
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
   await requireUser();
   const scope = await getScope();
+  // Admins work in the admin panel. The business app opens for them only inside one business (Help a client ›
+  // Open to make changes, or read-only); the old "All clients" view of every business together doesn't open.
+  if (scope.isAdmin && !scope.clientId) redirect("/admin");
   const [settings, client, sender, clients, rawOpenReplies, rawOrdersToHandle, rawPaymentsToCheck, requestsToCheck, access, plans] = await Promise.all([
     getSettings(),
     brandedClient(),

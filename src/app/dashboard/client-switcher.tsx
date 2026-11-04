@@ -10,8 +10,9 @@ import { setActiveClient } from "./actions/clients";
 
 type Clients = { id: string; name: string }[];
 
+// The old "All clients" view is gone: leaving a business goes back to the admin panel.
 const options = (clients: Clients) => [
-  { value: "", label: "All clients", hint: "Every client's data together" },
+  { value: "", label: "Admin panel", hint: "Leave this business" },
   ...clients.map((c) => ({ value: c.id, label: c.name })),
 ];
 
@@ -22,7 +23,8 @@ function useSwitch() {
     start(async () => {
       const r = await safeAction(() => setActiveClient(id));
       if (!r.ok) toastResult(r);
-      router.refresh();
+      if (r.ok && !id) router.push("/admin");
+      else router.refresh();
     });
   return { pending, change };
 }
@@ -68,7 +70,7 @@ export function ClientSwitcher({ clients, current, dark }: { clients: Clients; c
       trigger={(selected) => (
         <span className={cn("flex h-10 items-center gap-2 rounded-control px-2.5 text-sm font-medium transition", dark ? "border border-white/10 bg-white/[0.04] text-white hover:bg-white/10" : "border border-line-strong/60 bg-panel/90 text-ink shadow-xs")}>
           <Building2 aria-hidden className={cn("size-4 shrink-0", dark ? "text-glow" : "text-brand-deep")} />
-          <span className="min-w-0 flex-1 truncate">{selected?.label ?? "All clients"}</span>
+          <span className="min-w-0 flex-1 truncate">{selected?.label ?? "Admin panel"}</span>
           <ChevronDown aria-hidden className={cn("size-4 shrink-0", dark ? "text-white/70" : "text-muted")} />
         </span>
       )}

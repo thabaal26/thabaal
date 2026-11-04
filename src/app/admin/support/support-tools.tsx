@@ -2,6 +2,7 @@
 
 // Admin panel › Help a client: open a business's own app read-only, leave that view, or open it to make changes.
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "@/components/toast";
@@ -99,25 +100,12 @@ export function OpenToChange({ clientId, href = "/dashboard", label = "Open to m
   );
 }
 
-/** Portal-wide settings live in the dashboard's Settings with no business picked. */
+/** Portal-wide sending settings and the default look (Admin › Settings › Sending and look). */
 export function OpenPortalSettings() {
-  const router = useRouter();
-  const [busy, start] = useTransition();
   return (
-    <button
-      type="button"
-      className="btn sm"
-      disabled={busy}
-      onClick={() =>
-        start(async () => {
-          const r = await setActiveClient("");
-          if (!r.ok) return toast(false, r.message ?? "Could not open settings.");
-          router.push("/dashboard/settings");
-        })
-      }
-    >
+    <Link className="btn sm" href="/admin/settings/sending">
       Sending and look settings
-    </button>
+    </Link>
   );
 }
 
