@@ -20,7 +20,7 @@ Thabaal can build a configurable button-and-reply engine on Meta's Cloud API tod
 
 **How psychology shapes it.** Controlled experiments favour buttons over free text for user experience, yet users still want to be able to type ([Haugeland et al. 2022](https://sintef.brage.unit.no/sintef-xmlui/handle/11250/3086679); [NN/g](https://www.nngroup.com/articles/chatbots/)). The most common fear about automated service is losing access to a person ([Gartner 2024](https://www.gartner.com/en/newsroom/press-releases/2024-07-09-gartner-survey-finds-64-percent-of-customers-would-prefer-that-companies-didnt-use-ai-for-customer-service)). Surprise costs are the most-cited reason for abandoning checkout ([Baymard](https://baymard.com/lists/cart-abandonment-rate)). India's CCPA guidelines prohibit false urgency, nagging, drip pricing and basket sneaking ([JSA Law](https://www.jsalaw.com/?p=49613)). The engine should build these guardrails into its presets and linting, not leave them to each tenant.
 
-**Decisions the product owner must make** are in section 19. The most urgent five are: whether "ok", thumbs-up and other acknowledgements get a reply (the current code stays silent; the owner's standing preference is that every reaction gets a fast answer); the payment route for new tenants; whether to add an external one-minute scheduler; the default staff-pause behaviour; and whether to opt each WABA into Meta's irreversible template analytics.
+**Decisions** are in section 19: the owner decided D1 and delegated the rest, which are now decided with a confidence percentage in section 19.1a, together with workflow defaults for every industry. The five that mattered most were: whether "ok", thumbs-up and other acknowledgements get a reply (the current code stays silent; the owner's standing preference is that every reaction gets a fast answer); the payment route for new tenants; whether to add an external one-minute scheduler; the default staff-pause behaviour; and whether to opt each WABA into Meta's irreversible template analytics.
 
 ---
 
@@ -1407,6 +1407,50 @@ Extend the existing QA suites (`assistant-ui.mjs`, `orders-elsewhere.mjs`, `addr
 | D13 | AI fallback for unrecognised text | None; AI suggestion to staff; AI auto-reply | None in Phases 1-4; later only as staff suggestion or clearly secondary, never trained on platform data (Meta terms §4.7) |
 | D14 | Production without `META_APP_SECRET` | Allowed (today "unchecked"); forbidden | Forbidden; engine refuses state changes when unchecked |
 | D15 | Per-tenant provider (META vs WAHA/LOCAL) | Keep global `Setting.provider`; per tenant | Keep global for now; engine runs only on META; WAHA path stays record-only |
+
+### 19.1a Decision register (4 Nov 2026)
+
+The product owner decided D1 and delegated every other call: "decide the best option yourself, verify it, and give a confidence percentage". Confidence means how sure we are that this is the best choice given the evidence in this report. It is not a promised business result. Each line also says what would change the decision. Facts checked in the repository before deciding: production has a webhook app secret configured (the value was not read); the scheduler is a GitHub Actions `*/5` cron (`.github/workflows/scheduler.yml`) that has run 30–80 minutes late; Meta deep-integration payment messages (`order_details`) already exist in `src/lib/whatsapp.ts` / `payments.ts`; "Stop promotions" today adds the `no-offers` tag (`order-assistant.ts:419`).
+
+| # | Decided | Confidence | Why (evidence) | Would change if |
+|---|---|---|---|---|
+| D1 | Reply to "ok", 👍, stickers and reactions only when a step is pending; otherwise at most one short "Noted" per 6 h | Owner's decision | Owner's standing rule that every reaction is answered, plus the nagging prohibition and per-message cost from 1 Oct 2026 | Owner changes it |
+| D2 | Payments: Meta deep integration (`review_and_pay`) for tenants on Razorpay, PayU, BillDesk or Zaakpay; otherwise a gateway payment link (Razorpay/Cashfree) on a CTA URL; UPI "I paid" claims stay as the last fallback. Each tenant uses its own gateway account; Thabaal never holds tenant money | 85% | Deep integration is the only route with Meta payment webhooks in India and is partly built; links work for every other gateway; pooling funds would bring RBI payment-aggregator rules | Meta limits deep integration for ISV platforms, or most tenants use another gateway |
+| D3 | Scheduler: add an external one-minute cron that calls `/api/cron` with the cron secret, and keep GitHub Actions as a backup; no queue service yet | 85% | Timers (holds, reminders, nudges) need minute accuracy; the current cron is 30–80 min late; jobs already claim rows, so a second caller is safe | Vercel plan allows per-minute cron (then use it), or sub-minute timers become necessary |
+| D4 | Staff takeover: a per-tenant setting, default auto-pause for 2 h after a staff message, plus visible Pause / Resume buttons in Chats | 90% | Keeps today's behaviour, adds the explicit control the audit found missing, and staff always know whether the bot is on | Tenants report the bot answering over staff |
+| D5 | Template analytics: turn on per WhatsApp account at onboarding, after telling the owner it cannot be undone; switch link tracking off per template only where the tenant uses its own UTM links | 75% | It is the only source of URL-button click counts (aggregate, 7-day retention); turning it on adds data and costs nothing | Meta adds side effects (e.g. link rewriting tenants dislike) |
+| D6 | Two separate exits: "Stop offers" = marketing only (`no-offers`, order updates continue); typing STOP = full opt-out of all messages | 95% | Policy requires honouring every opt-out; keeps today's `no-offers` meaning; customers keep order updates they want | Meta policy treats "Stop offers" as a full opt-out |
+| D7 | Packaging: button mapping, automatic replies and business hours in the base plan; the visual builder and industry presets in a higher plan | 70% | Matches how Indian competitors charge (builder as add-on); every tenant needs the basics to avoid broken replies | Pricing review or competitor moves |
+| D8 | Bot disclosure: the first automatic message in a conversation says once "Automatic reply from {shop}. Type *staff* anytime to reach a person." | 85% | Users prefer knowing (NN/g); policy requires a clear human route; Luo 2019 showed disclosure can cut sales, so say it once, with the capability and the human promise | Tests show it hurts completion for a tenant (then shorten it, never remove the human route) |
+| D9 | Run expiry: session steps end when the 24 h window closes; steps whose next message is a template may wait up to 7 days | 90% | Interactive replies can't be sent after the window; templates can | Meta changes the window rules |
+| D10 | Language: infer from the customer's first message (Tamil script or Tanglish words → Tamil, else the tenant's default), remember it on the customer, offer a one-time "English / தமிழ்" switch | 85% | Regional-language preference evidence (Google-KPMG); no language field exists today; inference avoids an extra question | Wrong guesses are frequent (then ask once on first contact) |
+| D11 | In "orders elsewhere" mode, typed "COD" is not confirmed on the connected number; the customer gets the call-to-order reply | 90% | Consistent with that mode's promise; the audit found the current order of checks allows it | The affected tenant wants COD on both numbers |
+| D12 | A message to a number not linked to any business is recorded only; no automatic reply runs, and admins are alerted | 95% | Tenant isolation: never guess which business owns a conversation | — |
+| D13 | No AI auto-replies for unrecognised text in Phases 1–4; later at most an AI suggestion for staff, never trained on platform data | 90% | Meta platform terms §4.7, trust, and wrong-answer risk in orders and payments | Meta policy and tenant demand both change |
+| D14 | In production the engine refuses state changes when the webhook signature can't be checked; replies are only recorded | 95% | Production already has the secret, so nothing changes for live tenants; it closes a forgery path | — |
+| D15 | Provider stays global; the engine runs only on the Meta Cloud API; the local WhatsApp session stays record-only | 85% | Interactive buttons, payloads and `context.id` exist only on the Cloud API | A tenant must run on the local session long term |
+
+**Workflow defaults for every tenant and industry (presets and lint enforce them):**
+
+| Rule | Confidence | Evidence |
+|---|---|---|
+| One decision per message: up to 3 reply buttons; a list for 4–10 choices; narrow in two steps beyond 10; most-used option first | 90% | Meta limits; Chernev 2015 (overload under complexity/uncertainty); NN/g |
+| Labels are verb + object within 20 characters ("View Products", "Track My Order"); never "Click here", "Option 1" or "Submit" | 90% | NN/g microcopy; Meta label limits |
+| Buttons first, typing always accepted at every step (Tanglish words like "evlo", "venum", "seri" understood) | 90% | Haugeland 2022, NN/g chatbot study |
+| Every menu offers "Talk to a person" (or the word *staff*) with an honest reply time; outside hours it says when the shop opens | 95% | Gartner 2024; Meta policy escalation requirement |
+| An itemised summary with the full total before any pay button; afterwards a receipt with the UPI/payment reference | 95% | Baymard (extra costs and unseen totals drive abandonment); drip-pricing rule |
+| An order is created as confirmed only after an explicit "Confirm" tap on that summary | 95% | Error prevention; avoids disputed orders |
+| At most one reminder for an unfinished cart, then one expiry notice; no repeated welcome menus | 80% | India's nagging prohibition; per-user marketing cap (131049); message cost |
+| No fake countdowns, fake "X people bought", pre-ticked add-ons or confirm-shaming labels; the platform blocks them for all tenants | 95% | India CCPA dark-pattern guidelines; Mathur et al. 2019 |
+| Quick-reply payload keys up to 32 characters; the saved mapping, never the label, decides the action | 95% | Payload limit undocumented (stay short); multi-tenant requirement |
+| A tap on an old message whose step has expired restarts that button's workflow with a short "Let's start again" note; an order is acted on only while it is still open | 85% | Prevents acting on stale state; keeps the tap useful |
+| Double taps: one lock per conversation; the same tap again within 10 seconds is ignored | 90% | At-least-once webhooks; rapid taps |
+| Unknown payload: try the label (legacy path), else the tenant's default reply with the main menu | 90% | Backward compatibility during migration |
+| Hand to staff automatically after 2 invalid answers in a row, on payment problems, complaint words, or when asked | 85% | Conversational repair research; prevents loops |
+| Bookings: hold a slot for 10 minutes while the customer confirms; reminders 24 h and 2 h before (utility template); Reschedule and Cancel buttons in every reminder | 80% | Double-booking prevention; no-show reduction practice |
+| Clinics and similar: automated messages carry no health details; collect only what booking needs | 95% | DPDP Act purpose limitation; privacy |
+| Labels in English by default with a Tamil option per tenant; test Tanglish labels before making them a default | 70% | No study yet on Tamil vs Tanglish vs English labels |
+| One emoji at most per message, never in place of words on a button | 80% | Existing message style rule; readability |
 
 ### 19.2 Risks
 
