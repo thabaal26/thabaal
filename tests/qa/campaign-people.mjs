@@ -58,10 +58,10 @@ const toast = async () => (await page.locator("[role=status], [role=alert]").all
 
 try {
   await check(1, "Chats › Sent lists a customer we messaged who hasn't written, with 'You sent:' and the status", async () => {
-    await page.goto(`${BASE}/dashboard/replies?show=sent`, { waitUntil: "networkidle" });
+    await page.goto(`${BASE}/dashboard/replies`, { waitUntil: "networkidle" });
     const list = page.getByRole("navigation", { name: "Customer conversations" });
     const row = list.getByRole("link", { name: new RegExp(sentOnly.name) });
-    expect(await row.count(), "not in Sent");
+    expect(await row.count(), "not in Chats");
     const text = await row.innerText();
     expect(/You sent:/.test(text) && /Delivered/.test(text), `row: ${text}`);
     expect(!/Handled/.test(text), "marked handled");

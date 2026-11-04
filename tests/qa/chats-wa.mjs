@@ -87,7 +87,7 @@ try {
     return `${(await row.innerText()).replace(/\s+/g, " ")} | ${st.replace(/\s+/g, " ")}`;
   });
 
-  await check(2, "Search finds by name and by number; filters sit inside the list", async () => {
+  await check(2, "Search finds by name and by number; no Open / Handled / Sent chips", async () => {
     const box = page.getByRole("searchbox", { name: "Search chats" });
     await box.fill(`Meena Kumari ${run}`);
     expect((await list().getByRole("link").count()) === 1, "name search");
@@ -95,12 +95,11 @@ try {
     const n = await list().getByRole("link").count();
     expect(n === 1 && /Paid Claim/.test(await list().innerText()), `number search ${n}`);
     await box.fill("");
-    const f = page.locator(".wa-list .wa-filters").getByRole("link", { name: /Open/ });
-    await f.click();
-    await page.waitForURL(/show=open/);
-    await page.waitForLoadState("networkidle");
-    expect((await f.getAttribute("aria-current")) === "true", "Open not current");
-    expect((await list().getByRole("link", { name: new RegExp(closed.name) }).count()) === 0, "handled chat in Open");
+    const chips = (await page.locator(".wa-list .wa-filters").allInnerTexts()).join(" ");
+    expect(!/(Open|Handled|Sent)/.test(chips), `status chips still shown: ${chips}`);
+    // Old links with ?show=open now open every chat, the handled one too.
+    await page.goto(`${BASE}/dashboard/replies?show=open`, { waitUntil: "networkidle" });
+    expect((await list().getByRole("link", { name: new RegExp(closed.name) }).count()) === 1, "old ?show=open link still filters");
     return "ok";
   });
 
@@ -191,6 +190,7 @@ try {
 
   await check(8, "Says paid: the chip opens Record payment", async () => {
     await page.goto(`${BASE}/dashboard/replies?r=${payer.id}`, { waitUntil: "networkidle" });
+    await page.locator(".wa-who").first().click();
     await page.getByRole("button", { name: "Payment received: confirm" }).first().click();
     const sh = page.getByRole("dialog").filter({ hasText: "Record payment" }).last();
     await sh.waitFor();

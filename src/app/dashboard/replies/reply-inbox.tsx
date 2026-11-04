@@ -186,8 +186,7 @@ export function ReplyInbox({
   selectedId,
   thread,
   profile,
-  show,
-  filters,
+  total,
   group = "",
   groups = null,
   openCount,
@@ -198,8 +197,8 @@ export function ReplyInbox({
   selectedId?: string;
   thread: ConversationEntry[];
   profile?: ChatProfile | null;
-  show: string;
-  filters: ChatFilter[];
+  /** Every chat, for the "All" chip. */
+  total: number;
   /** The picked engagement group (super | active | inactive), and each group's chats; null before any campaign. */
   group?: string;
   groups?: ChatFilter[] | null;
@@ -231,11 +230,8 @@ export function ReplyInbox({
   const latestInboundAt = thread.find((e) => e.type === "in")?.at ?? (selected?.kind === "sent" ? undefined : selected?.receivedAt);
   const windowTimeRemaining = useWindowCountdown(latestInboundAt, isTamil);
   const windowOpen = Boolean(replyWindowEnd(latestInboundAt));
-  const listHref = (next: { show?: string; group?: string }) => {
-    const q = new URLSearchParams({ ...(next.show && { show: next.show }), ...(next.group && { group: next.group }) }).toString();
-    return q ? `/dashboard/replies?${q}` : "/dashboard/replies";
-  };
-  const hrefFor = (customerId: string) => `/dashboard/replies?${new URLSearchParams({ ...(show && { show: String(show) }), ...(group && { group }), r: customerId })}`;
+  const listHref = (g: string) => (g ? `/dashboard/replies?group=${g}` : "/dashboard/replies");
+  const hrefFor = (customerId: string) => `/dashboard/replies?${new URLSearchParams({ ...(group && { group }), r: customerId })}`;
   const unpaidOrder = (r: InboxReply) => r.customer.orders?.[0] ?? null;
 
   const currentUnpaid = selected ? unpaidOrder(selected) : null;
@@ -330,28 +326,17 @@ export function ReplyInbox({
     };
   });
 
-  const filterChips = (
-    <div className="wa-filters" role="group" aria-label={isTamil ? "உரையாடல் வடிகட்டி" : "Show chats"}>
-      {filters.map((f) => (
-        <Link
-          key={f.key}
-          href={listHref({ show: f.key, group })}
-          className="wa-f"
-          aria-current={show === f.key ? "true" : undefined}
-          scroll={false}
-        >
-          {isTamil ? f.labelTa : f.label} <small>{fmtNumber(f.count)}</small>
-        </Link>
-      ))}
-    </div>
-  );
-  // By how they respond to campaigns; tapping the picked group again shows every group.
+  // One row: All, then the groups the campaign form splits customers into (lib/engagement-segments.ts), each with
+  // its live count; tapping the picked group again shows every chat. Before a first campaign there are no groups.
   const groupChips = groups && (
     <div className="wa-filters wa-groups" role="group" aria-label={isTamil ? "குழு வாரியாக" : "By group"} data-testid="chat-groups">
+      <Link href={listHref("")} className="wa-f" data-group="all" aria-current={!group ? "true" : undefined} scroll={false}>
+        {isTamil ? "அனைத்தும்" : "All"} <small>{fmtNumber(total)}</small>
+      </Link>
       {groups.map((g) => (
         <Link
           key={g.key}
-          href={listHref({ show, group: group === g.key ? "" : g.key })}
+          href={listHref(group === g.key ? "" : g.key)}
           className="wa-f"
           data-group={g.key}
           aria-current={group === g.key ? "true" : undefined}
@@ -413,7 +398,7 @@ export function ReplyInbox({
             </div>
           )}
         </div>
-        <ChatList items={chatListItems} selectedCustomerId={selected?.customer.id} onSelectCustomer={() => setMobileView("chat")} filters={<>{filterChips}{groupChips}</>} />
+        <ChatList items={chatListItems} selectedCustomerId={selected?.customer.id} onSelectCustomer={() => setMobileView("chat")} filters={groupChips || undefined} />
       </aside>
 
       {/* Middle: the open chat */}
@@ -518,7 +503,6 @@ export function ReplyInbox({
               onTypingChange={setIsTyping}
               actions={
                 <>
-                  {paidButton}
                   {windowOpen && (
                     <PAction action={sendCatalogue.bind(null, selected.customer.id)} className="wa-qc" title={isTamil ? "பொருட்கள் பட்டியலை வாடிக்கையாளருக்கு அனுப்பும்" : "Sends your product list to the customer"}>
                       <ShoppingBag aria-hidden className="ic" style={ic} /> {isTamil ? "பொருட்கள் அனுப்பு" : "Send products"}
@@ -535,7 +519,7 @@ export function ReplyInbox({
           <div className="wa-body">
             <div className="wa-pick">
               <div>
-                <b>{show === "handled" ? "Nothing handled yet" : show === "open" ? "You're all caught up" : show === "sent" ? "Nothing sent in the last 7 days" : "No replies yet"}</b>
+                <b>{group ? (isTamil ? "இந்தக் குழுவில் உரையாடல் இல்லை" : "No chats in this group") : isTamil ? "இன்னும் பதில்கள் இல்லை" : "No replies yet"}</b>
                 {isTamil
                   ? "வாடிக்கையாளர்கள் பதில் எழுதும்போது அல்லது பட்டனைத் தட்டும்போது, அவர்களின் உரையாடல் இங்கே வரும்."
                   : "When customers tap “Order now” or write back after a campaign, each customer’s conversation appears here."}

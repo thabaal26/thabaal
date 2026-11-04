@@ -114,7 +114,7 @@ export async function GET(req: Request) {
       title: `Customer reply: ${r.customer.name}${count > 1 ? ` (${count} messages)` : ""}`,
       description: r.text || (r.kind ? `Sent a ${r.kind}` : "Customer responded to WhatsApp message"),
       timestamp: r.receivedAt.toISOString(),
-      href: `/dashboard/replies?show=${unread ? "open" : "all"}`,
+      href: `/dashboard/replies?r=${r.customerId}`,
       unread,
     });
   }
