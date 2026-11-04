@@ -27,6 +27,8 @@ import { findUtr, logPaymentEvent } from "@/lib/payment-events";
 import { JOIN_RE, joinFromWhatsApp } from "@/lib/optin";
 import { chargeMessage } from "@/lib/wallet";
 import { applyOwnerStatus } from "@/lib/owner-messages";
+import { claimInbound, markProcessed } from "@/lib/engine/inbound";
+import { handleButtonTap } from "@/lib/engine/buttons";
 
 export const dynamic = "force-dynamic";
 
@@ -262,6 +264,7 @@ async function detectAndApplyUpiPayment(
     where: { phone: m.from, ...customers },
     select: {
       id: true,
+      clientId: true,
       orders: {
         where: { paidAt: null, status: { in: ["NEW", "CONFIRMED"] } },
         // The order last asked for payment first (orders never asked come after, newest first). Postgres puts empty
@@ -355,8 +358,9 @@ async function detectAndApplyUpiPayment(
     return { text: `Possible UPI payment for ${ref} (${totalFormatted}) · check and verify`, kind: "order", media: base.media, handledAsPayment: true };
   }
 
-  // The customer asks to pay cash on delivery: set it on the order and send 1-click confirmation prompt.
-  if (m.type === "text" && COD_ASK_RE.test(base.text) && !NO_COD_RE.test(base.text)) {
+  // The customer asks to pay cash on delivery: set it on the order and send 1-click confirmation prompt. Not when the shop
+  // takes orders on its main number (orders elsewhere): that reply tells them where to order, nothing is confirmed here.
+  if (m.type === "text" && COD_ASK_RE.test(base.text) && !NO_COD_RE.test(base.text) && !(await ordersElsewhere(cust.clientId))) {
     // Payment settings › Cash on delivery: off, over the limit or outside the allowed areas → a polite no.
     const asked = await db.order.findUnique({ where: { id: targetOrder.id }, select: { total: true, clientId: true, customer: true, paymentRequestedAt: true } });
     const blocked = asked ? codBlocked((await paySettingsFor(asked.clientId)).settings, asked.total, asked.customer) : null;
@@ -574,6 +578,9 @@ export async function POST(req: NextRequest) {
             : applyStatus(s));
         }
         for (const m of v.messages ?? []) {
+          // Meta retries webhooks for days: a message already handled (or being handled) is not handled again.
+          const inboundId = m.id ? String(m.id) : "";
+          if (inboundId && (await claimInbound(inboundId)) === "duplicate") continue;
           // One message at a time, each with its own memo: the settings, the number to answer from and the shop's
           // details are read once while it is answered (lib/request-memo.ts), not again for every step.
           await withMemo(async () => {
@@ -590,6 +597,14 @@ export async function POST(req: NextRequest) {
             const profileName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name ?? null;
             const customer = await recordReply({ phone: m.from, text, kind, media, waMessageId: m.id, contextId: m.context?.id ? String(m.context.id) : null, phoneNumberId, at: m.timestamp ? new Date(Number(m.timestamp) * 1000) : undefined, profileName });
             const clientName = customer?.client?.name || "Thabaal";
+
+            // An answer to our "may we call you?" prompt is saved above (applyCallPermission); it isn't a campaign button,
+            // so it gets no catalogue or "please call" reply.
+            if (m.interactive?.type === "call_permission_reply") return;
+
+            // A tapped template button the business mapped to an action (lib/engine/buttons.ts): in engine mode that
+            // action answers instead of the built-in replies; in legacy and shadow modes nothing changes here.
+            if (customer && kind === "button" && !handledAsPayment && (await handleButtonTap(customer, m, { inboundId, phoneNumberId, signed }).catch((e) => (console.error("Button action failed", e), false)))) return;
 
             // The shop takes orders and payments on its main number (Payment settings › How orders work): no carts,
             // payments or order replies here; the customer is told to call it (with the price list when asked) or gets a
@@ -763,6 +778,7 @@ export async function POST(req: NextRequest) {
               }
             }
           });
+          if (inboundId) await markProcessed(inboundId);
         }
       } else if (change.field === "calls") {
         for (const c of v.calls ?? []) await applyCall(c, v);

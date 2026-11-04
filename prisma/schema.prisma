@@ -90,6 +90,11 @@ model Client {
   engagementDays      Int               @default(90)
   /// This many offers delivered in a row with no tap, reply or order after them = Inactive (low engagement).
   inactiveAfterOffers Int               @default(3)
+  /// Automatic actions for button taps (lib/engine): legacy = today's built-in replies only; shadow = also log what
+  /// the business's button mappings would do; engine = mapped buttons run their saved action.
+  automationMode      String            @default("legacy")
+  /// After staff type in Chats, automatic replies stay quiet this long (minutes).
+  staffPauseMinutes   Int               @default(120)
   /// No marketing sends between these HH:mm times (IST); null turns quiet hours off.
   quietFrom           String?           @default("21:00")
   quietTo             String?           @default("09:00")
@@ -150,6 +155,8 @@ model Client {
   users               User[]
   customers           Customer[]
   pending             PendingCustomer[]
+  buttonActions       ButtonAction[]
+  conversations       Conversation[]
   templates           Template[]
   campaigns           Campaign[]
   numbers             WhatsAppNumber[]
@@ -257,6 +264,7 @@ model Customer {
   orders           Order[]
   calls            Call[]
   loyaltyEntries   LoyaltyEntry[]
+  conversation     Conversation?
 
   @@unique([clientId, phone])
   @@index([phone])
@@ -334,6 +342,7 @@ model Template {
 
   campaigns Campaign[]
   messages  Message[]
+  buttonActions ButtonAction[]
 
   /// The WhatsApp Business Account the template lives in; null for the env-configured number.
   businessAccountId String?
@@ -977,4 +986,72 @@ model RazorpayEvent {
   id        String   @id
   event     String
   createdAt DateTime @default(now())
+}
+
+/// One claim per message Meta delivers (its wamid): Meta retries webhooks for days, so a message is handled once.
+/// processedAt stays null while it is being handled; a claim older than a few minutes without it is handled again.
+model InboundEvent {
+  id          String    @id // Meta's message id (wamid)
+  clientId    String?
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+
+  @@index([receivedAt])
+}
+
+/// A customer's chat state for automation (lib/engine): staff can pause automatic replies, and resume them.
+model Conversation {
+  id          String    @id @default(cuid())
+  clientId    String
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  customerId  String    @unique
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  /// Automatic replies are off until then (a far date = until someone resumes them).
+  pausedUntil DateTime?
+  pausedBy    String?
+  /// Staff messages before this don't pause automatic replies any more.
+  resumedAt   DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  @@index([clientId])
+}
+
+/// What a template's quick-reply button does when tapped (lib/engine), saved by the business. The button is found by
+/// its key (the label in lowercase-dashes unless set), never by the label alone at run time.
+model ButtonAction {
+  id         String   @id @default(cuid())
+  clientId   String
+  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  templateId String
+  template   Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  buttonKey  String
+  /// reply | handoff | tag | opt_out | builtin
+  action     String
+  /// reply text, tag name, opt-out kind (offers | all), or built-in name (catalogue | reorder)
+  value      String?
+  /// Text sent with tag / opt_out / handoff (optional; a default is used)
+  replyText  String?
+  enabled    Boolean  @default(true)
+  updatedAt  DateTime @updatedAt
+
+  @@unique([templateId, buttonKey])
+  @@index([clientId])
+}
+
+/// What the engine decided for a tap (lib/engine): in shadow mode only logged, in engine mode also done.
+model EngineDecision {
+  id         String   @id @default(cuid())
+  clientId   String
+  customerId String
+  inboundId  String
+  templateId String?
+  buttonKey  String?
+  action     String
+  mode       String
+  executed   Boolean  @default(false)
+  detail     String?
+  createdAt  DateTime @default(now())
+
+  @@unique([inboundId])
+  @@index([clientId, createdAt])
 }

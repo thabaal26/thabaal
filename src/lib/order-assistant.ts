@@ -44,14 +44,12 @@ import { logMessage, replyContext, sendPaymentChoicePrompt, textInWindow, update
 import { getSettings } from "./provider";
 import { sendInteractiveButtons } from "./whatsapp";
 import { bold, hello, nameOf } from "./wa-text";
+import { chatAutomation } from "./engine/conversation";
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
 
-/** Messages staff typed in Chats (or sent from an order); automatic replies stay quiet for a while after one. */
-const STAFF_LABELS = ["Typed reply", "Media reply"];
-const STAFF_QUIET_MS = 2 * HOUR;
 
 export const STATUS_REPLY = "Order status";
 export const CLOSED_REPLY = "Closed reply";
@@ -65,9 +63,12 @@ export const RECEIVED_REPLY = "Auto reply";
 
 type Cust = { id: string; clientId: string; phone: string; name: string; optedOut: boolean; tags?: string[] };
 
-/** Staff are talking to this customer right now. */
+/**
+ * Automatic replies keep quiet for this customer now: staff typed in Chats within the business's staffPauseMinutes
+ * (default 2 hours), or staff paused them (lib/engine/conversation.ts).
+ */
 export async function staffActive(customerId: string, now = new Date()) {
-  return Boolean(await db.message.findFirst({ where: { customerId, templateName: { in: STAFF_LABELS }, createdAt: { gte: new Date(now.getTime() - STAFF_QUIET_MS) } }, select: { id: true } }));
+  return (await chatAutomation(customerId, now)).paused;
 }
 
 /** Already sent this kind of automatic reply recently (no repeats). */

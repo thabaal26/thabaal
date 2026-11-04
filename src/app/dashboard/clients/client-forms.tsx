@@ -16,6 +16,7 @@ import {
   type ClientSectionId,
 } from "@/lib/client-sections";
 import { HEX, themeStyle } from "@/lib/theme";
+import { saveAutomationSettings } from "../actions/automation";
 import { cn } from "@/lib/cn";
 import { BUSINESS_TYPES } from "@/lib/business-types";
 import {
@@ -595,6 +596,36 @@ export function SendingRulesForm({
           <input id={`inact-${clientId}`} type="number" min={1} max={20} className="field" value={offers} onChange={(e) => setOffers(Number(e.target.value))} />
         </div>
       </div>
+    </form>
+  );
+}
+
+/** Admin › a client › automatic actions for button taps (lib/engine) and staff quiet time in Chats. */
+export function AutomationForm({ clientId, initial }: { clientId: string; initial: { mode: string; staffPauseMinutes: number } }) {
+  const [mode, setMode] = useState(initial.mode);
+  const [minutes, setMinutes] = useState(initial.staffPauseMinutes);
+  const { pending, submit } = useSubmit();
+  return (
+    <form
+      className="grid grid-cols-1 gap-4 md:grid-cols-[1.4fr_1fr_auto] md:items-end"
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit(() => saveAutomationSettings(clientId, { mode, staffPauseMinutes: minutes }));
+      }}
+    >
+      <div>
+        <Label htmlFor={`am-${clientId}`}>Automatic actions for button taps</Label>
+        <select id={`am-${clientId}`} className="field" value={mode} onChange={(e) => setMode(e.target.value)}>
+          <option value="legacy">Off: built-in replies only</option>
+          <option value="shadow">Testing: log what saved actions would do</option>
+          <option value="engine">On: saved actions answer taps</option>
+        </select>
+      </div>
+      <div>
+        <Label htmlFor={`sp-${clientId}`} hint="minutes">Quiet after a staff reply</Label>
+        <input id={`sp-${clientId}`} type="number" min={5} max={1440} className="field" value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} />
+      </div>
+      <Button type="submit" loading={pending} size="sm" className="max-sm:w-full md:mb-px">Save</Button>
     </form>
   );
 }

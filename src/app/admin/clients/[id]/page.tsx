@@ -31,6 +31,7 @@ import {
   ResetPasswordButton,
   SendingRulesForm,
   TokenForm,
+  AutomationForm,
 } from "../../../dashboard/clients/client-forms";
 import { OpenToChange, ViewAsButton } from "../../support/support-tools";
 import { K, Kpis, N, Pill, R, initials, pctOf } from "../../ui";
@@ -368,6 +369,14 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             Customers who got an offer recently are skipped, and marketing never goes out at night. Utility messages aren&apos;t affected.
           </p>
           <SendingRulesForm clientId={c.id} initial={{ marketingGapHours: c.marketingGapHours, quietFrom: c.quietFrom, quietTo: c.quietTo, engagementDays: c.engagementDays, inactiveAfterOffers: c.inactiveAfterOffers }} />
+        </section>
+
+        <section>
+          <h3>Automatic replies</h3>
+          <p className="muted small" style={{ marginBottom: 10 }}>
+            What a template&apos;s quick-reply buttons do is set on each template. Test first: the log shows what would happen while customers still get today&apos;s replies.
+          </p>
+          <AutomationForm clientId={c.id} initial={{ mode: c.automationMode, staffPauseMinutes: c.staffPauseMinutes }} />
         </section>
 
         <section>

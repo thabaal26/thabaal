@@ -9,6 +9,7 @@ import { ReplyInbox, type ChatProfile } from "./reply-inbox";
 import "./chats.css";
 import { templateLabel } from "@/lib/plain-error";
 import { planGate } from "@/app/dashboard/plan-lock";
+import { chatAutomation } from "@/lib/engine/conversation";
 
 export const metadata: Metadata = { title: "Chats" };
 export const dynamic = "force-dynamic";
@@ -188,7 +189,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
   const thread: ConversationEntry[] = [];
   let profile: ChatProfile | null = null;
   if (selected) {
-    const [msgs, reps, info] = await Promise.all([
+    const [msgs, reps, info, automation] = await Promise.all([
       db.message.findMany({
         where: { customerId: selected.customer.id, status: { not: "QUEUED" } },
         include: { run: { select: { campaign: { select: { name: true } } } }, sender: { select: { label: true } } },
@@ -214,6 +215,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
           orders: { orderBy: { createdAt: "desc" }, take: 3, select: { id: true, number: true, ref: true, total: true, currency: true, status: true, createdAt: true } },
         },
       }),
+      chatAutomation(selected.customer.id),
     ]);
     if (info) {
       profile = {
@@ -224,6 +226,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
         unreachable: info.unreachable,
         orderCount: info._count.orders,
         orders: info.orders,
+        automation: { paused: automation.paused, until: automation.until, reason: automation.reason },
       };
     }
     thread.push(

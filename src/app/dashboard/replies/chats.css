@@ -37,7 +37,7 @@ html.dark .thabaal-portal .wa-app{
   --wa-read:#53BDEB; --wa-sel:#21475F; --wa-hover:#18405A; --wa-time:#FFC329; --wa-doodle:rgba(255,249,240,.035)}
 @media (min-width:1280px){.thabaal-portal .wa-app.info{grid-template-columns:clamp(270px,24%,420px) minmax(0,1fr) clamp(300px,22%,400px)}}
 /* With contact info open the chat is narrower: the name keeps the room (the panel shows who it is). */
-.thabaal-portal .wa-app.info .wa-ch .wa-win{display:none}
+.thabaal-portal .wa-app.info .wa-ch .wa-win,.thabaal-portal .wa-app.info .wa-ch .wa-auto{display:none}
 
 /* ── Chat list ── */
 .thabaal-portal .wa-list{display:flex;flex-direction:column;min-height:0;min-width:0;border-right:1px solid var(--line)}
@@ -91,6 +91,8 @@ html.dark .thabaal-portal .wa-app{
 .thabaal-portal .wa-who p.claim{color:var(--warn);font-weight:600}
 .thabaal-portal .wa-win{flex:none;font-size:12px;font-weight:700;border-radius:999px;padding:3px 10px;background:var(--ok-bg);color:var(--ok);white-space:nowrap}
 .thabaal-portal .wa-win.closed{background:var(--warn-bg);color:var(--warn)}
+/* Automatic replies paused for this chat (staff paused them, or a staff reply is recent). */
+.thabaal-portal .wa-auto{flex:none;font-size:12px;font-weight:700;border-radius:999px;padding:3px 10px;background:var(--warn-bg);color:var(--warn);white-space:nowrap}
 .thabaal-portal .wa-ib{flex:none;width:38px;height:38px;border-radius:50%;display:inline-grid;place-items:center;border:0;background:transparent;color:var(--muted);cursor:pointer;text-decoration:none}
 .thabaal-portal .wa-ib:hover,.thabaal-portal .wa-ib[aria-expanded=true]{background:rgba(16,40,59,.07);color:var(--fg)}
 html.dark .thabaal-portal .wa-ib:hover,html.dark .thabaal-portal .wa-ib[aria-expanded=true]{background:rgba(255,249,240,.08)}
@@ -207,7 +209,7 @@ html.dark .thabaal-portal .wa-file{background:rgba(255,249,240,.08)}
   .thabaal-portal .wa-app[data-view=chat] .wa-comp,.thabaal-portal .wa-app[data-view=chat] .wa-closed{padding-bottom:max(8px,env(safe-area-inset-bottom,0px))}
   .thabaal-portal .wa-back{display:inline-grid}
   .thabaal-portal .wa-info{position:fixed;inset:0;z-index:46;width:auto;border-left:0}
-  .thabaal-portal .wa-ch .wa-win{display:none}
+  .thabaal-portal .wa-ch .wa-win,.thabaal-portal .wa-ch .wa-auto{display:none}
   .thabaal-portal .wa-hint .wa-win-sm{display:inline}
   .thabaal-portal .wa-msgs{padding:8px 10px 12px}
   .thabaal-portal .wa-b{max-width:88%}

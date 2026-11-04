@@ -6,6 +6,7 @@ import { memo } from "./request-memo";
 import { placeholders, renderFor, resolveVar, toPlainText, unmappedVars, type TemplateButton, type VarMap } from "./template";
 import { getSession, sendImage, sendText, type WahaConfig } from "./waha";
 import { NOT_CONNECTED, sendTemplateMessage, waConfig, type WaConfig } from "./whatsapp";
+import { PAYLOAD_PREFIX, quickReplies } from "./engine/keys";
 
 export type ProviderName = "META" | "LOCAL";
 
@@ -108,8 +109,24 @@ export async function deliver(
     catalogThumbnailProductId,
     urlButtonParams,
     otpCode: resolvedOtp,
+    quickReplyPayloads: isAuth ? [] : await payloadsFor(t.clientId, buttons),
   });
   return { ...res, provider, text };
+}
+
+// Businesses whose button taps run their saved actions (Client.automationMode "engine") get our payload on every
+// quick-reply button, so a tap names its button exactly. Read once a minute per business, not once per message.
+const modeCache = new Map<string, { mode: string; at: number }>();
+async function payloadsFor(clientId: string, buttons: TemplateButton[]) {
+  const replies = quickReplies(buttons);
+  if (!replies.length) return [];
+  let hit = modeCache.get(clientId);
+  if (!hit || Date.now() - hit.at > 60_000) {
+    const c = await db.client.findUnique({ where: { id: clientId }, select: { automationMode: true } });
+    hit = { mode: c?.automationMode ?? "legacy", at: Date.now() };
+    modeCache.set(clientId, hit);
+  }
+  return hit.mode === "engine" ? replies.map((r) => ({ index: r.index, payload: `${PAYLOAD_PREFIX}${r.key}` })) : [];
 }
 
 /** Meta needs an approved template; the local session can send any saved one. */
