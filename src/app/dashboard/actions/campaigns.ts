@@ -19,7 +19,7 @@ import { sendToCustomer } from "./send";
 import type { ActionResult } from "./templates";
 import { trackPress } from "@/lib/usage";
 import { notOpeningOffers } from "@/lib/engagement";
-import { cleanSegments } from "@/lib/engagement-segments";
+import { cleanSegments, segmentSummary, type SegmentSummary } from "@/lib/engagement-segments";
 import { planCapacityBlock } from "@/lib/subscription";
 
 export type CampaignInput = {
@@ -215,6 +215,12 @@ async function formClient(campaignId: string | null) {
   if (!campaignId) return s.clientId ?? null;
   const c = await db.campaign.findUnique({ where: { id: campaignId }, select: { clientId: true } });
   return c && mine(s, c.clientId) ? c.clientId : null;
+}
+
+/** The engagement groups right now, for the campaign form to refresh its counts while it is open. */
+export async function liveSegmentSummary(campaignId: string | null): Promise<SegmentSummary | null> {
+  const clientId = await formClient(campaignId);
+  return clientId ? segmentSummary(clientId) : null;
 }
 
 /**

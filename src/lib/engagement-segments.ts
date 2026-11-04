@@ -13,6 +13,9 @@ import { INACTIVE_TAG } from "./schedule";
 //   inactive – Inactive (low engagement): their last inactiveAfterOffers (default 3) delivered offers in a row got
 //              no tap, reply or order after them, and nothing within engagementDays.
 //   new      – Not reached yet: no offer has reached them and they never tapped, replied or ordered.
+// Customers the business moved to Inactive (the "inactive" tag, usually after messages failed) are in the Inactive group
+// too, and stay out of every send. The tag comes off by itself the moment they tap, reply or order (lib/replies.ts),
+// so the next read puts them in Super active: the groups follow what people do, live.
 //
 // Kept apart from it, never mixed into one status (a Super active customer can still be unreachable today):
 //   delivery  – what happened to their latest offer (delivered / read / failed with Meta's code),
@@ -145,9 +148,11 @@ export async function engagementRows(clientId: string, opts: { customerIds?: str
     ${opts.customerIds ? Prisma.sql`WHERE p.id IN (${Prisma.join(opts.customerIds)})` : Prisma.empty}`;
   return rows.map((r) => {
     const base = { lastInteractionAt: r.last_interaction, delivered: Number(r.delivered), sinceInteraction: Number(r.since) };
+    // Moved to Inactive by the business: in that group whatever they did before (the move came after it).
+    const segment: Segment = r.moved ? "inactive" : segmentOf(base, rules, now);
     return {
       id: r.id,
-      segment: segmentOf(base, rules, now),
+      segment,
       ...base,
       buttons: Number(r.buttons ?? 0),
       replies: Number(r.replies ?? 0),
@@ -170,8 +175,9 @@ export async function hasCampaignHistory(clientId: string) {
 export type SegmentSummary = {
   history: boolean;
   rules: { days: number; offers: number };
-  /** Per segment: customers a campaign can reach now, and those in it who can't (suppressed or paused by Meta). */
-  segments: Record<Segment, { eligible: number; excluded: number }>;
+  /** Per segment: customers a campaign can reach now, those in it who can't (suppressed or paused by Meta), and of
+   * those how many the business moved to Inactive. */
+  segments: Record<Segment, { eligible: number; excluded: number; moved: number }>;
   /** Active, split: read at least one offer vs. only delivered. */
   activeRead: number;
   totals: { customers: number; eligible: number; optedOut: number; unreachable: number; movedInactive: number; paused: number; invalidNumber: number };
@@ -187,10 +193,11 @@ export async function segmentSummary(clientId: string, now = new Date()): Promis
     engagementRules(clientId),
     db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM "Customer" WHERE "clientId" = ${clientId} AND length(regexp_replace(phone, '\\D', '', 'g')) < 10`,
   ]);
-  const segments = Object.fromEntries(SEGMENTS.map((s) => [s, { eligible: 0, excluded: 0 }])) as SegmentSummary["segments"];
+  const segments = Object.fromEntries(SEGMENTS.map((s) => [s, { eligible: 0, excluded: 0, moved: 0 }])) as SegmentSummary["segments"];
   let activeRead = 0;
   for (const r of rows) {
     segments[r.segment][eligibleRow(r) ? "eligible" : "excluded"]++;
+    if (r.movedToInactive) segments[r.segment].moved++;
     if (r.segment === "active" && r.read > 0 && eligibleRow(r)) activeRead++;
   }
   return {
