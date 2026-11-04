@@ -6,6 +6,7 @@ import { after, before, describe, test } from "node:test";
 import { campaignAudienceWhere } from "../../src/lib/audiences";
 import { db } from "../../src/lib/db";
 import { startRun } from "../../src/lib/dispatcher";
+import { segmentSummary } from "../../src/lib/engagement-segments";
 import { heldSummary, retryHeldBack } from "../../src/lib/held";
 import { inactiveCandidates, moveToInactive } from "../../src/lib/inactive";
 
@@ -83,13 +84,17 @@ describe("failure suggestions: send again after 24 h, Inactive", () => {
   });
 
   test("4. Inactive people are left out of campaigns unless the campaign picks the tag or adds them", async () => {
+    await db.customer.update({ where: { id: ids.gone }, data: { unreachable: true } });
     assert.equal(await moveToInactive(clientId, [ids.gone, ids.test]), 2);
     assert.equal(await moveToInactive(clientId, [ids.gone]), 0, "already there");
+    const summary = await segmentSummary(clientId);
+    assert.equal(summary.totals.unreachable, 1);
+    assert.equal(summary.totals.movedInactive, 2, "manual Inactive count includes customers who are also unreachable");
     const names = async (tag: string | null, people = {}) =>
       (await db.customer.findMany({ where: await campaignAudienceWhere(clientId, tag, people), select: { name: true }, orderBy: { name: "asc" } })).map((c) => c.name);
     const everyone = await names(null);
     assert.ok(!everyone.includes("test") && !everyone.includes("gone") && everyone.includes("ok"));
-    assert.deepEqual(await names("inactive"), ["gone", "test"]);
+    assert.deepEqual(await names("inactive"), ["test"], "unreachable customers stay out even when Inactive is selected");
     assert.ok((await names(null, { includeIds: [ids.test] })).includes("test"), "added by hand");
     assert.equal((await inactiveCandidates([runs.done])).experiment.length, 0, "no suggestion once moved");
   });

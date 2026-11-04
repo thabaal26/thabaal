@@ -49,6 +49,8 @@ export type EngagementRow = {
   read: number;
   /** Delivered offers since their last tap, reply or order (all of them when there was none). */
   sinceInteraction: number;
+  /** Whether this customer has the business's manual Inactive tag, independent of other suppression reasons. */
+  movedToInactive: boolean;
   lastOffer: { status: string; at: Date | null; errorCode: number | null } | null;
   suppressed: "opted-out" | "unreachable" | "moved-inactive" | null;
   pausedUntil: Date | null;
@@ -151,6 +153,7 @@ export async function engagementRows(clientId: string, opts: { customerIds?: str
       replies: Number(r.replies ?? 0),
       orders: Number(r.orders ?? 0),
       read: Number(r.read),
+      movedToInactive: r.moved,
       lastOffer: r.last_status ? { status: r.last_status, at: r.last_at, errorCode: r.last_code } : null,
       suppressed: r.optedOut ? "opted-out" : r.unreachable ? "unreachable" : r.moved ? "moved-inactive" : null,
       pausedUntil: r.paused_at ? new Date(r.paused_at.getTime() + SKIP_DAYS * 86_400_000) : null,
@@ -200,7 +203,9 @@ export async function segmentSummary(clientId: string, now = new Date()): Promis
       eligible: rows.filter(eligibleRow).length,
       optedOut: rows.filter((r) => r.suppressed === "opted-out").length,
       unreachable: rows.filter((r) => r.suppressed === "unreachable").length,
-      movedInactive: rows.filter((r) => r.suppressed === "moved-inactive").length,
+      // A customer may also be opted out or unreachable. Count the manual tag independently from the
+      // single suppression reason shown in the UI, so overlapping statuses do not hide moved customers.
+      movedInactive: rows.filter((r) => r.movedToInactive).length,
       paused: rows.filter((r) => !r.suppressed && r.pausedUntil).length,
       invalidNumber: bad[0]?.n ?? 0,
     },

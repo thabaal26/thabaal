@@ -118,6 +118,13 @@ export function SegmentPicker({ summary, value, onChange, capacity }: { summary:
                   <span className="tabular text-sm font-semibold">{n(seg.eligible)}</span>
                 </span>
                 <span className="block text-xs text-muted">{sub}</span>
+                {s === "inactive" && (
+                  <span className="block text-xs text-warning" data-testid="moved-inactive-count">
+                    {isTa
+                      ? `${n(t.movedInactive)} பேரை நீங்கள் Inactive-க்கு மாற்றியுள்ளீர்கள் · பிரச்சாரங்களில் விலக்கு`
+                      : `${n(t.movedInactive)} moved to Inactive · excluded from campaigns`}
+                  </span>
+                )}
               </span>
             </button>
           );
