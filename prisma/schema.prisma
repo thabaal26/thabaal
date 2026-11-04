@@ -993,10 +993,16 @@ model RazorpayEvent {
 model InboundEvent {
   id          String    @id // Meta's message id (wamid)
   clientId    String?
+  /// Meta's message type (text, button, interactive…), for the admin's inbound check.
+  kind        String?
+  createdAt   DateTime  @default(now())
   receivedAt  DateTime  @default(now())
   processedAt DateTime?
+  /// Why handling failed last time (Admin › Inbound); the claim is then free for Meta's retry.
+  lastError   String?
 
   @@index([receivedAt])
+  @@index([createdAt])
 }
 
 /// A customer's chat state for automation (lib/engine): staff can pause automatic replies, and resume them.
