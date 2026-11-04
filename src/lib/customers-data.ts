@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "./db";
 import { computeCustomerLoyalty, isInternalLoyaltyTag } from "./loyalty";
 import { mergePurchases } from "./linked-numbers";
+import { engagementRows, type Segment } from "./engagement-segments";
 import { loyaltyRulesFor } from "./loyalty-rules";
 import { saleSql } from "@/lib/sale-sql";
 
@@ -43,6 +44,8 @@ export type CustomerRow = {
   badPhone: boolean;
   /** The same person's other numbers (lib/linked-numbers.ts), so a search by any of them finds every row. */
   others: string[];
+  /** How they respond to campaigns (lib/engagement-segments.ts), null before the business's first campaign. */
+  segment: Segment | null;
 };
 
 export const TIER_TONE: Record<Tier, "ok" | "warn" | "mute" | "info"> = { Platinum: "ok", Gold: "warn", Silver: "mute", New: "info", "No orders": "mute" };
@@ -91,7 +94,10 @@ export async function customersData(clientId: string, opts: { clientName?: strin
     LIMIT 5000
   `;
 
-  const rules = await rulesP;
+  const [rules, engagement] = await Promise.all([rulesP, engagementRows(clientId)]);
+  // Before any campaign there is no history: no segment rather than everyone "Not reached yet".
+  const reached = engagement.some((e) => e.delivered > 0 || e.lastOffer);
+  const segmentOf = new Map(engagement.map((e) => [e.id, e.segment]));
   // One person, several numbers (lib/linked-numbers.ts): every row of the person shows the person's orders, spend,
   // points, tier and buying status; the cart, chats and the number's own state stay per number.
   const group = new Map<string, typeof rows>();
@@ -166,6 +172,7 @@ export async function customersData(clientId: string, opts: { clientName?: strin
       tags: own.tags.filter((t) => !t.startsWith("product:") && !isInternalLoyaltyTag(t) && plain(t) !== clientTag),
       badPhone: digits.length < 10,
       others: r.personId ? (numbersOf.get(r.personId) ?? []).filter((p) => p !== r.phone) : [],
+      segment: reached ? (segmentOf.get(r.id) ?? null) : null,
     };
   });
 

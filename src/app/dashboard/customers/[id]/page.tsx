@@ -17,6 +17,8 @@ import { formatPhone } from "@/lib/phone";
 import { replyWindowEnd } from "@/lib/replies";
 import { marketingPaused } from "@/lib/held";
 import { mergePurchases, otherNumbers } from "@/lib/linked-numbers";
+import { customerEngagementHistory, engagementRows, hasCampaignHistory } from "@/lib/engagement-segments";
+import { EngagementCard } from "./engagement-card";
 import { isInternalLoyaltyTag } from "@/lib/loyalty";
 import { homeCityOf, regionsFor } from "@/lib/regions";
 import { readFields, readValues, showValue } from "@/lib/custom-fields";
@@ -56,7 +58,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
   });
   if (!c) notFound();
 
-  const [templates, numbers, paused, others, otherOrders] = await Promise.all([
+  const [templates, numbers, paused, others, otherOrders, engagement, engagementHistory, hasHistory] = await Promise.all([
     sendableTemplates(c.clientId).then((sendable) =>
       db.template.findMany({ where: { clientId: c.clientId, status: "APPROVED", name: { notIn: META_SAMPLES }, ...sendable }, orderBy: { name: "asc" } }),
     ),
@@ -65,6 +67,9 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
     otherNumbers(c.clientId, c),
     // One person, several numbers: their orders on the other numbers count here too (lib/linked-numbers.ts).
     c.personId ? db.order.findMany({ where: { clientId: c.clientId, customer: { personId: c.personId }, customerId: { not: c.id } }, orderBy: { createdAt: "desc" }, take: 100 }) : [],
+    engagementRows(c.clientId, { customerIds: [c.id] }),
+    customerEngagementHistory(c.clientId, c.id),
+    hasCampaignHistory(c.clientId),
   ]);
   const orders = otherOrders.length ? [...c.orders, ...otherOrders].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()) : c.orders;
   const personTags = [...c.tags, ...others.flatMap((o) => o.tags.filter(isInternalLoyaltyTag))];
@@ -253,6 +258,8 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
             sheetPurchases={personPurchases}
             rules={loyaltyRules(c.client)}
           />
+
+          <EngagementCard row={engagement[0]} history={engagementHistory} hasHistory={hasHistory} />
 
           <Card className="card-3d overflow-hidden">
             <CardHeader tone="brand" icon={<Messages3D />} title="Conversation" description="Messages sent to this customer and what they wrote back. The newest is at the bottom." />

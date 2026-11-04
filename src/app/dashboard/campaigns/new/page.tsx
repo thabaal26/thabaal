@@ -19,7 +19,7 @@ export default async function NewCampaignPage({ searchParams }: { searchParams: 
   const scope = await getScope();
   if (!scope.canManage) redirect("/dashboard/campaigns");
   if (!scope.clientId) return <><PageHeader title="New campaign" back={{ href: "/dashboard/campaigns", label: "Campaigns" }} /><PickClientNotice what="campaign" /></>;
-  const { templates, audience, numbers } = await campaignFormData(scope.clientId);
+  const { templates, audience, numbers, segments } = await campaignFormData(scope.clientId);
   const defaultAccount = numbers[0]?.businessAccountId;
   const tomorrow = daysAgo(-1).toISOString().slice(0, 10);
   return (
@@ -30,6 +30,7 @@ export default async function NewCampaignPage({ searchParams }: { searchParams: 
         templates={templates}
         audience={audience}
         numbers={numbers}
+          segments={segments}
         initial={{
           name: tag ? `For ${tag.replace(/^aud:/, "saved group ")}` : "",
           // Campaigns are promotions: start on the first approved Marketing template (not an order update such as
@@ -50,6 +51,7 @@ export default async function NewCampaignPage({ searchParams }: { searchParams: 
           includeIds: [],
           excludeIds: [],
           skipUnread: false,
+          segments: [],
         }}
       />
     </>

@@ -588,7 +588,7 @@ export async function POST(req: NextRequest) {
               await joinFromWhatsApp({ phone: m.from, profileName, source: join[1], phoneNumberId }).catch((e) => console.error("Could not add joining customer", e));
             }
             const profileName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name ?? null;
-            const customer = await recordReply({ phone: m.from, text, kind, media, waMessageId: m.id, phoneNumberId, at: m.timestamp ? new Date(Number(m.timestamp) * 1000) : undefined, profileName });
+            const customer = await recordReply({ phone: m.from, text, kind, media, waMessageId: m.id, contextId: m.context?.id ? String(m.context.id) : null, phoneNumberId, at: m.timestamp ? new Date(Number(m.timestamp) * 1000) : undefined, profileName });
             const clientName = customer?.client?.name || "Thabaal";
 
             // The shop takes orders and payments on its main number (Payment settings › How orders work): no carts,

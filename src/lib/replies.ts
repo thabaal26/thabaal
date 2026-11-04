@@ -23,6 +23,8 @@ export type IncomingReply = {
   text: string;
   kind: "text" | "button" | "media" | "order";
   waMessageId?: string;
+  /** Our message they tapped a button on or replied to (Meta's context.id), for campaign attribution. */
+  contextId?: string | null;
   at?: Date;
   /** Meta phone number that received it; absent for the shared local session. */
   phoneNumberId?: string;
@@ -84,7 +86,7 @@ export async function recordReply(r: IncomingReply) {
 
   try {
     await db.reply.create({
-      data: { customerId: customer.id, senderId, text: r.text.trim().slice(0, 4000), kind: r.kind, mediaId: r.media?.id, mediaType: r.media?.type, waMessageId: r.waMessageId, receivedAt: r.at ?? new Date() },
+      data: { customerId: customer.id, senderId, text: r.text.trim().slice(0, 4000), kind: r.kind, mediaId: r.media?.id, mediaType: r.media?.type, waMessageId: r.waMessageId, contextId: r.contextId ?? null, receivedAt: r.at ?? new Date() },
     });
   } catch (e) {
     // Webhooks retry; the same message id arriving twice is expected.

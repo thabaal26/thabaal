@@ -72,21 +72,36 @@ export async function windowFreesAt(numberIds: string[]) {
   return oldest?.sentAt ? new Date(oldest.sentAt.getTime() + DAY_MS + 60_000) : new Date(Date.now() + 30 * 60_000);
 }
 
+/**
+ * The business portfolio's limit from Meta's answer. Meta now sets limits per portfolio and reports them in
+ * `whatsapp_business_manager_messaging_limit` (`messaging_limit_tier` is deprecated), e.g. "TIER_250".
+ * https://developers.facebook.com/docs/whatsapp/messaging-limits
+ */
+export function tierFromMeta(j: { whatsapp_business_manager_messaging_limit?: unknown; messaging_limit_tier?: unknown }): string | null {
+  const lim = j.whatsapp_business_manager_messaging_limit;
+  const fromNew = typeof lim === "string" ? lim : lim && typeof lim === "object" ? ((lim as Record<string, unknown>).tier ?? (lim as Record<string, unknown>).current_limit) : null;
+  const tier = typeof fromNew === "string" ? fromNew : typeof j.messaging_limit_tier === "string" ? j.messaging_limit_tier : null;
+  return tier?.toUpperCase() ?? null;
+}
+
 /** Pulls quality and limit tier from Meta. Failures leave the stored values alone. */
 export async function refreshNumberStatus(n: Pick<WhatsAppNumber, "id" | "phoneNumberId" | "token">, clientToken: string | null) {
   const token = n.token ?? clientToken;
   if (!token) return null;
-  const res = await fetch(
-    `https://graph.facebook.com/${process.env.META_GRAPH_VERSION ?? "v23.0"}/${n.phoneNumberId}?fields=quality_rating,messaging_limit_tier,display_phone_number,verified_name`,
-    { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" },
-  ).catch(() => null);
-  const j = res && (await res.json().catch(() => null));
+  const get = (fields: string) =>
+    fetch(`https://graph.facebook.com/${process.env.META_GRAPH_VERSION ?? "v23.0"}/${n.phoneNumberId}?fields=${fields}`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" })
+      .then((r) => r.json())
+      .catch(() => null);
+  const base = "quality_rating,display_phone_number,verified_name";
+  // The portfolio limit field first; an older API version that doesn't know it gets the deprecated one.
+  let j = await get(`${base},whatsapp_business_manager_messaging_limit,messaging_limit_tier`);
+  if (j?.error) j = await get(`${base},messaging_limit_tier`);
   if (!j || j.error) return null;
   return db.whatsAppNumber.update({
     where: { id: n.id },
     data: {
       qualityRating: j.quality_rating ?? null,
-      messagingTier: j.messaging_limit_tier ?? null,
+      messagingTier: tierFromMeta(j),
       ...(j.display_phone_number && { displayPhone: j.display_phone_number }),
       ...(j.verified_name && { verifiedName: j.verified_name }),
       statusCheckedAt: new Date(),
@@ -114,7 +129,8 @@ export async function numberHealth(clientId: string) {
       const meta = tierLimit(n.messagingTier);
       const used = n.dailyCap != null ? a.numberUsed : a.clientUsed;
       const limit = n.dailyCap != null ? Math.min(n.dailyCap, meta ?? Infinity) : meta;
-      return { ...n, used, limit, left: a.unlimited ? null : a.left, tier: tierLabel(n.messagingTier) };
+      // tierKnown: Meta told us the limit; otherwise the 250 above is only the safe assumption for sending.
+      return { ...n, used, limit, left: a.unlimited ? null : a.left, tier: tierLabel(n.messagingTier), tierKnown: Boolean(n.messagingTier && n.messagingTier.toUpperCase() in TIERS) };
     }),
   );
 }
