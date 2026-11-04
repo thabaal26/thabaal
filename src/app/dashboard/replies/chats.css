@@ -55,8 +55,8 @@ html.dark .thabaal-portal .wa-app{
 .thabaal-portal .wa-f small{font-size:11.5px;opacity:.8}
 .thabaal-portal .wa-f:hover{color:var(--fg)}
 .thabaal-portal .wa-f[aria-current=true]{background:var(--mango);color:#10283B}
-/* Second row: engagement groups (Super active / Active / Inactive), a little smaller than the status chips. */
-.thabaal-portal .wa-groups{margin-top:-2px}
+/* The one filter row: All + the campaign groups. Wraps instead of scrolling sideways, so every chip is in view. */
+.thabaal-portal .wa-groups{flex-wrap:wrap;overflow:visible}
 .thabaal-portal .wa-groups .wa-f{padding:3px 10px;font-size:12.5px}
 .thabaal-portal .wa-groups .wa-f small{opacity:1}
 .thabaal-portal .wa-rows{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}

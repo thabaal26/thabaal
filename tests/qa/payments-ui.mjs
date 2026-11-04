@@ -318,7 +318,8 @@ await check(27, "Chat confirm opens Record payment; recording with the UTR marks
     data: { ref, clientId: S.shopId, customerId: reply.customerId, items: [{ id: "QA-001", name: "Groundnut oil 1L", quantity: 1, price: 360 }], total: 360, status: "CONFIRMED", paymentClaimedAt: new Date(), paymentRequestedAt: new Date() },
   });
   await p.goto(`${BASE}/dashboard/replies?r=${reply.customerId}`, { waitUntil: "networkidle" });
-  // A quick action above the message box (Chats in WhatsApp's layout).
+  // In the contact info panel (the chat header opens it), not under the message box.
+  await p.locator(".wa-who").first().click();
   await p.getByRole("button", { name: "Payment received: confirm" }).first().click();
   const sh = sheet("Record payment");
   await sh.waitFor();

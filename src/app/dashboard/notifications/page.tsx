@@ -126,7 +126,7 @@ export default async function NotificationsPage({
       phone: r.customer.phone,
       description: r.text || (r.kind ? `Sent a ${r.kind}` : "Customer responded to WhatsApp message"),
       date: r.receivedAt,
-      href: `/dashboard/replies?show=${r.handled ? "all" : "open"}`,
+      href: `/dashboard/replies?r=${r.customerId}`,
       unread: !r.handled,
     });
   }

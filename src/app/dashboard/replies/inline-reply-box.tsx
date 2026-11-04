@@ -41,7 +41,7 @@ export function InlineReplyBox({
   windowLeft?: string | null;
   createOrderHref: string;
   onTypingChange?: (isTyping: boolean) => void;
-  /** Quick actions from the chat (mark paid, send products, mark handled), shown as chips. */
+  /** Quick actions from the chat (send products, mark handled), shown as chips. */
   actions?: React.ReactNode;
 }) {
   const router = useRouter();

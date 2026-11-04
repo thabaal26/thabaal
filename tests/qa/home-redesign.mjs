@@ -68,7 +68,7 @@ try {
     const h = await card.locator("h2").innerText();
     expect(n > 0 && h === `${n} of ${m} need you now`, `heading "${h}" for ${n} tiles, ${m} kinds`);
     const hrefs = Object.fromEntries(await card.locator("[data-todo]").evaluateAll((els) => els.map((e) => [e.dataset.todo, e.getAttribute("href")])));
-    expect(hrefs.carts === "/dashboard/orders?show=unpaid" && hrefs.pack === "/dashboard/orders?show=topack" && hrefs.chats === "/dashboard/replies?show=open", JSON.stringify(hrefs));
+    expect(hrefs.carts === "/dashboard/orders?show=unpaid" && hrefs.pack === "/dashboard/orders?show=topack" && hrefs.chats === "/dashboard/replies", JSON.stringify(hrefs));
     expect((await card.locator(".todo.first").count()) === 1, "no first tile");
     return `"${h}"`;
   });

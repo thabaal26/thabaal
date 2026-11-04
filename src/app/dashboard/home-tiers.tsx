@@ -193,7 +193,7 @@ export function HomeTiers(p: HomeTiersProps) {
       key: "chats",
       n: p.unhandledRepliesCount,
       urgent: chatsUrgent,
-      href: "/dashboard/replies?show=open",
+      href: "/dashboard/replies",
       big: String(p.unhandledRepliesCount),
       title: "Chats waiting",
       titleTa: "காத்திருக்கும் உரையாடல்கள்",

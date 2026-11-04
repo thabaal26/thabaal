@@ -15,16 +15,8 @@ import { engagementRows, hasCampaignHistory, SEGMENT_LABEL } from "@/lib/engagem
 export const metadata: Metadata = { title: "Chats" };
 export const dynamic = "force-dynamic";
 
-// Every chat by default, as in the design; "Open" narrows to the ones still waiting.
-/** The groups Chats can be narrowed to ("Not reached yet" customers have no chat to show here). */
+// Every chat by default; the only filter is the campaign group ("Not reached yet" customers have no chat to show here).
 const CHAT_GROUPS = ["super", "active", "inactive"] as const;
-
-const TABS = [
-  { key: "", label: "All", labelTa: "அனைத்தும்" },
-  { key: "open", label: "Open", labelTa: "திறந்தவை" },
-  { key: "handled", label: "Handled", labelTa: "பார்த்தவை" },
-  { key: "sent", label: "Sent", labelTa: "அனுப்பியவை" },
-] as const;
 
 /** Customers we messaged (a campaign, an order update) who haven't written back show as chats this many days. */
 const SENT_DAYS = 7;
@@ -32,11 +24,10 @@ const SENT_DAYS = 7;
 export default async function RepliesPage({ searchParams }: PageProps<"/dashboard/replies">) {
   const locked = await planGate();
   if (locked) return locked;
-  const { show: rawShow = "", r: picked, group: rawGroup = "" } = await searchParams;
-  // By how they respond to campaigns (lib/engagement-segments.ts), on top of Open / Handled / Sent.
+  // Older links may still carry ?show=open|handled|sent: those open every chat now.
+  const { r: picked, group: rawGroup = "" } = await searchParams;
+  // By how they respond to campaigns (lib/engagement-segments.ts), the same groups the campaign form shows.
   const group = typeof rawGroup === "string" && (CHAT_GROUPS as readonly string[]).includes(rawGroup) ? (rawGroup as (typeof CHAT_GROUPS)[number]) : "";
-  // Older links say show=all for everything.
-  const show = rawShow === "all" ? "" : rawShow;
   const scope = await getScope();
   const mine = ownedMessages(scope);
 
@@ -169,17 +160,6 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
   // Newest activity first: their last message to us, or ours to them when they haven't written.
   const allThreads = [...replyThreads, ...sentThreads].sort((a, b) => b.receivedAt.getTime() - a.receivedAt.getTime());
   const openThreadsCount = replyThreads.filter((t) => !t.handled).length;
-  const handledThreadsCount = replyThreads.filter((t) => t.handled).length;
-  const tabCount = {
-    "": allThreads.length,
-    open: openThreadsCount,
-    handled: handledThreadsCount,
-    sent: sentThreads.length,
-  };
-
-  const byStatus = allThreads.filter((t) =>
-    show === "handled" ? t.handled && t.kind !== "sent" : show === "open" ? !t.handled : show === "sent" ? t.kind === "sent" : true,
-  );
   // Each chat's group, read live for this business's own customers (none before its first campaign).
   const groupOf = new Map<string, string>();
   if (scope.clientId && (await hasCampaignHistory(scope.clientId))) {
@@ -187,9 +167,9 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
     for (const e of await engagementRows(scope.clientId, { customerIds: ids })) groupOf.set(e.id, e.segment);
   }
   const groups = groupOf.size
-    ? CHAT_GROUPS.map((key) => ({ key, label: SEGMENT_LABEL[key].en, labelTa: SEGMENT_LABEL[key].ta, count: byStatus.filter((t) => groupOf.get(t.customer.id) === key).length }))
+    ? CHAT_GROUPS.map((key) => ({ key, label: SEGMENT_LABEL[key].en, labelTa: SEGMENT_LABEL[key].ta, count: allThreads.filter((t) => groupOf.get(t.customer.id) === key).length }))
     : null;
-  const replies = group && groups ? byStatus.filter((t) => groupOf.get(t.customer.id) === group) : byStatus;
+  const replies = group && groups ? allThreads.filter((t) => groupOf.get(t.customer.id) === group) : [...allThreads];
 
   // Computers show the picked customer's conversation beside the list (the newest customer thread by default).
   let selected = replies.find((x) => x.id === picked || x.customer.id === picked);
@@ -280,8 +260,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
         selectedId={selected?.id}
         thread={thread}
         profile={profile}
-        show={typeof show === "string" ? show : ""}
-        filters={TABS.map((t) => ({ ...t, count: tabCount[t.key] }))}
+        total={allThreads.length}
         group={groups ? group : ""}
         groups={groups}
         openCount={openThreadsCount}

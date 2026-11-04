@@ -1,6 +1,8 @@
-// Chats › by group (replies/page.tsx + reply-inbox.tsx): Super active / Active / Inactive chips under Open / Handled /
-// Sent, combined with them, counted live from the business's campaigns; a tap on WhatsApp moves the customer into Super
-// active; a business without campaigns sees no group chips. End to end through Meta's signed webhook on the QA app.
+// Chats › by group (replies/page.tsx + reply-inbox.tsx): one chip row, All · Super active · Active · Inactive (the groups
+// the campaign form splits customers into), counted live; no Open / Handled / Sent chips; the row wraps instead of
+// scrolling sideways; Mark handled sits under the chat box and Mark order paid doesn't (it's in contact info); a tap
+// on WhatsApp moves the customer into Super active; a business without campaigns sees no chips. End to end through
+// Meta's signed webhook on the QA app.
 //   node tests/qa/chats-groups.mjs   (on a running `node tests/qa/serve.mjs`)
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -44,6 +46,8 @@ for (const [k, name] of ["Tapper", "Quiet", "Moved"].entries()) {
   await db.message.create({ data: { runId: qrun.id, customerId: c.id, templateId: t.id, templateName: t.name, status: "DELIVERED", waMessageId: `wamid.qa-grp-${run}-${k}`, sentAt: new Date(Date.now() - 3600_000), deliveredAt: new Date(Date.now() - 3500_000) } });
   who[name] = c;
 }
+// Tapper also has an unpaid order: the paid button belongs in contact info, not under the chat box.
+await db.order.create({ data: { ref: `QA-GRP-${run}`, clientId: S.shopId, customerId: who.Tapper.id, items: [{ id: "QA-001", name: "Groundnut oil 1L", quantity: 1, price: 360 }], total: 360, status: "CONFIRMED", paymentRequestedAt: new Date() } });
 const tapNow = (c, k) =>
   webhook({ contacts: [{ wa_id: c.phone, profile: { name: c.name } }], messages: [{ from: c.phone, id: `wamid.qa-grp-tap-${run}-${k}`, timestamp: String(Math.floor(Date.now() / 1000)), type: "button", button: { text: "View Products", payload: "View Products" }, context: { id: `wamid.qa-grp-${run}-${k}` } }] });
 await tapNow(who.Tapper, 0);
@@ -62,12 +66,17 @@ const go = (path) => m.goto(BASE + path, { waitUntil: "networkidle", timeout: 60
 const names = async () => (await m.locator(".wa-app a[href*='replies?']").allInnerTexts()).join(" | ");
 const chip = (g) => m.getByTestId("chat-groups").locator(`[data-group=${g}]`);
 
-await check("Group chips sit under Open / Handled / Sent, each with its count", async () => {
+await check("One row: All · Super active · Active · Inactive with counts; no Open / Handled / Sent", async () => {
   await go("/dashboard/replies");
   const row = m.getByTestId("chat-groups");
   await row.waitFor();
   const text = await row.innerText();
-  expect(/Super active/.test(text) && /Active/.test(text) && /Inactive/.test(text), `chips: ${text}`);
+  const keys = await row.locator("[data-group]").evaluateAll((els) => els.map((e) => e.dataset.group).join(","));
+  expect(keys === "all,super,active,inactive", `chips: ${keys}`);
+  expect((await chip("all").getAttribute("aria-current")) === "true", "All not marked");
+  expect(num(await chip("all").innerText()) === (await m.getByRole("navigation", { name: "Customer conversations" }).getByRole("link").count()), "All count ≠ chats");
+  const all = (await m.locator(".wa-list .wa-filters").allInnerTexts()).join(" ");
+  expect(!/(Open|Handled|Sent)/.test(all) && (await m.locator(".wa-list .wa-filters").count()) === 1, `status chips: ${all}`);
   expect(num(await chip("super").innerText()) >= 1 && num(await chip("active").innerText()) >= 1 && num(await chip("inactive").innerText()) >= 1, `counts: ${text.replace(/\s+/g, " ")}`);
   return text.replace(/\s+/g, " ");
 });
@@ -81,16 +90,22 @@ await check("Super active shows the customer who tapped, not the quiet one; the 
   return "tapper only";
 });
 
-await check("Status and group combine: Open + Super active; opening a chat keeps both; tapping the group again clears it", async () => {
-  await m.locator(".wa-filters a", { hasText: "Open" }).first().click();
-  await m.waitForURL(/show=open/);
-  expect(/group=super/.test(m.url()), `group lost: ${m.url()}`);
+await check("Opening a chat keeps the group; Mark handled is under the chat box, Mark order paid isn't (contact info has it)", async () => {
   await m.locator(".wa-app a[href*='replies?']", { hasText: who.Tapper.name }).first().click();
   await m.waitForURL(/r=/);
-  expect(/show=open/.test(m.url()) && /group=super/.test(m.url()), `chat link dropped filters: ${m.url()}`);
-  await chip("super").click();
+  expect(/group=super/.test(m.url()), `chat link dropped the group: ${m.url()}`);
+  const qr = m.locator(".wa-chat .wa-qr").first();
+  const quick = await qr.innerText();
+  expect(/Mark handled/.test(quick), `no Mark handled under the box: ${quick}`);
+  expect(!/Mark order paid|Payment received/.test(quick), `paid button under the box: ${quick}`);
+  await m.locator(".wa-who").first().click();
+  expect(await m.getByRole("button", { name: "Mark order paid" }).first().isVisible(), "paid button missing in contact info");
+  await m.keyboard.press("Escape");
+  await qr.getByRole("button", { name: "Mark handled" }).click();
+  await m.waitForFunction(() => /Reopen chat/.test(document.querySelector(".wa-chat .wa-qr")?.textContent ?? ""), null, { timeout: 15000 });
+  await chip("all").click();
   await m.waitForURL((u) => !/group=/.test(u.toString()));
-  return "combined and cleared";
+  return "kept, handled, cleared with All";
 });
 
 await check("Active and Inactive: the quiet customer is Active, the moved one Inactive", async () => {
@@ -117,14 +132,21 @@ await check("A business with no campaigns sees no group chips; a made-up group s
   expect((await other.getByTestId("chat-groups").count()) === 0, "chips shown without history");
   await other.context().close();
   await go("/dashboard/replies?group=everything");
-  expect((await m.locator(".wa-app a[href*='replies?']").count()) > 0 && !(await m.locator("[data-group][aria-current=true]").count()), "unknown group filtered the list");
+  expect((await m.locator(".wa-app a[href*='replies?']").count()) > 0 && (await m.locator("[data-group][aria-current=true]").getAttribute("data-group")) === "all", "unknown group filtered the list");
   return "no chips; unknown group ignored";
 });
 
-await check("390px phone: the two chip rows scroll sideways inside the list, the page doesn't", async () => {
-  const p = await as("manager", { width: 390, height: 844 });
+for (const [label, vp] of [["Desktop", { width: 1366, height: 860 }], ["390px phone", { width: 390, height: 844 }]])
+await check(`${label}: every chip is in view without swiping; the page doesn't scroll sideways`, async () => {
+  const p = await as("manager", vp);
   await p.goto(`${BASE}/dashboard/replies`, { waitUntil: "networkidle" });
-  await p.getByTestId("chat-groups").waitFor();
+  const row = p.getByTestId("chat-groups");
+  await row.waitFor();
+  const fit = await row.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return { scroll: el.scrollWidth - el.clientWidth, out: [...el.children].filter((c) => { const b = c.getBoundingClientRect(); return b.right > r.right + 1 || b.left < r.left - 1; }).length };
+  });
+  expect(fit.scroll <= 1 && fit.out === 0, `row scrolls ${fit.scroll}px, ${fit.out} chips cut off`);
   const over = await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(over <= 1, `page scrolls sideways by ${over}px`);
   expect(!p.errors.length, p.errors.join(" | "));
