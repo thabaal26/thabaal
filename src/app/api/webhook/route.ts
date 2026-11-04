@@ -27,7 +27,7 @@ import { findUtr, logPaymentEvent } from "@/lib/payment-events";
 import { JOIN_RE, joinFromWhatsApp } from "@/lib/optin";
 import { chargeMessage } from "@/lib/wallet";
 import { applyOwnerStatus } from "@/lib/owner-messages";
-import { claimInbound, markProcessed } from "@/lib/engine/inbound";
+import { claimInbound, markProcessed, releaseInbound } from "@/lib/engine/inbound";
 import { handleButtonTap } from "@/lib/engine/buttons";
 
 export const dynamic = "force-dynamic";
@@ -582,7 +582,9 @@ export async function POST(req: NextRequest) {
           const inboundId = m.id ? String(m.id) : "";
           if (inboundId && (await claimInbound(inboundId)) === "duplicate") continue;
           // One message at a time, each with its own memo: the settings, the number to answer from and the shop's
-          // details are read once while it is answered (lib/request-memo.ts), not again for every step.
+          // details are read once while it is answered (lib/request-memo.ts), not again for every step. If handling
+          // fails, the claim is dropped so Meta's retry handles the message again.
+          try {
           await withMemo(async () => {
             const base = metaReplyContent(m);
             const phoneNumberId = v.metadata?.phone_number_id;
@@ -778,7 +780,11 @@ export async function POST(req: NextRequest) {
               }
             }
           });
-          if (inboundId) await markProcessed(inboundId);
+          } catch (e) {
+            if (inboundId) await releaseInbound(inboundId);
+            throw e;
+          }
+          if (inboundId) await markProcessed(inboundId).catch(() => {});
         }
       } else if (change.field === "calls") {
         for (const c of v.calls ?? []) await applyCall(c, v);

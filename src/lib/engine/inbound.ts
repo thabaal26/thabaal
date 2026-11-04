@@ -9,16 +9,27 @@ import { db } from "../db";
 export const STALE_MS = 3 * 60_000;
 const KEEP_DAYS = 30;
 
-/** "new" = handle this message now; "duplicate" = it was handled already, or is being handled right now. */
+/**
+ * "new" = handle this message now; "duplicate" = it was handled already, or is being handled right now. If the claim
+ * itself can't be written, the message is handled anyway (as before claims existed): a reply is never lost to it.
+ */
 export async function claimInbound(id: string, clientId: string | null = null, now = new Date()): Promise<"new" | "duplicate"> {
   try {
     await db.inboundEvent.create({ data: { id, clientId, receivedAt: now } });
     return "new";
   } catch (e) {
-    if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) throw e;
+    if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) {
+      console.error("Inbound claim failed; handling the message anyway", e);
+      return "new";
+    }
     const takeover = await db.inboundEvent.updateMany({ where: { id, processedAt: null, receivedAt: { lt: new Date(now.getTime() - STALE_MS) } }, data: { receivedAt: now } });
     return takeover.count ? "new" : "duplicate";
   }
+}
+
+/** Handling failed: drop the claim so Meta's next retry handles the message again. */
+export async function releaseInbound(id: string) {
+  await db.inboundEvent.deleteMany({ where: { id, processedAt: null } }).catch(() => {});
 }
 
 /** The message was handled to the end. */
