@@ -10,11 +10,15 @@ import "./chats.css";
 import { templateLabel } from "@/lib/plain-error";
 import { planGate } from "@/app/dashboard/plan-lock";
 import { chatAutomation } from "@/lib/engine/conversation";
+import { engagementRows, hasCampaignHistory, SEGMENT_LABEL } from "@/lib/engagement-segments";
 
 export const metadata: Metadata = { title: "Chats" };
 export const dynamic = "force-dynamic";
 
 // Every chat by default, as in the design; "Open" narrows to the ones still waiting.
+/** The groups Chats can be narrowed to ("Not reached yet" customers have no chat to show here). */
+const CHAT_GROUPS = ["super", "active", "inactive"] as const;
+
 const TABS = [
   { key: "", label: "All", labelTa: "அனைத்தும்" },
   { key: "open", label: "Open", labelTa: "திறந்தவை" },
@@ -28,7 +32,9 @@ const SENT_DAYS = 7;
 export default async function RepliesPage({ searchParams }: PageProps<"/dashboard/replies">) {
   const locked = await planGate();
   if (locked) return locked;
-  const { show: rawShow = "", r: picked } = await searchParams;
+  const { show: rawShow = "", r: picked, group: rawGroup = "" } = await searchParams;
+  // By how they respond to campaigns (lib/engagement-segments.ts), on top of Open / Handled / Sent.
+  const group = typeof rawGroup === "string" && (CHAT_GROUPS as readonly string[]).includes(rawGroup) ? (rawGroup as (typeof CHAT_GROUPS)[number]) : "";
   // Older links say show=all for everything.
   const show = rawShow === "all" ? "" : rawShow;
   const scope = await getScope();
@@ -171,9 +177,19 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
     sent: sentThreads.length,
   };
 
-  const replies = allThreads.filter((t) =>
+  const byStatus = allThreads.filter((t) =>
     show === "handled" ? t.handled && t.kind !== "sent" : show === "open" ? !t.handled : show === "sent" ? t.kind === "sent" : true,
   );
+  // Each chat's group, read live for this business's own customers (none before its first campaign).
+  const groupOf = new Map<string, string>();
+  if (scope.clientId && (await hasCampaignHistory(scope.clientId))) {
+    const ids = [...new Set(allThreads.map((t) => t.customer.id))];
+    for (const e of await engagementRows(scope.clientId, { customerIds: ids })) groupOf.set(e.id, e.segment);
+  }
+  const groups = groupOf.size
+    ? CHAT_GROUPS.map((key) => ({ key, label: SEGMENT_LABEL[key].en, labelTa: SEGMENT_LABEL[key].ta, count: byStatus.filter((t) => groupOf.get(t.customer.id) === key).length }))
+    : null;
+  const replies = group && groups ? byStatus.filter((t) => groupOf.get(t.customer.id) === group) : byStatus;
 
   // Computers show the picked customer's conversation beside the list (the newest customer thread by default).
   let selected = replies.find((x) => x.id === picked || x.customer.id === picked);
@@ -266,6 +282,8 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
         profile={profile}
         show={typeof show === "string" ? show : ""}
         filters={TABS.map((t) => ({ ...t, count: tabCount[t.key] }))}
+        group={groups ? group : ""}
+        groups={groups}
         openCount={openThreadsCount}
         opened={Boolean(picked)}
         canOperate={scope.canOperate}

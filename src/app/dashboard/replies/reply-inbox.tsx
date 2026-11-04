@@ -188,6 +188,8 @@ export function ReplyInbox({
   profile,
   show,
   filters,
+  group = "",
+  groups = null,
   openCount,
   opened,
   canOperate,
@@ -198,6 +200,9 @@ export function ReplyInbox({
   profile?: ChatProfile | null;
   show: string;
   filters: ChatFilter[];
+  /** The picked engagement group (super | active | inactive), and each group's chats; null before any campaign. */
+  group?: string;
+  groups?: ChatFilter[] | null;
   /** Customers still waiting for an answer (for "Mark all handled"). */
   openCount: number;
   /** The address names a chat (?r=…): phones open it straight away instead of the list. */
@@ -226,7 +231,11 @@ export function ReplyInbox({
   const latestInboundAt = thread.find((e) => e.type === "in")?.at ?? (selected?.kind === "sent" ? undefined : selected?.receivedAt);
   const windowTimeRemaining = useWindowCountdown(latestInboundAt, isTamil);
   const windowOpen = Boolean(replyWindowEnd(latestInboundAt));
-  const hrefFor = (customerId: string) => `/dashboard/replies?${new URLSearchParams({ ...(show && { show: String(show) }), r: customerId })}`;
+  const listHref = (next: { show?: string; group?: string }) => {
+    const q = new URLSearchParams({ ...(next.show && { show: next.show }), ...(next.group && { group: next.group }) }).toString();
+    return q ? `/dashboard/replies?${q}` : "/dashboard/replies";
+  };
+  const hrefFor = (customerId: string) => `/dashboard/replies?${new URLSearchParams({ ...(show && { show: String(show) }), ...(group && { group }), r: customerId })}`;
   const unpaidOrder = (r: InboxReply) => r.customer.orders?.[0] ?? null;
 
   const currentUnpaid = selected ? unpaidOrder(selected) : null;
@@ -326,12 +335,29 @@ export function ReplyInbox({
       {filters.map((f) => (
         <Link
           key={f.key}
-          href={f.key ? `/dashboard/replies?show=${f.key}` : "/dashboard/replies"}
+          href={listHref({ show: f.key, group })}
           className="wa-f"
           aria-current={show === f.key ? "true" : undefined}
           scroll={false}
         >
           {isTamil ? f.labelTa : f.label} <small>{fmtNumber(f.count)}</small>
+        </Link>
+      ))}
+    </div>
+  );
+  // By how they respond to campaigns; tapping the picked group again shows every group.
+  const groupChips = groups && (
+    <div className="wa-filters wa-groups" role="group" aria-label={isTamil ? "குழு வாரியாக" : "By group"} data-testid="chat-groups">
+      {groups.map((g) => (
+        <Link
+          key={g.key}
+          href={listHref({ show, group: group === g.key ? "" : g.key })}
+          className="wa-f"
+          data-group={g.key}
+          aria-current={group === g.key ? "true" : undefined}
+          scroll={false}
+        >
+          {isTamil ? g.labelTa : g.label} <small>{fmtNumber(g.count)}</small>
         </Link>
       ))}
     </div>
@@ -387,7 +413,7 @@ export function ReplyInbox({
             </div>
           )}
         </div>
-        <ChatList items={chatListItems} selectedCustomerId={selected?.customer.id} onSelectCustomer={() => setMobileView("chat")} filters={filterChips} />
+        <ChatList items={chatListItems} selectedCustomerId={selected?.customer.id} onSelectCustomer={() => setMobileView("chat")} filters={<>{filterChips}{groupChips}</>} />
       </aside>
 
       {/* Middle: the open chat */}
