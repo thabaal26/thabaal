@@ -76,7 +76,7 @@ export function ProviderSwitch({ provider, metaLive, localReady }: { provider: P
                 </span>
                 {active ? <Badge tone="green" dot>Active</Badge> : pending ? <Spinner className="text-muted" /> : <span className="text-xs font-medium text-brand-deep">Switch</span>}
               </div>
-              <ul className="mt-3 space-y-1 text-xs text-ink-2">
+              <ul className="mt-3 list-none space-y-1 p-0 text-xs text-ink-2">
                 {o.points.map((p) => <li key={p}>• {p}</li>)}
               </ul>
               {!configured && <p className="mt-3 text-xs text-warning">Not set up yet, so sends are simulated (demo mode).</p>}
