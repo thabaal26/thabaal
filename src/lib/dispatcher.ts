@@ -28,6 +28,7 @@ import { MetaError } from "./whatsapp";
 import { normalizePhone } from "./phone";
 import { affordableMessages } from "./wallet";
 import { notOpeningOffers, UNREAD_OFFERS } from "./engagement";
+import { pruneInbound } from "./engine/inbound";
 
 const TIME_BUDGET_MS = 50_000; // stay under Vercel's function limit
 const KICK_BUDGET_MS = 40_000; // a kick runs after a webhook's answer, inside the same function
@@ -412,6 +413,8 @@ export async function dispatch() {
   // Messages from Thabaal to business owners (admin › Messages): automatic payment reminders, then anything due.
   if (Date.now() < deadline) await queueAutoReminders(now).catch((e) => console.error("Owner reminders failed", e));
   if (Date.now() < deadline) await processOwnerMessages(now, deadline).catch((e) => console.error("Owner messages failed", e));
+  // Claims on handled WhatsApp messages (lib/engine/inbound.ts) are only needed while Meta might retry.
+  if (Date.now() < deadline) await pruneInbound(now).catch((e) => console.error("Inbound claim cleanup failed", e));
   await db.setting.upsert({ where: { id: 1 }, update: { lastDispatchAt: now }, create: { id: 1, lastDispatchAt: now } });
   return { campaignsStarted, runsProcessed: runs, sent, failed, ms: Date.now() - startedAt };
 }

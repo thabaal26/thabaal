@@ -142,7 +142,7 @@
   --color-bubble: #ffffff;
   --color-bubble-out: #d9fdd3;
   --color-wa-bar: #075e54;
-  --color-wa-link: #0284c7;
+  --color-wa-link: #0369a1; /* 5.9:1 on the white bubble (axe colour-contrast) */
   --color-wa-tick: #0ea5e9;
   --color-call-answer: #22c55e; /* phone convention: green answers, red hangs up (danger-solid) */
 
@@ -587,6 +587,7 @@ input:-webkit-autofill:active {
   --color-chat: #0b141a;
   --color-bubble: #1f2c34;
   --color-bubble-out: #005c4b;
+  --color-wa-link: #53bdeb;
   --color-chart-emerald: #1fa47c;
   --color-chart-blue: #4189e2;
   --color-chart-gold: #b88a12;

@@ -9,7 +9,9 @@ import {
   Info,
   MessageCircle,
   MoreVertical,
+  PauseCircle,
   Phone,
+  Play,
   ReceiptText,
   RotateCcw,
   RotateCw,
@@ -24,6 +26,7 @@ import { fmtDate, fmtNumber } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { sendCatalogue } from "../actions/catalog";
 import { handleAllReplies, setReplyHandled } from "../actions/replies";
+import { pauseChatReplies, resumeChatReplies } from "../actions/automation";
 import { InlineReplyBox } from "./inline-reply-box";
 import { Avatar, ChatList, type ChatListItem } from "./chat-list";
 import { PAction } from "../portal-ui";
@@ -75,6 +78,8 @@ export type ChatProfile = {
   unreachable: boolean;
   orderCount: number;
   orders: { id: string; number: number; ref: string | null; total: number; currency: string; status: string; createdAt: Date }[];
+  /** Automatic replies off for this chat (lib/engine/conversation.ts): paused by staff, or quiet after a staff reply. */
+  automation: { paused: boolean; until: Date | null; reason: "paused" | "staff-typing" | null };
 };
 
 export type ChatFilter = { key: string; label: string; labelTa: string; count: number };
@@ -407,6 +412,19 @@ export function ReplyInbox({
             ) : (
               <span className="wa-win closed">{isTamil ? "இலவச பதில் நேரம் முடிந்தது" : "Free replies closed"}</span>
             )}
+            {profile?.automation.paused && (
+              <span
+                className="wa-auto"
+                data-testid="auto-paused"
+                title={
+                  profile.automation.until
+                    ? `${isTamil ? "தானியங்கி பதில்கள் நிறுத்தம்" : "Automatic replies off"} · ${fmtDate(profile.automation.until, "d MMM, h:mm a")}`
+                    : isTamil ? "நீங்கள் மீண்டும் தொடங்கும் வரை" : "Until you resume them"
+                }
+              >
+                {isTamil ? "தானியங்கி பதில் நிறுத்தம்" : "Auto replies paused"}
+              </span>
+            )}
             <Link className="wa-ib" href={`/dashboard/customers/${selected.customer.id}#call`} aria-label={isTamil ? "அழைக்க" : "Call"} title={isTamil ? "அழைக்க" : "Call"}>
               <Phone aria-hidden className="ic" />
             </Link>
@@ -428,6 +446,15 @@ export function ReplyInbox({
                         {selected.handled ? <RotateCcw aria-hidden className="ic" /> : <CheckCheck aria-hidden className="ic" />}{" "}
                         {selected.handled ? (isTamil ? "மீண்டும் திற" : "Reopen chat") : isTamil ? "பார்த்ததாகக் குறி" : "Mark handled"}
                       </PAction>
+                      {profile?.automation.paused ? (
+                        <PAction action={resumeChatReplies.bind(null, selected.customer.id)} className="wa-mi">
+                          <Play aria-hidden className="ic" /> {isTamil ? "தானியங்கி பதில்களைத் தொடங்கு" : "Resume automatic replies"}
+                        </PAction>
+                      ) : (
+                        <PAction action={pauseChatReplies.bind(null, selected.customer.id)} className="wa-mi">
+                          <PauseCircle aria-hidden className="ic" /> {isTamil ? "தானியங்கி பதில்களை நிறுத்து" : "Pause automatic replies"}
+                        </PAction>
+                      )}
                       {windowOpen && (
                         <PAction action={sendCatalogue.bind(null, selected.customer.id)} className="wa-mi">
                           <ShoppingBag aria-hidden className="ic" /> {isTamil ? "பொருட்கள் பட்டியல் அனுப்பு" : "Send catalogue"}

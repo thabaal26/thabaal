@@ -141,6 +141,8 @@ export type SendInput = {
   urlButtonParams?: { index: number; value: string }[];
   /** One-time passcode for AUTHENTICATION (OTP) templates. */
   otpCode?: string | null;
+  /** Our payload on each quick-reply button ("tb:<key>", lib/engine/keys.ts), so a tap says which button it was. */
+  quickReplyPayloads?: { index: number; payload: string }[];
 };
 
 export async function sendTemplateMessage(cfg: WaConfig, input: SendInput): Promise<{ id: string; simulated: boolean }> {
@@ -187,6 +189,9 @@ export async function sendTemplateMessage(cfg: WaConfig, input: SendInput): Prom
         index: ub.index,
         parameters: [{ type: "text", text: ub.value }],
       });
+    }
+    for (const qr of input.quickReplyPayloads ?? []) {
+      components.push({ type: "button", sub_type: "quick_reply", index: qr.index, parameters: [{ type: "payload", payload: qr.payload }] });
     }
   }
 
