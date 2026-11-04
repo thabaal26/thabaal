@@ -86,6 +86,10 @@ model Client {
   supportPhone        String?
   /// Hours a customer must wait between marketing messages; 0 turns the rule off.
   marketingGapHours   Int               @default(72)
+  /// Engagement segments (lib/engagement-segments.ts): a tap, reply or order within this many days = Super active.
+  engagementDays      Int               @default(90)
+  /// This many offers delivered in a row with no tap, reply or order after them = Inactive (low engagement).
+  inactiveAfterOffers Int               @default(3)
   /// No marketing sends between these HH:mm times (IST); null turns quiet hours off.
   quietFrom           String?           @default("21:00")
   quietTo             String?           @default("09:00")
@@ -358,6 +362,9 @@ model Campaign {
   excludeIds      String[]        @default([])
   /// Leave out customers who didn't open the last 3 offers they got (lib/engagement.ts).
   skipUnread      Boolean         @default(false)
+  /// Engagement segments to send to, on top of "Send to" (lib/engagement-segments.ts): super | active | inactive | new.
+  /// Empty = no segment filter.
+  segments        String[]        @default([])
   scheduleType    ScheduleType    @default(WEEKLY)
   daysOfWeek      Int[]           @default([]) // 0 = Sunday … 6 = Saturday
   sendTime        String          @default("10:00") // HH:mm in timezone
@@ -394,6 +401,9 @@ model CampaignRun {
   nextBatchAt  DateTime  @default(now())
   startedAt    DateTime  @default(now())
   completedAt  DateTime?
+  /// Batches in a row that Meta throttled (130429/80007/4) or was briefly down: the next try waits longer each time
+  /// (lib/meta-errors.ts throttleDelayMinutes); a batch that sends resets it.
+  throttles    Int       @default(0)
   messages     Message[]
 
   @@unique([campaignId, scheduledFor])
@@ -455,6 +465,8 @@ model Reply {
   mediaId     String?
   mediaType   String?
   waMessageId String?         @unique
+  /// Our message the customer tapped a button on or replied to (Meta's context.id = Message.waMessageId).
+  contextId   String?
   /// The number the customer wrote to.
   senderId    String?
   sender      WhatsAppNumber? @relation(fields: [senderId], references: [id], onDelete: SetNull)
@@ -463,6 +475,7 @@ model Reply {
 
   @@index([customerId, receivedAt])
   @@index([handled, receivedAt])
+  @@index([contextId])
   @@index([senderId])
 }
 

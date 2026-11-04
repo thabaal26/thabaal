@@ -367,7 +367,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
           <p className="muted small" style={{ marginBottom: 10 }}>
             Customers who got an offer recently are skipped, and marketing never goes out at night. Utility messages aren&apos;t affected.
           </p>
-          <SendingRulesForm clientId={c.id} initial={{ marketingGapHours: c.marketingGapHours, quietFrom: c.quietFrom, quietTo: c.quietTo }} />
+          <SendingRulesForm clientId={c.id} initial={{ marketingGapHours: c.marketingGapHours, quietFrom: c.quietFrom, quietTo: c.quietTo, engagementDays: c.engagementDays, inactiveAfterOffers: c.inactiveAfterOffers }} />
         </section>
 
         <section>

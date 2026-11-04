@@ -540,8 +540,16 @@ const GAPS = [
 ];
 
 /** How often one customer may get offers, and the night hours when marketing waits. */
-export function SendingRulesForm({ clientId, initial }: { clientId: string; initial: { marketingGapHours: number; quietFrom: string | null; quietTo: string | null } }) {
+export function SendingRulesForm({
+  clientId,
+  initial,
+}: {
+  clientId: string;
+  initial: { marketingGapHours: number; quietFrom: string | null; quietTo: string | null; engagementDays?: number; inactiveAfterOffers?: number };
+}) {
   const [gap, setGap] = useState(initial.marketingGapHours);
+  const [days, setDays] = useState(initial.engagementDays ?? 90);
+  const [offers, setOffers] = useState(initial.inactiveAfterOffers ?? 3);
   const [quietOn, setQuietOn] = useState(Boolean(initial.quietFrom && initial.quietTo));
   const [from, setFrom] = useState(initial.quietFrom ?? "21:00");
   const [to, setTo] = useState(initial.quietTo ?? "09:00");
@@ -551,7 +559,7 @@ export function SendingRulesForm({ clientId, initial }: { clientId: string; init
       className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_1.4fr_auto] md:items-end"
       onSubmit={(e) => {
         e.preventDefault();
-        submit(() => saveSendingRules(clientId, { marketingGapHours: gap, quietFrom: quietOn ? from : "", quietTo: quietOn ? to : "" }));
+        submit(() => saveSendingRules(clientId, { marketingGapHours: gap, quietFrom: quietOn ? from : "", quietTo: quietOn ? to : "", engagementDays: days, inactiveAfterOffers: offers }));
       }}
     >
       <div>
@@ -576,6 +584,17 @@ export function SendingRulesForm({ clientId, initial }: { clientId: string; init
         </div>
       </div>
       <Button type="submit" loading={pending} size="sm" className="max-sm:w-full md:mb-px">Save rules</Button>
+      {/* Engagement groups in campaigns (lib/engagement-segments.ts). */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:col-span-3">
+        <div>
+          <Label htmlFor={`eng-${clientId}`} hint="days">Super active: tap, reply or order within</Label>
+          <input id={`eng-${clientId}`} type="number" min={7} max={730} className="field" value={days} onChange={(e) => setDays(Number(e.target.value))} />
+        </div>
+        <div>
+          <Label htmlFor={`inact-${clientId}`} hint="offers in a row">Inactive: no response after</Label>
+          <input id={`inact-${clientId}`} type="number" min={1} max={20} className="field" value={offers} onChange={(e) => setOffers(Number(e.target.value))} />
+        </div>
+      </div>
     </form>
   );
 }

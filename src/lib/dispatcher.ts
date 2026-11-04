@@ -8,7 +8,7 @@ import { fmtDate } from "./format";
 import { deliver, getSettings, isSimulated, readiness, templateSendable } from "./provider";
 import { allowance, refreshStaleNumbers, windowFreesAt } from "./limits";
 import { marketingPaused } from "./held";
-import { explainError, metaError, PAUSING_KINDS } from "./meta-errors";
+import { explainError, metaError, PAUSING_KINDS, throttleDelayMinutes } from "./meta-errors";
 import { applyFailure, quietUntil, recentlyMarketed } from "./rules";
 import { sendRefillReminders } from "./refill";
 import { lockedClientIds } from "./plan-access";
@@ -315,9 +315,11 @@ async function processRun(runId: string, now: Date, deadline: number) {
   if (disconnected) await pause("WAITING_CONNECTION", 2);
   else if (setupProblem) await pause("WAITING_CONNECTION", 30);
   else if (restricted) await pause("WAITING_QUALITY", 6 * 60);
-  else if (throttled) await db.campaignRun.update({ where: { id: run.id }, data: { nextBatchAt: new Date(Date.now() + 5 * 60_000) } });
+  // Throttled: wait longer each time in a row (5, 10, 20… up to 120 minutes), never a tight retry loop.
+  else if (throttled) await db.campaignRun.update({ where: { id: run.id }, data: { throttles: { increment: 1 }, nextBatchAt: new Date(Date.now() + throttleDelayMinutes(run.throttles + 1) * 60_000) } });
   // Finish the rest of this batch on the next scheduler call instead of waiting a full interval.
   else if (outOfTime) await db.campaignRun.update({ where: { id: run.id }, data: { nextBatchAt: new Date() } });
+  if (!throttled && sent > 0 && run.throttles > 0) await db.campaignRun.update({ where: { id: run.id }, data: { throttles: 0 } });
 
   const left = await db.message.count({ where: { runId: run.id, status: "QUEUED" } });
   if (!left) await db.campaignRun.update({ where: { id: run.id }, data: { status: "COMPLETED", completedAt: new Date() } });

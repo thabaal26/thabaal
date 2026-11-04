@@ -16,6 +16,7 @@ import { useTr } from "@/lib/i18n/context";
 import { dayName, DAYS, describeScheduleSummary, effectiveInterval, estimateDuration, formatMinutes, SCHEDULER_TICK_MINUTES, TIME_PRESETS, WEEKLY_PAIRS } from "@/lib/schedule";
 import { AUDIENCE_PREFIX, decodeTags, describeTags, encodeTags, TAGS_PREFIX, type TagPick } from "@/lib/audience-tags";
 import { countCampaignAudience, saveCampaign, searchCampaignCustomers, type CampaignInput } from "../actions/campaigns";
+import { SegmentPicker, type Capacity, type SegmentSummaryProps } from "./segment-picker";
 
 type SendTo = "all" | "tags" | "saved";
 type ScheduleMode = "DATE" | "WEEKLY_1" | "WEEKLY_2" | "WEEKDAYS" | "DAILY" | "CUSTOM";
@@ -42,6 +43,7 @@ export function CampaignForm({
   templates,
   audience,
   numbers,
+  segments,
   people = [],
 }: {
   id: string | null;
@@ -50,7 +52,9 @@ export function CampaignForm({
   people?: { id: string; name: string; phone: string }[];
   templates: { id: string; name: string; category: string; status: string; businessAccountId: string | null }[];
   audience: { all: number; tags: { tag: string; label: string; hint?: string; n: number }[] };
-  numbers: { id: string; label: string; businessAccountId: string; isDefault: boolean; dailyLimit: number | null; quality: string | null }[];
+  numbers: { id: string; label: string; businessAccountId: string; isDefault: boolean; dailyLimit: number | null; quality: string | null; capacity?: Capacity }[];
+  /** Live engagement groups and who is left out (lib/engagement-segments.ts). */
+  segments: SegmentSummaryProps;
 }) {
   const { tr, isTa } = useTr();
   const [c, setC] = useState(initial);
@@ -116,16 +120,18 @@ export function CampaignForm({
   // (with how many don't open offers, and the test numbers still in it).
   const multi = sendTo === "tags" && pick.tags.length > 1;
   const handPicked = c.includeIds.length > 0 || c.excludeIds.length > 0;
-  const serverSize = multi || handPicked;
-  const peopleKey = JSON.stringify([c.audienceTag, c.includeIds, c.excludeIds]);
+  // Groups only once the business has campaign history; before that a first send goes to everyone eligible.
+  const picked = segments.history ? (c.segments ?? []) : [];
+  const serverSize = multi || handPicked || picked.length > 0;
+  const peopleKey = JSON.stringify([c.audienceTag, c.includeIds, c.excludeIds, picked]);
   const [counted, setCounted] = useState<{ key: string; n: number; unread: number; testIds: string[] } | null>(null);
   useEffect(() => {
     const t = setTimeout(async () => {
-      const r = await countCampaignAudience(id, c.audienceTag, { includeIds: c.includeIds, excludeIds: c.excludeIds }).catch(() => ({ ok: false, n: 0, unread: 0, testIds: [] }));
+      const r = await countCampaignAudience(id, c.audienceTag, { includeIds: c.includeIds, excludeIds: c.excludeIds, segments: picked }).catch(() => ({ ok: false, n: 0, unread: 0, testIds: [] }));
       setCounted({ key: peopleKey, n: r.ok ? r.n : -1, unread: r.unread ?? 0, testIds: r.testIds ?? [] }); // -1: couldn't count
     }, 300);
     return () => clearTimeout(t);
-    // peopleKey stands for audienceTag, includeIds and excludeIds.
+    // peopleKey stands for audienceTag, includeIds, excludeIds and the picked groups.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [peopleKey, id]);
   const counting = serverSize && counted?.key !== peopleKey;
@@ -299,9 +305,13 @@ export function CampaignForm({
                 />
               )}
 
-              <p className="tabular text-sm text-muted" aria-live="polite">
+              <SegmentPicker summary={segments} value={picked} onChange={(v) => set({ segments: v })} capacity={sender?.capacity ?? null} />
+
+              <p className="tabular text-sm text-muted" aria-live="polite" data-testid="audience-size">
                 {isTa
-                  ? sendTo === "all" && !handPicked
+                  ? picked.length && !counting && (counted?.n ?? -1) >= 0
+                    ? `தேர்ந்தெடுத்த குழுக்களில் ${size.toLocaleString("en-IN")} வாடிக்கையாளர்கள்.`
+                    : sendTo === "all" && !handPicked
                     ? `ஒப்புதல் அளித்த அனைத்து ${audience.all.toLocaleString("en-IN")} வாடிக்கையாளர்களும்.`
                     : sendTo === "tags" && !pick.tags.length
                       ? tr("Pick at least one tag.")
@@ -312,6 +322,8 @@ export function CampaignForm({
                           : handPicked
                             ? `${size.toLocaleString("en-IN")} வாடிக்கையாளர்கள் (${c.includeIds.length} சேர்த்தது, ${c.excludeIds.length} விலக்கியது).`
                           : `${size.toLocaleString("en-IN")} வாடிக்கையாளர்கள்${sendTo === "tags" ? ` (${describeTags(pick, tagLabel)})` : ""}.`
+                  : picked.length && !counting && (counted?.n ?? -1) >= 0
+                    ? `${size.toLocaleString("en-IN")} customer${size === 1 ? "" : "s"} in the groups you picked.`
                   : sendTo === "all" && !handPicked
                   ? `All ${audience.all.toLocaleString("en-IN")} opted-in customers.`
                   : sendTo === "tags" && !pick.tags.length

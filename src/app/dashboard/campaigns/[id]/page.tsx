@@ -25,6 +25,7 @@ import { FailureSummary } from "../failure-summary";
 import { campaignFormData } from "../form-data";
 import { templateLabel } from "@/lib/plain-error";
 import { STOP_CONFIRM } from "@/lib/held";
+import { ATTRIBUTION_DAYS, campaignInteractions } from "@/lib/engagement-segments";
 import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Campaign" };
@@ -45,7 +46,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
   });
   if (!c) notFound();
 
-  const [{ templates, audience, numbers }, stats, charged, people] = await Promise.all([
+  const [{ templates, audience, numbers, segments }, stats, charged, people] = await Promise.all([
     campaignFormData(c.clientId),
     db.message.groupBy({ by: ["runId", "status"], where: { runId: { in: c.runs.map((r) => r.id) } }, _count: true }),
     // Meta reports per message whether it was billed; it doesn't send the amount.
@@ -59,8 +60,9 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
   // Several tags can overlap, so their reach is counted, not looked up.
   const tagPick = picked ? null : decodeTags(c.audienceTag);
   const handPicked = c.includeIds.length > 0 || c.excludeIds.length > 0;
+  const narrowed = handPicked || c.segments.length > 0;
   const audienceSize =
-    !handPicked && !c.audienceTag ? audience.all : !handPicked && picked ? picked.n : await db.customer.count({ where: await campaignAudienceWhere(c.clientId, c.audienceTag, c) });
+    !narrowed && !c.audienceTag ? audience.all : !narrowed && picked ? picked.n : await db.customer.count({ where: await campaignAudienceWhere(c.clientId, c.audienceTag, c) });
   const audienceName = picked?.label ?? (tagPick ? describeTags(tagPick) : c.audienceTag);
   const sendConfirm = `Send "${templateLabel(c.template.name)}" now to ${fmtNumber(audienceSize)} customer${audienceSize === 1 ? "" : "s"} (${c.audienceTag ? `"${audienceName}"` : "ALL customers, no tag"})?`;
   // Sales credited to a run: orders a recipient placed within 7 days of getting its message.
@@ -80,6 +82,15 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
   const chargedIn = (runId: string) => charged.find((x) => x.runId === runId)?._count ?? 0;
   const stat = (runId: string, ...s: string[]) =>
     stats.filter((x) => x.runId === runId && s.includes(x.status)).reduce((a, x) => a + x._count, 0);
+  // How people responded, over every run: Meta's statuses, and taps/replies that answer these messages.
+  const all = (...s: string[]) => runIds.reduce((n, r) => n + stat(r, ...s), 0);
+  const response = {
+    sent: all("SENT", "DELIVERED", "READ"),
+    delivered: all("DELIVERED", "READ"),
+    read: all("READ"),
+    failed: all("FAILED"),
+    ...(await campaignInteractions(c.clientId, runIds)),
+  };
 
   const running = (status: string) => ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET", "WAITING_FUNDS"].includes(status);
   // A one-time campaign switches itself off when its run starts: say it is sending (or done), not "Paused".
@@ -183,6 +194,29 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
         </StaggerItem>
       </StaggerGroup>
 
+      {response.sent + response.failed > 0 && (
+        <Card className="card-3d mb-5" data-testid="campaign-response">
+          <CardHeader tone="info" icon={<Users3D />} title="How people responded" description={`All runs together. A tap or reply counts when it answers this campaign's message, or (older replies) came within ${ATTRIBUTION_DAYS} days of it.`} />
+          <dl className="grid grid-cols-2 gap-3 p-4 text-sm sm:grid-cols-4 sm:p-5 xl:grid-cols-8">
+            {[
+              ["Sent", fmtNumber(response.sent)],
+              ["Delivered", fmtNumber(response.delivered)],
+              ["Read", fmtNumber(response.read)],
+              ["Failed", fmtNumber(response.failed)],
+              ["Tapped a button", fmtNumber(response.buttons)],
+              ["Replied", fmtNumber(response.replies)],
+              ["Delivery rate", `${pct(response.delivered, response.sent + response.failed)}%`],
+              ["Responded", `${fmtNumber(response.interacted)} · ${pct(response.interacted, response.delivered)}%`],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-control bg-sunken px-3 py-2">
+                <dt className="text-xs text-muted">{label}</dt>
+                <dd className="tabular mt-0.5 font-semibold text-ink">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </Card>
+      )}
+
       {!scope.canManage ? (
         <Card className="card-3d">
           <CardHeader tone="brand" icon={<Calendar3D />} title="Campaign details" />
@@ -222,6 +256,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
           templates={templates}
           audience={audience}
           numbers={numbers}
+          segments={segments}
           initial={{
             name: c.name,
             templateId: c.templateId,
@@ -237,6 +272,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
             includeIds: c.includeIds,
             excludeIds: c.excludeIds,
             skipUnread: c.skipUnread,
+            segments: c.segments,
           }}
           people={people}
         />

@@ -19,6 +19,7 @@ import { sendToCustomer } from "./send";
 import type { ActionResult } from "./templates";
 import { trackPress } from "@/lib/usage";
 import { notOpeningOffers } from "@/lib/engagement";
+import { cleanSegments } from "@/lib/engagement-segments";
 import { planCapacityBlock } from "@/lib/subscription";
 
 export type CampaignInput = {
@@ -39,6 +40,8 @@ export type CampaignInput = {
   excludeIds: string[];
   /** Leave out people who didn't open their last offers (lib/engagement.ts). */
   skipUnread: boolean;
+  /** Engagement segments to send to, on top of "Send to" (lib/engagement-segments.ts); empty = no segment filter. */
+  segments?: string[];
 };
 
 /** At most this many people added or left out by hand (each list). */
@@ -100,6 +103,7 @@ export async function saveCampaign(id: string | null, input: CampaignInput): Pro
     includeIds: includeIds.filter((x) => !excludeIds.includes(x)),
     excludeIds,
     skipUnread: input.skipUnread === true,
+    segments: cleanSegments(input.segments),
     name: input.name.trim(),
     templateId: input.templateId,
     senderId: input.senderId || null,
@@ -220,13 +224,14 @@ async function formClient(campaignId: string | null) {
 export async function countCampaignAudience(
   campaignId: string | null,
   audienceTag: string,
-  people: { includeIds?: string[]; excludeIds?: string[] } = {},
+  people: { includeIds?: string[]; excludeIds?: string[]; segments?: string[] } = {},
 ): Promise<{ ok: boolean; n: number; unread?: number; testIds?: string[] }> {
   const clientId = await formClient(campaignId);
   if (!clientId) return { ok: false, n: 0 };
   const where = await campaignAudienceWhere(clientId, audienceTag.trim() || null, {
     includeIds: await ownCustomers(clientId, people.includeIds),
     excludeIds: await ownCustomers(clientId, people.excludeIds),
+    segments: cleanSegments(people.segments),
   });
   const [n, tests, unread] = await Promise.all([
     db.customer.count({ where }),
@@ -299,6 +304,7 @@ export async function duplicateCampaign(id: string): Promise<ActionResult> {
       includeIds: c.includeIds,
       excludeIds: c.excludeIds,
       skipUnread: c.skipUnread,
+      segments: c.segments,
       active: false,
       nextRunAt: null,
     },

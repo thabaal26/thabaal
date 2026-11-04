@@ -229,16 +229,30 @@ export async function setDailyCap(numberId: string, raw: string): Promise<Action
 }
 
 /** Protects number quality: hours between offers to the same person, and no offers at night. */
-export async function saveSendingRules(clientId: string, input: { marketingGapHours: number; quietFrom: string; quietTo: string }): Promise<ActionResult> {
+export async function saveSendingRules(
+  clientId: string,
+  input: { marketingGapHours: number; quietFrom: string; quietTo: string; engagementDays?: number; inactiveAfterOffers?: number },
+): Promise<ActionResult> {
   const s = await requireAdmin();
   if ("denied" in s) return { ok: false, message: s.denied };
   const time = /^([01]\d|2[0-3]):[0-5]\d$/;
   if (!Number.isInteger(input.marketingGapHours) || input.marketingGapHours < 0 || input.marketingGapHours > 24 * 30) return { ok: false, message: "Pick how long to wait between offers." };
   const quiet = input.quietFrom && input.quietTo;
   if (quiet && (!time.test(input.quietFrom) || !time.test(input.quietTo))) return { ok: false, message: "Quiet hours need a start and end time." };
+  // Engagement groups (lib/engagement-segments.ts): Super active within N days; Inactive after N offers in a row.
+  if (input.engagementDays !== undefined && (!Number.isInteger(input.engagementDays) || input.engagementDays < 7 || input.engagementDays > 730))
+    return { ok: false, message: "Super active window must be 7 to 730 days." };
+  if (input.inactiveAfterOffers !== undefined && (!Number.isInteger(input.inactiveAfterOffers) || input.inactiveAfterOffers < 1 || input.inactiveAfterOffers > 20))
+    return { ok: false, message: "Inactive after must be 1 to 20 offers." };
   await db.client.update({
     where: { id: clientId },
-    data: { marketingGapHours: input.marketingGapHours, quietFrom: quiet ? input.quietFrom : null, quietTo: quiet ? input.quietTo : null },
+    data: {
+      marketingGapHours: input.marketingGapHours,
+      quietFrom: quiet ? input.quietFrom : null,
+      quietTo: quiet ? input.quietTo : null,
+      ...(input.engagementDays !== undefined && { engagementDays: input.engagementDays }),
+      ...(input.inactiveAfterOffers !== undefined && { inactiveAfterOffers: input.inactiveAfterOffers }),
+    },
   });
   refresh();
   return { ok: true, message: "Sending rules saved. They apply from the next batch." };

@@ -7,6 +7,7 @@ import { normKey } from "./catalog-match";
 import { INACTIVE_TAG } from "./schedule";
 import { SKIP_CODES, SKIP_DAYS } from "./held";
 import { withSamePerson } from "./linked-numbers";
+import { cleanSegments, segmentCustomerIds } from "./engagement-segments";
 
 // Saved audiences: a named filter over a client's customers that campaigns can send to.
 // Campaigns store it as audienceTag "aud:<id>"; tags work too (see src/lib/audience-tags.ts).
@@ -89,17 +90,21 @@ export function describeFilter(raw: AudienceFilter) {
   return parts.length ? parts.join(" · ") : "all opted-in customers";
 }
 
-/** People added to or left out of a campaign by hand (Campaign.includeIds / excludeIds). */
-export type CampaignPeople = { includeIds?: readonly string[]; excludeIds?: readonly string[] };
+/** People added to or left out of a campaign by hand (Campaign.includeIds / excludeIds), and its engagement segments. */
+export type CampaignPeople = { includeIds?: readonly string[]; excludeIds?: readonly string[]; segments?: readonly string[] };
 
 /**
  * The customer filter for a campaign: its audienceTag (a saved audience, one or more tags, or everyone), plus the
- * people added by hand, minus the people left out (each with all their numbers). Opted-out and unreachable customers are never in it; Inactive
+ * people added by hand, minus the people left out (each with all their numbers). With segments (Super active, Active,
+ * Inactive, Not reached yet; lib/engagement-segments.ts), "Send to" keeps only customers in one of them, worked out
+ * from the business's whole campaign history at that moment. Opted-out and unreachable customers are never in it; Inactive
  * ones (INACTIVE_TAG) only when the campaign picks that tag or adds them by hand.
  */
 export async function campaignAudienceWhere(clientId: string, audienceTag: string | null, people: CampaignPeople = {}): Promise<Prisma.CustomerWhereInput> {
   const picked = await sendToWhere(clientId, audienceTag);
-  const send = decodeTags(audienceTag)?.tags.includes(INACTIVE_TAG) ? picked : { AND: [picked, { NOT: { tags: { has: INACTIVE_TAG } } }] };
+  const segments = cleanSegments(people.segments);
+  const kept = decodeTags(audienceTag)?.tags.includes(INACTIVE_TAG) ? picked : { AND: [picked, { NOT: { tags: { has: INACTIVE_TAG } } }] };
+  const send: Prisma.CustomerWhereInput = segments.length ? { AND: [kept, { id: { in: await segmentCustomerIds(clientId, segments) } }] } : kept;
   // A person with several numbers is added or left out as a whole (lib/linked-numbers.ts).
   const include = await withSamePerson(clientId, people.includeIds ?? []);
   const exclude = await withSamePerson(clientId, people.excludeIds ?? []);

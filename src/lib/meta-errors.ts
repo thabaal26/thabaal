@@ -7,6 +7,7 @@ export type ErrorKind =
   | "marketing-limit" // Meta is holding back marketing to this person for now
   | "experiment" // Meta's marketing experiment: no offers reach them at all, resending gets the same error
   | "rate" // sending too fast: slow down and retry, the message isn't lost
+  | "pair-rate" // too many messages to this one person just now: others can still be sent; this one later
   | "temporary" // Meta is briefly unavailable: try again in a few minutes, the message isn't lost
   | "number-restricted" // the sending number is limited: pause the campaign
   | "setup" // the access token or app permissions don't work: pause until an admin fixes them
@@ -20,7 +21,7 @@ export type ErrorKind =
 export const PAUSING_KINDS: ErrorKind[] = ["setup", "account"];
 
 /** Not the customer's fault: an automatic message hit by one of these is tried again on a later scheduler run. */
-export const TRY_LATER_KINDS: ErrorKind[] = ["rate", "temporary", "setup", "account", "number-restricted"];
+export const TRY_LATER_KINDS: ErrorKind[] = ["rate", "pair-rate", "temporary", "setup", "account", "number-restricted"];
 
 const ERRORS: Record<number, { title: string; kind: ErrorKind }> = {
   // Ours, not Meta's (lib/whatsapp NOT_CONNECTED_CODE): the client has no WhatsApp number of its own yet.
@@ -34,7 +35,7 @@ const ERRORS: Record<number, { title: string; kind: ErrorKind }> = {
   130472: { title: "Customer is in a Meta test that stops offers reaching them; sending again won't work", kind: "experiment" },
 
   // Speed and Meta's availability
-  131056: { title: "Too many messages to this customer in a short time", kind: "rate" },
+  131056: { title: "Too many messages to this customer in a short time; others can still be sent, this one later", kind: "pair-rate" },
   130429: { title: "Sending faster than Meta allows for this number", kind: "rate" },
   80007: { title: "Meta API rate limit reached", kind: "rate" },
   4: { title: "Too many requests to Meta from this app; slowing down", kind: "rate" },
@@ -99,6 +100,61 @@ export function metaError(code: number | null | undefined) {
   if (code == null) return undefined;
   // 200–299 are all permission problems with the app or token.
   return ERRORS[code] ?? (code >= 200 && code <= 299 ? { title: "The Meta app is missing a permission it needs; check the app and token in Meta", kind: "setup" as const } : undefined);
+}
+
+/**
+ * What a failure means for sending again, by category (codes checked against Meta's error-code page, Nov 2026):
+ *  permanent  – this person can't get WhatsApp from you (131026…): never retried; campaigns leave them out.
+ *  temporary  – Meta briefly unavailable: the message stays queued and is tried on the next batch.
+ *  marketing  – Meta is holding offers back from this person (131049; 130472 has no end): campaigns skip them
+ *               SKIP_DAYS; one retry after at least 24 h is the business's choice, never automatic (lib/held.ts),
+ *               and Meta may hold it again (24 h is a minimum, not a promise).
+ *  opt-out    – they stopped your marketing (131050): suppressed (Customer.optedOut), never retried.
+ *  template   – the template or its values are wrong (132000/132001…) or the 24 h window is closed (131047: send a
+ *               template): fixed by the business, then sent again; never retried as it is.
+ *  account    – token, payment, registration or a restricted number (131031, 131048…): the run pauses until fixed.
+ *  rate       – throughput (130429/80007/4): the batch waits longer each time (throttleDelayMinutes); 131056 is per
+ *               person: that message fails without charge, the rest of the batch goes on.
+ * A retry never bypasses opt-out, "can't receive" or Meta's holds: every send re-checks them.
+ */
+export type ErrorCategory = "permanent" | "temporary" | "marketing" | "opt-out" | "template" | "account" | "rate";
+
+const CATEGORY: Record<ErrorKind, ErrorCategory> = {
+  unreachable: "permanent",
+  "stopped-marketing": "opt-out",
+  "marketing-limit": "marketing",
+  experiment: "marketing",
+  rate: "rate",
+  "pair-rate": "rate",
+  temporary: "temporary",
+  "number-restricted": "account",
+  setup: "account",
+  account: "account",
+  window: "template",
+  template: "template",
+  "test-list": "account",
+  other: "permanent",
+};
+
+export const CATEGORY_INFO: Record<ErrorCategory, { label: string; retry: string }> = {
+  permanent: { label: "Can't be delivered", retry: "Not sent again: it would fail the same way." },
+  temporary: { label: "Meta briefly unavailable", retry: "Tried again automatically on the next batch." },
+  marketing: { label: "Held back by Meta", retry: "Skipped for 3 days; you can send once more after 24 hours. Meta may hold it again." },
+  "opt-out": { label: "Opted out of offers", retry: "Never sent offers again unless they opt back in." },
+  template: { label: "Template problem", retry: "Fix the template (or use a template), then send again." },
+  account: { label: "WhatsApp account problem", retry: "The campaign waits until the account or number is fixed." },
+  rate: { label: "Sending too fast", retry: "Waits longer each time, then goes on by itself." },
+};
+
+/** The category of a Meta error code; unknown codes are treated as permanent so nothing retries blindly. */
+export function errorCategory(code: number | null | undefined): ErrorCategory {
+  const kind = metaError(code)?.kind;
+  return kind ? CATEGORY[kind] : "permanent";
+}
+
+/** Exponential backoff after `n` throttled batches in a row: 5, 10, 20, 40, 80 minutes, then every 2 hours at most. */
+export function throttleDelayMinutes(n: number) {
+  return Math.min(120, 5 * 2 ** Math.max(0, n - 1));
 }
 
 /** Every listed code of these kinds (for database lookups; 200–299 are matched separately). */

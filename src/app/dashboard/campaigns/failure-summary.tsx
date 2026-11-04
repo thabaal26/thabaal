@@ -35,6 +35,7 @@ const NEXT: Record<Kind, { label: string; why: string; again: string; tip?: stri
   },
   "stopped-marketing": { label: "Turned off your offers", why: "They stopped offers from you in WhatsApp.", again: "Never sent again: they're opted out.", tone: "gray" },
   rate: { label: "Sent too fast", why: "Meta asked to slow down.", again: "Lower the batch size if this keeps happening.", tone: "amber" },
+  "pair-rate": { label: "Too many messages to one person", why: "This customer got several messages from you in a short time.", again: "Not charged. Send to them again later; everyone else in the campaign was still sent.", tone: "amber" },
   temporary: { label: "Meta briefly unavailable", why: "WhatsApp had a short problem.", again: "Campaigns keep these queued and try again a few minutes later.", tone: "gray" },
   setup: { label: "Access token or app permissions", why: "Meta didn't accept the connection.", again: "Campaigns pause until an admin replaces the token on the Clients page or fixes the app in Meta.", tone: "red" },
   "number-restricted": { label: "Number limited by Meta", why: "Meta limited your number.", again: "Sending paused to protect the number. Check WhatsApp number health on the Dashboard.", tone: "red" },
