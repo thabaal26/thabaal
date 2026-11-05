@@ -55,10 +55,26 @@ html.dark .thabaal-portal .wa-app{
 .thabaal-portal .wa-f small{font-size:11.5px;opacity:.8}
 .thabaal-portal .wa-f:hover{color:var(--fg)}
 .thabaal-portal .wa-f[aria-current=true]{background:var(--mango);color:#10283B}
-/* The one filter row: All + the campaign groups. Wraps instead of scrolling sideways, so every chip is in view. */
-.thabaal-portal .wa-groups{flex-wrap:wrap;overflow:visible}
-.thabaal-portal .wa-groups .wa-f{padding:3px 10px;font-size:12.5px}
-.thabaal-portal .wa-groups .wa-f small{opacity:1}
+/* The one filter row under the search box: All + the campaign groups as compact pills in a single line, lined up
+   with the search box (same 12px side gutter). When the list is too narrow for all four, the row scrolls sideways
+   inside the panel (never the page, never the chat list); a narrow list gets slightly tighter pills first. */
+.thabaal-portal .wa-list{container-type:inline-size}
+.thabaal-portal .wa-groups{flex-wrap:nowrap;align-items:center;overflow-x:auto;overscroll-behavior-x:contain;scroll-padding-inline:12px}
+.thabaal-portal .wa-groups::-webkit-scrollbar{display:none}
+.thabaal-portal .wa-groups::after{content:"";flex:0 0 6px}
+.thabaal-portal .wa-groups .wa-f{flex:none;height:28px;padding:0 10px;gap:4px;font-size:12.5px;line-height:1;box-shadow:inset 0 0 0 1px transparent;transition:background-color .15s,box-shadow .15s,color .15s}
+.thabaal-portal .wa-groups .wa-f small{font-size:11.5px;opacity:1;font-variant-numeric:tabular-nums}
+.thabaal-portal .wa-groups .wa-f:hover{box-shadow:inset 0 0 0 1px var(--line)}
+.thabaal-portal .wa-groups .wa-f[aria-current=true]{box-shadow:none}
+.thabaal-portal .wa-groups .wa-f:focus-visible{outline:2px solid var(--mango);outline-offset:1px}
+.thabaal-portal .wa-groups[data-fade=end]{mask-image:linear-gradient(to right,#000 calc(100% - 28px),transparent)}
+.thabaal-portal .wa-groups[data-fade=start]{mask-image:linear-gradient(to left,#000 calc(100% - 28px),transparent)}
+.thabaal-portal .wa-groups[data-fade=both]{mask-image:linear-gradient(to right,transparent,#000 28px,#000 calc(100% - 28px),transparent)}
+@container (max-width:360px){
+  .thabaal-portal .wa-groups{gap:4px}
+  .thabaal-portal .wa-groups .wa-f{padding:0 7px;font-size:12px}
+  .thabaal-portal .wa-groups .wa-f small{font-size:11px}
+}
 .thabaal-portal .wa-rows{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
 .thabaal-portal .wa-row{display:flex;align-items:center;gap:12px;padding:0 0 0 14px;text-decoration:none;color:inherit;min-height:68px}
 .thabaal-portal .wa-row:hover{background:var(--wa-hover)}
