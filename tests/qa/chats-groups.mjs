@@ -136,22 +136,49 @@ await check("A business with no campaigns sees no group chips; a made-up group s
   return "no chips; unknown group ignored";
 });
 
-for (const [label, vp] of [["Desktop", { width: 1366, height: 860 }], ["390px phone", { width: 390, height: 844 }]])
-await check(`${label}: every chip is in view without swiping; the page doesn't scroll sideways`, async () => {
+// Search box on top, the four pills in ONE line under it, lined up with the search box, same height. A wide list shows
+// them all; a narrow one (a 1366px laptop) scrolls the row inside the panel with a fade on the hidden side, and the
+// picked pill is scrolled into view. The page itself never scrolls sideways.
+const ROW = (el) => {
+  const r = el.getBoundingClientRect();
+  const s = document.querySelector(".wa-search input").getBoundingClientRect();
+  const kids = [...el.querySelectorAll(".wa-f")].map((c) => c.getBoundingClientRect());
+  const cur = el.querySelector("[aria-current=true]").getBoundingClientRect();
+  return {
+    below: r.top >= s.bottom - 1,
+    aligned: Math.abs(kids[0].left + el.scrollLeft - s.left) <= 1,
+    lines: new Set(kids.map((k) => Math.round(k.top))).size,
+    heights: new Set(kids.map((k) => Math.round(k.height))).size,
+    scroll: el.scrollWidth - el.clientWidth,
+    out: kids.filter((b) => b.right > r.right + 1 || b.left < r.left - 1).length,
+    fade: el.dataset.fade ?? "",
+    curInView: cur.left >= r.left - 1 && cur.right <= r.right + 1,
+    insideList: r.right <= document.querySelector(".wa-list").getBoundingClientRect().right + 1,
+    page: document.documentElement.scrollWidth - innerWidth,
+  };
+};
+for (const [label, vp, path] of [
+  ["1920px desktop", { width: 1920, height: 1000 }, ""],
+  ["1366px laptop, Inactive picked", { width: 1366, height: 860 }, "?group=inactive"],
+  ["768px tablet", { width: 768, height: 1024 }, ""],
+  ["390px phone, Inactive picked", { width: 390, height: 844 }, "?group=inactive"],
+  ["360px phone", { width: 360, height: 760 }, ""],
+])
+await check(`${label}: search on top, pills in one line, aligned; hidden pills scroll inside the row only`, async () => {
   const p = await as("manager", vp);
-  await p.goto(`${BASE}/dashboard/replies`, { waitUntil: "networkidle" });
+  await p.goto(`${BASE}/dashboard/replies${path}`, { waitUntil: "networkidle" });
   const row = p.getByTestId("chat-groups");
   await row.waitFor();
-  const fit = await row.evaluate((el) => {
-    const r = el.getBoundingClientRect();
-    return { scroll: el.scrollWidth - el.clientWidth, out: [...el.children].filter((c) => { const b = c.getBoundingClientRect(); return b.right > r.right + 1 || b.left < r.left - 1; }).length };
-  });
-  expect(fit.scroll <= 1 && fit.out === 0, `row scrolls ${fit.scroll}px, ${fit.out} chips cut off`);
-  const over = await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-  expect(over <= 1, `page scrolls sideways by ${over}px`);
+  const f = await row.evaluate(ROW);
+  expect(f.below && f.aligned && f.lines === 1 && f.heights === 1, `layout ${JSON.stringify(f)}`);
+  expect(f.insideList && f.page <= 1, `overflow ${JSON.stringify(f)}`);
+  expect(f.curInView, `picked pill hidden ${JSON.stringify(f)}`);
+  if (f.scroll > 1) expect(f.fade === "end" || f.fade === "start" || f.fade === "both", `scrolls ${f.scroll}px but no fade`);
+  else expect(f.out === 0 && f.fade === "", `fits but ${JSON.stringify(f)}`);
+  if (vp.width >= 1900 || vp.width === 768) expect(f.scroll <= 1, `wide list still scrolls ${f.scroll}px`);
   expect(!p.errors.length, p.errors.join(" | "));
   await p.context().close();
-  return "fits";
+  return f.scroll > 1 ? `scrolls ${f.scroll}px in the row, fade ${f.fade}` : "all four in view";
 });
 
 expect(!m.errors.length, m.errors.join(" | "));

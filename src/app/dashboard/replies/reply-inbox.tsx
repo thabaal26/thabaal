@@ -219,6 +219,7 @@ export function ReplyInbox({
   const [menuOpen, setMenuOpen] = useState(false);
   const [listMenuOpen, setListMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const groupRowRef = useRef<HTMLDivElement>(null);
   const listMenuRef = useRef<HTMLDivElement>(null);
   const closeMenu = useCallback(() => setMenuOpen(false), []);
   const closeListMenu = useCallback(() => setListMenuOpen(false), []);
@@ -326,10 +327,36 @@ export function ReplyInbox({
     };
   });
 
+  // When the list is too narrow for every pill, the row scrolls: fade the edge that has more pills, and keep the
+  // picked pill in view.
+  useEffect(() => {
+    const row = groupRowRef.current;
+    if (!row) return;
+    const mark = () => {
+      const more = row.scrollWidth - row.clientWidth;
+      const start = row.scrollLeft > 2;
+      const end = more - row.scrollLeft > 2;
+      row.dataset.fade = start && end ? "both" : start ? "start" : end ? "end" : "";
+    };
+    const picked = row.querySelector<HTMLElement>("[aria-current=true]");
+    if (picked) {
+      const at = picked.getBoundingClientRect().left - row.getBoundingClientRect().left + row.scrollLeft;
+      row.scrollLeft = Math.max(0, at - (row.clientWidth - picked.offsetWidth) / 2);
+    }
+    mark();
+    row.addEventListener("scroll", mark, { passive: true });
+    const ro = new ResizeObserver(mark);
+    ro.observe(row);
+    return () => {
+      row.removeEventListener("scroll", mark);
+      ro.disconnect();
+    };
+  }, [group, groups]);
+
   // One row: All, then the groups the campaign form splits customers into (lib/engagement-segments.ts), each with
   // its live count; tapping the picked group again shows every chat. Before a first campaign there are no groups.
   const groupChips = groups && (
-    <div className="wa-filters wa-groups" role="group" aria-label={isTamil ? "குழு வாரியாக" : "By group"} data-testid="chat-groups">
+    <div ref={groupRowRef} className="wa-filters wa-groups" role="group" aria-label={isTamil ? "குழு வாரியாக" : "By group"} data-testid="chat-groups">
       <Link href={listHref("")} className="wa-f" data-group="all" aria-current={!group ? "true" : undefined} scroll={false}>
         {isTamil ? "அனைத்தும்" : "All"} <small>{fmtNumber(total)}</small>
       </Link>
