@@ -137,8 +137,9 @@ await check("A business with no campaigns sees no group chips; a made-up group s
 });
 
 // Search box on top, the four pills in ONE line under it, lined up with the search box, same height. A wide list shows
-// them all; a narrow one (a 1366px laptop) scrolls the row inside the panel with a fade on the hidden side, and the
-// picked pill is scrolled into view. The page itself never scrolls sideways.
+// them all (the list is at least 360px beside the chat, so laptops and tablets fit them too); if a list is still too
+// narrow (a small phone, big counts) the row scrolls inside the panel with a fade on the hidden side, and the picked
+// pill is scrolled into view. The chat beside the list keeps a usable width. The page never scrolls sideways.
 const ROW = (el) => {
   const r = el.getBoundingClientRect();
   const s = document.querySelector(".wa-search input").getBoundingClientRect();
@@ -155,11 +156,16 @@ const ROW = (el) => {
     curInView: cur.left >= r.left - 1 && cur.right <= r.right + 1,
     insideList: r.right <= document.querySelector(".wa-list").getBoundingClientRect().right + 1,
     page: document.documentElement.scrollWidth - innerWidth,
+    chatW: Math.round(document.querySelector(".wa-chat")?.getBoundingClientRect().width ?? 0),
+    listW: Math.round(document.querySelector(".wa-list").getBoundingClientRect().width),
   };
 };
 for (const [label, vp, path] of [
   ["1920px desktop", { width: 1920, height: 1000 }, ""],
   ["1366px laptop, Inactive picked", { width: 1366, height: 860 }, "?group=inactive"],
+  ["1280px laptop", { width: 1280, height: 800 }, ""],
+  ["1024px tablet", { width: 1024, height: 768 }, ""],
+  ["920px small tablet", { width: 920, height: 1000 }, ""],
   ["768px tablet", { width: 768, height: 1024 }, ""],
   ["390px phone, Inactive picked", { width: 390, height: 844 }, "?group=inactive"],
   ["360px phone", { width: 360, height: 760 }, ""],
@@ -175,10 +181,14 @@ await check(`${label}: search on top, pills in one line, aligned; hidden pills s
   expect(f.curInView, `picked pill hidden ${JSON.stringify(f)}`);
   if (f.scroll > 1) expect(f.fade === "end" || f.fade === "start" || f.fade === "both", `scrolls ${f.scroll}px but no fade`);
   else expect(f.out === 0 && f.fade === "", `fits but ${JSON.stringify(f)}`);
-  if (vp.width >= 1900 || vp.width === 768) expect(f.scroll <= 1, `wide list still scrolls ${f.scroll}px`);
+  // 1024-1279px (side menu + chat) keeps the 280px list: the pills scroll there, the chat keeps its room.
+  const roomy = vp.width >= 1280 || (vp.width > 900 && vp.width < 1024);
+  if (roomy || vp.width === 768) expect(f.scroll <= 1, `list ${f.listW}px still scrolls ${f.scroll}px`);
+  if (roomy) expect(f.listW >= 360 && f.chatW >= 480, `list ${f.listW}px, chat ${f.chatW}px`);
+  if (vp.width >= 1024 && vp.width < 1280) expect(f.chatW >= 380, `chat squeezed to ${f.chatW}px`);
   expect(!p.errors.length, p.errors.join(" | "));
   await p.context().close();
-  return f.scroll > 1 ? `scrolls ${f.scroll}px in the row, fade ${f.fade}` : "all four in view";
+  return `${f.scroll > 1 ? `scrolls ${f.scroll}px in the row, fade ${f.fade}` : "all four in view"} · list ${f.listW}px${vp.width > 900 ? `, chat ${f.chatW}px` : ""}`;
 });
 
 expect(!m.errors.length, m.errors.join(" | "));

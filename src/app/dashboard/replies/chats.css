@@ -35,6 +35,11 @@
 html.dark .thabaal-portal .wa-app{
   --wa-bar:#17394F; --wa-wall:#0E2535; --wa-in:#1C415A; --wa-out:#4E4318; --wa-bad:#4B2A2A; --wa-meta:#9DB0C1;
   --wa-read:#53BDEB; --wa-sel:#21475F; --wa-hover:#18405A; --wa-time:#FFC329; --wa-doodle:rgba(255,249,240,.035)}
+/* Where the chat still has room beside it (a laptop from 1280px, a small tablet without the side menu), the list is
+   at least 360px so the search box and all four filter pills fit. 1024-1279px keeps 280px: with the side menu the
+   chat would get too narrow, and the pills scroll inside their row there. */
+@media (min-width:1280px),(min-width:901px) and (max-width:1023px){.thabaal-portal .wa-app{grid-template-columns:clamp(360px,27%,440px) minmax(0,1fr)}}
+/* Contact info open: the list keeps its narrower size so the chat keeps room (the pills scroll there if needed). */
 @media (min-width:1280px){.thabaal-portal .wa-app.info{grid-template-columns:clamp(270px,24%,420px) minmax(0,1fr) clamp(300px,22%,400px)}}
 /* With contact info open the chat is narrower: the name keeps the room (the panel shows who it is). */
 .thabaal-portal .wa-app.info .wa-ch .wa-win,.thabaal-portal .wa-app.info .wa-ch .wa-auto{display:none}
