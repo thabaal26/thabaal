@@ -239,11 +239,11 @@ export async function saveSendingRules(
   if (!Number.isInteger(input.marketingGapHours) || input.marketingGapHours < 0 || input.marketingGapHours > 24 * 30) return { ok: false, message: "Pick how long to wait between offers." };
   const quiet = input.quietFrom && input.quietTo;
   if (quiet && (!time.test(input.quietFrom) || !time.test(input.quietTo))) return { ok: false, message: "Quiet hours need a start and end time." };
-  // Engagement groups (lib/engagement-segments.ts): Super active within N days; Inactive after N offers in a row.
+  // Engagement groups (lib/engagement-segments.ts): Engaged within N days; Dormant after N offers in a row.
   if (input.engagementDays !== undefined && (!Number.isInteger(input.engagementDays) || input.engagementDays < 7 || input.engagementDays > 730))
-    return { ok: false, message: "Super active window must be 7 to 730 days." };
+    return { ok: false, message: "Engaged window must be 7 to 730 days." };
   if (input.inactiveAfterOffers !== undefined && (!Number.isInteger(input.inactiveAfterOffers) || input.inactiveAfterOffers < 1 || input.inactiveAfterOffers > 20))
-    return { ok: false, message: "Inactive after must be 1 to 20 offers." };
+    return { ok: false, message: "Dormant after must be 1 to 20 offers." };
   await db.client.update({
     where: { id: clientId },
     data: {

@@ -25,7 +25,7 @@ import { FailureSummary } from "../failure-summary";
 import { campaignFormData } from "../form-data";
 import { templateLabel } from "@/lib/plain-error";
 import { STOP_CONFIRM } from "@/lib/held";
-import { ATTRIBUTION_DAYS, campaignInteractions } from "@/lib/engagement-segments";
+import { ATTRIBUTION_DAYS, campaignInteractions, cleanSegments } from "@/lib/engagement-segments";
 import { planGate } from "@/app/dashboard/plan-lock";
 
 export const metadata: Metadata = { title: "Campaign" };
@@ -272,7 +272,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
             includeIds: c.includeIds,
             excludeIds: c.excludeIds,
             skipUnread: c.skipUnread,
-            segments: c.segments,
+            segments: cleanSegments(c.segments),
           }}
           people={people}
         />

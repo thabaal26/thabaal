@@ -10,13 +10,13 @@ import "./chats.css";
 import { templateLabel } from "@/lib/plain-error";
 import { planGate } from "@/app/dashboard/plan-lock";
 import { chatAutomation } from "@/lib/engine/conversation";
-import { engagementRows, hasCampaignHistory, SEGMENT_LABEL } from "@/lib/engagement-segments";
+import { ENGAGEMENT_GROUPS, engagementRows, groupKey, hasCampaignHistory, SEGMENT_LABEL } from "@/lib/engagement-segments";
 
 export const metadata: Metadata = { title: "Chats" };
 export const dynamic = "force-dynamic";
 
-// Every chat by default; the only filter is the campaign group ("Not reached yet" customers have no chat to show here).
-const CHAT_GROUPS = ["super", "active", "inactive"] as const;
+// Every chat by default; the only filter is the campaign group (Engaged / Seen / Reached / Dormant, the same groups
+// and the same rule as the campaign form: lib/engagement-segments.ts). "Not reached yet" customers sit under All.
 
 /** Customers we messaged (a campaign, an order update) who haven't written back show as chats this many days. */
 const SENT_DAYS = 7;
@@ -26,8 +26,8 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
   if (locked) return locked;
   // Older links may still carry ?show=open|handled|sent: those open every chat now.
   const { r: picked, group: rawGroup = "" } = await searchParams;
-  // By how they respond to campaigns (lib/engagement-segments.ts), the same groups the campaign form shows.
-  const group = typeof rawGroup === "string" && (CHAT_GROUPS as readonly string[]).includes(rawGroup) ? (rawGroup as (typeof CHAT_GROUPS)[number]) : "";
+  // By how they respond to campaigns, the same groups the campaign form shows; old links (?group=super) still work.
+  const group = groupKey(rawGroup);
   const scope = await getScope();
   const mine = ownedMessages(scope);
 
@@ -167,7 +167,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
     for (const e of await engagementRows(scope.clientId, { customerIds: ids })) groupOf.set(e.id, e.segment);
   }
   const groups = groupOf.size
-    ? CHAT_GROUPS.map((key) => ({ key, label: SEGMENT_LABEL[key].en, labelTa: SEGMENT_LABEL[key].ta, count: allThreads.filter((t) => groupOf.get(t.customer.id) === key).length }))
+    ? ENGAGEMENT_GROUPS.map((key) => ({ key, label: SEGMENT_LABEL[key].en, labelTa: SEGMENT_LABEL[key].ta, count: allThreads.filter((t) => groupOf.get(t.customer.id) === key).length }))
     : null;
   const replies = group && groups ? allThreads.filter((t) => groupOf.get(t.customer.id) === group) : [...allThreads];
 

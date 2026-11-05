@@ -36,9 +36,10 @@ html.dark .thabaal-portal .wa-app{
   --wa-bar:#17394F; --wa-wall:#0E2535; --wa-in:#1C415A; --wa-out:#4E4318; --wa-bad:#4B2A2A; --wa-meta:#9DB0C1;
   --wa-read:#53BDEB; --wa-sel:#21475F; --wa-hover:#18405A; --wa-time:#FFC329; --wa-doodle:rgba(255,249,240,.035)}
 /* Where the chat still has room beside it (a laptop from 1280px, a small tablet without the side menu), the list is
-   at least 360px so the search box and all four filter pills fit. 1024-1279px keeps 280px: with the side menu the
-   chat would get too narrow, and the pills scroll inside their row there. */
-@media (min-width:1280px),(min-width:901px) and (max-width:1023px){.thabaal-portal .wa-app{grid-template-columns:clamp(360px,27%,440px) minmax(0,1fr)}}
+   at least 412px so the search box and all five filter pills (All, Engaged, Seen, Reached, Dormant, with 3-digit
+   counts) fit. 1024-1279px keeps 280px: with the side menu the chat would get too narrow, and the pills scroll inside
+   their row there. */
+@media (min-width:1280px),(min-width:901px) and (max-width:1023px){.thabaal-portal .wa-app{grid-template-columns:clamp(412px,27%,460px) minmax(0,1fr)}}
 /* Contact info open: the list keeps its narrower size so the chat keeps room (the pills scroll there if needed). */
 @media (min-width:1280px){.thabaal-portal .wa-app.info{grid-template-columns:clamp(270px,24%,420px) minmax(0,1fr) clamp(300px,22%,400px)}}
 /* With contact info open the chat is narrower: the name keeps the room (the panel shows who it is). */
@@ -66,7 +67,7 @@ html.dark .thabaal-portal .wa-app{
 .thabaal-portal .wa-list{container-type:inline-size}
 .thabaal-portal .wa-groups{flex-wrap:nowrap;align-items:center;overflow-x:auto;overscroll-behavior-x:contain;scroll-padding-inline:12px}
 .thabaal-portal .wa-groups::-webkit-scrollbar{display:none}
-.thabaal-portal .wa-groups::after{content:"";flex:0 0 6px}
+.thabaal-portal .wa-groups[data-fade=end]::after,.thabaal-portal .wa-groups[data-fade=both]::after{content:"";flex:0 0 6px}
 .thabaal-portal .wa-groups .wa-f{flex:none;height:28px;padding:0 10px;gap:4px;font-size:12.5px;line-height:1;box-shadow:inset 0 0 0 1px transparent;transition:background-color .15s,box-shadow .15s,color .15s}
 .thabaal-portal .wa-groups .wa-f small{font-size:11.5px;opacity:1;font-variant-numeric:tabular-nums}
 .thabaal-portal .wa-groups .wa-f:hover{box-shadow:inset 0 0 0 1px var(--line)}
@@ -75,9 +76,9 @@ html.dark .thabaal-portal .wa-app{
 .thabaal-portal .wa-groups[data-fade=end]{mask-image:linear-gradient(to right,#000 calc(100% - 28px),transparent)}
 .thabaal-portal .wa-groups[data-fade=start]{mask-image:linear-gradient(to left,#000 calc(100% - 28px),transparent)}
 .thabaal-portal .wa-groups[data-fade=both]{mask-image:linear-gradient(to right,transparent,#000 28px,#000 calc(100% - 28px),transparent)}
-@container (max-width:360px){
+@container (max-width:440px){
   .thabaal-portal .wa-groups{gap:4px}
-  .thabaal-portal .wa-groups .wa-f{padding:0 7px;font-size:12px}
+  .thabaal-portal .wa-groups .wa-f{padding:0 7px;gap:3px;font-size:12px}
   .thabaal-portal .wa-groups .wa-f small{font-size:11px}
 }
 .thabaal-portal .wa-rows{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}

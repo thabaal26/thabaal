@@ -21,7 +21,7 @@ const NEXT: Record<Kind, { label: string; why: string; again: string; tip?: stri
     label: "Can't receive WhatsApp",
     why: "No WhatsApp on this number, an old app, or they blocked you.",
     again: "Sending again is a waste: it fails until they fix it. Campaigns already leave them out.",
-    tip: "Call them and ask them to update WhatsApp. Move them to Inactive to keep your list clean.",
+    tip: "Call them and ask them to update WhatsApp. Move them to Dormant to keep your list clean.",
     inactive: "unreachable",
     tone: "gray",
   },
@@ -29,7 +29,7 @@ const NEXT: Record<Kind, { label: string; why: string; again: string; tip?: stri
     label: "In a Meta test",
     why: "Meta stops offers to a few people as a test, with no end date.",
     again: "Sending again is a waste: Meta says it gets the same error.",
-    tip: "They still get your offers if they message you first. Move them to Inactive.",
+    tip: "They still get your offers if they message you first. Move them to Dormant.",
     inactive: "experiment",
     tone: "gray",
   },
@@ -48,7 +48,7 @@ const NEXT: Record<Kind, { label: string; why: string; again: string; tip?: stri
 
 /**
  * Why this campaign's messages failed, grouped, each with a simple reason, whether sending again can work, and a
- * suggestion the business can take (send once more, move to Inactive). Nothing here happens by itself.
+ * suggestion the business can take (send once more, move to Dormant). Nothing here happens by itself.
  */
 export async function FailureSummary({ campaignId, runIds, canManage }: { campaignId: string; runIds: string[]; canManage: boolean }) {
   if (!runIds.length) return null;
@@ -73,9 +73,9 @@ function MoveButton({ campaignId, group, n }: { campaignId: string; group: Inact
       className="shrink-0 max-sm:w-full"
       variant="secondary"
       action={moveFailedToInactive.bind(null, campaignId, group)}
-      confirm={`Move ${n} customer${n === 1 ? "" : "s"} to Inactive? Campaigns leave them out until you remove the "inactive" tag.`}
+      confirm={`Move ${n} customer${n === 1 ? "" : "s"} to Dormant? Campaigns leave them out until you remove the "inactive" tag.`}
     >
-      Move {fmtNumber(n)} to Inactive
+      Move {fmtNumber(n)} to Dormant
     </ActionButton>
   );
 }
@@ -121,7 +121,7 @@ export function FailureSummaryView({
                 <p className="mt-1 max-w-read text-sm text-muted">Meta holds offers back from people who get a lot of them.</p>
                 <p className="mt-1 max-w-read text-sm text-ink-2">
                   {held.ready > 0
-                    ? `${fmtNumber(held.ready)} can be sent again now (24 hours have passed). If Meta holds it again, move them to Inactive.`
+                    ? `${fmtNumber(held.ready)} can be sent again now (24 hours have passed). If Meta holds it again, move them to Dormant.`
                     : held.readyAt
                       ? `Can be sent again after 24 hours, from ${fmtDate(held.readyAt, "d MMM, h:mm a")}. Sooner is held again.`
                       : "Each one can be sent again once, after 24 hours."}
@@ -144,7 +144,7 @@ export function FailureSummaryView({
                   )}
                   {held.inactive > 0 && (
                     <li>
-                      <b className="text-ink">{fmtNumber(held.inactive)}</b> in Inactive
+                      <b className="text-ink">{fmtNumber(held.inactive)}</b> in Dormant
                     </li>
                   )}
                   {held.expired > 0 && (
@@ -183,7 +183,7 @@ export function FailureSummaryView({
                   </p>
                   <p className="mt-1 max-w-read text-sm text-muted">{g.why}</p>
                   <p className="mt-1 max-w-read text-sm text-ink-2">{g.again}</p>
-                  {g.tip && <p className="mt-1 max-w-read text-xs text-muted">{g.inactive && !move ? "All of them are in Inactive." : g.tip}</p>}
+                  {g.tip && <p className="mt-1 max-w-read text-xs text-muted">{g.inactive && !move ? "All of them are in Dormant." : g.tip}</p>}
                 </div>
                 {canManage && g.inactive && move > 0 && <MoveButton campaignId={campaignId} group={g.inactive} n={move} />}
               </div>

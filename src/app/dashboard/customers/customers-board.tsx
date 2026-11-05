@@ -10,6 +10,7 @@ import { safeAction, toastResult } from "@/components/toast";
 import type { CustomerRow, Status, Tier } from "@/lib/customers-data";
 import { useLanguage } from "@/lib/i18n/context";
 import { formatPhone } from "@/lib/phone";
+import { ENGAGEMENT_GROUPS, SEGMENT_LABEL } from "@/lib/segment-labels";
 import type { PointEvent } from "@/lib/loyalty-history";
 import { DEFAULT_LOYALTY_RULES, type LoyaltyRules } from "@/lib/loyalty";
 import { adjustLoyaltyPoints, tagCustomers } from "../actions/customers";
@@ -41,16 +42,13 @@ const LISTS: { id: string; label: string; labelTa: string; hint: string; hintTa:
   { id: "lost", label: "Lost", labelTa: "நீண்ட காலம் வராதவர்கள்", hint: "Gone much longer than usual", hintTa: "நீண்ட நாட்களாக வாங்காதவர்கள்", test: (c) => c.status === "Lost" },
   { id: "warm", label: "Chatted, never bought", labelTa: "பேசியவர்கள், வாங்காதவை", hint: "Wrote to you, no order yet", hintTa: "செய்தி அனுப்பியுள்ளனர், ஆர்டர் இல்லை", test: (c) => c.orders === 0 && c.chatted },
   { id: "never", label: "Never ordered", labelTa: "ஆர்டர் செய்யாதவர்கள்", hint: "On your list, no order yet", hintTa: "பட்டியலில் உள்ளோர், ஆர்டர் இல்லை", test: (c) => c.orders === 0 },
-  { id: "super", label: "Super active", labelTa: "மிக ஆர்வமானவர்கள்", hint: "Tapped, replied or ordered lately", hintTa: "சமீபத்தில் பட்டன், பதில் அல்லது ஆர்டர்", test: (c) => c.segment === "super" },
-  { id: "engaged", label: "Active", labelTa: "செயலில் உள்ளவர்கள்", hint: "Offers reach them, no response lately", hintTa: "சலுகைகள் சேர்கின்றன, பதில் இல்லை", test: (c) => c.segment === "active" },
-  { id: "cold", label: "Inactive", labelTa: "ஆர்வம் குறைந்தவர்கள்", hint: "Several offers, no response", hintTa: "பல சலுகைகள், பதில் இல்லை", test: (c) => c.segment === "inactive" },
+  // Engagement groups (lib/segment-labels.ts): the same names, meanings and rule as Chats and the campaign form.
+  ...ENGAGEMENT_GROUPS.map((g) => ({ id: g, label: SEGMENT_LABEL[g].en, labelTa: SEGMENT_LABEL[g].ta, hint: SEGMENT_LABEL[g].hint, hintTa: SEGMENT_LABEL[g].hintTa, test: (c: CustomerRow) => c.segment === g })),
   { id: "points", label: "Can use points", labelTa: "புள்ளிகள் பயன்படுத்தலாம்", hint: "Enough points for a discount", hintTa: "தள்ளுபடி பெற போதுமான புள்ளிகள்", test: (c) => c.redeemable > 0 },
 ];
 const TIERS: Tier[] = ["Platinum", "Gold", "Silver", "New", "No orders"];
 // Engagement badge (lib/engagement-segments.ts); "Not reached yet" shows nothing, to keep the list calm.
-const SEGMENT_EN = { super: "Super active", active: "Active", inactive: "Inactive", new: "" } as const;
-const SEGMENT_TA = { super: "மிக ஆர்வம்", active: "செயலில்", inactive: "ஆர்வம் குறைவு", new: "" } as const;
-const SEGMENT_TONE = { super: "ok", active: "info", inactive: "warn", new: "mute" } as const;
+const SEGMENT_TONE = { engaged: "ok", seen: "info", reached: "mute", dormant: "warn", new: "mute" } as const;
 const STATUSES: Status[] = ["Active", "Slipping", "Lost"];
 
 const lastTxt = (d: number | null, isTa?: boolean) => {
@@ -296,7 +294,7 @@ export function CustomerTable({ rows, canManage }: { rows: CustomerRow[]; canMan
                       <>
                         {" "}
                         <span data-segment={c.segment}>
-                          <Pill tone={SEGMENT_TONE[c.segment]}>{isTamil ? SEGMENT_TA[c.segment] : SEGMENT_EN[c.segment]}</Pill>
+                          <Pill tone={SEGMENT_TONE[c.segment]}>{isTamil ? SEGMENT_LABEL[c.segment].ta : SEGMENT_LABEL[c.segment].en}</Pill>
                         </span>
                       </>
                     )}

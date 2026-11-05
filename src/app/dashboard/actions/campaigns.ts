@@ -262,7 +262,7 @@ export async function searchCampaignCustomers(campaignId: string | null, q: stri
   });
 }
 
-/** The campaign page's suggestion: moves one group of this campaign's failed customers to Inactive (lib/inactive.ts). */
+/** The campaign page's suggestion: moves one group of this campaign's failed customers to Dormant (lib/inactive.ts). */
 export async function moveFailedToInactive(campaignId: string, group: InactiveGroup): Promise<ActionResult> {
   const s = await requireManager();
   if ("denied" in s) return { ok: false, message: s.denied };
@@ -271,7 +271,7 @@ export async function moveFailedToInactive(campaignId: string, group: InactiveGr
   if (!INACTIVE_GROUPS.includes(group)) return { ok: false, message: "Nothing to move." };
   const n = await moveToInactive(c.clientId, (await inactiveCandidates(c.runs.map((r) => r.id)))[group]);
   refresh();
-  return n ? { ok: true, message: `Moved ${n} to Inactive. Campaigns leave them out; remove the "${INACTIVE_TAG}" tag to bring someone back.` } : { ok: false, message: "They're already in Inactive." };
+  return n ? { ok: true, message: `Moved ${n} to Dormant. Campaigns leave them out; remove the "${INACTIVE_TAG}" tag to bring someone back.` } : { ok: false, message: "They're already in Dormant." };
 }
 
 export async function cancelRun(runId: string): Promise<ActionResult> {
