@@ -199,7 +199,7 @@ export function ReplyInbox({
   profile?: ChatProfile | null;
   /** Every chat, for the "All" chip. */
   total: number;
-  /** The picked engagement group (super | active | inactive), and each group's chats; null before any campaign. */
+  /** The picked engagement group (engaged | seen | reached | dormant), and each group's chats; null before any campaign. */
   group?: string;
   groups?: ChatFilter[] | null;
   /** Customers still waiting for an answer (for "Mark all handled"). */

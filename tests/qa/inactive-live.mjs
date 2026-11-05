@@ -1,5 +1,5 @@
-// Engagement groups stay live on the campaign form (segment-picker.tsx): customers moved to Inactive show on the
-// Inactive card (and stay out of sends); when one of them replies on WhatsApp they come back to Super active, and the
+// Engagement groups stay live on the campaign form (segment-picker.tsx): customers moved to Dormant show on the
+// Dormant card (and stay out of sends); when one of them replies on WhatsApp they come back to Engaged, and the
 // open form's counts change by themselves within a minute, with no reload.
 //   node tests/qa/inactive-live.mjs   (on a running `node tests/qa/serve.mjs`)
 import crypto from "node:crypto";
@@ -51,10 +51,10 @@ const p = await ctx.newPage();
 const total = async (s) => num(await p.getByTestId(`segment-total-${s}`).innerText());
 
 let before = 0;
-await check("Moved customers are on the Inactive card, marked as left out, and a send to Inactive leaves them out", async () => {
+await check("Moved customers are on the Dormant card, marked as left out, and a send to Dormant leaves them out", async () => {
   await p.goto(`${BASE}/dashboard/campaigns/new`, { waitUntil: "networkidle" });
   await p.getByTestId("segment-picker").waitFor();
-  before = await total("inactive");
+  before = await total("dormant");
   expect(before >= 3, `Inactive card shows ${before}`);
   const line = await p.getByTestId("moved-inactive-count").innerText();
   expect(/you moved here are left out/.test(line) && num(line.split("·")[1]) >= 3, `line: ${line}`);
@@ -63,21 +63,21 @@ await check("Moved customers are on the Inactive card, marked as left out, and a
 
 let superBefore = 0;
 await check("A moved customer replies on WhatsApp: tag off, can receive again, and the open form updates without a reload", async () => {
-  superBefore = await total("super");
+  superBefore = await total("engaged");
   const c = moved[0];
   await webhook({ contacts: [{ wa_id: c.phone, profile: { name: c.name } }], messages: [{ from: c.phone, id: `wamid.qa-back-${run}`, timestamp: String(Math.floor(Date.now() / 1000)), type: "text", text: { body: "What's the price of gingelly oil?" } }] });
   const back = await db.customer.findUniqueOrThrow({ where: { id: c.id } });
   expect(!back.tags.includes("inactive") && !back.unreachable, `tags ${back.tags} unreachable ${back.unreachable}`);
-  // The form refreshes its counts every minute while open (tab visible): wait for it, no reload.
+  // The form re-reads its counts when the live check changes (tab visible): wait for it, no reload.
   await p.waitForFunction(
     ([b, sb]) => {
       const get = (s) => Number((document.querySelector(`[data-testid=segment-total-${s}]`)?.textContent ?? "").replace(/[^\d]/g, "") || 0);
-      return get("inactive") === b - 1 && get("super") === sb + 1;
+      return get("dormant") === b - 1 && get("engaged") === sb + 1;
     },
     [before, superBefore],
-    { timeout: 80_000, polling: 1000 },
+    { timeout: 30_000, polling: 1000 },
   );
-  return `Inactive ${before}→${await total("inactive")}, Super active ${superBefore}→${await total("super")}`;
+  return `Dormant ${before}→${await total("dormant")}, Engaged ${superBefore}→${await total("engaged")}`;
 });
 
 await browser.close();

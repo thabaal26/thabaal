@@ -3,39 +3,33 @@ import { Prisma } from "@prisma/client";
 import { db } from "./db";
 import { SKIP_CODES, SKIP_DAYS } from "./held";
 import { INACTIVE_TAG } from "./schedule";
+import { cleanSegments, SEGMENTS, type Segment } from "./segment-labels";
 
 // Engagement segments: how each customer has responded to a business's campaigns, worked out live from that
 // business's own records every time they are read (messages and their Meta statuses, taps and replies, orders), over
-// all its campaigns, never only the latest. A new tap or reply moves a customer at once; nothing is stored.
+// all its campaigns, never only the latest. A new status, tap or reply moves a customer at once; nothing is stored.
+// Names, keys and the old-key mapping: lib/segment-labels.ts (shared with the browser).
 //
-//   super    – Super active: tapped a button, replied or ordered within the business's engagementDays (default 90).
-//   active   – Active: an offer reached them (delivered or read), no recent tap/reply/order, and not Inactive.
-//   inactive – Inactive (low engagement): their last inactiveAfterOffers (default 3) delivered offers in a row got
-//              no tap, reply or order after them, and nothing within engagementDays.
-//   new      – Not reached yet: no offer has reached them and they never tapped, replied or ordered.
-// Customers the business moved to Inactive (the "inactive" tag, usually after messages failed) are in the Inactive group
-// too, and stay out of every send. The tag comes off by itself the moment they tap, reply or order (lib/replies.ts),
-// so the next read puts them in Super active: the groups follow what people do, live.
+// The rule, per customer (one person with several numbers is one customer), first match wins:
+//   engaged – a tap, reply or order within engagementDays (default 90). Delivered or read alone never counts.
+//   new     – no campaign message was ever DELIVERED or READ (only sent, failed, skipped) and no tap/reply/order.
+//   dormant – their last inactiveAfterOffers (default 3) delivered offers in a row got no response (unchanged rule).
+//   seen    – offers reached them and Meta reported at least one of them READ.
+//   reached – offers reached them (DELIVERED) but Meta never reported one READ.
+// Customers the business moved to Dormant (the "inactive" tag, usually after messages failed) are in Dormant too, and
+// stay out of every send. The tag comes off by itself the moment they tap, reply or order (lib/replies.ts), so the next
+// read puts them in Engaged: the groups follow what people do, live.
 //
-// Kept apart from it, never mixed into one status (a Super active customer can still be unreachable today):
+// Meta's statuses only move forward on a message (webhook RANK: sent < delivered < read; a late or repeated "delivered"
+// never undoes "read"), and a message counts once however many webhooks arrive, so counts can't inflate.
+//
+// Kept apart from it, never mixed into one status (an Engaged customer can still be unreachable today):
 //   delivery  – what happened to their latest offer (delivered / read / failed with Meta's code),
-//   suppressed – opted out, can't receive WhatsApp, or moved to Inactive by the business (the "inactive" tag),
+//   suppressed – opted out, can't receive WhatsApp, or moved to Dormant by the business (the "inactive" tag),
 //   paused    – Meta is holding offers back for now (131049/130472, lib/held.ts): temporary, retried by its own rules.
-// A failed send never counts as an offer that reached them, so a temporary Meta error can't make anyone Inactive.
-// One person with several numbers (lib/linked-numbers.ts) is one customer here: every number gets the person's segment.
+// A failed send never counts as an offer that reached them, so a temporary Meta error can't make anyone Dormant.
 
-export const SEGMENTS = ["super", "active", "inactive", "new"] as const;
-export type Segment = (typeof SEGMENTS)[number];
-
-export const SEGMENT_LABEL: Record<Segment, { en: string; ta: string; hint: string; hintTa: string }> = {
-  super: { en: "Super active", ta: "மிக ஆர்வமானவர்கள்", hint: "Tapped a button, replied or ordered lately", hintTa: "சமீபத்தில் பட்டனை அழுத்தினார், பதில் அனுப்பினார் அல்லது ஆர்டர் செய்தார்" },
-  active: { en: "Active", ta: "செயலில் உள்ளவர்கள்", hint: "Offers reach them; no tap or reply lately", hintTa: "சலுகைகள் சென்றடைகின்றன; சமீபத்தில் பதில் இல்லை" },
-  inactive: { en: "Inactive", ta: "ஆர்வம் குறைந்தவர்கள்", hint: "Several offers in a row with no response", hintTa: "தொடர்ந்து பல சலுகைகளுக்கு பதில் இல்லை" },
-  new: { en: "Not reached yet", ta: "இன்னும் சென்றடையாதவர்கள்", hint: "No offer has reached them yet", hintTa: "இன்னும் எந்தச் சலுகையும் சென்றடையவில்லை" },
-};
-
-export const isSegment = (s: string): s is Segment => (SEGMENTS as readonly string[]).includes(s);
-export const cleanSegments = (xs: readonly string[] | null | undefined) => [...new Set((xs ?? []).filter(isSegment))];
+export { SEGMENTS, SEGMENT_LABEL, ENGAGEMENT_GROUPS, cleanSegments, isSegment, groupKey, type Segment } from "./segment-labels";
 
 /** A tap or reply counts for the campaign message it answers (Meta's context.id), else for one sent this recently. */
 export const ATTRIBUTION_DAYS = 3;
@@ -84,12 +78,16 @@ export async function engagementRules(clientId: string) {
 }
 
 /** The segment from a customer's figures (the one rule; the SQL only gathers the figures). */
-export function segmentOf(r: { lastInteractionAt: Date | null; delivered: number; sinceInteraction: number }, rules: { days: number; offers: number }, now = new Date()): Segment {
-  if (r.lastInteractionAt && r.lastInteractionAt.getTime() >= now.getTime() - rules.days * 86_400_000) return "super";
-  if (r.delivered === 0 && !r.lastInteractionAt) return "new";
-  if (r.sinceInteraction >= rules.offers) return "inactive";
-  // Reached before, or answered long ago and not offered enough since to call them Inactive.
-  return r.delivered === 0 ? "new" : "active";
+export function segmentOf(
+  r: { lastInteractionAt: Date | null; delivered: number; read: number; sinceInteraction: number },
+  rules: { days: number; offers: number },
+  now = new Date(),
+): Segment {
+  if (r.lastInteractionAt && r.lastInteractionAt.getTime() >= now.getTime() - rules.days * 86_400_000) return "engaged";
+  if (r.delivered === 0) return "new";
+  if (r.sinceInteraction >= rules.offers) return "dormant";
+  // Reached, no recent response, not enough unanswered offers for Dormant: did Meta ever report one read?
+  return r.read > 0 ? "seen" : "reached";
 }
 
 /**
@@ -148,8 +146,8 @@ export async function engagementRows(clientId: string, opts: { customerIds?: str
     ${opts.customerIds ? Prisma.sql`WHERE p.id IN (${Prisma.join(opts.customerIds)})` : Prisma.empty}`;
   return rows.map((r) => {
     const base = { lastInteractionAt: r.last_interaction, delivered: Number(r.delivered), sinceInteraction: Number(r.since) };
-    // Moved to Inactive by the business: in that group whatever they did before (the move came after it).
-    const segment: Segment = r.moved ? "inactive" : segmentOf(base, rules, now);
+    // Moved to Dormant by the business: in that group whatever they did before (the move came after it).
+    const segment: Segment = r.moved ? "dormant" : segmentOf({ ...base, read: Number(r.read) }, rules, now);
     return {
       id: r.id,
       segment,
@@ -176,10 +174,8 @@ export type SegmentSummary = {
   history: boolean;
   rules: { days: number; offers: number };
   /** Per segment: customers a campaign can reach now, those in it who can't (suppressed or paused by Meta), and of
-   * those how many the business moved to Inactive. */
+   * those how many the business moved to Dormant. */
   segments: Record<Segment, { eligible: number; excluded: number; moved: number }>;
-  /** Active, split: read at least one offer vs. only delivered. */
-  activeRead: number;
   totals: { customers: number; eligible: number; optedOut: number; unreachable: number; movedInactive: number; paused: number; invalidNumber: number };
 };
 
@@ -194,17 +190,14 @@ export async function segmentSummary(clientId: string, now = new Date()): Promis
     db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM "Customer" WHERE "clientId" = ${clientId} AND length(regexp_replace(phone, '\\D', '', 'g')) < 10`,
   ]);
   const segments = Object.fromEntries(SEGMENTS.map((s) => [s, { eligible: 0, excluded: 0, moved: 0 }])) as SegmentSummary["segments"];
-  let activeRead = 0;
   for (const r of rows) {
     segments[r.segment][eligibleRow(r) ? "eligible" : "excluded"]++;
     if (r.movedToInactive) segments[r.segment].moved++;
-    if (r.segment === "active" && r.read > 0 && eligibleRow(r)) activeRead++;
   }
   return {
     history,
     rules,
     segments,
-    activeRead,
     totals: {
       customers: rows.length,
       eligible: rows.filter(eligibleRow).length,

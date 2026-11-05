@@ -117,7 +117,7 @@ try {
     return "131026 · 131050 · 131049";
   });
 
-  await check(5, "failures: a simple reason each, 'send again' after 24 h, and Move to Inactive (which works)", async () => {
+  await check(5, "failures: a simple reason each, 'send again' after 24 h, and Move to Dormant (which works)", async () => {
     const c = await db.campaign.create({ data: { clientId: S.shopId, name: `QA failed ${run}`, templateId: tpl.id, scheduleType: "ONCE", active: false } });
     stoppedId = c.id;
     const ago = new Date(Date.now() - 30 * 3_600_000);
@@ -133,14 +133,14 @@ try {
     expect(/Sending again is a waste/.test(await gone.innerText()), await gone.innerText());
     expect(/Sending again is a waste/.test(await page.getByTestId("failure-experiment").innerText()), "experiment line");
     await page.screenshot({ path: ".git/shots-failure-suggestions.png", fullPage: false });
-    await gone.getByRole("button", { name: "Move 1 to Inactive" }).click();
+    await gone.getByRole("button", { name: "Move 1 to Dormant" }).click();
     await page.getByRole("button", { name: "Yes, continue" }).click();
     await page.waitForTimeout(2500);
     const tags = (await db.customer.findUnique({ where: { id: left.id } })).tags;
     expect(tags.includes("inactive"), `tags ${tags}: ${await toast()}`);
-    expect(/All of them are in Inactive/.test(await page.getByTestId("failure-unreachable").innerText()), "card not updated");
+    expect(/All of them are in Dormant/.test(await page.getByTestId("failure-unreachable").innerText()), "card not updated");
     expect(!errors.length, `script error: ${errors[0]}`);
-    return "reasons · send again · moved to Inactive";
+    return "reasons · send again · moved to Dormant";
   });
 
   await check(6, "a scheduled campaign card counts only who it will really reach", async () => {

@@ -588,11 +588,11 @@ export function SendingRulesForm({
       {/* Engagement groups in campaigns (lib/engagement-segments.ts). */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:col-span-3">
         <div>
-          <Label htmlFor={`eng-${clientId}`} hint="days">Super active: tap, reply or order within</Label>
+          <Label htmlFor={`eng-${clientId}`} hint="days">Engaged: tap, reply or order within</Label>
           <input id={`eng-${clientId}`} type="number" min={7} max={730} className="field" value={days} onChange={(e) => setDays(Number(e.target.value))} />
         </div>
         <div>
-          <Label htmlFor={`inact-${clientId}`} hint="offers in a row">Inactive: no response after</Label>
+          <Label htmlFor={`inact-${clientId}`} hint="offers in a row">Dormant: no response after</Label>
           <input id={`inact-${clientId}`} type="number" min={1} max={20} className="field" value={offers} onChange={(e) => setOffers(Number(e.target.value))} />
         </div>
       </div>

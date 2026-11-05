@@ -96,7 +96,7 @@ export async function recordReply(r: IncomingReply) {
   // Their 24-hour window starts again from this message.
   forget(replyContextKey(customer.id));
   // They wrote to us, so they are on WhatsApp and want to hear from us: out of Inactive, and "can't receive" no longer
-  // holds (lib/engagement-segments.ts puts them in Super active from this message on). Opt-outs stay as they are.
+  // holds (lib/engagement-segments.ts puts them in Engaged from this message on). Opt-outs stay as they are.
   await db.$executeRaw`
     UPDATE "Customer" SET tags = array_remove(tags, ${INACTIVE_TAG}), unreachable = false, "updatedAt" = now()
     WHERE id = ${customer.id} AND (${INACTIVE_TAG} = ANY(tags) OR unreachable = true)`.catch((e) => console.error("Could not bring the customer back", e));

@@ -95,7 +95,7 @@ export type CampaignPeople = { includeIds?: readonly string[]; excludeIds?: read
 
 /**
  * The customer filter for a campaign: its audienceTag (a saved audience, one or more tags, or everyone), plus the
- * people added by hand, minus the people left out (each with all their numbers). With segments (Super active, Active,
+ * people added by hand, minus the people left out (each with all their numbers). With segments (Engaged, Seen, Reached, Dormant,
  * Inactive, Not reached yet; lib/engagement-segments.ts), "Send to" keeps only customers in one of them, worked out
  * from the business's whole campaign history at that moment. Opted-out and unreachable customers are never in it; Inactive
  * ones (INACTIVE_TAG) only when the campaign picks that tag or adds them by hand.

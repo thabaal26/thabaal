@@ -1,7 +1,7 @@
-// Chats › by group (replies/page.tsx + reply-inbox.tsx): one chip row, All · Super active · Active · Inactive (the groups
+// Chats › by group (replies/page.tsx + reply-inbox.tsx): one chip row, All · Engaged · Seen · Reached · Dormant (the groups
 // the campaign form splits customers into), counted live; no Open / Handled / Sent chips; the row wraps instead of
 // scrolling sideways; Mark handled sits under the chat box and Mark order paid doesn't (it's in contact info); a tap
-// on WhatsApp moves the customer into Super active; a business without campaigns sees no chips. End to end through
+// on WhatsApp moves the customer into Engaged; a business without campaigns sees no chips. End to end through
 // Meta's signed webhook on the QA app.
 //   node tests/qa/chats-groups.mjs   (on a running `node tests/qa/serve.mjs`)
 import crypto from "node:crypto";
@@ -66,34 +66,35 @@ const go = (path) => m.goto(BASE + path, { waitUntil: "networkidle", timeout: 60
 const names = async () => (await m.locator(".wa-app a[href*='replies?']").allInnerTexts()).join(" | ");
 const chip = (g) => m.getByTestId("chat-groups").locator(`[data-group=${g}]`);
 
-await check("One row: All · Super active · Active · Inactive with counts; no Open / Handled / Sent", async () => {
+await check("One row: All · Engaged · Seen · Reached · Dormant with counts; no Open / Handled / Sent", async () => {
   await go("/dashboard/replies");
   const row = m.getByTestId("chat-groups");
   await row.waitFor();
   const text = await row.innerText();
   const keys = await row.locator("[data-group]").evaluateAll((els) => els.map((e) => e.dataset.group).join(","));
-  expect(keys === "all,super,active,inactive", `chips: ${keys}`);
+  expect(keys === "all,engaged,seen,reached,dormant", `chips: ${keys}`);
+  expect(!/Super active|Inactive|\bActive\b/.test(text), `old names: ${text}`);
   expect((await chip("all").getAttribute("aria-current")) === "true", "All not marked");
   expect(num(await chip("all").innerText()) === (await m.getByRole("navigation", { name: "Customer conversations" }).getByRole("link").count()), "All count ≠ chats");
   const all = (await m.locator(".wa-list .wa-filters").allInnerTexts()).join(" ");
   expect(!/(Open|Handled|Sent)/.test(all) && (await m.locator(".wa-list .wa-filters").count()) === 1, `status chips: ${all}`);
-  expect(num(await chip("super").innerText()) >= 1 && num(await chip("active").innerText()) >= 1 && num(await chip("inactive").innerText()) >= 1, `counts: ${text.replace(/\s+/g, " ")}`);
+  expect(num(await chip("engaged").innerText()) >= 1 && num(await chip("reached").innerText()) >= 1 && num(await chip("dormant").innerText()) >= 1, `counts: ${text.replace(/\s+/g, " ")}`);
   return text.replace(/\s+/g, " ");
 });
 
-await check("Super active shows the customer who tapped, not the quiet one; the address keeps the group", async () => {
-  await chip("super").click();
-  await m.waitForURL(/group=super/);
+await check("Engaged shows the customer who tapped, not the quiet one; the address keeps the group", async () => {
+  await chip("engaged").click();
+  await m.waitForURL(/group=engaged/);
   const list = await names();
   expect(list.includes(who.Tapper.name) && !list.includes(who.Quiet.name), `list: ${list.slice(0, 200)}`);
-  expect((await chip("super").getAttribute("aria-current")) === "true", "chip not marked");
+  expect((await chip("engaged").getAttribute("aria-current")) === "true", "chip not marked");
   return "tapper only";
 });
 
 await check("Opening a chat keeps the group; Mark handled is under the chat box, Mark order paid isn't (contact info has it)", async () => {
   await m.locator(".wa-app a[href*='replies?']", { hasText: who.Tapper.name }).first().click();
   await m.waitForURL(/r=/);
-  expect(/group=super/.test(m.url()), `chat link dropped the group: ${m.url()}`);
+  expect(/group=engaged/.test(m.url()), `chat link dropped the group: ${m.url()}`);
   const qr = m.locator(".wa-chat .wa-qr").first();
   const quick = await qr.innerText();
   expect(/Mark handled/.test(quick), `no Mark handled under the box: ${quick}`);
@@ -108,22 +109,26 @@ await check("Opening a chat keeps the group; Mark handled is under the chat box,
   return "kept, handled, cleared with All";
 });
 
-await check("Active and Inactive: the quiet customer is Active, the moved one Inactive", async () => {
-  await go("/dashboard/replies?group=active");
-  expect((await names()).includes(who.Quiet.name), "quiet not in Active");
-  await go("/dashboard/replies?group=inactive");
+await check("Reached and Dormant: the quiet customer (delivered, unread) is Reached, the moved one Dormant; old links still work", async () => {
+  await go("/dashboard/replies?group=reached");
+  expect((await names()).includes(who.Quiet.name), "quiet not in Reached");
+  await go("/dashboard/replies?group=seen");
+  expect(!(await names()).includes(who.Quiet.name), "unread customer in Seen");
+  await go("/dashboard/replies?group=super");
+  expect((await chip("engaged").getAttribute("aria-current")) === "true", "old ?group=super link not shown as Engaged");
+  await go("/dashboard/replies?group=dormant");
   const list = await names();
   expect(list.includes(who.Moved.name) && !list.includes(who.Quiet.name), `inactive list: ${list.slice(0, 200)}`);
-  return "active + inactive right";
+  return "reached + dormant right; old link = Engaged";
 });
 
-await check("End to end: the quiet customer taps on WhatsApp and moves from Active to Super active", async () => {
+await check("End to end: the quiet customer taps on WhatsApp and moves from Reached to Engaged", async () => {
   await tapNow(who.Quiet, 1);
-  await go("/dashboard/replies?group=super");
-  expect((await names()).includes(who.Quiet.name), "not in Super active after the tap");
-  await go("/dashboard/replies?group=active");
-  expect(!(await names()).includes(who.Quiet.name), "still in Active");
-  return "Active → Super active";
+  await go("/dashboard/replies?group=engaged");
+  expect((await names()).includes(who.Quiet.name), "not in Engaged after the tap");
+  await go("/dashboard/replies?group=reached");
+  expect(!(await names()).includes(who.Quiet.name), "still in Reached");
+  return "Reached → Engaged";
 });
 
 await check("A business with no campaigns sees no group chips; a made-up group shows every chat", async () => {
@@ -137,7 +142,7 @@ await check("A business with no campaigns sees no group chips; a made-up group s
 });
 
 // Search box on top, the four pills in ONE line under it, lined up with the search box, same height. A wide list shows
-// them all (the list is at least 360px beside the chat, so laptops and tablets fit them too); if a list is still too
+// them all (the list is at least 412px beside the chat, so laptops and tablets fit them too); if a list is still too
 // narrow (a small phone, big counts) the row scrolls inside the panel with a fade on the hidden side, and the picked
 // pill is scrolled into view. The chat beside the list keeps a usable width. The page never scrolls sideways.
 const ROW = (el) => {
@@ -162,12 +167,12 @@ const ROW = (el) => {
 };
 for (const [label, vp, path] of [
   ["1920px desktop", { width: 1920, height: 1000 }, ""],
-  ["1366px laptop, Inactive picked", { width: 1366, height: 860 }, "?group=inactive"],
+  ["1366px laptop, Dormant picked", { width: 1366, height: 860 }, "?group=dormant"],
   ["1280px laptop", { width: 1280, height: 800 }, ""],
   ["1024px tablet", { width: 1024, height: 768 }, ""],
   ["920px small tablet", { width: 920, height: 1000 }, ""],
   ["768px tablet", { width: 768, height: 1024 }, ""],
-  ["390px phone, Inactive picked", { width: 390, height: 844 }, "?group=inactive"],
+  ["390px phone, Dormant picked", { width: 390, height: 844 }, "?group=dormant"],
   ["360px phone", { width: 360, height: 760 }, ""],
 ])
 await check(`${label}: search on top, pills in one line, aligned; hidden pills scroll inside the row only`, async () => {
@@ -184,11 +189,11 @@ await check(`${label}: search on top, pills in one line, aligned; hidden pills s
   // 1024-1279px (side menu + chat) keeps the 280px list: the pills scroll there, the chat keeps its room.
   const roomy = vp.width >= 1280 || (vp.width > 900 && vp.width < 1024);
   if (roomy || vp.width === 768) expect(f.scroll <= 1, `list ${f.listW}px still scrolls ${f.scroll}px`);
-  if (roomy) expect(f.listW >= 360 && f.chatW >= 480, `list ${f.listW}px, chat ${f.chatW}px`);
+  if (roomy) expect(f.listW >= 412 && f.chatW >= 440, `list ${f.listW}px, chat ${f.chatW}px`);
   if (vp.width >= 1024 && vp.width < 1280) expect(f.chatW >= 380, `chat squeezed to ${f.chatW}px`);
   expect(!p.errors.length, p.errors.join(" | "));
   await p.context().close();
-  return `${f.scroll > 1 ? `scrolls ${f.scroll}px in the row, fade ${f.fade}` : "all four in view"} · list ${f.listW}px${vp.width > 900 ? `, chat ${f.chatW}px` : ""}`;
+  return `${f.scroll > 1 ? `scrolls ${f.scroll}px in the row, fade ${f.fade}` : "all in view"} · list ${f.listW}px${vp.width > 900 ? `, chat ${f.chatW}px` : ""}`;
 });
 
 expect(!m.errors.length, m.errors.join(" | "));

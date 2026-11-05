@@ -55,7 +55,7 @@ async function toast(p, re, ms = 15000) {
 }
 
 const manager = await as("manager");
-// The tapper and the held one from the seed; three new customers with no replies or orders, so they can only be Active.
+// The tapper and the held one from the seed; three new customers with no replies or orders: Seen (read) or Reached (delivered).
 const seeded = await db.customer.findMany({ where: { clientId: S.shopId, optedOut: false, unreachable: false }, orderBy: { createdAt: "asc" }, take: 2 });
 const fresh = [];
 for (const k of [1, 2, 3])
@@ -102,28 +102,40 @@ await check("Webhooks", "Delivered, read and failed statuses land once; a button
   return "statuses + 1 tap with context";
 });
 
-let superN = 0;
-let activeN = 0;
-await check("Second campaign", "With history: groups with live counts; picking one or two gives that many customers", async () => {
+let engagedN = 0;
+let seenN = 0;
+let reachedN = 0;
+await check("Second campaign", "With history: All eligible + Engaged / Seen / Reached / Dormant with live counts; picking groups gives that many customers", async () => {
   await go(manager, "/dashboard/campaigns/new");
   const picker = manager.getByTestId("segment-picker");
   await picker.waitFor({ timeout: 15000 });
   expect((await manager.getByTestId("first-campaign").count()) === 0, "first-campaign still shown");
   const card = (s) => picker.locator(`[data-segment=${s}]`);
+  const keys = await picker.locator("[data-segment]").evaluateAll((els) => els.map((e) => e.dataset.segment).join(","));
+  expect(keys === "all,engaged,seen,reached,dormant,new", `cards ${keys}`);
+  expect((await card("all").getAttribute("aria-checked")) === "true", "All eligible not picked by default");
+  const text = await picker.innerText();
+  expect(!/Super active|\bActive\b|Inactive/.test(text.replace(/can be sent now|Always left out/g, "")), `old names on the form: ${text.slice(0, 200)}`);
   // What a send reaches: the "N can be sent now" line when some in the group are left out, else the group's total.
   const sendable = async (s) => {
     const line = card(s).getByTestId(`segment-sendable-${s}`);
     return num(await ((await line.count()) ? line : card(s).getByTestId(`segment-total-${s}`)).innerText());
   };
-  superN = await sendable("super");
-  activeN = await sendable("active");
-  expect(superN >= 1 && activeN >= 3, `super ${superN}, active ${activeN}`);
-  await card("super").click();
-  await manager.waitForFunction((n) => /in the groups you picked/.test(document.querySelector("[data-testid=audience-size]")?.textContent ?? "") && document.querySelector("[data-testid=audience-size]")?.textContent?.includes(String(n)), superN, { timeout: 15000 });
-  await card("active").click();
-  await manager.waitForFunction((n) => (document.querySelector("[data-testid=audience-size]")?.textContent ?? "").replace(/,/g, "").includes(`${n} customer`), superN + activeN, { timeout: 15000 });
-  expect((await card("super").getAttribute("aria-checked")) === "true" && (await card("active").getAttribute("aria-checked")) === "true", "not both picked");
-  return `super ${superN} + active ${activeN}`;
+  engagedN = await sendable("engaged");
+  seenN = await sendable("seen");
+  reachedN = await sendable("reached");
+  expect(engagedN >= 1 && seenN >= 1 && reachedN >= 2, `engaged ${engagedN}, seen ${seenN}, reached ${reachedN}`);
+  await card("engaged").click();
+  await manager.waitForFunction((n) => /in the groups you picked/.test(document.querySelector("[data-testid=audience-size]")?.textContent ?? "") && document.querySelector("[data-testid=audience-size]")?.textContent?.includes(String(n)), engagedN, { timeout: 15000 });
+  await card("seen").click();
+  await card("reached").click();
+  const want = engagedN + seenN + reachedN;
+  await manager.waitForFunction((n) => (document.querySelector("[data-testid=audience-size]")?.textContent ?? "").replace(/,/g, "").includes(`${n} customer`), want, { timeout: 15000 });
+  expect(num(await picker.getByTestId("segment-chosen").innerText()) === want, "picked-groups line ≠ audience");
+  expect((await card("all").getAttribute("aria-checked")) === "false", "All eligible still ticked");
+  await card("all").click();
+  expect((await card("engaged").getAttribute("aria-checked")) === "false", "All eligible didn't clear the groups");
+  return `engaged ${engagedN} + seen ${seenN} + reached ${reachedN} = ${want}`;
 });
 
 await check("Second campaign", "Saving a campaign keeps the picked groups", async () => {
@@ -131,27 +143,40 @@ await check("Second campaign", "Saving a campaign keeps the picked groups", asyn
   await go(manager, `/dashboard/campaigns/${c.id}`);
   const picker = manager.getByTestId("segment-picker");
   await picker.waitFor();
-  await picker.locator("[data-segment=super]").click();
+  await picker.locator("[data-segment=engaged]").click();
   await manager.getByRole("button", { name: "Save changes" }).click();
   await toast(manager, /./);
   const saved = await db.campaign.findUniqueOrThrow({ where: { id: c.id } });
-  expect(JSON.stringify(saved.segments) === JSON.stringify(["super"]), `segments ${JSON.stringify(saved.segments)}`);
-  return "segments [super]";
+  expect(JSON.stringify(saved.segments) === JSON.stringify(["engaged"]), `segments ${JSON.stringify(saved.segments)}`);
+  // An older campaign saved with "active" opens with Seen and Reached ticked: the same people.
+  await db.campaign.update({ where: { id: c.id }, data: { segments: ["active"] } });
+  await go(manager, `/dashboard/campaigns/${c.id}`);
+  const p2 = manager.getByTestId("segment-picker");
+  await p2.waitFor();
+  const ticked = await p2.locator("[aria-checked=true]").evaluateAll((els) => els.map((e) => e.dataset.segment).join(","));
+  expect(ticked === "seen,reached", `old "active" opened as ${ticked}`);
+  return "segments [engaged]; old [active] = Seen + Reached";
 });
 
-await check("Customers", "The tapper shows Super active in the list and under its filter", async () => {
+await check("Customers", "The tapper shows Engaged in the list; the reader Seen; a delivered-only one Reached", async () => {
   await go(manager, "/dashboard/customers");
   await manager.getByLabel("Search customers").fill(tapper.name);
   const row = manager.locator("tbody tr").filter({ hasText: tapper.name }).first();
   await row.waitFor();
-  expect(await row.locator("[data-segment=super]").isVisible(), "no Super active badge");
-  return tapper.name;
+  expect(await row.locator("[data-segment=engaged]").isVisible(), "no Engaged badge");
+  for (const [c, seg] of [[reader, "seen"], [delivered, "reached"]]) {
+    await manager.getByLabel("Search customers").fill(c.name);
+    const r = manager.locator("tbody tr").filter({ hasText: c.name }).first();
+    await r.waitFor();
+    expect(await r.locator(`[data-segment=${seg}]`).isVisible(), `${c.name} not ${seg}`);
+  }
+  return "engaged / seen / reached badges";
 });
 
-await check("Customer page", "Campaign response: Super active, the tap and the delivery in the history", async () => {
+await check("Customer page", "Campaign response: Engaged, the tap and the delivery in the history", async () => {
   await go(manager, `/dashboard/customers/${tapper.id}`);
   const card = manager.getByTestId("engagement-card");
-  expect(await card.locator("[data-segment=super]").isVisible(), "no Super active badge");
+  expect(await card.locator("[data-segment=engaged]").isVisible(), "no Engaged badge");
   const text = await card.innerText();
   expect(/Tapped a button/.test(text) && /Delivered/.test(text) && /Read/.test(text), `history: ${text.replace(/\s+/g, " ").slice(0, 200)}`);
   await go(manager, `/dashboard/customers/${held.id}`);

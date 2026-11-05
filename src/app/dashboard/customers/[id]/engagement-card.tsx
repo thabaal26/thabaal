@@ -7,7 +7,7 @@ import { T } from "../../portal-ui";
 // Customer page › how this customer responds to campaigns (lib/engagement-segments.ts): their group, what can stop
 // a send (kept apart from the group), and their campaign story.
 
-const TONE = { super: "green", active: "blue", inactive: "amber", new: "gray" } as const;
+const TONE = { engaged: "green", seen: "blue", reached: "gray", dormant: "amber", new: "gray" } as const;
 const KIND: Record<HistoryItem["kind"], { en: string; ta: string }> = {
   offer: { en: "Offer sent", ta: "சலுகை அனுப்பப்பட்டது" },
   delivered: { en: "Delivered", ta: "சேர்ந்தது" },
@@ -20,7 +20,7 @@ const KIND: Record<HistoryItem["kind"], { en: string; ta: string }> = {
 const BLOCK = {
   "opted-out": { en: "Opted out: never sent offers", ta: "விலகியவர்: சலுகைகள் அனுப்பப்படாது" },
   unreachable: { en: "Can't receive WhatsApp: left out of campaigns", ta: "வாட்ஸ்அப் பெற முடியாது: பிரச்சாரங்களில் இல்லை" },
-  "moved-inactive": { en: "Moved to Inactive by you: left out of campaigns", ta: "நீங்கள் Inactive-க்கு மாற்றினீர்கள்: பிரச்சாரங்களில் இல்லை" },
+  "moved-inactive": { en: "Moved to Dormant by you: left out of campaigns", ta: "நீங்கள் Dormant-க்கு மாற்றினீர்கள்: பிரச்சாரங்களில் இல்லை" },
 } as const;
 
 export function EngagementCard({ row, history, hasHistory }: { row: EngagementRow | undefined; history: HistoryItem[]; hasHistory: boolean }) {
@@ -70,7 +70,7 @@ export function EngagementCard({ row, history, hasHistory }: { row: EngagementRo
           </p>
         )}
         {history.length > 0 && (
-          <ol className="max-h-72 space-y-1.5 overflow-y-auto text-sm" aria-label="Campaign history">
+          <ol className="max-h-72 space-y-1.5 overflow-y-auto text-sm" aria-label="Campaign history" tabIndex={0}>
             {history.map((h, k) => (
               <li key={k} className="flex gap-2">
                 <span className="tabular w-24 shrink-0 text-xs text-muted">{fmtDate(h.at, "d MMM, h:mm a")}</span>
