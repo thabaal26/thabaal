@@ -10,6 +10,18 @@ One Hostinger VPS (Ubuntu) runs the app (PM2, user `thabaal`), PostgreSQL (local
 | Backups, and their last results | `/var/backups/thabaal/` (`last-backup`, `last-restore-test`) |
 | Backup and restore-test schedule | `/etc/cron.d/thabaal`, log in `/var/log/thabaal-backup.log` |
 
+## Offsite backups
+
+Each night's dump is also copied, encrypted, to Google Drive with rclone (`/etc/thabaal-backup.conf`: `REMOTE=gcrypt:daily`;
+30 days kept). The Drive login has access only to files rclone itself made. Without the password in
+`/root/thabaal-backup-password` these copies can't be read, so keep that password outside this server too.
+
+Google limits rclone's shared login, so uploads can be slow; one small file a night is fine. If that ever fails,
+`last-backup` says FAILED and the local copies still exist.
+
+Restore from Drive: `rclone copyto gcrypt:daily/<name>.dump /root/<name>.dump`. On a new server, set up the `gcrypt`
+remote again with that password (`rclone config create gcrypt crypt remote gdrive:thabaal-backups ...`).
+
 ## Deploys
 
 A push to `main` builds in GitHub Actions (`.github/workflows/deploy-vps.yml`) and sends the release to the server, which
