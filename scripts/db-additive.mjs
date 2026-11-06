@@ -37,6 +37,12 @@ const FILES = [
   "prisma/sql/2026-11-05-inbound-check.sql",
 ];
 
+// The VPS applies the same files when a release arrives (deploy/vps/deploy-receive.sh).
+if (process.argv.includes("--list")) {
+  console.log(FILES.join(String.fromCharCode(10)));
+  process.exit(0);
+}
+
 if (process.env.VERCEL !== "1") {
   console.log("db-additive: not a Vercel build, skipped");
   process.exit(0);

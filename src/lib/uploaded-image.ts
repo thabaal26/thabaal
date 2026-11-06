@@ -85,7 +85,7 @@ export async function storePublicImage(opts: {
  * address. (Photos uploaded from another copy and linked to www.thabaal.in were why some product photos broke.)
  */
 async function storageOrigin(given?: string): Promise<string> {
-  if (process.env.VERCEL_ENV === "production") return APP_ORIGIN;
+  if (process.env.VERCEL_ENV === "production" || process.env.THABAAL_ENV === "production") return APP_ORIGIN;
   if (given && /^https?:\/\/[^/]+$/.test(given)) return given;
   try {
     const h = await headers();
