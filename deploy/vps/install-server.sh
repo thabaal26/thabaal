@@ -14,6 +14,7 @@ install -o root -g thabaal -m 640 "$HERE/ecosystem.config.cjs" "$ROOT/bin/ecosys
 install -o root -g root -m 750 "$HERE/backup.sh" /usr/local/sbin/thabaal-backup
 install -o root -g root -m 750 "$HERE/restore-test.sh" /usr/local/sbin/thabaal-restore-test
 install -o root -g root -m 750 "$HERE/set-keys.sh" /usr/local/sbin/thabaal-set-keys
+install -o root -g root -m 750 "$HERE/health-check.sh" /usr/local/sbin/thabaal-health
 install -o root -g root -m 644 "$HERE/Caddyfile.production" /etc/caddy/Caddyfile.production
 
 # 21:00 UTC is 02:30 in India. Sunday's restore test runs an hour after that night's backup.
@@ -21,6 +22,7 @@ cat > /etc/cron.d/thabaal <<'CRON'
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 0 21 * * * root /usr/local/sbin/thabaal-backup >> /var/log/thabaal-backup.log 2>&1
 0 22 * * 0 root /usr/local/sbin/thabaal-restore-test >> /var/log/thabaal-backup.log 2>&1
+*/5 * * * * root /usr/local/sbin/thabaal-health >> /var/log/thabaal-backup.log 2>&1
 CRON
 chmod 644 /etc/cron.d/thabaal
 
