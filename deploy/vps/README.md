@@ -22,6 +22,12 @@ Google limits rclone's shared login, so uploads can be slow; one small file a ni
 Restore from Drive: `rclone copyto gcrypt:daily/<name>.dump /root/<name>.dump`. On a new server, set up the `gcrypt`
 remote again with that password (`rclone config create gcrypt crypt remote gdrive:thabaal-backups ...`).
 
+## Alerts
+
+`thabaal-health` runs every 5 minutes: app, PostgreSQL, Caddy, disk, memory, backup, restore test, certificate. It emails
+the address in `/etc/thabaal-alert.conf` once when something breaks, daily while it stays broken, and once when fixed.
+`thabaal-health --test` sends a test email.
+
 ## Deploys
 
 A push to `main` builds in GitHub Actions (`.github/workflows/deploy-vps.yml`) and sends the release to the server, which
