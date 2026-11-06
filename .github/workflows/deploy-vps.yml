@@ -1,0 +1,75 @@
+name: Deploy to VPS
+
+# Builds here (the VPS has 4 GB and one CPU) and sends the release to the server, which switches to it only if it answers
+# /api/health, and otherwise goes back to the previous one.
+# Off until the repository variable VPS_DEPLOY is "on". Needs the secret VPS_DEPLOY_KEY. See deploy/vps/README.md.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: vps-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.repository == 'thabaal26/thabaal' && vars.VPS_DEPLOY == 'on'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: thabaal_build
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      # The build gets a throwaway database and test keys; the real ones exist only on the server.
+      DATABASE_URL: postgresql://postgres:test@localhost:5432/thabaal_build
+      DATABASE_URL_UNPOOLED: postgresql://postgres:test@localhost:5432/thabaal_build
+      AUTH_SECRET: ci-auth-secret-0123456789abcdefghijklmnop
+      DATA_ENC_KEY: BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=
+      NEXT_TELEMETRY_DISABLED: "1"
+      VPS_HOST: 189.72.145.225
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Public settings
+        # NEXT_PUBLIC_ values are fixed at build time. Only the ones set are written, so the rest keep the code's defaults.
+        env:
+          NEXT_PUBLIC_SALES_WHATSAPP: ${{ vars.NEXT_PUBLIC_SALES_WHATSAPP }}
+          NEXT_PUBLIC_SALES_EMAIL: ${{ vars.NEXT_PUBLIC_SALES_EMAIL }}
+          NEXT_PUBLIC_PRIVACY_EMAIL: ${{ vars.NEXT_PUBLIC_PRIVACY_EMAIL }}
+          NEXT_PUBLIC_LEGAL_NAME: ${{ vars.NEXT_PUBLIC_LEGAL_NAME }}
+          NEXT_PUBLIC_LEGAL_ADDRESS: ${{ vars.NEXT_PUBLIC_LEGAL_ADDRESS }}
+          NEXT_PUBLIC_LEGAL_JURISDICTION: ${{ vars.NEXT_PUBLIC_LEGAL_JURISDICTION }}
+          NEXT_PUBLIC_GRIEVANCE_OFFICER: ${{ vars.NEXT_PUBLIC_GRIEVANCE_OFFICER }}
+        run: |
+          for k in NEXT_PUBLIC_SALES_WHATSAPP NEXT_PUBLIC_SALES_EMAIL NEXT_PUBLIC_PRIVACY_EMAIL NEXT_PUBLIC_LEGAL_NAME \
+                   NEXT_PUBLIC_LEGAL_ADDRESS NEXT_PUBLIC_LEGAL_JURISDICTION NEXT_PUBLIC_GRIEVANCE_OFFICER; do
+            if [ -n "${!k}" ]; then echo "$k=\"${!k}\"" >> "$GITHUB_ENV"; fi
+          done
+      - name: Build
+        run: npx next build
+        env:
+          BUILD_STANDALONE: "1"
+      - name: Package
+        run: bash deploy/vps/package-release.sh release.tar.gz
+      - name: Send to the server
+        env:
+          VPS_DEPLOY_KEY: ${{ secrets.VPS_DEPLOY_KEY }}
+        run: |
+          install -m 600 /dev/null key
+          printf '%s\n' "$VPS_DEPLOY_KEY" > key
+          ssh -i key -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=deploy/vps/known_hosts \
+            "thabaal@$VPS_HOST" "$GITHUB_SHA" < release.tar.gz
+      - name: Remove the key
+        if: always()
+        run: rm -f key

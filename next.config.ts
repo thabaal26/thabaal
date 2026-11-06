@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // The VPS runs a self-contained build (deploy/vps); Vercel builds as before.
+  ...(process.env.BUILD_STANDALONE === "1" ? { output: "standalone" as const } : {}),
   experimental: {
     // Photo and file uploads go through server actions (default limit 1 MB). Photos are shrunk in the browser first
     // (lib/shrink-image.ts); this leaves room for a PDF up to the 4 MB the upload accepts (Vercel's own cap is 4.5 MB).

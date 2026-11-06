@@ -1,0 +1,12 @@
+# Goes to /etc/caddy/Caddyfile at the domain switch, once the DNS points here (Caddy then gets the certificates itself).
+# X-Real-IP is set here because the login limiter reads it first (lib/login-guard.ts); passed through as sent, a caller
+# could pretend to be a new address on every try.
+www.thabaal.in {
+	reverse_proxy 127.0.0.1:3000 {
+		header_up X-Real-IP {remote_host}
+	}
+}
+
+thabaal.in {
+	redir https://www.thabaal.in{uri} permanent
+}
