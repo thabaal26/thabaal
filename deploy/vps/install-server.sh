@@ -13,6 +13,7 @@ install -o root -g thabaal -m 750 "$HERE/deploy-receive.sh" "$ROOT/bin/deploy-re
 install -o root -g thabaal -m 640 "$HERE/ecosystem.config.cjs" "$ROOT/bin/ecosystem.config.cjs"
 install -o root -g root -m 750 "$HERE/backup.sh" /usr/local/sbin/thabaal-backup
 install -o root -g root -m 750 "$HERE/restore-test.sh" /usr/local/sbin/thabaal-restore-test
+install -o root -g root -m 750 "$HERE/set-keys.sh" /usr/local/sbin/thabaal-set-keys
 install -o root -g root -m 644 "$HERE/Caddyfile.production" /etc/caddy/Caddyfile.production
 
 # 21:00 UTC is 02:30 in India. Sunday's restore test runs an hour after that night's backup.
