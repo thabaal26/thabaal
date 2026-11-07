@@ -299,6 +299,7 @@ export function AddNumberForm({ clientId, hasToken }: { clientId: string; hasTok
   const [found, setFound] = useState<FoundNumber[] | null>(null);
   const [pick, setPick] = useState("");
   const [label, setLabel] = useState("");
+  const [tier, setTier] = useState("TIER_250");
   const [finding, startFind] = useTransition();
   const { pending, submit } = useSubmit();
 
@@ -345,8 +346,8 @@ export function AddNumberForm({ clientId, hasToken }: { clientId: string; hasTok
             className="space-y-3"
             onSubmit={(e) => {
               e.preventDefault();
-              submit(() => addClientNumber(clientId, { businessAccountId: waba, phoneNumberId: pick, label, token: ownToken }), () => {
-                setFound(null); setWaba(""); setOwnToken(""); setLabel(""); setPick("");
+              submit(() => addClientNumber(clientId, { businessAccountId: waba, phoneNumberId: pick, label, token: ownToken, tier }), () => {
+                setFound(null); setWaba(""); setOwnToken(""); setLabel(""); setPick(""); setTier("TIER_250");
               });
             }}
           >
@@ -365,6 +366,15 @@ export function AddNumberForm({ clientId, hasToken }: { clientId: string; hasTok
             </fieldset>
             <Field id={`label-${clientId}`} label="Name for this number" hint="shown when picking who sends">
               <input {...noFill} className="field" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Main, Madurai, Test…" />
+            </Field>
+            <Field id={`tier-${clientId}`} label="Is this number new to WhatsApp's Cloud API?" hint="Meta's answer replaces this when it comes">
+              <select id={`tier-${clientId}`} className="field" value={tier} onChange={(e) => setTier(e.target.value)}>
+                <option value="TIER_250">Yes, new: 250 a day</option>
+                <option value="TIER_2K">No, already used: 2,000 a day</option>
+                <option value="TIER_10K">No, already used: 10,000 a day</option>
+                <option value="TIER_100K">No, already used: 100,000 a day</option>
+                <option value="TIER_UNLIMITED">No, already used: unlimited</option>
+              </select>
             </Field>
             <Button type="submit" disabled={!pick || !label.trim()} loading={pending} size="sm" className="max-sm:w-full">Add number</Button>
           </form>

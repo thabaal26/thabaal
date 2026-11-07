@@ -98,6 +98,16 @@ describe("Meta messaging limit", () => {
     assert.equal(calls, before);
   });
 
+  test("what's shown left is exact: the limit minus people reached in 24 hours", async () => {
+    await db.whatsAppNumber.update({ where: { id: numberId }, data: { messagingTier: "TIER_2K", statusCheckedAt: new Date() } });
+    const c = await db.customer.create({ data: { clientId, name: "Limit test", phone: `9199${Date.now()}`.slice(0, 12) } });
+    await db.message.create({ data: { customerId: c.id, templateName: "t", status: "SENT", senderId: numberId, sentAt: new Date() } });
+    const [h] = await numberHealth(clientId);
+    assert.equal(h.limit, 2_000);
+    assert.equal(h.used, 1);
+    assert.equal(h.left, 1_999);
+  });
+
   test("a raised limit lets a campaign reach more people today, up to unlimited", async () => {
     const n = await db.whatsAppNumber.findUniqueOrThrow({ where: { id: numberId } });
     assert.ok((await allowance({ ...n, messagingTier: "TIER_250" })).left <= 250);
