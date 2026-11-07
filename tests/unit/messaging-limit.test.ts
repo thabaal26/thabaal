@@ -58,6 +58,22 @@ describe("Meta messaging limit", () => {
     assert.equal(await stored(), "TIER_2K");
   });
 
+  test("a field Meta removed doesn't stop the limit from coming through", async () => {
+    await db.whatsAppNumber.update({ where: { id: numberId }, data: { messagingTier: "TIER_250", statusCheckedAt: null } });
+    // Meta refuses any request that still asks for the removed per-number field.
+    globalThis.fetch = (async (url: string | URL) => {
+      const u = String(url);
+      if (u.includes("messaging_limit_tier")) return Response.json({ error: { message: "Tried accessing nonexisting field (messaging_limit_tier)", code: 100 } });
+      if (u.includes("/phone_numbers")) return Response.json({ data: [{ id: PHONE, whatsapp_business_manager_messaging_limit: "TIER_2K" }] });
+      return Response.json({ id: PHONE, whatsapp_business_manager_messaging_limit: "TIER_2K", quality_rating: "GREEN" });
+    }) as typeof fetch;
+    await refreshNumberStatus({ id: numberId, phoneNumberId: PHONE, token: "t" }, null);
+    assert.equal(await stored(), "TIER_2K");
+    await setTier("TIER_250");
+    await fetchMetaLiveStatus(clientId);
+    assert.equal(await stored(), "TIER_2K");
+  });
+
   test("the Home status check doesn't pull a raised limit back to 250", async () => {
     await setTier("TIER_2K");
     fakeMeta({ whatsapp_business_manager_messaging_limit: "TIER_2K", messaging_limit_tier: "TIER_250" });

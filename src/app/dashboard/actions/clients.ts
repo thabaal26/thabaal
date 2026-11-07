@@ -11,7 +11,7 @@ import { CLIENT_SECTIONS, sanitizeDisabledSections } from "@/lib/client-sections
 import { CLIENT_COOKIE, VIEW_PREFIX, requireAdmin } from "@/lib/session";
 import { HEX } from "@/lib/theme";
 import { enableMetaCalling, listPhoneNumbers, syncMetaBusinessProfile, waConfig } from "@/lib/whatsapp";
-import { refreshNumberStatus } from "@/lib/limits";
+import { checkNumberStatus, refreshNumberStatus } from "@/lib/limits";
 import { planCapacityBlock } from "@/lib/subscription";
 import type { ActionResult } from "./templates";
 
@@ -197,9 +197,11 @@ export async function refreshClientNumbers(clientId: string): Promise<ActionResu
   if ("denied" in s) return { ok: false, message: s.denied };
   const c = await db.client.findUnique({ where: { id: clientId }, include: { numbers: true } });
   if (!c) return { ok: false, message: "Client not found." };
+  const errors: string[] = [];
   const results = await Promise.all(
     c.numbers.map(async (n) => {
-      const ok = await refreshNumberStatus(n, c.waToken);
+      const { row: ok, error } = await checkNumberStatus(n, c.waToken);
+      if (error) errors.push(`${n.label}: ${error}`);
       const token = n.token ?? c.waToken;
       if (token) {
         const cfg = waConfig({ token, phoneNumberId: n.phoneNumberId, businessAccountId: n.businessAccountId });
@@ -213,7 +215,9 @@ export async function refreshClientNumbers(clientId: string): Promise<ActionResu
   );
   refresh();
   const ok = results.filter(Boolean).length;
-  return ok === c.numbers.length ? { ok: true, message: "Quality, calling settings, and limits updated from Meta." } : { ok: false, message: `Updated ${ok} of ${c.numbers.length}. Check the token can reach the others.` };
+  return ok === c.numbers.length
+    ? { ok: true, message: "Quality, calling settings, and limits updated from Meta." }
+    : { ok: false, message: `Updated ${ok} of ${c.numbers.length} numbers. ${errors.join(" · ")}`.trim() };
 }
 
 /** A lower daily limit than Meta's while a new number warms up. Empty clears it. */

@@ -86,18 +86,38 @@ export function tierFromMeta(j: { whatsapp_business_manager_messaging_limit?: un
 
 /** Pulls quality and limit tier from Meta. Failures leave the stored values alone. */
 export async function refreshNumberStatus(n: Pick<WhatsAppNumber, "id" | "phoneNumberId" | "token">, clientToken: string | null) {
+  return (await checkNumberStatus(n, clientToken)).row;
+}
+
+// When Meta last refused a number, per server instance: a page that polls doesn't ask Meta again for 10 minutes.
+const lastRefused = new Map<string, number>();
+
+/** Same as refreshNumberStatus, and says why Meta refused (for the admin's Refresh button). */
+export async function checkNumberStatus(n: Pick<WhatsAppNumber, "id" | "phoneNumberId" | "token">, clientToken: string | null) {
   const token = n.token ?? clientToken;
-  if (!token) return null;
+  if (!token) return { row: null, error: "No access token saved for this number." };
   const get = (fields: string) =>
-    fetch(`https://graph.facebook.com/${process.env.META_GRAPH_VERSION ?? "v23.0"}/${n.phoneNumberId}?fields=${fields}`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" , signal: AbortSignal.timeout(6_000) })
+    fetch(`https://graph.facebook.com/${process.env.META_GRAPH_VERSION ?? "v23.0"}/${n.phoneNumberId}?fields=${fields}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(6_000),
+    })
       .then((r) => r.json())
       .catch(() => null);
   const base = "quality_rating,display_phone_number,verified_name";
-  // The portfolio limit field first; an older API version that doesn't know it gets the deprecated one.
-  let j = await get(`${base},whatsapp_business_manager_messaging_limit,messaging_limit_tier`);
-  if (j?.error) j = await get(`${base},messaging_limit_tier`);
-  if (!j || j.error) return null;
-  return db.whatsAppNumber.update({
+  // One field per try: asking for a field Meta has removed fails the whole request. The portfolio limit first, then
+  // the deprecated per-number one, then quality alone.
+  let j = await get(`${base},whatsapp_business_manager_messaging_limit`);
+  if (!j || j.error) j = await get(`${base},messaging_limit_tier`);
+  if (!j || j.error) j = await get(base);
+  if (!j || j.error) {
+    lastRefused.set(n.id, Date.now());
+    const why = j?.error ? `Meta: ${String(j.error.message ?? "refused").slice(0, 160)}${j.error.code ? ` (code ${j.error.code})` : ""}` : "Meta didn't answer.";
+    console.warn(`[limits] couldn't refresh number ${n.id}: ${why}`);
+    return { row: null, error: why };
+  }
+  lastRefused.delete(n.id);
+  const row = await db.whatsAppNumber.update({
     where: { id: n.id },
     data: {
       qualityRating: j.quality_rating ?? null,
@@ -108,6 +128,7 @@ export async function refreshNumberStatus(n: Pick<WhatsAppNumber, "id" | "phoneN
       statusCheckedAt: new Date(),
     },
   });
+  return { row, error: null };
 }
 
 /** How old a number's limit may be before a campaign form, the Home card or a send asks Meta again. */
@@ -125,8 +146,9 @@ export async function freshenNumbers(where: { clientId: string } | { ids: string
     },
     include: { client: { select: { waToken: true } } },
   });
-  await Promise.all(old.map((n) => refreshNumberStatus(n, n.client.waToken).catch(() => null)));
-  return old.length;
+  const due = old.filter((n) => Date.now() - (lastRefused.get(n.id) ?? 0) > maxAgeMs);
+  await Promise.all(due.map((n) => refreshNumberStatus(n, n.client.waToken).catch(() => null)));
+  return due.length;
 }
 
 /** Refreshes numbers not checked in the last few hours; called by the scheduler. */
