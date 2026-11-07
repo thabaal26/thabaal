@@ -108,6 +108,20 @@ describe("Meta messaging limit", () => {
     assert.equal(h.left, 1_999);
   });
 
+  test("a message to someone who wrote in the last 24 hours isn't counted (open service window)", async () => {
+    await db.message.deleteMany({ where: { senderId: numberId } });
+    await db.whatsAppNumber.update({ where: { id: numberId }, data: { messagingTier: "TIER_2K", statusCheckedAt: new Date() } });
+    const stamp = String(Date.now()).slice(-8);
+    const wrote = await db.customer.create({ data: { clientId, name: "Wrote first", phone: `9191${stamp}` } });
+    const cold = await db.customer.create({ data: { clientId, name: "Cold", phone: `9192${stamp}` } });
+    await db.reply.create({ data: { customerId: wrote.id, text: "Hi", kind: "text", receivedAt: new Date(Date.now() - 2 * 3_600_000) } });
+    await db.message.createMany({ data: [wrote, cold].map((c) => ({ customerId: c.id, templateName: "t", status: "DELIVERED" as const, senderId: numberId, sentAt: new Date() })) });
+    const [h] = await numberHealth(clientId);
+    assert.equal(h.used, 1, "only the customer who hadn't written counts");
+    assert.equal(h.left, 1_999);
+    await db.message.deleteMany({ where: { senderId: numberId } });
+  });
+
   test("Meta's limit never holds sends back; only an admin's warm-up cap does", async () => {
     const n = await db.whatsAppNumber.findUniqueOrThrow({ where: { id: numberId } });
     assert.equal((await allowance({ ...n, messagingTier: "TIER_250", dailyCap: null })).unlimited, true);

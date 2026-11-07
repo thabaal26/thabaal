@@ -51,7 +51,7 @@ for (const L of looks) {
   ok("Settings has no limit picker", (await p.locator("#meta-limit").count()) === 0);
   await p.goto(BASE + "/dashboard/campaigns", { waitUntil: "networkidle" });
   const t = ((await p.getByTestId("meta-limit-card").textContent()) ?? "").replace(/\s+/g, " ");
-  ok("card counts people reached and what's left", /reached in 24 hours/.test(t) && /left/.test(t) && /next limit/.test(t), t.slice(0, 160));
+  ok("card counts people reached and what's left", /Last 24 hours: \d+ used, [\d,]+ left/.test(t) && /To reach [\d,]+: \d+ of [\d,]+ people in \d+ days/.test(t), t.slice(0, 160));
   r = await fetch(BASE + "/api/limits", { headers: { cookie: `wp_session=${S.tokens.manager}` } });
   const v = await r.json();
   ok("left is the limit minus people reached", v.limit === null || v.left === Math.max(0, v.limit - v.used), JSON.stringify(v).slice(0, 200));
