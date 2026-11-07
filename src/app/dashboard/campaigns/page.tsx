@@ -21,7 +21,7 @@ const LIVE_RUN = ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_
 const WAITING: Record<string, string> = {
   WAITING_TEMPLATE: "waiting for the template",
   WAITING_CONNECTION: "waiting for WhatsApp",
-  WAITING_LIMIT: "waiting: daily limit reached",
+  WAITING_LIMIT: "waiting: Meta's 24-hour limit reached; carries on by itself",
   WAITING_QUALITY: "paused to protect your number",
   WAITING_QUIET: "waiting for quiet hours to end",
   WAITING_FUNDS: "waiting for a wallet top-up",
