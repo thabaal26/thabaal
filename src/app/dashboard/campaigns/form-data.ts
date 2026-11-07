@@ -30,7 +30,9 @@ export async function campaignFormData(clientId: string) {
     audience: { all, tags: [...audiences, ...tags.map((t) => ({ tag: t.tag, label: t.tag, hint: undefined as string | undefined, n: Number(t.n) }))] },
     numbers: numbers.map((n) => {
       const meta = tierLimit(n.messagingTier);
-      const dailyLimit = n.dailyCap != null ? Math.min(n.dailyCap, meta ?? Infinity) : meta;
+      // Only an admin's warm-up cap spreads a send over days; Meta's limit isn't enforced by Thabaal.
+      void meta;
+      const dailyLimit = n.dailyCap ?? null;
       return { id: n.id, label: numberLabel(n), businessAccountId: n.businessAccountId, isDefault: n.isDefault, dailyLimit, quality: n.qualityRating, capacity: capacity.get(n.id) ?? null };
     }),
     segments,

@@ -367,13 +367,10 @@ export function AddNumberForm({ clientId, hasToken }: { clientId: string; hasTok
             <Field id={`label-${clientId}`} label="Name for this number" hint="shown when picking who sends">
               <input {...noFill} className="field" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Main, Madurai, Test…" />
             </Field>
-            <Field id={`tier-${clientId}`} label="Is this number new to WhatsApp's Cloud API?" hint="Meta's answer replaces this when it comes">
+            <Field id={`tier-${clientId}`} label="Is this number new to WhatsApp's Cloud API?" hint="the limit then rises by itself from your sends">
               <select id={`tier-${clientId}`} className="field" value={tier} onChange={(e) => setTier(e.target.value)}>
-                <option value="TIER_250">Yes, new: 250 a day</option>
-                <option value="TIER_2K">No, already used: 2,000 a day</option>
-                <option value="TIER_10K">No, already used: 10,000 a day</option>
-                <option value="TIER_100K">No, already used: 100,000 a day</option>
-                <option value="TIER_UNLIMITED">No, already used: unlimited</option>
+                <option value="TIER_250">New number: starts at 250 a day</option>
+                <option value="TIER_2K">Already used on the Cloud API: starts at 2,000 a day</option>
               </select>
             </Field>
             <Button type="submit" disabled={!pick || !label.trim()} loading={pending} size="sm" className="max-sm:w-full">Add number</Button>

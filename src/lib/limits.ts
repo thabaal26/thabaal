@@ -28,20 +28,49 @@ export function tierLabel(tier: string | null | undefined) {
   return n === null ? "Unlimited" : n >= 1000 ? `${n / 1000}K` : String(n);
 }
 
-/** Stays a little under Meta's limit so retries and replies never tip a number over it. */
-function withMargin(limit: number) {
-  return limit - Math.max(1, Math.ceil(limit * 0.04));
-}
-
 type LimitFields = Pick<WhatsAppNumber, "id" | "clientId" | "messagingTier" | "dailyCap" | "qualityRating">;
 
-/** Different customers messaged in the last 24 hours, through the given numbers. */
-async function contacted(where: { senderId: string } | { senderId: { in: string[] } }) {
+/** Different customers messaged in the last 24 hours (or `days`), through the given numbers. */
+async function contacted(
+  where: { senderId: string } | { senderId: { in: string[] } },
+  days = 1,
+  statuses: ("SENT" | "DELIVERED" | "READ")[] = ["SENT", "DELIVERED", "READ"],
+) {
   const rows = await db.message.groupBy({
     by: ["customerId"],
-    where: { ...where, sentAt: { gte: new Date(Date.now() - DAY_MS) }, status: { in: ["SENT", "DELIVERED", "READ"] } },
+    where: { ...where, sentAt: { gte: new Date(Date.now() - days * DAY_MS) }, status: { in: statuses } },
   });
   return rows.length;
+}
+
+const LADDER = ["TIER_250", "TIER_2K", "TIER_10K", "TIER_100K", "TIER_UNLIMITED"];
+
+/**
+ * Works out the business's Meta limit from its own sends, the way Meta raises it (developers.facebook.com, Messaging
+ * limits): from 250 to 2,000 after 2,000 different people got a message in 30 days; above that, one step up once half
+ * of the current limit was reached in the last 7 days with no low quality. It starts at 250 for a number new to the
+ * Cloud API, or at what was said or Meta answered, and only goes up: a lower limit comes only from Meta itself.
+ * Counts are our own messages delivered (or read); Meta's own count can be a little different.
+ */
+export async function estimateTier(clientId: string) {
+  const numbers = await db.whatsAppNumber.findMany({ where: { clientId }, select: { id: true, messagingTier: true, qualityRating: true } });
+  if (!numbers.length) return null;
+  const ids = { senderId: { in: numbers.map((n) => n.id) } };
+  const known = numbers.map((n) => LADDER.indexOf(n.messagingTier ?? "")).filter((i) => i >= 0);
+  const start = known.length ? Math.max(...known) : 0;
+  const lowQuality = numbers.some((n) => n.qualityRating === "RED" || n.qualityRating === "YELLOW");
+  const [week, month] = await Promise.all([contacted(ids, 7, ["DELIVERED", "READ"]), contacted(ids, 30, ["DELIVERED", "READ"])]);
+  let step = start;
+  if (step === 0 && month >= 2_000) step = 1;
+  else if (step >= 1 && step < LADDER.length - 1 && !lowQuality) {
+    const limit = tierLimit(LADDER[step]) ?? Infinity;
+    if (week >= limit / 2) step += 1;
+  }
+  const tier = LADDER[step];
+  if (step > start) await db.whatsAppNumber.updateMany({ where: { clientId }, data: { messagingTier: tier } });
+  const limit = tierLimit(tier);
+  const next = step < LADDER.length - 1 ? (step === 0 ? { tier: LADDER[1], need: 2_000, have: month, days: 30 } : { tier: LADDER[step + 1], need: Math.ceil((limit ?? 0) / 2), have: week, days: 7 }) : null;
+  return { tier, week, month, next, raised: step > start };
 }
 
 /**
@@ -54,11 +83,9 @@ export async function allowance(n: LimitFields) {
     contacted({ senderId: { in: siblings.map((s) => s.id) } }),
     n.dailyCap != null ? contacted({ senderId: n.id }) : Promise.resolve(0),
   ]);
-  const meta = tierLimit(n.messagingTier);
-  const left = Math.min(
-    meta === null ? Infinity : withMargin(meta) - clientUsed,
-    n.dailyCap != null ? n.dailyCap - numberUsed : Infinity,
-  );
+  // Meta's limit is shown, never enforced here: Meta itself holds back what goes over it. Only a warm-up cap the admin
+  // set on a number stops sends.
+  const left = n.dailyCap != null ? n.dailyCap - numberUsed : Infinity;
   return { left: Math.max(0, left), clientUsed, numberUsed, unlimited: left === Infinity };
 }
 
@@ -165,6 +192,7 @@ export async function refreshStaleNumbers(maxAgeMs = 3 * 60 * 60_000) {
 /** Each of a client's numbers with quality, limits and today's usage, for display. */
 export async function numberHealth(clientId: string) {
   await freshenNumbers({ clientId });
+  await estimateTier(clientId);
   const numbers = await db.whatsAppNumber.findMany({ where: { clientId }, orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }] });
   return Promise.all(
     numbers.map(async (n) => {
@@ -174,7 +202,7 @@ export async function numberHealth(clientId: string) {
       const limit = n.dailyCap != null ? Math.min(n.dailyCap, meta ?? Infinity) : meta;
       // tierKnown: Meta told us the limit; otherwise the 250 above is only the safe assumption for sending.
       // Shown left is exact (limit minus people reached in 24 hours); sending keeps its small safety margin.
-      return { ...n, used, limit, left: a.unlimited || limit === null ? null : Math.max(0, limit - used), tier: tierLabel(n.messagingTier), tierKnown: Boolean(n.messagingTier && n.messagingTier.toUpperCase() in TIERS) };
+      return { ...n, used, limit, left: limit === null ? null : Math.max(0, limit - used), tier: tierLabel(n.messagingTier), tierKnown: Boolean(n.messagingTier && n.messagingTier.toUpperCase() in TIERS) };
     }),
   );
 }

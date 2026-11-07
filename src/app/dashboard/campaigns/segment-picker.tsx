@@ -90,14 +90,14 @@ export function SegmentPicker({
     : !capacity.known
       ? isTa
         ? "Meta இன்னும் உங்கள் வணிகத்தின் தினசரி வரம்பைச் சொல்லவில்லை; பாதுகாப்புக்காக 24 மணி நேரத்தில் 250 பேர் என அனுப்பப்படும்."
-        : "Meta hasn't told us your business's daily limit yet; sending assumes 250 people per 24 hours to stay safe."
+        : "Meta limit: 250 people per 24 hours to start, worked out from your sends."
       : capacity.limit === null
         ? isTa
           ? "Meta வரம்பு: வரம்பில்லை."
           : "Meta limit: unlimited."
         : isTa
-          ? `Meta வரம்பு: 24 மணி நேரத்தில் ${n(capacity.limit)} பேர் · இப்போது ${n(capacity.left ?? 0)} மீதம். மீதி அடுத்த நாட்களில் தானாகச் செல்லும்.`
-          : `Meta limit: ${n(capacity.limit)} people per 24 hours · ${n(capacity.left ?? 0)} left now. The rest go out by themselves on the next days.`;
+          ? `Meta வரம்பு: 24 மணி நேரத்தில் ${n(capacity.limit)} பேர் · இப்போது ${n(capacity.left ?? 0)} மீதம். அனுப்புவது நிறுத்தப்படாது; வரம்புக்கு மேல் உள்ளவற்றை Meta நிறுத்தி வைக்கும்.`
+          : `Meta limit: ${n(capacity.limit)} people per 24 hours · ${n(capacity.left ?? 0)} left now. Sending isn't stopped; Meta holds back what goes over its limit.`;
   const leftOut = isTa
     ? `எப்போதும் விலக்கப்படுபவர்கள்: ${n(t.optedOut)} விலகியவர்கள், ${n(t.unreachable)} வாட்ஸ்அப் பெற முடியாதவர்கள், ${n(t.movedInactive)} நீங்கள் Dormant-க்கு மாற்றியவர்கள். ${n(t.paused)} பேருக்கு Meta தற்காலிகமாகச் சலுகைகளை நிறுத்தியுள்ளது; பின்னர் அனுப்பலாம்.`
     : `Always left out: ${n(t.optedOut)} opted out, ${n(t.unreachable)} can't receive WhatsApp, ${n(t.movedInactive)} you moved to Dormant. Meta is holding offers back from ${n(t.paused)} for now; they can be sent again later.`;

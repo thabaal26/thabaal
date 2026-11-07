@@ -1,5 +1,5 @@
 import "server-only";
-import { numberHealth } from "./limits";
+import { estimateTier, numberHealth, tierLimit } from "./limits";
 
 export type LimitSummary = {
   limit: number | null;
@@ -10,6 +10,11 @@ export type LimitSummary = {
   checkedLabel: string | null;
   /** Meta hasn't answered for over an hour (the token or number may need a look). */
   stale: boolean;
+  /** People reached in the last 24 hours (what the limit counts). */
+  used: number;
+  /** Different people a message was delivered to in the last 7 days, and what the next limit needs. */
+  week: number;
+  next: { limit: number | null; need: number; have: number; days: number } | null;
 } | null;
 
 /**
@@ -19,6 +24,7 @@ export type LimitSummary = {
 export async function limitSummary(clientId: string | null | undefined): Promise<LimitSummary> {
   if (!clientId) return null;
   const health = await numberHealth(clientId);
+  const est = await estimateTier(clientId);
   const n = health.find((h) => h.isDefault) ?? health[0];
   if (!n) return null;
   const at = n.statusCheckedAt;
@@ -31,5 +37,8 @@ export async function limitSummary(clientId: string | null | undefined): Promise
     checkedAt: at?.toISOString() ?? null,
     checkedLabel: at ? ist(at, today ? { hour: "numeric", minute: "2-digit" } : { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : null,
     stale: !at || Date.now() - at.getTime() > 60 * 60_000,
+    used: n.used,
+    week: est?.week ?? 0,
+    next: est?.next ? { limit: tierLimit(est.next.tier), need: est.next.need, have: est.next.have, days: est.next.days } : null,
   };
 }

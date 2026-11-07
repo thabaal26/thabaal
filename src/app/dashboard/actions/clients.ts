@@ -183,7 +183,7 @@ export async function addClientNumber(
       displayPhone: match.display_phone_number, verifiedName: match.verified_name, token: ownToken, isDefault: first,
       qualityRating: match.quality_rating ?? null,
       // A number new to the Cloud API starts at 250; an existing business says its tier. Meta's answer replaces it.
-      messagingTier: /^TIER_(250|2K|10K|100K|UNLIMITED)$/.test(input.tier ?? "") ? input.tier : "TIER_250",
+      messagingTier: input.tier === "TIER_2K" ? "TIER_2K" : "TIER_250",
     },
   });
   await refreshNumberStatus(created, t);
