@@ -36,12 +36,14 @@ export function MetaLimitCard({ initial }: { initial: LimitSummary }) {
 
   if (!s) return null;
   const n = (x: number) => x.toLocaleString("en-IN");
-  const time = s.checkedAt ? new Date(s.checkedAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }) : null;
+  const time = s.checkedLabel;
+
   const value = s.limit === null ? (isTamil ? "வரம்பு இல்லை" : "Unlimited") : isTamil ? `${n(s.limit)} பேர்` : `${n(s.limit)} people`;
   const parts = [
     s.limit === null ? null : isTamil ? `இப்போது ${n(s.left ?? 0)} மீதம்` : `${n(s.left ?? 0)} left now`,
     !s.known ? (isTamil ? "Meta இன்னும் சொல்லவில்லை; 250 என்று கொள்கிறோம்" : "Meta hasn't said yet; 250 assumed") : null,
     time ? (isTamil ? `${time}-க்கு சரிபார்த்தது` : `checked ${time}`) : null,
+    s.stale && s.known ? (isTamil ? "Meta-விடம் இப்போது கேட்க முடியவில்லை" : "Meta couldn't be reached since then") : null,
   ].filter(Boolean);
 
   return (

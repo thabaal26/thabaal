@@ -372,7 +372,7 @@ export async function fetchMetaCostSince(clientId: string, fromSec: number): Pro
 }
 
 function fetchPhones(wabaId: string, token: string, limitFields: string) {
-  return fetch(`https://graph.facebook.com/${VERSION}/${wabaId}/phone_numbers?fields=id,verified_name,display_phone_number,quality_rating,${limitFields}`, {
+  return fetch(`https://graph.facebook.com/${VERSION}/${wabaId}/phone_numbers?fields=id,verified_name,display_phone_number,quality_rating${limitFields}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   })
@@ -419,10 +419,11 @@ export async function fetchMetaLiveStatus(clientId: string) {
       })
         .then((r) => r.json())
         .catch(() => null),
-      // The portfolio limit field first: the deprecated one can keep saying TIER_250 after Meta raises the limit.
-      fetchPhones(wabaId, token, "whatsapp_business_manager_messaging_limit,messaging_limit_tier").then((j) =>
-        j?.error ? fetchPhones(wabaId, token, "messaging_limit_tier") : j,
-      ),
+      // One limit field per try (a removed field fails the request): the portfolio limit first; the deprecated one can keep
+      // saying TIER_250 after Meta raises the limit.
+      fetchPhones(wabaId, token, ",whatsapp_business_manager_messaging_limit")
+        .then((j) => (!j || j.error ? fetchPhones(wabaId, token, ",messaging_limit_tier") : j))
+        .then((j) => (!j || j.error ? fetchPhones(wabaId, token, "") : j)),
       fetchMetaLivePricing(clientId, monthStartSec, nowSec, true),
     ]);
 
