@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { tierFromMeta } from "./limits";
 
 const VERSION = process.env.META_GRAPH_VERSION ?? "v23.0";
 export const SYNC_NOTE_PREFIX = "[META_SYNC]";
@@ -370,6 +371,15 @@ export async function fetchMetaCostSince(clientId: string, fromSec: number): Pro
   }
 }
 
+function fetchPhones(wabaId: string, token: string, limitFields: string) {
+  return fetch(`https://graph.facebook.com/${VERSION}/${wabaId}/phone_numbers?fields=id,verified_name,display_phone_number,quality_rating,${limitFields}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  })
+    .then((r) => r.json())
+    .catch(() => null);
+}
+
 /**
  * Checks live Meta Graph API connection status for the client's WABA and all phone numbers.
  * Fetches verified name, quality rating, messaging tier, account status, and live pricing analytics in real-time,
@@ -409,12 +419,10 @@ export async function fetchMetaLiveStatus(clientId: string) {
       })
         .then((r) => r.json())
         .catch(() => null),
-      fetch(`https://graph.facebook.com/${VERSION}/${wabaId}/phone_numbers?fields=id,verified_name,display_phone_number,quality_rating,messaging_limit_tier`, {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: "no-store",
-      })
-        .then((r) => r.json())
-        .catch(() => null),
+      // The portfolio limit field first: the deprecated one can keep saying TIER_250 after Meta raises the limit.
+      fetchPhones(wabaId, token, "whatsapp_business_manager_messaging_limit,messaging_limit_tier").then((j) =>
+        j?.error ? fetchPhones(wabaId, token, "messaging_limit_tier") : j,
+      ),
       fetchMetaLivePricing(clientId, monthStartSec, nowSec, true),
     ]);
 
@@ -430,6 +438,7 @@ export async function fetchMetaLiveStatus(clientId: string) {
       verified_name?: string;
       display_phone_number?: string;
       quality_rating?: string;
+      whatsapp_business_manager_messaging_limit?: unknown;
       messaging_limit_tier?: string;
     }[] = phonesRes?.data ?? [];
 
@@ -449,7 +458,7 @@ export async function fetchMetaLiveStatus(clientId: string) {
             where: { id: localNum.id },
             data: {
               qualityRating: remote.quality_rating ?? localNum.qualityRating,
-              messagingTier: remote.messaging_limit_tier ?? localNum.messagingTier,
+              messagingTier: tierFromMeta(remote) ?? localNum.messagingTier,
               ...(remote.display_phone_number && { displayPhone: remote.display_phone_number }),
               ...(remote.verified_name && { verifiedName: remote.verified_name }),
               statusCheckedAt: new Date(),

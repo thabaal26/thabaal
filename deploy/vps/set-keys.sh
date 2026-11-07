@@ -9,8 +9,11 @@ LIST=/srv/thabaal/shared/.env.live.missing
 [ -s "$LIST" ] || { echo "No keys are missing."; exit 0; }
 
 for k in $(cat "$LIST"); do
-  read -rsp "$k (Enter to skip): " v </dev/tty
-  echo
+  # IDs aren't secret, so they show as typed. Secrets stay hidden: nothing appears, and that's normal.
+  case "$k" in
+    *_ID) read -rp "$k (shows as you type, Enter to skip): " v </dev/tty ;;
+    *) read -rsp "$k (hidden: nothing shows, paste then Enter, or Enter to skip): " v </dev/tty; echo ;;
+  esac
   [ -n "$v" ] || continue
   KEY="$k" VAL="$v" node -e '
     const fs = require("fs");
@@ -20,8 +23,8 @@ for k in $(cat "$LIST"); do
     fs.writeFileSync(f, lines.join("\n") + "\n", { mode: 0o600 });
   ' "$FILE"
   sed -i "/^$k\$/d" "$LIST"
+  echo "  saved (${#v} characters)"
   unset v
-  echo "  saved"
 done
 chown thabaal:thabaal "$FILE"
 chmod 600 "$FILE"

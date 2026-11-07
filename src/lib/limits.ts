@@ -101,7 +101,8 @@ export async function refreshNumberStatus(n: Pick<WhatsAppNumber, "id" | "phoneN
     where: { id: n.id },
     data: {
       qualityRating: j.quality_rating ?? null,
-      messagingTier: tierFromMeta(j),
+      // Meta didn't say: keep what we know, or the limit would fall back to 250.
+      messagingTier: tierFromMeta(j) ?? undefined,
       ...(j.display_phone_number && { displayPhone: j.display_phone_number }),
       ...(j.verified_name && { verifiedName: j.verified_name }),
       statusCheckedAt: new Date(),
