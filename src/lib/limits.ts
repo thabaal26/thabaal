@@ -173,7 +173,8 @@ export async function numberHealth(clientId: string) {
       const used = n.dailyCap != null ? a.numberUsed : a.clientUsed;
       const limit = n.dailyCap != null ? Math.min(n.dailyCap, meta ?? Infinity) : meta;
       // tierKnown: Meta told us the limit; otherwise the 250 above is only the safe assumption for sending.
-      return { ...n, used, limit, left: a.unlimited ? null : a.left, tier: tierLabel(n.messagingTier), tierKnown: Boolean(n.messagingTier && n.messagingTier.toUpperCase() in TIERS) };
+      // Shown left is exact (limit minus people reached in 24 hours); sending keeps its small safety margin.
+      return { ...n, used, limit, left: a.unlimited || limit === null ? null : Math.max(0, limit - used), tier: tierLabel(n.messagingTier), tierKnown: Boolean(n.messagingTier && n.messagingTier.toUpperCase() in TIERS) };
     }),
   );
 }

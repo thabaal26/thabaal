@@ -42,8 +42,8 @@ export function MetaLimitCard({ initial }: { initial: LimitSummary }) {
   const parts = [
     s.limit === null ? null : isTamil ? `இப்போது ${n(s.left ?? 0)} மீதம்` : `${n(s.left ?? 0)} left now`,
     !s.known ? (isTamil ? "Meta இன்னும் சொல்லவில்லை; 250 என்று கொள்கிறோம்" : "Meta hasn't said yet; 250 assumed") : null,
-    time ? (isTamil ? `${time}-க்கு சரிபார்த்தது` : `checked ${time}`) : null,
-    s.stale && s.known ? (isTamil ? "Meta-விடம் இப்போது கேட்க முடியவில்லை" : "Meta couldn't be reached since then") : null,
+    // Only a recent answer from Meta gets a time; a limit set by hand or an old answer just shows the count.
+    time && !s.stale ? (isTamil ? `${time}-க்கு சரிபார்த்தது` : `checked ${time}`) : null,
   ].filter(Boolean);
 
   return (

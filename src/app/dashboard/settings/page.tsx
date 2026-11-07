@@ -21,6 +21,7 @@ import { OrderTemplatesCard } from "./order-templates-card";
 import { spendSummary } from "@/lib/spend";
 import { effectivePlan, planUsage } from "@/lib/subscription";
 import { StaffLogins } from "./staff-logins";
+import { MetaLimitPicker } from "./meta-limit-picker";
 import { inr } from "../portal-format";
 import { LangChoice, PortalPage, T } from "../portal-ui";
 
@@ -301,6 +302,9 @@ export default async function SettingsPage() {
                   </p>
                 )}
               </div>
+              {numbers.length > 0 && cid && (
+                <MetaLimitPicker clientId={cid} current={numbers[0].messagingTier} canEdit={Boolean(scope.canManage)} />
+              )}
             </section>
           </ScrollReveal>
         )}

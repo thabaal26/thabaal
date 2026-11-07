@@ -42,6 +42,29 @@ for (const L of looks) {
   await p.screenshot({ path: `.git/shots-limit/campaigns-${L.name}.png` });
   await ctx.close();
 }
+{
+  // The business sets its limit in Settings (what WhatsApp Manager shows); the Campaigns card follows.
+  const ctx = await b.newContext({ viewport: { width: 1366, height: 900 } });
+  await ctx.addCookies([{ name: "wp_session", value: S.tokens.manager, url: BASE }]);
+  const p = await ctx.newPage();
+  await p.goto(BASE + "/dashboard/settings", { waitUntil: "networkidle" });
+  const sel = p.locator("#meta-limit");
+  ok("Settings has the limit picker", (await sel.count()) === 1);
+  await sel.selectOption("TIER_2K");
+  await p.waitForTimeout(2500);
+  await sel.scrollIntoViewIfNeeded();
+  await p.screenshot({ path: ".git/shots-limit/settings-picker.png" });
+  await p.goto(BASE + "/dashboard/campaigns", { waitUntil: "networkidle" });
+  const t = (await p.getByTestId("meta-limit-card").textContent()) ?? "";
+  ok("card follows the saved limit", /2,000 people/.test(t), t.replace(/\s+/g, " ").slice(0, 80));
+  r = await fetch(BASE + "/api/limits", { headers: { cookie: `wp_session=${S.tokens.staff}` } });
+  const staffView = await r.json();
+  ok("staff see the same limit", staffView?.limit === 2000, JSON.stringify(staffView));
+  await p.goto(BASE + "/dashboard/settings", { waitUntil: "networkidle" });
+  await p.locator("#meta-limit").selectOption("TIER_250");
+  await p.waitForTimeout(1500);
+  await ctx.close();
+}
 await b.close();
 console.log(`${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);
