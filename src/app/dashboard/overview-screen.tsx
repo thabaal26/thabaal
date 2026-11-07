@@ -144,6 +144,9 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
     hourly ? `${hourLabel(Number(k))} – ${hourLabel((Number(k) + 1) % 24)}` : weekly ? `Week of ${formatInTimeZone(new Date(`${k}T12:00:00Z`), "UTC", "d MMM")}` : formatInTimeZone(new Date(`${k}T12:00:00Z`), "UTC", "EEE d MMM");
   const keyOf = (d: Date) => bucketOf(formatInTimeZone(d, APP_TZ, hourly ? "HH" : "yyyy-MM-dd"));
 
+  // Customers who can and can't be messaged, in one query.
+  const customerCounts = db.customer.groupBy({ by: ["optedOut"], where: mineCustomers, _count: true });
+  customerCounts.catch(() => {});
   // One round for every independent read (several sequential rounds before).
   const [
     [client, reachable, msgByCustomer, repliersMonth, health, areaRows],
@@ -179,8 +182,8 @@ export async function OverviewScreen({ sp, mode }: { sp: Record<string, string |
     cid ? db.customer.groupBy({ by: ["region", "location"], where: { clientId: cid, optedOut: false, ...(allowed && { id: { in: allowed } }) }, _count: true }) : [],
     ]),
     Promise.all([
-      db.customer.count({ where: { ...mineCustomers, optedOut: false } }),
-      db.customer.count({ where: { ...mineCustomers, optedOut: true } }),
+      customerCounts.then((g) => g.find((x) => !x.optedOut)?._count ?? 0),
+      customerCounts.then((g) => g.find((x) => x.optedOut)?._count ?? 0),
       db.message.groupBy({ by: ["status"], where: { ...myMessages, createdAt: { gte: prevStart, lt: prevEnd }, status: { notIn: ["QUEUED", "SKIPPED"] } }, _count: true }),
       db.$queryRaw<{ k: string; status: string; n: bigint }[]>`
         SELECT to_char((m."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${APP_TZ}, ${bucketSql}) AS k, m.status::text AS status, count(*) AS n

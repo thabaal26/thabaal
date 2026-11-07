@@ -1,5 +1,5 @@
 import "server-only";
-import { estimateTier, numberHealth, tierLimit } from "./limits";
+import { numberHealthAndTier, tierLimit } from "./limits";
 
 export type LimitSummary = {
   limit: number | null;
@@ -23,8 +23,7 @@ export type LimitSummary = {
  */
 export async function limitSummary(clientId: string | null | undefined): Promise<LimitSummary> {
   if (!clientId) return null;
-  const health = await numberHealth(clientId);
-  const est = await estimateTier(clientId);
+  const { health, est } = await numberHealthAndTier(clientId);
   const n = health.find((h) => h.isDefault) ?? health[0];
   if (!n) return null;
   const at = n.statusCheckedAt;

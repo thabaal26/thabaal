@@ -93,11 +93,19 @@ export async function startDueCampaigns(now: Date, paused: ReadonlySet<string>, 
   return started;
 }
 
-async function inPool<T>(items: T[], size: number, fn: (item: T) => Promise<boolean | void>) {
-  for (let i = 0; i < items.length; i += size) {
-    const results = await Promise.all(items.slice(i, i + size).map(fn));
-    if (results.includes(false)) return; // a worker asked to stop the batch
-  }
+/**
+ * Runs fn over items with up to `size` at a time: a new one starts as soon as any finishes (no waiting for the slowest
+ * of a group). Once a worker returns false (asked to stop the batch), nothing new starts; the ones already running end.
+ */
+export async function inPool<T>(items: T[], size: number, fn: (item: T) => Promise<boolean | void>) {
+  let next = 0;
+  let stop = false;
+  const worker = async () => {
+    while (!stop && next < items.length) {
+      if ((await fn(items[next++])) === false) stop = true;
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(size, items.length) }, worker));
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -189,14 +197,18 @@ async function processRun(runId: string, now: Date, deadline: number) {
     orderBy: { id: "asc" },
   });
 
-  // Customers who got any marketing message recently are skipped, so nobody is flooded with offers.
-  const recent = marketing ? await recentlyMarketed(batch.map((m) => m.customerId), campaign.client.marketingGapHours) : new Map<string, Date>();
-  // Meta recently held marketing back from these customers; another offer now would only be held again.
-  const paused = marketing ? await marketingPaused(batch.map((m) => m.customerId)) : new Map<string, Date>();
-  // No offers for someone in the middle of an order, with a problem open, or who asked for none.
-  const busy = marketing ? await busyForOffers(batch.map((m) => m.customerId)) : new Map<string, string>();
-  // The campaign leaves out people who didn't open their last offers (lib/engagement.ts), when it says so.
-  const unread = marketing && campaign.skipUnread ? await notOpeningOffers(campaign.clientId, batch.map((m) => m.customerId)) : new Set<string>();
+  const ids = batch.map((m) => m.customerId);
+  // Who to leave out of this batch, read together (each is only read):
+  const [recent, paused, busy, unread] = await Promise.all([
+    // customers who got any marketing message recently, so nobody is flooded with offers;
+    marketing ? recentlyMarketed(ids, campaign.client.marketingGapHours) : new Map<string, Date>(),
+    // Meta recently held marketing back from them (another offer now would only be held again);
+    marketing ? marketingPaused(ids) : new Map<string, Date>(),
+    // in the middle of an order, with a problem open, or asked for no offers;
+    marketing ? busyForOffers(ids) : new Map<string, string>(),
+    // didn't open their last offers (lib/engagement.ts), when the campaign says so.
+    marketing && campaign.skipUnread ? notOpeningOffers(campaign.clientId, ids) : new Set<string>(),
+  ]);
 
   // The local session sends one by one with human-like gaps; Meta can take parallel sends.
   const local = settings.provider === "LOCAL" && !isSimulated(settings, cfg);
@@ -395,30 +407,51 @@ export async function dispatch() {
   const deadline = startedAt + TIME_BUDGET_MS;
   const now = new Date();
 
-  const paused = await lockedNow(now);
-  // Marketing-only businesses (Orders switched off): no order-based messages (reorder, unpaid-order, win-back).
+  // Locked businesses and marketing-only ones (Orders switched off), read together.
+  const [paused, ordersOff] = await Promise.all([
+    lockedNow(now),
+    db.client.findMany({ where: { disabledSections: { has: "orders" } }, select: { id: true } }).catch(() => []),
+  ]);
+  // Marketing-only businesses: no order-based messages (reorder, unpaid-order, win-back).
   const noOrders = new Set(paused);
-  for (const c of await db.client.findMany({ where: { disabledSections: { has: "orders" } }, select: { id: true } }).catch(() => [])) noOrders.add(c.id);
+  for (const c of ordersOff) noOrders.add(c.id);
   const campaignsStarted = await startDueCampaigns(now, paused);
-  await refreshStaleNumbers().catch((e) => console.error("Could not refresh number status", e));
+  // Each step runs only while there is time left; a failure is logged and the next step still runs.
+  const step = async (name: string, fn: () => Promise<unknown>) => {
+    if (Date.now() < deadline) await fn().catch((e) => console.error(`${name} failed`, e));
+  };
+  // Numbers' limits not checked for hours are asked again alongside the campaigns (a batch asks Meta itself when its
+  // number's limit is old, and Meta's limit never holds sends back).
+  const numbersRefreshed = refreshStaleNumbers().catch((e) => console.error("Could not refresh number status", e));
   // A run started just now is due now (its first batch goes in this same call, not the next one).
   const { runs, sent, failed } = await processDueRuns(new Date(), deadline, paused);
-  if (Date.now() < deadline) await sendRefillReminders(now, noOrders).catch((e) => console.error("Refill reminders failed", e));
-  if (Date.now() < deadline) await syncDueSheets(now).catch((e) => console.error("Sheet sync failed", e));
-  // Connected Google Sheets (lib/gsheet): anything a live update missed.
-  if (Date.now() < deadline) await syncAllSheets(deadline).catch((e) => console.error("Google Sheet live sync failed", e));
-  if (Date.now() < deadline) await backfillOrderNames().catch((e) => console.error("Order name backfill failed", e));
-  if (Date.now() < deadline) await backfillCustomerNames().catch((e) => console.error("Customer name backfill failed", e));
-  if (Date.now() < deadline) await expireUnfinishedOrders(now, noOrders).catch((e) => console.error("Order expiry failed", e));
-  if (Date.now() < deadline) await nudgeUnfinishedOrders(now, noOrders).catch((e) => console.error("Order nudges failed", e));
-  if (Date.now() < deadline) await remindUnpaidOrders(now, 20, noOrders).catch((e) => console.error("Payment reminders failed", e));
-  if (Date.now() < deadline) await refreshLifecycleTags().catch((e) => console.error("Lifecycle tags failed", e));
-  if (Date.now() < deadline) await sendWinbacks(now, noOrders).catch((e) => console.error("Win-back failed", e));
-  // Messages from Thabaal to business owners (admin › Messages): automatic payment reminders, then anything due.
-  if (Date.now() < deadline) await queueAutoReminders(now).catch((e) => console.error("Owner reminders failed", e));
-  if (Date.now() < deadline) await processOwnerMessages(now, deadline).catch((e) => console.error("Owner messages failed", e));
-  // Claims on handled WhatsApp messages (lib/engine/inbound.ts) are only needed while Meta might retry.
-  if (Date.now() < deadline) await pruneInbound(now).catch((e) => console.error("Inbound claim cleanup failed", e));
+  // Independent chains run side by side; inside each chain the order stays as it was.
+  await Promise.all([
+    numbersRefreshed,
+    // Messages to customers, one after another, so each step sees what the one before sent (and the names filled in).
+    (async () => {
+      await step("Refill reminders", () => sendRefillReminders(now, noOrders));
+      await step("Order name backfill", () => backfillOrderNames());
+      await step("Customer name backfill", () => backfillCustomerNames());
+      await step("Order expiry", () => expireUnfinishedOrders(now, noOrders));
+      await step("Order nudges", () => nudgeUnfinishedOrders(now, noOrders));
+      await step("Payment reminders", () => remindUnpaidOrders(now, 20, noOrders));
+      await step("Lifecycle tags", () => refreshLifecycleTags());
+      await step("Win-back", () => sendWinbacks(now, noOrders));
+    })(),
+    // Google Sheets: the old Apps Script sheets, then connected Google Sheets (lib/gsheet) for anything a live update missed.
+    (async () => {
+      await step("Sheet sync", () => syncDueSheets(now));
+      await step("Google Sheet live sync", () => syncAllSheets(deadline));
+    })(),
+    // Messages from Thabaal to business owners (admin › Messages): automatic payment reminders, then anything due.
+    (async () => {
+      await step("Owner reminders", () => queueAutoReminders(now));
+      await step("Owner messages", () => processOwnerMessages(now, deadline));
+    })(),
+    // Claims on handled WhatsApp messages (lib/engine/inbound.ts) are only needed while Meta might retry.
+    step("Inbound claim cleanup", () => pruneInbound(now)),
+  ]);
   await db.setting.upsert({ where: { id: 1 }, update: { lastDispatchAt: now }, create: { id: 1, lastDispatchAt: now } });
   return { campaignsStarted, runsProcessed: runs, sent, failed, ms: Date.now() - startedAt };
 }

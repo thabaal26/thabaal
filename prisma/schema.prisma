@@ -461,6 +461,7 @@ model Message {
   @@index([status])
   @@index([customerId, createdAt])
   @@index([senderId])
+  @@index([senderId, sentAt])
 }
 
 /// A message a customer sent back: a typed reply or a quick-reply button tap such as "Order now".

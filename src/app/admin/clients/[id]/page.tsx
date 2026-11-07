@@ -45,7 +45,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
   await requireAdminPage();
   const { id } = await params;
   const now = new Date();
-  const [{ rows, purchases }, c, settings, queue, subList] = await Promise.all([
+  const [{ rows, purchases }, c, settings, queue, subList, healthRows] = await Promise.all([
     loadClientRows(now),
     db.client.findUnique({
       where: { id },
@@ -58,10 +58,12 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
     getSettings(),
     adminQueue(now, id),
     loadSubscriptions(id),
+    // Each number's limits and usage, read alongside (an unknown id has no numbers).
+    numberHealth(id),
   ]);
   const r = rows.find((x) => x.id === id);
   if (!c || !r) notFound();
-  const health = new Map((await numberHealth(c.id)).map((h) => [h.id, h]));
+  const health = new Map(healthRows.map((h) => [h.id, h]));
   const history = purchases.filter((p) => p.clientId === id).reverse();
   const hasHistory = history.some((p) => p.status === "VERIFIED");
   const accounts = new Set(c.numbers.map((n) => n.businessAccountId)).size;

@@ -2,7 +2,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { after, NextResponse, type NextRequest } from "next/server";
 import { kickCampaigns } from "@/lib/dispatcher";
 import { db } from "@/lib/db";
-import { withMemo } from "@/lib/request-memo";
+import { newMemo } from "@/lib/request-memo";
+import { getSettings } from "@/lib/provider";
 import { ordersElsewhere, replyOrdersElsewhere } from "@/lib/orders-elsewhere";
 import { pushOrderToSheet, pushToGoogleSheet } from "@/lib/google-sheets-live";
 import { refreshNumberStatus } from "@/lib/limits";
@@ -580,12 +581,20 @@ export async function POST(req: NextRequest) {
         for (const m of v.messages ?? []) {
           // Meta retries webhooks for days: a message already handled (or being handled) is not handled again.
           const inboundId = m.id ? String(m.id) : "";
+          // This message's memo. While the claim is written, the reads every answer needs start in it: the number it
+          // came in on, the portal settings, and that business's payment settings (reads only; unused if a duplicate).
+          const inMemo = newMemo();
+          void inMemo(async () => {
+            getSettings().catch(() => null);
+            const { number } = await receivingNumber(v.metadata?.phone_number_id);
+            if (number?.clientId) await paySettingsFor(number.clientId);
+          }).catch(() => null);
           if (inboundId && (await claimInbound(inboundId, null, new Date(), m.type ? String(m.type) : null)) === "duplicate") continue;
           // One message at a time, each with its own memo: the settings, the number to answer from and the shop's
           // details are read once while it is answered (lib/request-memo.ts), not again for every step. If handling
           // fails, the claim is dropped so Meta's retry handles the message again.
           try {
-          await withMemo(async () => {
+          await inMemo(async () => {
             const base = metaReplyContent(m);
             const phoneNumberId = v.metadata?.phone_number_id;
             const { text, kind, media, handledAsPayment } = await detectAndApplyUpiPayment(m, phoneNumberId, base, signed);
@@ -784,7 +793,8 @@ export async function POST(req: NextRequest) {
             if (inboundId) await releaseInbound(inboundId, e);
             throw e;
           }
-          if (inboundId) await markProcessed(inboundId).catch(() => {});
+          // Handled: noted after the answer to Meta (only a retry, which a 200 never gets, would need it sooner).
+          if (inboundId) after(() => markProcessed(inboundId).catch(() => {}));
         }
       } else if (change.field === "calls") {
         for (const c of v.calls ?? []) await applyCall(c, v);

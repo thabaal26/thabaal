@@ -8,9 +8,11 @@ import { isInternalLoyaltyTag } from "./loyalty";
 /** These customers and every other number of the same people (for adding or leaving out a person in a campaign). */
 export async function withSamePerson(clientId: string, ids: readonly string[]): Promise<string[]> {
   if (!ids.length) return [];
-  const people = await db.customer.findMany({ where: { clientId, id: { in: [...ids] }, personId: { not: null } }, select: { personId: true } });
-  if (!people.length) return [...new Set(ids)];
-  const linked = await db.customer.findMany({ where: { clientId, personId: { in: people.map((p) => p.personId!) } }, select: { id: true } });
+  // The people of these numbers and all their numbers, in one query.
+  const linked = await db.$queryRaw<{ id: string }[]>`
+    SELECT DISTINCT other.id FROM "Customer" c
+    JOIN "Customer" other ON other."personId" = c."personId" AND other."clientId" = ${clientId}
+    WHERE c."clientId" = ${clientId} AND c.id = ANY(${[...ids]}::text[]) AND c."personId" IS NOT NULL`;
   return [...new Set([...ids, ...linked.map((c) => c.id)])];
 }
 

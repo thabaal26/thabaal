@@ -39,7 +39,10 @@ export default async function OrdersPage({
   // Product pages link here with ?product=<name>; it searches the order lines for that product.
   const initialQ = typeof sp.q === "string" ? sp.q : typeof sp.product === "string" ? sp.product : "";
 
-  const [rawOrders, clientData, catalogData] = await Promise.all([
+  // Loyalty points each unpaid order could use: the customers with an unpaid order, read in the same round as the
+  // orders (a superset of those in the list below; only the listed ones are looked up).
+  const unpaidWhere = { status: { not: "CANCELLED" as const }, paidAt: null, OR: [{ paidAmount: null }, { paidAmount: { lte: 0 } }] };
+  const [rawOrders, clientData, catalogData, pointsRows] = await Promise.all([
     db.order.findMany({
       where: mine,
       include: {
@@ -65,22 +68,18 @@ export default async function OrdersPage({
         })
       : null,
     scope.clientId ? getCatalogWithProducts(scope.clientId) : null,
+    db.customer.findMany({
+      where: { ...mine, orders: { some: unpaidWhere } },
+      select: { id: true, personId: true, name: true, tags: true, purchases: true, orders: { select: LOYALTY_ORDER_SELECT } },
+    }),
   ]);
 
   const canEdit = scope.canOperate && (scope.canManage || !!scope.clientId);
 
-  // Loyalty points each unpaid order could use: only those customers' orders are read (a small second read).
   const unpaid = (o: (typeof rawOrders)[number]) => o.status !== "CANCELLED" && !o.paidAt && !((o.paidAmount ?? 0) > 0);
-  const pointsCustomers = [...new Set(rawOrders.filter(unpaid).map((o) => o.customerId))];
+  const pointsCustomers = new Set(rawOrders.filter(unpaid).map((o) => o.customerId));
   // A person's points are one balance over all their numbers (lib/linked-numbers.ts).
-  const loyaltyRows = pointsCustomers.length
-    ? await asPeople(
-        await db.customer.findMany({
-          where: { id: { in: pointsCustomers } },
-          select: { id: true, personId: true, name: true, tags: true, purchases: true, orders: { select: LOYALTY_ORDER_SELECT } },
-        }),
-      )
-    : [];
+  const loyaltyRows = pointsCustomers.size ? await asPeople(pointsRows.filter((c) => pointsCustomers.has(c.id))) : [];
   const loyaltyOf = new Map(loyaltyRows.map((c) => [c.id, c]));
 
   const catalogProducts: CatalogProductOption[] = (catalogData?.products ?? []).map((p) => ({

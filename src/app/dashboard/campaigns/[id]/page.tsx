@@ -46,7 +46,9 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
   });
   if (!c) notFound();
 
-  const [{ templates, audience, numbers, segments }, stats, charged, people] = await Promise.all([
+  const runIds = c.runs.map((r) => r.id);
+  // Everything about the runs in one round: statuses, billing, the people picked by hand, sales and responses.
+  const [{ templates, audience, numbers, segments }, stats, charged, people, sales, interactions] = await Promise.all([
     campaignFormData(c.clientId),
     db.message.groupBy({ by: ["runId", "status"], where: { runId: { in: c.runs.map((r) => r.id) } }, _count: true }),
     // Meta reports per message whether it was billed; it doesn't send the amount.
@@ -55,6 +57,18 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
     c.includeIds.length || c.excludeIds.length
       ? db.customer.findMany({ where: { clientId: c.clientId, id: { in: [...c.includeIds, ...c.excludeIds] } }, select: { id: true, name: true, phone: true } })
       : [],
+    // Sales credited to a run: orders a recipient placed within 7 days of getting its message.
+    runIds.length
+      ? db.$queryRaw<{ runId: string; orders: bigint; revenue: number }[]>`
+        SELECT m."runId", count(DISTINCT o.id) AS orders, coalesce(sum(o.total), 0)::float AS revenue
+        FROM "Message" m
+        JOIN "Order" o ON o."customerId" = m."customerId" AND o.status <> 'CANCELLED'
+          AND o."createdAt" > m."sentAt" AND o."createdAt" <= m."sentAt" + interval '7 days'
+        WHERE m."runId" IN (${Prisma.join(runIds)}) AND m."sentAt" IS NOT NULL
+        GROUP BY 1`
+      : [],
+    // Taps and replies that answer these messages.
+    campaignInteractions(c.clientId, runIds),
   ]);
   const picked = c.audienceTag ? audience.tags.find((t) => t.tag === c.audienceTag) : undefined;
   // Several tags can overlap, so their reach is counted, not looked up.
@@ -65,17 +79,6 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
     !narrowed && !c.audienceTag ? audience.all : !narrowed && picked ? picked.n : await db.customer.count({ where: await campaignAudienceWhere(c.clientId, c.audienceTag, c) });
   const audienceName = picked?.label ?? (tagPick ? describeTags(tagPick) : c.audienceTag);
   const sendConfirm = `Send "${templateLabel(c.template.name)}" now to ${fmtNumber(audienceSize)} customer${audienceSize === 1 ? "" : "s"} (${c.audienceTag ? `"${audienceName}"` : "ALL customers, no tag"})?`;
-  // Sales credited to a run: orders a recipient placed within 7 days of getting its message.
-  const runIds = c.runs.map((r) => r.id);
-  const sales = runIds.length
-    ? await db.$queryRaw<{ runId: string; orders: bigint; revenue: number }[]>`
-        SELECT m."runId", count(DISTINCT o.id) AS orders, coalesce(sum(o.total), 0)::float AS revenue
-        FROM "Message" m
-        JOIN "Order" o ON o."customerId" = m."customerId" AND o.status <> 'CANCELLED'
-          AND o."createdAt" > m."sentAt" AND o."createdAt" <= m."sentAt" + interval '7 days'
-        WHERE m."runId" IN (${Prisma.join(runIds)}) AND m."sentAt" IS NOT NULL
-        GROUP BY 1`
-    : [];
   const salesOf = (runId: string) => sales.find((x) => x.runId === runId);
   const totalOrders = sales.reduce((n, x) => n + Number(x.orders), 0);
   const totalRevenue = sales.reduce((n, x) => n + Number(x.revenue), 0);
@@ -89,7 +92,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
     delivered: all("DELIVERED", "READ"),
     read: all("READ"),
     failed: all("FAILED"),
-    ...(await campaignInteractions(c.clientId, runIds)),
+    ...interactions,
   };
 
   const running = (status: string) => ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET", "WAITING_FUNDS"].includes(status);

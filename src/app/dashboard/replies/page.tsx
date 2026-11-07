@@ -31,6 +31,9 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
   const scope = await getScope();
   const mine = ownedMessages(scope);
 
+  // Whether this business has sent a campaign yet (chat groups show only after one) is read alongside the chats.
+  const historyRead = scope.clientId ? hasCampaignHistory(scope.clientId) : Promise.resolve(false);
+  historyRead.catch(() => {});
   const rawReplies = await db.reply.findMany({
     where: mine,
     include: {
@@ -95,7 +98,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
   }));
 
   // Customers we messaged lately who haven't written back: a chat too, so every campaign message shows here. One
-  // row per customer, our newest message as its preview.
+  // row per customer, our newest message as its preview; the customer comes in the same query.
   const sentMessages = await db.message.findMany({
     where: {
       ...mine,
@@ -113,11 +116,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
       sentAt: true,
       createdAt: true,
       customerId: true,
-    },
-  });
-  const sentCustomers = sentMessages.length
-    ? await db.customer.findMany({
-        where: { id: { in: sentMessages.map((m) => m.customerId) } },
+      customer: {
         select: {
           id: true,
           name: true,
@@ -131,11 +130,11 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
             select: { id: true, number: true, ref: true, total: true, currency: true, paymentClaimedAt: true, paidAmount: true, paymentMethod: true, paymentTxnId: true },
           },
         },
-      })
-    : [];
-  const customerById = new Map(sentCustomers.map((c) => [c.id, c]));
+      },
+    },
+  });
   const sentThreads = sentMessages.flatMap((m) => {
-    const customer = customerById.get(m.customerId);
+    const customer = m.customer;
     if (!customer) return [];
     return [
       {
@@ -162,26 +161,37 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
   const openThreadsCount = replyThreads.filter((t) => !t.handled).length;
   // Each chat's group, read live for this business's own customers (none before its first campaign).
   const groupOf = new Map<string, string>();
-  if (scope.clientId && (await hasCampaignHistory(scope.clientId))) {
-    const ids = [...new Set(allThreads.map((t) => t.customer.id))];
-    for (const e of await engagementRows(scope.clientId, { customerIds: ids })) groupOf.set(e.id, e.segment);
-  }
-  const groups = groupOf.size
-    ? ENGAGEMENT_GROUPS.map((key) => ({ key, label: SEGMENT_LABEL[key].en, labelTa: SEGMENT_LABEL[key].ta, count: allThreads.filter((t) => groupOf.get(t.customer.id) === key).length }))
-    : null;
-  const replies = group && groups ? allThreads.filter((t) => groupOf.get(t.customer.id) === group) : [...allThreads];
-
-  // Computers show the picked customer's conversation beside the list (the newest customer thread by default).
-  let selected = replies.find((x) => x.id === picked || x.customer.id === picked);
-  if (!selected && picked) {
-    selected = allThreads.find((x) => x.id === picked || x.customer.id === picked);
-    if (selected && !replies.some((r) => r.customer.id === selected!.customer.id)) {
-      replies.unshift(selected);
+  const readGroups = async () => {
+    if (scope.clientId && (await historyRead)) {
+      const ids = [...new Set(allThreads.map((t) => t.customer.id))];
+      for (const e of await engagementRows(scope.clientId, { customerIds: ids })) groupOf.set(e.id, e.segment);
     }
-  }
-  if (!selected) {
-    selected = replies[0];
-  }
+  };
+  // Without a group picked, the open chat doesn't depend on the groups: both are read at once.
+  const groupsRead = group ? null : readGroups();
+  groupsRead?.catch(() => {});
+  if (group) await readGroups();
+  const pick = () => {
+    const groups = groupOf.size
+      ? ENGAGEMENT_GROUPS.map((key) => ({ key, label: SEGMENT_LABEL[key].en, labelTa: SEGMENT_LABEL[key].ta, count: allThreads.filter((t) => groupOf.get(t.customer.id) === key).length }))
+      : null;
+    const replies = group && groups ? allThreads.filter((t) => groupOf.get(t.customer.id) === group) : [...allThreads];
+
+    // Computers show the picked customer's conversation beside the list (the newest customer thread by default).
+    let selected = replies.find((x) => x.id === picked || x.customer.id === picked);
+    if (!selected && picked) {
+      selected = allThreads.find((x) => x.id === picked || x.customer.id === picked);
+      if (selected && !replies.some((r) => r.customer.id === selected!.customer.id)) {
+        replies.unshift(selected);
+      }
+    }
+    if (!selected) {
+      selected = replies[0];
+    }
+    return { groups, replies, selected };
+  };
+  // With no group picked the list and the open chat are the same whatever the groups are; only the counts wait.
+  const { selected } = pick();
   const thread: ConversationEntry[] = [];
   let profile: ChatProfile | null = null;
   if (selected) {
@@ -251,6 +261,8 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
     );
     thread.sort((a, b) => b.at.getTime() - a.at.getTime());
   }
+  await groupsRead;
+  const { groups, replies } = pick();
 
   return (
     <PortalPage title="Chats" titleTa="உரையாடல்கள்" sub={CHATS_SUB} subTa={CHATS_SUB_TA} wide>

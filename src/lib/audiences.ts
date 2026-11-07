@@ -101,13 +101,17 @@ export type CampaignPeople = { includeIds?: readonly string[]; excludeIds?: read
  * ones (INACTIVE_TAG) only when the campaign picks that tag or adds them by hand.
  */
 export async function campaignAudienceWhere(clientId: string, audienceTag: string | null, people: CampaignPeople = {}): Promise<Prisma.CustomerWhereInput> {
-  const picked = await sendToWhere(clientId, audienceTag);
   const segments = cleanSegments(people.segments);
+  // Every read here is independent: one round.
+  const [picked, segmentIds, include, exclude] = await Promise.all([
+    sendToWhere(clientId, audienceTag),
+    segments.length ? segmentCustomerIds(clientId, segments) : null,
+    // A person with several numbers is added or left out as a whole (lib/linked-numbers.ts).
+    withSamePerson(clientId, people.includeIds ?? []),
+    withSamePerson(clientId, people.excludeIds ?? []),
+  ]);
   const kept = decodeTags(audienceTag)?.tags.includes(INACTIVE_TAG) ? picked : { AND: [picked, { NOT: { tags: { has: INACTIVE_TAG } } }] };
-  const send: Prisma.CustomerWhereInput = segments.length ? { AND: [kept, { id: { in: await segmentCustomerIds(clientId, segments) } }] } : kept;
-  // A person with several numbers is added or left out as a whole (lib/linked-numbers.ts).
-  const include = await withSamePerson(clientId, people.includeIds ?? []);
-  const exclude = await withSamePerson(clientId, people.excludeIds ?? []);
+  const send: Prisma.CustomerWhereInput = segmentIds ? { AND: [kept, { id: { in: segmentIds } }] } : kept;
   if (!include.length && !exclude.length) return send;
   return {
     AND: [

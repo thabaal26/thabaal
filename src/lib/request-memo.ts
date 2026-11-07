@@ -11,6 +11,12 @@ export function withMemo<T>(fn: () => Promise<T>): Promise<T> {
   return scope.run(new Map(), fn);
 }
 
+/** A memo kept for later: each call runs `fn` in the same memo (to start reads early, then use them in the work). */
+export function newMemo() {
+  const m = new Map<string, Promise<unknown>>();
+  return <T>(fn: () => Promise<T>): Promise<T> => scope.run(m, fn);
+}
+
 /**
  * `load()` once per `withMemo` scope for this key, shared by every caller in it; outside a scope it simply reads.
  * Only for things the scope itself doesn't change. A failed read isn't kept, so the next caller asks again.
