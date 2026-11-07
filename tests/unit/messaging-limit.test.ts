@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { after, afterEach, before, describe, test } from "node:test";
 import { db } from "../../src/lib/db";
-import { allowance, freshenNumbers, numberHealth, refreshNumberStatus, tierFromMeta, tierLimit } from "../../src/lib/limits";
+import { allowance, estimateTier, freshenNumbers, numberHealth, refreshNumberStatus, tierFromMeta, tierLimit } from "../../src/lib/limits";
 import { fetchMetaLiveStatus } from "../../src/lib/meta-balance";
 
 const realFetch = globalThis.fetch;
@@ -108,10 +108,37 @@ describe("Meta messaging limit", () => {
     assert.equal(h.left, 1_999);
   });
 
-  test("a raised limit lets a campaign reach more people today, up to unlimited", async () => {
+  test("Meta's limit never holds sends back; only an admin's warm-up cap does", async () => {
     const n = await db.whatsAppNumber.findUniqueOrThrow({ where: { id: numberId } });
-    assert.ok((await allowance({ ...n, messagingTier: "TIER_250" })).left <= 250);
-    assert.ok((await allowance({ ...n, messagingTier: "TIER_2K" })).left > 1_000);
-    assert.equal((await allowance({ ...n, messagingTier: "TIER_UNLIMITED" })).unlimited, true);
+    assert.equal((await allowance({ ...n, messagingTier: "TIER_250", dailyCap: null })).unlimited, true);
+    const capped = await allowance({ ...n, messagingTier: "TIER_UNLIMITED", dailyCap: 50 });
+    assert.equal(capped.unlimited, false);
+    assert.ok(capped.left <= 50);
   });
+
+  test("the limit rises by itself from our own sends, the way Meta raises it", async () => {
+    await db.message.deleteMany({ where: { senderId: numberId } });
+    await db.whatsAppNumber.update({ where: { id: numberId }, data: { messagingTier: "TIER_250", qualityRating: "GREEN" } });
+    let e = await estimateTier(clientId);
+    assert.equal(e?.tier, "TIER_250");
+    assert.deepEqual(e?.next && { need: e.next.need, days: e.next.days }, { need: 2_000, days: 30 });
+    const stamp = Date.now();
+    await db.customer.createMany({ data: Array.from({ length: 2_000 }, (_, k) => ({ clientId, name: `Reach ${k}`, phone: `7${stamp}${String(k).padStart(4, "0")}` })) });
+    const cs = await db.customer.findMany({ where: { clientId, name: { startsWith: "Reach " } }, select: { id: true } });
+    await db.message.createMany({ data: cs.map((c) => ({ customerId: c.id, templateName: "t", status: "DELIVERED" as const, senderId: numberId, sentAt: new Date() })) });
+    e = await estimateTier(clientId);
+    assert.equal(e?.tier, "TIER_2K");
+    assert.equal(await stored(), "TIER_2K");
+    // 2,000 reached this week is half of 2,000: one more step; 10,000 then needs 5,000.
+    e = await estimateTier(clientId);
+    assert.equal(e?.tier, "TIER_10K");
+    assert.equal(e?.next?.need, 5_000);
+    assert.equal((await estimateTier(clientId))?.tier, "TIER_10K");
+    // Low quality: no raise.
+    await db.whatsAppNumber.update({ where: { id: numberId }, data: { messagingTier: "TIER_2K", qualityRating: "RED" } });
+    assert.equal((await estimateTier(clientId))?.tier, "TIER_2K");
+    await db.message.deleteMany({ where: { senderId: numberId } });
+    await db.whatsAppNumber.update({ where: { id: numberId }, data: { qualityRating: "GREEN" } });
+  });
+
 });

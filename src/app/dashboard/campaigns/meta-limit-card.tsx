@@ -39,11 +39,15 @@ export function MetaLimitCard({ initial }: { initial: LimitSummary }) {
   const time = s.checkedLabel;
 
   const value = s.limit === null ? (isTamil ? "வரம்பு இல்லை" : "Unlimited") : isTamil ? `${n(s.limit)} பேர்` : `${n(s.limit)} people`;
+  const nextText = s.next
+    ? isTamil
+      ? `அடுத்த வரம்பு ${s.next.limit === null ? "வரம்பில்லை" : n(s.next.limit)}: ${s.next.days} நாளில் ${n(s.next.need)} பேர் தேவை (${n(s.next.have)} ஆனது)`
+      : `next limit ${s.next.limit === null ? "unlimited" : n(s.next.limit)} at ${n(s.next.need)} people in ${s.next.days} days (${n(s.next.have)} so far)`
+    : null;
   const parts = [
-    s.limit === null ? null : isTamil ? `இப்போது ${n(s.left ?? 0)} மீதம்` : `${n(s.left ?? 0)} left now`,
-    !s.known ? (isTamil ? "Meta இன்னும் சொல்லவில்லை; 250 என்று கொள்கிறோம்" : "Meta hasn't said yet; 250 assumed") : null,
-    // Only a recent answer from Meta gets a time; a limit set by hand or an old answer just shows the count.
-    time && !s.stale ? (isTamil ? `${time}-க்கு சரிபார்த்தது` : `checked ${time}`) : null,
+    s.limit === null ? null : isTamil ? `24 மணி நேரத்தில் ${n(s.used)} பேருக்கு · ${n(s.left ?? 0)} மீதம்` : `${n(s.used)} reached in 24 hours · ${n(s.left ?? 0)} left`,
+    nextText,
+    time && !s.stale ? (isTamil ? `${time}-க்கு Meta சரிபார்த்தது` : `Meta checked ${time}`) : null,
   ].filter(Boolean);
 
   return (

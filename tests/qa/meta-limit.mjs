@@ -43,26 +43,18 @@ for (const L of looks) {
   await ctx.close();
 }
 {
-  // The business sets its limit in Settings (what WhatsApp Manager shows); the Campaigns card follows.
+  // No limit to pick: Settings has no picker; the card counts people reached and shows the next step.
   const ctx = await b.newContext({ viewport: { width: 1366, height: 900 } });
   await ctx.addCookies([{ name: "wp_session", value: S.tokens.manager, url: BASE }]);
   const p = await ctx.newPage();
   await p.goto(BASE + "/dashboard/settings", { waitUntil: "networkidle" });
-  const sel = p.locator("#meta-limit");
-  ok("Settings has the limit picker", (await sel.count()) === 1);
-  await sel.selectOption("TIER_2K");
-  await p.waitForTimeout(2500);
-  await sel.scrollIntoViewIfNeeded();
-  await p.screenshot({ path: ".git/shots-limit/settings-picker.png" });
+  ok("Settings has no limit picker", (await p.locator("#meta-limit").count()) === 0);
   await p.goto(BASE + "/dashboard/campaigns", { waitUntil: "networkidle" });
-  const t = (await p.getByTestId("meta-limit-card").textContent()) ?? "";
-  ok("card follows the saved limit", /2,000 people/.test(t), t.replace(/\s+/g, " ").slice(0, 80));
-  r = await fetch(BASE + "/api/limits", { headers: { cookie: `wp_session=${S.tokens.staff}` } });
-  const staffView = await r.json();
-  ok("staff see the same limit", staffView?.limit === 2000, JSON.stringify(staffView));
-  await p.goto(BASE + "/dashboard/settings", { waitUntil: "networkidle" });
-  await p.locator("#meta-limit").selectOption("TIER_250");
-  await p.waitForTimeout(1500);
+  const t = ((await p.getByTestId("meta-limit-card").textContent()) ?? "").replace(/\s+/g, " ");
+  ok("card counts people reached and what's left", /reached in 24 hours/.test(t) && /left/.test(t) && /next limit/.test(t), t.slice(0, 160));
+  r = await fetch(BASE + "/api/limits", { headers: { cookie: `wp_session=${S.tokens.manager}` } });
+  const v = await r.json();
+  ok("left is the limit minus people reached", v.limit === null || v.left === Math.max(0, v.limit - v.used), JSON.stringify(v).slice(0, 200));
   await ctx.close();
 }
 await b.close();

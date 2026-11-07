@@ -48,7 +48,7 @@ describe("a campaign run, end to end", () => {
     // No quiet hours and no gap between offers here; those are tested on their own below.
     const client = await db.client.create({ data: { name: `QA Run Shop ${Date.now()}`, orderPrefix: "QR", quietFrom: null, quietTo: null, marketingGapHours: 0 } });
     clientId = client.id;
-    await db.whatsAppNumber.create({ data: { clientId, label: "Main", phoneNumberId: PNID, businessAccountId: "qa-run-waba", token: "qa-fake-token", isDefault: true, messagingTier: "TIER_250", qualityRating: "GREEN" } });
+    await db.whatsAppNumber.create({ data: { clientId, label: "Main", phoneNumberId: PNID, businessAccountId: "qa-run-waba", token: "qa-fake-token", isDefault: true, dailyCap: 240, messagingTier: "TIER_250", qualityRating: "GREEN" } });
     await db.customer.createMany({ data: Array.from({ length: 300 }, (_, i) => ({ clientId, phone: `${PHONE}${String(i).padStart(3, "0")}`, name: `Run ${i}`, tags: [tag] })) });
     templateId = (
       await db.template.create({
@@ -92,14 +92,14 @@ describe("a campaign run, end to end", () => {
     assert.ok(r.nextBatchAt && r.nextBatchAt.getTime() > Date.now() + 9 * MIN, "next batch in 10 minutes");
   });
 
-  test("2. a scheduler that comes 35 minutes late sends the batches it missed, up to Meta's daily limit (240 with margin)", async () => {
+  test("2. a scheduler that comes 35 minutes late sends the batches it missed, up to the admin's warm-up cap (240)", async () => {
     await dueAgo(35 * MIN);
     await runDueCampaigns(LATE, undefined, [clientId]);
     assert.equal(await count("SENT"), 240);
     assert.equal(sends(), 140);
   });
 
-  test("3. the limit reached, the run waits for the first send to turn 24 hours old, not giving up", async () => {
+  test("3. the cap reached, the run waits for the first send to turn 24 hours old, not giving up", async () => {
     await dueAgo(MIN);
     await runDueCampaigns(LATE, undefined, [clientId]);
     const r = await run();
