@@ -89,7 +89,7 @@ export async function refreshNumberStatus(n: Pick<WhatsAppNumber, "id" | "phoneN
   const token = n.token ?? clientToken;
   if (!token) return null;
   const get = (fields: string) =>
-    fetch(`https://graph.facebook.com/${process.env.META_GRAPH_VERSION ?? "v23.0"}/${n.phoneNumberId}?fields=${fields}`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" })
+    fetch(`https://graph.facebook.com/${process.env.META_GRAPH_VERSION ?? "v23.0"}/${n.phoneNumberId}?fields=${fields}`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" , signal: AbortSignal.timeout(6_000) })
       .then((r) => r.json())
       .catch(() => null);
   const base = "quality_rating,display_phone_number,verified_name";
@@ -110,6 +110,25 @@ export async function refreshNumberStatus(n: Pick<WhatsAppNumber, "id" | "phoneN
   });
 }
 
+/** How old a number's limit may be before a campaign form, the Home card or a send asks Meta again. */
+export const LIMIT_FRESH_MS = 10 * 60_000;
+
+/**
+ * Asks Meta again for numbers whose limit was checked longer ago than maxAgeMs, so a raised limit (250, 2K, 10K, 100K,
+ * unlimited) shows and is used within minutes. Never throws; on a failure the stored values stay.
+ */
+export async function freshenNumbers(where: { clientId: string } | { ids: string[] }, maxAgeMs = LIMIT_FRESH_MS) {
+  const old = await db.whatsAppNumber.findMany({
+    where: {
+      ...("clientId" in where ? { clientId: where.clientId } : { id: { in: where.ids } }),
+      OR: [{ statusCheckedAt: null }, { statusCheckedAt: { lt: new Date(Date.now() - maxAgeMs) } }],
+    },
+    include: { client: { select: { waToken: true } } },
+  });
+  await Promise.all(old.map((n) => refreshNumberStatus(n, n.client.waToken).catch(() => null)));
+  return old.length;
+}
+
 /** Refreshes numbers not checked in the last few hours; called by the scheduler. */
 export async function refreshStaleNumbers(maxAgeMs = 3 * 60 * 60_000) {
   const stale = await db.whatsAppNumber.findMany({
@@ -123,6 +142,7 @@ export async function refreshStaleNumbers(maxAgeMs = 3 * 60 * 60_000) {
 
 /** Each of a client's numbers with quality, limits and today's usage, for display. */
 export async function numberHealth(clientId: string) {
+  await freshenNumbers({ clientId });
   const numbers = await db.whatsAppNumber.findMany({ where: { clientId }, orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }] });
   return Promise.all(
     numbers.map(async (n) => {

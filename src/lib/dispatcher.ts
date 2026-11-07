@@ -6,7 +6,7 @@ import { pushToGoogleSheet } from "./google-sheets-live";
 import { computeNextRun } from "./schedule";
 import { fmtDate } from "./format";
 import { deliver, getSettings, isSimulated, readiness, templateSendable } from "./provider";
-import { allowance, refreshStaleNumbers, windowFreesAt } from "./limits";
+import { allowance, refreshStaleNumbers, windowFreesAt, freshenNumbers } from "./limits";
 import { marketingPaused } from "./held";
 import { explainError, metaError, PAUSING_KINDS, throttleDelayMinutes } from "./meta-errors";
 import { applyFailure, quietUntil, recentlyMarketed } from "./rules";
@@ -155,6 +155,10 @@ async function processRun(runId: string, now: Date, deadline: number) {
   // Respect Meta's 24-hour messaging limit and stop if the number's quality turns red.
   let take = campaign.batchSize * batches;
   if (settings.provider === "META" && number && cfg.live) {
+    // Each batch uses Meta's current limit, so a raise (250, 2K, 10K, 100K, unlimited) counts on the same day.
+    await freshenNumbers({ ids: [number.id] });
+    const current = await db.whatsAppNumber.findUnique({ where: { id: number.id } });
+    if (current) Object.assign(number, { messagingTier: current.messagingTier, qualityRating: current.qualityRating });
     if (number.qualityRating === "RED") {
       await pause("WAITING_QUALITY", 60);
       return { sent: 0, failed: 0 };

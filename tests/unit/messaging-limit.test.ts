@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { after, afterEach, before, describe, test } from "node:test";
 import { db } from "../../src/lib/db";
-import { allowance, refreshNumberStatus, tierFromMeta, tierLimit } from "../../src/lib/limits";
+import { allowance, freshenNumbers, numberHealth, refreshNumberStatus, tierFromMeta, tierLimit } from "../../src/lib/limits";
 import { fetchMetaLiveStatus } from "../../src/lib/meta-balance";
 
 const realFetch = globalThis.fetch;
@@ -68,6 +68,18 @@ describe("Meta messaging limit", () => {
     fakeMeta({ quality_rating: "GREEN" });
     await fetchMetaLiveStatus(clientId);
     assert.equal(await stored(), "TIER_10K");
+  });
+
+  test("an old limit is asked again by itself; a fresh one isn't", async () => {
+    await db.whatsAppNumber.update({ where: { id: numberId }, data: { messagingTier: "TIER_250", statusCheckedAt: new Date(Date.now() - 60 * 60_000) } });
+    let calls = 0;
+    globalThis.fetch = (async () => { calls++; return Response.json({ id: PHONE, whatsapp_business_manager_messaging_limit: "TIER_2K" }); }) as typeof fetch;
+    const health = await numberHealth(clientId);
+    assert.equal(await stored(), "TIER_2K");
+    assert.equal(health[0].limit, 2_000);
+    const before = calls;
+    assert.equal(await freshenNumbers({ ids: [numberId] }), 0);
+    assert.equal(calls, before);
   });
 
   test("a raised limit lets a campaign reach more people today, up to unlimited", async () => {
