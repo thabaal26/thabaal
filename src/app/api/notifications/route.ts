@@ -32,39 +32,28 @@ export async function GET(req: Request) {
   const oneDayAgo = daysAgo(1);
   const sevenDaysAgo = daysAgo(7);
 
-  const client = scope.clientId
-    ? await db.client.findUnique({ where: { id: scope.clientId }, select: { disabledSections: true } })
-    : null;
-  const disabledSections = client?.disabledSections ?? [];
-  const ordersOn = isSectionEnabled(disabledSections, "orders");
-  const repliesOn = isSectionEnabled(disabledSections, "replies");
-  const callsOn = isSectionEnabled(disabledSections, "calls");
-
-  const [replies, orders, calls, failures, recentSuccesses, numbers, flaggedTemplates] = await Promise.all([
-    repliesOn
-      ? db.reply.findMany({
-          where: { ...myMessages },
-          include: { customer: { select: { id: true, name: true, phone: true } } },
-          orderBy: { receivedAt: "desc" },
-          take: 15,
-        })
-      : [],
-    ordersOn
-      ? db.order.findMany({
-          where: { ...mine },
-          include: { customer: { select: { id: true, name: true, phone: true, location: true } } },
-          orderBy: { createdAt: "desc" },
-          take: 15,
-        }).catch(() => [])
-      : [],
-    callsOn
-      ? db.call.findMany({
-          where: { ...mine, startedAt: { gte: oneDayAgo } },
-          include: { customer: { select: { id: true, name: true } } },
-          orderBy: { startedAt: "desc" },
-          take: 10,
-        }).catch(() => [])
-      : [],
+  // Everything in one round: the business's switched-off sections are read alongside, and what belongs to an
+  // off section is dropped below (the bell asks every 12 seconds, so each round saved counts).
+  const [client, repliesAll, ordersAll, callsAll, failures, recentSuccesses, numbers, flaggedTemplates, claimsAll] = await Promise.all([
+    scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { disabledSections: true } }) : null,
+    db.reply.findMany({
+      where: { ...myMessages },
+      include: { customer: { select: { id: true, name: true, phone: true } } },
+      orderBy: { receivedAt: "desc" },
+      take: 15,
+    }),
+    db.order.findMany({
+      where: { ...mine },
+      include: { customer: { select: { id: true, name: true, phone: true, location: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 15,
+    }).catch(() => []),
+    db.call.findMany({
+      where: { ...mine, startedAt: { gte: oneDayAgo } },
+      include: { customer: { select: { id: true, name: true } } },
+      orderBy: { startedAt: "desc" },
+      take: 10,
+    }).catch(() => []),
     db.message.findMany({
       where: { status: "FAILED", failedAt: { gte: oneDayAgo }, ...myMessages },
       include: { customer: { select: { id: true, name: true } } },
@@ -92,7 +81,23 @@ export async function GET(req: Request) {
       orderBy: { updatedAt: "desc" },
       take: 5,
     }).catch(() => []),
+    // Payments to check: a customer says they paid, or WhatsApp showed a payment bubble Meta can't read.
+    db.order
+      .findMany({
+        where: { ...mine, paidAt: null, paymentClaimedAt: { not: null }, status: { not: "CANCELLED" } },
+        include: { customer: { select: { name: true } } },
+        orderBy: { paymentClaimedAt: "desc" },
+        take: 10,
+      })
+      .catch(() => []),
   ]);
+  const disabledSections = client?.disabledSections ?? [];
+  const ordersOn = isSectionEnabled(disabledSections, "orders");
+  const repliesOn = isSectionEnabled(disabledSections, "replies");
+  const callsOn = isSectionEnabled(disabledSections, "calls");
+  const replies = repliesOn ? repliesAll : [];
+  const orders = ordersOn ? ordersAll : [];
+  const calls = callsOn ? callsAll : [];
 
   const items: NotificationItem[] = [];
 
@@ -239,17 +244,9 @@ export async function GET(req: Request) {
     });
   }
 
-  // Payments to check: a customer says they paid, or WhatsApp showed a payment bubble Meta can't read.
+  // Payments to check (read above).
   if (ordersOn) {
-    const claims = await db.order
-      .findMany({
-        where: { ...mine, paidAt: null, paymentClaimedAt: { not: null }, status: { not: "CANCELLED" } },
-        include: { customer: { select: { name: true } } },
-        orderBy: { paymentClaimedAt: "desc" },
-        take: 10,
-      })
-      .catch(() => []);
-    for (const o of claims)
+    for (const o of claimsAll)
       items.push({
         id: `claim-${o.id}`,
         type: "order",

@@ -24,16 +24,21 @@ export default async function CallsPage() {
   const locked = await planGate("calls");
   if (locked) return locked;
   const scope = await getScope();
-  // Incoming calls on or off, as WhatsApp has it now for the business's main number.
-  const sender = scope.clientId ? await senderFor(scope.clientId) : null;
-  const waConnected = Boolean(sender?.cfg.live && sender.cfg.phoneNumberId);
-  const incoming = waConnected && sender ? await getIncomingCalls(sender.cfg).catch(() => null) : null;
-  const calls = await db.call.findMany({
-    where: owned(scope),
-    include: { customer: { select: { id: true, name: true } }, sender: { select: { label: true } } },
-    orderBy: { startedAt: "desc" },
-    take: 200,
-  });
+  // The call log is read while Meta is asked whether incoming calls are on or off for the business's main number.
+  const [{ waConnected, incoming }, calls] = await Promise.all([
+    (async () => {
+      const sender = scope.clientId ? await senderFor(scope.clientId) : null;
+      const waConnected = Boolean(sender?.cfg.live && sender.cfg.phoneNumberId);
+      const incoming = waConnected && sender ? await getIncomingCalls(sender.cfg).catch(() => null) : null;
+      return { waConnected, incoming };
+    })(),
+    db.call.findMany({
+      where: owned(scope),
+      include: { customer: { select: { id: true, name: true } }, sender: { select: { label: true } } },
+      orderBy: { startedAt: "desc" },
+      take: 200,
+    }),
+  ]);
 
   const answered = calls.filter((c) => c.status === "ENDED" || c.status === "ANSWERED");
   const connected = answered.length;

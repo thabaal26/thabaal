@@ -1,6 +1,7 @@
 // Whether a business may use thabaal right now (see accessState in subscription-core.ts for the rules).
 // Read on every request for client logins (lib/session.ts getScope), so it is one small query per request.
 
+import type { Prisma } from "@prisma/client";
 import { cache } from "react";
 import { db } from "./db";
 import { accessState, type AccessInfo } from "./subscription-core";
@@ -13,11 +14,14 @@ export type ClientAccess = AccessInfo & {
 
 const ROW = { id: true, plan: true, cycle: true, status: true, startsAt: true, endsAt: true, createdAt: true, utr: true } as const;
 
-export async function clientAccess(clientId: string, now = new Date()): Promise<ClientAccess> {
-  const [client, rows] = await Promise.all([
-    db.client.findUnique({ where: { id: clientId }, select: { planRequired: true } }),
-    db.planPurchase.findMany({ where: { clientId, status: { in: ["VERIFIED", "PENDING"] } }, select: ROW }),
-  ]);
+/** What clientAccess reads, as a nested select on Client: getScope reads it with the login in one query. */
+export const ACCESS_SELECT = { planRequired: true, planPurchases: { where: { status: { in: ["VERIFIED", "PENDING"] } }, select: ROW } } satisfies Prisma.ClientSelect;
+
+type AccessRows = { planRequired: boolean; planPurchases: Prisma.PlanPurchaseGetPayload<{ select: typeof ROW }>[] };
+
+/** clientAccess on rows already read (ACCESS_SELECT). */
+export function accessFrom(client: AccessRows | null, now = new Date()): ClientAccess {
+  const rows = client?.planPurchases ?? [];
   const planRequired = client?.planRequired ?? false;
   const pending = rows.find((r) => r.status === "PENDING") ?? null;
   return {
@@ -27,8 +31,28 @@ export async function clientAccess(clientId: string, now = new Date()): Promise<
   };
 }
 
+export async function clientAccess(clientId: string, now = new Date()): Promise<ClientAccess> {
+  const [client, rows] = await Promise.all([
+    db.client.findUnique({ where: { id: clientId }, select: { planRequired: true } }),
+    db.planPurchase.findMany({ where: { clientId, status: { in: ["VERIFIED", "PENDING"] } }, select: ROW }),
+  ]);
+  return accessFrom(client ? { planRequired: client.planRequired, planPurchases: rows } : { planRequired: false, planPurchases: rows }, now);
+}
+
+// This request's access already worked out from rows getScope read with the login (one Map per request).
+const seeded = cache(() => new Map<string, ClientAccess>());
+const readAccess = cache((clientId: string) => clientAccess(clientId));
+
+/** Keeps this request's access for a business, so clientAccessNow doesn't read it again. */
+export function seedAccess(clientId: string, access: ClientAccess) {
+  seeded().set(clientId, access);
+}
+
 /** clientAccess for this request: getScope and the dashboard layout both need it, so it is read once per page. */
-export const clientAccessNow = cache((clientId: string) => clientAccess(clientId));
+export const clientAccessNow = (clientId: string): Promise<ClientAccess> => {
+  const known = seeded().get(clientId);
+  return known ? Promise.resolve(known) : readAccess(clientId);
+};
 
 /** Businesses that are locked now: their campaigns and automatic messages wait until they pay. */
 export async function lockedClientIds(now = new Date()): Promise<Set<string>> {

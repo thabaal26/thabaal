@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { db } from "./db";
-import { clientAccessNow } from "./plan-access";
+import { accessFrom, ACCESS_SELECT, clientAccessNow, seedAccess } from "./plan-access";
 import { PLAN_LOCKED_MESSAGE } from "./plan-lock-paths";
 import { recordUsage } from "./usage-record";
 
@@ -71,19 +71,28 @@ export async function revokeSessions(userId: string) {
 }
 
 /** Returns the signed-in user or redirects to /login. Use in every page and action. */
-export const requireUser = cache(async () => {
+// The login with its business's plan rows (lib/plan-access.ts), in one query: getScope needs both on every page.
+const loadUser = cache(async () => {
   const session = await readSession((await cookies()).get(COOKIE)?.value);
   const found = session
     ? await db.user.findUnique({
         where: { id: session.userId },
-        select: { id: true, email: true, name: true, role: true, access: true, clientId: true, sessionVersion: true, client: { select: { name: true } } },
+        select: { id: true, email: true, name: true, role: true, access: true, clientId: true, sessionVersion: true, client: { select: { name: true, ...ACCESS_SELECT } } },
       })
     : null;
   if (!found || found.sessionVersion !== session?.version || (found.role === "CLIENT" && !found.clientId)) redirect(session ? "/api/session/clear" : "/login");
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- not needed by callers
-  const { sessionVersion, ...user } = found;
-  return user;
+  if (found.clientId && found.client) seedAccess(found.clientId, accessFrom(found.client));
+  return found;
 });
+
+/** What callers of requireUser get: the login without its session version or plan rows. */
+const asUser = (found: Awaited<ReturnType<typeof loadUser>>) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- not needed by callers
+  const { sessionVersion, client, ...user } = found;
+  return { ...user, client: client ? { name: client.name } : null };
+};
+
+export const requireUser = cache(async () => asUser(await loadUser()));
 
 export const SESSION_COOKIE = COOKIE;
 /** Admin-only: which client the admin is looking at. Absent means all clients. */
@@ -124,13 +133,18 @@ export const getScope = cache(async (): Promise<Scope> => {
   const raw = (await cookies()).get(CLIENT_COOKIE)?.value;
   const viewing = raw?.startsWith(VIEW_PREFIX) ?? false;
   const picked = viewing ? raw!.slice(VIEW_PREFIX.length) : raw;
-  const [user, pickedClient] = await Promise.all([
-    requireUser(),
-    picked ? db.client.findUnique({ where: { id: picked }, select: { id: true, name: true } }) : null,
+  const [found, pickedClient] = await Promise.all([
+    loadUser(),
+    picked ? db.client.findUnique({ where: { id: picked }, select: { id: true, name: true, ...ACCESS_SELECT } }) : null,
   ]);
-  if (user.role === "ADMIN" && viewing && pickedClient) {
-    // Read-only, as the owner sees it: their plan lock applies, and no admin menus or writes.
-    const planLocked = (await clientAccessNow(pickedClient.id)).locked;
+  const user = asUser(found);
+  // The picked business's plan state came with it: the layout's notice and the lock below don't read it again.
+  const pickedAccess = pickedClient && user.role === "ADMIN" ? accessFrom(pickedClient) : null;
+  if (pickedClient && pickedAccess) seedAccess(pickedClient.id, pickedAccess);
+  if (user.role === "ADMIN" && viewing && pickedClient && pickedAccess) {
+    // Read-only, as the owner sees it: their plan lock applies, and no admin menus or writes. Worked out from the rows
+    // read above (API routes don't keep the per-request copy, so it is never read twice).
+    const planLocked = pickedAccess.locked;
     return {
       isAdmin: false,
       viewOnly: true,
@@ -148,7 +162,8 @@ export const getScope = cache(async (): Promise<Scope> => {
     const operator = user.access !== "VIEWER";
     // Unpaid business: every page opens, but every change is refused (requireManager, requireOrderAccess and the
     // actions' own planLocked checks), except what My account and Settings allow.
-    const planLocked = user.clientId ? (await clientAccessNow(user.clientId)).locked : false;
+    // The plan rows came with the login (loadUser), so this is no extra read, in pages and API routes alike.
+    const planLocked = user.clientId ? (found.client ? accessFrom(found.client) : await clientAccessNow(user.clientId)).locked : false;
     return {
       isAdmin: false,
       viewOnly: false,

@@ -35,6 +35,7 @@ const FILES = [
   "prisma/sql/2026-11-05-engagement.sql",
   "prisma/sql/2026-11-05-automation-engine.sql",
   "prisma/sql/2026-11-05-inbound-check.sql",
+  "prisma/sql/2026-11-07-speed-indexes.sql",
 ];
 
 // The VPS applies the same files when a release arrives (deploy/vps/deploy-receive.sh).

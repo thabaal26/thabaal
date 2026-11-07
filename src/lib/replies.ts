@@ -82,38 +82,48 @@ export async function recordReply(r: IncomingReply) {
     }
   }
 
-  // Known only by their number so far: their WhatsApp name fills it in (a real name is never replaced).
-  if (r.profileName && customer.name !== undefined && isPlaceholderName(customer.name)) await fillCustomerName(customer.id, r.profileName).catch(() => false);
-
-  try {
-    await db.reply.create({
-      data: { customerId: customer.id, senderId, text: r.text.trim().slice(0, 4000), kind: r.kind, mediaId: r.media?.id, mediaType: r.media?.type, waMessageId: r.waMessageId, contextId: r.contextId ?? null, receivedAt: r.at ?? new Date() },
-    });
-  } catch (e) {
-    // Webhooks retry; the same message id arriving twice is expected.
-    if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) throw e;
-  }
+  const id = customer.id;
+  // Three independent writes, together (one round instead of three):
+  await Promise.all([
+    // known only by their number so far: their WhatsApp name fills it in (a real name is never replaced);
+    r.profileName && customer.name !== undefined && isPlaceholderName(customer.name) ? fillCustomerName(id, r.profileName).catch(() => false) : null,
+    // the reply itself (webhooks retry; the same message id arriving twice is expected);
+    db.reply
+      .create({
+        data: { customerId: id, senderId, text: r.text.trim().slice(0, 4000), kind: r.kind, mediaId: r.media?.id, mediaType: r.media?.type, waMessageId: r.waMessageId, contextId: r.contextId ?? null, receivedAt: r.at ?? new Date() },
+      })
+      .catch((e) => {
+        if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) throw e;
+      }),
+    // they wrote to us, so they are on WhatsApp and want to hear from us: out of Inactive, and "can't receive" no
+    // longer holds (lib/engagement-segments.ts puts them in Engaged from this message on). Opt-outs stay as they are.
+    db.$executeRaw`
+      UPDATE "Customer" SET tags = array_remove(tags, ${INACTIVE_TAG}), unreachable = false, "updatedAt" = now()
+      WHERE id = ${id} AND (${INACTIVE_TAG} = ANY(tags) OR unreachable = true)`.catch((e) => console.error("Could not bring the customer back", e)),
+  ]);
   // Their 24-hour window starts again from this message.
-  forget(replyContextKey(customer.id));
-  // They wrote to us, so they are on WhatsApp and want to hear from us: out of Inactive, and "can't receive" no longer
-  // holds (lib/engagement-segments.ts puts them in Engaged from this message on). Opt-outs stay as they are.
-  await db.$executeRaw`
-    UPDATE "Customer" SET tags = array_remove(tags, ${INACTIVE_TAG}), unreachable = false, "updatedAt" = now()
-    WHERE id = ${customer.id} AND (${INACTIVE_TAG} = ANY(tags) OR unreachable = true)`.catch((e) => console.error("Could not bring the customer back", e));
+  forget(replyContextKey(id));
 
   // Automatically detect delivery addresses sent in chat (text or shared location pin)
   // and sync to the customer profile (if missing) and any active open order without an address.
   if (r.kind === "text" || (r.kind === "media" && /^Location:/i.test(r.text))) {
     try {
       let parsed = parseAddressText(r.text);
+      // Read after the update above, with everything the caller gets back: when no address is saved below, this
+      // read is the answer (one query fewer on every message).
       const currentCust = await db.customer.findUnique({
         where: { id: customer.id },
         select: {
           id: true,
+          clientId: true,
+          phone: true,
+          name: true,
+          optedOut: true,
+          tags: true,
           location: true,
           locationRaw: true,
           region: true,
-          client: { select: { homeCity: true } },
+          client: { select: { homeCity: true, name: true } },
           orders: {
             where: { status: { in: ["NEW", "CONFIRMED", "PAID"] } },
             orderBy: { createdAt: "desc" },
@@ -122,7 +132,9 @@ export async function recordReply(r: IncomingReply) {
           },
         },
       });
-      if (currentCust) {
+      if (!currentCust) return null;
+      let changed = false;
+      {
         // Regions are relative to the client's home city; Madurai clients (no city set) keep the first read.
         if (currentCust.client.homeCity) parsed = parseAddressText(r.text, currentCust.client.homeCity);
         const activeOrder = currentCust.orders[0];
@@ -133,6 +145,7 @@ export async function recordReply(r: IncomingReply) {
         if (shouldUseAsAddress && parsed.fullAddress) {
           const customerHasNoAddress = !currentCust.locationRaw?.trim() && !currentCust.location?.trim();
           if (customerHasNoAddress || (!currentCust.locationRaw?.trim() && parsed.fullAddress.length > (currentCust.location?.length ?? 0))) {
+            changed = true;
             await db.customer.update({
               where: { id: currentCust.id },
               data: {
@@ -151,6 +164,10 @@ export async function recordReply(r: IncomingReply) {
             });
           }
         }
+      }
+      if (!changed) {
+        const { client, ...c } = currentCust;
+        return { id: c.id, clientId: c.clientId, phone: c.phone, name: c.name, optedOut: c.optedOut, tags: c.tags, location: c.location, locationRaw: c.locationRaw, region: c.region, client: { name: client.name } };
       }
     } catch (err) {
       console.error("Auto address extraction from reply failed", err);

@@ -196,6 +196,20 @@ const latest = (...d: (Date | null | undefined)[]) => d.filter((x): x is Date =>
 export async function loadClientRows(now = new Date()): Promise<{ rows: ClientRow[]; purchases: PurchaseRow[] }> {
   const month = lastMonths(1, now)[0].start;
   const d30 = new Date(now.getTime() - 30 * DAY_MS);
+  // Usage and auto-pay subscriptions are read in the same round as the figures below (awaited after them).
+  const usageAndSubs = Promise.all([
+    loadPlanPrices(),
+    db.usageDay.groupBy({ by: ["clientId"], where: { kind: { in: ["open", "login"] } }, _max: { lastAt: true } }),
+    db.usageDay.groupBy({ by: ["clientId"], where: { kind: "login", day: { gte: dateOnly(d30) } }, _sum: { count: true } }),
+    usageSince(),
+    // Newest plan subscription per business (Razorpay auto-pay).
+    db.razorpayRecord.findMany({
+      where: { kind: "subscription", purpose: "plan", status: { in: ["authenticated", "active", "pending", "halted", "cancelling"] } },
+      orderBy: { createdAt: "desc" },
+      select: { clientId: true, status: true, rzpId: true, plan: true, cycle: true, amountPaise: true, createdAt: true, updatedAt: true, note: true },
+    }),
+  ]);
+  usageAndSubs.catch(() => {});
   const [clients, purchases, runs, templates, salesAll, salesMonth, customers, msgs, spend, replies, sends, replyAt, orderAt] = await Promise.all([
     db.client.findMany({
       orderBy: { name: "asc" },
@@ -228,21 +242,10 @@ export async function loadClientRows(now = new Date()): Promise<{ rows: ClientRo
     lastReplies(),
     db.order.groupBy({ by: ["clientId"], _max: { createdAt: true } }),
   ]);
-  const [prices, opened, logins, since] = await Promise.all([
-    loadPlanPrices(),
-    db.usageDay.groupBy({ by: ["clientId"], where: { kind: { in: ["open", "login"] } }, _max: { lastAt: true } }),
-    db.usageDay.groupBy({ by: ["clientId"], where: { kind: "login", day: { gte: dateOnly(d30) } }, _sum: { count: true } }),
-    usageSince(),
-  ]);
+  const [prices, opened, logins, since, subs] = await usageAndSubs;
   // "Not opened lately" only counts once usage has been recorded for longer than that.
   const quietDays = 14;
   const canJudgeQuiet = !!since && since.getTime() <= now.getTime() - quietDays * DAY_MS;
-  // Newest plan subscription per business (Razorpay auto-pay).
-  const subs = await db.razorpayRecord.findMany({
-    where: { kind: "subscription", purpose: "plan", status: { in: ["authenticated", "active", "pending", "halted", "cancelling"] } },
-    orderBy: { createdAt: "desc" },
-    select: { clientId: true, status: true, rzpId: true, plan: true, cycle: true, amountPaise: true, createdAt: true, updatedAt: true, note: true },
-  });
   const autoPayOf = (clientId: string): ClientRow["autoPay"] => {
     const s = subs.find((x) => x.clientId === clientId)?.status;
     return !s ? "none" : s === "pending" || s === "halted" ? "failing" : s === "cancelling" ? "off" : "on";

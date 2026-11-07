@@ -14,16 +14,22 @@ export type ChatAutomation = { paused: boolean; until: Date | null; by: string |
 
 /** Are automatic replies off for this customer now, and why. */
 export async function chatAutomation(customerId: string, now = new Date()): Promise<ChatAutomation> {
+  // One query: the pause settings and staff's newest typed message (the quiet time below needs only the newest one).
   const c = await db.customer.findUnique({
     where: { id: customerId },
-    select: { client: { select: { staffPauseMinutes: true } }, conversation: { select: { pausedUntil: true, pausedBy: true, resumedAt: true } } },
+    select: {
+      client: { select: { staffPauseMinutes: true } },
+      conversation: { select: { pausedUntil: true, pausedBy: true, resumedAt: true } },
+      messages: { where: { templateName: { in: STAFF_LABELS } }, orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
+    },
   });
   const conv = c?.conversation;
   if (conv?.pausedUntil && conv.pausedUntil > now) return { paused: true, until: conv.pausedUntil.getTime() >= PAUSE_FOREVER.getTime() ? null : conv.pausedUntil, by: conv.pausedBy, reason: "paused" };
   const minutes = c?.client.staffPauseMinutes ?? 120;
   const windowStart = new Date(now.getTime() - minutes * 60_000);
   const since = conv?.resumedAt && conv.resumedAt > windowStart ? conv.resumedAt : windowStart;
-  const typed = await db.message.findFirst({ where: { customerId, templateName: { in: STAFF_LABELS }, createdAt: { gt: since } }, orderBy: { createdAt: "desc" }, select: { createdAt: true } });
+  const newest = c?.messages[0];
+  const typed = newest && newest.createdAt > since ? newest : null;
   return typed ? { paused: true, until: new Date(typed.createdAt.getTime() + minutes * 60_000), by: null, reason: "staff-typing" } : { paused: false, until: null, by: null, reason: null };
 }
 

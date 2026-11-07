@@ -55,13 +55,17 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
     );
   }
 
-  const [client, rows, numbers, staff, campaignsCount, templatesCount] = await Promise.all([
+  // Everything the page shows, in one round (plans, auto-pay and the admin's queue included).
+  const [client, rows, numbers, staff, campaignsCount, templatesCount, plans, autoRenew, adminRows] = await Promise.all([
     db.client.findUnique({ where: { id: clientId }, select: { name: true, appearance: true, supportPhone: true, homeCity: true, planRequired: true } }),
     db.planPurchase.findMany({ where: { clientId }, orderBy: { createdAt: "desc" } }),
     db.whatsAppNumber.count({ where: { clientId } }),
     db.user.count({ where: { clientId } }),
     db.campaign.count({ where: { clientId, createdAt: { gte: monthStart() } } }),
     db.template.count({ where: { clientId, status: "APPROVED" } }),
+    livePlans(),
+    razorpayReady() ? autoRenewView(clientId) : null,
+    scope.isAdmin ? adminQueue(now, clientId) : null,
   ]);
 
   const s = summarize(rows, now);
@@ -148,12 +152,12 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       usage={{ numbers, staff, campaigns: campaignsCount, templates: templatesCount }}
       billingProfile={billingProfile}
       customWorkRequests={customWorkRequests}
-      plans={await livePlans()}
-      razorpay={{ enabled: razorpayReady(), autoRenew: razorpayReady() ? await autoRenewView(clientId) : null }}
+      plans={plans}
+      razorpay={{ enabled: razorpayReady(), autoRenew }}
       adminPanel={
-        scope.isAdmin ? (
+        scope.isAdmin && adminRows ? (
           <AdminPlanPanel
-            rows={await adminQueue(now, clientId)}
+            rows={adminRows}
             clientId={clientId}
             clientName={client?.name ?? null}
             hasHistory={rows.some((r) => r.status === "VERIFIED")}

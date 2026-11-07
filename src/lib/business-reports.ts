@@ -149,7 +149,8 @@ export async function revenueReport(
     paidAt: true, status: true, total: true, paymentTxnId: true, paymentMethod: true, paidAmount: true, paymentRequestedAt: true,
     paymentClaimedAt: true, paymentFailedAt: true, refundedAt: true, refundAmount: true, internalNote: true,
   } as const;
-  const [ordersRaw, openRaw, refundRows, dueRefundRaw, billable] = await Promise.all([
+  // The catalogue lookup (for the product filter) is read alongside the money figures.
+  const [ordersRaw, openRaw, refundRows, dueRefundRaw, billable, catalog] = await Promise.all([
     db.order.findMany({
       where: { clientId, ...who, createdAt: { gte: start, lt: end }, status: { not: "CANCELLED" } },
       select: { ...paySelect, createdAt: true, items: true },
@@ -172,8 +173,8 @@ export async function revenueReport(
       WHERE c."clientId" = ${clientId} AND (${ids}::text[] IS NULL OR c.id = ANY(${ids}::text[])) AND m.billable = true AND m."pricingCategory" IS NOT NULL
         AND m."createdAt" >= ${start} AND m."createdAt" < ${end}
       GROUP BY 1, 2`,
+    catalogFor(clientId),
   ]);
-  const catalog = await catalogFor(clientId);
   const orders = narrowOrders(ordersRaw, opts.products ?? [], catalog);
   const open = narrowOrders(openRaw, opts.products ?? [], catalog);
 
@@ -248,11 +249,15 @@ export type ComboReport = { orders: number; pairs: ComboPair[]; bestSellers: { n
 
 export async function comboReport(clientId: string, days = 365): Promise<ComboReport> {
   const since = new Date(Date.now() - days * DAY);
-  const orders = await db.order.findMany({
-    where: { clientId, createdAt: { gte: since }, status: { not: "CANCELLED" } },
-    select: { items: true, paidAt: true, paymentMethod: true, internalNote: true, status: true, createdAt: true },
-  });
-  const catalog = await catalogFor(clientId);
+  // The orders, the catalogue lookup and the catalogue's products, read together.
+  const [orders, catalog, catalogue] = await Promise.all([
+    db.order.findMany({
+      where: { clientId, createdAt: { gte: since }, status: { not: "CANCELLED" } },
+      select: { items: true, paidAt: true, paymentMethod: true, internalNote: true, status: true, createdAt: true },
+    }),
+    catalogFor(clientId),
+    catalogProducts(clientId).catch(() => []),
+  ]);
   const bought = orders.filter(isBought);
   const single = new Map<string, { orders: number; units: number; price: number; last: Date }>();
   const pair = new Map<string, number>();
@@ -283,7 +288,6 @@ export async function comboReport(clientId: string, days = 365): Promise<ComboRe
     .sort((p, q) => q.together - p.together || q.lift - p.lift)
     .slice(0, 12);
 
-  const catalogue = await catalogProducts(clientId).catch(() => []);
   const slowCut = new Date(Date.now() - 45 * DAY);
   const slow: SlowMover[] = catalogue
     .map((p) => {

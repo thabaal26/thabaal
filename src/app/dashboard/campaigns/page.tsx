@@ -39,7 +39,10 @@ export default async function CampaignsPage() {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const [campaigns, audiences, clientData, templates, lapsed, results, monthMsgs, spendInfo] = await Promise.all([
+  // The Meta limit card's figures are read alongside the rest (awaited where the card is drawn).
+  const limitRead = limitSummary(scope.clientId);
+  limitRead.catch(() => {});
+  const [campaigns, audiences, clientData, templates, lapsed, results, monthMsgs, spendInfo, sections] = await Promise.all([
     db.campaign.findMany({
       where: owned(scope),
       include: {
@@ -77,15 +80,14 @@ export default async function CampaignsPage() {
       _count: true,
     }),
     scope.clientId ? spendSummary(scope.clientId).catch(() => null) : Promise.resolve(null),
+    scope.clientId ? db.client.findUnique({ where: { id: scope.clientId }, select: { disabledSections: true } }) : null,
   ]);
 
   const reach = (clientId: string) => audiences.find((a) => a.clientId === clientId)?._count ?? 0;
   const byId = new Map(results.map((r) => [r.id, r]));
   const canCreate = scope.canManage && scope.clientId;
   // Every automation here is order-based, so a marketing-only business (Orders off) doesn't get the tab.
-  const ordersOn = scope.clientId
-    ? !(await db.client.findUnique({ where: { id: scope.clientId }, select: { disabledSections: true } }))?.disabledSections.includes("orders")
-    : true;
+  const ordersOn = scope.clientId ? !sections?.disabledSections.includes("orders") : true;
 
   const stateOf = (c: (typeof campaigns)[number]): State => {
     const last = c.runs[0];
@@ -130,15 +132,21 @@ export default async function CampaignsPage() {
       let skipped = 0;
       try {
         const audienceWhereClause = await campaignAudienceWhere(c.clientId, c.audienceTag?.trim() || null, c);
-        targetCount = await db.customer.count({ where: audienceWhereClause });
-        if (s === "scheduled") {
-          const at = c.nextRunAt && c.nextRunAt > now ? c.nextRunAt : now;
-          const skip = [
-            ...(c.template.category === "MARKETING" ? [offerSkipWhere(c.client.marketingGapHours, at)] : []),
-            ...(c.scheduleType === "ONCE" && c._count.runs ? [alreadyReachedWhere(c.id, at)] : []),
-          ];
-          if (skip.length) skipped = await db.customer.count({ where: { AND: [audienceWhereClause, { OR: skip }] } });
-        }
+        const at = c.nextRunAt && c.nextRunAt > now ? c.nextRunAt : now;
+        const skip =
+          s === "scheduled"
+            ? [
+                ...(c.template.category === "MARKETING" ? [offerSkipWhere(c.client.marketingGapHours, at)] : []),
+                ...(c.scheduleType === "ONCE" && c._count.runs ? [alreadyReachedWhere(c.id, at)] : []),
+              ]
+            : [];
+        // Both counts together; a failure in either falls back as before.
+        const [all, held] = await Promise.all([
+          db.customer.count({ where: audienceWhereClause }),
+          skip.length ? db.customer.count({ where: { AND: [audienceWhereClause, { OR: skip }] } }) : 0,
+        ]);
+        targetCount = all;
+        skipped = held;
       } catch {
         targetCount = reach(c.clientId);
       }
@@ -213,7 +221,7 @@ export default async function CampaignsPage() {
       campaigns={liveItems}
       canManage={Boolean(canCreate)}
       showAutomations={ordersOn}
-      limitCard={<MetaLimitCard initial={await limitSummary(scope.clientId)} />}
+      limitCard={<MetaLimitCard initial={await limitRead} />}
     >
       {clientData ? (
         <Automations
