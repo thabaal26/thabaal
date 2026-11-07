@@ -39,13 +39,19 @@ export function MetaLimitCard({ initial }: { initial: LimitSummary }) {
   const time = s.checkedLabel;
 
   const value = s.limit === null ? (isTamil ? "வரம்பு இல்லை" : "Unlimited") : isTamil ? `${n(s.limit)} பேர்` : `${n(s.limit)} people`;
+  // Two different counts, said plainly: the daily one (what's left now) and the weekly one (what raises the limit).
+  const today = s.limit === null
+    ? null
+    : isTamil
+      ? `கடந்த 24 மணி நேரத்தில் ${n(s.used)} பேர் · இன்று ${n(s.left ?? 0)} மீதம்`
+      : `Last 24 hours: ${n(s.used)} used, ${n(s.left ?? 0)} left`;
   const nextText = s.next
     ? isTamil
-      ? `அடுத்த வரம்பு ${s.next.limit === null ? "வரம்பில்லை" : n(s.next.limit)}: ${s.next.days} நாளில் ${n(s.next.need)} பேர் தேவை (${n(s.next.have)} ஆனது)`
-      : `next limit ${s.next.limit === null ? "unlimited" : n(s.next.limit)} at ${n(s.next.need)} people in ${s.next.days} days (${n(s.next.have)} so far)`
+      ? `${s.next.limit === null ? "வரம்பில்லாமல்" : n(s.next.limit)} ஆக: ${s.next.days} நாளில் ${n(s.next.have)} / ${n(s.next.need)} பேர்`
+      : `To reach ${s.next.limit === null ? "unlimited" : n(s.next.limit)}: ${n(s.next.have)} of ${n(s.next.need)} people in ${s.next.days} days`
     : null;
   const parts = [
-    s.limit === null ? null : isTamil ? `24 மணி நேரத்தில் ${n(s.used)} பேருக்கு · ${n(s.left ?? 0)} மீதம்` : `${n(s.used)} reached in 24 hours · ${n(s.left ?? 0)} left`,
+    today,
     nextText,
     time && !s.stale ? (isTamil ? `${time}-க்கு Meta சரிபார்த்தது` : `Meta checked ${time}`) : null,
   ].filter(Boolean);

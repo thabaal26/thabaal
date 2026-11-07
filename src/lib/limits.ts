@@ -30,17 +30,28 @@ export function tierLabel(tier: string | null | undefined) {
 
 type LimitFields = Pick<WhatsAppNumber, "id" | "clientId" | "messagingTier" | "dailyCap" | "qualityRating">;
 
-/** Different customers messaged in the last 24 hours (or `days`), through the given numbers. */
+/**
+ * Different customers this business started a conversation with in the last 24 hours (or `days`), through the given
+ * numbers: what Meta's limit counts. Like Meta, a message to someone who wrote to the business in the 24 hours before
+ * it doesn't count (that's an open customer service window, not business-initiated).
+ */
 async function contacted(
   where: { senderId: string } | { senderId: { in: string[] } },
   days = 1,
   statuses: ("SENT" | "DELIVERED" | "READ")[] = ["SENT", "DELIVERED", "READ"],
 ) {
-  const rows = await db.message.groupBy({
-    by: ["customerId"],
-    where: { ...where, sentAt: { gte: new Date(Date.now() - days * DAY_MS) }, status: { in: statuses } },
-  });
-  return rows.length;
+  const ids = typeof where.senderId === "string" ? [where.senderId] : where.senderId.in;
+  if (!ids.length) return 0;
+  const since = new Date(Date.now() - days * DAY_MS);
+  const [row] = await db.$queryRaw<{ n: number }[]>`
+    SELECT count(DISTINCT m."customerId")::int AS n
+    FROM "Message" m
+    WHERE m."senderId" = ANY(${ids}) AND m."sentAt" >= ${since} AND m.status::text = ANY(${statuses})
+      AND NOT EXISTS (
+        SELECT 1 FROM "Reply" r
+        WHERE r."customerId" = m."customerId" AND r."receivedAt" <= m."sentAt" AND r."receivedAt" > m."sentAt" - interval '24 hours'
+      )`;
+  return row?.n ?? 0;
 }
 
 const LADDER = ["TIER_250", "TIER_2K", "TIER_10K", "TIER_100K", "TIER_UNLIMITED"];
