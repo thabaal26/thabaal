@@ -47,6 +47,8 @@ export type CampaignsDashboardProps = {
   campaigns: CampaignItem[];
   canManage: boolean;
   children?: React.ReactNode;
+  /** Today's Meta limit card, under the figures. */
+  limitCard?: React.ReactNode;
   /** False for a marketing-only business: every automation is order-based, so the tab is hidden. */
   showAutomations?: boolean;
 };
@@ -112,7 +114,7 @@ function sum(c: CampaignItem, isTamil = false) {
   );
 }
 
-export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage, children, showAutomations = true }: CampaignsDashboardProps) {
+export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage, children, limitCard, showAutomations = true }: CampaignsDashboardProps) {
   const tabDefs = showAutomations ? TAB_DEFS : TAB_DEFS.filter((t) => t.id !== "auto");
   const router = useRouter();
   const { isTamil } = useLanguage();
@@ -311,6 +313,8 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
           />
         </StaggerItem>
       </StaggerGroup>
+
+      {limitCard}
 
       {/* Tabs */}
       <div className="tabs" data-tabs role="tablist" aria-label={isTamil ? "பிரச்சார பார்வைகள்" : "Campaign views"} suppressHydrationWarning>

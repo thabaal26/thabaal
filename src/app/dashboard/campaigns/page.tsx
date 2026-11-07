@@ -11,6 +11,8 @@ import { readPaySettings, waPayOn } from "@/lib/pay-settings";
 import { Automations } from "./automations";
 import { CampaignsDashboard, type CampaignItem } from "./campaigns-dashboard";
 import { planGate } from "@/app/dashboard/plan-lock";
+import { limitSummary } from "@/lib/limit-summary";
+import { MetaLimitCard } from "./meta-limit-card";
 
 export const metadata: Metadata = { title: "Campaigns" };
 export const dynamic = "force-dynamic";
@@ -211,6 +213,7 @@ export default async function CampaignsPage() {
       campaigns={liveItems}
       canManage={Boolean(canCreate)}
       showAutomations={ordersOn}
+      limitCard={<MetaLimitCard initial={await limitSummary(scope.clientId)} />}
     >
       {clientData ? (
         <Automations
