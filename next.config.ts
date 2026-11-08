@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // No "X-Powered-By: Next.js" header: it only tells a stranger what the site runs on (security audit 8 Nov 2026).
+  poweredByHeader: false,
   // The VPS runs a self-contained build (deploy/vps); Vercel builds as before.
   ...(process.env.BUILD_STANDALONE === "1" ? { output: "standalone" as const } : {}),
   experimental: {
