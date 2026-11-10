@@ -1,6 +1,5 @@
 import "server-only";
 import crypto from "node:crypto";
-import { put } from "@vercel/blob";
 import { headers } from "next/headers";
 import { APP_ORIGIN } from "./app-host";
 import { db } from "./db";
@@ -21,9 +20,8 @@ async function ensureUploadedImageTable() {
 }
 
 /**
- * Stores a public template header image: tries Vercel Blob first, and automatically falls back
- * to PostgreSQL ("PortalUploadedImage") served at /api/upload/[id] so uploads always work
- * out-of-the-box without requiring external Blob tokens or manual file commits.
+ * Stores a public template header image or attachment directly in PostgreSQL ("PortalUploadedImage")
+ * served at /api/upload/[id]. Self-hosted on VPS, zero external dependencies or Blob tokens needed.
  */
 export async function storePublicImage(opts: {
   bytes: ArrayBuffer | Buffer;
@@ -48,22 +46,6 @@ export async function storePublicImage(opts: {
         : contentType === "image/webp"
           ? "webp"
           : "jpg";
-  const safeName = (opts.filename ?? `header.${ext}`).replace(/[^\w.-]+/g, "-").slice(-80);
-
-  const blobToken = process.env.BLOB_READ_WRITE_TOKEN || process.env.NEW_BLOB_READ_WRITE_TOKEN;
-  if (blobToken) {
-    try {
-      const blob = await put(`templates/${safeName}`, buf, {
-        access: "public",
-        contentType,
-        addRandomSuffix: true,
-        token: blobToken,
-      });
-      return blob.url;
-    } catch (e) {
-      console.warn("Vercel Blob unavailable, falling back to built-in DB media storage:", e instanceof Error ? e.message : e);
-    }
-  }
 
   await ensureUploadedImageTable();
   const hash = crypto.createHash("sha256").update(buf).digest("hex").slice(0, 24);

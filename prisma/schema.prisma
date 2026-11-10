@@ -1062,3 +1062,13 @@ model EngineDecision {
   @@unique([inboundId])
   @@index([clientId, createdAt])
 }
+
+/// Built-in local media storage for template headers and uploaded images.
+/// Replaces Vercel Blob with self-hosted PostgreSQL BYTEA storage served at /api/upload/[id].
+model PortalUploadedImage {
+  id        String   @id
+  mimeType  String
+  data      Bytes
+  createdAt DateTime @default(now())
+}
+
