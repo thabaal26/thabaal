@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { db } from "../../src/lib/db";
-import { getStoredPublicImage, missingUploadedImages, uploadedImageId } from "../../src/lib/uploaded-image";
+import { getStoredPublicImage, missingUploadedImages, storePublicImage, uploadedImageId } from "../../src/lib/uploaded-image";
 import { photoFor } from "../../src/lib/catalog";
 
 describe("uploaded product photos", () => {
@@ -40,5 +40,22 @@ describe("uploaded product photos", () => {
     assert.equal(photoFor({ image_url: kept, image_cdn_urls: meta }, missing), kept, "a photo thabaal still has stays as it is");
     assert.equal(photoFor({ image_url: lost }, missing), lost, "no copy at Meta: the link as it is");
     assert.equal(photoFor({ image_url: "https://thenanoils.com/a.jpg", image_cdn_urls: meta }, missing), "https://thenanoils.com/a.jpg");
+  });
+
+  test("4. storePublicImage stores directly in PostgreSQL PortalUploadedImage", async () => {
+    const testBuf = Buffer.from("fake-image-bytes-for-test");
+    const url = await storePublicImage({
+      bytes: testBuf,
+      contentType: "image/jpeg",
+      origin: "https://www.thabaal.in",
+    });
+    assert.match(url, /\/api\/upload\/[0-9a-f]{24}\.jpg$/);
+    const id = uploadedImageId(url);
+    assert.ok(id);
+    const stored = await getStoredPublicImage(id);
+    assert.ok(stored);
+    assert.equal(stored.mimeType, "image/jpeg");
+    assert.deepEqual(Buffer.from(stored.data), testBuf);
+    await db.$executeRaw`DELETE FROM "PortalUploadedImage" WHERE "id" = ${id}`;
   });
 });

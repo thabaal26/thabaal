@@ -13,6 +13,7 @@ import { HEX } from "@/lib/theme";
 import { enableMetaCalling, listPhoneNumbers, syncMetaBusinessProfile, waConfig } from "@/lib/whatsapp";
 import { checkNumberStatus, refreshNumberStatus } from "@/lib/limits";
 import { planCapacityBlock } from "@/lib/subscription";
+import { unseal } from "@/lib/secret-box";
 import type { ActionResult } from "./templates";
 
 // These tools are used from the client dashboard and from the admin panel's client page.
@@ -448,8 +449,9 @@ export async function verifyClientToken(clientId: string): Promise<ActionResult 
     include: { numbers: { take: 1, select: { phoneNumberId: true } } },
   });
   if (!client) return { ok: false, message: "Client not found." };
-  const token = client.waToken?.trim();
-  if (!token) return { ok: false, message: "No Meta access token saved for this client yet." };
+  const rawToken = client.waToken?.trim();
+  if (!rawToken) return { ok: false, message: "No Meta access token saved for this client yet." };
+  const token = unseal(rawToken)?.trim() || rawToken;
 
   try {
     const phoneId = client.numbers[0]?.phoneNumberId || client.waPhoneNumberId;
