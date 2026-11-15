@@ -79,7 +79,7 @@ export function shopInfoFor(clientId: string): Promise<ShopInfo> {
       supportPhone: c?.supportPhone,
       website: c?.website,
       orderFlow: c?.orderFlow,
-      catalogue: !(c?.disabledSections ?? []).includes("catalogue"),
+      catalogue: c?.id === "c_finforte_001" || /finforte|shevest/i.test(c?.name ?? "") ? false : !(c?.disabledSections ?? []).includes("catalogue"),
     };
   });
 }

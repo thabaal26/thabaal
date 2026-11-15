@@ -22,10 +22,10 @@ import {
   numberToWordsINR,
 } from "@/lib/account-plans";
 import { saveBillingDetails, submitCustomWorkRequest, withdrawPlanPayment } from "../actions/account";
-import { rzpCancelAutoRenew, rzpConfirm, rzpStartPlan } from "../actions/razorpay";
+import { rzpCancelAutoRenew, rzpConfirm, rzpStartPlan, rzpStartPlanOrder } from "../actions/razorpay";
 import { openRazorpay } from "@/components/razorpay-checkout";
 import type { AccessState } from "@/lib/subscription-core";
-import type { BillingView, HistoryRow } from "./billing-types";
+import type { AutoRenewView, BillingView, HistoryRow } from "./billing-types";
 import "./account.css";
 
 export type AccountViewProps = {
@@ -51,7 +51,7 @@ export type AccountViewProps = {
   /** The plans with today's prices (Settings › Plans and prices; lib/plan-prices-server.ts). */
   plans: readonly PlanDef[];
   /** The plan subscription through Razorpay auto-pay: the only way to pay for a plan. Off when the keys aren't set. */
-  razorpay?: { enabled: boolean; autoRenew: { plan: PlanKey; cycle: BillingCycle; status: string; amount: number } | null };
+  razorpay?: { enabled: boolean; autoRenew: AutoRenewView | null };
 };
 
 const CYCLE_LENGTH: Record<BillingCycle, string> = { m: "1 month", q: "3 months", y: "12 months" };
@@ -86,6 +86,8 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
   const autoRenew = razorpay?.autoRenew ?? null;
   const subOn = !!autoRenew && (autoRenew.status === "authenticated" || autoRenew.status === "active");
   const subFailing = !!autoRenew && (autoRenew.status === "pending" || autoRenew.status === "halted");
+  const subCancelling = !!autoRenew && autoRenew.status === "cancelling";
+  const subCancelled = !!autoRenew && autoRenew.status === "cancelled";
   // Arriving from a closed section's lock screen (?pay=now) opens the subscribe steps straight away.
   const canAutoPay = billing.autoPay !== null && billing.canPay && !billing.block && !subOn;
   const [activeTab, setActiveTab] = useState<"sub" | "plans" | "pay" | "acct">(canAutoPay && !billing.renew ? "plans" : "sub");
@@ -247,6 +249,35 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
       const out = await openRazorpay(start, { name: biz.contactPerson || biz.shopName, email: biz.email, contact: biz.mobile });
       if (out.status === "closed") {
         notify("Subscription not completed. If money left your account, it is added automatically within a few minutes.", false);
+        return;
+      }
+      if (out.status === "failed") {
+        notify(out.message, false);
+        return;
+      }
+      const res = await rzpConfirm({ kind: start.kind, id: start.id, paymentId: out.paymentId, signature: out.signature });
+      notify(res.message, res.ok);
+      if (res.ok) {
+        setBuy(null);
+        setActiveTab("sub");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        router.refresh();
+      }
+    });
+  };
+
+  /** Pay one-time: creates a standard Razorpay Order for the plan period. Works with 100% of UPI apps, Cards, and Netbanking. */
+  const payOneTime = () => {
+    if (!buy) return;
+    startBusy(async () => {
+      const start = await rzpStartPlanOrder(buy.plan, buy.cycle);
+      if (!start.ok) {
+        notify(start.message, false);
+        return;
+      }
+      const out = await openRazorpay(start, { name: biz.contactPerson || biz.shopName, email: biz.email, contact: biz.mobile });
+      if (out.status === "closed") {
+        notify("Payment not completed. If money left your account, it is added automatically within a few minutes.", false);
         return;
       }
       if (out.status === "failed") {
@@ -564,15 +595,25 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
           {rzpOn && autoRenew && (
             <div
               className="card"
-              style={{ marginBottom: 16, borderLeft: `6px solid ${subFailing ? "var(--bad)" : subOn ? "var(--ok)" : "var(--warn)"}` }}
+              style={{
+                marginBottom: 16,
+                borderLeft: `6px solid ${subFailing ? "var(--bad)" : subOn ? "var(--ok)" : subCancelling ? "var(--warn)" : "var(--border)"}`,
+              }}
             >
               <div className="hd" style={{ marginBottom: 0, flexWrap: "wrap", gap: 12 }}>
                 <div>
-                  <h2 style={{ fontSize: 17 }}>
-                    {subOn ? "Subscribed · auto-pay is on" : subFailing ? "Auto-pay: the last charge didn't go through" : "Subscription cancelled"}
-                  </h2>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                    <h2 style={{ fontSize: 17, margin: 0 }}>
+                      {subOn ? "Subscribed · auto-pay is on" : subFailing ? "Auto-pay: the last charge didn't go through" : "Subscription cancelled"}
+                    </h2>
+                    {subOn && <span className="badge ok">Auto-Pay Active</span>}
+                    {subCancelling && <span className="badge warn">Auto-Pay Scheduled to End</span>}
+                    {subCancelled && <span className="badge neutral">Auto-Pay Cancelled</span>}
+                    {subFailing && <span className="badge bad">Payment Retrying</span>}
+                  </div>
                   <p className="muted small">
                     {planOf(autoRenew.plan)?.n} · {CYCLE_NAMES[autoRenew.cycle].en} · {inr(autoRenew.amount)} {CYCLE_SUFFIX[autoRenew.cycle].en}
+                    {autoRenew.rzpId ? ` · ID: ${autoRenew.rzpId.slice(0, 9)}…` : ""}
                     {subOn
                       ? active
                         ? `. Renews by itself on ${active.endsLabel}; Razorpay tells you before each charge. Cancel any time and you keep access until the paid period ends.`
@@ -1809,23 +1850,49 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
                 </div>
 
                 {rzpOn ? (
-                  <div className="card" style={{ background: "var(--soft)", boxShadow: "none", padding: 18, marginBottom: 14 }}>
-                    <b>Auto-pay with Razorpay</b>
-                    <p className="muted small" style={{ margin: "6px 0 14px" }}>
-                      Approve the auto-pay mandate once with UPI AutoPay, a card or net banking.{" "}
-                      {timing(buy.cycle).fixed
-                        ? `Nothing is charged for the plan today: the first ${inr(buyPrice)} is on ${billing.nextStartLabel}. Your bank may show a small verification amount, which is returned.`
-                        : `${inr(buyPrice)} is charged now and your plan starts straight away.`}{" "}
-                      Razorpay tells you before every renewal.
-                    </p>
-                    {buyPrice > 15000 && (
-                      <p className="muted small" style={{ marginTop: -6, marginBottom: 14 }}>
-                        UPI AutoPay covers up to ₹15,000 a charge, so your bank or UPI app may ask you to approve each renewal of this plan.
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 14 }}>
+                    {/* OPTION 1: Instant One-Time Payment (Zero-failure UPI / Cards / QR) */}
+                    <div className="card" style={{ background: "var(--soft)", border: "1.5px solid var(--primary, #0ea5e9)", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", padding: 18, borderRadius: 12 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                        <span style={{ fontWeight: 700, fontSize: 15, color: "var(--foreground, #0f172a)" }}>
+                          ⚡ <T ta="உடனடி ஒருமுறை கட்டணம் (UPI / GPay / Cards)">Instant One-Time Payment</T>
+                        </span>
+                        <span style={{ fontSize: 11, background: "#10b981", color: "#fff", padding: "2px 8px", borderRadius: 999, fontWeight: 600 }}>
+                          <T ta="100% வெற்றி">Zero Mandate Failure</T>
+                        </span>
+                      </div>
+                      <p className="muted small" style={{ margin: "4px 0 14px", lineHeight: 1.45 }}>
+                        <T ta="Google Pay, PhonePe, Paytm, QR Code, டெபிட்/கிரெடிட் கார்டு அல்லது நெட்பேங்கிங் மூலம் உடனடியாக செலுத்தலாம். வங்கி ஆட்டோ-பே அனுமதி சிக்கல்கள் எதுவும் இல்லை.">
+                          Pay instantly via Google Pay, PhonePe, Paytm, UPI QR, Debit/Credit Card, or Netbanking. Activates your plan immediately for the full period with no bank AutoPay mandate hurdles.
+                        </T>
                       </p>
-                    )}
-                    <button type="button" className="btn primary" disabled={busy} onClick={payOnline} style={{ width: "100%", justifyContent: "center" }}>
-                      {busy ? "Opening Razorpay..." : timing(buy.cycle).fixed ? "Set up auto-pay" : `Subscribe · ${inr(buyPrice)}`}
-                    </button>
+                      <button type="button" className="btn primary" disabled={busy} onClick={payOneTime} style={{ width: "100%", justifyContent: "center", padding: "10px 16px", fontSize: 15, fontWeight: 600 }}>
+                        {busy ? "Opening Razorpay..." : `⚡ Pay ${inr(buyPrice)} (Instant UPI / Cards)`}
+                      </button>
+                    </div>
+
+                    {/* OPTION 2: AutoPay Subscription */}
+                    <div className="card" style={{ background: "var(--soft)", border: "1px solid var(--border, #e2e8f0)", boxShadow: "none", padding: 18, borderRadius: 12 }}>
+                      <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6, color: "var(--foreground, #0f172a)" }}>
+                        🔄 <T ta="தானியங்கி புதுப்பித்தல் (AutoPay)">Recurring AutoPay</T>
+                      </div>
+                      <p className="muted small" style={{ margin: "4px 0 14px", lineHeight: 1.45 }}>
+                        <T ta="UPI AutoPay அல்லது கார்டு மூலம் தானாகவே அடுத்த மாதம் புதுப்பிக்க அனுமதி வழங்கலாம்.">
+                          Set up an automatic recurring mandate with UPI AutoPay or credit/debit card to renew each cycle automatically.
+                        </T>{" "}
+                        {timing(buy.cycle).fixed
+                          ? `The first charge is on ${billing.nextStartLabel}.`
+                          : `${inr(buyPrice)} is charged now and your plan starts immediately.`}
+                      </p>
+                      <button type="button" className="btn" disabled={busy} onClick={payOnline} style={{ width: "100%", justifyContent: "center", padding: "10px 16px", fontWeight: 600 }}>
+                        {busy ? "Opening Razorpay..." : `🔄 Set up AutoPay · ${inr(buyPrice)}`}
+                      </button>
+                      <p className="fine muted" style={{ marginTop: 8, lineHeight: 1.35, textAlign: "center" }}>
+                        💡 <T ta="வங்கி ஆட்டோபே சர்வர் பிஸியாக இருந்தால், மேலே உள்ள 'உடனடி ஒருமுறை கட்டணம்' பொத்தானை கிளிக் செய்து எளிதாக செலுத்தலாம்.">
+                          Tip: If GPay or your bank shows &ldquo;Could not set up Autopay&rdquo;, use the Instant One-Time Payment button above to pay directly via GPay/Cards.
+                        </T>
+                      </p>
+                    </div>
                   </div>
                 ) : (
                   <div className="duebar warn" style={{ marginBottom: 14 }}>
