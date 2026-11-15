@@ -21,6 +21,7 @@ import { trackPress } from "@/lib/usage";
 import { notOpeningOffers } from "@/lib/engagement";
 import { cleanSegments, segmentSummary, type SegmentSummary } from "@/lib/engagement-segments";
 import { planCapacityBlock } from "@/lib/subscription";
+import { canSendLiveOutbound } from "@/lib/workspace-guard";
 
 export type CampaignInput = {
   name: string;
@@ -51,7 +52,7 @@ const MAX_HAND_PICKED = 500;
 async function ownCustomers(clientId: string, ids: unknown): Promise<string[]> {
   const list = Array.isArray(ids) ? [...new Set(ids.filter((x): x is string => typeof x === "string" && /^[a-z0-9]{10,40}$/i.test(x)))].slice(0, MAX_HAND_PICKED) : [];
   if (!list.length) return [];
-  return (await db.customer.findMany({ where: { clientId, id: { in: list } }, select: { id: true } })).map((c) => c.id);
+  return (await db.customer.findMany({ where: { clientId, deletedAt: null, id: { in: list } }, select: { id: true } })).map((c) => c.id);
 }
 
 function refresh() {
@@ -157,6 +158,10 @@ export async function runCampaignNow(id: string): Promise<ActionResult> {
   if ("denied" in s) return { ok: false, message: s.denied };
   const c = await db.campaign.findUnique({ where: { id }, include: { template: true } });
   if (!c || !mine(s, c.clientId)) return { ok: false, message: "Campaign not found." };
+  const liveCheck = await canSendLiveOutbound(c.clientId, "campaign dispatch");
+  if (!liveCheck.allowed) {
+    return { ok: false, message: liveCheck.reason || "Live campaign dispatch is locked in Demo Mode. Subscribe to a plan to start live broadcasting." };
+  }
   if (!templateSendable(await getSettings(), c.template)) return { ok: false, message: "The template isn't approved by Meta yet." };
   const busy = await db.campaignRun.findFirst({ where: { campaignId: id, status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET", "WAITING_FUNDS"] } } });
   if (busy) return { ok: false, message: "This campaign is already sending. Wait for it to finish or stop it." };
@@ -180,6 +185,11 @@ export async function sendCampaignTest(id: string): Promise<ActionResult> {
   if (!c || !mine(s, c.clientId)) return { ok: false, message: "Campaign not found." };
   const testers = await db.customer.findMany({ where: { clientId: c.clientId, tags: { has: TEST_TAG } }, select: { id: true, name: true }, take: 5 });
   if (!testers.length) return { ok: false, message: `No customers are tagged "${TEST_TAG}". Add that tag to your own number on the Customers page.` };
+
+  const liveCheck = await canSendLiveOutbound(c.clientId, "test send");
+  if (!liveCheck.allowed) {
+    return { ok: true, message: `[DEMO SIMULATION] Campaign test preview simulated for ${testers.map((t) => t.name).join(", ")}. In Demo Mode, messages are not sent to real phones.` };
+  }
 
   const results = await Promise.all(testers.map((t) => sendToCustomer(t.id, c.templateId, c.senderId, true)));
   const failed = results.filter((r) => !r.ok);
@@ -255,7 +265,7 @@ export async function searchCampaignCustomers(campaignId: string | null, q: stri
   if (!clientId || text.length < 2) return [];
   const digits = text.replace(/\D/g, "");
   return db.customer.findMany({
-    where: { clientId, OR: [{ name: { contains: text, mode: "insensitive" } }, ...(digits.length >= 3 ? [{ phone: { contains: digits } }] : [])] },
+    where: { clientId, deletedAt: null, OR: [{ name: { contains: text, mode: "insensitive" } }, ...(digits.length >= 3 ? [{ phone: { contains: digits } }] : [])] },
     select: { id: true, name: true, phone: true, tags: true },
     orderBy: { name: "asc" },
     take: 8,
@@ -325,5 +335,20 @@ export async function runDispatcherNow(): Promise<ActionResult> {
   const r = await dispatch();
   refresh();
   return { ok: true, message: `Scheduler ran: ${r.campaignsStarted} campaigns started, ${r.sent} sent, ${r.failed} failed.` };
+}
+
+export async function preflightCampaign(id: string) {
+  const s = await requireManager();
+  if ("denied" in s) return { ok: false, error: s.denied };
+  const owner = await db.campaign.findUnique({ where: { id }, select: { clientId: true } });
+  if (!owner || !mine(s, owner.clientId)) return { ok: false, error: "Campaign not found." };
+
+  const { validateCampaignPreflight } = await import("@/lib/campaign-preflight");
+  try {
+    const report = await validateCampaignPreflight(id);
+    return { ok: true, report };
+  } catch (e: any) {
+    return { ok: false, error: e.message || "Failed to execute campaign preflight." };
+  }
 }
 

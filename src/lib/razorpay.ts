@@ -9,10 +9,14 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 const API = "https://api.razorpay.com/v1";
 
 export function razorpayKeys() {
+  const token = process.env.RAZORPAY_ACCESS_TOKEN?.trim();
   const keyId = process.env.RAZORPAY_KEY_ID?.trim();
   const secret = process.env.RAZORPAY_KEY_SECRET?.trim();
+  if (token) {
+    return { keyId: keyId || "rzp_test_oauth", secret: token, token, mode: "test" as const };
+  }
   if (!keyId || !secret) return null;
-  return { keyId, secret, mode: keyId.startsWith("rzp_live_") ? ("live" as const) : ("test" as const) };
+  return { keyId, secret, token: null, mode: keyId.startsWith("rzp_live_") ? ("live" as const) : ("test" as const) };
 }
 
 export const razorpayReady = () => razorpayKeys() !== null;
@@ -30,11 +34,14 @@ export class RazorpayError extends Error {
 /** One API call. Throws RazorpayError with Razorpay's own description when the call fails. */
 export async function rzp<T = Record<string, unknown>>(method: "GET" | "POST" | "PATCH", path: string, body?: unknown): Promise<T> {
   const k = razorpayKeys();
-  if (!k) throw new RazorpayError("Razorpay keys are not set (RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET).", 500, "not_configured");
+  if (!k) throw new RazorpayError("Razorpay keys are not set (RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET / RAZORPAY_ACCESS_TOKEN).", 500, "not_configured");
+  const authHeader = k.token
+    ? `Bearer ${k.token}`
+    : `Basic ${Buffer.from(`${k.keyId}:${k.secret}`).toString("base64")}`;
   const res = await fetch(`${API}${path}`, {
     method,
     headers: {
-      Authorization: `Basic ${Buffer.from(`${k.keyId}:${k.secret}`).toString("base64")}`,
+      Authorization: authHeader,
       ...(body ? { "Content-Type": "application/json" } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,

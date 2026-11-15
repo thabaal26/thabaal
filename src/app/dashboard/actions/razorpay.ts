@@ -8,6 +8,7 @@ import {
   cancelAutoRenew,
   confirmOrderCheckout,
   confirmSubscriptionCheckout,
+  recordCheckoutOutcome,
   startOrder,
   startPlanOrder,
   startPlanSubscription,
@@ -62,6 +63,11 @@ export async function rzpConfirm(input: { kind: "subscription" | "order"; id: st
       ? await confirmSubscriptionCheckout(w, { subscriptionId: clean(input.id), paymentId: clean(input.paymentId), signature: clean(input.signature) })
       : await confirmOrderCheckout(w, { orderId: clean(input.id), paymentId: clean(input.paymentId), signature: clean(input.signature) });
   return refresh(r);
+}
+
+/** Records checkout outcome (closed/failed) so that failed attempts are immediately invalidated from reuse. */
+export async function rzpRecordCheckoutOutcome(rzpId: string, outcome: "closed" | "failed", message?: string): Promise<void> {
+  return recordCheckoutOutcome(rzpId, outcome, message);
 }
 
 /** Cancel the plan subscription: no more charges; the period already paid for runs to its end. */

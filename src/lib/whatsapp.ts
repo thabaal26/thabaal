@@ -1,6 +1,8 @@
 import "server-only";
 import { absoluteUrl, resolveImageBytes } from "./media";
+import { signMediaUrlIfNeeded } from "./media-token";
 import type { MetaComponent } from "./template";
+import { canSendLiveOutbound } from "./workspace-guard";
 
 // WhatsApp Cloud API client. When the Meta variables are missing the portal runs in
 // demo mode: sends are simulated and templates are approved locally.
@@ -14,7 +16,7 @@ const mediaIdCache = new Map<string, { id: string; expiresAt: number }>();
 const MEDIA_TTL_MS = 12 * 60 * 60 * 1000;
 
 /** Credentials of one sending number: its token, phone number ID and WhatsApp Business Account. */
-export type WaSource = { token: string | null; phoneNumberId: string | null; businessAccountId: string | null };
+export type WaSource = { token: string | null; phoneNumberId: string | null; businessAccountId: string | null; clientId?: string | null };
 
 /** Shown wherever a client without its own WhatsApp number tries to send or manage templates. */
 export const NOT_CONNECTED =
@@ -36,6 +38,7 @@ export function waConfig(src?: WaSource | null) {
   return {
     live: Boolean(token && phoneNumberId && wabaId),
     own,
+    clientId: src?.clientId ?? null,
     /** A client's number that isn't set up: sending must refuse, not simulate. */
     notConnected: !own && !platform,
     token,
@@ -60,7 +63,28 @@ function offline(cfg: WaConfig): { id: string; simulated: true } {
   return { id: `demo.${crypto.randomUUID()}`, simulated: true };
 }
 
+/**
+ * Checks both live credentials and tenant workspace mode.
+ * In DEMO, LIVE_PENDING_PAYMENT, LIVE_PENDING_CONNECTION, or SUSPENDED mode,
+ * all outbound sends are strictly simulated or blocked.
+ */
+async function isOutboundLiveAllowed(cfg: WaConfig, op?: string): Promise<boolean> {
+  if (!cfg.live) return false;
+  if (cfg.notConnected) return false;
+  if (cfg.clientId) {
+    const guard = await canSendLiveOutbound(cfg.clientId, op);
+    if (!guard.allowed) return false;
+  }
+  return true;
+}
+
 async function graph<T>(cfg: WaConfig, path: string, init: RequestInit = {}): Promise<T> {
+  const method = init.method?.toUpperCase() || "GET";
+  if (method === "POST" && (path.includes("/messages") || path.includes("/media"))) {
+    if (!(await isOutboundLiveAllowed(cfg, "Meta Graph API outbound call"))) {
+      throw new MetaError("Outbound live messaging is disabled in non-live workspace.", 403);
+    }
+  }
   const { token } = cfg;
   const res = await fetch(`${GRAPH}/${path}`, {
     ...init,
@@ -82,6 +106,7 @@ async function graph<T>(cfg: WaConfig, path: string, init: RequestInit = {}): Pr
  */
 export async function uploadWhatsAppMedia(cfg: WaConfig, imageUrl: string): Promise<string | null> {
   if (!cfg.live || !cfg.phoneNumberId || !cfg.token) return null;
+  if (!(await isOutboundLiveAllowed(cfg, "media upload"))) return null;
   const normalizedKey = absoluteUrl(imageUrl) ?? imageUrl.trim();
   const cacheKey = `${cfg.phoneNumberId}:${normalizedKey}`;
   const cached = mediaIdCache.get(cacheKey);
@@ -146,7 +171,7 @@ export type SendInput = {
 };
 
 export async function sendTemplateMessage(cfg: WaConfig, input: SendInput): Promise<{ id: string; simulated: boolean }> {
-  if (!cfg.live) return offline(cfg);
+  if (!(await isOutboundLiveAllowed(cfg, "template message"))) return offline(cfg);
 
   const components: Record<string, unknown>[] = [];
   if (input.otpCode) {
@@ -160,7 +185,8 @@ export async function sendTemplateMessage(cfg: WaConfig, input: SendInput): Prom
   } else {
     if (input.headerType === "IMAGE" && input.headerMediaUrl) {
       const mediaId = await uploadWhatsAppMedia(cfg, input.headerMediaUrl);
-      const fallbackLink = absoluteUrl(input.headerMediaUrl) ?? input.headerMediaUrl;
+      const rawFallback = absoluteUrl(input.headerMediaUrl) ?? input.headerMediaUrl;
+      const fallbackLink = await signMediaUrlIfNeeded(rawFallback, cfg.clientId);
       components.push({
         type: "header",
         parameters: [{ type: "image", image: mediaId ? { id: mediaId } : { link: fallbackLink } }],
@@ -210,7 +236,7 @@ export async function sendTemplateMessage(cfg: WaConfig, input: SendInput): Prom
 
 /** A plain text message. WhatsApp only allows it within 24 hours of the customer's last message. */
 export async function sendTextMessage(cfg: WaConfig, to: string, body: string): Promise<{ id: string; simulated: boolean }> {
-  if (!cfg.live) return offline(cfg);
+  if (!(await isOutboundLiveAllowed(cfg, "text message"))) return offline(cfg);
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
     body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to, type: "text", text: { body, preview_url: false } }),
@@ -225,10 +251,11 @@ export async function sendMediaMessage(
   mediaUrl: string,
   caption?: string,
 ): Promise<{ id: string; simulated: boolean }> {
-  if (!cfg.live) return offline(cfg);
+  if (!(await isOutboundLiveAllowed(cfg, "media message"))) return offline(cfg);
   const isPdf = /\.pdf(\?|$)/i.test(mediaUrl);
   const type = isPdf ? "document" : "image";
-  const normalizedUrl = absoluteUrl(mediaUrl) ?? mediaUrl;
+  const signedUrl = await signMediaUrlIfNeeded(mediaUrl, cfg.clientId);
+  const normalizedUrl = absoluteUrl(signedUrl) ?? signedUrl;
   const mediaId = await uploadWhatsAppMedia(cfg, mediaUrl);
   const payload = isPdf
     ? mediaId
@@ -281,7 +308,7 @@ export async function startMetaCall(cfg: WaConfig, to: string, sdp: string): Pro
  * within 24 hours of the customer's last message.
  */
 export async function sendCallPermissionRequest(cfg: WaConfig, to: string, body: string): Promise<{ id: string; simulated: boolean }> {
-  if (!cfg.live) return offline(cfg);
+  if (!(await isOutboundLiveAllowed(cfg, "call permission request"))) return offline(cfg);
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
     body: JSON.stringify({
@@ -339,7 +366,7 @@ function orderDetails(p: PaymentRequest) {
 
 /** Within the 24-hour window: an interactive order_details message with the "Review and pay" button. */
 export async function sendPaymentRequest(cfg: WaConfig, to: string, body: string, p: PaymentRequest): Promise<{ id: string; simulated: boolean }> {
-  if (!cfg.live) return offline(cfg);
+  if (!(await isOutboundLiveAllowed(cfg, "payment request"))) return offline(cfg);
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
     body: JSON.stringify({
@@ -363,9 +390,10 @@ export async function sendPaymentTemplate(
   template: { name: string; language: string; bodyParams: string[]; headerParams: string[]; headerImage?: string | null },
   p: PaymentRequest,
 ): Promise<{ id: string; simulated: boolean }> {
-  if (!cfg.live) return offline(cfg);
+  if (!(await isOutboundLiveAllowed(cfg, "payment template"))) return offline(cfg);
   const mediaId = template.headerImage ? await uploadWhatsAppMedia(cfg, template.headerImage) : null;
-  const fallbackLink = template.headerImage ? (absoluteUrl(template.headerImage) ?? template.headerImage) : null;
+  const rawFallback = template.headerImage ? (absoluteUrl(template.headerImage) ?? template.headerImage) : null;
+  const fallbackLink = rawFallback ? await signMediaUrlIfNeeded(rawFallback, cfg.clientId) : null;
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
     body: JSON.stringify({
@@ -399,7 +427,7 @@ export async function sendPaymentTemplate(
  * once paid. Sent as a reply to their payment, inside the window it opens.
  */
 export async function sendOrderStatus(cfg: WaConfig, to: string, referenceId: string, status: "processing" | "partially-shipped" | "shipped" | "completed" | "canceled", body: string, description?: string) {
-  if (!cfg.live) return offline(cfg);
+  if (!(await isOutboundLiveAllowed(cfg, "order status update"))) return offline(cfg);
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
     body: JSON.stringify({
@@ -422,7 +450,7 @@ export async function sendOrderStatus(cfg: WaConfig, to: string, referenceId: st
  * customer's 24-hour window (a service message), unlike a catalogue template.
  */
 export async function sendCatalogMessage(cfg: WaConfig, to: string, body: string): Promise<{ id: string; simulated: boolean }> {
-  if (!cfg.live) return offline(cfg);
+  if (!(await isOutboundLiveAllowed(cfg, "catalog message"))) return offline(cfg);
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
     body: JSON.stringify({
@@ -449,7 +477,7 @@ export async function sendInteractiveButtons(
   buttons: InteractiveReplyButton[],
   opts: { header?: string; footer?: string } = {}
 ): Promise<{ id: string; simulated: boolean }> {
-  if (!cfg.live) return offline(cfg);
+  if (!(await isOutboundLiveAllowed(cfg, "interactive buttons"))) return offline(cfg);
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
     body: JSON.stringify({
@@ -488,7 +516,7 @@ export async function sendCtaUrl(
   button: { text: string; url: string },
   opts: { footer?: string } = {},
 ): Promise<{ id: string; simulated: boolean }> {
-  if (!cfg.live) return offline(cfg);
+  if (!(await isOutboundLiveAllowed(cfg, "cta url message"))) return offline(cfg);
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
     body: JSON.stringify({
@@ -519,7 +547,7 @@ export async function sendInteractiveList(
   rows: { id: string; title: string; description?: string }[],
   opts: { header?: string; footer?: string } = {},
 ): Promise<{ id: string; simulated: boolean }> {
-  if (!cfg.live) return offline(cfg);
+  if (!(await isOutboundLiveAllowed(cfg, "interactive list"))) return offline(cfg);
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
     body: JSON.stringify({
@@ -561,7 +589,7 @@ export async function sendAddressMessage(
   body: string,
   opts: { values?: Record<string, string>; errors?: Record<string, string> } = {},
 ): Promise<{ id: string; simulated: boolean }> {
-  if (!cfg.live) return offline(cfg);
+  if (!(await isOutboundLiveAllowed(cfg, "address message"))) return offline(cfg);
   const values = opts.values && Object.keys(opts.values).length ? opts.values : undefined;
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
@@ -585,7 +613,7 @@ export async function sendAddressMessage(
 
 /** A message with WhatsApp's "Send location" button; the customer's pin comes back as a location message. */
 export async function sendLocationRequest(cfg: WaConfig, to: string, body: string): Promise<{ id: string; simulated: boolean }> {
-  if (!cfg.live) return offline(cfg);
+  if (!(await isOutboundLiveAllowed(cfg, "location request"))) return offline(cfg);
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
     body: JSON.stringify({

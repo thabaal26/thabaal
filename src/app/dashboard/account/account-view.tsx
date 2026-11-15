@@ -22,7 +22,7 @@ import {
   numberToWordsINR,
 } from "@/lib/account-plans";
 import { saveBillingDetails, submitCustomWorkRequest, withdrawPlanPayment } from "../actions/account";
-import { rzpCancelAutoRenew, rzpConfirm, rzpStartPlan, rzpStartPlanOrder } from "../actions/razorpay";
+import { rzpCancelAutoRenew, rzpConfirm, rzpRecordCheckoutOutcome, rzpStartPlan, rzpStartPlanOrder } from "../actions/razorpay";
 import { openRazorpay } from "@/components/razorpay-checkout";
 import type { AccessState } from "@/lib/subscription-core";
 import type { AutoRenewView, BillingView, HistoryRow } from "./billing-types";
@@ -248,10 +248,12 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
       }
       const out = await openRazorpay(start, { name: biz.contactPerson || biz.shopName, email: biz.email, contact: biz.mobile });
       if (out.status === "closed") {
+        await rzpRecordCheckoutOutcome(start.id, "closed");
         notify("Subscription not completed. If money left your account, it is added automatically within a few minutes.", false);
         return;
       }
       if (out.status === "failed") {
+        await rzpRecordCheckoutOutcome(start.id, "failed", out.message);
         notify(out.message, false);
         return;
       }
@@ -277,10 +279,12 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
       }
       const out = await openRazorpay(start, { name: biz.contactPerson || biz.shopName, email: biz.email, contact: biz.mobile });
       if (out.status === "closed") {
+        await rzpRecordCheckoutOutcome(start.id, "closed");
         notify("Payment not completed. If money left your account, it is added automatically within a few minutes.", false);
         return;
       }
       if (out.status === "failed") {
+        await rzpRecordCheckoutOutcome(start.id, "failed", out.message);
         notify(out.message, false);
         return;
       }

@@ -29,6 +29,7 @@ import { normalizePhone } from "./phone";
 import { affordableMessages } from "./wallet";
 import { notOpeningOffers, UNREAD_OFFERS } from "./engagement";
 import { pruneInbound } from "./engine/inbound";
+import { isTenantLiveActive } from "./workspace-guard";
 
 const TIME_BUDGET_MS = 50_000; // stay under Vercel's function limit
 const KICK_BUDGET_MS = 40_000; // a kick runs after a webhook's answer, inside the same function
@@ -39,17 +40,31 @@ const CONCURRENCY = 10;
 const LOCAL_GAP_MS = [1_000, 3_000]; // random pause between local-session sends
 
 /** Creates a run and queues one message per eligible customer. */
-export async function startRun(campaign: Campaign & { template: { name: string } }, scheduledFor: Date) {
+export async function startRun(campaign: Campaign & { template: { name: string; category?: string } }, scheduledFor: Date) {
   const audience = await campaignAudienceWhere(campaign.clientId, campaign.audienceTag, campaign);
   // A one-time campaign sent again soon (resumed after a stop) skips who it already reached; weekly ones repeat by design.
   const where = campaign.scheduleType === "ONCE" ? { AND: [audience, { NOT: alreadyReachedWhere(campaign.id, scheduledFor) }] } : audience;
-  const customers = await db.customer.findMany({ where, select: { id: true } });
+  const customers = await db.customer.findMany({ where, select: { id: true, phone: true } });
+  
+  // Deduplicate by normalized phone number so the same recipient is not queued twice
+  const seenPhones = new Set<string>();
+  const uniqueCustomers: { id: string }[] = [];
+  for (const c of customers) {
+    const p = normalizePhone(c.phone || "") || c.phone;
+    if (p) {
+      if (!seenPhones.has(p)) {
+        seenPhones.add(p);
+        uniqueCustomers.push({ id: c.id });
+      }
+    }
+  }
+
   const run = await db.campaignRun.create({
-    data: { campaignId: campaign.id, scheduledFor, total: customers.length, nextBatchAt: new Date() },
+    data: { campaignId: campaign.id, scheduledFor, total: uniqueCustomers.length, nextBatchAt: new Date() },
   });
-  if (customers.length) {
+  if (uniqueCustomers.length) {
     await db.message.createMany({
-      data: customers.map((c) => ({
+      data: uniqueCustomers.map((c) => ({
         runId: run.id,
         customerId: c.id,
         templateId: campaign.templateId,
@@ -77,6 +92,10 @@ export async function startDueCampaigns(now: Date, paused: ReadonlySet<string>, 
       data: { nextRunAt: next, active: next !== null },
     });
     if (!claimed.count) continue;
+    if (!(await isTenantLiveActive(c.clientId))) {
+      // In demo mode, background scheduler must never dispatch real campaigns
+      continue;
+    }
     // The plan's campaign sends for this month are used up: this send is skipped (the next one is still scheduled).
     const block = await planCapacityBlock(c.clientId, "camp", now).catch(() => null);
     if (block) {
@@ -115,7 +134,7 @@ function sessionDown(e: unknown) {
   return e instanceof WahaError && (!e.status || e.status === 422 || e.status >= 500);
 }
 
-async function processRun(runId: string, now: Date, deadline: number) {
+export async function processRun(runId: string, now: Date, deadline: number) {
   const run = await db.campaignRun.findUnique({
     where: { id: runId },
     include: { campaign: { include: { template: true, client: { select: { name: true, marketingGapHours: true, quietFrom: true, quietTo: true } } } } },
@@ -151,6 +170,11 @@ async function processRun(runId: string, now: Date, deadline: number) {
   if (!ready.ok) {
     // A client that hasn't connected its own number waits longer: it needs an admin, not a retry.
     await pause("WAITING_CONNECTION", ready.notConnected ? 30 : 2);
+    return { sent: 0, failed: 0 };
+  }
+  if (!(await isTenantLiveActive(campaign.clientId))) {
+    // In demo mode, live dispatch workers pause until plan activation
+    await pause("WAITING_FUNDS", 60);
     return { sent: 0, failed: 0 };
   }
   // Offers at night get reported; hold marketing until quiet hours end.
@@ -226,8 +250,22 @@ async function processRun(runId: string, now: Date, deadline: number) {
       return false;
     }
     if (throttled || restricted || setupProblem) return false;
+    if (m.customer.deletedAt) {
+      await db.message.update({ where: { id: m.id }, data: { status: "SKIPPED", error: "Customer record is archived or deleted" } });
+      return;
+    }
     if (m.customer.optedOut || m.customer.unreachable) {
       await db.message.update({ where: { id: m.id }, data: { status: "SKIPPED", error: m.customer.optedOut ? "Customer opted out" : "Number can't receive WhatsApp messages" } });
+      return;
+    }
+    if (marketing && (!m.customer.optInAt || !m.customer.optInSource || m.customer.optInSource.includes("(WhatsApp: Yes)"))) {
+      await db.message.update({
+        where: { id: m.id },
+        data: {
+          status: "SKIPPED",
+          error: "Consent unverified: missing attributable marketing opt-in record (optInAt/optInSource)",
+        },
+      });
       return;
     }
     const senderDigits = number?.displayPhone ? normalizePhone(number.displayPhone) : null;

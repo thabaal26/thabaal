@@ -49,7 +49,7 @@ describe("a campaign run, end to end", () => {
     const client = await db.client.create({ data: { name: `QA Run Shop ${Date.now()}`, orderPrefix: "QR", quietFrom: null, quietTo: null, marketingGapHours: 0 } });
     clientId = client.id;
     await db.whatsAppNumber.create({ data: { clientId, label: "Main", phoneNumberId: PNID, businessAccountId: "qa-run-waba", token: "qa-fake-token", isDefault: true, dailyCap: 240, messagingTier: "TIER_250", qualityRating: "GREEN" } });
-    await db.customer.createMany({ data: Array.from({ length: 300 }, (_, i) => ({ clientId, phone: `${PHONE}${String(i).padStart(3, "0")}`, name: `Run ${i}`, tags: [tag] })) });
+    await db.customer.createMany({ data: Array.from({ length: 300 }, (_, i) => ({ clientId, phone: `${PHONE}${String(i).padStart(3, "0")}`, name: `Run ${i}`, tags: [tag], optInAt: new Date("2026-01-01T00:00:00Z"), optInSource: "Store Buyer (Paper Order)" })) });
     templateId = (
       await db.template.create({
         data: { clientId, businessAccountId: "qa-run-waba", name: "qa_run_poster", category: "MARKETING", status: "APPROVED", language: "en", headerType: "IMAGE", headerMediaUrl: IMAGE, body: "Fresh oils at your door", buttons: [{ type: "PHONE_NUMBER", text: "Call to Order", phone: "+918925390439" }, { type: "URL", text: "Chat to Order", url: "https://www.thabaal.in/go/x" }] },

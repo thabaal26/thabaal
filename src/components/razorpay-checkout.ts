@@ -45,6 +45,10 @@ export async function openRazorpay(start: Start, prefill: { name?: string; email
         resolve(o);
       }
     };
+    const cleanContact = prefill.contact ? prefill.contact.replace(/[^\d+]/g, "").trim() : "";
+    const cleanEmail = prefill.email ? prefill.email.trim() : "";
+    const cleanName = prefill.name ? prefill.name.trim() : "";
+
     const rz = new window.Razorpay!({
       key: start.keyId,
       name: "Thabaal",
@@ -52,9 +56,9 @@ export async function openRazorpay(start: Start, prefill: { name?: string; email
       image: `${window.location.origin}/brands/thabaal/mark.png`,
       ...(start.kind === "subscription" ? { subscription_id: start.id } : { order_id: start.id, amount: start.amountPaise, currency: "INR" }),
       prefill: {
-        ...(prefill.name ? { name: prefill.name } : {}),
-        ...(prefill.email ? { email: prefill.email } : {}),
-        ...(prefill.contact ? { contact: prefill.contact } : {}),
+        ...(cleanName ? { name: cleanName } : {}),
+        ...(cleanEmail ? { email: cleanEmail } : {}),
+        ...(cleanContact ? { contact: cleanContact } : {}),
       },
       theme: { color: "#0d1b2a" },
       handler: (r: RazorpayResponse) => finish({ status: "paid", paymentId: r.razorpay_payment_id, signature: r.razorpay_signature }),

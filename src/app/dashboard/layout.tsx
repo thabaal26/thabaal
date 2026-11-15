@@ -26,6 +26,7 @@ import "./mobile.css";
 import "./design.css";
 import { PlanDueBar } from "./plan-due-bar";
 import { ViewOnlyBar } from "./view-only-bar";
+import { DemoWorkspaceBanner } from "@/components/demo-workspace-banner";
 import { LogOut } from "@/components/icons";
 import { logout } from "../login/actions";
 import { clientAccessNow } from "@/lib/plan-access";
@@ -299,6 +300,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
               {/* Every page sits in the portal design (portal.css); pages built from it add their own frame. */}
               <div className="thabaal-portal">
                 <div className="wrapin">
+                  <DemoWorkspaceBanner mode={client?.workspaceMode} clientId={client?.id} clientName={client?.name} />
                   {scope.viewOnly && <ViewOnlyBar name={scope.clientName ?? "this business"} />}
                   {/* Unpaid business: pages open, and any change answers with the "Subscribe to continue" popup. */}
                   {scope.planLocked && <PlanLockPopup canPay={scope.manager && !scope.viewOnly} />}

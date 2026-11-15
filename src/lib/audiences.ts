@@ -47,10 +47,18 @@ export function cleanFilter(f: AudienceFilter): AudienceFilter {
   };
 }
 
-/** Customers matching the filter: always opted in and reachable, like any campaign audience. */
-export async function audienceWhere(clientId: string, raw: AudienceFilter, now = new Date()): Promise<Prisma.CustomerWhereInput> {
+/** Customers matching the filter: always opted in, reachable and not archived, like any campaign audience. */
+export async function audienceWhere(clientId: string, raw: AudienceFilter, now = new Date(), requirePositiveConsent = false): Promise<Prisma.CustomerWhereInput> {
   const f = cleanFilter(raw);
-  const and: Prisma.CustomerWhereInput[] = [{ clientId, optedOut: false, unreachable: false }];
+  const and: Prisma.CustomerWhereInput[] = [
+    {
+      clientId,
+      optedOut: false,
+      unreachable: false,
+      deletedAt: null,
+      ...(requirePositiveConsent ? { optInAt: { not: null }, optInSource: { not: null } } : {}),
+    },
+  ];
   if (f.tags) and.push({ tags: { hasEvery: f.tags } });
   if (f.excludeTags) and.push({ NOT: { tags: { hasSome: f.excludeTags } } });
   if (f.region) and.push({ region: { equals: f.region, mode: "insensitive" } });
@@ -91,7 +99,12 @@ export function describeFilter(raw: AudienceFilter) {
 }
 
 /** People added to or left out of a campaign by hand (Campaign.includeIds / excludeIds), and its engagement segments. */
-export type CampaignPeople = { includeIds?: readonly string[]; excludeIds?: readonly string[]; segments?: readonly string[] };
+export type CampaignPeople = {
+  includeIds?: readonly string[];
+  excludeIds?: readonly string[];
+  segments?: readonly string[];
+  requirePositiveConsent?: boolean;
+};
 
 /**
  * The customer filter for a campaign: its audienceTag (a saved audience, one or more tags, or everyone), plus the
@@ -100,11 +113,17 @@ export type CampaignPeople = { includeIds?: readonly string[]; excludeIds?: read
  * from the business's whole campaign history at that moment. Opted-out and unreachable customers are never in it; Inactive
  * ones (INACTIVE_TAG) only when the campaign picks that tag or adds them by hand.
  */
-export async function campaignAudienceWhere(clientId: string, audienceTag: string | null, people: CampaignPeople = {}): Promise<Prisma.CustomerWhereInput> {
+export async function campaignAudienceWhere(
+  clientId: string,
+  audienceTag: string | null,
+  people: CampaignPeople = {},
+  options?: { requirePositiveConsent?: boolean }
+): Promise<Prisma.CustomerWhereInput> {
+  const requirePositiveConsent = Boolean(options?.requirePositiveConsent ?? people.requirePositiveConsent);
   const segments = cleanSegments(people.segments);
   // Every read here is independent: one round.
   const [picked, segmentIds, include, exclude] = await Promise.all([
-    sendToWhere(clientId, audienceTag),
+    sendToWhere(clientId, audienceTag, requirePositiveConsent),
     segments.length ? segmentCustomerIds(clientId, segments) : null,
     // A person with several numbers is added or left out as a whole (lib/linked-numbers.ts).
     withSamePerson(clientId, people.includeIds ?? []),
@@ -113,9 +132,17 @@ export async function campaignAudienceWhere(clientId: string, audienceTag: strin
   const kept = decodeTags(audienceTag)?.tags.includes(INACTIVE_TAG) ? picked : { AND: [picked, { NOT: { tags: { has: INACTIVE_TAG } } }] };
   const send: Prisma.CustomerWhereInput = segmentIds ? { AND: [kept, { id: { in: segmentIds } }] } : kept;
   if (!include.length && !exclude.length) return send;
+  const includeBase: Prisma.CustomerWhereInput = {
+    id: { in: include },
+    clientId,
+    optedOut: false,
+    unreachable: false,
+    deletedAt: null,
+    ...(requirePositiveConsent ? { optInAt: { not: null }, optInSource: { not: null } } : {}),
+  };
   return {
     AND: [
-      include.length ? { OR: [send, { id: { in: include }, clientId, optedOut: false, unreachable: false }] } : send,
+      include.length ? { OR: [send, includeBase] } : send,
       ...(exclude.length ? [{ id: { notIn: exclude } }] : []),
     ],
   };
@@ -145,14 +172,20 @@ export function alreadyReachedWhere(campaignId: string, now = new Date()): Prism
 }
 
 /** The customer filter for a campaign's audienceTag alone. */
-async function sendToWhere(clientId: string, audienceTag: string | null): Promise<Prisma.CustomerWhereInput> {
-  const base = { clientId, optedOut: false, unreachable: false };
+async function sendToWhere(clientId: string, audienceTag: string | null, requirePositiveConsent = false): Promise<Prisma.CustomerWhereInput> {
+  const base: Prisma.CustomerWhereInput = {
+    clientId,
+    optedOut: false,
+    unreachable: false,
+    deletedAt: null,
+    ...(requirePositiveConsent ? { optInAt: { not: null }, optInSource: { not: null } } : {}),
+  };
   if (!audienceTag) return base;
   if (audienceTag.startsWith(AUDIENCE_PREFIX)) {
     const a = await db.audience.findFirst({ where: { id: audienceTag.slice(AUDIENCE_PREFIX.length), clientId } });
     // A deleted audience must not fall back to "everyone".
     if (!a) return { id: { in: [] } };
-    return audienceWhere(clientId, a.filter as AudienceFilter);
+    return audienceWhere(clientId, a.filter as AudienceFilter, new Date(), requirePositiveConsent);
   }
   const pick = decodeTags(audienceTag);
   // A tag list that can't be read must not fall back to "everyone" either.

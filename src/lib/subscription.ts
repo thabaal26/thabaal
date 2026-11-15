@@ -19,6 +19,7 @@ import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { db } from "./db";
 import { APP_TZ } from "./format";
 import { loadPlanPrices } from "./plan-prices-server";
+import { reconcileTenantWorkspaceMode } from "./tenant-activation";
 import {
   isCycle,
   isPlanKey,
@@ -140,7 +141,7 @@ export async function verifyPlanPayment(
   const first = await db.planPurchase.findUnique({ where: { id }, select: { clientId: true } });
   if (!first) return { ok: false, code: "not_found", message: "Payment not found." };
 
-  return db.$transaction(async (tx) => {
+  const res = await db.$transaction(async (tx) => {
     await lockClient(tx, first.clientId);
     const row = await tx.planPurchase.findUnique({ where: { id } });
     if (!row) return { ok: false, code: "not_found", message: "Payment not found." };
@@ -168,6 +169,10 @@ export async function verifyPlanPayment(
     const when = startsAt.getTime() === now.getTime() ? "starts now" : `starts ${formatInTimeZone(startsAt, APP_TZ, "d MMM yyyy, h:mm a")}`;
     return { ok: true, message: `Verified. ${plan} ${when} and runs to ${formatInTimeZone(endsAt, APP_TZ, "d MMM yyyy, h:mm a")}.` };
   });
+  if (res.ok && first?.clientId) {
+    await reconcileTenantWorkspaceMode(first.clientId).catch(() => {});
+  }
+  return res;
 }
 
 /** Thabaal couldn't find the money. Grants nothing; the reference can be sent again if it was a mistake. */
@@ -198,7 +203,7 @@ export async function recordExistingPeriod(
   const endsAt = periodEnd(startsAt, input.cycle, APP_TZ);
   const prices = await loadPlanPrices();
 
-  return db.$transaction(async (tx) => {
+  const res = await db.$transaction(async (tx) => {
     if (!(await lockClient(tx, input.clientId))) return { ok: false, code: "not_found", message: "Business not found." };
     const rows = await periodRows(tx, input.clientId);
     const overlap = rows.some((r) => r.status === "VERIFIED" && r.startsAt && r.endsAt && r.startsAt < endsAt && startsAt < r.endsAt);
@@ -221,6 +226,10 @@ export async function recordExistingPeriod(
     });
     return { ok: true, id: row.id, message: `Recorded ${planDef(input.plan)!.n} to ${formatInTimeZone(endsAt, APP_TZ, "d MMM yyyy")}.` };
   });
+  if (res.ok) {
+    await reconcileTenantWorkspaceMode(input.clientId).catch(() => {});
+  }
+  return res;
 }
 
 /**
@@ -234,7 +243,7 @@ export async function grantGatewayPeriod(
 ): Promise<SubResult> {
   if (!isPlanKey(input.plan) || !isCycle(input.cycle)) return { ok: false, code: "invalid", message: "Unknown plan." };
   try {
-    return await db.$transaction(async (tx) => {
+    const res = await db.$transaction(async (tx) => {
       if (!(await lockClient(tx, input.clientId))) return { ok: false, code: "not_found", message: "Business not found." };
       const already = await tx.planPurchase.findUnique({ where: { paymentRef: input.paymentRef }, select: { id: true } });
       if (already) return { ok: true, code: "already", id: already.id, message: "Already recorded." };
@@ -263,6 +272,10 @@ export async function grantGatewayPeriod(
       await tx.planPurchase.update({ where: { id: row.id }, data: { billNo: billNumber(row.id, now) } });
       return { ok: true, id: row.id, message: `${planDef(input.plan)!.n} paid to ${formatInTimeZone(endsAt, APP_TZ, "d MMM yyyy, h:mm a")}.` };
     });
+    if (res.ok) {
+      await reconcileTenantWorkspaceMode(input.clientId).catch(() => {});
+    }
+    return res;
   } catch (e) {
     if (isUniqueClash(e)) return { ok: true, code: "already", message: "Already recorded." };
     throw e;
@@ -318,6 +331,39 @@ export async function planCapacityBlock(clientId: string, kind: PlanLimitKind, n
   return kind === "camp"
     ? `The ${eff.plan.n} plan allows ${limit} campaign sends a month, and all ${limit} are used this month. ${more}`
     : `The ${eff.plan.n} plan allows ${limit} ${what}, and all are in use. ${more}`;
+}
+
+/**
+ * Whether a client's subscription plan includes the Google Sheets live sync feature.
+ * Per Thabaal authoritative pricing plans (account-plans.ts), Google Sheets sync
+ * is an exclusive feature of the Business plan (₹4,999/mo).
+ */
+export async function canUseGoogleSheets(
+  clientId: string,
+  now = new Date(),
+): Promise<{ allowed: boolean; reason?: string; planKey?: string | null }> {
+  const eff = await effectivePlan(clientId, now);
+  if (eff.status === "none") {
+    // Unmanaged / legacy account without plan requirement (e.g. pre-plan clients)
+    return { allowed: true, planKey: null };
+  }
+  if (!eff.plan) {
+    return {
+      allowed: false,
+      reason: "Your subscription plan has expired. Please renew your plan in My account to use Google Sheets sync.",
+      planKey: null,
+    };
+  }
+  // Check if plan includes Google Sheets export / sync (Business plan)
+  const hasFeature = eff.plan.k === "business" || eff.plan.f.some((f) => /google sheet/i.test(f));
+  if (!hasFeature) {
+    return {
+      allowed: false,
+      reason: `Google Sheets sync is included in the Business plan. Your current plan (${eff.plan.n}) does not include this feature. Upgrade to Business in My account to enable Google Sheets sync.`,
+      planKey: eff.plan.k,
+    };
+  }
+  return { allowed: true, planKey: eff.plan.k };
 }
 
 /** Thabaal decides whether a business must have a paid plan to use thabaal (new businesses start with yes). */

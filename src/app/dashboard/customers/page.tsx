@@ -28,7 +28,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
   const locked = await planGate();
   if (locked) return locked;
   const sp = await searchParams;
-  const tab = sp.tab === "groups" || sp.tag === "lapsed" ? "groups" : sp.tab === "loyalty" || sp.tag === "loyalty" ? "loyalty" : "all";
+  const tab = sp.tab === "archived" ? "archived" : sp.tab === "groups" || sp.tag === "lapsed" ? "groups" : sp.tab === "loyalty" || sp.tag === "loyalty" ? "loyalty" : "all";
   const scope = await getScope();
 
   if (!scope.clientId)
@@ -41,7 +41,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
   const clientId = scope.clientId;
 
   const [{ customers: rows, platinumCut, goldCut }, client, pendingRows] = await Promise.all([
-    customersData(clientId, { clientName: scope.clientName }),
+    customersData(clientId, { clientName: scope.clientName, archivedOnly: tab === "archived" }),
     db.client.findUnique({ where: { id: clientId }, select: { homeCity: true, customFields: true } }),
     scope.canManage
       ? db.pendingCustomer.findMany({
@@ -236,13 +236,18 @@ export default async function CustomersPage({ searchParams }: PageProps<"/dashbo
             Open those customers and fix the number so they can be reached.
           </div>
         )}
+        {tab === "archived" && (
+          <div className="note" style={{ marginBottom: 14, background: "#fffbeb", borderColor: "#fde68a", color: "#92400e" }}>
+            <b>Archived Customers:</b> These customer profiles have been soft-deleted. Their order history, messages and payment records remain preserved. Click into any profile to view details or restore them.
+          </div>
+        )}
         <div className="toolbar" style={{ justifyContent: "flex-end", marginBottom: 0 }}>
           <CustomerActions
             canManage={scope.canManage}
             hasClient
             regions={regions}
             fields={readFields(client?.customFields, "customer")}
-            exportHref={scope.canManage && total > 0 ? "/api/customers/export" : null}
+            exportHref={scope.canManage && total > 0 ? (tab === "archived" ? "/api/customers/export?tab=archived" : "/api/customers/export") : null}
             exportCount={total}
           />
         </div>

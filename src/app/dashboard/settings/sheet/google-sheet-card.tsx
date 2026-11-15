@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ExternalLink, FileSpreadsheet, RefreshCw } from "@/components/icons";
 import { ActionButton } from "@/components/action-button";
 import { Badge, Callout, Card, CardHeader } from "@/components/ui";
@@ -5,6 +6,7 @@ import { buttonClass } from "@/components/ui-classes";
 import { fmtDate } from "@/lib/format";
 import { sheetUrl } from "@/lib/gsheet/google";
 import { sheetLinkView } from "@/lib/gsheet/sync";
+import { canUseGoogleSheets } from "@/lib/subscription";
 import { googleSheetDisconnect, googleSheetRebuild, googleSheetSyncNow } from "../../actions/google-sheet";
 
 /** What each tab of the connected sheet holds, in the words the sheet uses. */
@@ -25,19 +27,23 @@ const FLASH: Record<string, { tone: "success" | "danger" | "info"; text: string 
   expired: { tone: "danger", text: "That sign-in took too long or was for a different login. Please press Connect Google Sheets again." },
   "no-permission": { tone: "danger", text: "The box allowing Thabaal to create your sheet wasn't ticked. Press Connect again and tick it on Google's screen." },
   "not-allowed": { tone: "danger", text: "Only the business owner or a manager can connect Google Sheets." },
+  "upgrade-required": {
+    tone: "danger",
+    text: "Google Sheets live sync is included exclusively in the Business plan (₹4,999/mo). Please upgrade your subscription in My account to connect.",
+  },
   "not-configured": { tone: "danger", text: "Google sign-in isn't set up on this server yet. Please contact Thabaal." },
   failed: { tone: "danger", text: "Google didn't complete the connection. Please try again in a minute." },
 };
 
 /** Settings › Google Sheet: connect the business's own Google Sheet, kept live. */
 export async function GoogleSheetCard({ clientId, canManage, flash }: { clientId: string; canManage: boolean; flash?: string }) {
-  const link = await sheetLinkView(clientId);
+  const [link, ent] = await Promise.all([sheetLinkView(clientId), canUseGoogleSheets(clientId)]);
   const note = flash ? FLASH[flash] : undefined;
-  const connect = (
+  const connect = ent.allowed ? (
     <a className={buttonClass("primary", "md")} href="/api/google/sheets/connect">
       <FileSpreadsheet aria-hidden className="size-4" /> {link ? "Connect again" : "Connect Google Sheets"}
     </a>
-  );
+  ) : null;
   return (
     <Card className="card-3d">
       <CardHeader
@@ -52,6 +58,17 @@ export async function GoogleSheetCard({ clientId, canManage, flash }: { clientId
         }
       />
       <div className="space-y-4 p-4 sm:p-5">
+        {!ent.allowed && (
+          <Callout tone="warning" title="Business Plan Feature">
+            {ent.reason ?? "Google Sheets live sync is included exclusively in the Business plan."}
+            <div className="mt-2.5">
+              <Link href="/dashboard/account" className={buttonClass("primary", "sm")}>
+                View Plans & Upgrade
+              </Link>
+            </div>
+          </Callout>
+        )}
+
         {note && (
           <Callout tone={note.tone} role="status">
             {note.text}
@@ -60,7 +77,7 @@ export async function GoogleSheetCard({ clientId, canManage, flash }: { clientId
 
         {link?.status === "error" && (
           <Callout tone="danger" title="The sheet stopped updating">
-            {link.lastError ?? "Google access was removed."} {canManage ? "Press Connect again below; your sheet and its rows are kept." : "Ask a manager to connect it again."}
+            {link.lastError ?? "Google access was removed."} {canManage && ent.allowed ? "Press Connect again below; your sheet and its rows are kept." : "Ask a manager to connect it again."}
           </Callout>
         )}
 
@@ -77,7 +94,7 @@ export async function GoogleSheetCard({ clientId, canManage, flash }: { clientId
               <a className={buttonClass("primary", "md")} href={sheetUrl(link.spreadsheetId)} target="_blank" rel="noopener noreferrer">
                 <ExternalLink aria-hidden className="size-4" /> Open my sheet
               </a>
-              {canManage && link.status === "connected" && (
+              {canManage && ent.allowed && link.status === "connected" && (
                 <ActionButton action={googleSheetSyncNow} size="md">
                   <RefreshCw aria-hidden className="size-4" /> Update now
                 </ActionButton>
@@ -90,7 +107,11 @@ export async function GoogleSheetCard({ clientId, canManage, flash }: { clientId
             <p className="text-sm text-ink-2">
               Sign in with the business&apos;s Google account and allow Thabaal to create one sheet. Thabaal can only open that sheet, never your other files.
             </p>
-            {canManage ? connect : <p className="text-sm text-muted">Ask the business owner or a manager to connect it.</p>}
+            {ent.allowed ? (
+              canManage ? connect : <p className="text-sm text-muted">Ask the business owner or a manager to connect it.</p>
+            ) : (
+              <p className="text-sm text-muted">Upgrade to Business plan to enable Google Sheets sync.</p>
+            )}
           </div>
         )}
 

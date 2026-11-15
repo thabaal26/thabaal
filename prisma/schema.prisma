@@ -147,6 +147,8 @@ model Client {
   iconPack            String            @default("hugeicons")
   /// Look of the coloured icon tiles: "3d" (glossy, default) or "2d" (flat).
   iconLook            String            @default("3d")
+  /// Current workspace mode: DEMO (exploring), LIVE_PENDING_PAYMENT (provisioned, awaiting payment), LIVE_ACTIVE (paid and active), SUSPENDED
+  workspaceMode       WorkspaceMode     @default(DEMO)
   /// This client's own look, overriding the portal default key by key (lib/appearance.ts).
   appearance          Json?
   audiences           Audience[]
@@ -161,6 +163,9 @@ model Client {
   campaigns           Campaign[]
   numbers             WhatsAppNumber[]
   orders              Order[]
+  importBatches       ImportBatch[]
+  metaApps            MetaAppCredential[]
+  whatsAppConnections WhatsAppConnection[]
 }
 
 /// One sending number on Meta's Cloud API. Templates belong to its WhatsApp Business
@@ -184,13 +189,80 @@ model WhatsAppNumber {
   /// Our own lower limit while warming a new number up; null follows Meta's tier.
   dailyCap          Int?
   statusCheckedAt   DateTime?
-  createdAt         DateTime   @default(now())
+  createdAt         DateTime            @default(now())
+  connectionId      String?
+  connection        WhatsAppConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
   campaigns         Campaign[]
   messages          Message[]
   replies           Reply[]
   calls             Call[]
 
   @@index([clientId])
+}
+
+enum OnboardingMode {
+  MANUAL
+  EMBEDDED_SIGNUP
+}
+
+enum ConnectionStatus {
+  DRAFT
+  VALIDATING
+  PENDING_WEBHOOK
+  ACTIVE
+  NEEDS_REAUTH
+  DISCONNECTED
+  ERROR
+}
+
+enum WorkspaceMode {
+  DEMO
+  LIVE_PENDING_PAYMENT
+  LIVE_PENDING_CONNECTION
+  LIVE_ACTIVE
+  SUSPENDED
+}
+
+model MetaAppCredential {
+  id            String               @id @default(cuid())
+  appId         String               @unique
+  appName       String?
+  appSecret     String
+  verifyToken   String?
+  isPlatformApp Boolean              @default(false)
+  clientId      String?
+  client        Client?              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  connections   WhatsAppConnection[]
+
+  @@index([clientId])
+}
+
+model WhatsAppConnection {
+  id                String             @id @default(cuid())
+  clientId          String
+  client            Client             @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  appCredentialId   String?
+  appCredential     MetaAppCredential? @relation(fields: [appCredentialId], references: [id], onDelete: SetNull)
+  onboardingMode    OnboardingMode     @default(MANUAL)
+  wabaId            String
+  token             String
+  graphVersion      String             @default("v23.0")
+  status            ConnectionStatus   @default(DRAFT)
+  permissionCheck   Json?
+  assetCheck        Json?
+  webhookSubscribed Boolean            @default(false)
+  lastValidatedAt   DateTime?
+  lastErrorCode     Int?
+  lastErrorDetails  String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  numbers           WhatsAppNumber[]
+
+  @@unique([clientId, wabaId])
+  @@index([clientId])
+  @@index([wabaId])
 }
 
 enum Role {
@@ -257,6 +329,9 @@ model Customer {
   /// One person with several WhatsApp numbers (lib/linked-numbers.ts): every number is its own row, and rows with
   /// the same personId are the same person. Campaigns reach each number; null = a single number.
   personId         String?
+  deletedAt        DateTime?
+  deletedBy        String?
+  deleteReason     String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   messages         Message[]
@@ -269,6 +344,7 @@ model Customer {
   @@unique([clientId, phone])
   @@index([phone])
   @@index([clientId, personId])
+  @@index([clientId, deletedAt])
   @@index([clientId, region])
   @@index([clientId, optedOut, unreachable])
 }
@@ -433,7 +509,7 @@ model Message {
   runId           String?
   run             CampaignRun?    @relation(fields: [runId], references: [id], onDelete: SetNull)
   customerId      String
-  customer        Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer        Customer        @relation(fields: [customerId], references: [id], onDelete: Restrict)
   templateId      String?
   template        Template?       @relation(fields: [templateId], references: [id], onDelete: SetNull)
   templateName    String
@@ -468,7 +544,7 @@ model Message {
 model Reply {
   id          String          @id @default(cuid())
   customerId  String
-  customer    Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer    Customer        @relation(fields: [customerId], references: [id], onDelete: Restrict)
   text        String
   kind        String // text | button | media | order
   /// Media the customer sent (image, audio, video, document, sticker); fetched from Meta when viewed.
@@ -509,7 +585,7 @@ model Order {
   clientId           String
   client             Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
   customerId         String
-  customer           Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer           Customer    @relation(fields: [customerId], references: [id], onDelete: Restrict)
   waMessageId        String?     @unique
   catalogId          String?
   /// The note the customer typed with the cart, if any.
@@ -738,7 +814,7 @@ model LoyaltyEntry {
   id         String   @id @default(cuid())
   clientId   String
   customerId String
-  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
   /// Points added (positive) or taken off (negative).
   delta      Int
   /// "give", "take" or "redeem"
@@ -1012,7 +1088,7 @@ model Conversation {
   clientId    String
   client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
   customerId  String    @unique
-  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Restrict)
   /// Automatic replies are off until then (a far date = until someone resumes them).
   pausedUntil DateTime?
   pausedBy    String?
@@ -1069,6 +1145,189 @@ model PortalUploadedImage {
   id        String   @id
   mimeType  String
   data      Bytes
+  isPublic  Boolean  @default(false)
+  clientId  String?
   createdAt DateTime @default(now())
+
+  @@index([clientId])
 }
+
+/// Persistent registry of revoked media capability tokens.
+/// Guarantees revocation survives PM2 restarts, cluster instances, and deployments (F-01).
+model RevokedMediaToken {
+  tokenHash String   @id
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  clientId  String?
+  reason    String?
+
+  @@index([expiresAt])
+  @@index([clientId])
+}
+
+// ==========================================
+// UNIVERSAL MULTI-TENANT BULK CUSTOMER IMPORT
+// ==========================================
+
+enum ImportStatus {
+  UPLOADING       // Binary chunks actively assembling on disk
+  UPLOADED        // Full files assembled on disk; ready for inspection
+  INSPECTING      // Worker scanning sheets, boundaries, and headers
+  MAPPING_DUE     // Awaiting user confirmation of column mapping
+  STAGING         // Worker parsing and staging records in memory-bounded batches
+  STAGED          // All rows classified; reconciliation ledger ready
+  COMMITTING      // Ingestion into Customer table running in chunked transactions
+  COMPLETED       // Successfully committed; final reconciliation summary ready
+  FAILED          // Critical error during processing
+  CANCELLED       // Dismissed or rolled back by client
+}
+
+enum StagingRowClassification {
+  VALID_SINGLE_NEW
+  VALID_SINGLE_EXISTING
+  INTRA_FILE_DUPLICATE
+  AMBIGUOUS_MULTI_PHONE
+  INVALID_RECORD
+  STRUCTURAL_OR_HEADER
+  EMPTY_ROW
+}
+
+/// A bulk customer import job initiated by a tenant, supporting single or multi-file uploads.
+model ImportBatch {
+  id                    String              @id @default(cuid())
+  clientId              String
+  client                Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  userId                String              // User who initiated the import
+  idempotencyKey        String              @unique // Tenant-scoped unique key: "${clientId}_${batchId}"
+  status                ImportStatus        @default(UPLOADING)
+
+  totalFiles            Int                 @default(0)
+  totalSourceRows       Int                 @default(0)
+  emptyRows             Int                 @default(0)
+  structuralRows        Int                 @default(0)
+  invalidRows           Int                 @default(0)
+  ambiguousRows         Int                 @default(0)
+  validSingleNew        Int                 @default(0)
+  validSingleExist      Int                 @default(0)
+  intraFileDups         Int                 @default(0)
+
+  // Commit Ingestion Metrics
+  committedNew          Int                 @default(0)
+  committedUpdated      Int                 @default(0)
+  committedFailed       Int                 @default(0)
+
+  // Meta WhatsApp Compliance & Tags
+  optInSource           String              // Compliance note: e.g. "In-Store Billing POS"
+  defaultTags           String[]            @default([])
+
+  // Conflict & Safety Rules
+  overwriteNames        Boolean             @default(false)
+  overwriteAreas        Boolean             @default(false)
+  multiPhoneChoice      String              @default("PRIMARY_ONLY") // "PRIMARY_ONLY" | "SEPARATE" | "LINKED"
+
+  // Worker Lease & Distributed Locking (No connection pool deadlocks)
+  workerLeaseToken      String?
+  workerLeaseExpiresAt  DateTime?
+  workerHeartbeatAt     DateTime?
+  workerFenceVersion    Int                 @default(0)
+  attemptCount          Int                 @default(0)
+
+  approvedBy            String?
+  approvedAt            DateTime?
+  errorMessage          String?
+  startedAt             DateTime            @default(now())
+  completedAt           DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  files                 ImportFile[]
+  stagingRecords        ImportStagingRecord[]
+  errors                ImportErrorLog[]
+
+  @@index([clientId, status])
+  @@index([clientId, createdAt])
+  @@index([workerLeaseExpiresAt])
+}
+
+/// An individual spreadsheet or archive file inside an import batch.
+model ImportFile {
+  id                    String              @id @default(cuid())
+  batchId               String
+  batch                 ImportBatch         @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  clientId              String
+  originalFileName      String
+  safeStoredFileName    String
+  fileFormat            String              // CSV, TSV, XLSX, XLS, ODS, XLSM, ZIP
+  fileSize              Int                 // Exact size in bytes
+  checksum              String              // SHA-256 hash of assembled file
+  storagePath           String              // Disk path (/srv/thabaal/shared/imports/...)
+  sheetNames            String[]            @default([])
+  selectedSheet         String?
+  columnMapping         Json?               // Auto-detected or user-confirmed column map
+  status                String              @default("PENDING") // PENDING, STAGED, FAILED
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  stagingRecords        ImportStagingRecord[]
+  errors                ImportErrorLog[]
+
+  @@index([batchId])
+  @@index([clientId])
+}
+
+/// Staged raw and normalized row records before production commit.
+model ImportStagingRecord {
+  id                    String                    @id @default(cuid())
+  batchId               String
+  batch                 ImportBatch               @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  fileId                String
+  file                  ImportFile                @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  clientId              String
+  sheetName             String?
+  tableId               String?
+  sourceRowNumber       Int                       // 1-indexed row number from source file
+  sourceIdentity        String                    // Stable identity: "${fileId}:${sheetName}:${sourceRowNumber}"
+
+  rawRowData            Json?                     // Raw cell strings as extracted from sheet
+  normalizedData        Json?                     // Normalized customer fields
+  normalizedPhone       String?                   // Clean E.164 digits, e.g. "919876543210"
+  candidatePhones       String[]                  @default([]) // Extracted phone candidates
+  name                  String?
+  location              String?
+  region                String?
+  tags                  String[]                  @default([])
+  extra                 Json?
+
+  classification        StagingRowClassification  @default(VALID_SINGLE_NEW)
+  validationErrors      String[]                  @default([])
+  reviewStatus          String                    @default("PENDING") // PENDING, APPROVED, REJECTED
+  committedAt           DateTime?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  @@index([batchId, classification])
+  @@index([batchId, normalizedPhone])
+  @@index([clientId, normalizedPhone])
+}
+
+/// Detailed line-by-line failure and diagnostic log.
+model ImportErrorLog {
+  id                    String              @id @default(cuid())
+  batchId               String
+  batch                 ImportBatch         @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  fileId                String?
+  file                  ImportFile?         @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  clientId              String
+  sheetName             String?
+  tableId               String?
+  sourceRowNumber       Int
+  errorCode             String              // e.g. "INVALID_PHONE_LENGTH", "CORRUPTED_STRING"
+  reason                String              // Human-readable diagnostic message
+  safeDiagnosticData    Json?               // Non-sensitive context for debugging
+  createdAt             DateTime            @default(now())
+
+  @@index([batchId])
+  @@index([clientId])
+}
+
 

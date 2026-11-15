@@ -101,6 +101,9 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
         </div>
       </div>
       <div className="tools mb16" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <Pill tone={c.workspaceMode === "LIVE_ACTIVE" ? "ok" : c.workspaceMode === "LIVE_PENDING_PAYMENT" ? "warn" : c.workspaceMode === "LIVE_PENDING_CONNECTION" ? "info" : c.workspaceMode === "SUSPENDED" ? "bad" : "plain"}>
+          {c.workspaceMode === "LIVE_ACTIVE" ? "Live Active" : c.workspaceMode === "LIVE_PENDING_PAYMENT" ? "Live Pending Payment" : c.workspaceMode === "LIVE_PENDING_CONNECTION" ? "Live Pending Connection" : c.workspaceMode === "SUSPENDED" ? "Suspended" : "Demo Mode"}
+        </Pill>
         <Pill tone={r.stateTone}>{r.stateLabel}</Pill>
         <Pill tone="plain">{planName(r.plan)}</Pill>
         {r.cycle && <Pill tone="plain">{cycleName(r.cycle)}</Pill>}

@@ -1,4 +1,5 @@
 import "server-only";
+import { Prisma } from "@prisma/client";
 import { db } from "./db";
 import { computeCustomerLoyalty, isInternalLoyaltyTag } from "./loyalty";
 import { mergePurchases } from "./linked-numbers";
@@ -54,9 +55,18 @@ export const STATUS_TONE: Record<Status, "ok" | "warn" | "bad" | "mute"> = { Act
 /** Without a customer's own rhythm yet, this gap (days) stands in. */
 const DEFAULT_GAP = 30;
 
-export async function customersData(clientId: string, opts: { clientName?: string | null } = {}) {
+export async function customersData(
+  clientId: string,
+  opts: { clientName?: string | null; includeArchived?: boolean; archivedOnly?: boolean } = {},
+) {
   const now = Date.now();
   const rulesP = loyaltyRulesFor(clientId);
+  const deletedCondition = opts.archivedOnly
+    ? Prisma.sql`AND c."deletedAt" IS NOT NULL`
+    : opts.includeArchived
+      ? Prisma.sql``
+      : Prisma.sql`AND c."deletedAt" IS NULL`;
+
   const rows = await db.$queryRaw<
     {
       id: string;
@@ -88,7 +98,7 @@ export async function customersData(clientId: string, opts: { clientName?: strin
       (SELECT count(*) FROM "Reply" r WHERE r."customerId" = c.id) AS replies
     FROM "Customer" c
     LEFT JOIN "Order" o ON o."customerId" = c.id AND o.status <> 'CANCELLED'
-    WHERE c."clientId" = ${clientId}
+    WHERE c."clientId" = ${clientId} ${deletedCondition}
     GROUP BY c.id
     ORDER BY max(o."createdAt") DESC NULLS LAST, c."createdAt" DESC
     LIMIT 5000

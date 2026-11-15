@@ -196,8 +196,11 @@ type RzpSubscription = {
   ended_at?: number | null;
   has_scheduled_changes?: boolean;
   change_scheduled_at?: number | null;
+  plan_id?: string;
+  total_count?: number;
+  auth_attempts?: number;
 };
-type RzpOrder = { id: string; amount: number; status: string };
+type RzpOrder = { id: string; amount: number; status: string; attempts?: number };
 
 /* ------------------------------------------------------------- test package */
 
@@ -320,15 +323,54 @@ export async function startPlanSubscription(who: Who, plan: string, cycle: strin
     const startAt = through && through.getTime() > now.getTime() + 10 * 60_000 ? Math.floor(through.getTime() / 1000) : null;
     const startsLabel = startAt ? formatInTimeZone(new Date(startAt * 1000), APP_TZ, "d MMM yyyy, h:mm a") : null;
 
-    // Reuse a checkout opened in the last 30 minutes for the same plan instead of piling up unpaid subscriptions.
-    const recent = await db.razorpayRecord.findFirst({
-      where: { kind: "subscription", purpose: "plan", clientId, plan, cycle, amountPaise, status: "created", createdAt: { gte: new Date(now.getTime() - 30 * 60_000) } },
-      orderBy: { createdAt: "desc" },
-      select: { rzpId: true },
-    });
-    if (recent) return { ok: true, kind: "subscription", id: recent.rzpId, keyId: k.keyId, amountPaise, label, startsLabel };
-
     const planId = await razorpayPlanId(plan, cycle, amountPaise);
+
+    // Reuse a checkout opened in the last 5 minutes ONLY IF pristine and strictly valid for authorization:
+    // 1. Same clientId, plan, cycle, amountPaise
+    // 2. Status is "created"
+    // 3. No failure note recorded (note must be null)
+    // 4. No paymentId recorded
+    // 5. Provider state check: verify subscription in Razorpay has 0 auth attempts and matching plan & total_count
+    const REUSE_WINDOW_MS = 5 * 60_000;
+    const recent = await db.razorpayRecord.findFirst({
+      where: {
+        kind: "subscription",
+        purpose: "plan",
+        clientId,
+        plan,
+        cycle,
+        amountPaise,
+        status: "created",
+        paymentId: null,
+        note: null,
+        createdAt: { gte: new Date(now.getTime() - REUSE_WINDOW_MS) },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, rzpId: true },
+    });
+
+    if (recent) {
+      try {
+        const providerSub = await rzp<RzpSubscription>("GET", `/subscriptions/${recent.rzpId}`);
+        const isPristine =
+          providerSub.status === "created" &&
+          (providerSub.auth_attempts ?? 0) === 0 &&
+          (providerSub.total_count ?? 0) === TOTAL_COUNT[cycle] &&
+          providerSub.plan_id === planId;
+
+        if (isPristine) {
+          return { ok: true, kind: "subscription", id: recent.rzpId, keyId: k.keyId, amountPaise, label, startsLabel };
+        } else {
+          await db.razorpayRecord.update({
+            where: { id: recent.id },
+            data: { note: `Ineligible for reuse (provider status: ${providerSub.status}, auth_attempts: ${providerSub.auth_attempts ?? 0})` },
+          });
+        }
+      } catch (checkErr) {
+        console.warn("Could not verify candidate subscription for reuse:", recent.rzpId, checkErr);
+      }
+    }
+
     const sub = await rzp<RzpSubscription>("POST", "/subscriptions", {
       plan_id: planId,
       total_count: TOTAL_COUNT[cycle],
@@ -366,6 +408,41 @@ export async function startPlanOrder(who: Who, plan: string, cycle: string, now 
 
     const amountPaise = pricePaise(plan, cycle, await loadPlanPrices());
     const label = `${planDef(plan)!.n} · ${CYCLE_NAMES[cycle].en} (One-time)`;
+
+    // Check for a clean, unattempted order created in the last 2 minutes to prevent double-click duplication
+    const ORDER_REUSE_MS = 2 * 60_000;
+    const recentOrder = await db.razorpayRecord.findFirst({
+      where: {
+        kind: "order",
+        purpose: "plan",
+        clientId,
+        plan,
+        cycle,
+        amountPaise,
+        status: "created",
+        paymentId: null,
+        note: null,
+        createdAt: { gte: new Date(now.getTime() - ORDER_REUSE_MS) },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, rzpId: true },
+    });
+
+    if (recentOrder) {
+      try {
+        const providerOrder = await rzp<RzpOrder>("GET", `/orders/${recentOrder.rzpId}`);
+        if (providerOrder.status === "created" && (providerOrder.attempts ?? 0) === 0) {
+          return { ok: true, kind: "order", id: recentOrder.rzpId, keyId: k.keyId, amountPaise, label, startsLabel: null };
+        } else {
+          await db.razorpayRecord.update({
+            where: { id: recentOrder.id },
+            data: { note: `Ineligible for reuse (status: ${providerOrder.status}, attempts: ${providerOrder.attempts ?? 0})` },
+          });
+        }
+      } catch (err) {
+        console.warn("Could not verify candidate order for reuse:", recentOrder.rzpId, err);
+      }
+    }
 
     const order = await rzp<RzpOrder>("POST", "/orders", {
       amount: amountPaise,
@@ -828,6 +905,20 @@ async function applyOrderPayment(orderId: string, paymentId: string): Promise<Re
     }).catch(() => {});
   }
   return { ok: txRes.ok, message: txRes.message };
+}
+
+/** Records checkout outcome (closed/failed) so that failed attempts are immediately invalidated from reuse. */
+export async function recordCheckoutOutcome(rzpId: string, outcome: "closed" | "failed", message?: string): Promise<void> {
+  const cleanId = String(rzpId ?? "").trim().slice(0, 100);
+  if (!cleanId) return;
+  try {
+    await db.razorpayRecord.updateMany({
+      where: { rzpId: cleanId, status: "created", note: null },
+      data: { note: `Checkout ${outcome}: ${message || (outcome === "closed" ? "Modal closed by user" : "Failed in checkout")}` },
+    });
+  } catch (e) {
+    console.error("recordCheckoutOutcome error:", e);
+  }
 }
 
 export async function confirmOrderCheckout(who: Who, input: { orderId: string; paymentId: string; signature: string }): Promise<Result> {

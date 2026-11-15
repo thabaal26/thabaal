@@ -53,6 +53,7 @@ export type InboxReply = {
     name: string;
     phone: string;
     purchases: string | null;
+    deletedAt?: Date | null;
     client: { name: string };
     orders?: {
       id: string;
@@ -76,6 +77,7 @@ export type ChatProfile = {
   since: Date;
   optedOut: boolean;
   unreachable: boolean;
+  isArchived?: boolean;
   orderCount: number;
   orders: { id: string; number: number; ref: string | null; total: number; currency: string; status: string; createdAt: Date }[];
   /** Automatic replies off for this chat (lib/engine/conversation.ts): paused by staff, or quiet after a staff reply. */
@@ -442,6 +444,14 @@ export function ReplyInbox({
                 <p className={claimed ? "claim" : undefined}>{currentPurchasesSubtitle}</p>
               </span>
             </button>
+            {(profile?.isArchived || selected.customer.deletedAt) && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900 border border-amber-300"
+                title={isTamil ? "காப்பகப்படுத்தப்பட்ட வாடிக்கையாளர் தொடர்பு" : "Archived Customer Contact — Replies permitted within 24h service window"}
+              >
+                {isTamil ? "காப்பகப்படுத்தப்பட்டது" : "Archived Customer Contact"}
+              </span>
+            )}
             {windowOpen ? (
               <span className="wa-win" title={isTamil ? "வாடிக்கையாளர் எழுதியதிலிருந்து 24 மணி நேரம் இலவசமாக பதிலளிக்கலாம்" : "You can reply free for 24 hours after the customer writes"}>
                 {isTamil ? "இலவச பதில்" : "Free replies"}

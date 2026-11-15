@@ -55,7 +55,7 @@ describe("linked numbers: saving and campaigns", () => {
     clientId = (await db.client.create({ data: { name: `QA Linked ${Date.now()}`, orderPrefix: "QL", quietFrom: null, quietTo: null, marketingGapHours: 0 } })).id;
     await db.whatsAppNumber.create({ data: { clientId, label: "Main", phoneNumberId: `qa-linked-${Date.now()}`, businessAccountId: "qa-linked-waba", token: "qa-fake-token", isDefault: true, messagingTier: "TIER_1K" } });
     for (const [k, i] of [["jeeva", 1], ["kala", 2], ["mani", 3]] as const)
-      ids[k] = (await db.customer.create({ data: { clientId, phone: `${P}${i}`, name: k, location: "Ring Road", region: "Madurai city", purchases: "Gingelly oil", tags: ["ghee", "loyalty-bonus:50"], optInSource: "Bought from us" } })).id;
+      ids[k] = (await db.customer.create({ data: { clientId, phone: `${P}${i}`, name: k, location: "Ring Road", region: "Madurai city", purchases: "Gingelly oil", tags: ["ghee", "loyalty-bonus:50"], optInSource: "Bought from us", optInAt: new Date("2026-01-01T00:00:00Z") } })).id;
     templateId = (await db.template.create({ data: { clientId, businessAccountId: "qa-linked-waba", name: "qa_linked_offer", category: "MARKETING", status: "APPROVED", language: "en", body: "Offer" } })).id;
   });
 

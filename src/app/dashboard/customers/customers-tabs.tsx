@@ -1,7 +1,7 @@
 import { LinkTabs } from "../portal-ui";
 
-/** Customers' four tabs from the portal design (Refills keeps its own address). */
-export function CustomersTabs({ active }: { active: "all" | "groups" | "loyalty" | "refills" }) {
+/** Customers' tabs from the portal design (Refills keeps its own address). */
+export function CustomersTabs({ active }: { active: "all" | "groups" | "loyalty" | "refills" | "archived" }) {
   return (
     <LinkTabs
       label="Customers views"
@@ -11,6 +11,7 @@ export function CustomersTabs({ active }: { active: "all" | "groups" | "loyalty"
         { id: "groups", href: "/dashboard/customers?tab=groups", label: "Groups to reach", ta: "அணுக வேண்டிய குழுக்கள்" },
         { id: "loyalty", href: "/dashboard/customers?tab=loyalty", label: "Loyalty", ta: "லாயல்டி" },
         { id: "refills", href: "/dashboard/refills", label: "Refills", ta: "மறு ஆர்டர்கள்" },
+        { id: "archived", href: "/dashboard/customers?tab=archived", label: "Archived", ta: "காப்பகப்படுத்தப்பட்டது" },
       ]}
     />
   );

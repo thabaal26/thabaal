@@ -23,6 +23,8 @@ import {
   type WaConfig,
 } from "@/lib/whatsapp";
 import { clientAccounts, clientNumbers, senderForAccount } from "@/lib/senders";
+import { markTemplateImagePublic } from "@/lib/uploaded-image";
+import { revokeTokensForImage } from "@/lib/media-token";
 import { explainError } from "@/lib/meta-errors";
 import { syncedHeaderImage } from "@/lib/media";
 import { trackPress } from "@/lib/usage";
@@ -136,7 +138,18 @@ export async function saveTemplate(id: string | null, draft: TemplateDraft): Pro
     const sameForMeta = keys.every((k) => stable(newRest[k]) === stable(oldRest[k as keyof typeof oldRest]));
     if (sameForMeta) {
       const localChange = newUrl !== oldUrl || stable(newVars) !== stable(oldVars);
-      if (localChange) await db.template.update({ where: { id }, data: { headerMediaUrl: newUrl, variables: newVars } });
+      if (localChange) {
+        await db.template.update({ where: { id }, data: { headerMediaUrl: newUrl, variables: newVars } });
+        // Only promote to public if template is in APPROVED status
+        if (newUrl && existing.status === "APPROVED") {
+          await markTemplateImagePublic(newUrl, existing.clientId);
+        }
+        // F-02: Revoke tokens for the replaced/removed old media image
+        if (oldUrl && oldUrl !== newUrl) {
+          const match = oldUrl.match(/\/api\/upload\/([a-zA-Z0-9._-]+)/);
+          if (match) await revokeTokensForImage(match[1], { clientId: existing.clientId, reason: "Template header image replaced" });
+        }
+      }
       revalidatePath("/dashboard/templates");
       return {
         ok: true,
@@ -176,15 +189,20 @@ export async function saveTemplate(id: string | null, draft: TemplateDraft): Pro
     data: { clientId, businessAccountId, name: draft.name, language: draft.language, category: draft.category, ...contentFields(draft), status: live ? "DRAFT" : "APPROVED" },
   });
   if (!live) {
+    if (draft.headerMediaUrl) await markTemplateImagePublic(draft.headerMediaUrl, clientId);
     revalidatePath("/dashboard/templates");
     return { ok: true, id: created.id, message: "Template created. Demo mode approves templates instantly." };
   }
   try {
     const res = await createMetaTemplate(cfg, { name: draft.name, language: draft.language, category: draft.category, components: await metaComponents(cfg, draft) });
+    const mapped = mapMetaStatus(res.status);
     await db.template.update({
       where: { id: created.id },
-      data: { metaId: res.id, status: mapMetaStatus(res.status), category: res.category as never, lastSyncedAt: new Date() },
+      data: { metaId: res.id, status: mapped, category: res.category as never, lastSyncedAt: new Date() },
     });
+    if (mapped === "APPROVED" && draft.headerMediaUrl) {
+      await markTemplateImagePublic(draft.headerMediaUrl, clientId);
+    }
   } catch (e) {
     await db.template.update({ where: { id: created.id }, data: { statusReason: errText(e) } });
     revalidatePath("/dashboard/templates");
@@ -247,6 +265,7 @@ export async function syncTemplates(): Promise<ActionResult> {
 
           if (hasChanged) {
             await db.template.update({ where: { id: local.id }, data: { ...content, ...(image && { headerMediaUrl: image }) } });
+            if (image && content.status === "APPROVED") await markTemplateImagePublic(image, local.clientId);
           } else {
             await db.$executeRaw`
               UPDATE "Template"
@@ -256,6 +275,7 @@ export async function syncTemplates(): Promise<ActionResult> {
           }
         } else {
           await db.template.create({ data: { clientId, name: r.name, language: r.language, ...content, ...(image && { headerMediaUrl: image }), variables: { "1": { source: "first_name" } } } });
+          if (image && content.status === "APPROVED") await markTemplateImagePublic(image, clientId);
           imported++;
         }
       }
