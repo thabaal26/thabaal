@@ -13,9 +13,9 @@ export async function campaignFormData(clientId: string) {
       select: { id: true, name: true, category: true, status: true, businessAccountId: true },
       orderBy: { name: "asc" },
     }),
-    db.customer.count({ where: { clientId, optedOut: false } }),
+    db.customer.count({ where: { clientId, optedOut: false, deletedAt: null } }),
     db.$queryRaw<{ tag: string; n: bigint }[]>`
-      SELECT unnest(tags) AS tag, count(*) AS n FROM "Customer" WHERE "optedOut" = false AND "clientId" = ${clientId} GROUP BY 1 ORDER BY 1`,
+      SELECT unnest(tags) AS tag, count(*) AS n FROM "Customer" WHERE "optedOut" = false AND "deletedAt" IS NULL AND "clientId" = ${clientId} GROUP BY 1 ORDER BY 1`,
     clientNumbers(clientId),
     db.audience.findMany({ where: { clientId }, orderBy: { name: "asc" } }),
     segmentSummary(clientId),

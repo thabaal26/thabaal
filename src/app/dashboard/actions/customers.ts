@@ -7,6 +7,7 @@ import { asPerson, linkCustomers, numbersNote, otherNumbers, setOtherNumbers } f
 import { defaultRegion, homeCityOf, regionsFor } from "@/lib/regions";
 import { cleanValues, readFields, readValues } from "@/lib/custom-fields";
 import { owned, requireManager, requireUser } from "@/lib/session";
+import { revokeTokensForImage } from "@/lib/media-token";
 import type { ActionResult } from "./templates";
 
 const parseTags = (s: string) => [...new Set(s.split(/[,;|]/).map((t) => t.trim().toLowerCase()).filter(Boolean))];
@@ -191,7 +192,78 @@ function splitCsv(line: string) {
   return out;
 }
 
-export async function importCustomers(csv: string, extraTags: string, optInSource = ""): Promise<ActionResult> {
+export interface ImportPreviewResult {
+  ok: boolean;
+  message?: string;
+  totalRows: number;
+  newCount: number;
+  activeExistingCount: number;
+  archivedCount: number;
+  invalidCount: number;
+  archivedPhones: string[];
+}
+
+/** Previews a customer CSV before importing, discovering new, active, and archived matches. */
+export async function previewCustomerImport(csv: string): Promise<ImportPreviewResult> {
+  const s = await requireManager(true);
+  if ("denied" in s) return { ok: false, message: s.denied, totalRows: 0, newCount: 0, activeExistingCount: 0, archivedCount: 0, invalidCount: 0, archivedPhones: [] };
+  const lines = csv.replace(/^﻿/, "").split(/\r?\n/).filter((l) => l.trim());
+  if (!lines.length) return { ok: false, message: "The file is empty.", totalRows: 0, newCount: 0, activeExistingCount: 0, archivedCount: 0, invalidCount: 0, archivedPhones: [] };
+
+  const head = splitCsv(lines[0]).map((h) => h.toLowerCase());
+  const hasHeader = head.some((h) => /name|phone|mobile|number|whatsapp/.test(h));
+  const col = (re: RegExp, fallback: number) => (hasHeader ? head.findIndex((h) => re.test(h)) : fallback);
+  const phoneIdx = col(/phone|mobile|number|whatsapp/, 1);
+  if (phoneIdx < 0) return { ok: false, message: "Couldn't find a phone column. Name it 'phone'.", totalRows: 0, newCount: 0, activeExistingCount: 0, archivedCount: 0, invalidCount: 0, archivedPhones: [] };
+
+  const phonesFound: string[] = [];
+  let invalid = 0;
+  for (const line of lines.slice(hasHeader ? 1 : 0)) {
+    const cells = splitCsv(line);
+    const phones = readPhones(cells[phoneIdx] ?? "").phones.slice(0, MAX_NUMBERS);
+    if (!phones.length) { invalid++; continue; }
+    phonesFound.push(...phones);
+  }
+
+  const clientId = s.clientId;
+  const uniquePhones = [...new Set(phonesFound)];
+  const existing = await db.customer.findMany({
+    where: { clientId, phone: { in: uniquePhones } },
+    select: { phone: true, deletedAt: true },
+  });
+
+  const existingMap = new Map(existing.map((c) => [c.phone, c.deletedAt]));
+  let newCount = 0;
+  let activeExistingCount = 0;
+  const archivedPhones: string[] = [];
+
+  for (const p of uniquePhones) {
+    if (!existingMap.has(p)) {
+      newCount++;
+    } else if (existingMap.get(p) != null) {
+      archivedPhones.push(p);
+    } else {
+      activeExistingCount++;
+    }
+  }
+
+  return {
+    ok: true,
+    totalRows: lines.length - (hasHeader ? 1 : 0),
+    newCount,
+    activeExistingCount,
+    archivedCount: archivedPhones.length,
+    invalidCount: invalid,
+    archivedPhones,
+  };
+}
+
+export async function importCustomers(
+  csv: string,
+  extraTags: string,
+  optInSource = "",
+  opts?: { restoreArchived?: boolean },
+): Promise<ActionResult> {
   trackPress("customer.import");
   const s = await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
@@ -236,8 +308,11 @@ export async function importCustomers(csv: string, extraTags: string, optInSourc
   if (rows.size > 20_000) return { ok: false, message: "Import up to 20,000 customers at a time." };
 
   const clientId = s.clientId;
-  const existing = await db.customer.findMany({ where: { clientId, phone: { in: [...rows.keys()] } }, select: { phone: true, tags: true, extra: true } });
-  const known = new Map(existing.map((c) => [c.phone, c.tags]));
+  const existing = await db.customer.findMany({
+    where: { clientId, phone: { in: [...rows.keys()] } },
+    select: { phone: true, tags: true, extra: true, deletedAt: true, optedOut: true },
+  });
+  const known = new Map(existing.map((c) => [c.phone, c]));
   const knownExtra = new Map(existing.map((c) => [c.phone, readValues(c.extra)]));
   const fresh = [...rows].filter(([p]) => !known.has(p));
   const optInAt = new Date();
@@ -245,13 +320,26 @@ export async function importCustomers(csv: string, extraTags: string, optInSourc
     data: fresh.map(([phone, r]) => ({ clientId, phone, name: r.name, tags: r.tags, optInSource: optInSource.trim(), optInAt, ...(Object.keys(r.fields).length && { extra: r.fields }) })),
     skipDuplicates: true,
   });
+
+  let restoredCount = 0;
   for (const [phone, r] of rows) {
-    const tags = known.get(phone);
-    if (tags)
+    const cust = known.get(phone);
+    if (cust) {
+      const isArchived = cust.deletedAt != null;
+      const shouldRestore = isArchived && opts?.restoreArchived === true;
+      if (shouldRestore) restoredCount++;
+
+      // OD-03 MANDATORY RULE: Never modify or reset optedOut! Preserve existing consent status.
       await db.customer.update({
         where: { clientId_phone: { clientId, phone } },
-        data: { name: r.name, tags: [...new Set([...tags, ...r.tags])], ...(Object.keys(r.fields).length && { extra: { ...knownExtra.get(phone), ...r.fields } }) },
+        data: {
+          name: r.name,
+          tags: [...new Set([...cust.tags, ...r.tags])],
+          ...(shouldRestore && { deletedAt: null, deletedBy: null, deleteReason: null }),
+          ...(Object.keys(r.fields).length && { extra: { ...knownExtra.get(phone), ...r.fields } }),
+        },
       });
+    }
   }
   let linked = 0;
   if (people.length) {
@@ -261,7 +349,7 @@ export async function importCustomers(csv: string, extraTags: string, optInSourc
   revalidatePath("/dashboard", "layout");
   return {
     ok: true,
-    message: `${fresh.length} added, ${existing.length} updated${linked ? `, ${linked} with more than one number (each number saved and linked)` : ""}${invalid ? `, ${invalid} skipped (invalid number)` : ""}.`,
+    message: `${fresh.length} added, ${existing.length} updated${restoredCount ? ` (${restoredCount} restored from archive)` : ""}${linked ? `, ${linked} with more than one number` : ""}${invalid ? `, ${invalid} skipped (invalid number)` : ""}. Marketing consent was strictly preserved.`,
   };
 }
 
@@ -277,18 +365,57 @@ export async function setOptOut(id: string, optedOut: boolean): Promise<ActionRe
   return { ok: true, message: optedOut ? "Customer won't receive campaigns." : "Customer will receive campaigns again." };
 }
 
-export async function deleteCustomer(id: string): Promise<ActionResult> {
+export async function deleteCustomer(id: string, reason?: string): Promise<ActionResult> {
   const s = await requireManager();
   if ("denied" in s) return { ok: false, message: s.denied };
-  // Orders are deleted with the customer (cascade), so a customer with orders is kept: their payments, refunds
-  // and reports must stay on record. Opting out stops all messages instead.
-  const orders = await db.order.count({ where: { customerId: id, ...owned(s) } });
-  if (orders > 0)
-    return { ok: false, message: `This customer has ${orders} order${orders === 1 ? "" : "s"}, so they're kept for your payment records. Use "Opt out" to stop all messages to them.` };
-  const r = await db.customer.deleteMany({ where: { id, ...owned(s) } });
-  if (!r.count) return { ok: false, message: "Customer not found." };
+  const existing = await db.customer.findFirst({ where: { id, ...owned(s) } });
+  if (!existing) return { ok: false, message: "Customer not found." };
+
+  try {
+    // Soft delete: preserve customer record and all historical relations (orders, messages, payments, loyalty)
+    await db.customer.update({
+      where: { id },
+      data: {
+        deletedAt: new Date(),
+        deletedBy: (s as any).userId ?? "manager",
+        deleteReason: reason || "User archived customer",
+      },
+    });
+
+    // F-02: Revoke media access tokens for customer documents upon archival
+    await revokeTokensForImage(`cust:${id}`, { clientId: existing.clientId, reason: "Customer profile archived" });
+
+    revalidatePath("/dashboard/customers");
+    revalidatePath(`/dashboard/customers/${id}`);
+    return { ok: true, message: "Customer moved to Archived Customers." };
+  } catch (err: any) {
+    if (err?.code === "P2003" || err?.message?.includes("foreign key constraint")) {
+      return { ok: false, message: "Cannot archive customer: foreign key relational constraint error." };
+    }
+    throw err;
+  }
+}
+
+/** Restores an archived (soft-deleted) customer profile to the active customer directory. */
+export async function restoreCustomer(id: string): Promise<ActionResult> {
+  const s = await requireManager();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const existing = await db.customer.findFirst({ where: { id, ...owned(s) } });
+  if (!existing) return { ok: false, message: "Customer not found." };
+
+  // Un-archive customer profile. Crucially, existing marketing consent (optedOut) is strictly preserved!
+  await db.customer.update({
+    where: { id },
+    data: {
+      deletedAt: null,
+      deletedBy: null,
+      deleteReason: null,
+    },
+  });
   revalidatePath("/dashboard/customers");
-  return { ok: true, message: "Customer and their message history deleted." };
+  revalidatePath(`/dashboard/customers/${id}`);
+  revalidatePath("/dashboard/replies");
+  return { ok: true, message: "Customer restored to active directory. Marketing consent unchanged." };
 }
 
 /** Awards bonus loyalty points (positive delta) or redeems loyalty points (negative delta) for a specific customer. */

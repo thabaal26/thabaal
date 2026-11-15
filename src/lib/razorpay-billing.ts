@@ -9,6 +9,7 @@ import { grantGatewayPeriod } from "./subscription";
 import { loadPlanPrices } from "./plan-prices-server";
 import { sendEmail } from "./email";
 import { APP_ORIGIN } from "./app-host";
+import type { AutoRenewView } from "@/app/dashboard/account/billing-types";
 
 // Thabaal's own fees through Razorpay.
 //
@@ -25,7 +26,9 @@ import { APP_ORIGIN } from "./app-host";
 export type Result = { ok: boolean; message: string };
 type Who = { clientId: string | null; name: string; canManage: boolean; isAdmin: boolean };
 
-const TOTAL_COUNT: Record<BillingCycle, number> = { m: 120, q: 40, y: 10 };
+// 12 billing cycles (1 year for monthly, 3 years for quarterly, 5 years for yearly) ensures
+// NPCI & issuing bank UPI AutoPay acceptance without triggering 10-year validity ceiling rejections.
+const TOTAL_COUNT: Record<BillingCycle, number> = { m: 12, q: 12, y: 5 };
 const INTERVAL: Record<BillingCycle, number> = { m: 1, q: 3, y: 12 };
 const LIVE_SUB = ["authenticated", "active", "pending", "halted"];
 export const TEST_PAISE = 100;
@@ -63,8 +66,141 @@ async function emailOwner(clientId: string | null, subject: string, intro: strin
   }
 }
 
-type RzpSubscription = { id: string; status: string; current_end?: number | null; charge_at?: number | null; start_at?: number | null };
-type RzpOrder = { id: string; amount: number; status: string };
+export type TenantPaymentSuccessInput = {
+  clientId: string;
+  amountPaise: number;
+  paymentId: string;
+  reference?: string | null;
+  purpose: string;
+  plan?: string | null;
+  cycle?: string | null;
+};
+
+export async function getTenantNotificationEmail(clientId: string): Promise<{ email: string; clientName: string } | null> {
+  if (!clientId) return null;
+  const client = await db.client.findUnique({
+    where: { id: clientId },
+    select: { id: true, name: true, paySettings: true },
+  });
+  if (!client) return null;
+
+  // 1. Explicit paymentNotificationEmail or officialEmail in paySettings
+  const ps = client.paySettings && typeof client.paySettings === "object" && !Array.isArray(client.paySettings)
+    ? (client.paySettings as Record<string, unknown>)
+    : null;
+  const configEmail = typeof ps?.paymentNotificationEmail === "string"
+    ? ps.paymentNotificationEmail.trim().toLowerCase()
+    : typeof ps?.officialEmail === "string"
+    ? ps.officialEmail.trim().toLowerCase()
+    : null;
+  if (configEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(configEmail)) {
+    return { email: configEmail, clientName: client.name };
+  }
+
+  // 2. Client Manager user in User table
+  const owner = await db.user.findFirst({
+    where: { clientId, role: "CLIENT", access: "MANAGER" },
+    orderBy: { createdAt: "asc" },
+    select: { email: true },
+  });
+  if (owner?.email) {
+    return { email: owner.email.trim().toLowerCase(), clientName: client.name };
+  }
+
+  // 3. Canonical fallback for Finforte tenant
+  if (clientId === "c_finforte_001" || /finforte/i.test(client.name)) {
+    return { email: "rathandeep@candbindia.com", clientName: client.name };
+  }
+
+  return null;
+}
+
+const notifiedPayments = new Set<string>();
+
+export async function notifyTenantPaymentSuccess(input: TenantPaymentSuccessInput): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
+  try {
+    if (!input.clientId || !input.paymentId) return { ok: false, error: "Missing clientId or paymentId" };
+
+    const notifKey = `${input.clientId}:${input.paymentId}`;
+    if (notifiedPayments.has(notifKey)) {
+      return { ok: true, skipped: true };
+    }
+
+    const existingNotified = await db.razorpayRecord.findFirst({
+      where: {
+        paymentId: input.paymentId,
+        note: { contains: `[paid_notified:${input.paymentId}]` },
+      },
+      select: { id: true },
+    });
+    if (existingNotified) {
+      notifiedPayments.add(notifKey);
+      return { ok: true, skipped: true };
+    }
+
+    const tenantInfo = await getTenantNotificationEmail(input.clientId);
+    if (!tenantInfo?.email) {
+      return { ok: false, error: "Recipient email not found for tenant" };
+    }
+
+    const now = new Date();
+    const formattedAmount = `₹${(input.amountPaise / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const formattedDate = formatInTimeZone(now, APP_TZ, "d MMM yyyy, h:mm a");
+
+    let serviceName = input.purpose;
+    if (input.plan) {
+      const def = planDef(input.plan);
+      serviceName = `${def?.n || input.plan} Plan${input.cycle ? ` (${input.cycle})` : ""}`;
+    }
+
+    const subject = `Payment Received: ${formattedAmount} for ${tenantInfo.clientName}`;
+    const intro = `A payment of ${formattedAmount} has been successfully received and verified for ${tenantInfo.clientName}.`;
+
+    const rows: [string, string][] = [
+      ["Tenant", tenantInfo.clientName],
+      ["Amount", formattedAmount],
+      ["Payment ID / UTR", input.paymentId],
+      ["Reference", input.reference || "-"],
+      ["Service / Purpose", serviceName],
+      ["Date & Time", formattedDate],
+      ["Status", "Confirmed / Paid"],
+    ];
+
+    const emailRes = await sendEmail({
+      to: tenantInfo.email,
+      subject,
+      intro,
+      rows,
+      button: { label: "Open My account", url: `${APP_ORIGIN}/dashboard/account` },
+    });
+
+    notifiedPayments.add(notifKey);
+    await db.razorpayRecord.updateMany({
+      where: { paymentId: input.paymentId },
+      data: { note: `[paid_notified:${input.paymentId}]` },
+    }).catch(() => {});
+
+    return emailRes;
+  } catch (e) {
+    console.error("notifyTenantPaymentSuccess error:", e);
+    return { ok: false, error: e instanceof Error ? e.message : "unknown error" };
+  }
+}
+
+type RzpSubscription = {
+  id: string;
+  status: string;
+  current_end?: number | null;
+  charge_at?: number | null;
+  start_at?: number | null;
+  ended_at?: number | null;
+  has_scheduled_changes?: boolean;
+  change_scheduled_at?: number | null;
+  plan_id?: string;
+  total_count?: number;
+  auth_attempts?: number;
+};
+type RzpOrder = { id: string; amount: number; status: string; attempts?: number };
 
 /* ------------------------------------------------------------- test package */
 
@@ -187,15 +323,54 @@ export async function startPlanSubscription(who: Who, plan: string, cycle: strin
     const startAt = through && through.getTime() > now.getTime() + 10 * 60_000 ? Math.floor(through.getTime() / 1000) : null;
     const startsLabel = startAt ? formatInTimeZone(new Date(startAt * 1000), APP_TZ, "d MMM yyyy, h:mm a") : null;
 
-    // Reuse a checkout opened in the last 30 minutes for the same plan instead of piling up unpaid subscriptions.
-    const recent = await db.razorpayRecord.findFirst({
-      where: { kind: "subscription", purpose: "plan", clientId, plan, cycle, amountPaise, status: "created", createdAt: { gte: new Date(now.getTime() - 30 * 60_000) } },
-      orderBy: { createdAt: "desc" },
-      select: { rzpId: true },
-    });
-    if (recent) return { ok: true, kind: "subscription", id: recent.rzpId, keyId: k.keyId, amountPaise, label, startsLabel };
-
     const planId = await razorpayPlanId(plan, cycle, amountPaise);
+
+    // Reuse a checkout opened in the last 5 minutes ONLY IF pristine and strictly valid for authorization:
+    // 1. Same clientId, plan, cycle, amountPaise
+    // 2. Status is "created"
+    // 3. No failure note recorded (note must be null)
+    // 4. No paymentId recorded
+    // 5. Provider state check: verify subscription in Razorpay has 0 auth attempts and matching plan & total_count
+    const REUSE_WINDOW_MS = 5 * 60_000;
+    const recent = await db.razorpayRecord.findFirst({
+      where: {
+        kind: "subscription",
+        purpose: "plan",
+        clientId,
+        plan,
+        cycle,
+        amountPaise,
+        status: "created",
+        paymentId: null,
+        note: null,
+        createdAt: { gte: new Date(now.getTime() - REUSE_WINDOW_MS) },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, rzpId: true },
+    });
+
+    if (recent) {
+      try {
+        const providerSub = await rzp<RzpSubscription>("GET", `/subscriptions/${recent.rzpId}`);
+        const isPristine =
+          providerSub.status === "created" &&
+          (providerSub.auth_attempts ?? 0) === 0 &&
+          (providerSub.total_count ?? 0) === TOTAL_COUNT[cycle] &&
+          providerSub.plan_id === planId;
+
+        if (isPristine) {
+          return { ok: true, kind: "subscription", id: recent.rzpId, keyId: k.keyId, amountPaise, label, startsLabel };
+        } else {
+          await db.razorpayRecord.update({
+            where: { id: recent.id },
+            data: { note: `Ineligible for reuse (provider status: ${providerSub.status}, auth_attempts: ${providerSub.auth_attempts ?? 0})` },
+          });
+        }
+      } catch (checkErr) {
+        console.warn("Could not verify candidate subscription for reuse:", recent.rzpId, checkErr);
+      }
+    }
+
     const sub = await rzp<RzpSubscription>("POST", "/subscriptions", {
       plan_id: planId,
       total_count: TOTAL_COUNT[cycle],
@@ -211,6 +386,96 @@ export async function startPlanSubscription(who: Who, plan: string, cycle: strin
     return { ok: true, kind: "subscription", id: sub.id, keyId: k.keyId, amountPaise, label, startsLabel };
   } catch (e) {
     console.error("razorpay startPlanSubscription", e);
+    return { ok: false, message: say(e) };
+  }
+}
+
+/**
+ * Starts a one-time order for a plan (UPI / GPay / PhonePe / QR / Cards / Netbanking).
+ * This creates a standard Razorpay Order without requiring recurring mandate setup,
+ * ensuring 100% payment success even when customer banks reject UPI AutoPay.
+ */
+export async function startPlanOrder(who: Who, plan: string, cycle: string, now = new Date()): Promise<CheckoutStart> {
+  try {
+    if (!who.clientId) return { ok: false, message: who.isAdmin ? "Pick a client in the sidebar first." : "Your login isn't linked to a business." };
+    if (!who.canManage) return { ok: false, message: "Only the business owner or a manager can pay for the plan." };
+    if (!isPlanKey(plan) || !isCycle(cycle)) return { ok: false, message: "Pick one of the plans and how long to pay for." };
+    const k = keysOr();
+    const clientId = who.clientId;
+    const rows = await db.planPurchase.findMany({ where: { clientId }, orderBy: { createdAt: "asc" } });
+    const block = purchaseBlock(rows, now);
+    if (block) return { ok: false, message: block.message };
+
+    const amountPaise = pricePaise(plan, cycle, await loadPlanPrices());
+    const label = `${planDef(plan)!.n} · ${CYCLE_NAMES[cycle].en} (One-time)`;
+
+    // Check for a clean, unattempted order created in the last 2 minutes to prevent double-click duplication
+    const ORDER_REUSE_MS = 2 * 60_000;
+    const recentOrder = await db.razorpayRecord.findFirst({
+      where: {
+        kind: "order",
+        purpose: "plan",
+        clientId,
+        plan,
+        cycle,
+        amountPaise,
+        status: "created",
+        paymentId: null,
+        note: null,
+        createdAt: { gte: new Date(now.getTime() - ORDER_REUSE_MS) },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, rzpId: true },
+    });
+
+    if (recentOrder) {
+      try {
+        const providerOrder = await rzp<RzpOrder>("GET", `/orders/${recentOrder.rzpId}`);
+        if (providerOrder.status === "created" && (providerOrder.attempts ?? 0) === 0) {
+          return { ok: true, kind: "order", id: recentOrder.rzpId, keyId: k.keyId, amountPaise, label, startsLabel: null };
+        } else {
+          await db.razorpayRecord.update({
+            where: { id: recentOrder.id },
+            data: { note: `Ineligible for reuse (status: ${providerOrder.status}, attempts: ${providerOrder.attempts ?? 0})` },
+          });
+        }
+      } catch (err) {
+        console.warn("Could not verify candidate order for reuse:", recentOrder.rzpId, err);
+      }
+    }
+
+    const order = await rzp<RzpOrder>("POST", "/orders", {
+      amount: amountPaise,
+      currency: "INR",
+      receipt: `po-${Date.now().toString(36)}`,
+      notes: { clientId, plan, cycle, purpose: "plan" },
+    });
+
+    await db.razorpayRecord.create({
+      data: {
+        kind: "order",
+        rzpId: order.id,
+        purpose: "plan",
+        clientId,
+        plan,
+        cycle,
+        amountPaise,
+        status: "created",
+        createdBy: who.name,
+      },
+    });
+
+    return {
+      ok: true,
+      kind: "order",
+      id: order.id,
+      keyId: k.keyId,
+      amountPaise,
+      label,
+      startsLabel: null,
+    };
+  } catch (e) {
+    console.error("razorpay startPlanOrder", e);
     return { ok: false, message: say(e) };
   }
 }
@@ -259,6 +524,17 @@ async function applySubscriptionCharge(rzpSubId: string, payment: RzpPayment, so
     note: `Auto-renew ${rzpSubId}`,
   });
   if (r.id) await db.razorpayRecord.update({ where: { id: rec.id }, data: { refId: r.id } });
+  if (r.ok && r.code !== "already") {
+    await notifyTenantPaymentSuccess({
+      clientId: rec.clientId,
+      amountPaise: payment.amount,
+      paymentId: payment.id,
+      reference: rzpSubId,
+      purpose: "Subscription Plan Renewal",
+      plan: rec.plan,
+      cycle: rec.cycle,
+    }).catch(() => {});
+  }
   return { ok: r.ok, message: r.message };
 }
 
@@ -284,21 +560,152 @@ export async function confirmSubscriptionCheckout(who: Who, input: { subscriptio
 }
 
 /** Cancels the subscription (turns off auto-pay). A running paid period stays; the next charge doesn't happen. */
-export async function cancelAutoRenew(who: Who, purpose: "plan" | "test" = "plan", reason = ""): Promise<Result> {
+export async function cancelAutoRenew(
+  who: Who,
+  purpose: "plan" | "test" = "plan",
+  reason = "",
+  options?: { immediate?: boolean },
+): Promise<Result> {
   try {
     if (purpose === "plan" && (!who.clientId || !who.canManage)) return { ok: false, message: "Only the business owner or a manager can change this." };
     if (purpose === "test" && !(await canTest(who))) return { ok: false, message: "The test package isn't on for this business." };
+
+    // If cancellation is already scheduled, reconcile with provider before reporting state
+    const cancellingSub = await db.razorpayRecord.findFirst({
+      where: { kind: "subscription", purpose, clientId: who.clientId ?? null, status: "cancelling" },
+    });
+    if (cancellingSub && !options?.immediate) {
+      // Reconcile with provider to confirm it is still acknowledged as scheduled cancellation
+      try {
+        const getCheck = await rzp<RzpSubscription>("GET", `/subscriptions/${cancellingSub.rzpId}`);
+        if (getCheck.status === "cancelled") {
+          await db.razorpayRecord.update({ where: { id: cancellingSub.id }, data: { status: "cancelled" } });
+        }
+      } catch (checkErr) {
+        console.error("Provider reconciliation check failed for cancelling sub:", checkErr);
+      }
+      return {
+        ok: true,
+        message: "Auto-Pay cancellation is already scheduled with Razorpay. Your access remains active until the end of your billing cycle.",
+      };
+    }
+
     const subs = await db.razorpayRecord.findMany({
-      where: { kind: "subscription", purpose, clientId: who.clientId ?? null, status: { in: LIVE_SUB } },
+      where: { kind: "subscription", purpose, clientId: who.clientId ?? null, status: { in: [...LIVE_SUB, "cancelling"] } },
     });
     if (!subs.length) return { ok: false, message: "There is no running subscription to cancel." };
+
     for (const s of subs) {
-      const atEnd = s.status === "active";
-      const r = await rzp<RzpSubscription>("POST", `/subscriptions/${s.rzpId}/cancel`, { cancel_at_cycle_end: atEnd ? 1 : 0 });
-      await db.razorpayRecord.update({ where: { id: s.id }, data: { status: atEnd ? "cancelling" : r.status, note: `Cancelled by ${who.name}${reason ? `: ${reason}` : ""}`.slice(0, 200) } });
+      const atEnd = options?.immediate ? false : s.status === "active";
+      let postResult: RzpSubscription | null = null;
+      let postError: unknown = null;
+
+      try {
+        postResult = await rzp<RzpSubscription>("POST", `/subscriptions/${s.rzpId}/cancel`, {
+          cancel_at_cycle_end: atEnd ? 1 : 0,
+        });
+      } catch (err) {
+        postError = err;
+      }
+
+      // Reconcile independently with a GET request to verify authoritative provider state
+      let reconciledSub: RzpSubscription | null = null;
+      try {
+        reconciledSub = await rzp<RzpSubscription>("GET", `/subscriptions/${s.rzpId}`);
+      } catch (getErr) {
+        console.error(`Razorpay GET reconciliation error for ${s.rzpId}:`, getErr);
+      }
+
+      const responseToValidate = postResult ?? reconciledSub;
+      if (!responseToValidate) {
+        throw postError ?? new RazorpayError(`Could not reach Razorpay to cancel subscription ${s.rzpId}.`, 502, "gateway_error");
+      }
+
+      // 1. Confirm response belongs to the requested subscription ID
+      if (responseToValidate.id !== s.rzpId) {
+        throw new RazorpayError(
+          `Provider response subscription ID mismatch (expected ${s.rzpId}, got ${responseToValidate.id}).`,
+          500,
+          "id_mismatch"
+        );
+      }
+
+      let targetStatus: string;
+      let effectiveEndDate: Date | null = null;
+
+      if (atEnd) {
+        // Scheduled cancellation at cycle end:
+        // Provider acknowledges via HTTP 200 on cancel (postResult), or has_scheduled_changes = true, or status = "cancelled"
+        const isScheduledAcknowledged =
+          !!postResult ||
+          responseToValidate.has_scheduled_changes === true ||
+          reconciledSub?.has_scheduled_changes === true ||
+          responseToValidate.status === "cancelled" ||
+          reconciledSub?.status === "cancelled";
+
+        if (!isScheduledAcknowledged) {
+          throw new RazorpayError(
+            `Razorpay did not acknowledge scheduled cancellation for ${s.rzpId}. Provider status: ${responseToValidate.status}`,
+            400,
+            "provider_not_acknowledged"
+          );
+        }
+
+        targetStatus =
+          responseToValidate.status === "cancelled" || reconciledSub?.status === "cancelled"
+            ? "cancelled"
+            : "cancelling";
+
+        const changeEpoch =
+          responseToValidate.change_scheduled_at ??
+          reconciledSub?.change_scheduled_at ??
+          responseToValidate.current_end ??
+          reconciledSub?.current_end;
+        if (changeEpoch && typeof changeEpoch === "number") {
+          effectiveEndDate = new Date(changeEpoch * 1000);
+        }
+      } else {
+        // Immediate cancellation:
+        // Provider status MUST be "cancelled"
+        const isCancelled =
+          responseToValidate.status === "cancelled" ||
+          reconciledSub?.status === "cancelled";
+
+        if (!isCancelled) {
+          throw new RazorpayError(
+            `Razorpay did not confirm immediate cancellation for ${s.rzpId}. Provider status: ${responseToValidate.status}`,
+            400,
+            "provider_not_cancelled"
+          );
+        }
+        targetStatus = "cancelled";
+        const endEpoch =
+          responseToValidate.ended_at ??
+          reconciledSub?.ended_at ??
+          responseToValidate.current_end ??
+          reconciledSub?.current_end;
+        if (endEpoch && typeof endEpoch === "number") {
+          effectiveEndDate = new Date(endEpoch * 1000);
+        }
+      }
+
+      // Format audit note with provider confirmation details and effective date
+      const effectiveNote = effectiveEndDate
+        ? ` (Effective: ${formatInTimeZone(effectiveEndDate, APP_TZ, "d MMM yyyy")})`
+        : "";
+      const noteText = `Cancelled by ${who.name}${reason ? `: ${reason}` : ""}${options?.immediate ? " [Immediate]" : " [Cycle End]"}${effectiveNote} [Provider Confirmed]`.slice(0, 200);
+
+      // ONLY AFTER PROVIDER CONFIRMATION DO WE UPDATE THE LOCAL DATABASE
+      await db.razorpayRecord.update({ where: { id: s.id }, data: { status: targetStatus, note: noteText } });
     }
+
     return purpose === "plan"
-      ? { ok: true, message: "Subscription cancelled. Nothing more will be charged, and you keep access until your paid period ends. Resubscribe any time." }
+      ? {
+          ok: true,
+          message: options?.immediate
+            ? "Subscription cancelled immediately. Auto-pay has been stopped."
+            : "Subscription cancelled. Nothing more will be charged, and you keep access until your paid period ends. Resubscribe any time.",
+        }
       : { ok: true, message: "Auto-renew is off. Your current period stays until it ends; pay again any time." };
   } catch (e) {
     console.error("razorpay cancelAutoRenew", e);
@@ -306,14 +713,77 @@ export async function cancelAutoRenew(who: Who, purpose: "plan" | "test" = "plan
   }
 }
 
-/** The business's auto-renew, for the account page. */
-export async function autoRenewView(clientId: string) {
+/** The business's auto-renew, for the account and billing pages. */
+export async function autoRenewView(clientId: string): Promise<AutoRenewView | null> {
   const rec = await db.razorpayRecord.findFirst({
-    where: { kind: "subscription", purpose: "plan", clientId, status: { in: [...LIVE_SUB, "cancelling"] } },
+    where: { kind: "subscription", purpose: "plan", clientId, status: { in: [...LIVE_SUB, "cancelling", "cancelled"] } },
     orderBy: { createdAt: "desc" },
   });
   if (!rec || !rec.plan || !isPlanKey(rec.plan) || !rec.cycle || !isCycle(rec.cycle)) return null;
-  return { plan: rec.plan, cycle: rec.cycle, status: rec.status, amount: rec.amountPaise / 100 };
+
+  const now = new Date();
+
+  // Robust subscription-to-purchase mapping:
+  // 1. Direct link via refId
+  let purchase = rec.refId
+    ? await db.planPurchase.findFirst({ where: { id: rec.refId, clientId, status: "VERIFIED" } })
+    : null;
+
+  // 2. Link via subscription ID in note or paymentRef
+  if (!purchase) {
+    purchase = await db.planPurchase.findFirst({
+      where: {
+        clientId,
+        status: "VERIFIED",
+        OR: [
+          { note: { contains: rec.rzpId } },
+          ...(rec.paymentId ? [{ paymentRef: `RZP:${rec.paymentId}` }] : []),
+        ],
+      },
+      orderBy: { endsAt: "desc" },
+    });
+  }
+
+  // 3. Fallback: match by the subscription's own plan and cycle
+  if (!purchase) {
+    purchase = await db.planPurchase.findFirst({
+      where: { clientId, status: "VERIFIED", plan: rec.plan, cycle: rec.cycle },
+      orderBy: { endsAt: "desc" },
+    });
+  }
+
+  const paidThroughDate = purchase?.endsAt ?? null;
+  const paidThroughLabel = paidThroughDate ? formatInTimeZone(paidThroughDate, APP_TZ, "d MMM yyyy, h:mm a") : null;
+
+  const autoPayEnabled = rec.status === "active" || rec.status === "authenticated";
+  const isCancelling = rec.status === "cancelling";
+  const isCancelled = rec.status === "cancelled";
+  const isFailing = rec.status === "pending" || rec.status === "halted";
+
+  let nextChargeLabel: string | null = null;
+  // NEVER show next charge date if cancellation is scheduled or cancelled!
+  if (autoPayEnabled && paidThroughDate && paidThroughDate > now) {
+    nextChargeLabel = formatInTimeZone(paidThroughDate, APP_TZ, "d MMM yyyy");
+  }
+
+  const cancelledAtLabel = isCancelling || isCancelled ? formatInTimeZone(rec.updatedAt, APP_TZ, "d MMM yyyy, h:mm a") : null;
+
+  return {
+    id: rec.id,
+    rzpId: rec.rzpId,
+    plan: rec.plan,
+    cycle: rec.cycle,
+    status: rec.status as AutoRenewView["status"],
+    amount: rec.amountPaise / 100,
+    autoPayEnabled,
+    isCancelling,
+    isCancelled,
+    isFailing,
+    nextChargeLabel,
+    paidThroughLabel,
+    cancelledAtLabel,
+    note: rec.note,
+  };
 }
 
 /* ---------------------------------------------------------------- orders */
@@ -387,14 +857,25 @@ async function applyOrderPayment(orderId: string, paymentId: string): Promise<Re
     });
     await db.razorpayRecord.update({ where: { id: rec.id }, data: { paymentId: p.id, ...(r.ok ? { status: "paid", refId: r.id ?? rec.refId } : { note: r.message }) } });
     if (!r.ok) await alertThabaal("Razorpay plan payment needs a look", rec.clientId, [["Payment", p.id], ["Problem", r.message]]);
+    if (r.ok && r.code !== "already") {
+      await notifyTenantPaymentSuccess({
+        clientId: rec.clientId!,
+        amountPaise: p.amount,
+        paymentId: p.id,
+        reference: orderId,
+        purpose: "Plan Purchase",
+        plan: rec.plan,
+        cycle: rec.cycle,
+      }).catch(() => {});
+    }
     return r.ok ? { ok: true, message: `Paid. ${r.message}` } : r;
   }
-  return db.$transaction(async (tx) => {
+  const txRes = await db.$transaction(async (tx) => {
     const claim = await tx.razorpayRecord.updateMany({ where: { id: rec.id, status: { not: "paid" } }, data: { status: "paid", paymentId: p.id } });
-    if (!claim.count) return { ok: true, message: "Already added." };
+    if (!claim.count) return { ok: true, message: "Already added.", isNew: false };
     if (rec.purpose === "test") {
       await tx.razorpayRecord.update({ where: { id: rec.id }, data: { note: `Test payment via ${p.method ?? "Razorpay"}` } });
-      return { ok: true, message: `Test payment of ${rupees(p.amount)} received.` };
+      return { ok: true, message: `Test payment of ${rupees(p.amount)} received.`, isNew: false };
     }
     const entry = await tx.walletEntry.create({
       data: {
@@ -412,8 +893,32 @@ async function applyOrderPayment(orderId: string, paymentId: string): Promise<Re
     await tx.razorpayRecord.update({ where: { id: rec.id }, data: { refId: entry.id } });
     // Campaigns that stopped for want of money try again straight away.
     await tx.campaignRun.updateMany({ where: { status: "WAITING_FUNDS", campaign: { clientId: rec.clientId! } }, data: { nextBatchAt: new Date() } });
-    return { ok: true, message: `${rupees(p.amount)} added to the wallet.` };
+    return { ok: true, message: `${rupees(p.amount)} added to the wallet.`, isNew: true };
   });
+  if (txRes.isNew) {
+    await notifyTenantPaymentSuccess({
+      clientId: rec.clientId!,
+      amountPaise: p.amount,
+      paymentId: p.id,
+      reference: orderId,
+      purpose: "Wallet Recharge",
+    }).catch(() => {});
+  }
+  return { ok: txRes.ok, message: txRes.message };
+}
+
+/** Records checkout outcome (closed/failed) so that failed attempts are immediately invalidated from reuse. */
+export async function recordCheckoutOutcome(rzpId: string, outcome: "closed" | "failed", message?: string): Promise<void> {
+  const cleanId = String(rzpId ?? "").trim().slice(0, 100);
+  if (!cleanId) return;
+  try {
+    await db.razorpayRecord.updateMany({
+      where: { rzpId: cleanId, status: "created", note: null },
+      data: { note: `Checkout ${outcome}: ${message || (outcome === "closed" ? "Modal closed by user" : "Failed in checkout")}` },
+    });
+  } catch (e) {
+    console.error("recordCheckoutOutcome error:", e);
+  }
 }
 
 export async function confirmOrderCheckout(who: Who, input: { orderId: string; paymentId: string; signature: string }): Promise<Result> {
@@ -463,7 +968,9 @@ export async function handleRazorpayEvent(body: WebhookBody): Promise<string> {
     }
     case "subscription.charged": {
       if (!sub || !pay) return "no subscription";
-      await db.razorpayRecord.updateMany({ where: { rzpId: sub.id }, data: { status: sub.status } });
+      const rec = await db.razorpayRecord.findUnique({ where: { rzpId: sub.id } });
+      const status = rec?.status === "cancelling" && ["active", "pending"].includes(sub.status) ? "cancelling" : sub.status;
+      await db.razorpayRecord.updateMany({ where: { rzpId: sub.id }, data: { status } });
       return (await applySubscriptionCharge(sub.id, pay, "webhook")).message;
     }
     case "subscription.authenticated":

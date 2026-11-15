@@ -68,7 +68,7 @@ export async function sendWinbacks(now = new Date(), paused: ReadonlySet<string>
     if (room <= 0) continue;
 
     const due = await db.customer.findMany({
-      where: { clientId: client.id, tags: { has: "lapsed" }, winbackSentAt: null, optedOut: false, unreachable: false },
+      where: { clientId: client.id, tags: { has: "lapsed" }, winbackSentAt: null, optedOut: false, unreachable: false, deletedAt: null },
       take: room,
     });
     const { number, cfg } = await senderFor(client.id, null);

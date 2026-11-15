@@ -8,7 +8,7 @@ import { businessTypeOf } from "@/lib/business-types";
 import { CITY, newClientData } from "@/lib/client-create";
 import { db } from "@/lib/db";
 import { CLIENT_SECTIONS, sanitizeDisabledSections } from "@/lib/client-sections";
-import { CLIENT_COOKIE, VIEW_PREFIX, requireAdmin } from "@/lib/session";
+import { CLIENT_COOKIE, VIEW_PREFIX, requireAdmin, requireUser } from "@/lib/session";
 import { HEX } from "@/lib/theme";
 import { enableMetaCalling, listPhoneNumbers, syncMetaBusinessProfile, waConfig } from "@/lib/whatsapp";
 import { checkNumberStatus, refreshNumberStatus } from "@/lib/limits";
@@ -477,4 +477,30 @@ export async function verifyClientToken(clientId: string): Promise<ActionResult 
     return { ok: false, message: `Could not reach Meta Graph API: ${e instanceof Error ? e.message : "network error"}` };
   }
 }
+
+import { manuallySetWorkspaceMode } from "@/lib/tenant-activation";
+import type { WorkspaceMode } from "@prisma/client";
+
+/** Updates the client's WorkspaceMode (Super Admin action). */
+export async function updateClientWorkspaceMode(
+  clientId: string,
+  mode: WorkspaceMode,
+  options?: { reason?: string; breakGlass?: boolean },
+): Promise<ActionResult> {
+  const s = await requireAdmin();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const user = await requireUser();
+  const res = await manuallySetWorkspaceMode(clientId, mode, {
+    adminUserId: user.id,
+    adminEmail: user.email,
+    reason: options?.reason,
+    breakGlass: options?.breakGlass,
+  });
+  if (!res.ok) {
+    return { ok: false, message: res.message };
+  }
+  refresh();
+  return { ok: true, message: `Workspace mode updated to ${res.mode}` };
+}
+
 

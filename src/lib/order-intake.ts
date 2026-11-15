@@ -13,6 +13,7 @@ import { autoRedeemPoints } from "./loyalty-redeem";
 import { getOrderPricing } from "./order-pricing";
 import { itemsWithNames, money, nextOrderRef, orderRef, type OrderItem } from "./orders";
 import { deliveryFeeFor, flowFor } from "./pay-settings-server";
+import { clientBrandName } from "./catalog";
 import { customerWords } from "./order-flow";
 import { cancelSupersededOrdersForCustomer, logMessage, replyContext, startCheckout, textInWindow } from "./payments";
 import { getSettings } from "./provider";
@@ -90,7 +91,7 @@ async function offerAddToEarlier(newId: string) {
       { id: `cart_add:${o.id}:${earlier.id}`, title: buttonTitle(`➕ Add to ${oldRef}`) },
       { id: `cart_sep:${o.id}`, title: "🆕 Separate order" },
     ],
-    { header: "You have an order in progress", footer: o.client.name },
+    { header: "You have an order in progress", footer: clientBrandName(o.client) },
   );
   await logMessage(o.customer.id, ADD_TO_ORDER, body, res, number?.id ?? null);
   await db.order.update({ where: { id: o.id }, data: { mergeWith: earlier.id } });
@@ -215,7 +216,7 @@ export async function offerReorder(customerId: string) {
       { id: `reorder_yes:${last.id}`, title: "✅ Yes, same order" },
       { id: `reorder_change:${last.id}`, title: "🛍️ Change items" },
     ],
-    { header: "Order again", footer: `${c.client.name} · prices as on your last order`.slice(0, 60) },
+    { header: "Order again", footer: `${clientBrandName(c.client)} · prices as on your last order`.slice(0, 60) },
   );
   await logMessage(c.id, REORDER_OFFER, body, res, number?.id ?? null);
   return true;

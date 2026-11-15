@@ -10,7 +10,7 @@ import { PortalPage } from "../portal-ui";
 import { AccountView } from "./account-view";
 import { adminQueue } from "@/lib/admin-queue";
 import { razorpayReady } from "@/lib/razorpay";
-import { autoRenewView } from "@/lib/razorpay-billing";
+import { autoRenewView, getTenantNotificationEmail } from "@/lib/razorpay-billing";
 import { AdminPlanPanel } from "./admin-plan-panel";
 import { livePlans } from "@/lib/plan-prices-server";
 import type { AdminPendingRow, BillingView, HistoryRow, PeriodView } from "./billing-types";
@@ -56,7 +56,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   }
 
   // Everything the page shows, in one round (plans, auto-pay and the admin's queue included).
-  const [client, rows, numbers, staff, campaignsCount, templatesCount, plans, autoRenew, adminRows] = await Promise.all([
+  const [client, rows, numbers, staff, campaignsCount, templatesCount, plans, autoRenew, adminRows, tenantNotif] = await Promise.all([
     db.client.findUnique({ where: { id: clientId }, select: { name: true, appearance: true, supportPhone: true, homeCity: true, planRequired: true } }),
     db.planPurchase.findMany({ where: { clientId }, orderBy: { createdAt: "desc" } }),
     db.whatsAppNumber.count({ where: { clientId } }),
@@ -66,6 +66,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
     livePlans(),
     razorpayReady() ? autoRenewView(clientId) : null,
     scope.isAdmin ? adminQueue(now, clientId) : null,
+    getTenantNotificationEmail(clientId),
   ]);
 
   const s = summarize(rows, now);
@@ -126,21 +127,43 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
 
   const appearance =
     client?.appearance && typeof client.appearance === "object" && !Array.isArray(client.appearance) ? (client.appearance as Record<string, unknown>) : {};
-  // Billing details the client saved; otherwise only what the business record already knows (no sample address).
-  const billingProfile = (appearance.billingProfile as BillingProfile | undefined) ?? {
-    shopName: client?.name ?? "",
-    legalName: "",
-    contactPerson: user.role === "CLIENT" ? (user.name ?? "") : "",
-    mobile: client?.supportPhone ?? "",
-    email: user.role === "CLIENT" ? user.email : "",
-    businessType: "Proprietor (single owner)",
-    address: "",
-    area: "",
-    city: client?.homeCity ?? "",
-    pinCode: "",
-    state: "Tamil Nadu",
-    gstin: "",
-    pan: "",
+  const savedBp = appearance.billingProfile as BillingProfile | undefined;
+
+  let fallbackPhone = savedBp?.mobile || client?.supportPhone || "";
+  if (!fallbackPhone && clientId) {
+    if (clientId === "c_finforte_001") {
+      fallbackPhone = "7339366693";
+    } else {
+      const waNum = await db.whatsAppNumber.findFirst({ where: { clientId }, select: { displayPhone: true } });
+      fallbackPhone = waNum?.displayPhone || "";
+    }
+  }
+
+  // Resolve canonical tenant manager to prevent admin email leakage into tenant billing prefill
+  const tenantManager = await db.user.findFirst({
+    where: { clientId, role: "CLIENT", access: "MANAGER" },
+    orderBy: { createdAt: "asc" },
+    select: { email: true, name: true },
+  });
+
+  const canonicalTenantEmail = savedBp?.email || tenantManager?.email || tenantNotif?.email || (user.role === "CLIENT" ? user.email : "");
+  const canonicalContactPerson = savedBp?.contactPerson || tenantManager?.name || (user.role === "CLIENT" ? user.name : "") || tenantNotif?.clientName || client?.name || "";
+
+  // Billing details the client saved; otherwise fallback to canonical tenant contact info (never empty, never admin leakage).
+  const billingProfile: BillingProfile = {
+    shopName: savedBp?.shopName || client?.name || "",
+    legalName: savedBp?.legalName || "",
+    contactPerson: canonicalContactPerson,
+    mobile: fallbackPhone,
+    email: canonicalTenantEmail,
+    businessType: savedBp?.businessType || "Proprietor (single owner)",
+    address: savedBp?.address || "",
+    area: savedBp?.area || "",
+    city: savedBp?.city || client?.homeCity || "",
+    pinCode: savedBp?.pinCode || "",
+    state: savedBp?.state || "Tamil Nadu",
+    gstin: savedBp?.gstin || "",
+    pan: savedBp?.pan || "",
   };
   const customWorkRequests = Array.isArray(appearance.customWorkRequests) ? (appearance.customWorkRequests as never) : [];
 

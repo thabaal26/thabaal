@@ -5,6 +5,7 @@ import { memo, replyContextKey } from "./request-memo";
 import { headerImageFor } from "./media";
 import { pushOrderToSheet } from "./google-sheets-live";
 import { getOrderPricing, itemsText, itemsWithNames, money, orderRef } from "./orders";
+import { clientBrandName } from "./catalog";
 import { pointsDiscount } from "./order-pricing";
 import { logPaymentEvent, utrOf } from "./payment-events";
 import { checkoutMode, codBlocked, upiLink, type CheckoutMode, type PaySettings } from "./pay-settings";
@@ -144,14 +145,15 @@ export async function sendPaymentRequestFor(orderId: string, opts: { reminder?: 
       ? `Items: ${itemsText(items)} (${money(pricing.subtotal, order.currency)})${pricing.shipping > 0 ? `\nShipping: ${money(pricing.shipping, order.currency)}` : ""}${pointsLine}\nTotal: ${money(pricing.total, order.currency)}`
       : `Items: ${itemsText(items)}\nTotal: ${money(pricing.total, order.currency)}`) + balanceLines;
   const isReplacement = Boolean(order.internalNote?.includes("Replaced unpaid cart"));
+  const brand = clientBrandName(order.client);
   const head =
     opts.reminder === "last"
-      ? `Hello ${firstName(c.name)}, a last reminder that your ${order.client.name} order ${ref} is still waiting for payment.`
+      ? `Hello ${firstName(c.name)}, a last reminder that your ${brand} order ${ref} is still waiting for payment.`
       : opts.reminder
-        ? `Hello ${firstName(c.name)}, a reminder that your ${order.client.name} order ${ref} is waiting for payment.`
+        ? `Hello ${firstName(c.name)}, a reminder that your ${brand} order ${ref} is waiting for payment.`
         : isReplacement
-          ? `Hello ${firstName(c.name)}, here is your updated ${order.client.name} order ${ref} (replacing your earlier cart).`
-          : `Hello ${firstName(c.name)}, here is your ${order.client.name} order ${ref}.`;
+          ? `Hello ${firstName(c.name)}, here is your updated ${brand} order ${ref} (replacing your earlier cart).`
+          : `Hello ${firstName(c.name)}, here is your ${brand} order ${ref}.`;
   const sentData: SentData = opts.reminder === "last" ? { paymentReminder2At: new Date() } : opts.reminder ? { paymentReminderAt: new Date() } : { paymentRequestedAt: new Date() };
   const sentWord = opts.reminder ? "reminder" : "request";
   const { open, number, cfg } = await replyContext(c);
@@ -623,9 +625,10 @@ export async function sendCodConfirmationPrompt(orderId: string): Promise<{ ok: 
   const ref = orderRef(order);
   const totalFormatted = money(order.total, order.currency);
   const flow = await flowFor(order.clientId);
+  const brand = clientBrandName(order.client);
   const body = flowShips(flow)
-    ? `Hello ${firstName(c.name)}, your Cash on Delivery request for ${order.client.name} order ${ref} (${totalFormatted}) is received.\n\nPlease confirm your order below so we can pack and dispatch it for you:`
-    : `Hello ${firstName(c.name)}, your ${order.client.name} order ${ref} (${totalFormatted}) is received, to ${customerWords(flow).cashLater}.\n\nPlease confirm it below:`;
+    ? `Hello ${firstName(c.name)}, your Cash on Delivery request for ${brand} order ${ref} (${totalFormatted}) is received.\n\nPlease confirm your order below so we can pack and dispatch it for you:`
+    : `Hello ${firstName(c.name)}, your ${brand} order ${ref} (${totalFormatted}) is received, to ${customerWords(flow).cashLater}.\n\nPlease confirm it below:`;
 
   try {
     const res = await sendInteractiveButtons(
@@ -652,7 +655,7 @@ export async function sendCodConfirmationPrompt(orderId: string): Promise<{ ok: 
 export async function sendPaymentChoicePrompt(orderId: string): Promise<{ ok: boolean; message: string }> {
   const order = await db.order.findUnique({
     where: { id: orderId },
-    include: { customer: true, client: { select: { name: true } } },
+    include: { customer: true, client: { select: { id: true, name: true, appearance: true } } },
   });
   if (!order) return { ok: false, message: "Order not found." };
   if (order.status === "CANCELLED") return { ok: false, message: "This order is cancelled." };
@@ -671,9 +674,10 @@ export async function sendPaymentChoicePrompt(orderId: string): Promise<{ ok: bo
   const flow = await flowFor(order.clientId);
   const replaced = /Replaced unpaid cart (\S+)/.exec(order.internalNote ?? "")?.[1];
   const money2 = (n: number) => money(n, order.currency);
+  const brand = clientBrandName(order.client);
   let body = [
     replaced ? `Your earlier cart ${replaced} has been replaced by this one.` : null,
-    `${hello(c.name)} here is your ${order.client.name} order ${bold(ref)}.`,
+    `${hello(c.name)} here is your ${brand} order ${bold(ref)}.`,
     [
       itemLines(items, order.currency),
       pricing.shipping > 0 ? `Shipping: ${money2(pricing.shipping)}` : null,
@@ -698,7 +702,7 @@ export async function sendPaymentChoicePrompt(orderId: string): Promise<{ ok: bo
         { id: `pay_online:${order.id}`, title: "💳 Pay now online" },
         { id: `pay_cod:${order.id}`, title: customerWords(flow).cashButton },
       ],
-      { header: "Choose how to pay", footer: order.client.name }
+      { header: "Choose how to pay", footer: brand }
     );
     await logMessage(c.id, "Payment choice", body, res, number?.id ?? null);
     return { ok: true, message: `Payment choice sent to ${c.name}.` };

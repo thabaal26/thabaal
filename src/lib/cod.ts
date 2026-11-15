@@ -1,6 +1,7 @@
 // Cash on delivery confirmed by the customer (the "Cash on delivery" button, or "COD" typed): the order moves to
 // confirmed and the customer gets one confirmation (on the order card when "Review and pay" made one, else a text).
 import "server-only";
+import { clientBrandName } from "./catalog";
 import { db } from "./db";
 import { pushOrderToSheet } from "./google-sheets-live";
 import { customerWords, flowShips, readFlow } from "./order-flow";
@@ -9,7 +10,7 @@ import { textInWindow, updateOrderCard } from "./payments";
 import { bold, nameOf } from "./wa-text";
 
 export async function confirmCod(orderId: string) {
-  const order = await db.order.findUnique({ where: { id: orderId }, include: { customer: true, client: { select: { name: true, orderFlow: true } } } });
+  const order = await db.order.findUnique({ where: { id: orderId }, include: { customer: true, client: { select: { id: true, name: true, orderFlow: true, appearance: true } } } });
   if (!order || order.status === "CANCELLED" || order.paidAt || order.packedAt) return false;
   const done = await db.order.updateMany({
     where: { id: order.id, status: { in: ["NEW", "CONFIRMED"] }, paidAt: null },
@@ -21,20 +22,21 @@ export async function confirmCod(orderId: string) {
   const ref = orderRef(order);
   const addr = order.note?.trim() || order.customer.locationRaw?.trim() || order.customer.location?.trim() || "";
   const who = nameOf(order.customer.name);
+  const brand = clientBrandName(order.client);
   const flow = readFlow(order.client.orderFlow);
   const words = customerWords(flow);
   // Pickup and service shops: no address, and the cash is paid at the shop or the visit.
   const text = flowShips(flow)
     ? [
         `✅ ${bold("Order confirmed")}`,
-        `Thank you${who ? `, ${who}` : ""}! Your cash on delivery order ${bold(ref)} from ${order.client.name} is confirmed.`,
+        `Thank you${who ? `, ${who}` : ""}! Your cash on delivery order ${bold(ref)} from ${brand} is confirmed.`,
         `Amount to pay on delivery: ${bold(money(order.total, order.currency))}`,
         addr ? `📍 ${addr}` : `Please reply with your full delivery address (house/flat no., street, area, city and pincode) so we can deliver it.`,
         words.next,
       ].join("\n\n")
     : [
         `✅ ${bold(flow === "service" ? "Booking confirmed" : "Order confirmed")}`,
-        `Thank you${who ? `, ${who}` : ""}! Your ${flow === "service" ? "booking" : "order"} ${bold(ref)} from ${order.client.name} is confirmed.`,
+        `Thank you${who ? `, ${who}` : ""}! Your ${flow === "service" ? "booking" : "order"} ${bold(ref)} from ${brand} is confirmed.`,
         words.cashDue(bold(money(order.total, order.currency))),
         words.next,
       ].join("\n\n");

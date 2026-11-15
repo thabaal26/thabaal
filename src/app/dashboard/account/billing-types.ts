@@ -80,3 +80,21 @@ export type AdminPendingRow = {
   startsLabel: string;
   endsLabel: string;
 };
+
+export type AutoRenewView = {
+  id: string;
+  rzpId: string;
+  plan: PlanKey;
+  cycle: BillingCycle;
+  status: "created" | "authenticated" | "active" | "pending" | "halted" | "cancelling" | "cancelled";
+  amount: number;
+  autoPayEnabled: boolean;
+  isCancelling: boolean;
+  isCancelled: boolean;
+  isFailing: boolean;
+  nextChargeLabel: string | null;
+  paidThroughLabel: string | null;
+  cancelledAtLabel: string | null;
+  note: string | null;
+};
+

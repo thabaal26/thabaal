@@ -43,6 +43,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
           name: true,
           phone: true,
           purchases: true,
+          deletedAt: true,
           client: { select: { name: true } },
           orders: {
             where: { paidAt: null, status: { in: ["NEW", "CONFIRMED"] } },
@@ -122,6 +123,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
           name: true,
           phone: true,
           purchases: true,
+          deletedAt: true,
           client: { select: { name: true } },
           orders: {
             where: { paidAt: null, status: { in: ["NEW", "CONFIRMED"] } },
@@ -217,6 +219,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
           createdAt: true,
           optedOut: true,
           unreachable: true,
+          deletedAt: true,
           _count: { select: { orders: true } },
           orders: { orderBy: { createdAt: "desc" }, take: 3, select: { id: true, number: true, ref: true, total: true, currency: true, status: true, createdAt: true } },
         },
@@ -230,6 +233,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
         since: info.createdAt,
         optedOut: info.optedOut,
         unreachable: info.unreachable,
+        isArchived: info.deletedAt != null,
         orderCount: info._count.orders,
         orders: info.orders,
         automation: { paused: automation.paused, until: automation.until, reason: automation.reason },

@@ -1,5 +1,6 @@
 import "server-only";
 import { cleanPersonName } from "./customer-name";
+import { clientBrandName } from "./catalog";
 import { db } from "./db";
 import { receivingNumber } from "./replies";
 import { numberConfig } from "./senders";
@@ -64,12 +65,13 @@ export async function joinFromWhatsApp(m: { phone: string; profileName?: string;
 /** A typed welcome from the number they wrote to; allowed without a template because they just wrote to us. */
 async function welcome(clientId: string, numberId: string | null, customerId: string, phone: string) {
   const [client, number] = await Promise.all([
-    db.client.findUnique({ where: { id: clientId }, select: { name: true, waToken: true } }),
+    db.client.findUnique({ where: { id: clientId }, select: { id: true, name: true, waToken: true, appearance: true } }),
     numberId ? db.whatsAppNumber.findUnique({ where: { id: numberId } }) : null,
   ]);
   if (!client) return;
   const cfg = numberConfig(number, client.waToken);
-  const body = `Welcome to ${client.name}! 🎉 You'll now get our offers and updates here on WhatsApp. Reply STOP anytime to unsubscribe.`;
+  const brand = clientBrandName(client);
+  const body = `Welcome to ${brand}! 🎉 You'll now get our offers and updates here on WhatsApp. Reply STOP anytime to unsubscribe.`;
   const { id, simulated } = await sendTextMessage(cfg, phone, body);
   await db.message.create({
     data: { customerId, templateName: "Welcome", body, status: "SENT", waMessageId: id, simulated, provider: "META", sentAt: new Date(), senderId: numberId },

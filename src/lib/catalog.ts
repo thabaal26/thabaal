@@ -55,21 +55,31 @@ export async function firstMessageToday(customerId: string) {
   return (await db.reply.count({ where: { customerId, receivedAt: { gte: today } } })) <= 1;
 }
 
+/** Resolves the public brand name for customer-facing WhatsApp messages (e.g. Shevest for Finforte). */
+export function clientBrandName(client: { id?: string; name?: string | null; appearance?: unknown } | null | undefined): string {
+  if (!client) return "our shop";
+  const app = client.appearance && typeof client.appearance === "object" && !Array.isArray(client.appearance) ? (client.appearance as Record<string, unknown>) : null;
+  if (typeof app?.whatsappBrandName === "string" && app.whatsappBrandName.trim()) return app.whatsappBrandName.trim();
+  if (typeof app?.publicBrandName === "string" && app.publicBrandName.trim()) return app.publicBrandName.trim();
+  if (client.id === "c_finforte_001" || /finforte/i.test(client.name ?? "")) return "Shevest";
+  return client.name ?? "our shop";
+}
+
 /** The shop's own details for the automatic replies' wording (lib/assistant-intents.ts). */
 export function shopInfoFor(clientId: string): Promise<ShopInfo> {
   return memo(`shop-info:${clientId}`, async () => {
     const c = await db.client.findUnique({
       where: { id: clientId },
-      select: { name: true, tagline: true, homeCity: true, supportPhone: true, website: true, orderFlow: true, disabledSections: true },
+      select: { id: true, name: true, tagline: true, homeCity: true, supportPhone: true, website: true, orderFlow: true, disabledSections: true, appearance: true },
     });
     return {
-      name: c?.name ?? "our shop",
+      name: clientBrandName(c),
       tagline: c?.tagline,
       homeCity: c?.homeCity,
       supportPhone: c?.supportPhone,
       website: c?.website,
       orderFlow: c?.orderFlow,
-      catalogue: !(c?.disabledSections ?? []).includes("catalogue"),
+      catalogue: c?.id === "c_finforte_001" || /finforte|shevest/i.test(c?.name ?? "") ? false : !(c?.disabledSections ?? []).includes("catalogue"),
     };
   });
 }
@@ -87,7 +97,7 @@ async function orderHistory(customerId: string) {
  * `failed` is true only when WhatsApp itself refused the catalogue (e.g. no catalogue connected).
  */
 export async function sendCatalogueTo(customerId: string, mode: "asked" | "welcome" = "asked"): Promise<{ ok: boolean; message: string; failed?: boolean }> {
-  const c = await db.customer.findUnique({ where: { id: customerId }, select: { id: true, name: true, phone: true, clientId: true, optedOut: true, client: { select: { name: true } } } });
+  const c = await db.customer.findUnique({ where: { id: customerId }, select: { id: true, name: true, phone: true, clientId: true, optedOut: true, client: { select: { id: true, name: true, appearance: true } } } });
   if (!c) return { ok: false, message: "Customer not found." };
   if (c.optedOut) return { ok: false, message: "This customer opted out of messages." };
   // What the message needs, read together: the provider, their 24-hour window and our number, the shop's details.
@@ -107,7 +117,7 @@ export async function sendCatalogueTo(customerId: string, mode: "asked" | "welco
   const body =
     shop && history
       ? welcomeText(shop, c.name, { ...history, withCatalogue: true, closedOpensAt: opensAt })
-      : `${first ? `Hi ${first}, here` : "Here"} is the full ${bold(c.client.name)} range. 🛍️ Tap ${bold("View catalog")}, add what you need to your cart and send it here. We'll take it from there: delivery and payment, right in this chat.${night}`;
+      : `${first ? `Hi ${first}, here` : "Here"} is the full ${bold(clientBrandName(c.client))} range. 🛍️ Tap ${bold("View catalog")}, add what you need to your cart and send it here. We'll take it from there: delivery and payment, right in this chat.${night}`;
   try {
     const res = await sendCatalogMessage(cfg, c.phone, body);
     await db.message.create({

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { disconnectSheet, rebuildSheet, syncClientSheet } from "@/lib/gsheet/sync";
 import { requireManager } from "@/lib/session";
+import { canUseGoogleSheets } from "@/lib/subscription";
 import type { SendResult } from "./send-helpers";
 
 const done = (r: SendResult) => {
@@ -15,6 +16,10 @@ const done = (r: SendResult) => {
 export async function googleSheetSyncNow(): Promise<SendResult> {
   const s = await requireManager(true, { evenIfLocked: true });
   if ("denied" in s) return { ok: false, message: s.denied };
+
+  const ent = await canUseGoogleSheets(s.clientId);
+  if (!ent.allowed) return done({ ok: false, message: ent.reason || "Google Sheets sync is only available on the Business plan." });
+
   const r = await syncClientSheet(s.clientId, 45_000);
   const link = await db.sheetLink.findUnique({ where: { clientId: s.clientId }, select: { lastError: true, status: true } });
   if (link?.status === "error" || link?.lastError) return done({ ok: false, message: link.lastError ?? "The sheet couldn't be updated." });
@@ -26,6 +31,10 @@ export async function googleSheetSyncNow(): Promise<SendResult> {
 export async function googleSheetRebuild(): Promise<SendResult> {
   const s = await requireManager(true, { evenIfLocked: true });
   if ("denied" in s) return { ok: false, message: s.denied };
+
+  const ent = await canUseGoogleSheets(s.clientId);
+  if (!ent.allowed) return done({ ok: false, message: ent.reason || "Google Sheets sync is only available on the Business plan." });
+
   try {
     await rebuildSheet(s.clientId);
   } catch {

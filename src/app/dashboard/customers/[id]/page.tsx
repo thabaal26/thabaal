@@ -28,7 +28,7 @@ import { META_SAMPLES } from "@/lib/template";
 import { sendCatalogue } from "../../actions/catalog";
 import { requestCallPermission } from "../../actions/calls";
 import { setOptOut } from "../../actions/customers";
-import { DeleteCustomerButton, EditCustomerButton } from "../customer-tools";
+import { DeleteCustomerButton, EditCustomerButton, RestoreCustomerButton } from "../customer-tools";
 import { T } from "../../portal-ui";
 import { CallButton } from "./call-button";
 import { PausedOffersNote } from "./paused-offers-note";
@@ -97,6 +97,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
   const productTags = c.tags.filter((t) => plain(t) !== plain(c.client.name) && !t.trim().toLowerCase().startsWith("loyalty-bonus:"));
 
   const meta = [
+    c.deletedAt ? "[ARCHIVED PROFILE]" : null,
     formatPhone(c.phone),
     c.location ? `${c.location}${c.region && c.region !== "Not sure" ? `, ${c.region}` : ""}` : null,
     !scope.clientId ? c.client.name : null,
@@ -104,6 +105,7 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
     c.callAllowedUntil && c.callAllowedUntil > new Date() ? `calls allowed until ${fmtDate(c.callAllowedUntil, "d MMM")}` : null,
   ].filter(Boolean);
   const metaTa = [
+    c.deletedAt ? "[காப்பகப்படுத்தப்பட்டது]" : null,
     formatPhone(c.phone),
     c.location ? `${c.location}${c.region && c.region !== "Not sure" ? `, ${c.region}` : ""}` : null,
     !scope.clientId ? c.client.name : null,
@@ -133,7 +135,13 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
         {c.optedOut ? <T ta="மீண்டும் செய்திகளை அனுமதி">Opt back in</T> : <T ta="செய்திகளை நிறுத்து">Opt out</T>}
       </ActionButton>
     ),
-    scope.canManage && c.orders.length === 0 && <DeleteCustomerButton key="del" id={c.id} name={c.name} />,
+    scope.canManage && (
+      c.deletedAt ? (
+        <RestoreCustomerButton key="restore" id={c.id} name={c.name} />
+      ) : (
+        <DeleteCustomerButton key="del" id={c.id} name={c.name} />
+      )
+    ),
   ].filter(Boolean);
 
   return (
@@ -412,13 +420,24 @@ export default async function CustomerPage({ params }: PageProps<"/dashboard/cus
             )}
             {(() => {
               const values = readValues(c.extra);
-              const shown = readFields(c.client.customFields, "customer").filter((f) => values[f.key]);
-              return shown.length ? (
+              const configured = readFields(c.client.customFields, "customer");
+              const shown = configured.filter((f) => values[f.key]);
+              const shownKeys = new Set(shown.map((f) => f.key));
+              const unconfigured = Object.entries(values).filter(
+                ([k, v]) => !shownKeys.has(k) && !k.startsWith("_") && k !== "original_record" && v
+              );
+              return shown.length || unconfigured.length ? (
                 <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
                   {shown.map((f) => (
                     <div key={f.key} className="min-w-0">
                       <dt className="text-xs text-muted">{f.label}</dt>
-                      <dd className="truncate text-ink">{showValue(f, values[f.key])}</dd>
+                      <dd className="truncate text-ink" title={values[f.key]}>{showValue(f, values[f.key])}</dd>
+                    </div>
+                  ))}
+                  {unconfigured.map(([k, v]) => (
+                    <div key={k} className="min-w-0">
+                      <dt className="text-xs text-muted capitalize">{k.replace(/_/g, " ")}</dt>
+                      <dd className="truncate text-ink" title={v}>{v}</dd>
                     </div>
                   ))}
                 </dl>

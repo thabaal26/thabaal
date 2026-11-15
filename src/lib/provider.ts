@@ -7,6 +7,7 @@ import { placeholders, renderFor, resolveVar, toPlainText, unmappedVars, type Te
 import { getSession, sendImage, sendText, type WahaConfig } from "./waha";
 import { NOT_CONNECTED, sendTemplateMessage, waConfig, type WaConfig } from "./whatsapp";
 import { PAYLOAD_PREFIX, quickReplies } from "./engine/keys";
+import { canSendLiveOutbound } from "./workspace-guard";
 
 export type ProviderName = "META" | "LOCAL";
 
@@ -97,6 +98,21 @@ export async function deliver(
   const text = isAuth
     ? `${resolvedOtp} is your verification code.${t.securityNote ? " For your security, do not share this code." : ""}`
     : [r.header, r.body, r.footer].filter(Boolean).join("\n\n");
+
+  // Centralized demo/live execution guard: Demo mode must never call Meta outbound
+  const targetClient = t.clientId ?? cfg.clientId;
+  const guard = targetClient
+    ? await canSendLiveOutbound(targetClient, "template message")
+    : { allowed: false, simulated: true, reason: "No tenant context provided." };
+  if (!guard.allowed) {
+    return {
+      id: `demo.${crypto.randomUUID()}`,
+      simulated: true,
+      provider: "META" as ProviderName,
+      text,
+    };
+  }
+
   const res = await sendTemplateMessage(cfg, {
     to: customer.phone,
     templateName: t.name,

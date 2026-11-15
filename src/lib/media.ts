@@ -141,3 +141,5 @@ export async function syncedHeaderImage(name: string, components: MetaComponent[
     return null;
   }
 }
+
+export { signMediaUrlIfNeeded } from "./media-token";

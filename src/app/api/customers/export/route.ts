@@ -7,6 +7,7 @@ import { customerSegmentIds } from "@/lib/filter-scope";
 import { keepFilters, readFilters, resolvePeriod } from "@/lib/filters";
 import { fmtDate } from "@/lib/format";
 import { getScope, readSessionUserId, SESSION_COOKIE, PLAN_LOCKED_MESSAGE } from "@/lib/session";
+import { sanitizeFormulaInjection } from "@/lib/import-engine";
 
 /**
  * The customers listed on the Customers page (same search and filters) as a CSV, for Excel or
@@ -19,6 +20,28 @@ export async function GET(req: NextRequest) {
   // Unpaid business: closed until the plan payment is verified (lib/plan-access.ts).
   if (scope.planLocked) return new NextResponse(PLAN_LOCKED_MESSAGE, { status: 403 });
   if (!scope.canManage) return new NextResponse("Only managers can export customers.", { status: 403 });
+
+  // Strictly segregate DEMO mode: export returns synthetic records only, never real customer data.
+  const clientRecord = scope.clientId
+    ? await db.client.findUnique({ where: { id: scope.clientId }, select: { workspaceMode: true, name: true } })
+    : null;
+  if (clientRecord?.workspaceMode === "DEMO") {
+    const { DEMO_CUSTOMERS } = await import("@/lib/demo-fixtures");
+    const demoCsv = [
+      `"Name","Phone","Locality","Orders","Total Spend","Tags","Notice"`,
+      ...DEMO_CUSTOMERS.map(
+        (c) =>
+          `"${c.name}","${c.phone}","${c.locality}",${c.ordersCount},${c.totalSpend},"${c.tags.join("; ")}","[DEMO] Synthetic Sample Record"`,
+      ),
+    ].join("\n");
+    return new NextResponse(demoCsv, {
+      status: 200,
+      headers: {
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": `attachment; filename="demo-customers-export.csv"`,
+      },
+    });
+  }
 
   const params: Record<string, string | string[]> = {};
   for (const [k, v] of req.nextUrl.searchParams) params[k] = k in params ? [...[params[k]].flat(), v] : v;
@@ -47,10 +70,13 @@ export async function GET(req: NextRequest) {
     : [];
   const orderOf = new Map(orders.map((o) => [o.customerId, o]));
 
-  // Excel would run cells starting with = + - @ as formulas; a leading apostrophe keeps them as text.
+  // Excel/Sheets formula injection defense (CWE-1236 / DDE defense):
+  // Dangerous prefixes (=, +, -, @, \t, \r) are prepended with ' at the export boundary,
+  // while valid negative numbers (-15) and international phone numbers (+91...) are safely preserved.
   const cell = (v: unknown) => {
     const s = String(v ?? "");
-    return `"${(/^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`;
+    const safe = sanitizeFormulaInjection(s);
+    return `"${safe.replace(/"/g, '""')}"`;
   };
   // "91 98765 43210": Excel keeps it as text (not 9.19877E+11), and Import CSV reads it back.
   const phone = (digits: string) => (digits.startsWith("91") && digits.length === 12 ? `91 ${digits.slice(2, 7)} ${digits.slice(7)}` : digits.replace(/^(\d{1,3})(\d+)$/, "$1 $2"));

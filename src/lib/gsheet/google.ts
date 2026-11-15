@@ -53,9 +53,74 @@ export function readState(state: string | null | undefined, now = Date.now()): {
   }
 }
 
-export const redirectUri = (origin: string) => `${origin}/api/google/sheets/callback`;
+/**
+ * Resolves the public application origin, prioritizing:
+ * 1. Explicit PUBLIC_URL or NEXT_PUBLIC_APP_URL environment variable
+ * 2. Forwarded reverse-proxy headers (x-forwarded-host, x-forwarded-proto, host)
+ * 3. String origin parameter (ignoring internal localhost/127.0.0.1 in production)
+ * 4. Canonical production domain fallback (https://www.thabaal.in)
+ */
+export function getPublicOrigin(reqOrUri?: Request | string | null): string {
+  if (process.env.PUBLIC_URL?.trim()) {
+    return process.env.PUBLIC_URL.trim().replace(/\/$/, "");
+  }
+  if (process.env.NEXT_PUBLIC_APP_URL?.trim()) {
+    return process.env.NEXT_PUBLIC_APP_URL.trim().replace(/\/$/, "");
+  }
+  if (reqOrUri && typeof reqOrUri === "object" && "headers" in reqOrUri) {
+    const headers = reqOrUri.headers;
+    const host = headers.get("x-forwarded-host") || headers.get("host");
+    const proto = headers.get("x-forwarded-proto") || (host?.includes("localhost") || host?.includes("127.0.0.1") ? "http" : "https");
+    if (host && !host.includes("localhost") && !host.includes("127.0.0.1")) {
+      return `${proto}://${host}`.replace(/\/$/, "");
+    }
+    if (host && (host.includes("localhost") || host.includes("127.0.0.1")) && process.env.NODE_ENV !== "production") {
+      return `${proto}://${host}`.replace(/\/$/, "");
+    }
+  }
+  if (typeof reqOrUri === "string" && reqOrUri.startsWith("http")) {
+    try {
+      const u = new URL(reqOrUri);
+      if (!u.hostname.includes("localhost") && u.hostname !== "127.0.0.1") {
+        return u.origin;
+      }
+      if (process.env.NODE_ENV !== "production") {
+        return u.origin;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return "https://www.thabaal.in";
+}
 
-export function authUrl(origin: string, state: string) {
+/**
+ * Resolves the OAuth callback URI.
+ * Resolves to `/api/google/sheets/callback` (registered in Google Cloud Console),
+ * honoring GOOGLE_SHEETS_REDIRECT_URI if set, or resolving from the public origin.
+ */
+export const redirectUri = (originOrUri?: string | Request | null): string => {
+  if (process.env.GOOGLE_SHEETS_REDIRECT_URI?.trim()) {
+    return process.env.GOOGLE_SHEETS_REDIRECT_URI.trim();
+  }
+  if (typeof originOrUri === "string" && originOrUri.startsWith("http") && originOrUri.includes("/api/google/sheets/callback")) {
+    try {
+      const u = new URL(originOrUri);
+      if (!u.hostname.includes("localhost") && u.hostname !== "127.0.0.1") {
+        return originOrUri;
+      }
+      if (process.env.NODE_ENV !== "production") {
+        return originOrUri;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  const base = getPublicOrigin(originOrUri);
+  return `${base}/api/google/sheets/callback`;
+};
+
+export function authUrl(origin: string | Request, state: string) {
   const u = new URL(AUTH_URL);
   u.searchParams.set("client_id", process.env.GOOGLE_CLIENT_ID!.trim());
   u.searchParams.set("redirect_uri", redirectUri(origin));
@@ -96,8 +161,9 @@ function emailOf(idToken?: string) {
 }
 
 /** Swaps the sign-in code for tokens; insists the person ticked the Drive permission. */
-export async function exchangeCode(code: string, origin: string) {
-  const r = await tokenCall({ grant_type: "authorization_code", code, redirect_uri: redirectUri(origin) });
+export async function exchangeCode(code: string, originOrUri?: string | Request | null) {
+  const uri = redirectUri(originOrUri);
+  const r = await tokenCall({ grant_type: "authorization_code", code, redirect_uri: uri });
   if (!r.refresh_token || !r.access_token) throw new GoogleError("Google didn't give lasting access. Please try again.", 400, "auth");
   if (!(r.scope ?? "").split(/\s+/).includes(SHEETS_SCOPE))
     throw new GoogleError("The permission to create the sheet wasn't ticked. Connect again and allow it.", 400, "auth");

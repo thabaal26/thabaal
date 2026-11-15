@@ -28,7 +28,7 @@ describe("campaign people", () => {
     clientId = (await db.client.create({ data: { name: `QA People ${Date.now()}`, orderPrefix: "QP", quietFrom: null, quietTo: null, marketingGapHours: 0 } })).id;
     await db.whatsAppNumber.create({ data: { clientId, label: "Main", phoneNumberId: `qa-people-${Date.now()}`, businessAccountId: "qa-people-waba", token: "qa-fake-token", isDefault: true, messagingTier: "TIER_1K" } });
     for (const [k, i, tags] of [["anu", 1, ["ghee"]], ["bala", 2, ["ghee"]], ["chitra", 3, []], ["test", 4, ["test"]], ["unread", 5, []]] as const) {
-      ids[k] = (await db.customer.create({ data: { clientId, phone: `${PHONE}${i}`, name: k, tags: [...tags] } })).id;
+      ids[k] = (await db.customer.create({ data: { clientId, phone: `${PHONE}${i}`, name: k, tags: [...tags], optInAt: new Date("2026-01-01T00:00:00Z"), optInSource: "Inbound WhatsApp Chat" } })).id;
     }
     templateId = (await db.template.create({ data: { clientId, businessAccountId: "qa-people-waba", name: "qa_people_offer", category: "MARKETING", status: "APPROVED", language: "en", body: "Offer" } })).id;
     // "unread": their last 3 offers were delivered and none read; "chitra": 3 offers, one read.

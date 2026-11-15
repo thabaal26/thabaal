@@ -89,12 +89,12 @@ describe("engagement: two businesses, real records", () => {
     [B, templateB] = await mk("QA Seg B", "SB");
     // Business A: customers with history.
     const people = ["tapper", "replier", "reader", "deliveredOnly", "cold", "tempFail", "optedOut", "unreach", "oldFan", "fresh", "linkedA", "linkedB"];
-    for (const [k, name] of people.entries()) id[name] = (await db.customer.create({ data: { clientId: A, phone: `${P}${String(k).padStart(2, "0")}`, name } })).id;
+    for (const [k, name] of people.entries()) id[name] = (await db.customer.create({ data: { clientId: A, phone: `${P}${String(k).padStart(2, "0")}`, name, optInAt: new Date("2026-01-01T00:00:00Z"), optInSource: "Inbound WhatsApp Chat" } })).id;
     await db.customer.update({ where: { id: id.optedOut }, data: { optedOut: true } });
     await db.customer.update({ where: { id: id.unreach }, data: { unreachable: true } });
     await linkCustomers(A, [id.linkedA, id.linkedB]);
     // Business B: a new shop, no campaigns.
-    for (let k = 0; k < 3; k++) id[`b${k}`] = (await db.customer.create({ data: { clientId: B, phone: `${P}9${k}`, name: `b${k}` } })).id;
+    for (let k = 0; k < 3; k++) id[`b${k}`] = (await db.customer.create({ data: { clientId: B, phone: `${P}9${k}`, name: `b${k}`, optInAt: new Date("2026-01-01T00:00:00Z"), optInSource: "Inbound WhatsApp Chat" } })).id;
 
     // A's history: three past campaigns (one run each), 20, 12 and 4 days ago.
     const runs: string[] = [];

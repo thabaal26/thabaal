@@ -267,6 +267,9 @@ export default async function SettingsPage() {
                   <h2><T ta="WhatsApp எண்கள்">WhatsApp numbers</T></h2>
                   <p><T ta="தரம் மதிப்பீடு உங்கள் செய்திகளைப் பற்றி வாடிக்கையாளர்கள் எவ்வாறு உணர்கிறார்கள் என்பதைக் காட்டுகிறது.">Quality rating shows how customers feel about your messages.</T></p>
                 </div>
+                <Link className="btn" href="/dashboard/settings/whatsapp">
+                  <T ta="WhatsApp அமைப்புகள்">Manage Integration</T>
+                </Link>
               </div>
               <div className="list">
                 {numbers.map((n) => {
@@ -296,9 +299,14 @@ export default async function SettingsPage() {
                   );
                 })}
                 {numbers.length === 0 && (
-                  <p className="muted small">
-                    <T ta="இன்னும் WhatsApp எண் இணைக்கப்படவில்லை. உங்கள் தபால் நிர்வாகி இதைச் சேர்ப்பார்.">No WhatsApp number connected yet. Your Thabaal admin adds it.</T>
-                  </p>
+                  <div className="py-2 space-y-2">
+                    <p className="muted small">
+                      <T ta="இன்னும் WhatsApp எண் இணைக்கப்படவில்லை.">No WhatsApp number connected yet.</T>
+                    </p>
+                    <Link className="btn btn-primary" href="/dashboard/settings/whatsapp/connect">
+                      <T ta="WhatsApp இணைக்கவும்">Connect WhatsApp →</T>
+                    </Link>
+                  </div>
                 )}
               </div>
             </section>

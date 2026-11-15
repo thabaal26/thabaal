@@ -28,7 +28,7 @@ import {
   receivedText,
   thanksText,
 } from "./assistant-intents";
-import { sendCatalogueTo, shopInfoFor, type CatalogueTrigger } from "./catalog";
+import { clientBrandName, sendCatalogueTo, shopInfoFor, type CatalogueTrigger } from "./catalog";
 import { db } from "./db";
 import { APP_TZ } from "./format";
 import { pushOrderToSheet } from "./google-sheets-live";
@@ -275,7 +275,7 @@ export async function handleCancelRequest(c: Cust, text: string) {
       "Cancel request",
       `You have ${open.length} orders that can still be cancelled:\n\n${lines}\n\nWhich one should we cancel?${others}`,
       open.slice(0, 3).map((x) => ({ id: `ocancel_pick:${x.id}`, title: orderRef(x).slice(0, 20) })),
-      { header: "Which order?", footer: open[0].client.name },
+      { header: "Which order?", footer: clientBrandName(open[0].client) },
     );
     return true;
   }
@@ -304,7 +304,7 @@ async function confirmCancel(c: Cust, o: Cancellable) {
       { id: `ocancel_yes:${o.id}`, title: "Yes, cancel it" },
       { id: `ocancel_no:${o.id}`, title: "No, keep it" },
     ],
-    { header: "Cancel this order?", footer: o.client.name },
+    { header: "Cancel this order?", footer: clientBrandName(o.client) },
   );
   return true;
 }

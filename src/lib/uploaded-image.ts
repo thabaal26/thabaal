@@ -13,9 +13,15 @@ async function ensureUploadedImageTable() {
       "id" TEXT PRIMARY KEY,
       "mimeType" TEXT NOT NULL,
       "data" BYTEA NOT NULL,
+      "isPublic" BOOLEAN NOT NULL DEFAULT false,
+      "clientId" TEXT,
       "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+  await db.$executeRawUnsafe(`
+    ALTER TABLE "PortalUploadedImage" ADD COLUMN IF NOT EXISTS "isPublic" BOOLEAN NOT NULL DEFAULT false;
+    ALTER TABLE "PortalUploadedImage" ADD COLUMN IF NOT EXISTS "clientId" TEXT;
+  `).catch(() => {});
   tableEnsured = true;
 }
 
@@ -28,6 +34,8 @@ export async function storePublicImage(opts: {
   contentType: string;
   filename?: string;
   origin?: string;
+  isPublic?: boolean;
+  clientId?: string;
 }): Promise<string> {
   const buf = Buffer.isBuffer(opts.bytes) ? opts.bytes : Buffer.from(opts.bytes);
   const ct = opts.contentType.toLowerCase();
@@ -50,14 +58,73 @@ export async function storePublicImage(opts: {
   await ensureUploadedImageTable();
   const hash = crypto.createHash("sha256").update(buf).digest("hex").slice(0, 24);
   const id = `${hash}.${ext}`;
+  // Private by default per Batch 1 media security rules. Only explicitly requested template headers are public.
+  const isPublic = opts.isPublic ?? false;
+  const clientId = opts.clientId ?? null;
 
   await db.$executeRaw`
-    INSERT INTO "PortalUploadedImage" ("id", "mimeType", "data")
-    VALUES (${id}, ${contentType}, ${buf})
-    ON CONFLICT ("id") DO UPDATE SET "mimeType" = EXCLUDED."mimeType", "data" = EXCLUDED."data"
+    INSERT INTO "PortalUploadedImage" ("id", "mimeType", "data", "isPublic", "clientId")
+    VALUES (${id}, ${contentType}, ${buf}, ${isPublic}, ${clientId})
+    ON CONFLICT ("id") DO UPDATE SET "mimeType" = EXCLUDED."mimeType", "data" = EXCLUDED."data", "isPublic" = EXCLUDED."isPublic", "clientId" = COALESCE(EXCLUDED."clientId", "PortalUploadedImage"."clientId")
   `;
 
   return `${await storageOrigin(opts.origin)}/api/upload/${id}`;
+}
+
+/**
+ * Promotes an uploaded image to public access ONLY when all ownership and lifecycle conditions are met (F-04):
+ * 1. Image exists and is strictly owned by the specified tenant (never unassigned null-tenant).
+ * 2. An APPROVED template owned by this tenant legitimately references this exact image header.
+ * 3. The template is in APPROVED status (Meta-approved). Draft, pending, or rejected templates remain private.
+ */
+export async function markTemplateImagePublic(url: string, clientId?: string | null): Promise<boolean> {
+  if (!url || !clientId || typeof url !== "string" || typeof clientId !== "string") return false;
+  const match = url.match(/\/api\/upload\/([a-zA-Z0-9._-]+)/);
+  if (!match) return false;
+  const imageId = match[1];
+
+  await ensureUploadedImageTable();
+
+  // 1. Strict tenant ownership verification (reject null-tenant or cross-tenant images)
+  const imageRows: { id: string; clientId: string | null; isPublic: boolean }[] = await db.$queryRaw`
+    SELECT "id", "clientId", "isPublic"
+    FROM "PortalUploadedImage"
+    WHERE "id" = ${imageId}
+    LIMIT 1
+  `;
+  if (!imageRows.length) return false;
+  const image = imageRows[0];
+
+  // Must match the tenant strictly. Assets with clientId IS NULL or another tenant's clientId are rejected
+  if (!image.clientId || image.clientId !== clientId) {
+    return false;
+  }
+
+  // 2. Verified template relationship & approval state
+  // Only APPROVED WhatsApp templates authorize public header media exposure
+  const template = await db.template.findFirst({
+    where: {
+      clientId,
+      headerType: "IMAGE",
+      status: "APPROVED",
+      headerMediaUrl: { contains: imageId },
+    },
+    select: { id: true },
+  });
+
+  if (!template) {
+    // No approved template references this image for this tenant. Media stays private.
+    return false;
+  }
+
+  // 3. Authorized & verified: promote to public idempotently
+  const res = await db.$executeRaw`
+    UPDATE "PortalUploadedImage"
+    SET "isPublic" = true
+    WHERE "id" = ${imageId} AND "clientId" = ${clientId}
+  `;
+
+  return res > 0;
 }
 
 /**
@@ -99,13 +166,19 @@ export async function missingUploadedImages(ids: string[]): Promise<Set<string>>
   }
 }
 
-export async function getStoredPublicImage(id: string): Promise<{ mimeType: string; data: Buffer } | null> {
+export async function getStoredPublicImage(id: string): Promise<{ mimeType: string; data: Buffer; isPublic?: boolean; clientId?: string | null } | null> {
   try {
     await ensureUploadedImageTable();
-    const rows = await db.$queryRaw<{ mimeType: string; data: Buffer }[]>`
-      SELECT "mimeType", "data" FROM "PortalUploadedImage" WHERE "id" = ${id} LIMIT 1
+    const rows = await db.$queryRaw<{ mimeType: string; data: Buffer; isPublic?: boolean | null; clientId?: string | null }[]>`
+      SELECT "mimeType", "data", "isPublic", "clientId" FROM "PortalUploadedImage" WHERE "id" = ${id} LIMIT 1
     `;
-    return rows[0] ?? null;
+    if (!rows[0]) return null;
+    return {
+      mimeType: rows[0].mimeType,
+      data: rows[0].data,
+      isPublic: Boolean(rows[0].isPublic),
+      clientId: rows[0].clientId ?? null,
+    };
   } catch {
     return null;
   }

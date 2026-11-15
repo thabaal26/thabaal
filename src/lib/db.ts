@@ -7,6 +7,8 @@ const SECRET_FIELDS = {
   client: ["waToken", "sheetHookSecret"],
   whatsAppNumber: ["token"],
   setting: ["wahaApiKey"],
+  metaAppCredential: ["appSecret", "verifyToken"],
+  whatsAppConnection: ["token"],
 } as const;
 
 type Data = Record<string, unknown> | undefined;
@@ -113,6 +115,18 @@ function makeClient() {
             return query(args);
           },
         },
+        metaAppCredential: {
+          $allOperations({ operation, args, query }) {
+            sealArgs(SECRET_FIELDS.metaAppCredential, operation, args as Record<string, unknown>);
+            return query(args);
+          },
+        },
+        whatsAppConnection: {
+          $allOperations({ operation, args, query }) {
+            sealArgs(SECRET_FIELDS.whatsAppConnection, operation, args as Record<string, unknown>);
+            return query(args);
+          },
+        },
       },
     })
     .$extends({
@@ -126,6 +140,13 @@ function makeClient() {
         },
         setting: {
           wahaApiKey: { needs: { wahaApiKey: true }, compute: (s) => unseal(s.wahaApiKey) },
+        },
+        metaAppCredential: {
+          appSecret: { needs: { appSecret: true }, compute: (m) => unseal(m.appSecret) },
+          verifyToken: { needs: { verifyToken: true }, compute: (m) => (m.verifyToken ? unseal(m.verifyToken) : null) },
+        },
+        whatsAppConnection: {
+          token: { needs: { token: true }, compute: (w) => unseal(w.token) },
         },
       },
     });

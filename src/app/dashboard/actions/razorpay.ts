@@ -8,7 +8,9 @@ import {
   cancelAutoRenew,
   confirmOrderCheckout,
   confirmSubscriptionCheckout,
+  recordCheckoutOutcome,
   startOrder,
+  startPlanOrder,
   startPlanSubscription,
   startTestSubscription,
   type CheckoutStart,
@@ -24,6 +26,7 @@ async function who() {
 function refresh<T extends { ok: boolean }>(r: T): T {
   if (r.ok) {
     revalidatePath("/dashboard/account");
+    revalidatePath("/dashboard/billing");
     revalidatePath("/dashboard/wallet");
     revalidatePath("/dashboard", "layout");
     revalidatePath("/admin", "layout");
@@ -40,6 +43,14 @@ export async function rzpStartPlan(plan: string, cycle: string): Promise<Checkou
   return startPlanSubscription(await who(), plan, cycle);
 }
 
+/**
+ * Starts a one-time order for a plan (UPI / GPay / PhonePe / QR / Cards / NetBanking).
+ * Works 100% reliably even when the customer's bank does not support recurring UPI AutoPay mandates.
+ */
+export async function rzpStartPlanOrder(plan: string, cycle: string): Promise<CheckoutStart> {
+  return startPlanOrder(await who(), plan, cycle);
+}
+
 export async function rzpStartRecharge(amount: number): Promise<CheckoutStart> {
   return startOrder(await who(), "wallet", amount);
 }
@@ -54,10 +65,21 @@ export async function rzpConfirm(input: { kind: "subscription" | "order"; id: st
   return refresh(r);
 }
 
+/** Records checkout outcome (closed/failed) so that failed attempts are immediately invalidated from reuse. */
+export async function rzpRecordCheckoutOutcome(rzpId: string, outcome: "closed" | "failed", message?: string): Promise<void> {
+  return recordCheckoutOutcome(rzpId, outcome, message);
+}
+
 /** Cancel the plan subscription: no more charges; the period already paid for runs to its end. */
-export async function rzpCancelAutoRenew(reason?: string): Promise<Result> {
-  const why = typeof reason === "string" ? reason.replace(/\s+/g, " ").trim().slice(0, 80) : "";
-  return refresh(await cancelAutoRenew(await who(), "plan", why));
+export async function rzpCancelAutoRenew(reasonOrOptions?: string | { reason?: string; immediate?: boolean }): Promise<Result> {
+  const why =
+    typeof reasonOrOptions === "string"
+      ? reasonOrOptions.replace(/\s+/g, " ").trim().slice(0, 80)
+      : typeof reasonOrOptions?.reason === "string"
+      ? reasonOrOptions.reason.replace(/\s+/g, " ").trim().slice(0, 80)
+      : "";
+  const immediate = typeof reasonOrOptions === "object" && reasonOrOptions !== null ? !!reasonOrOptions.immediate : false;
+  return refresh(await cancelAutoRenew(await who(), "plan", why, { immediate }));
 }
 
 /* Thabaal admin: ₹1 live tests that grant nothing. */

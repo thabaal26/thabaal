@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Ban, Check, ChevronRight, Download, FileUp, MoreHorizontal, Pencil, QrCode, Trash2, UserCheck, UserPlus, UsersRound, X } from "@/components/icons";
+import { AlertCircle, Ban, Check, ChevronRight, Download, FileUp, MoreHorizontal, Pencil, QrCode, RefreshCw, Trash2, UserCheck, UserPlus, UsersRound, X } from "@/components/icons";
 import Link from "@/components/intent-link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -14,9 +14,10 @@ import { CustomFieldInputs } from "@/components/custom-field-inputs";
 import { useLanguage } from "@/lib/i18n/context";
 import type { CustomField } from "@/lib/custom-fields";
 import { readPhones } from "@/lib/phone";
-import { deleteCustomer, deletePendingCustomer, importCustomers, promotePendingCustomer, saveCustomer } from "../actions/customers";
+import { deleteCustomer, deletePendingCustomer, importCustomers, previewCustomerImport, type ImportPreviewResult, promotePendingCustomer, restoreCustomer, saveCustomer } from "../actions/customers";
+import { UniversalImportModal } from "./universal-import-modal";
 
-/** Deletes a customer from their profile after a confirmation, then goes back to the customer list. */
+/** Archives (soft-deletes) a customer from their profile after confirmation, preserving orders, messages and payments. */
 export function DeleteCustomerButton({ id, name }: { id: string; name: string }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -26,9 +27,9 @@ export function DeleteCustomerButton({ id, name }: { id: string; name: string })
       loading={pending}
       onClick={async () => {
         const ok = await confirmAction({
-          title: `Delete ${name}?`,
-          message: "They are removed with their chats and messages. This can't be undone. Customers with orders can't be deleted (their payments must stay on record): opt them out instead.",
-          confirmLabel: "Delete customer",
+          title: "Delete Customer?",
+          message: "This customer will be moved to Archived Customers. Their existing order history, messages and payment records will be retained. You can restore this customer later.",
+          confirmLabel: "Archive Customer",
           danger: true,
         });
         if (!ok) return;
@@ -39,7 +40,37 @@ export function DeleteCustomerButton({ id, name }: { id: string; name: string })
         });
       }}
     >
-      <Trash2 aria-hidden className="size-4 shrink-0" /> Delete customer
+      <Trash2 aria-hidden className="size-4 shrink-0" /> Archive customer
+    </Button>
+  );
+}
+
+/** Restores an archived customer back to the active customer directory. */
+export function RestoreCustomerButton({ id, name }: { id: string; name: string }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  return (
+    <Button
+      variant="primary"
+      loading={pending}
+      onClick={async () => {
+        const ok = await confirmAction({
+          title: "Restore Customer?",
+          message: "This customer has contacted your business again. Restoring this profile will return it to your active customer list. Existing history will be preserved. Marketing messages will remain disabled unless valid marketing consent exists.",
+          confirmLabel: "Restore Customer",
+          danger: false,
+        });
+        if (!ok) return;
+        start(async () => {
+          const r = await safeAction(() => restoreCustomer(id));
+          toastResult(r);
+          if (r.ok) {
+            router.refresh();
+          }
+        });
+      }}
+    >
+      <RefreshCw aria-hidden className="size-4 shrink-0" /> Restore customer
     </Button>
   );
 }
@@ -139,9 +170,10 @@ export function CustomerActions({
           )}
         </ul>
       </Sheet>
-      <Sheet open={open === "add" || open === "import"} onClose={() => setOpen(null)} title={open === "add" ? "Add customer" : "Import customers"}>
-        {open === "add" ? <CustomerForm id={null} regions={regions} fields={fields} done={() => setOpen(null)} /> : <ImportForm done={() => setOpen(null)} />}
+      <Sheet open={open === "add"} onClose={() => setOpen(null)} title="Add customer">
+        <CustomerForm id={null} regions={regions} fields={fields} done={() => setOpen(null)} />
       </Sheet>
+      <UniversalImportModal open={open === "import"} onClose={() => setOpen(null)} />
     </>
   );
 }
@@ -432,8 +464,24 @@ function ImportForm({ done }: { done: () => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [tags, setTags] = useState("");
   const [consent, setConsent] = useState(CONSENT[0]);
+  const [preview, setPreview] = useState<ImportPreviewResult | null>(null);
+  const [restoreArchived, setRestoreArchived] = useState(true);
   const [pending, start] = useTransition();
   const router = useRouter();
+
+  const handleFileChange = async (f: File | null) => {
+    setFile(f);
+    setPreview(null);
+    if (!f) return;
+    try {
+      const text = await f.text();
+      const p = await previewCustomerImport(text);
+      if (p.ok) setPreview(p);
+    } catch {
+      // Preview failed, standard import still works
+    }
+  };
+
   return (
     <form
       className="space-y-4"
@@ -441,7 +489,7 @@ function ImportForm({ done }: { done: () => void }) {
         e.preventDefault();
         if (!file) return;
         start(async () => {
-          const r = await safeAction(async () => importCustomers(await file.text(), tags, consent));
+          const r = await safeAction(async () => importCustomers(await file.text(), tags, consent, { restoreArchived }));
           toastResult(r);
           if (r.ok) { done(); router.refresh(); }
         });
@@ -451,8 +499,52 @@ function ImportForm({ done }: { done: () => void }) {
         <FileUp aria-hidden className="size-6 shrink-0 text-brand-deep" />
         <span className="text-sm font-medium text-ink">{file ? file.name : "Choose a .csv file"}</span>
         <span className="text-xs text-muted">Columns: <code>name, phone, tags</code>. Existing numbers are updated, not duplicated.</span>
-        <input type="file" accept=".csv,text/csv" className="sr-only" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        <input type="file" accept=".csv,text/csv" className="sr-only" onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)} />
       </label>
+
+      {preview && preview.archivedCount > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-xs space-y-2">
+          <div className="font-semibold text-amber-900">
+            Import Summary: {preview.newCount} new, {preview.activeExistingCount} active, {preview.archivedCount} previously archived
+          </div>
+          <div className="text-muted">
+            This file contains {preview.archivedCount} previously archived customer{preview.archivedCount === 1 ? "" : "s"}. What would you like to do?
+          </div>
+          <div className="space-y-1.5 pt-1">
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="archivedChoice"
+                checked={restoreArchived}
+                onChange={() => setRestoreArchived(true)}
+                className="mt-0.5"
+              />
+              <div>
+                <span className="font-medium text-ink">Option A — Restore Archived Customers</span>
+                <p className="text-[11px] text-muted">
+                  Restores matching profiles. Original IDs, orders and messages are preserved. Marketing consent is strictly preserved.
+                </p>
+              </div>
+            </label>
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="archivedChoice"
+                checked={!restoreArchived}
+                onChange={() => setRestoreArchived(false)}
+                className="mt-0.5"
+              />
+              <div>
+                <span className="font-medium text-ink">Option B — Keep Them Archived</span>
+                <p className="text-[11px] text-muted">
+                  Skips reactivation. Preserves the archived status.
+                </p>
+              </div>
+            </label>
+          </div>
+        </div>
+      )}
+
       <Field id="it" label="Add these tags to everyone" hint="optional">
         <input className="field" placeholder="october-list" value={tags} onChange={(e) => setTags(e.target.value)} />
       </Field>

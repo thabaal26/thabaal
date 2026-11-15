@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { after, NextResponse, type NextRequest } from "next/server";
+import { checkMultiAppSignature, verifyWebhookToken } from "@/lib/multi-app-webhook";
 import { kickCampaigns } from "@/lib/dispatcher";
 import { db } from "@/lib/db";
 import { newMemo } from "@/lib/request-memo";
@@ -34,10 +35,14 @@ import { handleButtonTap } from "@/lib/engine/buttons";
 export const dynamic = "force-dynamic";
 
 // Meta calls GET once to verify the webhook URL.
-export function GET(req: NextRequest) {
+export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams;
-  if (p.get("hub.mode") === "subscribe" && p.get("hub.verify_token") === process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN) {
-    return new NextResponse(p.get("hub.challenge"), { status: 200 });
+  const mode = p.get("hub.mode");
+  const token = p.get("hub.verify_token");
+  const challenge = p.get("hub.challenge");
+
+  if (mode === "subscribe" && challenge && (await verifyWebhookToken(token))) {
+    return new NextResponse(challenge, { status: 200 });
   }
   return new NextResponse("Forbidden", { status: 403 });
 }
@@ -557,11 +562,16 @@ async function loadOrderForButton(orderId: string) {
 
 export async function POST(req: NextRequest) {
   const raw = await req.text();
-  const signature = checkSignature(raw, req.headers.get("x-hub-signature-256"));
-  if (signature === "invalid") {
+  const sigResult = await checkMultiAppSignature(raw, req.headers.get("x-hub-signature-256"));
+  if (
+    sigResult.status === "invalid" ||
+    (sigResult.status === "unchecked" &&
+      process.env.NODE_ENV === "production" &&
+      process.env.ALLOW_UNVERIFIED_WEBHOOKS !== "true")
+  ) {
     return new NextResponse("Invalid signature", { status: 401 });
   }
-  const signed = signature === "signed";
+  const signed = sigResult.status === "signed";
   let payload;
   try {
     payload = JSON.parse(raw);

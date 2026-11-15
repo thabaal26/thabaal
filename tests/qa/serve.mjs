@@ -50,6 +50,9 @@ export const QA_ENV = {
   RESEND_API_KEY: "",
   GOOGLE_CLIENT_ID: "",
   GOOGLE_CLIENT_SECRET: "",
+  RAZORPAY_KEY_ID: "rzp_test_QA000000000000",
+  RAZORPAY_KEY_SECRET: "qa-test-secret-0123456789",
+  RAZORPAY_WEBHOOK_SECRET: "qa-webhook-secret-0123456789",
 };
 
 const pg = new EmbeddedPostgres({ databaseDir: DIR, user: "postgres", password: "test", port: PORT, persistent: true, initdbFlags: ["-E", "UTF8", "--locale=C"], onLog: () => {} });

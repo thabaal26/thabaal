@@ -1,7 +1,10 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { createSession } from "@/lib/session";
+import { exchangeCode, GoogleError, readState } from "@/lib/gsheet/google";
+import { connectSheet, kickSheetSync, logSheetActivity } from "@/lib/gsheet/sync";
+import { createSession, getScope, requireUser } from "@/lib/session";
+import { canUseGoogleSheets } from "@/lib/subscription";
 
 function getOrigin(request: Request) {
   if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/$/, "");
@@ -17,6 +20,45 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const oauthError = url.searchParams.get("error");
+
+  // Check if this callback is for Google Sheets Connect (signed state)
+  const sheetState = readState(state);
+  if (sheetState) {
+    const back = (q: string) => NextResponse.redirect(new URL(`/dashboard/settings/sheet?google=${q}`, origin));
+    if (oauthError) return back("cancelled");
+    if (!code) return back("failed");
+
+    try {
+      const [user, scope] = await Promise.all([requireUser(), getScope()]);
+      if (sheetState.userId !== user.id) return back("expired");
+      if (scope.clientId !== sheetState.clientId || !scope.manager || scope.viewOnly) return back("not-allowed");
+
+      // Verify package entitlement: Google Sheets requires Business plan
+      const ent = await canUseGoogleSheets(sheetState.clientId);
+      if (!ent.allowed) return back("upgrade-required");
+
+      const redirectUri = `${origin}/api/auth/google/callback`;
+      const t = await exchangeCode(code, redirectUri);
+      const r = await connectSheet({
+        clientId: sheetState.clientId,
+        refreshToken: t.refreshToken,
+        accessToken: t.accessToken,
+        expiresIn: t.expiresIn,
+        email: t.email,
+        by: user.name || user.email,
+      });
+      await logSheetActivity(sheetState.clientId, {
+        event: r.fresh ? "Google Sheet connected" : "Google Sheet reconnected",
+        details: t.email ? `Google account ${t.email}` : null,
+        by: user.name || user.email,
+      });
+      kickSheetSync(sheetState.clientId);
+      return back("connected");
+    } catch (e) {
+      console.error("[gsheet] connect failed via auth callback", e);
+      return back(e instanceof GoogleError && /permission/i.test(e.message) ? "no-permission" : "failed");
+    }
+  }
 
   if (oauthError) {
     console.warn("[Google OAuth] Access denied or error:", oauthError);

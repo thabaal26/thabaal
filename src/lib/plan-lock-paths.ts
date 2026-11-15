@@ -11,5 +11,13 @@ export const isPlanLockedMessage = (text: string | null | undefined) => text ===
 /** Sections a locked business can still change things in: Home, My account and Settings (and what they contain). */
 export function openWhenLocked(path: string): boolean {
   const p = path.split(/[?#]/)[0].replace(/\/+$/, "") || "/";
-  return p === "/dashboard" || p === "/dashboard/account" || p.startsWith("/dashboard/account/") || p === "/dashboard/settings" || p.startsWith("/dashboard/settings/");
+  return (
+    p === "/dashboard" ||
+    p === "/dashboard/account" ||
+    p.startsWith("/dashboard/account/") ||
+    p === "/dashboard/billing" ||
+    p.startsWith("/dashboard/billing/") ||
+    p === "/dashboard/settings" ||
+    p.startsWith("/dashboard/settings/")
+  );
 }

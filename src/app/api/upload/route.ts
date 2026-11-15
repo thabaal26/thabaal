@@ -39,13 +39,21 @@ export async function POST(req: NextRequest) {
     if (!looksLike(type, new Uint8Array(bytes, 0, Math.min(16, bytes.byteLength)))) {
       return NextResponse.json({ error: "That file isn't really a JPG, PNG, WebP or PDF." }, { status: 400 });
     }
+    const clientId = s.clientId ?? (s.isAdmin ? req.nextUrl.searchParams.get("clientId") || null : null);
+    // Remediation F-03: Every new upload strictly defaults to private (isPublic: false).
+    // The purpose query parameter NEVER independently authorizes public visibility.
+    // Public promotion requires verified, approved template association under the explicit lifecycle policy.
+    const isPublic = false;
+
     const url = await storePublicImage({
       bytes,
       contentType: type,
       filename: name,
       origin: req.nextUrl.origin,
+      isPublic: false,
+      clientId: clientId ?? undefined,
     });
-    return NextResponse.json({ url });
+    return NextResponse.json({ url, isPublic: false });
   } catch (e) {
     console.error("Image upload failed", e);
     return NextResponse.json({ error: e instanceof Error ? e.message : "Upload failed" }, { status: 500 });
