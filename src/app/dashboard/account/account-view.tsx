@@ -111,6 +111,9 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
   // Subscribe steps: 1 confirm the plan and when the first charge is, 2 approve auto-pay in Razorpay checkout.
   const [buy, setBuy] = useState<{ plan: PlanKey; cycle: BillingCycle } | null>(canAutoPay && billing.renew ? billing.renew : null);
   const [buyStep, setBuyStep] = useState<1 | 2>(1);
+  const [payMobile, setPayMobile] = useState<string>(initialProfile.mobile || "");
+  const [payEmail, setPayEmail] = useState<string>(initialProfile.email || "");
+  const [payName, setPayName] = useState<string>(initialProfile.contactPerson || initialProfile.shopName || "");
   // Bill viewer
   const [billRow, setBillRow] = useState<HistoryRow | null>(null);
 
@@ -145,6 +148,9 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
       notify("You are already subscribed to this plan. Auto-pay renews it by itself.");
       return;
     }
+    setPayMobile(biz.mobile || initialProfile.mobile || "");
+    setPayEmail(biz.email || initialProfile.email || "");
+    setPayName(biz.contactPerson || biz.shopName || initialProfile.contactPerson || "");
     setBuy({ plan, cycle });
     setBuyStep(1);
   };
@@ -237,16 +243,39 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
   const isStaffFull = limits ? usage.staff >= limits.staff : false;
   const isCampNearLimit = limits ? usage.campaigns / limits.camp >= 0.8 : false;
 
+  const getConfirmedContact = () => {
+    const cleanMobile = payMobile.replace(/[^\d]/g, "").slice(-10);
+    if (!cleanMobile || cleanMobile.length < 10) {
+      notify("Please enter a valid 10-digit mobile number linked with your GPay / UPI app.", false);
+      return null;
+    }
+    const cleanEmail = payEmail.trim().toLowerCase();
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      notify("Please enter a valid email address for receipt notifications.", false);
+      return null;
+    }
+    const contactName = (payName || biz.contactPerson || biz.shopName || "Customer").trim();
+    // Background update to billing profile so user's corrected contact is saved
+    if (cleanMobile !== biz.mobile || cleanEmail !== biz.email) {
+      const updated = { ...biz, mobile: cleanMobile, email: cleanEmail };
+      setBiz(updated);
+      saveBillingDetails(updated).catch(() => {});
+    }
+    return { name: contactName, mobile: cleanMobile, email: cleanEmail };
+  };
+
   /** Subscribe: the server creates the Razorpay subscription and reads the result back from Razorpay. */
   const payOnline = () => {
     if (!buy) return;
+    const contact = getConfirmedContact();
+    if (!contact) return;
     startBusy(async () => {
-      const start = await rzpStartPlan(buy.plan, buy.cycle);
+      const start = await rzpStartPlan(buy.plan, buy.cycle, contact);
       if (!start.ok) {
         notify(start.message, false);
         return;
       }
-      const out = await openRazorpay(start, { name: biz.contactPerson || biz.shopName, email: biz.email, contact: biz.mobile });
+      const out = await openRazorpay(start, { name: contact.name, email: contact.email, contact: contact.mobile });
       if (out.status === "closed") {
         await rzpRecordCheckoutOutcome(start.id, "closed");
         notify("Subscription not completed. If money left your account, it is added automatically within a few minutes.", false);
@@ -271,13 +300,15 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
   /** Pay one-time: creates a standard Razorpay Order for the plan period. Works with 100% of UPI apps, Cards, and Netbanking. */
   const payOneTime = () => {
     if (!buy) return;
+    const contact = getConfirmedContact();
+    if (!contact) return;
     startBusy(async () => {
-      const start = await rzpStartPlanOrder(buy.plan, buy.cycle);
+      const start = await rzpStartPlanOrder(buy.plan, buy.cycle, contact);
       if (!start.ok) {
         notify(start.message, false);
         return;
       }
-      const out = await openRazorpay(start, { name: biz.contactPerson || biz.shopName, email: biz.email, contact: biz.mobile });
+      const out = await openRazorpay(start, { name: contact.name, email: contact.email, contact: contact.mobile });
       if (out.status === "closed") {
         await rzpRecordCheckoutOutcome(start.id, "closed");
         notify("Payment not completed. If money left your account, it is added automatically within a few minutes.", false);
@@ -1855,6 +1886,52 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
 
                 {rzpOn ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 14 }}>
+                    {/* GPay / UPI Mobile Number & Billing Email Confirmation */}
+                    <div className="card" style={{ background: "var(--panel, #ffffff)", border: "1.5px solid var(--primary, #0ea5e9)", borderRadius: 12, padding: "16px 18px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                        <span style={{ fontWeight: 700, fontSize: 14, color: "var(--foreground, #0f172a)" }}>
+                          📱 <T ta="GPay / UPI மொபைல் எண் மற்றும் ரசீது விவரங்கள்">GPay / UPI & Receipt Details</T>
+                        </span>
+                        <span style={{ fontSize: 11, background: "var(--soft, #f1f5f9)", color: "var(--primary, #0284c7)", padding: "2px 8px", borderRadius: 999, fontWeight: 600 }}>
+                          <T ta="வங்கி எண் பொருத்தம்">Mandate Match Required</T>
+                        </span>
+                      </div>
+                      <p className="fine muted" style={{ margin: "2px 0 12px", lineHeight: 1.45 }}>
+                        <T ta="Google Pay அல்லது UPI AutoPay மூலம் செலுத்தும்போது, உங்கள் GPay கணக்குடன் இணைக்கப்பட்டுள்ள அதே 10-இலக்க மொபைல் எண்ணை உள்ளிடவும் (வாட்ஸ்அப் எண் வேறாக இருந்தால், உங்கள் GPay எண்ணை இங்கே உள்ளிடவும்).">
+                          For Google Pay / UPI AutoPay, ensure this number matches the phone number registered in your Google Pay or UPI banking app to prevent mandate errors.
+                        </T>
+                      </p>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+                        <div>
+                          <label className="fine" style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "var(--foreground)" }}>
+                            <T ta="GPay / UPI மொபைல் எண் (10 இலக்கம்)">GPay / UPI Mobile Number</T> *
+                          </label>
+                          <input
+                            type="tel"
+                            className="inp"
+                            placeholder="e.g. 9876543210"
+                            value={payMobile}
+                            onChange={(e) => setPayMobile(e.target.value)}
+                            maxLength={15}
+                            style={{ width: "100%", padding: "8px 12px", fontSize: 14, borderRadius: 8 }}
+                          />
+                        </div>
+                        <div>
+                          <label className="fine" style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "var(--foreground)" }}>
+                            <T ta="ரசீது மின்னஞ்சல் (Email)">Receipt Email</T> *
+                          </label>
+                          <input
+                            type="email"
+                            className="inp"
+                            placeholder="yourname@gmail.com"
+                            value={payEmail}
+                            onChange={(e) => setPayEmail(e.target.value)}
+                            style={{ width: "100%", padding: "8px 12px", fontSize: 14, borderRadius: 8 }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
                     {/* OPTION 1: Instant One-Time Payment (Zero-failure UPI / Cards / QR) */}
                     <div className="card" style={{ background: "var(--soft)", border: "1.5px solid var(--primary, #0ea5e9)", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", padding: 18, borderRadius: 12 }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
