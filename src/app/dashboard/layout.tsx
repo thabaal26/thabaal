@@ -289,6 +289,16 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
               <ThemeToggle className="max-sm:hidden" />
               {notificationsOn && <NotificationBell className="max-sm:size-10" />}
               <SettingsLink />
+              <form action={logout} className="shrink-0">
+                <button
+                  type="submit"
+                  title="Sign out · வெளியேறு"
+                  aria-label="Sign out"
+                  className="grid size-10 shrink-0 place-items-center rounded-xl text-muted transition hover:bg-danger-bg hover:text-danger active:scale-95 sm:size-11"
+                >
+                  <LogOut aria-hidden className="size-5" />
+                </button>
+              </form>
             </div>
           </header>
 
