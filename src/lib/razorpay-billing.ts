@@ -199,6 +199,11 @@ type RzpSubscription = {
   plan_id?: string;
   total_count?: number;
   auth_attempts?: number;
+  customer_id?: string | null;
+  customer_contact?: string | null;
+  customer_email?: string | null;
+  short_url?: string;
+  notes?: Record<string, string>;
 };
 type RzpOrder = { id: string; amount: number; status: string; attempts?: number };
 
@@ -294,11 +299,40 @@ export type CheckoutStart =
   | { ok: false; message: string }
   | { ok: true; kind: "subscription" | "order"; id: string; keyId: string; amountPaise: number; label: string; startsLabel: string | null };
 
+export type CheckoutContact = { name?: string; mobile?: string; email?: string };
+
+async function ensureRazorpayCustomer(contact?: CheckoutContact): Promise<string | null> {
+  if (!contact) return null;
+  const cleanMobile = contact.mobile ? contact.mobile.replace(/[^\d]/g, "").slice(-10) : "";
+  const cleanEmail = contact.email ? contact.email.trim().toLowerCase() : "";
+  const cleanName = contact.name ? contact.name.trim().slice(0, 50) : "Thabaal Customer";
+
+  if (!cleanMobile && !cleanEmail) return null;
+
+  try {
+    const payload: Record<string, unknown> = {
+      name: cleanName || "Thabaal Customer",
+      fail_existing: 0,
+    };
+    if (cleanMobile && cleanMobile.length === 10) {
+      payload.contact = cleanMobile;
+    }
+    if (cleanEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      payload.email = cleanEmail;
+    }
+    const cust = await rzp<{ id: string }>("POST", "/customers", payload);
+    return cust?.id || null;
+  } catch (err) {
+    console.warn("Could not create/fetch Razorpay customer for checkout:", err);
+    return null;
+  }
+}
+
 /**
  * Starts auto-renew for a plan: a Razorpay subscription the client authorises in checkout. If a paid period is
  * still running, the first charge waits until it ends, so paying early never overlaps a paid term.
  */
-export async function startPlanSubscription(who: Who, plan: string, cycle: string, now = new Date()): Promise<CheckoutStart> {
+export async function startPlanSubscription(who: Who, plan: string, cycle: string, contact?: CheckoutContact, now = new Date()): Promise<CheckoutStart> {
   try {
     if (!who.clientId) return { ok: false, message: who.isAdmin ? "Pick a client in the sidebar first." : "Your login isn't linked to a business." };
     if (!who.canManage) return { ok: false, message: "Only the business owner or a manager can pay for the plan." };
@@ -352,11 +386,15 @@ export async function startPlanSubscription(who: Who, plan: string, cycle: strin
     if (recent) {
       try {
         const providerSub = await rzp<RzpSubscription>("GET", `/subscriptions/${recent.rzpId}`);
+        const hasContact = Boolean(contact?.mobile || contact?.email);
+        const contactMatches = !hasContact || Boolean(providerSub.customer_id);
+
         const isPristine =
           providerSub.status === "created" &&
           (providerSub.auth_attempts ?? 0) === 0 &&
           (providerSub.total_count ?? 0) === TOTAL_COUNT[cycle] &&
-          providerSub.plan_id === planId;
+          providerSub.plan_id === planId &&
+          contactMatches;
 
         if (isPristine) {
           return { ok: true, kind: "subscription", id: recent.rzpId, keyId: k.keyId, amountPaise, label, startsLabel };
@@ -371,14 +409,17 @@ export async function startPlanSubscription(who: Who, plan: string, cycle: strin
       }
     }
 
+    const customerId = await ensureRazorpayCustomer(contact);
+
     const sub = await rzp<RzpSubscription>("POST", "/subscriptions", {
       plan_id: planId,
       total_count: TOTAL_COUNT[cycle],
       quantity: 1,
       customer_notify: 1,
+      ...(customerId ? { customer_id: customerId } : {}),
       ...(startAt ? { start_at: startAt } : {}),
       expire_by: nowSec() + 3 * 86_400,
-      notes: { clientId, plan, cycle, purpose: "plan" },
+      notes: { clientId, plan, cycle, purpose: "plan", ...(contact?.mobile ? { gpay_mobile: contact.mobile } : {}) },
     });
     await db.razorpayRecord.create({
       data: { kind: "subscription", rzpId: sub.id, purpose: "plan", clientId, plan, cycle, amountPaise, status: sub.status || "created", createdBy: who.name },
@@ -395,7 +436,7 @@ export async function startPlanSubscription(who: Who, plan: string, cycle: strin
  * This creates a standard Razorpay Order without requiring recurring mandate setup,
  * ensuring 100% payment success even when customer banks reject UPI AutoPay.
  */
-export async function startPlanOrder(who: Who, plan: string, cycle: string, now = new Date()): Promise<CheckoutStart> {
+export async function startPlanOrder(who: Who, plan: string, cycle: string, contact?: CheckoutContact, now = new Date()): Promise<CheckoutStart> {
   try {
     if (!who.clientId) return { ok: false, message: who.isAdmin ? "Pick a client in the sidebar first." : "Your login isn't linked to a business." };
     if (!who.canManage) return { ok: false, message: "Only the business owner or a manager can pay for the plan." };
@@ -444,11 +485,14 @@ export async function startPlanOrder(who: Who, plan: string, cycle: string, now 
       }
     }
 
+    const customerId = await ensureRazorpayCustomer(contact);
+
     const order = await rzp<RzpOrder>("POST", "/orders", {
       amount: amountPaise,
       currency: "INR",
       receipt: `po-${Date.now().toString(36)}`,
-      notes: { clientId, plan, cycle, purpose: "plan" },
+      ...(customerId ? { customer_id: customerId } : {}),
+      notes: { clientId, plan, cycle, purpose: "plan", ...(contact?.mobile ? { gpay_mobile: contact.mobile } : {}) },
     });
 
     await db.razorpayRecord.create({

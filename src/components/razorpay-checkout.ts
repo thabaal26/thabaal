@@ -61,6 +61,7 @@ export async function openRazorpay(start: Start, prefill: { name?: string; email
         ...(cleanContact ? { contact: cleanContact } : {}),
       },
       theme: { color: "#0d1b2a" },
+      retry: { enabled: true, max_count: 3 },
       handler: (r: RazorpayResponse) => finish({ status: "paid", paymentId: r.razorpay_payment_id, signature: r.razorpay_signature }),
       modal: { ondismiss: () => finish({ status: "closed" }), confirm_close: true },
     });

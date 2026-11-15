@@ -39,16 +39,24 @@ function refresh<T extends { ok: boolean }>(r: T): T {
  * owner cancels it. Yearly Growth and Business are above the ₹15,000 UPI AutoPay limit, so the owner's bank may ask
  * them to approve each yearly renewal.
  */
-export async function rzpStartPlan(plan: string, cycle: string): Promise<CheckoutStart> {
-  return startPlanSubscription(await who(), plan, cycle);
+export async function rzpStartPlan(
+  plan: string,
+  cycle: string,
+  contact?: { name?: string; mobile?: string; email?: string }
+): Promise<CheckoutStart> {
+  return startPlanSubscription(await who(), plan, cycle, contact);
 }
 
 /**
  * Starts a one-time order for a plan (UPI / GPay / PhonePe / QR / Cards / NetBanking).
  * Works 100% reliably even when the customer's bank does not support recurring UPI AutoPay mandates.
  */
-export async function rzpStartPlanOrder(plan: string, cycle: string): Promise<CheckoutStart> {
-  return startPlanOrder(await who(), plan, cycle);
+export async function rzpStartPlanOrder(
+  plan: string,
+  cycle: string,
+  contact?: { name?: string; mobile?: string; email?: string }
+): Promise<CheckoutStart> {
+  return startPlanOrder(await who(), plan, cycle, contact);
 }
 
 export async function rzpStartRecharge(amount: number): Promise<CheckoutStart> {

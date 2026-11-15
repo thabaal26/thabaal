@@ -40,6 +40,21 @@ describe("Razorpay Billing Remediation: Safe Reuse, Fail-Safe One-Time Orders & 
       const url = typeof input === "string" ? input : input.toString();
       const method = init?.method?.toUpperCase() ?? "GET";
 
+      if (url.includes("/customers")) {
+        const body = init?.body ? JSON.parse(init.body as string) : {};
+        const id = `cust_rem_${++seq}`;
+        return new Response(
+          JSON.stringify({
+            id,
+            entity: "customer",
+            name: body.name || "Test Customer",
+            contact: body.contact,
+            email: body.email,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
       if (url.includes("/subscriptions")) {
         if (method === "POST") {
           const body = init?.body ? JSON.parse(init.body as string) : {};
@@ -51,6 +66,8 @@ describe("Razorpay Billing Remediation: Safe Reuse, Fail-Safe One-Time Orders & 
             total_count: body.total_count,
             quantity: 1,
             customer_notify: 1,
+            customer_id: body.customer_id,
+            notes: body.notes,
             auth_attempts: 0,
             short_url: `https://rzp.io/rzp/${id}`,
           };
@@ -207,5 +224,25 @@ describe("Razorpay Billing Remediation: Safe Reuse, Fail-Safe One-Time Orders & 
     assert.equal(dbRec?.kind, "order");
     assert.equal(dbRec?.purpose, "plan");
     assert.equal(dbRec?.amountPaise, 299900);
+  });
+
+  test("6. Passes GPay contact details, creates/links Razorpay customer, and sets customer_id", async () => {
+    const actor = { clientId: testClientId, name: "Manager", canManage: true, isAdmin: false };
+    const contact = { name: "Rathandeep", mobile: "9876543210", email: "rathandeep@candbindia.com" };
+    const s = await startPlanSubscription(actor, "business", "m", contact);
+    assert.equal(s.ok, true);
+    assert.equal(s.kind, "subscription");
+
+    // Verify subscription was created with customer_id from mock customer endpoint
+    const created = createdSubs.find((sub) => sub.id === s.id);
+    assert.ok(created?.customer_id?.startsWith("cust_rem_"), "Expected subscription to link customer_id");
+    assert.equal(created?.notes?.gpay_mobile, "9876543210");
+
+    // Also test one-time order with contact
+    const ord = await startPlanOrder(actor, "business", "m", contact);
+    assert.equal(ord.ok, true);
+    assert.equal(ord.kind, "order");
+    const createdOrd = createdOrders.find((o) => o.id === ord.id);
+    assert.equal(createdOrd?.notes?.gpay_mobile, "9876543210");
   });
 });
