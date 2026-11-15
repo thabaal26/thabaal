@@ -29,6 +29,7 @@ import {
 import { db } from "./db";
 import { pushOrderToSheet } from "./google-sheets-live";
 import { orderRef } from "./orders";
+import { clientBrandName } from "./catalog";
 import { paySettingsFor } from "./pay-settings-server";
 import { confirmCod } from "./cod";
 import { logMessage, replyContext, startCheckout, textInWindow } from "./payments";
@@ -85,7 +86,7 @@ async function sendForm(order: LoadedOrder, opts: { errors?: Record<string, stri
   const ref = orderRef(order);
   const body = opts.errors
     ? `Please check the marked fields and send your address again for order ${bold(ref)}.`
-    : `${replacedLine(order)}${hello(c.name)} thank you for your order ${bold(ref)} from ${order.client.name}.\n\nWhere should we deliver it? Tap the button below to add your address. We'll keep it for your next order too.`;
+    : `${replacedLine(order)}${hello(c.name)} thank you for your order ${bold(ref)} from ${clientBrandName(order.client)}.\n\nWhere should we deliver it? Tap the button below to add your address. We'll keep it for your next order too.`;
   const res = await sendAddressMessage(cfg, c.phone, body, { values: opts.values ?? formPrefill(c), errors: opts.errors });
   await logMessage(c.id, ADDRESS_FORM, body, res, number?.id ?? null);
 }
@@ -93,7 +94,7 @@ async function sendForm(order: LoadedOrder, opts: { errors?: Record<string, stri
 async function sendTypeOrPin(order: LoadedOrder) {
   const c = order.customer;
   const { number, cfg } = await replyContext(c);
-  const body = `${replacedLine(order)}${hello(c.name)} thank you for your order ${bold(orderRef(order))} from ${order.client.name}.\n\nWhere should we deliver it? Please type your full address here (house/flat no., street, area, city and pincode), or tap ${bold("Send location")} to share your location.`;
+  const body = `${replacedLine(order)}${hello(c.name)} thank you for your order ${bold(orderRef(order))} from ${clientBrandName(order.client)}.\n\nWhere should we deliver it? Please type your full address here (house/flat no., street, area, city and pincode), or tap ${bold("Send location")} to share your location.`;
   const res = await sendLocationRequest(cfg, c.phone, body);
   await logMessage(c.id, ADDRESS_REQUEST, body, res, number?.id ?? null);
 }
@@ -112,7 +113,7 @@ async function sendAddressChoice(order: LoadedOrder, book: SavedAddress[]) {
           c.phone,
           body,
           [...book.map((a, i) => ({ id: pick(a), title: `📍 Address ${i + 1}` })), { id: `addr_new:${order.id}`, title: "✏️ New address" }],
-          { header: "Delivery address", footer: order.client.name },
+          { header: "Delivery address", footer: clientBrandName(order.client) },
         )
       : await sendInteractiveList(
           cfg,
@@ -123,7 +124,7 @@ async function sendAddressChoice(order: LoadedOrder, book: SavedAddress[]) {
             ...book.map((a, i) => ({ id: pick(a), title: `${i + 1}. ${a.area || "Address"}`, description: a.text })),
             { id: `addr_new:${order.id}`, title: "✏️ New address", description: "Send a different address" },
           ],
-          { header: "Delivery address", footer: order.client.name },
+          { header: "Delivery address", footer: clientBrandName(order.client) },
         );
   await logMessage(c.id, ADDRESS_CHECK, body, res, number?.id ?? null);
 }
@@ -164,7 +165,7 @@ export async function startAddressStep(orderId: string): Promise<"asked" | "skip
           { id: `addr_ok:${order.id}`, title: "✅ Yes, deliver here" },
           { id: `addr_new:${order.id}`, title: "✏️ New address" },
         ],
-        { header: "Delivery address", footer: order.client.name },
+        { header: "Delivery address", footer: clientBrandName(order.client) },
       );
       await logMessage(c.id, ADDRESS_CHECK, body, res, number?.id ?? null);
     } else if (isIndianNumber(c.phone)) {
