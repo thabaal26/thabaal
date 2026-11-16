@@ -305,7 +305,7 @@ export function CampaignForm({
                 />
               )}
 
-              <SegmentPicker campaignId={id} summary={segments} value={picked} onChange={(v) => set({ segments: v })} capacity={sender?.capacity ?? null} />
+              <SegmentPicker campaignId={id} audienceTag={c.audienceTag} summary={segments} value={picked} onChange={(v) => set({ segments: v })} capacity={sender?.capacity ?? null} />
 
               <p className="tabular text-sm text-muted" aria-live="polite" data-testid="audience-size">
                 {isTa

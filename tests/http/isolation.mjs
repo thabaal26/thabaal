@@ -14,7 +14,7 @@ const check = (name, pass, extra = "") => {
 };
 
 async function seed(tag, city) {
-  const client = await db.client.create({ data: { name: `Iso ${tag} Traders`, homeCity: city, orderPrefix: `I${tag}` } });
+  const client = await db.client.create({ data: { name: `Iso ${tag} Traders`, homeCity: city, orderPrefix: `I${tag}`, workspaceMode: "LIVE_ACTIVE" } });
   const user = await db.user.create({ data: { email: `manager-${tag.toLowerCase()}@iso.test`, name: `Manager ${tag}`, passwordHash: "x", role: "CLIENT", access: "MANAGER", clientId: client.id } });
   const customers = [];
   for (let i = 1; i <= 3; i++) {

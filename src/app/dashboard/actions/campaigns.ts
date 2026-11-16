@@ -228,9 +228,18 @@ async function formClient(campaignId: string | null) {
 }
 
 /** The engagement groups right now, for the campaign form to refresh its counts while it is open. */
-export async function liveSegmentSummary(campaignId: string | null): Promise<SegmentSummary | null> {
+export async function liveSegmentSummary(
+  campaignId: string | null,
+  audienceTag?: string | null,
+): Promise<SegmentSummary | null> {
   const clientId = await formClient(campaignId);
-  return clientId ? segmentSummary(clientId) : null;
+  if (!clientId) return null;
+  const tag = audienceTag?.trim() || null;
+  if (!tag) return segmentSummary(clientId);
+
+  const where = await campaignAudienceWhere(clientId, tag);
+  const matched = await db.customer.findMany({ where, select: { id: true } });
+  return segmentSummary(clientId, { customerIds: matched.map((m) => m.id) });
 }
 
 /**
