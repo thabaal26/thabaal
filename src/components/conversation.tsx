@@ -1,19 +1,83 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { Check, CheckCheck, CheckCircle2, CircleAlert, Clock, FileText, ShoppingBag } from "@/components/icons";
+import { useEffect, useRef, type ReactNode } from "react";
+import { Check, CheckCheck, CheckCircle2, CircleAlert, Clock, Copy, CreditCard, ExternalLink, FileText, Phone, Reply, ShoppingBag } from "@/components/icons";
 import { ReplyMedia } from "@/components/reply-media";
 import { cn } from "@/lib/cn";
 import { fmtDate } from "@/lib/format";
 import { plainError, templateLabel } from "@/lib/plain-error";
 import { T } from "@/app/dashboard/portal-ui";
 
+export type TemplateButton = {
+  type: "QUICK_REPLY" | "URL" | "PHONE_NUMBER" | "COPY_CODE" | "ORDER_DETAILS" | "CATALOG" | string;
+  text: string;
+  url?: string;
+  phone?: string;
+  phone_number?: string;
+};
+
 export type ConversationEntry =
-  | { at: Date; type: "out"; id: string; template: string; campaign: string | null; status: string; body: string | null; readAt: Date | null; error: string | null; via: string | null }
-  | { at: Date; type: "in"; id: string; text: string; kind: string; mediaId: string | null; mediaType: string | null; via: string | null };
+  | {
+      at: Date;
+      type: "out";
+      id: string;
+      template: string;
+      campaign: string | null;
+      status: string;
+      body: string | null;
+      readAt: Date | null;
+      error: string | null;
+      via: string | null;
+      fromSender?: string | null;
+      headerType?: string | null;
+      headerText?: string | null;
+      headerMediaUrl?: string | null;
+      footer?: string | null;
+      buttons?: TemplateButton[] | null;
+    }
+  | {
+      at: Date;
+      type: "in";
+      id: string;
+      text: string;
+      kind: string;
+      mediaId: string | null;
+      mediaType: string | null;
+      handled?: boolean;
+      via: string | null;
+      fromSender?: string | null;
+    };
 
 /** Sent from the chat box, not a template: no label needed above the message. */
 const TYPED = new Set(["Typed reply", "Media reply", "AI auto-reply"]);
+
+/** Renders WhatsApp's *bold*, _italic_, ~strike~ and ```mono``` formatting, plus clickable links. */
+function formatWa(text: string): ReactNode[] {
+  const parts = text.split(/(\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~|```[^`]+```|https?:\/\/[^\s]+)/g);
+  return parts.map((p, i) => {
+    if (/^\*[^*]+\*$/.test(p)) return <strong key={i} className="font-semibold">{p.slice(1, -1)}</strong>;
+    if (/^_[^_]+_$/.test(p)) return <em key={i}>{p.slice(1, -1)}</em>;
+    if (/^~[^~]+~$/.test(p)) return <s key={i}>{p.slice(1, -1)}</s>;
+    if (/^```[^`]+```$/.test(p)) return <code key={i} className="font-mono text-xs bg-black/5 dark:bg-white/10 px-1 py-0.5 rounded">{p.slice(3, -3)}</code>;
+    if (/^https?:\/\/[^\s]+$/.test(p)) {
+      return (
+        <a key={i} href={p} target="_blank" rel="noreferrer" className="text-wa-link hover:underline break-all text-[#027eb5] dark:text-[#53bdeb]">
+          {p}
+        </a>
+      );
+    }
+    return p;
+  });
+}
+
+const BTN_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
+  QUICK_REPLY: Reply,
+  URL: ExternalLink,
+  PHONE_NUMBER: Phone,
+  COPY_CODE: Copy,
+  ORDER_DETAILS: CreditCard,
+  CATALOG: ShoppingBag,
+};
 
 /** Extracts an optional `[Media: https://...]` attachment tag from an outbound message body. */
 function parseOutboundBody(body: string | null): { text: string; mediaUrl: string | null } {
@@ -139,14 +203,16 @@ export function Conversation({
                   </p>
                 )}
                 {(() => {
-                  const { text, mediaUrl } = parseOutboundBody(r.entry.body);
-                  const isPdf = mediaUrl ? /\.pdf(\?|$)/i.test(mediaUrl) : false;
+                  const { text, mediaUrl: parsedMediaUrl } = parseOutboundBody(r.entry.body);
+                  const headerMediaUrl = r.entry.headerMediaUrl || parsedMediaUrl;
+                  const isPdf = headerMediaUrl ? /\.pdf(\?|$)/i.test(headerMediaUrl) : false;
+                  const buttons = r.entry.buttons ?? [];
                   return (
                     <>
-                      {mediaUrl && (
+                      {headerMediaUrl && (
                         isPdf ? (
                           <a
-                            href={mediaUrl}
+                            href={headerMediaUrl}
                             target="_blank"
                             rel="noreferrer"
                             className="mb-1.5 flex items-center gap-2 rounded-control border border-black/10 bg-white/70 dark:border-white/10 dark:bg-white/10 px-3 py-2 text-xs font-medium text-brand-deep hover:underline"
@@ -155,13 +221,46 @@ export function Conversation({
                             <span className="truncate"><T>Open PDF attachment</T></span>
                           </a>
                         ) : (
-                          <a href={mediaUrl} target="_blank" rel="noreferrer" className="mb-1.5 block overflow-hidden rounded-control border border-black/10">
+                          <a href={headerMediaUrl} target="_blank" rel="noreferrer" className="-mx-3 -mt-2 mb-2 sm:-mx-4 sm:-mt-2.5 block overflow-hidden rounded-t-[12px] sm:rounded-t-[14px]">
                             {/* eslint-disable-next-line @next/next/no-img-element -- outbound attachment preview */}
-                            <img src={mediaUrl} alt="Sent attachment" className="max-h-56 w-auto object-cover" />
+                            <img src={headerMediaUrl} alt="Sent attachment" className="max-h-56 w-full object-cover" />
                           </a>
                         )
                       )}
-                      {text && <p className="whitespace-pre-wrap [overflow-wrap:anywhere] leading-relaxed">{text}</p>}
+                      {r.entry.headerText && <p className="mb-1 font-bold text-[14.5px] leading-snug">{formatWa(r.entry.headerText)}</p>}
+                      {text && <p className="whitespace-pre-wrap [overflow-wrap:anywhere] leading-relaxed">{formatWa(text)}</p>}
+                      {r.entry.footer && <p className="mt-1 text-xs text-[#54656F] dark:text-[#8696A0]">{r.entry.footer}</p>}
+                      {buttons.length > 0 && (
+                        <div className="-mx-3 -mb-2 mt-2 sm:-mx-4 sm:-mb-2.5 flex flex-col border-t border-black/10 dark:border-white/10">
+                          {buttons.map((b, btnIdx) => {
+                            const Icon = BTN_ICON[b.type] ?? ExternalLink;
+                            const href = b.type === "URL" ? b.url : b.type === "PHONE_NUMBER" ? `tel:${b.phone || b.phone_number}` : undefined;
+                            if (href) {
+                              return (
+                                <a
+                                  key={btnIdx}
+                                  href={href}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="flex items-center justify-center gap-2 py-2 px-3 text-sm font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-black/5 dark:hover:bg-white/5 border-b border-black/10 dark:border-white/10 last:border-b-0"
+                                >
+                                  <Icon aria-hidden className="size-4 shrink-0" />
+                                  <span>{b.text || "Button"}</span>
+                                </a>
+                              );
+                            }
+                            return (
+                              <div
+                                key={btnIdx}
+                                className="flex items-center justify-center gap-2 py-2 px-3 text-sm font-semibold text-emerald-700 dark:text-emerald-400 border-b border-black/10 dark:border-white/10 last:border-b-0"
+                              >
+                                <Icon aria-hidden className="size-4 shrink-0" />
+                                <span>{b.text || "Button"}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </>
                   );
                 })()}
@@ -254,8 +353,10 @@ function WaRows({ rows }: { rows: Row[] }) {
             </li>
           );
         }
-        const { text, mediaUrl } = parseOutboundBody(e.body);
-        const isPdf = mediaUrl ? /\.pdf(\?|$)/i.test(mediaUrl) : false;
+        const { text, mediaUrl: parsedMediaUrl } = parseOutboundBody(e.body);
+        const headerMediaUrl = e.headerMediaUrl || parsedMediaUrl;
+        const isPdf = headerMediaUrl ? /\.pdf(\?|$)/i.test(headerMediaUrl) : false;
+        const buttons = e.buttons ?? [];
         return (
           <li key={r.key} className={cn("out", first && "first")}>
             <div className={cn("wa-b", e.status === "FAILED" && "bad")}>
@@ -265,28 +366,52 @@ function WaRows({ rows }: { rows: Row[] }) {
                   {e.campaign && <span>· {e.campaign}</span>}
                 </p>
               )}
-              {mediaUrl &&
+              {headerMediaUrl &&
                 (isPdf ? (
-                  <a href={mediaUrl} target="_blank" rel="noreferrer" className="wa-file">
+                  <a href={headerMediaUrl} target="_blank" rel="noreferrer" className="wa-file">
                     <FileText aria-hidden className="ic" />
                     <span className="truncate">
                       <T>Open PDF attachment</T>
                     </span>
                   </a>
                 ) : (
-                  <a href={mediaUrl} target="_blank" rel="noreferrer" className="wa-img">
+                  <a href={headerMediaUrl} target="_blank" rel="noreferrer" className="wa-img wa-img-header">
                     {/* eslint-disable-next-line @next/next/no-img-element -- outbound attachment preview */}
-                    <img src={mediaUrl} alt="Sent attachment" />
+                    <img src={headerMediaUrl} alt="Header media" />
                   </a>
                 ))}
+              {e.headerText && <p className="mb-1 font-bold text-[14.5px] leading-snug">{formatWa(e.headerText)}</p>}
               <div className="wa-clear">
-                {text && <span className="tx">{text}</span>}
+                {text && <span className="tx">{formatWa(text)}</span>}
+                {e.footer && <p className="wa-footer">{e.footer}</p>}
                 <span className="wa-meta">
                   {e.via && <T ta={`${e.via}-லிருந்து · `}>{`from ${e.via} · `}</T>}
                   {time}
                   <WaTicks status={e.status} />
                 </span>
               </div>
+              {buttons.length > 0 && (
+                <div className="wa-card-buttons">
+                  {buttons.map((b, btnIdx) => {
+                    const Icon = BTN_ICON[b.type] ?? ExternalLink;
+                    const href = b.type === "URL" ? b.url : b.type === "PHONE_NUMBER" ? `tel:${b.phone || b.phone_number}` : undefined;
+                    if (href) {
+                      return (
+                        <a key={btnIdx} href={href} target="_blank" rel="noreferrer" className="wa-card-btn">
+                          <Icon aria-hidden className="ic" />
+                          <span>{b.text || "Button"}</span>
+                        </a>
+                      );
+                    }
+                    return (
+                      <div key={btnIdx} className="wa-card-btn">
+                        <Icon aria-hidden className="ic" />
+                        <span>{b.text || "Button"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               {e.error && <p className="wa-err">{plainError(e.error)}</p>}
             </div>
           </li>

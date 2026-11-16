@@ -159,6 +159,17 @@ html.dark .thabaal-portal .wa-ib:hover,html.dark .thabaal-portal .wa-ib[aria-exp
 html.dark .thabaal-portal .wa-file{background:rgba(255,249,240,.08)}
 .thabaal-portal .wa-img{display:block;margin:-3px -5px 4px;border-radius:6px;overflow:hidden}
 .thabaal-portal .wa-img img{display:block;max-height:280px;width:auto;max-width:100%;object-fit:cover}
+.thabaal-portal .wa-img-header{margin:-6px -8px 6px -9px;border-radius:8px 8px 0 0;overflow:hidden}
+.thabaal-portal .wa-img-header img{width:100%;max-height:260px;object-fit:cover;display:block}
+.thabaal-portal .wa-footer{font-size:12px;color:var(--wa-meta);margin-top:4px}
+.thabaal-portal .wa-card-buttons{margin:6px -8px -7px -9px;border-top:1px solid rgba(16,40,59,.1);display:flex;flex-direction:column}
+html.dark .thabaal-portal .wa-card-buttons{border-top-color:rgba(255,255,255,.1)}
+.thabaal-portal .wa-card-btn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:38px;padding:8px 12px;font-size:13.5px;font-weight:600;color:var(--wa-read,#027eb5);text-decoration:none;background:none;border:0;border-bottom:1px solid rgba(16,40,59,.1);transition:background-color .15s ease;cursor:pointer}
+.thabaal-portal .wa-card-btn:last-child{border-bottom:0;border-bottom-left-radius:8px;border-bottom-right-radius:8px}
+.thabaal-portal .wa-card-btn:hover{background-color:rgba(16,40,59,.06)}
+html.dark .thabaal-portal .wa-card-btn{border-bottom-color:rgba(255,255,255,.1);color:#53bdeb}
+html.dark .thabaal-portal .wa-card-btn:hover{background-color:rgba(255,255,255,.08)}
+.thabaal-portal .wa-card-btn .ic{width:16px;height:16px;flex-shrink:0}
 .thabaal-portal .wa-clear::after{content:"";display:block;clear:both}
 
 /* ── Composer ── */
