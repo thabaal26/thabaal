@@ -200,7 +200,21 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
     const [msgs, reps, info, automation] = await Promise.all([
       db.message.findMany({
         where: { customerId: selected.customer.id, status: { not: "QUEUED" } },
-        include: { run: { select: { campaign: { select: { name: true } } } }, sender: { select: { label: true } } },
+        include: {
+          run: { select: { campaign: { select: { name: true } } } },
+          sender: { select: { label: true } },
+          template: {
+            select: {
+              id: true,
+              name: true,
+              headerType: true,
+              headerText: true,
+              headerMediaUrl: true,
+              footer: true,
+              buttons: true,
+            },
+          },
+        },
         orderBy: { createdAt: "desc" },
         take: 40,
       }),
@@ -239,19 +253,45 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
         automation: { paused: automation.paused, until: automation.until, reason: automation.reason },
       };
     }
+
+    const missingTplNames = [...new Set(msgs.filter((m) => !m.template && m.templateName).map((m) => m.templateName))];
+    const fallbackTemplates = missingTplNames.length
+      ? await db.template.findMany({
+          where: { name: { in: missingTplNames } },
+          select: {
+            id: true,
+            name: true,
+            headerType: true,
+            headerText: true,
+            headerMediaUrl: true,
+            footer: true,
+            buttons: true,
+          },
+        })
+      : [];
+    const templateByName = new Map(fallbackTemplates.map((t) => [t.name, t]));
+
     thread.push(
-      ...msgs.map((m) => ({
-        at: m.sentAt ?? m.createdAt,
-        type: "out" as const,
-        id: m.id,
-        template: m.templateName,
-        campaign: m.run?.campaign.name ?? null,
-        status: m.status,
-        body: m.body,
-        readAt: m.readAt,
-        error: m.error,
-        via: m.sender?.label ?? null,
-      })),
+      ...msgs.map((m) => {
+        const t = m.template ?? templateByName.get(m.templateName);
+        return {
+          at: m.sentAt ?? m.createdAt,
+          type: "out" as const,
+          id: m.id,
+          template: m.templateName,
+          campaign: m.run?.campaign.name ?? null,
+          status: m.status,
+          body: m.body,
+          readAt: m.readAt,
+          error: m.error,
+          via: m.sender?.label ?? null,
+          headerType: t?.headerType ?? null,
+          headerText: t?.headerText ?? null,
+          headerMediaUrl: t?.headerMediaUrl ?? null,
+          footer: t?.footer ?? null,
+          buttons: (t?.buttons as any) ?? null,
+        };
+      }),
       ...reps.map((r) => ({
         at: r.receivedAt,
         type: "in" as const,
