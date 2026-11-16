@@ -182,12 +182,28 @@ export type SegmentSummary = {
 const eligibleRow = (r: EngagementRow) => !r.suppressed && !r.pausedUntil;
 
 /** Live counts for the campaign form and the customer list. */
-export async function segmentSummary(clientId: string, now = new Date()): Promise<SegmentSummary> {
+export async function segmentSummary(
+  clientId: string,
+  opts: { customerIds?: string[]; now?: Date } | Date = new Date(),
+): Promise<SegmentSummary> {
+  const options = opts instanceof Date ? { now: opts } : opts;
+  const now = options.now ?? new Date();
+  if (options.customerIds && !options.customerIds.length) {
+    const segments = Object.fromEntries(SEGMENTS.map((s) => [s, { eligible: 0, excluded: 0, moved: 0 }])) as SegmentSummary["segments"];
+    return {
+      history: false,
+      rules: await engagementRules(clientId),
+      segments,
+      totals: { customers: 0, eligible: 0, optedOut: 0, unreachable: 0, movedInactive: 0, paused: 0, invalidNumber: 0 },
+    };
+  }
   const [rows, history, rules, bad] = await Promise.all([
-    engagementRows(clientId, { now }),
+    engagementRows(clientId, { customerIds: options.customerIds, now }),
     hasCampaignHistory(clientId),
     engagementRules(clientId),
-    db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM "Customer" WHERE "clientId" = ${clientId} AND length(regexp_replace(phone, '\\D', '', 'g')) < 10`,
+    options.customerIds
+      ? db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM "Customer" WHERE "clientId" = ${clientId} AND id IN (${Prisma.join(options.customerIds)}) AND length(regexp_replace(phone, '\\D', '', 'g')) < 10`
+      : db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM "Customer" WHERE "clientId" = ${clientId} AND length(regexp_replace(phone, '\\D', '', 'g')) < 10`,
   ]);
   const segments = Object.fromEntries(SEGMENTS.map((s) => [s, { eligible: 0, excluded: 0, moved: 0 }])) as SegmentSummary["segments"];
   for (const r of rows) {

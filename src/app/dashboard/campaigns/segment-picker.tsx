@@ -32,12 +32,14 @@ const REFRESH_MS = 60_000;
 
 export function SegmentPicker({
   campaignId,
+  audienceTag,
   summary: initial,
   value,
   onChange,
   capacity,
 }: {
   campaignId: string | null;
+  audienceTag?: string | null;
   summary: SegmentSummaryProps;
   value: string[];
   onChange: (v: string[]) => void;
@@ -52,7 +54,7 @@ export function SegmentPicker({
     const pull = () => {
       if (document.visibilityState !== "visible" || busy) return;
       busy = true;
-      liveSegmentSummary(campaignId)
+      liveSegmentSummary(campaignId, audienceTag)
         .then((s) => {
           if (s && !stop) setSummary(s);
         })
@@ -61,6 +63,7 @@ export function SegmentPicker({
           busy = false;
         });
     };
+    pull();
     const check = async () => {
       if (document.visibilityState !== "visible") return;
       try {
@@ -83,7 +86,7 @@ export function SegmentPicker({
       clearInterval(t);
       document.removeEventListener("visibilitychange", pull);
     };
-  }, [campaignId]);
+  }, [campaignId, audienceTag]);
   const t = summary.totals;
   const capacityText = !capacity
     ? null
