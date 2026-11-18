@@ -244,7 +244,7 @@ export const CLASSIFICATION_DEFINITIONS: Record<string, ClassificationMeta> = {
     title: "Unreachable",
     dimension: "eligibility",
     definition: "Customer cannot receive WhatsApp messages (not registered, old version, or blocked).",
-    whyClassified: "Previous send returned Meta error 131026, 131021, or 130403.",
+    whyClassified: "Previous send returned Meta error 131026 or 130403 (recipient unreachable or blocked).",
     evidenceOrMetaError: "Customer.unreachable = true.",
     selectable: true,
     dispatchable: false,
