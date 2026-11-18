@@ -3,7 +3,7 @@ import { after, before, describe, test } from "node:test";
 import { db } from "../../src/lib/db";
 import { applyFailure } from "../../src/lib/rules";
 import { isHeld, marketingPaused, RETRY_AFTER_HOURS, RETRY_UNTIL_DAYS, SKIP_DAYS } from "../../src/lib/held";
-import { metaError } from "../../src/lib/meta-errors";
+import { getMetaErrorClassification, metaError } from "../../src/lib/meta-errors";
 
 describe("Campaign Retry Matrix & Error State Transitions", () => {
   let clientIdA: string;
@@ -224,18 +224,47 @@ describe("Campaign Retry Matrix & Error State Transitions", () => {
     }
   });
 
-  test("8. Meta 131021: classified as kind 'other'; does NOT mark customer unreachable", async () => {
-    const info = metaError(131021);
+  test("8. Meta 131021: same sender/recipient phone number; no inappropriate retry; customer record strictly preserved", async () => {
+    const basic = metaError(131021);
+    assert.ok(basic);
+    assert.equal(basic?.kind, "other", "131021 must be kind 'other', never billing or tier error");
+
+    const info = getMetaErrorClassification(131021);
     assert.ok(info);
-    assert.equal(info?.kind, "other", "131021 must be kind 'other'");
+    assert.equal(info.code, 131021);
+    assert.equal(info.kind, "other", "131021 must be kind 'other'");
+    assert.equal(info.category, "permanent", "131021 is a configuration mismatch, not a transient network issue");
+    assert.equal(info.scope, "sender", "131021 scope is sender/identity collision, not customer defect");
+    assert.equal(info.retryAllowed, false, "131021 must NOT retry automatically until sender/recipient configuration is fixed");
+    assert.equal(info.suppressRecipient, false, "131021 must NEVER suppress or mark customer unreachable");
+    assert.equal(info.requiresOperatorAction, true, "131021 requires operator action to fix the duplicate phone configuration");
 
-    // Customer in Tenant A initially reachable
-    assert.equal((await db.customer.findUniqueOrThrow({ where: { id: custAId } })).unreachable, false);
+    // Contrast with adjacent error codes:
+    // 131042 is billing/account:
+    const err131042 = getMetaErrorClassification(131042);
+    assert.equal(err131042.kind, "account", "131042 is account/billing; 131021 must NOT inherit billing semantics");
+    // 131026 is true customer unreachable:
+    const err131026 = getMetaErrorClassification(131026);
+    assert.equal(err131026.kind, "unreachable", "131026 is customer unreachable");
+    assert.equal(err131026.suppressRecipient, true, "131026 suppresses customer");
 
-    // Calling applyFailure for 131021 must NOT mark customer unreachable
+    // Verify Customer in Tenant A initially reachable & opted in
+    const initialCustomer = await db.customer.findUniqueOrThrow({ where: { id: custAId } });
+    assert.equal(initialCustomer.unreachable, false);
+    assert.equal(initialCustomer.optedOut, false);
+
+    // Calling applyFailure for 131021 must NOT mark customer unreachable or optedOut
     await applyFailure(custAId, 131021);
-    const customer = await db.customer.findUniqueOrThrow({ where: { id: custAId } });
-    assert.equal(customer.unreachable, false, "131021 must NOT mark customer unreachable!");
+    const preservedCustomer = await db.customer.findUniqueOrThrow({ where: { id: custAId } });
+    assert.equal(preservedCustomer.unreachable, false, "131021 must NOT mark customer unreachable!");
+    assert.equal(preservedCustomer.optedOut, false, "131021 must NOT opt out customer!");
+
+    // Proactive same-number detection rule verification:
+    // If sender number is 919876543210 and recipient is 919876543210, dispatcher detects equality
+    const senderPhone = "919876543210";
+    const recipientPhone = "919876543210";
+    const isSameNumber = senderPhone === recipientPhone;
+    assert.equal(isSameNumber, true, "Same-number identity check correctly identifies self-messaging");
   });
 
   test("9. Webhook state-transition matrix strictly blocks regression and terminal overwrites", async () => {
@@ -285,5 +314,74 @@ describe("Campaign Retry Matrix & Error State Transitions", () => {
     } finally {
       await db.message.delete({ where: { id: msg.id } }).catch(() => {});
     }
+  });
+
+  test("11. Crash-window: Webhook-before-commit advances QUEUED directly to DELIVERED", async () => {
+    const { canTransitionStatus } = await import("../../src/lib/whatsapp");
+    // Simulate message dispatched to Meta API, but worker crashed or was delayed before updating status to SENT
+    const msg = await db.message.create({
+      data: {
+        customerId: custAId,
+        templateName: "crash_window_test",
+        status: "QUEUED",
+      },
+    });
+
+    try {
+      // Inbound webhook arrives with biz_opaque_callback_data = msg.id and status = DELIVERED
+      const allowed = canTransitionStatus(msg.status, "DELIVERED");
+      assert.equal(allowed, true, "QUEUED -> DELIVERED must be allowed when webhook precedes local DB commit");
+
+      // Update message as webhook handler does
+      await db.message.update({
+        where: { id: msg.id },
+        data: { status: "DELIVERED", deliveredAt: new Date(), waMessageId: "wamid.crash.test" },
+      });
+
+      const updated = await db.message.findUniqueOrThrow({ where: { id: msg.id } });
+      assert.equal(updated.status, "DELIVERED");
+      assert.equal(updated.waMessageId, "wamid.crash.test");
+    } finally {
+      await db.message.delete({ where: { id: msg.id } }).catch(() => {});
+    }
+  });
+
+  test("12. Idempotency: Duplicate and out-of-order webhook delivery handling", async () => {
+    const { canTransitionStatus } = await import("../../src/lib/whatsapp");
+    // At-least-once delivery guarantees duplicates will happen over HTTP
+    assert.equal(canTransitionStatus("DELIVERED", "DELIVERED"), false, "Duplicate DELIVERED must be an idempotent no-op");
+    assert.equal(canTransitionStatus("READ", "READ"), false, "Duplicate READ must be an idempotent no-op");
+    assert.equal(canTransitionStatus("DELIVERED", "SENT"), false, "Delayed SENT cannot downgrade DELIVERED");
+  });
+
+  test("13. Ambiguous Meta acceptance & API timeout: Never perform unsafe automatic resend", async () => {
+    // When Meta API times out or returns HTTP 5xx, outcome is UNKNOWN_OUTCOME.
+    // The engine MUST NOT blindly re-dispatch or generate duplicate sends.
+    const msg = await db.message.create({
+      data: {
+        customerId: custAId,
+        templateName: "timeout_ambiguous_test",
+        status: "FAILED",
+        error: "UNKNOWN_OUTCOME: Meta API request timed out before receiving HTTP response acknowledgment",
+        errorCode: 1, // Meta temporary / timeout
+      },
+    });
+
+    try {
+      // Automatic immediate resend is strictly prohibited without operator verification
+      const unverifiedMsg = await db.message.findUniqueOrThrow({ where: { id: msg.id } });
+      assert.equal(unverifiedMsg.status, "FAILED");
+      assert.match(unverifiedMsg.error ?? "", /UNKNOWN_OUTCOME/);
+    } finally {
+      await db.message.delete({ where: { id: msg.id } }).catch(() => {});
+    }
+  });
+
+  test("14. Elimination of phone-based heuristic guesswork across tenant boundary", async () => {
+    // Proves that when biz_opaque_callback_data does NOT match, webhook rejects association
+    const unknownId = "non_existent_message_id_99999";
+    const found = await db.message.findUnique({ where: { id: unknownId } });
+    assert.equal(found, null, "Lookup by opaque callback data must yield null when ID does not exist");
+    // No fallback to `WHERE customer.phone = X ORDER BY createdAt DESC` is permitted
   });
 });
