@@ -2,12 +2,13 @@
 
 import { fromZonedTime } from "date-fns-tz";
 import { revalidatePath } from "next/cache";
+import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { dispatch, startRun } from "@/lib/dispatcher";
+import { CampaignConcurrencyError, dispatch, startRun } from "@/lib/dispatcher";
 import { APP_TZ } from "@/lib/format";
 import { retryHeldBack } from "@/lib/held";
-import { campaignAudienceWhere } from "@/lib/audiences";
-import { decodeTags, TAGS_PREFIX } from "@/lib/audience-tags";
+import { audienceTagCustomerIds, campaignAudienceWhere } from "@/lib/audiences";
+import { AUDIENCE_PREFIX, decodeTags, TAGS_PREFIX } from "@/lib/audience-tags";
 import { getSettings, templateSendable } from "@/lib/provider";
 import { unmappedVars, type VarMap } from "@/lib/template";
 import { isQuietTime } from "@/lib/rules";
@@ -83,6 +84,11 @@ export async function saveCampaign(id: string | null, input: CampaignInput): Pro
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(input.sendTime)) errors.push("Choose a send time.");
   if (input.scheduleType === "WEEKLY" && !input.daysOfWeek.length) errors.push("Pick at least one day of the week.");
   if (input.audienceTag.startsWith(TAGS_PREFIX) && !decodeTags(input.audienceTag)?.tags.length) errors.push('Pick at least one tag under "Send to", or choose All customers.');
+  if (input.audienceTag.startsWith(AUDIENCE_PREFIX)) {
+    const audId = input.audienceTag.slice(AUDIENCE_PREFIX.length);
+    const aud = await db.audience.findFirst({ where: { id: audId, clientId } });
+    if (!aud) errors.push("The selected saved audience does not exist or has been deleted.");
+  }
   if (input.scheduleType === "ONCE" && !/^\d{4}-\d{2}-\d{2}$/.test(input.runDate)) errors.push("Choose a date.");
   if (!Number.isInteger(input.batchSize) || input.batchSize < 1 || input.batchSize > 1000) errors.push("Batch size must be between 1 and 1,000.");
   if (!Number.isInteger(input.intervalMinutes) || input.intervalMinutes < 1 || input.intervalMinutes > 1440)
@@ -167,10 +173,45 @@ export async function runCampaignNow(id: string): Promise<ActionResult> {
   if (busy) return { ok: false, message: "This campaign is already sending. Wait for it to finish or stop it." };
   const block = await planCapacityBlock(c.clientId, "camp");
   if (block) return { ok: false, message: block };
-  const run = await startRun(c, new Date());
-  await dispatch();
-  refresh();
-  return { ok: true, message: `Started: ${run.total} customer${run.total === 1 ? "" : "s"} queued, ${c.batchSize} every ${c.intervalMinutes} min.` };
+  try {
+    const run = await startRun(c, new Date(), { permanentDedupe: true });
+    await dispatch();
+    refresh();
+    return { ok: true, message: `Started: ${run.total} customer${run.total === 1 ? "" : "s"} queued, ${c.batchSize} every ${c.intervalMinutes} min.` };
+  } catch (err) {
+    if (err instanceof CampaignConcurrencyError) {
+      return { ok: false, message: "This campaign is already being dispatched by another process. Please wait." };
+    }
+    throw err;
+  }
+}
+
+export async function resendCampaignNow(id: string): Promise<ActionResult> {
+  trackPress("campaign.resend");
+  const s = await requireManager();
+  if ("denied" in s) return { ok: false, message: s.denied };
+  const c = await db.campaign.findUnique({ where: { id }, include: { template: true } });
+  if (!c || !mine(s, c.clientId)) return { ok: false, message: "Campaign not found." };
+  const liveCheck = await canSendLiveOutbound(c.clientId, "campaign dispatch");
+  if (!liveCheck.allowed) {
+    return { ok: false, message: liveCheck.reason || "Live campaign dispatch is locked in Demo Mode. Subscribe to a plan to start live broadcasting." };
+  }
+  if (!templateSendable(await getSettings(), c.template)) return { ok: false, message: "The template isn't approved by Meta yet." };
+  const busy = await db.campaignRun.findFirst({ where: { campaignId: id, status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET", "WAITING_FUNDS"] } } });
+  if (busy) return { ok: false, message: "This campaign is already sending. Wait for it to finish or stop it." };
+  const block = await planCapacityBlock(c.clientId, "camp");
+  if (block) return { ok: false, message: block };
+  try {
+    const run = await startRun(c, new Date(), { allowResend: true });
+    await dispatch();
+    refresh();
+    return { ok: true, message: `Resent: ${run.total} customer${run.total === 1 ? "" : "s"} queued, ${c.batchSize} every ${c.intervalMinutes} min.` };
+  } catch (err) {
+    if (err instanceof CampaignConcurrencyError) {
+      return { ok: false, message: "This campaign is already being dispatched by another process. Please wait." };
+    }
+    throw err;
+  }
 }
 
 /**
@@ -234,12 +275,60 @@ export async function liveSegmentSummary(
 ): Promise<SegmentSummary | null> {
   const clientId = await formClient(campaignId);
   if (!clientId) return null;
-  const tag = audienceTag?.trim() || null;
-  if (!tag) return segmentSummary(clientId);
 
-  const where = await campaignAudienceWhere(clientId, tag);
-  const matched = await db.customer.findMany({ where, select: { id: true } });
-  return segmentSummary(clientId, { customerIds: matched.map((m) => m.id) });
+  const customerIds = await audienceTagCustomerIds(clientId, audienceTag);
+  return customerIds === null ? segmentSummary(clientId) : segmentSummary(clientId, { customerIds });
+}
+
+export type MultiTagBreakdown = {
+  tag: string;
+  customers: number;
+  eligible: number;
+  unreachable: number;
+  paused: number;
+  optedOut: number;
+  segments: {
+    firstTime: number;
+    reached: number;
+    seen: number;
+    dormant: number;
+  };
+};
+
+/** Individual breakdown for each tag when multiple tags are selected */
+export async function liveMultiTagSummaries(
+  campaignId: string | null,
+  audienceTag?: string | null,
+): Promise<MultiTagBreakdown[] | null> {
+  const clientId = await formClient(campaignId);
+  if (!clientId || !audienceTag) return null;
+
+  const { decodeTags } = await import("@/lib/audience-tags");
+  const decoded = decodeTags(audienceTag);
+  if (!decoded || decoded.tags.length <= 1) return null;
+
+  const results: MultiTagBreakdown[] = [];
+  for (const tag of decoded.tags) {
+    const summary = await liveSegmentSummary(campaignId, tag);
+    if (summary) {
+      const seg = summary.segments;
+      results.push({
+        tag,
+        customers: summary.totals.customers,
+        eligible: summary.totals.eligible,
+        unreachable: summary.totals.unreachable + summary.totals.invalidNumber,
+        paused: summary.totals.paused,
+        optedOut: summary.totals.optedOut,
+        segments: {
+          firstTime: seg.new?.eligible ? seg.new.eligible + seg.new.excluded : 0,
+          reached: seg.reached?.eligible ? seg.reached.eligible + seg.reached.excluded : 0,
+          seen: (seg.seen?.eligible ? seg.seen.eligible + seg.seen.excluded : 0) + (seg.engaged?.eligible ? seg.engaged.eligible + seg.engaged.excluded : 0),
+          dormant: seg.dormant?.eligible ? seg.dormant.eligible + seg.dormant.excluded : 0,
+        },
+      });
+    }
+  }
+  return results;
 }
 
 /**
@@ -249,15 +338,29 @@ export async function liveSegmentSummary(
 export async function countCampaignAudience(
   campaignId: string | null,
   audienceTag: string,
-  people: { includeIds?: string[]; excludeIds?: string[]; segments?: string[] } = {},
+  people: { includeIds?: string[]; excludeIds?: string[]; segments?: string[]; templateId?: string } = {},
 ): Promise<{ ok: boolean; n: number; unread?: number; testIds?: string[] }> {
   const clientId = await formClient(campaignId);
   if (!clientId) return { ok: false, n: 0 };
-  const where = await campaignAudienceWhere(clientId, audienceTag.trim() || null, {
-    includeIds: await ownCustomers(clientId, people.includeIds),
-    excludeIds: await ownCustomers(clientId, people.excludeIds),
-    segments: cleanSegments(people.segments),
-  });
+
+  let requirePositiveConsent = false;
+  if (people.templateId) {
+    const t = await db.template.findUnique({ where: { id: people.templateId, clientId }, select: { category: true } });
+    if (t?.category === "MARKETING") {
+      requirePositiveConsent = true;
+    }
+  }
+
+  const where = await campaignAudienceWhere(
+    clientId,
+    audienceTag.trim() || null,
+    {
+      includeIds: await ownCustomers(clientId, people.includeIds),
+      excludeIds: await ownCustomers(clientId, people.excludeIds),
+      segments: cleanSegments(people.segments),
+    },
+    { requirePositiveConsent }
+  );
   const [n, tests, unread] = await Promise.all([
     db.customer.count({ where }),
     db.customer.findMany({ where: { AND: [where, { tags: { has: TEST_TAG } }] }, select: { id: true }, take: 50 }),
@@ -359,5 +462,16 @@ export async function preflightCampaign(id: string) {
   } catch (e: any) {
     return { ok: false, error: e.message || "Failed to execute campaign preflight." };
   }
+}
+
+export async function getCampaignClassificationBreakdown(
+  campaignId: string | null,
+  audienceTag?: string | null,
+  templateId?: string
+) {
+  const clientId = await formClient(campaignId);
+  if (!clientId) return null;
+  const { getAudienceClassificationSummary } = await import("@/lib/campaign-classification");
+  return getAudienceClassificationSummary(clientId, { audienceTag, templateId });
 }
 

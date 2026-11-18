@@ -39,49 +39,125 @@ const MAX_CATCH_UP = 12;
 const CONCURRENCY = 10;
 const LOCAL_GAP_MS = [1_000, 3_000]; // random pause between local-session sends
 
-/** Creates a run and queues one message per eligible customer. */
-export async function startRun(campaign: Campaign & { template: { name: string; category?: string } }, scheduledFor: Date) {
-  const audience = await campaignAudienceWhere(campaign.clientId, campaign.audienceTag, campaign);
-  // A one-time campaign sent again soon (resumed after a stop) skips who it already reached; weekly ones repeat by design.
-  const where = campaign.scheduleType === "ONCE" ? { AND: [audience, { NOT: alreadyReachedWhere(campaign.id, scheduledFor) }] } : audience;
-  const customers = await db.customer.findMany({ where, select: { id: true, phone: true } });
-  
-  // Deduplicate by normalized phone number so the same recipient is not queued twice
-  const seenPhones = new Set<string>();
-  const uniqueCustomers: { id: string }[] = [];
-  for (const c of customers) {
-    const p = normalizePhone(c.phone || "") || c.phone;
-    if (p) {
-      if (!seenPhones.has(p)) {
-        seenPhones.add(p);
-        uniqueCustomers.push({ id: c.id });
-      }
-    }
+export class CampaignConcurrencyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CampaignConcurrencyError";
   }
+}
 
-  const run = await db.campaignRun.create({
-    data: { campaignId: campaign.id, scheduledFor, total: uniqueCustomers.length, nextBatchAt: new Date() },
-  });
-  if (uniqueCustomers.length) {
-    await db.message.createMany({
-      data: uniqueCustomers.map((c) => ({
-        runId: run.id,
-        customerId: c.id,
-        templateId: campaign.templateId,
-        templateName: campaign.template.name,
-      })),
-    });
-  } else {
-    await db.campaignRun.update({ where: { id: run.id }, data: { status: "COMPLETED", completedAt: new Date() } });
-  }
-  return run;
+/** Creates a run and queues one message per eligible customer. */
+export async function startRun(
+  campaign: Campaign & { template: { name: string; category?: string } },
+  scheduledFor: Date,
+  options: { allowResend?: boolean; permanentDedupe?: boolean } = {}
+) {
+  const isMarketing = campaign.template.category === "MARKETING";
+  const audience = await campaignAudienceWhere(campaign.clientId, campaign.audienceTag, campaign, { requirePositiveConsent: isMarketing });
+
+  return await db.$transaction(
+    async (tx) => {
+      // 1. Acquire transaction-scoped PostgreSQL advisory lock for this campaign.
+      // Automatically released on commit or rollback; zero orphaned lock risk.
+      const lock = await tx.$queryRaw<{ acquired: boolean }[]>`
+        SELECT pg_try_advisory_xact_lock(hashtext('camp_dispatch_' || ${campaign.id})::bigint) AS acquired
+      `;
+      if (!lock[0]?.acquired) {
+        throw new CampaignConcurrencyError(
+          `Campaign "${campaign.name}" (${campaign.id}) is already being dispatched by another process.`
+        );
+      }
+
+      // 2. Resolve audience
+      // A one-time campaign sent again soon (resumed after a stop) skips who it already reached; weekly ones repeat by design.
+      const where = campaign.scheduleType === "ONCE" && !options.allowResend
+        ? { AND: [audience, { NOT: alreadyReachedWhere(campaign.id, scheduledFor) }] }
+        : audience;
+      const customers = await tx.customer.findMany({ where, select: { id: true, phone: true } });
+
+      // Deduplicate by normalized phone number so the same recipient is not queued twice
+      const seenPhones = new Set<string>();
+      const uniqueCustomers: { id: string }[] = [];
+      for (const c of customers) {
+        const p = normalizePhone(c.phone || "") || c.phone;
+        if (p) {
+          if (!seenPhones.has(p)) {
+            seenPhones.add(p);
+            uniqueCustomers.push({ id: c.id });
+          }
+        }
+      }
+
+      // 3. Deduplication guard for ONCE campaigns
+      let finalCustomers = uniqueCustomers;
+      if (campaign.scheduleType === "ONCE" && !options.allowResend) {
+        const checkDate = options.permanentDedupe ? null : new Date(scheduledFor.getTime() - 7 * 86_400_000);
+        const priorMessaged = await tx.message.findMany({
+          where: {
+            run: { campaignId: campaign.id },
+            OR: [
+              { status: "QUEUED" },
+              {
+                status: { in: ["SENT", "DELIVERED", "READ"] },
+                ...(checkDate ? { sentAt: { gte: checkDate } } : {}),
+              },
+            ],
+          },
+          select: { customerId: true },
+        });
+        const priorSet = new Set(priorMessaged.map((m) => m.customerId));
+        if (priorSet.size > 0) {
+          finalCustomers = uniqueCustomers.filter((c) => !priorSet.has(c.id));
+        }
+      }
+
+      // 4. Create CampaignRun
+      let run;
+      try {
+        run = await tx.campaignRun.create({
+          data: { campaignId: campaign.id, scheduledFor, total: finalCustomers.length, nextBatchAt: new Date() },
+        });
+      } catch (err: unknown) {
+        // P2002: Unique constraint failed on (campaignId, scheduledFor) - another concurrent dispatch created this run
+        if (typeof err === "object" && err !== null && "code" in err && (err as { code: string }).code === "P2002") {
+          throw new CampaignConcurrencyError(
+            `Campaign "${campaign.name}" (${campaign.id}) is already being dispatched by another process.`
+          );
+        }
+        throw err;
+      }
+
+      // 5. Chunk inserts into batches of 2,000 to strictly respect PostgreSQL 65,535 parameter limit
+      if (finalCustomers.length) {
+        const CHUNK_SIZE = 2000;
+        for (let i = 0; i < finalCustomers.length; i += CHUNK_SIZE) {
+          const chunk = finalCustomers.slice(i, i + CHUNK_SIZE);
+          await tx.message.createMany({
+            data: chunk.map((c) => ({
+              runId: run.id,
+              customerId: c.id,
+              templateId: campaign.templateId,
+              templateName: campaign.template.name,
+            })),
+          });
+        }
+        return run;
+      } else {
+        return await tx.campaignRun.update({
+          where: { id: run.id },
+          data: { status: "COMPLETED", completedAt: new Date() },
+        });
+      }
+    },
+    { maxWait: 5000, timeout: 60000 }
+  );
 }
 
 export async function startDueCampaigns(now: Date, paused: ReadonlySet<string>, only?: readonly string[]) {
   const due = await db.campaign.findMany({
     // Businesses locked for an unpaid plan: their scheduled campaigns wait (and start once they pay).
     where: { active: true, nextRunAt: { lte: now }, clientId: { notIn: [...paused], ...(only && { in: [...only] }) } },
-    include: { template: { select: { name: true } } },
+    include: { template: { select: { name: true, category: true } } },
   });
   let started = 0;
   for (const c of due) {
@@ -106,7 +182,11 @@ export async function startDueCampaigns(now: Date, paused: ReadonlySet<string>, 
       await startRun(c, c.nextRunAt!);
       started++;
     } catch (e) {
-      console.error(`Could not start campaign ${c.id}`, e);
+      if (e instanceof CampaignConcurrencyError) {
+        console.warn(`Campaign ${c.id} skipped this tick: lock busy.`);
+      } else {
+        console.error(`Could not start campaign ${c.id}`, e);
+      }
     }
   }
   return started;
@@ -299,7 +379,7 @@ export async function processRun(runId: string, now: Date, deadline: number) {
       return;
     }
     try {
-      const res = await deliver(settings, t, m.customer, cfg);
+      const res = await deliver(settings, t, m.customer, cfg, undefined, { messageId: m.id });
       await db.message.update({
         where: { id: m.id },
         data: {

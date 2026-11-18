@@ -223,7 +223,7 @@ export function UniversalImportModal({
           fileId,
           curSheet.headerRowIndex ?? 0,
           mapping,
-          { overwriteNames, overwriteAreas }
+          { overwriteNames, overwriteAreas, selectedSheet: curSheet.name }
         );
 
         if (!stageRes.ok || !stageRes.data) {

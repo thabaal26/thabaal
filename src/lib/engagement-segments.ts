@@ -96,6 +96,16 @@ export function segmentOf(
  */
 export async function engagementRows(clientId: string, opts: { customerIds?: string[]; now?: Date } = {}): Promise<EngagementRow[]> {
   if (opts.customerIds && !opts.customerIds.length) return [];
+  if (opts.customerIds && opts.customerIds.length > 2000) {
+    const CHUNK = 2000;
+    const allRows: EngagementRow[] = [];
+    for (let i = 0; i < opts.customerIds.length; i += CHUNK) {
+      const slice = opts.customerIds.slice(i, i + CHUNK);
+      const sub = await engagementRows(clientId, { ...opts, customerIds: slice });
+      allRows.push(...sub);
+    }
+    return allRows;
+  }
   const now = opts.now ?? new Date();
   const rules = await engagementRules(clientId);
   const pausedSince = new Date(now.getTime() - SKIP_DAYS * 86_400_000);
@@ -197,13 +207,24 @@ export async function segmentSummary(
       totals: { customers: 0, eligible: 0, optedOut: 0, unreachable: 0, movedInactive: 0, paused: 0, invalidNumber: 0 },
     };
   }
+  const targetIds = options.customerIds;
   const [rows, history, rules, bad] = await Promise.all([
-    engagementRows(clientId, { customerIds: options.customerIds, now }),
+    engagementRows(clientId, { customerIds: targetIds, now }),
     hasCampaignHistory(clientId),
     engagementRules(clientId),
-    options.customerIds
-      ? db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM "Customer" WHERE "clientId" = ${clientId} AND id IN (${Prisma.join(options.customerIds)}) AND length(regexp_replace(phone, '\\D', '', 'g')) < 10`
-      : db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM "Customer" WHERE "clientId" = ${clientId} AND length(regexp_replace(phone, '\\D', '', 'g')) < 10`,
+    targetIds && targetIds.length > 2000
+      ? (async () => {
+          let count = 0;
+          for (let i = 0; i < targetIds.length; i += 2000) {
+            const slice = targetIds.slice(i, i + 2000);
+            const r = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM "Customer" WHERE "clientId" = ${clientId} AND id IN (${Prisma.join(slice)}) AND length(regexp_replace(phone, '\\D', '', 'g')) < 10`;
+            count += r[0]?.n ?? 0;
+          }
+          return [{ n: count }];
+        })()
+      : targetIds
+        ? db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM "Customer" WHERE "clientId" = ${clientId} AND id IN (${Prisma.join(targetIds)}) AND length(regexp_replace(phone, '\\D', '', 'g')) < 10`
+        : db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM "Customer" WHERE "clientId" = ${clientId} AND length(regexp_replace(phone, '\\D', '', 'g')) < 10`,
   ]);
   const segments = Object.fromEntries(SEGMENTS.map((s) => [s, { eligible: 0, excluded: 0, moved: 0 }])) as SegmentSummary["segments"];
   for (const r of rows) {

@@ -1,6 +1,33 @@
 // Meta Cloud API error codes, in plain words, with what the portal does about each.
 // https://developers.facebook.com/docs/whatsapp/cloud-api/support/error-codes
 
+export type ErrorScope =
+  | "customer"
+  | "recipient-pair"
+  | "sender"
+  | "waba"
+  | "template"
+  | "api"
+  | "system";
+
+export type TemporaryOrPermanent = "temporary" | "permanent";
+
+export interface MetaErrorClassification {
+  code: number;
+  metaDescription: string;
+  category: ErrorCategory;
+  kind: ErrorKind;
+  scope: ErrorScope;
+  temporaryOrPermanent: TemporaryOrPermanent;
+  customerFacingStatus: string;
+  retryAllowed: boolean;
+  retryCooldownRule: string;
+  suppressRecipient: boolean;
+  requiresOperatorAction: boolean;
+  sourceRef: string;
+  lastVerified: string;
+}
+
 export type ErrorKind =
   | "unreachable" // this person can't get WhatsApp messages: skip them from now on
   | "stopped-marketing" // they turned off marketing from this business: opt them out
@@ -28,7 +55,7 @@ const ERRORS: Record<number, { title: string; kind: ErrorKind }> = {
   990001: { title: "This business hasn't connected its own WhatsApp number yet", kind: "setup" },
   // The customer
   131026: { title: "Can't receive WhatsApp messages: not on WhatsApp, an old app version, or they blocked the number", kind: "unreachable" },
-  131021: { title: "Recipient is the sending number itself", kind: "unreachable" },
+  131021: { title: "Recipient is the sending number itself", kind: "other" },
   130403: { title: "This customer is blocked in your WhatsApp Business account", kind: "unreachable" },
   131050: { title: "Customer turned off marketing messages from this business", kind: "stopped-marketing" },
   131049: { title: "Meta held this offer back because the customer gets many; it can be sent again after 24 hours", kind: "marketing-limit" },
@@ -168,4 +195,297 @@ export function codesOf(kinds: ErrorKind[]) {
 export function explainError(code: number | null | undefined, raw: string | null | undefined) {
   const known = metaError(code);
   return known ? `${known.title} (${code})` : (raw ?? "Failed");
+}
+
+export const META_ERROR_CATALOG: Record<number, MetaErrorClassification> = {
+  131026: {
+    code: 131026,
+    metaDescription: "Message Undeliverable: The recipient cannot receive WhatsApp messages, has an incompatible app version, or has blocked the sender number.",
+    category: "permanent",
+    kind: "unreachable",
+    scope: "customer",
+    temporaryOrPermanent: "permanent",
+    customerFacingStatus: "Cannot receive WhatsApp messages",
+    retryAllowed: false,
+    retryCooldownRule: "No retry permitted. Customer marked unreachable until phone number is re-verified or updated.",
+    suppressRecipient: true,
+    requiresOperatorAction: false,
+    sourceRef: "Meta Graph API Cloud API Error Codes: 131026",
+    lastVerified: "2026-11",
+  },
+  131049: {
+    code: 131049,
+    metaDescription: "Marketing message limit reached: Meta held back delivery to this recipient to prevent fatigue / spam over-saturation.",
+    category: "marketing",
+    kind: "marketing-limit",
+    scope: "recipient-pair",
+    temporaryOrPermanent: "temporary",
+    customerFacingStatus: "Temporarily held by Meta (Frequency fatigue)",
+    retryAllowed: true,
+    retryCooldownRule: "Cooldown minimum 24 hours. Campaigns skip for 3 days; manual operator retry allowed after 24h.",
+    suppressRecipient: false,
+    requiresOperatorAction: false,
+    sourceRef: "Meta Graph API Cloud API Error Codes: 131049",
+    lastVerified: "2026-11",
+  },
+  130472: {
+    code: 130472,
+    metaDescription: "User is part of an ongoing Meta marketing experiment preventing delivery of promotional content.",
+    category: "marketing",
+    kind: "experiment",
+    scope: "recipient-pair",
+    temporaryOrPermanent: "permanent",
+    customerFacingStatus: "Meta marketing test limitation",
+    retryAllowed: false,
+    retryCooldownRule: "Do not retry: Meta explicitly documents that resending will fail with the same error indefinitely.",
+    suppressRecipient: false,
+    requiresOperatorAction: false,
+    sourceRef: "Meta Graph API Cloud API Error Codes: 130472",
+    lastVerified: "2026-11",
+  },
+  131050: {
+    code: 131050,
+    metaDescription: "User has opted out of marketing messages from this WhatsApp Business Account.",
+    category: "opt-out",
+    kind: "stopped-marketing",
+    scope: "customer",
+    temporaryOrPermanent: "permanent",
+    customerFacingStatus: "Opted out of marketing",
+    retryAllowed: false,
+    retryCooldownRule: "Never retry marketing broadcasts. Requires explicit affirmative customer opt-in to clear.",
+    suppressRecipient: true,
+    requiresOperatorAction: false,
+    sourceRef: "Meta Graph API Cloud API Error Codes: 131050",
+    lastVerified: "2026-11",
+  },
+  131056: {
+    code: 131056,
+    metaDescription: "Pair rate limit exceeded: Too many messages sent to this recipient in a short time frame.",
+    category: "rate",
+    kind: "pair-rate",
+    scope: "recipient-pair",
+    temporaryOrPermanent: "temporary",
+    customerFacingStatus: "Temporary recipient frequency limit",
+    retryAllowed: true,
+    retryCooldownRule: "Controlled exponential backoff: retry after 5 to 15 minutes.",
+    suppressRecipient: false,
+    requiresOperatorAction: false,
+    sourceRef: "Meta Graph API Cloud API Error Codes: 131056",
+    lastVerified: "2026-11",
+  },
+  130429: {
+    code: 130429,
+    metaDescription: "Cloud API rate limit hit: Sending throughput exceeds the registered tier capacity.",
+    category: "rate",
+    kind: "rate",
+    scope: "sender",
+    temporaryOrPermanent: "temporary",
+    customerFacingStatus: "Sender throughput throttled",
+    retryAllowed: true,
+    retryCooldownRule: "Backoff schedule via throttleDelayMinutes (5, 10, 20... up to 120 mins). Customer is NOT invalid or dormant.",
+    suppressRecipient: false,
+    requiresOperatorAction: false,
+    sourceRef: "Meta Graph API Cloud API Error Codes: 130429",
+    lastVerified: "2026-11",
+  },
+  80007: {
+    code: 80007,
+    metaDescription: "Account level rate limit: Meta API hourly or daily request quota reached.",
+    category: "rate",
+    kind: "rate",
+    scope: "waba",
+    temporaryOrPermanent: "temporary",
+    customerFacingStatus: "Meta API account rate limit",
+    retryAllowed: true,
+    retryCooldownRule: "System throttles batch and delays next send. Customer is NOT invalid or dormant.",
+    suppressRecipient: false,
+    requiresOperatorAction: false,
+    sourceRef: "Meta Graph API Cloud API Error Codes: 80007",
+    lastVerified: "2026-11",
+  },
+  190: {
+    code: 190,
+    metaDescription: "Access token has expired or been revoked.",
+    category: "account",
+    kind: "setup",
+    scope: "system",
+    temporaryOrPermanent: "permanent",
+    customerFacingStatus: "System access token expired",
+    retryAllowed: false,
+    retryCooldownRule: "Pause campaign runs immediately until administrator updates token on Clients settings. Not a customer failure.",
+    suppressRecipient: false,
+    requiresOperatorAction: true,
+    sourceRef: "Meta Graph API Cloud API Error Codes: 190",
+    lastVerified: "2026-11",
+  },
+  200: {
+    code: 200,
+    metaDescription: "Permissions error: Meta app does not have required permissions or scopes to send messages.",
+    category: "account",
+    kind: "setup",
+    scope: "system",
+    temporaryOrPermanent: "permanent",
+    customerFacingStatus: "System permissions error",
+    retryAllowed: false,
+    retryCooldownRule: "Pause campaign runs until app permissions are restored in Meta App Dashboard.",
+    suppressRecipient: false,
+    requiresOperatorAction: true,
+    sourceRef: "Meta Graph API Cloud API Error Codes: 200",
+    lastVerified: "2026-11",
+  },
+  131009: {
+    code: 131009,
+    metaDescription: "Parameter value invalid: Phone number format is invalid or malformed.",
+    category: "permanent",
+    kind: "other",
+    scope: "customer",
+    temporaryOrPermanent: "permanent",
+    customerFacingStatus: "Invalid phone number format",
+    retryAllowed: false,
+    retryCooldownRule: "Do not retry until customer phone number is corrected in database.",
+    suppressRecipient: true,
+    requiresOperatorAction: true,
+    sourceRef: "Meta Graph API Cloud API Error Codes: 131009",
+    lastVerified: "2026-11",
+  },
+  131021: {
+    code: 131021,
+    metaDescription: "Sender and recipient are the same: Cannot message the business's own WhatsApp number.",
+    category: "permanent",
+    kind: "other",
+    scope: "sender",
+    temporaryOrPermanent: "permanent",
+    customerFacingStatus: "Recipient is sender's own number",
+    retryAllowed: false,
+    retryCooldownRule: "Cannot message the business's own WhatsApp number. Do not suppress customer record.",
+    suppressRecipient: false,
+    requiresOperatorAction: false,
+    sourceRef: "Meta Graph API Cloud API Error Codes: 131021",
+    lastVerified: "2026-11",
+  },
+  130403: {
+    code: 130403,
+    metaDescription: "Customer is blocked in the WhatsApp Business Account.",
+    category: "permanent",
+    kind: "unreachable",
+    scope: "customer",
+    temporaryOrPermanent: "permanent",
+    customerFacingStatus: "Customer blocked in WhatsApp Business",
+    retryAllowed: false,
+    retryCooldownRule: "Do not retry. Customer cannot receive messages unless unblocked in Meta Business Manager.",
+    suppressRecipient: true,
+    requiresOperatorAction: true,
+    sourceRef: "Meta Graph API Cloud API Error Codes: 130403",
+    lastVerified: "2026-11",
+  },
+  132000: {
+    code: 132000,
+    metaDescription: "Template variable mismatch: Parameter count or positions do not match approved template specification.",
+    category: "template",
+    kind: "template",
+    scope: "template",
+    temporaryOrPermanent: "permanent",
+    customerFacingStatus: "Template variable mapping error",
+    retryAllowed: false,
+    retryCooldownRule: "Do not retry automatically. Fix variable mappings on Templates page, then resubmit.",
+    suppressRecipient: false,
+    requiresOperatorAction: true,
+    sourceRef: "Meta Graph API Cloud API Error Codes: 132000",
+    lastVerified: "2026-11",
+  },
+  132001: {
+    code: 132001,
+    metaDescription: "Template does not exist: Template name or language code is not found or not approved on Meta WABA.",
+    category: "template",
+    kind: "template",
+    scope: "template",
+    temporaryOrPermanent: "permanent",
+    customerFacingStatus: "Template or language not found in Meta",
+    retryAllowed: false,
+    retryCooldownRule: "Do not retry automatically. Verify template name, status and language in WhatsApp Manager.",
+    suppressRecipient: false,
+    requiresOperatorAction: true,
+    sourceRef: "Meta Graph API Cloud API Error Codes: 132001",
+    lastVerified: "2026-11",
+  },
+  131048: {
+    code: 131048,
+    metaDescription: "Sending phone number has been restricted by Meta due to policy violations, spam reports, or quality score dropping to RED.",
+    category: "account",
+    kind: "number-restricted",
+    scope: "sender",
+    temporaryOrPermanent: "permanent",
+    customerFacingStatus: "Sender number restricted by Meta",
+    retryAllowed: false,
+    retryCooldownRule: "Campaigns pause immediately. Requires review of sender quality score and Meta Business Account health.",
+    suppressRecipient: false,
+    requiresOperatorAction: true,
+    sourceRef: "Meta Graph API Cloud API Error Codes: 131048",
+    lastVerified: "2026-11",
+  },
+  133004: {
+    code: 133004,
+    metaDescription: "Server maintenance: WhatsApp backend servers are temporarily undergoing maintenance.",
+    category: "temporary",
+    kind: "temporary",
+    scope: "system",
+    temporaryOrPermanent: "temporary",
+    customerFacingStatus: "WhatsApp servers in maintenance",
+    retryAllowed: true,
+    retryCooldownRule: "Temporary failure: retry on next scheduled batch tick in 5-10 minutes.",
+    suppressRecipient: false,
+    requiresOperatorAction: false,
+    sourceRef: "Meta Graph API Cloud API Error Codes: 133004",
+    lastVerified: "2026-11",
+  },
+};
+
+export function getMetaErrorClassification(code: number | null | undefined): MetaErrorClassification {
+  if (code == null) {
+    return {
+      code: 0,
+      metaDescription: "Unknown error code",
+      category: "permanent",
+      kind: "other",
+      scope: "system",
+      temporaryOrPermanent: "permanent",
+      customerFacingStatus: "Unknown error",
+      retryAllowed: false,
+      retryCooldownRule: "Never retry unknown errors automatically.",
+      suppressRecipient: false,
+      requiresOperatorAction: true,
+      sourceRef: "Internal fallback",
+      lastVerified: "2026-11",
+    };
+  }
+
+  const found = META_ERROR_CATALOG[code];
+  if (found) return found;
+
+  const basic = metaError(code);
+  const cat = basic?.kind ? CATEGORY[basic.kind] : "permanent";
+  const kind = basic?.kind ?? "other";
+
+  let scope: ErrorScope = "system";
+  if (["unreachable", "stopped-marketing"].includes(kind)) scope = "customer";
+  else if (["marketing-limit", "experiment", "pair-rate"].includes(kind)) scope = "recipient-pair";
+  else if (["rate", "number-restricted"].includes(kind)) scope = "sender";
+  else if (["template", "window"].includes(kind)) scope = "template";
+  else if (["account", "setup"].includes(kind)) scope = "waba";
+
+  return {
+    code,
+    metaDescription: basic?.title ?? `Meta Cloud API error code ${code}`,
+    category: cat,
+    kind,
+    scope,
+    temporaryOrPermanent: cat === "temporary" || cat === "rate" ? "temporary" : "permanent",
+    customerFacingStatus: basic?.title ?? `Error (${code})`,
+    retryAllowed: cat === "temporary" || (cat === "marketing" && code === 131049),
+    retryCooldownRule: cat === "temporary" ? "Try on next batch" : "Not retryable",
+    suppressRecipient: cat === "permanent" && kind === "unreachable",
+    requiresOperatorAction: true,
+    sourceRef: "Meta Graph API Cloud API Error Reference",
+    lastVerified: "2026-11",
+  };
 }

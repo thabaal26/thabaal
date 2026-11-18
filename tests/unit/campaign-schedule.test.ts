@@ -54,8 +54,8 @@ describe("starting campaigns on time", () => {
     templateId = t.id;
     await db.customer.createMany({
       data: [
-        { clientId, name: "A", phone: `9198${Date.now().toString().slice(-8)}` },
-        { clientId, name: "B", phone: `9197${Date.now().toString().slice(-8)}` },
+        { clientId, name: "A", phone: `9198${Date.now().toString().slice(-8)}`, optInAt: new Date(), optInSource: "Web Opt-in" },
+        { clientId, name: "B", phone: `9197${Date.now().toString().slice(-8)}`, optInAt: new Date(), optInSource: "Web Opt-in" },
       ],
     });
   });
