@@ -193,3 +193,39 @@ async function sendToWhere(clientId: string, audienceTag: string | null, require
   if (pick.tags.length === 1) return { ...base, tags: { has: pick.tags[0] } };
   return { ...base, tags: pick.match === "all" ? { hasEvery: pick.tags } : { hasSome: pick.tags } };
 }
+
+/**
+ * Resolves customer IDs belonging to an audience tag or saved audience for engagement segment scoping.
+ * - null / "" -> returns null (tenant-wide Everyone mode)
+ * - aud:<id> -> resolves saved audience and returns matching customer IDs
+ * - tags (single or multiple) -> returns all matching active customer IDs in the tenant (including unreachable/paused)
+ * - empty tags -> returns [] (0 matches)
+ */
+export async function audienceTagCustomerIds(
+  clientId: string,
+  audienceTag?: string | null,
+): Promise<string[] | null> {
+  const tag = audienceTag?.trim() || null;
+  if (!tag) return null;
+
+  if (tag.startsWith(AUDIENCE_PREFIX)) {
+    const a = await db.audience.findFirst({ where: { id: tag.slice(AUDIENCE_PREFIX.length), clientId } });
+    if (!a) return [];
+    const where = await audienceWhere(clientId, a.filter as AudienceFilter);
+    const matched = await db.customer.findMany({ where, select: { id: true } });
+    return matched.map((m) => m.id);
+  }
+
+  const pick = decodeTags(tag);
+  if (!pick?.tags.length) {
+    return [];
+  }
+
+  const tagWhere: Prisma.CustomerWhereInput = {
+    clientId,
+    deletedAt: null,
+    tags: pick.match === "all" ? { hasEvery: pick.tags } : { hasSome: pick.tags },
+  };
+  const matched = await db.customer.findMany({ where: tagWhere, select: { id: true } });
+  return matched.map((m) => m.id);
+}

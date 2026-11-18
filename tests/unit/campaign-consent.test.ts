@@ -296,7 +296,7 @@ describe("Campaign Customer Consent & Launch Safety Gate", () => {
       data: {
         clientId: clientAId,
         name: "StartRun Deduplication Test",
-        templateId: marketingTemplateId,
+        templateId: utilityTemplateId,
         senderId: senderNumberId,
         scheduleType: "ONCE",
         sendTime: "11:00",

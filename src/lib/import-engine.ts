@@ -340,9 +340,16 @@ export async function stageImportFile(
       invalidCount++;
       validationErrors.push(bad.length ? `Unparseable phone value: "${bad.join(", ")}"` : "Missing phone number");
     } else if (phones.length > 1) {
-      classification = "AMBIGUOUS_MULTI_PHONE";
-      ambiguousCount++;
+      // PRIMARY_ACTIVE_ONLY policy: Select first phone as primary active recipient, retain candidates for audit
+      normalizedPhone = phones[0];
       candidatePhones = phones;
+      if (seenPhonesInFile.has(normalizedPhone)) {
+        classification = "INTRA_FILE_DUPLICATE";
+      } else {
+        seenPhonesInFile.add(normalizedPhone);
+        classification = "VALID_SINGLE_NEW";
+        validCount++;
+      }
     } else {
       normalizedPhone = phones[0];
       if (seenPhonesInFile.has(normalizedPhone)) {

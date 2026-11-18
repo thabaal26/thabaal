@@ -7,7 +7,7 @@ import { THEME_SCRIPT } from "@/lib/theme-script";
 import "./globals.css";
 import "./controls.css";
 
-const dmSans = DM_Sans({ variable: "--font-dm-sans", subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap" });
+const dmSans = DM_Sans({ variable: "--font-dm-sans", subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap", preload: false });
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"], display: "swap", preload: false });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"], display: "swap", preload: false });
 // Fonts a portal can pick (Settings → Appearance). Not preloaded: a browser only downloads one

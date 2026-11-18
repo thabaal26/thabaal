@@ -52,6 +52,7 @@ export async function deliver(
   customer: { name: string; phone: string; location?: string | null; purchases?: string | null },
   cfg: WaConfig = waConfig(),
   otpCode?: string,
+  options?: { messageId?: string | null },
 ) {
   const isAuth = t.category === "AUTHENTICATION";
   const resolvedOtp = isAuth ? (otpCode?.trim() || String(Math.floor(100000 + Math.random() * 900000))) : null;
@@ -126,6 +127,7 @@ export async function deliver(
     urlButtonParams,
     otpCode: resolvedOtp,
     quickReplyPayloads: isAuth ? [] : await payloadsFor(t.clientId, buttons),
+    bizOpaqueCallbackData: options?.messageId ?? null,
   });
   return { ...res, provider, text };
 }

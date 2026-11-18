@@ -8,7 +8,7 @@ import { CalendarPicker, getTodayStr } from "@/components/calendar-picker";
 import { MobileActionBar } from "@/components/mobile-action-bar";
 import { MultiPicker } from "@/components/multi-picker";
 import { Picker } from "@/components/picker";
-import { safeAction, toastResult } from "@/components/toast";
+import { safeAction, toast, toastResult } from "@/components/toast";
 import { Button, Callout, Card, CardHeader, CheckRow, Field, Segmented } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { templateLabel } from "@/lib/plain-error";
@@ -109,11 +109,14 @@ export function CampaignForm({
   const tagValue = (p: TagPick) => encodeTags(p) || `${TAGS_PREFIX}${JSON.stringify({ match: p.match, tags: [] })}`;
   const chooseSendTo = (v: SendTo) => {
     setSendTo(v);
-    set({ audienceTag: v === "all" ? "" : v === "tags" ? tagValue(pick) : (savedOptions.find((o) => o.tag === c.audienceTag)?.tag ?? savedOptions[0]?.tag ?? "") });
+    set({
+      audienceTag: v === "all" ? "" : v === "tags" ? tagValue(pick) : (savedOptions.find((o) => o.tag === c.audienceTag)?.tag ?? savedOptions[0]?.tag ?? ""),
+      segments: [],
+    });
   };
   const choosePick = (next: TagPick) => {
     setPick(next);
-    set({ audienceTag: tagValue(next) });
+    set({ audienceTag: tagValue(next), segments: [] });
   };
 
   // Several tags can overlap, and people can be added or left out by hand, so the reach is counted on the server
@@ -123,15 +126,15 @@ export function CampaignForm({
   // Groups only once the business has campaign history; before that a first send goes to everyone eligible.
   const picked = segments.history ? (c.segments ?? []) : [];
   const serverSize = multi || handPicked || picked.length > 0;
-  const peopleKey = JSON.stringify([c.audienceTag, c.includeIds, c.excludeIds, picked]);
+  const peopleKey = JSON.stringify([c.audienceTag, c.includeIds, c.excludeIds, picked, c.templateId]);
   const [counted, setCounted] = useState<{ key: string; n: number; unread: number; testIds: string[] } | null>(null);
   useEffect(() => {
     const t = setTimeout(async () => {
-      const r = await countCampaignAudience(id, c.audienceTag, { includeIds: c.includeIds, excludeIds: c.excludeIds, segments: picked }).catch(() => ({ ok: false, n: 0, unread: 0, testIds: [] }));
+      const r = await countCampaignAudience(id, c.audienceTag, { includeIds: c.includeIds, excludeIds: c.excludeIds, segments: picked, templateId: c.templateId }).catch(() => ({ ok: false, n: 0, unread: 0, testIds: [] }));
       setCounted({ key: peopleKey, n: r.ok ? r.n : -1, unread: r.unread ?? 0, testIds: r.testIds ?? [] }); // -1: couldn't count
     }, 300);
     return () => clearTimeout(t);
-    // peopleKey stands for audienceTag, includeIds, excludeIds and the picked groups.
+    // peopleKey stands for audienceTag, includeIds, excludeIds, picked groups and templateId.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [peopleKey, id]);
   const counting = serverSize && counted?.key !== peopleKey;
@@ -180,6 +183,10 @@ export function CampaignForm({
 
   function save() {
     if (pending) return;
+    if (sendTo === "tags" && !pick.tags.length) {
+      toast(false, isTa ? "குறைந்தது ஒரு குறிச்சொல்லைத் தேர்ந்தெடுக்கவும்" : "Pick at least one tag.");
+      return;
+    }
     start(async () => {
       const r = await safeAction(() => saveCampaign(id, c));
       toastResult(r);
@@ -305,7 +312,16 @@ export function CampaignForm({
                 />
               )}
 
-              <SegmentPicker campaignId={id} audienceTag={c.audienceTag} summary={segments} value={picked} onChange={(v) => set({ segments: v })} capacity={sender?.capacity ?? null} />
+              <SegmentPicker
+                campaignId={id}
+                audienceTag={c.audienceTag}
+                summary={segments}
+                value={picked}
+                onChange={(v) => set({ segments: v })}
+                capacity={sender?.capacity ?? null}
+                mode={sendTo}
+                tagsCount={sendTo === "tags" ? pick.tags.length : undefined}
+              />
 
               <p className="tabular text-sm text-muted" aria-live="polite" data-testid="audience-size">
                 {isTa

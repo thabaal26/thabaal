@@ -105,7 +105,7 @@ export async function confirmMappingAndStage(
   fileId: string,
   headerRowIndex: number,
   mapping: Record<string, number>,
-  options: { overwriteNames?: boolean; overwriteAreas?: boolean } = {}
+  options: { overwriteNames?: boolean; overwriteAreas?: boolean; selectedSheet?: string } = {}
 ): Promise<ActionResult<{ total: number; valid: number; invalid: number; ambiguous: number }>> {
   const s = await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
@@ -115,6 +115,11 @@ export async function confirmMappingAndStage(
     include: { files: true },
   });
   if (!batch) return { ok: false, message: "Batch not found." };
+
+  const BATCH_TTL_MS = 24 * 60 * 60 * 1000;
+  if (Date.now() - batch.createdAt.getTime() > BATCH_TTL_MS) {
+    return { ok: false, message: "Import draft has expired (24-hour limit). Please upload a fresh file." };
+  }
 
   const file = batch.files.find((f) => f.id === fileId) || batch.files[0];
   if (!file) return { ok: false, message: "File not found in batch." };
@@ -139,7 +144,8 @@ export async function confirmMappingAndStage(
       file.fileFormat,
       headerRowIndex,
       mapping,
-      batch.defaultTags
+      batch.defaultTags,
+      options.selectedSheet
     );
     return { ok: true, data: result };
   } catch (e: any) {
@@ -197,6 +203,14 @@ export async function getImportBatchProgress(batchId: string): Promise<ActionRes
 export async function approveAndCommitBatch(batchId: string): Promise<ActionResult<{ committedNew: number; committedUpdated: number }>> {
   const s = await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
+
+  const batch = await db.importBatch.findFirst({ where: { id: batchId, clientId: s.clientId } });
+  if (!batch) return { ok: false, message: "Import batch not found." };
+
+  const BATCH_TTL_MS = 24 * 60 * 60 * 1000;
+  if (Date.now() - batch.createdAt.getTime() > BATCH_TTL_MS) {
+    return { ok: false, message: "Import draft has expired (24-hour limit). Please re-upload." };
+  }
 
   try {
     const res = await commitImportBatch(batchId, s.clientId);

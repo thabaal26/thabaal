@@ -24,7 +24,7 @@ import { paySettingsFor } from "@/lib/pay-settings-server";
 import { confirmPayment, parseMetaAmount, recordPaymentClaim, recordPaymentFailure, sendPaymentRequestFor, textInWindow, updateOrderCard } from "@/lib/payments";
 import { detectPaymentApp } from "@/lib/payment-app";
 import { autoSendCatalogue, catalogueTrigger, firstMessageToday } from "@/lib/catalog";
-import { mapMetaStatus } from "@/lib/whatsapp";
+import { canTransitionStatus, mapMetaStatus } from "@/lib/whatsapp";
 import { findUtr, logPaymentEvent } from "@/lib/payment-events";
 import { JOIN_RE, joinFromWhatsApp } from "@/lib/optin";
 import { chargeMessage } from "@/lib/wallet";
@@ -50,7 +50,15 @@ export async function GET(req: NextRequest) {
 const RANK = { QUEUED: 0, SENT: 1, DELIVERED: 2, READ: 3, FAILED: 4, SKIPPED: 4 } as const;
 const OPT_OUT = /^\s*(stop|unsubscribe|opt[\s-]?out|cancel|dont\s*send|don't\s*send|no\s*more|நிறுத்து|வேண்டாம்|बंद\s*करो)\s*$/i;
 
-type StatusUpdate = { id: string; status: string; timestamp: string; pricing?: { category?: string; billable?: boolean }; errors?: { code?: number; title?: string; message?: string; error_data?: { details?: string } }[] };
+type StatusUpdate = {
+  id: string;
+  status: string;
+  timestamp: string;
+  recipient_id?: string;
+  biz_opaque_callback_data?: string;
+  pricing?: { category?: string; billable?: boolean };
+  errors?: { code?: number; title?: string; message?: string; error_data?: { details?: string } }[];
+};
 
 /**
  * "signed": Meta's signature checks out. "unchecked": no app secret is configured, so messages are still taken
@@ -78,7 +86,7 @@ const UNVERIFIED_NOTE = "WhatsApp reported a payment, but the webhook couldn't b
 const notSucceeded = (status: unknown) => typeof status === "string" && !["success", "completed", "captured", "paid"].includes(status.toLowerCase());
 
 async function applyStatus(s: StatusUpdate) {
-  const msg = await db.message.findUnique({
+  let msg = await db.message.findUnique({
     where: { waMessageId: s.id },
     select: {
       id: true,
@@ -90,6 +98,34 @@ async function applyStatus(s: StatusUpdate) {
       customer: { select: { phone: true, name: true, clientId: true, client: { select: { name: true } } } },
     },
   });
+
+  // Crash window reconciliation: if not found by waMessageId, resolve via deterministic biz_opaque_callback_data (internal message.id)
+  if (!msg && s.biz_opaque_callback_data) {
+    const candidate = await db.message.findUnique({
+      where: { id: s.biz_opaque_callback_data },
+      select: {
+        id: true,
+        status: true,
+        customerId: true,
+        templateName: true,
+        pricingCategory: true,
+        template: { select: { category: true } },
+        customer: { select: { phone: true, name: true, clientId: true, client: { select: { name: true } } } },
+      },
+    });
+    if (candidate) {
+      const candidateDigits = candidate.customer?.phone?.replace(/\D/g, "") ?? "";
+      const recipientDigits = s.recipient_id?.replace(/\D/g, "") ?? "";
+      if (!recipientDigits || candidateDigits.endsWith(recipientDigits) || recipientDigits.endsWith(candidateDigits)) {
+        await db.message.update({
+          where: { id: candidate.id },
+          data: { waMessageId: s.id },
+        }).catch(() => {});
+        msg = candidate;
+      }
+    }
+  }
+
   // Not a business's message: maybe one of Thabaal's own messages to an owner (admin › Messages).
   if (!msg) {
     await applyOwnerStatus(s).catch((e) => console.error("[owner message status]", e));
@@ -111,6 +147,12 @@ async function applyStatus(s: StatusUpdate) {
   }
   const at = new Date(Number(s.timestamp) * 1000);
   const next = s.status.toUpperCase();
+
+  // Enforce strict state-transition matrix:
+  // Discard out-of-order, delayed, or duplicate webhooks that attempt to downgrade or overwrite terminal statuses.
+  // Specifically: FAILED cannot overwrite DELIVERED or READ; SENT cannot downgrade DELIVERED/READ; FAILED/READ are terminal.
+  if (!canTransitionStatus(msg.status, next)) return;
+
   if (next === "FAILED") {
     const err = s.errors?.[0];
     const code = err?.code ?? null;
@@ -130,7 +172,6 @@ async function applyStatus(s: StatusUpdate) {
     });
     return;
   }
-  if (!(next in RANK) || RANK[next as keyof typeof RANK] <= RANK[msg.status]) return;
   await db.message.update({
     where: { id: msg.id },
     data: {
@@ -277,7 +318,7 @@ async function detectAndApplyUpiPayment(
         // dates first in a descending sort, so without nulls: "last" an unrequested order would win.
         orderBy: [{ paymentRequestedAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
         take: 5,
-        select: { id: true, number: true, ref: true, total: true, currency: true, paymentRequestedAt: true, createdAt: true },
+        select: { id: true, clientId: true, number: true, ref: true, total: true, currency: true, paymentRequestedAt: true, createdAt: true },
       },
     },
   });
@@ -394,6 +435,7 @@ async function detectAndApplyUpiPayment(
       if (utrMatch) {
         const dupOrder = await db.order.findFirst({
           where: {
+            clientId: targetOrder.clientId,
             OR: [
               { paymentUtr: utrMatch[1] },
               { paymentTxnId: { contains: utrMatch[1] } },
@@ -439,6 +481,7 @@ async function detectAndApplyUpiPayment(
       if (utrMatch) {
         const dupOrder = await db.order.findFirst({
           where: {
+            clientId: targetOrder.clientId,
             OR: [
               { paymentUtr: utrMatch[1] },
               { paymentTxnId: { contains: utrMatch[1] } },

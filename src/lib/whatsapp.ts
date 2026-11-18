@@ -168,6 +168,8 @@ export type SendInput = {
   otpCode?: string | null;
   /** Our payload on each quick-reply button ("tb:<key>", lib/engine/keys.ts), so a tap says which button it was. */
   quickReplyPayloads?: { index: number; payload: string }[];
+  /** Internal opaque identifier (e.g. Message.id) echoed back in status webhooks for deterministic correlation. */
+  bizOpaqueCallbackData?: string | null;
 };
 
 export async function sendTemplateMessage(cfg: WaConfig, input: SendInput): Promise<{ id: string; simulated: boolean }> {
@@ -221,25 +223,45 @@ export async function sendTemplateMessage(cfg: WaConfig, input: SendInput): Prom
     }
   }
 
+  const payload: Record<string, unknown> = {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to: input.to,
+    type: "template",
+    template: { name: input.templateName, language: { code: input.language }, components },
+  };
+  if (input.bizOpaqueCallbackData) {
+    payload.biz_opaque_callback_data = input.bizOpaqueCallbackData;
+  }
+
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      recipient_type: "individual",
-      to: input.to,
-      type: "template",
-      template: { name: input.templateName, language: { code: input.language }, components },
-    }),
+    body: JSON.stringify(payload),
   });
   return { id: res.messages[0].id, simulated: false };
 }
 
 /** A plain text message. WhatsApp only allows it within 24 hours of the customer's last message. */
-export async function sendTextMessage(cfg: WaConfig, to: string, body: string): Promise<{ id: string; simulated: boolean }> {
+export async function sendTextMessage(
+  cfg: WaConfig,
+  to: string,
+  body: string,
+  options?: { bizOpaqueCallbackData?: string | null },
+): Promise<{ id: string; simulated: boolean }> {
   if (!(await isOutboundLiveAllowed(cfg, "text message"))) return offline(cfg);
+  const payload: Record<string, unknown> = {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to,
+    type: "text",
+    text: { body, preview_url: false },
+  };
+  if (options?.bizOpaqueCallbackData) {
+    payload.biz_opaque_callback_data = options.bizOpaqueCallbackData;
+  }
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
-    body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to, type: "text", text: { body, preview_url: false } }),
+    body: JSON.stringify(payload),
   });
   return { id: res.messages[0].id, simulated: false };
 }
@@ -250,6 +272,7 @@ export async function sendMediaMessage(
   to: string,
   mediaUrl: string,
   caption?: string,
+  options?: { bizOpaqueCallbackData?: string | null },
 ): Promise<{ id: string; simulated: boolean }> {
   if (!(await isOutboundLiveAllowed(cfg, "media message"))) return offline(cfg);
   const isPdf = /\.pdf(\?|$)/i.test(mediaUrl);
@@ -264,15 +287,19 @@ export async function sendMediaMessage(
     : mediaId
       ? { id: mediaId, ...(caption ? { caption } : {}) }
       : { link: normalizedUrl, ...(caption ? { caption } : {}) };
+  const bodyPayload: Record<string, unknown> = {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to,
+    type,
+    [type]: payload,
+  };
+  if (options?.bizOpaqueCallbackData) {
+    bodyPayload.biz_opaque_callback_data = options.bizOpaqueCallbackData;
+  }
   const res = await graph<{ messages: { id: string }[] }>(cfg, `${cfg.phoneNumberId}/messages`, {
     method: "POST",
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      recipient_type: "individual",
-      to,
-      type,
-      [type]: payload,
-    }),
+    body: JSON.stringify(bodyPayload),
   });
   return { id: res.messages[0].id, simulated: false };
 }
@@ -730,6 +757,31 @@ export function mapMetaStatus(s: string) {
     default:
       return "PENDING" as const; // PENDING, IN_APPEAL, PENDING_DELETION…
   }
+}
+
+/**
+ * Strict state transition matrix for WhatsApp message delivery lifecycles.
+ * Prevents out-of-order or duplicate webhooks from downgrading terminal statuses.
+ * Specifically guarantees:
+ * 1. FAILED cannot overwrite DELIVERED or READ.
+ * 2. SENT cannot downgrade DELIVERED or READ.
+ * 3. READ is terminal.
+ * 4. FAILED is terminal (cannot be revived by delayed SENT).
+ * 5. SKIPPED is terminal.
+ */
+export const ALLOWED_STATUS_TRANSITIONS: Record<string, ReadonlySet<string>> = {
+  QUEUED: new Set(["SENT", "DELIVERED", "READ", "FAILED", "SKIPPED"]),
+  SENT: new Set(["DELIVERED", "READ", "FAILED"]),
+  DELIVERED: new Set(["READ"]),
+  READ: new Set<string>(),
+  FAILED: new Set<string>(),
+  SKIPPED: new Set<string>(),
+};
+
+export function canTransitionStatus(current: string, next: string): boolean {
+  const c = current?.toUpperCase();
+  const n = next?.toUpperCase();
+  return Boolean(ALLOWED_STATUS_TRANSITIONS[c]?.has(n));
 }
 
 /**

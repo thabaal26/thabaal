@@ -19,7 +19,7 @@ import { APP_TZ, fmtDate, fmtNumber, pct } from "@/lib/format";
 import { formatInTimeZone } from "date-fns-tz";
 import { describeScheduleSummary, effectiveInterval, TEST_TAG } from "@/lib/schedule";
 import { getScope, owned } from "@/lib/session";
-import { cancelRun, deleteCampaign, runCampaignNow, sendCampaignTest, toggleCampaign } from "../../actions/campaigns";
+import { cancelRun, deleteCampaign, resendCampaignNow, runCampaignNow, sendCampaignTest, toggleCampaign } from "../../actions/campaigns";
 import { CampaignForm } from "../campaign-form";
 import { FailureSummary } from "../failure-summary";
 import { campaignFormData } from "../form-data";
@@ -40,7 +40,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
     where: { id, ...owned(scope) },
     include: {
       runs: { orderBy: { scheduledFor: "desc" }, take: 20 },
-      template: { select: { name: true, status: true } },
+      template: { select: { name: true, status: true, category: true } },
       sender: { select: { label: true, displayPhone: true } },
     },
   });
@@ -75,8 +75,13 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
   const tagPick = picked ? null : decodeTags(c.audienceTag);
   const handPicked = c.includeIds.length > 0 || c.excludeIds.length > 0;
   const narrowed = handPicked || c.segments.length > 0;
+  const isMarketing = c.template.category === "MARKETING";
   const audienceSize =
-    !narrowed && !c.audienceTag ? audience.all : !narrowed && picked ? picked.n : await db.customer.count({ where: await campaignAudienceWhere(c.clientId, c.audienceTag, c) });
+    !narrowed && !c.audienceTag
+      ? audience.all
+      : !narrowed && picked
+        ? picked.n
+        : await db.customer.count({ where: await campaignAudienceWhere(c.clientId, c.audienceTag, c, { requirePositiveConsent: isMarketing }) });
   const audienceName = picked?.label ?? (tagPick ? describeTags(tagPick) : c.audienceTag);
   const sendConfirm = `Send "${templateLabel(c.template.name)}" now to ${fmtNumber(audienceSize)} customer${audienceSize === 1 ? "" : "s"} (${c.audienceTag ? `"${audienceName}"` : "ALL customers, no tag"})?`;
   const salesOf = (runId: string) => sales.find((x) => x.runId === runId);
@@ -131,9 +136,19 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
         actions={
           scope.canManage && (
             <>
-              <ActionButton action={runCampaignNow.bind(null, c.id)} size="md" confirm={sendConfirm}>
-                <Send aria-hidden className="size-4 shrink-0" /> Send now
-              </ActionButton>
+              {done ? (
+                <ActionButton
+                  action={resendCampaignNow.bind(null, c.id)}
+                  size="md"
+                  confirm={`Resend "${templateLabel(c.template.name)}" to all ${fmtNumber(audienceSize)} customers? This campaign was already completed.`}
+                >
+                  <Send aria-hidden className="size-4 shrink-0" /> Resend campaign
+                </ActionButton>
+              ) : (
+                <ActionButton action={runCampaignNow.bind(null, c.id)} size="md" confirm={sendConfirm}>
+                  <Send aria-hidden className="size-4 shrink-0" /> Send now
+                </ActionButton>
+              )}
               <ActionButton action={toggleCampaign.bind(null, c.id, !c.active)} size="md">
                 {c.active ? (
                   <>
@@ -149,6 +164,11 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
                 <ActionButton action={sendCampaignTest.bind(null, c.id)} size="md" title={`Send one copy to your own numbers (customers tagged "${TEST_TAG}")`}>
                   <FlaskConical aria-hidden className="size-4 shrink-0" /> Send test to me
                 </ActionButton>
+                {done ? (
+                  <ActionButton action={runCampaignNow.bind(null, c.id)} size="md" confirm={sendConfirm}>
+                    <Send aria-hidden className="size-4 shrink-0" /> Send unsent only
+                  </ActionButton>
+                ) : null}
                 <ActionButton action={deleteCampaign.bind(null, c.id)} variant="danger" size="md" confirm="Delete this campaign? Messages already sent stay in the log." afterOk="/dashboard/campaigns">
                   <Trash2 aria-hidden className="size-4 shrink-0" /> Delete
                 </ActionButton>
@@ -305,8 +325,8 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
                       <dl className="tabular mt-2 grid grid-cols-4 gap-1.5 text-center">
                         {[
                           ["Sent to", fmtNumber(r.total)],
-                          ["Delivered", `${pct(delivered, r.total)}%`],
-                          ["Read", `${pct(read, r.total)}%`],
+                          ["Delivered", `${Math.min(100, pct(delivered, r.total))}%`],
+                          ["Read", `${Math.min(100, pct(read, r.total))}%`],
                           ["Failed", fmtNumber(failed)],
                         ].map(([k, v]) => (
                           <div key={k} className="flex flex-col-reverse rounded-control bg-sunken px-1 py-1.5">
