@@ -74,7 +74,7 @@ DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'WorkspaceMode') THEN
     CREATE TYPE "WorkspaceMode" AS ENUM ('DEMO', 'LIVE_PENDING_PAYMENT', 'LIVE_PENDING_CONNECTION', 'LIVE_ACTIVE', 'SUSPENDED');
   ELSE
-    IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumtypid = 'WorkspaceMode'::regtype AND enumlabel = 'LIVE_PENDING_CONNECTION') THEN
+    IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumtypid = (SELECT oid FROM pg_type WHERE typname = 'WorkspaceMode' LIMIT 1) AND enumlabel = 'LIVE_PENDING_CONNECTION') THEN
       ALTER TYPE "WorkspaceMode" ADD VALUE 'LIVE_PENDING_CONNECTION';
     END IF;
   END IF;
