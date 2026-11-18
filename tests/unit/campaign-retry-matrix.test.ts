@@ -384,4 +384,156 @@ describe("Campaign Retry Matrix & Error State Transitions", () => {
     assert.equal(found, null, "Lookup by opaque callback data must yield null when ID does not exist");
     // No fallback to `WHERE customer.phone = X ORDER BY createdAt DESC` is permitted
   });
+
+  test("15. Late valid webhook reconciles UNKNOWN_OUTCOME to DELIVERED in actual database", async () => {
+    const { canTransitionStatus, isUnknownOutcome } = await import("../../src/lib/whatsapp");
+
+    // 1. Create a message in UNKNOWN_OUTCOME state stored as FAILED to prevent duplicate auto-resend
+    const msg = await db.message.create({
+      data: {
+        customerId: custAId,
+        templateName: "reconciliation_integration_test",
+        status: "FAILED",
+        error: "UNKNOWN_OUTCOME: Meta API request timed out before receiving HTTP response acknowledgment",
+      },
+    });
+
+    try {
+      assert.equal(isUnknownOutcome(msg.error), true, "Must be identified as an ambiguous unknown outcome");
+
+      // 2. Late genuine webhook arrives from Meta with DELIVERED status
+      const nextStatus = "DELIVERED";
+      const allowed = canTransitionStatus(msg.status, nextStatus, { currentError: msg.error, currentErrorCode: msg.errorCode });
+      assert.equal(allowed, true, "Delayed valid webhook MUST be allowed to reconcile UNKNOWN_OUTCOME from FAILED -> DELIVERED");
+
+      // 3. Simulate applyStatus database transition
+      const deliveryTimestamp = new Date();
+      await db.message.update({
+        where: { id: msg.id },
+        data: {
+          status: "DELIVERED",
+          error: null,
+          errorCode: null,
+          failedAt: null,
+          deliveredAt: deliveryTimestamp,
+          waMessageId: "wamid.reconciled.unknown.outcome",
+        },
+      });
+
+      // 4. Verify message in database is now cleanly DELIVERED with error cleared
+      const reconciled = await db.message.findUniqueOrThrow({ where: { id: msg.id } });
+      assert.equal(reconciled.status, "DELIVERED");
+      assert.equal(reconciled.error, null, "Ambiguous timeout error must be cleared upon delivery confirmation");
+      assert.equal(reconciled.errorCode, null);
+      assert.equal(reconciled.waMessageId, "wamid.reconciled.unknown.outcome");
+      assert.ok(reconciled.deliveredAt);
+
+      // 5. Subsequent duplicate DELIVERED webhook must be rejected as an idempotent no-op
+      const duplicateAllowed = canTransitionStatus(reconciled.status, "DELIVERED", { currentError: reconciled.error });
+      assert.equal(duplicateAllowed, false, "Duplicate DELIVERED webhook must be rejected as idempotent no-op");
+    } finally {
+      await db.message.delete({ where: { id: msg.id } }).catch(() => {});
+    }
+  });
+
+  test("16. Confirmed failure (Meta 131026 Undeliverable) strictly rejects late reconciliation and remains terminal FAILED", async () => {
+    const { canTransitionStatus, isUnknownOutcome } = await import("../../src/lib/whatsapp");
+
+    // 1. Create a confirmed failure message
+    const msg = await db.message.create({
+      data: {
+        customerId: custAId,
+        templateName: "confirmed_failure_terminal_test",
+        status: "FAILED",
+        errorCode: 131026,
+        error: "Undeliverable: Recipient phone number is not registered on WhatsApp or blocked",
+      },
+    });
+
+    try {
+      assert.equal(isUnknownOutcome(msg.error, msg.errorCode), false, "Confirmed Meta error code must NOT be treated as unknown outcome");
+
+      // 2. Delayed or fraudulent DELIVERED webhook arrives
+      const allowed = canTransitionStatus(msg.status, "DELIVERED", { currentError: msg.error, currentErrorCode: msg.errorCode });
+      assert.equal(allowed, false, "Confirmed FAILED message must NEVER transition to DELIVERED");
+
+      // 3. Verify status in database remains FAILED
+      const current = await db.message.findUniqueOrThrow({ where: { id: msg.id } });
+      assert.equal(current.status, "FAILED");
+      assert.equal(current.errorCode, 131026);
+    } finally {
+      await db.message.delete({ where: { id: msg.id } }).catch(() => {});
+    }
+  });
+
+  test("17. Webhook HMAC Security: Valid accepted, invalid/missing/modified rejected, tenant isolation enforced", async () => {
+    const { createHmac } = await import("node:crypto");
+    const { checkMultiAppSignature } = await import("../../src/lib/multi-app-webhook");
+
+    const secretA = "test_meta_app_secret_tenant_a_123456789";
+    const secretB = "test_meta_app_secret_tenant_b_987654321";
+    const testWabaId = `waba_sec_${Date.now()}`;
+    const rawPayload = JSON.stringify({
+      object: "whatsapp_business_account",
+      entry: [{ id: testWabaId, changes: [{ value: { messaging_product: "whatsapp", statuses: [{ id: "wamid.test.sec", status: "delivered" }] } }] }],
+    });
+
+    // 1. Link test WABA to Tenant A in database
+    await db.client.update({
+      where: { id: clientIdA },
+      data: { waBusinessAccountId: testWabaId },
+    });
+
+    // 2. Register test AppCredential for Tenant A
+    const appCredA = await db.metaAppCredential.create({
+      data: {
+        clientId: clientIdA,
+        appId: "app_id_A_test",
+        appSecret: secretA,
+        verifyToken: "token_A_test",
+      },
+    });
+
+    // 3. Register test AppCredential for Tenant B (foreign tenant)
+    const appCredB = await db.metaAppCredential.create({
+      data: {
+        clientId: clientIdB,
+        appId: "app_id_B_test",
+        appSecret: secretB,
+        verifyToken: "token_B_test",
+      },
+    });
+
+    try {
+      // Valid signature from Tenant A's secret
+      const validSig = "sha256=" + createHmac("sha256", secretA).update(rawPayload).digest("hex");
+      const validResult = await checkMultiAppSignature(rawPayload, validSig);
+      assert.equal(validResult.status, "signed", "Valid HMAC-SHA256 signature must be accepted as 'signed'");
+
+      // Invalid signature
+      const invalidSig = "sha256=0000000000000000000000000000000000000000000000000000000000000000";
+      const invalidResult = await checkMultiAppSignature(rawPayload, invalidSig);
+      assert.equal(invalidResult.status, "invalid", "Forged/incorrect signature must be rejected as 'invalid'");
+
+      // Missing signature header
+      const missingResult = await checkMultiAppSignature(rawPayload, null);
+      assert.equal(missingResult.status, "invalid", "Missing signature header must be rejected as 'invalid'");
+
+      // Malformed header (no 'sha256=' prefix)
+      const malformedResult = await checkMultiAppSignature(rawPayload, "badformat12345");
+      assert.equal(malformedResult.status, "invalid", "Header without sha256= prefix must be rejected as 'invalid'");
+
+      // Tampered/modified payload with Tenant A's signature (body changed by 1 character)
+      const tamperedPayload = rawPayload.replace("wamid.test.sec", "wamid.test.MOD");
+      const tamperedResult = await checkMultiAppSignature(tamperedPayload, validSig);
+      assert.equal(tamperedResult.status, "invalid", "Modified body with original signature must be rejected as 'invalid'");
+
+      // Foreign tenant secret: signature computed with Tenant B's secret for Tenant A's WABA payload
+      const foreignSig = "sha256=" + createHmac("sha256", secretB).update(rawPayload).digest("hex");
+      const foreignResult = await checkMultiAppSignature(rawPayload, foreignSig);
+      assert.equal(foreignResult.status, "invalid", "Signature signed with foreign tenant secret B must be rejected");
+    } finally {
+      await db.metaAppCredential.deleteMany({ where: { id: { in: [appCredA.id, appCredB.id] } } }).catch(() => {});
+    }
+  });
 });

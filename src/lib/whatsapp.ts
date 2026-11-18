@@ -766,11 +766,26 @@ export function mapMetaStatus(s: string) {
  * 1. FAILED cannot overwrite DELIVERED or READ.
  * 2. SENT cannot downgrade DELIVERED or READ.
  * 3. READ is terminal.
- * 4. FAILED is terminal (cannot be revived by delayed SENT).
+ * 4. Confirmed FAILED is terminal (cannot be revived by delayed SENT).
  * 5. SKIPPED is terminal.
+ * 6. Ambiguous UNKNOWN_OUTCOME / timeouts stored as FAILED can be safely reconciled by late valid Meta webhooks.
  */
+export const UNKNOWN_OUTCOME_PREFIX = "UNKNOWN_OUTCOME";
+export const UNKNOWN_OUTCOME_CODE = 990002;
+
+/**
+ * Checks whether an error or errorCode indicates an ambiguous/unknown outcome (e.g. timeout during HTTP request)
+ * rather than a confirmed failure from Meta.
+ */
+export function isUnknownOutcome(error?: string | null, errorCode?: number | null): boolean {
+  if (errorCode === UNKNOWN_OUTCOME_CODE) return true;
+  if (!error) return false;
+  return error.startsWith(UNKNOWN_OUTCOME_PREFIX) || error.includes("UNKNOWN_OUTCOME");
+}
+
 export const ALLOWED_STATUS_TRANSITIONS: Record<string, ReadonlySet<string>> = {
-  QUEUED: new Set(["SENT", "DELIVERED", "READ", "FAILED", "SKIPPED"]),
+  QUEUED: new Set(["SENT", "DELIVERED", "READ", "FAILED", "SKIPPED", "UNKNOWN_OUTCOME"]),
+  UNKNOWN_OUTCOME: new Set(["SENT", "DELIVERED", "READ", "FAILED"]),
   SENT: new Set(["DELIVERED", "READ", "FAILED"]),
   DELIVERED: new Set(["READ"]),
   READ: new Set<string>(),
@@ -778,9 +793,22 @@ export const ALLOWED_STATUS_TRANSITIONS: Record<string, ReadonlySet<string>> = {
   SKIPPED: new Set<string>(),
 };
 
-export function canTransitionStatus(current: string, next: string): boolean {
+export function canTransitionStatus(
+  current: string,
+  next: string,
+  options?: { isUnknownOutcome?: boolean; currentError?: string | null; currentErrorCode?: number | null }
+): boolean {
   const c = current?.toUpperCase();
   const n = next?.toUpperCase();
+
+  // If the current message has an ambiguous/unknown outcome (e.g. timeout before response was received),
+  // a late genuine webhook callback (SENT, DELIVERED, READ) proves Meta did receive and process it.
+  // Such unknown outcomes are safely reconcilable, whereas confirmed failures (Meta error codes) remain terminal.
+  const unknown = options?.isUnknownOutcome || isUnknownOutcome(options?.currentError, options?.currentErrorCode);
+  if ((c === "FAILED" && unknown) || c === "UNKNOWN_OUTCOME") {
+    return n === "SENT" || n === "DELIVERED" || n === "READ" || n === "FAILED";
+  }
+
   return Boolean(ALLOWED_STATUS_TRANSITIONS[c]?.has(n));
 }
 

@@ -91,6 +91,8 @@ async function applyStatus(s: StatusUpdate) {
     select: {
       id: true,
       status: true,
+      error: true,
+      errorCode: true,
       customerId: true,
       templateName: true,
       pricingCategory: true,
@@ -106,6 +108,8 @@ async function applyStatus(s: StatusUpdate) {
       select: {
         id: true,
         status: true,
+        error: true,
+        errorCode: true,
         customerId: true,
         templateName: true,
         pricingCategory: true,
@@ -151,7 +155,8 @@ async function applyStatus(s: StatusUpdate) {
   // Enforce strict state-transition matrix:
   // Discard out-of-order, delayed, or duplicate webhooks that attempt to downgrade or overwrite terminal statuses.
   // Specifically: FAILED cannot overwrite DELIVERED or READ; SENT cannot downgrade DELIVERED/READ; FAILED/READ are terminal.
-  if (!canTransitionStatus(msg.status, next)) return;
+  // Exception: Ambiguous UNKNOWN_OUTCOME / timeouts stored as FAILED can be safely reconciled by late valid Meta webhooks.
+  if (!canTransitionStatus(msg.status, next, { currentError: msg.error, currentErrorCode: msg.errorCode })) return;
 
   if (next === "FAILED") {
     const err = s.errors?.[0];
@@ -176,6 +181,10 @@ async function applyStatus(s: StatusUpdate) {
     where: { id: msg.id },
     data: {
       status: next as "SENT" | "DELIVERED" | "READ",
+      error: null,
+      errorCode: null,
+      failedAt: null,
+      ...(next === "SENT" && { sentAt: at }),
       ...(next === "DELIVERED" && { deliveredAt: at }),
       ...(next === "READ" && { readAt: at }),
     },
