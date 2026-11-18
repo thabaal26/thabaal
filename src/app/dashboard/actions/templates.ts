@@ -11,6 +11,7 @@ import {
   validateDraft,
   type TemplateDraft,
 } from "@/lib/template";
+import { isEphemeralCdnUrl } from "@/lib/media";
 import {
   NOT_CONNECTED,
   createMetaTemplate,
@@ -75,6 +76,12 @@ export async function saveTemplate(id: string | null, draft: TemplateDraft): Pro
   // An approved template can drop its own image (it then sends the default image); Meta only needs a sample
   // image when the template is created or its wording is resubmitted, which is checked further down.
   const imageRemoved = Boolean(id) && draft.headerType === "IMAGE" && !draft.headerMediaUrl.trim();
+  if (draft.headerType === "IMAGE" && draft.headerMediaUrl && isEphemeralCdnUrl(draft.headerMediaUrl)) {
+    return {
+      ok: false,
+      message: "Temporary Meta CDN preview links (scontent.whatsapp.net / fbcdn.net) expire and cannot be used as permanent template headers. Please upload an image directly.",
+    };
+  }
   const errors = validateDraft(imageRemoved ? { ...draft, headerMediaUrl: "https://example.com/placeholder.jpg" } : draft);
   if (errors.length) return { ok: false, errors };
   const owner = id ? await db.template.findUnique({ where: { id }, select: { clientId: true, businessAccountId: true } }) : null;

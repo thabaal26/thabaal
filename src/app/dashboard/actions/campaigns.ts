@@ -4,7 +4,7 @@ import { fromZonedTime } from "date-fns-tz";
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { CampaignConcurrencyError, dispatch, startRun } from "@/lib/dispatcher";
+import { CampaignConcurrencyError, CampaignMediaPreflightError, dispatch, startRun } from "@/lib/dispatcher";
 import { APP_TZ } from "@/lib/format";
 import { retryHeldBack } from "@/lib/held";
 import { audienceTagCustomerIds, campaignAudienceWhere } from "@/lib/audiences";
@@ -181,6 +181,9 @@ export async function runCampaignNow(id: string): Promise<ActionResult> {
   } catch (err) {
     if (err instanceof CampaignConcurrencyError) {
       return { ok: false, message: "This campaign is already being dispatched by another process. Please wait." };
+    }
+    if (err instanceof CampaignMediaPreflightError) {
+      return { ok: false, message: err.message };
     }
     throw err;
   }

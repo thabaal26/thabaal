@@ -1,5 +1,5 @@
 import "server-only";
-import { absoluteUrl, resolveImageBytes } from "./media";
+import { absoluteUrl, isEphemeralCdnUrl, resolveImageBytes } from "./media";
 import { signMediaUrlIfNeeded } from "./media-token";
 import type { MetaComponent } from "./template";
 import { canSendLiveOutbound } from "./workspace-guard";
@@ -108,7 +108,7 @@ export async function uploadWhatsAppMedia(cfg: WaConfig, imageUrl: string): Prom
   if (!cfg.live || !cfg.phoneNumberId || !cfg.token) return null;
   if (!(await isOutboundLiveAllowed(cfg, "media upload"))) return null;
   const normalizedKey = absoluteUrl(imageUrl) ?? imageUrl.trim();
-  const cacheKey = `${cfg.phoneNumberId}:${normalizedKey}`;
+  const cacheKey = `${cfg.phoneNumberId}:${cfg.clientId || "default"}:${normalizedKey}`;
   const cached = mediaIdCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.id;
@@ -185,10 +185,23 @@ export async function sendTemplateMessage(cfg: WaConfig, input: SendInput): Prom
       parameters: [{ type: "text", text: input.otpCode }],
     });
   } else {
-    if (input.headerType === "IMAGE" && input.headerMediaUrl) {
+    if (input.headerType === "IMAGE") {
+      if (!input.headerMediaUrl) {
+        throw new MetaError("IMAGE header template requires a valid headerMediaUrl", 132012);
+      }
       const mediaId = await uploadWhatsAppMedia(cfg, input.headerMediaUrl);
       const rawFallback = absoluteUrl(input.headerMediaUrl) ?? input.headerMediaUrl;
       const fallbackLink = await signMediaUrlIfNeeded(rawFallback, cfg.clientId);
+
+      // FAIL-CLOSED: If direct Meta upload failed and the fallback link is an ephemeral Meta preview link,
+      // fail closed immediately with MetaError 131053 to prevent submitting a guaranteed-to-fail request to Meta Cloud API.
+      if (!mediaId && isEphemeralCdnUrl(rawFallback)) {
+        throw new MetaError(
+          `Template header image upload failed and the fallback link is an ephemeral Meta preview link (${rawFallback.slice(0, 48)}...). Failing closed to prevent Meta Error 131053.`,
+          131053
+        );
+      }
+
       components.push({
         type: "header",
         parameters: [{ type: "image", image: mediaId ? { id: mediaId } : { link: fallbackLink } }],

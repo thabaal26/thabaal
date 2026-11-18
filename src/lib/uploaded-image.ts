@@ -18,10 +18,8 @@ async function ensureUploadedImageTable() {
       "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
-  await db.$executeRawUnsafe(`
-    ALTER TABLE "PortalUploadedImage" ADD COLUMN IF NOT EXISTS "isPublic" BOOLEAN NOT NULL DEFAULT false;
-    ALTER TABLE "PortalUploadedImage" ADD COLUMN IF NOT EXISTS "clientId" TEXT;
-  `).catch(() => {});
+  await db.$executeRawUnsafe(`ALTER TABLE "PortalUploadedImage" ADD COLUMN IF NOT EXISTS "isPublic" BOOLEAN NOT NULL DEFAULT false`).catch(() => {});
+  await db.$executeRawUnsafe(`ALTER TABLE "PortalUploadedImage" ADD COLUMN IF NOT EXISTS "clientId" TEXT`).catch(() => {});
   tableEnsured = true;
 }
 

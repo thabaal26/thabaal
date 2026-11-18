@@ -30,6 +30,7 @@ import { affordableMessages } from "./wallet";
 import { notOpeningOffers, UNREAD_OFFERS } from "./engagement";
 import { pruneInbound } from "./engine/inbound";
 import { isTenantLiveActive } from "./workspace-guard";
+import { headerImageFor, validateMediaAsset } from "./media";
 
 const TIME_BUDGET_MS = 50_000; // stay under Vercel's function limit
 const KICK_BUDGET_MS = 40_000; // a kick runs after a webhook's answer, inside the same function
@@ -46,12 +47,34 @@ export class CampaignConcurrencyError extends Error {
   }
 }
 
+export class CampaignMediaPreflightError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CampaignMediaPreflightError";
+  }
+}
+
 /** Creates a run and queues one message per eligible customer. */
 export async function startRun(
-  campaign: Campaign & { template: { name: string; category?: string } },
+  campaign: Campaign & { template: { name: string; category?: string; headerType?: string; headerMediaUrl?: string | null } },
   scheduledFor: Date,
   options: { allowResend?: boolean; permanentDedupe?: boolean } = {}
 ) {
+  // 0. Pre-flight media validation: fail fast before creating run or queueing any messages
+  if (campaign.template.headerType === "IMAGE") {
+    const headerUrl = await headerImageFor({
+      clientId: campaign.clientId,
+      headerType: campaign.template.headerType,
+      headerMediaUrl: campaign.template.headerMediaUrl ?? null,
+    });
+    const mediaCheck = await validateMediaAsset(headerUrl, "IMAGE", campaign.clientId);
+    if (!mediaCheck.ok) {
+      throw new CampaignMediaPreflightError(
+        `Campaign "${campaign.name}" pre-flight media validation failed: ${mediaCheck.reason}. Run halted; zero messages queued.`
+      );
+    }
+  }
+
   const isMarketing = campaign.template.category === "MARKETING";
   const audience = await campaignAudienceWhere(campaign.clientId, campaign.audienceTag, campaign, { requirePositiveConsent: isMarketing });
 
@@ -157,7 +180,7 @@ export async function startDueCampaigns(now: Date, paused: ReadonlySet<string>, 
   const due = await db.campaign.findMany({
     // Businesses locked for an unpaid plan: their scheduled campaigns wait (and start once they pay).
     where: { active: true, nextRunAt: { lte: now }, clientId: { notIn: [...paused], ...(only && { in: [...only] }) } },
-    include: { template: { select: { name: true, category: true } } },
+    include: { template: { select: { name: true, category: true, headerType: true, headerMediaUrl: true } } },
   });
   let started = 0;
   for (const c of due) {
@@ -184,6 +207,10 @@ export async function startDueCampaigns(now: Date, paused: ReadonlySet<string>, 
     } catch (e) {
       if (e instanceof CampaignConcurrencyError) {
         console.warn(`Campaign ${c.id} skipped this tick: lock busy.`);
+      } else if (e instanceof CampaignMediaPreflightError) {
+        console.error(`Campaign ${c.id} pre-flight media validation error:`, e.message);
+        // Automatically deactivate campaign to prevent repeated failing attempts every minute
+        await db.campaign.update({ where: { id: c.id }, data: { active: false } });
       } else {
         console.error(`Could not start campaign ${c.id}`, e);
       }
