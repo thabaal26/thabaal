@@ -9,6 +9,7 @@ import { APP_HOST, currentAppUrl, isOldAppUrl } from "./app-host";
 import { welcomeText, whenTeam, type ShopInfo } from "./assistant-intents";
 import { chooseCatalogId } from "./catalog-pick";
 import { db } from "./db";
+import { isSectionEnabled } from "./client-sections";
 import { memo } from "./request-memo";
 import { APP_TZ } from "./format";
 import { isShopClosed, opensAtText } from "./pay-settings";
@@ -79,7 +80,7 @@ export function shopInfoFor(clientId: string): Promise<ShopInfo> {
       supportPhone: c?.supportPhone,
       website: c?.website,
       orderFlow: c?.orderFlow,
-      catalogue: c?.id === "c_finforte_001" || /finforte|shevest/i.test(c?.name ?? "") ? false : !(c?.disabledSections ?? []).includes("catalogue"),
+      catalogue: isSectionEnabled(c?.disabledSections, "catalogue"),
     };
   });
 }
