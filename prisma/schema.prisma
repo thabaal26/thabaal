@@ -26,7 +26,7 @@ model Setting {
   /// When the scheduler last ran, so the dashboard can warn if it stopped.
   lastDispatchAt DateTime?
   /// Last time the scheduler sent CRON_SECRET in the web address (?key=) instead of the Authorization header.
-  cronKeyInUrlAt  DateTime?
+  cronKeyInUrlAt DateTime?
   /// The portal-wide default look (lib/appearance.ts): icon set, tiles, cards, UI style, chart library.
   appearance     Json?
   /// Wallet recharges: the UPI ID and name shown on the recharge QR (lib/wallet.ts).
@@ -47,141 +47,142 @@ model Setting {
 /// A business whose customers and campaigns the portal runs. It sends from its own
 /// WhatsApp numbers when it has any, otherwise from the env-configured number.
 model Client {
-  id                  String            @id @default(cuid())
-  name                String            @unique
+  id                    String                 @id @default(cuid())
+  name                  String                 @unique
   /// Meta access token shared by the client's numbers unless a number has its own.
-  waToken             String?
+  waToken               String?
   /// Superseded by WhatsAppNumber; kept so older rows stay readable.
-  waPhoneNumberId     String?           @unique
-  waBusinessAccountId String?
+  waPhoneNumberId       String?                @unique
+  waBusinessAccountId   String?
   /// Branding their login sees. Colours are #rrggbb; image paths are under /public or full URLs.
-  brandPrimary        String?
-  brandAccent         String?
-  logoUrl             String?
-  bannerUrl           String?
+  brandPrimary          String?
+  brandAccent           String?
+  logoUrl               String?
+  bannerUrl             String?
   /// Image used by image-header templates that have none of their own, including the picture order updates.
-  defaultImageUrl     String?
+  defaultImageUrl       String?
   /// City the business delivers from; customer regions are "<city> city" / "Outside <city>". Null means Madurai (clients set up before this).
-  homeCity            String?
+  homeCity              String?
   /// Order steps the client picked in Settings (lib/order-flow.ts): pickup, deliver, courier or service. Null = deliver.
-  orderFlow           String?
+  orderFlow             String?
   /// Kind of business (lib/business-types.ts): retail, restaurant, service, wholesale or other. Null = not chosen yet.
-  businessType        String?
+  businessType          String?
   /// Extra fields this client keeps on customers and orders: [{ key, label, type, options?, on }] (lib/custom-fields.ts).
-  customFields        Json?
+  customFields          Json?
   /// Who pays Meta for this client's messages: "direct" (their own Meta billing, the default) or "wallet" (Thabaal wallet).
-  billingMode         String            @default("direct")
+  billingMode           String                 @default("direct")
   /// Wallet rates per delivered message before GST, by category; missing ones use Meta's rate (lib/wallet.ts).
-  walletRates         Json?
+  walletRates           Json?
   /// Warn the client when their wallet falls below this many rupees.
-  walletLowAlert      Float             @default(200)
-  walletEntries       WalletEntry[]
+  walletLowAlert        Float                  @default(200)
+  walletEntries         WalletEntry[]
   /// Thabaal plan periods bought by this client (lib/subscription.ts).
-  planPurchases       PlanPurchase[]
+  planPurchases         PlanPurchase[]
   /// Must have a paid plan to use thabaal (lib/plan-access.ts). New businesses start true; businesses set up before
   /// plans were tracked stay false until Thabaal records their paid period and switches it on (My account, admin panel).
-  planRequired        Boolean           @default(false)
-  tagline             String?
-  website             String?
-  supportPhone        String?
+  planRequired          Boolean                @default(false)
+  tagline               String?
+  website               String?
+  supportPhone          String?
   /// Hours a customer must wait between marketing messages; 0 turns the rule off.
-  marketingGapHours   Int               @default(72)
+  marketingGapHours     Int                    @default(72)
   /// Engagement segments (lib/engagement-segments.ts): a tap, reply or order within this many days = Super active.
-  engagementDays      Int               @default(90)
+  engagementDays        Int                    @default(90)
   /// This many offers delivered in a row with no tap, reply or order after them = Inactive (low engagement).
-  inactiveAfterOffers Int               @default(3)
+  inactiveAfterOffers   Int                    @default(3)
   /// Automatic actions for button taps (lib/engine): legacy = today's built-in replies only; shadow = also log what
   /// the business's button mappings would do; engine = mapped buttons run their saved action.
-  automationMode      String            @default("legacy")
+  automationMode        String                 @default("legacy")
   /// After staff type in Chats, automatic replies stay quiet this long (minutes).
-  staffPauseMinutes   Int               @default(120)
+  staffPauseMinutes     Int                    @default(120)
   /// No marketing sends between these HH:mm times (IST); null turns quiet hours off.
-  quietFrom           String?           @default("21:00")
-  quietTo             String?           @default("09:00")
+  quietFrom             String?                @default("21:00")
+  quietTo               String?                @default("09:00")
   /// Refill reminder: this many days after an order, send refillTemplate. Null turns it off.
-  refillDays          Int?
-  refillTemplateId    String?
+  refillDays            Int?
+  refillTemplateId      String?
   /// Google Sheet tabs shared as "anyone with the link"; synced into Customers and Orders.
-  sheetCustomersUrl   String?
-  sheetOrdersUrl      String?
-  sheetSyncedAt       DateTime?
+  sheetCustomersUrl     String?
+  sheetOrdersUrl        String?
+  sheetSyncedAt         DateTime?
   /// Result of the last sync, shown on the sheet page (e.g. "12 added, 3 updated").
-  sheetSyncNote       String?
+  sheetSyncNote         String?
   /// This client's own live-log Apps Script web app (/exec link) and the shared secret it checks.
   /// Unset: no live updates, except the first client, which keeps the deployment-wide GOOGLE_SHEET_WEBHOOK_URL.
   /// Prefix of this client's order numbers (FM in FM-1001), unique across clients; set from the name if blank.
-  orderPrefix         String?           @unique
+  orderPrefix           String?                @unique
   /// Last order number used for this client; the next order takes orderSeq + 1.
-  orderSeq            Int               @default(1000)
-  sheetHookUrl        String?
-  sheetHookSecret     String?
+  orderSeq              Int                    @default(1000)
+  sheetHookUrl          String?
+  sheetHookSecret       String?
   /// The business's own Google Sheet, connected with "Connect Google Sheets" (lib/gsheet): live sync of
   /// customers, addresses, orders, items, payments, chats and activity.
-  sheetLink           SheetLink?
-  sheetLogs           SheetLog[]
-  usage               UsageDay[]
+  sheetLink             SheetLink?
+  sheetLogs             SheetLog[]
+  usage                 UsageDay[]
   /// The enquiry this business came from (admin › Enquiries › Make it a business).
-  lead                Lead?
-  ownerMessages       OwnerMessageTo[]
+  lead                  Lead?
+  ownerMessages         OwnerMessageTo[]
   /// Win-back: customers whose last order is this many days old are tagged "lapsed" and sent winbackTemplate once.
-  lapsedDays          Int               @default(60)
-  winbackTemplateId   String?
+  lapsedDays            Int                    @default(60)
+  winbackTemplateId     String?
   /// WhatsApp Manager → Payment configurations: the name of the active one (e.g. a UPI VPA). Null turns payment requests off.
-  paymentConfig       String?
+  paymentConfig         String?
   /// Use a customer's loyalty points automatically on each new order (cart or hand-entered), before payment is asked.
-  loyaltyAutoRedeem   Boolean           @default(false)
+  loyaltyAutoRedeem     Boolean                @default(false)
   /// Customers can use their points as a discount (by hand or automatically). Off: points still add up, but nobody
   /// can use them and no message offers them (lib/loyalty.ts redeemOn).
-  loyaltyRedeemOn     Boolean           @default(true)
+  loyaltyRedeemOn       Boolean                @default(true)
   /// Loyalty rules (Payments › Settings): 1 point per loyaltyRupeesPerPoint ₹ of bought orders, when loyaltyEarnOn.
-  loyaltyEarnOn         Boolean         @default(true)
-  loyaltyRupeesPerPoint Int             @default(100)
+  loyaltyEarnOn         Boolean                @default(true)
+  loyaltyRupeesPerPoint Int                    @default(100)
   /// Bonus points for every bought order after the first, when loyaltyRepeatOn.
-  loyaltyRepeatOn       Boolean         @default(true)
-  loyaltyRepeatBonus    Int             @default(50)
+  loyaltyRepeatOn       Boolean                @default(true)
+  loyaltyRepeatBonus    Int                    @default(50)
   /// Payments › Payment settings (lib/pay-settings.ts): pay in WhatsApp, UPI, cash on delivery, bank (last 4 only), reminders.
-  paySettings         Json?
+  paySettings           Json?
   /// Portal sections disabled for this client by the portal owner (e.g. ["orders", "catalogue", "calls"]). Empty means all sections enabled.
-  disabledSections    String[]          @default([])
+  disabledSections      String[]               @default([])
   /// Icon set for this client's portal: "hugeicons" (default) or "lucide".
-  iconPack            String            @default("hugeicons")
+  iconPack              String                 @default("hugeicons")
   /// Look of the coloured icon tiles: "3d" (glossy, default) or "2d" (flat).
-  iconLook            String            @default("3d")
+  iconLook              String                 @default("3d")
   /// Current workspace mode: DEMO (exploring), LIVE_PENDING_PAYMENT (provisioned, awaiting payment), LIVE_ACTIVE (paid and active), SUSPENDED
-  workspaceMode       WorkspaceMode     @default(DEMO)
+  workspaceMode         WorkspaceMode          @default(DEMO)
   /// This client's own look, overriding the portal default key by key (lib/appearance.ts).
-  appearance          Json?
-  audiences           Audience[]
-  topUps              TopUp[]
-  createdAt           DateTime          @default(now())
-  users               User[]
-  customers           Customer[]
-  pending             PendingCustomer[]
-  buttonActions       ButtonAction[]
-  conversations       Conversation[]
-  templates           Template[]
-  campaigns           Campaign[]
-  numbers             WhatsAppNumber[]
-  orders              Order[]
-  importBatches       ImportBatch[]
-  metaApps            MetaAppCredential[]
-  whatsAppConnections WhatsAppConnection[]
+  appearance            Json?
+  audiences             Audience[]
+  topUps                TopUp[]
+  createdAt             DateTime               @default(now())
+  users                 User[]
+  customers             Customer[]
+  pending               PendingCustomer[]
+  buttonActions         ButtonAction[]
+  conversations         Conversation[]
+  templates             Template[]
+  campaigns             Campaign[]
+  numbers               WhatsAppNumber[]
+  orders                Order[]
+  importBatches         ImportBatch[]
+  metaApps              MetaAppCredential[]
+  whatsAppConnections   WhatsAppConnection[]
+  sentTemplateSnapshots SentTemplateSnapshot[]
 }
 
 /// One sending number on Meta's Cloud API. Templates belong to its WhatsApp Business
 /// Account, so numbers in the same account share templates.
 model WhatsAppNumber {
-  id                String     @id @default(cuid())
+  id                String              @id @default(cuid())
   clientId          String
-  client            Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client            Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
   label             String
-  phoneNumberId     String     @unique
+  phoneNumberId     String              @unique
   businessAccountId String
   displayPhone      String?
   verifiedName      String?
   /// Overrides the client's token, for numbers in an account the shared token can't reach.
   token             String?
-  isDefault         Boolean    @default(false)
+  isDefault         Boolean             @default(false)
   /// From Meta: GREEN, YELLOW, RED or UNKNOWN.
   qualityRating     String?
   /// From Meta: TIER_250, TIER_1K, TIER_10K, TIER_100K or TIER_UNLIMITED.
@@ -278,41 +279,41 @@ enum ClientAccess {
 }
 
 model User {
-  id           String       @id @default(cuid())
-  email        String       @unique
-  name         String
-  passwordHash String
+  id             String       @id @default(cuid())
+  email          String       @unique
+  name           String
+  passwordHash   String
   /// Raised when the password changes, so logins made before it stop working on every device.
-  sessionVersion Int        @default(0)
-  role         Role         @default(CLIENT)
-  access       ClientAccess @default(STAFF)
-  clientId     String?
-  client       Client?      @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  createdAt    DateTime     @default(now())
-  usage        UsageDay[]
+  sessionVersion Int          @default(0)
+  role           Role         @default(CLIENT)
+  access         ClientAccess @default(STAFF)
+  clientId       String?
+  client         Client?      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  usage          UsageDay[]
   /// Enquiries this admin follows up.
-  leads        Lead[]
+  leads          Lead[]
 }
 
 model Customer {
-  id               String    @id @default(cuid())
+  id               String         @id @default(cuid())
   clientId         String
-  client           Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client           Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name             String
   phone            String // E.164 digits only, e.g. 919876543210
-  tags             String[]  @default([])
+  tags             String[]       @default([])
   purchases        String? // items as written on the paper order sheets
   /// Area, cleaned up (e.g. "Sellur"); region groups areas: Madurai city / Outside Madurai / Not sure.
   location         String?
   region           String?
   /// The location exactly as written on the order sheet.
   locationRaw      String?
-  optedOut         Boolean   @default(false)
+  optedOut         Boolean        @default(false)
   /// How and when the customer agreed to receive WhatsApp messages (Meta requires opt-in).
   optInSource      String?
   optInAt          DateTime?
   /// Set when Meta says the number can't receive messages; campaigns skip them.
-  unreachable      Boolean   @default(false)
+  unreachable      Boolean        @default(false)
   /// When the win-back message went out; cleared when they order again so a later lapse can be won back too.
   winbackSentAt    DateTime?
   /// WhatsApp calling: when we last asked to call them, and until when they allowed it (null = not allowed).
@@ -332,8 +333,8 @@ model Customer {
   deletedAt        DateTime?
   deletedBy        String?
   deleteReason     String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
   messages         Message[]
   replies          Reply[]
   orders           Order[]
@@ -416,8 +417,8 @@ model Template {
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
-  campaigns Campaign[]
-  messages  Message[]
+  campaigns     Campaign[]
+  messages      Message[]
   buttonActions ButtonAction[]
 
   /// The WhatsApp Business Account the template lives in; null for the env-configured number.
@@ -532,12 +533,48 @@ model Message {
   pricingCategory String?
   billable        Boolean?
 
+  sentTemplateSnapshot SentTemplateSnapshot?
+
   @@index([runId, status])
   @@index([createdAt])
   @@index([status])
   @@index([customerId, createdAt])
   @@index([senderId])
   @@index([senderId, sentAt])
+}
+
+/// Cryptographically verified, immutable snapshot of an outbound Meta template message at send time.
+model SentTemplateSnapshot {
+  id                      String  @id @default(cuid())
+  clientId                String  @map("client_id")
+  messageId               String  @unique @map("message_id")
+  provider                String  @default("META_CLOUD_API")
+  wabaId                  String  @map("waba_id")
+  phoneNumberId           String  @map("phone_number_id")
+  graphApiVersion         String  @map("graph_api_version")
+  providerTemplateId      String? @map("provider_template_id")
+  templateName            String  @map("template_name")
+  languageCode            String  @map("language_code")
+  category                String?
+  sourceTemplateVersionId String? @map("source_template_version_id")
+
+  templateDefinition Json @map("template_definition") @db.JsonB
+  requestPayload     Json @map("request_payload") @db.JsonB
+  renderSnapshot     Json @map("render_snapshot") @db.JsonB
+
+  definitionSha256 String   @map("definition_sha256")
+  requestSha256    String   @map("request_sha256")
+  renderSha256     String   @map("render_sha256")
+  schemaVersion    Int      @default(1) @map("schema_version")
+  capturedAt       DateTime @default(now()) @map("captured_at") @db.Timestamptz(6)
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  client  Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, messageId], map: "sent_template_snapshots_client_message_uq")
+  @@index([clientId, templateName, languageCode], map: "sent_template_snapshots_template_idx")
+  @@index([clientId, capturedAt], map: "sent_template_snapshots_captured_idx")
+  @@map("sent_template_snapshots")
 }
 
 /// A message a customer sent back: a typed reply or a quick-reply button tap such as "Order now".
@@ -576,25 +613,25 @@ enum OrderStatus {
 
 /// A cart a customer sent from the WhatsApp catalogue.
 model Order {
-  id                 String      @id @default(cuid())
+  id                 String         @id @default(cuid())
   /// Running number shown to people as RG-1001, RG-1002…; also the WhatsApp payment reference.
-  number             Int         @unique @default(autoincrement())
+  number             Int            @unique @default(autoincrement())
   /// What people see and quote: the client's own prefix and running number (FM-1001). Null on orders made
   /// before per-client numbers, which show as RG-<1000 + number> (lib/order-ref.ts).
-  ref                String?     @unique
+  ref                String?        @unique
   clientId           String
-  client             Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client             Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
   customerId         String
-  customer           Customer    @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  waMessageId        String?     @unique
+  customer           Customer       @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  waMessageId        String?        @unique
   catalogId          String?
   /// The note the customer typed with the cart, if any.
   note               String?
   /// [{ id: retailer id, name?: product name, quantity, price, currency }]
   items              Json
-  total              Float       @default(0)
-  currency           String      @default("INR")
-  status             OrderStatus @default(NEW)
+  total              Float          @default(0)
+  currency           String         @default("INR")
+  status             OrderStatus    @default(NEW)
   /// When the order was marked packed (the "Packed" step); status stays CONFIRMED or PAID until it is dispatched.
   packedAt           DateTime?
   /// When the order reached each step; stamped by a database trigger on status changes
@@ -609,7 +646,7 @@ model Order {
   /// When the refill reminder for this order went out, so it's sent once.
   reminderSentAt     DateTime?
   /// Where the order came from outside WhatsApp, e.g. a Google Sheet row; keeps a sync from adding it twice.
-  externalRef        String?     @unique
+  externalRef        String?        @unique
   /// "Review and pay" message sent on WhatsApp; Meta's payment webhook fills paidAt and the UPI transaction id.
   paymentRequestedAt DateTime?
   /// One automatic reminder when the payment request is still unpaid after a few hours.
@@ -650,7 +687,7 @@ model Order {
   refundNote         String?
   /// Loyalty points used on this order; total is already reduced by their value (100 points = ₹50).
   /// Points used on a cancelled order go back to the customer (lib/loyalty-redeem.ts).
-  pointsRedeemed     Int         @default(0)
+  pointsRedeemed     Int            @default(0)
   /// Delivery address step on WhatsApp (lib/delivery-address.ts): when the customer was asked, and when they
   /// gave or confirmed it (the payment choice goes out after that). note holds the address itself.
   addressAskedAt     DateTime?
@@ -658,12 +695,12 @@ model Order {
   /// Map link of a location the customer shared for this order.
   mapUrl             String?
   /// Follow-ups for an unfinished WhatsApp order (lib/cart-followups.ts): how many nudges went, and when the last did.
-  nudgeCount         Int         @default(0)
+  nudgeCount         Int            @default(0)
   nudgedAt           DateTime?
   /// While the customer decides "Add to order X / Separate order": the earlier order's id (lib/order-intake.ts).
   mergeWith          String?
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
   @@index([clientId, status, createdAt])
   @@index([customerId])
@@ -783,16 +820,16 @@ model PlanPurchase {
 /// The Thabaal wallet ledger (lib/wallet.ts). Balance = sum of DONE amounts. Credits are positive,
 /// message charges negative. One MESSAGE entry per charged message (messageId is unique).
 model WalletEntry {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   clientId  String
-  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
   /// RECHARGE | MESSAGE | ADJUSTMENT | REFUND
   kind      String
   /// Rupees, GST included: + adds to the balance, - takes from it.
   amount    Float
   /// PENDING (recharge waiting for approval) | DONE | REJECTED
-  status    String   @default("DONE")
-  messageId String?  @unique
+  status    String    @default("DONE")
+  messageId String?   @unique
   /// For MESSAGE entries: marketing | utility | authentication | service.
   category  String?
   /// UPI transaction reference the client entered for a recharge.
@@ -801,7 +838,7 @@ model WalletEntry {
   createdBy String?
   decidedBy String?
   decidedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([clientId, status, createdAt])
   @@index([utr])
@@ -1170,16 +1207,16 @@ model RevokedMediaToken {
 // ==========================================
 
 enum ImportStatus {
-  UPLOADING       // Binary chunks actively assembling on disk
-  UPLOADED        // Full files assembled on disk; ready for inspection
-  INSPECTING      // Worker scanning sheets, boundaries, and headers
-  MAPPING_DUE     // Awaiting user confirmation of column mapping
-  STAGING         // Worker parsing and staging records in memory-bounded batches
-  STAGED          // All rows classified; reconciliation ledger ready
-  COMMITTING      // Ingestion into Customer table running in chunked transactions
-  COMPLETED       // Successfully committed; final reconciliation summary ready
-  FAILED          // Critical error during processing
-  CANCELLED       // Dismissed or rolled back by client
+  UPLOADING // Binary chunks actively assembling on disk
+  UPLOADED // Full files assembled on disk; ready for inspection
+  INSPECTING // Worker scanning sheets, boundaries, and headers
+  MAPPING_DUE // Awaiting user confirmation of column mapping
+  STAGING // Worker parsing and staging records in memory-bounded batches
+  STAGED // All rows classified; reconciliation ledger ready
+  COMMITTING // Ingestion into Customer table running in chunked transactions
+  COMPLETED // Successfully committed; final reconciliation summary ready
+  FAILED // Critical error during processing
+  CANCELLED // Dismissed or rolled back by client
 }
 
 enum StagingRowClassification {
@@ -1194,55 +1231,55 @@ enum StagingRowClassification {
 
 /// A bulk customer import job initiated by a tenant, supporting single or multi-file uploads.
 model ImportBatch {
-  id                    String              @id @default(cuid())
-  clientId              String
-  client                Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  userId                String              // User who initiated the import
-  idempotencyKey        String              @unique // Tenant-scoped unique key: "${clientId}_${batchId}"
-  status                ImportStatus        @default(UPLOADING)
+  id             String       @id @default(cuid())
+  clientId       String
+  client         Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  userId         String // User who initiated the import
+  idempotencyKey String       @unique // Tenant-scoped unique key: "${clientId}_${batchId}"
+  status         ImportStatus @default(UPLOADING)
 
-  totalFiles            Int                 @default(0)
-  totalSourceRows       Int                 @default(0)
-  emptyRows             Int                 @default(0)
-  structuralRows        Int                 @default(0)
-  invalidRows           Int                 @default(0)
-  ambiguousRows         Int                 @default(0)
-  validSingleNew        Int                 @default(0)
-  validSingleExist      Int                 @default(0)
-  intraFileDups         Int                 @default(0)
+  totalFiles       Int @default(0)
+  totalSourceRows  Int @default(0)
+  emptyRows        Int @default(0)
+  structuralRows   Int @default(0)
+  invalidRows      Int @default(0)
+  ambiguousRows    Int @default(0)
+  validSingleNew   Int @default(0)
+  validSingleExist Int @default(0)
+  intraFileDups    Int @default(0)
 
   // Commit Ingestion Metrics
-  committedNew          Int                 @default(0)
-  committedUpdated      Int                 @default(0)
-  committedFailed       Int                 @default(0)
+  committedNew     Int @default(0)
+  committedUpdated Int @default(0)
+  committedFailed  Int @default(0)
 
   // Meta WhatsApp Compliance & Tags
-  optInSource           String              // Compliance note: e.g. "In-Store Billing POS"
-  defaultTags           String[]            @default([])
+  optInSource String // Compliance note: e.g. "In-Store Billing POS"
+  defaultTags String[] @default([])
 
   // Conflict & Safety Rules
-  overwriteNames        Boolean             @default(false)
-  overwriteAreas        Boolean             @default(false)
-  multiPhoneChoice      String              @default("PRIMARY_ONLY") // "PRIMARY_ONLY" | "SEPARATE" | "LINKED"
+  overwriteNames   Boolean @default(false)
+  overwriteAreas   Boolean @default(false)
+  multiPhoneChoice String  @default("PRIMARY_ONLY") // "PRIMARY_ONLY" | "SEPARATE" | "LINKED"
 
   // Worker Lease & Distributed Locking (No connection pool deadlocks)
-  workerLeaseToken      String?
-  workerLeaseExpiresAt  DateTime?
-  workerHeartbeatAt     DateTime?
-  workerFenceVersion    Int                 @default(0)
-  attemptCount          Int                 @default(0)
+  workerLeaseToken     String?
+  workerLeaseExpiresAt DateTime?
+  workerHeartbeatAt    DateTime?
+  workerFenceVersion   Int       @default(0)
+  attemptCount         Int       @default(0)
 
-  approvedBy            String?
-  approvedAt            DateTime?
-  errorMessage          String?
-  startedAt             DateTime            @default(now())
-  completedAt           DateTime?
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
+  approvedBy   String?
+  approvedAt   DateTime?
+  errorMessage String?
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  files                 ImportFile[]
-  stagingRecords        ImportStagingRecord[]
-  errors                ImportErrorLog[]
+  files          ImportFile[]
+  stagingRecords ImportStagingRecord[]
+  errors         ImportErrorLog[]
 
   @@index([clientId, status])
   @@index([clientId, createdAt])
@@ -1251,25 +1288,25 @@ model ImportBatch {
 
 /// An individual spreadsheet or archive file inside an import batch.
 model ImportFile {
-  id                    String              @id @default(cuid())
-  batchId               String
-  batch                 ImportBatch         @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  clientId              String
-  originalFileName      String
-  safeStoredFileName    String
-  fileFormat            String              // CSV, TSV, XLSX, XLS, ODS, XLSM, ZIP
-  fileSize              Int                 // Exact size in bytes
-  checksum              String              // SHA-256 hash of assembled file
-  storagePath           String              // Disk path (/srv/thabaal/shared/imports/...)
-  sheetNames            String[]            @default([])
-  selectedSheet         String?
-  columnMapping         Json?               // Auto-detected or user-confirmed column map
-  status                String              @default("PENDING") // PENDING, STAGED, FAILED
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
+  id                 String      @id @default(cuid())
+  batchId            String
+  batch              ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  clientId           String
+  originalFileName   String
+  safeStoredFileName String
+  fileFormat         String // CSV, TSV, XLSX, XLS, ODS, XLSM, ZIP
+  fileSize           Int // Exact size in bytes
+  checksum           String // SHA-256 hash of assembled file
+  storagePath        String // Disk path (/srv/thabaal/shared/imports/...)
+  sheetNames         String[]    @default([])
+  selectedSheet      String?
+  columnMapping      Json? // Auto-detected or user-confirmed column map
+  status             String      @default("PENDING") // PENDING, STAGED, FAILED
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
 
-  stagingRecords        ImportStagingRecord[]
-  errors                ImportErrorLog[]
+  stagingRecords ImportStagingRecord[]
+  errors         ImportErrorLog[]
 
   @@index([batchId])
   @@index([clientId])
@@ -1277,33 +1314,33 @@ model ImportFile {
 
 /// Staged raw and normalized row records before production commit.
 model ImportStagingRecord {
-  id                    String                    @id @default(cuid())
-  batchId               String
-  batch                 ImportBatch               @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  fileId                String
-  file                  ImportFile                @relation(fields: [fileId], references: [id], onDelete: Cascade)
-  clientId              String
-  sheetName             String?
-  tableId               String?
-  sourceRowNumber       Int                       // 1-indexed row number from source file
-  sourceIdentity        String                    // Stable identity: "${fileId}:${sheetName}:${sourceRowNumber}"
+  id              String      @id @default(cuid())
+  batchId         String
+  batch           ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  fileId          String
+  file            ImportFile  @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  clientId        String
+  sheetName       String?
+  tableId         String?
+  sourceRowNumber Int // 1-indexed row number from source file
+  sourceIdentity  String // Stable identity: "${fileId}:${sheetName}:${sourceRowNumber}"
 
-  rawRowData            Json?                     // Raw cell strings as extracted from sheet
-  normalizedData        Json?                     // Normalized customer fields
-  normalizedPhone       String?                   // Clean E.164 digits, e.g. "919876543210"
-  candidatePhones       String[]                  @default([]) // Extracted phone candidates
-  name                  String?
-  location              String?
-  region                String?
-  tags                  String[]                  @default([])
-  extra                 Json?
+  rawRowData      Json? // Raw cell strings as extracted from sheet
+  normalizedData  Json? // Normalized customer fields
+  normalizedPhone String? // Clean E.164 digits, e.g. "919876543210"
+  candidatePhones String[] @default([]) // Extracted phone candidates
+  name            String?
+  location        String?
+  region          String?
+  tags            String[] @default([])
+  extra           Json?
 
-  classification        StagingRowClassification  @default(VALID_SINGLE_NEW)
-  validationErrors      String[]                  @default([])
-  reviewStatus          String                    @default("PENDING") // PENDING, APPROVED, REJECTED
-  committedAt           DateTime?
-  createdAt             DateTime                  @default(now())
-  updatedAt             DateTime                  @updatedAt
+  classification   StagingRowClassification @default(VALID_SINGLE_NEW)
+  validationErrors String[]                 @default([])
+  reviewStatus     String                   @default("PENDING") // PENDING, APPROVED, REJECTED
+  committedAt      DateTime?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
 
   @@index([batchId, classification])
   @@index([batchId, normalizedPhone])
@@ -1312,22 +1349,20 @@ model ImportStagingRecord {
 
 /// Detailed line-by-line failure and diagnostic log.
 model ImportErrorLog {
-  id                    String              @id @default(cuid())
-  batchId               String
-  batch                 ImportBatch         @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  fileId                String?
-  file                  ImportFile?         @relation(fields: [fileId], references: [id], onDelete: Cascade)
-  clientId              String
-  sheetName             String?
-  tableId               String?
-  sourceRowNumber       Int
-  errorCode             String              // e.g. "INVALID_PHONE_LENGTH", "CORRUPTED_STRING"
-  reason                String              // Human-readable diagnostic message
-  safeDiagnosticData    Json?               // Non-sensitive context for debugging
-  createdAt             DateTime            @default(now())
+  id                 String      @id @default(cuid())
+  batchId            String
+  batch              ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  fileId             String?
+  file               ImportFile? @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  clientId           String
+  sheetName          String?
+  tableId            String?
+  sourceRowNumber    Int
+  errorCode          String // e.g. "INVALID_PHONE_LENGTH", "CORRUPTED_STRING"
+  reason             String // Human-readable diagnostic message
+  safeDiagnosticData Json? // Non-sensitive context for debugging
+  createdAt          DateTime    @default(now())
 
   @@index([batchId])
   @@index([clientId])
 }
-
-

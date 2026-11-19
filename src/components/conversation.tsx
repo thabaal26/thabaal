@@ -7,6 +7,9 @@ import { cn } from "@/lib/cn";
 import { fmtDate } from "@/lib/format";
 import { plainError, templateLabel } from "@/lib/plain-error";
 import { T } from "@/app/dashboard/portal-ui";
+import { groupBubbles, type BubbleCandidate } from "@/lib/chat/bubble-grouping";
+import { safeHistoricalUrl, safeHistoricalPhone } from "@/lib/chat/url-sanitizer";
+import type { HistoricalTemplateResult, TemplateRenderSnapshotV1 } from "@/lib/whatsapp/template-snapshot";
 
 export type TemplateButton = {
   type: "QUICK_REPLY" | "URL" | "PHONE_NUMBER" | "COPY_CODE" | "ORDER_DETAILS" | "CATALOG" | string;
@@ -21,6 +24,8 @@ export type ConversationEntry =
       at: Date;
       type: "out";
       id: string;
+      conversationId?: string;
+      actorKey?: string;
       template: string;
       campaign: string | null;
       status: string;
@@ -34,11 +39,15 @@ export type ConversationEntry =
       headerMediaUrl?: string | null;
       footer?: string | null;
       buttons?: TemplateButton[] | null;
+      historicalTemplate?: HistoricalTemplateResult;
+      bubblePosition?: "SINGLE" | "FIRST" | "MIDDLE" | "LAST";
     }
   | {
       at: Date;
       type: "in";
       id: string;
+      conversationId?: string;
+      actorKey?: string;
       text: string;
       kind: string;
       mediaId: string | null;
@@ -46,6 +55,7 @@ export type ConversationEntry =
       handled?: boolean;
       via: string | null;
       fromSender?: string | null;
+      bubblePosition?: "SINGLE" | "FIRST" | "MIDDLE" | "LAST";
     };
 
 /** Sent from the chat box, not a template: no label needed above the message. */
@@ -111,6 +121,110 @@ function Ticks({ status }: { status: string }) {
   );
 }
 
+function HistoricalTemplateCard({
+  snapshot,
+  legacy = false,
+}: {
+  snapshot: TemplateRenderSnapshotV1;
+  legacy?: boolean;
+}) {
+  const header = snapshot.header;
+  const mediaUrl = safeHistoricalUrl(header?.media?.storageKey || header?.media?.filename);
+
+  return (
+    <div className={cn("wa-template-card", legacy && "wa-template-card-legacy")}>
+      <div className="wa-template-label">{snapshot.template.name}</div>
+      {header?.kind === "TEXT" && header.text && (
+        <div className="wa-template-header">{formatWa(header.text)}</div>
+      )}
+      {header?.kind === "IMAGE" && mediaUrl && (
+        <div className="wa-template-media">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={mediaUrl} alt="Template header" loading="lazy" />
+        </div>
+      )}
+      {header?.kind === "DOCUMENT" && mediaUrl && (
+        <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="wa-template-document flex items-center gap-2">
+          <FileText aria-hidden className="size-4 shrink-0" />
+          <span>Open document</span>
+        </a>
+      )}
+      {header?.kind === "VIDEO" && mediaUrl && (
+        <video src={mediaUrl} controls preload="metadata" className="wa-template-video" />
+      )}
+      <div className="wa-template-body">{formatWa(snapshot.body.text)}</div>
+      {snapshot.footer?.text && <div className="wa-template-footer">{snapshot.footer.text}</div>}
+      {snapshot.buttons.length > 0 && (
+        <div className="wa-template-buttons">
+          {snapshot.buttons.map((b) => {
+            const isUrl = b.type.toUpperCase() === "URL";
+            const isPhone = b.type.toUpperCase() === "PHONE_NUMBER";
+            const isQuickReply = b.type.toUpperCase() === "QUICK_REPLY";
+            const validUrl = isUrl ? safeHistoricalUrl(b.resolvedUrl) : null;
+            const validPhone = isPhone ? safeHistoricalPhone(b.phoneNumber) : null;
+            const href = validUrl ?? validPhone ?? undefined;
+            const Icon = BTN_ICON[b.type] ?? ExternalLink;
+
+            return (
+              <div key={`${b.index}-${b.type}`} className="wa-template-button">
+                {href ? (
+                  <a href={href} target="_blank" rel="noopener noreferrer">
+                    <Icon aria-hidden className="size-3.5 shrink-0" />
+                    <span>{b.label}</span>
+                  </a>
+                ) : isQuickReply ? (
+                  <span className="inline-flex flex-col items-center justify-center text-center">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Icon aria-hidden className="size-3.5 shrink-0" />
+                      <span>{b.label}</span>
+                    </span>
+                    <span className="wa-template-history-note">Historical action · View only</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 justify-center">
+                    <Icon aria-hidden className="size-3.5 shrink-0" />
+                    <span>{b.label}</span>
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {legacy && (
+        <div className="wa-template-history-note">Original template layout unavailable</div>
+      )}
+    </div>
+  );
+}
+
+function HistoricalTemplateRenderer({ value }: { value: HistoricalTemplateResult }) {
+  switch (value.source) {
+    case "SNAPSHOT":
+      return <HistoricalTemplateCard snapshot={value.snapshot} />;
+    case "LEGACY_CAPTURE":
+      return <HistoricalTemplateCard snapshot={value.snapshot} legacy />;
+    case "UNAVAILABLE":
+      return (
+        <div className="wa-template-fallback">
+          <div className="wa-template-label">Historical template</div>
+          <div>Historical message content unavailable</div>
+        </div>
+      );
+    case "INTEGRITY_ERROR":
+      return (
+        <div className="wa-template-fallback wa-template-integrity-error">
+          <div className="wa-template-label">Historical template</div>
+          <div>Historical message could not be verified</div>
+        </div>
+      );
+    default: {
+      const exhaustive: never = value;
+      return exhaustive;
+    }
+  }
+}
+
 /**
  * A customer's messages and replies as a chat: oldest at the top, newest at the bottom,
  * with native, smooth, responsive scrolling that auto-anchors to the latest message.
@@ -130,12 +244,28 @@ export function Conversation({
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Oldest → newest with day dividers
-  const ordered = [...entries].reverse();
+  // Oldest → newest with deterministic tie-breaker
+  const chronological = [...entries].sort(
+    (a, b) => a.at.getTime() - b.at.getTime() || a.id.localeCompare(b.id)
+  );
+
+  const candidates: BubbleCandidate[] = chronological.map((e) => ({
+    id: e.id,
+    conversationId: e.conversationId ?? "default",
+    direction: e.type === "in" ? "INBOUND" : "OUTBOUND",
+    actorKey: e.actorKey ?? (e.type === "in" ? "cust:in" : "biz:out"),
+    createdAt: e.at,
+    displayDayKey: fmtDate(e.at, "yyyy-MM-dd"),
+    isSystemEvent: false,
+  }));
+  const grouped = groupBubbles(candidates);
+  const posMap = new Map(grouped.map((g) => [g.id, g.bubblePosition]));
+
   const dayOf = (e: ConversationEntry) => fmtDate(e.at, "yyyy-MM-dd");
-  const rows = ordered.flatMap((e, i) => {
+  const rows = chronological.flatMap((e, i) => {
+    e.bubblePosition = posMap.get(e.id) ?? "SINGLE";
     const day = dayOf(e);
-    const divider = i === 0 || dayOf(ordered[i - 1]) !== day ? [{ divider: fmtDate(e.at, "EEE d MMM yyyy"), key: `d-${day}` }] : [];
+    const divider = i === 0 || dayOf(chronological[i - 1]) !== day ? [{ divider: fmtDate(e.at, "EEE d MMM yyyy"), key: `d-${day}` }] : [];
     return [...divider, { entry: e, key: e.id }];
   });
 
@@ -317,7 +447,9 @@ function WaRows({ rows }: { rows: Row[] }) {
           );
         const e = r.entry;
         const prev = rows[i - 1];
-        const first = !prev || "divider" in prev || prev.entry.type !== e.type;
+        const first = e.bubblePosition
+          ? e.bubblePosition === "FIRST" || e.bubblePosition === "SINGLE"
+          : !prev || "divider" in prev || prev.entry.type !== e.type;
         const time = (
           <time dateTime={e.at.toISOString()}>{fmtDate(e.at, "h:mm a")}</time>
         );
@@ -360,57 +492,72 @@ function WaRows({ rows }: { rows: Row[] }) {
         return (
           <li key={r.key} className={cn("out", first && "first")}>
             <div className={cn("wa-b", e.status === "FAILED" && "bad")}>
-              {(!TYPED.has(e.template) || e.campaign) && (
-                <p className="wa-lbl">
-                  {!TYPED.has(e.template) && <span>{templateLabel(e.template)}</span>}
-                  {e.campaign && <span>· {e.campaign}</span>}
-                </p>
-              )}
-              {headerMediaUrl &&
-                (isPdf ? (
-                  <a href={headerMediaUrl} target="_blank" rel="noreferrer" className="wa-file">
-                    <FileText aria-hidden className="ic" />
-                    <span className="truncate">
-                      <T>Open PDF attachment</T>
+              {e.historicalTemplate ? (
+                <>
+                  <HistoricalTemplateRenderer value={e.historicalTemplate} />
+                  <div className="wa-clear mt-1">
+                    <span className="wa-meta">
+                      {e.via && <T ta={`${e.via}-லிருந்து · `}>{`from ${e.via} · `}</T>}
+                      {time}
+                      <WaTicks status={e.status} />
                     </span>
-                  </a>
-                ) : (
-                  <a href={headerMediaUrl} target="_blank" rel="noreferrer" className="wa-img wa-img-header">
-                    {/* eslint-disable-next-line @next/next/no-img-element -- outbound attachment preview */}
-                    <img src={headerMediaUrl} alt="Header media" />
-                  </a>
-                ))}
-              {e.headerText && <p className="mb-1 font-bold text-[14.5px] leading-snug">{formatWa(e.headerText)}</p>}
-              <div className="wa-clear">
-                {text && <span className="tx">{formatWa(text)}</span>}
-                {e.footer && <p className="wa-footer">{e.footer}</p>}
-                <span className="wa-meta">
-                  {e.via && <T ta={`${e.via}-லிருந்து · `}>{`from ${e.via} · `}</T>}
-                  {time}
-                  <WaTicks status={e.status} />
-                </span>
-              </div>
-              {buttons.length > 0 && (
-                <div className="wa-card-buttons">
-                  {buttons.map((b, btnIdx) => {
-                    const Icon = BTN_ICON[b.type] ?? ExternalLink;
-                    const href = b.type === "URL" ? b.url : b.type === "PHONE_NUMBER" ? `tel:${b.phone || b.phone_number}` : undefined;
-                    if (href) {
-                      return (
-                        <a key={btnIdx} href={href} target="_blank" rel="noreferrer" className="wa-card-btn">
-                          <Icon aria-hidden className="ic" />
-                          <span>{b.text || "Button"}</span>
-                        </a>
-                      );
-                    }
-                    return (
-                      <div key={btnIdx} className="wa-card-btn">
-                        <Icon aria-hidden className="ic" />
-                        <span>{b.text || "Button"}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {(!TYPED.has(e.template) || e.campaign) && (
+                    <p className="wa-lbl">
+                      {!TYPED.has(e.template) && <span>{templateLabel(e.template)}</span>}
+                      {e.campaign && <span>· {e.campaign}</span>}
+                    </p>
+                  )}
+                  {headerMediaUrl &&
+                    (isPdf ? (
+                      <a href={headerMediaUrl} target="_blank" rel="noreferrer" className="wa-file">
+                        <FileText aria-hidden className="ic" />
+                        <span className="truncate">
+                          <T>Open PDF attachment</T>
+                        </span>
+                      </a>
+                    ) : (
+                      <a href={headerMediaUrl} target="_blank" rel="noreferrer" className="wa-img wa-img-header">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- outbound attachment preview */}
+                        <img src={headerMediaUrl} alt="Header media" />
+                      </a>
+                    ))}
+                  {e.headerText && <p className="mb-1 font-bold text-[14.5px] leading-snug">{formatWa(e.headerText)}</p>}
+                  <div className="wa-clear">
+                    {text && <span className="tx">{formatWa(text)}</span>}
+                    {e.footer && <p className="wa-footer">{e.footer}</p>}
+                    <span className="wa-meta">
+                      {e.via && <T ta={`${e.via}-லிருந்து · `}>{`from ${e.via} · `}</T>}
+                      {time}
+                      <WaTicks status={e.status} />
+                    </span>
+                  </div>
+                  {buttons.length > 0 && (
+                    <div className="wa-card-buttons">
+                      {buttons.map((b, btnIdx) => {
+                        const Icon = BTN_ICON[b.type] ?? ExternalLink;
+                        const href = b.type === "URL" ? b.url : b.type === "PHONE_NUMBER" ? `tel:${b.phone || b.phone_number}` : undefined;
+                        if (href) {
+                          return (
+                            <a key={btnIdx} href={href} target="_blank" rel="noreferrer" className="wa-card-btn">
+                              <Icon aria-hidden className="ic" />
+                              <span>{b.text || "Button"}</span>
+                            </a>
+                          );
+                        }
+                        return (
+                          <div key={btnIdx} className="wa-card-btn">
+                            <Icon aria-hidden className="ic" />
+                            <span>{b.text || "Button"}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
               )}
               {e.error && <p className="wa-err">{plainError(e.error)}</p>}
             </div>

@@ -26,7 +26,7 @@ describe("a campaign run, end to end", () => {
   let n = 0;
   const tag = `qa-run-${Date.now()}`;
   const PNID = `qa-run-pnid-${Date.now()}`;
-  const IMAGE = "https://img.qa-run.example/poster.jpg";
+  const IMAGE = "/thenan-banner.jpg";
   const PHONE = `9188${String(Date.now()).slice(-5)}`;
 
   const run = () => db.campaignRun.findFirstOrThrow({ where: { campaignId }, orderBy: { startedAt: "desc" } });
@@ -46,7 +46,7 @@ describe("a campaign run, end to end", () => {
     }) as typeof fetch;
     await db.setting.upsert({ where: { id: 1 }, update: { provider: "META" }, create: { id: 1, provider: "META" } });
     // No quiet hours and no gap between offers here; those are tested on their own below.
-    const client = await db.client.create({ data: { name: `QA Run Shop ${Date.now()}`, orderPrefix: "QR", quietFrom: null, quietTo: null, marketingGapHours: 0 } });
+    const client = await db.client.create({ data: { name: `QA Run Shop ${Date.now()}`, orderPrefix: "QR", quietFrom: null, quietTo: null, marketingGapHours: 0, workspaceMode: "LIVE_ACTIVE" } });
     clientId = client.id;
     await db.whatsAppNumber.create({ data: { clientId, label: "Main", phoneNumberId: PNID, businessAccountId: "qa-run-waba", token: "qa-fake-token", isDefault: true, dailyCap: 240, messagingTier: "TIER_250", qualityRating: "GREEN" } });
     await db.customer.createMany({ data: Array.from({ length: 300 }, (_, i) => ({ clientId, phone: `${PHONE}${String(i).padStart(3, "0")}`, name: `Run ${i}`, tags: [tag], optInAt: new Date("2026-01-01T00:00:00Z"), optInSource: "Store Buyer (Paper Order)" })) });

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import type { ConversationEntry } from "@/components/conversation";
 import { db } from "@/lib/db";
 import { daysAgo } from "@/lib/format";
@@ -11,6 +12,7 @@ import { templateLabel } from "@/lib/plain-error";
 import { planGate } from "@/app/dashboard/plan-lock";
 import { chatAutomation } from "@/lib/engine/conversation";
 import { ENGAGEMENT_GROUPS, engagementRows, groupKey, hasCampaignHistory, SEGMENT_LABEL } from "@/lib/engagement-segments";
+import { resolveHistoricalTemplate, type TemplateRenderSnapshotV1 } from "@/lib/whatsapp/template-snapshot";
 
 export const metadata: Metadata = { title: "Chats" };
 export const dynamic = "force-dynamic";
@@ -40,6 +42,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
       customer: {
         select: {
           id: true,
+          clientId: true,
           name: true,
           phone: true,
           purchases: true,
@@ -120,6 +123,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
       customer: {
         select: {
           id: true,
+          clientId: true,
           name: true,
           phone: true,
           purchases: true,
@@ -197,25 +201,43 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
   const thread: ConversationEntry[] = [];
   let profile: ChatProfile | null = null;
   if (selected) {
+    if (scope.clientId) {
+      const authorizedCustomer = await db.customer.findFirst({
+        where: {
+          id: selected.customer.id,
+          clientId: scope.clientId,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!authorizedCustomer) {
+        notFound();
+      }
+    }
+
     const [msgs, reps, info, automation] = await Promise.all([
       db.message.findMany({
-        where: { customerId: selected.customer.id, status: { not: "QUEUED" } },
+        where: {
+          customerId: selected.customer.id,
+          ...(scope.clientId ? { customer: { clientId: scope.clientId } } : {}),
+          status: { not: "QUEUED" },
+        },
         include: {
           run: { select: { campaign: { select: { name: true } } } },
           sender: { select: { label: true } },
-          template: {
+          sentTemplateSnapshot: {
             select: {
-              id: true,
-              name: true,
-              headerType: true,
-              headerText: true,
-              headerMediaUrl: true,
-              footer: true,
-              buttons: true,
+              clientId: true,
+              messageId: true,
+              schemaVersion: true,
+              renderSnapshot: true,
+              renderSha256: true,
             },
           },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take: 40,
       }),
       db.reply.findMany({
@@ -254,30 +276,48 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
       };
     }
 
-    const missingTplNames = [...new Set(msgs.filter((m) => !m.template && m.templateName).map((m) => m.templateName))];
-    const fallbackTemplates = missingTplNames.length
-      ? await db.template.findMany({
-          where: { name: { in: missingTplNames } },
-          select: {
-            id: true,
-            name: true,
-            headerType: true,
-            headerText: true,
-            headerMediaUrl: true,
-            footer: true,
-            buttons: true,
-          },
-        })
-      : [];
-    const templateByName = new Map(fallbackTemplates.map((t) => [t.name, t]));
+    function buildLegacyTemplateCapture(m: {
+      templateName: string;
+      body: string | null;
+    }): TemplateRenderSnapshotV1 | null {
+      if (m.body === null) {
+        return null;
+      }
+      return {
+        schemaVersion: 1,
+        template: {
+          name: m.templateName,
+          language: "und",
+          category: null,
+        },
+        header: undefined,
+        body: {
+          text: m.body,
+          parameters: [],
+        },
+        footer: undefined,
+        buttons: [],
+      };
+    }
 
     thread.push(
       ...msgs.map((m) => {
-        const t = m.template ?? templateByName.get(m.templateName);
+        const stored = m.sentTemplateSnapshot
+          ? {
+              schemaVersion: m.sentTemplateSnapshot.schemaVersion,
+              renderSnapshot: m.sentTemplateSnapshot.renderSnapshot as any,
+              renderSha256: m.sentTemplateSnapshot.renderSha256,
+            }
+          : null;
+        const legacyCapture = buildLegacyTemplateCapture({ templateName: m.templateName, body: m.body });
+        const historicalTemplate = resolveHistoricalTemplate(stored, legacyCapture);
+
         return {
           at: m.sentAt ?? m.createdAt,
           type: "out" as const,
           id: m.id,
+          conversationId: selected.customer.id,
+          actorKey: m.senderId ? `biz:${m.senderId}` : `biz:unknown:${m.id}`,
           template: m.templateName,
           campaign: m.run?.campaign.name ?? null,
           status: m.status,
@@ -285,17 +325,15 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
           readAt: m.readAt,
           error: m.error,
           via: m.sender?.label ?? null,
-          headerType: t?.headerType ?? null,
-          headerText: t?.headerText ?? null,
-          headerMediaUrl: t?.headerMediaUrl ?? null,
-          footer: t?.footer ?? null,
-          buttons: (t?.buttons as any) ?? null,
+          historicalTemplate,
         };
       }),
       ...reps.map((r) => ({
         at: r.receivedAt,
         type: "in" as const,
         id: r.id,
+        conversationId: selected.customer.id,
+        actorKey: `cust:${selected.customer.phone}`,
         text: r.text,
         kind: r.kind,
         mediaId: r.mediaId,
@@ -303,7 +341,7 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
         via: r.sender?.label ?? null,
       })),
     );
-    thread.sort((a, b) => b.at.getTime() - a.at.getTime());
+    thread.sort((a, b) => b.at.getTime() - a.at.getTime() || b.id.localeCompare(a.id));
   }
   await groupsRead;
   const { groups, replies } = pick();
