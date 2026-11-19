@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { queryWabaPhoneNumbers } from "../../src/lib/whatsapp-connection-validation";
+import { queryWabaPhoneNumbers, verifyTenantWabaOnboarding } from "../../src/lib/whatsapp-connection-validation";
 
 test("SEC-01: WhatsApp Connect Authorization, Validation & Redaction Test Suite", async (t) => {
   const originalFetch = globalThis.fetch;
@@ -155,5 +155,92 @@ test("SEC-01: WhatsApp Connect Authorization, Validation & Redaction Test Suite"
     const result = await queryWabaPhoneNumbers("1465822505685652", "valid_meta_token");
     assert.equal(result.ok, false);
     assert.match(result.message ?? "", /no registered phone numbers/);
+  });
+
+  await t.test("11. rejects a WABA belonging to another tenant", async () => {
+    const res = await verifyTenantWabaOnboarding(
+      { clientId: "client_thenan_001", wabaId: "1465822505685652", token: "valid_token" },
+      {
+        findActiveForeignConnection: async (waba, client) => true, // Already active under another tenant
+        findTenantConnection: async () => null,
+      }
+    );
+
+    assert.equal(res.ok, false);
+    assert.match(res.message ?? "", /already registered to another tenant/);
+  });
+
+  await t.test("12. rejects a token without authorization for the requested WABA", async () => {
+    const res = await verifyTenantWabaOnboarding(
+      { clientId: "client_thenan_001", wabaId: "1465822505685652", token: "invalid_unauthorized_token" },
+      {
+        findActiveForeignConnection: async () => false,
+        findTenantConnection: async () => null,
+        validateWabaMetaAccess: async () => ({ ok: false, message: "Token does not have permissions for WABA" }),
+      }
+    );
+
+    assert.equal(res.ok, false);
+    assert.match(res.message ?? "", /does not have permissions/);
+  });
+
+  await t.test("13. rejects an expired onboarding attempt", async () => {
+    const pastTime = new Date(Date.now() - 45 * 60 * 1000); // 45 minutes ago (TTL is 30 mins)
+    const res = await verifyTenantWabaOnboarding(
+      { clientId: "client_thenan_001", wabaId: "1465822505685652", token: "valid_token" },
+      {
+        findActiveForeignConnection: async () => false,
+        findTenantConnection: async () => ({
+          id: "conn_draft_123",
+          clientId: "client_thenan_001",
+          wabaId: "1465822505685652",
+          token: "valid_token",
+          status: "DRAFT",
+          lastValidatedAt: pastTime,
+        }),
+      }
+    );
+
+    assert.equal(res.ok, false);
+    assert.match(res.message ?? "", /onboarding attempt has expired/);
+  });
+
+  await t.test("14. rejects an onboarding attempt belonging to another client", async () => {
+    const res = await verifyTenantWabaOnboarding(
+      { clientId: "client_thenan_001", wabaId: "1465822505685652", token: "valid_token", attemptId: "foreign_attempt_999" },
+      {
+        findActiveForeignConnection: async () => false,
+        findTenantConnection: async () => ({
+          id: "real_attempt_111",
+          clientId: "client_thenan_001",
+          wabaId: "1465822505685652",
+          token: "valid_token",
+          status: "DRAFT",
+          lastValidatedAt: new Date(),
+        }),
+      }
+    );
+
+    assert.equal(res.ok, false);
+    assert.match(res.message ?? "", /does not match/);
+  });
+
+  await t.test("15. allows a valid first-time tenant onboarding attempt without existing sender record", async () => {
+    let upsertCalled = false;
+    const res = await verifyTenantWabaOnboarding(
+      { clientId: "client_shevest_001", wabaId: "1465822505685652", token: "valid_meta_token" },
+      {
+        findActiveForeignConnection: async () => false,
+        findTenantConnection: async () => null, // No existing connection or sender record
+        validateWabaMetaAccess: async () => ({ ok: true, data: { wabaId: "1465822505685652", name: "SheVest WABA" } }),
+        upsertDraftConnection: async () => {
+          upsertCalled = true;
+        },
+      }
+    );
+
+    assert.equal(res.ok, true);
+    assert.equal(res.data?.isFirstTime, true);
+    assert.equal(upsertCalled, true);
   });
 });

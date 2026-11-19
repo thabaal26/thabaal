@@ -61,6 +61,17 @@ describe("CAM-03: Meta Delivery Failure Intelligence & Error Policy Test Suite",
     assert.equal(policy.optedOut, false);
   });
 
+  test("5b. Meta 130472: applyFailure strictly preserves customer.optedOut=false", async () => {
+    const client = await db.client.create({ data: { name: "Test Client 130472" } });
+    const customer = await db.customer.create({
+      data: { name: "Test User 130472", phone: "919999111222", clientId: client.id, optedOut: false },
+    });
+    const policy = await applyFailure(customer.id, 130472, "User in Meta experiment");
+    const updated = await db.customer.findUniqueOrThrow({ where: { id: customer.id } });
+    assert.equal(updated.optedOut, false, "Customer optedOut must remain false on 130472 experiment hold");
+    assert.equal(policy?.retryAllowed, false, "Retry must be disallowed for 130472");
+  });
+
   test("6. Meta 131026: Details explicitly confirming 'not on WhatsApp' -> SUPPRESS_NON_WHATSAPP (isUnreachable=true)", () => {
     assert.equal(isExplicitlyNotOnWhatsApp("The recipient is not registered on WhatsApp"), true);
     assert.equal(isExplicitlyNotOnWhatsApp("Invalid WhatsApp user: does not exist"), true);

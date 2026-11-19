@@ -9,12 +9,13 @@ import {
   validateMetaAppInput,
   validateWabaAccess,
   queryWabaPhoneNumbers,
+  verifyTenantWabaOnboarding,
   type ActionResult,
   type ValidateWabaResult,
   type WabaPhoneNumberOption,
 } from "@/lib/whatsapp-connection-validation";
 
-export { validateMetaAppInput, validateWabaAccess, queryWabaPhoneNumbers };
+export { validateMetaAppInput, validateWabaAccess, queryWabaPhoneNumbers, verifyTenantWabaOnboarding };
 export type { ActionResult, ValidateWabaResult, WabaPhoneNumberOption };
 
 async function revalidateSettings() {
@@ -31,16 +32,82 @@ const META_TOKEN = /^EA[A-Za-z0-9_]{20,}$/;
 
 /**
  * Step 3: Retrieves available registered phone numbers under the WABA.
- * Secure: Requires manager capability, client binding, and strict argument validation.
+ * Secure: Requires manager capability, client binding, onboarding attempt verification,
+ * and strict argument validation.
  */
 export async function fetchWabaPhoneNumbers(
   wabaId: string,
   token: string,
   graphVersion?: string,
+  attemptId?: string,
 ): Promise<ActionResult<WabaPhoneNumberOption[]>> {
   const scope = await requireManager(true);
   if ("denied" in scope) {
     return { ok: false, message: scope.denied };
+  }
+
+  const targetClientId = scope.clientId;
+  if (!targetClientId) {
+    return { ok: false, message: "No tenant context found for manager." };
+  }
+
+  // Tenant-bound WABA & token onboarding verification (SEC-01)
+  const authCheck = await verifyTenantWabaOnboarding(
+    { clientId: targetClientId, wabaId, token, graphVersion, attemptId },
+    {
+      findActiveForeignConnection: async (waba, client) => {
+        const found = await db.whatsAppConnection.findFirst({
+          where: { wabaId: waba, clientId: { not: client }, status: "ACTIVE" },
+        });
+        return !!found;
+      },
+      findTenantConnection: async (waba, client) => {
+        const found = await db.whatsAppConnection.findFirst({
+          where: { wabaId: waba, clientId: client, status: { in: ["DRAFT", "VALIDATING", "ACTIVE"] } },
+        });
+        if (!found) return null;
+        return {
+          id: found.id,
+          clientId: found.clientId,
+          wabaId: found.wabaId,
+          token: found.token,
+          status: found.status,
+          lastValidatedAt: found.lastValidatedAt,
+        };
+      },
+      validateWabaMetaAccess: async (waba, tok, ver) => {
+        return validateWabaAccess(waba, tok, ver);
+      },
+      upsertDraftConnection: async (client, waba, tok, ver) => {
+        await db.whatsAppConnection.upsert({
+          where: { clientId_wabaId: { clientId: client, wabaId: waba } },
+          create: {
+            clientId: client,
+            wabaId: waba,
+            token: tok,
+            graphVersion: ver,
+            status: "DRAFT",
+            lastValidatedAt: new Date(),
+          },
+          update: {
+            token: tok,
+            graphVersion: ver,
+            status: "DRAFT",
+            lastValidatedAt: new Date(),
+          },
+        });
+      },
+      updateDraftToken: async (connId, tok) => {
+        await db.whatsAppConnection.update({
+          where: { id: connId },
+          data: { token: tok, lastValidatedAt: new Date() },
+        });
+      },
+    }
+  );
+
+  if (!authCheck.ok) {
+    return { ok: false, message: authCheck.message };
   }
 
   return queryWabaPhoneNumbers(wabaId, token, graphVersion, {
