@@ -127,6 +127,7 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
   // Stop / pause modal
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("Too costly for now");
+  const [showTestQr, setShowTestQr] = useState(true);
 
   const buyPlan = planOf(buy?.plan);
   const buyPrice = buyPlan && buy ? buyPlan.p[buy.cycle] : 0;
@@ -678,6 +679,106 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
               </div>
             </div>
           )}
+
+          {/* Dedicated ₹10 Test AutoPay (External Assistance) Diagnostic Card */}
+          <div
+            className="card"
+            style={{
+              marginBottom: 16,
+              borderLeft: "6px solid #6366f1",
+              background: "var(--card-bg, #ffffff)",
+            }}
+          >
+            <div className="hd" style={{ marginBottom: 0, flexWrap: "wrap", gap: 12 }}>
+              <div style={{ flex: "1 1 300px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+                  <h2 style={{ fontSize: 17, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+                    🔄 <T ta="₹10 டெஸ்ட் ஆட்டோ பே (External Assistance)">₹10 Test AutoPay (External Assistance)</T>
+                  </h2>
+                  <span
+                    className="badge"
+                    style={{
+                      background: "#e0e7ff",
+                      color: "#4338ca",
+                      fontWeight: 600,
+                      padding: "2px 8px",
+                      borderRadius: 4,
+                      fontSize: 12,
+                    }}
+                  >
+                    External Assistance · Test Mandate
+                  </span>
+                </div>
+                <p className="muted small" style={{ margin: "4px 0 8px", lineHeight: 1.5 }}>
+                  <T ta="Finforte-ன் முக்கிய குரோத் பேக் சப்ஸ்கிரிப்ஷனை பாதிக்காமல், நேரலை UPI AutoPay மேண்டேட்டை ₹10 கட்டணத்தில் சோதிக்கும் பிரத்யேக வசதி. உங்கள் எண்: 8778613372.">
+                    Isolated diagnostic to test live UPI AutoPay mandate with ₹10 without modifying your primary Growth Plan. Tested contact: 8778613372.
+                  </T>
+                </p>
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13, color: "var(--text-muted)" }}>
+                  <span><b><T ta="தொகை">Amount</T>:</b> ₹10.00 / <T ta="மாதம்">month</T></span>
+                  <span><b><T ta="மேண்டேட் ஐடி">Mandate ID</T>:</b> sub_U1yKdF3uQJTgbr</span>
+                  <span><b><T ta="வகை">Method</T>:</b> GPay / UPI AutoPay / QR</span>
+                </div>
+              </div>
+              <div className="tools" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <a
+                  href="https://rzp.io/rzp/QCdi9o8a"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn sm primary"
+                  style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600 }}
+                >
+                  <span>📱</span> <T ta="₹10 ஆட்டோ-பே செலுத்து">Pay ₹10 AutoPay</T>
+                </a>
+                <button
+                  type="button"
+                  className="btn sm"
+                  onClick={() => setShowTestQr((v) => !v)}
+                >
+                  {showTestQr ? "📷 QR Code மறை" : "📷 QR Code காண்க"}
+                </button>
+              </div>
+            </div>
+
+            {showTestQr && (
+              <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px dashed var(--border)", textAlign: "center" }}>
+                <p className="small muted" style={{ marginBottom: 12 }}>
+                  <T ta="உங்கள் மொபைல் கேமரா அல்லது Google Pay / PhonePe மூலம் கீழே உள்ள QR Code-ஐ ஸ்கேன் செய்யவும்:">
+                    Scan the QR Code below using Google Pay / PhonePe to set up the ₹10 AutoPay test mandate:
+                  </T>
+                </p>
+                <div
+                  style={{
+                    display: "inline-block",
+                    padding: 12,
+                    background: "#ffffff",
+                    borderRadius: 8,
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                  }}
+                >
+                  <img
+                    src="/test_mandate_10rupee_qr.png"
+                    alt="₹10 Test AutoPay QR Code"
+                    width={240}
+                    height={240}
+                    style={{ display: "block", margin: "0 auto" }}
+                  />
+                </div>
+                <div style={{ marginTop: 10 }}>
+                  <a
+                    href="https://rzp.io/rzp/QCdi9o8a"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="small"
+                    style={{ color: "#4f46e5", fontWeight: 500 }}
+                  >
+                    https://rzp.io/rzp/QCdi9o8a
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
+
           {rzpOn && !autoRenew && active && billing.canPay && !billing.block && (
             <div className="card" style={{ marginBottom: 16, borderLeft: "6px solid var(--warn)" }}>
               <div className="hd" style={{ marginBottom: 0, flexWrap: "wrap", gap: 12 }}>
