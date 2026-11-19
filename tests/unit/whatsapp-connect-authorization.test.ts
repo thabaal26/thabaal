@@ -167,21 +167,41 @@ test("SEC-01: WhatsApp Connect Authorization, Validation & Redaction Test Suite"
     );
 
     assert.equal(res.ok, false);
-    assert.match(res.message ?? "", /already registered to another tenant/);
+    assert.match(res.message ?? "", /already registered or reserved by another tenant/);
   });
 
-  await t.test("12. rejects a token without authorization for the requested WABA", async () => {
+  await t.test("12. rejects a token without authorization for the requested WABA and prevents /phone_numbers listing", async () => {
+    let authVerificationCalled = false;
+    let phoneNumberListingCalled = false;
+
+    // Distinguish initial Meta authorization verification from subsequent phone-number listing:
+    const mockValidateWabaMetaAccess = async (wabaId: string, token: string) => {
+      authVerificationCalled = true;
+      // Meta Graph API /v23.0/<wabaId> authorization verification rejects unauthorized token
+      return { ok: false, message: "OAuthException: (#10) Application does not have permission for WABA" };
+    };
+
     const res = await verifyTenantWabaOnboarding(
       { clientId: "client_thenan_001", wabaId: "1465822505685652", token: "invalid_unauthorized_token" },
       {
         findActiveForeignConnection: async () => false,
         findTenantConnection: async () => null,
-        validateWabaMetaAccess: async () => ({ ok: false, message: "Token does not have permissions for WABA" }),
+        validateWabaMetaAccess: mockValidateWabaMetaAccess,
+        upsertDraftConnection: async () => {
+          // If upsert was called, listing would proceed
+          phoneNumberListingCalled = true;
+        },
       }
     );
 
+    assert.equal(authVerificationCalled, true, "Meta credential verification must be invoked");
     assert.equal(res.ok, false);
-    assert.match(res.message ?? "", /does not have permissions/);
+    assert.match(res.message ?? "", /does not have permission/);
+    assert.equal(
+      phoneNumberListingCalled,
+      false,
+      "Unauthorized tokens must NEVER reach the phone-number listing operation"
+    );
   });
 
   await t.test("13. rejects an expired onboarding attempt", async () => {
@@ -233,6 +253,63 @@ test("SEC-01: WhatsApp Connect Authorization, Validation & Redaction Test Suite"
         findActiveForeignConnection: async () => false,
         findTenantConnection: async () => null, // No existing connection or sender record
         validateWabaMetaAccess: async () => ({ ok: true, data: { wabaId: "1465822505685652", name: "SheVest WABA" } }),
+        upsertDraftConnection: async () => {
+          upsertCalled = true;
+        },
+      }
+    );
+
+    assert.equal(res.ok, true);
+    assert.equal(res.data?.isFirstTime, true);
+    assert.equal(upsertCalled, true);
+  });
+
+  await t.test("16. rejects an onboarding attempt when another tenant has an active pending DRAFT reservation", async () => {
+    const res = await verifyTenantWabaOnboarding(
+      { clientId: "client_finforte_001", wabaId: "1465822505685652", token: "valid_meta_token" },
+      {
+        findForeignReservation: async (waba, client) => {
+          // Another client (e.g. client_thenan_001) holds a pending DRAFT within TTL
+          return true;
+        },
+        findTenantConnection: async () => null,
+      }
+    );
+
+    assert.equal(res.ok, false);
+    assert.match(res.message ?? "", /already registered or reserved by another tenant/);
+  });
+
+  await t.test("17. handles concurrent first-time onboarding attempts by atomically rejecting competing reservation", async () => {
+    // Simulating atomic transaction rejection when another tenant won the race to reserve the WABA
+    const res = await verifyTenantWabaOnboarding(
+      { clientId: "client_finforte_002", wabaId: "1465822505685652", token: "valid_meta_token" },
+      {
+        findForeignReservation: async () => false, // Initial check passed
+        findTenantConnection: async () => null,
+        validateWabaMetaAccess: async () => ({ ok: true, data: { wabaId: "1465822505685652", name: "WABA" } }),
+        upsertDraftConnection: async () => {
+          // Transaction throws because concurrent competitor committed a reservation first
+          throw new Error("WhatsApp Business Account 1465822505685652 is already registered or reserved by another tenant.");
+        },
+      }
+    );
+
+    assert.equal(res.ok, false);
+    assert.match(res.message ?? "", /already registered or reserved by another tenant/);
+  });
+
+  await t.test("18. allows onboarding once a previous competing tenant's DRAFT attempt has expired past TTL", async () => {
+    let upsertCalled = false;
+    const res = await verifyTenantWabaOnboarding(
+      { clientId: "client_finforte_001", wabaId: "1465822505685652", token: "valid_meta_token" },
+      {
+        findForeignReservation: async (waba, client) => {
+          // Foreign reservation check verified that the other client's draft was older than 30 mins -> returns false
+          return false;
+        },
+        findTenantConnection: async () => null,
+        validateWabaMetaAccess: async () => ({ ok: true, data: { wabaId: "1465822505685652", name: "WABA" } }),
         upsertDraftConnection: async () => {
           upsertCalled = true;
         },

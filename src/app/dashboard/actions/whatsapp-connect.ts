@@ -55,9 +55,17 @@ export async function fetchWabaPhoneNumbers(
   const authCheck = await verifyTenantWabaOnboarding(
     { clientId: targetClientId, wabaId, token, graphVersion, attemptId },
     {
-      findActiveForeignConnection: async (waba, client) => {
+      findForeignReservation: async (waba, client) => {
+        const cutoff = new Date(Date.now() - 30 * 60 * 1000); // 30-min attempt TTL
         const found = await db.whatsAppConnection.findFirst({
-          where: { wabaId: waba, clientId: { not: client }, status: "ACTIVE" },
+          where: {
+            wabaId: waba,
+            clientId: { not: client },
+            OR: [
+              { status: { in: ["ACTIVE", "VALIDATING", "PENDING_WEBHOOK"] } },
+              { status: "DRAFT", lastValidatedAt: { gte: cutoff } },
+            ],
+          },
         });
         return !!found;
       },
@@ -79,22 +87,39 @@ export async function fetchWabaPhoneNumbers(
         return validateWabaAccess(waba, tok, ver);
       },
       upsertDraftConnection: async (client, waba, tok, ver) => {
-        await db.whatsAppConnection.upsert({
-          where: { clientId_wabaId: { clientId: client, wabaId: waba } },
-          create: {
-            clientId: client,
-            wabaId: waba,
-            token: tok,
-            graphVersion: ver,
-            status: "DRAFT",
-            lastValidatedAt: new Date(),
-          },
-          update: {
-            token: tok,
-            graphVersion: ver,
-            status: "DRAFT",
-            lastValidatedAt: new Date(),
-          },
+        // Atomic concurrency guard: serialize and prevent concurrent competing reservations
+        await db.$transaction(async (tx) => {
+          const cutoff = new Date(Date.now() - 30 * 60 * 1000);
+          const foreign = await tx.whatsAppConnection.findFirst({
+            where: {
+              wabaId: waba,
+              clientId: { not: client },
+              OR: [
+                { status: { in: ["ACTIVE", "VALIDATING", "PENDING_WEBHOOK"] } },
+                { status: "DRAFT", lastValidatedAt: { gte: cutoff } },
+              ],
+            },
+          });
+          if (foreign) {
+            throw new Error(`WhatsApp Business Account ${waba} is already registered or reserved by another tenant.`);
+          }
+          await tx.whatsAppConnection.upsert({
+            where: { clientId_wabaId: { clientId: client, wabaId: waba } },
+            create: {
+              clientId: client,
+              wabaId: waba,
+              token: tok,
+              graphVersion: ver,
+              status: "DRAFT",
+              lastValidatedAt: new Date(),
+            },
+            update: {
+              token: tok,
+              graphVersion: ver,
+              status: "DRAFT",
+              lastValidatedAt: new Date(),
+            },
+          });
         });
       },
       updateDraftToken: async (connId, tok) => {

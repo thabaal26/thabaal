@@ -182,7 +182,8 @@ export interface OnboardingAttemptRecord {
 }
 
 export interface VerifyWabaOnboardingOptions {
-  findActiveForeignConnection: (wabaId: string, clientId: string) => Promise<boolean>;
+  findActiveForeignConnection?: (wabaId: string, clientId: string) => Promise<boolean>;
+  findForeignReservation?: (wabaId: string, clientId: string) => Promise<boolean>;
   findTenantConnection: (wabaId: string, clientId: string) => Promise<OnboardingAttemptRecord | null>;
   validateWabaMetaAccess?: (wabaId: string, token: string, version: string) => Promise<ActionResult<ValidateWabaResult>>;
   upsertDraftConnection?: (clientId: string, wabaId: string, token: string, version: string) => Promise<void>;
@@ -195,10 +196,11 @@ export interface VerifyWabaOnboardingOptions {
  * SEC-01 Hardening: Strict tenant-bound WABA and token authorization.
  * Enforces:
  * 1. Manager client context resolution.
- * 2. Cross-tenant WABA access prevention (cannot claim or probe active foreign WABA).
- * 3. Onboarding attempt verification (expiry, pending/active status, client ownership).
- * 4. Token authorization for the requested WABA.
- * 5. First-time onboarding allowance without existing sender records.
+ * 2. Cross-tenant WABA access prevention (cannot claim or probe active foreign WABA or pending foreign DRAFT).
+ * 3. Atomic onboarding reservation to prevent race conditions during simultaneous first-time onboarding.
+ * 4. Onboarding attempt verification (expiry, pending/active status, client ownership).
+ * 5. Token authorization for the requested WABA (unauthorized tokens can never reach /phone_numbers listing).
+ * 6. First-time onboarding allowance without existing sender records.
  */
 export async function verifyTenantWabaOnboarding(
   input: {
@@ -225,13 +227,16 @@ export async function verifyTenantWabaOnboarding(
     return { ok: false, message: "Invalid access token. Token length must be between 1 and 4096 characters." };
   }
 
-  // 1. Cross-tenant WABA rejection:
-  const isForeignActive = await opts.findActiveForeignConnection(trimmedWaba, trimmedClientId);
-  if (isForeignActive) {
-    return {
-      ok: false,
-      message: `WhatsApp Business Account ${trimmedWaba} is already registered to another tenant. Cross-tenant WABA access is strictly prohibited.`,
-    };
+  // 1. Cross-tenant WABA rejection (checks both active connections and pending non-expired DRAFT reservations):
+  const checkForeign = opts.findForeignReservation || opts.findActiveForeignConnection;
+  if (checkForeign) {
+    const isForeignReserved = await checkForeign(trimmedWaba, trimmedClientId);
+    if (isForeignReserved) {
+      return {
+        ok: false,
+        message: `WhatsApp Business Account ${trimmedWaba} is already registered or reserved by another tenant. Cross-tenant WABA access is strictly prohibited.`,
+      };
+    }
   }
 
   // 2. Load existing connection / onboarding attempt for this client
@@ -272,8 +277,16 @@ export async function verifyTenantWabaOnboarding(
         };
       }
     }
+    // Atomic reservation of draft connection attempt
     if (opts.upsertDraftConnection) {
-      await opts.upsertDraftConnection(trimmedClientId, trimmedWaba, trimmedToken, version);
+      try {
+        await opts.upsertDraftConnection(trimmedClientId, trimmedWaba, trimmedToken, version);
+      } catch (e) {
+        return {
+          ok: false,
+          message: e instanceof Error ? e.message : "Failed to reserve onboarding attempt for tenant.",
+        };
+      }
     }
     return { ok: true, data: { isFirstTime: true } };
   }
