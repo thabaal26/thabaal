@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { queryWabaPhoneNumbers, verifyTenantWabaOnboarding } from "../../src/lib/whatsapp-connection-validation";
+import { queryWabaPhoneNumbers, verifyTenantWabaOnboarding, atomicReserveWabaDraft } from "../../src/lib/whatsapp-connection-validation";
+import { db } from "../../src/lib/db";
 
 test("SEC-01: WhatsApp Connect Authorization, Validation & Redaction Test Suite", async (t) => {
   const originalFetch = globalThis.fetch;
@@ -319,5 +320,44 @@ test("SEC-01: WhatsApp Connect Authorization, Validation & Redaction Test Suite"
     assert.equal(res.ok, true);
     assert.equal(res.data?.isFirstTime, true);
     assert.equal(upsertCalled, true);
+  });
+
+  await t.test("19. real PostgreSQL concurrency: overlapping transactions for identical WABA atomically serialize via pg_advisory_xact_lock and reject competitor", async () => {
+    // Only execute if real database connection is available (tests/run.mjs environment)
+    if (!process.env.DATABASE_URL) return;
+
+    const testWaba = `999${Date.now().toString().slice(-10)}`;
+    const clientA = await db.client.create({ data: { name: `TenantA_${Date.now()}` } });
+    const clientB = await db.client.create({ data: { name: `TenantB_${Date.now()}` } });
+
+    try {
+      // Fire two concurrent overlapping reservation attempts for the exact same WABA ID:
+      const [resA, resB] = await Promise.allSettled([
+        atomicReserveWabaDraft(db, clientA.id, testWaba, "token_tenant_a", "v23.0"),
+        atomicReserveWabaDraft(db, clientB.id, testWaba, "token_tenant_b", "v23.0"),
+      ]);
+
+      const fulfilled = [resA, resB].filter((r) => r.status === "fulfilled");
+      const rejected = [resA, resB].filter((r) => r.status === "rejected");
+
+      assert.equal(fulfilled.length, 1, "Exactly one concurrent reservation transaction must succeed");
+      assert.equal(rejected.length, 1, "Competing concurrent reservation transaction must be rejected");
+
+      const rejectedError = (rejected[0] as PromiseRejectedResult).reason;
+      assert.match(
+        rejectedError.message,
+        /already registered or reserved by another tenant/,
+        "Rejected transaction must fail with foreign reservation error"
+      );
+
+      // Verify PostgreSQL database state: exactly 1 DRAFT record saved
+      const saved = await db.whatsAppConnection.findMany({ where: { wabaId: testWaba } });
+      assert.equal(saved.length, 1, "Database must contain exactly 1 connection record for the WABA");
+      assert.equal(saved[0].status, "DRAFT");
+      assert.ok(saved[0].clientId === clientA.id || saved[0].clientId === clientB.id);
+    } finally {
+      await db.whatsAppConnection.deleteMany({ where: { wabaId: testWaba } }).catch(() => {});
+      await db.client.deleteMany({ where: { id: { in: [clientA.id, clientB.id] } } }).catch(() => {});
+    }
   });
 });

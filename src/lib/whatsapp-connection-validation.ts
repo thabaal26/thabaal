@@ -309,3 +309,66 @@ export async function verifyTenantWabaOnboarding(
 
   return { ok: true, data: { connectionId: connection.id, isFirstTime: false } };
 }
+
+/**
+ * Atomic reservation of a WABA DRAFT connection with PostgreSQL advisory xact lock.
+ * Serializes concurrent onboarding attempts on the same WABA ID across all database connections,
+ * guaranteeing race safety under PostgreSQL READ COMMITTED isolation.
+ * Lock is automatically released on commit or rollback.
+ */
+export async function atomicReserveWabaDraft(
+  txOrDb: any,
+  clientId: string,
+  wabaId: string,
+  token: string,
+  graphVersion: string = "v23.0"
+): Promise<{ id: string; status: string }> {
+  const executeInTransaction = async (tx: any) => {
+    // 1. Transaction-scoped PostgreSQL advisory lock:
+    // Serializes concurrent onboarding transactions for this specific WABA across the database.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('waba_onboarding:' || ${wabaId})::bigint)`;
+
+    // 2. Re-check for foreign reservations (active connections or unexpired DRAFTs within 30 min)
+    const cutoff = new Date(Date.now() - 30 * 60 * 1000);
+    const foreign = await tx.whatsAppConnection.findFirst({
+      where: {
+        wabaId,
+        clientId: { not: clientId },
+        OR: [
+          { status: { in: ["ACTIVE", "VALIDATING", "PENDING_WEBHOOK"] } },
+          { status: "DRAFT", lastValidatedAt: { gte: cutoff } },
+        ],
+      },
+    });
+
+    if (foreign) {
+      throw new Error(`WhatsApp Business Account ${wabaId} is already registered or reserved by another tenant.`);
+    }
+
+    // 3. Atomically upsert the tenant's draft connection
+    return await tx.whatsAppConnection.upsert({
+      where: { clientId_wabaId: { clientId, wabaId } },
+      create: {
+        clientId,
+        wabaId,
+        token,
+        graphVersion,
+        status: "DRAFT",
+        lastValidatedAt: new Date(),
+      },
+      update: {
+        token,
+        graphVersion,
+        status: "DRAFT",
+        lastValidatedAt: new Date(),
+      },
+    });
+  };
+
+  if ("$transaction" in txOrDb && typeof txOrDb.$transaction === "function") {
+    return await txOrDb.$transaction(executeInTransaction);
+  } else {
+    return await executeInTransaction(txOrDb);
+  }
+}
+

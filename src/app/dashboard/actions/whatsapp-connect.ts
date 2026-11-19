@@ -10,12 +10,13 @@ import {
   validateWabaAccess,
   queryWabaPhoneNumbers,
   verifyTenantWabaOnboarding,
+  atomicReserveWabaDraft,
   type ActionResult,
   type ValidateWabaResult,
   type WabaPhoneNumberOption,
 } from "@/lib/whatsapp-connection-validation";
 
-export { validateMetaAppInput, validateWabaAccess, queryWabaPhoneNumbers, verifyTenantWabaOnboarding };
+export { validateMetaAppInput, validateWabaAccess, queryWabaPhoneNumbers, verifyTenantWabaOnboarding, atomicReserveWabaDraft };
 export type { ActionResult, ValidateWabaResult, WabaPhoneNumberOption };
 
 async function revalidateSettings() {
@@ -87,40 +88,9 @@ export async function fetchWabaPhoneNumbers(
         return validateWabaAccess(waba, tok, ver);
       },
       upsertDraftConnection: async (client, waba, tok, ver) => {
-        // Atomic concurrency guard: serialize and prevent concurrent competing reservations
-        await db.$transaction(async (tx) => {
-          const cutoff = new Date(Date.now() - 30 * 60 * 1000);
-          const foreign = await tx.whatsAppConnection.findFirst({
-            where: {
-              wabaId: waba,
-              clientId: { not: client },
-              OR: [
-                { status: { in: ["ACTIVE", "VALIDATING", "PENDING_WEBHOOK"] } },
-                { status: "DRAFT", lastValidatedAt: { gte: cutoff } },
-              ],
-            },
-          });
-          if (foreign) {
-            throw new Error(`WhatsApp Business Account ${waba} is already registered or reserved by another tenant.`);
-          }
-          await tx.whatsAppConnection.upsert({
-            where: { clientId_wabaId: { clientId: client, wabaId: waba } },
-            create: {
-              clientId: client,
-              wabaId: waba,
-              token: tok,
-              graphVersion: ver,
-              status: "DRAFT",
-              lastValidatedAt: new Date(),
-            },
-            update: {
-              token: tok,
-              graphVersion: ver,
-              status: "DRAFT",
-              lastValidatedAt: new Date(),
-            },
-          });
-        });
+        // Atomic concurrency guard with PostgreSQL advisory xact lock:
+        // Serializes concurrent onboarding attempts and prevents competing draft reservations.
+        await atomicReserveWabaDraft(db, client, waba, tok, ver);
       },
       updateDraftToken: async (connId, tok) => {
         await db.whatsAppConnection.update({
