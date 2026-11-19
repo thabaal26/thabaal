@@ -33,7 +33,26 @@ async function canMessage(c: { id: string; clientId: string; optedOut: boolean }
 }
 
 const withCustomer = { customer: true, client: { select: { name: true } } } as const;
-const load = (id: string) => db.order.findUnique({ where: { id }, include: withCustomer });
+
+/**
+ * Resolves an order strictly bounded to its authorized tenant (TEN-01).
+ * Guarantees cross-tenant orders cannot be inspected or mutated.
+ */
+export async function resolveOrderForClient(input: { orderId: string; clientId: string }) {
+  const orderId = input.orderId?.trim();
+  const clientId = input.clientId?.trim();
+  if (!orderId || !clientId) return null;
+  return db.order.findFirst({
+    where: { id: orderId, clientId },
+    include: withCustomer,
+  });
+}
+
+export const load = (id: string, clientId?: string) =>
+  db.order.findFirst({
+    where: { id, ...(clientId ? { clientId } : {}) },
+    include: withCustomer,
+  });
 
 /** Address, then payment: the rest of the journey for an order the customer has decided on. */
 async function toAddressAndPayment(orderId: string) {
@@ -112,21 +131,22 @@ function mergeItems(a: OrderItem[], b: OrderItem[]) {
 }
 
 /** The customer answered "Add to order X" (cart_add:new:old) or "Separate order" (cart_sep:new). */
-export async function handleCartChoice(customerId: string, actionVal: string) {
+export async function handleCartChoice(customerId: string, actionVal: string, tenantClientId?: string) {
   const add = actionVal.startsWith("cart_add:");
   const [newId, oldId] = actionVal.slice(add ? 9 : 9).split(":");
-  const o = await load(newId);
+  const o = await load(newId, tenantClientId);
   if (!o || o.customerId !== customerId || o.status !== "NEW" || o.paidAt) return;
+  if (tenantClientId && o.clientId !== tenantClientId) return;
   // Claim the answer once: a second tap, or the other button, changes nothing.
-  const claimed = await db.order.updateMany({ where: { id: o.id, mergeWith: { not: null } }, data: { mergeWith: null } });
+  const claimed = await db.order.updateMany({ where: { id: o.id, clientId: o.clientId, mergeWith: { not: null } }, data: { mergeWith: null } });
   if (!claimed.count) return;
   const newRef = orderRef(o);
 
   if (add && oldId) {
-    const old = await load(oldId);
-    const stillOpen = old && old.customerId === customerId && old.status !== "CANCELLED" && !old.packedAt && !old.dispatchedAt;
+    const old = await load(oldId, o.clientId);
+    const stillOpen = old && old.customerId === customerId && old.clientId === o.clientId && old.status !== "CANCELLED" && !old.packedAt && !old.dispatchedAt;
     if (!old || !stillOpen) {
-      await db.order.update({ where: { id: o.id }, data: { internalNote: note(o.internalNote, "Customer asked to add to an earlier order that was already packed") } });
+      await db.order.updateMany({ where: { id: o.id, clientId: o.clientId }, data: { internalNote: note(o.internalNote, "Customer asked to add to an earlier order that was already packed") } });
       const already = old?.dispatchedAt ? "on its way" : customerWords(await flowFor(o.clientId)).packed;
       await textInWindow(o.customer, `Your earlier order is already ${already}, so these items will be a separate order ${bold(newRef)}.`, "Add to order").catch(() => {});
       return toAddressAndPayment(o.id);
@@ -140,11 +160,11 @@ export async function handleCartChoice(customerId: string, actionVal: string) {
       const added = getOrderPricing(newItems).subtotal;
       const merged = mergeItems(oldItems, newItems);
       const total = Math.round((old.total + added) * 100) / 100;
-      await db.order.update({
-        where: { id: old.id },
+      await db.order.updateMany({
+        where: { id: old.id, clientId: old.clientId },
         data: { items: merged as unknown as Prisma.InputJsonValue, total, internalNote: note(old.internalNote, `Customer added ${newRef} (+${money(added, old.currency)}) on WhatsApp`) },
       });
-      await db.order.update({ where: { id: o.id }, data: { status: "CANCELLED", internalNote: note(o.internalNote, `Added to ${oldRef} at the customer's request`), paymentReminderAt: new Date() } });
+      await db.order.updateMany({ where: { id: o.id, clientId: o.clientId }, data: { status: "CANCELLED", internalNote: note(o.internalNote, `Added to ${oldRef} at the customer's request`), paymentReminderAt: new Date() } });
       pushOrderToSheet(old.id, "ORDER_UPDATE", `Items from ${newRef} added`);
       pushOrderToSheet(o.id, "ORDER_UPDATE", `Added to ${oldRef}`);
       const text = [
@@ -158,15 +178,15 @@ export async function handleCartChoice(customerId: string, actionVal: string) {
       return;
     }
     // A paid order can't take more money on its card: the new items are paid for on their own and shipped with it.
-    await db.order.update({
-      where: { id: o.id },
+    await db.order.updateMany({
+      where: { id: o.id, clientId: o.clientId },
       data: {
         note: old.note ?? o.note,
         addressConfirmedAt: old.note ? new Date() : null,
         internalNote: note(o.internalNote, `Ship together with ${oldRef}`),
       },
     });
-    await db.order.update({ where: { id: old.id }, data: { internalNote: note(old.internalNote, `Ship together with ${newRef}`) } });
+    await db.order.updateMany({ where: { id: old.id, clientId: old.clientId }, data: { internalNote: note(old.internalNote, `Ship together with ${newRef}`) } });
     pushOrderToSheet(o.id, "ORDER_UPDATE", `Ship together with ${oldRef}`);
     await textInWindow(o.customer, `Sure! Your new items (order ${bold(newRef)}) will be delivered together with order ${bold(oldRef)}. Please complete the payment for them below.`, "Add to order").catch(() => {});
     if (old.note) {
@@ -177,7 +197,7 @@ export async function handleCartChoice(customerId: string, actionVal: string) {
     return toAddressAndPayment(o.id);
   }
 
-  await db.order.update({ where: { id: o.id }, data: { internalNote: note(o.internalNote, "Customer kept it as a separate order") } });
+  await db.order.updateMany({ where: { id: o.id, clientId: o.clientId }, data: { internalNote: note(o.internalNote, "Customer kept it as a separate order") } });
   return toAddressAndPayment(o.id);
 }
 

@@ -1,21 +1,29 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { getScope, requireUser } from "@/lib/session";
+import { getScope, requireManager, requireUser } from "@/lib/session";
 import { normalizeGraphVersion } from "@/lib/graph-version";
 import { maskSecret } from "@/lib/whatsapp-connection-provider";
 import { listPhoneNumbers, type MetaPhoneNumber } from "@/lib/whatsapp";
 import {
   validateMetaAppInput,
   validateWabaAccess,
+  queryWabaPhoneNumbers,
   type ActionResult,
   type ValidateWabaResult,
   type WabaPhoneNumberOption,
 } from "@/lib/whatsapp-connection-validation";
 
-export { validateMetaAppInput, validateWabaAccess };
+export { validateMetaAppInput, validateWabaAccess, queryWabaPhoneNumbers };
 export type { ActionResult, ValidateWabaResult, WabaPhoneNumberOption };
+
+async function revalidateSettings() {
+  try {
+    const { revalidatePath } = await import("next/cache");
+    revalidatePath("/dashboard/settings");
+    revalidatePath("/dashboard/settings/whatsapp");
+  } catch {}
+}
 
 const DIGITS = /^\d{6,30}$/;
 const HEX_SECRET = /^[a-fA-F0-9]{20,64}$/;
@@ -23,63 +31,27 @@ const META_TOKEN = /^EA[A-Za-z0-9_]{20,}$/;
 
 /**
  * Step 3: Retrieves available registered phone numbers under the WABA.
+ * Secure: Requires manager capability, client binding, and strict argument validation.
  */
 export async function fetchWabaPhoneNumbers(
   wabaId: string,
   token: string,
   graphVersion?: string,
 ): Promise<ActionResult<WabaPhoneNumberOption[]>> {
-  const trimmedWaba = wabaId.trim();
-  const trimmedToken = token.trim();
-  const version = normalizeGraphVersion(graphVersion);
-
-  try {
-    const url = `https://graph.facebook.com/${version}/${trimmedWaba}/phone_numbers?fields=id,display_phone_number,verified_name,quality_rating`;
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${trimmedToken}` },
-      cache: "no-store",
-    });
-    const json = (await res.json().catch(() => ({}))) as { data?: MetaPhoneNumber[]; error?: { message?: string } };
-
-    if (!res.ok || json.error || !Array.isArray(json.data)) {
-      return {
-        ok: false,
-        message: json.error?.message || `Could not fetch phone numbers from Meta (${res.status})`,
-      };
-    }
-
-    const numbers = json.data;
-    if (numbers.length === 0) {
-      return {
-        ok: false,
-        message: "This WABA has no registered phone numbers. Add and verify a phone number in WhatsApp Manager first.",
-      };
-    }
-
-    // Check which numbers are already assigned to other clients in Thabaal
-    const existingNumbers = await db.whatsAppNumber.findMany({
-      where: { phoneNumberId: { in: numbers.map((n) => n.id) } },
-      include: { client: { select: { name: true } } },
-    });
-
-    const options: WabaPhoneNumberOption[] = numbers.map((n) => {
-      const match = existingNumbers.find((e) => e.phoneNumberId === n.id);
-      return {
-        id: n.id,
-        displayPhoneNumber: n.display_phone_number,
-        verifiedName: n.verified_name,
-        qualityRating: n.quality_rating,
-        alreadyAssignedTo: match ? match.client.name : undefined,
-      };
-    });
-
-    return { ok: true, data: options };
-  } catch (e) {
-    return {
-      ok: false,
-      message: `Error querying phone numbers: ${e instanceof Error ? e.message : "network error"}`,
-    };
+  const scope = await requireManager(true);
+  if ("denied" in scope) {
+    return { ok: false, message: scope.denied };
   }
+
+  return queryWabaPhoneNumbers(wabaId, token, graphVersion, {
+    lookupExisting: async (ids) => {
+      const existing = await db.whatsAppNumber.findMany({
+        where: { phoneNumberId: { in: ids } },
+        include: { client: { select: { name: true } } },
+      });
+      return existing.map((e) => ({ phoneNumberId: e.phoneNumberId, clientName: e.client.name }));
+    },
+  });
 }
 
 export interface SaveManualConnectionInput {
@@ -277,8 +249,7 @@ export async function saveManualWhatsAppConnection(
       },
     });
 
-    revalidatePath("/dashboard/settings");
-    revalidatePath("/dashboard/settings/whatsapp");
+    await revalidateSettings();
 
     return { ok: true, data: { connectionId: connection.id } };
   } catch (e) {
@@ -417,8 +388,7 @@ export async function disconnectWhatsAppConnection(
     data: { status: "DISCONNECTED" },
   });
 
-  revalidatePath("/dashboard/settings");
-  revalidatePath("/dashboard/settings/whatsapp");
+  await revalidateSettings();
 
   return { ok: true, message: "WhatsApp connection disconnected." };
 }

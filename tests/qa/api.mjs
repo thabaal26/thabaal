@@ -36,16 +36,16 @@ const users = Object.fromEntries((await db.user.findMany({ select: { id: true, e
 const managerId = users[Object.keys(users).find((e) => /^manager@qa\.test$/.test(e))];
 
 // ── Scheduler and webhooks ──
-await check("API-01", "cron: no secret → 401", async () => {
+await check("API-01", "cron: GET returns 405 Method Not Allowed", async () => {
   const r = await get("/api/cron");
+  expect(r.status === 405, `got ${r.status}`);
+});
+await check("API-02", "cron: wrong Bearer secret on POST → 401", async () => {
+  const r = await fetch(BASE + "/api/cron?probe=key", { method: "POST", headers: { authorization: "Bearer wrong" } });
   expect(r.status === 401, `got ${r.status}`);
 });
-await check("API-02", "cron: wrong Bearer secret → 401", async () => {
-  const r = await get("/api/cron?probe=key", { authorization: "Bearer wrong" });
-  expect(r.status === 401, `got ${r.status}`);
-});
-await check("API-03", "cron: right secret, key probe → 200 with key fingerprint only", async () => {
-  const r = await get("/api/cron?probe=key", { authorization: `Bearer ${S.cronSecret}` });
+await check("API-03", "cron: right secret on POST, key probe → 200 with key fingerprint only", async () => {
+  const r = await fetch(BASE + "/api/cron?probe=key", { method: "POST", headers: { authorization: `Bearer ${S.cronSecret}` } });
   const j = await r.json();
   expect(r.status === 200 && typeof j.encryptionKey === "string" && Object.keys(j).length === 1, `got ${r.status} ${JSON.stringify(j)}`);
 });

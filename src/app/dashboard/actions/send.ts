@@ -93,7 +93,7 @@ export async function sendToCustomer(
     await db.message.create({
       data: { customerId: customer.id, templateId: t.id, templateName: t.name, status: "FAILED", provider: settings.provider, errorCode: code, error, failedAt: new Date(), pricingCategory: t.category.toLowerCase(), billable: false },
     });
-    await applyFailure(customer.id, code);
+    await applyFailure(customer.id, code, error);
     pushToGoogleSheet(customer.clientId, "CAMPAIGN_STATUS", {
       campaign: t.name,
       phone: customer.phone,

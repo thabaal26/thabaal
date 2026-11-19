@@ -97,3 +97,75 @@ export async function validateWabaAccess(
     };
   }
 }
+
+/**
+ * Strict validation and token redaction for fetching WABA phone numbers.
+ * Enforces:
+ * - WABA ID format: 5-25 numeric digits
+ * - Token length: 1-4096 chars
+ * - Graph version normalization
+ * - Bearer token redaction from error messages
+ */
+export async function queryWabaPhoneNumbers(
+  wabaId: string,
+  token: string,
+  graphVersion?: string,
+  options?: {
+    lookupExisting?: (phoneIds: string[]) => Promise<{ phoneNumberId: string; clientName: string }[]>;
+  }
+): Promise<ActionResult<WabaPhoneNumberOption[]>> {
+  const trimmedWaba = (wabaId ?? "").trim();
+  const trimmedToken = (token ?? "").trim();
+
+  if (!/^\d{5,25}$/.test(trimmedWaba)) {
+    return { ok: false, message: "Invalid WABA ID format. WABA ID must be between 5 and 25 digits." };
+  }
+  if (!trimmedToken || trimmedToken.length > 4096) {
+    return { ok: false, message: "Invalid access token. Token length must be between 1 and 4096 characters." };
+  }
+
+  const version = normalizeGraphVersion(graphVersion);
+
+  try {
+    const url = `https://graph.facebook.com/${version}/${trimmedWaba}/phone_numbers?fields=id,display_phone_number,verified_name,quality_rating`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${trimmedToken}` },
+      cache: "no-store",
+    });
+    const json = (await res.json().catch(() => ({}))) as { data?: MetaPhoneNumber[]; error?: { message?: string } };
+
+    if (!res.ok || json.error || !Array.isArray(json.data)) {
+      const rawMsg = json.error?.message || `Could not fetch phone numbers from Meta (${res.status})`;
+      const safeMsg = rawMsg.replace(/Bearer\s+[A-Za-z0-9_-]+/gi, "Bearer [REDACTED]");
+      return { ok: false, message: safeMsg };
+    }
+
+    const numbers = json.data;
+    if (numbers.length === 0) {
+      return {
+        ok: false,
+        message: "This WABA has no registered phone numbers. Add and verify a phone number in WhatsApp Manager first.",
+      };
+    }
+
+    const assigned = options?.lookupExisting ? await options.lookupExisting(numbers.map((n) => n.id)) : [];
+
+    const resultOptions: WabaPhoneNumberOption[] = numbers.map((n) => {
+      const match = assigned.find((e) => e.phoneNumberId === n.id);
+      return {
+        id: n.id,
+        displayPhoneNumber: n.display_phone_number,
+        verifiedName: n.verified_name,
+        qualityRating: n.quality_rating,
+        alreadyAssignedTo: match ? match.clientName : undefined,
+      };
+    });
+
+    return { ok: true, data: resultOptions };
+  } catch (e) {
+    return {
+      ok: false,
+      message: `Error querying phone numbers: ${e instanceof Error ? e.message.replace(/Bearer\s+[A-Za-z0-9_-]+/gi, "Bearer [REDACTED]") : "network error"}`,
+    };
+  }
+}

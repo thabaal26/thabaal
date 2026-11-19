@@ -239,7 +239,7 @@ async function customerSays(o, text) {
     }),
   );
 }
-const cron = () => fetch(`${S.base}/api/cron`, { headers: { authorization: `Bearer ${S.cronSecret}` } }).then((r) => r.status);
+const cron = () => fetch(`${S.base}/api/cron`, { method: "POST", headers: { authorization: `Bearer ${S.cronSecret}` } }).then((r) => r.status);
 
 // 17. Cash on delivery follows Payment settings: off, over the limit, then allowed.
 await check(17, "A customer's 'COD' is refused when COD is off or over the limit, and accepted when allowed", async () => {

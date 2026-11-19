@@ -7,10 +7,16 @@ import { db } from "./db";
 /**
  * A customer's delivery addresses, newest first (up to 5): the saved list, plus, for customers from before the list,
  * the address on their profile and the addresses on their past orders.
+ *
+ * TEN-01: Explicitly scoped to client tenant context for strict defense-in-depth isolation.
  */
-export async function addressBook(customerId: string): Promise<SavedAddress[]> {
-  const c = await db.customer.findUnique({
-    where: { id: customerId },
+export async function addressBook(customerId: string, clientId?: string): Promise<SavedAddress[]> {
+  if (!customerId?.trim()) return [];
+  const c = await db.customer.findFirst({
+    where: {
+      id: customerId.trim(),
+      ...(clientId?.trim() ? { clientId: clientId.trim() } : {}),
+    },
     select: {
       addresses: true,
       locationRaw: true,
@@ -18,7 +24,11 @@ export async function addressBook(customerId: string): Promise<SavedAddress[]> {
       deliveryAddress: true,
       client: { select: { homeCity: true } },
       orders: {
-        where: { note: { not: null }, status: { not: "CANCELLED" } },
+        where: {
+          note: { not: null },
+          status: { not: "CANCELLED" },
+          ...(clientId?.trim() ? { clientId: clientId.trim() } : {}),
+        },
         orderBy: { createdAt: "desc" },
         take: 20,
         select: { note: true, createdAt: true, mapUrl: true },
@@ -49,20 +59,39 @@ export async function addressBook(customerId: string): Promise<SavedAddress[]> {
  * Call before a customer's latest address (locationRaw) changes: a customer from before the list gets the addresses
  * known so far (profile and past orders) written to it, so the one being replaced isn't lost.
  */
-export async function keepKnownAddresses(customerId: string) {
-  const c = await db.customer.findUnique({ where: { id: customerId }, select: { addresses: true } });
+export async function keepKnownAddresses(customerId: string, clientId?: string) {
+  if (!customerId?.trim()) return;
+  const c = await db.customer.findFirst({
+    where: { id: customerId.trim(), ...(clientId?.trim() ? { clientId: clientId.trim() } : {}) },
+    select: { id: true, addresses: true },
+  });
   if (!c || readAddresses(c.addresses).length) return;
-  const known = await addressBook(customerId);
-  if (known.length) await db.customer.update({ where: { id: customerId }, data: { addresses: known as unknown as Prisma.InputJsonValue } });
+  const known = await addressBook(c.id, clientId);
+  if (known.length) {
+    await db.customer.updateMany({
+      where: { id: c.id, ...(clientId?.trim() ? { clientId: clientId.trim() } : {}) },
+      data: { addresses: known as unknown as Prisma.InputJsonValue },
+    });
+  }
 }
 
 /** Puts an address on top of the customer's list (given or used now). The first save keeps their older addresses. */
-export async function rememberAddress(customerId: string, entry: { text: string; area?: string | null; mapUrl?: string | null }) {
-  if (!entry.text.trim()) return;
-  const c = await db.customer.findUnique({ where: { id: customerId }, select: { addresses: true } });
+export async function rememberAddress(
+  customerId: string,
+  entry: { text: string; area?: string | null; mapUrl?: string | null },
+  clientId?: string
+) {
+  if (!entry.text.trim() || !customerId?.trim()) return;
+  const c = await db.customer.findFirst({
+    where: { id: customerId.trim(), ...(clientId?.trim() ? { clientId: clientId.trim() } : {}) },
+    select: { id: true, addresses: true },
+  });
   if (!c) return;
   const saved = readAddresses(c.addresses);
-  const base = saved.length ? saved : await addressBook(customerId);
+  const base = saved.length ? saved : await addressBook(c.id, clientId);
   const next = withAddress(base, entry);
-  await db.customer.update({ where: { id: customerId }, data: { addresses: next as unknown as Prisma.InputJsonValue } });
+  await db.customer.updateMany({
+    where: { id: c.id, ...(clientId?.trim() ? { clientId: clientId.trim() } : {}) },
+    data: { addresses: next as unknown as Prisma.InputJsonValue },
+  });
 }

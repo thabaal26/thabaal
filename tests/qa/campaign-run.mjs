@@ -104,7 +104,7 @@ try {
   await check(2, "a scheduler call 35 minutes late sends the batches it missed and the run completes", async () => {
     const rr = await latest();
     await db.campaignRun.update({ where: { id: rr.id }, data: { nextBatchAt: new Date(Date.now() - 35 * 60_000) } });
-    const r = await fetch(`${BASE}/api/cron`, { headers: { authorization: `Bearer ${S.cronSecret}` } });
+    const r = await fetch(`${BASE}/api/cron`, { method: "POST", headers: { authorization: `Bearer ${S.cronSecret}` } });
     expect(r.ok, `cron ${r.status}`);
     const n = await sent();
     const done = await latest();

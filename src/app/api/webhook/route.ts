@@ -161,11 +161,12 @@ async function applyStatus(s: StatusUpdate) {
   if (next === "FAILED") {
     const err = s.errors?.[0];
     const code = err?.code ?? null;
+    const errorDetail = err?.error_data?.details || err?.message || err?.title || "Delivery failed";
     await db.message.update({
       where: { id: msg.id },
-      data: { status: "FAILED", failedAt: at, billable: false, errorCode: code, error: explainError(code, err?.error_data?.details || err?.message || err?.title || "Delivery failed") },
+      data: { status: "FAILED", failedAt: at, billable: false, errorCode: code, error: explainError(code, errorDetail) },
     });
-    await applyFailure(msg.customerId, code);
+    await applyFailure(msg.customerId, code, errorDetail);
     // The address form can't show on this customer's WhatsApp (old app): ask them to type it or share a location.
     if (code === 1026 && msg.templateName === ADDRESS_FORM) await sendAddressFallback(msg.customerId).catch((e) => console.error("Address fallback failed", e));
     pushToGoogleSheet(msg.customer?.clientId, "CAMPAIGN_STATUS", {

@@ -22,6 +22,6 @@ jobs:
           APP_URL: ${{ secrets.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl --fail --silent --show-error --max-time 90 \
+          curl -X POST --fail --silent --show-error --max-time 90 \
             -H "Authorization: Bearer $CRON_SECRET" \
             "$APP_URL/api/cron"

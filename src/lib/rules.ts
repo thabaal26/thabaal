@@ -3,6 +3,7 @@ import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { db } from "./db";
 import { APP_TZ } from "./format";
 import { metaError } from "./meta-errors";
+import { classifyMetaDeliveryError, type MetaDeliveryPolicyResult } from "./whatsapp/error-policy";
 
 // Sending rules that protect a number's quality: no marketing at night, no customer
 // flooded with offers, and no retrying people Meta says can't be reached.
@@ -54,7 +55,24 @@ export async function recentlyMarketed(customerIds: string[], gapHours: number) 
 }
 
 /** Updates the customer after a failed send, so campaigns stop retrying hopeless numbers. */
-export async function applyFailure(customerId: string, code: number | null | undefined) {
+export async function applyFailure(
+  customerId: string,
+  code: number | null | undefined,
+  details?: string | null
+): Promise<MetaDeliveryPolicyResult | void> {
+  // If details is provided, apply strict cause-aware error policy (CAM-03):
+  if (details !== undefined) {
+    const policy = classifyMetaDeliveryError(code, details);
+    if (policy.isUnreachable) {
+      await db.customer.update({ where: { id: customerId }, data: { unreachable: true } });
+    }
+    if (policy.action === "MARKETING_OPT_OUT") {
+      await db.customer.update({ where: { id: customerId }, data: { optedOut: true } });
+    }
+    return policy;
+  }
+
+  // Fallback for legacy callers without details:
   const kind = metaError(code)?.kind;
   if (kind === "unreachable") await db.customer.update({ where: { id: customerId }, data: { unreachable: true } });
   if (kind === "stopped-marketing") await db.customer.update({ where: { id: customerId }, data: { optedOut: true } });

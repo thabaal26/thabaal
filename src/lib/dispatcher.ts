@@ -451,17 +451,18 @@ export async function processRun(runId: string, now: Date, deadline: number) {
       }
       // Restricted number: fail this one and stop the whole run.
       if (kind === "number-restricted") restricted = true;
+      const rawError = e instanceof Error ? e.message : String(e);
       await db.message.update({
         where: { id: m.id },
         data: {
           status: "FAILED",
           provider: settings.provider,
           errorCode: code,
-          error: explainError(code, e instanceof Error ? e.message : String(e)),
+          error: explainError(code, rawError),
           failedAt: new Date(),
         },
       });
-      await applyFailure(m.customerId, code);
+      await applyFailure(m.customerId, code, rawError);
       failed++;
       pushToGoogleSheet(campaign.clientId, "CAMPAIGN_STATUS", {
         campaign: t.name,
