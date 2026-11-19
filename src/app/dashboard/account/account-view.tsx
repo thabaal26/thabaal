@@ -244,9 +244,10 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
   const isCampNearLimit = limits ? usage.campaigns / limits.camp >= 0.8 : false;
 
   const getConfirmedContact = () => {
-    const cleanMobile = payMobile.replace(/[^\d]/g, "").slice(-10);
-    if (!cleanMobile || cleanMobile.length < 10) {
-      notify("Please enter a valid 10-digit mobile number linked with your GPay / UPI app.", false);
+    const digits = payMobile.replace(/[^\d]/g, "");
+    const cleanMobile = /^[6-9]\d{9}$/.test(digits) ? digits : (/^91[6-9]\d{9}$/.test(digits) ? digits.slice(2) : "");
+    if (!cleanMobile) {
+      notify("Please enter a valid 10-digit Indian mobile number for invoices and checkout.", false);
       return null;
     }
     const cleanEmail = payEmail.trim().toLowerCase();
@@ -255,8 +256,8 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
       return null;
     }
     const contactName = (payName || biz.contactPerson || biz.shopName || "Customer").trim();
-    // Background update to billing profile so user's corrected contact is saved
-    if (cleanMobile !== biz.mobile || cleanEmail !== biz.email) {
+    // Background update to billing profile only for tenant managers, preventing admin/developer contact leakage
+    if (!billing.isAdmin && (cleanMobile !== biz.mobile || cleanEmail !== biz.email)) {
       const updated = { ...biz, mobile: cleanMobile, email: cleanEmail };
       setBiz(updated);
       saveBillingDetails(updated).catch(() => {});
@@ -1886,25 +1887,25 @@ export function AccountView({ billing, usage, billingProfile: initialProfile, cu
 
                 {rzpOn ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 14 }}>
-                    {/* GPay / UPI Mobile Number & Billing Email Confirmation */}
+                    {/* Billing Contact & Receipt Confirmation */}
                     <div className="card" style={{ background: "var(--panel, #ffffff)", border: "1.5px solid var(--primary, #0ea5e9)", borderRadius: 12, padding: "16px 18px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                         <span style={{ fontWeight: 700, fontSize: 14, color: "var(--foreground, #0f172a)" }}>
-                          📱 <T ta="GPay / UPI மொபைல் எண் மற்றும் ரசீது விவரங்கள்">GPay / UPI & Receipt Details</T>
+                          📄 <T ta="ரசீது மற்றும் கட்டணத் தொடர்பு விவரங்கள்">Billing & Receipt Contact</T>
                         </span>
-                        <span style={{ fontSize: 11, background: "var(--soft, #f1f5f9)", color: "var(--primary, #0284c7)", padding: "2px 8px", borderRadius: 999, fontWeight: 600 }}>
-                          <T ta="வங்கி எண் பொருத்தம்">Mandate Match Required</T>
+                        <span style={{ fontSize: 11, background: "var(--soft, #f1f5f9)", color: "var(--muted, #64748b)", padding: "2px 8px", borderRadius: 999, fontWeight: 600 }}>
+                          <T ta="ரசீது & முன்பதிவு">Invoicing & Prefill</T>
                         </span>
                       </div>
                       <p className="fine muted" style={{ margin: "2px 0 12px", lineHeight: 1.45 }}>
-                        <T ta="Google Pay அல்லது UPI AutoPay மூலம் செலுத்தும்போது, உங்கள் GPay கணக்குடன் இணைக்கப்பட்டுள்ள அதே 10-இலக்க மொபைல் எண்ணை உள்ளிடவும் (வாட்ஸ்அப் எண் வேறாக இருந்தால், உங்கள் GPay எண்ணை இங்கே உள்ளிடவும்).">
-                          For Google Pay / UPI AutoPay, ensure this number matches the phone number registered in your Google Pay or UPI banking app to prevent mandate errors.
+                        <T ta="அதிகாரப்பூர்வ ஜிஎஸ்டி ரசீதுகள், இன்வாய்ஸ்கள் மற்றும் கட்டண முன்பதிவுக்காக இந்த விவரங்கள் பயன்படுத்தப்படும். உங்கள் யுபிஐ வங்கி கணக்கு உங்கள் கட்டண செயலிக்குள் நேரடியாக சரிபார்க்கப்படும்.">
+                          These details are used for official receipts, invoices, and checkout prefill. Your UPI bank account is verified independently inside your selected UPI app.
                         </T>
                       </p>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
                         <div>
                           <label className="fine" style={{ display: "block", marginBottom: 4, fontWeight: 600, color: "var(--foreground)" }}>
-                            <T ta="GPay / UPI மொபைல் எண் (10 இலக்கம்)">GPay / UPI Mobile Number</T> *
+                            <T ta="தொடர்பு மொபைல் எண் (10 இலக்கம்)">Billing Mobile Number</T> *
                           </label>
                           <input
                             type="tel"

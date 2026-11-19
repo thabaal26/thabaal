@@ -303,7 +303,8 @@ export type CheckoutContact = { name?: string; mobile?: string; email?: string }
 
 async function ensureRazorpayCustomer(contact?: CheckoutContact): Promise<string | null> {
   if (!contact) return null;
-  const cleanMobile = contact.mobile ? contact.mobile.replace(/[^\d]/g, "").slice(-10) : "";
+  const digits = contact.mobile ? contact.mobile.replace(/[^\d]/g, "") : "";
+  const cleanMobile = /^[6-9]\d{9}$/.test(digits) ? digits : (/^91[6-9]\d{9}$/.test(digits) ? digits.slice(2) : "");
   const cleanEmail = contact.email ? contact.email.trim().toLowerCase() : "";
   const cleanName = contact.name ? contact.name.trim().slice(0, 50) : "Thabaal Customer";
 
