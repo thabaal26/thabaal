@@ -167,43 +167,145 @@ const CUSTOMER_COLS = {
   optout: /opt|stop|unsubscrib/,
 };
 
-async function syncCustomers(clientId: string, rows: string[][]) {
+export async function syncCustomers(clientId: string, rows: string[][]) {
   const c = columns(rows[0], CUSTOMER_COLS);
   if (!c.has("phone")) throw new Error("Customers tab: add a column headed \"Phone\".");
   let added = 0, updated = 0, skipped = 0;
-  for (const row of rows.slice(1, 20_001)) {
-    const phone = normalizePhone(c.get(row, "phone"));
-    if (!phone) { skipped++; continue; }
-    const name = c.get(row, "name");
-    const area = c.get(row, "area");
-    const buys = c.get(row, "buys");
-    const tags = splitTags(c.get(row, "tags"));
-    const existing = await db.customer.findUnique({ where: { clientId_phone: { clientId, phone } }, select: { id: true, tags: true } });
-    if (existing) {
-      await db.customer.update({
-        where: { id: existing.id },
-        data: {
-          ...(name && { name }),
-          ...(area && { location: area }),
-          ...(c.get(row, "region") && { region: c.get(row, "region") }),
-          ...(buys && { purchases: buys }),
-          ...(tags.length && { tags: [...new Set([...existing.tags, ...tags])] }),
-          // The sheet can opt someone out, never back in: that needs the customer's own consent.
-          ...(yes(c.get(row, "optout")) && { optedOut: true }),
-        },
+  const CHUNK_SIZE = 500;
+  const rawRows = rows.slice(1, 20_001);
+
+  for (let i = 0; i < rawRows.length; i += CHUNK_SIZE) {
+    const chunk = rawRows.slice(i, i + CHUNK_SIZE);
+
+    type RowParsed = {
+      phone: string;
+      name: string | null;
+      area: string | null;
+      region: string | null;
+      buys: string | null;
+      tags: string[];
+      optedOut: boolean;
+    };
+
+    const parsedRows: RowParsed[] = [];
+    const chunkPhones = new Set<string>();
+
+    for (const row of chunk) {
+      const phone = normalizePhone(c.get(row, "phone"));
+      if (!phone) {
+        skipped++;
+        continue;
+      }
+      chunkPhones.add(phone);
+      parsedRows.push({
+        phone,
+        name: c.get(row, "name"),
+        area: c.get(row, "area"),
+        region: c.get(row, "region"),
+        buys: c.get(row, "buys"),
+        tags: splitTags(c.get(row, "tags")),
+        optedOut: yes(c.get(row, "optout")),
       });
-      updated++;
-    } else {
-      await db.customer.create({
-        data: {
-          clientId, phone, name: name || `+${phone}`, location: area || null, region: c.get(row, "region") || null,
-          purchases: buys || null, tags, optedOut: yes(c.get(row, "optout")),
-          optInSource: "Added from Google Sheet", optInAt: new Date(),
-        },
+    }
+
+    if (parsedRows.length === 0) continue;
+
+    // Fetch all existing customers in this chunk with 1 single query (SHT-01)
+    const existingList = await db.customer.findMany({
+      where: { clientId, phone: { in: Array.from(chunkPhones) } },
+      select: { id: true, phone: true, tags: true },
+    });
+    const existingMap = new Map(existingList.map((e) => [e.phone, e]));
+
+    const toCreate: Array<{
+      clientId: string;
+      phone: string;
+      name: string;
+      location: string | null;
+      region: string | null;
+      purchases: string | null;
+      tags: string[];
+      optedOut: boolean;
+      optInSource: string;
+      optInAt: Date;
+    }> = [];
+
+    const toUpdate: Array<{
+      id: string;
+      data: {
+        name?: string;
+        location?: string;
+        region?: string;
+        purchases?: string;
+        tags?: string[];
+        optedOut?: boolean;
+      };
+    }> = [];
+
+    const seenInChunk = new Set<string>();
+
+    for (const r of parsedRows) {
+      if (seenInChunk.has(r.phone)) {
+        continue;
+      }
+      seenInChunk.add(r.phone);
+
+      const existing = existingMap.get(r.phone);
+      if (existing) {
+        toUpdate.push({
+          id: existing.id,
+          data: {
+            ...(r.name && { name: r.name }),
+            ...(r.area && { location: r.area }),
+            ...(r.region && { region: r.region }),
+            ...(r.buys && { purchases: r.buys }),
+            ...(r.tags.length && { tags: [...new Set([...existing.tags, ...r.tags])] }),
+            ...(r.optedOut && { optedOut: true }),
+          },
+        });
+      } else {
+        toCreate.push({
+          clientId,
+          phone: r.phone,
+          name: r.name || `+${r.phone}`,
+          location: r.area || null,
+          region: r.region || null,
+          purchases: r.buys || null,
+          tags: r.tags,
+          optedOut: r.optedOut,
+          optInSource: "Added from Google Sheet",
+          optInAt: new Date(),
+        });
+      }
+    }
+
+    // Execute bulk creations
+    if (toCreate.length > 0) {
+      await db.customer.createMany({
+        data: toCreate,
+        skipDuplicates: true,
       });
-      added++;
+      added += toCreate.length;
+    }
+
+    // Execute updates in parallel batches of 25
+    if (toUpdate.length > 0) {
+      const UPDATE_BATCH = 25;
+      for (let u = 0; u < toUpdate.length; u += UPDATE_BATCH) {
+        const batch = toUpdate.slice(u, u + UPDATE_BATCH);
+        await Promise.all(
+          batch.map(({ id, data }) =>
+            db.customer.update({
+              where: { id },
+              data,
+            })
+          )
+        );
+      }
+      updated += toUpdate.length;
     }
   }
+
   return `Customers: ${added} added, ${updated} updated${skipped ? `, ${skipped} skipped (no valid phone)` : ""}`;
 }
 
