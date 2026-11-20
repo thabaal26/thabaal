@@ -20,7 +20,7 @@ async function callFor(id: string) {
     include: { sender: { include: { client: { select: { waToken: true } } } } },
   });
   if (!call) return { denied: "Call not found." } as const;
-  return { call, cfg: numberConfig(call.sender, call.sender?.client.waToken ?? null) };
+  return { call, cfg: numberConfig(call.sender, call.sender?.client.waToken ?? null), scope };
 }
 
 /** Picks up a ringing call with the SDP answer the browser made from Meta's offer. */
@@ -30,13 +30,23 @@ export async function answerCall(id: string, sdp: string): Promise<ActionResult>
   if ("denied" in found) return { ok: false, message: found.denied };
   const user = await requireUser();
   // Claim it first so two people answering at once don't both connect.
-  const claimed = await db.call.updateMany({ where: { id, status: "RINGING" }, data: { status: "ANSWERED", answeredAt: new Date(), answeredBy: user.name } });
+  const claimed = await db.call.updateMany({
+    where: { id, status: "RINGING", ...owned(found.scope) },
+    data: { status: "ANSWERED", answeredAt: new Date(), answeredBy: user.name },
+  });
   if (!claimed.count) return { ok: false, message: "Someone else answered, or the caller hung up." };
   try {
     await callAction(found.cfg, found.call.waCallId, "pre_accept", sdp);
     await callAction(found.cfg, found.call.waCallId, "accept", sdp);
   } catch (e) {
-    await db.call.update({ where: { id }, data: { status: "ENDED", endedAt: new Date() } });
+    try {
+      await db.call.updateMany({
+        where: { id, ...owned(found.scope) },
+        data: { status: "ENDED", endedAt: new Date() },
+      });
+    } catch (cleanupErr) {
+      console.error("[Calls] Failed to cleanup call status after provider error:", cleanupErr);
+    }
     return { ok: false, message: errText(e) };
   }
   revalidatePath("/dashboard/calls");
@@ -46,7 +56,10 @@ export async function answerCall(id: string, sdp: string): Promise<ActionResult>
 export async function rejectCall(id: string): Promise<ActionResult> {
   const found = await callFor(id);
   if ("denied" in found) return { ok: false, message: found.denied };
-  const claimed = await db.call.updateMany({ where: { id, status: "RINGING" }, data: { status: "REJECTED", endedAt: new Date() } });
+  const claimed = await db.call.updateMany({
+    where: { id, status: "RINGING", ...owned(found.scope) },
+    data: { status: "REJECTED", endedAt: new Date() },
+  });
   if (!claimed.count) return { ok: false, message: "This call is no longer ringing." };
   await callAction(found.cfg, found.call.waCallId, "reject").catch((e) => console.error("Could not reject call", e));
   revalidatePath("/dashboard/calls");
@@ -58,7 +71,10 @@ export async function hangUp(id: string): Promise<ActionResult> {
   if ("denied" in found) return { ok: false, message: found.denied };
   await callAction(found.cfg, found.call.waCallId, "terminate").catch((e) => console.error("Could not end call", e));
   // Hanging up an outgoing call that is still ringing cancels it.
-  await db.call.updateMany({ where: { id, status: { in: ["RINGING", "ANSWERED"] } }, data: { status: "ENDED", endedAt: new Date() } });
+  await db.call.updateMany({
+    where: { id, status: { in: ["RINGING", "ANSWERED"] }, ...owned(found.scope) },
+    data: { status: "ENDED", endedAt: new Date() },
+  });
   revalidatePath("/dashboard/calls");
   return { ok: true };
 }

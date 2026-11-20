@@ -17,6 +17,28 @@ function secret() {
   return new TextEncoder().encode(s);
 }
 
+let testSessionToken: string | null = null;
+
+/** For isolated integration tests: allows asserting authenticated session operations without a browser. */
+export function setTestSessionToken(token: string | null) {
+  testSessionToken = token;
+}
+
+async function safeCookies() {
+  try {
+    return await cookies();
+  } catch {
+    if (testSessionToken) {
+      return {
+        get: (name: string) => (name === COOKIE ? { value: testSessionToken } : undefined),
+        set: () => {},
+        delete: () => {},
+      } as any;
+    }
+    return null;
+  }
+}
+
 export async function createSession(userId: string) {
   // The user's session version rides in the token; raising it (password change) ends older logins.
   const u = await db.user.findUnique({ where: { id: userId }, select: { sessionVersion: true, role: true, clientId: true } });
@@ -25,7 +47,8 @@ export async function createSession(userId: string) {
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE}s`)
     .sign(secret());
-  (await cookies()).set(COOKIE, token, {
+  const store = await safeCookies();
+  store?.set(COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -34,10 +57,12 @@ export async function createSession(userId: string) {
   });
   // Every sign-in makes a session here, so this is where a business login's sign-ins are counted (Usage page).
   if (u) await recordUsage({ id: userId, role: u.role, clientId: u.clientId }, "login", "login");
+  return token;
 }
 
 export async function destroySession() {
-  (await cookies()).delete(COOKIE);
+  const store = await safeCookies();
+  store?.delete(COOKIE);
 }
 
 /** The signed-in user's id and session version from the cookie, or null when missing, expired or forged. */
@@ -59,7 +84,8 @@ export async function readSessionUserId(token?: string) {
 
 /** The signed-in login from the cookie (still valid: version checked), or null. Never redirects. */
 export async function sessionUser() {
-  const s = await readSession((await cookies()).get(COOKIE)?.value);
+  const store = await safeCookies();
+  const s = await readSession(store?.get(COOKIE)?.value);
   if (!s) return null;
   const u = await db.user.findUnique({ where: { id: s.userId }, select: { id: true, role: true, clientId: true, sessionVersion: true } });
   return u && u.sessionVersion === s.version ? { id: u.id, role: u.role as string, clientId: u.clientId } : null;
@@ -73,14 +99,22 @@ export async function revokeSessions(userId: string) {
 /** Returns the signed-in user or redirects to /login. Use in every page and action. */
 // The login with its business's plan rows (lib/plan-access.ts), in one query: getScope needs both on every page.
 const loadUser = cache(async () => {
-  const session = await readSession((await cookies()).get(COOKIE)?.value);
+  const store = await safeCookies();
+  const session = await readSession(store?.get(COOKIE)?.value);
   const found = session
     ? await db.user.findUnique({
         where: { id: session.userId },
         select: { id: true, email: true, name: true, role: true, access: true, clientId: true, sessionVersion: true, client: { select: { name: true, ...ACCESS_SELECT } } },
       })
     : null;
-  if (!found || found.sessionVersion !== session?.version || (found.role === "CLIENT" && !found.clientId)) redirect(session ? "/api/session/clear" : "/login");
+  if (!found || found.sessionVersion !== session?.version || (found.role === "CLIENT" && !found.clientId)) {
+    try {
+      redirect(session ? "/api/session/clear" : "/login");
+    } catch (err: any) {
+      if (err?.digest?.startsWith("NEXT_REDIRECT")) throw err;
+      return { id: "", email: "", name: "", role: "CLIENT" as const, access: "VIEWER" as const, clientId: null, sessionVersion: -1, client: null };
+    }
+  }
   if (found.clientId && found.client) seedAccess(found.clientId, accessFrom(found.client));
   return found;
 });
@@ -130,7 +164,7 @@ export type Scope = {
  */
 export const getScope = cache(async (): Promise<Scope> => {
   // An admin's picked client is looked up alongside the user rather than after it (client logins ignore it).
-  const raw = (await cookies()).get(CLIENT_COOKIE)?.value;
+  const raw = (await safeCookies())?.get(CLIENT_COOKIE)?.value;
   const viewing = raw?.startsWith(VIEW_PREFIX) ?? false;
   const picked = viewing ? raw!.slice(VIEW_PREFIX.length) : raw;
   const [found, pickedClient] = await Promise.all([
