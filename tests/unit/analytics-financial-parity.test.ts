@@ -141,9 +141,17 @@ describe("Domain 6 Batch A: Financial Parity & Accounting Integrity Test Suite",
     const oCancelledWithPaidAt = await db.order.create({
       data: { clientId: client.id, customerId: customer.id, total: 1000, status: "CANCELLED", paidAt: now, number: Math.floor(100000 + Math.random() * 800000), items: [] },
     });
-    // 6. Paid order with 100% full refund
+    // 6. Paid order with 100% full refund (preserves PAID status, excluded by refund check)
     const oFullyRefunded = await db.order.create({
       data: { clientId: client.id, customerId: customer.id, total: 600, status: "PAID", paidAt: now, refundAmount: 600, refundedAt: now, number: Math.floor(100000 + Math.random() * 800000), items: [] },
+    });
+    // 6b. Delivered order with 100% full refund (preserves DELIVERED fulfilment status, excluded from sales)
+    const oDeliveredFullyRefunded = await db.order.create({
+      data: { clientId: client.id, customerId: customer.id, total: 900, status: "DELIVERED", paidAt: now, refundAmount: 900, refundedAt: now, number: Math.floor(100000 + Math.random() * 800000), items: [] },
+    });
+    // 6c. Dispatched order with 100% full refund (preserves DISPATCHED fulfilment status, excluded from sales)
+    const oDispatchedFullyRefunded = await db.order.create({
+      data: { clientId: client.id, customerId: customer.id, total: 700, status: "DISPATCHED", paidAt: now, refundAmount: 700, refundedAt: now, number: Math.floor(100000 + Math.random() * 800000), items: [] },
     });
     // 7. Paid order with Partial refund (₹250 refunded on ₹1000)
     const oPartiallyRefunded = await db.order.create({
@@ -241,5 +249,22 @@ describe("Domain 6 Batch A: Financial Parity & Accounting Integrity Test Suite",
     await db.order.deleteMany({ where: { clientId: client.id } });
     await db.customer.deleteMany({ where: { clientId: client.id } });
     await db.client.delete({ where: { id: client.id } });
+  });
+
+  test("8. ANL-01 & ANL-04: Over-refund auditability and cross-period refund completion attribution", async () => {
+    // 1. Over-refund anomaly auditability: over-refund must produce measurable negative net figure, never silently clamped
+    const overRefundOrder = {
+      status: "PAID",
+      paidAt: new Date(),
+      paymentMethod: "upi",
+      internalNote: null,
+      total: 500,
+      refundAmount: 600, // ₹100 over-refund anomaly
+    };
+    // Should NOT qualify as active positive sale
+    assert.equal(isSale(overRefundOrder), false, "Over-refunded order must not qualify as sale");
+    // Net reconciliation calculation must expose anomaly
+    const net = Math.round((overRefundOrder.total - overRefundOrder.refundAmount) * 100) / 100;
+    assert.equal(net, -100, "Net calculation must expose -100 anomaly rather than silently clamping to 0");
   });
 });

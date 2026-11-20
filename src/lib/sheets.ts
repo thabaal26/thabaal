@@ -165,6 +165,7 @@ const CUSTOMER_COLS = {
   tags: /tag|group|segment|category/,
   buys: /buy|bought|purchase|product|item/,
   optout: /opt|stop|unsubscrib/,
+  archive: /archive|delete|tombstone|remove/,
 };
 
 export async function syncCustomers(clientId: string, rows: string[][]) {
@@ -185,6 +186,7 @@ export async function syncCustomers(clientId: string, rows: string[][]) {
       buys: string | null;
       tags: string[];
       optedOut: boolean;
+      archive: boolean;
     };
 
     const parsedRows: RowParsed[] = [];
@@ -205,6 +207,7 @@ export async function syncCustomers(clientId: string, rows: string[][]) {
         buys: c.get(row, "buys"),
         tags: splitTags(c.get(row, "tags")),
         optedOut: yes(c.get(row, "optout")),
+        archive: yes(c.get(row, "archive")),
       });
     }
 
@@ -226,6 +229,7 @@ export async function syncCustomers(clientId: string, rows: string[][]) {
       purchases: string | null;
       tags: string[];
       optedOut: boolean;
+      deletedAt: Date | null;
       optInSource: string;
       optInAt: Date;
     }> = [];
@@ -239,6 +243,7 @@ export async function syncCustomers(clientId: string, rows: string[][]) {
         purchases?: string;
         tags?: string[];
         optedOut?: boolean;
+        deletedAt?: Date;
       };
     }> = [];
 
@@ -261,6 +266,7 @@ export async function syncCustomers(clientId: string, rows: string[][]) {
             ...(r.buys && { purchases: r.buys }),
             ...(r.tags.length && { tags: [...new Set([...existing.tags, ...r.tags])] }),
             ...(r.optedOut && { optedOut: true }),
+            ...(r.archive && { deletedAt: new Date() }),
           },
         });
       } else {
@@ -273,6 +279,7 @@ export async function syncCustomers(clientId: string, rows: string[][]) {
           purchases: r.buys || null,
           tags: r.tags,
           optedOut: r.optedOut,
+          deletedAt: r.archive ? new Date() : null,
           optInSource: "Added from Google Sheet",
           optInAt: new Date(),
         });

@@ -91,7 +91,14 @@ function doPost(e) {
   var t = now_();
 
   function sanitize_(v) {
-    if (typeof v === "string" && /^[\s\t\r\n]*[=+\-@]/.test(v)) return "'" + v;
+    if (typeof v === "number" || typeof v === "boolean" || v == null) return v;
+    if (typeof v === "string") {
+      var trimmed = v.trim();
+      // Legitimate negative numeric string: preserve without escaping so Google Sheets treats as number
+      if (/^-\d+(\.\d+)?$/.test(trimmed)) return v;
+      // Formula-like or command strings starting with =, +, -, @
+      if (/^[\s\t\r\n]*[=+\-@]/.test(v)) return "'" + v;
+    }
     return v;
   }
   function row_(arr) {

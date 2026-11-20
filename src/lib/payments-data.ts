@@ -98,8 +98,18 @@ export async function paymentsData(clientId: string, period: "t" | "w" | "m") {
       select: paySelect,
       orderBy: { createdAt: "asc" },
     }),
-    // Received in the period (the paid date).
-    db.order.findMany({ where: { clientId, paidAt: { gte: from } }, select: paySelect, orderBy: { paidAt: "desc" } }),
+    // Received or refunded in the period.
+    db.order.findMany({
+      where: {
+        clientId,
+        OR: [
+          { paidAt: { gte: from } },
+          { refundedAt: { gte: from } },
+        ],
+      },
+      select: paySelect,
+      orderBy: { paidAt: "desc" },
+    }),
     // Payment events in the last 90 days for All transactions — one query per kind, each newest-first by its own
     // date, so a cap drops the oldest events (not whichever orders happened to be edited longest ago).
     db.order.findMany({ where: { clientId, paidAt: { gte: ninety } }, select: paySelect, orderBy: { paidAt: "desc" }, take: 600 }),
@@ -181,7 +191,7 @@ export async function paymentsData(clientId: string, period: "t" | "w" | "m") {
 
   const receivedToday = paid.filter((o) => o.paidAt && o.paidAt >= today).reduce((n, o) => n + receivedOf(o), 0);
   const refundsToday = paid.filter((o) => o.refundedAt && o.refundedAt >= today).reduce((n, o) => n + (o.refundAmount ?? 0), 0);
-  const netReceivedToday = Math.max(0, Math.round((receivedToday - refundsToday) * 100) / 100);
+  const netReceivedToday = Math.round((receivedToday - refundsToday) * 100) / 100;
 
   return {
     collect,

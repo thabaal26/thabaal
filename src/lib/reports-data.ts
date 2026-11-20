@@ -213,8 +213,15 @@ function readPeriod(clientId: string, from: Date, to: Date) {
       select: { status: true, pricingCategory: true, billable: true },
     }),
     db.order.findMany({
-      where: { clientId, createdAt: range, status: { not: "CANCELLED" } },
-      select: { id: true, total: true, status: true, paidAt: true, paymentMethod: true, internalNote: true, refundAmount: true },
+      where: {
+        clientId,
+        status: { not: "CANCELLED" },
+        OR: [
+          { createdAt: range },
+          { refundedAt: range },
+        ],
+      },
+      select: { id: true, total: true, status: true, createdAt: true, paidAt: true, paymentMethod: true, internalNote: true, refundAmount: true, refundedAt: true },
     }),
     db.reply.count({
       where: { customer: { clientId }, receivedAt: range },
@@ -226,6 +233,7 @@ function computePeriodFigures(
   [msgs, orders, rawReplies]: Awaited<ReturnType<typeof readPeriod>>,
   periodName: "this month" | "this week",
   refillDueCount: number,
+  periodRange?: { from: Date; to: Date },
 ): PeriodFigures {
   const replies = rawReplies;
   let cost = 0;
@@ -245,29 +253,33 @@ function computePeriodFigures(
 
   let grossSales = 0;
   let refunds = 0;
-  let sales = 0;
   let wait = 0;
   let paidCount = 0;
   let unpaidCount = 0;
 
   for (const o of orders) {
-    const isPaid = isSale(o);
-    if (isPaid) {
-      // Disclose Gross Sales, Completed Refunds, and Net Sales separately (ANL-01)
-      const ref = o.refundAmount ?? 0;
-      const net = Math.round((o.total - ref) * 100) / 100;
-      grossSales += o.total;
-      refunds += ref;
-      sales += net;
-      paidCount++;
-    } else {
-      wait += o.total;
-      unpaidCount++;
+    const inCreatedRange = !periodRange || (o.createdAt >= periodRange.from && o.createdAt < periodRange.to);
+    const inRefundedRange = periodRange && o.refundedAt && o.refundedAt >= periodRange.from && o.refundedAt < periodRange.to;
+
+    if (inCreatedRange) {
+      if (isSale(o)) {
+        grossSales += o.total;
+        paidCount++;
+      } else {
+        wait += o.total;
+        unpaidCount++;
+      }
+    }
+
+    // A refund is included in the reporting period when it is actually completed (ANL-04)
+    if (inRefundedRange || (!periodRange && o.refundAmount)) {
+      refunds += o.refundAmount ?? 0;
     }
   }
   grossSales = Math.round(grossSales * 100) / 100;
   refunds = Math.round(refunds * 100) / 100;
-  sales = Math.round(sales * 100) / 100;
+  // Net sales reconciles gross sales minus completed refunds without artificial clamping (ANL-01)
+  const sales = Math.round((grossSales - refunds) * 100) / 100;
   const netSales = sales;
 
   cost = Math.round(cost * 100) / 100;
@@ -426,8 +438,8 @@ export async function getComprehensiveReportData(clientId: string): Promise<Comp
   const refillDueCount = refills.due.length;
 
   // 1. Period Figures for Month & Week
-  const pMonth = computePeriodFigures(monthReads, "this month", refillDueCount);
-  const pWeek = computePeriodFigures(weekReads, "this week", refillDueCount);
+  const pMonth = computePeriodFigures(monthReads, "this month", refillDueCount, { from: thisMonth, to: tomorrow });
+  const pWeek = computePeriodFigures(weekReads, "this week", refillDueCount, { from: weekStart, to: tomorrow });
 
   // 2. Wallet & Spend Telemetry
   // Real figures only: a balance when Meta's prepaid balance is known (as on Home), otherwise none.

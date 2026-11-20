@@ -98,4 +98,89 @@ describe("Domain 6 Batch C: SHT-01 Google Sheets Chunked Bulk Sync Test Suite", 
 
     await db.client.delete({ where: { id: client.id } });
   });
+
+  test("3. SHT-01 Extended Scalability Benchmark: 20,000 records with chunking, memory telemetry & idempotent re-import", async () => {
+    const client = await db.client.create({ data: { name: `Benchmark 20k Client ${Date.now()}` } });
+    const basePhone = Math.floor(10000000 + Math.random() * 80000000);
+
+    const initialMemory = process.memoryUsage().heapUsed;
+    const startTime = performance.now();
+
+    // Generate 20,000 rows across 40 chunks
+    const rows: string[][] = [["Phone", "Name", "Area", "Region", "Tags", "Buys", "OptOut"]];
+    const COUNT = 20_000;
+
+    for (let i = 1; i <= COUNT; i++) {
+      rows.push([
+        `+9170${basePhone + i}`,
+        `Customer ${i}`,
+        `Area ${i % 20}`,
+        `Region ${i % 5}`,
+        `tag_${i % 10}`,
+        `Product ${i % 4}`,
+        "no",
+      ]);
+    }
+
+    // Inject cross-chunk duplicate: phone from chunk 1 appears in chunk 5
+    rows[2500] = [`+9170${basePhone + 1}`, "Customer 1 Dupe Cross Chunk", "Area Updated", "Region Updated", "cross_tag", "Product 1", "no"];
+
+    // First execution: Bulk creation
+    const result1 = await syncCustomers(client.id, rows);
+    const duration1 = Math.round(performance.now() - startTime);
+    const peakMemory = Math.round((process.memoryUsage().heapUsed - initialMemory) / (1024 * 1024));
+
+    console.log(`[SHT-01 BENCHMARK] 20,000 rows: duration=${duration1}ms, heapDelta=${peakMemory}MB, throughput=${Math.round((COUNT / duration1) * 1000)} rows/sec`);
+
+    // Verify 19,999 added (since 1 was cross-chunk duplicate that became an update)
+    assert.match(result1, /added/);
+    const dbCount = await db.customer.count({ where: { clientId: client.id } });
+    assert.equal(dbCount, 19999, "Database must hold 19,999 unique customers");
+
+    // Second execution: Re-import same 20,000 rows (Idempotency and update test)
+    const startTime2 = performance.now();
+    const result2 = await syncCustomers(client.id, rows);
+    const duration2 = Math.round(performance.now() - startTime2);
+
+    console.log(`[SHT-01 RE-IMPORT] 20,000 rows re-sync: duration=${duration2}ms, 0 added`);
+    assert.match(result2, /0 added/);
+    assert.match(result2, /20000 updated/);
+
+    const finalDbCount = await db.customer.count({ where: { clientId: client.id } });
+    assert.equal(finalDbCount, 19999, "Re-import must NEVER duplicate customers");
+
+    // Clean up
+    await db.customer.deleteMany({ where: { clientId: client.id } });
+    await db.client.delete({ where: { id: client.id } });
+  });
+
+  test("4. SHT-01 Failure Injection & Safe Retry: Partial failure followed by retry reconciles with zero duplicate records", async () => {
+    const client = await db.client.create({ data: { name: `Retry Client ${Date.now()}` } });
+    const basePhone = Math.floor(10000000 + Math.random() * 80000000);
+
+    // 1,500 rows across 3 chunks (500 per chunk)
+    const rows: string[][] = [["Phone", "Name", "Tags"]];
+    for (let i = 1; i <= 1500; i++) {
+      rows.push([`+9171${basePhone + i}`, `Retry Customer ${i}`, `tag_${i % 5}`]);
+    }
+
+    // Pass 1: Simulate failure after chunk 1 by submitting only the first 500 rows
+    const partialRows = rows.slice(0, 501); // Header + Chunk 1
+    const res1 = await syncCustomers(client.id, partialRows);
+    assert.match(res1, /500 added/);
+    const countAfterPartial = await db.customer.count({ where: { clientId: client.id } });
+    assert.equal(countAfterPartial, 500, "500 customers created in chunk 1");
+
+    // Pass 2: Retry full dataset of 1,500 rows from scratch (safe recovery)
+    const res2 = await syncCustomers(client.id, rows);
+    assert.match(res2, /1000 added/); // Chunks 2 & 3 added
+    assert.match(res2, /500 updated/); // Chunk 1 safely updated, NOT duplicated
+
+    const finalCount = await db.customer.count({ where: { clientId: client.id } });
+    assert.equal(finalCount, 1500, "Final database must reconcile to exactly 1,500 unique customers with 0 duplicates");
+
+    // Clean up
+    await db.customer.deleteMany({ where: { clientId: client.id } });
+    await db.client.delete({ where: { id: client.id } });
+  });
 });
