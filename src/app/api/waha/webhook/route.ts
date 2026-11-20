@@ -117,61 +117,68 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, ignored: "fromMe" });
     }
 
+    // Replay Protection (WEB-04): Durable idempotency via database uniqueness
+    if (p.id) {
+      const existingReply = await db.reply.findUnique({
+        where: { waMessageId: p.id },
+        select: { id: true },
+      });
+      if (existingReply) {
+        return NextResponse.json({ ok: true, duplicate: true, eventId: p.id });
+      }
+    }
+
     const phone = p.from.split("@")[0];
     if (!p.from.endsWith("@g.us")) {
-      if (OPT_OUT.test(p.body ?? "")) {
-        // Resolve tenant ownership strictly from explicit WAHA session-to-tenant mapping (WEB-01)
-        // Never infer tenant ownership from recipient phone activity or recent messages.
-        let resolvedClientId: string | null = null;
+      // Resolve tenant ownership strictly from explicit WAHA session-to-tenant mapping (WEB-01)
+      // Per-tenant WhatsAppNumber.label / phoneNumberId is authoritative.
+      // Conflicting or duplicate session mappings across tenants must strictly fail closed.
+      let resolvedClientId: string | null = null;
+      let resolvedSenderId: string | null = null;
 
-        if (sessionName) {
-          const senderNumber = await db.whatsAppNumber.findFirst({
-            where: {
-              OR: [
-                { label: sessionName },
-                { phoneNumberId: sessionName },
-              ],
-            },
-            select: { clientId: true },
-          });
+      if (sessionName) {
+        const matchedNumbers = await db.whatsAppNumber.findMany({
+          where: {
+            OR: [
+              { label: sessionName },
+              { phoneNumberId: sessionName },
+            ],
+          },
+          select: { id: true, clientId: true },
+        });
 
-          if (senderNumber?.clientId) {
-            resolvedClientId = senderNumber.clientId;
-          } else {
-            const setting = await db.setting.findFirst({
-              where: { id: 1, wahaSession: sessionName },
-              select: { id: true },
-            });
-            if (setting) {
-              const designatedClient = await db.client.findFirst({
-                where: { workspaceMode: { not: "SUSPENDED" } },
-                orderBy: { createdAt: "asc" },
-                select: { id: true },
-              });
-              resolvedClientId = designatedClient?.id ?? null;
-            }
-          }
+        if (matchedNumbers.length === 1 && matchedNumbers[0].clientId) {
+          resolvedClientId = matchedNumbers[0].clientId;
+          resolvedSenderId = matchedNumbers[0].id;
+        } else if (matchedNumbers.length > 1) {
+          console.warn(`[WAHA WEBHOOK] Ambiguous session mapping: '${sessionName}' matches ${matchedNumbers.length} numbers across tenants. Failing closed (WEB-01).`);
+          return new NextResponse("Conflict: Ambiguous session mapping", { status: 409 });
+        } else {
+          console.warn(`[WAHA WEBHOOK] Unmapped session '${sessionName}'. Failed-closed without customer mutation (WEB-01).`);
         }
+      }
 
+      if (OPT_OUT.test(p.body ?? "")) {
         if (resolvedClientId) {
           await db.customer.updateMany({
             where: { phone, clientId: resolvedClientId },
             data: { optedOut: true },
           });
-        } else {
-          console.warn(`[WAHA STOP] Unmapped session '${sessionName}'. Failed-closed without customer mutation (WEB-01).`);
         }
       }
 
       const text = p.body?.trim() || (p.hasMedia ? "[Photo or file]" : "");
-      await recordReply({
-        phone,
-        text,
-        kind: p.body?.trim() ? "text" : "media",
-        waMessageId: p.id,
-        anyClient: true,
-        at: p.timestamp ? new Date(p.timestamp * 1000) : undefined,
-      });
+      if (resolvedClientId) {
+        await recordReply({
+          phone,
+          text,
+          kind: p.body?.trim() ? "text" : "media",
+          waMessageId: p.id,
+          anyClient: false,
+          phoneNumberId: sessionName,
+          at: p.timestamp ? new Date(p.timestamp * 1000) : undefined,
+        });
+      }
     }
   }
   return NextResponse.json({ ok: true });

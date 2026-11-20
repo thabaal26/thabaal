@@ -211,7 +211,7 @@ function readPeriod(clientId: string, from: Date, to: Date) {
     }),
     db.order.findMany({
       where: { clientId, createdAt: range, status: { not: "CANCELLED" } },
-      select: { id: true, total: true, status: true, paidAt: true, paymentMethod: true, internalNote: true },
+      select: { id: true, total: true, status: true, paidAt: true, paymentMethod: true, internalNote: true, refundAmount: true },
     }),
     db.reply.count({
       where: { customer: { clientId }, receivedAt: range },
@@ -248,7 +248,9 @@ function computePeriodFigures(
   for (const o of orders) {
     const isPaid = isSale(o);
     if (isPaid) {
-      sales += o.total;
+      // Net Sales (ANL-01): deduct any completed refund from qualifying sales
+      const net = Math.max(0, o.total - (o.refundAmount ?? 0));
+      sales += net;
       paidCount++;
     } else {
       wait += o.total;

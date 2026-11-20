@@ -279,11 +279,11 @@ export const spendSummary = cache(async (clientId: string) => {
     db.order
       .findMany({
         where: {
-          customer: { clientId },
+          clientId,
           createdAt: { gte: thisMonth },
           ...SALE_WHERE,
         },
-        select: { total: true },
+        select: { total: true, refundAmount: true },
       })
       .catch(() => []),
     // Count all free-form 24h window replies ("Typed reply" / "Media reply" or pricingCategory="service") sent this month
@@ -344,7 +344,8 @@ export const spendSummary = cache(async (clientId: string) => {
   };
 
   const monthOrdersCount = monthOrders.length;
-  const monthOrderRevenue = Math.round(monthOrders.reduce((s, o) => s + o.total, 0));
+  // Net Order Revenue (ANL-01 & SPD-01): deduct any refunds and leverage direct clientId index
+  const monthOrderRevenue = Math.round(monthOrders.reduce((s, o) => s + Math.max(0, o.total - (o.refundAmount ?? 0)), 0));
 
   let localAllTimeSpent = 0;
   for (const g of allTimeGroups) {

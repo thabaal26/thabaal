@@ -59,7 +59,7 @@ export async function campaignResults(clientId: string, days = 90): Promise<Camp
        SELECT m.*,
          EXISTS (SELECT 1 FROM "Reply" rp WHERE rp."customerId" = m.cust AND rp."receivedAt" BETWEEN m.at AND m.at + interval '3 days') AS replied,
          EXISTS (SELECT 1 FROM "Order" o WHERE o."customerId" = m.cust AND o."createdAt" BETWEEN m.at AND m.at + interval '7 days') AS carted,
-         (SELECT coalesce(sum(o.total), 0) FROM "Order" o WHERE o."customerId" = m.cust AND o."createdAt" BETWEEN m.at AND m.at + interval '7 days' AND ${BOUGHT_SQL}) AS spent
+         (SELECT coalesce(sum(o.total - coalesce(o."refundAmount", 0)), 0) FROM "Order" o WHERE o."clientId" = $1 AND o."customerId" = m.cust AND o."createdAt" BETWEEN m.at AND m.at + interval '7 days' AND ${BOUGHT_SQL}) AS spent
        FROM m
      )
      SELECT id, name, template, count(DISTINCT run_id) AS runs, max(at) AS last_at, count(*) AS sent,

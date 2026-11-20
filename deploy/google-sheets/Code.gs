@@ -89,13 +89,22 @@ function doPost(e) {
   var event = String(body.event || "");
   var d = body.data || {};
   var t = now_();
+
+  function sanitize_(v) {
+    if (typeof v === "string" && /^[=+\-@]/.test(v.trim())) return "'" + v;
+    return v;
+  }
+  function row_(arr) {
+    return arr.map(sanitize_);
+  }
+
   // One write at a time, so two updates to the same order can't both add a row.
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
     if (event === "NEW_ORDER" || event === "ORDER_UPDATE") {
       var sh = tab_(TABS.orders);
-      var row = [d.orderId || "", d.created || t, t, d.status || "", d.name || "", d.phone || "", d.items || "", Number(d.total) || 0, d.paid || "", d.address || "", d.client || ""];
+      var row = row_([d.orderId || "", d.created || t, t, d.status || "", d.name || "", d.phone || "", d.items || "", Number(d.total) || 0, d.paid || "", d.address || "", d.client || ""]);
       var r = findRow_(sh, 1, d.orderId);
       if (r) {
         row[1] = sh.getRange(r, 2).getValue() || row[1]; // keep the original created time
@@ -103,19 +112,19 @@ function doPost(e) {
       } else {
         sh.appendRow(row);
       }
-      tab_(TABS.orderLog).appendRow([t, d.orderId || "", event === "NEW_ORDER" ? "New order" : d.change || "Updated", d.status || "", d.name || "", d.phone || "", Number(d.total) || 0, d.client || ""]);
+      tab_(TABS.orderLog).appendRow(row_([t, d.orderId || "", event === "NEW_ORDER" ? "New order" : d.change || "Updated", d.status || "", d.name || "", d.phone || "", Number(d.total) || 0, d.client || ""]));
     } else if (event === "NEW_CHAT") {
-      tab_(TABS.chats).appendRow([t, d.phone || "", d.name || "", d.message || "", d.source || "", d.client || ""]);
+      tab_(TABS.chats).appendRow(row_([t, d.phone || "", d.name || "", d.message || "", d.source || "", d.client || ""]));
     } else if (event === "BUTTON_CLICK") {
-      tab_(TABS.clicks).appendRow([t, d.phone || "", d.name || "", d.buttonText || "", d.actionValue || "", d.campaign || "", d.client || ""]);
+      tab_(TABS.clicks).appendRow(row_([t, d.phone || "", d.name || "", d.buttonText || "", d.actionValue || "", d.campaign || "", d.client || ""]));
     } else if (event === "CAMPAIGN_STATUS") {
       var cs = tab_(TABS.campaign);
       var cr = findRow_(cs, 6, d.waMessageId);
       if (cr) {
         cs.getRange(cr, 2).setValue(t);
-        cs.getRange(cr, 5).setValue(d.status || "");
+        cs.getRange(cr, 5).setValue(sanitize_(d.status || ""));
       } else {
-        cs.appendRow([t, t, d.campaign || "", d.phone || "", d.status || "", d.waMessageId || "", d.client || ""]);
+        cs.appendRow(row_([t, t, d.campaign || "", d.phone || "", d.status || "", d.waMessageId || "", d.client || ""]));
       }
     } else {
       tab_(TABS.other).appendRow([t, event, JSON.stringify(d)]);

@@ -36,13 +36,15 @@ export const isOpenCart = (o: SaleFields) => (o.status === "NEW" || o.status ===
 
 /** The same rule for raw SQL on an Order alias (e.g. `o`). Postgres \m…\M are word boundaries, like \b in COD_NOTE_RE. */
 export const saleSqlText = (a = "o") =>
-  `(${a}."paidAt" IS NOT NULL OR ${a}.status IN ('PAID','DISPATCHED','DELIVERED') OR (${a}.status = 'CONFIRMED' AND (${a}."paymentMethod" = 'cod' OR (${a}."paymentMethod" IS NULL AND ${a}."internalNote" ~* '\\m(cod|cash\\s+on\\s+delivery)\\M'))))`;
+  `(${a}.status <> 'CANCELLED' AND (${a}."refundAmount" IS NULL OR ${a}.total IS NULL OR ${a}.total <= 0 OR ${a}."refundAmount" < ${a}.total) AND (${a}."paidAt" IS NOT NULL OR ${a}.status IN ('PAID','DISPATCHED','DELIVERED') OR (${a}.status = 'CONFIRMED' AND (${a}."paymentMethod" = 'cod' OR (${a}."paymentMethod" IS NULL AND ${a}."internalNote" ~* '\\m(cod|cash\\s+on\\s+delivery)\\M')))))`;
 
 /**
  * The same rule as a Prisma filter. Prisma can't match a word, so older orders with only a "COD" note are found
  * by the note containing "cod" or "cash on delivery" (close enough for counts; the code rule above is exact).
+ * Excludes CANCELLED orders so direct callers (...SALE_WHERE) never count cancelled orders (ANL-03).
  */
 export const SALE_WHERE: Prisma.OrderWhereInput = {
+  status: { not: "CANCELLED" },
   OR: [
     { paidAt: { not: null } },
     { status: { in: ["PAID", "DISPATCHED", "DELIVERED"] } },

@@ -194,4 +194,83 @@ describe("WEB-01 & WEB-04: WAHA Webhook Authentication & Tenant Scoping Test Sui
     const freshCustomer = await db.customer.findUniqueOrThrow({ where: { id: customer.id } });
     assert.equal(freshCustomer.optedOut, false, "Unmapped session must fail closed with zero database mutations");
   });
+
+  test("7. WEB-01: Conflicting duplicate session mapping across tenants strictly fails closed with 409", async () => {
+    const key = await wahaWebhookKey();
+    const collisionSession = `collision_session_${Date.now()}`;
+    const client1 = await db.client.create({ data: { name: `Client 1 ${Date.now()}` } });
+    const client2 = await db.client.create({ data: { name: `Client 2 ${Date.now()}` } });
+
+    // Both clients inadvertently register the same WAHA session name
+    await db.whatsAppNumber.create({ data: { clientId: client1.id, label: collisionSession, phoneNumberId: `p1_${Date.now()}`, businessAccountId: `waba1_${Date.now()}` } });
+    await db.whatsAppNumber.create({ data: { clientId: client2.id, label: collisionSession, phoneNumberId: `p2_${Date.now()}`, businessAccountId: `waba2_${Date.now()}` } });
+
+    const payload = JSON.stringify({
+      event: "message",
+      session: collisionSession,
+      payload: { id: `msg_collision_${Date.now()}`, from: "919999999999@c.us", body: "Hello", timestamp: Math.floor(Date.now() / 1000) },
+    });
+    const signature = createHmac("sha512", key).update(payload).digest("hex");
+    const req = new NextRequest("http://localhost:3000/api/waha/webhook", {
+      method: "POST",
+      headers: { "x-webhook-hmac": `sha512=${signature}`, "content-type": "application/json" },
+      body: payload,
+    });
+
+    const res = await POST(req);
+    assert.equal(res.status, 409, "Conflicting session mappings across tenants must return 409 Conflict");
+  });
+
+  test("8. WEB-04: Replay attack with same valid signed body within 5-min window is safely deduplicated", async () => {
+    const key = await wahaWebhookKey();
+    const session = `replay_session_${Date.now()}`;
+    const client = await db.client.create({ data: { name: `Replay Client ${Date.now()}` } });
+    const phone = `91987${Math.floor(1000000 + Math.random() * 9000000)}`;
+
+    const customer = await db.customer.create({
+      data: { clientId: client.id, name: "Replay Test User", phone, optedOut: false },
+    });
+    const number = await db.whatsAppNumber.create({
+      data: { clientId: client.id, label: session, phoneNumberId: session, businessAccountId: `waba_${Date.now()}` },
+    });
+
+    const eventId = `waha_event_${Date.now()}`;
+    const payload = JSON.stringify({
+      event: "message",
+      session,
+      payload: {
+        id: eventId,
+        from: `${phone}@c.us`,
+        body: "Hello first time",
+        timestamp: Math.floor(Date.now() / 1000),
+      },
+    });
+    const signature = createHmac("sha512", key).update(payload).digest("hex");
+
+    // 1st delivery (legitimate)
+    const req1 = new NextRequest("http://localhost:3000/api/waha/webhook", {
+      method: "POST",
+      headers: { "x-webhook-hmac": `sha512=${signature}`, "content-type": "application/json" },
+      body: payload,
+    });
+    const res1 = await POST(req1);
+    assert.equal(res1.status, 200);
+
+    const repliesCount1 = await db.reply.count({ where: { waMessageId: eventId } });
+    assert.equal(repliesCount1, 1, "Exactly 1 reply must be created for initial delivery");
+
+    // 2nd delivery (replay within 5 minutes)
+    const req2 = new NextRequest("http://localhost:3000/api/waha/webhook", {
+      method: "POST",
+      headers: { "x-webhook-hmac": `sha512=${signature}`, "content-type": "application/json" },
+      body: payload,
+    });
+    const res2 = await POST(req2);
+    assert.equal(res2.status, 200);
+    const data2 = await res2.json();
+    assert.equal(data2.duplicate, true, "Replay must be recognized as duplicate");
+
+    const repliesCount2 = await db.reply.count({ where: { waMessageId: eventId } });
+    assert.equal(repliesCount2, 1, "Zero duplicate replies created during replay attack");
+  });
 });

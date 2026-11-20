@@ -180,6 +180,8 @@ export async function paymentsData(clientId: string, period: "t" | "w" | "m") {
   }
 
   const receivedToday = paid.filter((o) => o.paidAt && o.paidAt >= today).reduce((n, o) => n + receivedOf(o), 0);
+  const refundsToday = paid.filter((o) => o.refundedAt && o.refundedAt >= today).reduce((n, o) => n + (o.refundAmount ?? 0), 0);
+  const netReceivedToday = Math.max(0, Math.round((receivedToday - refundsToday) * 100) / 100);
 
   return {
     collect,
@@ -187,6 +189,8 @@ export async function paymentsData(clientId: string, period: "t" | "w" | "m") {
     txns,
     cashDay: [...cashToday.values()].sort((a, b) => b.amount - a.amount),
     receivedToday,
+    refundsToday,
+    netReceivedToday,
     hasPaymentConfig: pay.waPay || pay.upi,
   };
 }
