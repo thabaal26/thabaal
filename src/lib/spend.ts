@@ -3,7 +3,7 @@ import { cache } from "react";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { db } from "./db";
 import { APP_TZ } from "./format";
-import { SALE_WHERE } from "@/lib/sale";
+import { filterSales, SALE_WHERE } from "@/lib/sale";
 import {
   fetchMetaCostSince,
   fetchMetaLivePricing,
@@ -283,7 +283,7 @@ export const spendSummary = cache(async (clientId: string) => {
           createdAt: { gte: thisMonth },
           ...SALE_WHERE,
         },
-        select: { total: true, refundAmount: true },
+        select: { total: true, refundAmount: true, status: true, paidAt: true, paymentMethod: true, internalNote: true },
       })
       .catch(() => []),
     // Count all free-form 24h window replies ("Typed reply" / "Media reply" or pricingCategory="service") sent this month
@@ -343,9 +343,10 @@ export const spendSummary = cache(async (clientId: string) => {
     rateAfterQuota: RATES.service,
   };
 
-  const monthOrdersCount = monthOrders.length;
+  const qualifyingSales = filterSales(monthOrders);
+  const monthOrdersCount = qualifyingSales.length;
   // Net Order Revenue (ANL-01 & SPD-01): deduct any refunds and leverage direct clientId index
-  const monthOrderRevenue = Math.round(monthOrders.reduce((s, o) => s + Math.max(0, o.total - (o.refundAmount ?? 0)), 0));
+  const monthOrderRevenue = Math.round(qualifyingSales.reduce((s, o) => s + (o.total - (o.refundAmount ?? 0)), 0));
 
   let localAllTimeSpent = 0;
   for (const g of allTimeGroups) {

@@ -91,7 +91,7 @@ function doPost(e) {
   var t = now_();
 
   function sanitize_(v) {
-    if (typeof v === "string" && /^[=+\-@]/.test(v.trim())) return "'" + v;
+    if (typeof v === "string" && /^[\s\t\r\n]*[=+\-@]/.test(v)) return "'" + v;
     return v;
   }
   function row_(arr) {

@@ -207,6 +207,7 @@ export async function recordRefund(id: string, input: { amount?: number | null; 
   const how = input.method && isPaymentMethod(input.method) ? methodLabel(input.method, true) : null;
   const line = `${stamp()}: refunded ${money(amount, o.currency)}${how ? ` by ${how}` : ""}${input.note?.trim() ? ` (${input.note.trim()})` : ""}`;
   // Only if no other refund was recorded since this order was read (a double tap, two staff at once).
+  const isFullRefund = already + amount >= o.total && o.total > 0;
   const saved = await db.order.updateMany({
     where: { id: o.id, refundAmount: o.refundAmount },
     data: {
@@ -214,6 +215,7 @@ export async function recordRefund(id: string, input: { amount?: number | null; 
       refundAmount: Math.round((already + amount) * 100) / 100,
       refundNote: [o.refundNote, line].filter(Boolean).join("\n").slice(0, 500),
       internalNote: addNote(o.internalNote, line),
+      ...(isFullRefund ? { status: "CANCELLED", cancelledAt: new Date(), cancelledBy: "100% Full Refund" } : {}),
     },
   });
   if (saved.count === 0) return done(`A refund on ${orderRef(o)} was recorded a moment ago. Check the order before recording another.`, false);

@@ -273,4 +273,49 @@ describe("WEB-01 & WEB-04: WAHA Webhook Authentication & Tenant Scoping Test Sui
     const repliesCount2 = await db.reply.count({ where: { waMessageId: eventId } });
     assert.equal(repliesCount2, 1, "Zero duplicate replies created during replay attack");
   });
+
+  test("9. WEB-04 Concurrency: 10 concurrent duplicate deliveries via Promise.allSettled create exactly 1 side effect", async () => {
+    const key = await wahaWebhookKey();
+    const session = `concurrent_session_${Date.now()}`;
+    const client = await db.client.create({ data: { name: `Concurrent Client ${Date.now()}` } });
+    const phone = `91986${Math.floor(1000000 + Math.random() * 9000000)}`;
+
+    await db.customer.create({
+      data: { clientId: client.id, name: "Concurrent User", phone, optedOut: false },
+    });
+    await db.whatsAppNumber.create({
+      data: { clientId: client.id, label: session, phoneNumberId: session, businessAccountId: `waba_${Date.now()}` },
+    });
+
+    const eventId = `waha_concurrent_${Date.now()}`;
+    const payload = JSON.stringify({
+      event: "message",
+      session,
+      payload: {
+        id: eventId,
+        from: `${phone}@c.us`,
+        body: "Concurrent message storm",
+        timestamp: Math.floor(Date.now() / 1000),
+      },
+    });
+    const signature = createHmac("sha512", key).update(payload).digest("hex");
+
+    // Fire 10 concurrent deliveries with the exact same eventId
+    const requests = Array.from({ length: 10 }, () =>
+      new NextRequest("http://localhost:3000/api/waha/webhook", {
+        method: "POST",
+        headers: { "x-webhook-hmac": `sha512=${signature}`, "content-type": "application/json" },
+        body: payload,
+      })
+    );
+
+    const results = await Promise.allSettled(requests.map((r) => POST(r)));
+
+    // Every single promise must resolve cleanly without crashing (fulfilled)
+    assert.equal(results.every((r) => r.status === "fulfilled"), true, "All 10 concurrent requests must settle cleanly");
+
+    // Exactly 1 Reply record exists in the database
+    const repliesCount = await db.reply.count({ where: { waMessageId: eventId } });
+    assert.equal(repliesCount, 1, "Exactly 1 reply must be created despite 10 competing deliveries");
+  });
 });

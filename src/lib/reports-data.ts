@@ -15,6 +15,9 @@ export type PeriodKey = "m" | "w";
 export type PeriodFigures = {
   cost: number;
   sales: number;
+  grossSales: number;
+  refunds: number;
+  netSales: number;
   wait: number;
   sent: number;
   reached: number;
@@ -240,6 +243,8 @@ function computePeriodFigures(
     if (m.status === "READ") read++;
   }
 
+  let grossSales = 0;
+  let refunds = 0;
   let sales = 0;
   let wait = 0;
   let paidCount = 0;
@@ -248,8 +253,11 @@ function computePeriodFigures(
   for (const o of orders) {
     const isPaid = isSale(o);
     if (isPaid) {
-      // Net Sales (ANL-01): deduct any completed refund from qualifying sales
-      const net = Math.max(0, o.total - (o.refundAmount ?? 0));
+      // Disclose Gross Sales, Completed Refunds, and Net Sales separately (ANL-01)
+      const ref = o.refundAmount ?? 0;
+      const net = Math.round((o.total - ref) * 100) / 100;
+      grossSales += o.total;
+      refunds += ref;
       sales += net;
       paidCount++;
     } else {
@@ -257,6 +265,10 @@ function computePeriodFigures(
       unpaidCount++;
     }
   }
+  grossSales = Math.round(grossSales * 100) / 100;
+  refunds = Math.round(refunds * 100) / 100;
+  sales = Math.round(sales * 100) / 100;
+  const netSales = sales;
 
   cost = Math.round(cost * 100) / 100;
   // No recorded message cost: there is no return per ₹1 to show (it used to fall back to the sales total).
@@ -344,6 +356,9 @@ function computePeriodFigures(
   return {
     cost,
     sales,
+    grossSales,
+    refunds,
+    netSales,
     wait,
     sent,
     reached,

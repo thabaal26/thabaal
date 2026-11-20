@@ -34,6 +34,9 @@ export function isSale(o: SaleFields): boolean {
 /** Still an open cart: not a sale, not cancelled, money not in. */
 export const isOpenCart = (o: SaleFields) => (o.status === "NEW" || o.status === "CONFIRMED") && !o.paidAt && !isSale(o);
 
+/** Filters an in-memory array of orders to only qualifying active sales (excluding cancelled & 100% full refunds). */
+export const filterSales = <T extends SaleFields>(orders: T[]): T[] => orders.filter(isSale);
+
 /** The same rule for raw SQL on an Order alias (e.g. `o`). Postgres \m…\M are word boundaries, like \b in COD_NOTE_RE. */
 export const saleSqlText = (a = "o") =>
   `(${a}.status <> 'CANCELLED' AND (${a}."refundAmount" IS NULL OR ${a}.total IS NULL OR ${a}.total <= 0 OR ${a}."refundAmount" < ${a}.total) AND (${a}."paidAt" IS NOT NULL OR ${a}.status IN ('PAID','DISPATCHED','DELIVERED') OR (${a}.status = 'CONFIRMED' AND (${a}."paymentMethod" = 'cod' OR (${a}."paymentMethod" IS NULL AND ${a}."internalNote" ~* '\\m(cod|cash\\s+on\\s+delivery)\\M')))))`;
