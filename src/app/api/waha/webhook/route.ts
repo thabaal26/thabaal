@@ -37,28 +37,21 @@ export async function POST(req: NextRequest) {
   const expectedKey = await wahaWebhookKey();
   const rawBody = await req.text();
 
-  // 1. Verify Timestamp Freshness if provided (5-minute replay window) (WEB-04)
-  const reqTimestamp = req.headers.get("x-webhook-timestamp") || req.headers.get("x-timestamp");
-  if (reqTimestamp) {
-    const ts = Number(reqTimestamp);
-    if (!Number.isFinite(ts) || Math.abs(Date.now() - (ts > 1e11 ? ts : ts * 1000)) > 5 * 60 * 1000) {
-      return new NextResponse("Webhook timestamp expired or invalid", { status: 401 });
-    }
-  }
-
-  // 2. Multi-strategy Authentication (HMAC Header, Secret Header, or Legacy Query Key) (WEB-04)
+  // 1. Multi-strategy Authentication (Native HMAC-SHA512 Header, Secret Header, or Query Key) (WEB-04)
   const hmacHeader =
     req.headers.get("x-webhook-hmac") ||
     req.headers.get("x-hub-signature-256") ||
+    req.headers.get("x-hub-signature-512") ||
     req.headers.get("x-webhook-signature");
 
   let authenticated = false;
 
   if (hmacHeader) {
     const cleanHeader = hmacHeader.replace(/^sha(256|512)=/i, "");
-    const computedSha256 = createHmac("sha256", expectedKey).update(rawBody).digest("hex");
+    // WAHA official documentation specifies native HMAC-SHA512 over the raw request body
     const computedSha512 = createHmac("sha512", expectedKey).update(rawBody).digest("hex");
-    authenticated = safeCompare(cleanHeader, computedSha256) || safeCompare(cleanHeader, computedSha512);
+    const computedSha256 = createHmac("sha256", expectedKey).update(rawBody).digest("hex");
+    authenticated = safeCompare(cleanHeader, computedSha512) || safeCompare(cleanHeader, computedSha256);
   }
 
   if (!authenticated) {
@@ -86,6 +79,9 @@ export async function POST(req: NextRequest) {
     return new NextResponse("Invalid JSON", { status: 400 });
   }
 
+  // 2. Body-level Timestamp Freshness Verification (WEB-04)
+  const sessionName = (e as { session?: string }).session;
+
   if (e.event === "message.ack") {
     const p = (e as Extract<Event, { event: "message.ack" }>).payload;
     const next = mapAck(p.ack);
@@ -107,6 +103,15 @@ export async function POST(req: NextRequest) {
     }
   } else if (e.event === "message") {
     const p = (e as Extract<Event, { event: "message" }>).payload;
+
+    // Freshness filtering must check the timestamp inside the HMAC-verified body (WEB-04)
+    if (p.timestamp) {
+      const bodyTs = p.timestamp > 1e11 ? p.timestamp : p.timestamp * 1000;
+      if (Math.abs(Date.now() - bodyTs) > 5 * 60 * 1000) {
+        return new NextResponse("Webhook body timestamp expired", { status: 401 });
+      }
+    }
+
     // Suppress own-session echoes
     if (p.fromMe) {
       return NextResponse.json({ ok: true, ignored: "fromMe" });
@@ -115,33 +120,46 @@ export async function POST(req: NextRequest) {
     const phone = p.from.split("@")[0];
     if (!p.from.endsWith("@g.us")) {
       if (OPT_OUT.test(p.body ?? "")) {
-        // Resolve tenant scope from recent outbound message to this phone (WEB-01)
-        const recentMsg = await db.message.findFirst({
-          where: { customer: { phone } },
-          orderBy: { createdAt: "desc" },
-          select: { customer: { select: { clientId: true } } },
-        });
+        // Resolve tenant ownership strictly from explicit WAHA session-to-tenant mapping (WEB-01)
+        // Never infer tenant ownership from recipient phone activity or recent messages.
+        let resolvedClientId: string | null = null;
 
-        if (recentMsg?.customer?.clientId) {
+        if (sessionName) {
+          const senderNumber = await db.whatsAppNumber.findFirst({
+            where: {
+              OR: [
+                { label: sessionName },
+                { phoneNumberId: sessionName },
+              ],
+            },
+            select: { clientId: true },
+          });
+
+          if (senderNumber?.clientId) {
+            resolvedClientId = senderNumber.clientId;
+          } else {
+            const setting = await db.setting.findFirst({
+              where: { id: 1, wahaSession: sessionName },
+              select: { id: true },
+            });
+            if (setting) {
+              const designatedClient = await db.client.findFirst({
+                where: { workspaceMode: { not: "SUSPENDED" } },
+                orderBy: { createdAt: "asc" },
+                select: { id: true },
+              });
+              resolvedClientId = designatedClient?.id ?? null;
+            }
+          }
+        }
+
+        if (resolvedClientId) {
           await db.customer.updateMany({
-            where: { phone, clientId: recentMsg.customer.clientId },
+            where: { phone, clientId: resolvedClientId },
             data: { optedOut: true },
           });
         } else {
-          // If no message found, check if only one client owns this phone
-          const candidateCustomers = await db.customer.findMany({
-            where: { phone },
-            select: { id: true, clientId: true },
-            take: 2,
-          });
-          if (candidateCustomers.length === 1) {
-            await db.customer.update({
-              where: { id: candidateCustomers[0].id },
-              data: { optedOut: true },
-            });
-          } else {
-            console.warn(`[WAHA STOP] Unresolved tenant for phone ${phone}. Global opt-out suppressed (WEB-01).`);
-          }
+          console.warn(`[WAHA STOP] Unmapped session '${sessionName}'. Failed-closed without customer mutation (WEB-01).`);
         }
       }
 
