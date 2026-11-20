@@ -31,6 +31,7 @@ import { chargeMessage } from "@/lib/wallet";
 import { applyOwnerStatus } from "@/lib/owner-messages";
 import { claimInbound, markProcessed, releaseInbound } from "@/lib/engine/inbound";
 import { handleButtonTap } from "@/lib/engine/buttons";
+import { normalizePhone } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
 
@@ -118,9 +119,9 @@ async function applyStatus(s: StatusUpdate) {
       },
     });
     if (candidate) {
-      const candidateDigits = candidate.customer?.phone?.replace(/\D/g, "") ?? "";
-      const recipientDigits = s.recipient_id?.replace(/\D/g, "") ?? "";
-      if (!recipientDigits || candidateDigits.endsWith(recipientDigits) || recipientDigits.endsWith(candidateDigits)) {
+      const candidateNorm = normalizePhone(candidate.customer?.phone ?? "");
+      const recipientNorm = normalizePhone(s.recipient_id ?? "");
+      if (candidateNorm && recipientNorm && candidateNorm === recipientNorm) {
         await db.message.update({
           where: { id: candidate.id },
           data: { waMessageId: s.id },

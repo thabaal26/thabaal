@@ -16,8 +16,8 @@ const rupees = (n: number) => `₹${Number.isInteger(n) ? n : n.toFixed(2)}`;
 type PricedLine = { price: number; quantity: number };
 
 /** The order with its customer's loyalty over all their numbers (a person's points are one balance). */
-async function loadOrder(orderId: string) {
-  const order = await db.order.findUnique({
+async function loadOrder(orderId: string, client: { order: typeof db.order; customer: typeof db.customer } = db) {
+  const order = await client.order.findUnique({
     where: { id: orderId },
     select: {
       id: true,
@@ -33,7 +33,7 @@ async function loadOrder(orderId: string) {
       customer: { select: { id: true, personId: true, name: true, tags: true, purchases: true, orders: { select: LOYALTY_ORDER_SELECT } } },
     },
   });
-  return order && { ...order, customer: await asPerson(order.customer) };
+  return order && { ...order, customer: await asPerson(order.customer, client) };
 }
 
 /**
@@ -57,56 +57,97 @@ export function maxPointsDiscount(order: {
 /**
  * Sets the points discount on an order to `amount` rupees ("max" = as much as the balance allows; 0 removes it).
  * The order's total becomes items + shipping − discount. Refused on paid or cancelled orders.
+ * Serialized per customer via PostgreSQL transaction advisory lock (LOY-02).
  */
 export async function setOrderPoints(orderId: string, amount: number | "max"): Promise<{ ok: boolean; message: string; applied: number }> {
-  const order = await loadOrder(orderId);
-  if (!order) return { ok: false, message: "Order not found.", applied: 0 };
-  if (order.status === "CANCELLED") return { ok: false, message: "This order is cancelled.", applied: 0 };
-  if (order.paidAt || (order.paidAmount ?? 0) > 0) {
-    return { ok: false, message: "Money has already been received for this order, so its total can't change. Record a refund instead.", applied: 0 };
-  }
+  return await db.$transaction(async (tx) => {
+    // 1. Identify preliminary customer/person lock target
+    const preliminary = await tx.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        customerId: true,
+        customer: { select: { id: true, personId: true } },
+      },
+    });
+    if (!preliminary) return { ok: false, message: "Order not found.", applied: 0 };
 
-  const items = (order.items as PricedLine[] | null) ?? [];
-  const current = pointsDiscount(order);
-  const { subtotal, shipping } = getOrderPricing(items, order.total, { discount: current });
-  if (subtotal <= 0) return { ok: false, message: "Add item prices before using points.", applied: 0 };
+    // 2. Acquire transaction-scoped advisory lock on customer / person identity (LOY-02)
+    const lockTarget = preliminary.customer?.personId || preliminary.customer?.id || preliminary.customerId;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('loyalty_cust:' || ${lockTarget})::bigint)`;
 
-  const rules = loyaltyRules(order.client);
-  const { max, balance } = maxPointsDiscount(order, rules);
-  const wanted = amount === "max" ? max : Math.max(0, Math.floor(amount / REDEEM_STEP) * REDEEM_STEP);
-  // Using points is off: nothing new comes off; points already on an order can still be taken back off.
-  if (rules.redeemOn === false && wanted > 0) {
-    return { ok: false, message: "Using loyalty points is off. Turn it on in Payments › Settings › Loyalty points at checkout.", applied: current };
-  }
-  if (wanted > max) {
+    // 3. Load fresh order and customer data under transaction lock
+    const order = await loadOrder(orderId, tx as unknown as { order: typeof db.order; customer: typeof db.customer });
+    if (!order) return { ok: false, message: "Order not found.", applied: 0 };
+    if (order.status === "CANCELLED") return { ok: false, message: "This order is cancelled.", applied: 0 };
+    if (order.paidAt || (order.paidAmount ?? 0) > 0) {
+      return { ok: false, message: "Money has already been received for this order, so its total can't change. Record a refund instead.", applied: 0 };
+    }
+
+    const items = (order.items as PricedLine[] | null) ?? [];
+    const current = pointsDiscount(order);
+    const { subtotal, shipping } = getOrderPricing(items, order.total, { discount: current });
+    if (subtotal <= 0) return { ok: false, message: "Add item prices before using points.", applied: 0 };
+
+    const rules = loyaltyRules(order.client);
+    const { max, balance } = maxPointsDiscount(order, rules);
+    const wanted = amount === "max" ? max : Math.max(0, Math.floor(amount / REDEEM_STEP) * REDEEM_STEP);
+
+    // Using points is off: nothing new comes off; points already on an order can still be taken back off.
+    if (rules.redeemOn === false && wanted > 0) {
+      return { ok: false, message: "Using loyalty points is off. Turn it on in Payments › Settings › Loyalty points at checkout.", applied: current };
+    }
+    if (wanted > max) {
+      return {
+        ok: false,
+        message:
+          max > 0
+            ? `${order.customer.name} can use up to ${rupees(max)} of points on this order (${balance} points).`
+            : `${order.customer.name} doesn't have enough points yet (${balance} points; 50 are needed for ₹25).`,
+        applied: current,
+      };
+    }
+    if (wanted === current) return { ok: true, message: wanted ? `${rupees(wanted)} of points is already on this order.` : "No points are used on this order.", applied: current };
+
+    const total = r2(subtotal + shipping - wanted);
+    // Only if no money arrived and nobody changed the points since this was read (a payment landing at the same
+    // moment must not have the total changed under it).
+    const saved = await tx.order.updateMany({
+      where: { id: order.id, paidAt: null, paidAmount: order.paidAmount, pointsRedeemed: order.pointsRedeemed, total: order.total },
+      data: { pointsRedeemed: wanted * 2, total },
+    });
+    if (saved.count === 0) return { ok: false, message: "This order changed a moment ago (a payment or another change). Check it and try again.", applied: current };
+
+    // Record immutable ledger entry in LoyaltyEntry (LOY-03)
+    const ptsWanted = wanted * 2;
+    const ptsCurrent = (order.pointsRedeemed ?? 0);
+    const delta = ptsCurrent - ptsWanted;
+    if (delta !== 0) {
+      const idempotencyKey = `order-points:${order.id}:${ptsWanted}:${Date.now()}`;
+      await tx.loyaltyEntry.create({
+        data: {
+          clientId: order.clientId,
+          customerId: order.customer.id,
+          delta,
+          kind: delta < 0 ? "redeem" : "give",
+          reason: delta < 0 ? `Order discount: ${rupees(wanted)}` : `Reverted order discount: ${rupees(current - wanted)}`,
+          byName: "Order Checkout",
+          told: false,
+          idempotencyKey,
+          sourceRef: order.id,
+        },
+      });
+    }
+
+    const resend = order.paymentRequestedAt ? " Send the payment request again so they pay the new total." : "";
     return {
-      ok: false,
-      message:
-        max > 0
-          ? `${order.customer.name} can use up to ${rupees(max)} of points on this order (${balance} points).`
-          : `${order.customer.name} doesn't have enough points yet (${balance} points; 50 are needed for ₹25).`,
-      applied: current,
+      ok: true,
+      applied: wanted,
+      message: wanted
+        ? `Used ${wanted * 2} points: ${rupees(wanted)} off ${order.customer.name}'s order. New total ${rupees(total)}.${resend}`
+        : `Points removed. ${order.customer.name}'s ${current * 2} points are back and the total is ${rupees(total)} again.${resend}`,
     };
-  }
-  if (wanted === current) return { ok: true, message: wanted ? `${rupees(wanted)} of points is already on this order.` : "No points are used on this order.", applied: current };
-
-  const total = r2(subtotal + shipping - wanted);
-  // Only if no money arrived and nobody changed the points since this was read (a payment landing at the same
-  // moment must not have the total changed under it).
-  const saved = await db.order.updateMany({
-    where: { id: order.id, paidAt: null, paidAmount: order.paidAmount, pointsRedeemed: order.pointsRedeemed, total: order.total },
-    data: { pointsRedeemed: wanted * 2, total },
   });
-  if (saved.count === 0) return { ok: false, message: "This order changed a moment ago (a payment or another change). Check it and try again.", applied: current };
-
-  const resend = order.paymentRequestedAt ? " Send the payment request again so they pay the new total." : "";
-  return {
-    ok: true,
-    applied: wanted,
-    message: wanted
-      ? `Used ${wanted * 2} points: ${rupees(wanted)} off ${order.customer.name}'s order. New total ${rupees(total)}.${resend}`
-      : `Points removed. ${order.customer.name}'s ${current * 2} points are back and the total is ${rupees(total)} again.${resend}`,
-  };
 }
 
 /** A new order arrived (cart or hand-entered): use the customer's points on it when the client has this turned on. */

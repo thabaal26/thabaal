@@ -10,11 +10,22 @@ import { COD_NOTE_RE } from "./payment-state";
  * Owner's decision, 30 Oct 2026 (DEC-01 in docs/qa/BUG_REPORT.md).
  */
 
-export type SaleFields = { status: string; paidAt: Date | null; paymentMethod: string | null; internalNote: string | null };
+export type SaleFields = {
+  status: string;
+  paidAt: Date | null;
+  paymentMethod: string | null;
+  internalNote: string | null;
+  refundAmount?: number | null;
+  total?: number | null;
+};
 
 const isCod = (o: SaleFields) => (o.paymentMethod ? o.paymentMethod === "cod" : COD_NOTE_RE.test(o.internalNote ?? ""));
 
 export function isSale(o: SaleFields): boolean {
+  // A cancelled/voided order is not a qualifying sale, regardless of previous payment timestamps.
+  if (o.status === "CANCELLED") return false;
+  // A 100% fully refunded order returns zero net revenue and is no longer a qualifying sale.
+  if (o.refundAmount != null && o.total != null && o.total > 0 && o.refundAmount >= o.total) return false;
   if (o.paidAt) return true;
   if (o.status === "PAID" || o.status === "DISPATCHED" || o.status === "DELIVERED") return true;
   return o.status === "CONFIRMED" && isCod(o);

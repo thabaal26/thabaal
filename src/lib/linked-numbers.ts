@@ -106,7 +106,7 @@ export function numbersNote(r: { added: string[]; joined: { name: string; phone:
 /* ---------- One person's totals: orders, sheet purchases and points on every number ---------- */
 
 /** The order fields loyalty needs (lib/loyalty.ts loyaltyFromOrders). */
-export const LOYALTY_ORDER_SELECT = { id: true, total: true, status: true, paidAt: true, paymentMethod: true, internalNote: true, pointsRedeemed: true } as const;
+export const LOYALTY_ORDER_SELECT = { id: true, total: true, status: true, paidAt: true, paymentMethod: true, internalNote: true, pointsRedeemed: true, refundAmount: true } as const;
 
 /** What was written on the order sheets for each number, once: a linked number copies it, so the same text counts once. */
 export function mergePurchases(list: readonly (string | null | undefined)[]) {
@@ -128,10 +128,13 @@ type LoyaltyInput = { id: string; personId: string | null; purchases?: string | 
  * purchases once, and points given or used by hand on any number (loyalty-bonus tags). The rest of each row,
  * its own tags included, stays as it is. Rows without other numbers come back unchanged.
  */
-export async function asPeople<T extends LoyaltyInput>(rows: T[]): Promise<T[]> {
+export async function asPeople<T extends LoyaltyInput>(
+  rows: T[],
+  client: { customer: { findMany: typeof db.customer.findMany } } = db
+): Promise<T[]> {
   const people = [...new Set(rows.map((r) => r.personId).filter((p): p is string => Boolean(p)))];
   if (!people.length) return rows;
-  const all = await db.customer.findMany({ where: { personId: { in: people } }, select: { id: true, personId: true, purchases: true, tags: true, orders: { select: LOYALTY_ORDER_SELECT } } });
+  const all = await client.customer.findMany({ where: { personId: { in: people } }, select: { id: true, personId: true, purchases: true, tags: true, orders: { select: LOYALTY_ORDER_SELECT } } });
   return rows.map((r) => {
     const others = all.filter((o) => o.personId === r.personId && o.id !== r.id);
     if (!r.personId || !others.length) return r;
@@ -145,6 +148,9 @@ export async function asPeople<T extends LoyaltyInput>(rows: T[]): Promise<T[]> 
 }
 
 /** One customer's loyalty inputs for the whole person (see asPeople). */
-export async function asPerson<T extends LoyaltyInput>(row: T): Promise<T> {
-  return (await asPeople([row]))[0];
+export async function asPerson<T extends LoyaltyInput>(
+  row: T,
+  client: { customer: { findMany: typeof db.customer.findMany } } = db
+): Promise<T> {
+  return (await asPeople([row], client))[0];
 }

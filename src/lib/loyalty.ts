@@ -98,8 +98,9 @@ export function loyaltyRules(c?: RuleColumns | null): LoyaltyRules {
 }
 
 /** Points the rules give for one bought order; `nth` is its place among the customer's bought orders (1 = first). */
-export function pointsForOrder(total: number, nth: number, rules: LoyaltyRules = DEFAULT_LOYALTY_RULES) {
-  const spend = rules.earnOn ? Math.floor(Math.max(0, Number(total) || 0) / rules.rupeesPerPoint) : 0;
+export function pointsForOrder(total: number, nth: number, rules: LoyaltyRules = DEFAULT_LOYALTY_RULES, refundAmount: number = 0) {
+  const eligible = Math.max(0, (Number(total) || 0) - (Number(refundAmount) || 0));
+  const spend = rules.earnOn ? Math.floor(eligible / rules.rupeesPerPoint) : 0;
   return spend + (rules.repeatOn && nth > 1 ? rules.repeatBonus : 0);
 }
 
@@ -147,7 +148,16 @@ export function applyManualLoyaltyDelta(tags: string[], delta: number, totalAfte
   return cleaned;
 }
 
-type LoyaltyOrderRow = { id?: string; total: number; status: string; paidAt: Date | null; paymentMethod: string | null; internalNote: string | null; pointsRedeemed?: number | null };
+type LoyaltyOrderRow = {
+  id?: string;
+  total: number;
+  status: string;
+  paidAt: Date | null;
+  paymentMethod: string | null;
+  internalNote: string | null;
+  pointsRedeemed?: number | null;
+  refundAmount?: number | null;
+};
 
 /** Bought = paid, or confirmed and beyond: the orders that earn points. */
 export const isBoughtOrder = (o: SaleFields) => isSale(o);
@@ -166,11 +176,12 @@ export function loyaltyFromOrders(
 ) {
   const { exceptOrderId, ...rest } = extra;
   const bought = c.orders.filter((o) => isBoughtOrder(o) && o.id !== exceptOrderId);
+  const netSpent = bought.reduce((n, o) => n + Math.max(0, o.total - (o.refundAmount ?? 0)), 0);
   return computeCustomerLoyalty({
     ...rest,
     name: c.name,
     paidOrdersCount: bought.length,
-    totalSpent: bought.reduce((n, o) => n + o.total, 0),
+    totalSpent: netSpent,
     sheetPurchases: c.purchases,
     tags: c.tags,
     redeemedPoints: redeemedOnOrders(c.orders, exceptOrderId),

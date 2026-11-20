@@ -848,19 +848,21 @@ model WalletEntry {
 /// Loyalty points given, taken back or used on a bill by hand (Customers › Loyalty), with the reason and who did it.
 /// Points earned and used on orders come from the orders themselves; these are the hand changes for the history.
 model LoyaltyEntry {
-  id         String   @id @default(cuid())
-  clientId   String
-  customerId String
-  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  id             String   @id @default(cuid())
+  clientId       String
+  customerId     String
+  customer       Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
   /// Points added (positive) or taken off (negative).
-  delta      Int
+  delta          Int
   /// "give", "take" or "redeem"
-  kind       String
-  reason     String
-  byName     String?
+  kind           String
+  reason         String
+  byName         String?
   /// Whether the customer was told on WhatsApp.
-  told       Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  told           Boolean  @default(false)
+  idempotencyKey String?  @unique
+  sourceRef      String?
+  createdAt      DateTime @default(now())
 
   @@index([clientId, createdAt])
   @@index([customerId])
@@ -1105,18 +1107,25 @@ model RazorpayEvent {
 /// One claim per message Meta delivers (its wamid): Meta retries webhooks for days, so a message is handled once.
 /// processedAt stays null while it is being handled; a claim older than a few minutes without it is handled again.
 model InboundEvent {
-  id          String    @id // Meta's message id (wamid)
-  clientId    String?
+  id             String    @id // Meta's message id (wamid)
+  clientId       String?
   /// Meta's message type (text, button, interactive…), for the admin's inbound check.
-  kind        String?
-  createdAt   DateTime  @default(now())
-  receivedAt  DateTime  @default(now())
-  processedAt DateTime?
+  kind           String?
+  status         String    @default("RECEIVED")
+  leaseOwnerId   String?
+  leaseExpiresAt DateTime?
+  leaseVersion   Int       @default(0)
+  attemptCount   Int       @default(0)
+  createdAt      DateTime  @default(now())
+  receivedAt     DateTime  @default(now())
+  processedAt    DateTime?
+  completedAt    DateTime?
   /// Why handling failed last time (Admin › Inbound); the claim is then free for Meta's retry.
-  lastError   String?
+  lastError      String?
 
   @@index([receivedAt])
   @@index([createdAt])
+  @@index([status, leaseExpiresAt])
 }
 
 /// A customer's chat state for automation (lib/engine): staff can pause automatic replies, and resume them.

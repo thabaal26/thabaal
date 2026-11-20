@@ -66,6 +66,7 @@ describe("linked numbers: saving and campaigns", () => {
     await db.campaignRun.deleteMany({ where: { campaign: { clientId } } });
     await db.campaign.deleteMany({ where: { clientId } });
     await db.template.deleteMany({ where: { clientId } });
+    await db.loyaltyEntry.deleteMany({ where: { clientId } });
     await db.customer.deleteMany({ where: { clientId } });
     await db.whatsAppNumber.deleteMany({ where: { clientId } });
     await db.client.delete({ where: { id: clientId } });

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { formatPhone, MAX_NUMBERS, readPhones } from "@/lib/phone";
-import { asPerson, linkCustomers, numbersNote, otherNumbers, setOtherNumbers } from "@/lib/linked-numbers";
+import { asPerson, linkCustomers, LOYALTY_ORDER_SELECT, numbersNote, otherNumbers, setOtherNumbers } from "@/lib/linked-numbers";
 import { defaultRegion, homeCityOf, regionsFor } from "@/lib/regions";
 import { cleanValues, readFields, readValues } from "@/lib/custom-fields";
 import { owned, requireManager, requireUser } from "@/lib/session";
@@ -432,36 +432,49 @@ export async function adjustLoyaltyPoints(
   if (kind === "redeem" && (delta >= 0 || -delta % 50 !== 0 || -delta > 500))
     return { ok: false, message: "Use points for a bill in steps of 50 (₹25), up to 500 points (₹250)." };
 
-  const c = await db.customer.findFirst({
+  const preliminary = await db.customer.findFirst({
     where: { id, ...owned(s) },
-    select: {
-      id: true,
-      personId: true,
-      clientId: true,
-      name: true,
-      tags: true,
-      purchases: true,
-      client: { select: LOYALTY_RULE_FIELDS },
-      // Every order: bought ones earn points, and points used on orders that still stand come off.
-      orders: { select: { id: true, total: true, status: true, paidAt: true, paymentMethod: true, internalNote: true, pointsRedeemed: true } },
-    },
+    select: { id: true, personId: true, clientId: true },
   });
-  if (!c) return { ok: false, message: "Customer not found." };
+  if (!preliminary) return { ok: false, message: "Customer not found." };
 
-  // The balance right now, worked out the same way as on screen: one balance over all the person's numbers.
-  const balance = loyaltyFromOrders(await asPerson(c), { rules: loyaltyRules(c.client) }).totalPoints;
-  if (delta < 0 && -delta > balance) {
-    return { ok: false, message: `${c.name} has only ${balance} points, so ${Math.abs(Math.round(delta))} can't be redeemed.` };
-  }
-  if (kind === "redeem" && balance < 50) return { ok: false, message: `${c.name} needs at least 50 points to use them on a bill.` };
-
-  const nextTags = applyManualLoyaltyDelta(c.tags, delta, balance + Math.round(delta));
-  const manualAfter = parseManualLoyaltyPoints(nextTags);
-  await db.customer.update({ where: { id: c.id }, data: { tags: nextTags } });
-  // The history line (Customers › Loyalty › Point history); the balance above stands even if this can't be saved.
   const user = await requireUser();
-  await db.loyaltyEntry
-    .create({
+
+  const result = await db.$transaction(async (tx) => {
+    // Acquire customer-wide advisory lock (LOY-02)
+    const lockTarget = preliminary.personId || preliminary.id;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('loyalty_cust:' || ${lockTarget})::bigint)`;
+
+    const c = await tx.customer.findFirst({
+      where: { id, ...owned(s) },
+      select: {
+        id: true,
+        personId: true,
+        clientId: true,
+        name: true,
+        tags: true,
+        purchases: true,
+        client: { select: LOYALTY_RULE_FIELDS },
+        orders: { select: LOYALTY_ORDER_SELECT },
+      },
+    });
+    if (!c) return { ok: false, message: "Customer not found." };
+
+    // The balance right now, evaluated fresh under lock
+    const personCustomer = await asPerson(c, tx as unknown as { customer: typeof db.customer });
+    const balance = loyaltyFromOrders(personCustomer, { rules: loyaltyRules(c.client) }).totalPoints;
+    if (delta < 0 && -delta > balance) {
+      return { ok: false, message: `${c.name} has only ${balance} points, so ${Math.abs(Math.round(delta))} can't be redeemed.` };
+    }
+    if (kind === "redeem" && balance < 50) return { ok: false, message: `${c.name} needs at least 50 points to use them on a bill.` };
+
+    const nextTags = applyManualLoyaltyDelta(c.tags, delta, balance + Math.round(delta));
+    const manualAfter = parseManualLoyaltyPoints(nextTags);
+    await tx.customer.update({ where: { id: c.id }, data: { tags: nextTags } });
+
+    // The history line (Customers › Loyalty › Point history); throws on failure inside transaction to maintain atomicity (LOY-03)
+    const idempotencyKey = `manual-loyalty:${c.id}:${Math.round(delta)}:${Date.now()}`;
+    await tx.loyaltyEntry.create({
       data: {
         clientId: c.clientId,
         customerId: c.id,
@@ -470,25 +483,30 @@ export async function adjustLoyaltyPoints(
         reason: (opts.reason?.trim() || (kind === "redeem" ? "Walk-in bill" : "Other")).slice(0, 120),
         byName: user.name || user.email,
         told: Boolean(opts.told),
+        idempotencyKey,
       },
-    })
-    .catch((e) => console.error("Could not save the points history line", e));
+    });
 
-  revalidatePath(`/dashboard/customers/${c.id}`);
+    const sign = delta > 0 ? `+${Math.round(delta)}` : `${Math.round(delta)}`;
+    const message =
+      kind === "redeem"
+        ? `Used ${Math.abs(Math.round(delta))} points of ${c.name}'s for ₹${Math.round(Math.abs(delta) * 0.5)} off the bill.`
+        : kind === "take"
+          ? `Took back ${Math.abs(Math.round(delta))} points from ${c.name}.`
+          : delta > 0
+            ? `Added ${sign} bonus loyalty points to ${c.name} (manual adjustment: ${manualAfter >= 0 ? `+${manualAfter}` : manualAfter} pts).`
+            : `Redeemed ${Math.abs(Math.round(delta))} loyalty points (₹${Math.round(Math.abs(delta) * 0.5)} discount) for ${c.name}.`;
+
+    return { ok: true, message, customerId: c.id };
+  });
+
+  if (!result.ok) return result;
+
+  revalidatePath(`/dashboard/customers/${result.customerId}`);
   revalidatePath("/dashboard/customers");
   revalidatePath("/dashboard");
 
-  const sign = delta > 0 ? `+${Math.round(delta)}` : `${Math.round(delta)}`;
-  if (kind === "redeem")
-    return { ok: true, message: `Used ${Math.abs(Math.round(delta))} points of ${c.name}'s for ₹${Math.round(Math.abs(delta) * 0.5)} off the bill.` };
-  if (kind === "take") return { ok: true, message: `Took back ${Math.abs(Math.round(delta))} points from ${c.name}.` };
-  return {
-    ok: true,
-    message:
-      delta > 0
-        ? `Added ${sign} bonus loyalty points to ${c.name} (manual adjustment: ${manualAfter >= 0 ? `+${manualAfter}` : manualAfter} pts).`
-        : `Redeemed ${Math.abs(Math.round(delta))} loyalty points (₹${Math.round(Math.abs(delta) * 0.5)} discount) for ${c.name}.`,
-  };
+  return { ok: true, message: result.message };
 }
 
 
