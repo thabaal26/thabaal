@@ -6,7 +6,8 @@
 
 ## 1. Local Conversation Transcripts (From Previous Account Sessions)
 If you need to inspect any earlier conversation step or code diff from previous account sessions, the raw JSONL transcripts are stored locally on this machine at:
-- **Latest Session (Sign-in UI & Animation Refinements)**: `C:\Users\step1\.gemini\antigravity\brain\9c280eb1-afa5-42c2-80ed-c53998a891ee\.system_generated\logs\transcript.jsonl` (full: `.../transcript_full.jsonl`)
+- **Active End-to-End Audit, Domain 4A & Domain 6 Turn 17 Session**: `C:\Users\step1\.gemini\antigravity\brain\1bf02987-2bcf-41de-baa1-ccab398cd951\.system_generated\logs\transcript.jsonl` (full: `.../transcript_full.jsonl`)
+- **Landing Page Visibility & Heritage Footer Session**: `C:\Users\step1\.gemini\antigravity\brain\9c280eb1-afa5-42c2-80ed-c53998a891ee\.system_generated\logs\transcript.jsonl` (full: `.../transcript_full.jsonl`)
 - **Previous Session Compact Transcript**: `C:\Users\step1\.gemini\antigravity\brain\322fbc6e-ce65-4054-bda4-c917d739f683\.system_generated\logs\transcript.jsonl`
 - **Previous Session Full Transcript**: `C:\Users\step1\.gemini\antigravity\brain\322fbc6e-ce65-4054-bda4-c917d739f683\.system_generated\logs\transcript_full.jsonl`
 - **Meta Integration Auditor Subagent Transcript**: `C:\Users\step1\.gemini\antigravity\brain\42d50663-5eaa-4d77-805e-9ea59292e49a\.system_generated\logs\transcript.jsonl`
@@ -15,9 +16,10 @@ If you need to inspect any earlier conversation step or code diff from previous 
 
 ## 2. Project Identity & Tech Stack
 - **Repository / App Path**: `c:\Users\step1\OneDrive\Desktop\cupnsaucer\whatsapp-portal`
+- **Active Working Branch**: `HomeNewUi` (Pushed to both remotes: `origin/HomeNewUi` and `thabaal/HomeNewUi`)
 - **Platform Brand Name**: **Thabaal** (Multi-tenant WhatsApp Business Commerce, CRM, AI & Loyalty Platform)
 - **Primary Active Tenant / Store**: **Thenan Oils** (Cold-pressed oils, Madurai / Tamil Nadu retail & D2C)
-- **Framework**: Next.js (App Router, React Server Components + Server Actions), TypeScript, Tailwind CSS
+- **Framework**: Next.js 16 (App Router, React Server Components + Server Actions), TypeScript, Tailwind CSS
 - **Database**: PostgreSQL (Neon) + Prisma ORM (`prisma/schema.prisma`)
 - **Messaging Providers**:
   - Primary: **Meta WhatsApp Cloud API** (`src/lib/whatsapp.ts`, `src/lib/provider.ts`)
@@ -43,91 +45,115 @@ If you need to inspect any earlier conversation step or code diff from previous 
 12. **`Audience`**: Saved dynamic customer segmentation filters (`aud:<id>`).
 13. **`Call`**: Browser-based WebRTC WhatsApp voice calls (`INCOMING` | `OUTGOING`, `RINGING` | `ANSWERED` | `ENDED` | `MISSED` | `REJECTED`, `offerSdp`, `answerSdp`, `duration`).
 14. **`TopUp`**: Manual wallet top-up ledger for estimating live Meta account balance (`src/lib/meta-balance.ts`, `src/lib/spend.ts`).
+15. **`LoyaltyEntry`**: Immutable append-only loyalty ledger (`customerId`, `clientId`, `delta`, `reason`, `sourceRef`, `idempotencyKey`).
+16. **`SentTemplateSnapshot`**: Cryptographically verified immutable snapshot of outbound Meta templates at send time.
 
 ---
 
-## 4. Core Libraries & Business Logic Map (`src/lib/*`)
-- **AI & Copilot (`src/lib/ai.ts`)**:
-  - Uses Groq (`llama-3.3-70b-versatile`) for 7 features:
-    1. Dashboard AI Executive Briefing & Copilot (`src/app/dashboard/ai-copilot.tsx`)
-    2. Inbox Smart Reply Drafts (English & Tanglish/Tamil)
-    3. Customer Sentiment & Purchase Intent Analysis
-    4. Template Copywriter & Meta Approval Guard
-    5. Campaign Audience & Timing Optimizer
-    6. Order Note / Address / Payment Claim Extractor
-    7. Catalogue Product Description & Combo Generator
-- **Meta Spend, 1,000 Free Service Quota & Pricing (`src/lib/spend.ts`, `src/lib/meta-balance.ts`)**:
-  - Tracks monthly service conversations (first 1,000 service conversations/month telemetry + 24h free customer service window tracking), category-wise spend (`marketing`, `utility`, `authentication`, `service`), and Apache ECharts spend visualizations (`src/app/dashboard/spend-card.tsx`, `src/app/dashboard/spend-charts.tsx`).
-- **Cart Mentality & Purchase Behavior (`src/lib/cart-mentality.ts`)**:
-  - Diffs consecutive WhatsApp carts sent by the same customer within a shopping session to detect **hesitation / dropped items / replaced items** (e.g., customer added 1L Gingelly Oil, then replaced it with 500ml before paying) vs. abandoned carts vs. completed orders.
-- **Loyalty Points, Tiers & RFM Ratio Engine (`src/lib/loyalty.ts`)**:
-  - **Auto-Earned Points**: `1 pt` per `₹10` spent on paid/active WhatsApp orders + `+50 pts` per repeat order + `+35 pts` per historical sheet item.
-  - **Manual Point Adjustments**: Stored as tags (`loyalty-adj:<delta>:<timestamp>:<reason>`) on `Customer.tags` via `adjustCustomerLoyaltyPoints` in `src/app/dashboard/actions/customers.ts` (`+50`, `+100`, `+200`, or `-100 Redeem` = `₹10` discount).
-  - **Tiers**: `Bronze` (`0–199 pts`, 2% perk), `Silver` (`200–499 pts`, 5% perk), `Gold` (`500–999 pts`, 8% perk), `Platinum` (`1000+ pts`, 12% VIP perk + free delivery).
-  - **RFM Score (`R·F·M`)**: Scores every customer `1–5` on **Recency (R)**, **Frequency (F)**, and **Monetary (M)** + composite score (`3–15` / `0–100%`) + segment (`Champion`, `Loyal Regular`, `High-Spend Buyer`, `Promising`, `Cooling Down`, `At Risk`, `New / Prospect`).
-  - **Smart Offer Engine**: Generates 1-click personalized `wa.me` offer links based on tier, RFM segment, cart drops, or reorder due status.
-- **Payments & Order Lifecycle (`src/lib/payments.ts`, `src/lib/payment-state.ts`, `src/app/dashboard/actions/orders.ts`)**:
-  - **Native Checkout (`order_details`)**: `autoRequestPayment` automatically sends Meta's native "Review and Pay" card when a customer submits a catalogue cart.
-  - **24h Window Smart Routing**: Sends interactive `order_details` (free) if the 24h customer reply window is open; falls back to `ORDER_DETAILS` utility template (`payment_request`) if closed.
-  - **Resilient Image Fallback (`withCatalogFallback`)**: Automatically retries without product image header if Meta returns `error 131053` (media fetch error).
-  - **Live Order Card Updates (`updateOrderCard`)**: Mutates the customer's in-chat WhatsApp order card via `order_status` (`processing` -> *"Payment received"*, `shipped` -> *"Order dispatched"*, `completed` -> *"Order delivered"*, `canceled` -> *"Order cancelled"*).
-  - **10-State Payment Machine (`computePaymentInfo`)**: Tracks `paid`, `part_paid` (partial advance + balance due), `cod_due`, `claimed` (auto-detects customer `"paid"` text, 12-digit UPI UTRs, or payment screenshots), `failed` (with Meta fail reason), `requested`, `unpaid`, `refund_due` (paid order later cancelled), and `refunded`.
-  - **6-Hour Unpaid Cart Reminder**: `sendDuePaymentReminders` nudges unpaid carts after 6 hours (`REMIND_AFTER_MS`).
-- **Filter System (`src/lib/filters.ts`, `src/lib/filter-scope.ts`, `src/components/filter-bar.tsx`)**:
-  - Clean, simplified per-page filter scoping (`dateRange`, `area`, `product`, etc.) without history/sheet popstate collisions.
-- **Reorder Reminders & Forecast (`src/lib/refill.ts`, `src/lib/refill-forecast.ts`, `src/app/dashboard/refills/*`, `src/app/dashboard/orders/refill-form.tsx`)**:
-  - User-facing wording across the entire portal uses **Reorder / Reorders** (while preserving DB column names `refillDays`, `refillTemplateId` and Meta template identifiers `thenan_refill_reminder*`).
-  - The **Reorder reminders** configuration card (`RefillForm`) lives in `/dashboard/campaigns` right beside `WinbackForm`.
+## 4. Master Architectural Audit Progress & Status (ChatGPT Lead Architect Thread)
+- **Active Thread URL**: `https://chatgpt.com/c/6afed935-d278-83ee-8217-c25f486170f6`
+- **Thread Title**: `Continue WhatsApp UI Architecture`
+- **Lead Systems Architect Turn 20 Verdict: ALL 7 DOMAINS PASSED!**:
+  1. **Domain 1 (Tenant Boundaries & Identity Tracing)**: **`PASS WITH DOCUMENTED RISKS · REMEDIATION ACCEPTED`** (Closed in commit `dd3fec0`).
+  2. **Domain 2 (Orders, Checkout & Payment State Machine)**: **`PASS WITH DOCUMENTED RISKS`** (Accepted by Architect).
+  3. **Domain 3 (Campaign Engine & Rate Limiting)**: **`PASS WITH DOCUMENTED RISKS`** (Accepted by Architect).
+  4. **Domain 4A (Inbound Webhooks & WAHA Local Failover)**: **`PASS WITH DOCUMENTED RISKS`** (Closed in Turn 18 via `WEB-01` and `WEB-04`).
+  5. **Domain 5A (AI & Copilot Integration)**: **`PASS WITH DOCUMENTED RISKS`** (Accepted by Architect).
+  6. **Domain 5B (Customer Intelligence, RFM Matrix & Loyalty Engine)**: **`PASS WITH DOCUMENTED RISKS · ACCEPTED`** (Closed via `LOY-01..03` in commit `cfa042b`).
+  7. **Domain 6 (Analytics, Google Sheets 2-Way Sync & Spend Reporting)**: **`PASS WITH DOCUMENTED RISKS · ACCEPTED`** (Closed in Turn 20 via `ANL-01..04`, `SHT-01..03`, `SPD-01` in commits `5bf50fa`, `a9982c9`, `30b2dcd`).
+- **Lead Systems Architect Turn 21 Verdict: CONDITIONAL GO · PRODUCTION RELEASE AUTHORIZED**:
+  - Controlled Staging Acceptance Report accepted across Gates A through E.
+  - Authorized promotion of commit `c51e754` (`c51e754f4b24d600e9b4fe9f64dcad96e484f0bc`) to controlled production application deployment on Hostinger VPS (`189.72.145.225`).
+- **Lead Systems Architect Turn 22 Verdict: PRODUCTION APPLICATION RELEASE ACCEPTED**:
+  - Confirmed atomic zero-downtime switch to `/srv/thabaal/releases/20261120094035-c51e754f4b24`.
+  - PM2 online, zero restarts, internal and public health endpoints returning `{"ok":true}`.
+- **Lead Systems Architect Turn 23 & 24 Verdict: FINAL ACCEPTANCE**:
+  - **Git Tree Provenance**: Non-destructive `git merge-tree --write-tree 16a600e c51e754` executed on local and VPS; matched `c51e754^{tree}` exactly (`5988c0692b3b...`), formally closing the provenance qualification.
+  - **Production Backup Full Restore**: Successfully restored `/srv/thabaal/backups/pre-c51e754-20261120T092508Z.dump` into isolated database `thabaal_restore_c51e754_20261120T094724Z` on PostgreSQL 18.6 with exit code 0.
+  - **Host Environment**: Confirmed Ubuntu 26.04.1 LTS, Kernel 7.0.0-42-generic, PostgreSQL 18.6.
+  - **FINAL STATUS**: **ALL 7 DOMAINS PASSED · PRODUCTION APPLICATION RELEASE ACCEPTED · ALL FOLLOW-UPS CLOSED · RUNTIME ONLINE & HEALTHY**.
+- **Lead Systems Architect Turn 44 Verdict: UNCONDITIONAL PRODUCTION PERMANENT-PREVENTION CERTIFICATION GRANTED**:
+  - **Verdict**: **`UNCONDITIONAL ACCEPTANCE — PERMANENT-PREVENTION CERTIFICATION GRANTED` · APPROVED AND CLOSED**.
+  - **Incident Resolution**: Missing-table `sent_template_snapshots` rendering defect (digest `3888382912`) permanently resolved via PostgreSQL 18.6 table creation + defensive compatibility fallback in `src/app/dashboard/replies/page.tsx`. Finforte `/dashboard/replies` loads with `HTTP 200 OK`.
+  - **Control A (Schema Drift Gate)**: 11 / 11 adversarial DDL scenarios blocked with Exit 1 on PostgreSQL 18.6. Pinned Prisma CLI executed via `execFileSync` without shell interpolation. Verified against `$REL/prisma/schema.prisma` before promotion.
+  - **Control B (Import Tenant Isolation & Lease Fencing)**: Stale worker finalization transaction rollback verified (Subtest 7); cross-tenant child record isolation enforced.
+  - **Control C (Loyalty Idempotency & Operation Identity)**: Explicit `conflict: true` contract alignment + stable operation identity validation (Subtest 6 & 7) preventing cross-tenant replay and mutation mismatch.
+  - **Control D (Chats Resilience)**: Verified live on production with 0 P2021 errors in log.
+  - **Production Release**: Atomically promoted and active at `/srv/thabaal/releases/20261121023931-107aed35bb26` under PM2 PID `570595` (0 restarts, online).
+  - **Acceptance Scope**: All permanent-prevention controls formally certified. Zero outstanding requirements.
 
 ---
 
-## 5. Recent Git Commits (All Pushed to `origin/main` & `thabaal/main`)
-- `604a436`: **style(mobile): Optimize Data Density, Compact Layouts, and Responsive Alignment Across All Pages** — Refined `Stat`, `Table`, `Th`, `Td`, and `OrderStepper` in `src/components/ui.tsx` with compact padding, truncation, and responsive typography to prevent multi-line number wrapping on 360-390px mobile screens. Compacted `HomeTiers` TodoTiles, section padding, and 4 KPI cards in `src/app/dashboard/home-tiers.tsx`. Refined `OrderCard` and phone customer list rows with compact avatar sizing, tighter spacing, and proper truncation. Optimized `ChatList`, `Conversation` bubbles, `ReplyInbox` header, and `InlineReplyBox` composer padding to prevent keyboard crowding on mobile. Compacted 4-KPI spend strip, ECharts metric tiles, report summary table, campaign schedule cards, and catalogue product cards. Ensured 100% desktop fidelity and breathing room via `sm:*` and `lg:*` responsive utility parity.
-- `e22d50e`: **style(ui): Polish Layout Spacing, Fluid Button Swaps, and Sign-in Theme/Language Indicators** — Corrected sign-in theme toggle track inversion bug (day mode renders blue daytime sky with clouds; night mode renders dark starry sky). Added animated sliding indicator to language toggle pill (`EN | தமிழ்`) with spring physics transition. Upgraded `buttonClass` with hover elevation (`hover:-translate-y-px`), tactile active compression (`active:scale-[0.97]`), and subtle variant shadows. Added fluid button-swap transitions to `FilterChips`, `Segmented` radio switches, and sub-view navs across Campaigns, Customers, Inbox, Catalogue, Revenue, and Reports. Fixed customer sub-nav tab label from 'Refills' to 'Reorders'. Refined `PageHeader`, `Section`, and `CardHeader` spacing rhythm and vertical centering. Refined dashboard layout container padding (`px-3.5 pt-3.5` on mobile, `lg:pb-12` on desktop).
-- `98bb860`: **perf(db): Add Compound Indexes on Message, Customer, and Reply for High-Throughput Scaling** — Added `@@index([customerId, createdAt])` and `@@index([senderId])` to `Message` to eliminate full-table scans during customer chat history lookups. Added `@@index([clientId, optedOut, unreachable])` to `Customer` for instant audience filtering during high-volume campaign broadcasts. Added `@@index([senderId])` to `Reply`. Created additive migration `prisma/sql/2026-10-16-indexes.sql`, registered in `scripts/db-additive.mjs` for Vercel, and executed on live Neon PostgreSQL database.
-- `0b43005`: **Theme & UI Consistency: Elevate 100% of Dashboard Cards to 3D Glassmorphism Across All 34 Pages** — Upgraded every `<Card>` across Settings, Wallet, Campaigns, Customers, Orders, Replies, and Templates to `card-3d` with matching glossy `IconCube` headers and theme tone bands (`brand`, `violet`, `info`, `gold`, `rose`, `amber`). Verified 0 direct imports of `lucide-react` across application code.
-- `81e695c`: **Reports & Analytics Overhaul** — Rolling 7-day range, today's live data inclusion in `weeklyReport`, top products fallback, direct 1-tap WhatsApp report sharing link (`wa.me/?text=...`), and 4-KPI carts summary tiles.
-- `28a20ae`: **Auth: Integrate Continue with Google OAuth 2.0 & Update Login Credentials** — Updated login credentials in Neon PostgreSQL to `rgfoodproducts2018@gmail.com` (`rgfood2018`). Implemented `/api/auth/google` (CSRF state generation & cookie) and `/api/auth/google/callback` (Google code exchange, user profile lookup, `db.user` matching, and session creation). Added "Continue with Google" button with Google 4-color SVG and "or continue with email" divider in `src/app/login/login-form.tsx` and `src/app/login/thabaal-login.css`. Added bilingual error handling (`unauthorized_email`, `google_not_configured`, `google_denied`) in English and Tamil. Documented `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env.example`.
-- `0cd1ab6`: **Sign-in UI: Expand Breathing Room Between Welcome Back Text and Email Input on Mobile and Desktop** — Increased the vertical separation between the "Welcome back! Please sign in to continue" text and the "Email id" input box to `clamp(36px, 5vh, 46px)` on mobile (measured `42px` live) and `44px` on desktop (and `30px` on short screens), creating an unmistakably generous, airy visual distinction between the introductory header text and the form input card.
-- `5cc2b2d`: **Sign-in UI: Shift Form Down to Balance Layout & Add Breathing Room Between Sign-in Title, Subtitle, and Input** — Shifted the entire brand and form section slightly downwards on mobile (`margin-top: clamp(14px, 2.8vh, 28px)` on brand, `padding: clamp(24px, 4vh, 42px) 20px clamp(60px, 8vh, 80px)`) to gracefully fill the bottom empty space and eliminate top banner crowding. Added distinct, comfortable breathing room between the "Sign in" title and "Welcome back! Please sign in to continue" subtitle (`margin-top: 10px` desktop / `8px` mobile), widened the gap between the subtitle and the "Email id" input field (`margin-top: 32px` desktop / `28px` mobile), and increased brand-to-form clearance (`gap: clamp(28px, 4.5vh, 42px)` desktop / `clamp(22px, 3.5vh, 32px)` mobile) with guaranteed clearance above the floating scroll badge on short screens (iPhone SE).
-- `31d593e`: **Sign-in UI: Light Mode Default and Comfortable Element Spacing for Mobile and Desktop** — Removed `prefers-color-scheme: dark` fallback so the portal opens in light (day) mode by default on initial visits rather than forcing night mode automatically based on OS theme. Solved congested/cramped spacing across mobile and desktop: added 24px/20px top separation between subtitle and first input, comfortable 16px/14px input field spacing, 14px/10px forgot-password row margin, 22px/20px primary login CTA separation, and 18px/15px sign-up link margin. Centered mobile form layout vertically in `.thabaal-left` to eliminate the bottom empty void and guaranteed no overlap above the floating scroll badge on both iPhone SE and large displays. Fixed Recharts `RowText` typing for clean build.
-- `9e32a0f`: **Sign-in Mobile Perfection: Compact Responsive Layout, Zero Button Overlap, and 60-120fps Scroll Virtualization** — Removed the 77.3px ghost `.mark` element inside `.thabaal-brand` that was pushing the sign-in form down, decoupled the language toggle (`EN | தமிழ்`) into a clean top-left header badge on mobile matching the theme toggle at top-right, refined sky banner height (`clamp(135px, 18vh, 160px)`) and bird scale, compacted form padding/gaps (`height: 44px` inputs/buttons) so all controls and links fit comfortably above the fold with zero bottom prompt overlap on all mobile screens (360x667 iPhone SE to 430x932 Pro Max). Implemented 60–120 FPS high-refresh scrolling with `requestAnimationFrame` throttled scroll listener in `scroll-prompt.tsx`, `visibility: hidden` GPU compositor bypass for backdrop-blur, and `content-visibility: auto` layout virtualization across all landing sections (`landing.css`).
-- `35fed5a`: **Appearance & Charts Optimization** — Immutable caching headers for icon art/sets, decoupled ClientAppearance component, and Recharts bar indexing fix.
-- `b241881`: **Sign-in: Eliminate Corner Reload Glitch & Add Attention Scroll-Down Prompt with Pulsing Circle Bar** — Eliminated 1-second corner flash on page reload by placing the mascot directly inside `.thabaal-brand .words` with pure CSS percentage coordinates (`96.55%, 23%` English; `26.22%, 23.4%` Tamil on `த`). Replaced the static text explore link with an interactive floating glassmorphic pop-up badge (`src/app/login/scroll-prompt.tsx`, `scroll-prompt.css`) centered at the bottom of the viewport featuring a pulsing concentric halo ring (`thabaal-circle-pulse`), theme yellow gradient (`#FDB913`), animated bouncing arrow, smooth scroll to `#explore`, and auto-hide past 70px scroll.
-- `fc846d5`: **Sign-in Mascot: Sits Directly on Target Letter on Start, Jumping Animations and Cartoon Eyes/Mouth Removed** — Eliminated intro flight from left and multi-hop letter sequences; the mascot bird now sits directly on the target letter right from page load (`l` in English, `த` in Tamil) with gentle resting wing flutters and breathing bob. Completely removed `<BirdFace />` (cartoon SVG eyes and mouth), presenting only clean, authentic brand artwork (`body.png` + `wing.png`).
-- `d34993a`: **Sign-in Mascot: Realistic Ballistic Physics Jumps & Crazy Funny Double Hops on Every Letter** — Implemented authentic 2D projectile physics (constant horizontal velocity $v_x$, parabolic vertical gravity deceleration to apex hang-time and accelerating fall, synchronized anticipation crouch, launch stretch, impact compression, and letter elastic oscillation). Mascot performs two jumps on every letter (Hop 1 = realistic spring jump, Hop 2 = crazy/funny personality bounce with cheeky tongue-out wink, bug-eyed shock O, laughing wiggle, or 360° backflip on tall letter `b`). Tamil executes double hops on first letter `த` and perches; English hops across all letters and perches on `l`.
-- `026fbb0`: **Sign-in UI: Floating Inset Sky Panel with Curved Rounded Corners (`border-radius: 32px`) & Tamil Mascot Perched on First Letter 'த'** — Styled `.thabaal-right` as an elevated floating card with `margin: 16px; border-radius: 32px;` and soft drop-shadow. Updated Tamil letter mapping and `perchIndex` so the mascot lands and perches cleanly on the first letter `த` (matching official brand logo), while perching on `l` in English.
-- `d740f1e`: **Sign-in Animation Simplification & Cut-Off Fixes** — Removed cartoon eyes (`<BirdFace />`) from the right big bird (flies constantly undisturbed). Streamlined mascot sequence: enters from left, hops letters, and sits on target letter. Fixed letter `b` sparks cut-off using custom polygon clip-paths.
-- `a63f825`: Smoother scrolling and lighter pages: charts draw when scrolling pauses, lighter login images.
-- `359b3de`: Icons: one module per icon, so each page loads only the icons it uses.
-- `478c7ee`: **Simplified & Decluttered Orders Page (`/dashboard/orders`)** — Replaced congested 7-stat strip with a clean 4-KPI summary bar, consolidated 11 filter pills into 6 core tabs + secondary dropdown, redesigned `OrderCard` with a 4-step progress stepper (`Confirmed → Paid → Dispatched → Delivered`) and single primary CTA + `More` menu (`src/app/dashboard/orders/*`).
-- `a66bf55`: **PWA Rebrand to Thabaal** — Updated `src/app/manifest.ts`, `src/app/api/manifest/[clientId]/route.ts`, `src/app/dashboard/layout.tsx`, `public/offline.html`, and `public/sw.js` (`thabaal-v3`) so Chrome PWA install always shows **Thabaal** instead of client name (*Thenan Oils*).
+## 5. Recent Git Commits on `HomeNewUi` (All Pushed to `origin` & `thabaal`)
+- `fd38644`: **fix(turn-44): eliminate shell interpolation in schema drift gate using execFileSync**
+- `107aed3`: **fix(turn-42): complete loyalty idempotency contract with conflict flag and stable operation identity validation**
+- `e12fa16`: **fix(turn-41): complete permanent prevention suite, enum value drift parser, stale worker transaction rollback, and cross-tenant idempotency protection**
+- `8e87cc5`: **fix(turn-40): close all architect requirements: clean fail-closed gate hook, import child isolation, loyalty db unique constraint, and chats ssr fallback**
+- `c51e754`: **test(staging): add controlled staging validation suite for turn 20 gates A-E**
+  - Added dedicated staging validation suite `tests/staging/controlled-staging-validation.test.ts`.
+  - Verified cross-period financial reconciliation (Order Oct 28 ₹10k / Refund Nov 5 ₹3k).
+  - Verified explicit `Archive = yes` tombstone semantics, PostgreSQL 17.10 index scan, and 10-concurrent webhook delivery idempotency.
+- `30b2dcd`: **fix(domain-6): reconcile refund status lifecycle, enforce sht-03 tombstone semantics, and complete 20k benchmark**
+  - Fulfilment status (`DELIVERED`, `DISPATCHED`, `PAID`) preserved post-refund; removed artificial `status: "CANCELLED"` overwrite.
+  - Sales eligibility strictly governed by `refundAmount < total` in both `isSale(o)` and `saleSqlText(a)`.
+  - Implemented SHT-03 explicit tombstone semantics (`Archive = yes` sets `deletedAt`), preserving all historical orders, messages, and loyalty records.
+  - Reconciled period attribution in `reports-data.ts` and `payments-data.ts` using `refundedAt` completion date.
+  - Executed 20,000-row benchmark: 7,853 ms (2,547 rows/sec, 38 MB heap delta).
+- `a9982c9`: **fix(domain-6): implement chunked sheets sync, order parity validation, and spd-01 index proof**
+  - Implemented 500-row chunking in `syncCustomers` reducing DB round-trips by >98%.
+  - Added deterministic 10-state order-ID set parity test (`qualifyingPrismaIds === qualifyingSqlIds`).
+  - Executed `EXPLAIN (ANALYZE, BUFFERS)` for SPD-01 proving direct Bitmap Index Scan on `Order_clientId_status_createdAt_idx`.
+- `5bf50fa`: **fix(domain-4a-6a): enforce waha unique mapping, durable replay protection, and financial parity**
+  - Enforced strict session-to-tenant binding in `src/app/api/waha/webhook/route.ts` with 409 fail-closed on duplicate sessions.
+  - Implemented HMAC-SHA512 verification, payload freshness (< 5 mins), and durable event replay deduplication via `Reply.waMessageId` unique index. Tested with 10 concurrent requests via `Promise.allSettled`.
+  - Enforced gross vs net sales and refunds separation across `reports-data.ts`, `business-reports.ts`, `payments-data.ts`, and `spend.ts`.
+  - Aligned Prisma and PostgreSQL order sets by stamping `status: "CANCELLED"` on 100% full refunds.
+  - Sanitized Google Sheets cell inputs against formula injection with leading whitespace/newlines.
+- `e3eca52`: **docs(audit): add master forensic report for domain 6 analytics gsheets and spend**
+- `67b8c90`: **fix(web-01-04): enforce explicit waha session-to-tenant mapping and native hmac-sha512 body freshness**
+  - Enforced strict session-to-tenant binding in `src/app/api/waha/webhook/route.ts` (`WhatsAppNumber.wahaSession` and `Setting.wahaSession`), failing closed without touching customer records for unmapped sessions.
+  - Implemented constant-time `timingSafeEqual` HMAC-SHA512 signature verification over raw body bytes, payload timestamp freshness (< 5 mins), and echo suppression (`fromMe === true`).
+  - Added test suite `tests/unit/waha-webhook-security.test.ts` (6/6 passing).
+- `cfa042b`: **fix(domain-4a-5b): complete forensic remediation for loyalty concurrency, refund lifecycle, inbound lease fencing, and waha webhook security**
+- `6a06d50`: **fix(sec-01): implement pg_advisory_xact_lock for true database-level WABA reservation serialization**
+- `ef3d000`: **fix(sec-01): add cross-tenant draft reservation check and atomic concurrency guard**
+- `6c0ebe4`: **fix(sec-01): enforce tenant-bound WABA and token authorization for onboarding**
 
 ---
 
-## 6. Where We Left Off & Next Potential Tasks
-In our latest session:
-1. **Mobile Data Simplification & Compact Responsive Alignment Complete (Commit `604a436`)**:
-   - Refined `Stat`, `Table`, `Th`, `Td`, and `OrderStepper` in `src/components/ui.tsx` with compact padding, truncation, and responsive typography to prevent multi-line number wrapping on 360-390px mobile screens.
-   - Compacted `HomeTiers` TodoTiles, section padding, and 4 KPI cards in `src/app/dashboard/home-tiers.tsx`.
-   - Refined `OrderCard` and phone customer list rows with compact avatar sizing, tighter spacing, and proper truncation.
-   - Optimized `ChatList`, `Conversation` bubbles, `ReplyInbox` header, and `InlineReplyBox` composer padding to prevent keyboard crowding on mobile.
-   - Compacted 4-KPI spend strip, ECharts metric tiles, report summary table, campaign schedule cards, and catalogue product cards.
-   - Ensured 100% desktop fidelity and breathing room via `sm:*` and `lg:*` responsive utility parity.
-   - 100% tests passing (36/36), 0 TypeScript errors, verified production build, pushed to both `origin` and `thabaal`.
-2. **Layout Spacing, Button Swap Animations & Sign-in Theme/Language Indicators Complete (Commit `e22d50e`)**:
-   - Corrected sign-in theme toggle track inversion bug (day mode renders blue daytime sky; night mode renders dark starry sky).
-   - Added animated sliding indicator to language toggle pill (`EN | தமிழ்`) with spring physics transition.
-   - Upgraded `buttonClass` with hover elevation (`hover:-translate-y-px`), tactile active compression (`active:scale-[0.97]`), and subtle variant shadows.
-   - Added fluid button-swap transitions to `FilterChips`, `Segmented` radio switches, and sub-view navs across Campaigns, Customers, Inbox, Catalogue, Revenue, and Reports.
-   - Fixed customer sub-nav tab label from 'Refills' to 'Reorders'.
-   - Refined `PageHeader`, `Section`, and `CardHeader` spacing rhythm and vertical centering.
-   - Refined dashboard layout container padding (`px-3.5 pt-3.5` on mobile, `lg:pb-12` on desktop).
-3. **Database Index Optimization Complete (Commit `98bb860`)**:
-   - Added compound and foreign-key indexes on `Message(customerId, createdAt)`, `Message(senderId)`, `Customer(clientId, optedOut, unreachable)`, and `Reply(senderId)`.
-   - Additive SQL migration registered in `scripts/db-additive.mjs` and applied to live Neon PostgreSQL database.
-4. **Held Tasks (Per User Request)**:
-   - **Item 1 (Hold)**: COD-to-Prepaid Instant Discount Nudge (`₹20–₹50 OFF` or `+100 Bonus Loyalty Points`).
-   - **Item 2 (Hold)**: Auto-Generated PDF Receipt / GST Bill in Chat upon order payment.
-   - **Item 4 (Hold)**: Shipping Tracking Link Integration (`Shiprocket` / `Delhivery` / `India Post` / ST Courier) in `order_status` cards.
+## 6. Current Status & Active Production Environment
+- **Branch**: `HomeNewUi` (HEAD: `fd386449c678af55b47c92734ce7caded4479e77`)
+- **Git Remotes**:
+  - `origin`: `https://github.com/Rensog878/campaign.git` (up-to-date with `fd38644`)
+  - `thabaal`: `https://github.com/thabaal26/thabaal.git` (up-to-date with `fd38644`)
+- **Production Server**: Hostinger VPS (`189.72.145.225`, Ubuntu 26.04.1 LTS, PostgreSQL 18.6)
+- **Active Release Symlink**: `/srv/thabaal/current -> /srv/thabaal/releases/20261121023931-107aed35bb26`
+- **PM2 Process**: `thabaal` (PID `570595`, 0 restarts, memory `290 MB`, cpu `0.0%`, uptime online)
+- **Health Endpoints**:
+  - Internal: `http://127.0.0.1:3000/api/health` -> `{"ok":true}`
+  - Public HTTPS: `https://www.thabaal.in/api/health` -> `{"ok":true}`
+  - Finforte Tenant Live Chats: `https://www.thabaal.in/dashboard/replies` -> `HTTP 200 OK` (Digest `3888382912` absent, 0 P2021 errors).
+- **Tests**: **888 / 888 tests passing** across 132 suites (`node tests/run.mjs` against embedded-postgres).
+- **TypeScript**: `npx tsc --noEmit` cleanly passes with 0 errors.
+- **Architect Disposition**: **FINAL ARCHITECTURAL CERTIFICATION GRANTED (TURN 44 — APPROVED AND CLOSED)** across all 7 Domains, Staging Validation, Controlled Production Release, Schema Drift Gates (Controls A–D), and Provenance.
 
+---
+
+## 7. How to Continue in the New Account (Zero Disruption Checklist)
+1. Antigravity will automatically load this `GEMINI.md` on start.
+2. Confirm git branch by running `git status` inside `whatsapp-portal` (should be on `HomeNewUi`, clean working tree).
+3. Confirm test suite: `node tests/run.mjs` (all 888 tests pass).
+4. VPS Production Status: App is LIVE on `/srv/thabaal/releases/20261121023931-107aed35bb26`.
+5. Next Operational Steps (Post-Deployment):
+   - Broad customer marketing campaign dispatch remains restricted until separate 10-handset internal verification and written operator signoff are executed.
+   - For all future tasks, reference the active ChatGPT Lead Architect thread: `https://chatgpt.com/c/6afed935-d278-83ee-8217-c25f486170f6`.
+
+---
+
+## 8. Autonomous ChatGPT Interaction & Continuous Verification Rule (Strict Persistent Invariant)
+- **Permanent Permission & Full Autonomous Authority Granted**: The user has explicitly and permanently authorized automated interactions with ChatGPT (`https://chatgpt.com/*`) via MCP tools (such as `chrome-devtools-mcp`) and the built-in webview browser (`browser` subagent).
+- **No Repetitive Prompts**: **NEVER ask the user for permission** before performing any of these actions. Autonomously execute them as needed.
+- **ChatGPT as Sole Decision Maker, Planner & Evaluator**: Treat ChatGPT as the active lead architect, evaluator, and decision maker. Antigravity does NOT stop on its own and does not decide completion on its own.
+- **Mandatory Evidence & Screenshot/File Upload to ChatGPT**: Antigravity's internal verification is not sufficient. Always upload live screenshots and detailed `.md` reports to ChatGPT.
+- **Scroll-to-Bottom Memory**: In the ChatGPT conversation view, click the floating circular down-arrow button to jump to the absolute bottom of the history.
+- **Copy-and-Paste Ready Prompts & Output Format**: Whenever asking ChatGPT for next steps, tasks, plans, or execution instructions, **ALWAYS instruct ChatGPT to format actionable commands, queries, code diffs, and remediation steps as copy-and-paste ready code blocks**.
