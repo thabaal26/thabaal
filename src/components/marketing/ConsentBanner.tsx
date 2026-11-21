@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getMarketingConsent, setMarketingConsent, type ConsentStatus } from "@/lib/marketing/consent";
+import { getMarketingConsent, setMarketingConsent, resetMarketingConsent, type ConsentStatus } from "@/lib/marketing/consent";
 import { useLanguage } from "@/lib/i18n/context";
 
 export function ConsentBanner({ lang: propLang }: { lang?: "en" | "ta" } = {}) {
@@ -15,6 +15,13 @@ export function ConsentBanner({ lang: propLang }: { lang?: "en" | "ta" } = {}) {
   } catch {}
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const search = window.location.search;
+      if (search.includes("reset_consent") || search.includes("cookie_settings")) {
+        resetMarketingConsent();
+      }
+    }
+
     setMounted(true);
     setConsent(getMarketingConsent());
 

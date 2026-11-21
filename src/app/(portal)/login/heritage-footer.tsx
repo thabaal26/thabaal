@@ -634,13 +634,21 @@ export function HeritageFooter({ lang }: HeritageFooterProps) {
 
       {/* Layer C — Deep-Navy Bottom Bar */}
       <div className="footer-bottom-bar">
-        <div className="landing-container footer-bottom-inner">
+        <div className="landing-container footer-bottom-inner flex flex-wrap items-center justify-between gap-2">
           <span className="footer-copyright">
             © 2026 Thabaal. {ta ? "வளரும் வணிகங்களுக்காக உருவாக்கப்பட்டது." : "Built for growing businesses."}
           </span>
-          <span className="footer-tagline">
-            {ta ? "வாட்ஸ்அப் மார்க்கெட்டிங் இனி எளிது." : "WhatsApp marketing made simple."}
-          </span>
+          <div className="flex items-center gap-4">
+            <a
+              href="/?reset_consent=1"
+              className="text-xs text-amber-300/80 hover:text-amber-200 transition underline underline-offset-2"
+            >
+              {ta ? "குக்கீ அமைப்புகள்" : "Cookie Settings"}
+            </a>
+            <span className="footer-tagline">
+              {ta ? "வாட்ஸ்அப் மார்க்கெட்டிங் இனி எளிது." : "WhatsApp marketing made simple."}
+            </span>
+          </div>
         </div>
       </div>
     </footer>
