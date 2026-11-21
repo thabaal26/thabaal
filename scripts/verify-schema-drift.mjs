@@ -1,14 +1,16 @@
 #!/usr/bin/env node
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
 /**
- * Automated Production Deployment Schema Drift Gate (Turn 40 Full Coverage)
+ * Automated Production Deployment Schema Drift Gate (Turn 40-44 Full Coverage)
  *
  * Compares live database schema against current release's prisma/schema.prisma.
  * Fails closed if ANY required table, column, unique index, regular index,
- * foreign key constraint, enum type, or nullability constraint is missing.
+ * foreign key constraint, enum type, enum value, or nullability constraint is missing.
+ *
+ * Security: Uses execFileSync with explicit argument array to eliminate shell interpolation.
  *
  * Explicit Legacy Allowlist:
  * Tolerates known unmanaged legacy objects (PortalMetaAlert, PortalMetaConnect, PortalMetaSignup)
@@ -22,19 +24,46 @@ if (!fs.existsSync(schemaPath)) {
 }
 
 const dbUrl = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
-if (!dbUrl) {
+if (!dbUrl || !dbUrl.trim()) {
   console.error("[Schema Drift Gate] FATAL: DATABASE_URL_UNPOOLED or DATABASE_URL must be set");
   process.exit(1);
 }
 
 console.log("[Schema Drift Gate] Running comprehensive schema diff check against database...");
 
+// Prefer local node_modules/.bin/prisma if available, otherwise fallback to npx with pinned version
+const localPrisma = path.resolve("node_modules/.bin/prisma");
+const useLocalPrisma = fs.existsSync(localPrisma);
+
 let diffOutput = "";
 try {
-  diffOutput = execSync(
-    `npx --yes prisma@6.19.3 migrate diff --from-url "${dbUrl}" --to-schema-datamodel "${schemaPath}" --script`,
-    { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }
-  );
+  if (useLocalPrisma) {
+    diffOutput = execFileSync(
+      localPrisma,
+      ["migrate", "diff", "--from-url", dbUrl, "--to-schema-datamodel", schemaPath, "--script"],
+      {
+        encoding: "utf8",
+        cwd: process.cwd(),
+        stdio: ["ignore", "pipe", "pipe"],
+        timeout: 120_000,
+        maxBuffer: 10 * 1024 * 1024,
+        env: process.env,
+      }
+    );
+  } else {
+    diffOutput = execFileSync(
+      "npx",
+      ["--yes", "prisma@6.19.3", "migrate", "diff", "--from-url", dbUrl, "--to-schema-datamodel", schemaPath, "--script"],
+      {
+        encoding: "utf8",
+        cwd: process.cwd(),
+        stdio: ["ignore", "pipe", "pipe"],
+        timeout: 120_000,
+        maxBuffer: 10 * 1024 * 1024,
+        env: process.env,
+      }
+    );
+  }
 } catch (err) {
   console.error("[Schema Drift Gate] FATAL: Failed to execute prisma migrate diff:", err.message || err);
   process.exit(1);
