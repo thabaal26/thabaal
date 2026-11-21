@@ -38,6 +38,7 @@ const FILES = [
   "prisma/sql/2026-11-07-speed-indexes.sql",
   "prisma/sql/2026-11-10-portal-uploaded-image.sql",
   "prisma/sql/2026-11-13-workspace-mode.sql",
+  "prisma/sql/2026-11-21-demo-conversion-attempt.sql",
 ];
 
 // The VPS applies the same files when a release arrives (deploy/vps/deploy-receive.sh).
