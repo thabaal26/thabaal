@@ -7,6 +7,22 @@ export type ConsentStatus = "granted" | "denied" | null;
 export function getMarketingConsent(): ConsentStatus {
   if (typeof window === "undefined") return null;
   try {
+    // 0. Turn 53 Architect Condition B: One-shot, fail-closed reset parameter check
+    const search = window.location.search;
+    if (search && (search.includes("reset_consent=1") || search.includes("cookie_settings=1"))) {
+      resetMarketingConsent();
+      // Strip reset parameter from visible URL so later navigations or reloads do not re-trigger reset
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("reset_consent");
+        url.searchParams.delete("cookie_settings");
+        const cleanSearch = url.searchParams.toString();
+        const cleanUrl = url.pathname + (cleanSearch ? `?${cleanSearch}` : "") + url.hash;
+        window.history.replaceState({}, "", cleanUrl);
+      } catch {}
+      return null;
+    }
+
     // 1. Check cookie
     const match = document.cookie.match(new RegExp(`(^|;\\s*)${CONSENT_COOKIE_NAME}=([^;]*)`));
     if (match) {

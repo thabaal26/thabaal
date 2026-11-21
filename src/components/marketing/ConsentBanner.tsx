@@ -15,13 +15,6 @@ export function ConsentBanner({ lang: propLang }: { lang?: "en" | "ta" } = {}) {
   } catch {}
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const search = window.location.search;
-      if (search.includes("reset_consent") || search.includes("cookie_settings")) {
-        resetMarketingConsent();
-      }
-    }
-
     setMounted(true);
     setConsent(getMarketingConsent());
 

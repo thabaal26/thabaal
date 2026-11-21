@@ -333,4 +333,72 @@ describe("Google Ads Conversion Pipeline & Zero-Leakage Boundary (Turn 48-49 Cer
     assert.ok(!portalContent.includes("ConsentBanner"), "Portal layout must NOT contain ConsentBanner");
     assert.ok(!portalContent.includes("googletagmanager.com"), "Portal layout must NOT contain GTM");
   });
+
+  it("13. One-Shot, Fail-Closed Consent Reset & URL Cleansing (Turn 53 Condition B)", async () => {
+    // Dynamically test getMarketingConsent in simulated browser environment
+    const { getMarketingConsent, setMarketingConsent, CONSENT_STORAGE_KEY } = await import("../../src/lib/marketing/consent");
+
+    // Setup global window / document / localStorage mocks
+    const storage: Record<string, string> = { [CONSENT_STORAGE_KEY]: "granted" };
+    let currentUrl = "https://www.thabaal.in/?cookie_settings=1";
+
+    const originalWindow = (global as any).window;
+    const originalDocument = (global as any).document;
+
+    try {
+      (global as any).window = {
+        location: {
+          get search() {
+            try { return new URL(currentUrl).search; } catch { return ""; }
+          },
+          get href() { return currentUrl; },
+          protocol: "https:",
+        },
+        history: {
+          replaceState: (_state: any, _title: string, url: string) => {
+            currentUrl = url.startsWith("http") ? url : `https://www.thabaal.in${url}`;
+          },
+        },
+        dispatchEvent: () => true,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      };
+
+      (global as any).document = {
+        cookie: "thabaal_marketing_consent=granted; Path=/",
+      };
+
+      (global as any).localStorage = {
+        getItem: (k: string) => storage[k] ?? null,
+        setItem: (k: string, v: string) => { storage[k] = v; },
+        removeItem: (k: string) => { delete storage[k]; },
+      };
+
+      (global as any).CustomEvent = class CustomEvent {
+        type: string;
+        detail: any;
+        constructor(type: string, opts?: { detail?: any }) {
+          this.type = type;
+          this.detail = opts?.detail;
+        }
+      };
+
+      // 1. Initial call with ?cookie_settings=1 should reset stored "granted" to null
+      const res = getMarketingConsent();
+      assert.equal(res, null, "Must return null (undecided) when reset parameter is detected");
+      assert.equal(storage[CONSENT_STORAGE_KEY], undefined, "localStorage must be purged");
+      assert.ok(!currentUrl.includes("cookie_settings"), `URL must have parameter stripped: ${currentUrl}`);
+
+      // 2. User subsequently selects "denied"
+      setMarketingConsent("denied");
+      assert.equal(storage[CONSENT_STORAGE_KEY], "denied");
+
+      // 3. Page reload (now without parameter): choice persists
+      const resAfterReload = getMarketingConsent();
+      assert.equal(resAfterReload, "denied", "User choice must persist after parameter consumption");
+    } finally {
+      (global as any).window = originalWindow;
+      (global as any).document = originalDocument;
+    }
+  });
 });
