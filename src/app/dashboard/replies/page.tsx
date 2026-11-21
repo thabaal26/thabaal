@@ -20,6 +20,16 @@ export const dynamic = "force-dynamic";
 // Every chat by default; the only filter is the campaign group (Engaged / Seen / Reached / Dormant, the same groups
 // and the same rule as the campaign form: lib/engagement-segments.ts). "Not reached yet" customers sit under All.
 
+function isMissingSentTemplateSnapshotsTable(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const candidate = error as { code?: unknown; meta?: { table?: unknown } };
+  const table = candidate.meta?.table;
+  return (
+    candidate.code === "P2021" &&
+    (table === "public.sent_template_snapshots" || table === "sent_template_snapshots")
+  );
+}
+
 /** Customers we messaged (a campaign, an order update) who haven't written back show as chats this many days. */
 const SENT_DAYS = 7;
 
@@ -217,29 +227,55 @@ export default async function RepliesPage({ searchParams }: PageProps<"/dashboar
       }
     }
 
-    const [msgs, reps, info, automation] = await Promise.all([
-      db.message.findMany({
-        where: {
-          customerId: selected.customer.id,
-          ...(scope.clientId ? { customer: { clientId: scope.clientId } } : {}),
-          status: { not: "QUEUED" },
-        },
-        include: {
-          run: { select: { campaign: { select: { name: true } } } },
-          sender: { select: { label: true } },
-          sentTemplateSnapshot: {
-            select: {
-              clientId: true,
-              messageId: true,
-              schemaVersion: true,
-              renderSnapshot: true,
-              renderSha256: true,
+    const messageWhere = {
+      customerId: selected.customer.id,
+      ...(scope.clientId ? { customer: { clientId: scope.clientId } } : {}),
+      status: { not: "QUEUED" as const },
+    };
+    const commonMessageInclude = {
+      run: { select: { campaign: { select: { name: true } } } },
+      sender: { select: { label: true } },
+    };
+
+    const fetchMsgs = async () => {
+      try {
+        return await db.message.findMany({
+          where: messageWhere,
+          include: {
+            ...commonMessageInclude,
+            sentTemplateSnapshot: {
+              select: {
+                clientId: true,
+                messageId: true,
+                schemaVersion: true,
+                renderSnapshot: true,
+                renderSha256: true,
+              },
             },
           },
-        },
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        take: 40,
-      }),
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: 40,
+        });
+      } catch (error) {
+        if (!isMissingSentTemplateSnapshotsTable(error)) {
+          throw error;
+        }
+        console.error("[dashboard/replies] Snapshot table missing; using compatibility read.");
+        const fallbackRows = await db.message.findMany({
+          where: messageWhere,
+          include: commonMessageInclude,
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: 40,
+        });
+        return fallbackRows.map((message) => ({
+          ...message,
+          sentTemplateSnapshot: null,
+        }));
+      }
+    };
+
+    const [msgs, reps, info, automation] = await Promise.all([
+      fetchMsgs(),
       db.reply.findMany({
         where: { customerId: selected.customer.id },
         include: { sender: { select: { label: true } } },
