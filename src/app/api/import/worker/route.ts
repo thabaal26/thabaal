@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { stageImportFile, commitImportBatch } from "@/lib/import-engine";
 import { getSpoolFilePath, purgeBatchDir } from "@/lib/import-storage";
 import { requireManager } from "@/lib/session";
+import { verifySameOrigin, rejectCrossSite } from "@/lib/csrf";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -47,7 +48,10 @@ export async function POST(req: NextRequest) {
   let tenantClientId: string | null = null;
 
   if (!isCronAuthed) {
-    // Authorization Path 2: Manager session authentication
+    // Authorization Path 2: Manager session authentication (requires browser CSRF check)
+    const originCheck = verifySameOrigin(req);
+    if (!originCheck.ok) return rejectCrossSite(originCheck.reason);
+
     const scope = await requireManager(true).catch(() => ({ denied: "Unauthorized" } as const));
     if ("denied" in scope || !scope.clientId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

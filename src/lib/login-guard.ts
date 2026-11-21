@@ -11,8 +11,12 @@ const MAX_PER_IP = 20;
 
 /** The caller's network address as Vercel reports it (first hop of x-forwarded-for). */
 export async function clientIp(): Promise<string> {
-  const h = await headers();
-  return (h.get("x-real-ip") || h.get("x-forwarded-for")?.split(",")[0] || "unknown").trim().slice(0, 64);
+  try {
+    const h = await headers();
+    return (h.get("x-real-ip") || h.get("x-forwarded-for")?.split(",")[0] || "unknown").trim().slice(0, 64);
+  } catch {
+    return "unknown";
+  }
 }
 
 const keys = (email: string, ip: string) => ({ email: `email:${email}`, ip: `ip:${ip}` });

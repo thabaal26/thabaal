@@ -230,6 +230,7 @@ export async function addWebsiteLead(
   const asked = [sells && `sells ${sells}`, plan && `asked about ${plan}`].filter(Boolean).join(", ");
   const open = await db.lead.findFirst({ where: { phone, stage: { notIn: ["won", "lost"] } } });
   if (open) {
+    const shopDiff = shop !== open.shop ? ` for "${shop}"` : "";
     await db.lead.update({
       where: { id: open.id },
       data: {
@@ -238,7 +239,7 @@ export async function addWebsiteLead(
         ...(sells && !open.sells ? { sells } : {}),
         ...(town && !open.town ? { town } : {}),
         ...(!open.person ? { person } : {}),
-        activity: { create: { kind: "edit", text: `Asked for a demo again on the website${asked ? ` (${asked})` : ""}. Follow up today.`, by: WEBSITE } },
+        activity: { create: { kind: "edit", text: `Asked for a demo again${shopDiff} on the website${asked ? ` (${asked})` : ""}. Follow up today.`, by: WEBSITE } },
       },
     });
     return { ok: true, id: open.id, again: true, message: "We already have your request and will call you today." };

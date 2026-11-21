@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireManager } from "@/lib/session";
 import { storePublicImage } from "@/lib/uploaded-image";
+import { verifySameOrigin, rejectCrossSite } from "@/lib/csrf";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,9 @@ function looksLike(type: string, b: Uint8Array) {
  * Public because WhatsApp downloads the file by that link; only admins/managers can upload.
  */
 export async function POST(req: NextRequest) {
+  const originCheck = verifySameOrigin(req);
+  if (!originCheck.ok) return rejectCrossSite(originCheck.reason);
+
   const s = await requireManager();
   if ("denied" in s) return NextResponse.json({ error: s.denied }, { status: 403 });
 

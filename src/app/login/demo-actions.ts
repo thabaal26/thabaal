@@ -35,7 +35,7 @@ export async function requestDemo(_: DemoState, form: FormData): Promise<DemoSta
   await db.loginAttempt.create({ data: { key } });
 
   const phone = cleanPhone(input.phone)!;
-  after(async () => {
+  const sendTask = async () => {
     const sent = await sendEmail({
       subject: r.again ? `Demo asked again: ${input.shop}` : `New demo request: ${input.shop}`,
       intro: r.again ? "They already had an open enquiry; it is back in Follow up today." : "From the free demo form on thabaal.in. It is waiting in Enquiries › Follow up today.",
@@ -50,6 +50,12 @@ export async function requestDemo(_: DemoState, form: FormData): Promise<DemoSta
       ],
     });
     if (!sent.ok) console.warn("Demo request email not sent:", sent.error);
-  });
+  };
+
+  try {
+    after(sendTask);
+  } catch {
+    void sendTask().catch(() => {});
+  }
   return { ok: true, again: r.again, person: input.person, phone, shop: input.shop };
 }

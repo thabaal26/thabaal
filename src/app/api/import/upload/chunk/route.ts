@@ -4,11 +4,15 @@ import crypto from "node:crypto";
 import { db } from "@/lib/db";
 import { requireManager } from "@/lib/session";
 import { getSpoolFilePath, computeFileSha256 } from "@/lib/import-storage";
+import { verifySameOrigin, rejectCrossSite } from "@/lib/csrf";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
+    const originCheck = verifySameOrigin(req);
+    if (!originCheck.ok) return rejectCrossSite(originCheck.reason);
+
     const s = await requireManager(true);
     if ("denied" in s) {
       return NextResponse.json({ ok: false, message: s.denied }, { status: 403 });
