@@ -194,4 +194,147 @@ test("IMPORT-TENANT-ISOLATION: Worker Lease Fencing & Cross-Tenant Boundary Inva
 
     assert.equal(eligible, null, "Active unexpired lease must NOT be eligible for another worker");
   });
+
+  await t.test("5. Stale worker final-commit fencing: expired worker cannot commit after newer lease", async () => {
+    // 1. Create batch leased to Worker A under fence version 2
+    const past = new Date(Date.now() - 5_000); // Expired
+    const batch = await db.importBatch.create({
+      data: {
+        clientId: testClientA,
+        userId: "user_a",
+        idempotencyKey: `idem_stale_commit_${Date.now()}`,
+        status: "COMMITTING",
+        workerLeaseToken: "worker-a-stale-token",
+        workerLeaseExpiresAt: past,
+        workerFenceVersion: 2,
+        optInSource: "Store POS Bill",
+      },
+    });
+
+    // 2. Worker B reclaims the batch with fence version 3
+    const newExpiresAt = new Date(Date.now() + 60_000);
+    const reclaimResult = await db.importBatch.updateMany({
+      where: {
+        id: batch.id,
+        clientId: testClientA,
+        workerFenceVersion: 2,
+      },
+      data: {
+        workerLeaseToken: "worker-b-active-token",
+        workerLeaseExpiresAt: newExpiresAt,
+        workerFenceVersion: { increment: 1 }, // Becomes 3
+      },
+    });
+    assert.equal(reclaimResult.count, 1, "Worker B must successfully acquire the lease");
+
+    // 3. Worker A (stale) wakes up and attempts to commit results using stale fence version 2
+    const staleCommitAttempt = await db.importBatch.updateMany({
+      where: {
+        id: batch.id,
+        clientId: testClientA,
+        workerFenceVersion: 2, // STALE! Database is now at 3
+      },
+      data: {
+        status: "COMPLETED",
+        workerLeaseToken: null,
+        workerLeaseExpiresAt: null,
+      },
+    });
+
+    assert.equal(staleCommitAttempt.count, 0, "Stale worker commit MUST mutate exactly 0 rows");
+
+    // 4. Verify batch remains in COMMITTING state owned by Worker B
+    const currentBatch = await db.importBatch.findUnique({ where: { id: batch.id } });
+    assert.equal(currentBatch?.status, "COMMITTING", "Batch state must not be overwritten by stale worker");
+    assert.equal(currentBatch?.workerLeaseToken, "worker-b-active-token", "Worker B lease must remain intact");
+    assert.equal(currentBatch?.workerFenceVersion, 3, "Fence version must remain at 3");
+  });
+
+  await t.test("6. Child-record tenant & batch consistency: ImportFile, ImportStagingRecord & ImportErrorLog isolation", async () => {
+    // 1. Setup Tenant B batch with file, staging records, and error log
+    const batchB = await db.importBatch.create({
+      data: {
+        clientId: testClientB,
+        userId: "user_b",
+        idempotencyKey: `idem_child_b_${Date.now()}`,
+        status: "STAGING",
+        optInSource: "Store POS Bill",
+      },
+    });
+
+    const fileB = await db.importFile.create({
+      data: {
+        batchId: batchB.id,
+        clientId: testClientB,
+        originalFileName: "tenant_b_customers.xlsx",
+        safeStoredFileName: "safe_tenant_b_customers.xlsx",
+        fileFormat: "XLSX",
+        fileSize: 2048,
+        storagePath: "/tmp/b.xlsx",
+        checksum: "hash_b_123456",
+      },
+    });
+
+    const stagingB = await db.importStagingRecord.create({
+      data: {
+        batchId: batchB.id,
+        fileId: fileB.id,
+        clientId: testClientB,
+        sourceRowNumber: 1,
+        sourceIdentity: `${fileB.id}:Sheet1:1`,
+        normalizedPhone: "919988776655",
+        name: "Tenant B Secret Customer",
+        reviewStatus: "PENDING",
+      },
+    });
+
+    const errorB = await db.importErrorLog.create({
+      data: {
+        batchId: batchB.id,
+        clientId: testClientB,
+        fileId: fileB.id,
+        sourceRowNumber: 2,
+        errorCode: "INVALID_PHONE_LENGTH",
+        reason: "Malformed phone number in Tenant B sheet",
+      },
+    });
+
+    // 2. Query child records scoped to Tenant A looking for Tenant B records
+    const crossTenantStaging = await db.importStagingRecord.findFirst({
+      where: {
+        id: stagingB.id,
+        clientId: testClientA, // Scoped to Tenant A
+      },
+    });
+    assert.equal(crossTenantStaging, null, "Tenant A must NEVER be able to query Tenant B staging records");
+
+    // 3. Attempted mutation on Tenant B staging records by Tenant A
+    const crossTenantStagingUpdate = await db.importStagingRecord.updateMany({
+      where: {
+        id: stagingB.id,
+        clientId: testClientA,
+      },
+      data: {
+        reviewStatus: "REJECTED",
+      },
+    });
+    assert.equal(crossTenantStagingUpdate.count, 0, "Tenant A cannot mutate Tenant B staging records");
+
+    // 4. Verify batch boundary consistency for files and error logs
+    const crossBatchFile = await db.importFile.findFirst({
+      where: {
+        id: fileB.id,
+        batch: { clientId: testClientA }, // Traversed to Tenant A
+      },
+    });
+    assert.equal(crossBatchFile, null, "Tenant A must NOT traverse Tenant B import files");
+
+    const crossBatchError = await db.importErrorLog.findFirst({
+      where: {
+        id: errorB.id,
+        batch: { clientId: testClientA },
+      },
+    });
+    assert.equal(crossBatchError, null, "Tenant A must NOT traverse Tenant B import error logs");
+  });
 });

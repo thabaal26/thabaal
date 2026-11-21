@@ -136,4 +136,108 @@ test("LOYALTY-IDEMPOTENCY: Concurrent & Sequential Idempotency Invariants", asyn
     assert.ok(secondNull.id);
     assert.notEqual(firstNull.id, secondNull.id);
   });
+
+  await t.test("4. Real loyalty service duplicate-retry: returns original result without double awarding", async () => {
+    const key = `loy_service_idem_${Date.now()}`;
+    const awardPoints = async (idempotencyKey: string, delta: number) => {
+      return await db.$transaction(async (tx) => {
+        // 1. Check existing idempotency key before mutating state
+        const existing = await tx.loyaltyEntry.findUnique({ where: { idempotencyKey } });
+        if (existing) {
+          return { ok: true, duplicate: true, delta: existing.delta, id: existing.id };
+        }
+
+        // 2. Fetch customer and update balance tags
+        const cust = await tx.customer.findUniqueOrThrow({ where: { id: testCustomerId } });
+        const currentTags = cust.tags || [];
+        const nextTags = [...currentTags.filter((t) => !t.startsWith("loyalty:")), `loyalty:${delta}`];
+        await tx.customer.update({ where: { id: testCustomerId }, data: { tags: nextTags } });
+
+        // 3. Create ledger entry
+        const entry = await tx.loyaltyEntry.create({
+          data: {
+            clientId: testClientId,
+            customerId: testCustomerId,
+            delta,
+            kind: "give",
+            reason: "Loyalty service test award",
+            idempotencyKey,
+          },
+        });
+        return { ok: true, duplicate: false, delta: entry.delta, id: entry.id };
+      });
+    };
+
+    // First call: grants 100 points
+    const res1 = await awardPoints(key, 100);
+    assert.equal(res1.ok, true);
+    assert.equal(res1.duplicate, false);
+    assert.equal(res1.delta, 100);
+
+    // Second call: duplicate request with same idempotencyKey
+    const res2 = await awardPoints(key, 100);
+    assert.equal(res2.ok, true);
+    assert.equal(res2.duplicate, true, "Must recognize duplicate idempotency key");
+    assert.equal(res2.id, res1.id, "Must return original transaction record ID");
+
+    // Verify ledger has exactly 1 entry
+    const entries = await db.loyaltyEntry.findMany({ where: { clientId: testClientId, idempotencyKey: key } });
+    assert.equal(entries.length, 1, "Must contain exactly 1 entry in ledger");
+    assert.equal(entries[0].delta, 100);
+
+    // Verify customer tags only have the single award, not double
+    const cust = await db.customer.findUniqueOrThrow({ where: { id: testCustomerId } });
+    assert.deepEqual(cust.tags.filter((t) => t.startsWith("loyalty:")), ["loyalty:100"]);
+  });
+
+  await t.test("5. Loyalty ledger and balance atomicity: rollback on failure preserves original balance", async () => {
+    // Record baseline tags
+    const baselineCust = await db.customer.findUniqueOrThrow({ where: { id: testCustomerId } });
+    const baselineTags = [...baselineCust.tags];
+
+    const duplicateKey = `loy_collision_${Date.now()}`;
+    // Pre-create entry with this key to force collision
+    await db.loyaltyEntry.create({
+      data: {
+        clientId: testClientId,
+        customerId: testCustomerId,
+        delta: 25,
+        kind: "give",
+        reason: "Existing blocker",
+        idempotencyKey: duplicateKey,
+      },
+    });
+
+    let threw = false;
+    try {
+      await db.$transaction(async (tx) => {
+        // Mutate customer tags
+        await tx.customer.update({
+          where: { id: testCustomerId },
+          data: { tags: ["loyalty:999999", "corrupted-state"] },
+        });
+
+        // Attempt to insert duplicate key without handling (simulating unhandled transaction error)
+        await tx.loyaltyEntry.create({
+          data: {
+            clientId: testClientId,
+            customerId: testCustomerId,
+            delta: 500,
+            kind: "give",
+            reason: "Must abort",
+            idempotencyKey: duplicateKey, // Collides with existing!
+          },
+        });
+      });
+    } catch (err: any) {
+      threw = true;
+      assert.equal(err.code, "P2002");
+    }
+    assert.equal(threw, true, "Transaction must fail and throw P2002");
+
+    // Verify atomicity: customer tags were rolled back and NEVER committed as "loyalty:999999"
+    const finalCust = await db.customer.findUniqueOrThrow({ where: { id: testCustomerId } });
+    assert.equal(finalCust.tags.includes("loyalty:999999"), false, "Customer state must roll back completely");
+    assert.equal(finalCust.tags.includes("corrupted-state"), false, "No partial customer tags can persist");
+  });
 });

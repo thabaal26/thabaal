@@ -422,8 +422,8 @@ export async function restoreCustomer(id: string): Promise<ActionResult> {
 export async function adjustLoyaltyPoints(
   id: string,
   delta: number,
-  opts: { kind?: "give" | "take" | "redeem"; reason?: string; told?: boolean } = {},
-): Promise<ActionResult> {
+  opts: { kind?: "give" | "take" | "redeem"; reason?: string; told?: boolean; idempotencyKey?: string } = {},
+): Promise<ActionResult & { duplicate?: boolean }> {
   const s = await requireManager();
   if ("denied" in s) return { ok: false, message: s.denied };
   if (!Number.isFinite(delta) || delta === 0) return { ok: false, message: "Enter a valid points change." };
@@ -468,24 +468,52 @@ export async function adjustLoyaltyPoints(
     }
     if (kind === "redeem" && balance < 50) return { ok: false, message: `${c.name} needs at least 50 points to use them on a bill.` };
 
+    // Check existing idempotency key before mutating state (LOY-IDEM-01)
+    if (opts.idempotencyKey) {
+      const existing = await tx.loyaltyEntry.findUnique({ where: { idempotencyKey: opts.idempotencyKey } });
+      if (existing) {
+        return {
+          ok: true,
+          message: `Previously applied (${existing.delta > 0 ? `+${existing.delta}` : existing.delta} pts).`,
+          customerId: c.id,
+          duplicate: true,
+        };
+      }
+    }
+
     const nextTags = applyManualLoyaltyDelta(c.tags, delta, balance + Math.round(delta));
     const manualAfter = parseManualLoyaltyPoints(nextTags);
     await tx.customer.update({ where: { id: c.id }, data: { tags: nextTags } });
 
     // The history line (Customers › Loyalty › Point history); throws on failure inside transaction to maintain atomicity (LOY-03)
-    const idempotencyKey = `manual-loyalty:${c.id}:${Math.round(delta)}:${Date.now()}`;
-    await tx.loyaltyEntry.create({
-      data: {
-        clientId: c.clientId,
-        customerId: c.id,
-        delta: Math.round(delta),
-        kind,
-        reason: (opts.reason?.trim() || (kind === "redeem" ? "Walk-in bill" : "Other")).slice(0, 120),
-        byName: user.name || user.email,
-        told: Boolean(opts.told),
-        idempotencyKey,
-      },
-    });
+    const idempotencyKey = opts.idempotencyKey || `manual-loyalty:${c.id}:${Math.round(delta)}:${Date.now()}`;
+    try {
+      await tx.loyaltyEntry.create({
+        data: {
+          clientId: c.clientId,
+          customerId: c.id,
+          delta: Math.round(delta),
+          kind,
+          reason: (opts.reason?.trim() || (kind === "redeem" ? "Walk-in bill" : "Other")).slice(0, 120),
+          byName: user.name || user.email,
+          told: Boolean(opts.told),
+          idempotencyKey,
+        },
+      });
+    } catch (err: any) {
+      if (err?.code === "P2002" && opts.idempotencyKey) {
+        const existing = await tx.loyaltyEntry.findUnique({ where: { idempotencyKey: opts.idempotencyKey } });
+        if (existing) {
+          return {
+            ok: true,
+            message: `Previously applied (${existing.delta > 0 ? `+${existing.delta}` : existing.delta} pts).`,
+            customerId: c.id,
+            duplicate: true,
+          };
+        }
+      }
+      throw err;
+    }
 
     const sign = delta > 0 ? `+${Math.round(delta)}` : `${Math.round(delta)}`;
     const message =
