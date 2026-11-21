@@ -61,7 +61,7 @@ const run = (cmd) => {
 try {
   execSync("npx prisma db push --skip-generate --accept-data-loss", { stdio: "inherit", env });
   const target = process.argv.find((a) => a.startsWith("--file="))?.slice(7) || "tests/unit/*.test.ts";
-  run(`npx tsx --conditions=react-server --test ${target}`);
+  run(`npx tsx --conditions=react-server --test --test-concurrency=1 ${target}`);
   if (http) {
     // Its own process group off Windows, so stopping it also stops the Next.js server the shell started.
     const app = spawn("npx", ["next", "start", "-p", "3200"], { env: { ...env, NODE_ENV: "production" }, stdio: "inherit", shell: true, detached: process.platform !== "win32" });

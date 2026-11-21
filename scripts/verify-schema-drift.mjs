@@ -87,6 +87,13 @@ for (const rawStmt of statements) {
     continue;
   }
 
+  // 4b. Missing Enum Value: ALTER TYPE ... ADD VALUE ...
+  const addEnumValueMatch = stmt.match(/^ALTER\s+TYPE\s+(?:public\.)?"?([a-zA-Z0-9_]+)"?\s+ADD\s+VALUE\s+('?[a-zA-Z0-9_]+'?)/i);
+  if (addEnumValueMatch) {
+    violations.push({ type: "MISSING_ENUM_VALUE", object: `${addEnumValueMatch[1]}.${addEnumValueMatch[2]}`, sql: stmt });
+    continue;
+  }
+
   // 5. Missing Column: ALTER TABLE ... ADD COLUMN ...
   const addColMatch = stmt.match(/^ALTER\s+TABLE\s+(?:public\.)?"?([a-zA-Z0-9_]+)"?\s+ADD\s+COLUMN\s+"?([a-zA-Z0-9_]+)"?/i);
   if (addColMatch) {

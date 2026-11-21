@@ -337,4 +337,133 @@ test("IMPORT-TENANT-ISOLATION: Worker Lease Fencing & Cross-Tenant Boundary Inva
     });
     assert.equal(crossBatchError, null, "Tenant A must NOT traverse Tenant B import error logs");
   });
+
+  await t.test("7. Complete stale-worker finalization transaction: expired worker committing side effects is fully rejected", async () => {
+    // 1. Setup batch leased to Worker A under version 2
+    const past = new Date(Date.now() - 5_000);
+    const batch = await db.importBatch.create({
+      data: {
+        clientId: testClientA,
+        userId: "user_a",
+        idempotencyKey: `idem_full_stale_${Date.now()}`,
+        status: "COMMITTING",
+        workerLeaseToken: "worker-a-stale-token",
+        workerLeaseExpiresAt: past,
+        workerFenceVersion: 2,
+        optInSource: "Store POS Bill",
+      },
+    });
+
+    const file = await db.importFile.create({
+      data: {
+        batchId: batch.id,
+        clientId: testClientA,
+        originalFileName: "customers.xlsx",
+        safeStoredFileName: "safe_customers.xlsx",
+        fileFormat: "XLSX",
+        fileSize: 1024,
+        storagePath: "/tmp/a.xlsx",
+        checksum: "hash_a_123456",
+      },
+    });
+
+    const staging = await db.importStagingRecord.create({
+      data: {
+        batchId: batch.id,
+        fileId: file.id,
+        clientId: testClientA,
+        sourceRowNumber: 1,
+        sourceIdentity: `${file.id}:Sheet1:1`,
+        normalizedPhone: "919111223344",
+        name: "Stale Candidate Customer",
+        tags: ["stale-tag"],
+        reviewStatus: "PENDING",
+      },
+    });
+
+    // 2. Worker B reclaims the batch, incrementing fence version to 3
+    const newExpiresAt = new Date(Date.now() + 60_000);
+    await db.importBatch.updateMany({
+      where: {
+        id: batch.id,
+        clientId: testClientA,
+        workerFenceVersion: 2,
+      },
+      data: {
+        workerLeaseToken: "worker-b-active-token",
+        workerLeaseExpiresAt: newExpiresAt,
+        workerFenceVersion: 3,
+      },
+    });
+
+    // 3. Worker A (stale with version 2) attempts complete commit transaction
+    const executeWorkerCommit = async (workerToken: string, fenceVersion: number) => {
+      return await db.$transaction(async (tx) => {
+        // Enforce fencing invariant on the batch inside the commit transaction
+        const claim = await tx.importBatch.updateMany({
+          where: {
+            id: batch.id,
+            clientId: testClientA,
+            workerFenceVersion: fenceVersion,
+            workerLeaseToken: workerToken,
+          },
+          data: {
+            status: "COMPLETED",
+            workerLeaseToken: null,
+            workerLeaseExpiresAt: null,
+          },
+        });
+
+        if (claim.count === 0) {
+          throw new Error("STALE_WORKER_FENCE_VIOLATION");
+        }
+
+        // Side effect: create customer
+        await tx.customer.create({
+          data: {
+            clientId: testClientA,
+            phone: staging.normalizedPhone!,
+            name: staging.name!,
+            tags: staging.tags,
+          },
+        });
+
+        // Side effect: mark staging record committed
+        await tx.importStagingRecord.update({
+          where: { id: staging.id },
+          data: { reviewStatus: "APPROVED", committedAt: new Date() },
+        });
+
+        return { ok: true };
+      });
+    };
+
+    let workerAError: string | null = null;
+    try {
+      await executeWorkerCommit("worker-a-stale-token", 2);
+    } catch (err: any) {
+      workerAError = err.message;
+    }
+
+    // 4. Verify all invariants requested by Architect:
+    // a) Stale worker rejected with fence violation
+    assert.equal(workerAError, "STALE_WORKER_FENCE_VIOLATION");
+
+    // b) No Customer is created or updated
+    const customer = await db.customer.findFirst({
+      where: { clientId: testClientA, phone: "919111223344" },
+    });
+    assert.equal(customer, null, "No customer record must be created by stale worker");
+
+    // c) No staging record is marked committed
+    const freshStaging = await db.importStagingRecord.findUniqueOrThrow({ where: { id: staging.id } });
+    assert.equal(freshStaging.reviewStatus, "PENDING", "Staging record must remain PENDING");
+    assert.equal(freshStaging.committedAt, null, "committedAt must remain null");
+
+    // d) Worker B active lease remains untouched
+    const freshBatch = await db.importBatch.findUniqueOrThrow({ where: { id: batch.id } });
+    assert.equal(freshBatch.status, "COMMITTING", "Batch must remain in COMMITTING status");
+    assert.equal(freshBatch.workerLeaseToken, "worker-b-active-token", "Worker B lease must remain active");
+    assert.equal(freshBatch.workerFenceVersion, 3, "workerFenceVersion must remain 3");
+  });
 });

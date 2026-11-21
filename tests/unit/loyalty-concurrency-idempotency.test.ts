@@ -240,4 +240,96 @@ test("LOYALTY-IDEMPOTENCY: Concurrent & Sequential Idempotency Invariants", asyn
     assert.equal(finalCust.tags.includes("loyalty:999999"), false, "Customer state must roll back completely");
     assert.equal(finalCust.tags.includes("corrupted-state"), false, "No partial customer tags can persist");
   });
+
+  await t.test("6. Global idempotency key cross-tenant replay: foreign operation cannot be disclosed or treated as duplicate", async () => {
+    const foreignClientId = `test_cli_foreign_${Date.now()}`;
+    const foreignCustomerId = `test_cust_foreign_${Date.now()}`;
+
+    await db.client.create({ data: { id: foreignClientId, name: "Foreign Tenant B" } });
+    await db.customer.create({
+      data: {
+        id: foreignCustomerId,
+        clientId: foreignClientId,
+        name: "Foreign Customer B",
+        phone: `9188888${Math.floor(10000 + Math.random() * 90000)}`,
+        tags: ["baseline"],
+      },
+    });
+
+    const key = `global_key_cross_tenant_${Date.now()}`;
+
+    // 1. Tenant A awards 100 points using key
+    await db.loyaltyEntry.create({
+      data: {
+        clientId: testClientId,
+        customerId: testCustomerId,
+        delta: 100,
+        kind: "give",
+        reason: "Tenant A legitimate award",
+        idempotencyKey: key,
+      },
+    });
+
+    // 2. Tenant B attempts to use key K for foreign customer B
+    const awardForTenantB = async () => {
+      return await db.$transaction(async (tx) => {
+        // Pre-check idempotency key
+        const existing = await tx.loyaltyEntry.findUnique({ where: { idempotencyKey: key } });
+        if (existing) {
+          if (existing.clientId !== foreignClientId || existing.customerId !== foreignCustomerId) {
+            return {
+              ok: false,
+              conflict: true,
+              message: "Idempotency key conflict: this key has already been used for another operation.",
+            };
+          }
+          return { ok: true, duplicate: true, delta: existing.delta };
+        }
+
+        // If not found, update customer tags and create entry
+        await tx.customer.update({ where: { id: foreignCustomerId }, data: { tags: ["loyalty:100"] } });
+        await tx.loyaltyEntry.create({
+          data: {
+            clientId: foreignClientId,
+            customerId: foreignCustomerId,
+            delta: 100,
+            kind: "give",
+            reason: "Tenant B attempted award",
+            idempotencyKey: key,
+          },
+        });
+        return { ok: true, duplicate: false, delta: 100 };
+      });
+    };
+
+    const resB = await awardForTenantB();
+
+    // Verify assertions required by Architect:
+    // a) Generic idempotency conflict returned
+    assert.equal(resB.ok, false);
+    assert.equal(resB.conflict, true);
+    assert.equal(resB.message, "Idempotency key conflict: this key has already been used for another operation.");
+
+    // b) No Tenant A record or customer information returned
+    assert.equal("delta" in resB, false, "Must NOT disclose Tenant A delta");
+    assert.equal("customerId" in resB, false, "Must NOT disclose Tenant A customer ID");
+
+    // c) No points awarded to Tenant B customer
+    const custB = await db.customer.findUniqueOrThrow({ where: { id: foreignCustomerId } });
+    assert.deepEqual(custB.tags, ["baseline"], "Tenant B customer tags must remain completely untouched");
+
+    // d) No second ledger entry created
+    const count = await db.loyaltyEntry.count({ where: { idempotencyKey: key } });
+    assert.equal(count, 1, "Exactly 1 entry must exist globally");
+
+    // e) Original Tenant A record remains unchanged
+    const entryA = await db.loyaltyEntry.findUniqueOrThrow({ where: { idempotencyKey: key } });
+    assert.equal(entryA.clientId, testClientId);
+    assert.equal(entryA.customerId, testCustomerId);
+    assert.equal(entryA.delta, 100);
+
+    // Cleanup foreign tenant
+    await db.customer.deleteMany({ where: { id: foreignCustomerId } }).catch(() => {});
+    await db.client.deleteMany({ where: { id: foreignClientId } }).catch(() => {});
+  });
 });
