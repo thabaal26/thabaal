@@ -131,7 +131,8 @@ export default async function CampaignsPage() {
       // card says how many it really goes to.
       let skipped = 0;
       try {
-        const audienceWhereClause = await campaignAudienceWhere(c.clientId, c.audienceTag?.trim() || null, c);
+        const isMarketing = c.template.category === "MARKETING";
+        const audienceWhereClause = await campaignAudienceWhere(c.clientId, c.audienceTag?.trim() || null, c, { requirePositiveConsent: isMarketing });
         const at = c.nextRunAt && c.nextRunAt > now ? c.nextRunAt : now;
         const skip =
           s === "scheduled"
@@ -165,6 +166,8 @@ export default async function CampaignsPage() {
         }
       }
 
+      const activeRun = s === "running" ? last : null;
+
       return {
         id: c.id,
         n: c.name,
@@ -187,6 +190,7 @@ export default async function CampaignsPage() {
         body: c.template.body ?? "",
         buttons: templateButtons.length > 0 ? templateButtons : ["Order now"],
         isLive: true,
+        targetAtStart: activeRun?.total ?? undefined,
       };
     })
   );

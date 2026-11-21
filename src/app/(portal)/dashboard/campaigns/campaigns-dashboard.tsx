@@ -35,6 +35,7 @@ export type CampaignItem = {
   body?: string;
   buttons?: string[];
   isLive?: boolean;
+  targetAtStart?: number;
 };
 
 export type CampaignsDashboardProps = {
@@ -463,8 +464,8 @@ export function CampaignsDashboard({ kpi, campaigns: initialCampaigns, canManage
                           </div>
                           <p className="small muted" style={{ marginBottom: 8 }}>
                             {isTamil
-                              ? `${c.sent.toLocaleString("en-IN")} / ${c.cnt.toLocaleString("en-IN")} அனுப்பப்பட்டது (${pct}%)${c.fail ? ` · ${c.fail} தோல்வி` : ""}`
-                              : `${c.sent.toLocaleString("en-IN")} of ${c.cnt.toLocaleString("en-IN")} sent (${pct}%)${c.fail ? ` · ${c.fail} failed` : ""}`}
+                              ? `${c.sent.toLocaleString("en-IN")} / ${(c.targetAtStart ?? c.cnt).toLocaleString("en-IN")} அனுப்பப்பட்டது (${pct}%)${c.fail ? ` · ${c.fail} தோல்வி` : ""}${c.targetAtStart && c.targetAtStart !== c.cnt ? ` · தற்போதைய ஆடியன்ஸ்: ${c.cnt.toLocaleString("en-IN")}` : ""}`
+                              : `${c.sent.toLocaleString("en-IN")} of ${(c.targetAtStart ?? c.cnt).toLocaleString("en-IN")} targeted sent (${pct}%)${c.fail ? ` · ${c.fail} failed` : ""}${c.targetAtStart && c.targetAtStart !== c.cnt ? ` · current audience estimate: ${c.cnt.toLocaleString("en-IN")}` : ""}`}
                           </p>
                         </>
                       )}

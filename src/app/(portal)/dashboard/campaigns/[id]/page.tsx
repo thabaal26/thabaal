@@ -21,7 +21,7 @@ import { describeScheduleSummary, effectiveInterval, TEST_TAG } from "@/lib/sche
 import { getScope, owned } from "@/lib/session";
 import { cancelRun, deleteCampaign, resendCampaignNow, runCampaignNow, sendCampaignTest, toggleCampaign } from "../../actions/campaigns";
 import { CampaignForm } from "../campaign-form";
-import { FailureSummary } from "../failure-summary";
+import { FailureSummary, SkippedSummary } from "../failure-summary";
 import { campaignFormData } from "../form-data";
 import { templateLabel } from "@/lib/plain-error";
 import { STOP_CONFIRM } from "@/lib/held";
@@ -97,6 +97,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
     delivered: all("DELIVERED", "READ"),
     read: all("READ"),
     failed: all("FAILED"),
+    skipped: all("SKIPPED"),
     ...interactions,
   };
 
@@ -217,15 +218,16 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
         </StaggerItem>
       </StaggerGroup>
 
-      {response.sent + response.failed > 0 && (
+      {response.sent + response.failed + (response.skipped ?? 0) > 0 && (
         <Card className="card-3d mb-5" data-testid="campaign-response">
           <CardHeader tone="info" icon={<Users3D />} title="How people responded" description={`All runs together. A tap or reply counts when it answers this campaign's message, or (older replies) came within ${ATTRIBUTION_DAYS} days of it.`} />
-          <dl className="grid grid-cols-2 gap-3 p-4 text-sm sm:grid-cols-4 sm:p-5 xl:grid-cols-8">
+          <dl className="grid grid-cols-2 gap-3 p-4 text-sm sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
             {[
               ["Sent", fmtNumber(response.sent)],
               ["Delivered", fmtNumber(response.delivered)],
               ["Read", fmtNumber(response.read)],
               ["Failed", fmtNumber(response.failed)],
+              ["Skipped", fmtNumber(response.skipped ?? 0)],
               ["Tapped a button", fmtNumber(response.buttons)],
               ["Replied", fmtNumber(response.replies)],
               ["Delivery rate", `${pct(response.delivered, response.sent + response.failed)}%`],
@@ -313,25 +315,29 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
             <>
               <ul className="divide-y divide-line sm:hidden">
                 {c.runs.map((r) => {
+                  const submitted = stat(r.id, "SENT", "DELIVERED", "READ");
                   const delivered = stat(r.id, "DELIVERED", "READ");
                   const read = stat(r.id, "READ");
                   const failed = stat(r.id, "FAILED");
+                  const skipped = stat(r.id, "SKIPPED");
                   return (
                     <li key={r.id} className="px-4 py-3.5">
                       <div className="flex items-center justify-between gap-2">
                         <p className="tabular text-sm font-medium text-ink">{fmtDate(r.startedAt, "EEE d MMM, h:mm a")}</p>
                         <StatusBadge status={r.status} />
                       </div>
-                      <dl className="tabular mt-2 grid grid-cols-4 gap-1.5 text-center">
+                      <dl className="tabular mt-2 grid grid-cols-3 gap-1.5 text-center sm:grid-cols-6">
                         {[
-                          ["Sent to", fmtNumber(r.total)],
+                          ["Targeted", fmtNumber(r.total)],
+                          ["Submitted", fmtNumber(submitted)],
                           ["Delivered", `${Math.min(100, pct(delivered, r.total))}%`],
                           ["Read", `${Math.min(100, pct(read, r.total))}%`],
                           ["Failed", fmtNumber(failed)],
+                          ["Skipped", fmtNumber(skipped)],
                         ].map(([k, v]) => (
                           <div key={k} className="flex flex-col-reverse rounded-control bg-sunken px-1 py-1.5">
                             <dt className="text-2xs text-muted">{k}</dt>
-                            <dd className={cn("text-sm font-semibold", k === "Failed" && failed > 0 && "text-danger")}>{v}</dd>
+                            <dd className={cn("text-xs font-semibold", k === "Failed" && failed > 0 && "text-danger", k === "Skipped" && skipped > 0 && "text-amber-500 font-medium")}>{v}</dd>
                           </div>
                         ))}
                       </dl>
@@ -361,10 +367,12 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
                     <tr>
                       <Th>Started</Th>
                       <Th>Status</Th>
-                      <Th numeric>Customers</Th>
-                      <Th numeric>Delivered</Th>
-                      <Th numeric>Read</Th>
-                      <Th numeric>Failed</Th>
+                      <Th numeric title="Targeted recipients at run start">Targeted</Th>
+                      <Th numeric title="Total messages accepted by Meta API (Sent + Delivered + Read)">Submitted</Th>
+                      <Th numeric title="Delivered to customer's handset (subset of Submitted)">Delivered</Th>
+                      <Th numeric title="Read by customer (subset of Delivered)">Read</Th>
+                      <Th numeric title="Rejected by Meta API or undeliverable">Failed</Th>
+                      <Th numeric title="Skipped by internal cooldown or Meta frequency holdback">Skipped</Th>
                       <Th numeric className="max-lg:hidden" title="Messages Meta billed (marketing rate)">Charged</Th>
                       <Th numeric title="Orders placed within 7 days of receiving this run's message">Sales (7 days)</Th>
                       <Th><span className="sr-only">Actions</span></Th>
@@ -372,14 +380,17 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
                   </thead>
                   <tbody>
                     {c.runs.map((r) => {
+                      const submitted = stat(r.id, "SENT", "DELIVERED", "READ");
                       const delivered = stat(r.id, "DELIVERED", "READ");
                       const read = stat(r.id, "READ");
                       const failed = stat(r.id, "FAILED");
+                      const skipped = stat(r.id, "SKIPPED");
                       return (
                         <tr key={r.id} className={rowClass}>
                           <Td className="tabular whitespace-nowrap">{fmtDate(r.startedAt)}</Td>
                           <Td><StatusBadge status={r.status} /></Td>
                           <Td numeric>{fmtNumber(r.total)}</Td>
+                          <Td numeric>{fmtNumber(submitted)}</Td>
                           <Td numeric className="whitespace-nowrap">
                             {fmtNumber(delivered)} <span className="text-xs text-muted">{pct(delivered, r.total)}%</span>
                           </Td>
@@ -387,6 +398,7 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
                             {fmtNumber(read)} <span className="text-xs text-muted">{pct(read, r.total)}%</span>
                           </Td>
                           <Td numeric className={failed ? "text-danger" : undefined}>{fmtNumber(failed)}</Td>
+                          <Td numeric className={skipped ? "text-amber-500 font-medium" : undefined}>{fmtNumber(skipped)}</Td>
                           <Td numeric className="max-lg:hidden">{fmtNumber(chargedIn(r.id))}</Td>
                           <Td numeric className="whitespace-nowrap">
                             {salesOf(r.id) ? (
@@ -424,6 +436,9 @@ export default async function CampaignPage({ params }: PageProps<"/dashboard/cam
       {/* Failure details stream in after the rest of the campaign. */}
       <Suspense fallback={null}>
         <FailureSummary campaignId={c.id} runIds={runIds} canManage={scope.canManage} />
+      </Suspense>
+      <Suspense fallback={null}>
+        <SkippedSummary campaignId={c.id} clientId={c.clientId} runIds={runIds} canManage={scope.canManage} />
       </Suspense>
     </>
   );

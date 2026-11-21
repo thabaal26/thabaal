@@ -56,8 +56,12 @@ async function ownCustomers(clientId: string, ids: unknown): Promise<string[]> {
   return (await db.customer.findMany({ where: { clientId, deletedAt: null, id: { in: list } }, select: { id: true } })).map((c) => c.id);
 }
 
-function refresh() {
+function refresh(campaignId?: string) {
   revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/campaigns");
+  if (campaignId) {
+    revalidatePath(`/dashboard/campaigns/${campaignId}`);
+  }
 }
 
 export async function saveCampaign(id: string | null, input: CampaignInput): Promise<ActionResult> {
@@ -131,7 +135,7 @@ export async function saveCampaign(id: string | null, input: CampaignInput): Pro
     : await db.campaign.create({ data: { ...data, clientId, nextRunAt } });
 
   // Batch size and interval apply to runs already in progress from their next batch.
-  refresh();
+  refresh(saved.id);
   return { ok: true, id: saved.id, message: id ? "Campaign updated." : "Campaign created." };
 }
 

@@ -48,11 +48,11 @@ describe("plan limits", () => {
     const c = await shop("starter");
     const t = await template(c.id);
     const camp = await db.campaign.create({ data: { clientId: c.id, templateId: t.id, name: "c", scheduleType: "ONCE", active: false } });
-    await db.campaignRun.create({ data: { campaignId: camp.id, scheduledFor: new Date(), total: 0, startedAt: new Date(Date.now() - 40 * 86_400_000) } });
-    for (let i = 0; i < 4; i++) await db.campaignRun.create({ data: { campaignId: camp.id, scheduledFor: new Date(), total: 0 } });
+    await db.campaignRun.create({ data: { campaignId: camp.id, scheduledFor: new Date(Date.now() - 40 * 86_400_000), total: 0, startedAt: new Date(Date.now() - 40 * 86_400_000) } });
+    for (let i = 0; i < 4; i++) await db.campaignRun.create({ data: { campaignId: camp.id, scheduledFor: new Date(Date.now() - (i + 1) * 1000), total: 0 } });
     assert.equal((await planUsage(c.id)).camp, 4);
     assert.equal(await planCapacityBlock(c.id, "camp"), null);
-    await db.campaignRun.create({ data: { campaignId: camp.id, scheduledFor: new Date(), total: 0 } });
+    await db.campaignRun.create({ data: { campaignId: camp.id, scheduledFor: new Date(Date.now() - 10_000), total: 0 } });
     assert.match((await planCapacityBlock(c.id, "camp")) ?? "", /allows 5 campaign sends a month, and all 5 are used this month/);
   });
 

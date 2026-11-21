@@ -194,3 +194,194 @@ export function FailureSummaryView({
     </Card>
   );
 }
+
+export type ClassifiedSkip = {
+  key: string;
+  label: string;
+  ownerLabel: string;
+  tone: Tone;
+  why: string;
+  guidance: string;
+  count: number;
+  deepLink?: { href: string; label: string };
+  examples: string[];
+};
+
+export function classifySkipReason(error: string | null): { key: string; label: string; ownerLabel: string; tone: Tone; why: string; guidance: string; deepLink?: { href: string; label: string } } {
+  const err = error || "";
+  if (/Already got an offer within \d+ hours/i.test(err)) {
+    return {
+      key: "MARKETING_GAP_ACTIVE",
+      label: "Business Marketing Gap Protection",
+      ownerLabel: "Thabaal Policy",
+      tone: "amber",
+      why: "Recipient received another marketing offer within your business cooldown window.",
+      guidance: "Prevents spamming customers. Automatically resets when the gap window passes.",
+      deepLink: { href: "/dashboard/settings#sending-rules", label: "Adjust in Settings › Sending Rules" },
+    };
+  }
+  if (/Meta is holding back marketing/i.test(err)) {
+    return {
+      key: "META_SUPPRESSION_UNSPECIFIED",
+      label: "Meta Marketing Frequency Restriction",
+      ownerLabel: "Meta Cloud API",
+      tone: "red",
+      why: "Meta algorithmically holds back marketing offers from recipients who receive high volumes across WhatsApp.",
+      guidance: "Meta controls this restriction. There is no guaranteed release time. Recheck recipient eligibility before a later attempt.",
+    };
+  }
+  if (/Didn't open the last \d+ offers/i.test(err)) {
+    return {
+      key: "UNREAD_OFFERS",
+      label: "Unread Offers Filter",
+      ownerLabel: "Campaign Rule",
+      tone: "gray",
+      why: "Skipped because the recipient hasn't opened previous marketing offers.",
+      guidance: "Can be turned off in campaign settings (Leave out unread offers).",
+    };
+  }
+  if (/Number can't receive WhatsApp|Customer opted out|archived or deleted/i.test(err)) {
+    return {
+      key: "DORMANT_OR_UNREACHABLE",
+      label: "Archived or Inactive Contacts",
+      ownerLabel: "Contact Health",
+      tone: "gray",
+      why: "The contact is marked as unreachable, opted out, or archived.",
+      guidance: "Check contact status in Customers to update or clean list.",
+    };
+  }
+  if (/Consent unverified/i.test(err)) {
+    return {
+      key: "CONSENT_UNVERIFIED",
+      label: "Marketing Consent Unverified",
+      ownerLabel: "Compliance Guard",
+      tone: "amber",
+      why: "Recipient lacks verified marketing opt-in evidence (optInAt / optInSource).",
+      guidance: "Ensure customer records have verifiable opt-in source before marketing.",
+    };
+  }
+  return {
+    key: "OTHER",
+    label: "Other Protection Rule",
+    ownerLabel: "Thabaal Guard",
+    tone: "gray",
+    why: err || "Skipped by safety policy.",
+    guidance: "Check campaign log for exact details.",
+  };
+}
+
+export async function SkippedSummary({
+  campaignId,
+  clientId,
+  runIds,
+  canManage,
+}: {
+  campaignId: string;
+  clientId: string;
+  runIds: string[];
+  canManage: boolean;
+}) {
+  if (!runIds.length) return null;
+  const skippedRows = await db.message.groupBy({
+    by: ["error"],
+    where: {
+      runId: { in: runIds },
+      status: "SKIPPED",
+      run: {
+        is: {
+          campaignId,
+          campaign: {
+            is: { clientId },
+          },
+        },
+      },
+    },
+    _count: true,
+  });
+  if (!skippedRows.length) return null;
+  return <SkippedSummaryView campaignId={campaignId} rows={skippedRows} canManage={canManage} />;
+}
+
+export function SkippedSummaryView({
+  campaignId,
+  rows,
+  canManage,
+}: {
+  campaignId: string;
+  rows: { error: string | null; _count: number }[];
+  canManage: boolean;
+}) {
+  const map = new Map<string, ClassifiedSkip>();
+  for (const r of rows) {
+    const meta = classifySkipReason(r.error);
+    const existing = map.get(meta.key);
+    if (existing) {
+      existing.count += r._count;
+      if (r.error && !existing.examples.includes(r.error) && existing.examples.length < 3) {
+        existing.examples.push(r.error);
+      }
+    } else {
+      map.set(meta.key, {
+        ...meta,
+        count: r._count,
+        examples: r.error ? [r.error] : [],
+      });
+    }
+  }
+  const categories = [...map.values()].sort((a, b) => b.count - a.count);
+  const totalSkipped = categories.reduce((sum, c) => sum + c.count, 0);
+
+  if (totalSkipped === 0) return null;
+
+  return (
+    <Card className="card-3d mt-4 sm:mt-6" data-testid="skipped-summary">
+      <CardHeader
+        tone="amber"
+        icon={<Alert3D />}
+        title="Why messages were skipped"
+        description="Recipients protected by marketing gap rules or held by Meta. Skipped messages are never charged."
+        action={
+          <Link href={`/dashboard/messages?campaign=${campaignId}&status=SKIPPED`} className="inline-flex min-h-11 items-center text-sm font-medium text-brand-deep hover:underline sm:min-h-8">
+            See skipped messages
+          </Link>
+        }
+      />
+      <ul className="m-0 list-none divide-y divide-line p-0">
+        {categories.map((cat) => (
+          <li key={cat.key} className="px-4 py-3.5 sm:px-5" data-testid={`skipped-${cat.key}`}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium text-ink">{cat.label}</span>
+                  <Badge tone={cat.tone}>{fmtNumber(cat.count)}</Badge>
+                  <Badge tone="gray">{cat.ownerLabel}</Badge>
+                </div>
+                <p className="mt-1 max-w-read text-sm text-muted">{cat.why}</p>
+                <p className="mt-1 max-w-read text-xs text-ink-2">{cat.guidance}</p>
+                {cat.deepLink && (
+                  <div className="mt-2">
+                    <Link href={cat.deepLink.href} className="inline-flex items-center gap-1 text-xs font-medium text-brand-deep hover:underline">
+                      {cat.deepLink.label} &rarr;
+                    </Link>
+                  </div>
+                )}
+              </div>
+              {canManage && (
+                <div className="shrink-0 max-sm:w-full">
+                  <button
+                    type="button"
+                    disabled
+                    className="btn sm secondary opacity-60 cursor-not-allowed max-sm:w-full"
+                    title="Smart cohort scheduling will be enabled in the upcoming update"
+                  >
+                    Create Cohort Campaign
+                  </button>
+                </div>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
