@@ -2,7 +2,7 @@ import test, { describe } from "node:test";
 import assert from "node:assert/strict";
 import { db } from "../../src/lib/db";
 import { addWebsiteLead, convertLead, loadLead, loadLeads, logCall, moveLead } from "../../src/lib/leads";
-import { requestDemo } from "../../src/app/login/demo-actions";
+import { requestDemo } from "../../src/app/(portal)/login/demo-actions";
 
 describe("ADMIN-DEMO-PIPELINE: Master 'Book a Demo' & Lead-to-Client End-to-End Test Suite", () => {
   const adminActor = {

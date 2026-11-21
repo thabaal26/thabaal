@@ -2,7 +2,7 @@ import test, { describe } from "node:test";
 import assert from "node:assert/strict";
 import { db } from "../../src/lib/db";
 import { addWebsiteLead, convertLead, moveLead } from "../../src/lib/leads";
-import { requestDemo } from "../../src/app/login/demo-actions";
+import { requestDemo } from "../../src/app/(portal)/login/demo-actions";
 import { sendEmail } from "../../src/lib/email";
 
 describe("ADMIN-DEMO-CLOSURE: Turn 32 Closure Requirements Test Suite", () => {

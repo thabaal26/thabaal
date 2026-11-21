@@ -1,16 +1,27 @@
 "use server";
 
 import { after } from "next/server";
+import { cookies } from "next/headers";
 import { APP_ORIGIN } from "@/lib/app-host";
 import { db } from "@/lib/db";
 import { sendEmail } from "@/lib/email";
 import { cleanPhone } from "@/lib/lead-stages";
 import { addWebsiteLead } from "@/lib/leads";
 import { clientIp } from "@/lib/login-guard";
+import { processDemoRequestAtomic, RECEIPT_COOKIE_NAME, RECEIPT_TTL_SECONDS } from "@/lib/marketing/receipt";
 
 type DemoValues = { shop: string; person: string; phone: string; town: string; sells: string; plan: string };
 /** On a problem the form comes back with what was typed (the browser clears a form after it is sent). */
-export type DemoState = { ok?: boolean; again?: boolean; error?: string; values?: DemoValues; person?: string; phone?: string; shop?: string } | undefined;
+export type DemoState = {
+  ok?: boolean;
+  again?: boolean;
+  error?: string;
+  values?: DemoValues;
+  person?: string;
+  phone?: string;
+  shop?: string;
+  redirectTo?: string;
+} | undefined;
 
 const PER_IP = 5;
 const WINDOW_MS = 60 * 60_000;
@@ -30,11 +41,36 @@ export async function requestDemo(_: DemoState, form: FormData): Promise<DemoSta
   const recent = await db.loginAttempt.count({ where: { key, createdAt: { gte: new Date(Date.now() - WINDOW_MS) } } });
   if (recent >= PER_IP) return { error: "Too many requests from this network. Please message us on WhatsApp instead.", values: input };
 
-  const r = await addWebsiteLead(input);
-  if (!r.ok) return { error: r.message, values: input };
+  const submissionKey = get("submissionKey") || `${input.phone}:${Date.now()}:${Math.random()}`;
+  let atomicRes: Awaited<ReturnType<typeof processDemoRequestAtomic>>;
+  try {
+    atomicRes = await processDemoRequestAtomic({
+      input,
+      submissionKey,
+    });
+  } catch (err: any) {
+    return { error: err?.message || "Failed to process demo request", values: input };
+  }
+
+  const { leadResult: r, conversion } = atomicRes;
+  if (!r.ok || !r.id) return { error: r.message, values: input };
   await db.loginAttempt.create({ data: { key } });
 
   const phone = cleanPhone(input.phone)!;
+
+  try {
+    const cookieStore = await cookies();
+    cookieStore.set(RECEIPT_COOKIE_NAME, conversion.receiptToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/thank-you",
+      maxAge: RECEIPT_TTL_SECONDS,
+    });
+  } catch (err) {
+    // Non-blocking in environments without active cookie store
+  }
+
   const sendTask = async () => {
     const sent = await sendEmail({
       subject: r.again ? `Demo asked again: ${input.shop}` : `New demo request: ${input.shop}`,
@@ -57,5 +93,5 @@ export async function requestDemo(_: DemoState, form: FormData): Promise<DemoSta
   } catch {
     void sendTask().catch(() => {});
   }
-  return { ok: true, again: r.again, person: input.person, phone, shop: input.shop };
+  return { ok: true, again: r.again ? true : undefined, person: input.person, phone, shop: input.shop, redirectTo: "/thank-you" };
 }

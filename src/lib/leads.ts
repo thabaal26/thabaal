@@ -217,6 +217,7 @@ const SIGNUP_NOTE = "Made their own account on thabaal.in and hasn't paid yet. H
 export async function addWebsiteLead(
   input: { shop: string; person: string; phone: string; town?: string; sells?: string; plan?: string },
   now = new Date(),
+  client: any = db,
 ): Promise<LeadResult & { again?: boolean }> {
   const phone = cleanPhone(input.phone);
   if (!phone) return { ok: false, message: "Enter your 10-digit WhatsApp number." };
@@ -228,10 +229,10 @@ export async function addWebsiteLead(
   const town = text(input.town, 60) || null;
   const sells = text(input.sells, 120) || null;
   const asked = [sells && `sells ${sells}`, plan && `asked about ${plan}`].filter(Boolean).join(", ");
-  const open = await db.lead.findFirst({ where: { phone, stage: { notIn: ["won", "lost"] } } });
+  const open = await client.lead.findFirst({ where: { phone, stage: { notIn: ["won", "lost"] } } });
   if (open) {
     const shopDiff = shop !== open.shop ? ` for "${shop}"` : "";
-    await db.lead.update({
+    await client.lead.update({
       where: { id: open.id },
       data: {
         nextOn: asDate(todayKey(now)),
@@ -244,7 +245,7 @@ export async function addWebsiteLead(
     });
     return { ok: true, id: open.id, again: true, message: "We already have your request and will call you today." };
   }
-  const lead = await db.lead.create({
+  const lead = await client.lead.create({
     data: {
       shop,
       person,
@@ -258,7 +259,7 @@ export async function addWebsiteLead(
       activity: { create: { kind: "created", text: `Asked for a free demo on the website${asked ? ` (${asked})` : ""}`, by: WEBSITE } },
     },
   });
-  return { ok: true, id: lead.id, message: "Thank you! We'll WhatsApp you soon." };
+  return { ok: true, id: lead.id, again: false, message: "Thank you! We'll WhatsApp you soon." };
 }
 
 /**

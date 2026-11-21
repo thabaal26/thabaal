@@ -3,7 +3,8 @@
 // The website's free demo form (landing page, #start). Only what we need to call back: WhatsApp number, shop and name
 // are asked; town, what they sell and the plan help the call but can be left out. It lands in Admin › Enquiries.
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { requestDemo } from "./demo-actions";
 import { DEMO_URL } from "./demo-link";
 
@@ -11,8 +12,18 @@ const PLAN_NAMES: Record<string, string> = { starter: "Starter", growth: "Growth
 
 export function DemoForm({ lang, plan, onPlan }: { lang: "en" | "ta"; plan: string; onPlan: (p: string) => void }) {
   const ta = lang === "ta";
+  const router = useRouter();
+  const navigatedRef = useRef(false);
+  const [submissionKey] = useState(() => `${Date.now()}-${Math.random().toString(36).slice(2)}`);
   const [state, action, pending] = useActionState(requestDemo, undefined);
   const v = state?.values;
+
+  useEffect(() => {
+    if (state?.ok && state?.redirectTo && !navigatedRef.current) {
+      navigatedRef.current = true;
+      router.replace(state.redirectTo);
+    }
+  }, [state?.ok, state?.redirectTo, router]);
 
   if (state?.ok) {
     // Thanks, what happens next and when, and the quicker way if they can't wait.
@@ -44,6 +55,7 @@ export function DemoForm({ lang, plan, onPlan }: { lang: "en" | "ta"; plan: stri
       <p className="demo-form-sub">{ta ? "பணம் தேவையில்லை. உங்கள் கடைக்கு எப்படி வேலை செய்யும் என்று காட்டுவோம்." : "No payment needed. We show you how it works for your shop."}</p>
       {/* People never see this; robots fill it in. */}
       <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="demo-hp" />
+      <input type="hidden" name="submissionKey" value={submissionKey} />
       <label className="demo-field">
         <span>{ta ? "உங்கள் WhatsApp எண்" : "Your WhatsApp number"}</span>
         <input id="demo-phone" name="phone" type="tel" inputMode="numeric" autoComplete="tel-national" required maxLength={16} placeholder="98765 43210" defaultValue={v?.phone ?? ""} />

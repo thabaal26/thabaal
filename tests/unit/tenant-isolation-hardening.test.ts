@@ -43,7 +43,7 @@ describe("SEC-P1-01 & SEC-P2-01: Tenant Isolation & Method Security Hardening Te
     HEAD = workerModule.HEAD;
     POST = workerModule.POST;
 
-    const callsModule = await import("../../src/app/dashboard/actions/calls");
+    const callsModule = await import("../../src/app/(portal)/dashboard/actions/calls");
     answerCall = callsModule.answerCall;
     rejectCall = callsModule.rejectCall;
     hangUp = callsModule.hangUp;

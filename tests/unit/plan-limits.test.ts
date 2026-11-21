@@ -67,7 +67,7 @@ describe("plan limits", () => {
     const c = await shop("starter");
     const t = await template(c.id);
     const used = await db.campaign.create({ data: { clientId: c.id, templateId: t.id, name: "used", scheduleType: "ONCE", active: false } });
-    for (let i = 0; i < 5; i++) await db.campaignRun.create({ data: { campaignId: used.id, scheduledFor: new Date(), total: 0 } });
+    for (let i = 0; i < 5; i++) await db.campaignRun.create({ data: { campaignId: used.id, scheduledFor: new Date(Date.now() - (i + 1) * 1000), total: 0 } });
     const due = new Date(Date.now() - 60_000);
     const weekly = await db.campaign.create({
       data: { clientId: c.id, templateId: t.id, name: "weekly", scheduleType: "WEEKLY", daysOfWeek: [0, 1, 2, 3, 4, 5, 6], sendTime: "10:00", nextRunAt: due },

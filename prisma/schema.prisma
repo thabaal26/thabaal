@@ -1016,7 +1016,8 @@ model Lead {
   createdBy String
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
-  activity  LeadActivity[]
+  activity           LeadActivity[]
+  conversionAttempts DemoConversionAttempt[]
 
   @@index([stage])
   @@index([nextOn])
@@ -1035,6 +1036,22 @@ model LeadActivity {
   createdAt DateTime @default(now())
 
   @@index([leadId, createdAt])
+}
+
+/// Tracks Google Ads lead conversion attempts and server-issued verification receipts for demo requests.
+model DemoConversionAttempt {
+  id                String   @id @default(cuid())
+  leadId            String
+  lead              Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  submissionKeyHash String   @unique
+  receiptTokenHash  String   @unique
+  outcome           String
+  conversionEventId String?  @unique
+  expiresAt         DateTime @db.Timestamptz(3)
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([leadId])
+  @@index([expiresAt])
 }
 
 /// What a business's logins did on one day (lib/usage-record.ts), for the admin panel's Usage page: sections
