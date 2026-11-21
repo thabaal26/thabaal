@@ -45,8 +45,8 @@ export default async function MarketingRootLayout({ children }: { children: Reac
         <GoogleAdsProvider>
           <LanguageProvider initialLang={lang}>
             {children}
+            <ConsentBanner />
           </LanguageProvider>
-          <ConsentBanner lang={lang} />
         </GoogleAdsProvider>
       </body>
     </html>

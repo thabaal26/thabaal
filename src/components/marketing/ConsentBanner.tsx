@@ -2,10 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { getMarketingConsent, setMarketingConsent, type ConsentStatus } from "@/lib/marketing/consent";
+import { useLanguage } from "@/lib/i18n/context";
 
-export function ConsentBanner({ lang = "ta" }: { lang?: "en" | "ta" }) {
+export function ConsentBanner({ lang: propLang }: { lang?: "en" | "ta" } = {}) {
   const [consent, setConsent] = useState<ConsentStatus>("denied"); // default hidden until mounted
   const [mounted, setMounted] = useState(false);
+
+  let ctxLang: "en" | "ta" = "ta";
+  try {
+    const ctx = useLanguage();
+    if (ctx?.lang) ctxLang = ctx.lang;
+  } catch {}
 
   useEffect(() => {
     setMounted(true);
@@ -23,7 +30,8 @@ export function ConsentBanner({ lang = "ta" }: { lang?: "en" | "ta" }) {
     return null; // Don't show if user already made a choice
   }
 
-  const ta = lang === "ta";
+  const activeLang = propLang || ctxLang || "ta";
+  const ta = activeLang === "ta";
 
   return (
     <div
