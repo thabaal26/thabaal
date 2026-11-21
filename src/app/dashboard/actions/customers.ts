@@ -472,18 +472,25 @@ export async function adjustLoyaltyPoints(
     if (opts.idempotencyKey) {
       const existing = await tx.loyaltyEntry.findUnique({ where: { idempotencyKey: opts.idempotencyKey } });
       if (existing) {
-        // Enforce strict tenant and customer ownership boundary (cross-tenant replay defense)
-        if (existing.clientId !== c.clientId || existing.customerId !== c.id) {
+        // Enforce strict tenant, customer, and operation identity boundary (cross-tenant & mutation mismatch replay defense)
+        const matchesIdentity =
+          existing.clientId === c.clientId &&
+          existing.customerId === c.id &&
+          existing.delta === Math.round(delta) &&
+          existing.kind === kind;
+
+        if (!matchesIdentity) {
           return {
             ok: false,
+            conflict: true,
             message: "Idempotency key conflict: this key has already been used for another operation.",
           };
         }
         return {
           ok: true,
+          duplicate: true,
           message: `Previously applied (${existing.delta > 0 ? `+${existing.delta}` : existing.delta} pts).`,
           customerId: c.id,
-          duplicate: true,
         };
       }
     }
@@ -511,17 +518,24 @@ export async function adjustLoyaltyPoints(
       if (err?.code === "P2002" && opts.idempotencyKey) {
         const existing = await tx.loyaltyEntry.findUnique({ where: { idempotencyKey: opts.idempotencyKey } });
         if (existing) {
-          if (existing.clientId !== c.clientId || existing.customerId !== c.id) {
+          const matchesIdentity =
+            existing.clientId === c.clientId &&
+            existing.customerId === c.id &&
+            existing.delta === Math.round(delta) &&
+            existing.kind === kind;
+
+          if (!matchesIdentity) {
             return {
               ok: false,
+              conflict: true,
               message: "Idempotency key conflict: this key has already been used for another operation.",
             };
           }
           return {
             ok: true,
+            duplicate: true,
             message: `Previously applied (${existing.delta > 0 ? `+${existing.delta}` : existing.delta} pts).`,
             customerId: c.id,
-            duplicate: true,
           };
         }
       }
@@ -547,7 +561,7 @@ export async function adjustLoyaltyPoints(
   revalidatePath("/dashboard/customers");
   revalidatePath("/dashboard");
 
-  return { ok: true, message: result.message };
+  return result;
 }
 
 

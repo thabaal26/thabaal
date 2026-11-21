@@ -332,4 +332,91 @@ test("LOYALTY-IDEMPOTENCY: Concurrent & Sequential Idempotency Invariants", asyn
     await db.customer.deleteMany({ where: { id: foreignCustomerId } }).catch(() => {});
     await db.client.deleteMany({ where: { id: foreignClientId } }).catch(() => {});
   });
+
+  await t.test("7. Stable operation identity validation: same customer reusing key for mismatched mutation returns conflict: true, while identical retry returns duplicate: true", async () => {
+    const key = `stable_op_identity_${Date.now()}`;
+
+    // Helper simulating the production transaction in adjustLoyaltyPoints
+    const executeLoyaltyAction = async (delta: number, kind: "give" | "take" | "redeem") => {
+      return await db.$transaction(async (tx) => {
+        const existing = await tx.loyaltyEntry.findUnique({ where: { idempotencyKey: key } });
+        if (existing) {
+          const matchesIdentity =
+            existing.clientId === testClientId &&
+            existing.customerId === testCustomerId &&
+            existing.delta === Math.round(delta) &&
+            existing.kind === kind;
+
+          if (!matchesIdentity) {
+            return {
+              ok: false,
+              conflict: true,
+              message: "Idempotency key conflict: this key has already been used for another operation.",
+            };
+          }
+          return {
+            ok: true,
+            duplicate: true,
+            delta: existing.delta,
+            message: `Previously applied (${existing.delta > 0 ? `+${existing.delta}` : existing.delta} pts).`,
+          };
+        }
+
+        // Apply tags & create ledger
+        const cust = await tx.customer.findUniqueOrThrow({ where: { id: testCustomerId } });
+        const currentTags = cust.tags || [];
+        const nextTags = [...currentTags.filter((t) => !t.startsWith("loyalty:")), `loyalty:${delta}`];
+        await tx.customer.update({ where: { id: testCustomerId }, data: { tags: nextTags } });
+
+        const entry = await tx.loyaltyEntry.create({
+          data: {
+            clientId: testClientId,
+            customerId: testCustomerId,
+            delta: Math.round(delta),
+            kind,
+            reason: "Initial award",
+            idempotencyKey: key,
+          },
+        });
+
+        return {
+          ok: true,
+          duplicate: false,
+          delta: entry.delta,
+          message: "Awarded",
+        };
+      });
+    };
+
+    // 1. First execution: legitimate award of +100 points
+    const res1 = await executeLoyaltyAction(100, "give");
+    assert.equal(res1.ok, true);
+    assert.equal(res1.duplicate, false);
+    assert.equal(res1.delta, 100);
+
+    // 2. Mismatched execution: same customer, same key, but different delta (+50 instead of +100)
+    const resMismatchedDelta = await executeLoyaltyAction(50, "give");
+    assert.equal(resMismatchedDelta.ok, false);
+    assert.equal(resMismatchedDelta.conflict, true, "Must flag conflict: true for mismatched operation delta");
+    assert.equal(resMismatchedDelta.message, "Idempotency key conflict: this key has already been used for another operation.");
+
+    // 3. Mismatched execution: same customer, same key, but different kind ("take" instead of "give")
+    const resMismatchedKind = await executeLoyaltyAction(100, "take");
+    assert.equal(resMismatchedKind.ok, false);
+    assert.equal(resMismatchedKind.conflict, true, "Must flag conflict: true for mismatched operation kind");
+    assert.equal(resMismatchedKind.message, "Idempotency key conflict: this key has already been used for another operation.");
+
+    // 4. Identical retry: same customer, same key, exact same delta (+100) and kind ("give")
+    const resIdenticalRetry = await executeLoyaltyAction(100, "give");
+    assert.equal(resIdenticalRetry.ok, true);
+    assert.equal(resIdenticalRetry.duplicate, true, "Must flag duplicate: true for identical retry");
+    assert.equal(resIdenticalRetry.delta, 100);
+
+    // Verify database state: customer tags remain at 100, exactly 1 ledger record exists
+    const finalCust = await db.customer.findUniqueOrThrow({ where: { id: testCustomerId } });
+    assert.deepEqual(finalCust.tags.filter((t) => t.startsWith("loyalty:")), ["loyalty:100"]);
+
+    const ledgerCount = await db.loyaltyEntry.count({ where: { idempotencyKey: key } });
+    assert.equal(ledgerCount, 1, "Exactly 1 ledger record must exist despite replay attempts");
+  });
 });
