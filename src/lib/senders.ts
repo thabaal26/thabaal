@@ -75,9 +75,11 @@ export const numberLabel = (n: { label: string; displayPhone: string | null }) =
 export type QualityRating = "GREEN" | "YELLOW" | "RED" | "UNKNOWN" | "NA";
 
 export class SenderHealthError extends Error {
+  public readonly connectionStatus?: string | null;
   constructor(message: string, public readonly qualityRating?: string | null, public readonly status?: string | null) {
     super(message);
     this.name = "SenderHealthError";
+    this.connectionStatus = status;
   }
 }
 
@@ -111,7 +113,7 @@ export async function assertSenderHealthy(
       select: { status: true },
     });
     const cStatus = conn?.status ? String(conn.status).toUpperCase() : null;
-    if (cStatus && (cStatus === "DISCONNECTED" || cStatus === "NEEDS_REAUTH" || cStatus === "ERROR" || cStatus === "DRAFT")) {
+    if (cStatus && (cStatus === "DISCONNECTED" || cStatus === "NEEDS_REAUTH" || cStatus === "ERROR" || cStatus === "DRAFT" || cStatus === "RESTRICTED" || cStatus === "VALIDATING" || cStatus === "PENDING_WEBHOOK")) {
       throw new SenderHealthError(
         `WhatsApp sender connection status is ${cStatus}. Reconnect in Settings first.`,
         rating,
@@ -120,11 +122,22 @@ export async function assertSenderHealthy(
     }
   }
 
+  // Stale health check: verified health record checked longer than 24 hours ago
+  const STALE_HEALTH_MS = 24 * 60 * 60_000;
+  if (number.statusCheckedAt && (Date.now() - number.statusCheckedAt.getTime() > STALE_HEALTH_MS)) {
+    throw new SenderHealthError(
+      "WhatsApp sender health information is stale (>24h). Fresh sync from Meta required.",
+      rating,
+      "STALE_HEALTH"
+    );
+  }
+
   if (!isMarketing) {
-    // Utility / Transactional messages: only blocked if banned or disabled
-    if (rating === "BANNED" || rating === "DISABLED") {
+    // Utility / Transactional messages: allowed under RED or YELLOW quality rating,
+    // but strictly blocked if account/number is RESTRICTED, BANNED, DISABLED, RATE_LIMITED, UNKNOWN, or NA
+    if (rating === "BANNED" || rating === "DISABLED" || rating === "RESTRICTED" || rating === "RATE_LIMITED" || rating === "UNKNOWN" || rating === "NA") {
       throw new SenderHealthError(
-        `Transactional dispatch blocked: Number status is ${rating}. The account is disabled by Meta.`,
+        `Transactional dispatch blocked: Number status is ${rating}. The account is restricted or disabled by Meta.`,
         rating
       );
     }
@@ -150,9 +163,9 @@ export async function assertSenderHealthy(
       rating
     );
   }
-  if (rating === "UNKNOWN" || rating === "NA") {
+  if (rawRating && (rating === "UNKNOWN" || rating === "NA")) {
     throw new SenderHealthError(
-      "Marketing dispatch blocked: Number health is UNKNOWN. Sync number status from Meta first.",
+      `Marketing dispatch blocked: Number health is ${rating}. Sync number status from Meta first.`,
       rating
     );
   }

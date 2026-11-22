@@ -475,7 +475,7 @@ export type AudienceDetailedPartition = {
 export async function partitionAudienceDetailed(
   clientId: string,
   audienceTag?: string | null,
-  people: { includeIds?: string[]; excludeIds?: string[]; segments?: string[]; templateId?: string; skipUnread?: boolean } = {},
+  people: { includeIds?: string[]; excludeIds?: string[]; segments?: string[]; templateId?: string; skipUnread?: boolean; isCohortFrozen?: boolean } = {},
 ): Promise<AudienceDetailedPartition> {
   const [client, template] = await Promise.all([
     db.client.findUnique({ where: { id: clientId }, select: { marketingGapHours: true } }),
@@ -486,7 +486,7 @@ export async function partitionAudienceDetailed(
 
   const pick = decodeTags(audienceTag);
   let audienceBase: Prisma.CustomerWhereInput = { clientId, deletedAt: null };
-  const isCohortFrozen = audienceTag === "cohort:frozen" || (!audienceTag && people.includeIds && people.includeIds.length > 0);
+  const isCohortFrozen = people.isCohortFrozen === true || audienceTag === "cohort:frozen";
 
   if (isCohortFrozen && people.includeIds?.length) {
     audienceBase = { clientId, deletedAt: null, id: { in: people.includeIds } };

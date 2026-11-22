@@ -552,23 +552,29 @@ async function optOut(phone: string, phoneNumberId?: string) {
       const confirmMsg = `You have been successfully unsubscribed from marketing offers from ${shopTitle}. You may still receive necessary service or order updates. Reply START at any time to resubscribe.\n\n${shopTitle} விளம்பரச் செய்திகளிலிருந்து நீங்கள் விலகியுள்ளீர்கள். அத்தியாவசிய சேவை அல்லது ஆர்டர் தகவல்கள் மட்டும் வரலாம். மீண்டும் பெற START என அனுப்பவும்.`;
       await textInWindow(c, confirmMsg, "Offers stopped").catch(() => false);
     }
-    await db.customer.update({
-      where: { id: c.id },
-      data: { optedOut: true, optInAt: null, optInSource: null },
-    });
-    // Safely suppress pending marketing messages without deleting history or non-marketing messages
-    await db.message.updateMany({
-      where: {
-        customerId: c.id,
-        status: "QUEUED",
-        template: { is: { category: "MARKETING" } },
-        run: { is: { campaign: { is: { clientId: c.clientId } } } },
-      },
-      data: {
-        status: "SKIPPED",
-        error: "MARKETING_OPT_OUT_BEFORE_DISPATCH",
-        errorCode: null,
-      },
+    // Shared atomic coordination with dispatch claim via Customer row lock
+    await db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Customer" WHERE "id" = ${c.id} FOR UPDATE`;
+      await tx.customer.update({
+        where: { id: c.id },
+        data: { optedOut: true, optInAt: null, optInSource: null },
+      });
+      // Safely suppress pending marketing messages without deleting history or non-marketing messages.
+      // Excludes messages already claimed into external SUBMITTING flight.
+      await tx.message.updateMany({
+        where: {
+          customerId: c.id,
+          status: "QUEUED",
+          OR: [{ error: null }, { error: { not: "SUBMITTING" } }],
+          template: { is: { category: "MARKETING" } },
+          run: { is: { campaign: { is: { clientId: c.clientId } } } },
+        },
+        data: {
+          status: "SKIPPED",
+          error: "MARKETING_OPT_OUT_BEFORE_DISPATCH",
+          errorCode: null,
+        },
+      });
     }).catch(() => {});
   }
 }

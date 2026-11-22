@@ -463,10 +463,38 @@ export async function processRun(runId: string, now: Date, deadline: number) {
       });
       return;
     }
-    // Final pre-dispatch verification: ensure status was not transitioned to SKIPPED while waiting for pool slot
-    const preDeliver = await db.message.findUnique({ where: { id: m.id }, select: { status: true } });
-    if (preDeliver?.status === "SKIPPED") {
-      return;
+    // Shared atomic claim protocol: coordinate with opt-out webhook via Customer row lock
+    const claim = await db.$transaction(async (tx) => {
+      // 1. Lock customer row FOR UPDATE so opt-out webhook and dispatch claim are strictly serialized
+      const rows = await tx.$queryRaw<Array<{ id: string; optedOut: boolean; unreachable: boolean; deletedAt: Date | null }>>`
+        SELECT "id", "optedOut", "unreachable", "deletedAt" FROM "Customer" WHERE "id" = ${m.customerId} FOR UPDATE
+      `;
+      const cust = rows[0];
+      if (!cust || cust.optedOut || cust.unreachable || cust.deletedAt) {
+        await tx.message.updateMany({
+          where: { id: m.id, status: "QUEUED" },
+          data: {
+            status: "SKIPPED",
+            error: cust?.optedOut ? "Customer opted out" : (cust?.deletedAt ? "Customer record is archived or deleted" : "Number can't receive WhatsApp messages"),
+            errorCode: null,
+          },
+        });
+        return { ok: false, reason: "OPTED_OUT_OR_INELIGIBLE" };
+      }
+
+      // 2. Atomically claim message and mark SUBMITTING in-flight state
+      const claimed = await tx.message.updateMany({
+        where: { id: m.id, status: "QUEUED" },
+        data: { error: "SUBMITTING" },
+      });
+      if (claimed.count === 0) {
+        return { ok: false, reason: "ALREADY_CLAIMED_OR_SKIPPED" };
+      }
+      return { ok: true };
+    });
+
+    if (!claim.ok) {
+      return; // Canceled by concurrent opt-out or ineligible; strictly abort dispatch and do NOT call Meta
     }
     try {
       const res = await deliver(settings, t, m.customer, cfg, undefined, { messageId: m.id });

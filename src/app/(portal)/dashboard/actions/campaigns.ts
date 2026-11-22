@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { CampaignConcurrencyError, CampaignMediaPreflightError, CampaignSenderQualityError, dispatch, startRun } from "@/lib/dispatcher";
 import { APP_TZ } from "@/lib/format";
 import { retryHeldBack, SKIP_CODES, SKIP_DAYS } from "@/lib/held";
-import { audienceTagCustomerIds, campaignAudienceWhere } from "@/lib/audiences";
+import { assertFrozenCohortImmutable, audienceTagCustomerIds, campaignAudienceWhere } from "@/lib/audiences";
 import { AUDIENCE_PREFIX, decodeTags, TAGS_PREFIX } from "@/lib/audience-tags";
 import { getSettings, templateSendable } from "@/lib/provider";
 import { unmappedVars, type VarMap } from "@/lib/template";
@@ -72,9 +72,14 @@ export async function saveCampaign(id: string | null, input: CampaignInput): Pro
   trackPress("campaign.save");
   const s = id ? await requireManager() : await requireManager(true);
   if ("denied" in s) return { ok: false, message: s.denied };
-  const existing = id ? await db.campaign.findUnique({ where: { id }, select: { clientId: true } }) : null;
+  const existing = id ? await db.campaign.findUnique({ where: { id }, select: { clientId: true, audienceTag: true, includeIds: true } }) : null;
   if (id && (!existing || !mine(s, existing.clientId))) return { ok: false, message: "Campaign not found." };
   const clientId = existing?.clientId ?? s.clientId!;
+
+  // Server-side immutability for frozen cohorts: reject audience changes on an already frozen campaign
+  if (existing) {
+    assertFrozenCohortImmutable(existing, input);
+  }
 
   const errors: string[] = [];
   if (!input.name.trim()) errors.push("Give the campaign a name.");

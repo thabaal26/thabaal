@@ -133,12 +133,11 @@ export async function campaignAudienceWhere(
   const kept = decodeTags(audienceTag)?.tags.includes(INACTIVE_TAG) ? picked : { AND: [picked, { NOT: { tags: { has: INACTIVE_TAG } } }] };
   const send: Prisma.CustomerWhereInput = segmentIds ? { AND: [kept, { id: { in: segmentIds } }] } : kept;
 
-  // Strict child cohort isolation: if cohort is frozen (or audienceTag is "cohort:frozen" / includeIds specified without tag),
+  // Strict child cohort isolation: if cohort is explicitly frozen (or audienceTag is "cohort:frozen"),
   // membership is 100% frozen to the explicit includeIds and NEVER falls back to base / Everyone.
   const isCohortFrozen = Boolean(
-    people.isCohortFrozen ||
-    audienceTag === "cohort:frozen" ||
-    (people.includeIds && people.includeIds.length > 0 && !audienceTag)
+    people.isCohortFrozen === true ||
+    audienceTag === "cohort:frozen"
   );
   if (isCohortFrozen) {
     const finalIds = exclude.length ? include.filter((id) => !exclude.includes(id)) : include;
@@ -250,4 +249,30 @@ export async function audienceTagCustomerIds(
   };
   const matched = await db.customer.findMany({ where: tagWhere, select: { id: true } });
   return matched.map((m) => m.id);
+}
+
+/**
+ * Server-side immutability enforcement for frozen cohorts:
+ * Reject any audience or recipient membership changes on an already frozen campaign.
+ */
+export function assertFrozenCohortImmutable(
+  existing: { audienceTag?: string | null; includeIds?: string[] | null },
+  incoming: { audienceTag?: string | null; includeIds?: string[] | null; segments?: string[] | null }
+) {
+  if (existing.audienceTag === "cohort:frozen") {
+    const sameSortedIds = (a: string[] = [], b: string[] = []) => {
+      if (a.length !== b.length) return false;
+      const sA = [...a].sort();
+      const sB = [...b].sort();
+      return sA.every((v, i) => v === sB[i]);
+    };
+    const membershipChanged =
+      !sameSortedIds(existing.includeIds ?? [], incoming.includeIds ?? []) ||
+      incoming.audienceTag !== "cohort:frozen" ||
+      (incoming.segments?.length ?? 0) > 0;
+
+    if (membershipChanged) {
+      throw new Error("Frozen cohort membership cannot be modified.");
+    }
+  }
 }

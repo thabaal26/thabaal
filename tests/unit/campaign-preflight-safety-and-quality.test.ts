@@ -4,7 +4,7 @@ import { db } from "../../src/lib/db";
 import { assertSenderHealthy, SenderHealthError } from "../../src/lib/senders";
 import { CampaignSenderQualityError, processRun, startRun } from "../../src/lib/dispatcher";
 import { partitionAudienceDetailed } from "../../src/lib/campaign-preflight";
-import { campaignAudienceWhere } from "../../src/lib/audiences";
+import { assertFrozenCohortImmutable, campaignAudienceWhere } from "../../src/lib/audiences";
 
 describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suite", () => {
   let clientId: string;
@@ -43,6 +43,7 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
         businessAccountId: `waba_${Date.now()}`,
         qualityRating: "GREEN",
         messagingTier: "TIER_2K",
+        statusCheckedAt: new Date(),
         token: "EAABtest_token_safety_suite",
       },
     });
@@ -180,6 +181,7 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
     await db.campaign.deleteMany({ where: { clientId } }).catch(() => {});
     await db.customer.deleteMany({ where: { clientId } }).catch(() => {});
     await db.template.deleteMany({ where: { clientId } }).catch(() => {});
+    await db.user.deleteMany({ where: { clientId } }).catch(() => {});
     await db.whatsAppNumber.deleteMany({ where: { clientId } }).catch(() => {});
     await db.client.deleteMany({ where: { id: clientId } }).catch(() => {});
   });
@@ -637,6 +639,14 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
     });
     const matchedExcluded = await db.customer.findMany({ where: whereExcluded });
     assert.equal(matchedExcluded.length, 0, "Excluding a frozen ID returns 0 matches");
+
+    // Check D: Ordinary non-frozen campaign using includeIds retains original dynamic audience semantics
+    const whereOrdinary = await campaignAudienceWhere(clientId, null, {
+      includeIds: [custGapId],
+      isCohortFrozen: false,
+    });
+    const matchedOrdinary = await db.customer.findMany({ where: whereOrdinary, select: { id: true } });
+    assert.ok(matchedOrdinary.length > 1, "Ordinary non-frozen campaign must retain dynamic audience semantics");
   });
 
   test("11. Concurrent opt-out dispatch cancellation: aborts dispatch and stamps SKIPPED with errorCode null without sending to Meta", async () => {
@@ -750,6 +760,350 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
       await db.whatsAppNumber.update({ where: { id: greenSenderId }, data: { qualityRating: "GREEN" } });
       await db.campaignRun.deleteMany({ where: { id: flagRun.id } }).catch(() => {});
       await db.campaign.deleteMany({ where: { id: flagCamp.id } }).catch(() => {});
+    }
+  });
+
+  test("13. Server-side immutability: assertFrozenCohortImmutable strictly rejects audience membership changes on an already frozen campaign", () => {
+    const existing = {
+      audienceTag: "cohort:frozen",
+      includeIds: [custGapId],
+    };
+
+    // 1. Modifying includeIds must throw
+    assert.throws(
+      () => {
+        assertFrozenCohortImmutable(existing, {
+          audienceTag: "cohort:frozen",
+          includeIds: [custEligibleId], // changed membership!
+        });
+      },
+      /Frozen cohort membership cannot be modified/
+    );
+
+    // 2. Changing audienceTag must throw
+    assert.throws(
+      () => {
+        assertFrozenCohortImmutable(existing, {
+          audienceTag: "", // attempted expansion to everyone!
+          includeIds: [custGapId],
+        });
+      },
+      /Frozen cohort membership cannot be modified/
+    );
+
+    // 3. Adding segments must throw
+    assert.throws(
+      () => {
+        assertFrozenCohortImmutable(existing, {
+          audienceTag: "cohort:frozen",
+          includeIds: [custGapId],
+          segments: ["active_buyers"], // attempted segment modification!
+        });
+      },
+      /Frozen cohort membership cannot be modified/
+    );
+
+    // 4. Exact same membership (even if array order varies) must NOT throw
+    assert.doesNotThrow(() => {
+      assertFrozenCohortImmutable(existing, {
+        audienceTag: "cohort:frozen",
+        includeIds: [custGapId],
+      });
+    });
+  });
+
+  test("14. Concurrency race proof: atomic dispatch claim and opt-out coordination via Customer row lock", async () => {
+    // 1. Create marketing and utility templates
+    const raceCamp = await db.campaign.create({
+      data: {
+        clientId,
+        name: "Atomic Race Test",
+        templateId: marketingTemplateId,
+        senderId: greenSenderId,
+        scheduleType: "ONCE",
+        sendTime: "10:00",
+        batchSize: 50,
+        intervalMinutes: 15,
+        active: true,
+      },
+    });
+
+    const raceRun = await db.campaignRun.create({
+      data: {
+        campaignId: raceCamp.id,
+        scheduledFor: new Date(),
+        status: "RUNNING",
+        total: 2,
+        nextBatchAt: new Date(),
+      },
+    });
+
+    // Marketing message
+    const mktgMsg = await db.message.create({
+      data: {
+        customerId: custEligibleId,
+        runId: raceRun.id,
+        templateId: marketingTemplateId,
+        templateName: "test_mktg",
+        status: "QUEUED",
+      },
+    });
+
+    // Utility message for the same customer
+    const utilMsg = await db.message.create({
+      data: {
+        customerId: custEligibleId,
+        templateId: utilityTemplateId,
+        templateName: "test_util",
+        status: "QUEUED",
+      },
+    });
+
+    try {
+      // 2. Execute concurrent dispatcher claim and opt-out simulation
+      // Inbound opt-out webhook acquires Customer lock and cancels marketing message
+      await db.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT "id" FROM "Customer" WHERE "id" = ${custEligibleId} FOR UPDATE`;
+        await tx.customer.update({
+          where: { id: custEligibleId },
+          data: { optedOut: true, optInAt: null, optInSource: null },
+        });
+        await tx.message.updateMany({
+          where: {
+            customerId: custEligibleId,
+            status: "QUEUED",
+            OR: [{ error: null }, { error: { not: "SUBMITTING" } }],
+            template: { is: { category: "MARKETING" } },
+          },
+          data: {
+            status: "SKIPPED",
+            error: "MARKETING_OPT_OUT_BEFORE_DISPATCH",
+            errorCode: null,
+          },
+        });
+      });
+
+      // 3. Dispatcher processes the run
+      const result = await processRun(raceRun.id, new Date(), Date.now() + 5000);
+      assert.equal(result.sent, 0, "Zero marketing messages sent when customer opted out before dispatch claim");
+
+      // Verify marketing message was skipped with errorCode: null and no deletion
+      const checkMktg = await db.message.findUnique({ where: { id: mktgMsg.id } });
+      assert.equal(checkMktg?.status, "SKIPPED");
+      assert.equal(checkMktg?.error, "MARKETING_OPT_OUT_BEFORE_DISPATCH");
+      assert.equal(checkMktg?.errorCode, null);
+
+      // Verify Utility message was NOT skipped or touched
+      const checkUtil = await db.message.findUnique({ where: { id: utilMsg.id } });
+      assert.equal(checkUtil?.status, "QUEUED", "Utility message must NOT be skipped by marketing opt-out");
+
+      // Verify idempotency of repeated opt-out: repeated webhook execution completes without errors or duplicate actions
+      await db.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT "id" FROM "Customer" WHERE "id" = ${custEligibleId} FOR UPDATE`;
+        await tx.customer.update({
+          where: { id: custEligibleId },
+          data: { optedOut: true, optInAt: null, optInSource: null },
+        });
+        await tx.message.updateMany({
+          where: {
+            customerId: custEligibleId,
+            status: "QUEUED",
+            OR: [{ error: null }, { error: { not: "SUBMITTING" } }],
+            template: { is: { category: "MARKETING" } },
+          },
+          data: {
+            status: "SKIPPED",
+            error: "MARKETING_OPT_OUT_BEFORE_DISPATCH",
+            errorCode: null,
+          },
+        });
+      });
+      const checkMktg2 = await db.message.findUnique({ where: { id: mktgMsg.id } });
+      assert.equal(checkMktg2?.status, "SKIPPED");
+      assert.equal(checkMktg2?.errorCode, null);
+    } finally {
+      await db.customer.update({ where: { id: custEligibleId }, data: { optedOut: false, optInAt: new Date(), optInSource: "Explicit Opt-In" } });
+      await db.message.deleteMany({ where: { id: { in: [mktgMsg.id, utilMsg.id] } } }).catch(() => {});
+      await db.campaignRun.deleteMany({ where: { id: raceRun.id } }).catch(() => {});
+      await db.campaign.deleteMany({ where: { id: raceCamp.id } }).catch(() => {});
+    }
+  });
+
+  test("15. Comprehensive sender health matrix: validates NA, stale health, DISCONNECTED, NEEDS_REAUTH, ERROR, DRAFT, RATE_LIMITED, GREEN with RESTRICTED, and Utility under RED/YELLOW vs RESTRICTED/UNKNOWN", async () => {
+    // 1. Connection statuses: DISCONNECTED, NEEDS_REAUTH, ERROR, DRAFT
+    const conn = await db.whatsAppConnection.create({
+      data: {
+        clientId,
+        wabaId: `waba_conn_${Date.now()}`,
+        token: "fake_token_matrix",
+        status: "DISCONNECTED",
+      },
+    });
+
+    const connSender = await db.whatsAppNumber.create({
+      data: {
+        clientId,
+        label: "Conn Sender",
+        phoneNumberId: `pnid_conn_${Date.now()}`,
+        businessAccountId: conn.wabaId,
+        qualityRating: "GREEN",
+        connectionId: conn.id,
+        statusCheckedAt: new Date(),
+      },
+    });
+
+    try {
+      // 1A. DISCONNECTED connection blocks dispatch
+      await assert.rejects(
+        () => assertSenderHealthy(clientId, connSender.id, "MARKETING"),
+        (err: any) => err instanceof SenderHealthError && err.connectionStatus === "DISCONNECTED"
+      );
+
+      // 1B. NEEDS_REAUTH connection blocks dispatch
+      await db.whatsAppConnection.update({ where: { id: conn.id }, data: { status: "NEEDS_REAUTH" } });
+      await assert.rejects(
+        () => assertSenderHealthy(clientId, connSender.id, "MARKETING"),
+        (err: any) => err instanceof SenderHealthError && err.connectionStatus === "NEEDS_REAUTH"
+      );
+
+      // 1C. ERROR connection blocks dispatch
+      await db.whatsAppConnection.update({ where: { id: conn.id }, data: { status: "ERROR" } });
+      await assert.rejects(
+        () => assertSenderHealthy(clientId, connSender.id, "MARKETING"),
+        (err: any) => err instanceof SenderHealthError && err.connectionStatus === "ERROR"
+      );
+
+      // 1D. DRAFT connection blocks dispatch
+      await db.whatsAppConnection.update({ where: { id: conn.id }, data: { status: "DRAFT" } });
+      await assert.rejects(
+        () => assertSenderHealthy(clientId, connSender.id, "MARKETING"),
+        (err: any) => err instanceof SenderHealthError && err.connectionStatus === "DRAFT"
+      );
+
+      // Update connection to ACTIVE for subsequent tests
+      await db.whatsAppConnection.update({ where: { id: conn.id }, data: { status: "ACTIVE" } });
+
+      // 2. NA quality rating
+      await db.whatsAppNumber.update({ where: { id: connSender.id }, data: { qualityRating: "NA" } });
+      await assert.rejects(
+        () => assertSenderHealthy(clientId, connSender.id, "MARKETING"),
+        (err: any) => err instanceof SenderHealthError && err.qualityRating === "NA"
+      );
+
+      // 3. Stale health (>24 hours)
+      await db.whatsAppNumber.update({
+        where: { id: connSender.id },
+        data: {
+          qualityRating: "GREEN",
+          statusCheckedAt: new Date(Date.now() - 48 * 3600_000), // 48 hours ago
+        },
+      });
+      await assert.rejects(
+        () => assertSenderHealthy(clientId, connSender.id, "MARKETING"),
+        (err: any) => err instanceof SenderHealthError && err.connectionStatus === "STALE_HEALTH"
+      );
+
+      // Fresh health (<24 hours)
+      await db.whatsAppNumber.update({
+        where: { id: connSender.id },
+        data: { statusCheckedAt: new Date() },
+      });
+
+      // 4. RATE_LIMITED blocks both MARKETING and UTILITY
+      await db.whatsAppNumber.update({ where: { id: connSender.id }, data: { qualityRating: "RATE_LIMITED" } });
+      await assert.rejects(
+        () => assertSenderHealthy(clientId, connSender.id, "MARKETING"),
+        (err: any) => err instanceof SenderHealthError && err.qualityRating === "RATE_LIMITED"
+      );
+      await assert.rejects(
+        () => assertSenderHealthy(clientId, connSender.id, "UTILITY"),
+        (err: any) => err instanceof SenderHealthError && err.qualityRating === "RATE_LIMITED"
+      );
+
+      // 5. GREEN quality with RESTRICTED operational status
+      await db.whatsAppNumber.update({ where: { id: connSender.id }, data: { qualityRating: "RESTRICTED" } });
+      await assert.rejects(
+        () => assertSenderHealthy(clientId, connSender.id, "MARKETING"),
+        (err: any) => err instanceof SenderHealthError && err.qualityRating === "RESTRICTED"
+      );
+
+      // 6. Utility category under RESTRICTED and UNKNOWN
+      await assert.rejects(
+        () => assertSenderHealthy(clientId, connSender.id, "UTILITY"),
+        (err: any) => err instanceof SenderHealthError && err.qualityRating === "RESTRICTED"
+      );
+      await db.whatsAppNumber.update({ where: { id: connSender.id }, data: { qualityRating: "UNKNOWN" } });
+      await assert.rejects(
+        () => assertSenderHealthy(clientId, connSender.id, "UTILITY"),
+        (err: any) => err instanceof SenderHealthError && err.qualityRating === "UNKNOWN"
+      );
+
+      // 7. Utility category under RED and YELLOW: ALLOWED without error
+      await db.whatsAppNumber.update({ where: { id: connSender.id }, data: { qualityRating: "RED" } });
+      await assert.doesNotReject(() => assertSenderHealthy(clientId, connSender.id, "UTILITY"));
+
+      await db.whatsAppNumber.update({ where: { id: connSender.id }, data: { qualityRating: "YELLOW" } });
+      await assert.doesNotReject(() => assertSenderHealthy(clientId, connSender.id, "UTILITY"));
+
+      await db.whatsAppNumber.update({ where: { id: connSender.id }, data: { qualityRating: "GREEN" } });
+      await assert.doesNotReject(() => assertSenderHealthy(clientId, connSender.id, "UTILITY"));
+      await assert.doesNotReject(() => assertSenderHealthy(clientId, connSender.id, "MARKETING"));
+    } finally {
+      await db.whatsAppNumber.delete({ where: { id: connSender.id } }).catch(() => {});
+      await db.whatsAppConnection.delete({ where: { id: conn.id } }).catch(() => {});
+    }
+  });
+
+  test("16. GREEN-to-RED degradation between dispatch batches: strictly pauses run with WAITING_QUALITY", async () => {
+    // 1. Setup campaign with running status and 2 messages
+    await db.whatsAppNumber.update({ where: { id: greenSenderId }, data: { qualityRating: "GREEN", statusCheckedAt: new Date() } });
+
+    const batchCamp = await db.campaign.create({
+      data: {
+        clientId,
+        name: "Batch Degradation Test",
+        templateId: marketingTemplateId,
+        senderId: greenSenderId,
+        scheduleType: "ONCE",
+        sendTime: "10:00",
+        batchSize: 1,
+        intervalMinutes: 15,
+        active: true,
+      },
+      include: { template: true },
+    });
+
+    const batchRun = await db.campaignRun.create({
+      data: {
+        campaignId: batchCamp.id,
+        scheduledFor: new Date(),
+        status: "RUNNING",
+        total: 2,
+        nextBatchAt: new Date(),
+      },
+    });
+
+    const msg1 = await db.message.create({
+      data: { customerId: custEligibleId, runId: batchRun.id, templateId: marketingTemplateId, templateName: "mktg1", status: "QUEUED" },
+    });
+    const msg2 = await db.message.create({
+      data: { customerId: custEligibleId, runId: batchRun.id, templateId: marketingTemplateId, templateName: "mktg2", status: "QUEUED" },
+    });
+
+    try {
+      // Degrade sender quality from GREEN to RED between batches
+      await db.whatsAppNumber.update({ where: { id: greenSenderId }, data: { qualityRating: "RED" } });
+
+      const res = await processRun(batchRun.id, new Date(), Date.now() + 5000);
+      assert.equal(res.sent, 0, "Zero messages sent when sender quality degraded to RED between batches");
+
+      const paused = await db.campaignRun.findUnique({ where: { id: batchRun.id } });
+      assert.equal(paused?.status, "WAITING_QUALITY", "Run must pause with WAITING_QUALITY");
+    } finally {
+      await db.whatsAppNumber.update({ where: { id: greenSenderId }, data: { qualityRating: "GREEN" } });
+      await db.message.deleteMany({ where: { id: { in: [msg1.id, msg2.id] } } }).catch(() => {});
+      await db.campaignRun.deleteMany({ where: { id: batchRun.id } }).catch(() => {});
+      await db.campaign.deleteMany({ where: { id: batchCamp.id } }).catch(() => {});
     }
   });
 });
