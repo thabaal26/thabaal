@@ -166,11 +166,18 @@ export async function POST(req: NextRequest) {
               where: { id: c.id },
               data: { optedOut: true, optInAt: null, optInSource: null },
             });
-            await db.message.deleteMany({
+            // Safely suppress pending marketing messages without deleting history or non-marketing messages
+            await db.message.updateMany({
               where: {
                 customerId: c.id,
                 status: "QUEUED",
-                run: { status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET", "WAITING_FUNDS"] } },
+                template: { is: { category: "MARKETING" } },
+                run: { is: { campaign: { is: { clientId: c.clientId } } } },
+              },
+              data: {
+                status: "SKIPPED",
+                error: "MARKETING_OPT_OUT_BEFORE_DISPATCH",
+                errorCode: 131050,
               },
             }).catch(() => {});
           }

@@ -419,10 +419,26 @@ export async function validateCampaignPreflight(campaignId: string): Promise<Cam
   };
 }
 
+export type PrimaryDisposition =
+  | "ELIGIBLE_NOW"
+  | "INTERNAL_COOLDOWN"
+  | "PROVIDER_REASSESSMENT"
+  | "CAMPAIGN_SUPPRESSED"
+  | "PERMANENTLY_EXCLUDED"
+  | "NEEDS_REVIEW";
+
 export type AudienceDetailedPartition = {
   ok: boolean;
   total: number;
   eligibleNow: number;
+  dispositions: {
+    eligibleNow: number;
+    internalCooldown: number;
+    providerReassessment: number;
+    campaignSuppressed: number;
+    permanentlyExcluded: number;
+    needsReview: number;
+  };
   marketingGap: {
     count: number;
     earliestUnlockAt: string | null;
@@ -445,19 +461,21 @@ export type AudienceDetailedPartition = {
 };
 
 /**
- * Evaluates the authoritative 4-way audience partition for a campaign before send:
- * 1. Eligible Now (Ready to receive immediately)
- * 2. Deterministic 72h Cooldown (Marketing Gap with exact unlock timestamps)
- * 3. Meta Ecosystem Holdback (Error 131049)
- * 4. Excluded (Opted out, unreachable, invalid phone format, dormant)
+ * Evaluates the authoritative 6-way recipient disposition partition before send:
+ * 1. ELIGIBLE_NOW (Passed all consent, reachability, marketing-gap, and suppression checks)
+ * 2. INTERNAL_COOLDOWN (Deterministic 72h marketing gap with exact unlock timestamps)
+ * 3. PROVIDER_REASSESSMENT (Meta Error 131049 ecosystem holdback)
+ * 4. CAMPAIGN_SUPPRESSED (Unread filter / campaign suppressions)
+ * 5. PERMANENTLY_EXCLUDED (Opted out, unreachable, E.164-invalid phone, dormant)
+ * 6. NEEDS_REVIEW (Meta Error 130472 test or ambiguous holdback)
  *
  * Mathematical Invariant:
- * Total == EligibleNow + MarketingGap + MetaHoldback + Excluded
+ * Total == ELIGIBLE_NOW + INTERNAL_COOLDOWN + PROVIDER_REASSESSMENT + CAMPAIGN_SUPPRESSED + PERMANENTLY_EXCLUDED + NEEDS_REVIEW
  */
 export async function partitionAudienceDetailed(
   clientId: string,
   audienceTag?: string | null,
-  people: { includeIds?: string[]; excludeIds?: string[]; segments?: string[]; templateId?: string } = {},
+  people: { includeIds?: string[]; excludeIds?: string[]; segments?: string[]; templateId?: string; skipUnread?: boolean } = {},
 ): Promise<AudienceDetailedPartition> {
   const [client, template] = await Promise.all([
     db.client.findUnique({ where: { id: clientId }, select: { marketingGapHours: true } }),
@@ -506,11 +524,11 @@ export async function partitionAudienceDetailed(
     }),
   ]);
 
-  // Invalid phone check on candidates
+  // E.164-aware international phone validation on candidates
   const invalidPhoneIds = new Set<string>();
   for (const c of allRawCustomers) {
-    const digits = (c.phone || "").replace(/\D/g, "");
-    if (digits.length < 10) invalidPhoneIds.add(c.id);
+    const normalized = normalizePhone(c.phone || "");
+    if (!normalized) invalidPhoneIds.add(c.id);
   }
   const invalidPhoneCount = invalidPhoneIds.size;
   const validCandidateIds = allRawCustomers.filter((c) => !invalidPhoneIds.has(c.id)).map((c) => c.id);
@@ -523,6 +541,14 @@ export async function partitionAudienceDetailed(
       ok: true,
       total,
       eligibleNow: 0,
+      dispositions: {
+        eligibleNow: 0,
+        internalCooldown: 0,
+        providerReassessment: 0,
+        campaignSuppressed: 0,
+        permanentlyExcluded: excludedTotal,
+        needsReview: 0,
+      },
       marketingGap: { count: 0, earliestUnlockAt: null, latestUnlockAt: null, buckets: [] },
       metaHoldback: { count: 0, explanation: "No customers held back by Meta." },
       excluded: { total: excludedTotal, optedOut: optedOutCount, unreachable: unreachableCount, invalidPhone: invalidPhoneCount, dormant: dormantCount },
@@ -531,12 +557,19 @@ export async function partitionAudienceDetailed(
     };
   }
 
-  // 2. Marketing gap & Meta holdback on valid candidates
+  // 2. Marketing gap, Meta holdback, and unread suppression on valid candidates
   let gapCount = 0;
-  let metaHoldbackCount = 0;
+  let meta131049Count = 0;
+  let meta130472Count = 0;
+  let unreadSuppressedCount = 0;
   let earliestUnlockAt: string | null = null;
   let latestUnlockAt: string | null = null;
   const buckets: { label: string; count: number }[] = [];
+
+  const [tests, unreadSet] = await Promise.all([
+    db.customer.findMany({ where: { AND: [rawWhere, { tags: { has: TEST_TAG } }] }, select: { id: true }, take: 50 }),
+    notOpeningOffers(clientId),
+  ]);
 
   if (isMarketing) {
     const recentGapMessages = await db.message.findMany({
@@ -589,33 +622,57 @@ export async function partitionAudienceDetailed(
     // Meta holdback: candidates NOT in gapCustomerMap
     const nonGapCandidateIds = validCandidateIds.filter((id) => !gapCustomerMap.has(id));
     if (nonGapCandidateIds.length > 0) {
-      const heldMessages = await db.message.findMany({
-        where: {
-          customerId: { in: nonGapCandidateIds },
-          status: "FAILED",
-          errorCode: { in: SKIP_CODES },
-          failedAt: { gt: skipCutoff },
-        },
-        select: { customerId: true },
-        distinct: ["customerId"],
-      });
-      metaHoldbackCount = heldMessages.length;
+      const [held131049, held130472] = await Promise.all([
+        db.message.findMany({
+          where: {
+            customerId: { in: nonGapCandidateIds },
+            status: "FAILED",
+            errorCode: 131049,
+            failedAt: { gt: skipCutoff },
+          },
+          select: { customerId: true },
+          distinct: ["customerId"],
+        }),
+        db.message.findMany({
+          where: {
+            customerId: { in: nonGapCandidateIds },
+            status: "FAILED",
+            errorCode: 130472,
+            failedAt: { gt: skipCutoff },
+          },
+          select: { customerId: true },
+          distinct: ["customerId"],
+        }),
+      ]);
+      meta131049Count = held131049.length;
+      meta130472Count = held130472.length;
     }
   }
 
-  const eligibleNow = validCandidateIds.length - gapCount - metaHoldbackCount;
-  const total = eligibleNow + gapCount + metaHoldbackCount + excludedTotal;
+  // Check unread suppression if skipUnread requested
+  const heldIds = new Set<string>();
+  const nonHeldCandidateIds = validCandidateIds.filter((id) => !heldIds.has(id));
+  if (people.skipUnread && unreadSet.size > 0) {
+    unreadSuppressedCount = nonHeldCandidateIds.filter((id) => unreadSet.has(id)).length;
+  }
 
-  const [tests, unread] = await Promise.all([
-    db.customer.findMany({ where: { AND: [rawWhere, { tags: { has: TEST_TAG } }] }, select: { id: true }, take: 50 }),
-    notOpeningOffers(clientId),
-  ]);
-  const unreadIn = unread.size ? await db.customer.count({ where: { AND: [rawWhere, { id: { in: [...unread] } }] } }) : 0;
+  const eligibleNow = validCandidateIds.length - gapCount - meta131049Count - meta130472Count - unreadSuppressedCount;
+  const total = eligibleNow + gapCount + meta131049Count + meta130472Count + unreadSuppressedCount + excludedTotal;
+
+  const unreadIn = unreadSet.size ? await db.customer.count({ where: { AND: [rawWhere, { id: { in: [...unreadSet] } }] } }) : 0;
 
   return {
     ok: true,
     total,
     eligibleNow,
+    dispositions: {
+      eligibleNow,
+      internalCooldown: gapCount,
+      providerReassessment: meta131049Count,
+      campaignSuppressed: unreadSuppressedCount,
+      permanentlyExcluded: excludedTotal,
+      needsReview: meta130472Count,
+    },
     marketingGap: {
       count: gapCount,
       earliestUnlockAt,
@@ -623,11 +680,11 @@ export async function partitionAudienceDetailed(
       buckets,
     },
     metaHoldback: {
-      count: metaHoldbackCount,
-      explanation: "Held by Meta frequency protection across all businesses. Exact unlock timestamp is non-deterministic (managed by Meta's algorithm); will be re-evaluated at dispatch time.",
+      count: meta131049Count + meta130472Count,
+      explanation: "Held by Meta frequency protection across all businesses. Re-evaluated at dispatch time.",
     },
     excluded: {
-      total: excludedTotal,
+      total: excludedTotal + unreadSuppressedCount,
       optedOut: optedOutCount,
       unreachable: unreachableCount,
       invalidPhone: invalidPhoneCount,

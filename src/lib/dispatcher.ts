@@ -22,7 +22,7 @@ import { backfillOrderNames } from "./orders";
 import { remindUnpaidOrders } from "./payments";
 import { expireUnfinishedOrders, nudgeUnfinishedOrders } from "./cart-followups";
 import { busyForOffers } from "./order-assistant";
-import { senderFor } from "./senders";
+import { assertSenderHealthy, senderFor, SenderHealthError } from "./senders";
 import { WahaError } from "./waha";
 import { MetaError } from "./whatsapp";
 import { normalizePhone } from "./phone";
@@ -83,13 +83,13 @@ export async function startRun(
   }
 
   const isMarketing = campaign.template.category === "MARKETING";
-  if (isMarketing) {
-    const { number: sender } = await senderFor(campaign.clientId, campaign.senderId || null);
-    if (sender?.qualityRating === "RED") {
-      throw new CampaignSenderQualityError(
-        `Campaign "${campaign.name}" dispatch blocked: Sender number ${sender.label} has quality RED (Low Quality). Cooldown active to protect your WhatsApp account from being permanently banned.`
-      );
+  try {
+    await assertSenderHealthy(campaign.clientId, campaign.senderId || null, campaign.template.category);
+  } catch (err) {
+    if (err instanceof SenderHealthError) {
+      throw new CampaignSenderQualityError(err.message);
     }
+    throw err;
   }
   const audience = await campaignAudienceWhere(campaign.clientId, campaign.audienceTag, campaign, { requirePositiveConsent: isMarketing });
 
@@ -313,7 +313,8 @@ export async function processRun(runId: string, now: Date, deadline: number) {
     await freshenNumbers({ ids: [number.id] });
     const current = await db.whatsAppNumber.findUnique({ where: { id: number.id } });
     if (current) Object.assign(number, { messagingTier: current.messagingTier, qualityRating: current.qualityRating });
-    if (number.qualityRating === "RED") {
+    const qRating = (number.qualityRating || "GREEN").toUpperCase();
+    if (marketing && qRating !== "GREEN") {
       await pause("WAITING_QUALITY", 60);
       return { sent: 0, failed: 0 };
     }

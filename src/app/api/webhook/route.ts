@@ -549,19 +549,25 @@ async function optOut(phone: string, phoneNumberId?: string) {
     if (!c.optedOut) {
       const client = await db.client.findUnique({ where: { id: c.clientId }, select: { name: true } });
       const shopTitle = client?.name ?? "our business";
-      const confirmMsg = `You have been successfully unsubscribed from marketing offers from ${shopTitle}. Reply START at any time to resubscribe.\n\n${shopTitle} விளம்பரக் குறுஞ்செய்திகளில் இருந்து நீங்கள் விலகிவிட்டீர்கள். மீண்டும் பெற START என அனுப்பவும்.`;
+      const confirmMsg = `You have been successfully unsubscribed from marketing offers from ${shopTitle}. You may still receive necessary service or order updates. Reply START at any time to resubscribe.\n\n${shopTitle} விளம்பரச் செய்திகளிலிருந்து நீங்கள் விலகியுள்ளீர்கள். அத்தியாவசிய சேவை அல்லது ஆர்டர் தகவல்கள் மட்டும் வரலாம். மீண்டும் பெற START என அனுப்பவும்.`;
       await textInWindow(c, confirmMsg, "Offers stopped").catch(() => false);
     }
     await db.customer.update({
       where: { id: c.id },
       data: { optedOut: true, optInAt: null, optInSource: null },
     });
-    // Immediately purge any queued campaign messages for this customer across active runs
-    await db.message.deleteMany({
+    // Safely suppress pending marketing messages without deleting history or non-marketing messages
+    await db.message.updateMany({
       where: {
         customerId: c.id,
         status: "QUEUED",
-        run: { status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET", "WAITING_FUNDS"] } },
+        template: { is: { category: "MARKETING" } },
+        run: { is: { campaign: { is: { clientId: c.clientId } } } },
+      },
+      data: {
+        status: "SKIPPED",
+        error: "MARKETING_OPT_OUT_BEFORE_DISPATCH",
+        errorCode: 131050,
       },
     }).catch(() => {});
   }

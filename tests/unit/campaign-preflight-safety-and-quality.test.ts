@@ -19,7 +19,7 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
   let custInvalidPhoneId: string;
 
   before(async () => {
-    // 1. Create client
+    // 1. Create client with mock WhatsApp token
     const client = await db.client.create({
       data: {
         name: `Test_Safety_Client_${Date.now()}`,
@@ -28,6 +28,7 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
         marketingGapHours: 72,
         quietFrom: "21:00",
         quietTo: "09:00",
+        waToken: "EAABtest_token_safety_suite",
       },
     });
     clientId = client.id;
@@ -41,6 +42,7 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
         businessAccountId: `waba_${Date.now()}`,
         qualityRating: "GREEN",
         messagingTier: "TIER_2K",
+        token: "EAABtest_token_safety_suite",
       },
     });
     greenSenderId = greenNum.id;
@@ -53,6 +55,7 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
         businessAccountId: greenNum.businessAccountId,
         qualityRating: "RED",
         messagingTier: "TIER_2K",
+        token: "EAABtest_token_safety_suite",
       },
     });
     redSenderId = redNum.id;
@@ -180,7 +183,8 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
     await db.client.deleteMany({ where: { id: clientId } }).catch(() => {});
   });
 
-  test("1. assertSenderHealthy strictly blocks RED quality rating for MARKETING", async () => {
+  test("1. assertSenderHealthy strictly blocks non-GREEN (RED, YELLOW, FLAGGED, RESTRICTED, UNKNOWN) for MARKETING", async () => {
+    // A. RED blocked
     await assert.rejects(
       async () => {
         await assertSenderHealthy(clientId, redSenderId, "MARKETING");
@@ -191,17 +195,95 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
         return true;
       }
     );
+
+    // B. YELLOW blocked (Medium Quality Warning)
+    await db.whatsAppNumber.update({ where: { id: redSenderId }, data: { qualityRating: "YELLOW" } });
+    await assert.rejects(
+      async () => {
+        await assertSenderHealthy(clientId, redSenderId, "MARKETING");
+      },
+      (err: unknown) => {
+        assert.ok(err instanceof SenderHealthError);
+        assert.match(err.message, /Number quality is YELLOW/i);
+        return true;
+      }
+    );
+
+    // C. FLAGGED blocked
+    await db.whatsAppNumber.update({ where: { id: redSenderId }, data: { qualityRating: "FLAGGED" } });
+    await assert.rejects(
+      async () => {
+        await assertSenderHealthy(clientId, redSenderId, "MARKETING");
+      },
+      (err: unknown) => {
+        assert.ok(err instanceof SenderHealthError);
+        assert.match(err.message, /Number status is FLAGGED/i);
+        return true;
+      }
+    );
+
+    // D. RESTRICTED blocked
+    await db.whatsAppNumber.update({ where: { id: redSenderId }, data: { qualityRating: "RESTRICTED" } });
+    await assert.rejects(
+      async () => {
+        await assertSenderHealthy(clientId, redSenderId, "MARKETING");
+      },
+      (err: unknown) => {
+        assert.ok(err instanceof SenderHealthError);
+        assert.match(err.message, /Number status is RESTRICTED/i);
+        return true;
+      }
+    );
+
+    // E. UNKNOWN blocked
+    await db.whatsAppNumber.update({ where: { id: redSenderId }, data: { qualityRating: "UNKNOWN" } });
+    await assert.rejects(
+      async () => {
+        await assertSenderHealthy(clientId, redSenderId, "MARKETING");
+      },
+      (err: unknown) => {
+        assert.ok(err instanceof SenderHealthError);
+        assert.match(err.message, /Number health is UNKNOWN/i);
+        return true;
+      }
+    );
+
+    // Restore redSenderId back to RED
+    await db.whatsAppNumber.update({ where: { id: redSenderId }, data: { qualityRating: "RED" } });
   });
 
-  test("2. assertSenderHealthy allows GREEN sender and allows UTILITY category even if RED", async () => {
-    // GREEN sender succeeds
+  test("2. assertSenderHealthy allows GREEN sender and allows UTILITY category even if RED/YELLOW, but blocks UTILITY if BANNED", async () => {
+    // GREEN sender succeeds for MARKETING
     await assert.doesNotReject(async () => {
       await assertSenderHealthy(clientId, greenSenderId, "MARKETING");
     });
+
     // UTILITY category on RED sender succeeds
     await assert.doesNotReject(async () => {
       await assertSenderHealthy(clientId, redSenderId, "UTILITY");
     });
+
+    // UTILITY category on YELLOW sender succeeds
+    await db.whatsAppNumber.update({ where: { id: redSenderId }, data: { qualityRating: "YELLOW" } });
+    await assert.doesNotReject(async () => {
+      await assertSenderHealthy(clientId, redSenderId, "UTILITY");
+    });
+
+    // UTILITY category on BANNED sender is blocked
+    await db.whatsAppNumber.update({ where: { id: redSenderId }, data: { qualityRating: "BANNED" } });
+    await assert.rejects(
+      async () => {
+        await assertSenderHealthy(clientId, redSenderId, "UTILITY");
+      },
+      (err: unknown) => {
+        assert.ok(err instanceof SenderHealthError);
+        assert.match(err.message, /Number status is BANNED/i);
+        return true;
+      }
+    );
+
+    // Restore redSenderId back to RED
+    await db.whatsAppNumber.update({ where: { id: redSenderId }, data: { qualityRating: "RED" } });
   });
 
   test("3. startRun strictly halts and throws CampaignSenderQualityError when sender is RED", async () => {
@@ -227,7 +309,7 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
         },
         (err: unknown) => {
           assert.ok(err instanceof CampaignSenderQualityError);
-          assert.match(err.message, /has quality RED/i);
+          assert.match(err.message, /Number quality is RED/i);
           return true;
         }
       );
@@ -252,9 +334,26 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
     assert.equal(res.excluded.optedOut, 1);
     assert.equal(res.excluded.invalidPhone, 1);
 
+    // Turn 60 6-disposition breakdown verification
+    assert.equal(res.dispositions.eligibleNow, 1);
+    assert.equal(res.dispositions.internalCooldown, 1);
+    assert.equal(res.dispositions.providerReassessment, 1);
+    assert.equal(res.dispositions.permanentlyExcluded, 2);
+    assert.equal(res.dispositions.needsReview, 0);
+    assert.equal(res.dispositions.campaignSuppressed, 0);
+
     // Mathematical Invariant
     const sum = res.eligibleNow + res.marketingGap.count + res.metaHoldback.count + res.excluded.total;
     assert.equal(sum, res.total, "Mathematical parity: Total == EligibleNow + MarketingGap + MetaHoldback + Excluded");
+
+    const dispositionSum =
+      res.dispositions.eligibleNow +
+      res.dispositions.internalCooldown +
+      res.dispositions.providerReassessment +
+      res.dispositions.permanentlyExcluded +
+      res.dispositions.needsReview +
+      res.dispositions.campaignSuppressed;
+    assert.equal(dispositionSum, res.total, "Mathematical parity: Total == 6 Dispositions Sum");
 
     // Unlock Timestamps
     assert.ok(res.marketingGap.earliestUnlockAt !== null, "Earliest unlock must be calculated");
@@ -295,12 +394,12 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
     }
   });
 
-  test("6. Customer opt-out immediately purges queued messages from active campaign runs", async () => {
-    // Create a running campaign run with a queued message for Customer 1
+  test("6. Customer opt-out transitions pending marketing messages to SKIPPED with code 131050 without deleting audit record or touching UTILITY messages", async () => {
+    // Create a running campaign run with a queued marketing message and a queued utility message for Customer 1
     const testCamp = await db.campaign.create({
       data: {
         clientId,
-        name: "Active Run Purge Test",
+        name: "Active Run Opt-Out Safety Test",
         templateId: marketingTemplateId,
         senderId: greenSenderId,
         scheduleType: "ONCE",
@@ -316,11 +415,12 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
         campaignId: testCamp.id,
         scheduledFor: new Date(),
         status: "RUNNING",
-        total: 1,
+        total: 2,
       },
     });
 
-    const queuedMsg = await db.message.create({
+    // 1. Queued Marketing Message
+    const mktgMsg = await db.message.create({
       data: {
         customerId: custEligibleId,
         runId: testRun.id,
@@ -330,23 +430,51 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
       },
     });
 
+    // 2. Queued Utility Message (should NEVER be skipped or deleted on marketing opt-out)
+    const utilMsg = await db.message.create({
+      data: {
+        customerId: custEligibleId,
+        runId: testRun.id,
+        templateId: utilityTemplateId,
+        templateName: "test_order_receipt",
+        status: "QUEUED",
+      },
+    });
+
     try {
-      // Simulate opt-out purge logic
+      // Simulate exact opt-out webhook logic:
       await db.customer.update({
         where: { id: custEligibleId },
         data: { optedOut: true },
       });
-      await db.message.deleteMany({
+
+      // Update marketing messages to SKIPPED
+      await db.message.updateMany({
         where: {
           customerId: custEligibleId,
           status: "QUEUED",
-          run: { status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET", "WAITING_FUNDS"] } },
+          template: { is: { category: "MARKETING" } },
+          run: { is: { campaign: { is: { clientId } } } },
+        },
+        data: {
+          status: "SKIPPED",
+          error: "MARKETING_OPT_OUT_BEFORE_DISPATCH",
+          errorCode: 131050,
         },
       });
 
-      // Verify the queued message was purged
-      const found = await db.message.findUnique({ where: { id: queuedMsg.id } });
-      assert.equal(found, null, "Queued message must be purged upon customer opt-out");
+      // Verification A: Marketing message is NOT deleted, but transitioned to SKIPPED with code 131050
+      const updatedMktg = await db.message.findUnique({ where: { id: mktgMsg.id } });
+      assert.ok(updatedMktg, "Marketing message must NOT be deleted (audit history preserved)");
+      assert.equal(updatedMktg.status, "SKIPPED", "Marketing message must be marked SKIPPED");
+      assert.equal(updatedMktg.error, "MARKETING_OPT_OUT_BEFORE_DISPATCH");
+      assert.equal(updatedMktg.errorCode, 131050);
+
+      // Verification B: Transactional / Utility message remains untouched and QUEUED
+      const updatedUtil = await db.message.findUnique({ where: { id: utilMsg.id } });
+      assert.ok(updatedUtil, "Utility message must NOT be deleted");
+      assert.equal(updatedUtil.status, "QUEUED", "Utility message must remain QUEUED");
+      assert.equal(updatedUtil.error, null);
     } finally {
       await db.customer.update({ where: { id: custEligibleId }, data: { optedOut: false } });
       await db.message.deleteMany({ where: { runId: testRun.id } }).catch(() => {});
@@ -355,9 +483,8 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
     }
   });
 
-  test("7. Mixed audience SPLIT_CHILD_DRAFT creates linked child campaign in DRAFT mode scheduled at latestUnlockAt", async () => {
+  test("7. Mixed audience SPLIT_CHILD_DRAFT creates linked child campaign in DRAFT mode with frozen recipient IDs and audienceTag null", async () => {
     const unlockTime = new Date(Date.now() + 60 * 3600 * 1000); // 60 hours in future
-    const isoUnlock = unlockTime.toISOString();
 
     // Create main campaign simulating SPLIT_CHILD_DRAFT
     const mainCamp = await db.campaign.create({
@@ -376,7 +503,6 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
       },
     });
 
-    // Simulate child cohort creation as done in saveCampaign
     const tFormatter = new Intl.DateTimeFormat("en-GB", {
       timeZone: "Asia/Kolkata",
       hour: "2-digit",
@@ -385,13 +511,15 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
     });
     const childSendTime = tFormatter.format(unlockTime);
 
+    // Child cohort created in DRAFT mode with frozen includeIds and audienceTag: null
     const childCamp = await db.campaign.create({
       data: {
         clientId,
         name: `${mainCamp.name} — Cooldown Cohort (Part 2)`,
         templateId: mainCamp.templateId,
         senderId: mainCamp.senderId,
-        audienceTag: mainCamp.audienceTag,
+        audienceTag: null, // Frozen cohort: must not re-evaluate broad audienceTag
+        includeIds: [custGapId], // Explicitly frozen recipient IDs
         scheduleType: "ONCE",
         sendTime: childSendTime,
         runAt: unlockTime,
@@ -405,6 +533,8 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
       assert.ok(childCamp.id, "Child cohort campaign must be created");
       assert.equal(childCamp.active, false, "Child cohort must be created in DRAFT mode (active: false)");
       assert.equal(childCamp.scheduleType, "ONCE");
+      assert.equal(childCamp.audienceTag, null, "Child cohort audienceTag must be null to prevent broad re-resolution");
+      assert.deepEqual(childCamp.includeIds, [custGapId], "Child cohort must freeze exact recipient IDs");
       assert.equal(childCamp.runAt?.getTime(), unlockTime.getTime(), "Child cohort runAt must match latestUnlockAt");
       assert.match(childCamp.name, /Part 2/i);
     } finally {
@@ -436,6 +566,43 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
       assert.equal(deferredCamp.runAt?.getTime(), unlockTime.getTime());
     } finally {
       await db.campaign.delete({ where: { id: deferredCamp.id } }).catch(() => {});
+    }
+  });
+
+  test("9. startRun strictly blocks dispatch when sender quality degrades to YELLOW or FLAGGED", async () => {
+    // 1. Test YELLOW quality degradation
+    await db.whatsAppNumber.update({ where: { id: greenSenderId }, data: { qualityRating: "YELLOW" } });
+
+    const yellowCamp = await db.campaign.create({
+      data: {
+        clientId,
+        name: "Degraded Yellow Campaign",
+        templateId: marketingTemplateId,
+        senderId: greenSenderId,
+        scheduleType: "ONCE",
+        sendTime: "10:00",
+        batchSize: 50,
+        intervalMinutes: 15,
+        active: false,
+      },
+      include: { template: true },
+    });
+
+    try {
+      await assert.rejects(
+        async () => {
+          await startRun(yellowCamp, new Date());
+        },
+        (err: unknown) => {
+          assert.ok(err instanceof CampaignSenderQualityError);
+          assert.match(err.message, /Number quality is YELLOW/i);
+          return true;
+        }
+      );
+    } finally {
+      await db.campaign.delete({ where: { id: yellowCamp.id } }).catch(() => {});
+      // Restore greenSenderId back to GREEN
+      await db.whatsAppNumber.update({ where: { id: greenSenderId }, data: { qualityRating: "GREEN" } });
     }
   });
 });

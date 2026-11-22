@@ -89,8 +89,14 @@ export async function saveCampaign(id: string | null, input: CampaignInput): Pro
   if (input.senderId && sender?.id !== input.senderId) errors.push("Choose a number to send from.");
   if (template && sender && template.businessAccountId && template.businessAccountId !== sender.businessAccountId)
     errors.push(`"${template.name}" is approved in a different WhatsApp account than ${sender.label}. Pick a template from that number's account.`);
-  if (template?.category === "MARKETING" && input.active && sender?.qualityRating === "RED") {
-    errors.push("Marketing dispatch blocked: Number quality is RED (Low Quality). A 7-day cooldown is active to protect your WhatsApp account from being permanently banned.");
+  if (input.active && template?.category === "MARKETING") {
+    try {
+      await assertSenderHealthy(clientId, input.senderId || null, "MARKETING");
+    } catch (err) {
+      if (err instanceof SenderHealthError) {
+        errors.push(err.message);
+      }
+    }
   }
   let scheduleType = input.scheduleType;
   let sendTime = input.sendTime;
@@ -223,8 +229,18 @@ export async function saveCampaign(id: string | null, input: CampaignInput): Pro
 export async function toggleCampaign(id: string, active: boolean): Promise<ActionResult> {
   const s = await requireManager();
   if ("denied" in s) return { ok: false, message: s.denied };
-  const c = await db.campaign.findUnique({ where: { id } });
+  const c = await db.campaign.findUnique({ where: { id }, include: { template: true } });
   if (!c || !mine(s, c.clientId)) return { ok: false, message: "Campaign not found." };
+  if (active && c.template?.category === "MARKETING") {
+    try {
+      await assertSenderHealthy(c.clientId, c.senderId, "MARKETING");
+    } catch (err) {
+      if (err instanceof SenderHealthError) {
+        return { ok: false, message: err.message };
+      }
+      throw err;
+    }
+  }
   const nextRunAt = active ? computeNextRun(c) : null;
   if (active && !nextRunAt) return { ok: false, message: "Nothing left to schedule. Edit the date or days first." };
   await db.campaign.update({ where: { id }, data: { active, nextRunAt } });
@@ -502,6 +518,14 @@ export async function countCampaignAudienceDetailed(
       ok: false,
       total: 0,
       eligibleNow: 0,
+      dispositions: {
+        eligibleNow: 0,
+        internalCooldown: 0,
+        providerReassessment: 0,
+        campaignSuppressed: 0,
+        permanentlyExcluded: 0,
+        needsReview: 0,
+      },
       marketingGap: { count: 0, earliestUnlockAt: null, latestUnlockAt: null, buckets: [] },
       metaHoldback: { count: 0, explanation: "" },
       excluded: { total: 0, optedOut: 0, unreachable: 0, invalidPhone: 0, dormant: 0 },

@@ -72,25 +72,78 @@ export async function sendableTemplates(clientId: string) {
 
 export const numberLabel = (n: { label: string; displayPhone: string | null }) => (n.displayPhone ? `${n.label} · ${n.displayPhone}` : n.label);
 
+export type QualityRating = "GREEN" | "YELLOW" | "RED" | "UNKNOWN" | "NA";
+
 export class SenderHealthError extends Error {
-  constructor(message: string, public readonly qualityRating?: string | null) {
+  constructor(message: string, public readonly qualityRating?: string | null, public readonly status?: string | null) {
     super(message);
     this.name = "SenderHealthError";
   }
 }
 
 /**
- * Asserts that a sender number is healthy enough for outbound marketing dispatches.
- * Strictly blocks RED quality ratings or FLAGGED/RESTRICTED status to prevent WhatsApp account bans.
+ * Asserts that a sender number is healthy enough for outbound dispatches.
+ *
+ * For MARKETING campaigns:
+ * - Strictly requires GREEN rating.
+ * - Blocks YELLOW (Medium Quality Warning), RED (Low Quality), FLAGGED, RESTRICTED, BANNED, DISABLED.
+ * - Fails closed on UNKNOWN, NA, or missing credentials.
+ *
+ * For UTILITY / Transactional messages:
+ * - Allowed even if RED/YELLOW, unless number is BANNED, DISABLED, or disconnected.
  */
-export async function assertSenderHealthy(clientId: string, senderId?: string | null, category: string = "MARKETING") {
-  if (category !== "MARKETING") return; // Utility / transactional messages are allowed even during recovery
+export async function assertSenderHealthy(
+  clientId: string,
+  senderId?: string | null,
+  category: string = "MARKETING"
+) {
   const { number } = await senderFor(clientId, senderId);
   if (!number) return;
-  if (number.qualityRating === "RED") {
+
+  const rawRating = number.qualityRating;
+  const rating = (rawRating || "GREEN").toUpperCase();
+  const isMarketing = category === "MARKETING";
+
+  if (!isMarketing) {
+    // Utility / Transactional messages: only blocked if banned or disabled
+    if (rating === "BANNED" || rating === "DISABLED") {
+      throw new SenderHealthError(
+        `Transactional dispatch blocked: Number status is ${rating}. The account is disabled by Meta.`,
+        rating
+      );
+    }
+    return;
+  }
+
+  // Marketing dispatch checks: strictly require GREEN rating and block low quality/restricted states
+  if (rating === "RED") {
     throw new SenderHealthError(
-      "Marketing dispatch blocked: Number quality is RED (Low Quality). A 7-day cooldown is active to protect your WhatsApp account from being permanently banned.",
-      number.qualityRating
+      "Marketing dispatch blocked: Number quality is RED (Low Quality). Promotional sending is paused to protect your WhatsApp account from a permanent ban.",
+      rating
+    );
+  }
+  if (rating === "YELLOW") {
+    throw new SenderHealthError(
+      "Marketing dispatch blocked: Number quality is YELLOW (Medium Quality Warning). Bulk promotional sending is paused to prevent your number from downgrading to RED.",
+      rating
+    );
+  }
+  if (rating === "FLAGGED" || rating === "RESTRICTED" || rating === "BANNED" || rating === "DISABLED") {
+    throw new SenderHealthError(
+      `Marketing dispatch blocked: Number status is ${rating}. WhatsApp has restricted promotional outbound messaging for this account.`,
+      rating
+    );
+  }
+  if (rating === "UNKNOWN" || rating === "NA") {
+    throw new SenderHealthError(
+      "Marketing dispatch blocked: Number health is UNKNOWN. Sync number status from Meta first.",
+      rating
+    );
+  }
+  if (rating && rating !== "GREEN") {
+    throw new SenderHealthError(
+      `Marketing dispatch blocked: Number quality must be GREEN (actual: ${rating}).`,
+      rating
     );
   }
 }
