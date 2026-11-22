@@ -8,7 +8,7 @@ import { mapAck } from "@/lib/waha";
 export const dynamic = "force-dynamic";
 
 const RANK = { QUEUED: 0, SENT: 1, DELIVERED: 2, READ: 3, FAILED: 4, SKIPPED: 4 } as const;
-const OPT_OUT = /^\s*(stop|unsubscribe|opt[\s-]?out|cancel)\s*$/i;
+const OPT_OUT = /^\s*(stop|unsubscribe|opt[\s-]?out|cancel|dont\s*send|don't\s*send|no\s*more|நிறுத்து|நிறுத்தவும்|வேண்டாம்|बंद\s*करோ|quit|end)\s*$/i;
 
 type Event =
   | { event: "message.ack"; payload: { id: string; ack: number; ackName?: string } }
@@ -160,10 +160,20 @@ export async function POST(req: NextRequest) {
 
       if (OPT_OUT.test(p.body ?? "")) {
         if (resolvedClientId) {
-          await db.customer.updateMany({
-            where: { phone, clientId: resolvedClientId },
-            data: { optedOut: true },
-          });
+          const matched = await db.customer.findMany({ where: { phone, clientId: resolvedClientId } });
+          for (const c of matched) {
+            await db.customer.update({
+              where: { id: c.id },
+              data: { optedOut: true, optInAt: null, optInSource: null },
+            });
+            await db.message.deleteMany({
+              where: {
+                customerId: c.id,
+                status: "QUEUED",
+                run: { status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET", "WAITING_FUNDS"] } },
+              },
+            }).catch(() => {});
+          }
         }
       }
 

@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
 }
 
 const RANK = { QUEUED: 0, SENT: 1, DELIVERED: 2, READ: 3, FAILED: 4, SKIPPED: 4 } as const;
-const OPT_OUT = /^\s*(stop|unsubscribe|opt[\s-]?out|cancel|dont\s*send|don't\s*send|no\s*more|நிறுத்து|வேண்டாம்|बंद\s*करो)\s*$/i;
+const OPT_OUT = /^\s*(stop|unsubscribe|opt[\s-]?out|cancel|dont\s*send|don't\s*send|no\s*more|நிறுத்து|நிறுத்தவும்|வேண்டாம்|बंद\s*करो|quit|end)\s*$/i;
 
 type StatusUpdate = {
   id: string;
@@ -544,7 +544,27 @@ async function detectAndApplyUpiPayment(
 /** STOP only opts out of the business whose number received it. */
 async function optOut(phone: string, phoneNumberId?: string) {
   const { customers } = await receivingNumber(phoneNumberId);
-  await db.customer.updateMany({ where: { phone, ...customers }, data: { optedOut: true } });
+  const matched = await db.customer.findMany({ where: { phone, ...customers } });
+  for (const c of matched) {
+    if (!c.optedOut) {
+      const client = await db.client.findUnique({ where: { id: c.clientId }, select: { name: true } });
+      const shopTitle = client?.name ?? "our business";
+      const confirmMsg = `You have been successfully unsubscribed from marketing offers from ${shopTitle}. Reply START at any time to resubscribe.\n\n${shopTitle} விளம்பரக் குறுஞ்செய்திகளில் இருந்து நீங்கள் விலகிவிட்டீர்கள். மீண்டும் பெற START என அனுப்பவும்.`;
+      await textInWindow(c, confirmMsg, "Offers stopped").catch(() => false);
+    }
+    await db.customer.update({
+      where: { id: c.id },
+      data: { optedOut: true, optInAt: null, optInSource: null },
+    });
+    // Immediately purge any queued campaign messages for this customer across active runs
+    await db.message.deleteMany({
+      where: {
+        customerId: c.id,
+        status: "QUEUED",
+        run: { status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET", "WAITING_FUNDS"] } },
+      },
+    }).catch(() => {});
+  }
 }
 
 type CallEvent = { id: string; from?: string; to?: string; event?: string; direction?: string; status?: string; duration?: number; session?: { sdp?: string; sdp_type?: string } };

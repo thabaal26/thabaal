@@ -1,6 +1,8 @@
 import "server-only";
+import type { Prisma } from "@prisma/client";
 import { db } from "./db";
-import { campaignAudienceWhere } from "./audiences";
+import { audienceWhere, campaignAudienceWhere, type AudienceFilter } from "./audiences";
+import { AUDIENCE_PREFIX, decodeTags } from "./audience-tags";
 import { senderFor } from "./senders";
 import { unmappedVars, type VarMap } from "./template";
 import { isQuietTime, recentlyMarketed } from "./rules";
@@ -9,6 +11,9 @@ import { canSendLiveOutbound } from "./workspace-guard";
 import { resolveTenantReadiness } from "./tenant-activation";
 import { readPhones, normalizePhone } from "./phone";
 import { cleanSegments } from "./engagement-segments";
+import { SKIP_CODES, SKIP_DAYS } from "./held";
+import { INACTIVE_TAG, TEST_TAG } from "./schedule";
+import { notOpeningOffers } from "./engagement";
 
 export type CampaignPreflightStatus = "READY_FOR_MANUAL_LAUNCH" | "CONDITIONAL_GO" | "NO_GO";
 
@@ -411,5 +416,224 @@ export async function validateCampaignPreflight(campaignId: string): Promise<Cam
     blockingIssues,
     warnings,
     evaluatedAt: new Date().toISOString(),
+  };
+}
+
+export type AudienceDetailedPartition = {
+  ok: boolean;
+  total: number;
+  eligibleNow: number;
+  marketingGap: {
+    count: number;
+    earliestUnlockAt: string | null;
+    latestUnlockAt: string | null;
+    buckets: { label: string; count: number }[];
+  };
+  metaHoldback: {
+    count: number;
+    explanation: string;
+  };
+  excluded: {
+    total: number;
+    optedOut: number;
+    unreachable: number;
+    invalidPhone: number;
+    dormant: number;
+  };
+  unread: number;
+  testIds: string[];
+};
+
+/**
+ * Evaluates the authoritative 4-way audience partition for a campaign before send:
+ * 1. Eligible Now (Ready to receive immediately)
+ * 2. Deterministic 72h Cooldown (Marketing Gap with exact unlock timestamps)
+ * 3. Meta Ecosystem Holdback (Error 131049)
+ * 4. Excluded (Opted out, unreachable, invalid phone format, dormant)
+ *
+ * Mathematical Invariant:
+ * Total == EligibleNow + MarketingGap + MetaHoldback + Excluded
+ */
+export async function partitionAudienceDetailed(
+  clientId: string,
+  audienceTag?: string | null,
+  people: { includeIds?: string[]; excludeIds?: string[]; segments?: string[]; templateId?: string } = {},
+): Promise<AudienceDetailedPartition> {
+  const [client, template] = await Promise.all([
+    db.client.findUnique({ where: { id: clientId }, select: { marketingGapHours: true } }),
+    people.templateId ? db.template.findUnique({ where: { id: people.templateId, clientId }, select: { category: true } }) : null,
+  ]);
+  const gapHours = client?.marketingGapHours ?? 72;
+  const isMarketing = template ? template.category === "MARKETING" : true;
+
+  const pick = decodeTags(audienceTag);
+  let audienceBase: Prisma.CustomerWhereInput = { clientId, deletedAt: null };
+  if (audienceTag && audienceTag.startsWith(AUDIENCE_PREFIX)) {
+    const audId = audienceTag.slice(AUDIENCE_PREFIX.length);
+    const aud = await db.audience.findFirst({ where: { id: audId, clientId } });
+    if (aud) {
+      audienceBase = await audienceWhere(clientId, aud.filter as AudienceFilter, new Date(), false);
+      delete audienceBase.optedOut;
+      delete audienceBase.unreachable;
+    }
+  } else if (pick && pick.tags.length > 0) {
+    audienceBase = {
+      clientId,
+      deletedAt: null,
+      tags: pick.tags.length === 1 ? { has: pick.tags[0] } : pick.match === "all" ? { hasEvery: pick.tags } : { hasSome: pick.tags },
+    };
+  }
+
+  const rawWhere: Prisma.CustomerWhereInput = {
+    AND: [
+      people.includeIds?.length ? { OR: [audienceBase, { id: { in: people.includeIds }, clientId, deletedAt: null }] } : audienceBase,
+      ...(people.excludeIds?.length ? [{ id: { notIn: people.excludeIds } }] : []),
+    ],
+  };
+
+  const now = new Date();
+  const gapCutoff = new Date(now.getTime() - gapHours * 3_600_000);
+  const skipCutoff = new Date(now.getTime() - SKIP_DAYS * 86_400_000);
+
+  // 1. Excluded cohorts
+  const [optedOutCount, unreachableCount, dormantCount, allRawCustomers] = await Promise.all([
+    db.customer.count({ where: { AND: [rawWhere, { optedOut: true }] } }),
+    db.customer.count({ where: { AND: [rawWhere, { optedOut: false, unreachable: true }] } }),
+    db.customer.count({ where: { AND: [rawWhere, { optedOut: false, unreachable: false, tags: { has: INACTIVE_TAG } }] } }),
+    db.customer.findMany({
+      where: { AND: [rawWhere, { optedOut: false, unreachable: false, NOT: { tags: { has: INACTIVE_TAG } } }] },
+      select: { id: true, phone: true },
+    }),
+  ]);
+
+  // Invalid phone check on candidates
+  const invalidPhoneIds = new Set<string>();
+  for (const c of allRawCustomers) {
+    const digits = (c.phone || "").replace(/\D/g, "");
+    if (digits.length < 10) invalidPhoneIds.add(c.id);
+  }
+  const invalidPhoneCount = invalidPhoneIds.size;
+  const validCandidateIds = allRawCustomers.filter((c) => !invalidPhoneIds.has(c.id)).map((c) => c.id);
+
+  const excludedTotal = optedOutCount + unreachableCount + dormantCount + invalidPhoneCount;
+
+  if (validCandidateIds.length === 0) {
+    const total = excludedTotal;
+    return {
+      ok: true,
+      total,
+      eligibleNow: 0,
+      marketingGap: { count: 0, earliestUnlockAt: null, latestUnlockAt: null, buckets: [] },
+      metaHoldback: { count: 0, explanation: "No customers held back by Meta." },
+      excluded: { total: excludedTotal, optedOut: optedOutCount, unreachable: unreachableCount, invalidPhone: invalidPhoneCount, dormant: dormantCount },
+      unread: 0,
+      testIds: [],
+    };
+  }
+
+  // 2. Marketing gap & Meta holdback on valid candidates
+  let gapCount = 0;
+  let metaHoldbackCount = 0;
+  let earliestUnlockAt: string | null = null;
+  let latestUnlockAt: string | null = null;
+  const buckets: { label: string; count: number }[] = [];
+
+  if (isMarketing) {
+    const recentGapMessages = await db.message.findMany({
+      where: {
+        customerId: { in: validCandidateIds },
+        status: { in: ["SENT", "DELIVERED", "READ"] },
+        sentAt: { gte: gapCutoff },
+        template: { category: "MARKETING" },
+      },
+      select: { customerId: true, sentAt: true },
+      orderBy: { sentAt: "asc" },
+    });
+
+    const gapCustomerMap = new Map<string, Date>();
+    for (const m of recentGapMessages) {
+      if (m.customerId && m.sentAt) {
+        const prev = gapCustomerMap.get(m.customerId);
+        if (!prev || m.sentAt > prev) {
+          gapCustomerMap.set(m.customerId, m.sentAt);
+        }
+      }
+    }
+    gapCount = gapCustomerMap.size;
+
+    if (gapCount > 0) {
+      const unlockDates = Array.from(gapCustomerMap.values()).map(
+        (sentAt) => new Date(sentAt.getTime() + gapHours * 3_600_000)
+      );
+      unlockDates.sort((a, b) => a.getTime() - b.getTime());
+      earliestUnlockAt = unlockDates[0].toISOString();
+      latestUnlockAt = unlockDates[unlockDates.length - 1].toISOString();
+
+      let b12 = 0;
+      let b24 = 0;
+      let b48 = 0;
+      let b72 = 0;
+      for (const u of unlockDates) {
+        const diffH = (u.getTime() - now.getTime()) / 3_600_000;
+        if (diffH <= 12) b12++;
+        else if (diffH <= 24) b24++;
+        else if (diffH <= 48) b48++;
+        else b72++;
+      }
+      if (b12 > 0) buckets.push({ label: "Within 12 hours", count: b12 });
+      if (b24 > 0) buckets.push({ label: "12 to 24 hours", count: b24 });
+      if (b48 > 0) buckets.push({ label: "24 to 48 hours", count: b48 });
+      if (b72 > 0) buckets.push({ label: "48 to 72 hours", count: b72 });
+    }
+
+    // Meta holdback: candidates NOT in gapCustomerMap
+    const nonGapCandidateIds = validCandidateIds.filter((id) => !gapCustomerMap.has(id));
+    if (nonGapCandidateIds.length > 0) {
+      const heldMessages = await db.message.findMany({
+        where: {
+          customerId: { in: nonGapCandidateIds },
+          status: "FAILED",
+          errorCode: { in: SKIP_CODES },
+          failedAt: { gt: skipCutoff },
+        },
+        select: { customerId: true },
+        distinct: ["customerId"],
+      });
+      metaHoldbackCount = heldMessages.length;
+    }
+  }
+
+  const eligibleNow = validCandidateIds.length - gapCount - metaHoldbackCount;
+  const total = eligibleNow + gapCount + metaHoldbackCount + excludedTotal;
+
+  const [tests, unread] = await Promise.all([
+    db.customer.findMany({ where: { AND: [rawWhere, { tags: { has: TEST_TAG } }] }, select: { id: true }, take: 50 }),
+    notOpeningOffers(clientId),
+  ]);
+  const unreadIn = unread.size ? await db.customer.count({ where: { AND: [rawWhere, { id: { in: [...unread] } }] } }) : 0;
+
+  return {
+    ok: true,
+    total,
+    eligibleNow,
+    marketingGap: {
+      count: gapCount,
+      earliestUnlockAt,
+      latestUnlockAt,
+      buckets,
+    },
+    metaHoldback: {
+      count: metaHoldbackCount,
+      explanation: "Held by Meta frequency protection across all businesses. Exact unlock timestamp is non-deterministic (managed by Meta's algorithm); will be re-evaluated at dispatch time.",
+    },
+    excluded: {
+      total: excludedTotal,
+      optedOut: optedOutCount,
+      unreachable: unreachableCount,
+      invalidPhone: invalidPhoneCount,
+      dormant: dormantCount,
+    },
+    unread: unreadIn,
+    testIds: tests.map((t) => t.id),
   };
 }

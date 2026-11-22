@@ -4,9 +4,9 @@ import { fromZonedTime } from "date-fns-tz";
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { CampaignConcurrencyError, CampaignMediaPreflightError, dispatch, startRun } from "@/lib/dispatcher";
+import { CampaignConcurrencyError, CampaignMediaPreflightError, CampaignSenderQualityError, dispatch, startRun } from "@/lib/dispatcher";
 import { APP_TZ } from "@/lib/format";
-import { retryHeldBack } from "@/lib/held";
+import { retryHeldBack, SKIP_CODES, SKIP_DAYS } from "@/lib/held";
 import { audienceTagCustomerIds, campaignAudienceWhere } from "@/lib/audiences";
 import { AUDIENCE_PREFIX, decodeTags, TAGS_PREFIX } from "@/lib/audience-tags";
 import { getSettings, templateSendable } from "@/lib/provider";
@@ -14,7 +14,7 @@ import { unmappedVars, type VarMap } from "@/lib/template";
 import { isQuietTime } from "@/lib/rules";
 import { computeNextRun, INACTIVE_TAG, TEST_TAG } from "@/lib/schedule";
 import { INACTIVE_GROUPS, inactiveCandidates, moveToInactive, type InactiveGroup } from "@/lib/inactive";
-import { senderFor } from "@/lib/senders";
+import { assertSenderHealthy, senderFor, SenderHealthError } from "@/lib/senders";
 import { mine, requireAdmin, requireManager } from "@/lib/session";
 import { sendToCustomer } from "./send";
 import type { ActionResult } from "./templates";
@@ -44,6 +44,10 @@ export type CampaignInput = {
   skipUnread: boolean;
   /** Engagement segments to send to, on top of "Send to" (lib/engagement-segments.ts); empty = no segment filter. */
   segments?: string[];
+  /** Strategy when audience contains contacts in 72h cooldown */
+  cohortStrategy?: "ALL_ELIGIBLE" | "SPLIT_CHILD_DRAFT" | "DEFER_ALL";
+  /** Latest unlock timestamp (ISO string) for the cooldown cohort */
+  childCohortRunAt?: string;
 };
 
 /** At most this many people added or left out by hand (each list). */
@@ -85,28 +89,58 @@ export async function saveCampaign(id: string | null, input: CampaignInput): Pro
   if (input.senderId && sender?.id !== input.senderId) errors.push("Choose a number to send from.");
   if (template && sender && template.businessAccountId && template.businessAccountId !== sender.businessAccountId)
     errors.push(`"${template.name}" is approved in a different WhatsApp account than ${sender.label}. Pick a template from that number's account.`);
-  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(input.sendTime)) errors.push("Choose a send time.");
-  if (input.scheduleType === "WEEKLY" && !input.daysOfWeek.length) errors.push("Pick at least one day of the week.");
+  if (template?.category === "MARKETING" && input.active && sender?.qualityRating === "RED") {
+    errors.push("Marketing dispatch blocked: Number quality is RED (Low Quality). A 7-day cooldown is active to protect your WhatsApp account from being permanently banned.");
+  }
+  let scheduleType = input.scheduleType;
+  let sendTime = input.sendTime;
+  let runDate = input.runDate;
+  let deferRunAt: Date | null = null;
+
+  if (input.cohortStrategy === "DEFER_ALL" && input.childCohortRunAt) {
+    const deferDate = new Date(input.childCohortRunAt);
+    if (!isNaN(deferDate.getTime())) {
+      scheduleType = "ONCE";
+      deferRunAt = deferDate;
+      const dFormatter = new Intl.DateTimeFormat("en-CA", {
+        timeZone: APP_TZ,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+      runDate = dFormatter.format(deferDate);
+      const tFormatter = new Intl.DateTimeFormat("en-GB", {
+        timeZone: APP_TZ,
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+      sendTime = tFormatter.format(deferDate);
+    }
+  }
+
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(sendTime)) errors.push("Choose a send time.");
+  if (scheduleType === "WEEKLY" && !input.daysOfWeek.length) errors.push("Pick at least one day of the week.");
   if (input.audienceTag.startsWith(TAGS_PREFIX) && !decodeTags(input.audienceTag)?.tags.length) errors.push('Pick at least one tag under "Send to", or choose All customers.');
   if (input.audienceTag.startsWith(AUDIENCE_PREFIX)) {
     const audId = input.audienceTag.slice(AUDIENCE_PREFIX.length);
     const aud = await db.audience.findFirst({ where: { id: audId, clientId } });
     if (!aud) errors.push("The selected saved audience does not exist or has been deleted.");
   }
-  if (input.scheduleType === "ONCE" && !/^\d{4}-\d{2}-\d{2}$/.test(input.runDate)) errors.push("Choose a date.");
+  if (scheduleType === "ONCE" && !/^\d{4}-\d{2}-\d{2}$/.test(runDate)) errors.push("Choose a date.");
   if (!Number.isInteger(input.batchSize) || input.batchSize < 1 || input.batchSize > 1000) errors.push("Batch size must be between 1 and 1,000.");
   if (!Number.isInteger(input.intervalMinutes) || input.intervalMinutes < 1 || input.intervalMinutes > 1440)
     errors.push("Interval must be between 1 and 1,440 minutes.");
 
   // Say it now instead of letting the campaign wait silently: marketing isn't sent in quiet hours.
-  if (template?.category === "MARKETING" && /^([01]\d|2[0-3]):[0-5]\d$/.test(input.sendTime)) {
+  if (template?.category === "MARKETING" && /^([01]\d|2[0-3]):[0-5]\d$/.test(sendTime)) {
     const client = await db.client.findUnique({ where: { id: clientId }, select: { quietFrom: true, quietTo: true } });
-    if (client && isQuietTime(client, input.sendTime))
-      errors.push(`${input.sendTime} is inside quiet hours (${client.quietFrom} to ${client.quietTo}), so marketing would be held. Pick a time outside them, or turn quiet hours off for this client.`);
+    if (client && isQuietTime(client, sendTime))
+      errors.push(`${sendTime} is inside quiet hours (${client.quietFrom} to ${client.quietTo}), so marketing would be held. Pick a time outside them, or turn quiet hours off for this client.`);
   }
   if (errors.length) return { ok: false, errors };
 
-  const runAt = input.scheduleType === "ONCE" ? fromZonedTime(`${input.runDate}T${input.sendTime}:00`, APP_TZ) : null;
+  const runAt = deferRunAt ?? (scheduleType === "ONCE" ? fromZonedTime(`${runDate}T${sendTime}:00`, APP_TZ) : null);
   if (runAt && runAt <= new Date() && input.active) return { ok: false, errors: ["That date and time has already passed."] };
 
   const [includeIds, excludeIds] = await Promise.all([ownCustomers(clientId, input.includeIds), ownCustomers(clientId, input.excludeIds)]);
@@ -119,9 +153,9 @@ export async function saveCampaign(id: string | null, input: CampaignInput): Pro
     templateId: input.templateId,
     senderId: input.senderId || null,
     audienceTag: input.audienceTag.trim() || null,
-    scheduleType: input.scheduleType,
-    daysOfWeek: input.scheduleType === "WEEKLY" ? [...new Set(input.daysOfWeek)].sort() : [],
-    sendTime: input.sendTime,
+    scheduleType,
+    daysOfWeek: scheduleType === "WEEKLY" ? [...new Set(input.daysOfWeek)].sort() : [],
+    sendTime,
     runAt,
     timezone: APP_TZ,
     batchSize: input.batchSize,
@@ -134,9 +168,56 @@ export async function saveCampaign(id: string | null, input: CampaignInput): Pro
     ? await db.campaign.update({ where: { id }, data: { ...data, nextRunAt } })
     : await db.campaign.create({ data: { ...data, clientId, nextRunAt } });
 
+  // If SPLIT_CHILD_DRAFT was requested, create linked child cohort in DRAFT mode
+  if (input.cohortStrategy === "SPLIT_CHILD_DRAFT" && input.childCohortRunAt) {
+    const childRunAt = new Date(input.childCohortRunAt);
+    if (!isNaN(childRunAt.getTime())) {
+      const tFormatter = new Intl.DateTimeFormat("en-GB", {
+        timeZone: APP_TZ,
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+      const childSendTime = tFormatter.format(childRunAt);
+      await db.campaign.create({
+        data: {
+          clientId,
+          name: `${data.name} — Cooldown Cohort (Part 2)`,
+          templateId: data.templateId,
+          senderId: data.senderId,
+          audienceTag: data.audienceTag,
+          includeIds: data.includeIds,
+          excludeIds: data.excludeIds,
+          skipUnread: data.skipUnread,
+          segments: data.segments,
+          scheduleType: "ONCE",
+          sendTime: childSendTime,
+          runAt: childRunAt,
+          timezone: APP_TZ,
+          batchSize: data.batchSize,
+          intervalMinutes: data.intervalMinutes,
+          active: false, // DRAFT status as required by Architect Turn 58
+          nextRunAt: null,
+        },
+      });
+    }
+  }
+
   // Batch size and interval apply to runs already in progress from their next batch.
   refresh(saved.id);
-  return { ok: true, id: saved.id, message: id ? "Campaign updated." : "Campaign created." };
+  const successMsg =
+    input.cohortStrategy === "SPLIT_CHILD_DRAFT"
+      ? id
+        ? "Campaign updated and Part 2 child cohort draft scheduled."
+        : "Campaign created and Part 2 child cohort draft scheduled."
+      : input.cohortStrategy === "DEFER_ALL"
+        ? id
+          ? "Campaign updated and deferred until audience unlocks."
+          : "Campaign created and deferred until audience unlocks."
+        : id
+          ? "Campaign updated."
+          : "Campaign created.";
+  return { ok: true, id: saved.id, message: successMsg };
 }
 
 export async function toggleCampaign(id: string, active: boolean): Promise<ActionResult> {
@@ -177,6 +258,16 @@ export async function runCampaignNow(id: string): Promise<ActionResult> {
   if (busy) return { ok: false, message: "This campaign is already sending. Wait for it to finish or stop it." };
   const block = await planCapacityBlock(c.clientId, "camp");
   if (block) return { ok: false, message: block };
+  if (c.template.category === "MARKETING") {
+    try {
+      await assertSenderHealthy(c.clientId, c.senderId, "MARKETING");
+    } catch (err) {
+      if (err instanceof SenderHealthError) {
+        return { ok: false, message: err.message };
+      }
+      throw err;
+    }
+  }
   try {
     const run = await startRun(c, new Date(), { permanentDedupe: true });
     await dispatch();
@@ -187,6 +278,9 @@ export async function runCampaignNow(id: string): Promise<ActionResult> {
       return { ok: false, message: "This campaign is already being dispatched by another process. Please wait." };
     }
     if (err instanceof CampaignMediaPreflightError) {
+      return { ok: false, message: err.message };
+    }
+    if (err instanceof CampaignSenderQualityError) {
       return { ok: false, message: err.message };
     }
     throw err;
@@ -208,6 +302,16 @@ export async function resendCampaignNow(id: string): Promise<ActionResult> {
   if (busy) return { ok: false, message: "This campaign is already sending. Wait for it to finish or stop it." };
   const block = await planCapacityBlock(c.clientId, "camp");
   if (block) return { ok: false, message: block };
+  if (c.template.category === "MARKETING") {
+    try {
+      await assertSenderHealthy(c.clientId, c.senderId, "MARKETING");
+    } catch (err) {
+      if (err instanceof SenderHealthError) {
+        return { ok: false, message: err.message };
+      }
+      throw err;
+    }
+  }
   try {
     const run = await startRun(c, new Date(), { allowResend: true });
     await dispatch();
@@ -216,6 +320,12 @@ export async function resendCampaignNow(id: string): Promise<ActionResult> {
   } catch (err) {
     if (err instanceof CampaignConcurrencyError) {
       return { ok: false, message: "This campaign is already being dispatched by another process. Please wait." };
+    }
+    if (err instanceof CampaignMediaPreflightError) {
+      return { ok: false, message: err.message };
+    }
+    if (err instanceof CampaignSenderQualityError) {
+      return { ok: false, message: err.message };
     }
     throw err;
   }
@@ -377,7 +487,31 @@ export async function countCampaignAudience(
   return { ok: true, n, unread: unreadIn, testIds: tests.map((t) => t.id) };
 }
 
-/** Customers matching a name or number, to add to a campaign or leave out of it (at most 8). */
+import { AudienceDetailedPartition, partitionAudienceDetailed } from "@/lib/campaign-preflight";
+
+export type { AudienceDetailedPartition };
+
+export async function countCampaignAudienceDetailed(
+  campaignId: string | null,
+  audienceTag: string,
+  people: { includeIds?: string[]; excludeIds?: string[]; segments?: string[]; templateId?: string } = {},
+): Promise<AudienceDetailedPartition> {
+  const clientId = await formClient(campaignId);
+  if (!clientId) {
+    return {
+      ok: false,
+      total: 0,
+      eligibleNow: 0,
+      marketingGap: { count: 0, earliestUnlockAt: null, latestUnlockAt: null, buckets: [] },
+      metaHoldback: { count: 0, explanation: "" },
+      excluded: { total: 0, optedOut: 0, unreachable: 0, invalidPhone: 0, dormant: 0 },
+      unread: 0,
+      testIds: [],
+    };
+  }
+  return partitionAudienceDetailed(clientId, audienceTag, people);
+}
+
 export async function searchCampaignCustomers(campaignId: string | null, q: string): Promise<{ id: string; name: string; phone: string; tags: string[] }[]> {
   const clientId = await formClient(campaignId);
   const text = q.trim().slice(0, 60);

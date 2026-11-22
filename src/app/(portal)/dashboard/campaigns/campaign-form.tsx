@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar as CalendarIcon, CalendarDays, CalendarRange, Clock, Gauge, Repeat, Users, X } from "@/components/icons";
+import { AlertCircle, Calendar as CalendarIcon, CalendarDays, CalendarRange, CheckCircle2, Clock, Gauge, Info, Repeat, ShieldAlert, Users, X } from "@/components/icons";
 import { Calendar3D, Gauge3D, Send3D } from "@/components/icons-3d";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
@@ -8,6 +8,7 @@ import { CalendarPicker, getTodayStr } from "@/components/calendar-picker";
 import { MobileActionBar } from "@/components/mobile-action-bar";
 import { MultiPicker } from "@/components/multi-picker";
 import { Picker } from "@/components/picker";
+import { Sheet } from "@/components/sheet";
 import { safeAction, toast, toastResult } from "@/components/toast";
 import { Button, Callout, Card, CardHeader, CheckRow, Field, Segmented } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -15,7 +16,7 @@ import { templateLabel } from "@/lib/plain-error";
 import { useTr } from "@/lib/i18n/context";
 import { dayName, DAYS, describeScheduleSummary, effectiveInterval, estimateDuration, formatMinutes, SCHEDULER_TICK_MINUTES, TIME_PRESETS, WEEKLY_PAIRS } from "@/lib/schedule";
 import { AUDIENCE_PREFIX, decodeTags, describeTags, encodeTags, TAGS_PREFIX, type TagPick } from "@/lib/audience-tags";
-import { countCampaignAudience, saveCampaign, searchCampaignCustomers, type CampaignInput } from "../actions/campaigns";
+import { countCampaignAudience, countCampaignAudienceDetailed, saveCampaign, searchCampaignCustomers, type AudienceDetailedPartition, type CampaignInput } from "../actions/campaigns";
 import { SegmentPicker, type Capacity, type SegmentSummaryProps } from "./segment-picker";
 
 type SendTo = "all" | "tags" | "saved";
@@ -36,6 +37,24 @@ const PRESETS = [
   { label: "Balanced", batch: 100, interval: 10 },
   { label: "Fast", batch: 250, interval: 5 },
 ];
+
+function formatUnlockIST(isoString: string | null | undefined, isTa: boolean): string {
+  if (!isoString) return isTa ? "தகவல் இல்லை" : "None";
+  try {
+    const d = new Date(isoString);
+    return new Intl.DateTimeFormat("en-IN", {
+      timeZone: "Asia/Kolkata",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }).format(d);
+  } catch {
+    return isoString;
+  }
+}
 
 export function CampaignForm({
   id,
@@ -128,10 +147,21 @@ export function CampaignForm({
   const serverSize = multi || handPicked || picked.length > 0;
   const peopleKey = JSON.stringify([c.audienceTag, c.includeIds, c.excludeIds, picked, c.templateId]);
   const [counted, setCounted] = useState<{ key: string; n: number; unread: number; testIds: string[] } | null>(null);
+  const [partition, setPartition] = useState<AudienceDetailedPartition | null>(null);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"eligible" | "gap" | "meta" | "excluded">("eligible");
+  const [cohortStrategy, setCohortStrategy] = useState<"ALL_ELIGIBLE" | "SPLIT_CHILD_DRAFT" | "DEFER_ALL">("ALL_ELIGIBLE");
+
   useEffect(() => {
     const t = setTimeout(async () => {
-      const r = await countCampaignAudience(id, c.audienceTag, { includeIds: c.includeIds, excludeIds: c.excludeIds, segments: picked, templateId: c.templateId }).catch(() => ({ ok: false, n: 0, unread: 0, testIds: [] }));
-      setCounted({ key: peopleKey, n: r.ok ? r.n : -1, unread: r.unread ?? 0, testIds: r.testIds ?? [] }); // -1: couldn't count
+      const [rSimple, rDetailed] = await Promise.all([
+        countCampaignAudience(id, c.audienceTag, { includeIds: c.includeIds, excludeIds: c.excludeIds, segments: picked, templateId: c.templateId }).catch(() => ({ ok: false, n: 0, unread: 0, testIds: [] })),
+        countCampaignAudienceDetailed(id, c.audienceTag, { includeIds: c.includeIds, excludeIds: c.excludeIds, segments: picked, templateId: c.templateId }).catch(() => null),
+      ]);
+      setCounted({ key: peopleKey, n: rSimple.ok ? rSimple.n : -1, unread: rSimple.unread ?? 0, testIds: rSimple.testIds ?? [] }); // -1: couldn't count
+      if (rDetailed && rDetailed.ok) {
+        setPartition(rDetailed);
+      }
     }, 300);
     return () => clearTimeout(t);
     // peopleKey stands for audienceTag, includeIds, excludeIds, picked groups and templateId.
@@ -140,7 +170,7 @@ export function CampaignForm({
   const counting = serverSize && counted?.key !== peopleKey;
   const fresh = counted?.key === peopleKey ? counted : null;
 
-  const size = serverSize
+  const rawSize = serverSize
     ? Math.max(0, counted?.n ?? 0)
     : sendTo === "all" || !c.audienceTag
       ? audience.all
@@ -148,8 +178,6 @@ export function CampaignForm({
         ? 0
         : (audience.tags.find((t) => t.tag === (sendTo === "tags" ? pick.tags[0] : c.audienceTag))?.n ?? 0);
   const tagLabel = (tag: string) => tagOptions.find((t) => t.tag === tag)?.label ?? tag;
-  // While the server is counting (or couldn't), the summary shows that instead of 0.
-  const sizeKnown = !serverSize || (!counting && (counted?.n ?? -1) >= 0);
 
   // People added or left out by hand: names come from the page, then from searches.
   const [names, setNames] = useState(() => new Map(people.map((p) => [p.id, p])));
@@ -169,26 +197,50 @@ export function CampaignForm({
   const addPerson = (pid: string) => set({ includeIds: [...new Set([...c.includeIds, pid])], excludeIds: c.excludeIds.filter((x) => x !== pid) });
   const leaveOut = (ids: string[]) => set({ excludeIds: [...new Set([...c.excludeIds, ...ids])], includeIds: c.includeIds.filter((x) => !ids.includes(x)) });
   const nameOf = (pid: string) => names.get(pid)?.name ?? (isTa ? "வாடிக்கையாளர்" : "Customer");
+
+  // Meta only sends a template from numbers in the account that approved it.
+  const sender = numbers.find((n) => n.id === c.senderId) ?? numbers[0];
+  const usable = sender ? templates.filter((t) => !t.businessAccountId || t.businessAccountId === sender.businessAccountId) : templates;
+  const chosen = usable.find((t) => t.id === c.templateId);
+  const isMarketing = chosen?.category === "MARKETING";
+  const isSenderRed = sender?.quality === "RED";
+  const isBlockedByQuality = isSenderRed && isMarketing;
+
+  // Real send reach: respects the chosen cohort strategy when in 72h marketing cooldown
+  const size =
+    partition && isMarketing
+      ? cohortStrategy === "DEFER_ALL"
+        ? partition.eligibleNow + partition.marketingGap.count
+        : partition.eligibleNow
+      : rawSize;
+  // While the server is counting (or couldn't), the summary shows that instead of 0.
+  const sizeKnown = !serverSize || (!counting && (counted?.n ?? -1) >= 0);
+
   const batches = c.batchSize > 0 ? Math.ceil(size / c.batchSize) : 0;
   const mins = estimateDuration(size, c.batchSize, c.intervalMinutes);
   const [h, m] = c.sendTime.split(":").map(Number);
   const end = new Date(2000, 0, 1, h || 0, (m || 0) + mins);
   const perWeek = c.scheduleType === "WEEKLY" ? c.daysOfWeek.length : 0;
-  // Meta only sends a template from numbers in the account that approved it.
-  const sender = numbers.find((n) => n.id === c.senderId) ?? numbers[0];
   // Meta's 24-hour limit can stretch a big send over several days.
   const days = sender?.dailyLimit ? Math.ceil(size / sender.dailyLimit) : 1;
-  const usable = sender ? templates.filter((t) => !t.businessAccountId || t.businessAccountId === sender.businessAccountId) : templates;
-  const chosen = usable.find((t) => t.id === c.templateId);
 
   function save() {
     if (pending) return;
+    if (isBlockedByQuality) {
+      toast(false, isTa ? "எண் தரம் RED என்பதால் மார்க்கெட்டிங் பிரச்சாரத்தை சேமிக்க முடியாது." : "Cannot save active marketing campaign while sender quality is RED.");
+      return;
+    }
     if (sendTo === "tags" && !pick.tags.length) {
       toast(false, isTa ? "குறைந்தது ஒரு குறிச்சொல்லைத் தேர்ந்தெடுக்கவும்" : "Pick at least one tag.");
       return;
     }
     start(async () => {
-      const r = await safeAction(() => saveCampaign(id, c));
+      const payload: CampaignInput = {
+        ...c,
+        cohortStrategy,
+        childCohortRunAt: partition?.marketingGap.latestUnlockAt ?? undefined,
+      };
+      const r = await safeAction(() => saveCampaign(id, payload));
       toastResult(r);
       if (r.ok) {
         router.push(`/dashboard/campaigns/${r.id}`);
@@ -203,6 +255,16 @@ export function CampaignForm({
         <Card className="card-3d">
           <CardHeader tone="brand" icon={<Send3D />} title="Message" />
           <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 sm:p-5">
+            {isBlockedByQuality && (
+              <Callout tone="danger" className="sm:col-span-2">
+                <b>{isTa ? "எண் தரம்: RED (குறைவு) — மார்க்கெட்டிங் நிறுத்தி வைக்கப்பட்டுள்ளது" : "Number Quality: RED (Low) — Marketing Paused to Prevent Ban"}</b>
+                <p className="mt-1 text-xs">
+                  {isTa
+                    ? "Meta உங்கள் எண்ணின் தரத்தைக் குறைவாகக் குறித்துள்ளது. நிரந்தரத் தடையைத் தடுக்க அனைத்து விளம்பரப் பிரச்சாரங்களும் நிறுத்தப்பட்டுள்ளன. குறைந்தது 7 நாட்கள் (29 நவம்பர் வரை) காத்திருக்கவும்."
+                    : "Meta has rated this number as Low Quality (RED). To protect your WhatsApp Business Account from a permanent ban, promotional marketing is paused. 7-day cooldown active until at least 29 Nov 2026."}
+                </p>
+              </Callout>
+            )}
             <Field id="cname" label="Campaign name" className="sm:col-span-2">
               <input className="field" placeholder="Weekly offers" value={c.name} onChange={(e) => set({ name: e.target.value })} />
             </Field>
@@ -352,6 +414,443 @@ export function CampaignForm({
                         ? `${size.toLocaleString("en-IN")} customer${size === 1 ? "" : "s"} (${c.includeIds.length} added, ${c.excludeIds.length} left out).`
                       : `${size.toLocaleString("en-IN")} customer${size === 1 ? "" : "s"}${sendTo === "tags" ? ` tagged ${describeTags(pick, tagLabel)}` : ""}.`}
               </p>
+
+              {/* Pre-Flight Audience Health & Safety Card */}
+              <div className="space-y-3.5 rounded-panel border border-brand/25 bg-brand-soft/20 p-4 sm:p-5" data-testid="campaign-preflight-card">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert className="size-4 text-brand shrink-0" />
+                    <h4 className="text-sm font-semibold text-ink">
+                      {isTa ? "வாடிக்கையாளர் பாதுகாப்பு மற்றும் தகுதித் தணிக்கை" : "Audience Eligibility & Safety Inspection"}
+                    </h4>
+                  </div>
+                  <span className="rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-medium text-brand-deep">
+                    {partition
+                      ? isTa
+                        ? `மொத்தம் ${partition.total.toLocaleString("en-IN")} நபர்கள்`
+                        : `${partition.total.toLocaleString("en-IN")} Total Matching`
+                      : isTa
+                        ? "கணக்கிடப்படுகிறது…"
+                        : "Calculating…"}
+                  </span>
+                </div>
+
+                {partition && partition.total > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-line flex">
+                      {partition.eligibleNow > 0 && (
+                        <div
+                          style={{ width: `${(partition.eligibleNow / partition.total) * 100}%` }}
+                          className="h-full bg-emerald-500 transition-all duration-300"
+                          title={`${isTa ? "இப்போது தயார்" : "Eligible Now"}: ${partition.eligibleNow}`}
+                        />
+                      )}
+                      {partition.marketingGap.count > 0 && (
+                        <div
+                          style={{ width: `${(partition.marketingGap.count / partition.total) * 100}%` }}
+                          className="h-full bg-amber-500 transition-all duration-300"
+                          title={`${isTa ? "72h கூல்டவுன்" : "72h Cooldown"}: ${partition.marketingGap.count}`}
+                        />
+                      )}
+                      {partition.metaHoldback.count > 0 && (
+                        <div
+                          style={{ width: `${(partition.metaHoldback.count / partition.total) * 100}%` }}
+                          className="h-full bg-purple-500 transition-all duration-300"
+                          title={`${isTa ? "Meta நிறுத்தியவை" : "Meta Holdback"}: ${partition.metaHoldback.count}`}
+                        />
+                      )}
+                      {partition.excluded.total > 0 && (
+                        <div
+                          style={{ width: `${(partition.excluded.total / partition.total) * 100}%` }}
+                          className="h-full bg-rose-500 transition-all duration-300"
+                          title={`${isTa ? "விலக்கப்பட்டவை" : "Excluded"}: ${partition.excluded.total}`}
+                        />
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-1 text-2xs text-muted">
+                      <span className="flex items-center gap-1">
+                        <span className="size-2 rounded-full bg-emerald-500" />
+                        {isTa ? "உடனே தயார்" : "Ready"} ({partition.eligibleNow.toLocaleString("en-IN")})
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="size-2 rounded-full bg-amber-500" />
+                        {isTa ? "72h கேப்" : "72h Gap"} ({partition.marketingGap.count.toLocaleString("en-IN")})
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="size-2 rounded-full bg-purple-500" />
+                        {isTa ? "Meta நிறுத்தியவை" : "Meta Hold"} ({partition.metaHoldback.count.toLocaleString("en-IN")})
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="size-2 rounded-full bg-rose-500" />
+                        {isTa ? "விலக்கு" : "Excluded"} ({partition.excluded.total.toLocaleString("en-IN")})
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {partition && (
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <div className="rounded-control border border-emerald-200 bg-emerald-50/70 p-2.5 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                      <p className="text-2xs font-medium text-emerald-800 dark:text-emerald-300">{isTa ? "உடனே தயார்" : "Eligible Now"}</p>
+                      <p className="tabular mt-0.5 text-lg font-bold text-emerald-700 dark:text-emerald-400">{partition.eligibleNow.toLocaleString("en-IN")}</p>
+                      <p className="text-2xs text-emerald-600/80 dark:text-emerald-400/70">{isTa ? "உடனடி அனுப்புதல்" : "Immediate send"}</p>
+                    </div>
+                    <div className="rounded-control border border-amber-200 bg-amber-50/70 p-2.5 dark:border-amber-900/50 dark:bg-amber-950/20">
+                      <p className="text-2xs font-medium text-amber-800 dark:text-amber-300">{isTa ? "72h கூல்டவுன்" : "72h Cooldown"}</p>
+                      <p className="tabular mt-0.5 text-lg font-bold text-amber-700 dark:text-amber-400">{partition.marketingGap.count.toLocaleString("en-IN")}</p>
+                      <p className="text-2xs text-amber-600/80 dark:text-amber-400/70">{isTa ? "சமீபத்தில் அனுப்பியவை" : "Recent marketing"}</p>
+                    </div>
+                    <div className="rounded-control border border-purple-200 bg-purple-50/70 p-2.5 dark:border-purple-900/50 dark:bg-purple-950/20">
+                      <p className="text-2xs font-medium text-purple-800 dark:text-purple-300">{isTa ? "Meta நிறுத்தியவை" : "Meta Holdback"}</p>
+                      <p className="tabular mt-0.5 text-lg font-bold text-purple-700 dark:text-purple-400">{partition.metaHoldback.count.toLocaleString("en-IN")}</p>
+                      <p className="text-2xs text-purple-600/80 dark:text-purple-400/70">{isTa ? "பிழை 131049" : "Error 131049"}</p>
+                    </div>
+                    <div className="rounded-control border border-rose-200 bg-rose-50/70 p-2.5 dark:border-rose-900/50 dark:bg-rose-950/20">
+                      <p className="text-2xs font-medium text-rose-800 dark:text-rose-300">{isTa ? "விலக்கப்பட்டவை" : "Excluded"}</p>
+                      <p className="tabular mt-0.5 text-lg font-bold text-rose-700 dark:text-rose-400">{partition.excluded.total.toLocaleString("en-IN")}</p>
+                      <p className="text-2xs text-rose-600/80 dark:text-rose-400/70">{isTa ? "STOP / பிழைகள்" : "Opt-out / Blocked"}</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => {
+                      setActiveTab(partition && partition.marketingGap.count > 0 ? "gap" : "eligible");
+                      setInspectorOpen(true);
+                    }}
+                  >
+                    <Info className="size-3.5 text-brand" />
+                    {isTa ? "விவரங்களைத் தணிக்கை செய் & அட்டவணை" : "Inspect Full Audit & Unlock Timeline"}
+                  </Button>
+                  {partition?.marketingGap.earliestUnlockAt && (
+                    <span className="text-2xs text-muted">
+                      {isTa ? "அடுத்த அன்லாக்: " : "Earliest unlock: "}
+                      <b className="text-ink">{formatUnlockIST(partition.marketingGap.earliestUnlockAt, isTa)}</b>
+                    </span>
+                  )}
+                </div>
+
+                {/* Mixed Audience Strategy Selector */}
+                {partition && partition.marketingGap.count > 0 && partition.eligibleNow > 0 && isMarketing && (
+                  <div className="mt-3 space-y-2.5 rounded-control border border-amber-300/80 bg-amber-50/60 p-3.5 dark:border-amber-800/60 dark:bg-amber-950/30">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="size-4 text-amber-600 shrink-0" />
+                      <h5 className="text-xs font-semibold text-ink">
+                        {isTa ? "கலப்புப் பார்வையாளர் உத்தி (Mixed Audience Strategy)" : "Mixed Audience Strategy Selection"}
+                      </h5>
+                    </div>
+                    <p className="text-2xs text-muted leading-relaxed">
+                      {isTa
+                        ? `${partition.marketingGap.count} வாடிக்கையாளர்கள் கடந்த 72 மணி நேரத்திற்குள் சலுகை பெற்றுள்ளனர். உங்கள் எண்ணின் தரத்தைப் பாதுகாக்க தகுந்த வழியைத் தேர்வு செய்யவும்:`
+                        : `${partition.marketingGap.count} contacts received an offer in the last 72 hours. Choose how to handle them to protect your sender score:`}
+                    </p>
+                    <div className="space-y-2">
+                      <label className="flex items-start gap-2.5 p-2 rounded-control border border-line bg-panel cursor-pointer hover:border-brand transition">
+                        <input
+                          type="radio"
+                          name="cohortStrategy"
+                          className="mt-0.5 text-brand focus:ring-brand"
+                          checked={cohortStrategy === "ALL_ELIGIBLE"}
+                          onChange={() => setCohortStrategy("ALL_ELIGIBLE")}
+                        />
+                        <div className="text-xs leading-tight">
+                          <span className="font-semibold text-ink">
+                            {isTa
+                              ? `விருப்பம் 1: தயாராக உள்ள ${partition.eligibleNow} நபர்களுக்கு மட்டும் உடனே அனுப்பவும் (பரிந்துரைக்கப்பட்டது)`
+                              : `Option A: Send to ${partition.eligibleNow} Eligible Now only (Recommended)`}
+                          </span>
+                          <p className="text-2xs text-muted mt-0.5">
+                            {isTa
+                              ? `கூல்டவுனில் உள்ள ${partition.marketingGap.count} பேர் தவிர்க்கப்படுவார்கள்; எண் தரம் முழுமையாகப் பாதுகாக்கப்படும்.`
+                              : `${partition.marketingGap.count} contacts in cooldown will be safely skipped to protect quality.`}
+                          </p>
+                        </div>
+                      </label>
+
+                      <label className="flex items-start gap-2.5 p-2 rounded-control border border-line bg-panel cursor-pointer hover:border-brand transition">
+                        <input
+                          type="radio"
+                          name="cohortStrategy"
+                          className="mt-0.5 text-brand focus:ring-brand"
+                          checked={cohortStrategy === "SPLIT_CHILD_DRAFT"}
+                          onChange={() => setCohortStrategy("SPLIT_CHILD_DRAFT")}
+                        />
+                        <div className="text-xs leading-tight">
+                          <span className="font-semibold text-ink">
+                            {isTa
+                              ? `விருப்பம் 2: ${partition.eligibleNow} பேருக்கு உடனே அனுப்பவும் + மீதி ${partition.marketingGap.count} பேருக்கு அன்லாக் ஆனதும் தானாக செல்ல Part 2 டிராஃப்ட் அமைக்கவும்`
+                              : `Option B: Send ${partition.eligibleNow} Now + Auto-schedule Part 2 Draft for ${partition.marketingGap.count} at unlock`}
+                          </span>
+                          <p className="text-2xs text-muted mt-0.5">
+                            {isTa
+                              ? `Part 2 கேம்பெயின் ${formatUnlockIST(partition.marketingGap.latestUnlockAt, isTa)} நேரத்திற்கு டிராஃப்ட் நிலையில் உருவாகும்.`
+                              : `A linked Part 2 child campaign will be drafted for ${formatUnlockIST(partition.marketingGap.latestUnlockAt, isTa)}.`}
+                          </p>
+                        </div>
+                      </label>
+
+                      <label className="flex items-start gap-2.5 p-2 rounded-control border border-line bg-panel cursor-pointer hover:border-brand transition">
+                        <input
+                          type="radio"
+                          name="cohortStrategy"
+                          className="mt-0.5 text-brand focus:ring-brand"
+                          checked={cohortStrategy === "DEFER_ALL"}
+                          onChange={() => setCohortStrategy("DEFER_ALL")}
+                        />
+                        <div className="text-xs leading-tight">
+                          <span className="font-semibold text-ink">
+                            {isTa
+                              ? `விருப்பம் 3: அனைவரும் அன்லாக் ஆகும் வரை (${formatUnlockIST(partition.marketingGap.latestUnlockAt, isTa)}) முழு கேம்பெயினையும் தள்ளி வைக்கவும்`
+                              : `Option C: Defer entire campaign until all contacts unlock (${formatUnlockIST(partition.marketingGap.latestUnlockAt, isTa)})`}
+                          </span>
+                          <p className="text-2xs text-muted mt-0.5">
+                            {isTa
+                              ? `அனைத்து ${partition.eligibleNow + partition.marketingGap.count} வாடிக்கையாளர்களும் அன்லாக் ஆனதும் ஒரே நேரத்தில் பெறுவார்கள்.`
+                              : `All ${partition.eligibleNow + partition.marketingGap.count} customers will receive the broadcast together when unlocked.`}
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Audience Eligibility & Safety Inspection Detailed Modal Sheet */}
+              <Sheet
+                open={inspectorOpen}
+                onClose={() => setInspectorOpen(false)}
+                title={isTa ? "வாடிக்கையாளர் தகுதி மற்றும் பாதுகாப்புத் தணிக்கை" : "Audience Eligibility & Safety Inspection"}
+                description={
+                  isTa
+                    ? `மொத்தம் ${partition?.total ?? 0} தொடர்புகள். மார்க்கெட்டிங் கேப் (72h) மற்றும் Meta பாதுகாப்பு விவரங்கள்:`
+                    : `Total ${partition?.total ?? 0} matching contacts. Detailed 72h marketing gap and Meta safety breakdown:`
+                }
+                className="sm:max-w-xl"
+                footer={
+                  <div className="flex w-full justify-end">
+                    <Button variant="secondary" onClick={() => setInspectorOpen(false)}>
+                      {isTa ? "சரி / மூடு" : "Close"}
+                    </Button>
+                  </div>
+                }
+              >
+                <div className="space-y-4">
+                  {/* Tab Navigation */}
+                  <div role="tablist" className="flex border-b border-line text-xs font-medium">
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={activeTab === "eligible"}
+                      onClick={() => setActiveTab("eligible")}
+                      className={cn(
+                        "flex items-center gap-1.5 border-b-2 px-3 py-2.5 transition",
+                        activeTab === "eligible"
+                          ? "border-emerald-600 text-emerald-700 font-semibold dark:border-emerald-400 dark:text-emerald-400"
+                          : "border-transparent text-muted hover:text-ink"
+                      )}
+                    >
+                      <CheckCircle2 className="size-3.5 text-emerald-600" />
+                      {isTa ? "உடனே தயார்" : "Eligible"} ({partition?.eligibleNow ?? 0})
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={activeTab === "gap"}
+                      onClick={() => setActiveTab("gap")}
+                      className={cn(
+                        "flex items-center gap-1.5 border-b-2 px-3 py-2.5 transition",
+                        activeTab === "gap"
+                          ? "border-amber-600 text-amber-700 font-semibold dark:border-amber-400 dark:text-amber-400"
+                          : "border-transparent text-muted hover:text-ink"
+                      )}
+                    >
+                      <Clock className="size-3.5 text-amber-600" />
+                      {isTa ? "72h கேப்" : "72h Cooldown"} ({partition?.marketingGap.count ?? 0})
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={activeTab === "meta"}
+                      onClick={() => setActiveTab("meta")}
+                      className={cn(
+                        "flex items-center gap-1.5 border-b-2 px-3 py-2.5 transition",
+                        activeTab === "meta"
+                          ? "border-purple-600 text-purple-700 font-semibold dark:border-purple-400 dark:text-purple-400"
+                          : "border-transparent text-muted hover:text-ink"
+                      )}
+                    >
+                      <ShieldAlert className="size-3.5 text-purple-600" />
+                      {isTa ? "Meta ஹோல்ட்" : "Meta Hold"} ({partition?.metaHoldback.count ?? 0})
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={activeTab === "excluded"}
+                      onClick={() => setActiveTab("excluded")}
+                      className={cn(
+                        "flex items-center gap-1.5 border-b-2 px-3 py-2.5 transition",
+                        activeTab === "excluded"
+                          ? "border-rose-600 text-rose-700 font-semibold dark:border-rose-400 dark:text-rose-400"
+                          : "border-transparent text-muted hover:text-ink"
+                      )}
+                    >
+                      <X className="size-3.5 text-rose-600" />
+                      {isTa ? "விலக்கு" : "Excluded"} ({partition?.excluded.total ?? 0})
+                    </button>
+                  </div>
+
+                  {/* Tab Panels */}
+                  {activeTab === "eligible" && (
+                    <div className="space-y-3 text-xs">
+                      <Callout tone="success">
+                        <b>{isTa ? "உடனடி அனுப்பலுக்குத் தயாராக உள்ளவர்கள்" : "Ready for Immediate Dispatch"}</b>
+                        <p className="mt-1">
+                          {isTa
+                            ? "இந்த வாடிக்கையாளர்கள் ஒப்புதல் அளித்துள்ளனர், வாட்ஸ்அப்பில் செயலில் உள்ளனர், கடந்த 72 மணி நேரத்தில் சலுகை பெறவில்லை, மற்றும் Meta கட்டுப்பாடுகள் எதுவும் இவர்களுக்கு இல்லை."
+                            : "These contacts have active WhatsApp accounts, valid consent, no marketing sent in the last 72 hours, and are not restricted by Meta."}
+                        </p>
+                      </Callout>
+                      <div className="rounded-control border border-line p-3 bg-panel">
+                        <div className="flex justify-between py-1 border-b border-line/50">
+                          <span className="text-muted">{isTa ? "மொத்தத் தகுதி:" : "Total Eligible Now:"}</span>
+                          <span className="font-bold text-ink">{partition?.eligibleNow.toLocaleString("en-IN")}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-line/50">
+                          <span className="text-muted">{isTa ? "பாதுகாப்பு நிலை:" : "Safety Assessment:"}</span>
+                          <span className="font-semibold text-emerald-600">{isTa ? "பாதுகாப்பானது (Safe)" : "100% Safe to Send"}</span>
+                        </div>
+                        <div className="flex justify-between py-1">
+                          <span className="text-muted">{isTa ? "தரம் மீதான தாக்கம்:" : "Sender Quality Impact:"}</span>
+                          <span className="font-semibold text-emerald-600">{isTa ? "நம்பகமானது (Zero Risk)" : "Zero Risk of Spam Penalty"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTab === "gap" && (
+                    <div className="space-y-3 text-xs">
+                      <Callout tone="warning">
+                        <b>{isTa ? "72 மணி நேர மார்க்கெட்டிங் இடைவெளி பாதுகாப்பு" : "72-Hour Marketing Gap Protection"}</b>
+                        <p className="mt-1">
+                          {isTa
+                            ? "ஒரே வாடிக்கையாளருக்கு மிக அடிக்கடி சலுகைகள் அனுப்பப்பட்டால், அவர்கள் புகாரளிக்கவோ பிளாக் செய்யவோ வாய்ப்புள்ளது. உங்கள் எண்ணின் தரத்தைக் காப்பாற்ற 72 மணி நேர இடைவெளி கட்டாயமாகப் பின்பற்றப்படுகிறது."
+                            : "Sending promotions too frequently causes users to report or block your number, downgrading sender quality to RED. To prevent bans, Thabaal strictly enforces a 72-hour cooldown window."}
+                        </p>
+                      </Callout>
+
+                      <div className="rounded-control border border-line p-3 bg-panel space-y-2">
+                        <h6 className="font-semibold text-ink">{isTa ? "அன்லாக் அட்டவணை (Unlock Timeline — IST)" : "Unlock Timeline (IST)"}</h6>
+                        <div className="flex justify-between py-1 border-b border-line/50">
+                          <span className="text-muted">{isTa ? "முதல் அன்லாக் நேரம்:" : "Earliest Unlock:"}</span>
+                          <span className="font-bold text-ink">{formatUnlockIST(partition?.marketingGap.earliestUnlockAt, isTa)}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-line/50">
+                          <span className="text-muted">{isTa ? "கடைசி அன்லாக் நேரம்:" : "Latest Unlock:"}</span>
+                          <span className="font-bold text-ink">{formatUnlockIST(partition?.marketingGap.latestUnlockAt, isTa)}</span>
+                        </div>
+                        <div className="flex justify-between py-1">
+                          <span className="text-muted">{isTa ? "கூல்டவுனில் உள்ளவர்கள்:" : "Total in Cooldown:"}</span>
+                          <span className="font-bold text-amber-600">{partition?.marketingGap.count.toLocaleString("en-IN")}</span>
+                        </div>
+                      </div>
+
+                      {partition && partition.marketingGap.buckets.length > 0 && (
+                        <div className="rounded-control border border-line p-3 bg-panel space-y-2">
+                          <h6 className="font-semibold text-ink">{isTa ? "மணி நேர வாரியான அன்லாக் விவரங்கள்:" : "Hourly Unlock Buckets:"}</h6>
+                          <div className="divide-y divide-line/40">
+                            {partition.marketingGap.buckets.map((b) => (
+                              <div key={b.label} className="flex justify-between py-1.5">
+                                <span className="text-muted">{b.label}</span>
+                                <span className="font-bold text-ink">{b.count.toLocaleString("en-IN")} {isTa ? "நபர்கள்" : "contacts"}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {activeTab === "meta" && (
+                    <div className="space-y-3 text-xs">
+                      <Callout tone="info">
+                        <b>{isTa ? "Meta Ecosystem Holdback (Error 131049)" : "Meta Ecosystem Frequency Cap"}</b>
+                        <p className="mt-1">
+                          {isTa
+                            ? "ஒருவருக்கு அனைத்து வணிகங்களிலிருந்தும் (All WhatsApp Businesses) வரும் சலுகைகளை Meta கட்டுப்படுத்துகிறது. இது வாடிக்கையாளர் சலிப்படையாமல் இருக்க Meta-வின் சொந்த AI அல்காரிதம் மூலம் நிர்ணயிக்கப்படுகிறது."
+                            : "Meta restricts how many promotional messages any single user receives across ALL businesses on WhatsApp to protect user experience. This frequency cap is enforced by Meta's algorithm."}
+                        </p>
+                      </Callout>
+
+                      <div className="rounded-control border border-line p-3 bg-panel space-y-2">
+                        <div className="flex justify-between py-1 border-b border-line/50">
+                          <span className="text-muted">{isTa ? "தற்காலிகமாக நிறுத்தி வைக்கப்பட்டவர்கள்:" : "Held Back by Meta:"}</span>
+                          <span className="font-bold text-purple-600">{partition?.metaHoldback.count.toLocaleString("en-IN")}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-line/50">
+                          <span className="text-muted">{isTa ? "காரணம்:" : "Reason:"}</span>
+                          <span className="text-ink">Meta Error 131049</span>
+                        </div>
+                        <div className="flex justify-between py-1">
+                          <span className="text-muted">{isTa ? "மறுமுயற்சி கொள்கை:" : "Retry Policy:"}</span>
+                          <span className="text-ink">{isTa ? "24 மணி நேரத்துக்குப் பின் மீண்டும் முயற்சி செய்யலாம்" : "Can be retried after 24h"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTab === "excluded" && (
+                    <div className="space-y-3 text-xs">
+                      <Callout tone="danger">
+                        <b>{isTa ? "தானாக விலக்கப்பட்ட வாடிக்கையாளர்கள்" : "Automatically Excluded Contacts"}</b>
+                        <p className="mt-1">
+                          {isTa
+                            ? "வாட்ஸ்அப் கொள்கை மீறல்கள், வாடிக்கையாளர் புகார்கள் மற்றும் கட்டண இழப்புகளைத் தடுக்க பின்வரும் தொடர்புகள் பிரச்சாரத்திலிருந்து விலக்கப்பட்டுள்ளன."
+                            : "Contacts suppressed to comply with WhatsApp opt-out rules, prevent spam complaints, and avoid billable delivery failures."}
+                        </p>
+                      </Callout>
+
+                      <div className="rounded-control border border-line p-3 bg-panel divide-y divide-line/40">
+                        <div className="flex justify-between py-2">
+                          <div>
+                            <span className="font-semibold text-ink">{isTa ? "விலகியவர்கள் (Opted Out / STOP)" : "Opted Out (STOP / Unsubscribed)"}</span>
+                            <p className="text-2xs text-muted">{isTa ? "STOP, வேண்டாம் என்று குறுஞ்செய்தி அனுப்பியவர்கள்" : "Replied STOP, opt-out, or வேண்டாம்"}</p>
+                          </div>
+                          <span className="font-bold text-rose-600">{partition?.excluded.optedOut.toLocaleString("en-IN")}</span>
+                        </div>
+
+                        <div className="flex justify-between py-2">
+                          <div>
+                            <span className="font-semibold text-ink">{isTa ? "அடைய முடியாதவர்கள் (Unreachable)" : "Unreachable (Meta 131026)"}</span>
+                            <p className="text-2xs text-muted">{isTa ? "வாட்ஸ்அப் இல்லாதவர்கள் அல்லது உங்களைத் தடுத்தவர்கள்" : "Not on WhatsApp, old app, or blocked you"}</p>
+                          </div>
+                          <span className="font-bold text-rose-600">{partition?.excluded.unreachable.toLocaleString("en-IN")}</span>
+                        </div>
+
+                        <div className="flex justify-between py-2">
+                          <div>
+                            <span className="font-semibold text-ink">{isTa ? "தவறான தொலைபேசி எண் (< 10 இலக்கங்கள்)" : "Invalid Phone (< 10 digits)"}</span>
+                            <p className="text-2xs text-muted">{isTa ? "அழைக்க முடியாத சிதைந்த எண்கள்" : "Malformed phone numbers"}</p>
+                          </div>
+                          <span className="font-bold text-rose-600">{partition?.excluded.invalidPhone.toLocaleString("en-IN")}</span>
+                        </div>
+
+                        <div className="flex justify-between py-2">
+                          <div>
+                            <span className="font-semibold text-ink">{isTa ? "செயலற்றவர்கள் (Dormant / Inactive)" : "Dormant (Tag: inactive)"}</span>
+                            <p className="text-2xs text-muted">{isTa ? "தோல்விக்குப் பின் நீங்கள் Dormant-க்கு மாற்றியவர்கள்" : "Marked dormant after delivery failures"}</p>
+                          </div>
+                          <span className="font-bold text-rose-600">{partition?.excluded.dormant.toLocaleString("en-IN")}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Sheet>
 
               {/* Add one person, or leave some out, on top of "Send to". */}
               <div className="space-y-2.5 rounded-control border border-line p-3" data-testid="campaign-people">
@@ -818,6 +1317,12 @@ export function CampaignForm({
             <p className="tabular mt-2 text-3xl font-semibold">
               {sizeKnown ? size.toLocaleString("en-IN") : "…"} <span className="text-base font-normal text-white/75">{tr(size === 1 ? "customer" : "customers")}</span>
             </p>
+            {partition && isMarketing && partition.marketingGap.count > 0 && cohortStrategy !== "DEFER_ALL" && (
+              <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-amber-400/20 px-2.5 py-0.5 text-xs font-medium text-amber-200">
+                <span>+ {partition.marketingGap.count.toLocaleString("en-IN")} {isTa ? "72h கூல்டவுன்" : "in 72h cooldown"}</span>
+                <span className="opacity-75">({cohortStrategy === "SPLIT_CHILD_DRAFT" ? (isTa ? "Part 2 டிராஃப்ட்" : "Part 2 draft") : (isTa ? "தவிர்க்கப்பட்டது" : "skipped")})</span>
+              </p>
+            )}
             <p className="mt-1 text-sm text-white/80">
               {!sizeKnown
                 ? tr("Counting customers…")
@@ -879,9 +1384,14 @@ export function CampaignForm({
         </Card>
 
         <div className="hidden lg:block">
-          <Button className="w-full" loading={pending} onClick={save}>
+          <Button className="w-full" loading={pending} disabled={isBlockedByQuality} onClick={save}>
             {id ? "Save changes" : "Create campaign"}
           </Button>
+          {isBlockedByQuality && (
+            <p className="mt-2 text-center text-xs font-semibold text-danger">
+              {isTa ? "எண் தரம் RED: மார்க்கெட்டிங் பிரச்சாரம் முடக்கப்பட்டுள்ளது" : "Quality RED: Marketing campaign is blocked"}
+            </p>
+          )}
         </div>
         {id && <p className="text-center text-xs text-muted">{tr("Pacing changes also apply to a run that is already sending, from its next batch.")}</p>}
       </aside>
@@ -900,7 +1410,7 @@ export function CampaignForm({
                   : `${batches} batch${batches === 1 ? "" : "es"} · ${days > 1 ? `about ${days} days` : mins < 1 ? "all at once" : `done in ${formatMinutes(mins)}`}`}
           </p>
         </div>
-        <Button className="!flex-none shrink-0 px-6" loading={pending} onClick={save}>
+        <Button className="!flex-none shrink-0 px-6" loading={pending} disabled={isBlockedByQuality} onClick={save}>
           {id ? "Save" : "Create"}
         </Button>
       </MobileActionBar>

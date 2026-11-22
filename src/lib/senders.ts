@@ -71,3 +71,27 @@ export async function sendableTemplates(clientId: string) {
 }
 
 export const numberLabel = (n: { label: string; displayPhone: string | null }) => (n.displayPhone ? `${n.label} · ${n.displayPhone}` : n.label);
+
+export class SenderHealthError extends Error {
+  constructor(message: string, public readonly qualityRating?: string | null) {
+    super(message);
+    this.name = "SenderHealthError";
+  }
+}
+
+/**
+ * Asserts that a sender number is healthy enough for outbound marketing dispatches.
+ * Strictly blocks RED quality ratings or FLAGGED/RESTRICTED status to prevent WhatsApp account bans.
+ */
+export async function assertSenderHealthy(clientId: string, senderId?: string | null, category: string = "MARKETING") {
+  if (category !== "MARKETING") return; // Utility / transactional messages are allowed even during recovery
+  const { number } = await senderFor(clientId, senderId);
+  if (!number) return;
+  if (number.qualityRating === "RED") {
+    throw new SenderHealthError(
+      "Marketing dispatch blocked: Number quality is RED (Low Quality). A 7-day cooldown is active to protect your WhatsApp account from being permanently banned.",
+      number.qualityRating
+    );
+  }
+}
+

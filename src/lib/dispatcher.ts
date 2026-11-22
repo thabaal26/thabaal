@@ -54,6 +54,13 @@ export class CampaignMediaPreflightError extends Error {
   }
 }
 
+export class CampaignSenderQualityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CampaignSenderQualityError";
+  }
+}
+
 /** Creates a run and queues one message per eligible customer. */
 export async function startRun(
   campaign: Campaign & { template: { name: string; category?: string; headerType?: string; headerMediaUrl?: string | null } },
@@ -76,6 +83,14 @@ export async function startRun(
   }
 
   const isMarketing = campaign.template.category === "MARKETING";
+  if (isMarketing) {
+    const { number: sender } = await senderFor(campaign.clientId, campaign.senderId || null);
+    if (sender?.qualityRating === "RED") {
+      throw new CampaignSenderQualityError(
+        `Campaign "${campaign.name}" dispatch blocked: Sender number ${sender.label} has quality RED (Low Quality). Cooldown active to protect your WhatsApp account from being permanently banned.`
+      );
+    }
+  }
   const audience = await campaignAudienceWhere(campaign.clientId, campaign.audienceTag, campaign, { requirePositiveConsent: isMarketing });
 
   return await db.$transaction(

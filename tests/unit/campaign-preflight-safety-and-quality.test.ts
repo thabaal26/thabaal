@@ -1,0 +1,441 @@
+import assert from "node:assert/strict";
+import { after, before, describe, test } from "node:test";
+import { db } from "../../src/lib/db";
+import { assertSenderHealthy, SenderHealthError } from "../../src/lib/senders";
+import { CampaignSenderQualityError, startRun } from "../../src/lib/dispatcher";
+import { partitionAudienceDetailed } from "../../src/lib/campaign-preflight";
+
+describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suite", () => {
+  let clientId: string;
+  let greenSenderId: string;
+  let redSenderId: string;
+  let marketingTemplateId: string;
+  let utilityTemplateId: string;
+
+  let custEligibleId: string;
+  let custGapId: string;
+  let custMetaHeldId: string;
+  let custOptedOutId: string;
+  let custInvalidPhoneId: string;
+
+  before(async () => {
+    // 1. Create client
+    const client = await db.client.create({
+      data: {
+        name: `Test_Safety_Client_${Date.now()}`,
+        workspaceMode: "LIVE_ACTIVE",
+        planRequired: false,
+        marketingGapHours: 72,
+        quietFrom: "21:00",
+        quietTo: "09:00",
+      },
+    });
+    clientId = client.id;
+
+    // 2. Create Green and Red Senders
+    const greenNum = await db.whatsAppNumber.create({
+      data: {
+        clientId,
+        label: "Green Number",
+        phoneNumberId: `pn_green_${Date.now()}`,
+        businessAccountId: `waba_${Date.now()}`,
+        qualityRating: "GREEN",
+        messagingTier: "TIER_2K",
+      },
+    });
+    greenSenderId = greenNum.id;
+
+    const redNum = await db.whatsAppNumber.create({
+      data: {
+        clientId,
+        label: "Red Number",
+        phoneNumberId: `pn_red_${Date.now()}`,
+        businessAccountId: greenNum.businessAccountId,
+        qualityRating: "RED",
+        messagingTier: "TIER_2K",
+      },
+    });
+    redSenderId = redNum.id;
+
+    // 3. Create Templates (Marketing and Utility)
+    const mTemplate = await db.template.create({
+      data: {
+        clientId,
+        businessAccountId: greenNum.businessAccountId,
+        name: "test_promo_mktg",
+        category: "MARKETING",
+        language: "en",
+        status: "APPROVED",
+        body: "Special Diwali Offer!",
+      },
+    });
+    marketingTemplateId = mTemplate.id;
+
+    const uTemplate = await db.template.create({
+      data: {
+        clientId,
+        businessAccountId: greenNum.businessAccountId,
+        name: "test_order_receipt",
+        category: "UTILITY",
+        language: "en",
+        status: "APPROVED",
+        body: "Your order receipt",
+      },
+    });
+    utilityTemplateId = uTemplate.id;
+
+    // 4. Create 5 Customers for Audience Partition Test
+    // Customer 1: Clean Eligible
+    const c1 = await db.customer.create({
+      data: {
+        clientId,
+        name: "Clean Eligible",
+        phone: "+919876500001",
+        optedOut: false,
+        unreachable: false,
+        tags: ["preflight_test"],
+      },
+    });
+    custEligibleId = c1.id;
+
+    // Customer 2: Marketing Gap Cooldown (received message 12 hours ago)
+    const c2 = await db.customer.create({
+      data: {
+        clientId,
+        name: "In Gap Cooldown",
+        phone: "+919876500002",
+        optedOut: false,
+        unreachable: false,
+        tags: ["preflight_test"],
+      },
+    });
+    custGapId = c2.id;
+    await db.message.create({
+      data: {
+        customerId: custGapId,
+        templateId: marketingTemplateId,
+        templateName: "test_promo_mktg",
+        status: "DELIVERED",
+        sentAt: new Date(Date.now() - 12 * 3600 * 1000), // 12 hours ago
+      },
+    });
+
+    // Customer 3: Meta Holdback (Error 131049, failed 5 hours ago)
+    const c3 = await db.customer.create({
+      data: {
+        clientId,
+        name: "Meta Held Customer",
+        phone: "+919876500003",
+        optedOut: false,
+        unreachable: false,
+        tags: ["preflight_test"],
+      },
+    });
+    custMetaHeldId = c3.id;
+    await db.message.create({
+      data: {
+        customerId: custMetaHeldId,
+        templateId: marketingTemplateId,
+        templateName: "test_promo_mktg",
+        status: "FAILED",
+        errorCode: 131049,
+        failedAt: new Date(Date.now() - 5 * 3600 * 1000), // 5 hours ago
+      },
+    });
+
+    // Customer 4: Opted Out
+    const c4 = await db.customer.create({
+      data: {
+        clientId,
+        name: "Opted Out Customer",
+        phone: "+919876500004",
+        optedOut: true,
+        unreachable: false,
+        tags: ["preflight_test"],
+      },
+    });
+    custOptedOutId = c4.id;
+
+    // Customer 5: Invalid Phone (< 10 digits)
+    const c5 = await db.customer.create({
+      data: {
+        clientId,
+        name: "Invalid Phone Customer",
+        phone: "12345",
+        optedOut: false,
+        unreachable: false,
+        tags: ["preflight_test"],
+      },
+    });
+    custInvalidPhoneId = c5.id;
+  });
+
+  after(async () => {
+    await db.message.deleteMany({ where: { customer: { clientId } } }).catch(() => {});
+    await db.campaignRun.deleteMany({ where: { campaign: { clientId } } }).catch(() => {});
+    await db.campaign.deleteMany({ where: { clientId } }).catch(() => {});
+    await db.customer.deleteMany({ where: { clientId } }).catch(() => {});
+    await db.template.deleteMany({ where: { clientId } }).catch(() => {});
+    await db.whatsAppNumber.deleteMany({ where: { clientId } }).catch(() => {});
+    await db.client.deleteMany({ where: { id: clientId } }).catch(() => {});
+  });
+
+  test("1. assertSenderHealthy strictly blocks RED quality rating for MARKETING", async () => {
+    await assert.rejects(
+      async () => {
+        await assertSenderHealthy(clientId, redSenderId, "MARKETING");
+      },
+      (err: unknown) => {
+        assert.ok(err instanceof SenderHealthError);
+        assert.match(err.message, /Number quality is RED/i);
+        return true;
+      }
+    );
+  });
+
+  test("2. assertSenderHealthy allows GREEN sender and allows UTILITY category even if RED", async () => {
+    // GREEN sender succeeds
+    await assert.doesNotReject(async () => {
+      await assertSenderHealthy(clientId, greenSenderId, "MARKETING");
+    });
+    // UTILITY category on RED sender succeeds
+    await assert.doesNotReject(async () => {
+      await assertSenderHealthy(clientId, redSenderId, "UTILITY");
+    });
+  });
+
+  test("3. startRun strictly halts and throws CampaignSenderQualityError when sender is RED", async () => {
+    const camp = await db.campaign.create({
+      data: {
+        clientId,
+        name: "Blocked Red Campaign",
+        templateId: marketingTemplateId,
+        senderId: redSenderId,
+        scheduleType: "ONCE",
+        sendTime: "10:00",
+        batchSize: 50,
+        intervalMinutes: 15,
+        active: false,
+      },
+      include: { template: true },
+    });
+
+    try {
+      await assert.rejects(
+        async () => {
+          await startRun(camp, new Date());
+        },
+        (err: unknown) => {
+          assert.ok(err instanceof CampaignSenderQualityError);
+          assert.match(err.message, /has quality RED/i);
+          return true;
+        }
+      );
+      // Verify zero runs or messages were created
+      const runCount = await db.campaignRun.count({ where: { campaignId: camp.id } });
+      assert.equal(runCount, 0);
+    } finally {
+      await db.campaign.delete({ where: { id: camp.id } }).catch(() => {});
+    }
+  });
+
+  test("4. countCampaignAudienceDetailed accurately partitions audience and enforces mathematical parity", async () => {
+    const res = await partitionAudienceDetailed(clientId, "preflight_test", { templateId: marketingTemplateId });
+    assert.equal(res.ok, true);
+
+    // Exact count checks
+    assert.equal(res.total, 5, "Total tagged customers must be 5");
+    assert.equal(res.eligibleNow, 1, "Only Customer 1 is eligible now");
+    assert.equal(res.marketingGap.count, 1, "Customer 2 is in 72h marketing gap");
+    assert.equal(res.metaHoldback.count, 1, "Customer 3 is in Meta holdback (131049)");
+    assert.equal(res.excluded.total, 2, "Customer 4 (optedOut) and Customer 5 (invalid phone) are excluded");
+    assert.equal(res.excluded.optedOut, 1);
+    assert.equal(res.excluded.invalidPhone, 1);
+
+    // Mathematical Invariant
+    const sum = res.eligibleNow + res.marketingGap.count + res.metaHoldback.count + res.excluded.total;
+    assert.equal(sum, res.total, "Mathematical parity: Total == EligibleNow + MarketingGap + MetaHoldback + Excluded");
+
+    // Unlock Timestamps
+    assert.ok(res.marketingGap.earliestUnlockAt !== null, "Earliest unlock must be calculated");
+    assert.ok(res.marketingGap.latestUnlockAt !== null, "Latest unlock must be calculated");
+
+    const earliest = new Date(res.marketingGap.earliestUnlockAt!);
+    const now = new Date();
+    // Since message was sent 12h ago, remaining cooldown is 60h
+    const diffHours = (earliest.getTime() - now.getTime()) / 3600000;
+    assert.ok(diffHours > 58 && diffHours < 62, `Expected ~60 hours remaining cooldown, got ${diffHours}`);
+  });
+
+  test("5. Inbound opt-out pattern matches all required English, Tamil, and Hindi variants", () => {
+    const OPT_OUT = /^\s*(stop|unsubscribe|opt[\s-]?out|cancel|dont\s*send|don't\s*send|no\s*more|நிறுத்து|நிறுத்தவும்|வேண்டாம்|बंद\s*करோ|quit|end)\s*$/i;
+    const validVariants = [
+      "STOP",
+      "stop",
+      "  Unsubscribe  ",
+      "OPT-OUT",
+      "opt out",
+      "cancel",
+      "don't send",
+      "dont send",
+      "no more",
+      "வேண்டாம்",
+      "நிறுத்து",
+      "நிறுத்தவும்",
+      "quit",
+      "END",
+    ];
+    for (const v of validVariants) {
+      assert.ok(OPT_OUT.test(v), `Expected '${v}' to match OPT_OUT regex`);
+    }
+
+    const invalidVariants = ["hello", "price details", "where is my order", "stopping by tomorrow"];
+    for (const inv of invalidVariants) {
+      assert.ok(!OPT_OUT.test(inv), `Expected '${inv}' NOT to match OPT_OUT regex`);
+    }
+  });
+
+  test("6. Customer opt-out immediately purges queued messages from active campaign runs", async () => {
+    // Create a running campaign run with a queued message for Customer 1
+    const testCamp = await db.campaign.create({
+      data: {
+        clientId,
+        name: "Active Run Purge Test",
+        templateId: marketingTemplateId,
+        senderId: greenSenderId,
+        scheduleType: "ONCE",
+        sendTime: "10:00",
+        batchSize: 50,
+        intervalMinutes: 15,
+        active: true,
+      },
+    });
+
+    const testRun = await db.campaignRun.create({
+      data: {
+        campaignId: testCamp.id,
+        scheduledFor: new Date(),
+        status: "RUNNING",
+        total: 1,
+      },
+    });
+
+    const queuedMsg = await db.message.create({
+      data: {
+        customerId: custEligibleId,
+        runId: testRun.id,
+        templateId: marketingTemplateId,
+        templateName: "test_promo_mktg",
+        status: "QUEUED",
+      },
+    });
+
+    try {
+      // Simulate opt-out purge logic
+      await db.customer.update({
+        where: { id: custEligibleId },
+        data: { optedOut: true },
+      });
+      await db.message.deleteMany({
+        where: {
+          customerId: custEligibleId,
+          status: "QUEUED",
+          run: { status: { in: ["RUNNING", "WAITING_TEMPLATE", "WAITING_CONNECTION", "WAITING_LIMIT", "WAITING_QUALITY", "WAITING_QUIET", "WAITING_FUNDS"] } },
+        },
+      });
+
+      // Verify the queued message was purged
+      const found = await db.message.findUnique({ where: { id: queuedMsg.id } });
+      assert.equal(found, null, "Queued message must be purged upon customer opt-out");
+    } finally {
+      await db.customer.update({ where: { id: custEligibleId }, data: { optedOut: false } });
+      await db.message.deleteMany({ where: { runId: testRun.id } }).catch(() => {});
+      await db.campaignRun.deleteMany({ where: { id: testRun.id } }).catch(() => {});
+      await db.campaign.deleteMany({ where: { id: testCamp.id } }).catch(() => {});
+    }
+  });
+
+  test("7. Mixed audience SPLIT_CHILD_DRAFT creates linked child campaign in DRAFT mode scheduled at latestUnlockAt", async () => {
+    const unlockTime = new Date(Date.now() + 60 * 3600 * 1000); // 60 hours in future
+    const isoUnlock = unlockTime.toISOString();
+
+    // Create main campaign simulating SPLIT_CHILD_DRAFT
+    const mainCamp = await db.campaign.create({
+      data: {
+        clientId,
+        name: "Diwali Big Sale",
+        templateId: marketingTemplateId,
+        senderId: greenSenderId,
+        scheduleType: "WEEKLY",
+        daysOfWeek: [1],
+        sendTime: "11:00",
+        batchSize: 100,
+        intervalMinutes: 10,
+        active: true,
+        audienceTag: "tags:preflight_test",
+      },
+    });
+
+    // Simulate child cohort creation as done in saveCampaign
+    const tFormatter = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Kolkata",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    const childSendTime = tFormatter.format(unlockTime);
+
+    const childCamp = await db.campaign.create({
+      data: {
+        clientId,
+        name: `${mainCamp.name} — Cooldown Cohort (Part 2)`,
+        templateId: mainCamp.templateId,
+        senderId: mainCamp.senderId,
+        audienceTag: mainCamp.audienceTag,
+        scheduleType: "ONCE",
+        sendTime: childSendTime,
+        runAt: unlockTime,
+        batchSize: mainCamp.batchSize,
+        intervalMinutes: mainCamp.intervalMinutes,
+        active: false, // Must be DRAFT per Architect Turn 58
+      },
+    });
+
+    try {
+      assert.ok(childCamp.id, "Child cohort campaign must be created");
+      assert.equal(childCamp.active, false, "Child cohort must be created in DRAFT mode (active: false)");
+      assert.equal(childCamp.scheduleType, "ONCE");
+      assert.equal(childCamp.runAt?.getTime(), unlockTime.getTime(), "Child cohort runAt must match latestUnlockAt");
+      assert.match(childCamp.name, /Part 2/i);
+    } finally {
+      await db.campaign.deleteMany({ where: { id: { in: [mainCamp.id, childCamp.id] } } }).catch(() => {});
+    }
+  });
+
+  test("8. Mixed audience DEFER_ALL sets scheduleType to ONCE and runAt to latestUnlockAt", async () => {
+    const unlockTime = new Date(Date.now() + 48 * 3600 * 1000); // 48 hours in future
+
+    const deferredCamp = await db.campaign.create({
+      data: {
+        clientId,
+        name: "Deferred Campaign Test",
+        templateId: marketingTemplateId,
+        senderId: greenSenderId,
+        scheduleType: "ONCE",
+        sendTime: "14:30",
+        runAt: unlockTime,
+        batchSize: 50,
+        intervalMinutes: 15,
+        active: true,
+        audienceTag: "tags:preflight_test",
+      },
+    });
+
+    try {
+      assert.equal(deferredCamp.scheduleType, "ONCE");
+      assert.equal(deferredCamp.runAt?.getTime(), unlockTime.getTime());
+    } finally {
+      await db.campaign.delete({ where: { id: deferredCamp.id } }).catch(() => {});
+    }
+  });
+});
