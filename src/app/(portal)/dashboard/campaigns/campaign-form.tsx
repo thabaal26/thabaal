@@ -306,17 +306,31 @@ export function CampaignForm({
             </div>
             <fieldset className="space-y-3 sm:col-span-2">
               <legend className="mb-1.5 text-sm font-medium text-ink-2">{tr("Send to")}</legend>
-              <Segmented
-                label="Send to"
-                value={sendTo}
-                onChange={chooseSendTo}
-                options={[
-                  { value: "all", label: "Everyone" },
-                  { value: "tags", label: "Tags" },
-                  ...(savedOptions.length ? [{ value: "saved" as const, label: "Audience" }] : []),
-                ]}
-                className="w-full sm:w-auto"
-              />
+              {c.audienceTag === "cohort:frozen" ? (
+                <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-3.5 text-sm text-blue-300">
+                  <div className="flex items-center gap-2 font-semibold">
+                    <span className="inline-block size-2 rounded-full bg-blue-400 animate-pulse" />
+                    {isTa ? "முடக்கப்பட்ட வாடிக்கையாளர் பட்டியல் (Part 2 — Cooldown Cohort)" : "Frozen Recipient Cohort (Part 2 — Cooldown Cohort)"}
+                  </div>
+                  <p className="text-xs text-blue-300/80 mt-1">
+                    {isTa
+                      ? `இந்த கேம்பெயின் முந்தைய கேம்பெயினில் 72 மணி நேர கூல்டவுனில் இருந்த ${c.includeIds.length} வாடிக்கையாளர்களுக்கு மட்டுமே அனுப்பப்படும். பாதுகாப்புக் காரணங்களுக்காக இந்த பட்டியலை விரிவுபடுத்த முடியாது.`
+                      : `This campaign is frozen strictly to the ${c.includeIds.length} recipients who were in cooldown during Part 1. Target list cannot be modified.`}
+                  </p>
+                </div>
+              ) : (
+                <Segmented
+                  label="Send to"
+                  value={sendTo}
+                  onChange={chooseSendTo}
+                  options={[
+                    { value: "all", label: "Everyone" },
+                    { value: "tags", label: "Tags" },
+                    ...(savedOptions.length ? [{ value: "saved" as const, label: "Audience" }] : []),
+                  ]}
+                  className="w-full sm:w-auto"
+                />
+              )}
 
               {sendTo === "tags" && (
                 <div className="space-y-3">
@@ -374,16 +388,18 @@ export function CampaignForm({
                 />
               )}
 
-              <SegmentPicker
-                campaignId={id}
-                audienceTag={c.audienceTag}
-                summary={segments}
-                value={picked}
-                onChange={(v) => set({ segments: v })}
-                capacity={sender?.capacity ?? null}
-                mode={sendTo}
-                tagsCount={sendTo === "tags" ? pick.tags.length : undefined}
-              />
+              {c.audienceTag !== "cohort:frozen" && (
+                <SegmentPicker
+                  campaignId={id}
+                  audienceTag={c.audienceTag}
+                  summary={segments}
+                  value={picked}
+                  onChange={(v) => set({ segments: v })}
+                  capacity={sender?.capacity ?? null}
+                  mode={sendTo}
+                  tagsCount={sendTo === "tags" ? pick.tags.length : undefined}
+                />
+              )}
 
               <p className="tabular text-sm text-muted" aria-live="polite" data-testid="audience-size">
                 {isTa

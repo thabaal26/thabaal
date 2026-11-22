@@ -486,7 +486,11 @@ export async function partitionAudienceDetailed(
 
   const pick = decodeTags(audienceTag);
   let audienceBase: Prisma.CustomerWhereInput = { clientId, deletedAt: null };
-  if (audienceTag && audienceTag.startsWith(AUDIENCE_PREFIX)) {
+  const isCohortFrozen = audienceTag === "cohort:frozen" || (!audienceTag && people.includeIds && people.includeIds.length > 0);
+
+  if (isCohortFrozen && people.includeIds?.length) {
+    audienceBase = { clientId, deletedAt: null, id: { in: people.includeIds } };
+  } else if (audienceTag && audienceTag.startsWith(AUDIENCE_PREFIX)) {
     const audId = audienceTag.slice(AUDIENCE_PREFIX.length);
     const aud = await db.audience.findFirst({ where: { id: audId, clientId } });
     if (aud) {
@@ -502,12 +506,19 @@ export async function partitionAudienceDetailed(
     };
   }
 
-  const rawWhere: Prisma.CustomerWhereInput = {
-    AND: [
-      people.includeIds?.length ? { OR: [audienceBase, { id: { in: people.includeIds }, clientId, deletedAt: null }] } : audienceBase,
-      ...(people.excludeIds?.length ? [{ id: { notIn: people.excludeIds } }] : []),
-    ],
-  };
+  const rawWhere: Prisma.CustomerWhereInput = isCohortFrozen && people.includeIds?.length
+    ? {
+        AND: [
+          audienceBase,
+          ...(people.excludeIds?.length ? [{ id: { notIn: people.excludeIds } }] : []),
+        ],
+      }
+    : {
+        AND: [
+          people.includeIds?.length ? { OR: [audienceBase, { id: { in: people.includeIds }, clientId, deletedAt: null }] } : audienceBase,
+          ...(people.excludeIds?.length ? [{ id: { notIn: people.excludeIds } }] : []),
+        ],
+      };
 
   const now = new Date();
   const gapCutoff = new Date(now.getTime() - gapHours * 3_600_000);

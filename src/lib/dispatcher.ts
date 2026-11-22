@@ -313,10 +313,15 @@ export async function processRun(runId: string, now: Date, deadline: number) {
     await freshenNumbers({ ids: [number.id] });
     const current = await db.whatsAppNumber.findUnique({ where: { id: number.id } });
     if (current) Object.assign(number, { messagingTier: current.messagingTier, qualityRating: current.qualityRating });
-    const qRating = (number.qualityRating || "GREEN").toUpperCase();
-    if (marketing && qRating !== "GREEN") {
-      await pause("WAITING_QUALITY", 60);
-      return { sent: 0, failed: 0 };
+    // Enforce full sender health check (quality rating, flagged, restricted, banned, rate-limited, or disconnected)
+    try {
+      await assertSenderHealthy(campaign.clientId, number.id, t.category);
+    } catch (err) {
+      if (err instanceof SenderHealthError) {
+        await pause("WAITING_QUALITY", 60);
+        return { sent: 0, failed: 0 };
+      }
+      throw err;
     }
     const a = await allowance(number);
     if (!a.unlimited) {
@@ -373,12 +378,49 @@ export async function processRun(runId: string, now: Date, deadline: number) {
       return false;
     }
     if (throttled || restricted || setupProblem) return false;
+
+    // Concurrency guard: verify message status hasn't transitioned to SKIPPED while sitting in the dispatcher buffer
+    const freshMsg = await db.message.findUnique({
+      where: { id: m.id },
+      select: { status: true },
+    });
+    if (freshMsg?.status === "SKIPPED") {
+      return; // Canceled by concurrent opt-out webhook; strictly abort dispatch and do not send to Meta
+    }
+
+    // Fresh customer check to guard against concurrent opt-out
+    const freshCust = await db.customer.findUnique({
+      where: { id: m.customerId },
+      select: { optedOut: true, deletedAt: true, unreachable: true },
+    });
+    if (freshCust?.deletedAt) {
+      await db.message.update({ where: { id: m.id }, data: { status: "SKIPPED", error: "Customer record is archived or deleted", errorCode: null } });
+      return;
+    }
+    if (freshCust?.optedOut || freshCust?.unreachable) {
+      await db.message.update({
+        where: { id: m.id },
+        data: {
+          status: "SKIPPED",
+          error: freshCust.optedOut ? "Customer opted out" : "Number can't receive WhatsApp messages",
+          errorCode: null,
+        },
+      });
+      return;
+    }
     if (m.customer.deletedAt) {
-      await db.message.update({ where: { id: m.id }, data: { status: "SKIPPED", error: "Customer record is archived or deleted" } });
+      await db.message.update({ where: { id: m.id }, data: { status: "SKIPPED", error: "Customer record is archived or deleted", errorCode: null } });
       return;
     }
     if (m.customer.optedOut || m.customer.unreachable) {
-      await db.message.update({ where: { id: m.id }, data: { status: "SKIPPED", error: m.customer.optedOut ? "Customer opted out" : "Number can't receive WhatsApp messages" } });
+      await db.message.update({
+        where: { id: m.id },
+        data: {
+          status: "SKIPPED",
+          error: m.customer.optedOut ? "Customer opted out" : "Number can't receive WhatsApp messages",
+          errorCode: null,
+        },
+      });
       return;
     }
     if (marketing && (!m.customer.optInAt || !m.customer.optInSource || m.customer.optInSource.includes("(WhatsApp: Yes)"))) {
@@ -419,6 +461,11 @@ export async function processRun(runId: string, now: Date, deadline: number) {
         where: { id: m.id },
         data: { status: "SKIPPED", error: `Already got an offer within ${campaign.client.marketingGapHours} hours (last ${fmtDate(last, "d MMM, h:mm a")})` },
       });
+      return;
+    }
+    // Final pre-dispatch verification: ensure status was not transitioned to SKIPPED while waiting for pool slot
+    const preDeliver = await db.message.findUnique({ where: { id: m.id }, select: { status: true } });
+    if (preDeliver?.status === "SKIPPED") {
       return;
     }
     try {

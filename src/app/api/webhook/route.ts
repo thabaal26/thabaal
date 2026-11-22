@@ -567,7 +567,7 @@ async function optOut(phone: string, phoneNumberId?: string) {
       data: {
         status: "SKIPPED",
         error: "MARKETING_OPT_OUT_BEFORE_DISPATCH",
-        errorCode: 131050,
+        errorCode: null,
       },
     }).catch(() => {});
   }

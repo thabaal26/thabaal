@@ -104,6 +104,22 @@ export async function assertSenderHealthy(
   const rating = (rawRating || "GREEN").toUpperCase();
   const isMarketing = category === "MARKETING";
 
+  // Check linked WhatsApp connection status if present
+  if (number.connectionId) {
+    const conn = await db.whatsAppConnection.findUnique({
+      where: { id: number.connectionId },
+      select: { status: true },
+    });
+    const cStatus = conn?.status ? String(conn.status).toUpperCase() : null;
+    if (cStatus && (cStatus === "DISCONNECTED" || cStatus === "NEEDS_REAUTH" || cStatus === "ERROR" || cStatus === "DRAFT")) {
+      throw new SenderHealthError(
+        `WhatsApp sender connection status is ${cStatus}. Reconnect in Settings first.`,
+        rating,
+        cStatus
+      );
+    }
+  }
+
   if (!isMarketing) {
     // Utility / Transactional messages: only blocked if banned or disabled
     if (rating === "BANNED" || rating === "DISABLED") {
@@ -128,7 +144,7 @@ export async function assertSenderHealthy(
       rating
     );
   }
-  if (rating === "FLAGGED" || rating === "RESTRICTED" || rating === "BANNED" || rating === "DISABLED") {
+  if (rating === "FLAGGED" || rating === "RESTRICTED" || rating === "BANNED" || rating === "DISABLED" || rating === "RATE_LIMITED") {
     throw new SenderHealthError(
       `Marketing dispatch blocked: Number status is ${rating}. WhatsApp has restricted promotional outbound messaging for this account.`,
       rating

@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { db } from "../../src/lib/db";
 import { assertSenderHealthy, SenderHealthError } from "../../src/lib/senders";
-import { CampaignSenderQualityError, startRun } from "../../src/lib/dispatcher";
+import { CampaignSenderQualityError, processRun, startRun } from "../../src/lib/dispatcher";
 import { partitionAudienceDetailed } from "../../src/lib/campaign-preflight";
+import { campaignAudienceWhere } from "../../src/lib/audiences";
 
 describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suite", () => {
   let clientId: string;
@@ -459,16 +460,16 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
         data: {
           status: "SKIPPED",
           error: "MARKETING_OPT_OUT_BEFORE_DISPATCH",
-          errorCode: 131050,
+          errorCode: null,
         },
       });
 
-      // Verification A: Marketing message is NOT deleted, but transitioned to SKIPPED with code 131050
+      // Verification A: Marketing message is NOT deleted, but transitioned to SKIPPED with errorCode null (Release Blocker A)
       const updatedMktg = await db.message.findUnique({ where: { id: mktgMsg.id } });
       assert.ok(updatedMktg, "Marketing message must NOT be deleted (audit history preserved)");
       assert.equal(updatedMktg.status, "SKIPPED", "Marketing message must be marked SKIPPED");
       assert.equal(updatedMktg.error, "MARKETING_OPT_OUT_BEFORE_DISPATCH");
-      assert.equal(updatedMktg.errorCode, 131050);
+      assert.equal(updatedMktg.errorCode, null, "Locally suppressed opt-out message must have errorCode: null (no 131050 domain pollution)");
 
       // Verification B: Transactional / Utility message remains untouched and QUEUED
       const updatedUtil = await db.message.findUnique({ where: { id: utilMsg.id } });
@@ -483,7 +484,7 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
     }
   });
 
-  test("7. Mixed audience SPLIT_CHILD_DRAFT creates linked child campaign in DRAFT mode with frozen recipient IDs and audienceTag null", async () => {
+  test("7. Mixed audience SPLIT_CHILD_DRAFT creates linked child campaign in DRAFT mode with frozen recipient IDs and audienceTag cohort:frozen", async () => {
     const unlockTime = new Date(Date.now() + 60 * 3600 * 1000); // 60 hours in future
 
     // Create main campaign simulating SPLIT_CHILD_DRAFT
@@ -511,14 +512,14 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
     });
     const childSendTime = tFormatter.format(unlockTime);
 
-    // Child cohort created in DRAFT mode with frozen includeIds and audienceTag: null
+    // Child cohort created in DRAFT mode with frozen includeIds and audienceTag: cohort:frozen
     const childCamp = await db.campaign.create({
       data: {
         clientId,
         name: `${mainCamp.name} — Cooldown Cohort (Part 2)`,
         templateId: mainCamp.templateId,
         senderId: mainCamp.senderId,
-        audienceTag: null, // Frozen cohort: must not re-evaluate broad audienceTag
+        audienceTag: "cohort:frozen", // Explicit frozen cohort contract
         includeIds: [custGapId], // Explicitly frozen recipient IDs
         scheduleType: "ONCE",
         sendTime: childSendTime,
@@ -533,7 +534,7 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
       assert.ok(childCamp.id, "Child cohort campaign must be created");
       assert.equal(childCamp.active, false, "Child cohort must be created in DRAFT mode (active: false)");
       assert.equal(childCamp.scheduleType, "ONCE");
-      assert.equal(childCamp.audienceTag, null, "Child cohort audienceTag must be null to prevent broad re-resolution");
+      assert.equal(childCamp.audienceTag, "cohort:frozen", "Child cohort audienceTag must be cohort:frozen to prevent broad re-resolution");
       assert.deepEqual(childCamp.includeIds, [custGapId], "Child cohort must freeze exact recipient IDs");
       assert.equal(childCamp.runAt?.getTime(), unlockTime.getTime(), "Child cohort runAt must match latestUnlockAt");
       assert.match(childCamp.name, /Part 2/i);
@@ -603,6 +604,152 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
       await db.campaign.delete({ where: { id: yellowCamp.id } }).catch(() => {});
       // Restore greenSenderId back to GREEN
       await db.whatsAppNumber.update({ where: { id: greenSenderId }, data: { qualityRating: "GREEN" } });
+    }
+  });
+
+  test("10. Child draft frozen cohort isolation: cannot resolve any contact outside explicit includeIds, even if audienceTag is null", async () => {
+    // There are 5 customers in this tenant (custEligibleId, custGapId, custMetaHeldId, custOptedOutId, custInvalidPhoneId).
+    // A frozen child cohort is created with includeIds = [custGapId] and audienceTag = 'cohort:frozen' (or audienceTag = null).
+
+    // Check A: With audienceTag = 'cohort:frozen'
+    const whereFrozen = await campaignAudienceWhere(clientId, "cohort:frozen", {
+      includeIds: [custGapId],
+      isCohortFrozen: true,
+    });
+    const matchedFrozen = await db.customer.findMany({ where: whereFrozen, select: { id: true, name: true } });
+    assert.equal(matchedFrozen.length, 1, "Must strictly resolve only the 1 frozen recipient");
+    assert.equal(matchedFrozen[0].id, custGapId, "Must match custGapId exactly");
+
+    // Check B: With audienceTag = null (implicit Everyone fallback prevented when isCohortFrozen is true)
+    const whereNullTag = await campaignAudienceWhere(clientId, null, {
+      includeIds: [custGapId],
+      isCohortFrozen: true,
+    });
+    const matchedNullTag = await db.customer.findMany({ where: whereNullTag, select: { id: true, name: true } });
+    assert.equal(matchedNullTag.length, 1, "Must NEVER fall back to Everyone when includeIds are frozen");
+    assert.equal(matchedNullTag[0].id, custGapId);
+
+    // Check C: Excluded IDs within frozen cohort are respected
+    const whereExcluded = await campaignAudienceWhere(clientId, "cohort:frozen", {
+      includeIds: [custGapId],
+      excludeIds: [custGapId],
+      isCohortFrozen: true,
+    });
+    const matchedExcluded = await db.customer.findMany({ where: whereExcluded });
+    assert.equal(matchedExcluded.length, 0, "Excluding a frozen ID returns 0 matches");
+  });
+
+  test("11. Concurrent opt-out dispatch cancellation: aborts dispatch and stamps SKIPPED with errorCode null without sending to Meta", async () => {
+    // 1. Create a running campaign with a queued marketing message
+    const raceCamp = await db.campaign.create({
+      data: {
+        clientId,
+        name: "Race Condition Opt-Out Test",
+        templateId: marketingTemplateId,
+        senderId: greenSenderId,
+        scheduleType: "ONCE",
+        sendTime: "10:00",
+        batchSize: 50,
+        intervalMinutes: 15,
+        active: true,
+      },
+      include: { template: true },
+    });
+
+    const raceRun = await db.campaignRun.create({
+      data: {
+        campaignId: raceCamp.id,
+        scheduledFor: new Date(),
+        status: "RUNNING",
+        total: 1,
+        nextBatchAt: new Date(),
+      },
+    });
+
+    const raceMsg = await db.message.create({
+      data: {
+        customerId: custEligibleId,
+        runId: raceRun.id,
+        templateId: marketingTemplateId,
+        templateName: "test_promo_mktg",
+        status: "QUEUED",
+      },
+    });
+
+    try {
+      // 2. Simulate concurrent opt-out webhook arriving right as message is in memory buffer:
+      // The webhook marks the message SKIPPED with errorCode: null and customer optedOut: true
+      await db.customer.update({
+        where: { id: custEligibleId },
+        data: { optedOut: true },
+      });
+      await db.message.update({
+        where: { id: raceMsg.id },
+        data: {
+          status: "SKIPPED",
+          error: "MARKETING_OPT_OUT_BEFORE_DISPATCH",
+          errorCode: null,
+        },
+      });
+
+      // 3. Dispatcher processes the run
+      const result = await processRun(raceRun.id, new Date(), Date.now() + 5000);
+
+      // 4. Assert zero messages sent to Meta
+      assert.equal(result.sent, 0, "Zero messages must be sent when concurrent opt-out occurred");
+
+      // 5. Assert message remained SKIPPED with errorCode null
+      const finalMsg = await db.message.findUnique({ where: { id: raceMsg.id } });
+      assert.equal(finalMsg?.status, "SKIPPED");
+      assert.equal(finalMsg?.error, "MARKETING_OPT_OUT_BEFORE_DISPATCH");
+      assert.equal(finalMsg?.errorCode, null, "Local opt-out suppression must have errorCode: null (Release Blocker A)");
+    } finally {
+      await db.customer.update({ where: { id: custEligibleId }, data: { optedOut: false } });
+      await db.message.deleteMany({ where: { runId: raceRun.id } }).catch(() => {});
+      await db.campaignRun.deleteMany({ where: { id: raceRun.id } }).catch(() => {});
+      await db.campaign.deleteMany({ where: { id: raceCamp.id } }).catch(() => {});
+    }
+  });
+
+  test("12. processRun strictly pauses with WAITING_QUALITY when sender status degrades mid-run to FLAGGED or RESTRICTED", async () => {
+    // Set sender to FLAGGED
+    await db.whatsAppNumber.update({ where: { id: greenSenderId }, data: { qualityRating: "FLAGGED" } });
+
+    const flagCamp = await db.campaign.create({
+      data: {
+        clientId,
+        name: "Flagged Sender Batch Test",
+        templateId: marketingTemplateId,
+        senderId: greenSenderId,
+        scheduleType: "ONCE",
+        sendTime: "10:00",
+        batchSize: 50,
+        intervalMinutes: 15,
+        active: true,
+      },
+      include: { template: true },
+    });
+
+    const flagRun = await db.campaignRun.create({
+      data: {
+        campaignId: flagCamp.id,
+        scheduledFor: new Date(),
+        status: "RUNNING",
+        total: 1,
+        nextBatchAt: new Date(),
+      },
+    });
+
+    try {
+      const res = await processRun(flagRun.id, new Date(), Date.now() + 5000);
+      assert.equal(res.sent, 0, "Zero messages sent when sender is FLAGGED");
+
+      const pausedRun = await db.campaignRun.findUnique({ where: { id: flagRun.id } });
+      assert.equal(pausedRun?.status, "WAITING_QUALITY", "Run must pause with WAITING_QUALITY");
+    } finally {
+      await db.whatsAppNumber.update({ where: { id: greenSenderId }, data: { qualityRating: "GREEN" } });
+      await db.campaignRun.deleteMany({ where: { id: flagRun.id } }).catch(() => {});
+      await db.campaign.deleteMany({ where: { id: flagCamp.id } }).catch(() => {});
     }
   });
 });

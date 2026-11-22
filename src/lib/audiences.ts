@@ -104,6 +104,7 @@ export type CampaignPeople = {
   excludeIds?: readonly string[];
   segments?: readonly string[];
   requirePositiveConsent?: boolean;
+  isCohortFrozen?: boolean;
 };
 
 /**
@@ -131,6 +132,26 @@ export async function campaignAudienceWhere(
   ]);
   const kept = decodeTags(audienceTag)?.tags.includes(INACTIVE_TAG) ? picked : { AND: [picked, { NOT: { tags: { has: INACTIVE_TAG } } }] };
   const send: Prisma.CustomerWhereInput = segmentIds ? { AND: [kept, { id: { in: segmentIds } }] } : kept;
+
+  // Strict child cohort isolation: if cohort is frozen (or audienceTag is "cohort:frozen" / includeIds specified without tag),
+  // membership is 100% frozen to the explicit includeIds and NEVER falls back to base / Everyone.
+  const isCohortFrozen = Boolean(
+    people.isCohortFrozen ||
+    audienceTag === "cohort:frozen" ||
+    (people.includeIds && people.includeIds.length > 0 && !audienceTag)
+  );
+  if (isCohortFrozen) {
+    const finalIds = exclude.length ? include.filter((id) => !exclude.includes(id)) : include;
+    return {
+      id: { in: finalIds },
+      clientId,
+      optedOut: false,
+      unreachable: false,
+      deletedAt: null,
+      ...(requirePositiveConsent ? { optInAt: { not: null }, optInSource: { not: null } } : {}),
+    };
+  }
+
   if (!include.length && !exclude.length) return send;
   const includeBase: Prisma.CustomerWhereInput = {
     id: { in: include },
@@ -181,6 +202,7 @@ async function sendToWhere(clientId: string, audienceTag: string | null, require
     ...(requirePositiveConsent ? { optInAt: { not: null }, optInSource: { not: null } } : {}),
   };
   if (!audienceTag) return base;
+  if (audienceTag === "cohort:frozen") return { id: { in: [] } };
   if (audienceTag.startsWith(AUDIENCE_PREFIX)) {
     const a = await db.audience.findFirst({ where: { id: audienceTag.slice(AUDIENCE_PREFIX.length), clientId } });
     // A deleted audience must not fall back to "everyone".
