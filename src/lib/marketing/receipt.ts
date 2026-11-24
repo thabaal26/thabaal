@@ -37,12 +37,14 @@ export function calculateReceiptExpiry(): Date {
 export type DemoConversionRecord = {
   receiptToken: string;
   conversionEventId: string | null;
+  transactionReference: string | null;
   outcome: "CREATED" | "UPDATED_EXISTING";
 };
 
 /**
  * Records a demo conversion attempt in PostgreSQL within the authoritative Lead lifecycle.
- * If the lead is newly created, generates a persistent conversionEventId for Google Ads transaction_id deduplication.
+ * If the lead is newly created, generates a persistent conversionEventId and structured transactionReference
+ * for Google Ads transaction_id deduplication.
  */
 export async function recordDemoConversionAttempt(
   params: {
@@ -74,6 +76,7 @@ export async function recordDemoConversionAttempt(
     return {
       receiptToken: freshToken,
       conversionEventId: existing.conversionEventId,
+      transactionReference: existing.transactionReference,
       outcome: existing.outcome as "CREATED" | "UPDATED_EXISTING",
     };
   }
@@ -82,6 +85,8 @@ export async function recordDemoConversionAttempt(
   const receiptTokenHash = hashReceiptToken(rawToken);
   const conversionEventId = isNew ? randomUUID() : null;
   const outcome = isNew ? "CREATED" : "UPDATED_EXISTING";
+  const now = new Date();
+  const transactionReference = isNew ? formatGoogleAdsTransactionReference(leadId, now) : null;
 
   await client.demoConversionAttempt.create({
     data: {
@@ -90,6 +95,7 @@ export async function recordDemoConversionAttempt(
       receiptTokenHash,
       outcome,
       conversionEventId,
+      transactionReference,
       expiresAt: calculateReceiptExpiry(),
     },
   });
@@ -97,6 +103,7 @@ export async function recordDemoConversionAttempt(
   return {
     receiptToken: rawToken,
     conversionEventId,
+    transactionReference,
     outcome,
   };
 }
@@ -143,6 +150,7 @@ export async function processDemoRequestAtomic(params: {
         conversion: {
           receiptToken: freshToken,
           conversionEventId: existing.conversionEventId,
+          transactionReference: existing.transactionReference,
           outcome: existing.outcome as "CREATED" | "UPDATED_EXISTING",
         },
       };
@@ -198,11 +206,14 @@ export type ResolvedThankYouReceipt = {
 /**
  * Formats a Google Ads-compliant, structured external transaction reference (max 64 chars, strictly no PII).
  * Deterministically derived from authoritative lead identifier and creation timestamp.
- * Example: THB-LEAD-2026-X11B5PXQ0R
+ * Preserves full leadId (up to 48 chars) without suffix truncation to ensure absolute uniqueness.
+ * Example: THB-LEAD-2026-CMWUXHGR00000KZ2U4366PDT5
  */
 export function formatGoogleAdsTransactionReference(leadId: string, date: Date = new Date()): string {
   const year = date.getUTCFullYear();
-  const cleanId = leadId.replace(/[^a-zA-Z0-9]/g, "").slice(-12).toUpperCase();
+  // Strip non-alphanumerics, preserve full uppercase lead identifier (up to 48 chars).
+  // Total length under Google Ads 64-char limit: "THB-LEAD-" (9) + 4 (year) + 1 ("-") + 48 = 62 chars.
+  const cleanId = leadId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 48).toUpperCase();
   return `THB-LEAD-${year}-${cleanId}`;
 }
 
@@ -230,6 +241,7 @@ export async function resolveThankYouReceipt(rawToken: string | undefined | null
     select: {
       outcome: true,
       conversionEventId: true,
+      transactionReference: true,
       leadId: true,
       createdAt: true,
     },
@@ -240,7 +252,7 @@ export async function resolveThankYouReceipt(rawToken: string | undefined | null
   }
 
   const isEligible = attempt.outcome === "CREATED" && typeof attempt.conversionEventId === "string" && attempt.conversionEventId.length > 0;
-  const transactionRef = isEligible ? formatGoogleAdsTransactionReference(attempt.leadId, attempt.createdAt) : null;
+  const transactionRef = isEligible ? (attempt.transactionReference || formatGoogleAdsTransactionReference(attempt.leadId, attempt.createdAt)) : null;
 
   return {
     valid: true,

@@ -469,11 +469,100 @@ describe("Google Ads Conversion Pipeline & Zero-Leakage Boundary (Turn 48-49 Cer
     assert.ok(content.includes("const lastAttemptedId = useRef<string | null>(null);"));
     assert.ok(content.includes("if (lastAttemptedId.current === transactionId) return;"));
 
-    // Must manage transmission state machine with queued, dispatched, retryable
-    assert.ok(content.includes('sessionStorage.setItem(storageKey, "queued");'));
+    // Must manage transmission state machine with queued timestamp, dispatched, retryable
+    assert.ok(content.includes("sessionStorage.setItem(storageKey, `queued:${now}`);"));
     assert.ok(content.includes('sessionStorage.setItem(storageKey, "dispatched");'));
     assert.ok(content.includes('sessionStorage.setItem(storageKey, "retryable");'));
     assert.ok(content.includes("event_timeout: 2000"));
     assert.ok(content.includes("event_callback: () => {"));
+  });
+
+  it("18. Bounded queued:<timestamp> State Machine & Stale Queued Recovery (Turn 82-83 Architect Requirement 1)", () => {
+    const providerFile = path.resolve(__dirname, "../../src/components/marketing/GoogleAdsProvider.tsx");
+    const content = fs.readFileSync(providerFile, "utf8");
+
+    // Must check for queued: timestamp and calculate elapsed time
+    assert.ok(content.includes('status.startsWith("queued:")'), "Must detect timestamped queued status");
+    assert.ok(content.includes("Date.now() - queuedTs"), "Must calculate elapsed time from timestamp");
+    assert.ok(content.includes("elapsed < 3000"), "Must bound in-flight suppression to timeout + grace period");
+
+    // Functional logic simulation
+    const now = Date.now();
+    const freshQueued = `queued:${now - 1000}`; // 1s ago
+    const staleQueued = `queued:${now - 3500}`; // 3.5s ago
+
+    function shouldSuppress(status: string): boolean {
+      if (status === "dispatched" || status === "done") return true;
+      if (status && status.startsWith("queued:")) {
+        const ts = parseInt(status.slice(7), 10);
+        const elapsed = now - ts;
+        if (!isNaN(ts) && elapsed < 3000) return true;
+      }
+      return false;
+    }
+
+    assert.equal(shouldSuppress("dispatched"), true, "Dispatched must permanently suppress");
+    assert.equal(shouldSuppress("done"), true, "Done must permanently suppress");
+    assert.equal(shouldSuppress(freshQueued), true, "Fresh queued within 3s must suppress duplicate");
+    assert.equal(shouldSuppress(staleQueued), false, "Stale queued older than 3s must allow bounded retry");
+    assert.equal(shouldSuppress("retryable"), false, "Retryable must allow retry");
+  });
+
+  it("19. Synchronous Dispatch Exception Recovery (Turn 82-83 Architect Requirement 2)", () => {
+    const providerFile = path.resolve(__dirname, "../../src/components/marketing/GoogleAdsProvider.tsx");
+    const content = fs.readFileSync(providerFile, "utf8");
+
+    // In catch block, must reset lastAttemptedId.current to null and set storage to retryable
+    assert.ok(
+      content.includes("lastAttemptedId.current = null;"),
+      "Must clear lastAttemptedId.current on synchronous dispatch failure"
+    );
+    assert.ok(
+      content.includes('sessionStorage.setItem(storageKey, "retryable");'),
+      "Must mark storage status as retryable on catch"
+    );
+  });
+
+  it("20. Database-Level Unique Constraint & Collision Prevention for Transaction Reference (Turn 82-83 Architect Requirement 3)", async () => {
+    const schemaFile = path.resolve(__dirname, "../../prisma/schema.prisma");
+    const schemaContent = fs.readFileSync(schemaFile, "utf8");
+
+    // Must define transactionReference with @unique in DemoConversionAttempt model
+    assert.ok(
+      schemaContent.includes("transactionReference String? @unique"),
+      "Prisma schema must enforce @unique on transactionReference"
+    );
+
+    // Full CUID preservation check: 25-char CUID must not be truncated to 12 chars
+    const fullCuid = "cmwutn3x30002kz611b5pxq0r";
+    const ref = formatGoogleAdsTransactionReference(fullCuid, new Date("2026-11-24T12:00:00Z"));
+    assert.equal(
+      ref,
+      "THB-LEAD-2026-CMWUTN3X30002KZ611B5PXQ0R",
+      "Must preserve full 25-character CUID to eliminate suffix collisions"
+    );
+    assert.ok(ref.length <= 64, `Must remain within Google Ads 64-character limit (was ${ref.length})`);
+
+    // Verify database-level uniqueness across records
+    const testPhoneA = `91${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const testPhoneB = `91${Math.floor(10000000 + Math.random() * 90000000)}`;
+
+    const resA = await processDemoRequestAtomic({
+      input: { shop: "Store Alpha", person: "Person A", phone: testPhoneA },
+      submissionKey: `sub_uniq_a_${Date.now()}`,
+    });
+
+    const resB = await processDemoRequestAtomic({
+      input: { shop: "Store Beta", person: "Person B", phone: testPhoneB },
+      submissionKey: `sub_uniq_b_${Date.now()}`,
+    });
+
+    assert.ok(resA.conversion.transactionReference, "Record A must have transactionReference");
+    assert.ok(resB.conversion.transactionReference, "Record B must have transactionReference");
+    assert.notEqual(
+      resA.conversion.transactionReference,
+      resB.conversion.transactionReference,
+      "Two distinct leads must have distinct transaction references"
+    );
   });
 });

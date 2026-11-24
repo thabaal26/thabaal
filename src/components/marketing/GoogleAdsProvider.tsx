@@ -98,7 +98,16 @@ export function GoogleAdsConversion({ transactionId }: { transactionId?: string 
     const storageKey = `thabaal-ads-conv:${transactionId}`;
     try {
       const status = sessionStorage.getItem(storageKey);
-      if (status === "dispatched" || status === "done" || status === "queued") return;
+      if (status === "dispatched" || status === "done") return;
+      if (status && status.startsWith("queued:")) {
+        const queuedTs = parseInt(status.slice(7), 10);
+        const elapsed = Date.now() - queuedTs;
+        // Suppress concurrent duplicate if in flight within event_timeout (2000ms) + grace buffer (1000ms) = 3000ms
+        if (!isNaN(queuedTs) && elapsed < 3000) {
+          return;
+        }
+        // If elapsed >= 3000ms, past in-flight attempt timed out or page was reloaded: allow bounded retry
+      }
     } catch {}
 
     lastAttemptedId.current = transactionId;
@@ -111,8 +120,9 @@ export function GoogleAdsConversion({ transactionId }: { transactionId?: string 
         };
       }
 
+      const now = Date.now();
       try {
-        sessionStorage.setItem(storageKey, "queued");
+        sessionStorage.setItem(storageKey, `queued:${now}`);
       } catch {}
 
       (window as any).gtag("event", "conversion", {
@@ -129,6 +139,7 @@ export function GoogleAdsConversion({ transactionId }: { transactionId?: string 
       });
     } catch (err) {
       console.warn("[GoogleAdsConversion] Failed to dispatch conversion:", err);
+      lastAttemptedId.current = null; // Clear so subsequent re-render or recovery attempt can retry cleanly
       try {
         sessionStorage.setItem(storageKey, "retryable");
       } catch {}
