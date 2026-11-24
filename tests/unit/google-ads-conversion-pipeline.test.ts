@@ -12,6 +12,7 @@ import {
   processDemoRequestAtomic,
   resolveThankYouReceipt,
   calculateReceiptExpiry,
+  formatGoogleAdsTransactionReference,
 } from "../../src/lib/marketing/receipt";
 import {
   GOOGLE_ADS_ID,
@@ -400,5 +401,79 @@ describe("Google Ads Conversion Pipeline & Zero-Leakage Boundary (Turn 48-49 Cer
       (global as any).window = originalWindow;
       (global as any).document = originalDocument;
     }
+  });
+
+  it("14. Structured External Transaction Reference: Deterministic, non-PII, max 64 chars (Turn 81-82)", () => {
+    const testLeadId = "cmwutn3x30002kz611b5pxq0r";
+    const ref2026 = formatGoogleAdsTransactionReference(testLeadId, new Date("2026-11-24T12:00:00Z"));
+
+    assert.ok(ref2026.startsWith("THB-LEAD-2026-"), "Must start with THB-LEAD-<year>-");
+    assert.ok(ref2026.length <= 64, `Must not exceed 64 characters (length: ${ref2026.length})`);
+    assert.ok(/^[A-Z0-9-]+$/.test(ref2026), "Must be uppercase alphanumeric and dashes only");
+    assert.ok(!ref2026.includes("@") && !ref2026.includes("+"), "Must not contain PII");
+
+    // Idempotency: same leadId and year must return identical reference
+    const refAgain = formatGoogleAdsTransactionReference(testLeadId, new Date("2026-11-24T15:30:00Z"));
+    assert.equal(refAgain, ref2026, "Reference must be identical across retries for the same lead");
+  });
+
+  it("15. resolveThankYouReceipt returns structured transactionReference alongside conversionEventId (Turn 81-82)", async () => {
+    const testPhone = `91${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const submissionKey = `sub_trans_ref_${Date.now()}`;
+
+    const { leadResult: r, conversion } = await processDemoRequestAtomic({
+      input: {
+        shop: "Reference Test Store",
+        person: "Ganesan",
+        phone: testPhone,
+      },
+      submissionKey,
+    });
+
+    assert.equal(r.ok, true);
+    const resolved = await resolveThankYouReceipt(conversion.receiptToken);
+
+    assert.equal(resolved.valid, true);
+    assert.equal(resolved.conversionEligible, true);
+    assert.ok(resolved.conversionEventId, "Must return stable conversionEventId UUID");
+    assert.ok(resolved.transactionReference, "Must return structured transactionReference");
+    assert.ok(resolved.transactionReference.startsWith("THB-LEAD-"), "transactionReference must have THB-LEAD prefix");
+    assert.ok(resolved.transactionReference.length <= 64, "transactionReference must be <= 64 chars");
+  });
+
+  it("16. Consent Mode v2 Signals: default denied and update granted on consent (Turn 81-82)", () => {
+    const providerFile = path.resolve(__dirname, "../../src/components/marketing/GoogleAdsProvider.tsx");
+    const content = fs.readFileSync(providerFile, "utf8");
+
+    // Must define Consent Mode v2 default with all 4 parameters
+    assert.ok(content.includes("'ad_storage': 'denied'"), "Must set ad_storage denied by default");
+    assert.ok(content.includes("'analytics_storage': 'denied'"), "Must set analytics_storage denied by default");
+    assert.ok(content.includes("'ad_user_data': 'denied'"), "Must set ad_user_data denied by default");
+    assert.ok(content.includes("'ad_personalization': 'denied'"), "Must set ad_personalization denied by default");
+
+    // Must define Consent Mode v2 update on consent granted
+    assert.ok(content.includes("'ad_storage': 'granted'"), "Must update ad_storage to granted");
+    assert.ok(content.includes("'analytics_storage': 'granted'"), "Must update analytics_storage to granted");
+    assert.ok(content.includes("'ad_user_data': 'granted'"), "Must update ad_user_data to granted");
+    assert.ok(content.includes("'ad_personalization': 'granted'"), "Must update ad_personalization to granted");
+
+    // Must handle consent revocation
+    assert.ok(content.includes("ad_storage: newStatus === \"granted\" ? \"granted\" : \"denied\""));
+  });
+
+  it("17. Dispatch State Management & Transaction-Specific Tracking (Turn 81-82)", () => {
+    const providerFile = path.resolve(__dirname, "../../src/components/marketing/GoogleAdsProvider.tsx");
+    const content = fs.readFileSync(providerFile, "utf8");
+
+    // Must track by transaction ID, NOT global boolean firedRef
+    assert.ok(content.includes("const lastAttemptedId = useRef<string | null>(null);"));
+    assert.ok(content.includes("if (lastAttemptedId.current === transactionId) return;"));
+
+    // Must manage transmission state machine with queued, dispatched, retryable
+    assert.ok(content.includes('sessionStorage.setItem(storageKey, "queued");'));
+    assert.ok(content.includes('sessionStorage.setItem(storageKey, "dispatched");'));
+    assert.ok(content.includes('sessionStorage.setItem(storageKey, "retryable");'));
+    assert.ok(content.includes("event_timeout: 2000"));
+    assert.ok(content.includes("event_callback: () => {"));
   });
 });

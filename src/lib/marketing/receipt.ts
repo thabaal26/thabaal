@@ -192,7 +192,19 @@ export type ResolvedThankYouReceipt = {
   valid: boolean;
   conversionEligible: boolean;
   conversionEventId: string | null;
+  transactionReference: string | null;
 };
+
+/**
+ * Formats a Google Ads-compliant, structured external transaction reference (max 64 chars, strictly no PII).
+ * Deterministically derived from authoritative lead identifier and creation timestamp.
+ * Example: THB-LEAD-2026-X11B5PXQ0R
+ */
+export function formatGoogleAdsTransactionReference(leadId: string, date: Date = new Date()): string {
+  const year = date.getUTCFullYear();
+  const cleanId = leadId.replace(/[^a-zA-Z0-9]/g, "").slice(-12).toUpperCase();
+  return `THB-LEAD-${year}-${cleanId}`;
+}
 
 /**
  * Server-only verification of a thank-you page receipt against PostgreSQL.
@@ -200,14 +212,14 @@ export type ResolvedThankYouReceipt = {
  */
 export async function resolveThankYouReceipt(rawToken: string | undefined | null): Promise<ResolvedThankYouReceipt> {
   if (!rawToken || typeof rawToken !== "string") {
-    return { valid: false, conversionEligible: false, conversionEventId: null };
+    return { valid: false, conversionEligible: false, conversionEventId: null, transactionReference: null };
   }
 
   let tokenHash: string;
   try {
     tokenHash = hashReceiptToken(rawToken);
   } catch {
-    return { valid: false, conversionEligible: false, conversionEventId: null };
+    return { valid: false, conversionEligible: false, conversionEventId: null, transactionReference: null };
   }
 
   const attempt = await db.demoConversionAttempt.findFirst({
@@ -218,18 +230,22 @@ export async function resolveThankYouReceipt(rawToken: string | undefined | null
     select: {
       outcome: true,
       conversionEventId: true,
+      leadId: true,
+      createdAt: true,
     },
   });
 
   if (!attempt) {
-    return { valid: false, conversionEligible: false, conversionEventId: null };
+    return { valid: false, conversionEligible: false, conversionEventId: null, transactionReference: null };
   }
 
   const isEligible = attempt.outcome === "CREATED" && typeof attempt.conversionEventId === "string" && attempt.conversionEventId.length > 0;
+  const transactionRef = isEligible ? formatGoogleAdsTransactionReference(attempt.leadId, attempt.createdAt) : null;
 
   return {
     valid: true,
     conversionEligible: isEligible,
     conversionEventId: isEligible ? attempt.conversionEventId : null,
+    transactionReference: transactionRef,
   };
 }

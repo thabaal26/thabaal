@@ -22,11 +22,21 @@ export function GoogleAdsProvider({ children }: { children: ReactNode }) {
   const [consent, setConsent] = useState<ConsentStatus>(null);
 
   useEffect(() => {
-    setConsent(getMarketingConsent());
+    const current = getMarketingConsent();
+    setConsent(current);
 
     const handler = (e: Event) => {
       const custom = e as CustomEvent<ConsentStatus>;
-      setConsent(custom.detail);
+      const newStatus = custom.detail;
+      setConsent(newStatus);
+      if (typeof window !== "undefined" && typeof (window as any).gtag === "function") {
+        (window as any).gtag("consent", "update", {
+          ad_storage: newStatus === "granted" ? "granted" : "denied",
+          analytics_storage: newStatus === "granted" ? "granted" : "denied",
+          ad_user_data: newStatus === "granted" ? "granted" : "denied",
+          ad_personalization: newStatus === "granted" ? "granted" : "denied",
+        });
+      }
     };
     window.addEventListener("thabaal:consent-change", handler);
     return () => window.removeEventListener("thabaal:consent-change", handler);
@@ -46,6 +56,18 @@ export function GoogleAdsProvider({ children }: { children: ReactNode }) {
               __html: `
                 window.dataLayer = window.dataLayer || [];
                 function gtag(){dataLayer.push(arguments);}
+                gtag('consent', 'default', {
+                  'ad_storage': 'denied',
+                  'analytics_storage': 'denied',
+                  'ad_user_data': 'denied',
+                  'ad_personalization': 'denied'
+                });
+                gtag('consent', 'update', {
+                  'ad_storage': 'granted',
+                  'analytics_storage': 'granted',
+                  'ad_user_data': 'granted',
+                  'ad_personalization': 'granted'
+                });
                 gtag('js', new Date());
                 gtag('config', '${GOOGLE_ADS_ID}');
               `,
@@ -66,18 +88,20 @@ export function GoogleAdsProvider({ children }: { children: ReactNode }) {
 
 export function GoogleAdsConversion({ transactionId }: { transactionId?: string | null }) {
   const { enabled } = useContext(AdsContext);
-  const firedRef = useRef(false);
+  const lastAttemptedId = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!enabled || !transactionId || firedRef.current) return;
+    if (!enabled || !transactionId) return;
+    if (lastAttemptedId.current === transactionId) return;
     if (typeof window === "undefined") return;
 
     const storageKey = `thabaal-ads-conv:${transactionId}`;
     try {
-      if (sessionStorage.getItem(storageKey) === "done") return;
+      const status = sessionStorage.getItem(storageKey);
+      if (status === "dispatched" || status === "done" || status === "queued") return;
     } catch {}
 
-    firedRef.current = true;
+    lastAttemptedId.current = transactionId;
 
     try {
       (window as any).dataLayer = (window as any).dataLayer || [];
@@ -87,18 +111,27 @@ export function GoogleAdsConversion({ transactionId }: { transactionId?: string 
         };
       }
 
+      try {
+        sessionStorage.setItem(storageKey, "queued");
+      } catch {}
+
       (window as any).gtag("event", "conversion", {
         send_to: `${GOOGLE_ADS_ID}/${GOOGLE_ADS_CONVERSION_LABEL}`,
         value: 1.0,
         currency: "INR",
         transaction_id: transactionId,
+        event_callback: () => {
+          try {
+            sessionStorage.setItem(storageKey, "dispatched");
+          } catch {}
+        },
+        event_timeout: 2000,
       });
-
-      try {
-        sessionStorage.setItem(storageKey, "done");
-      } catch {}
     } catch (err) {
       console.warn("[GoogleAdsConversion] Failed to dispatch conversion:", err);
+      try {
+        sessionStorage.setItem(storageKey, "retryable");
+      } catch {}
     }
   }, [enabled, transactionId]);
 
