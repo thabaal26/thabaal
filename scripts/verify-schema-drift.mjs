@@ -31,17 +31,19 @@ if (!dbUrl || !dbUrl.trim()) {
 
 console.log("[Schema Drift Gate] Running comprehensive schema diff check against database...");
 
-// Prefer local node_modules/.bin/prisma if available, otherwise fallback to npx with pinned version
-const localPrisma = path.resolve(
-  process.platform === "win32" ? "node_modules/.bin/prisma.cmd" : "node_modules/.bin/prisma"
-);
-const useLocalPrisma = fs.existsSync(localPrisma);
+// Prefer local node_modules/.bin/prisma if available, otherwise check build repo, otherwise fallback to npx with pinned version
+const candidatePrismaPaths = [
+  path.resolve(process.platform === "win32" ? "node_modules/.bin/prisma.cmd" : "node_modules/.bin/prisma"),
+  "/srv/thabaal/build/repo/node_modules/.bin/prisma",
+];
+const prismaBinary = candidatePrismaPaths.find((p) => fs.existsSync(p));
+const useLocalPrisma = Boolean(prismaBinary);
 
 let diffOutput = "";
 try {
-  if (useLocalPrisma) {
+  if (useLocalPrisma && prismaBinary) {
     diffOutput = execFileSync(
-      localPrisma,
+      prismaBinary,
       ["migrate", "diff", "--from-url", dbUrl, "--to-schema-datamodel", schemaPath, "--script"],
       {
         encoding: "utf8",
