@@ -113,25 +113,50 @@ export function GoogleAdsConversion({ transactionId }: { transactionId?: string 
     const storageKey = `thabaal-ads-conv:${transactionId}`;
 
     function parseState(): ConversionDispatchState | null {
+      // Step 1: Check memoryFallback FIRST.
+      // This guarantees that any updated state in memory (e.g. if setItem threw when storage quota exceeded)
+      // takes absolute precedence over older/stale sessionStorage data within the page lifecycle.
+      const inMemory = memoryFallback.get(storageKey);
+      if (inMemory) {
+        return inMemory;
+      }
+
       try {
         const raw = sessionStorage.getItem(storageKey);
-        if (!raw) return memoryFallback.get(storageKey) || null;
+        if (!raw) return null;
         if (raw.startsWith("{")) {
-          return JSON.parse(raw);
+          const parsed = JSON.parse(raw);
+          // Validate structure and attempt boundaries before accepting from storage
+          if (
+            typeof parsed.attempts !== "number" ||
+            !Number.isInteger(parsed.attempts) ||
+            parsed.attempts < 0 ||
+            parsed.attempts > MAX_DISPATCH_ATTEMPTS
+          ) {
+            return null;
+          }
+          memoryFallback.set(storageKey, parsed);
+          return parsed;
         }
         if (raw === "dispatched" || raw === "done" || raw === "tag_callback_completed") {
-          return { status: "tag_callback_completed", attempts: 1, lastAttemptTs: Date.now() };
+          const legacy: ConversionDispatchState = { status: "tag_callback_completed", attempts: 1, lastAttemptTs: Date.now() };
+          memoryFallback.set(storageKey, legacy);
+          return legacy;
         }
         if (raw.startsWith("queued:")) {
           const ts = parseInt(raw.slice(7), 10);
-          return { status: "pending", attempts: 1, lastAttemptTs: isNaN(ts) ? Date.now() : ts };
+          const legacy: ConversionDispatchState = { status: "pending", attempts: 1, lastAttemptTs: isNaN(ts) ? Date.now() : ts };
+          memoryFallback.set(storageKey, legacy);
+          return legacy;
         }
         if (raw === "retryable") {
-          return { status: "retryable", attempts: 1, lastAttemptTs: Date.now() };
+          const legacy: ConversionDispatchState = { status: "retryable", attempts: 1, lastAttemptTs: Date.now() };
+          memoryFallback.set(storageKey, legacy);
+          return legacy;
         }
-        return memoryFallback.get(storageKey) || null;
+        return null;
       } catch {
-        return memoryFallback.get(storageKey) || null;
+        return null;
       }
     }
 

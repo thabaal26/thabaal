@@ -252,7 +252,10 @@ export async function resolveThankYouReceipt(rawToken: string | undefined | null
   }
 
   const isEligible = attempt.outcome === "CREATED" && typeof attempt.conversionEventId === "string" && attempt.conversionEventId.length > 0;
-  const transactionRef = isEligible ? (attempt.transactionReference || formatGoogleAdsTransactionReference(attempt.leadId, attempt.createdAt)) : null;
+  // Turn 85-86 Architecture: Database check constraint 'chk_created_has_trans_ref' strictly guarantees
+  // transactionReference IS NOT NULL for outcome='CREATED'. Strictly select the persisted database reference;
+  // fail-closed with null if unpersisted rather than generating a transient unpersisted reference.
+  const transactionRef = isEligible ? (attempt.transactionReference ?? null) : null;
 
   return {
     valid: true,
