@@ -461,65 +461,76 @@ describe("Google Ads Conversion Pipeline & Zero-Leakage Boundary (Turn 48-49 Cer
     assert.ok(content.includes("ad_storage: newStatus === \"granted\" ? \"granted\" : \"denied\""));
   });
 
-  it("17. Dispatch State Management & Transaction-Specific Tracking (Turn 81-82)", () => {
+  it("17. Dispatch State Management & Transaction-Specific Tracking (Turn 81-83)", () => {
     const providerFile = path.resolve(__dirname, "../../src/components/marketing/GoogleAdsProvider.tsx");
     const content = fs.readFileSync(providerFile, "utf8");
 
-    // Must track by transaction ID, NOT global boolean firedRef
-    assert.ok(content.includes("const lastAttemptedId = useRef<string | null>(null);"));
-    assert.ok(content.includes("if (lastAttemptedId.current === transactionId) return;"));
-
-    // Must manage transmission state machine with queued timestamp, dispatched, retryable
-    assert.ok(content.includes("sessionStorage.setItem(storageKey, `queued:${now}`);"));
-    assert.ok(content.includes('sessionStorage.setItem(storageKey, "dispatched");'));
-    assert.ok(content.includes('sessionStorage.setItem(storageKey, "retryable");'));
-    assert.ok(content.includes("event_timeout: 2000"));
+    // Must manage transmission state machine with pending, tag_callback_completed, retryable, max_retries_exceeded
+    assert.ok(content.includes('status: "pending"'));
+    assert.ok(content.includes('status: "tag_callback_completed"'));
+    assert.ok(content.includes('status: "retryable"'));
+    assert.ok(content.includes('status: "max_retries_exceeded"'));
+    assert.ok(content.includes("event_timeout: DISPATCH_TIMEOUT_MS"));
     assert.ok(content.includes("event_callback: () => {"));
   });
 
-  it("18. Bounded queued:<timestamp> State Machine & Stale Queued Recovery (Turn 82-83 Architect Requirement 1)", () => {
+  it("18. Bounded State Machine & Stale Queued Recovery with Attempt Counter (Turn 82-84 Architect Requirement 1 & 2)", () => {
     const providerFile = path.resolve(__dirname, "../../src/components/marketing/GoogleAdsProvider.tsx");
     const content = fs.readFileSync(providerFile, "utf8");
 
-    // Must check for queued: timestamp and calculate elapsed time
-    assert.ok(content.includes('status.startsWith("queued:")'), "Must detect timestamped queued status");
-    assert.ok(content.includes("Date.now() - queuedTs"), "Must calculate elapsed time from timestamp");
-    assert.ok(content.includes("elapsed < 3000"), "Must bound in-flight suppression to timeout + grace period");
+    // Must enforce maximum attempts (bounded retry cap)
+    assert.ok(content.includes("const MAX_DISPATCH_ATTEMPTS = 3;"), "Must enforce MAX_DISPATCH_ATTEMPTS = 3");
+    assert.ok(content.includes("currentAttempts >= MAX_DISPATCH_ATTEMPTS"), "Must check against max attempts limit");
+    assert.ok(content.includes("IN_FLIGHT_WINDOW_MS"), "Must bound in-flight window to timeout + buffer");
 
-    // Functional logic simulation
+    // Functional logic simulation of the bounded state machine
+    const MAX_ATTEMPTS = 3;
     const now = Date.now();
-    const freshQueued = `queued:${now - 1000}`; // 1s ago
-    const staleQueued = `queued:${now - 3500}`; // 3.5s ago
 
-    function shouldSuppress(status: string): boolean {
-      if (status === "dispatched" || status === "done") return true;
-      if (status && status.startsWith("queued:")) {
-        const ts = parseInt(status.slice(7), 10);
-        const elapsed = now - ts;
-        if (!isNaN(ts) && elapsed < 3000) return true;
+    function evaluateAction(state: { status: string; attempts: number; lastAttemptTs: number } | null) {
+      if (!state) return "DISPATCH_NEW";
+      if (state.status === "tag_callback_completed" || state.status === "max_retries_exceeded") {
+        return "TERMINAL_SUPPRESS";
       }
-      return false;
+      if (state.attempts >= MAX_ATTEMPTS) {
+        return "TERMINAL_MAX_EXCEEDED";
+      }
+      if (state.status === "pending") {
+        const elapsed = now - state.lastAttemptTs;
+        if (elapsed < 3000) return "IN_FLIGHT_WAIT";
+        return "STALE_PENDING_RETRY";
+      }
+      if (state.status === "retryable") {
+        return "RETRY_ALLOWED";
+      }
+      return "DISPATCH_NEW";
     }
 
-    assert.equal(shouldSuppress("dispatched"), true, "Dispatched must permanently suppress");
-    assert.equal(shouldSuppress("done"), true, "Done must permanently suppress");
-    assert.equal(shouldSuppress(freshQueued), true, "Fresh queued within 3s must suppress duplicate");
-    assert.equal(shouldSuppress(staleQueued), false, "Stale queued older than 3s must allow bounded retry");
-    assert.equal(shouldSuppress("retryable"), false, "Retryable must allow retry");
+    assert.equal(evaluateAction({ status: "tag_callback_completed", attempts: 1, lastAttemptTs: now }), "TERMINAL_SUPPRESS");
+    assert.equal(evaluateAction({ status: "max_retries_exceeded", attempts: 3, lastAttemptTs: now }), "TERMINAL_SUPPRESS");
+    assert.equal(evaluateAction({ status: "pending", attempts: 1, lastAttemptTs: now - 1000 }), "IN_FLIGHT_WAIT");
+    assert.equal(evaluateAction({ status: "pending", attempts: 1, lastAttemptTs: now - 3500 }), "STALE_PENDING_RETRY");
+    assert.equal(evaluateAction({ status: "retryable", attempts: 2, lastAttemptTs: now }), "RETRY_ALLOWED");
+    assert.equal(evaluateAction({ status: "retryable", attempts: 3, lastAttemptTs: now }), "TERMINAL_MAX_EXCEEDED");
   });
 
-  it("19. Synchronous Dispatch Exception Recovery (Turn 82-83 Architect Requirement 2)", () => {
+  it("19. Synchronous Dispatch Exception Recovery & In-Page Timer Recovery (Turn 82-84 Architect Requirement 2)", () => {
     const providerFile = path.resolve(__dirname, "../../src/components/marketing/GoogleAdsProvider.tsx");
     const content = fs.readFileSync(providerFile, "utf8");
 
-    // In catch block, must reset lastAttemptedId.current to null and set storage to retryable
+    // In catch block, must clear in-flight lock and set storage to retryable or max_retries_exceeded
     assert.ok(
-      content.includes("lastAttemptedId.current = null;"),
-      "Must clear lastAttemptedId.current on synchronous dispatch failure"
+      content.includes("inFlightRef.current = false;"),
+      "Must clear inFlightRef.current on synchronous dispatch failure"
     );
     assert.ok(
-      content.includes('sessionStorage.setItem(storageKey, "retryable");'),
-      "Must mark storage status as retryable on catch"
+      content.includes("status: nextAttempts < MAX_DISPATCH_ATTEMPTS ? \"retryable\" : \"max_retries_exceeded\""),
+      "Must mark storage status as retryable with attempt tracking"
+    );
+    // In-page automatic recovery timer must be present
+    assert.ok(
+      content.includes("recoveryTimer = setTimeout("),
+      "Must schedule automatic in-page recovery timer"
     );
   });
 

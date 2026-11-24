@@ -86,31 +86,95 @@ export function GoogleAdsProvider({ children }: { children: ReactNode }) {
   );
 }
 
+interface ConversionDispatchState {
+  status: "pending" | "tag_callback_completed" | "retryable" | "max_retries_exceeded";
+  attempts: number;
+  lastAttemptTs: number;
+}
+
+const MAX_DISPATCH_ATTEMPTS = 3;
+const DISPATCH_TIMEOUT_MS = 2000; // matches Google event_timeout: 2000
+const GRACE_BUFFER_MS = 1000;
+const IN_FLIGHT_WINDOW_MS = DISPATCH_TIMEOUT_MS + GRACE_BUFFER_MS; // 3000ms
+
 export function GoogleAdsConversion({ transactionId }: { transactionId?: string | null }) {
   const { enabled } = useContext(AdsContext);
-  const lastAttemptedId = useRef<string | null>(null);
+  const [attemptTrigger, setAttemptTrigger] = useState(0);
+  const inFlightRef = useRef(false);
 
   useEffect(() => {
     if (!enabled || !transactionId) return;
-    if (lastAttemptedId.current === transactionId) return;
     if (typeof window === "undefined") return;
 
     const storageKey = `thabaal-ads-conv:${transactionId}`;
-    try {
-      const status = sessionStorage.getItem(storageKey);
-      if (status === "dispatched" || status === "done") return;
-      if (status && status.startsWith("queued:")) {
-        const queuedTs = parseInt(status.slice(7), 10);
-        const elapsed = Date.now() - queuedTs;
-        // Suppress concurrent duplicate if in flight within event_timeout (2000ms) + grace buffer (1000ms) = 3000ms
-        if (!isNaN(queuedTs) && elapsed < 3000) {
-          return;
-        }
-        // If elapsed >= 3000ms, past in-flight attempt timed out or page was reloaded: allow bounded retry
-      }
-    } catch {}
 
-    lastAttemptedId.current = transactionId;
+    function parseState(): ConversionDispatchState | null {
+      try {
+        const raw = sessionStorage.getItem(storageKey);
+        if (!raw) return null;
+        if (raw.startsWith("{")) {
+          return JSON.parse(raw);
+        }
+        if (raw === "dispatched" || raw === "done" || raw === "tag_callback_completed") {
+          return { status: "tag_callback_completed", attempts: 1, lastAttemptTs: Date.now() };
+        }
+        if (raw.startsWith("queued:")) {
+          const ts = parseInt(raw.slice(7), 10);
+          return { status: "pending", attempts: 1, lastAttemptTs: isNaN(ts) ? Date.now() : ts };
+        }
+        if (raw === "retryable") {
+          return { status: "retryable", attempts: 1, lastAttemptTs: Date.now() };
+        }
+        return null;
+      } catch {
+        return null;
+      }
+    }
+
+    function saveState(state: ConversionDispatchState) {
+      try {
+        sessionStorage.setItem(storageKey, JSON.stringify(state));
+      } catch {}
+    }
+
+    const current = parseState();
+
+    // 1. Terminal states: permanent suppression for this session
+    if (current?.status === "tag_callback_completed" || current?.status === "max_retries_exceeded") {
+      return;
+    }
+
+    const currentAttempts = current?.attempts ?? 0;
+    if (currentAttempts >= MAX_DISPATCH_ATTEMPTS) {
+      saveState({ status: "max_retries_exceeded", attempts: currentAttempts, lastAttemptTs: Date.now() });
+      return;
+    }
+
+    // 2. In-flight concurrency check: if currently pending within window, do not double-dispatch
+    if (current?.status === "pending") {
+      const elapsed = Date.now() - current.lastAttemptTs;
+      if (elapsed < IN_FLIGHT_WINDOW_MS) {
+        // Schedule recovery timer for remaining time if not already handled
+        const remaining = IN_FLIGHT_WINDOW_MS - elapsed;
+        const timer = setTimeout(() => {
+          setAttemptTrigger((prev) => prev + 1);
+        }, remaining + 100);
+        return () => clearTimeout(timer);
+      }
+      // If elapsed >= 3000ms, past attempt expired without callback -> falls through to bounded retry
+    }
+
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+
+    const nextAttempts = currentAttempts + 1;
+    saveState({
+      status: "pending",
+      attempts: nextAttempts,
+      lastAttemptTs: Date.now(),
+    });
+
+    let recoveryTimer: NodeJS.Timeout | null = null;
 
     try {
       (window as any).dataLayer = (window as any).dataLayer || [];
@@ -120,10 +184,19 @@ export function GoogleAdsConversion({ transactionId }: { transactionId?: string 
         };
       }
 
-      const now = Date.now();
-      try {
-        sessionStorage.setItem(storageKey, `queued:${now}`);
-      } catch {}
+      // Schedule in-page automatic recovery timer if Google callback stalls
+      recoveryTimer = setTimeout(() => {
+        inFlightRef.current = false;
+        const check = parseState();
+        if (check?.status === "pending") {
+          if (nextAttempts < MAX_DISPATCH_ATTEMPTS) {
+            saveState({ status: "retryable", attempts: nextAttempts, lastAttemptTs: Date.now() });
+            setAttemptTrigger((prev) => prev + 1);
+          } else {
+            saveState({ status: "max_retries_exceeded", attempts: nextAttempts, lastAttemptTs: Date.now() });
+          }
+        }
+      }, IN_FLIGHT_WINDOW_MS);
 
       (window as any).gtag("event", "conversion", {
         send_to: `${GOOGLE_ADS_ID}/${GOOGLE_ADS_CONVERSION_LABEL}`,
@@ -131,20 +204,31 @@ export function GoogleAdsConversion({ transactionId }: { transactionId?: string 
         currency: "INR",
         transaction_id: transactionId,
         event_callback: () => {
-          try {
-            sessionStorage.setItem(storageKey, "dispatched");
-          } catch {}
+          if (recoveryTimer) clearTimeout(recoveryTimer);
+          inFlightRef.current = false;
+          saveState({
+            status: "tag_callback_completed",
+            attempts: nextAttempts,
+            lastAttemptTs: Date.now(),
+          });
         },
-        event_timeout: 2000,
+        event_timeout: DISPATCH_TIMEOUT_MS,
       });
     } catch (err) {
       console.warn("[GoogleAdsConversion] Failed to dispatch conversion:", err);
-      lastAttemptedId.current = null; // Clear so subsequent re-render or recovery attempt can retry cleanly
-      try {
-        sessionStorage.setItem(storageKey, "retryable");
-      } catch {}
+      if (recoveryTimer) clearTimeout(recoveryTimer);
+      inFlightRef.current = false;
+      saveState({
+        status: nextAttempts < MAX_DISPATCH_ATTEMPTS ? "retryable" : "max_retries_exceeded",
+        attempts: nextAttempts,
+        lastAttemptTs: Date.now(),
+      });
     }
-  }, [enabled, transactionId]);
+
+    return () => {
+      if (recoveryTimer) clearTimeout(recoveryTimer);
+    };
+  }, [enabled, transactionId, attemptTrigger]);
 
   return null;
 }
