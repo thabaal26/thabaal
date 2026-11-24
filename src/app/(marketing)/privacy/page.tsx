@@ -14,7 +14,7 @@ import { ScrollReveal } from "@/components/motion";
  *   NEXT_PUBLIC_SALES_WHATSAPP (shown as a second way to reach us when set)
  */
 
-const LAST_UPDATED = "13 October 2026";
+const LAST_UPDATED = "24 November 2026";
 const EMAIL = process.env.NEXT_PUBLIC_PRIVACY_EMAIL || process.env.NEXT_PUBLIC_SALES_EMAIL || "privacy@thabaal.in";
 const LEGAL_NAME = process.env.NEXT_PUBLIC_LEGAL_NAME || "Thabaal";
 const ADDRESS = process.env.NEXT_PUBLIC_LEGAL_ADDRESS || "India";

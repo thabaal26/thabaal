@@ -65,12 +65,12 @@ export function GoogleAdsProvider({ children }: { children: ReactNode }) {
 }
 
 export function GoogleAdsConversion({ transactionId }: { transactionId?: string | null }) {
-  const { ready, enabled } = useContext(AdsContext);
+  const { enabled } = useContext(AdsContext);
   const firedRef = useRef(false);
 
   useEffect(() => {
-    if (!enabled || !ready || !transactionId || firedRef.current) return;
-    if (typeof window === "undefined" || !(window as any).gtag) return;
+    if (!enabled || !transactionId || firedRef.current) return;
+    if (typeof window === "undefined") return;
 
     const storageKey = `thabaal-ads-conv:${transactionId}`;
     try {
@@ -80,21 +80,27 @@ export function GoogleAdsConversion({ transactionId }: { transactionId?: string 
     firedRef.current = true;
 
     try {
+      (window as any).dataLayer = (window as any).dataLayer || [];
+      if (typeof (window as any).gtag !== "function") {
+        (window as any).gtag = function () {
+          (window as any).dataLayer.push(arguments);
+        };
+      }
+
       (window as any).gtag("event", "conversion", {
         send_to: `${GOOGLE_ADS_ID}/${GOOGLE_ADS_CONVERSION_LABEL}`,
         value: 1.0,
         currency: "INR",
         transaction_id: transactionId,
-        event_callback: () => {
-          try {
-            sessionStorage.setItem(storageKey, "done");
-          } catch {}
-        },
       });
+
+      try {
+        sessionStorage.setItem(storageKey, "done");
+      } catch {}
     } catch (err) {
       console.warn("[GoogleAdsConversion] Failed to dispatch conversion:", err);
     }
-  }, [enabled, ready, transactionId]);
+  }, [enabled, transactionId]);
 
   return null;
 }
