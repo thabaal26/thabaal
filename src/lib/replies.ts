@@ -35,6 +35,13 @@ export type IncomingReply = {
   media?: { id: string; type: string };
   /** Their WhatsApp profile name (sent with every message): fills in a customer still named by their number. */
   profileName?: string | null;
+  /** Inbound Click-to-WhatsApp referral attribution for Conversions API (Turn 74) */
+  referral?: {
+    source_type?: string;
+    source_id?: string;
+    headline?: string;
+    ctwa_clid?: string;
+  };
 };
 
 const MEDIA_TYPES = ["image", "audio", "video", "document", "sticker"];
@@ -90,7 +97,21 @@ export async function recordReply(r: IncomingReply) {
     // the reply itself (webhooks retry; the same message id arriving twice is expected);
     db.reply
       .create({
-        data: { customerId: id, senderId, text: r.text.trim().slice(0, 4000), kind: r.kind, mediaId: r.media?.id, mediaType: r.media?.type, waMessageId: r.waMessageId, contextId: r.contextId ?? null, receivedAt: r.at ?? new Date() },
+        data: {
+          customerId: id,
+          senderId,
+          text: r.text.trim().slice(0, 4000),
+          kind: r.kind,
+          mediaId: r.media?.id,
+          mediaType: r.media?.type,
+          waMessageId: r.waMessageId,
+          contextId: r.contextId ?? null,
+          receivedAt: r.at ?? new Date(),
+          referralSourceType: r.referral?.source_type ?? null,
+          referralSourceId: r.referral?.source_id ?? null,
+          referralHeadline: r.referral?.headline ?? null,
+          ctwaClid: r.referral?.ctwa_clid ?? null,
+        },
       })
       .catch((e) => {
         if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) throw e;

@@ -702,7 +702,25 @@ export async function POST(req: NextRequest) {
               await joinFromWhatsApp({ phone: m.from, profileName, source: join[1], phoneNumberId }).catch((e) => console.error("Could not add joining customer", e));
             }
             const profileName = v.contacts?.find((c: { wa_id?: string }) => c.wa_id === m.from)?.profile?.name ?? null;
-            const customer = await recordReply({ phone: m.from, text, kind, media, waMessageId: m.id, contextId: m.context?.id ? String(m.context.id) : null, phoneNumberId, at: m.timestamp ? new Date(Number(m.timestamp) * 1000) : undefined, profileName });
+            const customer = await recordReply({
+              phone: m.from,
+              text,
+              kind,
+              media,
+              waMessageId: m.id,
+              contextId: m.context?.id ? String(m.context.id) : null,
+              phoneNumberId,
+              at: m.timestamp ? new Date(Number(m.timestamp) * 1000) : undefined,
+              profileName,
+              referral: m.referral
+                ? {
+                    source_type: m.referral.source_type,
+                    source_id: m.referral.source_id,
+                    headline: m.referral.headline,
+                    ctwa_clid: m.referral.ctwa_clid,
+                  }
+                : undefined,
+            });
             const clientName = customer?.client?.name || "Thabaal";
 
             // An answer to our "may we call you?" prompt is saved above (applyCallPermission); it isn't a campaign button,

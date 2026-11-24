@@ -20,6 +20,7 @@ import { replyWindowEnd } from "./replies";
 import { senderFor } from "./senders";
 import { renderFor, type TemplateButton, type VarMap } from "./template";
 import { MetaError, sendInteractiveButtons, sendMediaMessage, sendOrderStatus, sendPaymentRequest, sendPaymentTemplate, sendTextMessage } from "./whatsapp";
+import { recordWhatsAppPurchaseConversion } from "./meta-conversions";
 
 // WhatsApp payments for orders: the "Review and pay" request, reminders, confirmation and the order card
 // in the customer's chat. Shared by the webhook, the Orders page and the scheduler.
@@ -359,6 +360,9 @@ async function confirmPaymentOnce(orderId: string, txnId: string | null | undefi
   if (rec.source === "staff" || rec.source === "verified")
     await logPaymentEvent({ clientId: order.clientId, orderId: order.id, source: "staff", status: "recorded", transactionId: txnId ?? null, utr: rec.utr ?? utrOf(txnId) ?? order.paymentUtr, amount, currency: order.currency, note: `${rec.source === "verified" ? "Checked and confirmed" : "Recorded"} by staff${method ? ` (${method})` : ""}` });
   pushOrderToSheet(order.id, "ORDER_UPDATE", full ? "Payment received" : "Part payment received");
+  if (full) {
+    recordWhatsAppPurchaseConversion(order.id, order.clientId, order.customerId, received, order.currency ?? "INR").catch(() => {});
+  }
   if (!full || rec.quiet) return true;
   // Payment settings › Reminder rules › "Send a receipt when paid" off: no thank-you message.
   if (!(await paySettingsFor(order.clientId)).settings.receipt) return true;

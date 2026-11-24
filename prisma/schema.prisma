@@ -54,6 +54,7 @@ model Client {
   /// Superseded by WhatsAppNumber; kept so older rows stay readable.
   waPhoneNumberId       String?                @unique
   waBusinessAccountId   String?
+  wabaDatasetId         String?
   /// Branding their login sees. Colours are #rrggbb; image paths are under /public or full URLs.
   brandPrimary          String?
   brandAccent           String?
@@ -596,10 +597,16 @@ model Reply {
   handled     Boolean         @default(false)
   receivedAt  DateTime        @default(now())
 
+  referralSourceType String?
+  referralSourceId   String?
+  referralHeadline   String?
+  ctwaClid           String?
+
   @@index([customerId, receivedAt])
   @@index([handled, receivedAt])
   @@index([contextId])
   @@index([senderId])
+  @@index([ctwaClid])
 }
 
 enum OrderStatus {
@@ -643,6 +650,8 @@ model Order {
   internalNote       String?
   /// Values of the client's custom order fields, by key (lib/custom-fields.ts).
   extra              Json?
+  /// Click-to-WhatsApp click identifier for Conversions API attribution.
+  ctwaClid           String?
   /// When the refill reminder for this order went out, so it's sent once.
   reminderSentAt     DateTime?
   /// Where the order came from outside WhatsApp, e.g. a Google Sheet row; keeps a sync from adding it twice.
@@ -1391,4 +1400,39 @@ model ImportErrorLog {
 
   @@index([batchId])
   @@index([clientId])
+}
+
+enum MetaConversionStatus {
+  PENDING
+  SUBMITTING
+  SENT
+  FAILED_RETRYABLE
+  UNKNOWN_EXTERNAL_OUTCOME
+  PERMANENT_FAILURE
+}
+
+/// Idempotent outbox for Meta Business Messaging Conversions API (Turn 74)
+model MetaConversionOutbox {
+  id             String               @id @default(cuid())
+  clientId       String
+  wabaId         String
+  datasetId      String
+  conversationId String?
+  orderId        String
+  eventName      String
+  eventTime      DateTime
+  currency       String?
+  value          Decimal?             @db.Decimal(10, 2)
+  status         MetaConversionStatus @default(PENDING)
+  attemptCount   Int                  @default(0)
+  metaTraceId    String?
+  metaResponse   Json?
+  lastError      String?
+  submittedAt    DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@unique([clientId, orderId, eventName])
+  @@index([clientId, status])
+  @@index([wabaId, datasetId])
 }

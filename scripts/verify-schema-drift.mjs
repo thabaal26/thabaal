@@ -32,7 +32,9 @@ if (!dbUrl || !dbUrl.trim()) {
 console.log("[Schema Drift Gate] Running comprehensive schema diff check against database...");
 
 // Prefer local node_modules/.bin/prisma if available, otherwise fallback to npx with pinned version
-const localPrisma = path.resolve("node_modules/.bin/prisma");
+const localPrisma = path.resolve(
+  process.platform === "win32" ? "node_modules/.bin/prisma.cmd" : "node_modules/.bin/prisma"
+);
 const useLocalPrisma = fs.existsSync(localPrisma);
 
 let diffOutput = "";
@@ -48,6 +50,7 @@ try {
         timeout: 120_000,
         maxBuffer: 10 * 1024 * 1024,
         env: process.env,
+        shell: process.platform === "win32",
       }
     );
   } else {
@@ -61,6 +64,7 @@ try {
         timeout: 120_000,
         maxBuffer: 10 * 1024 * 1024,
         env: process.env,
+        shell: process.platform === "win32",
       }
     );
   }
