@@ -23,6 +23,7 @@ import { effectivePlan, planUsage } from "@/lib/subscription";
 import { StaffLogins } from "./staff-logins";
 import { inr } from "../portal-format";
 import { LangChoice, PortalPage, T } from "../portal-ui";
+import { MetaBusinessConnectionCard, type MetaBusinessConnectionData } from "@/components/settings/MetaBusinessConnectionCard";
 
 /** The order update templates the shop's order steps need, each with its best status (any plain or picture version). */
 async function orderTemplateRows(clientId: string, flow: OrderFlowKey) {
@@ -82,7 +83,7 @@ export default async function SettingsPage() {
             .then((c) => c?.products.length ?? null)
             .catch(() => null),
           db.order.count({ where: { clientId: cid } }),
-          db.client.findUnique({ where: { id: cid }, select: { name: true, website: true, supportPhone: true, paymentConfig: true, paySettings: true, billingMode: true, orderFlow: true, sheetCustomersUrl: true, sheetOrdersUrl: true, sheetSyncedAt: true, sheetHookUrl: true, customFields: true, defaultImageUrl: true, bannerUrl: true } }),
+          db.client.findUnique({ where: { id: cid }, select: { name: true, website: true, supportPhone: true, paymentConfig: true, paySettings: true, billingMode: true, orderFlow: true, sheetCustomersUrl: true, sheetOrdersUrl: true, sheetSyncedAt: true, sheetHookUrl: true, customFields: true, defaultImageUrl: true, bannerUrl: true, waBusinessAccountId: true, waPhoneNumberId: true } }),
           spendSummary(cid).catch(() => null),
           db.template.findFirst({ where: { clientId: cid, name: PAYMENT_TEMPLATE }, select: { status: true } }),
           paymentTemplateFor(cid),
@@ -107,8 +108,38 @@ export default async function SettingsPage() {
       : r === "RED" ? { tone: "bad", label: "Low quality", labelTa: "குறைந்த தரம்" }
       : { tone: "mute", label: "Not rated yet", labelTa: "இன்னும் மதிப்பிடப்படவில்லை" }
     );
+
+    const metaCardData: MetaBusinessConnectionData = {
+      businessPortfolioId: null,
+      businessPortfolioName: client?.name ?? "Business",
+      wabaId: client?.waBusinessAccountId ?? (numbers[0]?.businessAccountId ?? null),
+      fallbackPhoneNumberId: client?.waPhoneNumberId ?? null,
+      connectionStatus: (numbers.length > 0 || client?.waBusinessAccountId) ? "CONNECTED" : "NOT_CONNECTED",
+      verificationStatus: "VERIFIED",
+      lastVerifiedAt: numbers[0]?.statusCheckedAt ? fmtDate(numbers[0].statusCheckedAt, "d MMM, h:mm a") : null,
+      phoneNumbers: numbers.map((n) => ({
+        id: n.id,
+        phoneNumberId: n.phoneNumberId,
+        displayPhone: n.displayPhone,
+        verifiedName: n.verifiedName || n.label,
+        qualityRating: n.qualityRating,
+        messagingTier: n.limit ? `Tier (${n.limit.toLocaleString("en-IN")}/day)` : null,
+        limit: n.limit,
+        isDefault: n.isDefault,
+      })),
+    };
+
     return frame(
       <div className="stack">
+        {cid && (
+          <ScrollReveal>
+            <MetaBusinessConnectionCard
+              data={metaCardData}
+              canManageIntegration={scope.manager}
+            />
+          </ScrollReveal>
+        )}
+
         {cid && client && (
           <ScrollReveal>
             <PaymentSetupForm
@@ -257,61 +288,6 @@ export default async function SettingsPage() {
           <StaggerItem>{langCard}</StaggerItem>
           <StaggerItem>{lookCard}</StaggerItem>
         </StaggerGroup>
-
-
-        {cid && (
-          <ScrollReveal>
-            <section className="card">
-              <div className="hd">
-                <div>
-                  <h2><T ta="WhatsApp எண்கள்">WhatsApp numbers</T></h2>
-                  <p><T ta="தரம் மதிப்பீடு உங்கள் செய்திகளைப் பற்றி வாடிக்கையாளர்கள் எவ்வாறு உணர்கிறார்கள் என்பதைக் காட்டுகிறது.">Quality rating shows how customers feel about your messages.</T></p>
-                </div>
-                <Link className="btn" href="/dashboard/settings/whatsapp">
-                  <T ta="WhatsApp அமைப்புகள்">Manage Integration</T>
-                </Link>
-              </div>
-              <div className="list">
-                {numbers.map((n) => {
-                  const qy = quality(n.qualityRating);
-                  return (
-                    <div key={n.id} className="row">
-                      <div className="grow">
-                        <div className="t">
-                          {n.verifiedName || n.label}
-                          {n.isDefault && (
-                            <span className="muted small">
-                              {" "}· <T ta="முதன்மை எண்">main number</T>
-                            </span>
-                          )}
-                        </div>
-                        <div className="muted small">
-                          {n.displayPhone ?? <T ta="எண் இன்னும் காட்டப்படவில்லை">Number not shown yet</T>}
-                          {n.limit != null ? (
-                            <>
-                              {" "}· <T ta={`ஒரு நாளைக்கு ${n.limit.toLocaleString("en-IN")} வாடிக்கையாளர்கள் வரை`}>{`up to ${n.limit.toLocaleString("en-IN")} customers a day`}</T>
-                            </>
-                          ) : ""}
-                        </div>
-                      </div>
-                      <span className={`pill ${qy.tone}`}><T ta={qy.labelTa}>{qy.label}</T></span>
-                    </div>
-                  );
-                })}
-                {numbers.length === 0 && (
-                  <div className="py-2 space-y-2">
-                    <p className="muted small">
-                      <T ta="இன்னும் WhatsApp எண் இணைக்கப்படவில்லை.">No WhatsApp number connected yet.</T>
-                    </p>
-                    <Link className="btn btn-primary" href="/dashboard/settings/whatsapp/connect">
-                      <T ta="WhatsApp இணைக்கவும்">Connect WhatsApp →</T>
-                    </Link>
-                  </div>
-                )}
-              </div>
-            </section>
-          </ScrollReveal>
-        )}
 
         {cid && teamUsage && (
           <ScrollReveal>
