@@ -97,6 +97,10 @@ const DISPATCH_TIMEOUT_MS = 2000; // matches Google event_timeout: 2000
 const GRACE_BUFFER_MS = 1000;
 const IN_FLIGHT_WINDOW_MS = DISPATCH_TIMEOUT_MS + GRACE_BUFFER_MS; // 3000ms
 
+// Module-scoped in-memory session cache ensuring retry-limit bound is strictly enforced
+// even in private browsing, partitioned storage, or if sessionStorage throws.
+const memoryFallback = new Map<string, ConversionDispatchState>();
+
 export function GoogleAdsConversion({ transactionId }: { transactionId?: string | null }) {
   const { enabled } = useContext(AdsContext);
   const [attemptTrigger, setAttemptTrigger] = useState(0);
@@ -111,7 +115,7 @@ export function GoogleAdsConversion({ transactionId }: { transactionId?: string 
     function parseState(): ConversionDispatchState | null {
       try {
         const raw = sessionStorage.getItem(storageKey);
-        if (!raw) return null;
+        if (!raw) return memoryFallback.get(storageKey) || null;
         if (raw.startsWith("{")) {
           return JSON.parse(raw);
         }
@@ -125,9 +129,9 @@ export function GoogleAdsConversion({ transactionId }: { transactionId?: string 
         if (raw === "retryable") {
           return { status: "retryable", attempts: 1, lastAttemptTs: Date.now() };
         }
-        return null;
+        return memoryFallback.get(storageKey) || null;
       } catch {
-        return null;
+        return memoryFallback.get(storageKey) || null;
       }
     }
 
@@ -135,6 +139,7 @@ export function GoogleAdsConversion({ transactionId }: { transactionId?: string 
       try {
         sessionStorage.setItem(storageKey, JSON.stringify(state));
       } catch {}
+      memoryFallback.set(storageKey, state);
     }
 
     const current = parseState();
@@ -175,6 +180,7 @@ export function GoogleAdsConversion({ transactionId }: { transactionId?: string 
     });
 
     let recoveryTimer: NodeJS.Timeout | null = null;
+    let retryTimer: NodeJS.Timeout | null = null;
 
     try {
       (window as any).dataLayer = (window as any).dataLayer || [];
@@ -205,6 +211,7 @@ export function GoogleAdsConversion({ transactionId }: { transactionId?: string 
         transaction_id: transactionId,
         event_callback: () => {
           if (recoveryTimer) clearTimeout(recoveryTimer);
+          if (retryTimer) clearTimeout(retryTimer);
           inFlightRef.current = false;
           saveState({
             status: "tag_callback_completed",
@@ -218,15 +225,23 @@ export function GoogleAdsConversion({ transactionId }: { transactionId?: string 
       console.warn("[GoogleAdsConversion] Failed to dispatch conversion:", err);
       if (recoveryTimer) clearTimeout(recoveryTimer);
       inFlightRef.current = false;
+      const targetStatus = nextAttempts < MAX_DISPATCH_ATTEMPTS ? "retryable" : "max_retries_exceeded";
       saveState({
-        status: nextAttempts < MAX_DISPATCH_ATTEMPTS ? "retryable" : "max_retries_exceeded",
+        status: targetStatus,
         attempts: nextAttempts,
         lastAttemptTs: Date.now(),
       });
+      if (nextAttempts < MAX_DISPATCH_ATTEMPTS) {
+        const backoffMs = Math.min(1000 * Math.pow(2, nextAttempts - 1), 4000);
+        retryTimer = setTimeout(() => {
+          setAttemptTrigger((prev) => prev + 1);
+        }, backoffMs);
+      }
     }
 
     return () => {
       if (recoveryTimer) clearTimeout(recoveryTimer);
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, [enabled, transactionId, attemptTrigger]);
 
