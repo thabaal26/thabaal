@@ -286,10 +286,10 @@ export default function PrivacyPage() {
 
           <Section id="transfers" title="8. Where your data is stored">
             <p>
-              Our production web application, PostgreSQL database and uploaded media storage are hosted on a self-hosted <strong>Hostinger VPS in Mumbai, Maharashtra, India</strong>{" "}
-              (<code>189.72.145.225</code>). When you sign in with Google, connect Meta WhatsApp, grant optional Google Ads marketing consent, pay via Razorpay, receive email via
-              Resend or trigger optional AI features, relevant data may also be processed by those providers in India, the United States or other regions where they operate,
-              encrypted in transit and at rest and subject to applicable Indian law.
+              Our production web application, PostgreSQL database and uploaded media storage are hosted on a self-managed <strong>Hostinger KVM VPS in India</strong>. When you sign in
+              with Google, connect Meta WhatsApp, grant optional Google Ads marketing consent, pay via Razorpay, receive email via Resend or trigger optional AI features, relevant data
+              may also be processed by those providers in India, the United States or other regions where they operate, encrypted in transit and at rest and subject to applicable Indian
+              law.
             </p>
           </Section>
 
@@ -308,9 +308,11 @@ export default function PrivacyPage() {
               <li>
                 <strong>Processing, security and operational logs:</strong> under our current VPS configuration, rotated application, cron and backup logs are kept for up to{" "}
                 <strong>8 weeks</strong>, database logs for up to <strong>10 weeks</strong>, system logs for <strong>4 weeks</strong>, security rate-limit records for{" "}
-                <strong>24 hours</strong> and webhook deduplication claims for <strong>30 days</strong>. Rules 6 and 8(3) of the DPDP Rules, 2025 (notified under G.S.R. 846(E))
-                are scheduled to commence on <strong>13 May 2027</strong>, introducing a statutory minimum one-year retention period for relevant processing logs, ahead of which we
-                will extend our log retention window accordingly.
+                <strong>24 hours</strong> and webhook deduplication claims for <strong>30 days</strong>. Rule 6(1)(e) of the DPDP Rules, 2025 is scheduled to commence on{" "}
+                <strong>13 May 2027</strong>. It requires one-year retention of the logs and personal data relevant to detecting, investigating and remediating unauthorised access and
+                supporting continued processing after a compromise. We will extend the retention of those relevant security records before that commencement date. Rule 8(3) provides a
+                separate one-year retention requirement only for processing purposes specified in the Seventh Schedule; it is not a general one-year retention rule for all Thabaal
+                operational logs.
               </li>
               <li>
                 <strong>Billing and tax records:</strong> kept for as long as Indian tax and accounting laws require, then deleted.
@@ -359,8 +361,9 @@ export default function PrivacyPage() {
               </li>
               <li>
                 <strong>Marketing consent:</strong> if you choose &ldquo;Accept&rdquo; on our cookie banner, all four Consent Mode v2 parameters are updated to <code>granted</code>{" "}
-                and Google measurement tags may load. If you choose &ldquo;Decline&rdquo; or withdraw consent, all four parameters are updated to <code>denied</code> and Google Ads
-                scripts remain blocked.
+                and Google measurement tags may load. If you choose &ldquo;Decline&rdquo;, Google Ads tags are not loaded. If you later withdraw consent after a tag has loaded, all
+                four parameters are updated to <code>denied</code> and Thabaal stops dispatching new conversion events. A tag script already downloaded may remain in the current
+                document until that document is unloaded; it is not loaded in a later page lifecycle unless you grant consent again.
               </li>
               <li>
                 <strong>Consent preference retention:</strong> the <code>thabaal_marketing_consent</code> cookie is kept for up to <strong>365 days</strong>. The{" "}
@@ -388,10 +391,11 @@ export default function PrivacyPage() {
             </ul>
             <p>
               India&apos;s Digital Personal Data Protection Act, 2023 and the Digital Personal Data Protection Rules, 2025 have phased commencement under notifications G.S.R. 843(E)
-              and G.S.R. 846(E) (dated 13 November 2025): the statutory Data Principal rights framework in Sections 11&ndash;14 and corresponding Rules 5&ndash;16 (including Data
-              Protection Board escalation) are scheduled to take legal effect on <strong>13 May 2027</strong>. We provide these privacy request channels voluntarily today and respond
-              within 30 days at the latest. Email <Mail /> from the email address or WhatsApp number concerned so we can confirm your identity; if you are a merchant&apos;s customer,
-              we will coordinate with the business that holds your data.
+              and G.S.R. 846(E), dated 13 November 2025. The statutory Data Principal rights in Sections 11&ndash;14 of the Act, including the Section 13 grievance redressal and
+              complaint route to the Data Protection Board, are scheduled to commence on <strong>13 May 2027</strong>. Rules 3 and 5&ndash;16 of the Rules are also scheduled for that
+              date. The Board-related provisions in Sections 18&ndash;26 of the Act and Rules 17&ndash;21 of the Rules commenced upon publication. We provide privacy request channels
+              voluntarily today and respond within 30 days at the latest. Email <Mail /> from the email address or WhatsApp number concerned so we can confirm your identity; if you are a
+              merchant&apos;s customer, we will coordinate with the business that holds your data.
             </p>
           </Section>
 

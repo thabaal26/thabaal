@@ -204,7 +204,8 @@ export type ResolvedThankYouReceipt = {
 };
 
 /**
- * Formats a Google Ads-compliant, structured external transaction reference (max 64 chars, strictly no PII).
+ * Formats a Google Ads-compliant, structured external opaque pseudonymous transaction reference
+ * (max 64 chars; excludes direct customer PII such as names, phone numbers, or email addresses).
  * Deterministically derived from authoritative lead identifier and creation timestamp.
  * Preserves full leadId (up to 48 chars) without suffix truncation to ensure absolute uniqueness.
  * Example: THB-LEAD-2026-CMWUXHGR00000KZ2U4366PDT5
@@ -218,8 +219,9 @@ export function formatGoogleAdsTransactionReference(leadId: string, date: Date =
 }
 
 /**
- * Server-only verification of a thank-you page receipt against PostgreSQL.
- * Strictly verifies expiry, outcome, and non-consumed conversion eligibility.
+ * Server-only verification of a thank-you page receipt bearer token against PostgreSQL.
+ * Verifies SHA-256 token hash, 10-minute expiry, and CREATED outcome eligibility
+ * (reusable until expiry; not consumed on read in PostgreSQL).
  */
 export async function resolveThankYouReceipt(rawToken: string | undefined | null): Promise<ResolvedThankYouReceipt> {
   if (!rawToken || typeof rawToken !== "string") {

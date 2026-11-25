@@ -424,14 +424,15 @@ describe("Google Ads Conversion Pipeline & Zero-Leakage Boundary (Turn 48-49 Cer
     }
   });
 
-  it("14. Structured External Transaction Reference: Deterministic, non-PII, max 64 chars (Turn 81-82)", () => {
+  it("14. Structured Opaque Pseudonymous Transaction Reference: Deterministic, uppercase alphanumeric-dash, max 64 chars (Turn 81-91)", () => {
     const testLeadId = "cmwutn3x30002kz611b5pxq0r";
     const ref2026 = formatGoogleAdsTransactionReference(testLeadId, new Date("2026-11-24T12:00:00Z"));
 
     assert.ok(ref2026.startsWith("THB-LEAD-2026-"), "Must start with THB-LEAD-<year>-");
     assert.ok(ref2026.length <= 64, `Must not exceed 64 characters (length: ${ref2026.length})`);
     assert.ok(/^[A-Z0-9-]+$/.test(ref2026), "Must be uppercase alphanumeric and dashes only");
-    assert.ok(!ref2026.includes("@") && !ref2026.includes("+"), "Must not contain PII");
+    assert.equal(ref2026, `THB-LEAD-2026-${testLeadId.toUpperCase()}`, "Opaque pseudonymous reference must preserve normalized leadId only");
+    assert.ok(!ref2026.includes("@") && !ref2026.includes("+"), "Must not include email/phone delimiter characters");
 
     // Idempotency: same leadId and year must return identical reference
     const refAgain = formatGoogleAdsTransactionReference(testLeadId, new Date("2026-11-24T15:30:00Z"));
@@ -669,19 +670,27 @@ describe("Google Ads Conversion Pipeline & Zero-Leakage Boundary (Turn 48-49 Cer
     assert.ok(fs.existsSync(path.resolve(__dirname, "../../src/app/(auth)/forgot-password/page.tsx")));
     assert.ok(fs.existsSync(path.resolve(__dirname, "../../src/app/(auth)/reset-password/page.tsx")));
 
-    // 4. Privacy Policy discloses Google Ads measurement, Consent Mode v2, Hostinger Mumbai India, DPDP May 13 2027, and uses SPA CookieSettingsButton
+    // 4. Privacy Policy discloses Google Ads measurement, accurate post-withdrawal behavior, Hostinger KVM VPS in India,
+    //    exact DPDP Rules 6(1)(e)/8(3) and Sections 18-26 phased commencement, and uses SPA CookieSettingsButton
     const privacyContent = fs.readFileSync(
       path.resolve(__dirname, "../../src/app/(marketing)/privacy/page.tsx"),
       "utf8",
     );
     assert.ok(!privacyContent.includes("There are no advertising or third-party tracking cookies."));
     assert.ok(!privacyContent.includes("Vercel and Neon, US East"));
+    assert.ok(!privacyContent.includes("Mumbai, Maharashtra, India"));
+    assert.ok(!privacyContent.includes("scripts remain blocked."));
     assert.ok(privacyContent.includes("AW-18580810849"));
     assert.ok(privacyContent.includes("thabaal_marketing_consent"));
     assert.ok(privacyContent.includes("Google Consent Mode v2"));
+    assert.ok(privacyContent.includes("stops dispatching new conversion events"));
     assert.ok(privacyContent.includes("365 days"));
-    assert.ok(privacyContent.includes("Hostinger"));
-    assert.ok(privacyContent.includes("Mumbai, Maharashtra, India"));
+    assert.ok(privacyContent.includes("Hostinger KVM VPS in India"));
+    assert.ok(privacyContent.includes("Rule 6(1)(e)"));
+    assert.ok(privacyContent.includes("Rule 8(3)"));
+    assert.ok(privacyContent.includes("Seventh Schedule"));
+    assert.ok(privacyContent.includes("Sections 18&ndash;26"));
+    assert.ok(privacyContent.includes("Rules 17&ndash;21"));
     assert.ok(privacyContent.includes("13 May 2027"));
     assert.ok(privacyContent.includes("<CookieSettingsButton />"));
     assert.ok(!privacyContent.includes('<Link href="/?reset_consent=1"'));
