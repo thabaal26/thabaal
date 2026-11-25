@@ -1002,7 +1002,7 @@
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
   }
   .thabaal-left {
-    padding: clamp(14px, 2.5vh, 26px) 20px clamp(55px, 7vh, 75px);
+    padding: clamp(14px, 2.5vh, 26px) 20px clamp(16px, 2.5vh, 24px);
     gap: clamp(14px, 2.2vh, 22px);
     justify-content: center;
     align-items: center;

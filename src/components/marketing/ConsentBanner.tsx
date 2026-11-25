@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getMarketingConsent, setMarketingConsent, resetMarketingConsent, type ConsentStatus } from "@/lib/marketing/consent";
+import {
+  CONSENT_STORAGE_KEY,
+  getMarketingConsent,
+  setMarketingConsent,
+  type ConsentStatus,
+} from "@/lib/marketing/consent";
 import { useLanguage } from "@/lib/i18n/context";
 
 export function ConsentBanner({ lang: propLang }: { lang?: "en" | "ta" } = {}) {
@@ -22,8 +27,19 @@ export function ConsentBanner({ lang: propLang }: { lang?: "en" | "ta" } = {}) {
       const custom = e as CustomEvent<ConsentStatus>;
       setConsent(custom.detail);
     };
+
+    const storageHandler = (event: StorageEvent) => {
+      if (event.key === CONSENT_STORAGE_KEY || event.key === null) {
+        setConsent(getMarketingConsent());
+      }
+    };
+
     window.addEventListener("thabaal:consent-change", handler);
-    return () => window.removeEventListener("thabaal:consent-change", handler);
+    window.addEventListener("storage", storageHandler);
+    return () => {
+      window.removeEventListener("thabaal:consent-change", handler);
+      window.removeEventListener("storage", storageHandler);
+    };
   }, []);
 
   if (!mounted || consent !== null) {

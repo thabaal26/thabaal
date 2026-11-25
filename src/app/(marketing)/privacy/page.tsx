@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ScrollReveal } from "@/components/motion";
+import { CookieSettingsButton } from "@/components/marketing/CookieSettingsButton";
 
 /*
  * Thabaal's privacy policy (public: no login needed, so Meta's app review and anyone else can read
@@ -252,14 +253,12 @@ export default function PrivacyPage() {
                 and the WhatsApp Business terms apply to that part.
               </li>
               <li>
-                <strong>Vercel</strong>: hosts the website and stores uploaded images (Vercel Blob).
+                <strong>Hostinger</strong>: hosts our production web application, self-hosted PostgreSQL database and uploaded template media attachments (stored in PostgreSQL
+                and served through our portal API on the same infrastructure; Vercel and Vercel Blob are not used in production).
               </li>
               <li>
-                <strong>Neon</strong>: our database provider.
-              </li>
-              <li>
-                <strong>Google</strong>: &ldquo;Continue with Google&rdquo; sign-in, the Gemini AI features, and, where Google Sheets sync is switched on, copying customer
-                and order details to the business&apos;s Google Sheet.
+                <strong>Google</strong>: &ldquo;Continue with Google&rdquo; sign-in, Google Sheets sync (when switched on by a business), optional Gemini AI features when enabled,
+                and optional Google Ads conversion measurement.
               </li>
               <li>
                 <strong>Google Ads</strong>: when a public website visitor grants marketing consent, Google processes website measurement and conversion information associated
@@ -267,7 +266,13 @@ export default function PrivacyPage() {
                 for conversion measurement.
               </li>
               <li>
-                <strong>Groq</strong>: AI features.
+                <strong>Resend</strong>: delivers transactional emails such as password reset links, sign-up notifications and demo enquiry alerts.
+              </li>
+              <li>
+                <strong>Razorpay</strong>: processes merchant subscription payments and wallet recharge transactions.
+              </li>
+              <li>
+                <strong>Groq</strong>: optional AI features when configured.
               </li>
               <li>
                 If a business connects through its own WhatsApp app session instead of Meta&apos;s Cloud API, its messages pass through that session, which the business controls.
@@ -281,8 +286,10 @@ export default function PrivacyPage() {
 
           <Section id="transfers" title="8. Where your data is stored">
             <p>
-              Our servers and database are located in the <strong>United States</strong> (Vercel and Neon, US East). The DPDP Act allows this transfer unless the Government of
-              India restricts transfers to a country. We choose established providers that encrypt data in transit and at rest.
+              Our production web application, PostgreSQL database and uploaded media storage are hosted on a self-hosted <strong>Hostinger VPS in Mumbai, Maharashtra, India</strong>{" "}
+              (<code>189.72.145.225</code>). When you sign in with Google, connect Meta WhatsApp, grant optional Google Ads marketing consent, pay via Razorpay, receive email via
+              Resend or trigger optional AI features, relevant data may also be processed by those providers in India, the United States or other regions where they operate,
+              encrypted in transit and at rest and subject to applicable Indian law.
             </p>
           </Section>
 
@@ -299,8 +306,14 @@ export default function PrivacyPage() {
                 <strong>Opt-outs:</strong> a phone number that opted out is kept only so we keep honouring that choice.
               </li>
               <li>
-                <strong>Logs and records the law requires:</strong> processing logs for at least one year, as the DPDP Rules require, and billing and tax records for as long as
-                Indian tax law requires. These are then deleted.
+                <strong>Processing, security and operational logs:</strong> under our current VPS configuration, rotated application, cron and backup logs are kept for up to{" "}
+                <strong>8 weeks</strong>, database logs for up to <strong>10 weeks</strong>, system logs for <strong>4 weeks</strong>, security rate-limit records for{" "}
+                <strong>24 hours</strong> and webhook deduplication claims for <strong>30 days</strong>. Rules 6 and 8(3) of the DPDP Rules, 2025 (notified under G.S.R. 846(E))
+                are scheduled to commence on <strong>13 May 2027</strong>, introducing a statutory minimum one-year retention period for relevant processing logs, ahead of which we
+                will extend our log retention window accordingly.
+              </li>
+              <li>
+                <strong>Billing and tax records:</strong> kept for as long as Indian tax and accounting laws require, then deleted.
               </li>
             </ul>
           </Section>
@@ -345,34 +358,40 @@ export default function PrivacyPage() {
                 <code>ad_personalization</code>) are denied by default and Google Ads scripts do not load until you grant permission.
               </li>
               <li>
-                <strong>Marketing consent:</strong> if you choose &ldquo;Accept&rdquo; on our cookie banner, we record your choice in the <code>thabaal_marketing_consent</code>{" "}
-                cookie and <code>thabaal:marketing-consent</code> localStorage key, and allow Google measurement tags to load. If you choose &ldquo;Decline&rdquo;, Google Ads
+                <strong>Marketing consent:</strong> if you choose &ldquo;Accept&rdquo; on our cookie banner, all four Consent Mode v2 parameters are updated to <code>granted</code>{" "}
+                and Google measurement tags may load. If you choose &ldquo;Decline&rdquo; or withdraw consent, all four parameters are updated to <code>denied</code> and Google Ads
                 scripts remain blocked.
               </li>
               <li>
-                <strong>Preferences:</strong> you can reset or withdraw your marketing consent at any time by selecting{" "}
-                <Link href="/?reset_consent=1" className="font-medium text-brand-deep underline underline-offset-2">
-                  Cookie Settings
-                </Link>{" "}
-                in our footer or loading any public page with <code>?reset_consent=1</code>.
+                <strong>Consent preference retention:</strong> the <code>thabaal_marketing_consent</code> cookie is kept for up to <strong>365 days</strong>. The{" "}
+                <code>thabaal:marketing-consent</code> localStorage preference stays on your device until you reset it or clear this website&apos;s browser data.
+              </li>
+              <li>
+                <strong>Preferences:</strong> you can reset or withdraw your marketing consent immediately on this page using <CookieSettingsButton />, in our site footer, or by
+                loading any public page with <code>?reset_consent=1</code>.
               </li>
             </ul>
             <p>We do not use advertising or third-party tracking cookies inside the authenticated merchant application dashboard (<code>/dashboard</code> or <code>/admin</code>).</p>
           </Section>
 
           <Section id="your-rights" title="12. Your rights">
-            <p>Under the DPDP Act you can:</p>
+            <p>
+              You may contact us at any time under our published privacy commitments and applicable law to request to:
+            </p>
             <ul>
               <li>get a summary of the personal data we process about you and whom it was shared with;</li>
               <li>have inaccurate or incomplete data corrected, completed or updated;</li>
               <li>have your data erased when it is no longer needed or you withdraw consent;</li>
-              <li>withdraw consent at any time (customers can simply reply STOP);</li>
+              <li>withdraw consent at any time (customers can simply reply STOP, and website visitors can withdraw marketing consent using Cookie Settings);</li>
               <li>nominate someone to act for you if you die or become unable to act;</li>
-              <li>have your grievances addressed, and then complain to the Data Protection Board of India if you are not satisfied.</li>
+              <li>have your grievances addressed and escalated where applicable.</li>
             </ul>
             <p>
-              Email <Mail /> from the email address or WhatsApp number concerned, so we can confirm it is you. Customers: we will work with the business that holds your data.
-              We reply within 30 days at the latest, and always within the 90 days the DPDP Rules allow.
+              India&apos;s Digital Personal Data Protection Act, 2023 and the Digital Personal Data Protection Rules, 2025 have phased commencement under notifications G.S.R. 843(E)
+              and G.S.R. 846(E) (dated 13 November 2025): the statutory Data Principal rights framework in Sections 11&ndash;14 and corresponding Rules 5&ndash;16 (including Data
+              Protection Board escalation) are scheduled to take legal effect on <strong>13 May 2027</strong>. We provide these privacy request channels voluntarily today and respond
+              within 30 days at the latest. Email <Mail /> from the email address or WhatsApp number concerned so we can confirm your identity; if you are a merchant&apos;s customer,
+              we will coordinate with the business that holds your data.
             </p>
           </Section>
 

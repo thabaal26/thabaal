@@ -133,6 +133,7 @@ export function ensureGoogleAdsScriptLoaded(adsId: string): Promise<void> {
 
     const onError = () => {
       cleanup();
+      script.remove();
       runtime!.status = "error";
       runtime!.promise = undefined;
       reject(new Error("Failed to load Google Ads tag script"));

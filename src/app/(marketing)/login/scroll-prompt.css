@@ -155,9 +155,26 @@
   }
 }
 
+@media (max-width: 900px) {
+  .thabaal-scroll-prompt {
+    position: static;
+    display: flex;
+    width: fit-content;
+    margin: 4px auto 20px;
+    left: auto;
+    bottom: auto;
+    transform: none;
+    animation: none;
+  }
+  .thabaal-scroll-prompt:hover,
+  .thabaal-scroll-prompt:active,
+  .thabaal-scroll-prompt.is-hidden {
+    transform: none;
+  }
+}
+
 @media (max-width: 600px) {
   .thabaal-scroll-prompt {
-    bottom: 14px;
     padding: 4px 6px 4px 14px;
     gap: 10px;
   }

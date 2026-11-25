@@ -410,6 +410,14 @@ describe("Google Ads Conversion Pipeline & Zero-Leakage Boundary (Turn 48-49 Cer
       // 3. Page reload (now without parameter): choice persists
       const resAfterReload = getMarketingConsent();
       assert.equal(resAfterReload, "denied", "User choice must persist after parameter consumption");
+
+      // 4. Exact URLSearchParams matching: unrelated query containing reset_consent substring must NOT wipe consent
+      currentUrl = "https://www.thabaal.in/?redirect=%2F%3Freset_consent%3D1";
+      assert.equal(
+        getMarketingConsent(),
+        "denied",
+        "Substring match inside another parameter must NOT trigger consent reset",
+      );
     } finally {
       (global as any).window = originalWindow;
       (global as any).document = originalDocument;
@@ -472,7 +480,7 @@ describe("Google Ads Conversion Pipeline & Zero-Leakage Boundary (Turn 48-49 Cer
     assert.ok(content.includes("'ad_personalization': 'granted'"), "Must update ad_personalization to granted");
 
     // Must handle consent revocation
-    assert.ok(content.includes("ad_storage: newStatus === \"granted\" ? \"granted\" : \"denied\""));
+    assert.ok(content.includes("ad_storage: nextStatus === \"granted\" ? \"granted\" : \"denied\""));
   });
 
   it("17. Dispatch State Management & Transaction-Specific Tracking (Turn 81-88)", () => {
@@ -661,17 +669,24 @@ describe("Google Ads Conversion Pipeline & Zero-Leakage Boundary (Turn 48-49 Cer
     assert.ok(fs.existsSync(path.resolve(__dirname, "../../src/app/(auth)/forgot-password/page.tsx")));
     assert.ok(fs.existsSync(path.resolve(__dirname, "../../src/app/(auth)/reset-password/page.tsx")));
 
-    // 4. Privacy Policy discloses Google Ads measurement, Consent Mode v2, and has no blanket contradiction
+    // 4. Privacy Policy discloses Google Ads measurement, Consent Mode v2, Hostinger Mumbai India, DPDP May 13 2027, and uses SPA CookieSettingsButton
     const privacyContent = fs.readFileSync(
       path.resolve(__dirname, "../../src/app/(marketing)/privacy/page.tsx"),
       "utf8",
     );
     assert.ok(!privacyContent.includes("There are no advertising or third-party tracking cookies."));
+    assert.ok(!privacyContent.includes("Vercel and Neon, US East"));
     assert.ok(privacyContent.includes("AW-18580810849"));
     assert.ok(privacyContent.includes("thabaal_marketing_consent"));
     assert.ok(privacyContent.includes("Google Consent Mode v2"));
+    assert.ok(privacyContent.includes("365 days"));
+    assert.ok(privacyContent.includes("Hostinger"));
+    assert.ok(privacyContent.includes("Mumbai, Maharashtra, India"));
+    assert.ok(privacyContent.includes("13 May 2027"));
+    assert.ok(privacyContent.includes("<CookieSettingsButton />"));
+    assert.ok(!privacyContent.includes('<Link href="/?reset_consent=1"'));
 
-    // 5. ConsentBanner renders non-overlapping in-flow on mobile and floating bottom-right on desktop + syncs with landing Tamil toggle
+    // 5. ConsentBanner renders non-overlapping in-flow on mobile and floating bottom-right on desktop + cross-tab sync + syncs with landing Tamil toggle
     const bannerContent = fs.readFileSync(
       path.resolve(__dirname, "../../src/components/marketing/ConsentBanner.tsx"),
       "utf8",
@@ -679,6 +694,8 @@ describe("Google Ads Conversion Pipeline & Zero-Leakage Boundary (Turn 48-49 Cer
     assert.ok(bannerContent.includes("relative w-full"));
     assert.ok(bannerContent.includes("lg:fixed lg:inset-x-auto lg:bottom-5 lg:right-5"));
     assert.ok(bannerContent.includes("focus-visible:ring-2"));
+    assert.ok(bannerContent.includes("CONSENT_STORAGE_KEY"));
+    assert.ok(bannerContent.includes('window.addEventListener("storage", storageHandler)'));
 
     const signInContent = fs.readFileSync(
       path.resolve(__dirname, "../../src/app/(marketing)/login/thabaal-sign-in.tsx"),
@@ -686,9 +703,30 @@ describe("Google Ads Conversion Pipeline & Zero-Leakage Boundary (Turn 48-49 Cer
     );
     assert.ok(signInContent.includes('from "@/lib/i18n/context"'));
     assert.ok(signInContent.includes("setLanguage(next)"));
+
+    // 6. ScrollDownPrompt moves into normal flow on narrow mobile viewports (no overlap over Login button)
+    const scrollPromptCss = fs.readFileSync(
+      path.resolve(__dirname, "../../src/app/(marketing)/login/scroll-prompt.css"),
+      "utf8",
+    );
+    assert.ok(scrollPromptCss.includes("@media (max-width: 900px)"));
+    assert.ok(scrollPromptCss.includes("position: static;"));
+
+    // 7. CookieSettingsButton directly triggers resetMarketingConsent and demo-actions logs only errorName on cookie write failure
+    const cookieBtnContent = fs.readFileSync(
+      path.resolve(__dirname, "../../src/components/marketing/CookieSettingsButton.tsx"),
+      "utf8",
+    );
+    assert.ok(cookieBtnContent.includes("resetMarketingConsent()"));
+
+    const demoActionsContent = fs.readFileSync(
+      path.resolve(__dirname, "../../src/app/(marketing)/login/demo-actions.ts"),
+      "utf8",
+    );
+    assert.ok(demoActionsContent.includes("{ errorName }"));
   });
 
-  it("25. GoogleAdsProvider singleton loader lifecycle: idempotent queue/config, shared loading promise, error retry, and ID mismatch guard", async () => {
+  it("25. GoogleAdsProvider singleton loader lifecycle: idempotent queue/config, shared loading promise, error DOM removal & retry, cross-tab sync, and ID mismatch guard", async () => {
     const g = globalThis as Record<string, unknown>;
     const hadWindow = Object.prototype.hasOwnProperty.call(g, "window");
     const hadDocument = Object.prototype.hasOwnProperty.call(g, "document");
@@ -700,8 +738,13 @@ describe("Google Ads Conversion Pipeline & Zero-Leakage Boundary (Turn 48-49 Cer
       id = "";
       async = false;
       src = "";
+      removed = false;
       dataset: Record<string, string> = {};
       private listeners = new Map<string, ListenerEntry[]>();
+
+      remove() {
+        this.removed = true;
+      }
 
       addEventListener(type: string, fn: () => void, opts?: { once?: boolean }) {
         const list = this.listeners.get(type) ?? [];
@@ -736,12 +779,16 @@ describe("Google Ads Conversion Pipeline & Zero-Leakage Boundary (Turn 48-49 Cer
       const mockWindow: Record<string, unknown> = {};
       const mockDocument = {
         getElementById(id: string) {
-          return headChildren.find((el) => el.id === id) ?? null;
+          return headChildren.find((el) => !el.removed && el.id === id) ?? null;
         },
         querySelector(selector: string) {
           const match = selector.match(/googletagmanager\.com\/gtag\/js\?id=([^"\]]+)/);
           if (!match) return null;
-          return headChildren.find((el) => el.src.includes(`googletagmanager.com/gtag/js?id=${match[1]}`)) ?? null;
+          return (
+            headChildren.find(
+              (el) => !el.removed && el.src.includes(`googletagmanager.com/gtag/js?id=${match[1]}`),
+            ) ?? null
+          );
         },
         createElement(_tag: string) {
           createdCount += 1;
@@ -826,33 +873,44 @@ describe("Google Ads Conversion Pipeline & Zero-Leakage Boundary (Turn 48-49 Cer
       assert.throws(() => initializeGoogleAdsQueue("AW-9999999999"), /runtime ID mismatch/);
       await assert.rejects(() => ensureGoogleAdsScriptLoaded("AW-9999999999"), /runtime ID mismatch/);
 
-      // Scenario C: Error event resets cached promise to status='error' and allows retry on existing tag
+      // Scenario C: Error removes failed script element and retry creates & appends a fresh second script element
       const env2 = setupDomEnv();
       initializeGoogleAdsQueue(testAdsId);
-      const errPromise = ensureGoogleAdsScriptLoaded(testAdsId);
+      const firstPromise = ensureGoogleAdsScriptLoaded(testAdsId);
       assert.equal(env2.mockWindow.__thabaalGoogleAdsRuntime?.status, "loading");
-      env2.headChildren[0].emit("error");
+      const failedScript = env2.headChildren[0];
+      failedScript.emit("error");
 
-      await assert.rejects(errPromise, /Failed to load Google Ads tag script/);
+      await assert.rejects(firstPromise, /Failed to load Google Ads tag script/);
+      assert.equal(failedScript.removed, true);
       assert.equal(env2.mockWindow.__thabaalGoogleAdsRuntime?.status, "error");
       assert.equal(env2.mockWindow.__thabaalGoogleAdsRuntime?.promise, undefined);
 
       const retryPromise = ensureGoogleAdsScriptLoaded(testAdsId);
       assert.equal(env2.mockWindow.__thabaalGoogleAdsRuntime?.status, "loading");
-      assert.equal(env2.getCreatedCount(), 1);
-      assert.equal(env2.headChildren.length, 1);
+      assert.equal(env2.getCreatedCount(), 2);
+      assert.equal(env2.getAppendedCount(), 2);
+      assert.equal(env2.headChildren.length, 2);
 
-      env2.headChildren[0].emit("load");
+      const retryScript = env2.headChildren[1];
+      assert.notEqual(retryScript, failedScript);
+      assert.equal(env2.headChildren.filter((el) => !el.removed).length, 1);
+
+      retryScript.emit("load");
       await retryPromise;
       assert.equal(env2.mockWindow.__thabaalGoogleAdsRuntime?.status, "loaded");
-      assert.equal(env2.headChildren[0].dataset.thabaalLoaded, "1");
+      assert.equal(retryScript.dataset.thabaalLoaded, "1");
 
-      // Scenario D: Provider revocation boundary invariant in source
+      // Scenario D: Provider bounded retry, cross-tab storage sync, and revocation boundary invariants
       const providerSource = fs.readFileSync(
         path.resolve(__dirname, "../../src/components/marketing/GoogleAdsProvider.tsx"),
         "utf8",
       );
-      assert.ok(providerSource.includes('ad_storage: newStatus === "granted" ? "granted" : "denied"'));
+      assert.ok(providerSource.includes("const MAX_TAG_LOAD_RETRIES = 1;"));
+      assert.ok(providerSource.includes("const TAG_LOAD_RETRY_DELAY_MS = 1_000;"));
+      assert.ok(providerSource.includes('window.addEventListener("thabaal:consent-change", customHandler)'));
+      assert.ok(providerSource.includes('window.addEventListener("storage", storageHandler)'));
+      assert.ok(providerSource.includes('ad_storage: nextStatus === "granted" ? "granted" : "denied"'));
       assert.ok(providerSource.includes("if (!enabled || !ready || !transactionId) return;"));
       assert.ok(providerSource.includes("attemptGenerationRef.current"));
     } finally {

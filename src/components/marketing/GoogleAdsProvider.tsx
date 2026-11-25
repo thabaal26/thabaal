@@ -1,7 +1,11 @@
 "use client";
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { getMarketingConsent, type ConsentStatus } from "@/lib/marketing/consent";
+import {
+  CONSENT_STORAGE_KEY,
+  getMarketingConsent,
+  type ConsentStatus,
+} from "@/lib/marketing/consent";
 import {
   computeRetryBackoffMs,
   DISPATCH_TIMEOUT_MS,
@@ -41,29 +45,45 @@ type AdsContextType = {
 
 const AdsContext = createContext<AdsContextType>({ ready: false, consent: null, enabled: false });
 
+const MAX_TAG_LOAD_RETRIES = 1;
+const TAG_LOAD_RETRY_DELAY_MS = 1_000;
+
 export function GoogleAdsProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [consent, setConsent] = useState<ConsentStatus>(null);
 
   useEffect(() => {
-    const current = getMarketingConsent();
-    setConsent(current);
-
-    const handler = (e: Event) => {
-      const custom = e as CustomEvent<ConsentStatus>;
-      const newStatus = custom.detail;
-      setConsent(newStatus);
+    const applyConsent = (nextStatus: ConsentStatus) => {
+      setConsent(nextStatus);
       if (typeof window !== "undefined" && typeof window.gtag === "function") {
         window.gtag("consent", "update", {
-          ad_storage: newStatus === "granted" ? "granted" : "denied",
-          analytics_storage: newStatus === "granted" ? "granted" : "denied",
-          ad_user_data: newStatus === "granted" ? "granted" : "denied",
-          ad_personalization: newStatus === "granted" ? "granted" : "denied",
+          ad_storage: nextStatus === "granted" ? "granted" : "denied",
+          analytics_storage: nextStatus === "granted" ? "granted" : "denied",
+          ad_user_data: nextStatus === "granted" ? "granted" : "denied",
+          ad_personalization: nextStatus === "granted" ? "granted" : "denied",
         });
       }
     };
-    window.addEventListener("thabaal:consent-change", handler);
-    return () => window.removeEventListener("thabaal:consent-change", handler);
+
+    applyConsent(getMarketingConsent());
+
+    const customHandler = (event: Event) => {
+      applyConsent((event as CustomEvent<ConsentStatus>).detail);
+    };
+
+    const storageHandler = (event: StorageEvent) => {
+      if (event.key !== CONSENT_STORAGE_KEY && event.key !== null) {
+        return;
+      }
+      applyConsent(getMarketingConsent());
+    };
+
+    window.addEventListener("thabaal:consent-change", customHandler);
+    window.addEventListener("storage", storageHandler);
+    return () => {
+      window.removeEventListener("thabaal:consent-change", customHandler);
+      window.removeEventListener("storage", storageHandler);
+    };
   }, []);
 
   // Basic Consent Mode: Tags load ONLY when consent is granted AND configuration is valid
@@ -76,31 +96,43 @@ export function GoogleAdsProvider({ children }: { children: ReactNode }) {
     }
 
     let active = true;
-    setReady(false);
+    let retries = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
-    try {
-      initializeGoogleAdsQueue(GOOGLE_ADS_ID);
-      ensureGoogleAdsScriptLoaded(GOOGLE_ADS_ID)
-        .then(() => {
-          if (active) setReady(true);
-        })
-        .catch((error) => {
-          if (active) setReady(false);
-          console.error(
-            "[GoogleAdsProvider] Tag loading failed:",
-            error instanceof Error ? error.message : "Unknown error",
-          );
-        });
-    } catch (error) {
-      if (active) setReady(false);
+    const fail = (error: unknown) => {
+      if (!active) return;
+      if (retries < MAX_TAG_LOAD_RETRIES) {
+        retries += 1;
+        retryTimer = setTimeout(loadTag, TAG_LOAD_RETRY_DELAY_MS * retries);
+        return;
+      }
+      setReady(false);
       console.error(
-        "[GoogleAdsProvider] Queue initialization failed:",
+        "[GoogleAdsProvider] Tag loading failed after retry:",
         error instanceof Error ? error.message : "Unknown error",
       );
-    }
+    };
+
+    const loadTag = () => {
+      if (!active) return;
+      try {
+        initializeGoogleAdsQueue(GOOGLE_ADS_ID);
+        void ensureGoogleAdsScriptLoaded(GOOGLE_ADS_ID)
+          .then(() => {
+            if (active) setReady(true);
+          })
+          .catch(fail);
+      } catch (error) {
+        fail(error);
+      }
+    };
+
+    setReady(false);
+    loadTag();
 
     return () => {
       active = false;
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, [shouldLoadScripts]);
 
