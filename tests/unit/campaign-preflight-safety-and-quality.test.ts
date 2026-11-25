@@ -5,6 +5,7 @@ import { assertSenderHealthy, SenderHealthError } from "../../src/lib/senders";
 import { CampaignSenderQualityError, processRun, startRun } from "../../src/lib/dispatcher";
 import { partitionAudienceDetailed } from "../../src/lib/campaign-preflight";
 import { assertFrozenCohortImmutable, campaignAudienceWhere } from "../../src/lib/audiences";
+import { isQuietTime, quietUntil } from "../../src/lib/rules";
 
 describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suite", () => {
   let clientId: string;
@@ -722,6 +723,8 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
   });
 
   test("12. processRun strictly pauses with WAITING_QUALITY when sender status degrades mid-run to FLAGGED or RESTRICTED", async () => {
+    // Temporarily disable quiet hours on this test client so sender quality check runs regardless of IST clock
+    await db.client.update({ where: { id: clientId }, data: { quietFrom: null, quietTo: null } });
     // Set sender to FLAGGED
     await db.whatsAppNumber.update({ where: { id: greenSenderId }, data: { qualityRating: "FLAGGED" } });
 
@@ -757,6 +760,7 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
       const pausedRun = await db.campaignRun.findUnique({ where: { id: flagRun.id } });
       assert.equal(pausedRun?.status, "WAITING_QUALITY", "Run must pause with WAITING_QUALITY");
     } finally {
+      await db.client.update({ where: { id: clientId }, data: { quietFrom: "21:00", quietTo: "09:00" } });
       await db.whatsAppNumber.update({ where: { id: greenSenderId }, data: { qualityRating: "GREEN" } });
       await db.campaignRun.deleteMany({ where: { id: flagRun.id } }).catch(() => {});
       await db.campaign.deleteMany({ where: { id: flagCamp.id } }).catch(() => {});
@@ -1055,7 +1059,8 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
   });
 
   test("16. GREEN-to-RED degradation between dispatch batches: strictly pauses run with WAITING_QUALITY", async () => {
-    // 1. Setup campaign with running status and 2 messages
+    // 1. Setup campaign with running status and 2 messages; isolate test from IST night quiet window
+    await db.client.update({ where: { id: clientId }, data: { quietFrom: null, quietTo: null } });
     await db.whatsAppNumber.update({ where: { id: greenSenderId }, data: { qualityRating: "GREEN", statusCheckedAt: new Date() } });
 
     const batchCamp = await db.campaign.create({
@@ -1100,10 +1105,40 @@ describe("Campaign Preflight Audience Partition, Quality Gate & Safety Test Suit
       const paused = await db.campaignRun.findUnique({ where: { id: batchRun.id } });
       assert.equal(paused?.status, "WAITING_QUALITY", "Run must pause with WAITING_QUALITY");
     } finally {
+      await db.client.update({ where: { id: clientId }, data: { quietFrom: "21:00", quietTo: "09:00" } });
       await db.whatsAppNumber.update({ where: { id: greenSenderId }, data: { qualityRating: "GREEN" } });
       await db.message.deleteMany({ where: { id: { in: [msg1.id, msg2.id] } } }).catch(() => {});
       await db.campaignRun.deleteMany({ where: { id: batchRun.id } }).catch(() => {});
       await db.campaign.deleteMany({ where: { id: batchCamp.id } }).catch(() => {});
     }
+  });
+
+  test("17. Deterministic clock-injected quiet-hours enforcement: inside window, outside window, exact boundaries, and overnight wrap", () => {
+    const overnightRules = { quietFrom: "21:00", quietTo: "09:00" };
+    const daytimeRules = { quietFrom: "13:00", quietTo: "15:00" };
+
+    // 1. Inside overnight window (23:30 IST = 18:00 UTC) -> returns next morning 09:00 IST
+    assert.equal(isQuietTime(overnightRules, "23:30"), true);
+    const resumeNight = quietUntil(overnightRules, new Date("2026-11-24T18:00:00Z"));
+    assert.equal(resumeNight?.toISOString(), "2026-11-25T03:30:00.000Z"); // 09:00 IST next day
+
+    // 2. Inside early morning before quietTo (07:30 IST = 02:00 UTC) -> returns same day 09:00 IST
+    assert.equal(isQuietTime(overnightRules, "07:30"), true);
+    const resumeMorning = quietUntil(overnightRules, new Date("2026-11-25T02:00:00Z"));
+    assert.equal(resumeMorning?.toISOString(), "2026-11-25T03:30:00.000Z"); // 09:00 IST same day
+
+    // 3. Outside quiet window (14:00 IST = 08:30 UTC) -> returns null (eligible for dispatch)
+    assert.equal(isQuietTime(overnightRules, "14:00"), false);
+    assert.equal(quietUntil(overnightRules, new Date("2026-11-25T08:30:00Z")), null);
+
+    // 4. Exact boundary checks: quietFrom is inclusive, quietTo is exclusive
+    assert.equal(isQuietTime(overnightRules, "21:00"), true, "quietFrom boundary must be inside quiet window");
+    assert.equal(isQuietTime(overnightRules, "09:00"), false, "quietTo boundary must be outside quiet window");
+    assert.equal(quietUntil(overnightRules, new Date("2026-11-25T03:30:00Z")), null, "Exact 09:00 IST must be dispatch-eligible");
+
+    // 5. Same-day afternoon window boundary check
+    assert.equal(isQuietTime(daytimeRules, "13:00"), true);
+    assert.equal(isQuietTime(daytimeRules, "14:59"), true);
+    assert.equal(isQuietTime(daytimeRules, "15:00"), false);
   });
 });

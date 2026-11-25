@@ -14,7 +14,7 @@ import { ScrollReveal } from "@/components/motion";
  *   NEXT_PUBLIC_SALES_WHATSAPP (shown as a second way to reach us when set)
  */
 
-const LAST_UPDATED = "24 November 2026";
+const LAST_UPDATED = "25 November 2026";
 const EMAIL = process.env.NEXT_PUBLIC_PRIVACY_EMAIL || process.env.NEXT_PUBLIC_SALES_EMAIL || "privacy@thabaal.in";
 const LEGAL_NAME = process.env.NEXT_PUBLIC_LEGAL_NAME || "Thabaal";
 const ADDRESS = process.env.NEXT_PUBLIC_LEGAL_ADDRESS || "India";
@@ -38,7 +38,7 @@ const SECTIONS = [
   ["transfers", "Where your data is stored"],
   ["retention", "How long we keep it"],
   ["security", "How we protect it"],
-  ["cookies", "Cookies and local storage"],
+  ["cookies", "Cookies and tracking technologies"],
   ["your-rights", "Your rights"],
   ["delete-your-data", "Deleting your data"],
   ["children", "Children"],
@@ -91,8 +91,9 @@ export default function PrivacyPage() {
           <div className="rounded-card border border-line bg-panel p-4 text-[0.9375rem] leading-relaxed text-ink-2 sm:p-5">
             <p>
               <strong className="text-ink">In short:</strong> Thabaal helps businesses talk to their customers on WhatsApp: campaigns, replies, orders, payments and calls. We
-              only use personal data to run that service for the business that collected it. We don&apos;t sell it, we don&apos;t use it for advertising, and customers can stop
-              messages at any time by replying <strong className="text-ink">STOP</strong>.
+              process personal data needed to provide these services for the business that collected it. On our public website, we may also use Google Ads conversion measurement
+              when a visitor grants marketing consent to measure successful demo enquiries. We don&apos;t sell personal data or use merchants&apos; customer lists to build
+              advertising audiences, and customers can stop messages at any time by replying <strong className="text-ink">STOP</strong>.
             </p>
           </div>
         </ScrollReveal>
@@ -202,10 +203,15 @@ export default function PrivacyPage() {
               <li>To sign you in, keep accounts secure, prevent misuse, and give support.</li>
               <li>To work out each business&apos;s WhatsApp messaging costs and wallet balance.</li>
               <li>To meet legal obligations, such as tax records or lawful requests from authorities.</li>
+              <li>
+                To measure successful demo enquiries on our public website through Google Ads conversion measurement, where the visitor has granted marketing consent. A conversion
+                event is generated only after our server confirms a newly created enquiry and validates its thank-you receipt.
+              </li>
             </ul>
             <p>
-              We <strong>do not</strong> sell personal data, use it for advertising, or combine one business&apos;s customer list with another&apos;s. Each business sees only its own
-              customers.
+              We <strong>do not</strong> sell personal data, use merchants&apos; customer lists to build advertising audiences, or combine one business&apos;s customer list with
+              another&apos;s. Google Ads measurement on our public website is a separate activity, controlled by the visitor&apos;s marketing-consent choice. Each business sees only
+              its own customers.
             </p>
           </Section>
 
@@ -254,6 +260,11 @@ export default function PrivacyPage() {
               <li>
                 <strong>Google</strong>: &ldquo;Continue with Google&rdquo; sign-in, the Gemini AI features, and, where Google Sheets sync is switched on, copying customer
                 and order details to the business&apos;s Google Sheet.
+              </li>
+              <li>
+                <strong>Google Ads</strong>: when a public website visitor grants marketing consent, Google processes website measurement and conversion information associated
+                with successful demo enquiries (tag <code>AW-18580810849</code>). The Google tag may use advertising cookies, click identifiers and technical information needed
+                for conversion measurement.
               </li>
               <li>
                 <strong>Groq</strong>: AI features.
@@ -307,8 +318,11 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
-          <Section id="cookies" title="11. Cookies and local storage">
-            <p>We use only the cookies the portal needs to work. There are no advertising or third-party tracking cookies.</p>
+          <Section id="cookies" title="11. Cookies and tracking technologies">
+            <p>
+              We use strictly necessary technical cookies and local storage mechanisms to keep you signed in, preserve your theme and language preferences, and maintain secure
+              sessions:
+            </p>
             <ul>
               <li>
                 <strong>wp_session</strong>: keeps you signed in (up to 7 days).
@@ -321,6 +335,29 @@ export default function PrivacyPage() {
               </li>
               <li>Your browser&apos;s local storage remembers display choices such as light or dark mode and language. It stays on your device.</li>
             </ul>
+            <p>
+              On public marketing pages, we also support optional Google Ads conversion measurement (<code>AW-18580810849</code>) to evaluate the performance of our demo enquiry
+              campaigns. This measurement is governed by Google Consent Mode v2:
+            </p>
+            <ul>
+              <li>
+                <strong>Default state:</strong> advertising and analytics storage (<code>ad_storage</code>, <code>analytics_storage</code>, <code>ad_user_data</code>,{" "}
+                <code>ad_personalization</code>) are denied by default and Google Ads scripts do not load until you grant permission.
+              </li>
+              <li>
+                <strong>Marketing consent:</strong> if you choose &ldquo;Accept&rdquo; on our cookie banner, we record your choice in the <code>thabaal_marketing_consent</code>{" "}
+                cookie and <code>thabaal:marketing-consent</code> localStorage key, and allow Google measurement tags to load. If you choose &ldquo;Decline&rdquo;, Google Ads
+                scripts remain blocked.
+              </li>
+              <li>
+                <strong>Preferences:</strong> you can reset or withdraw your marketing consent at any time by selecting{" "}
+                <Link href="/?reset_consent=1" className="font-medium text-brand-deep underline underline-offset-2">
+                  Cookie Settings
+                </Link>{" "}
+                in our footer or loading any public page with <code>?reset_consent=1</code>.
+              </li>
+            </ul>
+            <p>We do not use advertising or third-party tracking cookies inside the authenticated merchant application dashboard (<code>/dashboard</code> or <code>/admin</code>).</p>
           </Section>
 
           <Section id="your-rights" title="12. Your rights">

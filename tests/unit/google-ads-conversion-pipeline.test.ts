@@ -17,8 +17,20 @@ import {
 import {
   GOOGLE_ADS_ID,
   GOOGLE_ADS_CONVERSION_LABEL,
+  GOOGLE_ADS_SCRIPT_ID,
   isAdsConfigValid,
-} from "../../src/components/marketing/GoogleAdsProvider";
+  initializeGoogleAdsQueue,
+  ensureGoogleAdsScriptLoaded,
+} from "../../src/lib/marketing/google-ads-loader";
+import {
+  computeRetryBackoffMs,
+  MAX_DISPATCH_ATTEMPTS,
+  parseConversionDispatchState,
+  readConversionDispatchState,
+  writeConversionDispatchState,
+  type ConversionDispatchState,
+  type DispatchStorage,
+} from "../../src/lib/marketing/google-ads-dispatch-state";
 
 describe("Google Ads Conversion Pipeline & Zero-Leakage Boundary (Turn 48-49 Certification)", () => {
   it("1. New Lead creates an eligible DemoConversionAttempt and persistent conversionEventId", async () => {
@@ -235,7 +247,8 @@ describe("Google Ads Conversion Pipeline & Zero-Leakage Boundary (Turn 48-49 Cer
 
   it("9. Zero Hardcoded Production Credentials: No fallback to live IDs when env is unset", () => {
     const providerFile = path.resolve(__dirname, "../../src/components/marketing/GoogleAdsProvider.tsx");
-    const content = fs.readFileSync(providerFile, "utf8");
+    const loaderFile = path.resolve(__dirname, "../../src/lib/marketing/google-ads-loader.ts");
+    const content = `${fs.readFileSync(providerFile, "utf8")}\n${fs.readFileSync(loaderFile, "utf8")}`;
 
     // Must NOT contain hardcoded fallbacks
     assert.ok(!content.includes('|| "AW-18580810849"'), "Must NOT fall back to production AW ID");
@@ -441,9 +454,10 @@ describe("Google Ads Conversion Pipeline & Zero-Leakage Boundary (Turn 48-49 Cer
     assert.ok(resolved.transactionReference.length <= 64, "transactionReference must be <= 64 chars");
   });
 
-  it("16. Consent Mode v2 Signals: default denied and update granted on consent (Turn 81-82)", () => {
+  it("16. Consent Mode v2 Signals: default denied and update granted on consent (Turn 81-88)", () => {
     const providerFile = path.resolve(__dirname, "../../src/components/marketing/GoogleAdsProvider.tsx");
-    const content = fs.readFileSync(providerFile, "utf8");
+    const loaderFile = path.resolve(__dirname, "../../src/lib/marketing/google-ads-loader.ts");
+    const content = `${fs.readFileSync(providerFile, "utf8")}\n${fs.readFileSync(loaderFile, "utf8")}`;
 
     // Must define Consent Mode v2 default with all 4 parameters
     assert.ok(content.includes("'ad_storage': 'denied'"), "Must set ad_storage denied by default");
@@ -461,110 +475,76 @@ describe("Google Ads Conversion Pipeline & Zero-Leakage Boundary (Turn 48-49 Cer
     assert.ok(content.includes("ad_storage: newStatus === \"granted\" ? \"granted\" : \"denied\""));
   });
 
-  it("17. Dispatch State Management & Transaction-Specific Tracking (Turn 81-83)", () => {
+  it("17. Dispatch State Management & Transaction-Specific Tracking (Turn 81-88)", () => {
     const providerFile = path.resolve(__dirname, "../../src/components/marketing/GoogleAdsProvider.tsx");
     const content = fs.readFileSync(providerFile, "utf8");
 
-    // Must manage transmission state machine with pending, tag_callback_completed, retryable, max_retries_exceeded
-    assert.ok(content.includes('status: "pending"'));
+    // Provider must use the shared exported state helpers rather than duplicating private parsing logic
+    assert.ok(content.includes("readConversionDispatchState("), "Must use shared readConversionDispatchState helper");
+    assert.ok(content.includes("writeConversionDispatchState("), "Must use shared writeConversionDispatchState helper");
+    assert.ok(content.includes("if (!enabled || !ready || !transactionId) return;"), "Must gate conversion dispatch on both enabled and ready");
+    assert.ok(content.includes("attemptGenerationRef"), "Must isolate stale callbacks via attemptGenerationRef");
     assert.ok(content.includes('status: "tag_callback_completed"'));
-    assert.ok(content.includes('status: "retryable"'));
-    assert.ok(content.includes('status: "max_retries_exceeded"'));
     assert.ok(content.includes("event_timeout: DISPATCH_TIMEOUT_MS"));
-    assert.ok(content.includes("event_callback: () => {"));
   });
 
-  it("18. Bounded State Machine & Stale Queued Recovery with Attempt Counter (Turn 82-84 Architect Requirement 1 & 2)", () => {
+  it("18. Real Production State Machine: Malformed/Out-of-Range Values Fail Closed & Retry Cap (Turn 82-88)", () => {
     const providerFile = path.resolve(__dirname, "../../src/components/marketing/GoogleAdsProvider.tsx");
     const content = fs.readFileSync(providerFile, "utf8");
-
-    // Must enforce maximum attempts (bounded retry cap)
-    assert.ok(content.includes("const MAX_DISPATCH_ATTEMPTS = 3;"), "Must enforce MAX_DISPATCH_ATTEMPTS = 3");
-    assert.ok(content.includes("currentAttempts >= MAX_DISPATCH_ATTEMPTS"), "Must check against max attempts limit");
+    assert.ok(content.includes("MAX_DISPATCH_ATTEMPTS"), "Must enforce MAX_DISPATCH_ATTEMPTS");
     assert.ok(content.includes("IN_FLIGHT_WINDOW_MS"), "Must bound in-flight window to timeout + buffer");
 
-    // Functional logic simulation of the bounded state machine
-    const MAX_ATTEMPTS = 3;
-    const now = Date.now();
+    // Directly test real parseConversionDispatchState helper
+    assert.equal(parseConversionDispatchState(null), null);
+    assert.equal(parseConversionDispatchState(""), null);
+    assert.equal(parseConversionDispatchState("done")?.status, "tag_callback_completed");
+    assert.equal(parseConversionDispatchState("retryable")?.status, "retryable");
+    assert.equal(parseConversionDispatchState("queued:1700000000000")?.status, "pending");
 
-    function evaluateAction(state: { status: string; attempts: number; lastAttemptTs: number } | null) {
-      if (!state) return "DISPATCH_NEW";
-      if (state.status === "tag_callback_completed" || state.status === "max_retries_exceeded") {
-        return "TERMINAL_SUPPRESS";
-      }
-      if (state.attempts >= MAX_ATTEMPTS) {
-        return "TERMINAL_MAX_EXCEEDED";
-      }
-      if (state.status === "pending") {
-        const elapsed = now - state.lastAttemptTs;
-        if (elapsed < 3000) return "IN_FLIGHT_WAIT";
-        return "STALE_PENDING_RETRY";
-      }
-      if (state.status === "retryable") {
-        return "RETRY_ALLOWED";
-      }
-      return "DISPATCH_NEW";
-    }
-
-    assert.equal(evaluateAction({ status: "tag_callback_completed", attempts: 1, lastAttemptTs: now }), "TERMINAL_SUPPRESS");
-    assert.equal(evaluateAction({ status: "max_retries_exceeded", attempts: 3, lastAttemptTs: now }), "TERMINAL_SUPPRESS");
-    assert.equal(evaluateAction({ status: "pending", attempts: 1, lastAttemptTs: now - 1000 }), "IN_FLIGHT_WAIT");
-    assert.equal(evaluateAction({ status: "pending", attempts: 1, lastAttemptTs: now - 3500 }), "STALE_PENDING_RETRY");
-    assert.equal(evaluateAction({ status: "retryable", attempts: 2, lastAttemptTs: now }), "RETRY_ALLOWED");
-    assert.equal(evaluateAction({ status: "retryable", attempts: 3, lastAttemptTs: now }), "TERMINAL_MAX_EXCEEDED");
+    // Corrupt JSON and out-of-range attempts fail closed to max_retries_exceeded
+    assert.equal(parseConversionDispatchState("{broken json")?.status, "max_retries_exceeded");
+    assert.equal(parseConversionDispatchState('{"status":"pending","attempts":99,"lastAttemptTs":1000}')?.status, "max_retries_exceeded");
+    assert.equal(parseConversionDispatchState('{"status":"unknown","attempts":1,"lastAttemptTs":1000}')?.status, "max_retries_exceeded");
+    assert.equal(parseConversionDispatchState('{"status":"retryable","attempts":2,"lastAttemptTs":1000}')?.attempts, 2);
   });
 
-  it("19. Synchronous Dispatch Exception Recovery & In-Page Timer Recovery (Turn 82-84 Architect Requirement 2)", () => {
+  it("19. Synchronous Dispatch Exception Recovery, Exponential Backoff & In-Page Recovery (Turn 82-88)", () => {
     const providerFile = path.resolve(__dirname, "../../src/components/marketing/GoogleAdsProvider.tsx");
     const content = fs.readFileSync(providerFile, "utf8");
 
-    // In catch block, must clear in-flight lock and set storage to retryable or max_retries_exceeded
-    assert.ok(
-      content.includes("inFlightRef.current = false;"),
-      "Must clear inFlightRef.current on synchronous dispatch failure"
-    );
-    assert.ok(
-      content.includes('nextAttempts < MAX_DISPATCH_ATTEMPTS ? "retryable" : "max_retries_exceeded"'),
-      "Must mark storage status as retryable with attempt tracking"
-    );
-    // In-page automatic recovery timer must be present
-    assert.ok(
-      content.includes("recoveryTimer = setTimeout("),
-      "Must schedule automatic in-page recovery timer"
-    );
+    assert.ok(content.includes("inFlightRef.current = false;"), "Must clear inFlightRef.current on synchronous failure");
+    assert.ok(content.includes('nextAttempts < MAX_DISPATCH_ATTEMPTS ? "retryable" : "max_retries_exceeded"'));
+    assert.ok(content.includes("recoveryTimer = setTimeout("), "Must schedule automatic in-page recovery timer");
+    assert.ok(content.includes("retryTimer = setTimeout("), "Must schedule delayed retry in synchronous catch path");
+    assert.ok(content.includes("computeRetryBackoffMs(nextAttempts)"), "Must use shared computeRetryBackoffMs helper");
 
-    // Turn 85: Catch block must schedule delayed retry trigger with exponential backoff up to MAX_DISPATCH_ATTEMPTS
-    assert.ok(
-      content.includes("retryTimer = setTimeout("),
-      "Must schedule delayed retry in synchronous catch path"
-    );
-    assert.ok(
-      content.includes("Math.min(1000 * Math.pow(2, nextAttempts - 1), 4000)"),
-      "Must compute exponential backoff for synchronous retry"
-    );
+    // Verify real exported computeRetryBackoffMs sequence: 1s, 2s, 4s capped
+    assert.equal(computeRetryBackoffMs(1), 1000);
+    assert.equal(computeRetryBackoffMs(2), 2000);
+    assert.equal(computeRetryBackoffMs(3), 4000);
+    assert.equal(computeRetryBackoffMs(10), 4000);
   });
 
-  it("20. Database-Level Unique Constraint & Collision Prevention for Transaction Reference (Turn 82-83 Architect Requirement 3)", async () => {
+  it("20. Database-Level Unique Constraint & Collision Prevention for Transaction Reference (Turn 82-88)", async () => {
     const schemaFile = path.resolve(__dirname, "../../prisma/schema.prisma");
     const schemaContent = fs.readFileSync(schemaFile, "utf8");
 
-    // Must define transactionReference with @unique in DemoConversionAttempt model
     assert.ok(
       schemaContent.includes("transactionReference String? @unique"),
       "Prisma schema must enforce @unique on transactionReference"
     );
 
-    // Full CUID preservation check: 25-char CUID must not be truncated to 12 chars
+    const migrationFile = path.resolve(__dirname, "../../prisma/sql/2026-11-21-demo-conversion-attempt.sql");
+    const sqlContent = fs.readFileSync(migrationFile, "utf8");
+    assert.ok(sqlContent.includes('"transactionReference" TEXT'), "SQL migration must match Prisma TEXT type");
+    assert.ok(sqlContent.includes('"DemoConversionAttempt_transactionReference_key"'), "SQL migration must define unique index");
+    assert.ok(sqlContent.includes("chk_created_has_trans_ref"), "SQL migration must define CHECK constraint");
+
     const fullCuid = "cmwutn3x30002kz611b5pxq0r";
     const ref = formatGoogleAdsTransactionReference(fullCuid, new Date("2026-11-24T12:00:00Z"));
-    assert.equal(
-      ref,
-      "THB-LEAD-2026-CMWUTN3X30002KZ611B5PXQ0R",
-      "Must preserve full 25-character CUID to eliminate suffix collisions"
-    );
-    assert.ok(ref.length <= 64, `Must remain within Google Ads 64-character limit (was ${ref.length})`);
+    assert.equal(ref, "THB-LEAD-2026-CMWUTN3X30002KZ611B5PXQ0R");
+    assert.ok(ref.length <= 64);
 
-    // Verify database-level uniqueness across records
     const testPhoneA = `91${Math.floor(10000000 + Math.random() * 90000000)}`;
     const testPhoneB = `91${Math.floor(10000000 + Math.random() * 90000000)}`;
 
@@ -572,70 +552,45 @@ describe("Google Ads Conversion Pipeline & Zero-Leakage Boundary (Turn 48-49 Cer
       input: { shop: "Store Alpha", person: "Person A", phone: testPhoneA },
       submissionKey: `sub_uniq_a_${Date.now()}`,
     });
-
     const resB = await processDemoRequestAtomic({
       input: { shop: "Store Beta", person: "Person B", phone: testPhoneB },
       submissionKey: `sub_uniq_b_${Date.now()}`,
     });
 
-    assert.ok(resA.conversion.transactionReference, "Record A must have transactionReference");
-    assert.ok(resB.conversion.transactionReference, "Record B must have transactionReference");
-    assert.notEqual(
-      resA.conversion.transactionReference,
-      resB.conversion.transactionReference,
-      "Two distinct leads must have distinct transaction references"
-    );
+    assert.ok(resA.conversion.transactionReference);
+    assert.ok(resB.conversion.transactionReference);
+    assert.notEqual(resA.conversion.transactionReference, resB.conversion.transactionReference);
   });
 
-  it("21. In-Memory Session Cache Fallback for Storage Failures (Turn 85 Architect Fix 2)", () => {
-    const providerFile = path.resolve(__dirname, "../../src/components/marketing/GoogleAdsProvider.tsx");
-    const content = fs.readFileSync(providerFile, "utf8");
+  it("21. Real Helper Storage Failure Handling: Read Throw & Write Throw Within Page Lifecycle (Turn 85-88)", () => {
+    const key = "thabaal-ads-conv:THB-FAIL-STORAGE";
+    const memory = new Map<string, ConversionDispatchState>();
+    const brokenStorage: DispatchStorage = {
+      getItem: () => {
+        throw new Error("SecurityError: sessionStorage disabled");
+      },
+      setItem: () => {
+        throw new Error("SecurityError: sessionStorage disabled");
+      },
+    };
 
-    // Must define module-scoped memoryFallback map
-    assert.ok(
-      content.includes("const memoryFallback = new Map<string, ConversionDispatchState>();"),
-      "Must define module-scoped memoryFallback Map"
+    assert.equal(readConversionDispatchState(key, memory, brokenStorage), null);
+    writeConversionDispatchState(key, { status: "pending", attempts: 1, lastAttemptTs: 100 }, memory, brokenStorage);
+    assert.deepEqual(readConversionDispatchState(key, memory, brokenStorage), {
+      status: "pending",
+      attempts: 1,
+      lastAttemptTs: 100,
+    });
+    writeConversionDispatchState(
+      key,
+      { status: "max_retries_exceeded", attempts: MAX_DISPATCH_ATTEMPTS, lastAttemptTs: 200 },
+      memory,
+      brokenStorage,
     );
-    // saveState must update memoryFallback
-    assert.ok(
-      content.includes("memoryFallback.set(storageKey, state);"),
-      "Must write state to memory fallback cache"
-    );
-    // parseState must fall back to memoryFallback on storage missing or throw
-    assert.ok(
-      content.includes("memoryFallback.get(storageKey)"),
-      "Must read from memory fallback cache when sessionStorage fails or is empty"
-    );
-
-    // Functional verification: simulate throwing sessionStorage
-    const simulatedMemory = new Map<string, { status: string; attempts: number }>();
-    const mockStorageKey = "thabaal-ads-conv:THB-TEST-MOCK";
-
-    function mockSave(state: { status: string; attempts: number }) {
-      try {
-        throw new Error("SecurityError: sessionStorage is disabled in private browsing");
-      } catch {}
-      simulatedMemory.set(mockStorageKey, state);
-    }
-
-    function mockParse(): { status: string; attempts: number } | null {
-      try {
-        throw new Error("SecurityError: sessionStorage is disabled in private browsing");
-      } catch {
-        return simulatedMemory.get(mockStorageKey) || null;
-      }
-    }
-
-    assert.equal(mockParse(), null);
-    mockSave({ status: "pending", attempts: 1 });
-    assert.deepEqual(mockParse(), { status: "pending", attempts: 1 });
-    mockSave({ status: "retryable", attempts: 2 });
-    assert.deepEqual(mockParse(), { status: "retryable", attempts: 2 });
-    mockSave({ status: "max_retries_exceeded", attempts: 3 });
-    assert.deepEqual(mockParse(), { status: "max_retries_exceeded", attempts: 3 });
+    assert.equal(readConversionDispatchState(key, memory, brokenStorage)?.status, "max_retries_exceeded");
   });
 
-  it("22. Database Mathematical Completeness: Zero Created Attempts Missing Reference (Turn 85 Architect Gate 3)", async () => {
+  it("22. Database Mathematical Completeness: Zero Created Attempts Missing Reference (Turn 85-88)", async () => {
     const attempts = await db.demoConversionAttempt.findMany({
       where: { outcome: "CREATED" },
       select: { id: true, transactionReference: true, leadId: true },
@@ -643,84 +598,258 @@ describe("Google Ads Conversion Pipeline & Zero-Leakage Boundary (Turn 48-49 Cer
 
     assert.ok(attempts.length > 0, "Must have at least one CREATED attempt in database");
     const missingRef = attempts.filter((a) => !a.transactionReference);
-    assert.equal(
-      missingRef.length,
-      0,
-      `All CREATED attempts must have non-null transactionReference (found ${missingRef.length} missing)`
-    );
+    assert.equal(missingRef.length, 0);
   });
 
-  it("23. Storage Fallback Precedence & Stale Persistence Prevention (Turn 86 Architect Final Hold)", () => {
-    const providerFile = path.resolve(__dirname, "../../src/components/marketing/GoogleAdsProvider.tsx");
-    const content = fs.readFileSync(providerFile, "utf8");
-
-    // parseState must check memoryFallback FIRST before reading sessionStorage
-    assert.ok(
-      content.includes("const inMemory = memoryFallback.get(storageKey);"),
-      "Must check memoryFallback before reading sessionStorage"
-    );
-    assert.ok(
-      content.includes("if (inMemory) {\n        return inMemory;\n      }"),
-      "Must return inMemory state immediately when present"
-    );
-
-    // Functional regression test of exact scenario:
-    // 1. Initial state exists and is readable in sessionStorage (attempts: 1)
-    let mockStorage: Record<string, string> = {
-      "thabaal-ads-conv:THB-TEST": JSON.stringify({ status: "pending", attempts: 1, lastAttemptTs: 1000 }),
+  it("23. Real Helper Memory Precedence Over Stale Storage When Write Fails (Turn 86-88)", () => {
+    const key = "thabaal-ads-conv:THB-STALE-PRECEDENCE";
+    const memory = new Map<string, ConversionDispatchState>();
+    const backing: Record<string, string> = {
+      [key]: JSON.stringify({ status: "pending", attempts: 1, lastAttemptTs: 1000 }),
     };
-    const mockMemory = new Map<string, any>();
-    const testKey = "thabaal-ads-conv:THB-TEST";
+    let throwOnWrite = false;
+    const flakyStorage: DispatchStorage = {
+      getItem: (k) => backing[k] ?? null,
+      setItem: (k, v) => {
+        if (throwOnWrite) throw new Error("QuotaExceededError");
+        backing[k] = v;
+      },
+    };
 
-    // 2. Updating sessionStorage throws an exception (e.g. QuotaExceededError / storage locked)
-    let throwOnSet = false;
+    // Step 1: Initial read pulls attempts=1 from storage and seeds memory
+    const initial = readConversionDispatchState(key, memory, flakyStorage);
+    assert.equal(initial?.attempts, 1);
 
-    function simulatedSave(state: any) {
-      try {
-        if (throwOnSet) {
-          throw new Error("QuotaExceededError: Dom storage quota exceeded");
+    // Step 2: Storage write throws, so backing retains stale attempts=1 while memory gets attempts=2
+    throwOnWrite = true;
+    writeConversionDispatchState(key, { status: "retryable", attempts: 2, lastAttemptTs: 2000 }, memory, flakyStorage);
+    assert.equal(JSON.parse(backing[key]).attempts, 1, "Backing storage still has stale attempt counter");
+
+    // Step 3: Subsequent read prioritizes memory (attempts=2) instead of stale storage (attempts=1)
+    const updated = readConversionDispatchState(key, memory, flakyStorage);
+    assert.equal(updated?.attempts, 2);
+    assert.equal(updated?.status, "retryable");
+
+    // Step 4: Writing max_retries_exceeded caps further retries cleanly
+    writeConversionDispatchState(
+      key,
+      { status: "max_retries_exceeded", attempts: MAX_DISPATCH_ATTEMPTS, lastAttemptTs: 3000 },
+      memory,
+      flakyStorage,
+    );
+    const exhausted = readConversionDispatchState(key, memory, flakyStorage);
+    assert.equal(exhausted?.status, "max_retries_exceeded");
+    assert.equal(exhausted?.attempts, 3);
+  });
+
+  it("24. Turn 88 Project Boundaries: Public Marketing Auth Coverage, Strict Privacy Disclosure, & Zero UUID Fallback", () => {
+    // 1. /thank-you strictly fails closed on transactionReference without conversionEventId fallback
+    const thankYouContent = fs.readFileSync(
+      path.resolve(__dirname, "../../src/app/(marketing)/thank-you/page.tsx"),
+      "utf8",
+    );
+    assert.ok(thankYouContent.includes("<GoogleAdsConversion transactionId={receipt.transactionReference} />"));
+    assert.ok(!thankYouContent.includes("receipt.transactionReference ?? receipt.conversionEventId"));
+
+    // 2. /login and /signup live in (marketing) so ConsentBanner + GoogleAdsProvider cover ALL public landing routes
+    assert.ok(fs.existsSync(path.resolve(__dirname, "../../src/app/(marketing)/login/page.tsx")));
+    assert.ok(fs.existsSync(path.resolve(__dirname, "../../src/app/(marketing)/signup/page.tsx")));
+
+    // 3. Password recovery lives in isolated (auth) root layout without any Google Ads provider
+    const authLayout = fs.readFileSync(path.resolve(__dirname, "../../src/app/(auth)/layout.tsx"), "utf8");
+    assert.ok(!authLayout.includes("GoogleAdsProvider") && !authLayout.includes("AW-18580810849"));
+    assert.ok(fs.existsSync(path.resolve(__dirname, "../../src/app/(auth)/forgot-password/page.tsx")));
+    assert.ok(fs.existsSync(path.resolve(__dirname, "../../src/app/(auth)/reset-password/page.tsx")));
+
+    // 4. Privacy Policy discloses Google Ads measurement, Consent Mode v2, and has no blanket contradiction
+    const privacyContent = fs.readFileSync(
+      path.resolve(__dirname, "../../src/app/(marketing)/privacy/page.tsx"),
+      "utf8",
+    );
+    assert.ok(!privacyContent.includes("There are no advertising or third-party tracking cookies."));
+    assert.ok(privacyContent.includes("AW-18580810849"));
+    assert.ok(privacyContent.includes("thabaal_marketing_consent"));
+    assert.ok(privacyContent.includes("Google Consent Mode v2"));
+  });
+
+  it("25. GoogleAdsProvider singleton loader lifecycle: idempotent queue/config, shared loading promise, error retry, and ID mismatch guard", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const hadWindow = Object.prototype.hasOwnProperty.call(g, "window");
+    const hadDocument = Object.prototype.hasOwnProperty.call(g, "document");
+    const prevWindow = g.window;
+    const prevDocument = g.document;
+
+    type ListenerEntry = { fn: () => void; once: boolean };
+    class MockScriptElement {
+      id = "";
+      async = false;
+      src = "";
+      dataset: Record<string, string> = {};
+      private listeners = new Map<string, ListenerEntry[]>();
+
+      addEventListener(type: string, fn: () => void, opts?: { once?: boolean }) {
+        const list = this.listeners.get(type) ?? [];
+        list.push({ fn, once: Boolean(opts?.once) });
+        this.listeners.set(type, list);
+      }
+
+      removeEventListener(type: string, fn: () => void) {
+        const list = this.listeners.get(type);
+        if (!list) return;
+        this.listeners.set(
+          type,
+          list.filter((entry) => entry.fn !== fn),
+        );
+      }
+
+      emit(type: string) {
+        const list = [...(this.listeners.get(type) ?? [])];
+        for (const entry of list) {
+          if (entry.once) {
+            this.removeEventListener(type, entry.fn);
+          }
+          entry.fn();
         }
-        mockStorage[testKey] = JSON.stringify(state);
-      } catch {}
-      mockMemory.set(testKey, state);
-    }
-
-    function simulatedParse(): any | null {
-      // Memory precedence: check memory first
-      const inMem = mockMemory.get(testKey);
-      if (inMem) return inMem;
-
-      try {
-        const raw = mockStorage[testKey];
-        if (!raw) return null;
-        const parsed = JSON.parse(raw);
-        mockMemory.set(testKey, parsed);
-        return parsed;
-      } catch {
-        return null;
       }
     }
 
-    // Step 1: Initial parse reads from sessionStorage
-    const initial = simulatedParse();
-    assert.equal(initial.attempts, 1, "Initial parse should read attempts = 1");
+    function setupDomEnv() {
+      const headChildren: MockScriptElement[] = [];
+      let createdCount = 0;
+      let appendedCount = 0;
+      const mockWindow: Record<string, unknown> = {};
+      const mockDocument = {
+        getElementById(id: string) {
+          return headChildren.find((el) => el.id === id) ?? null;
+        },
+        querySelector(selector: string) {
+          const match = selector.match(/googletagmanager\.com\/gtag\/js\?id=([^"\]]+)/);
+          if (!match) return null;
+          return headChildren.find((el) => el.src.includes(`googletagmanager.com/gtag/js?id=${match[1]}`)) ?? null;
+        },
+        createElement(_tag: string) {
+          createdCount += 1;
+          return new MockScriptElement();
+        },
+        head: {
+          appendChild(el: MockScriptElement) {
+            appendedCount += 1;
+            headChildren.push(el);
+            return el;
+          },
+        },
+      };
+      g.window = mockWindow;
+      g.document = mockDocument;
+      return {
+        headChildren,
+        getCreatedCount: () => createdCount,
+        getAppendedCount: () => appendedCount,
+        mockWindow: mockWindow as {
+          dataLayer?: ArrayLike<unknown>[];
+          gtag?: (...args: unknown[]) => void;
+          __thabaalGoogleAdsRuntime?: {
+            adsId: string;
+            configured: boolean;
+            status: string;
+            promise?: Promise<void>;
+          };
+        },
+      };
+    }
 
-    // Step 2: Storage fails on update (setItem throws)
-    throwOnSet = true;
-    simulatedSave({ status: "retryable", attempts: 2, lastAttemptTs: 2000 });
+    try {
+      // Scenario A & B: Single queue/config across revocation+regrant and shared loading promise
+      const env1 = setupDomEnv();
+      const testAdsId = "AW-18580810849";
 
-    // Step 3: Verify sessionStorage still has stale attempts = 1
-    assert.equal(JSON.parse(mockStorage[testKey]).attempts, 1, "SessionStorage has stale attempt counter");
+      initializeGoogleAdsQueue(testAdsId);
+      assert.equal(env1.mockWindow.__thabaalGoogleAdsRuntime?.configured, true);
 
-    // Step 4: Verify parseState returns newer memory state (attempts = 2), NOT stale storage data
-    const updated = simulatedParse();
-    assert.equal(updated.attempts, 2, "parseState must return newer in-memory state (attempts = 2)");
-    assert.equal(updated.status, "retryable", "parseState must return updated status");
+      // Simulate consent revocation then re-grant without duplicating gtag('config', ...)
+      env1.mockWindow.gtag?.("consent", "update", {
+        ad_storage: "denied",
+        analytics_storage: "denied",
+        ad_user_data: "denied",
+        ad_personalization: "denied",
+      });
+      initializeGoogleAdsQueue(testAdsId);
 
-    // Step 5: Reach 3rd attempt ceiling and verify max_retries_exceeded is enforced
-    simulatedSave({ status: "max_retries_exceeded", attempts: 3, lastAttemptTs: 3000 });
-    const finalState = simulatedParse();
-    assert.equal(finalState.attempts, 3, "parseState must enforce ceiling of 3 attempts");
-    assert.equal(finalState.status, "max_retries_exceeded", "parseState must return terminal max_retries_exceeded");
+      const commands = (env1.mockWindow.dataLayer ?? []).map((args) => Array.from(args));
+      const configCalls = commands.filter((c) => c[0] === "config" && c[1] === testAdsId);
+      const consentDefaultCalls = commands.filter((c) => c[0] === "consent" && c[1] === "default");
+      const grantedUpdates = commands.filter(
+        (c) => c[0] === "consent" && c[1] === "update" && (c[2] as Record<string, string>)?.ad_storage === "granted",
+      );
+      assert.equal(configCalls.length, 1);
+      assert.equal(consentDefaultCalls.length, 1);
+      assert.equal(grantedUpdates.length, 2);
+
+      // Concurrent ensureGoogleAdsScriptLoaded shares single promise and creates one script tag
+      const p1 = ensureGoogleAdsScriptLoaded(testAdsId);
+      const p2 = ensureGoogleAdsScriptLoaded(testAdsId);
+      assert.equal(p1, p2);
+      assert.equal(env1.mockWindow.__thabaalGoogleAdsRuntime?.status, "loading");
+      assert.equal(env1.getCreatedCount(), 1);
+      assert.equal(env1.getAppendedCount(), 1);
+      assert.equal(env1.headChildren[0].id, GOOGLE_ADS_SCRIPT_ID);
+      assert.equal(env1.headChildren[0].async, true);
+      assert.equal(env1.headChildren[0].src, `https://www.googletagmanager.com/gtag/js?id=${testAdsId}`);
+
+      env1.headChildren[0].emit("load");
+      await Promise.all([p1, p2]);
+      assert.equal(env1.mockWindow.__thabaalGoogleAdsRuntime?.status, "loaded");
+      assert.equal(env1.headChildren[0].dataset.thabaalLoaded, "1");
+
+      // Subsequent call after loaded creates no extra element
+      await ensureGoogleAdsScriptLoaded(testAdsId);
+      assert.equal(env1.getCreatedCount(), 1);
+      assert.equal(env1.getAppendedCount(), 1);
+
+      // Mismatched ID fails fast
+      assert.throws(() => initializeGoogleAdsQueue("AW-9999999999"), /runtime ID mismatch/);
+      await assert.rejects(() => ensureGoogleAdsScriptLoaded("AW-9999999999"), /runtime ID mismatch/);
+
+      // Scenario C: Error event resets cached promise to status='error' and allows retry on existing tag
+      const env2 = setupDomEnv();
+      initializeGoogleAdsQueue(testAdsId);
+      const errPromise = ensureGoogleAdsScriptLoaded(testAdsId);
+      assert.equal(env2.mockWindow.__thabaalGoogleAdsRuntime?.status, "loading");
+      env2.headChildren[0].emit("error");
+
+      await assert.rejects(errPromise, /Failed to load Google Ads tag script/);
+      assert.equal(env2.mockWindow.__thabaalGoogleAdsRuntime?.status, "error");
+      assert.equal(env2.mockWindow.__thabaalGoogleAdsRuntime?.promise, undefined);
+
+      const retryPromise = ensureGoogleAdsScriptLoaded(testAdsId);
+      assert.equal(env2.mockWindow.__thabaalGoogleAdsRuntime?.status, "loading");
+      assert.equal(env2.getCreatedCount(), 1);
+      assert.equal(env2.headChildren.length, 1);
+
+      env2.headChildren[0].emit("load");
+      await retryPromise;
+      assert.equal(env2.mockWindow.__thabaalGoogleAdsRuntime?.status, "loaded");
+      assert.equal(env2.headChildren[0].dataset.thabaalLoaded, "1");
+
+      // Scenario D: Provider revocation boundary invariant in source
+      const providerSource = fs.readFileSync(
+        path.resolve(__dirname, "../../src/components/marketing/GoogleAdsProvider.tsx"),
+        "utf8",
+      );
+      assert.ok(providerSource.includes('ad_storage: newStatus === "granted" ? "granted" : "denied"'));
+      assert.ok(providerSource.includes("if (!enabled || !ready || !transactionId) return;"));
+      assert.ok(providerSource.includes("attemptGenerationRef.current"));
+    } finally {
+      if (hadWindow) {
+        g.window = prevWindow;
+      } else {
+        delete g.window;
+      }
+      if (hadDocument) {
+        g.document = prevDocument;
+      } else {
+        delete g.document;
+      }
+    }
   });
 });

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { IconSetLink } from "@/components/icon-set-link";
 import { readResetToken } from "@/lib/password-reset";
-import { ThabaalSignIn } from "../login/thabaal-sign-in";
+import { ThabaalSignIn } from "@/app/login/thabaal-sign-in";
 
 export const metadata: Metadata = {
   title: "Set a new password · Thabaal (தபால்)",

@@ -28,7 +28,7 @@ import { PlanDueBar } from "./plan-due-bar";
 import { ViewOnlyBar } from "./view-only-bar";
 import { DemoWorkspaceBanner } from "@/components/demo-workspace-banner";
 import { LogOut } from "@/components/icons";
-import { logout } from "../login/actions";
+import { logout } from "@/app/login/actions";
 import { clientAccessNow } from "@/lib/plan-access";
 import { inr } from "@/lib/account-plans";
 import { livePlans } from "@/lib/plan-prices-server";

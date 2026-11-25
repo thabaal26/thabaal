@@ -30,7 +30,7 @@
         "./src/app/(portal)/admin/*"
       ],
       "@/app/login/*": [
-        "./src/app/(portal)/login/*"
+        "./src/app/(marketing)/login/*"
       ],
       "@/*": [
         "./src/*"

@@ -68,7 +68,7 @@ export async function requestDemo(_: DemoState, form: FormData): Promise<DemoSta
       maxAge: RECEIPT_TTL_SECONDS,
     });
   } catch (err) {
-    // Non-blocking in environments without active cookie store
+    console.error("[DemoConversion] Failed to set receipt cookie:", err instanceof Error ? err.message : "unknown cookie error");
   }
 
   const sendTask = async () => {

@@ -37,9 +37,9 @@ export function ConsentBanner({ lang: propLang }: { lang?: "en" | "ta" } = {}) {
     <div
       role="region"
       aria-label="Cookie consent banner"
-      className="fixed bottom-0 inset-x-0 z-50 p-4 bg-[#161b22]/95 border-t border-gray-800 backdrop-blur shadow-2xl text-white"
+      className="fixed bottom-0 inset-x-0 z-50 p-4 bg-[#161b22]/95 border-t border-gray-800 backdrop-blur shadow-2xl text-white lg:left-auto lg:right-5 lg:bottom-5 lg:max-w-md lg:rounded-2xl lg:border"
     >
-      <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="max-w-4xl mx-auto flex flex-col sm:flex-row lg:flex-col items-center lg:items-stretch justify-between gap-4 lg:gap-3">
         <div className="text-xs sm:text-sm text-gray-300 space-y-1">
           <p className="font-semibold text-white">
             {ta ? "குக்கீகள் & விளம்பர கண்காணிப்பு" : "Cookie & Marketing Preferences"}
@@ -50,18 +50,18 @@ export function ConsentBanner({ lang: propLang }: { lang?: "en" | "ta" } = {}) {
               : "Choose whether to enable Google Ads measurement and performance cookies. You can use all Thabaal services normally even if you decline."}
           </p>
         </div>
-        <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto">
+        <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto lg:w-full">
           <button
             type="button"
             onClick={() => setMarketingConsent("denied")}
-            className="flex-1 sm:flex-none px-4 py-2 text-xs sm:text-sm rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium transition border border-gray-700"
+            className="flex-1 sm:flex-none lg:flex-1 px-4 py-2 text-xs sm:text-sm rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium transition border border-gray-700"
           >
             {ta ? "நிராகரி" : "Decline"}
           </button>
           <button
             type="button"
             onClick={() => setMarketingConsent("granted")}
-            className="flex-1 sm:flex-none px-4 py-2 text-xs sm:text-sm rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition shadow-lg shadow-emerald-900/30"
+            className="flex-1 sm:flex-none lg:flex-1 px-4 py-2 text-xs sm:text-sm rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition shadow-lg shadow-emerald-900/30"
           >
             {ta ? "ஏற்கிறேன்" : "Accept"}
           </button>

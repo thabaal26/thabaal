@@ -8,7 +8,7 @@ import { db } from "@/lib/db";
 import { getSettings } from "@/lib/provider";
 import { pendingSignupCount } from "@/lib/meta-signup";
 import { CLIENT_COOKIE, VIEW_PREFIX, requireAdminPage } from "@/lib/session";
-import { logout } from "../login/actions";
+import { logout } from "@/app/login/actions";
 import "../dashboard/portal.css";
 import "./admin.css";
 import "../dashboard/design.css";

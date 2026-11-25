@@ -27,8 +27,8 @@ export default async function ThankYouPage() {
 
   return (
     <>
-      {receipt.conversionEligible && (receipt.transactionReference || receipt.conversionEventId) && (
-        <GoogleAdsConversion transactionId={receipt.transactionReference ?? receipt.conversionEventId} />
+      {receipt.conversionEligible && receipt.transactionReference && (
+        <GoogleAdsConversion transactionId={receipt.transactionReference} />
       )}
       <main className="min-h-screen bg-[#0d1117] text-white flex flex-col items-center justify-center p-4">
         <div className="max-w-md w-full bg-[#161b22] border border-gray-800 rounded-2xl p-8 shadow-2xl text-center">

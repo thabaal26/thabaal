@@ -2,7 +2,7 @@ import { jwtVerify } from "jose";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import LoginPage from "../(portal)/login/page";
+import LoginPage from "./login/page";
 
 /*
  * www.thabaal.in opens straight on sign-in. Below the form the page says what Thabaal does, and its footer links

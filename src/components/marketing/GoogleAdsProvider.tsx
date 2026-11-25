@@ -1,13 +1,37 @@
 "use client";
 
-import Script from "next/script";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { getMarketingConsent, type ConsentStatus } from "@/lib/marketing/consent";
+import {
+  computeRetryBackoffMs,
+  DISPATCH_TIMEOUT_MS,
+  IN_FLIGHT_WINDOW_MS,
+  MAX_DISPATCH_ATTEMPTS,
+  readConversionDispatchState,
+  writeConversionDispatchState,
+  type ConversionDispatchState,
+} from "@/lib/marketing/google-ads-dispatch-state";
+import {
+  ensureGoogleAdsScriptLoaded,
+  GOOGLE_ADS_CONVERSION_LABEL,
+  GOOGLE_ADS_ID,
+  GOOGLE_ADS_SCRIPT_ID,
+  initializeGoogleAdsQueue,
+  isAdsConfigValid,
+  type GoogleAdsLoaderStatus,
+  type GoogleAdsRuntime,
+} from "@/lib/marketing/google-ads-loader";
 
-// Strict configuration validation: NO production credentials as hardcoded defaults
-export const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID ?? "";
-export const GOOGLE_ADS_CONVERSION_LABEL = process.env.NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL ?? "";
-export const isAdsConfigValid = /^AW-\d+$/.test(GOOGLE_ADS_ID) && /^[A-Za-z0-9_-]+$/.test(GOOGLE_ADS_CONVERSION_LABEL);
+export {
+  ensureGoogleAdsScriptLoaded,
+  GOOGLE_ADS_CONVERSION_LABEL,
+  GOOGLE_ADS_ID,
+  GOOGLE_ADS_SCRIPT_ID,
+  initializeGoogleAdsQueue,
+  isAdsConfigValid,
+  type GoogleAdsLoaderStatus,
+  type GoogleAdsRuntime,
+};
 
 type AdsContextType = {
   ready: boolean;
@@ -29,8 +53,8 @@ export function GoogleAdsProvider({ children }: { children: ReactNode }) {
       const custom = e as CustomEvent<ConsentStatus>;
       const newStatus = custom.detail;
       setConsent(newStatus);
-      if (typeof window !== "undefined" && typeof (window as any).gtag === "function") {
-        (window as any).gtag("consent", "update", {
+      if (typeof window !== "undefined" && typeof window.gtag === "function") {
+        window.gtag("consent", "update", {
           ad_storage: newStatus === "granted" ? "granted" : "denied",
           analytics_storage: newStatus === "granted" ? "granted" : "denied",
           ad_user_data: newStatus === "granted" ? "granted" : "denied",
@@ -45,200 +69,150 @@ export function GoogleAdsProvider({ children }: { children: ReactNode }) {
   // Basic Consent Mode: Tags load ONLY when consent is granted AND configuration is valid
   const shouldLoadScripts = isAdsConfigValid && consent === "granted";
 
+  useEffect(() => {
+    if (!shouldLoadScripts) {
+      setReady(false);
+      return;
+    }
+
+    let active = true;
+    setReady(false);
+
+    try {
+      initializeGoogleAdsQueue(GOOGLE_ADS_ID);
+      ensureGoogleAdsScriptLoaded(GOOGLE_ADS_ID)
+        .then(() => {
+          if (active) setReady(true);
+        })
+        .catch((error) => {
+          if (active) setReady(false);
+          console.error(
+            "[GoogleAdsProvider] Tag loading failed:",
+            error instanceof Error ? error.message : "Unknown error",
+          );
+        });
+    } catch (error) {
+      if (active) setReady(false);
+      console.error(
+        "[GoogleAdsProvider] Queue initialization failed:",
+        error instanceof Error ? error.message : "Unknown error",
+      );
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [shouldLoadScripts]);
+
   return (
     <AdsContext.Provider value={{ ready, consent, enabled: shouldLoadScripts }}>
-      {shouldLoadScripts && (
-        <>
-          <Script
-            id="thabaal-google-ads-init"
-            strategy="afterInteractive"
-            dangerouslySetInnerHTML={{
-              __html: `
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('consent', 'default', {
-                  'ad_storage': 'denied',
-                  'analytics_storage': 'denied',
-                  'ad_user_data': 'denied',
-                  'ad_personalization': 'denied'
-                });
-                gtag('consent', 'update', {
-                  'ad_storage': 'granted',
-                  'analytics_storage': 'granted',
-                  'ad_user_data': 'granted',
-                  'ad_personalization': 'granted'
-                });
-                gtag('js', new Date());
-                gtag('config', '${GOOGLE_ADS_ID}');
-              `,
-            }}
-          />
-          <Script
-            id="thabaal-google-ads-tag"
-            strategy="afterInteractive"
-            src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ADS_ID}`}
-            onLoad={() => setReady(true)}
-          />
-        </>
-      )}
       {children}
     </AdsContext.Provider>
   );
 }
 
-interface ConversionDispatchState {
-  status: "pending" | "tag_callback_completed" | "retryable" | "max_retries_exceeded";
-  attempts: number;
-  lastAttemptTs: number;
-}
-
-const MAX_DISPATCH_ATTEMPTS = 3;
-const DISPATCH_TIMEOUT_MS = 2000; // matches Google event_timeout: 2000
-const GRACE_BUFFER_MS = 1000;
-const IN_FLIGHT_WINDOW_MS = DISPATCH_TIMEOUT_MS + GRACE_BUFFER_MS; // 3000ms
-
 // Module-scoped in-memory session cache ensuring retry-limit bound is strictly enforced
-// even in private browsing, partitioned storage, or if sessionStorage throws.
+// across the JavaScript page lifecycle, even if sessionStorage throws or contains stale data.
 const memoryFallback = new Map<string, ConversionDispatchState>();
 
 export function GoogleAdsConversion({ transactionId }: { transactionId?: string | null }) {
-  const { enabled } = useContext(AdsContext);
+  const { enabled, ready } = useContext(AdsContext);
   const [attemptTrigger, setAttemptTrigger] = useState(0);
   const inFlightRef = useRef(false);
+  const attemptGenerationRef = useRef(0);
 
   useEffect(() => {
-    if (!enabled || !transactionId) return;
+    // Wait strictly for marketing consent (`enabled`), actual script readiness (`ready`), and persisted reference.
+    if (!enabled || !ready || !transactionId) return;
     if (typeof window === "undefined") return;
 
+    const generation = ++attemptGenerationRef.current;
     const storageKey = `thabaal-ads-conv:${transactionId}`;
+    const storage = typeof window.sessionStorage !== "undefined" ? window.sessionStorage : null;
 
-    function parseState(): ConversionDispatchState | null {
-      // Step 1: Check memoryFallback FIRST.
-      // This guarantees that any updated state in memory (e.g. if setItem threw when storage quota exceeded)
-      // takes absolute precedence over older/stale sessionStorage data within the page lifecycle.
-      const inMemory = memoryFallback.get(storageKey);
-      if (inMemory) {
-        return inMemory;
-      }
+    const readState = () => readConversionDispatchState(storageKey, memoryFallback, storage);
+    const writeState = (state: ConversionDispatchState) =>
+      writeConversionDispatchState(storageKey, state, memoryFallback, storage);
 
-      try {
-        const raw = sessionStorage.getItem(storageKey);
-        if (!raw) return null;
-        if (raw.startsWith("{")) {
-          const parsed = JSON.parse(raw);
-          // Validate structure and attempt boundaries before accepting from storage
-          if (
-            typeof parsed.attempts !== "number" ||
-            !Number.isInteger(parsed.attempts) ||
-            parsed.attempts < 0 ||
-            parsed.attempts > MAX_DISPATCH_ATTEMPTS
-          ) {
-            return null;
-          }
-          memoryFallback.set(storageKey, parsed);
-          return parsed;
-        }
-        if (raw === "dispatched" || raw === "done" || raw === "tag_callback_completed") {
-          const legacy: ConversionDispatchState = { status: "tag_callback_completed", attempts: 1, lastAttemptTs: Date.now() };
-          memoryFallback.set(storageKey, legacy);
-          return legacy;
-        }
-        if (raw.startsWith("queued:")) {
-          const ts = parseInt(raw.slice(7), 10);
-          const legacy: ConversionDispatchState = { status: "pending", attempts: 1, lastAttemptTs: isNaN(ts) ? Date.now() : ts };
-          memoryFallback.set(storageKey, legacy);
-          return legacy;
-        }
-        if (raw === "retryable") {
-          const legacy: ConversionDispatchState = { status: "retryable", attempts: 1, lastAttemptTs: Date.now() };
-          memoryFallback.set(storageKey, legacy);
-          return legacy;
-        }
-        return null;
-      } catch {
-        return null;
-      }
-    }
+    const current = readState();
 
-    function saveState(state: ConversionDispatchState) {
-      try {
-        sessionStorage.setItem(storageKey, JSON.stringify(state));
-      } catch {}
-      memoryFallback.set(storageKey, state);
-    }
-
-    const current = parseState();
-
-    // 1. Terminal states: permanent suppression for this session
+    // 1. Terminal states: permanent suppression for this session / page lifecycle
     if (current?.status === "tag_callback_completed" || current?.status === "max_retries_exceeded") {
       return;
     }
 
     const currentAttempts = current?.attempts ?? 0;
     if (currentAttempts >= MAX_DISPATCH_ATTEMPTS) {
-      saveState({ status: "max_retries_exceeded", attempts: currentAttempts, lastAttemptTs: Date.now() });
+      writeState({ status: "max_retries_exceeded", attempts: currentAttempts, lastAttemptTs: Date.now() });
       return;
     }
 
-    // 2. In-flight concurrency check: if currently pending within window, do not double-dispatch
+    // 2. In-flight concurrency check: if currently pending within window, wait remaining buffer
     if (current?.status === "pending") {
       const elapsed = Date.now() - current.lastAttemptTs;
       if (elapsed < IN_FLIGHT_WINDOW_MS) {
-        // Schedule recovery timer for remaining time if not already handled
         const remaining = IN_FLIGHT_WINDOW_MS - elapsed;
-        const timer = setTimeout(() => {
+        const waitTimer = setTimeout(() => {
+          if (attemptGenerationRef.current !== generation) return;
           setAttemptTrigger((prev) => prev + 1);
         }, remaining + 100);
-        return () => clearTimeout(timer);
+        return () => {
+          if (attemptGenerationRef.current === generation) {
+            attemptGenerationRef.current += 1;
+          }
+          clearTimeout(waitTimer);
+        };
       }
-      // If elapsed >= 3000ms, past attempt expired without callback -> falls through to bounded retry
     }
 
     if (inFlightRef.current) return;
     inFlightRef.current = true;
 
     const nextAttempts = currentAttempts + 1;
-    saveState({
+    writeState({
       status: "pending",
       attempts: nextAttempts,
       lastAttemptTs: Date.now(),
     });
 
-    let recoveryTimer: NodeJS.Timeout | null = null;
-    let retryTimer: NodeJS.Timeout | null = null;
+    let recoveryTimer: ReturnType<typeof setTimeout> | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     try {
-      (window as any).dataLayer = (window as any).dataLayer || [];
-      if (typeof (window as any).gtag !== "function") {
-        (window as any).gtag = function () {
-          (window as any).dataLayer.push(arguments);
+      window.dataLayer = window.dataLayer || [];
+      if (typeof window.gtag !== "function") {
+        window.gtag = function gtag() {
+          // eslint-disable-next-line prefer-rest-params
+          window.dataLayer!.push(arguments);
         };
       }
 
-      // Schedule in-page automatic recovery timer if Google callback stalls
+      // Schedule automatic in-page recovery timer if Google callback stalls past timeout + grace buffer
       recoveryTimer = setTimeout(() => {
+        if (attemptGenerationRef.current !== generation) return;
         inFlightRef.current = false;
-        const check = parseState();
+        const check = readState();
         if (check?.status === "pending") {
           if (nextAttempts < MAX_DISPATCH_ATTEMPTS) {
-            saveState({ status: "retryable", attempts: nextAttempts, lastAttemptTs: Date.now() });
+            writeState({ status: "retryable", attempts: nextAttempts, lastAttemptTs: Date.now() });
             setAttemptTrigger((prev) => prev + 1);
           } else {
-            saveState({ status: "max_retries_exceeded", attempts: nextAttempts, lastAttemptTs: Date.now() });
+            writeState({ status: "max_retries_exceeded", attempts: nextAttempts, lastAttemptTs: Date.now() });
           }
         }
       }, IN_FLIGHT_WINDOW_MS);
 
-      (window as any).gtag("event", "conversion", {
+      window.gtag("event", "conversion", {
         send_to: `${GOOGLE_ADS_ID}/${GOOGLE_ADS_CONVERSION_LABEL}`,
         value: 1.0,
         currency: "INR",
         transaction_id: transactionId,
         event_callback: () => {
+          if (attemptGenerationRef.current !== generation) return;
           if (recoveryTimer) clearTimeout(recoveryTimer);
           if (retryTimer) clearTimeout(retryTimer);
           inFlightRef.current = false;
-          saveState({
+          writeState({
             status: "tag_callback_completed",
             attempts: nextAttempts,
             lastAttemptTs: Date.now(),
@@ -251,24 +225,29 @@ export function GoogleAdsConversion({ transactionId }: { transactionId?: string 
       if (recoveryTimer) clearTimeout(recoveryTimer);
       inFlightRef.current = false;
       const targetStatus = nextAttempts < MAX_DISPATCH_ATTEMPTS ? "retryable" : "max_retries_exceeded";
-      saveState({
+      writeState({
         status: targetStatus,
         attempts: nextAttempts,
         lastAttemptTs: Date.now(),
       });
       if (nextAttempts < MAX_DISPATCH_ATTEMPTS) {
-        const backoffMs = Math.min(1000 * Math.pow(2, nextAttempts - 1), 4000);
+        const backoffMs = computeRetryBackoffMs(nextAttempts);
         retryTimer = setTimeout(() => {
+          if (attemptGenerationRef.current !== generation) return;
           setAttemptTrigger((prev) => prev + 1);
         }, backoffMs);
       }
     }
 
     return () => {
+      if (attemptGenerationRef.current === generation) {
+        attemptGenerationRef.current += 1;
+      }
+      inFlightRef.current = false;
       if (recoveryTimer) clearTimeout(recoveryTimer);
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [enabled, transactionId, attemptTrigger]);
+  }, [enabled, ready, transactionId, attemptTrigger]);
 
   return null;
 }

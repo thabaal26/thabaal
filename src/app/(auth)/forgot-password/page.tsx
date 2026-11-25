@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { IconSetLink } from "@/components/icon-set-link";
-import { ThabaalSignIn } from "../login/thabaal-sign-in";
+import { ThabaalSignIn } from "@/app/login/thabaal-sign-in";
 
 export const metadata: Metadata = {
   title: "Forgot password · Thabaal (தபால்)",
