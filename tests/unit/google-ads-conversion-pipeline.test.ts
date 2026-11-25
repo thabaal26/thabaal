@@ -670,6 +670,22 @@ describe("Google Ads Conversion Pipeline & Zero-Leakage Boundary (Turn 48-49 Cer
     assert.ok(privacyContent.includes("AW-18580810849"));
     assert.ok(privacyContent.includes("thabaal_marketing_consent"));
     assert.ok(privacyContent.includes("Google Consent Mode v2"));
+
+    // 5. ConsentBanner renders non-overlapping in-flow on mobile and floating bottom-right on desktop + syncs with landing Tamil toggle
+    const bannerContent = fs.readFileSync(
+      path.resolve(__dirname, "../../src/components/marketing/ConsentBanner.tsx"),
+      "utf8",
+    );
+    assert.ok(bannerContent.includes("relative w-full"));
+    assert.ok(bannerContent.includes("lg:fixed lg:inset-x-auto lg:bottom-5 lg:right-5"));
+    assert.ok(bannerContent.includes("focus-visible:ring-2"));
+
+    const signInContent = fs.readFileSync(
+      path.resolve(__dirname, "../../src/app/(marketing)/login/thabaal-sign-in.tsx"),
+      "utf8",
+    );
+    assert.ok(signInContent.includes('from "@/lib/i18n/context"'));
+    assert.ok(signInContent.includes("setLanguage(next)"));
   });
 
   it("25. GoogleAdsProvider singleton loader lifecycle: idempotent queue/config, shared loading promise, error retry, and ID mismatch guard", async () => {

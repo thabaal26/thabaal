@@ -44,8 +44,8 @@ export default async function MarketingRootLayout({ children }: { children: Reac
       <body className="min-h-full font-sans" suppressHydrationWarning>
         <GoogleAdsProvider>
           <LanguageProvider initialLang={lang}>
-            {children}
             <ConsentBanner />
+            {children}
           </LanguageProvider>
         </GoogleAdsProvider>
       </body>

@@ -11,6 +11,7 @@ import type { PriceTable } from "@/lib/plan-prices";
 import { MascotIntro } from "./mascot-intro";
 import { ScrollDownPrompt } from "./scroll-prompt";
 import { SiteHeader } from "./site-header";
+import { LANG_EVENT, setLanguage } from "@/lib/i18n/context";
 import "./thabaal-login.css";
 
 function getThemeSnapshot(): "day" | "night" {
@@ -25,6 +26,15 @@ function getThemeSnapshot(): "day" | "night" {
 function subscribeTheme(callback: () => void) {
   window.addEventListener("storage", callback);
   return () => window.removeEventListener("storage", callback);
+}
+
+function subscribeLang(callback: () => void) {
+  window.addEventListener("storage", callback);
+  window.addEventListener(LANG_EVENT, callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener(LANG_EVENT, callback);
+  };
 }
 
 /** The last language picked on this device, so the sign-in page opens in it next time. */
@@ -57,7 +67,7 @@ export function ThabaalSignIn({
   const [localTheme, setLocalTheme] = useState<"day" | "night" | null>(null);
   const theme = localTheme ?? syncedTheme;
   const syncedLang = useSyncExternalStore(
-    subscribeTheme,
+    subscribeLang,
     getLangSnapshot,
     () => "en" as const,
   );
@@ -65,9 +75,7 @@ export function ThabaalSignIn({
   const lang = localLang ?? syncedLang;
   const setLang = (next: "en" | "ta") => {
     setLocalLang(next);
-    try {
-      localStorage.setItem("thabaal-lang", next);
-    } catch {}
+    setLanguage(next);
   };
 
   const isNight = theme === "night";
